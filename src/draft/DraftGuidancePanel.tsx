@@ -1,0 +1,458 @@
+import { useId } from "react";
+import {
+  ArrowDownToLine,
+  ArrowUpRight,
+  BookOpen,
+  ChevronDown,
+  Circle,
+  ClipboardList,
+  FileText,
+  Info,
+  LoaderCircle,
+  Quote,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react";
+import {
+  linuxContributionUrl,
+  type DraftPreparation,
+  type DraftProposal,
+  type DraftSource,
+} from "../../shared/drafts";
+import { MarkdownContent } from "../review/MarkdownContent";
+import "./drafts.css";
+
+interface Props {
+  preparation?: DraftPreparation;
+  busy: boolean;
+  disabled?: boolean;
+  demo?: boolean;
+  onGenerate: () => void;
+  onApply: (proposal: DraftProposal) => void;
+}
+
+const sourceKinds: Record<DraftSource["kind"], string> = {
+  contributing: "貢獻規範",
+  template: "PR 範本",
+  documentation: "專案文件",
+  maintainer: "維護者指引",
+  example: "參考案例",
+};
+
+function webLink(value?: string) {
+  try {
+    const url = new URL(value ?? "");
+    return ["https:", "http:"].includes(url.protocol) ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function DraftGuidancePanel({
+  preparation,
+  busy,
+  disabled = false,
+  demo = false,
+  onGenerate,
+  onApply,
+}: Props) {
+  const prefix = useId().replaceAll(":", "");
+  const proposal = preparation?.proposal;
+  const sources = preparation?.context?.sources ?? [];
+  const template = sources.find(
+    (source) => source.id === proposal?.templateSourceId,
+  );
+  const checkedAt = preparation?.context?.checkedAt;
+  const checkedDate = checkedAt ? new Date(checkedAt) : undefined;
+  const generating = busy || preparation?.status === "generating";
+  const ready = preparation?.status === "ready" && !!proposal;
+  const sourceAnchor = (index: number) => `draft-source-${prefix}-${index}`;
+  const statusMessage = generating
+    ? "正在閱讀貢獻規範與 PR 範本，並對照本次變更整理建議。你可以繼續編輯下方草稿。"
+    : preparation?.status === "failed"
+      ? preparation.error ||
+        "這次未能整理草稿，請稍後重試。下方編輯內容已保留。"
+      : preparation?.status === "stale"
+        ? "變更內容已更新，這份建議需要重新整理。請產生新版建議後再套用。"
+        : undefined;
+  const generateLabel = generating
+    ? "正在整理…"
+    : preparation?.status === "failed"
+      ? "重新嘗試"
+      : preparation
+        ? "重新整理建議"
+        : demo
+          ? "查看草稿建議示範"
+          : "依專案規範產生建議草稿";
+
+  return (
+    <section
+      className="draft-guidance-panel"
+      aria-labelledby={`draft-guidance-${prefix}`}
+    >
+      <header className="draft-guidance-header">
+        <span className="draft-guidance-icon" aria-hidden="true">
+          <BookOpen size={21} />
+        </span>
+        <div className="draft-guidance-heading">
+          <div className="draft-guidance-eyebrow">CONTRIBUTION GUIDE</div>
+          <h2 id={`draft-guidance-${prefix}`}>寫出維護者容易理解的 PR</h2>
+          <p>先看投稿規範與範本，再把這次貢獻整理成清楚的草稿。</p>
+        </div>
+        <div className="draft-guidance-actions">
+          {demo && (
+            <span className="draft-guidance-badge is-demo">示範資料</span>
+          )}
+          {proposal && (
+            <span
+              className={`draft-guidance-badge ${proposal.policy === "linux" ? "is-fallback" : ""}`}
+            >
+              {proposal.policy === "repository"
+                ? "依專案規範"
+                : "Linux 原則 · PR 調整版"}
+            </span>
+          )}
+          <button
+            type="button"
+            className="button secondary draft-guidance-generate"
+            onClick={onGenerate}
+            disabled={disabled || generating}
+          >
+            {generating ? (
+              <LoaderCircle className="spin" size={15} />
+            ) : preparation ? (
+              <RefreshCw size={15} />
+            ) : (
+              <Sparkles size={15} />
+            )}
+            {generateLabel}
+          </button>
+        </div>
+      </header>
+
+      {statusMessage && (
+        <div
+          className={`draft-guidance-notice ${preparation?.status === "failed" ? "is-error" : ""}`}
+          role="status"
+          aria-live="polite"
+        >
+          {generating ? (
+            <LoaderCircle className="spin" size={17} />
+          ) : (
+            <Info size={17} />
+          )}
+          <p>{statusMessage}</p>
+        </div>
+      )}
+
+      {!preparation && (
+        <div className="draft-guidance-empty">
+          <span>
+            <FileText size={16} /> 核對規範與範本
+          </span>
+          <span>
+            <Quote size={16} /> 每個建議附上依據
+          </span>
+          <span>
+            <ArrowDownToLine size={16} /> 由你選擇套用
+          </span>
+          <p>
+            {demo
+              ? "使用示範文件體驗完整流程，不會讀取或修改遠端專案。"
+              : "適用於已完成變更的任務；舊任務也可以在這裡補上草稿建議。"}
+          </p>
+        </div>
+      )}
+
+      {!!preparation?.context?.warnings.length && (
+        <div className="draft-guidance-warnings">
+          <div>
+            <Info size={16} />
+            <strong>閱讀範圍與待確認事項</strong>
+          </div>
+          <ul>
+            {preparation.context.warnings.map((warning, index) => (
+              <li key={index}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {proposal && (
+        <>
+          <p className="draft-guidance-summary">{proposal.summary}</p>
+          <div className="draft-guidance-columns">
+            <div className="draft-guidance-rules">
+              <h3>
+                <Quote size={16} />{" "}
+                {proposal.policy === "linux" && !proposal.rules.length
+                  ? "預設寫作原則"
+                  : "這份草稿的撰寫依據"}
+              </h3>
+              {proposal.rules.length ? (
+                <ol>
+                  {proposal.rules.map((rule, index) => {
+                    const sourceIndex = sources.findIndex(
+                      (source) => source.id === rule.sourceId,
+                    );
+                    const source = sources[sourceIndex];
+                    const url = webLink(source?.url);
+                    return (
+                      <li key={`${rule.sourceId}-${index}`}>
+                        <span
+                          className="draft-guidance-number"
+                          aria-hidden="true"
+                        >
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <div>
+                          <p>{rule.text}</p>
+                          {source ? (
+                            <a
+                              className="draft-guidance-source-link"
+                              href={url ?? `#${sourceAnchor(sourceIndex)}`}
+                              {...(url
+                                ? {
+                                    target: "_blank",
+                                    rel: "noopener noreferrer",
+                                  }
+                                : {})}
+                            >
+                              <FileText size={12} />
+                              {source.label}
+                              {url && <ArrowUpRight size={12} />}
+                            </a>
+                          ) : (
+                            <span className="draft-guidance-source-missing">
+                              未附可核對的來源
+                            </span>
+                          )}
+                          <details className="draft-guidance-quote">
+                            <summary>
+                              <ChevronDown size={13} /> 查看原文依據
+                            </summary>
+                            <blockquote>{rule.quote}</blockquote>
+                          </details>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : proposal.policy === "linux" ? (
+                <ol>
+                  {[
+                    "具體簡潔的標題，直接說明變更。",
+                    "交代問題與對使用者的影響。",
+                    "說明修改理由、設計取捨與限制。",
+                    "如實記錄驗證結果與未完成事項。",
+                  ].map((principle, index) => (
+                    <li key={principle}>
+                      <span
+                        className="draft-guidance-number"
+                        aria-hidden="true"
+                      >
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <p>{principle}</p>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="draft-guidance-template-note">
+                  {template ? (
+                    <>
+                      依照「<strong>{template.label}</strong>
+                      」整理段落。此範本未附額外寫作規範，請核對每個段落是否符合本次變更。
+                    </>
+                  ) : (
+                    "未附額外寫作規範，請對照來源文件確認草稿段落。"
+                  )}
+                </p>
+              )}
+            </div>
+            <div className="draft-guidance-checks">
+              <h3>
+                <ClipboardList size={16} /> 送出前由你確認
+              </h3>
+              <p>以下是核對提醒，尚未代表完成檢查。</p>
+              <ul>
+                {proposal.checklist.map((item, index) => (
+                  <li key={index}>
+                    <Circle size={14} aria-hidden="true" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <details className="draft-guidance-proposal">
+            <summary>
+              <span className="draft-guidance-proposal-label">
+                <FileText size={17} />
+                <span>
+                  <strong>預覽建議草稿</strong>
+                  <small>{proposal.title}</small>
+                </span>
+              </span>
+              <ChevronDown size={17} />
+            </summary>
+            <div className="draft-guidance-proposal-content">
+              <h3>{proposal.title}</h3>
+              <MarkdownContent>{proposal.body}</MarkdownContent>
+            </div>
+          </details>
+          <div className="draft-guidance-apply">
+            <p>套用後仍可編輯，儲存後才更新草稿。</p>
+            <button
+              type="button"
+              className="button primary"
+              onClick={() => onApply(proposal)}
+              disabled={disabled || generating || !ready}
+            >
+              <ArrowDownToLine size={15} /> 套用建議草稿
+            </button>
+          </div>
+        </>
+      )}
+
+      {!demo && preparation?.context && (
+        <div className="draft-guidance-source-meta">
+          <span>
+            基準版本 <code>{preparation.context.baseSha.slice(0, 7)}</code>
+          </span>
+          {checkedDate && !Number.isNaN(checkedDate.getTime()) && (
+            <span>
+              查閱{" "}
+              <time dateTime={checkedAt} title="台北時間">
+                {checkedDate.toLocaleString("zh-TW", {
+                  timeZone: "Asia/Taipei",
+                  year: "numeric",
+                  month: "2-digit",
+                  day: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                })}
+              </time>
+            </span>
+          )}
+        </div>
+      )}
+
+      {!!sources.length && (
+        <details className="draft-guidance-sources">
+          <summary>
+            <FileText size={15} />
+            <span>
+              查閱來源文件 <small>{sources.length} 份</small>
+            </span>
+            <ChevronDown size={15} />
+          </summary>
+          <div className="draft-guidance-source-list">
+            {sources.map((source, index) => {
+              const url = webLink(source.url);
+              return (
+                <details key={source.id} id={sourceAnchor(index)}>
+                  <summary>
+                    <span>
+                      {source.label}
+                      <small>{source.path ?? sourceKinds[source.kind]}</small>
+                    </span>
+                    <span className="draft-guidance-source-kind">
+                      {source.id === proposal?.templateSourceId
+                        ? "本次採用範本"
+                        : sourceKinds[source.kind]}
+                    </span>
+                    <ChevronDown size={14} />
+                  </summary>
+                  <div className="draft-guidance-source-content">
+                    {url && (
+                      <a href={url} target="_blank" rel="noopener noreferrer">
+                        開啟來源文件 <ArrowUpRight size={13} />
+                      </a>
+                    )}
+                    <pre tabIndex={0} aria-label={`${source.label}原文`}>
+                      {source.content}
+                    </pre>
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        </details>
+      )}
+
+      {proposal?.policy === "linux" && (
+        <p className="draft-guidance-linux">
+          以{" "}
+          <a
+            href={linuxContributionUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Linux 官方提交指引 <ArrowUpRight size={12} />
+          </a>{" "}
+          中的動機、變更與驗證原則作為備用依據，調整成 GitHub PR
+          格式。Signed-off-by 等簽署資訊需由本人確認，不會自動填入。
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** Synthetic content for the local demo; none of these rules are attributed to a real repository. */
+export const demoDraftPreparation: DraftPreparation = {
+  status: "ready",
+  fingerprint: "demo-draft-guidance",
+  context: {
+    checkedAt: "2026-10-03T00:00:00.000Z",
+    baseSha: "demo",
+    warnings: [
+      "這是介面示範，來源文件、規範與草稿均為示範資料，未讀取任何實際專案。",
+    ],
+    sources: [
+      {
+        id: "demo-contributing",
+        kind: "contributing",
+        label: "貢獻規範（示範）",
+        path: "CONTRIBUTING.md",
+        content:
+          "# 示範貢獻規範\n\n標題應直接描述使用者會得到的改善。\n\n測試段落應區分已執行的檢查與仍需驗證的項目。",
+      },
+      {
+        id: "demo-template",
+        kind: "template",
+        label: "PR 範本（示範）",
+        path: ".github/PULL_REQUEST_TEMPLATE.md",
+        content:
+          "## 修改動機\n\n## 變更內容\n\n## 驗證與限制\n\n請區分已執行的檢查與待驗證項目。",
+      },
+    ],
+  },
+  proposal: {
+    title: "改善讀取請求遇到暫時失敗時的恢復方式",
+    policy: "repository",
+    summary:
+      "這份示範沿用專案範本，先交代使用者遇到的問題，再說明重試範圍與需要確認的限制。",
+    templateSourceId: "demo-template",
+    body: "## 修改動機\n\n當讀取請求遇到暫時性網路問題時，使用者需要重新操作才能繼續。此示範說明如何讓符合條件的讀取請求有機會自動恢復。\n\n## 變更內容\n\n- 限定可重試的請求與錯誤種類。\n- 加上等待時間與重試次數上限。\n- 保留最終失敗時的錯誤訊息。\n\n## 驗證與限制\n\n這是草稿介面示範，**尚未執行任何測試**。送出前需確認：\n\n- 暫時失敗後成功的情境。\n- 超過重試上限時仍正確回報錯誤。\n- 不適合重試的寫入操作不會重複送出。",
+    rules: [
+      {
+        text: "標題直接說明這次貢獻帶來的改善。",
+        sourceId: "demo-contributing",
+        quote: "標題應直接描述使用者會得到的改善。",
+      },
+      {
+        text: "把驗證狀況與限制放進範本，避免把待測項目寫成已通過。",
+        sourceId: "demo-template",
+        quote: "請區分已執行的檢查與待驗證項目。",
+      },
+    ],
+    checklist: [
+      "確認範本各段落與實際 diff 一致。",
+      "填入真正執行過的測試指令與結果。",
+      "核對重試上限及不應重試的操作範圍。",
+    ],
+  },
+};

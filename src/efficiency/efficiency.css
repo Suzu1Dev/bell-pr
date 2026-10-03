@@ -1,0 +1,75 @@
+.efficiency-summary {
+  min-width: 0;
+  padding: 15px 18px;
+  border: 1px solid #dfe7d9;
+  border-radius: 9px;
+  background: #f8faf5;
+  color: #344d31;
+}
+.efficiency-heading,
+.efficiency-heading > span,
+.efficiency-heading > a {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.efficiency-heading {
+  flex-wrap: wrap;
+  gap: 9px;
+  font-size: 13px;
+}
+.efficiency-heading strong {
+  font-weight: 550;
+}
+.efficiency-heading .efficiency-mode {
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: #e9f0e1;
+  font-size: 12px;
+}
+.efficiency-heading > a {
+  margin-left: auto;
+  color: #526c43;
+  font-size: 12px;
+  text-decoration: none;
+}
+.efficiency-heading > a:hover {
+  text-decoration: underline;
+}
+.efficiency-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0 0;
+}
+.efficiency-metrics dt {
+  color: #607155;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.efficiency-metrics dd {
+  margin: 4px 0 0;
+  font: 500 16px/1.5 var(--mono, monospace);
+  overflow-wrap: anywhere;
+}
+.efficiency-summary .efficiency-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #627258;
+}
+.mission-project-card > .efficiency-summary {
+  margin-top: 16px;
+  background: #ffffff85;
+}
+@media (max-width: 560px) {
+  .efficiency-summary {
+    padding: 14px;
+  }
+  .efficiency-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .efficiency-heading > a {
+    margin-left: 0;
+  }
+}

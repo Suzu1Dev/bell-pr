@@ -1,0 +1,46 @@
+.model-summary {
+  padding: 15px 18px;
+  border: 1px solid #dde6dc;
+  border-radius: 9px;
+  background: #f8faf5;
+  color: #35533e;
+  min-width: 0;
+}
+.model-summary-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.model-summary dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 35px;
+  margin: 12px 0 0;
+}
+.model-summary dl > div {
+  min-width: 0;
+}
+.model-summary dt {
+  color: #6f7c68;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.model-summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-weight: 550;
+}
+.model-summary p {
+  color: #718067;
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 8px 0 0;
+}
+.mission-project-card > .model-summary {
+  margin-top: 16px;
+}
+.team-board > .model-summary {
+  margin: 22px 0 16px;
+}

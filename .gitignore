@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.bellpr/
+.env
+.env.*
+!.env.example
+output/
+.playwright-cli/
+.DS_Store

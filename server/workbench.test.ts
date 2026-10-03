@@ -1,0 +1,664 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, writeFile, rm, mkdir } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { once } from "node:events";
+import { request } from "node:http";
+import { command, git, redact } from "./process.js";
+import {
+  parseGitHubSource,
+  readDiff,
+  reviewFingerprint,
+  synchronizeReview,
+  sensitivePath,
+} from "./git.js";
+import { Store } from "./store.js";
+import { Workbench } from "./workbench.js";
+import { createApp } from "./index.js";
+import { AppError, type Run } from "./types.js";
+import { defaultContributionSettings } from "../shared/insights.js";
+
+async function http(
+  url: string,
+  options: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+  } = {},
+) {
+  return new Promise<{ status: number; json: () => any }>((resolve, reject) => {
+    const req = request(
+      url,
+      { method: options.method, headers: options.headers },
+      (response) => {
+        let body = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => {
+          body += chunk;
+        });
+        response.on("end", () =>
+          resolve({
+            status: response.statusCode!,
+            json: () => JSON.parse(body),
+          }),
+        );
+      },
+    );
+    req.on("error", reject);
+    req.end(options.body);
+  });
+}
+
+async function fixture() {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-pr-test-"));
+  const repository = path.join(directory, "repo");
+  await mkdir(repository);
+  await git(repository, ["init", "-b", "main"]);
+  await git(repository, ["config", "user.name", "BELL Test"]);
+  await git(repository, ["config", "user.email", "test@example.invalid"]);
+  await writeFile(
+    path.join(repository, "hello.ts"),
+    'export const hello = "before";\n',
+  );
+  await writeFile(
+    path.join(repository, "[id].ts"),
+    "export const literal = 1;\n",
+  );
+  await writeFile(path.join(repository, "i.ts"), "export const other = 1;\n");
+  await git(repository, ["add", "--", "hello.ts", "[id].ts", "i.ts"]);
+  await git(repository, ["commit", "-m", "initial"]);
+  const baseSha = (await git(repository, ["rev-parse", "HEAD"])).stdout.trim();
+  const store = new Store(path.join(directory, "state"));
+  await store.initialize();
+  const workbench = new Workbench(store);
+  const repo = await workbench.importRepository(repository);
+  const run: Run = {
+    id: "test-run",
+    repoId: repo.id,
+    title: "Improve greeting",
+    prompt: "Improve greeting",
+    status: "review",
+    branch: "main",
+    baseBranch: "main",
+    baseSha,
+    worktreePath: repository,
+    createdAt: new Date().toISOString(),
+    agents: [],
+    logs: [],
+    draft: {
+      title: "Improve greeting",
+      body: "A tested greeting improvement.",
+    },
+    reviewedFiles: [],
+    reviewedFingerprints: {},
+  };
+  store.data.runs.push(run);
+  return {
+    directory,
+    repository,
+    baseSha,
+    run,
+    store,
+    workbench,
+    cleanup: () => rm(directory, { recursive: true, force: true }),
+  };
+}
+
+test("GitHub sources are normalized and remote option-like inputs rejected", () => {
+  assert.equal(
+    parseGitHubSource("https://github.com/openai/codex.git")?.fullName,
+    "openai/codex",
+  );
+  assert.equal(
+    parseGitHubSource("git@github.com:openai/codex.git")?.url,
+    "https://github.com/openai/codex",
+  );
+  assert.equal(
+    parseGitHubSource("https://github.com/openai/codex/extra"),
+    null,
+  );
+  assert.equal(
+    parseGitHubSource("https://user:password@github.com/openai/codex"),
+    null,
+  );
+  assert.equal(parseGitHubSource("--config=whatever"), null);
+  assert.equal(parseGitHubSource("https://example.com/openai/codex"), null);
+});
+
+test("real Git diffs include tracked, added and literal bracket paths, with stable staged patches", async () => {
+  const f = await fixture();
+  try {
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    await writeFile(
+      path.join(f.repository, "new file.ts"),
+      "export const added = true;\n",
+    );
+    await writeFile(
+      path.join(f.repository, "[id].ts"),
+      "export const literal = 2;\n",
+    );
+    await writeFile(
+      path.join(f.repository, "i.ts"),
+      "export const other = 2;\n",
+    );
+    const files = await readDiff(f.run);
+    assert.equal(files.length, 4);
+    assert.equal(
+      files.find((file) => file.path === "new file.ts")?.status,
+      "added",
+    );
+    const bracket = files.find((file) => file.path === "[id].ts")!;
+    assert.match(bracket.patch, /literal = 2/);
+    assert.doesNotMatch(bracket.patch, /other = 2/);
+    assert.equal(bracket.hunks.length, 1);
+    assert.equal(bracket.additions, 1);
+    await git(f.repository, [
+      "--literal-pathspecs",
+      "add",
+      "--",
+      ...files.map((file) => file.path),
+    ]);
+    const staged = await readDiff(f.run);
+    assert.deepEqual(
+      staged.map((file) => file.fingerprint),
+      files.map((file) => file.fingerprint),
+    );
+    for (const file of files) {
+      const patch = (
+        await git(f.repository, [
+          "--literal-pathspecs",
+          "diff",
+          "--cached",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--no-renames",
+          f.baseSha,
+          "--",
+          file.path,
+        ])
+      ).stdout;
+      assert.equal(patch, file.patch);
+    }
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("approval requires current per-file reviews and is invalidated by later edits", async () => {
+  const f = await fixture();
+  try {
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    await assert.rejects(
+      f.workbench.approve(f.run.id, { ...f.run.draft }),
+      /審閱所有/,
+    );
+    await f.workbench.review(
+      f.run.id,
+      "hello.ts",
+      true,
+      (await readDiff(f.run))[0].fingerprint,
+    );
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    assert.equal(f.run.status, "approved");
+    const approved = f.run.approvedFingerprint;
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "changed again";\n',
+    );
+    await f.workbench.diff(f.run.id);
+    assert.equal(f.run.status, "review");
+    assert.equal(f.run.approvedFingerprint, undefined);
+    assert.deepEqual(f.run.reviewedFiles, []);
+    assert.notEqual(
+      reviewFingerprint(await readDiff(f.run), f.run.draft),
+      approved,
+    );
+    await assert.rejects(f.workbench.publish(f.run.id, approved!), /核准/);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("draft changes clear approval while preserving unchanged file reviews", async () => {
+  const f = await fixture();
+  try {
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    await f.workbench.review(
+      f.run.id,
+      "hello.ts",
+      true,
+      (await readDiff(f.run))[0].fingerprint,
+    );
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    await f.workbench.draft(f.run.id, {
+      title: "Edited title",
+      body: "Updated body",
+    });
+    assert.equal(f.run.status, "review");
+    assert.equal(f.run.approvedFingerprint, undefined);
+    assert.deepEqual(f.run.reviewedFiles, ["hello.ts"]);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("review rejects a changed file when the user submits the fingerprint of an older displayed diff", async () => {
+  const f = await fixture();
+  try {
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "displayed version";\n',
+    );
+    const displayedFile = (await f.workbench.diff(f.run.id))[0];
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "unseen newer version";\n',
+    );
+    await assert.rejects(
+      f.workbench.review(
+        f.run.id,
+        displayedFile.path,
+        true,
+        displayedFile.fingerprint,
+      ),
+      (error) =>
+        error instanceof AppError &&
+        error.statusCode === 409 &&
+        /重新載入/.test(error.message),
+    );
+    assert.deepEqual(f.run.reviewedFiles, []);
+    assert.equal(f.run.reviewedFingerprints[displayedFile.path], undefined);
+    const reloadedFile = (await f.workbench.diff(f.run.id))[0];
+    await f.workbench.review(
+      f.run.id,
+      reloadedFile.path,
+      true,
+      reloadedFile.fingerprint,
+    );
+    assert.equal(
+      f.run.reviewedFingerprints[reloadedFile.path],
+      reloadedFile.fingerprint,
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("approval rejects an unseen draft and publish rejects an older approved preview", async () => {
+  const f = await fixture();
+  try {
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    const file = (await f.workbench.diff(f.run.id))[0];
+    await f.workbench.review(f.run.id, file.path, true, file.fingerprint);
+    const displayedDraft = { ...f.run.draft };
+    await f.workbench.approve(f.run.id, displayedDraft);
+    const previousApproval = f.run.approvedFingerprint!;
+    await f.workbench.draft(f.run.id, {
+      title: "Changed in another tab",
+      body: "New draft content.",
+    });
+    await assert.rejects(
+      f.workbench.approve(f.run.id, displayedDraft),
+      (error) =>
+        error instanceof AppError &&
+        error.statusCode === 409 &&
+        /草稿已更新/.test(error.message),
+    );
+    assert.equal(f.run.status, "review");
+    assert.equal(f.run.approvedFingerprint, undefined);
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    assert.notEqual(f.run.approvedFingerprint, previousApproval);
+    await assert.rejects(
+      f.workbench.publish(f.run.id, previousApproval),
+      (error) =>
+        error instanceof AppError &&
+        error.statusCode === 409 &&
+        /核准版本已更新/.test(error.message),
+    );
+    assert.equal(f.run.publishCommit, undefined);
+    assert.equal(f.run.publishing, undefined);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("sensitive files and credential-like diff content are blocked and hidden", async () => {
+  const f = await fixture();
+  try {
+    assert.equal(sensitivePath(".env"), true);
+    assert.equal(sensitivePath(".env.local"), true);
+    assert.equal(sensitivePath(".env.example"), false);
+    await writeFile(path.join(f.repository, ".env"), "PASSWORD=private-value");
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const key = "' + "ghp_" + "a".repeat(36) + '";\n',
+    );
+    const files = await readDiff(f.run);
+    assert.equal(files.length, 2);
+    assert.ok(files.every((file) => file.blocked));
+    assert.ok(
+      files.every(
+        (file) =>
+          !file.patch.includes("private-value") &&
+          !file.patch.includes("a".repeat(36)),
+      ),
+    );
+    await assert.rejects(
+      f.workbench.review(
+        f.run.id,
+        ".env",
+        true,
+        files.find((file) => file.path === ".env")!.fingerprint,
+      ),
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("store preserves state and marks interrupted work as failed on restart", async () => {
+  const f = await fixture();
+  try {
+    f.run.status = "running";
+    await f.store.save();
+    const reopened = new Store(f.store.directory);
+    await reopened.initialize();
+    assert.equal(reopened.data.repos.length, 1);
+    assert.equal(reopened.data.runs[0].status, "failed");
+    assert.match(reopened.data.runs[0].error!, /中斷/);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("process output is bounded and cancellation terminates a running command", async () => {
+  await assert.rejects(
+    command(
+      process.execPath,
+      ["-e", 'process.stdout.write("x".repeat(4096))'],
+      { maxBytes: 64 },
+    ),
+    /輸出超過/,
+  );
+  const controller = new AbortController();
+  const running = command(
+    process.execPath,
+    ["-e", "setInterval(() => {}, 1000)"],
+    { signal: controller.signal },
+  );
+  setTimeout(() => controller.abort(), 50);
+  await assert.rejects(running, /取消/);
+  assert.equal(redact("ghp_" + "a".repeat(36)), "[REDACTED]");
+});
+
+test("HTTP API restricts localhost origins, requires JSON mutations, and validates input", async () => {
+  const f = await fixture();
+  const app = createApp(f.workbench, {
+    staticDirectory: path.join(f.directory, "missing"),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing server port");
+  const url = `http://127.0.0.1:${address.port}`;
+  const local = { host: "127.0.0.1:4311" };
+  try {
+    const good = await http(`${url}/api/repos`, { headers: local });
+    assert.equal(good.status, 200);
+    assert.equal(((await good.json()) as { repos: unknown[] }).repos.length, 1);
+    const badHost = await http(`${url}/api/repos`, {
+      headers: { host: "invalid.example:4311" },
+    });
+    assert.equal(badHost.status, 403);
+    const crossSite = await http(`${url}/api/repos`, {
+      headers: { ...local, origin: "https://invalid.example" },
+    });
+    assert.equal(crossSite.status, 403);
+    const plain = await http(`${url}/api/repos`, {
+      method: "POST",
+      headers: local,
+      body: "text",
+    });
+    assert.equal(plain.status, 415);
+    const invalid = await http(`${url}/api/repos`, {
+      method: "POST",
+      headers: { ...local, "content-type": "application/json" },
+      body: "{}",
+    });
+    assert.equal(invalid.status, 400);
+    const absent = await http(`${url}/api/runs/missing`, { headers: local });
+    assert.equal(absent.status, 404);
+    for (const [endpoint, body] of [
+      ["review", { filePath: "hello.ts", reviewed: true }],
+      ["approve", {}],
+      ["publish", {}],
+      ["explanations", { retry: "yes" }],
+      ["draft/prepare", { refresh: "yes" }],
+      ["draft/prepare", { automatic: true }],
+    ] as const) {
+      const missingSnapshot = await http(
+        `${url}/api/runs/${f.run.id}/${endpoint}`,
+        {
+          method: "POST",
+          headers: { ...local, "content-type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      assert.equal(missingSnapshot.status, 400);
+    }
+    const explanations = await http(
+      `${url}/api/runs/${f.run.id}/explanations`,
+      {
+        method: "POST",
+        headers: { ...local, "content-type": "application/json" },
+        body: "{}",
+      },
+    );
+    assert.equal(explanations.status, 200);
+    assert.deepEqual(explanations.json().files, []);
+    assert.equal(explanations.json().run.id, f.run.id);
+    const unknownExplanation = await http(
+      `${url}/api/runs/${f.run.id}/explanations`,
+      {
+        method: "POST",
+        headers: { ...local, "content-type": "application/json" },
+        body: JSON.stringify({ retry: true, filePath: "missing.ts" }),
+      },
+    );
+    assert.equal(unknownExplanation.status, 404);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await f.cleanup();
+  }
+});
+
+test("deleted file reviews are removed from the review map", () => {
+  const run = {
+    reviewedFingerprints: { "old.ts": "stale" },
+    reviewedFiles: ["old.ts"],
+    status: "review" as const,
+    draft: { title: "Title", body: "Body" },
+  };
+  synchronizeReview(run, []);
+  assert.deepEqual(run.reviewedFiles, []);
+});
+
+test("publish retry reuses the reviewed commit after a successful push and failed PR creation", async () => {
+  const f = await fixture();
+  const previousPath = process.env.PATH;
+  try {
+    const realGit = (await command("which", ["git"])).stdout.trim();
+    const bin = path.join(f.directory, "bin");
+    await mkdir(bin);
+    const marker = path.join(f.directory, "pr-attempted");
+    // These local stand-ins intercept every remote operation. No network, agent, or real PR is used.
+    await writeFile(
+      path.join(bin, "git"),
+      `#!/usr/bin/env node
+const { spawnSync } = require('node:child_process');
+const args = process.argv.slice(2);
+if (args.includes('push')) process.exit(0);
+if (args.includes('fetch') || args.includes('clone') || args.includes('ls-remote')) process.exit(98);
+const result = spawnSync(${JSON.stringify(realGit)}, args, { stdio: 'inherit', env: process.env });
+process.exit(result.status ?? 1);
+`,
+      { mode: 0o700 },
+    );
+    await writeFile(
+      path.join(bin, "gh"),
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+if (args[0] === 'api' && args[1] === 'user') console.log('test-owner');
+else if (args[0] === 'api') console.log(${JSON.stringify(f.baseSha)});
+else if (args[0] === 'repo' && args[1] === 'view') console.log(JSON.stringify({viewerPermission:'WRITE',defaultBranchRef:{name:'main'}}));
+else if (args[0] === 'pr' && args[1] === 'list') console.log('[]');
+else if (args[0] === 'pr' && args[1] === 'create') {
+  if (!fs.existsSync(${JSON.stringify(marker)})) { fs.writeFileSync(${JSON.stringify(marker)}, '1'); console.error('simulated PR creation failure'); process.exit(1); }
+  console.log('https://github.com/test-owner/example/pull/1');
+} else process.exit(97);
+`,
+      { mode: 0o700 },
+    );
+    const repo = f.workbench.repo(f.run.repoId);
+    repo.url = "https://github.com/test-owner/example";
+    repo.fullName = "test-owner/example";
+    repo.owner = "test-owner";
+    repo.name = "example";
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    await f.workbench.review(
+      f.run.id,
+      "hello.ts",
+      true,
+      (await readDiff(f.run))[0].fingerprint,
+    );
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
+    const displayedFingerprint = f.run.approvedFingerprint!;
+    await assert.rejects(
+      f.workbench.publish(f.run.id, displayedFingerprint),
+      /simulated PR creation failure/,
+    );
+    const firstCommit = f.run.publishCommit;
+    assert.ok(firstCommit);
+    assert.equal(f.run.status, "approved");
+    assert.equal(f.run.publishing, false);
+    const published = await f.workbench.publish(f.run.id, displayedFingerprint);
+    assert.equal(published.status, "published");
+    assert.equal(published.publishCommit, firstCommit);
+    assert.equal(
+      published.prUrl,
+      "https://github.com/test-owner/example/pull/1",
+    );
+    assert.equal(
+      (await git(f.repository, ["rev-parse", "HEAD^"])).stdout.trim(),
+      f.baseSha,
+    );
+  } finally {
+    process.env.PATH = previousPath;
+    await f.cleanup();
+  }
+});
+
+test("model API exposes available choices, persists settings and rejects unavailable model/effort combinations", async () => {
+  const f = await fixture();
+  f.workbench.models = async () => ({
+    source: "codex",
+    models: [
+      {
+        id: "test-model",
+        name: "Test model",
+        description: "Test only",
+        isDefault: true,
+        reasoningEfforts: ["low", "high"],
+        defaultReasoningEffort: "low",
+      },
+    ],
+  });
+  const app = createApp(f.workbench, {
+    staticDirectory: path.join(f.directory, "missing"),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address() as { port: number };
+  const url = `http://127.0.0.1:${address.port}`;
+  const headers = {
+    host: "127.0.0.1:4311",
+    "content-type": "application/json",
+  };
+  const repoId = f.store.data.repos[0].id;
+  const settings = {
+    ...defaultContributionSettings,
+    model: "test-model",
+    reasoningEffort: "high",
+  };
+  try {
+    const catalog = await http(`${url}/api/models`, { headers });
+    assert.equal(catalog.status, 200);
+    assert.deepEqual(catalog.json(), await f.workbench.models());
+    const saved = await http(`${url}/api/repos/${repoId}/settings`, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify(settings),
+    });
+    assert.equal(saved.status, 200);
+    assert.deepEqual(saved.json().settings, settings);
+    const read = await http(`${url}/api/repos/${repoId}/settings`, { headers });
+    assert.deepEqual(read.json().settings, settings);
+    for (const invalid of [
+      { ...settings, model: "unknown" },
+      { ...settings, reasoningEffort: "ultra" },
+    ]) {
+      const updated = await http(`${url}/api/repos/${repoId}/settings`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(invalid),
+      });
+      assert.equal(updated.status, 400);
+      const run = await http(`${url}/api/runs`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          repoId,
+          prompt: "Improve greeting output",
+          settings: invalid,
+        }),
+      });
+      assert.equal(run.status, 400);
+    }
+    assert.deepEqual(
+      (await http(`${url}/api/repos/${repoId}/settings`, { headers })).json()
+        .settings,
+      settings,
+    );
+    assert.equal(f.store.data.runs.length, 1);
+    assert.equal(
+      f.run.modelExecution,
+      undefined,
+      "historic runs must not be relabeled with today's model",
+    );
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await app.locals.insights.shutdown();
+    await f.cleanup();
+  }
+});
