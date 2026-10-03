@@ -1448,6 +1448,64 @@ button {
   margin-top: 13px;
   line-height: 1.7;
 }
+.discovery-entry {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 22px 24px;
+  margin-bottom: 24px;
+  text-align: left;
+  border: 1px solid #cfe3da;
+  border-radius: 14px;
+  background: #eef6f1;
+  color: #244b3c;
+  cursor: pointer;
+}
+.discovery-entry:hover {
+  background: #e4f1e9;
+}
+.discovery-entry-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: #fff;
+}
+.discovery-entry strong {
+  display: block;
+  font-size: 15px;
+}
+.discovery-entry small {
+  display: block;
+  margin-top: 6px;
+  line-height: 1.6;
+  color: #63736a;
+}
+.discovery-entry-action {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .discovery-entry {
+    flex-wrap: wrap;
+    padding: 18px;
+  }
+  .discovery-entry-action {
+    margin-left: 62px;
+  }
+  .discovery-entry > span:nth-child(2) {
+    flex: 1;
+    min-width: 160px;
+  }
+}
 .repository-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

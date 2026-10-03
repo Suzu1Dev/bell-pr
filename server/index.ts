@@ -14,6 +14,7 @@ import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
 import { AppError } from "./types.js";
 import { redact } from "./process.js";
+import { DiscoveryService } from "./discovery.js";
 
 export function localhostGuard(ports: number[]): RequestHandler {
   const allowedHosts = new Set(
@@ -66,8 +67,12 @@ export function createApp(
   const insights = new ProjectInsightsService(workbench.store, {
     getModelCatalog: () => workbench.models(),
   });
+  const discovery = new DiscoveryService(workbench.store, {
+    getModelCatalog: () => workbench.models(),
+  });
   const app = express();
   app.locals.insights = insights;
+  app.locals.discovery = discovery;
   app.disable("x-powered-by");
   app.use(localhostGuard([port, frontendPort]));
   app.use(express.json({ limit: "160kb", strict: true }));
@@ -76,6 +81,15 @@ export function createApp(
   });
   app.get("/api/models", async (_req, res) => {
     res.json(await workbench.models());
+  });
+  app.get("/api/discovery", async (_req, res) => {
+    res.json(await discovery.get());
+  });
+  app.post("/api/discovery", async (req, res) => {
+    res.status(202).json(await discovery.start(req.body));
+  });
+  app.post("/api/discovery/cancel", async (_req, res) => {
+    res.json(await discovery.cancel());
   });
   app.get("/api/repos", (_req, res) => {
     res.json({ repos: workbench.store.data.repos });
@@ -281,6 +295,7 @@ async function main() {
     const stopped = Promise.all([
       workbench.shutdown(),
       app.locals.insights.shutdown(),
+      app.locals.discovery.shutdown(),
     ]);
     server.close(() => {
       void stopped.finally(() => process.exit(0));
