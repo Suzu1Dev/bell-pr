@@ -14,6 +14,7 @@ export function redact(text: string): string {
     );
 }
 
+/** ANTHROPIC_API_KEY is deliberately excluded so Claude Code uses the signed-in subscription, not API billing. */
 export function agentEnvironment(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const key of [
@@ -28,6 +29,8 @@ export function agentEnvironment(): NodeJS.ProcessEnv {
     "CODEX_HOME",
     "OPENAI_API_KEY",
     "CODEX_API_KEY",
+    "CLAUDE_CONFIG_DIR",
+    "CLAUDE_CODE_OAUTH_TOKEN",
   ]) {
     if (process.env[key]) env[key] = process.env[key];
   }

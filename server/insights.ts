@@ -27,8 +27,13 @@ import { Store } from "./store.js";
 import { AppError, type Repository } from "./types.js";
 import { defaultPonytailMode, ponytailModes } from "../shared/efficiency.js";
 import {
+  agentCommand,
+  agentEventReader,
+  agentLabel,
+  agentLoginCheck,
+} from "./agent-cli.js";
+import {
   getModelCatalog,
-  modelArguments,
   modelExecutionSchema,
   modelSettingsSchema,
   resolveModelExecution,
@@ -388,7 +393,10 @@ export class ProjectInsightsService {
     this.repository(repoId);
     const settings = contributionSettingsSchema.parse(input);
     if (settings.model || settings.reasoningEffort)
-      resolveModelExecution(settings, await this.modelCatalog());
+      resolveModelExecution(
+        settings,
+        await this.modelCatalog(settings.provider),
+      );
     await this.update(repoId, (cache) => {
       cache.settings = settings;
     });
@@ -638,9 +646,11 @@ export class ProjectInsightsService {
             maxProjectRecommendations - previous.insights!.recommendations.length,
           )
         : projectRecommendationBatchSize;
+      const settings = await this.getSettings(repoId);
+      const login = agentLoginCheck(settings.provider);
       try {
-        await this.execute("codex", ["login", "status"], {
-          timeoutMs: 5000,
+        await this.execute(login.executable, login.args, {
+          timeoutMs: 10_000,
           maxBytes: 20_000,
           env: agentEnvironment(),
           signal,
@@ -648,16 +658,15 @@ export class ProjectInsightsService {
       } catch {
         this.assertActive(signal);
         throw new AppError(
-          "無法使用 Codex：請確認已安裝 CLI 並執行 codex login。",
+          `無法使用 ${agentLabel(settings.provider)}：請確認已安裝 CLI 並執行 ${login.executable === "claude" ? "claude auth login" : "codex login"}。`,
           503,
         );
       }
       this.assertActive(signal);
       const context = await this.context(repo, version.tracked, signal);
-      const settings = await this.getSettings(repoId);
       const modelExecution = resolveModelExecution(
         settings,
-        await this.modelCatalog(),
+        await this.modelCatalog(settings.provider),
       );
       await mkdir(this.directory, { recursive: true, mode: 0o700 });
       temporary = await mkdtemp(path.join(this.directory, "analysis-"));
@@ -707,52 +716,35 @@ export class ProjectInsightsService {
       let failed = false;
       this.assertActive(signal);
       const efficiency = trackEfficiency(mode);
-      await this.execute(
-        "codex",
-        [
-          "exec",
-          "--ignore-user-config",
-          "--ephemeral",
-          ...modelArguments(modelExecution),
-          "--sandbox",
-          "read-only",
-          "-c",
-          'approval_policy="never"',
-          "--skip-git-repo-check",
-          "--json",
-          "--color",
-          "never",
-          "--output-schema",
-          schemaPath,
-          "-C",
-          temporary,
-          "-",
-        ],
-        {
-          input,
-          cwd: temporary,
-          env: agentEnvironment(),
-          signal,
-          timeoutMs: 240_000,
-          maxBytes: 1_000_000,
-          onLine: (line, stream) => {
-            if (stream !== "stdout") return;
-            try {
-              const event = JSON.parse(line);
-              efficiency.observe(event);
-              if (event.type === "turn.failed" || event.type === "error")
-                failed = true;
-              if (
-                event.type === "item.completed" &&
-                event.item?.type === "agent_message"
-              )
-                answer = String(event.item.text ?? "");
-            } catch {
-              /* Raw tool output is not trusted analysis. */
+      const cli = await agentCommand(modelExecution, {
+        cwd: temporary,
+        access: "none",
+        outputSchema: schemaPath,
+        skipGitRepoCheck: true,
+      });
+      const read = agentEventReader(modelExecution.provider);
+      await this.execute(cli.executable, cli.args, {
+        input,
+        cwd: temporary,
+        env: agentEnvironment(),
+        signal,
+        timeoutMs: 240_000,
+        maxBytes: 1_000_000,
+        onLine: (line, stream) => {
+          if (stream !== "stdout") return;
+          try {
+            const event = JSON.parse(line);
+            efficiency.observe(event);
+            for (const item of read(event)) {
+              if (item.kind === "error") failed = true;
+              if (item.kind === "message" || item.kind === "final")
+                answer = item.text;
             }
-          },
+          } catch {
+            /* Raw tool output is not trusted analysis. */
+          }
         },
-      );
+      });
       this.assertActive(signal);
       if (failed || !answer || Buffer.byteLength(answer) > 120_000)
         throw new AppError(

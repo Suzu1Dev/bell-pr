@@ -65,6 +65,7 @@ import type {
   DiscoveryCandidate,
 } from "../shared/discovery";
 import { DiffView } from "./review/DiffView";
+import { providerLabels } from "../shared/models";
 import { CommandPalette } from "./navigation/CommandPalette";
 const ExplanationPanel = lazy(() =>
   import("./review/ExplanationPanel").then((module) => ({
@@ -110,6 +111,8 @@ type Tab = "overview" | "changes" | "activity" | "draft";
 type Status = {
   codex: boolean;
   codexAuthenticated?: boolean;
+  claude?: boolean;
+  claudeAuthenticated?: boolean;
   github: boolean;
   githubUser?: string;
 };
@@ -2455,7 +2458,7 @@ export default function App() {
               <div>
                 <strong>Agent 負責開發，你保有最後決定權。</strong>
                 <p>
-                  使用本機 Codex CLI
+                  使用本機 Codex 或 Claude Code CLI
                   登入狀態。每個任務有獨立分支，完成後進入審查，不會自動建立
                   PR。
                 </p>
@@ -2573,6 +2576,30 @@ export default function App() {
               <div className="setup-command">
                 <span>在終端機完成登入</span>
                 <code>codex login</code>
+              </div>
+            </div>
+            <div className="settings-card">
+              <div className="settings-service">
+                <div className="service-icon">
+                  <Bot size={24} />
+                </div>
+                <div>
+                  <h3>Claude Code CLI</h3>
+                  <p>可在模型設定改用 Claude，沿用你的 Claude 訂閱登入</p>
+                </div>
+                <span
+                  className={`service-status ${status?.claude && status?.claudeAuthenticated ? "connected" : ""}`}
+                >
+                  {status?.claude && status?.claudeAuthenticated
+                    ? "已就緒"
+                    : status?.claude
+                      ? "尚未登入"
+                      : "尚未安裝"}
+                </span>
+              </div>
+              <div className="setup-command">
+                <span>在終端機完成登入</span>
+                <code>claude auth login</code>
               </div>
             </div>
             <div className="settings-card">
@@ -2919,7 +2946,9 @@ export default function App() {
               <span>Reviewer + Test analyst</span>
             </div>
             <p className="field-help">
-              會使用本機 Codex 帳號執行任務，消耗對應用量。完成後等待你審查。
+              會使用本機{" "}
+              {providerLabels[contributionSettings.provider ?? "codex"]}{" "}
+              帳號執行任務，消耗對應用量。完成後等待你審查。
             </p>
             {formError && (
               <p role="alert" className="inline-error">

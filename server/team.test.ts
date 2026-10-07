@@ -112,6 +112,8 @@ async function fixture(runner?: TeamAgentRunner) {
     codex: true,
     codexAuthenticated: true,
     github: false,
+    claude: false,
+    claudeAuthenticated: false,
   });
   const repo = await workbench.importRepository(repository);
   return {

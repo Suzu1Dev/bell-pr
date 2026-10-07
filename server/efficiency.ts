@@ -63,31 +63,52 @@ export function emptyEfficiency(mode: PonytailMode): EfficiencyMetrics {
   };
 }
 
+const tokenCount = (n: unknown): n is number =>
+  typeof n === "number" && Number.isSafeInteger(n) && n >= 0;
+
+/** Codex reports cached input inside input; Claude Code reports uncached, cache-write and cache-read input separately. */
+function reportedUsage(event: unknown) {
+  if (!event || typeof event !== "object") return;
+  const { type, usage } = event as { type?: unknown; usage?: unknown };
+  if (!usage || typeof usage !== "object") return;
+  const value = usage as Record<string, unknown>;
+  if (type === "turn.completed") {
+    const counts = [
+      value.input_tokens,
+      value.cached_input_tokens,
+      value.output_tokens,
+    ];
+    if (!counts.every(tokenCount)) return;
+    const [input, cached, output] = counts;
+    return { input, cached, output };
+  }
+  if (type === "result") {
+    const counts = [
+      value.input_tokens,
+      value.cache_creation_input_tokens,
+      value.cache_read_input_tokens,
+      value.output_tokens,
+    ];
+    if (!counts.every(tokenCount)) return;
+    const [uncached, cacheWrite, cacheRead, output] = counts;
+    const input = uncached + cacheWrite + cacheRead;
+    if (!Number.isSafeInteger(input)) return;
+    return { input, cached: cacheRead, output };
+  }
+}
+
 /** One exec invocation is one call; repeated terminal events replace, not add, usage. */
 export function trackEfficiency(mode: PonytailMode) {
   const started = performance.now();
   const metrics = { ...emptyEfficiency(mode), calls: 1 };
   return {
     observe(event: unknown) {
-      if (!event || typeof event !== "object") return;
-      const { type, usage } = event as { type?: unknown; usage?: unknown };
-      if (type !== "turn.completed" || !usage || typeof usage !== "object")
-        return;
-      const value = usage as Record<string, unknown>;
-      const input = value.input_tokens;
-      const cached = value.cached_input_tokens;
-      const output = value.output_tokens;
-      if (
-        ![input, cached, output].every(
-          (n) => typeof n === "number" && Number.isSafeInteger(n) && n >= 0,
-        )
-      )
-        return;
-      if ((cached as number) > (input as number)) return;
+      const usage = reportedUsage(event);
+      if (!usage || usage.cached > usage.input) return;
       metrics.measuredCalls = 1;
-      metrics.inputTokens = input as number;
-      metrics.cachedInputTokens = cached as number;
-      metrics.outputTokens = output as number;
+      metrics.inputTokens = usage.input;
+      metrics.cachedInputTokens = usage.cached;
+      metrics.outputTokens = usage.output;
     },
     finish(completed: boolean): EfficiencyMetrics {
       metrics.completedCalls = completed ? 1 : 0;

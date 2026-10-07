@@ -4,11 +4,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { z } from "zod";
 import {
+  agentProviders,
   reasoningEfforts,
+  type AgentProvider,
   type ModelCatalog,
   type ModelExecution,
   type ModelOption,
   type ModelSettings,
+  type ReasoningEffort,
 } from "../shared/models.js";
 import { agentEnvironment } from "./process.js";
 import { AppError } from "./types.js";
@@ -18,11 +21,14 @@ const modelId = z
   .trim()
   .regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/);
 const effort = z.enum(reasoningEfforts);
+const provider = z.enum(agentProviders);
 export const modelSettingsSchema = {
+  provider: provider.optional(),
   model: modelId.or(z.literal("")).default(""),
   reasoningEffort: effort.or(z.literal("")).default(""),
 };
 export const modelExecutionSchema = z.object({
+  provider: provider.optional(),
   model: modelId.optional(),
   reasoningEffort: effort.optional(),
   source: z.enum(["selected", "catalog-default", "cli-default"]),
@@ -224,9 +230,51 @@ export async function readModelCatalog(
   }
 }
 
+const claudeEfforts: ReasoningEffort[] = ["low", "medium", "high", "xhigh", "max"];
+/**
+ * Claude Code has no model-list command, so BELL offers its documented aliases.
+ * Each alias follows the latest model of that family; availability depends on the plan.
+ */
+export const claudeModelCatalog: ModelCatalog = {
+  source: "claude",
+  models: [
+    {
+      id: "opus",
+      name: "Claude Opus",
+      description: "適合複雜的程式修改、審查與多步驟推理。",
+      isDefault: false,
+      reasoningEfforts: claudeEfforts,
+    },
+    {
+      id: "sonnet",
+      name: "Claude Sonnet",
+      description: "速度與能力較平衡，適合日常開發與分析。",
+      isDefault: false,
+      reasoningEfforts: claudeEfforts,
+    },
+    {
+      id: "fable",
+      name: "Claude Fable",
+      description: "能力最強，單次工作可能較久；需方案支援。",
+      isDefault: false,
+      reasoningEfforts: claudeEfforts,
+    },
+    {
+      id: "haiku",
+      name: "Claude Haiku",
+      description: "最快、用量最低；不支援思考強度設定。",
+      isDefault: false,
+      reasoningEfforts: [],
+    },
+  ],
+};
+
 let cached: { value: ModelCatalog; expires: number } | undefined;
 let pending: Promise<ModelCatalog> | undefined;
-export function getModelCatalog(): Promise<ModelCatalog> {
+export function getModelCatalog(
+  provider: AgentProvider = "codex",
+): Promise<ModelCatalog> {
+  if (provider === "claude") return Promise.resolve(claudeModelCatalog);
   if (cached && cached.expires > Date.now())
     return Promise.resolve(cached.value);
   if (pending) return pending;
@@ -249,6 +297,10 @@ export function resolveModelExecution(
   if (!parsed.success)
     throw new AppError("模型設定格式不正確，請重新選擇。", 400);
   const selected = parsed.data;
+  if ((selected.provider ?? "codex") !== catalog.source)
+    throw new AppError("模型目錄與所選 Agent 不一致，請重新載入後再選擇。", 400);
+  const recordedProvider =
+    catalog.source === "codex" ? {} : { provider: catalog.source };
   const model = selected.model
     ? catalog.models.find((item) => item.id === selected.model)
     : catalog.models.find((item) => item.isDefault);
@@ -259,7 +311,7 @@ export function resolveModelExecution(
         400,
       );
     }
-    return { source: "cli-default" };
+    return { ...recordedProvider, source: "cli-default" };
   }
   const reasoningEffort =
     selected.reasoningEffort || model.defaultReasoningEffort;
@@ -267,6 +319,7 @@ export function resolveModelExecution(
     throw new AppError("所選模型不支援這個思考強度，請重新選擇。", 400);
   }
   return {
+    ...recordedProvider,
     model: model.id,
     ...(reasoningEffort ? { reasoningEffort } : {}),
     source:

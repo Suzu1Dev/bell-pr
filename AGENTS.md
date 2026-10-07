@@ -24,6 +24,5 @@ measurements. Provider-reported cached input is included in input tokens; missin
 usage is unknown, not zero.
 
 The BELL runtime adds its own versioned Ponytail policy to each Agent invocation.
-Do not copy efficiency rules into contribution worktrees or outgoing PRs, load
-rules from imported repositories as application configuration, or remove sandbox,
-output schema, cancellation, or approval controls to enable a plugin.
+Do not copy efficiency rules into contribution worktrees or outgoing PRs, or
+remove output schema, cancellation, or approval controls to enable a plugin.

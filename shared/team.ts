@@ -1,3 +1,5 @@
+import type { AgentProvider } from "./models.js";
+
 export type TeamTaskStatus =
   "pending" | "ready" | "running" | "complete" | "failed" | "blocked";
 
@@ -35,7 +37,7 @@ export interface AgentTeam {
   config: {
     maxTeammates: 2 | 3 | 4;
     requirePlanApproval: boolean;
-    provider: "codex";
+    provider: AgentProvider;
     protocol: "bell-shared-tasks";
     messageDelivery: "between-turns";
   };

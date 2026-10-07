@@ -15,6 +15,7 @@ import { Workbench } from "./workbench.js";
 import { AppError } from "./types.js";
 import { redact } from "./process.js";
 import { DiscoveryService } from "./discovery.js";
+import { agentProviders } from "../shared/models.js";
 
 export function parseAllowedOrigins(value = ""): string[] {
   if (!value.trim()) return [];
@@ -104,10 +105,10 @@ export function createApp(
   } = {},
 ) {
   const insights = new ProjectInsightsService(workbench.store, {
-    getModelCatalog: () => workbench.models(),
+    getModelCatalog: (provider) => workbench.models(provider),
   });
   const discovery = new DiscoveryService(workbench.store, {
-    getModelCatalog: () => workbench.models(),
+    getModelCatalog: (provider) => workbench.models(provider),
   });
   const app = express();
   app.locals.insights = insights;
@@ -118,8 +119,15 @@ export function createApp(
   app.get("/api/status", async (_req, res) => {
     res.json(await workbench.status());
   });
-  app.get("/api/models", async (_req, res) => {
-    res.json(await workbench.models());
+  app.get("/api/models", async (req, res) => {
+    // Without a provider the Codex catalog is returned, as before.
+    const provider = z
+      .enum(agentProviders)
+      .default("codex")
+      .safeParse(req.query.provider);
+    if (!provider.success)
+      throw new AppError("不支援這個 Agent 類型。", 400);
+    res.json(await workbench.models(provider.data));
   });
   app.get("/api/discovery", async (_req, res) => {
     res.json(await discovery.get());
