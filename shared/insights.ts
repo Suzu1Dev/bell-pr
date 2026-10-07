@@ -11,6 +11,8 @@ export const contributionDirections = [
 ] as const;
 
 export type ContributionDirection = (typeof contributionDirections)[number];
+export const projectRecommendationBatchSize = 5;
+export const maxProjectRecommendations = 30;
 
 export interface ContributionSettings extends ModelSettings {
   direction: ContributionDirection;
@@ -51,6 +53,12 @@ export interface ContributionRecommendation {
   evidenceDetails?: { path: string; quote: string; reason: string }[];
 }
 
+/** Display preferences belong to the user, independently of AI analysis. */
+export interface RecommendationPreferences {
+  order: string[];
+  hidden: string[];
+}
+
 export interface ProjectInsights {
   modelExecution?: ModelExecution;
   efficiency?: EfficiencyMetrics;
@@ -61,6 +69,13 @@ export interface ProjectInsights {
   modules: { path: string; purpose: string }[];
   evidence: { path: string; note: string }[];
   recommendations: ContributionRecommendation[];
+  recommendationExpansion?: {
+    generatedAt: string;
+    addedIds: string[];
+    requestedCount?: number;
+    modelExecution?: ModelExecution;
+    efficiency?: EfficiencyMetrics;
+  };
   generatedAt: string;
   source: "ai" | "demo";
   baseSha: string;

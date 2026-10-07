@@ -1,21 +1,32 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import type { ProjectInsights } from "../../shared/insights";
+import {
+  maxProjectRecommendations,
+  type ProjectInsights,
+  type RecommendationPreferences,
+} from "../../shared/insights";
 import { api, send } from "../api";
 import { demoInsights } from "./demo";
 
 interface InsightsResult {
   insights: ProjectInsights | null;
   stale: boolean;
+  recommendationPreferences?: RecommendationPreferences;
 }
 
 interface InsightsState extends InsightsResult {
   loading: boolean;
   error: string;
+  recommending: boolean;
+  recommendationError: string;
+  recommendationPreferences: RecommendationPreferences;
+  savingPreferences: boolean;
+  preferenceError: string;
 }
 
+type InsightsOperation = "load" | "analyze" | "recommend";
 type InsightsRequest = (
   repoId: string,
-  generate: boolean,
+  operation: InsightsOperation,
 ) => Promise<InsightsResult>;
 
 const emptyState: InsightsState = {
@@ -23,6 +34,11 @@ const emptyState: InsightsState = {
   stale: false,
   loading: false,
   error: "",
+  recommending: false,
+  recommendationError: "",
+  recommendationPreferences: { order: [], hidden: [] },
+  savingPreferences: false,
+  preferenceError: "",
 };
 
 /** One cache belongs to the mounted workbench, so changing repositories keeps active work. */
@@ -31,15 +47,23 @@ export class ProjectInsightsCache {
     ["demo-repo", { ...emptyState, insights: demoInsights }],
   ]);
   private reads = new Map<string, Promise<void>>();
-  private analyses = new Map<string, Promise<void>>();
+  private mutations = new Map<string, Promise<void>>();
   private revisions = new Map<string, number>();
   private listeners = new Set<() => void>();
 
   constructor(
-    private request: InsightsRequest = (repoId, generate) =>
+    private request: InsightsRequest = (repoId, operation) =>
       api<InsightsResult>(
-        `/repos/${repoId}/insights`,
-        generate ? send("POST") : undefined,
+        `/repos/${repoId}/insights${operation === "recommend" ? "/recommendations" : ""}`,
+        operation === "load" ? undefined : send("POST"),
+      ),
+    private savePreferencesRequest = (
+      repoId: string,
+      preferences: RecommendationPreferences,
+    ) =>
+      api<{ recommendationPreferences: RecommendationPreferences }>(
+        `/repos/${repoId}/insights/preferences`,
+        send("PUT", preferences),
       ),
   ) {}
 
@@ -68,15 +92,21 @@ export class ProjectInsightsCache {
   load(repoId: string): Promise<void> {
     if (repoId === "demo-repo") return Promise.resolve();
     // Re-entering an active repository joins its original analysis instead of reading old cache.
-    const pending = this.analyses.get(repoId) ?? this.reads.get(repoId);
+    const pending = this.mutations.get(repoId) ?? this.reads.get(repoId);
     if (pending) return pending;
     const revision = this.nextRevision(repoId);
     this.update(repoId, { error: "" });
     const operation = Promise.resolve()
-      .then(() => this.request(repoId, false))
+      .then(() => this.request(repoId, "load"))
       .then((result) => {
         if (this.revisions.get(repoId) === revision)
-          this.update(repoId, result);
+          this.update(repoId, {
+            ...result,
+            recommendationPreferences: result.recommendationPreferences ?? {
+              order: [],
+              hidden: [],
+            },
+          });
       })
       .catch((error: unknown) => {
         if (this.revisions.get(repoId) === revision)
@@ -103,33 +133,113 @@ export class ProjectInsightsCache {
       });
       return Promise.resolve();
     }
-    // The map guards duplicate clicks synchronously, before React can render loading=true.
-    const pending = this.analyses.get(repoId);
+    return this.generate(repoId, "analyze");
+  }
+
+  recommendMore(repoId: string): Promise<void> {
+    const pending = this.mutations.get(repoId);
     if (pending) return pending;
+    const state = this.snapshot(repoId);
+    const error =
+      repoId === "demo-repo" || state.insights?.source === "demo"
+        ? "匯入真實專案後，即可產出更多貢獻建議。"
+        : !state.insights || state.stale
+          ? "請先重新分析專案，再產出更多建議。"
+          : state.insights.recommendations.length >= maxProjectRecommendations
+            ? `這份分析已累積 ${maxProjectRecommendations} 個建議。`
+            : "";
+    if (error) {
+      this.update(repoId, { recommendationError: error });
+      return Promise.resolve();
+    }
+    return this.generate(repoId, "recommend");
+  }
+
+  savePreferences(
+    repoId: string,
+    preferences: RecommendationPreferences,
+  ): Promise<void> {
+    const pending = this.mutations.get(repoId);
+    if (pending) return pending;
+    const state = this.snapshot(repoId);
+    if (!state.insights) return Promise.resolve();
     const revision = this.nextRevision(repoId);
-    this.update(repoId, { loading: true, error: "" });
+    this.update(repoId, {
+      recommendationPreferences: preferences,
+      savingPreferences: true,
+      preferenceError: "",
+    });
     const operation = Promise.resolve()
-      .then(() => this.request(repoId, true))
+      .then(() => repoId === "demo-repo"
+        ? { recommendationPreferences: preferences }
+        : this.savePreferencesRequest(repoId, preferences))
       .then((result) => {
-        if (this.revisions.get(repoId) === revision)
-          this.update(repoId, result);
+        if (this.revisions.get(repoId) === revision) this.update(repoId, result);
       })
       .catch((error: unknown) => {
         if (this.revisions.get(repoId) === revision)
           this.update(repoId, {
-            error:
-              error instanceof Error
-                ? error.message
-                : "專案分析未完成，請重試。",
+            recommendationPreferences: state.recommendationPreferences,
+            preferenceError: error instanceof Error
+              ? `未儲存顯示與排序設定，已還原：${error.message}`
+              : "未儲存顯示與排序設定，已還原。請再試一次。",
           });
       })
       .finally(() => {
-        if (this.analyses.get(repoId) === operation) {
-          this.analyses.delete(repoId);
-          this.update(repoId, { loading: false });
+        if (this.mutations.get(repoId) === operation) {
+          this.mutations.delete(repoId);
+          this.update(repoId, { savingPreferences: false });
         }
       });
-    this.analyses.set(repoId, operation);
+    this.mutations.set(repoId, operation);
+    return operation;
+  }
+
+  private generate(
+    repoId: string,
+    action: "analyze" | "recommend",
+  ): Promise<void> {
+    // The map guards duplicate clicks synchronously, before React can render loading=true.
+    const pending = this.mutations.get(repoId);
+    if (pending) return pending;
+    const revision = this.nextRevision(repoId);
+    const recommending = action === "recommend";
+    this.update(
+      repoId,
+      recommending
+        ? { recommending: true, recommendationError: "" }
+        : { loading: true, error: "", recommendationError: "" },
+    );
+    const operation = Promise.resolve()
+      .then(() => this.request(repoId, action))
+      .then((result) => {
+        if (this.revisions.get(repoId) === revision)
+          this.update(repoId, {
+            ...result,
+            recommendationPreferences: result.recommendationPreferences ?? {
+              order: [],
+              hidden: [],
+            },
+          });
+      })
+      .catch((error: unknown) => {
+        if (this.revisions.get(repoId) === revision)
+          this.update(repoId, {
+            [recommending ? "recommendationError" : "error"]:
+              error instanceof Error
+                ? error.message
+                : recommending
+                  ? "尚未產出更多建議，原有清單已保留。請重試。"
+                  : "專案分析未完成，請重試。",
+          });
+      })
+      .finally(() => {
+        if (this.mutations.get(repoId) === operation) {
+          this.mutations.delete(repoId);
+          this.update(repoId, { loading: false, recommending: false });
+        }
+      });
+    this.mutations.set(repoId, operation);
     return operation;
   }
 }
@@ -150,6 +260,16 @@ export function useProjectInsights(repoId?: string) {
     () => (repoId ? cache.analyze(repoId) : Promise.resolve()),
     [cache, repoId],
   );
+  const recommendMore = useCallback(
+    () => (repoId ? cache.recommendMore(repoId) : Promise.resolve()),
+    [cache, repoId],
+  );
 
-  return { ...state, analyze };
+  const savePreferences = useCallback(
+    (preferences: RecommendationPreferences) =>
+      repoId ? cache.savePreferences(repoId, preferences) : Promise.resolve(),
+    [cache, repoId],
+  );
+
+  return { ...state, analyze, recommendMore, savePreferences };
 }

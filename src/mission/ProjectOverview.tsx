@@ -1,13 +1,18 @@
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
   BookOpen,
   Check,
+  ChevronLeft,
   ChevronRight,
   Code2,
+  Eye,
+  EyeOff,
   FileSearch,
   FolderTree,
   GitBranch,
+  GripVertical,
   Lightbulb,
   Loader2,
   RefreshCw,
@@ -16,15 +21,22 @@ import {
   Target,
   Users,
 } from "lucide-react";
-import type {
-  ContributionBrief,
-  ContributionRecommendation,
-  ProjectInsights,
+import {
+  maxProjectRecommendations,
+  projectRecommendationBatchSize,
+  type ContributionBrief,
+  type ContributionRecommendation,
+  type ProjectInsights,
+  type RecommendationPreferences,
 } from "../../shared/insights";
 import type { Repo, Run } from "../types";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
 import { ModelSummary } from "../models/ModelSummary";
 import { directionOptions } from "./DirectionSettings";
+import {
+  moveRecommendation,
+  orderedRecommendations,
+} from "./recommendation-preferences";
 import "./mission.css";
 
 export interface ProjectOverviewProps {
@@ -34,8 +46,15 @@ export interface ProjectOverviewProps {
   brief?: ContributionBrief;
   loading: boolean;
   error: string;
+  recommending: boolean;
+  recommendationError: string;
+  recommendationPreferences: RecommendationPreferences;
+  savingPreferences: boolean;
+  preferenceError: string;
   stale: boolean;
   onAnalyze: () => void;
+  onRecommendMore: () => void;
+  onSavePreferences: (preferences: RecommendationPreferences) => void;
   onChooseRecommendation: (idea: ContributionRecommendation) => void;
   onReadCode: () => void;
   onStartContribution?: () => void;
@@ -47,6 +66,18 @@ const confidenceLabels = {
   medium: "需進一步確認",
   low: "初步構想",
 };
+
+function analysisDate(value?: string) {
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.valueOf())
+    ? date.toLocaleString("zh-TW", {
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
+}
 
 function EvidencePaths({
   paths,
@@ -203,24 +234,218 @@ export function ProjectOverview({
   brief,
   loading,
   error,
+  recommending,
+  recommendationError,
+  recommendationPreferences,
+  savingPreferences,
+  preferenceError,
   stale,
   onAnalyze,
+  onRecommendMore,
+  onSavePreferences,
   onChooseRecommendation,
   onReadCode,
   onStartContribution,
 }: ProjectOverviewProps) {
-  const generatedAt = insights?.generatedAt
-    ? new Date(insights.generatedAt)
-    : null;
-  const dateLabel =
-    generatedAt && !Number.isNaN(generatedAt.valueOf())
-      ? generatedAt.toLocaleString("zh-TW", {
-          month: "numeric",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : "";
+  const ideaRail = useRef<HTMLDivElement>(null);
+  const hiddenSummary = useRef<HTMLElement>(null);
+  const pointerDrag = useRef<{
+    pointerId: number;
+    id: string;
+    startX: number;
+    startY: number;
+    x: number;
+    y: number;
+    active: boolean;
+  } | null>(null);
+  const [drag, setDrag] = useState<{ repoId: string; id: string } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{
+    id: string;
+    side: "before" | "after";
+  } | null>(null);
+  const [visibleIdeas, setVisibleIdeas] = useState({
+    first: 1,
+    last: 1,
+    previous: false,
+    next: false,
+  });
+  const recommendationCount = insights?.recommendations.length ?? 0;
+  const orderedIdeas = orderedRecommendations(
+    insights?.recommendations ?? [],
+    recommendationPreferences,
+  );
+  const hiddenIds = new Set(recommendationPreferences.hidden);
+  const shownIdeas = orderedIdeas.filter((idea) => !hiddenIds.has(idea.id));
+  const hiddenIdeas = orderedIdeas.filter((idea) => hiddenIds.has(idea.id));
+  const shownIds = shownIdeas.map((idea) => idea.id).join("\n");
+  const preferencesDisabled = loading || recommending || savingPreferences;
+  const draggedId = drag?.repoId === repo.id ? drag.id : null;
+  useEffect(() => {
+    pointerDrag.current = null;
+    setDrag(null);
+    setDropTarget(null);
+  }, [repo.id, insights?.generatedAt, preferencesDisabled]);
+  const dropAtPoint = (x: number, y: number) => {
+    const card = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-recommendation-id]");
+    if (!card || !ideaRail.current?.contains(card)) return null;
+    const id = card.dataset.recommendationId;
+    if (!id || id === pointerDrag.current?.id) return null;
+    const bounds = card.getBoundingClientRect();
+    return { id, side: x < bounds.left + bounds.width / 2 ? "before" as const : "after" as const };
+  };
+  useEffect(() => {
+    if (!draggedId) return;
+    let frame = 0;
+    const updateDrag = () => {
+      const pointer = pointerDrag.current;
+      const rail = ideaRail.current;
+      if (!pointer?.active || !rail) return;
+      const bounds = rail.getBoundingClientRect();
+      if (pointer.y >= bounds.top && pointer.y <= bounds.bottom) {
+        if (pointer.x >= bounds.left && pointer.x < bounds.left + 60) {
+          rail.scrollBy({ left: -8, behavior: "auto" });
+        } else if (pointer.x <= bounds.right && pointer.x > bounds.right - 60) {
+          rail.scrollBy({ left: 8, behavior: "auto" });
+        }
+      }
+      const target = dropAtPoint(pointer.x, pointer.y);
+      setDropTarget((current) => current?.id === target?.id && current?.side === target?.side ? current : target);
+      frame = window.requestAnimationFrame(updateDrag);
+    };
+    frame = window.requestAnimationFrame(updateDrag);
+    return () => window.cancelAnimationFrame(frame);
+  }, [draggedId, repo.id]);
+  useEffect(() => {
+    const rail = ideaRail.current;
+    if (!rail) return;
+    const updateVisibleIdeas = () => {
+      const bounds = rail.getBoundingClientRect();
+      const visible = Array.from(rail.children).flatMap((card, index) => {
+        const rect = card.getBoundingClientRect();
+        return rect.right > bounds.left + 5 && rect.left < bounds.right - 5
+          ? [index + 1]
+          : [];
+      });
+      const position = {
+        first: visible[0] ?? 1,
+        last: visible.at(-1) ?? 1,
+        previous: rail.scrollLeft > 1,
+        next: rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 1,
+      };
+      setVisibleIdeas((current) =>
+        current.first === position.first &&
+        current.last === position.last &&
+        current.previous === position.previous &&
+        current.next === position.next
+          ? current
+          : position,
+      );
+    };
+    updateVisibleIdeas();
+    rail.addEventListener("scroll", updateVisibleIdeas, { passive: true });
+    const observer = new ResizeObserver(updateVisibleIdeas);
+    observer.observe(rail);
+    return () => {
+      rail.removeEventListener("scroll", updateVisibleIdeas);
+      observer.disconnect();
+    };
+  }, [repo.id, insights?.generatedAt, shownIds]);
+  const scrollIdeas = (direction: -1 | 1) => {
+    const rail = ideaRail.current;
+    const card = rail?.firstElementChild as HTMLElement | null;
+    if (!rail || !card) return;
+    const gap = parseFloat(getComputedStyle(rail).columnGap) || 0;
+    rail.scrollBy({
+      left: direction * (card.offsetWidth + gap),
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+    });
+  };
+  const dateLabel = analysisDate(insights?.generatedAt);
+  const expansion = insights?.recommendationExpansion;
+  const addedIds = new Set(
+    recommending || recommendationError ? [] : (expansion?.addedIds ?? []),
+  );
+  const firstAddedIdea = shownIdeas.find((idea) => addedIds.has(idea.id));
+  const ideaAnchor = (id: string) => `mission-idea-${repo.id}-${id}`;
+  const focusIdea = (id?: string) => {
+    window.requestAnimationFrame(() => {
+      const target = id
+        ? document.getElementById(ideaAnchor(id))
+        : hiddenSummary.current;
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+  };
+  const saveOrder = (
+    sourceId: string,
+    targetId: string,
+    side: "before" | "after",
+  ) => {
+    if (preferencesDisabled) return;
+    const currentOrder = orderedIdeas.map((idea) => idea.id);
+    const order = moveRecommendation(
+      currentOrder,
+      recommendationPreferences.hidden,
+      sourceId,
+      targetId,
+      side,
+    );
+    if (order.some((id, index) => id !== currentOrder[index])) {
+      onSavePreferences({ order, hidden: recommendationPreferences.hidden });
+      focusIdea(sourceId);
+    }
+  };
+  const resetDrag = () => {
+    pointerDrag.current = null;
+    setDrag(null);
+    setDropTarget(null);
+  };
+  const finishDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const pointer = pointerDrag.current;
+    if (!pointer || pointer.pointerId !== event.pointerId) return;
+    const target = pointer.active ? dropAtPoint(event.clientX, event.clientY) : null;
+    resetDrag();
+    if (target) saveOrder(pointer.id, target.id, target.side);
+  };
+  const setHidden = (id: string, hide: boolean) => {
+    if (preferencesDisabled) return;
+    onSavePreferences({
+      order: orderedIdeas.map((idea) => idea.id),
+      hidden: hide
+        ? [...new Set([...recommendationPreferences.hidden, id])]
+        : recommendationPreferences.hidden.filter((hiddenId) => hiddenId !== id),
+    });
+    if (hide) {
+      const index = shownIdeas.findIndex((idea) => idea.id === id);
+      focusIdea(shownIdeas[index + 1]?.id ?? shownIdeas[index - 1]?.id);
+    } else {
+      focusIdea(id);
+    }
+  };
+  const requestedCount = Math.min(
+    projectRecommendationBatchSize,
+    Math.max(0, maxProjectRecommendations - recommendationCount),
+  );
+  const shortfall =
+    expansion?.requestedCount !== undefined &&
+    addedIds.size < expansion.requestedCount;
+  const moreDisabled =
+    loading ||
+    recommending ||
+    savingPreferences ||
+    !insights ||
+    stale ||
+    insights.source === "demo" ||
+    insights.recommendations.length >= maxProjectRecommendations;
+  const moreDescription = insights?.source === "demo"
+    ? "示範內容使用預寫建議。匯入真實專案後，即可請 Agent 產出更多貢獻方向。"
+    : stale
+      ? "專案版本已更新，請先重新分析專案，再產出更多建議。"
+      : (insights?.recommendations.length ?? 0) >= maxProjectRecommendations
+        ? `已累積 ${maxProjectRecommendations} 個建議，達到這份分析的上限。可先挑選方向，或重新分析專案。`
+        : "Agent 會沿用這個專案已儲存的模型設定，尋找不同的改善問題與使用者價值。既有建議會保留，由你決定何時開始開發。";
   return (
     <div className="mission-overview">
       <div className="mission-overview-heading">
@@ -236,7 +461,7 @@ export function ProjectOverview({
           type="button"
           className="mission-button mission-button-secondary"
           onClick={onAnalyze}
-          disabled={loading}
+          disabled={loading || recommending || savingPreferences}
         >
           {loading ? (
             <Loader2 className="mission-spin" size={15} />
@@ -250,7 +475,11 @@ export function ProjectOverview({
       {error && (
         <div className="mission-alert mission-alert-error" role="alert">
           <span>{error}</span>
-          <button type="button" onClick={onAnalyze} disabled={loading}>
+          <button
+            type="button"
+            onClick={onAnalyze}
+            disabled={loading || recommending || savingPreferences}
+          >
             重試
             <RefreshCw size={13} />
           </button>
@@ -468,83 +697,328 @@ export function ProjectOverview({
               </h2>
               <p>先看問題與使用者價值，再決定要不要交給團隊。</p>
             </div>
-            <span className="mission-ideas-count">
-              {insights.recommendations.length} 個
-              {insights.source === "demo" ? "示範" : "建議"}
-            </span>
+            <div className="mission-ideas-actions">
+              <span className="mission-ideas-count">
+                {insights.recommendations.length} 個
+                {insights.source === "demo" ? "示範" : "建議"}
+              </span>
+              <button
+                type="button"
+                className="mission-button mission-button-secondary"
+                onClick={onRecommendMore}
+                disabled={moreDisabled}
+                aria-describedby="mission-more-description"
+              >
+                {recommending ? (
+                  <Loader2 className="mission-spin" size={15} />
+                ) : (
+                  <Sparkles size={15} />
+                )}
+                {recommending
+                  ? `正在產出 ${requestedCount} 個新建議…`
+                  : requestedCount
+                    ? `產出 ${requestedCount} 個新建議`
+                    : "建議數量已達上限"}
+              </button>
+            </div>
           </div>
-          {insights.recommendations.length ? (
-            <div className="mission-idea-list">
-              {insights.recommendations.map((idea, index) => {
-                const direction = directionOptions.find(
-                  (option) => option.value === idea.direction,
-                );
-                const Icon = direction?.icon ?? Lightbulb;
-                return (
-                  <article className="mission-idea" key={idea.id}>
-                    <div className="mission-idea-top">
-                      <span className="mission-idea-number">
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
-                      <span className="mission-idea-direction">
-                        <Icon size={13} />
-                        {direction?.label ?? idea.direction}
-                      </span>
-                      <span className="mission-idea-effort">
-                        {effortLabels[idea.effort]}範圍
-                      </span>
-                    </div>
-                    <h3>{idea.title}</h3>
-                    <p className="mission-idea-problem">{idea.problem}</p>
-                    <div className="mission-idea-impact">
-                      <Users size={15} />
-                      <p>
-                        <strong>對使用者的幫助</strong>
-                        {idea.userImpact}
-                      </p>
-                    </div>
-                    <details className="mission-idea-approach">
-                      <summary>
-                        看建議做法與驗收方式
-                        <ChevronRight size={14} />
-                      </summary>
-                      <p>{idea.approach}</p>
-                      {idea.acceptance.length > 0 && (
-                        <ul>
-                          {idea.acceptance.map((item, itemIndex) => (
-                            <li key={itemIndex}>{item}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </details>
-                    <EvidencePaths
-                      paths={idea.evidence}
-                      details={idea.evidenceDetails}
-                    />
-                    <div className="mission-idea-bottom">
-                      <span
-                        className={`mission-confidence mission-confidence-${idea.confidence}`}
-                      >
-                        <span />
-                        {confidenceLabels[idea.confidence]}
-                      </span>
+          <div className="mission-more-context">
+            <p id="mission-more-description">{moreDescription}</p>
+            <div className="mission-more-status" role="status" aria-live="polite">
+              {recommending ? (
+                <span>正在閱讀專案、避開既有方向，你可以繼續閱讀下方建議。</span>
+              ) : expansion && !recommendationError ? (
+                <>
+                  {firstAddedIdea ? (
+                    <a
+                      href={`#${encodeURIComponent(ideaAnchor(firstAddedIdea.id))}`}
+                    >
+                      查看本輪新增 {addedIds.size}
+                      {expansion.requestedCount !== undefined &&
+                        ` / ${expansion.requestedCount}`} 個建議
+                      <ArrowRight size={14} aria-hidden="true" />
+                    </a>
+                  ) : (
+                    <span>
+                      {addedIds.size
+                        ? `本輪新增 ${addedIds.size}${expansion.requestedCount !== undefined ? ` / ${expansion.requestedCount}` : ""} 個建議，目前皆已隱藏。`
+                        : expansion.requestedCount !== undefined
+                        ? `本輪新增 0 / ${expansion.requestedCount} 個建議。`
+                        : "本輪沒有新增不同且有足夠依據的建議，既有清單保持不變。"}
+                    </span>
+                  )}
+                  {shortfall && (
+                    <p>未補足本輪目標數量；既有清單保留。</p>
+                  )}
+                </>
+              ) : null}
+            </div>
+            {expansion && (
+              <details className="mission-more-provenance">
+                <summary>
+                  最近一次追加分析的模型與用量
+                  <ChevronRight size={14} aria-hidden="true" />
+                </summary>
+                <p>產生於 {analysisDate(expansion.generatedAt)}</p>
+                <ModelSummary execution={expansion.modelExecution} analysis />
+                <EfficiencySummary
+                  title="這次追加建議用量"
+                  metrics={expansion.efficiency}
+                />
+              </details>
+            )}
+          </div>
+          {recommendationError && (
+            <div
+              className="mission-alert mission-alert-error mission-more-error"
+              role="alert"
+            >
+              <span>{recommendationError}</span>
+              <button
+                type="button"
+                onClick={onRecommendMore}
+                disabled={moreDisabled}
+              >
+                重試產出
+                <RefreshCw size={13} />
+              </button>
+            </div>
+          )}
+          <div
+            className="mission-idea-organization"
+            hidden={!savingPreferences && hiddenIdeas.length === 0}
+          >
+            <p role="status" aria-live="polite" hidden={!savingPreferences}>
+              {savingPreferences ? "正在儲存排列與顯示設定…" : ""}
+            </p>
+            {hiddenIdeas.length > 0 && (
+              <details key={repo.id} className="mission-hidden-ideas">
+                <summary ref={hiddenSummary}>
+                  <EyeOff size={14} aria-hidden="true" />
+                  已隱藏 {hiddenIdeas.length} 個建議
+                  <ChevronRight size={14} aria-hidden="true" />
+                </summary>
+                <ul>
+                  {hiddenIdeas.map((idea) => (
+                    <li key={idea.id}>
+                      <span>{idea.title}</span>
                       <button
                         type="button"
-                        className="mission-text-button"
-                        onClick={() => onChooseRecommendation(idea)}
+                        disabled={preferencesDisabled}
+                        onClick={() => setHidden(idea.id, false)}
+                        aria-label={`恢復顯示：${idea.title}`}
                       >
-                        以此方向開始
-                        <ArrowUpRight size={15} />
+                        <Eye size={14} aria-hidden="true" />恢復顯示
                       </button>
-                    </div>
-                  </article>
-                );
-              })}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+          {preferenceError && (
+            <div className="mission-alert mission-alert-error mission-more-error" role="alert">
+              <span>{preferenceError}</span>
             </div>
+          )}
+          {shownIdeas.length ? (
+            <>
+              <div className="mission-idea-navigation">
+                <p id="mission-ideas-navigation">
+                  左右滑動，或聚焦清單後按方向鍵
+                  <span>
+                    顯示 {visibleIdeas.first}
+                    {visibleIdeas.last > visibleIdeas.first &&
+                      `–${visibleIdeas.last}`}
+                    {` / ${shownIdeas.length} 個顯示中的建議`}
+                  </span>
+                </p>
+                <div>
+                  <button
+                    type="button"
+                    aria-label="上一個建議"
+                    aria-controls={`mission-idea-rail-${repo.id}`}
+                    disabled={!visibleIdeas.previous}
+                    onClick={() => scrollIdeas(-1)}
+                  >
+                    <ChevronLeft size={18} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="下一個建議"
+                    aria-controls={`mission-idea-rail-${repo.id}`}
+                    disabled={!visibleIdeas.next}
+                    onClick={() => scrollIdeas(1)}
+                  >
+                    <ChevronRight size={18} aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+              <div
+                key={`${repo.id}-${insights.generatedAt}`}
+                className={`mission-idea-list${draggedId ? " mission-idea-list-dragging" : ""}`}
+                id={`mission-idea-rail-${repo.id}`}
+                ref={ideaRail}
+                role="region"
+                aria-label="貢獻建議橫向清單"
+                aria-describedby="mission-ideas-navigation"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return;
+                  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+                    event.preventDefault();
+                    scrollIdeas(event.key === "ArrowLeft" ? -1 : 1);
+                  }
+                }}
+              >
+                {shownIdeas.map((idea, index) => {
+                  const direction = directionOptions.find(
+                    (option) => option.value === idea.direction,
+                  );
+                  const Icon = direction?.icon ?? Lightbulb;
+                  return (
+                    <article
+                      className={`mission-idea${addedIds.has(idea.id) ? " mission-idea-new" : ""}${draggedId === idea.id ? " mission-idea-dragging" : ""}${draggedId && dropTarget?.id === idea.id ? ` mission-idea-drop-${dropTarget.side}` : ""}`}
+                      key={idea.id}
+                      id={ideaAnchor(idea.id)}
+                      data-recommendation-id={idea.id}
+                      tabIndex={-1}
+                      aria-labelledby={`${ideaAnchor(idea.id)}-title`}
+                    >
+                      <div className="mission-idea-utilities" aria-label={`管理建議：${idea.title}`}>
+                        <button
+                          type="button"
+                          className="mission-idea-drag-handle"
+                          disabled={preferencesDisabled}
+                          aria-label={`拖曳排序：${idea.title}；也可使用向左或向右移動按鈕`}
+                          title="拖曳排序，或使用旁邊的左右按鈕"
+                          onPointerDown={(event) => {
+                            if (preferencesDisabled || event.button !== 0 || !event.isPrimary) return;
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                            pointerDrag.current = {
+                              pointerId: event.pointerId,
+                              id: idea.id,
+                              startX: event.clientX,
+                              startY: event.clientY,
+                              x: event.clientX,
+                              y: event.clientY,
+                              active: false,
+                            };
+                          }}
+                          onPointerMove={(event) => {
+                            const pointer = pointerDrag.current;
+                            if (!pointer || pointer.pointerId !== event.pointerId || preferencesDisabled) return;
+                            pointer.x = event.clientX;
+                            pointer.y = event.clientY;
+                            if (!pointer.active && Math.hypot(pointer.x - pointer.startX, pointer.y - pointer.startY) >= 6) {
+                              pointer.active = true;
+                              setDrag({ repoId: repo.id, id: idea.id });
+                            }
+                          }}
+                          onPointerUp={finishDrag}
+                          onPointerCancel={resetDrag}
+                          onLostPointerCapture={resetDrag}
+                        >
+                          <GripVertical size={16} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={preferencesDisabled || index === 0}
+                          title="向左移動"
+                          aria-label={`向左移動：${idea.title}`}
+                          onClick={() => saveOrder(idea.id, shownIdeas[index - 1].id, "before")}
+                        >
+                          <ChevronLeft size={16} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={preferencesDisabled || index === shownIdeas.length - 1}
+                          title="向右移動"
+                          aria-label={`向右移動：${idea.title}`}
+                          onClick={() => saveOrder(idea.id, shownIdeas[index + 1].id, "after")}
+                        >
+                          <ChevronRight size={16} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          className="mission-idea-hide"
+                          disabled={preferencesDisabled}
+                          aria-label={`隱藏：${idea.title}`}
+                          title="隱藏此建議，可稍後恢復"
+                          onClick={() => setHidden(idea.id, true)}
+                        >
+                          <EyeOff size={14} aria-hidden="true" />隱藏
+                        </button>
+                      </div>
+                      <div className="mission-idea-top">
+                        <span className="mission-idea-number">
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <span className="mission-idea-direction">
+                          <Icon size={13} />
+                          {direction?.label ?? idea.direction}
+                        </span>
+                        <span className="mission-idea-effort">
+                          {effortLabels[idea.effort]}範圍
+                        </span>
+                        {addedIds.has(idea.id) && (
+                          <span className="mission-idea-new-badge">本輪新增</span>
+                        )}
+                      </div>
+                      <h3 id={`${ideaAnchor(idea.id)}-title`}>{idea.title}</h3>
+                      <p className="mission-idea-problem">{idea.problem}</p>
+                      <div className="mission-idea-impact">
+                        <Users size={15} />
+                        <p>
+                          <strong>對使用者的幫助</strong>
+                          {idea.userImpact}
+                        </p>
+                      </div>
+                      <details className="mission-idea-approach">
+                        <summary>
+                          看建議做法與驗收方式
+                          <ChevronRight size={14} />
+                        </summary>
+                        <p>{idea.approach}</p>
+                        {idea.acceptance.length > 0 && (
+                          <ul>
+                            {idea.acceptance.map((item, itemIndex) => (
+                              <li key={itemIndex}>{item}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </details>
+                      <EvidencePaths
+                        paths={idea.evidence}
+                        details={idea.evidenceDetails}
+                      />
+                      <div className="mission-idea-bottom">
+                        <span
+                          className={`mission-confidence mission-confidence-${idea.confidence}`}
+                        >
+                          <span />
+                          {confidenceLabels[idea.confidence]}
+                        </span>
+                        <button
+                          type="button"
+                          className="mission-text-button"
+                          onClick={() => onChooseRecommendation(idea)}
+                        >
+                          以此方向開始
+                          <ArrowUpRight size={15} />
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </>
           ) : (
             <div className="mission-no-ideas">
               <p>
-                這次分析尚未提出有足夠依據的建議。你可以指定想改善的方向，再讓團隊確認範圍。
+                {hiddenIdeas.length
+                  ? `你已隱藏全部 ${hiddenIdeas.length} 個建議。展開上方「已隱藏」清單，就能選擇恢復顯示。`
+                  : "這次分析尚未提出有足夠依據的建議。你可以指定想改善的方向，再讓團隊確認範圍。"}
               </p>
             </div>
           )}

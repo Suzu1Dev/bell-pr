@@ -99,6 +99,14 @@ button {
   border-right: 1px solid #e3e7df;
   padding: 28px 15px 0;
   z-index: 20;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  scroll-padding-block: 12px;
+}
+.sidebar > * {
+  flex-shrink: 0;
 }
 .brand {
   display: flex;
@@ -425,6 +433,54 @@ button {
   display: flex;
   align-items: center;
   gap: 22px;
+}
+.workspace-command {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #f8faf6;
+  color: #697368;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.workspace-command:hover:not(:disabled) {
+  border-color: #b8cbb4;
+  color: var(--green);
+}
+.workspace-command kbd {
+  font: inherit;
+  color: #7a8873;
+}
+.skip-to-content {
+  position: fixed;
+  top: 8px;
+  left: 12px;
+  z-index: 110;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: white;
+  transform: translateY(-160%);
+}
+.skip-to-content:focus {
+  transform: translateY(0);
+}
+@media (max-width: 1100px) {
+  .workspace-command > span {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .workspace-command kbd {
+    display: none;
+  }
+  .workspace-command {
+    min-width: 32px;
+    padding: 5px;
+  }
 }
 .local-badge {
   font-size: 10px;

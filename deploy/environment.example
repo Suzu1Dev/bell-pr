@@ -1,0 +1,9 @@
+BELLPR_PORT=8443
+BELLPR_FRONTEND_PORT=8443
+BELLPR_DATA_DIR=/home/you/apps/bell-pr/.bellpr
+BELLPR_ALLOWED_ORIGINS=https://your-host.your-tailnet.ts.net:8443
+# Set these to the human contributor's existing Git identity when no account-wide Git identity is configured.
+GIT_AUTHOR_NAME="Your name"
+GIT_AUTHOR_EMAIL=you@example.com
+GIT_COMMITTER_NAME="Your name"
+GIT_COMMITTER_EMAIL=you@example.com

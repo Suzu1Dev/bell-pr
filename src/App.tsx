@@ -65,6 +65,7 @@ import type {
   DiscoveryCandidate,
 } from "../shared/discovery";
 import { DiffView } from "./review/DiffView";
+import { CommandPalette } from "./navigation/CommandPalette";
 const ExplanationPanel = lazy(() =>
   import("./review/ExplanationPanel").then((module) => ({
     default: module.ExplanationPanel,
@@ -160,6 +161,7 @@ function Modal({
       ?.querySelector<HTMLElement>("input, textarea, button")
       ?.focus();
     const handler = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || document.querySelector("dialog[open]")) return;
       if (event.key === "Escape") onClose();
       if (event.key === "Tab") {
         const nodes = panel.current?.querySelectorAll<HTMLElement>(
@@ -227,8 +229,11 @@ export default function App() {
   const [status, setStatus] = useState<Status | null>(null);
   const [apiError, setApiError] = useState("");
   const [toast, setToast] = useState("");
+  const [commandOpen, setCommandOpen] = useState(false);
+  const mainContent = useRef<HTMLElement>(null);
+  const commandShortcut = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? "⌘ K" : "Ctrl K";
   const [modal, setModal] = useState<
-    "import" | "task" | "publish" | "help" | "runs" | null
+    "import" | "task" | "models" | "publish" | "help" | "runs" | null
   >(null);
   const [source, setSource] = useState("");
   const [taskRepoId, setTaskRepoId] = useState("");
@@ -240,6 +245,8 @@ export default function App() {
   const settingsRequest = useRef(0);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsReady, setSettingsReady] = useState(false);
+  const [settingsNotice, setSettingsNotice] = useState("");
+  const settingsSaveButton = useRef<HTMLButtonElement>(null);
   const [showFiles, setShowFiles] = useState(true);
   const [showExplanation, setShowExplanation] = useState(true);
   const [focusMode, setFocusMode] = useState(false);
@@ -306,10 +313,40 @@ export default function App() {
   const draftDirty =
     draftTitle !== run.draft.title || draftBody !== run.draft.body;
   const closeModal = useCallback(() => {
+    settingsRequest.current++;
     setModal(null);
     setFormError("");
   }, []);
   const notify = useCallback((message: string) => setToast(message), []);
+  const closeCommandPalette = useCallback(() => {
+    selectionSequence.current++;
+    navigationIntent.current++;
+    setCommandOpen(false);
+  }, []);
+  const toggleCommandPalette = useCallback(() => {
+    if (busy) {
+      notify("正在完成目前操作，稍後即可切換。");
+      return;
+    }
+    if (commandOpen) closeCommandPalette();
+    else {
+      selectionSequence.current++;
+      navigationIntent.current++;
+      setCommandOpen(true);
+    }
+  }, [busy, commandOpen, closeCommandPalette, notify]);
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.repeat) return;
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        toggleCommandPalette();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [toggleCommandPalette]);
 
   useEffect(() => {
     if (reading) window.scrollTo({ top: 0, behavior: "instant" });
@@ -326,11 +363,12 @@ export default function App() {
   }, [sidebarCollapsed]);
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setFocusMode(false);
+      if (event.key === "Escape" && !event.defaultPrevented && !event.isComposing && !modal && !commandOpen)
+        setFocusMode(false);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [modal, commandOpen]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 4500);
@@ -566,6 +604,7 @@ export default function App() {
     setTaskRepoId(id);
     const request = ++settingsRequest.current;
     setFormError("");
+    setSettingsNotice("");
     setSettingsReady(false);
     setSettingsLoading(true);
     setContributionSettings({ ...defaultContributionSettings, ...overrides });
@@ -601,6 +640,19 @@ export default function App() {
   ) {
     void configureTaskRepo(id);
     openModal("task");
+  }
+  function configureContributionModels() {
+    const repo = (currentRepo?.id !== demoRepo.id && currentRepo)
+      || repos.find((repo) => repo.id === exploreRepoId)
+      || repos[0]
+      || demoRepo;
+    void configureTaskRepo(repo.id);
+    openModal("models");
+  }
+  function changeContributionSettings(settings: ContributionSettings) {
+    setContributionSettings(settings);
+    setSettingsNotice("");
+    setFormError("");
   }
   function chooseRecommendation(idea: ContributionRecommendation) {
     setTaskTitle(idea.title);
@@ -670,9 +722,11 @@ export default function App() {
     notify(`已帶入 ${repo.fullName} 的貢獻提案，確認設定後即可開始規劃。`);
   }
   async function saveDirection() {
-    if (!settingsReady || settingsLoading) return;
+    if (busy || !taskRepoId || !settingsReady || settingsLoading) return;
+    const request = settingsRequest.current;
     setBusy(true);
     setFormError("");
+    setSettingsNotice("");
     try {
       if (taskRepoId === "demo-repo")
         localStorage.setItem(
@@ -684,11 +738,24 @@ export default function App() {
           `/repos/${taskRepoId}/settings`,
           send("PUT", contributionSettings),
         );
-      notify("專案的貢獻設定已儲存");
+      if (request === settingsRequest.current) {
+        const message = taskRepoId === demoRepo.id
+          ? "示範設定已儲存在此瀏覽器。"
+          : "此專案的預設設定已儲存。";
+        setSettingsNotice(message);
+        if (modal !== "models") notify(message);
+      }
     } catch (error) {
-      setFormError((error as Error).message);
+      if (request === settingsRequest.current)
+        setFormError((error as Error).message);
     } finally {
       setBusy(false);
+      if (request === settingsRequest.current) {
+        window.requestAnimationFrame(() => {
+          if (document.activeElement === document.body)
+            settingsSaveButton.current?.focus();
+        });
+      }
     }
   }
   async function approveTeamPlan() {
@@ -760,14 +827,20 @@ export default function App() {
     setPage(value);
     setSidebarOpen(false);
   }
-  async function chooseRun(id: string) {
-    navigationIntent.current++;
+  async function chooseRun(id: string, reportError = true): Promise<boolean> {
+    const intent = ++navigationIntent.current;
+    if (id === run.id) {
+      selectionSequence.current++;
+      navigate("workspace");
+      return true;
+    }
     if (
       draftDirty &&
       !window.confirm("PR 草稿尚未儲存。確定切換任務並捨棄這次編輯？")
     )
-      return;
+      return false;
     const sequence = ++selectionSequence.current;
+    const draftAtStart = { ...editorDraft.current };
     try {
       if (id === demoRun.id) {
         setRun(loadDemo());
@@ -778,7 +851,11 @@ export default function App() {
           api<{ run: Run }>(`/runs/${id}`),
           api<{ files: DiffFile[] }>(`/runs/${id}/diff`),
         ]);
-        if (sequence !== selectionSequence.current) return;
+        if (sequence !== selectionSequence.current || intent !== navigationIntent.current) return false;
+        if (editorDraft.current.title !== draftAtStart.title || editorDraft.current.body !== draftAtStart.body) {
+          notify("草稿在切換期間已更新，已保留目前任務。");
+          return false;
+        }
         setRun(r.run);
         setFiles(f.files);
         setSelectedPath(f.files[0]?.path || "");
@@ -787,9 +864,36 @@ export default function App() {
       setMessages({});
       setChatRequests({});
       navigate("workspace");
+      return true;
     } catch (error) {
+      if (sequence !== selectionSequence.current || intent !== navigationIntent.current) return false;
+      if (!reportError) throw error;
       notify((error as Error).message);
+      return false;
     }
+  }
+
+  function focusDestination() {
+    window.requestAnimationFrame(() => {
+      const heading = mainContent.current?.querySelector<HTMLElement>("h1");
+      (heading ?? mainContent.current)?.focus();
+    });
+  }
+
+  async function openPaletteRun(id: string) {
+    const opened = await chooseRun(id, false);
+    if (opened) {
+      closeModal();
+      focusDestination();
+    }
+    return opened;
+  }
+
+  function openPaletteRepo(id: string) {
+    setExploreRepoId(id);
+    closeModal();
+    navigate("explore");
+    focusDestination();
   }
   async function refreshRun() {
     if (demo) {
@@ -1105,6 +1209,10 @@ export default function App() {
         } as CSSProperties
       }
     >
+      <a className="skip-to-content" href="#main-content" onClick={(event) => {
+        event.preventDefault();
+        focusDestination();
+      }}>跳至主要內容</a>
       {sidebarOpen && (
         <button
           className="sidebar-scrim"
@@ -1260,7 +1368,7 @@ export default function App() {
           </div>
         </div>
       </aside>
-      <main className="main-shell">
+      <main className="main-shell" id="main-content" ref={mainContent} tabIndex={-1}>
         <header className="topbar">
           <div className="breadcrumb">
             <button
@@ -1303,6 +1411,19 @@ export default function App() {
             </span>
           </div>
           <div className="topbar-right">
+            <button
+              className="workspace-command"
+              onClick={toggleCommandPalette}
+              disabled={busy}
+              aria-label="快速切換專案與貢獻"
+              aria-keyshortcuts="Meta+K Control+K"
+              aria-haspopup="dialog"
+              title={`快速切換專案與貢獻 (${commandShortcut})`}
+            >
+              <Search size={15} aria-hidden="true" />
+              <span>快速切換</span>
+              <kbd>{commandShortcut}</kbd>
+            </button>
             <span className="local-badge">
               <span className="connection-dot" /> Local-first
             </span>
@@ -1350,7 +1471,7 @@ export default function App() {
                 </button>
               </div>
               <div className="title-row">
-                <h1>{run.title}</h1>
+                <h1 tabIndex={-1}>{run.title}</h1>
                 <span
                   className={`status-badge ${run.status === "failed" ? "error" : ""}`}
                 >
@@ -1439,9 +1560,23 @@ export default function App() {
                   className="review-tabs"
                   role="tablist"
                   aria-label="任務內容"
+                  onKeyDown={(event) => {
+                    if (event.altKey || event.ctrlKey || event.metaKey || event.nativeEvent.isComposing) return;
+                    const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+                    const index = tabs.indexOf(event.target as HTMLButtonElement);
+                    if (index < 0) return;
+                    const next = event.key === "ArrowRight" ? (index + 1) % tabs.length
+                      : event.key === "ArrowLeft" ? (index - 1 + tabs.length) % tabs.length
+                        : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
+                    if (next < 0) return;
+                    event.preventDefault();
+                    tabs[next].focus();
+                    tabs[next].click();
+                  }}
                 >
                   <button
                     role="tab"
+                    tabIndex={tab === "overview" ? 0 : -1}
                     aria-selected={tab === "overview"}
                     className={tab === "overview" ? "selected" : ""}
                     onClick={() => {
@@ -1454,6 +1589,7 @@ export default function App() {
                   </button>
                   <button
                     role="tab"
+                    tabIndex={tab === "changes" ? 0 : -1}
                     aria-selected={tab === "changes"}
                     className={tab === "changes" ? "selected" : ""}
                     onClick={() => setTab("changes")}
@@ -1463,6 +1599,7 @@ export default function App() {
                   </button>
                   <button
                     role="tab"
+                    tabIndex={tab === "activity" ? 0 : -1}
                     aria-selected={tab === "activity"}
                     className={tab === "activity" ? "selected" : ""}
                     onClick={() => setTab("activity")}
@@ -1472,6 +1609,7 @@ export default function App() {
                   </button>
                   <button
                     role="tab"
+                    tabIndex={tab === "draft" ? 0 : -1}
                     aria-selected={tab === "draft"}
                     className={tab === "draft" ? "selected" : ""}
                     onClick={() => setTab("draft")}
@@ -1496,8 +1634,15 @@ export default function App() {
                   brief={demo ? demoContributionBrief : contributionBrief(run)}
                   loading={intelligence.loading}
                   error={intelligence.error}
+                  recommending={intelligence.recommending}
+                  recommendationError={intelligence.recommendationError}
+                  recommendationPreferences={intelligence.recommendationPreferences}
+                  savingPreferences={intelligence.savingPreferences}
+                  preferenceError={intelligence.preferenceError}
+                  onSavePreferences={intelligence.savePreferences}
                   stale={intelligence.stale}
                   onAnalyze={intelligence.analyze}
+                  onRecommendMore={intelligence.recommendMore}
                   onChooseRecommendation={chooseRecommendation}
                   onReadCode={() => setTab("changes")}
                 />
@@ -2115,7 +2260,7 @@ export default function App() {
             <div className="page-title">
               <div>
                 <span className="eyebrow">REPOSITORY EXPLORER</span>
-                <h1>{exploreRepo.fullName}</h1>
+                <h1 tabIndex={-1}>{exploreRepo.fullName}</h1>
                 <p>先了解使用者與問題，再決定這次貢獻的方向。</p>
               </div>
               <button
@@ -2131,8 +2276,15 @@ export default function App() {
               insights={intelligence.insights}
               loading={intelligence.loading}
               error={intelligence.error}
+              recommending={intelligence.recommending}
+              recommendationError={intelligence.recommendationError}
+              recommendationPreferences={intelligence.recommendationPreferences}
+              savingPreferences={intelligence.savingPreferences}
+              preferenceError={intelligence.preferenceError}
+              onSavePreferences={intelligence.savePreferences}
               stale={intelligence.stale}
               onAnalyze={intelligence.analyze}
+              onRecommendMore={intelligence.recommendMore}
               onChooseRecommendation={chooseRecommendation}
               onReadCode={() => setTab("changes")}
               onStartContribution={() => beginContribution(exploreRepo.id)}
@@ -2151,7 +2303,7 @@ export default function App() {
             <div className="page-title">
               <div>
                 <span className="eyebrow">YOUR REPOSITORIES</span>
-                <h1>下一個貢獻，從這裡開始。</h1>
+                <h1 tabIndex={-1}>下一個貢獻，從這裡開始。</h1>
                 <p>帶入你在意的專案，讓想法成為真正的改動。</p>
               </div>
               <button
@@ -2244,7 +2396,7 @@ export default function App() {
             <div className="page-title">
               <div>
                 <span className="eyebrow">BUILT TO COLLABORATE</span>
-                <h1>一個目標，一支 Agent team。</h1>
+                <h1 tabIndex={-1}>一個目標，一支 Agent team。</h1>
                 <p>從拆解問題到交叉審查，讓專業分工融入你的開發流程。</p>
               </div>
               <button
@@ -2315,7 +2467,7 @@ export default function App() {
             <div className="page-title">
               <div>
                 <span className="eyebrow">LEARN BY CONTRIBUTING</span>
-                <h1>讓看懂的程式碼，成為你的經驗。</h1>
+                <h1 tabIndex={-1}>讓看懂的程式碼，成為你的經驗。</h1>
                 <p>從這次重試機制的示範，理解實際開發中的選擇與取捨。</p>
               </div>
               <span className="demo-pill">示範學習內容</span>
@@ -2352,11 +2504,13 @@ export default function App() {
                   <code>{note.snippet}</code>
                   <button
                     onClick={() => {
-                      chooseRun(demoRun.id).then(() =>
+                      chooseRun(demoRun.id).then((opened) => {
+                        if (!opened) return;
                         setSelectedPath(
                           demoFiles[note.index]?.path || demoFiles[0].path,
-                        ),
-                      );
+                        );
+                        setTab("changes");
+                      });
                     }}
                   >
                     回到程式碼理解它 <ArrowUpRight size={15} />
@@ -2379,7 +2533,7 @@ export default function App() {
             <div className="page-title">
               <div>
                 <span className="eyebrow">CONNECTIONS</span>
-                <h1>讓工作環境準備就緒。</h1>
+                <h1 tabIndex={-1}>讓工作環境準備就緒。</h1>
                 <p>沿用本機 CLI 的登入狀態，憑證不會儲存在瀏覽器。</p>
               </div>
               <button
@@ -2434,7 +2588,7 @@ export default function App() {
               <div className="setup-command">
                 <button
                   className="button secondary"
-                  onClick={() => beginContribution()}
+                  onClick={configureContributionModels}
                 >
                   設定貢獻模型
                 </button>
@@ -2488,6 +2642,18 @@ export default function App() {
           </section>
         )}
       </main>
+      {commandOpen && (
+        <CommandPalette
+          repos={[...repos, demoRepo]}
+          runs={[...runs, { ...demoRun, status: demo ? run.status : demoRun.status }]}
+          currentRepoId={insightRepo?.id}
+          currentRunId={run.id}
+          statusLabels={statusLabels}
+          onClose={closeCommandPalette}
+          onSelectRun={openPaletteRun}
+          onSelectRepo={openPaletteRepo}
+        />
+      )}
       {toast && (
         <div className="toast" role="status">
           <CircleCheck size={18} />
@@ -2558,6 +2724,83 @@ export default function App() {
           </form>
         </Modal>
       )}
+      {modal === "models" && (
+        <Modal
+          wide
+          title="設定貢獻模型"
+          subtitle="為專案儲存預設模型與思考強度，套用到之後建立的任務。"
+          onClose={closeModal}
+        >
+          <form onSubmit={(event) => {
+            event.preventDefault();
+            void saveDirection();
+          }}>
+            <label className="field-label" htmlFor="model-settings-repo">
+              專案
+            </label>
+            <select
+              id="model-settings-repo"
+              className="text-input"
+              value={taskRepoId}
+              disabled={busy}
+              onChange={(event) => configureTaskRepo(event.target.value)}
+              required
+            >
+              {[...repos, demoRepo].map((repo) => (
+                <option value={repo.id} key={repo.id}>
+                  {repo.fullName}
+                  {repo.id === demoRepo.id ? "（示範 · 僅存於瀏覽器）" : ""}
+                </option>
+              ))}
+            </select>
+            {settingsLoading && (
+              <p className="field-help" role="status">正在載入專案設定…</p>
+            )}
+            {!settingsLoading && !settingsReady && (
+              <button
+                type="button"
+                className="save-direction-button"
+                onClick={() => configureTaskRepo(taskRepoId)}
+              >
+                重新載入專案設定
+              </button>
+            )}
+            <fieldset
+              className="direction-settings-container"
+              disabled={busy || settingsLoading || !settingsReady}
+            >
+              <DirectionSettings
+                value={contributionSettings}
+                onChange={changeContributionSettings}
+                modelsOnly
+                compact
+              />
+            </fieldset>
+            {formError && (
+              <p role="alert" className="inline-error">{formError}</p>
+            )}
+            {settingsNotice && (
+              <p role="status" className="model-settings-saved">
+                <CircleCheck size={16} />{settingsNotice}
+              </p>
+            )}
+            <div className="modal-actions">
+              <button type="button" className="button secondary" onClick={closeModal}>
+                關閉
+              </button>
+              <button
+                ref={settingsSaveButton}
+                type="submit"
+                className="button primary"
+                disabled={busy || !taskRepoId || settingsLoading || !settingsReady}
+              >
+                {busy ? <Loader2 size={16} className="spin" /> : <Check size={16} />}
+                {busy ? "正在儲存…" : "儲存設定"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
       {modal === "task" && (
         <Modal
           wide
@@ -2573,6 +2816,7 @@ export default function App() {
               id="task-repo"
               className="text-input"
               value={taskRepoId}
+              disabled={busy}
               onChange={(e) => configureTaskRepo(e.target.value)}
               required
             >
@@ -2625,11 +2869,11 @@ export default function App() {
             )}
             <fieldset
               className="direction-settings-container"
-              disabled={settingsLoading || !settingsReady}
+              disabled={busy || settingsLoading || !settingsReady}
             >
               <DirectionSettings
                 value={contributionSettings}
-                onChange={setContributionSettings}
+                onChange={changeContributionSettings}
                 compact
               />
             </fieldset>

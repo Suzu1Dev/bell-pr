@@ -71,12 +71,14 @@ export interface DirectionSettingsProps {
   value: ContributionSettings;
   onChange: (next: ContributionSettings) => void;
   compact?: boolean;
+  modelsOnly?: boolean;
 }
 
 export function DirectionSettings({
   value,
   onChange,
   compact = false,
+  modelsOnly = false,
 }: DirectionSettingsProps) {
   const id = useId();
   const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
@@ -126,116 +128,124 @@ export function DirectionSettings({
 
   return (
     <div
-      className={`mission-settings${compact ? " mission-settings-compact" : ""}`}
+      className={`mission-settings${compact ? " mission-settings-compact" : ""}${modelsOnly ? " mission-settings-models-only" : ""}`}
     >
-      <fieldset className="mission-fieldset">
-        <legend>
-          <span className="mission-legend-icon">
-            <Sparkles size={16} />
-          </span>
-          這次想從哪個方向貢獻？
-        </legend>
-        <p className="mission-field-note">
-          選一個主要方向，讓團隊圍繞同一個目標工作。
-        </p>
-        <div className="mission-direction-grid">
-          {directionOptions.map(
-            ({ value: direction, label, hint, icon: Icon }) => (
-              <label
-                className={`mission-direction${value.direction === direction ? " mission-direction-selected" : ""}`}
-                key={direction}
-              >
-                <input
-                  type="radio"
-                  name={`${id}-direction`}
-                  value={direction}
-                  checked={value.direction === direction}
-                  onChange={() => update("direction", direction)}
+      {!modelsOnly && (
+        <>
+          <fieldset className="mission-fieldset">
+            <legend>
+              <span className="mission-legend-icon">
+                <Sparkles size={16} />
+              </span>
+              這次想從哪個方向貢獻？
+            </legend>
+            <p className="mission-field-note">
+              選一個主要方向，讓團隊圍繞同一個目標工作。
+            </p>
+            <div className="mission-direction-grid">
+              {directionOptions.map(
+                ({ value: direction, label, hint, icon: Icon }) => (
+                  <label
+                    className={`mission-direction${value.direction === direction ? " mission-direction-selected" : ""}`}
+                    key={direction}
+                  >
+                    <input
+                      type="radio"
+                      name={`${id}-direction`}
+                      value={direction}
+                      checked={value.direction === direction}
+                      onChange={() => update("direction", direction)}
+                    />
+                    <Icon size={17} aria-hidden="true" />
+                    <span>
+                      <strong>{label}</strong>
+                      {!compact && <small>{hint}</small>}
+                    </span>
+                  </label>
+                ),
+              )}
+            </div>
+          </fieldset>
+
+          <div className="mission-settings-fields">
+            <div className="mission-form-field">
+              <label htmlFor={`${id}-target`}>誰會因此受益？</label>
+              <input
+                id={`${id}-target`}
+                maxLength={2000}
+                value={value.targetUser}
+                onChange={(event) => update("targetUser", event.target.value)}
+                placeholder="例如：用這個 SDK 建立儀表板的前端開發者"
+              />
+            </div>
+            <div className="mission-form-field">
+              <label htmlFor={`${id}-outcome`}>完成後，使用者會有什麼不同？</label>
+              <textarea
+                id={`${id}-outcome`}
+                maxLength={4000}
+                value={value.outcome}
+                onChange={(event) => update("outcome", event.target.value)}
+                rows={compact ? 2 : 3}
+                placeholder="例如：短暫網路中斷時，列表能自動重試載入，不需要手動重新整理。"
+              />
+            </div>
+            <div className="mission-form-columns">
+              <div className="mission-form-field">
+                <label htmlFor={`${id}-constraints`}>
+                  開發界線 <span>選填</span>
+                </label>
+                <textarea
+                  id={`${id}-constraints`}
+                  maxLength={4000}
+                  value={value.constraints}
+                  onChange={(event) => update("constraints", event.target.value)}
+                  rows={3}
+                  placeholder="例如：維持既有 API 相容；只處理 GET；不新增套件。"
+                  aria-describedby={`${id}-constraints-help`}
                 />
-                <Icon size={17} aria-hidden="true" />
-                <span>
-                  <strong>{label}</strong>
-                  {!compact && <small>{hint}</small>}
-                </span>
-              </label>
-            ),
-          )}
-        </div>
-      </fieldset>
-
-      <div className="mission-settings-fields">
-        <div className="mission-form-field">
-          <label htmlFor={`${id}-target`}>誰會因此受益？</label>
-          <input
-            id={`${id}-target`}
-            maxLength={2000}
-            value={value.targetUser}
-            onChange={(event) => update("targetUser", event.target.value)}
-            placeholder="例如：用這個 SDK 建立儀表板的前端開發者"
-          />
-        </div>
-        <div className="mission-form-field">
-          <label htmlFor={`${id}-outcome`}>完成後，使用者會有什麼不同？</label>
-          <textarea
-            id={`${id}-outcome`}
-            maxLength={4000}
-            value={value.outcome}
-            onChange={(event) => update("outcome", event.target.value)}
-            rows={compact ? 2 : 3}
-            placeholder="例如：短暫網路中斷時，列表能自動重試載入，不需要手動重新整理。"
-          />
-        </div>
-        <div className="mission-form-columns">
-          <div className="mission-form-field">
-            <label htmlFor={`${id}-constraints`}>
-              開發界線 <span>選填</span>
-            </label>
-            <textarea
-              id={`${id}-constraints`}
-              maxLength={4000}
-              value={value.constraints}
-              onChange={(event) => update("constraints", event.target.value)}
-              rows={3}
-              placeholder="例如：維持既有 API 相容；只處理 GET；不新增套件。"
-              aria-describedby={`${id}-constraints-help`}
-            />
-            <p id={`${id}-constraints-help`} className="mission-field-note">
-              寫下不能改動的行為、相容性或範圍限制。
-            </p>
+                <p id={`${id}-constraints-help`} className="mission-field-note">
+                  寫下不能改動的行為、相容性或範圍限制。
+                </p>
+              </div>
+              <div className="mission-form-field">
+                <label htmlFor={`${id}-acceptance`}>
+                  怎樣算完成？ <span>選填</span>
+                </label>
+                <textarea
+                  id={`${id}-acceptance`}
+                  maxLength={4000}
+                  value={value.acceptance}
+                  onChange={(event) => update("acceptance", event.target.value)}
+                  rows={3}
+                  placeholder={
+                    "例如：\n暫時性失敗可重試成功\n401 不重試\n既有測試全部通過"
+                  }
+                  aria-describedby={`${id}-acceptance-help`}
+                />
+                <p id={`${id}-acceptance-help`} className="mission-field-note">
+                  以可觀察的結果或測試描述，一行一項。
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="mission-form-field">
-            <label htmlFor={`${id}-acceptance`}>
-              怎樣算完成？ <span>選填</span>
-            </label>
-            <textarea
-              id={`${id}-acceptance`}
-              maxLength={4000}
-              value={value.acceptance}
-              onChange={(event) => update("acceptance", event.target.value)}
-              rows={3}
-              placeholder={
-                "例如：\n暫時性失敗可重試成功\n401 不重試\n既有測試全部通過"
-              }
-              aria-describedby={`${id}-acceptance-help`}
-            />
-            <p id={`${id}-acceptance-help`} className="mission-field-note">
-              以可觀察的結果或測試描述，一行一項。
-            </p>
-          </div>
-        </div>
-      </div>
 
-      <fieldset className="mission-fieldset mission-model-settings">
-        <legend>
-          <span className="mission-legend-icon">
-            <Cpu size={16} />
-          </span>
-          模型與思考方式
-        </legend>
-        <p className="mission-field-note">
-          全體 Agents
-          共用此設定。新任務會記錄自己的設定，後續修改不會影響已建立的任務。
-        </p>
+        </>
+      )}
+      <div
+        className="mission-model-settings"
+        role="group"
+        aria-labelledby={`${id}-model-heading`}
+      >
+        <div className="mission-model-header">
+          <h3 id={`${id}-model-heading`} className="mission-model-heading">
+            <Cpu size={16} aria-hidden="true" />
+            模型與思考方式
+          </h3>
+          <p className="mission-field-note">
+            全體 Agents
+            共用此設定。新任務會記錄自己的設定，後續修改不會影響已建立的任務。
+          </p>
+        </div>
         <div className="mission-form-columns">
           <div className="mission-form-field">
             <label htmlFor={`${id}-model`}>執行模型</label>
@@ -332,80 +342,84 @@ export function DirectionSettings({
             </button>
           </div>
         )}
-      </fieldset>
-
-      <div className="mission-form-field mission-ponytail-setting">
-        <label htmlFor={`${id}-ponytail`}>Ponytail 開發方式</label>
-        <select
-          id={`${id}-ponytail`}
-          value={value.ponytailMode ?? defaultPonytailMode}
-          onChange={(event) =>
-            update("ponytailMode", event.target.value as PonytailMode)
-          }
-          aria-describedby={`${id}-ponytail-help`}
-        >
-          <option value="lite">輕量 · 預設</option>
-          <option value="full">完整</option>
-          <option value="off">關閉</option>
-        </select>
-        <p id={`${id}-ponytail-help`} className="mission-field-note">
-          輕量：以精簡規則減少過度開發。完整：套用更多規則，優先重用現有程式與原生功能。關閉：方便比較不同方式的成果與用量。{" "}
-          <a href={ponytailSource} target="_blank" rel="noreferrer">
-            查看 Ponytail
-          </a>
-        </p>
       </div>
 
-      <div className="mission-team-settings">
-        <fieldset className="mission-fieldset mission-team-size">
-          <legend>
-            <span className="mission-legend-icon">
-              <Users size={16} />
-            </span>
-            協作規模
-          </legend>
-          <div className="mission-team-choices">
-            {([2, 3, 4] as const).map((count) => (
-              <label
-                className={
-                  value.maxTeammates === count
-                    ? "mission-team-choice selected"
-                    : "mission-team-choice"
-                }
-                key={count}
-              >
-                <input
-                  type="radio"
-                  name={`${id}-teammates`}
-                  checked={value.maxTeammates === count}
-                  onChange={() => update("maxTeammates", count)}
-                />
-                <strong>{count}</strong>
-                <span>位隊友</span>
-              </label>
-            ))}
+      {!modelsOnly && (
+        <>
+          <div className="mission-form-field mission-ponytail-setting">
+            <label htmlFor={`${id}-ponytail`}>Ponytail 開發方式</label>
+            <select
+              id={`${id}-ponytail`}
+              value={value.ponytailMode ?? defaultPonytailMode}
+              onChange={(event) =>
+                update("ponytailMode", event.target.value as PonytailMode)
+              }
+              aria-describedby={`${id}-ponytail-help`}
+            >
+              <option value="lite">輕量 · 預設</option>
+              <option value="full">完整</option>
+              <option value="off">關閉</option>
+            </select>
+            <p id={`${id}-ponytail-help`} className="mission-field-note">
+              輕量：以精簡規則減少過度開發。完整：套用更多規則，優先重用現有程式與原生功能。關閉：方便比較不同方式的成果與用量。{" "}
+              <a href={ponytailSource} target="_blank" rel="noreferrer">
+                查看 Ponytail
+              </a>
+            </p>
           </div>
-          <p className="mission-field-note">
-            設定團隊上限，實際分工由任務計畫決定。
-          </p>
-        </fieldset>
-        <label className="mission-plan-option">
-          <input
-            type="checkbox"
-            checked={value.requirePlanApproval}
-            onChange={(event) =>
-              update("requirePlanApproval", event.target.checked)
-            }
-          />
-          <span className="mission-plan-copy">
-            <strong>
-              <Settings2 size={16} />
-              開發前，先讓我確認計畫
-            </strong>
-            <small>先看分工、範圍與驗收方式，確認後再進入實作。</small>
-          </span>
-        </label>
-      </div>
+
+          <div className="mission-team-settings">
+            <fieldset className="mission-fieldset mission-team-size">
+              <legend>
+                <span className="mission-legend-icon">
+                  <Users size={16} />
+                </span>
+                協作規模
+              </legend>
+              <div className="mission-team-choices">
+                {([2, 3, 4] as const).map((count) => (
+                  <label
+                    className={
+                      value.maxTeammates === count
+                        ? "mission-team-choice selected"
+                        : "mission-team-choice"
+                    }
+                    key={count}
+                  >
+                    <input
+                      type="radio"
+                      name={`${id}-teammates`}
+                      checked={value.maxTeammates === count}
+                      onChange={() => update("maxTeammates", count)}
+                    />
+                    <strong>{count}</strong>
+                    <span>位隊友</span>
+                  </label>
+                ))}
+              </div>
+              <p className="mission-field-note">
+                設定團隊上限，實際分工由任務計畫決定。
+              </p>
+            </fieldset>
+            <label className="mission-plan-option">
+              <input
+                type="checkbox"
+                checked={value.requirePlanApproval}
+                onChange={(event) =>
+                  update("requirePlanApproval", event.target.checked)
+                }
+              />
+              <span className="mission-plan-copy">
+                <strong>
+                  <Settings2 size={16} />
+                  開發前，先讓我確認計畫
+                </strong>
+                <small>先看分工、範圍與驗收方式，確認後再進入實作。</small>
+              </span>
+            </label>
+          </div>
+        </>
+      )}
     </div>
   );
 }

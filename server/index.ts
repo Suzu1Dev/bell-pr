@@ -16,25 +16,63 @@ import { AppError } from "./types.js";
 import { redact } from "./process.js";
 import { DiscoveryService } from "./discovery.js";
 
-export function localhostGuard(ports: number[]): RequestHandler {
-  const allowedHosts = new Set(
+export function parseAllowedOrigins(value = ""): string[] {
+  if (!value.trim()) return [];
+  return value.split(",").map((entry) => {
+    const value = entry.trim();
+    try {
+      const url = new URL(value);
+      if (
+        !/^https?:\/\/[^/?#\\\s@*]+$/i.test(value) ||
+        url.username ||
+        url.password ||
+        url.pathname !== "/" ||
+        url.search ||
+        url.hash ||
+        url.hostname.includes("*") ||
+        value.endsWith(":") ||
+        url.port === "0"
+      )
+        throw new Error("Invalid origin");
+      return url.origin;
+    } catch {
+      throw new Error(
+        "BELLPR_ALLOWED_ORIGINS must contain comma-separated HTTP(S) origins without credentials, paths, queries, fragments, or wildcards.",
+      );
+    }
+  });
+}
+
+export function localhostGuard(
+  ports: number[],
+  configuredOrigins = "",
+): RequestHandler {
+  const localHosts = new Set(
     ports.flatMap((port) => [
       `localhost:${port}`,
       `127.0.0.1:${port}`,
       `[::1]:${port}`,
     ]),
   );
-  const allowedOrigins = new Set(
-    [...allowedHosts].map((host) => `http://${host}`),
-  );
+  const localOrigins = new Set([...localHosts].map((host) => `http://${host}`));
+  const allowedOrigins = new Set(parseAllowedOrigins(configuredOrigins));
+  const allowedHosts = new Set([
+    ...localHosts,
+    ...[...allowedOrigins].map((origin) => new URL(origin).host),
+  ]);
   return (req, res, next) => {
-    if (!allowedHosts.has((req.headers.host ?? "").toLowerCase())) {
-      res.status(403).json({ error: "此服務僅接受本機網址。" });
+    const host = (req.headers.host ?? "").toLowerCase();
+    if (!allowedHosts.has(host)) {
+      res.status(403).json({ error: "不允許此服務網址。" });
       return;
     }
     const origin = req.get("origin");
     if (
-      (origin && !allowedOrigins.has(origin)) ||
+      (origin &&
+        !(
+          (localHosts.has(host) && localOrigins.has(origin)) ||
+          (allowedOrigins.has(origin) && new URL(origin).host === host)
+        )) ||
       req.get("sec-fetch-site") === "cross-site"
     ) {
       res.status(403).json({ error: "不允許跨來源請求。" });
@@ -62,6 +100,7 @@ export function createApp(
     port = 4311,
     frontendPort = 4310,
     staticDirectory = path.resolve("dist"),
+    allowedOrigins = "",
   } = {},
 ) {
   const insights = new ProjectInsightsService(workbench.store, {
@@ -74,7 +113,7 @@ export function createApp(
   app.locals.insights = insights;
   app.locals.discovery = discovery;
   app.disable("x-powered-by");
-  app.use(localhostGuard([port, frontendPort]));
+  app.use(localhostGuard([port, frontendPort], allowedOrigins));
   app.use(express.json({ limit: "160kb", strict: true }));
   app.get("/api/status", async (_req, res) => {
     res.json(await workbench.status());
@@ -105,6 +144,17 @@ export function createApp(
   );
   app.post("/api/repos/:id/insights", async (req, res) =>
     res.json(await insights.generate(req.params.id)),
+  );
+  app.post("/api/repos/:id/insights/recommendations", async (req, res) =>
+    res.json(await insights.generateMore(req.params.id, req.body)),
+  );
+  app.put("/api/repos/:id/insights/preferences", async (req, res) =>
+    res.json({
+      recommendationPreferences: await insights.setRecommendationPreferences(
+        req.params.id,
+        req.body,
+      ),
+    }),
   );
   app.get("/api/repos/:id/settings", async (req, res) =>
     res.json({ settings: await insights.getSettings(req.params.id) }),
@@ -279,12 +329,14 @@ async function main() {
     throw new Error(
       "BELLPR_PORT / BELLPR_FRONTEND_PORT must be between 1024 and 65535.",
     );
+  const allowedOrigins = process.env.BELLPR_ALLOWED_ORIGINS ?? "";
+  parseAllowedOrigins(allowedOrigins);
   const store = new Store(
     path.resolve(process.env.BELLPR_DATA_DIR ?? ".bellpr"),
   );
   await store.initialize();
   const workbench = new Workbench(store);
-  const app = createApp(workbench, { port, frontendPort });
+  const app = createApp(workbench, { port, frontendPort, allowedOrigins });
   const server = app.listen(port, "127.0.0.1", () =>
     console.log(`BELL-PR → http://127.0.0.1:${port}`),
   );

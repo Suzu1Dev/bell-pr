@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { once } from "node:events";
+import { request } from "node:http";
 import {
   mkdtemp,
   mkdir,
@@ -12,7 +14,11 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { defaultContributionSettings } from "../shared/insights.js";
+import {
+  defaultContributionSettings,
+  projectRecommendationBatchSize,
+  type ProjectInsights,
+} from "../shared/insights.js";
 import type { ModelCatalog } from "../shared/models.js";
 import { ProjectInsightsService } from "./insights.js";
 import { command, git } from "./process.js";
@@ -220,6 +226,7 @@ test("analysis uses bounded read-only structured Codex context and excludes secr
     assert.deepEqual(await service.get(f.repo.id), {
       insights: null,
       stale: false,
+      recommendationPreferences: { order: [], hidden: [] },
     });
     const result = await service.generate(f.repo.id);
     assert.equal(result.stale, false);
@@ -460,6 +467,7 @@ test("missing authentication and duplicate in-flight analysis fail explicitly wi
     assert.deepEqual(await unavailable.get(f.repo.id), {
       insights: null,
       stale: false,
+      recommendationPreferences: { order: [], hidden: [] },
     });
     let release!: () => void;
     let entered!: () => void;
@@ -522,6 +530,7 @@ test("shutdown aborts active analysis, waits for cleanup and blocks new generati
     assert.deepEqual(await service.get(f.repo.id), {
       insights: null,
       stale: false,
+      recommendationPreferences: { order: [], hidden: [] },
     });
     assert.deepEqual(
       (await readdir(path.join(f.store.directory, "insights"))).filter((file) =>
@@ -586,6 +595,342 @@ test("analysis sends and persists the chosen model even when repository settings
     );
   } finally {
     await service.shutdown();
+    await f.cleanup();
+  }
+});
+
+test("more recommendations request five new proposals per call, append atomically and retain original analysis", async () => {
+  const f = await fixture();
+  try {
+    const first = new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: fakeCodex().execute,
+    });
+    const original = (await first.generate(f.repo.id)).insights;
+    const proposal = validAnalysis().recommendations[0];
+    const newer = {
+      ...proposal,
+      title: "更容易理解的問候範例",
+      problem: "問候常數的用途可考慮補充範例，完整文件仍待確認。",
+      direction: "docs",
+    };
+    const distinct = {
+      ...newer,
+      title: "說明輸出格式的設計考量",
+      problem: "固定問候字串的格式決策可補充說明，需求需先確認。",
+    };
+    let answer: unknown = { recommendations: [
+      { ...proposal, title: ` ${proposal.title}！ `, problem: "改寫同一個標題不應再新增" },
+      { ...proposal, title: "重複問題也應忽略", problem: ` ${proposal.problem}！ ` },
+      newer,
+      distinct,
+      { ...newer, title: ` ${newer.title}！ `, problem: "同一輪重複也應忽略" },
+    ] };
+    let inspect = true;
+    let requestedCount = projectRecommendationBatchSize;
+    let beforeBatch: ProjectInsights | undefined;
+    let service: ProjectInsightsService;
+    const catalog = async (): Promise<ModelCatalog> => ({ source: "codex", models: [{
+      id: "test-model", name: "Test", description: "Test only", isDefault: true,
+      reasoningEfforts: ["low", "high"], defaultReasoningEffort: "low",
+    }] });
+    const stub = fakeCodex(() => answer, async (args, options) => {
+      assert.ok(options.input!.includes(`Return exactly ${requestedCount}`));
+      assert.match(options.input!, /Consider all relevant contribution directions/);
+      assert.match(options.input!, /Return fewer only when the supplied evidence cannot support/);
+      if (beforeBatch)
+        assert.deepEqual((await service.get(f.repo.id)).insights, beforeBatch);
+      if (inspect) {
+        assert.equal(args[args.indexOf("--sandbox") + 1], "read-only");
+        assert.ok(args.includes("--ignore-user-config"));
+        assert.ok(args.includes('approval_policy="never"'));
+        assert.notEqual(options.cwd, f.repository);
+        assert.equal(args[args.indexOf("--model") + 1], "test-model");
+        assert.ok(args.includes('model_reasoning_effort="high"'));
+        assert.match(options.input!, /mode=full/);
+        assert.match(options.input!, /existingRecommendations/);
+        assert.match(options.input!, /驗證問候文字/);
+        assert.doesNotMatch(options.input!, /Return 0–5/);
+        assert.doesNotMatch(options.input!, /do-not-send-env|ghp_abcdefghijklmnopqrstuvwxyz/);
+        const schema = JSON.parse(await readFile(args[args.indexOf("--output-schema") + 1], "utf8"));
+        assert.deepEqual(schema.required, ["recommendations"]);
+        assert.equal(schema.additionalProperties, false);
+        await service.setSettings(f.repo.id, { ...defaultContributionSettings, outcome: "產出期間更新的偏好" });
+      }
+      options.onLine?.(JSON.stringify({ type: "turn.completed", usage: { input_tokens: 250, cached_input_tokens: 120, output_tokens: 90 } }), "stdout");
+    });
+    service = new ProjectInsightsService(f.store, { command: stub.execute, getModelCatalog: catalog });
+    await service.setSettings(f.repo.id, { ...defaultContributionSettings, model: "test-model", reasoningEffort: "high", ponytailMode: "full" });
+    const expanded = (await service.generateMore(f.repo.id, {})).insights;
+    assert.equal(stub.calls.filter((call) => call.args[0] === "exec").length, 1);
+    assert.deepEqual(expanded.recommendations.slice(0, 1), original.recommendations);
+    assert.equal(expanded.recommendations.length, 3);
+    assert.equal(expanded.recommendationExpansion?.requestedCount, 5);
+    assert.deepEqual(expanded.recommendationExpansion?.addedIds, ["greeting-tests-2", "greeting-tests-3"]);
+    assert.deepEqual(expanded.recommendationExpansion?.modelExecution, { model: "test-model", reasoningEffort: "high", source: "selected" });
+    assert.equal(expanded.recommendationExpansion?.efficiency?.inputTokens, 250);
+    assert.equal(expanded.recommendationExpansion?.efficiency?.cachedInputTokens, 120);
+    const { recommendations: _old, ...originalOverview } = original;
+    const { recommendations: _new, recommendationExpansion: _expansion, ...expandedOverview } = expanded;
+    assert.deepEqual(expandedOverview, originalOverview);
+    assert.equal((await service.getSettings(f.repo.id)).outcome, "產出期間更新的偏好");
+    assert.deepEqual((await new ProjectInsightsService(f.store).get(f.repo.id)).insights, expanded);
+
+    inspect = false;
+    answer = { recommendations: [] };
+    const empty = (await service.generateMore(f.repo.id, {})).insights;
+    assert.equal(stub.calls.filter((call) => call.args[0] === "exec").length, 2);
+    assert.deepEqual(empty.recommendations, expanded.recommendations);
+    assert.deepEqual(empty.recommendationExpansion?.addedIds, []);
+    assert.equal(empty.recommendationExpansion?.requestedCount, 5);
+    assert.equal(empty.generatedAt, original.generatedAt);
+
+    for (let round = 0; round < 6; round++) {
+      beforeBatch = (await service.get(f.repo.id)).insights!;
+      requestedCount = Math.min(projectRecommendationBatchSize, 30 - beforeBatch.recommendations.length);
+      const proposals = Array.from({ length: requestedCount }, (_, n) => ({ ...proposal, id: `direction-${round}-${n}`, title: `探索方向 ${round}-${n}`, problem: `待驗證的獨立改善假設 ${round}-${n}` }));
+      answer = { recommendations: proposals };
+      const callsBefore = stub.calls.filter((call) => call.args[0] === "exec").length;
+      const batch = (await service.generateMore(f.repo.id, {})).insights;
+      assert.deepEqual(batch.recommendations, [...beforeBatch.recommendations, ...proposals]);
+      assert.equal(batch.recommendationExpansion?.requestedCount, requestedCount);
+      assert.equal(batch.recommendationExpansion?.addedIds.length, requestedCount);
+      assert.equal(stub.calls.filter((call) => call.args[0] === "exec").length, callsBefore + 1);
+    }
+    await service.setRecommendationPreferences(f.repo.id, {
+      order: [],
+      hidden: (await service.get(f.repo.id)).insights!.recommendations.map((entry) => entry.id),
+    });
+    const full = await new ProjectInsightsService(f.store).get(f.repo.id);
+    assert.equal(full.insights?.recommendations.length, 30);
+    assert.equal(full.insights?.recommendationExpansion?.addedIds.length, 2);
+    assert.equal(full.insights?.recommendationExpansion?.requestedCount, 2);
+    const calls = stub.calls.length;
+    await assert.rejects(service.generateMore(f.repo.id, {}), (error: any) => error.statusCode === 409);
+    assert.equal(stub.calls.length, calls);
+    assert.deepEqual(await service.get(f.repo.id), full);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("more recommendations require an unchanged prior analysis and reject client-supplied history", async () => {
+  const f = await fixture();
+  try {
+    const stub = fakeCodex();
+    const service = new ProjectInsightsService(f.store, { command: stub.execute, getModelCatalog: async () => ({ source: "codex", models: [] }) });
+    await assert.rejects(service.generateMore(f.repo.id, {}), (error: any) => error.statusCode === 409);
+    await assert.rejects(service.generateMore(f.repo.id, { recommendations: [] }));
+    assert.equal(stub.calls.length, 0);
+    const original = await service.generate(f.repo.id);
+    const calls = stub.calls.length;
+    await writeFile(path.join(f.repository, "hello.ts"), 'export const hello = "updated";\n');
+    await assert.rejects(service.generateMore(f.repo.id, {}), (error: any) => error.statusCode === 409);
+    assert.equal(stub.calls.length, calls);
+    assert.deepEqual(await service.get(f.repo.id), { ...original, stale: true });
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("invalid, failed and interrupted expansion results never replace existing recommendations", async () => {
+  const f = await fixture();
+  try {
+    const original = await new ProjectInsightsService(f.store, { command: fakeCodex().execute, getModelCatalog: async () => ({ source: "codex", models: [] }) }).generate(f.repo.id);
+    const proposal = validAnalysis().recommendations[0];
+    const responses = [
+      { recommendations: [], summary: "不能覆寫全貌" },
+      { recommendations: Array.from({ length: 6 }, () => proposal) },
+      { recommendations: [{ ...proposal, evidence: ["missing.ts"] }] },
+      { recommendations: [{ ...proposal, evidenceDetails: [{ path: "hello.ts", quote: "a nonexistent source quote", reason: "假設" }] }] },
+      { recommendations: [{ ...proposal, title: "ghp_abcdefghijklmnopqrstuvwxyz" }] },
+    ];
+    for (const answer of responses) {
+      const service = new ProjectInsightsService(f.store, { command: fakeCodex(() => answer).execute, getModelCatalog: async () => ({ source: "codex", models: [] }) });
+      await assert.rejects(service.generateMore(f.repo.id, {}), (error: any) => error.statusCode === 422);
+      assert.deepEqual(await service.get(f.repo.id), original);
+    }
+    for (const onExec of [
+      async () => { throw new Error("provider unavailable"); },
+      async (_args: string[], options: NonNullable<Parameters<typeof command>[2]>) => { options.onLine?.(JSON.stringify({ type: "turn.failed" }), "stdout"); },
+    ]) {
+      const service = new ProjectInsightsService(f.store, { command: fakeCodex(() => ({ recommendations: [] }), onExec).execute, getModelCatalog: async () => ({ source: "codex", models: [] }) });
+      await assert.rejects(service.generateMore(f.repo.id, {}));
+      assert.deepEqual(await service.get(f.repo.id), original);
+    }
+    const changed = new ProjectInsightsService(f.store, { command: fakeCodex(() => ({ recommendations: [] }), async () => {
+      await writeFile(path.join(f.repository, "hello.ts"), 'export const hello = "changed during expansion";\n');
+    }).execute, getModelCatalog: async () => ({ source: "codex", models: [] }) });
+    await assert.rejects(changed.generateMore(f.repo.id, {}), (error: any) => error.statusCode === 409);
+    assert.deepEqual(await changed.get(f.repo.id), { ...original, stale: true });
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("expansion shares the analysis lock and shutdown preserves the saved result", async () => {
+  const f = await fixture();
+  try {
+    const original = await new ProjectInsightsService(f.store, { command: fakeCodex().execute, getModelCatalog: async () => ({ source: "codex", models: [] }) }).generate(f.repo.id);
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => { entered = resolve; });
+    const service = new ProjectInsightsService(f.store, { command: fakeCodex(() => ({ recommendations: [] }), async (_args, options) => {
+      entered();
+      await new Promise<void>((resolve) => options.signal!.addEventListener("abort", () => resolve(), { once: true }));
+    }).execute, getModelCatalog: async () => ({ source: "codex", models: [] }) });
+    const pending = service.generateMore(f.repo.id, {});
+    const rejected = assert.rejects(pending, (error: any) => error.statusCode === 409);
+    await started;
+    await assert.rejects(service.generateMore(f.repo.id, {}), (error: any) => error.statusCode === 409);
+    await assert.rejects(service.generate(f.repo.id), (error: any) => error.statusCode === 409);
+    await service.shutdown();
+    await rejected;
+    assert.deepEqual(await service.get(f.repo.id), original);
+    assert.deepEqual((await readdir(path.join(f.store.directory, "insights"))).filter((file) => file.startsWith("analysis-")), []);
+    await assert.rejects(service.generateMore(f.repo.id, {}), (error: any) => error.statusCode === 503);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("recommendation preferences persist separately, validate known unique IDs and read legacy caches", async () => {
+  const f = await fixture();
+  try {
+    const stub = fakeCodex();
+    const service = new ProjectInsightsService(f.store, { command: stub.execute, getModelCatalog: async () => ({ source: "codex", models: [] }) });
+    await assert.rejects(service.setRecommendationPreferences(f.repo.id, { order: [], hidden: [] }), (error: any) => error.statusCode === 409);
+    const original = await service.generate(f.repo.id);
+    const directory = path.join(f.store.directory, "insights");
+    const cachePath = path.join(directory, (await readdir(directory)).find((file) => file.endsWith(".json"))!);
+    const legacy = JSON.parse(await readFile(cachePath, "utf8"));
+    delete legacy.recommendationPreferences;
+    await writeFile(cachePath, JSON.stringify(legacy));
+    assert.deepEqual((await service.get(f.repo.id)).recommendationPreferences, { order: [], hidden: [] });
+
+    const preferences = { order: [], hidden: ["greeting-tests"] };
+    const settings = { ...defaultContributionSettings, outcome: "保留開發方向" };
+    const calls = stub.calls.length;
+    await Promise.all([
+      service.setRecommendationPreferences(f.repo.id, preferences),
+      service.setSettings(f.repo.id, settings),
+    ]);
+    const restarted = new ProjectInsightsService(f.store);
+    assert.deepEqual(await restarted.get(f.repo.id), { ...original, recommendationPreferences: preferences });
+    assert.deepEqual(await restarted.getSettings(f.repo.id), settings);
+    const second = { ...f.repo, id: randomUUID() };
+    f.store.data.repos.push(second);
+    assert.deepEqual((await restarted.get(second.id)).recommendationPreferences, { order: [], hidden: [] });
+    for (const input of [
+      { order: ["missing"], hidden: [] },
+      { order: [], hidden: ["missing"] },
+      { order: ["greeting-tests", "greeting-tests"], hidden: [] },
+      { order: [], hidden: ["greeting-tests", "greeting-tests"] },
+      { order: Array.from({ length: 31 }, (_, index) => `idea-${index}`), hidden: [] },
+      { order: [], hidden: [], recommendations: [] },
+      { order: [] },
+      null,
+    ]) await assert.rejects(service.setRecommendationPreferences(f.repo.id, input));
+    assert.deepEqual(await service.get(f.repo.id), { ...original, recommendationPreferences: preferences });
+    assert.equal(stub.calls.length, calls);
+    assert.deepEqual((await readdir(directory)).filter((file) => file.endsWith(".tmp")), []);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("analysis merges the latest display preferences, retains hidden ideas for dedupe and prunes replaced IDs", async () => {
+  const f = await fixture();
+  try {
+    const first = validAnalysis();
+    const proposal = first.recommendations[0];
+    const second = { ...proposal, id: "greeting-docs", title: "說明問候格式", problem: "文件可考慮補充輸出格式的說明。" };
+    const third = { ...proposal, id: "greeting-example", title: "補充問候範例", problem: "可考慮補充可執行範例供初次使用者參考。" };
+    let answer: unknown = { ...first, recommendations: [proposal, second] };
+    let whileGenerating: (() => Promise<void>) | undefined;
+    const stub = fakeCodex(() => answer, async (_args, options) => {
+      assert.doesNotMatch(options.input!, /recommendationPreferences|"hidden":|"order":/);
+      if (options.input!.includes("existingRecommendations")) assert.ok(options.input!.includes(proposal.title));
+      await whileGenerating?.();
+    });
+    const service = new ProjectInsightsService(f.store, { command: stub.execute, getModelCatalog: async () => ({ source: "codex", models: [] }) });
+    await service.generate(f.repo.id);
+    await service.setRecommendationPreferences(f.repo.id, { order: [second.id], hidden: [proposal.id] });
+    const latest = { order: [second.id, proposal.id], hidden: [proposal.id, second.id] };
+    whileGenerating = async () => {
+      await service.setRecommendationPreferences(f.repo.id, latest);
+      await service.setSettings(f.repo.id, { ...defaultContributionSettings, outcome: "分析期間更新" });
+    };
+    answer = { recommendations: [proposal, third] };
+    const expanded = await service.generateMore(f.repo.id, {});
+    assert.deepEqual(expanded.insights.recommendations.map((entry) => entry.id), [proposal.id, second.id, third.id]);
+    assert.deepEqual(expanded.insights.recommendationExpansion?.addedIds, [third.id]);
+    assert.deepEqual(expanded.recommendationPreferences, latest);
+    assert.equal((await service.getSettings(f.repo.id)).outcome, "分析期間更新");
+    assert.deepEqual(await new ProjectInsightsService(f.store).get(f.repo.id), expanded);
+
+    whileGenerating = async () => {
+      await service.setRecommendationPreferences(f.repo.id, { order: [third.id, second.id, proposal.id], hidden: [third.id, proposal.id] });
+    };
+    answer = { ...first, recommendations: [proposal, third] };
+    const refreshed = await service.generate(f.repo.id);
+    assert.deepEqual(refreshed.recommendationPreferences, { order: [third.id, proposal.id], hidden: [third.id, proposal.id] });
+    assert.deepEqual(await new ProjectInsightsService(f.store).get(f.repo.id), refreshed);
+    assert.equal(stub.calls.filter((call) => call.args[0] === "exec").length, 3);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("recommendation APIs validate display preferences and keep them separate from expansion", async () => {
+  const f = await fixture();
+  const { createApp } = await import("./index.js");
+  const { Workbench } = await import("./workbench.js");
+  const workbench = new Workbench(f.store);
+  const app = createApp(workbench, { staticDirectory: path.join(f.directory, "missing") });
+  let answer: unknown = validAnalysis();
+  const stub = fakeCodex(() => answer);
+  const service = new ProjectInsightsService(f.store, { command: stub.execute, getModelCatalog: async () => ({ source: "codex", models: [] }) });
+  app.locals.insights.generateMore = service.generateMore.bind(service);
+  app.locals.insights.setRecommendationPreferences = service.setRecommendationPreferences.bind(service);
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const endpoint = `http://127.0.0.1:${address.port}/api/repos/${f.repo.id}/insights`;
+  const send = (input: unknown, method = "POST") => new Promise<{ status: number; body: any }>((resolve, reject) => {
+    const req = request(`${endpoint}/${method === "PUT" ? "preferences" : "recommendations"}`, { method, headers: { "Content-Type": "application/json", Host: "127.0.0.1:4311" } }, (res) => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => { body += chunk; });
+      res.on("end", () => resolve({ status: res.statusCode!, body: JSON.parse(body) }));
+    });
+    req.on("error", reject);
+    req.end(JSON.stringify(input));
+  });
+  try {
+    assert.equal((await send({ recommendations: [] })).status, 400);
+    assert.equal((await send({})).status, 409);
+    assert.equal((await send({ order: [], hidden: [] }, "PUT")).status, 409);
+    assert.equal(stub.calls.length, 0);
+    await service.generate(f.repo.id);
+    const calls = stub.calls.length;
+    const preferences = { order: ["greeting-tests"], hidden: ["greeting-tests"] };
+    assert.deepEqual(await send(preferences, "PUT"), { status: 200, body: { recommendationPreferences: preferences } });
+    assert.equal((await send({ ...preferences, arbitrary: true }, "PUT")).status, 400);
+    assert.equal((await send({ order: ["missing"], hidden: [] }, "PUT")).status, 409);
+    assert.equal(stub.calls.length, calls);
+    answer = { recommendations: [] };
+    const response = await send({});
+    assert.equal(response.status, 200);
+    const result = response.body;
+    assert.equal(result.stale, false);
+    assert.deepEqual(result.insights.recommendationExpansion.addedIds, []);
+    assert.deepEqual(result.recommendationPreferences, preferences);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    await service.shutdown();
+    await app.locals.insights.shutdown();
+    await app.locals.discovery.shutdown();
     await f.cleanup();
   }
 });

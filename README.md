@@ -34,6 +34,10 @@ codex login
 
 ## 專案分析與 AI 建議
 
+按 **⌘K（macOS）／Ctrl+K（Windows、Linux）** 開啟中央快速切換面板。`↑`／`↓` 選擇貢獻，`{`／`}` 切換專案（也支援 `[`／`]`），Enter 開啟，Esc 關閉並回到原本焦點。可輸入名稱或分支搜尋目前專案的貢獻；沒有貢獻的專案仍可開啟專案全貌。方向鍵只選取，不會啟動 Agent 或送出 PR。
+
+工作台的「全貌與動機／程式碼變更／Agent 動態／PR 草稿」可用左右方向鍵與 Home／End 切換。Tab／Shift+Tab 移動焦點；頁首提供「跳至主要內容」。從快速切換面板開啟貢獻時，未儲存草稿仍需確認，取消或關閉面板會保留原畫面。
+
 ### 在 GitHub 尋找下一個貢獻
 
 從左側「探索貢獻」或 Repositories 的「推薦貢獻項目」進入，設定興趣、程式語言、可接受的難度與最低星數，再按「推薦貢獻項目」。搜尋會讀取 GitHub 公開專案的資料、開放 issues、貢獻文件與部分維護者留言，再交給唯讀 Codex 分析；不需先匯入 repository。介面會顯示搜尋、核對與分析進度，可停止工作，重新進入頁面後也能接續查看。
@@ -49,6 +53,14 @@ codex login
 分析使用本機 Codex 的唯讀模式，以已匯入 repository 的本機版本為來源。會優先取 README、套件設定、架構文件與主要程式碼，最多抽樣 60 個 Git 已追蹤文字檔、總計約 240 KB，每檔最多約 18 KB；略過未追蹤檔、二進位檔、敏感路徑與疑似憑證。這是有範圍的專案導讀，不能據此判定整個專案一定缺少某個功能或測試。
 
 新產生的推薦包含來源路徑、原文引用與推論理由；後端會確認引用確實存在於送進模型的節錄中。匹配的引用只證明來源存在，問題嚴重性、使用者影響與改善方向仍需要確認，介面的驗收清單也不是已執行的測試結果。
+
+選定專案並完成分析後，可在「值得探索的貢獻方向」按「產出 5 個新建議」，讓 Agent 依這個專案的原始碼與已儲存的貢獻／模型設定，一次提出 5 個不同的改善方向。每次只呼叫一次模型，累積最多 30 項；剩餘額度不足 5 項時，按鈕會顯示本次可追加的數量。若來源或去重後的結果不足，會顯示實際新增與目標數量，不會為湊數虛構建議。新項目標示「本輪新增」，既有專案全貌、建議與引用保持不變；失敗時也會保留原有清單。
+
+建議卡片可以左右滑動，或用「上一個／下一個」按鈕切換；聚焦卡片清單後，也能使用鍵盤左右鍵瀏覽。「查看本輪新增」可直接移到新建議，追加完成時不會自動打斷目前閱讀的位置。這一步只產生建議；選擇「以此方向開始」後，才進入可編輯的貢獻設定。
+
+每張卡片可隱藏，也可從「已隱藏」清單恢復顯示。拖曳卡片上的排序把手可調整順序；手機與鍵盤使用者也能使用卡片的向前／向後移動按鈕。顯示與排序設定按專案儲存在伺服器，重新整理後仍保留；儲存失敗會還原並顯示錯誤。隱藏不會刪除建議，也不會重複產生相同方向或釋出 30 項額度。追加的新建議排在最後；重新分析會移除已不存在的建議設定。示範專案的調整僅保留在目前工作台中。
+
+追加建議與原始專案分析的模型、時間及用量分開顯示。專案版本已改變時，需先「重新分析」建立最新的全貌與建議，再追加方向；重新分析會重建清單。示範專案只使用預寫內容，需匯入真實專案才能產出更多建議。
 
 分析結果與貢獻偏好保存在本機資料目錄。讀取快取時會比對本機 HEAD、追蹤檔案與未提交差異；版本不同會標示分析已過期，需手動重新分析。這項比較發生於載入分析資料時，不會持續監看外部檔案變動。分析不會自動 fetch 遠端，也不等同於某次任務 worktree 的最新狀態；畫面會顯示來源版本。
 
@@ -127,6 +139,36 @@ npm start
 
 建置完成後，正式模式由同一個 Node.js 服務提供網頁與 API，開啟 <http://127.0.0.1:4311>。
 
+## Ubuntu 私網部署
+
+`deploy/bell-pr.service` 提供 systemd 使用者服務，預設安裝於 `~/apps/bell-pr`。在 Ubuntu 使用 Node.js 22 以上、Git、GitHub CLI 與已登入的 Codex CLI；服務的 PATH 包含 `~/.local/bin`。執行 `npm ci` 後建置，保留開發依賴，因為正式啟動仍使用 `tsx`。
+
+```sh
+cd ~/apps/bell-pr
+npm ci
+npm run build
+npm test
+mkdir -p ~/.config/bell-pr ~/.config/systemd/user
+cp deploy/environment.example ~/.config/bell-pr/environment
+chmod 600 ~/.config/bell-pr/environment
+# 編輯環境檔：確認資料目錄、私網 origin 與自己的 Git 姓名／email
+cp deploy/bell-pr.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now bell-pr
+```
+
+`your-host` 的入口設定為 `https://your-host.your-tailnet.ts.net:8443`，必須連入可存取該機器的 Tailscale 私網。Node.js 只監聽 `127.0.0.1:8443`，由 Tailscale Serve 提供 HTTPS。由具備 Tailscale 管理權限的帳號執行下列命令；此設定只新增 `8443` 入口，不重設其他 Serve 服務：
+
+```sh
+tailscale serve --bg --yes --https=8443 http://127.0.0.1:8443
+```
+
+確認 `loginctl show-user "$USER" -p Linger` 為 `Linger=yes`，服務才能在未登入及重開機後啟動；尚未啟用時需請系統管理者開啟 linger。`BELLPR_ALLOWED_ORIGINS` 只是來源檢查，不提供帳號認證；存取權限由 Tailscale 裝置與網路政策控制，不要將此代理公開到網際網路。
+
+維護可使用 `systemctl --user status bell-pr`、`systemctl --user restart bell-pr` 與 `journalctl --user -u bell-pr -n 100`。更新前確認沒有執行中的 Agent，再停止服務、備份整份 `.bellpr`、更新程式與依賴、建置後啟動。
+
+資料搬移必須包含完整 `.bellpr`，其中有尚未提交的檔案、Git objects/index/refs、worktree、解說與草稿。更改安裝位置時，需一併修正 `state.json` 的 repository/worktree 路徑及 Git worktree 的雙向連結，並比對檔案與 Git 差異；不能只複製 `state.json` 或重新 clone。CLI 登入狀態由目的機器提供，不隨工作資料搬移。瀏覽器示範資料與閱讀偏好保存在各網址的 localStorage，不包含在服務端備份中。
+
 ## 本機設定
 
 不需要 `.env` 即可啟動。可設定的變數列在 [`.env.example`](.env.example)；程式只讀取程序的環境變數，不會自動載入 `.env`。若需要自訂，可在 macOS / Linux 的 shell 執行：
@@ -145,12 +187,13 @@ npm run dev
 | `BELLPR_PORT`          | `4311`    | API 與正式模式網頁的埠。開發模式若修改，需同步 `vite.config.ts` 的 proxy。 |
 | `BELLPR_FRONTEND_PORT` | `4310`    | API 允許的開發網頁來源埠。修改時需同步 `package.json` 的 `dev:web`。       |
 | `BELLPR_DATA_DIR`      | `.bellpr` | 本機工作資料位置，可使用絕對路徑。                                         |
+| `BELLPR_ALLOWED_ORIGINS` | 空值 | 額外允許的精確 HTTP(S) origin，以逗號分隔；僅供已有存取控制、保留 Host 的私網代理使用。 |
 
 `.bellpr` 與 `.env` 已排除於 Git 追蹤外。請妥善保留工作資料；刪除資料目錄會移除其中的 repository、工作目錄與紀錄。
 
 ## 使用範圍
 
-這是設計給單一使用者在自己電腦操作的 local-first 工具。請透過 `127.0.0.1` 使用，不要直接公開 API 至網際網路或作為多人服務部署。工具會讀寫本機專案，並使用目前使用者的 CLI 登入狀態。
+這是設計給單一使用者操作的 local-first 工具。請透過 `127.0.0.1` 或上述具備存取控制的私網代理使用，不要直接公開 API 至網際網路或作為多人服務部署。工具會讀寫服務所在機器的專案，並使用該使用者的 CLI 登入狀態。
 
 目前版本以 GitHub 為目標平台。程式碼與 PR 內容仍需要使用者審閱；白話解說與 agent 的判斷可能出錯。Lead、Reviewer 與 Test analyst 的整合／審查回合只做靜態檢視，真正執行過的檢查應以各 teammate 報告的命令與結果為準。
 
