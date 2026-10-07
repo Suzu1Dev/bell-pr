@@ -21,6 +21,7 @@ import type { AgentTeam, TeamTask } from "../../shared/team";
 import type { Run } from "../types";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
 import { ModelSummary } from "../models/ModelSummary";
+import { providerLabels } from "../../shared/models";
 import "./team.css";
 
 const taskLabels = {
@@ -102,7 +103,9 @@ export function TeamBoard({
         <div className="team-runtime-badge">
           <Bot size={16} />
           <span>
-            {demo ? "團隊協作示範" : "Codex · BELL 協作引擎"}
+            {demo
+              ? "團隊協作示範"
+              : `${providerLabels[team.config.provider]} · BELL 協作引擎`}
             <small>最多 {team.config.maxTeammates} 位成員同時工作</small>
           </span>
         </div>
@@ -387,8 +390,9 @@ export function TeamBoard({
       </div>
       <p className="team-protocol-note">
         <ShieldCheck size={14} />
-        BELL 使用共享任務、獨立工作目錄及回合間訊息協作。這是 Codex
-        驅動的實作，並非 Claude Code 原生 Agent Teams。
+        BELL 使用共享任務、獨立工作目錄及回合間訊息協作。這是由{" "}
+        {providerLabels[team.config.provider]} 逐回合驅動的 BELL
+        實作，並非 Claude Code 原生 Agent Teams。
       </p>
     </section>
   );

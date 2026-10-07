@@ -4,7 +4,7 @@
 
 ## 開始使用
 
-需要 Node.js 22 以上與 npm。實際開發與 GitHub 操作另外需要 Git、GitHub CLI (`gh`) 與 Codex CLI (`codex`)；建立提交前需設定 Git 的 `user.name` 與 `user.email`。
+需要 Node.js 22 以上與 npm。實際開發與 GitHub 操作另外需要 Git、GitHub CLI (`gh`)，以及 Codex CLI (`codex`) 或 Claude Code CLI (`claude`)；建立提交前需設定 Git 的 `user.name` 與 `user.email`。
 
 ```sh
 npm install
@@ -18,6 +18,7 @@ npm run dev
 ```sh
 gh auth login
 codex login
+claude auth login   # 只在要改用 Claude Code 時需要
 ```
 
 本工具使用這些 CLI 既有的登入狀態，不需要在網頁輸入 GitHub token 或模型 API key。
@@ -74,7 +75,7 @@ codex login
 
 ### 協作方式
 
-這是由 **Codex CLI 驅動的 BELL 協作引擎**，並非 Claude Code 原生 Agent Teams。Lead 先產生 1–8 個子任務，指定各任務的檔案範圍與相依關係；排程器在依賴完成後認領任務，最多同時執行設定的 2–4 位 teammates。每位 teammate 在獨立 worktree 中取得自己的任務、依賴報告與團隊訊息，修改超出分配範圍的檔案會被拒絕整合。
+這是由 **Codex CLI 或 Claude Code CLI 逐回合驅動的 BELL 協作引擎**，並非 Claude Code 原生 Agent Teams。Lead 先產生 1–8 個子任務，指定各任務的檔案範圍與相依關係；排程器在依賴完成後認領任務，最多同時執行設定的 2–4 位 teammates。每位 teammate 在獨立 worktree 中取得自己的任務、依賴報告與團隊訊息，修改超出分配範圍的檔案會被拒絕整合。
 
 應用程式將通過範圍檢查的變更整合回本次工作的 worktree，交由 Lead 唯讀檢視，再由 Reviewer 與 Test analyst 平行審查。Lead 會區分團隊回報的實測、自己的靜態檢查與未完成事項。最多有 2 個貢獻工作同時執行；執行、排隊與等待計畫確認的工作合計最多 8 個。
 
@@ -88,7 +89,7 @@ GitHub repository 會以該專案預設分支的最新遠端提交為起點。�
 
 審閱狀態會對應畫面上檔案的版本；內容變更後需要重新整理 diff 並重新審閱。修改已確認的 PR 草稿也需要再次確認。任務資料留在本機，停止或失敗後保留工作目錄，方便查看已產生的變更。
 
-工作用 worktree 提供 Git 工作區隔離，並不是容器或虛擬機。Agent 沿用本機 Codex CLI，請只導入你願意讓 agent 讀取與處理的專案。
+工作用 worktree 提供 Git 工作區隔離，並不是容器或虛擬機。Agent 沿用本機 Codex 或 Claude Code CLI，請只導入你願意讓 agent 讀取與處理的專案。
 
 PR 會以匯入時的 GitHub repository 為目標。具有寫入權限時，分支推到該專案；沒有寫入權限時，送出流程會嘗試建立或使用你個人帳號下的同名 fork，再向目標開 Draft PR。若本機 `origin` 已經指向你自己的 fork，請改匯入上游 GitHub URL，才能把上游設為 PR 目標。
 
@@ -112,7 +113,16 @@ PR 草稿會優先採用目標專案的 `CONTRIBUTING`、PR 模板與相關投�
 
 新任務會保存當次解析的模型設定，Lead、Teammates、Reviewer、Test analyst、自動解說與追問共用；後續修改 repository 預設不影響既有任務。專案分析則採分析啟動時已儲存的設定，並把設定與分析結果一起保存。選擇預設時，若模型目錄可用，會固定其中的預設模型；無法讀取目錄時可沿用 CLI 預設，但名稱會明確標示未記錄。
 
-「Agent 動態」顯示的是傳入 Codex 的模型 ID 與思考強度，不是推測的供應端實際路由。加入此功能前的舊任務沒有模型紀錄，介面會標示未記錄；示範也不會顯示虛構的執行模型。模型目錄介面參考 [Codex App Server 官方文件](https://learn.chatgpt.com/docs/app-server#list-models-modellist)。
+「Agent 動態」顯示的是傳入 CLI 的模型 ID 與思考強度，不是推測的供應端實際路由。加入此功能前的舊任務沒有模型紀錄，介面會標示未記錄；示範也不會顯示虛構的執行模型。模型目錄介面參考 [Codex App Server 官方文件](https://learn.chatgpt.com/docs/app-server#list-models-modellist)。
+
+### 改用 Claude Code
+
+模型設定的「Agent」可改選 **Claude Code**，依專案保存。BELL 直接呼叫本機 `claude -p`，沿用 `claude auth login` 的 Claude 訂閱登入；傳給 Agent 的環境變數不包含 `ANTHROPIC_API_KEY`，因此不會改走 API 計費。「設定」頁會顯示 Claude Code CLI 是否已安裝與登入。
+
+- 模型清單為固定的別名 `opus`、`sonnet`、`fable`、`haiku`，各自指向該系列的最新模型；Claude Code 沒有列出模型的指令，實際可用模型依訂閱方案而定。選「Claude Code 預設」時不傳 `--model`。Haiku 不提供思考強度選項，其餘為 low–max。
+- 專案分析與探索不開放任何工具，只讀 BELL 提供的節錄並以 `--json-schema` 回傳結構化結果；Lead、Reviewer、Test analyst 與解說只能使用 Read、Grep、Glob；Teammates 可使用 Read、Grep、Glob、Edit、Write 與 Bash。檔案編輯以 `acceptEdits` 限制在工作目錄內，但 **Bash 不在沙箱中執行**，可存取這台機器上服務帳號能存取的任何檔案與網路。
+- 執行時加上 `--strict-mcp-config`，不載入 claude.ai 連接器（Gmail、Drive 等）或其他 MCP 伺服器，避免 Agent 讀到不可信內容時被誘導使用你的帳號服務。其餘 Claude Code 設定照常載入，包括使用者 hooks、`CLAUDE.md`，以及匯入專案中的 `CLAUDE.md` 與 `.claude/settings.json`。
+- 用量以 Claude Code 回報的 tokens 計算：輸入 = 未快取輸入 + 快取寫入 + 快取讀取，快取欄位只計快取讀取。`total_cost_usd` 對訂閱帳戶沒有意義，不會顯示。訂閱有使用額度限制，多位 teammates 同時執行時較快達到上限，達到時任務會顯示 Claude Code 回報的錯誤。
 
 ## Ponytail 效率規則
 
@@ -141,7 +151,7 @@ npm start
 
 ## Ubuntu 私網部署
 
-`deploy/bell-pr.service` 提供 systemd 使用者服務，預設安裝於 `~/apps/bell-pr`。在 Ubuntu 使用 Node.js 22 以上、Git、GitHub CLI 與已登入的 Codex CLI；服務的 PATH 包含 `~/.local/bin`。執行 `npm ci` 後建置，保留開發依賴，因為正式啟動仍使用 `tsx`。
+`deploy/bell-pr.service` 提供 systemd 使用者服務，預設安裝於 `~/apps/bell-pr`。在 Ubuntu 使用 Node.js 22 以上、Git、GitHub CLI 與已登入的 Codex CLI 或 Claude Code CLI（服務以同一使用者執行時，會沿用 `~/.claude` 的登入）；服務的 PATH 包含 `~/.local/bin`。執行 `npm ci` 後建置，保留開發依賴，因為正式啟動仍使用 `tsx`。
 
 ```sh
 cd ~/apps/bell-pr
@@ -203,4 +213,4 @@ npm run dev
 
 ## 實作參考
 
-Agent 執行使用 [Codex 非互動模式](https://learn.chatgpt.com/docs/non-interactive-mode)，沿用 read-only / workspace-write 沙箱與 JSONL 事件。前端開發服務使用 [Vite proxy](https://vite.dev/config/server-options#server-proxy) 將同源 `/api` 請求轉送至本機後端。
+Agent 執行使用 [Codex 非互動模式](https://learn.chatgpt.com/docs/non-interactive-mode)，沿用 read-only / workspace-write 沙箱與 JSONL 事件；選擇 Claude Code 時使用 [Claude Code 非互動模式](https://code.claude.com/docs/en/headless) 的 `stream-json` 事件。前端開發服務使用 [Vite proxy](https://vite.dev/config/server-options#server-proxy) 將同源 `/api` 請求轉送至本機後端。

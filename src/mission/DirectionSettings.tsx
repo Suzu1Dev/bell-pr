@@ -13,7 +13,13 @@ import {
   Wrench,
 } from "lucide-react";
 import type { ContributionSettings } from "../../shared/insights";
-import type { ModelCatalog, ReasoningEffort } from "../../shared/models";
+import {
+  agentProviders,
+  providerLabels,
+  type AgentProvider,
+  type ModelCatalog,
+  type ReasoningEffort,
+} from "../../shared/models";
 import { reasoningLabels } from "../models/ModelSummary";
 import {
   defaultPonytailMode,
@@ -85,13 +91,17 @@ export function DirectionSettings({
   const [modelError, setModelError] = useState("");
   const [loadingModels, setLoadingModels] = useState(true);
   const [catalogAttempt, setCatalogAttempt] = useState(0);
+  const provider = value.provider ?? "codex";
+  const providerLabel = providerLabels[provider];
   useEffect(() => {
     const controller = new AbortController();
+    setCatalog(null);
     setLoadingModels(true);
     setModelError("");
-    fetch("/api/models", { signal: controller.signal })
+    fetch(`/api/models?provider=${provider}`, { signal: controller.signal })
       .then(async (response) => {
-        if (!response.ok) throw new Error("暫時無法讀取 Codex 模型清單。");
+        if (!response.ok)
+          throw new Error(`暫時無法讀取 ${providerLabel} 模型清單。`);
         const result: ModelCatalog = await response.json();
         if (!controller.signal.aborted) {
           setCatalog(result);
@@ -108,7 +118,7 @@ export function DirectionSettings({
         if (!controller.signal.aborted) setLoadingModels(false);
       });
     return () => controller.abort();
-  }, [catalogAttempt]);
+  }, [catalogAttempt, provider, providerLabel]);
   const models = catalog?.models ?? [];
   const defaultModel = models.find((model) => model.isDefault);
   const selectedModel = value.model
@@ -246,6 +256,33 @@ export function DirectionSettings({
             共用此設定。新任務會記錄自己的設定，後續修改不會影響已建立的任務。
           </p>
         </div>
+        <div className="mission-form-field">
+          <label htmlFor={`${id}-provider`}>Agent</label>
+          <select
+            id={`${id}-provider`}
+            value={provider}
+            aria-describedby={`${id}-provider-help`}
+            onChange={(event) =>
+              onChange({
+                ...value,
+                provider: event.target.value as AgentProvider,
+                model: "",
+                reasoningEffort: "",
+              })
+            }
+          >
+            {agentProviders.map((option) => (
+              <option key={option} value={option}>
+                {providerLabels[option]}
+              </option>
+            ))}
+          </select>
+          <p id={`${id}-provider-help`} className="mission-field-note">
+            {provider === "claude"
+              ? "沿用本機 Claude Code 的訂閱登入，不使用 API 金鑰；可用模型依方案而定。"
+              : "沿用本機 Codex CLI 的登入。"}
+          </p>
+        </div>
         <div className="mission-form-columns">
           <div className="mission-form-field">
             <label htmlFor={`${id}-model`}>執行模型</label>
@@ -268,7 +305,8 @@ export function DirectionSettings({
               }}
             >
               <option value="">
-                Codex 預設{defaultModel ? ` · ${defaultModel.name}` : ""}
+                {providerLabel} 預設
+                {defaultModel ? ` · ${defaultModel.name}` : ""}
               </option>
               {unknownModel && (
                 <option value={value.model}>
@@ -283,10 +321,11 @@ export function DirectionSettings({
             </select>
             <p id={`${id}-model-help`} className="mission-field-note">
               {loadingModels
-                ? "正在讀取本機 Codex 可用模型…"
+                ? `正在讀取本機 ${providerLabel} 可用模型…`
                 : unknownModel
                   ? "目前無法驗證這個已儲存的模型，請重新選擇或載入清單。"
-                  : selectedModel?.description || "沿用本機 Codex 的預設模型。"}
+                  : selectedModel?.description ||
+                    `沿用本機 ${providerLabel} 的預設模型。`}
             </p>
           </div>
           <div className="mission-form-field">

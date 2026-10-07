@@ -6,6 +6,8 @@ import { z } from "zod";
 import type { ModelCatalog } from "../shared/models.js";
 import { AppError } from "./types.js";
 import {
+  claudeModelCatalog,
+  getModelCatalog,
   modelArguments,
   modelSettingsSchema,
   parseModelPage,
@@ -207,4 +209,52 @@ test("repeating pagination cursor fails without returning a partial catalog", as
   );
   assert.equal(value.models.length, 0);
   assert.ok(value.error);
+});
+
+test("Claude Code settings resolve against its static aliases and record the provider", async () => {
+  assert.equal(await getModelCatalog("claude"), claudeModelCatalog);
+  assert.deepEqual(
+    resolveModelExecution({ provider: "claude" }, claudeModelCatalog),
+    { provider: "claude", source: "cli-default" },
+  );
+  assert.deepEqual(
+    resolveModelExecution(
+      { provider: "claude", model: "opus", reasoningEffort: "xhigh" },
+      claudeModelCatalog,
+    ),
+    {
+      provider: "claude",
+      model: "opus",
+      reasoningEffort: "xhigh",
+      source: "selected",
+    },
+  );
+  assert.deepEqual(
+    resolveModelExecution(
+      { provider: "claude", model: "haiku" },
+      claudeModelCatalog,
+    ),
+    { provider: "claude", model: "haiku", source: "selected" },
+  );
+  for (const settings of [
+    { provider: "claude" as const, model: "haiku", reasoningEffort: "low" as const },
+    { provider: "claude" as const, model: "codex-example" },
+    { provider: "claude" as const, reasoningEffort: "ultra" as const },
+  ]) {
+    assert.throws(
+      () => resolveModelExecution(settings, claudeModelCatalog),
+      (error) => error instanceof AppError && error.statusCode === 400,
+    );
+  }
+  assert.throws(
+    () => resolveModelExecution({ provider: "claude" }, catalog),
+    (error) => error instanceof AppError && error.statusCode === 400,
+  );
+  assert.throws(
+    () => resolveModelExecution({ model: "opus" }, claudeModelCatalog),
+    AppError,
+  );
+  assert.throws(() =>
+    z.object(modelSettingsSchema).parse({ provider: "openai" }),
+  );
 });

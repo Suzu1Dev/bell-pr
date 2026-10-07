@@ -21,7 +21,13 @@ import {
   type DiscoveryJob,
   type DiscoveryPreferences,
 } from "../../shared/discovery";
-import type { ModelCatalog, ReasoningEffort } from "../../shared/models";
+import {
+  agentProviders,
+  providerLabels,
+  type AgentProvider,
+  type ModelCatalog,
+  type ReasoningEffort,
+} from "../../shared/models";
 import { api, send } from "../api";
 import { ModelSummary, reasoningLabels } from "../models/ModelSummary";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
@@ -102,28 +108,35 @@ export default function DiscoveryPanel({
         setLoading(false);
     }
   }
+  const provider = preferences.provider ?? "codex";
+  const providerLabel = providerLabels[provider];
   useEffect(() => {
     mounted.current = true;
     void reload(true);
+    return () => {
+      mounted.current = false;
+      epoch.current++;
+    };
+  }, []);
+  useEffect(() => {
     const controller = new AbortController();
-    void api<ModelCatalog>("/models", { signal: controller.signal })
+    setCatalog({ source: provider, models: [] });
+    void api<ModelCatalog>(`/models?provider=${provider}`, {
+      signal: controller.signal,
+    })
       .then((value) => {
-        if (mounted.current) setCatalog(value);
+        if (!controller.signal.aborted) setCatalog(value);
       })
       .catch((cause) => {
-        if (mounted.current && !controller.signal.aborted)
+        if (!controller.signal.aborted)
           setCatalog({
-            source: "codex",
+            source: provider,
             models: [],
             error: (cause as Error).message,
           });
       });
-    return () => {
-      mounted.current = false;
-      epoch.current++;
-      controller.abort();
-    };
-  }, []);
+    return () => controller.abort();
+  }, [provider]);
   useEffect(() => {
     if (!running) return;
     const timer = window.setInterval(() => {
@@ -293,6 +306,25 @@ export default function DiscoveryPanel({
             className="discovery-fields discovery-model-fields"
           >
             <label>
+              Agent
+              <select
+                value={provider}
+                onChange={(event) =>
+                  update({
+                    provider: event.target.value as AgentProvider,
+                    model: "",
+                    reasoningEffort: "",
+                  })
+                }
+              >
+                {agentProviders.map((value) => (
+                  <option key={value} value={value}>
+                    {providerLabels[value]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
               分析模型
               <select
                 value={preferences.model || ""}
@@ -300,7 +332,7 @@ export default function DiscoveryPanel({
                   update({ model: event.target.value, reasoningEffort: "" })
                 }
               >
-                <option value="">使用 Codex 預設模型</option>
+                <option value="">使用 {providerLabel} 預設模型</option>
                 {preferences.model &&
                   !catalog.models.some(
                     (item) => item.id === preferences.model,
@@ -362,7 +394,7 @@ export default function DiscoveryPanel({
           </fieldset>
           <p className="discovery-hint">
             {catalog.error ||
-              "分析會沿用你的 Codex 登入，使用模型用量。模型目錄不代表帳號具有所有模型的使用權限。"}
+              `分析會沿用你的 ${providerLabel} 登入，使用模型用量。模型目錄不代表帳號具有所有模型的使用權限。`}
           </p>
         </details>
         <div className="discovery-form-footer">

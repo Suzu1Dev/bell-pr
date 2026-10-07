@@ -26,9 +26,9 @@ import {
   trackEfficiency,
 } from "./efficiency.js";
 import { secretInPatch } from "./git.js";
+import { agentCommand, agentEventReader } from "./agent-cli.js";
 import {
   getModelCatalog,
-  modelArguments,
   modelExecutionSchema,
   modelSettingsSchema,
   resolveModelExecution,
@@ -318,14 +318,14 @@ export class DiscoveryService {
   private stopping = false;
   private active?: { controller: AbortController; finished: Promise<void> };
   private execute: typeof command;
-  private modelCatalog: () => Promise<ModelCatalog>;
+  private modelCatalog: typeof getModelCatalog;
   private collect: typeof collectDiscoveryCandidates;
   private file: string;
   constructor(
     private store: Store,
     dependencies: {
       command?: typeof command;
-      getModelCatalog?: () => Promise<ModelCatalog>;
+      getModelCatalog?: typeof getModelCatalog;
       collectCandidates?: typeof collectDiscoveryCandidates;
     } = {},
   ) {
@@ -511,7 +511,7 @@ export class DiscoveryService {
       job.message = "已取得真實 GitHub 來源，正在分析適合的貢獻機會";
       job.modelExecution = resolveModelExecution(
         job.preferences,
-        await this.modelCatalog(),
+        await this.modelCatalog(job.preferences.provider),
       );
       this.assertActive(signal);
       await this.save();
@@ -523,52 +523,35 @@ export class DiscoveryService {
       let answer = "";
       let failed = false;
       efficiency = trackEfficiency(job.preferences.ponytailMode);
-      await this.execute(
-        "codex",
-        [
-          "exec",
-          "--ignore-user-config",
-          "--ephemeral",
-          ...modelArguments(job.modelExecution),
-          "--sandbox",
-          "read-only",
-          "-c",
-          'approval_policy="never"',
-          "--skip-git-repo-check",
-          "--json",
-          "--color",
-          "never",
-          "--output-schema",
-          schemaPath,
-          "-C",
-          temporary,
-          "-",
-        ],
-        {
-          cwd: temporary,
-          input: discoveryPrompt(eligible, job.preferences),
-          signal,
-          env: agentEnvironment(),
-          timeoutMs: 240_000,
-          maxBytes: 1_000_000,
-          onLine: (line, stream) => {
-            if (stream !== "stdout") return;
-            try {
-              const event = JSON.parse(line);
-              efficiency?.observe(event);
-              if (event.type === "error" || event.type === "turn.failed")
-                failed = true;
-              if (
-                event.type === "item.completed" &&
-                event.item?.type === "agent_message"
-              )
-                answer = String(event.item.text ?? "");
-            } catch {
-              /* Only structured agent messages are candidates for analysis output. */
+      const cli = await agentCommand(job.modelExecution, {
+        cwd: temporary,
+        access: "none",
+        outputSchema: schemaPath,
+        skipGitRepoCheck: true,
+      });
+      const read = agentEventReader(job.modelExecution.provider);
+      await this.execute(cli.executable, cli.args, {
+        cwd: temporary,
+        input: discoveryPrompt(eligible, job.preferences),
+        signal,
+        env: agentEnvironment(),
+        timeoutMs: 240_000,
+        maxBytes: 1_000_000,
+        onLine: (line, stream) => {
+          if (stream !== "stdout") return;
+          try {
+            const event = JSON.parse(line);
+            efficiency?.observe(event);
+            for (const item of read(event)) {
+              if (item.kind === "error") failed = true;
+              if (item.kind === "message" || item.kind === "final")
+                answer = item.text;
             }
-          },
+          } catch {
+            /* Only structured agent messages are candidates for analysis output. */
+          }
         },
-      );
+      });
       this.assertActive(signal);
       if (
         failed ||

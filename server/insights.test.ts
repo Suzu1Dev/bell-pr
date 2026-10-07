@@ -599,6 +599,92 @@ test("analysis sends and persists the chosen model even when repository settings
   }
 });
 
+test("Claude Code analysis uses the signed-in CLI without tools, an inline schema and Claude usage fields", async () => {
+  const f = await fixture();
+  const calls: {
+    executable: string;
+    args: string[];
+    options: NonNullable<Parameters<typeof command>[2]>;
+  }[] = [];
+  const execute: typeof command = async (executable, args, options = {}) => {
+    calls.push({ executable, args, options });
+    if (executable === "claude" && args[0] === "-p") {
+      const value = (flag: string) => args[args.indexOf(flag) + 1];
+      assert.equal(value("--model"), "sonnet");
+      assert.equal(value("--effort"), "high");
+      assert.equal(value("--tools"), "");
+      assert.ok(args.includes("--strict-mcp-config"));
+      assert.ok(
+        JSON.parse(value("--json-schema")).required.includes(
+          "recommendations",
+        ),
+      );
+      assert.notEqual(options.cwd, f.repository);
+      assert.equal(options.env?.ANTHROPIC_API_KEY, undefined);
+      assert.match(options.input!, /untrusted DATA/);
+      options.onLine?.(
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", id: "out-1", name: "StructuredOutput" },
+            ],
+          },
+        }),
+        "stdout",
+      );
+      options.onLine?.(
+        JSON.stringify({
+          type: "result",
+          subtype: "success",
+          is_error: false,
+          result: "",
+          structured_output: validAnalysis(),
+          usage: {
+            input_tokens: 10,
+            cache_creation_input_tokens: 200,
+            cache_read_input_tokens: 300,
+            output_tokens: 40,
+          },
+        }),
+        "stdout",
+      );
+    }
+    return { stdout: "", stderr: "", code: 0 };
+  };
+  const service = new ProjectInsightsService(f.store, { command: execute });
+  try {
+    await service.setSettings(f.repo.id, {
+      ...defaultContributionSettings,
+      provider: "claude",
+      model: "sonnet",
+      reasoningEffort: "high",
+    });
+    const result = await service.generate(f.repo.id);
+    assert.deepEqual(
+      calls.map(({ executable, args }) => [executable, args[0]]),
+      [
+        ["claude", "auth"],
+        ["claude", "-p"],
+      ],
+    );
+    assert.deepEqual(result.insights.modelExecution, {
+      provider: "claude",
+      model: "sonnet",
+      reasoningEffort: "high",
+      source: "selected",
+    });
+    assert.equal(result.insights.recommendations.length, 1);
+    assert.equal(result.insights.efficiency?.measuredCalls, 1);
+    assert.equal(result.insights.efficiency?.inputTokens, 510);
+    assert.equal(result.insights.efficiency?.cachedInputTokens, 300);
+    assert.equal(result.insights.efficiency?.outputTokens, 40);
+  } finally {
+    await service.shutdown();
+    await f.cleanup();
+  }
+});
+
 test("more recommendations request five new proposals per call, append atomically and retain original analysis", async () => {
   const f = await fixture();
   try {

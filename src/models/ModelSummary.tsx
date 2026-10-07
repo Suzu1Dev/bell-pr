@@ -1,5 +1,9 @@
 import { Cpu } from "lucide-react";
-import type { ModelExecution, ReasoningEffort } from "../../shared/models";
+import {
+  providerLabels,
+  type ModelExecution,
+  type ReasoningEffort,
+} from "../../shared/models";
 import "./models.css";
 
 export const reasoningLabels: Record<ReasoningEffort, string> = {
@@ -22,6 +26,7 @@ export function ModelSummary({
   demo?: boolean;
   analysis?: boolean;
 }) {
+  const label = providerLabels[execution?.provider ?? "codex"];
   return (
     <section
       className="model-summary"
@@ -39,19 +44,23 @@ export function ModelSummary({
         <>
           <dl>
             <div>
+              <dt>Agent</dt>
+              <dd>{label}</dd>
+            </div>
+            <div>
               <dt>模型</dt>
-              <dd>{execution.model || "Codex 預設（型號未回報）"}</dd>
+              <dd>{execution.model || `${label} 預設（型號未回報）`}</dd>
             </div>
             <div>
               <dt>思考強度</dt>
               <dd>
                 {execution.reasoningEffort
                   ? `${reasoningLabels[execution.reasoningEffort]} · ${execution.reasoningEffort}`
-                  : "Codex 預設"}
+                  : `${label} 預設`}
               </dd>
             </div>
           </dl>
-          <p>這是 BELL 傳入 Codex 的設定；服務端實際使用的模型未另外回報。</p>
+          <p>這是 BELL 傳入 {label} 的設定；服務端實際使用的模型未另外回報。</p>
         </>
       )}
     </section>

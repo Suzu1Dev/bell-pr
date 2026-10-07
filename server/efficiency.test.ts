@@ -80,3 +80,35 @@ test("missing and invalid usage never becomes a measured zero-token call", () =>
   });
   assert.equal(call.finish(true).measuredCalls, 0);
 });
+
+test("Claude Code usage counts cache writes and reads as input, with reads as cached input", () => {
+  const call = trackEfficiency("lite");
+  call.observe({
+    type: "result",
+    usage: {
+      input_tokens: 9,
+      cache_creation_input_tokens: 7408,
+      cache_read_input_tokens: 100,
+      output_tokens: 145,
+    },
+  });
+  const metrics = call.finish(true);
+  assert.equal(metrics.measuredCalls, 1);
+  assert.equal(metrics.inputTokens, 7517);
+  assert.equal(metrics.cachedInputTokens, 100);
+  assert.equal(metrics.outputTokens, 145);
+  for (const usage of [
+    { input_tokens: 9, output_tokens: 1 },
+    { input_tokens: 9, cache_creation_input_tokens: 0, output_tokens: 1 },
+    {
+      input_tokens: 9,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: -1,
+      output_tokens: 1,
+    },
+  ]) {
+    const missing = trackEfficiency("lite");
+    missing.observe({ type: "result", usage });
+    assert.equal(missing.finish(true).measuredCalls, 0);
+  }
+});
