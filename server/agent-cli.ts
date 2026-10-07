@@ -33,6 +33,7 @@ const claudeAccess: Record<AgentAccess, string[]> = {
     "dontAsk",
   ],
   // acceptEdits approves file edits inside the working directory only; Bash is not sandboxed.
+  // Deny rules win over allow rules: pushing, GitHub CLI and raw downloads stay with BELL's own flow.
   write: [
     "--tools",
     "Read,Grep,Glob,Edit,Write,Bash",
@@ -40,6 +41,11 @@ const claudeAccess: Record<AgentAccess, string[]> = {
     "Read Grep Glob Bash",
     "--permission-mode",
     "acceptEdits",
+    "--disallowedTools",
+    "Bash(git push:*)",
+    "Bash(gh:*)",
+    "Bash(curl:*)",
+    "Bash(wget:*)",
   ],
 };
 
@@ -60,6 +66,9 @@ export async function agentCommand(
         "--no-session-persistence",
         // Keeps the user's claude.ai connectors and MCP servers away from agents reading untrusted content.
         "--strict-mcp-config",
+        // -p shows no trust dialog, so the imported repository's .claude settings, hooks and memory must not load.
+        "--setting-sources",
+        "user",
         ...(value.model ? ["--model", value.model] : []),
         ...(value.reasoningEffort ? ["--effort", value.reasoningEffort] : []),
         ...claudeAccess[options.access],
