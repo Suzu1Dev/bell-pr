@@ -3,12 +3,7 @@ import type {
   DiscoveryPreferences,
   DiscoverySource,
 } from "../shared/discovery.js";
-import {
-  parseGitHubSource,
-  safeRelativePath,
-  secretInPatch,
-  sensitivePath,
-} from "./git.js";
+import { parseGitHubSource, safeRelativePath, sensitivePath } from "./git.js";
 import { command, redact } from "./process.js";
 import { AppError } from "./types.js";
 
@@ -185,14 +180,7 @@ export async function collectDiscoveryCandidates(
       candidate.warnings.push(`${source.title} 不是可安全讀取的文字，已略過。`);
       return;
     }
-    const cleaned = redact(source.content).replace(
-      /\bAKIA[A-Z0-9]{16}\b/g,
-      "[REDACTED]",
-    );
-    if (secretInPatch(cleaned)) {
-      candidate.warnings.push(`${source.title} 疑似含有敏感資訊，已略過。`);
-      return;
-    }
+    const cleaned = redact(source.content);
     if (cleaned !== source.content)
       candidate.warnings.push(`${source.title} 已遮蔽疑似憑證。`);
     const used = candidate.sources.reduce(
