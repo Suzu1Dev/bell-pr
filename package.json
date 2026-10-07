@@ -9,7 +9,10 @@
     "dev:server": "tsx watch server/index.ts",
     "build": "tsc --noEmit && vite build",
     "start": "tsx server/index.ts",
-    "test": "tsx --test server/*.test.ts src/review/*.test.ts"
+    "test": "tsx --import ./test/css-stub.mjs --test \"server/*.test.ts\" \"src/**/*.test.ts\""
+  },
+  "engines": {
+    "node": ">=22"
   },
   "dependencies": {
     "express": "^5.1.0",

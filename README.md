@@ -147,7 +147,11 @@ npm run build
 npm start
 ```
 
-`npm run build` 執行 TypeScript 檢查並建立前端資產。`npm test` 執行後端與 diff 解析的自動化測試。
+`npm run build` 執行 TypeScript 檢查並建立前端資產。`npm test` 以 Node.js 內建的 test runner（透過 `tsx`）執行 `server/*.test.ts` 與 `src/**/*.test.ts`，新增到 `src/` 任一子目錄的 `*.test.ts` 都會被納入。測試只需要 Node.js、Git 與基本的系統工具，不會呼叫 `codex`、`claude` 或 `gh`。
+
+前端除了 diff 解析的純函式測試與 Markdown 渲染測試外，另有 `DiffView`、`ExplanationPanel`、`TeamBoard` 與 `EfficiencySummary` 的 smoke tests：用 `react-dom/server` 的 `renderToStaticMarkup` 把示範資料渲染成 HTML，再檢查畫面文字是否存在。這些元件在模組層級匯入 `.css`，應用程式中由 Vite 處理樣式匯入，但 Node.js 不認得 `.css` 副檔名；因此 `npm test` 會先載入 `test/css-stub.mjs`，以 `node:module` 的 `register()` 將所有 `*.css` 匯入解析為空模組。這只影響測試，不影響建置。
+
+`.github/workflows/ci.yml` 會在 push 與 pull request 時於 `ubuntu-latest`、Node.js 22 執行 `npm ci`、`npm run build` 與 `npm test`。`package.json` 的 `engines.node` 設為 `>=22`；專案沒有啟用 `engine-strict`，較舊的 Node.js 在 `npm install` 時只會收到警告而不會被阻擋，實際執行仍需要 Node.js 22 以上。本輪未加入 Prettier 或 ESLint。
 
 建置完成後，正式模式由同一個 Node.js 服務提供網頁與 API，開啟 <http://127.0.0.1:4311>。
 
