@@ -21,6 +21,7 @@ import {
   type ProjectInsights,
   type RecommendationPreferences,
 } from "../shared/insights.js";
+import type { ModelSettings } from "../shared/models.js";
 import { safeRelativePath, secretInPatch, sensitivePath } from "./git.js";
 import { agentEnvironment, command, git, redact } from "./process.js";
 import { Store } from "./store.js";
@@ -204,6 +205,26 @@ const cacheSchema = z.object({
 });
 type Cache = z.infer<typeof cacheSchema>;
 
+const sharedModelSettingsSchema = z.object(modelSettingsSchema).strict();
+
+/** Model choices are shared by every project; legacy per-project values are ignored. */
+function withoutModel(settings: ContributionSettings) {
+  const { provider: _provider, model: _model, reasoningEffort: _effort, ...project } =
+    settings;
+  return project;
+}
+
+async function writeJsonAtomically(file: string, value: unknown) {
+  await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
+  const temporary = `${file}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporary, JSON.stringify(value, null, 2), { mode: 0o600 });
+    await rename(temporary, file);
+  } finally {
+    await rm(temporary, { force: true });
+  }
+}
+
 function validateAnalysis<
   S extends typeof analysisSchema | typeof recommendationsSchema,
 >(
@@ -295,6 +316,7 @@ function novelRecommendations(
 /** Separate persistence keeps contribution preferences independent of run lifecycle writes. */
 export class ProjectInsightsService {
   private writes = new Map<string, Promise<unknown>>();
+  private modelWrite: Promise<unknown> = Promise.resolve();
   private generating = new Set<string>();
   private controllers = new Map<string, AbortController>();
   private jobs = new Set<Promise<void>>();
@@ -361,16 +383,7 @@ export class ProjectInsightsService {
       .then(async () => {
         const cache = await this.read(id);
         change(cache);
-        await mkdir(this.directory, { recursive: true, mode: 0o700 });
-        const temporary = `${this.cachePath(id)}.${randomUUID()}.tmp`;
-        try {
-          await writeFile(temporary, JSON.stringify(cache, null, 2), {
-            mode: 0o600,
-          });
-          await rename(temporary, this.cachePath(id));
-        } finally {
-          await rm(temporary, { force: true });
-        }
+        await writeJsonAtomically(this.cachePath(id), cache);
       });
     this.writes.set(id, next);
     try {
@@ -380,27 +393,66 @@ export class ProjectInsightsService {
     }
   }
 
+  private get modelSettingsPath() {
+    return path.join(this.store.directory, "model-settings.json");
+  }
+
+  async getModelSettings(): Promise<ModelSettings> {
+    await this.modelWrite.catch(() => undefined);
+    try {
+      return sharedModelSettingsSchema.parse(
+        JSON.parse(await readFile(this.modelSettingsPath, "utf8")),
+      );
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT")
+        return sharedModelSettingsSchema.parse({});
+      throw new AppError("模型設定無法讀取，請檢查本機 model-settings.json。", 500);
+    }
+  }
+
+  async setModelSettings(input: unknown): Promise<ModelSettings> {
+    const settings = sharedModelSettingsSchema.parse(input);
+    if (settings.model || settings.reasoningEffort)
+      resolveModelExecution(
+        settings,
+        await this.modelCatalog(settings.provider),
+      );
+    const write = this.modelWrite
+      .catch(() => undefined)
+      .then(() => writeJsonAtomically(this.modelSettingsPath, settings));
+    this.modelWrite = write;
+    await write;
+    return settings;
+  }
+
+  /** Project preferences combined with the shared model settings. */
   async getSettings(repoId: string): Promise<ContributionSettings> {
     this.repository(repoId);
     await this.writes.get(repoId);
-    return (await this.read(repoId)).settings;
+    const [cache, model] = await Promise.all([
+      this.read(repoId),
+      this.getModelSettings(),
+    ]);
+    return { ...withoutModel(cache.settings), ...model };
   }
 
+  /** Saves project preferences here and the model fields as the shared default. */
   async setSettings(
     repoId: string,
     input: unknown,
   ): Promise<ContributionSettings> {
     this.repository(repoId);
     const settings = contributionSettingsSchema.parse(input);
-    if (settings.model || settings.reasoningEffort)
-      resolveModelExecution(
-        settings,
-        await this.modelCatalog(settings.provider),
-      );
-    await this.update(repoId, (cache) => {
-      cache.settings = settings;
+    const project = withoutModel(settings);
+    const model = await this.setModelSettings({
+      ...(settings.provider ? { provider: settings.provider } : {}),
+      model: settings.model,
+      reasoningEffort: settings.reasoningEffort,
     });
-    return settings;
+    await this.update(repoId, (cache) => {
+      cache.settings = contributionSettingsSchema.parse(project);
+    });
+    return { ...project, ...model };
   }
 
   async setRecommendationPreferences(

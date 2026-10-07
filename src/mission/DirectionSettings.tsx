@@ -252,7 +252,7 @@ export function DirectionSettings({
             模型與思考方式
           </h3>
           <p className="mission-field-note">
-            全體 Agents
+            所有專案與 Agents
             共用此設定。新任務會記錄自己的設定，後續修改不會影響已建立的任務。
           </p>
         </div>
