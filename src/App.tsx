@@ -65,7 +65,7 @@ import type {
   DiscoveryCandidate,
 } from "../shared/discovery";
 import { DiffView } from "./review/DiffView";
-import { providerLabels } from "../shared/models";
+import { providerLabels, type ModelSettings } from "../shared/models";
 import { CommandPalette } from "./navigation/CommandPalette";
 const ExplanationPanel = lazy(() =>
   import("./review/ExplanationPanel").then((module) => ({
@@ -246,6 +246,7 @@ export default function App() {
   const [contributionSettings, setContributionSettings] =
     useState<ContributionSettings>({ ...defaultContributionSettings });
   const settingsRequest = useRef(0);
+  const [modelSettings, setModelSettings] = useState<ModelSettings>({});
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsReady, setSettingsReady] = useState(false);
   const [settingsNotice, setSettingsNotice] = useState("");
@@ -644,13 +645,48 @@ export default function App() {
     void configureTaskRepo(id);
     openModal("task");
   }
-  function configureContributionModels() {
-    const repo = (currentRepo?.id !== demoRepo.id && currentRepo)
-      || repos.find((repo) => repo.id === exploreRepoId)
-      || repos[0]
-      || demoRepo;
-    void configureTaskRepo(repo.id);
+  async function configureContributionModels() {
     openModal("models");
+    const request = ++settingsRequest.current;
+    setSettingsNotice("");
+    setSettingsReady(false);
+    setSettingsLoading(true);
+    try {
+      const { settings } = await api<{ settings: ModelSettings }>(
+        "/model-settings",
+      );
+      if (request === settingsRequest.current) {
+        setModelSettings(settings);
+        setSettingsReady(true);
+      }
+    } catch (error) {
+      if (request === settingsRequest.current)
+        setFormError((error as Error).message);
+    } finally {
+      if (request === settingsRequest.current) setSettingsLoading(false);
+    }
+  }
+  async function saveModelSettings() {
+    if (busy || !settingsReady || settingsLoading) return;
+    const request = settingsRequest.current;
+    setBusy(true);
+    setFormError("");
+    setSettingsNotice("");
+    try {
+      const { settings } = await api<{ settings: ModelSettings }>(
+        "/model-settings",
+        send("PUT", modelSettings),
+      );
+      if (request === settingsRequest.current) {
+        setModelSettings(settings);
+        setSettingsNotice("已儲存，之後所有專案的任務與分析都會使用這組設定。");
+      }
+    } catch (error) {
+      if (request === settingsRequest.current)
+        setFormError((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
   }
   function changeContributionSettings(settings: ContributionSettings) {
     setContributionSettings(settings);
@@ -744,9 +780,9 @@ export default function App() {
       if (request === settingsRequest.current) {
         const message = taskRepoId === demoRepo.id
           ? "示範設定已儲存在此瀏覽器。"
-          : "此專案的預設設定已儲存。";
+          : "已儲存此專案的方向設定，模型設定已套用到所有專案。";
         setSettingsNotice(message);
-        if (modal !== "models") notify(message);
+        notify(message);
       }
     } catch (error) {
       if (request === settingsRequest.current)
@@ -2609,7 +2645,7 @@ export default function App() {
                 </div>
                 <div>
                   <h3>模型與思考強度</h3>
-                  <p>為每個專案保存預設，既有任務保留當次設定。</p>
+                  <p>所有專案共用一組設定，既有任務保留當次設定。</p>
                 </div>
               </div>
               <div className="setup-command">
@@ -2755,41 +2791,23 @@ export default function App() {
         <Modal
           wide
           title="設定貢獻模型"
-          subtitle="為專案儲存預設模型與思考強度，套用到之後建立的任務。"
+          subtitle="所有專案共用的 Agent、模型與思考強度，套用到之後建立的任務與專案分析。"
           onClose={closeModal}
         >
           <form onSubmit={(event) => {
             event.preventDefault();
-            void saveDirection();
+            void saveModelSettings();
           }}>
-            <label className="field-label" htmlFor="model-settings-repo">
-              專案
-            </label>
-            <select
-              id="model-settings-repo"
-              className="text-input"
-              value={taskRepoId}
-              disabled={busy}
-              onChange={(event) => configureTaskRepo(event.target.value)}
-              required
-            >
-              {[...repos, demoRepo].map((repo) => (
-                <option value={repo.id} key={repo.id}>
-                  {repo.fullName}
-                  {repo.id === demoRepo.id ? "（示範 · 僅存於瀏覽器）" : ""}
-                </option>
-              ))}
-            </select>
             {settingsLoading && (
-              <p className="field-help" role="status">正在載入專案設定…</p>
+              <p className="field-help" role="status">正在載入模型設定…</p>
             )}
             {!settingsLoading && !settingsReady && (
               <button
                 type="button"
                 className="save-direction-button"
-                onClick={() => configureTaskRepo(taskRepoId)}
+                onClick={() => void configureContributionModels()}
               >
-                重新載入專案設定
+                重新載入模型設定
               </button>
             )}
             <fieldset
@@ -2797,8 +2815,12 @@ export default function App() {
               disabled={busy || settingsLoading || !settingsReady}
             >
               <DirectionSettings
-                value={contributionSettings}
-                onChange={changeContributionSettings}
+                value={{ ...defaultContributionSettings, ...modelSettings }}
+                onChange={({ provider, model, reasoningEffort }) => {
+                  setModelSettings({ provider, model, reasoningEffort });
+                  setSettingsNotice("");
+                  setFormError("");
+                }}
                 modelsOnly
                 compact
               />
@@ -2819,7 +2841,7 @@ export default function App() {
                 ref={settingsSaveButton}
                 type="submit"
                 className="button primary"
-                disabled={busy || !taskRepoId || settingsLoading || !settingsReady}
+                disabled={busy || settingsLoading || !settingsReady}
               >
                 {busy ? <Loader2 size={16} className="spin" /> : <Check size={16} />}
                 {busy ? "正在儲存…" : "儲存設定"}
@@ -2913,7 +2935,7 @@ export default function App() {
               onClick={saveDirection}
             >
               <Check size={14} />
-              儲存為此專案的預設設定
+              儲存為預設設定
             </button>
             <label className="field-label" htmlFor="task-title">
               任務名稱 <span>選填</span>

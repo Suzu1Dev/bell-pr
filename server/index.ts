@@ -164,6 +164,12 @@ export function createApp(
       ),
     }),
   );
+  app.get("/api/model-settings", async (_req, res) =>
+    res.json({ settings: await insights.getModelSettings() }),
+  );
+  app.put("/api/model-settings", async (req, res) =>
+    res.json({ settings: await insights.setModelSettings(req.body) }),
+  );
   app.get("/api/repos/:id/settings", async (req, res) =>
     res.json({ settings: await insights.getSettings(req.params.id) }),
   );

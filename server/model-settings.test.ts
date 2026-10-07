@@ -12,7 +12,7 @@ import { createApp } from "./index.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
 
-test("settings API persists each repository's model and effort without starting runs and rejects unsupported pairs", async (t) => {
+test("settings API shares one model and effort across repositories without starting runs and rejects unsupported pairs", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-model-settings-test-"));
   const cleanup: (() => Promise<void>)[] = [];
   t.after(async () => {
@@ -66,22 +66,31 @@ test("settings API persists each repository's model and effort without starting 
   const api = await start(store);
   const firstSettings = { ...defaultContributionSettings, direction: "docs", outcome: "保留這個專案的貢獻目標", model: "test-balanced", reasoningEffort: "high" };
   const secondSettings = { ...defaultContributionSettings, model: "test-fast", reasoningEffort: "low" };
+  const sharedModel = { model: "test-fast", reasoningEffort: "low" };
+  assert.deepEqual(await api("/model-settings"), { status: 200, body: { settings: { model: "", reasoningEffort: "" } } });
   assert.deepEqual(await api(`/repos/${first.id}/settings`, firstSettings), { status: 200, body: { settings: firstSettings } });
   assert.deepEqual(await api(`/repos/${second.id}/settings`, secondSettings), { status: 200, body: { settings: secondSettings } });
+  // The latest saved model applies to every project; project preferences stay separate.
+  assert.deepEqual((await api(`/repos/${first.id}/settings`)).body.settings, { ...firstSettings, ...sharedModel });
+  assert.deepEqual(await api("/model-settings"), { status: 200, body: { settings: sharedModel } });
 
   const restartedStore = new Store(directory);
   await restartedStore.initialize();
   const reloadedApi = await start(restartedStore);
-  assert.deepEqual(await reloadedApi(`/repos/${first.id}/settings`), { status: 200, body: { settings: firstSettings } });
-  assert.deepEqual(await reloadedApi(`/repos/${second.id}/settings`), { status: 200, body: { settings: secondSettings } });
+  const balanced = { model: "test-balanced", reasoningEffort: "high" };
+  assert.deepEqual(await reloadedApi("/model-settings", balanced), { status: 200, body: { settings: balanced } });
+  assert.deepEqual(await reloadedApi(`/repos/${first.id}/settings`), { status: 200, body: { settings: { ...firstSettings, ...balanced } } });
+  assert.deepEqual(await reloadedApi(`/repos/${second.id}/settings`), { status: 200, body: { settings: { ...secondSettings, ...balanced } } });
   for (const invalid of [
-    { ...firstSettings, model: "test-fast", reasoningEffort: "high" },
-    { ...firstSettings, model: "missing-model" },
+    { model: "test-fast", reasoningEffort: "high" },
+    { model: "missing-model" },
   ]) {
-    assert.equal((await reloadedApi(`/repos/${first.id}/settings`, invalid)).status, 400);
-    assert.deepEqual((await reloadedApi(`/repos/${first.id}/settings`)).body.settings, firstSettings);
+    assert.equal((await reloadedApi("/model-settings", invalid)).status, 400);
+    assert.equal((await reloadedApi(`/repos/${first.id}/settings`, { ...firstSettings, ...invalid })).status, 400);
+    assert.deepEqual((await reloadedApi("/model-settings")).body.settings, balanced);
   }
-  assert.deepEqual((await reloadedApi(`/repos/${second.id}/settings`)).body.settings, secondSettings);
+  assert.equal((await reloadedApi("/model-settings", { ...balanced, direction: "docs" })).status, 400);
+  assert.deepEqual((await reloadedApi(`/repos/${first.id}/settings`)).body.settings, { ...firstSettings, ...balanced });
   assert.deepEqual(await reloadedApi("/runs"), { status: 200, body: { runs: [] } });
   assert.deepEqual(store.data.runs, []);
   assert.equal(createRunCalls, 0);
