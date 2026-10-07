@@ -124,7 +124,7 @@ PR 草稿會優先採用目標專案的 `CONTRIBUTING`、PR 模板與相關投�
 - Teammates 的 Bash 以 `--disallowedTools` 拒絕 `git push`、`gh`、`curl`、`wget` 開頭的指令（拒絕規則優先於允許規則），推送與 PR 仍由 BELL 自己的流程處理。這是縱深防禦，不是沙箱：實測中 `git push --dry-run origin HEAD` 與 `curl https://example.com` 被 Claude Code 回絕為「Permission to use Bash with command … has been denied」，並列在結果事件的 `permission_denials`；`git status` 與 `git log` 照常執行並回傳輸出。
 - 執行時加上 `--strict-mcp-config`，不載入 claude.ai 連接器（Gmail、Drive 等）或其他 MCP 伺服器，避免 Agent 讀到不可信內容時被誘導使用你的帳號服務。
 - 執行時加上 `--setting-sources user`，只載入使用者層級的設定（依 Claude Code 對 `user` 來源的定義，包含 `~/.claude/settings.json`、使用者 hooks 與 `~/.claude/CLAUDE.md`）；匯入專案裡的 `.claude/settings.json`、`.claude/settings.local.json` 與專案 `CLAUDE.md` 則不載入。`claude -p` 不會顯示信任資料夾的確認對話，BELL 又是在匯入的第三方 repository 的 worktree 中執行 Agent，因此必須由 BELL 自己關掉這些來源。實測：匯入專案 `.claude/settings.json` 中的 SessionStart hook 在加上此旗標後沒有執行（拿掉旗標則會執行），專案 `CLAUDE.md` 的內容也不再出現在模型的回應中。
-- 用量以 Claude Code 回報的 tokens 計算：輸入 = 未快取輸入 + 快取寫入 + 快取讀取，快取欄位只計快取讀取。`total_cost_usd` 對訂閱帳戶沒有意義，不會顯示。訂閱有使用額度限制，多位 teammates 同時執行時較快達到上限，達到時任務會顯示 Claude Code 回報的錯誤。
+- 用量以 Claude Code 回報的 tokens 計算：輸入 = 未快取輸入 + 快取寫入 + 快取讀取，快取欄位只計快取讀取。`total_cost_usd` 對訂閱帳戶沒有意義，不會顯示。訂閱有使用額度限制，多位 teammates 同時執行時較快達到上限，達到時任務會顯示 Claude Code 回報的錯誤。`BELLPR_MAX_AGENT_PROCESSES`（預設 3）限制所有工作、專案分析與探索同時執行的 CLI 行程數，超過的呼叫排隊等待：工作中的 Agent 會顯示「等待其他 Agent 完成」，專案分析與探索則維持原本的進度訊息。
 
 ## Ponytail 效率規則
 
@@ -204,6 +204,7 @@ npm run dev
 | `BELLPR_FRONTEND_PORT` | `4310`    | API 允許的開發網頁來源埠。修改時需同步 `package.json` 的 `dev:web`。       |
 | `BELLPR_DATA_DIR`      | `.bellpr` | 本機工作資料位置，可使用絕對路徑。                                         |
 | `BELLPR_ALLOWED_ORIGINS` | 空值 | 額外允許的精確 HTTP(S) origin，以逗號分隔；僅供已有存取控制、保留 Host 的私網代理使用。 |
+| `BELLPR_MAX_AGENT_PROCESSES` | `3` | 同時執行的 Agent CLI 行程上限（1–32），涵蓋所有工作、專案分析與探索；超過時後續 Agent 排隊等待。 |
 
 `.bellpr` 與 `.env` 已排除於 Git 追蹤外。請妥善保留工作資料；刪除資料目錄會移除其中的 repository、工作目錄與紀錄。
 

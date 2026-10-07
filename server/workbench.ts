@@ -23,6 +23,7 @@ import type { ContributionSettings } from "../shared/insights.js";
 import { defaultPonytailMode } from "../shared/efficiency.js";
 import { addEfficiency, applyPonytail, trackEfficiency } from "./efficiency.js";
 import { Store } from "./store.js";
+import { AgentSlots, defaultAgentProcessLimit } from "./agent-slots.js";
 import { AppError, type Repository, type Run } from "./types.js";
 import { getModelCatalog, resolveModelExecution } from "./models.js";
 import {
@@ -88,14 +89,20 @@ export class Workbench {
       claudeAuthenticated: boolean;
     };
   };
+  /** Shared by every agent CLI call, including project analysis and discovery. */
+  readonly agentSlots: AgentSlots;
   constructor(
     public store: Store,
     private agentRunner?: TeamAgentRunner,
     private dependencies: {
       getModelCatalog?: typeof getModelCatalog;
       collectDraftContext?: typeof collectDraftContext;
+      agentSlots?: AgentSlots;
     } = {},
-  ) {}
+  ) {
+    this.agentSlots =
+      dependencies.agentSlots ?? new AgentSlots(defaultAgentProcessLimit);
+  }
 
   models(provider?: AgentProvider) {
     return (this.dependencies.getModelCatalog ?? getModelCatalog)(provider);
@@ -456,15 +463,26 @@ export class Workbench {
       role,
       `${agent?.name ?? "Guide"} 開始工作。模型：${modelExecution.model ?? `${label} CLI 預設（未記錄模型）`}；推理：${modelExecution.reasoningEffort ?? "模型預設"}。${inbox.length ? ` 已在回合起點收到 ${inbox.length} 則團隊訊息。` : ""}`,
     );
-    const efficiency = trackEfficiency(mode);
+    let efficiency: ReturnType<typeof trackEfficiency> | undefined;
     const answerLimit = context.outputSchema ? 80_000 : 24_000;
     const cwd = context.cwd ?? run.worktreePath;
     let completed = false;
     let answer = "";
     let terminalFailure: string | undefined;
     let lastSave = 0;
+    let releaseSlot: (() => void) | undefined;
     try {
       await this.store.save();
+      if (this.agentSlots.active >= this.agentSlots.limit) {
+        const waiting = `等待其他 Agent 完成（${this.agentSlots.waiting + 1} 個排隊中）`;
+        if (agent) agent.detail = waiting;
+        this.log(run, role, `${waiting}。`);
+      }
+      releaseSlot = await this.agentSlots.acquire(signal);
+      if (agent) agent.detail = `正在執行 ${label}…`;
+      // Queue time is not agent time: measure from the moment the slot is held.
+      const call = trackEfficiency(mode);
+      efficiency = call;
       if (this.agentRunner) {
         answer = redact(
           await this.agentRunner({
@@ -496,7 +514,7 @@ export class Workbench {
             if (stream !== "stdout") return;
             try {
               const event = JSON.parse(line);
-              efficiency.observe(event);
+              call.observe(event);
               for (const item of read(event)) {
                 if (item.kind === "message" || item.kind === "final") {
                   const text = redact(item.text).slice(0, answerLimit);
@@ -550,10 +568,12 @@ export class Workbench {
       }
       throw error;
     } finally {
-      run.efficiency = addEfficiency(
-        run.efficiency,
-        efficiency.finish(completed),
-      );
+      releaseSlot?.();
+      if (efficiency)
+        run.efficiency = addEfficiency(
+          run.efficiency,
+          efficiency.finish(completed),
+        );
       await this.store.save();
     }
   }

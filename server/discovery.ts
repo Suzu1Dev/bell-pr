@@ -36,6 +36,7 @@ import {
 import { agentEnvironment, command, redact } from "./process.js";
 import { collectDiscoveryCandidates } from "./discovery-sources.js";
 import { Store } from "./store.js";
+import { AgentSlots, defaultAgentProcessLimit } from "./agent-slots.js";
 import { AppError } from "./types.js";
 
 export const discoveryPreferencesSchema = z
@@ -320,6 +321,7 @@ export class DiscoveryService {
   private execute: typeof command;
   private modelCatalog: typeof getModelCatalog;
   private collect: typeof collectDiscoveryCandidates;
+  private slots: AgentSlots;
   private file: string;
   constructor(
     private store: Store,
@@ -327,12 +329,15 @@ export class DiscoveryService {
       command?: typeof command;
       getModelCatalog?: typeof getModelCatalog;
       collectCandidates?: typeof collectDiscoveryCandidates;
+      agentSlots?: AgentSlots;
     } = {},
   ) {
     this.file = path.join(store.directory, "discovery.json");
     this.execute = dependencies.command ?? command;
     this.modelCatalog = dependencies.getModelCatalog ?? getModelCatalog;
     this.collect = dependencies.collectCandidates ?? collectDiscoveryCandidates;
+    this.slots =
+      dependencies.agentSlots ?? new AgentSlots(defaultAgentProcessLimit);
   }
   private initialize() {
     this.initialization ??= (async () => {
@@ -530,28 +535,33 @@ export class DiscoveryService {
         skipGitRepoCheck: true,
       });
       const read = agentEventReader(job.modelExecution.provider);
-      await this.execute(cli.executable, cli.args, {
-        cwd: temporary,
-        input: discoveryPrompt(eligible, job.preferences),
-        signal,
-        env: agentEnvironment(),
-        timeoutMs: 240_000,
-        maxBytes: 1_000_000,
-        onLine: (line, stream) => {
-          if (stream !== "stdout") return;
-          try {
-            const event = JSON.parse(line);
-            efficiency?.observe(event);
-            for (const item of read(event)) {
-              if (item.kind === "error") failed = true;
-              if (item.kind === "message" || item.kind === "final")
-                answer = item.text;
+      const releaseSlot = await this.slots.acquire(signal);
+      try {
+        await this.execute(cli.executable, cli.args, {
+          cwd: temporary,
+          input: discoveryPrompt(eligible, job.preferences),
+          signal,
+          env: agentEnvironment(),
+          timeoutMs: 240_000,
+          maxBytes: 1_000_000,
+          onLine: (line, stream) => {
+            if (stream !== "stdout") return;
+            try {
+              const event = JSON.parse(line);
+              efficiency?.observe(event);
+              for (const item of read(event)) {
+                if (item.kind === "error") failed = true;
+                if (item.kind === "message" || item.kind === "final")
+                  answer = item.text;
+              }
+            } catch {
+              /* Only structured agent messages are candidates for analysis output. */
             }
-          } catch {
-            /* Only structured agent messages are candidates for analysis output. */
-          }
-        },
-      });
+          },
+        });
+      } finally {
+        releaseSlot();
+      }
       this.assertActive(signal);
       if (
         failed ||

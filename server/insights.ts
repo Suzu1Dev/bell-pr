@@ -25,6 +25,7 @@ import type { ModelSettings } from "../shared/models.js";
 import { safeRelativePath, secretInPatch, sensitivePath } from "./git.js";
 import { agentEnvironment, command, git, redact } from "./process.js";
 import { Store } from "./store.js";
+import { AgentSlots, defaultAgentProcessLimit } from "./agent-slots.js";
 import { AppError, type Repository } from "./types.js";
 import { defaultPonytailMode, ponytailModes } from "../shared/efficiency.js";
 import {
@@ -323,16 +324,20 @@ export class ProjectInsightsService {
   private stopping = false;
   private execute: typeof command;
   private modelCatalog: typeof getModelCatalog;
+  private slots: AgentSlots;
 
   constructor(
     public store: Store,
     dependencies: {
       command?: typeof command;
       getModelCatalog?: typeof getModelCatalog;
+      agentSlots?: AgentSlots;
     } = {},
   ) {
     this.execute = dependencies.command ?? command;
     this.modelCatalog = dependencies.getModelCatalog ?? getModelCatalog;
+    this.slots =
+      dependencies.agentSlots ?? new AgentSlots(defaultAgentProcessLimit);
   }
 
   private repository(id: string): Repository {
@@ -775,28 +780,33 @@ export class ProjectInsightsService {
         skipGitRepoCheck: true,
       });
       const read = agentEventReader(modelExecution.provider);
-      await this.execute(cli.executable, cli.args, {
-        input,
-        cwd: temporary,
-        env: agentEnvironment(),
-        signal,
-        timeoutMs: 240_000,
-        maxBytes: 1_000_000,
-        onLine: (line, stream) => {
-          if (stream !== "stdout") return;
-          try {
-            const event = JSON.parse(line);
-            efficiency.observe(event);
-            for (const item of read(event)) {
-              if (item.kind === "error") failed = true;
-              if (item.kind === "message" || item.kind === "final")
-                answer = item.text;
+      const releaseSlot = await this.slots.acquire(signal);
+      try {
+        await this.execute(cli.executable, cli.args, {
+          input,
+          cwd: temporary,
+          env: agentEnvironment(),
+          signal,
+          timeoutMs: 240_000,
+          maxBytes: 1_000_000,
+          onLine: (line, stream) => {
+            if (stream !== "stdout") return;
+            try {
+              const event = JSON.parse(line);
+              efficiency.observe(event);
+              for (const item of read(event)) {
+                if (item.kind === "error") failed = true;
+                if (item.kind === "message" || item.kind === "final")
+                  answer = item.text;
+              }
+            } catch {
+              /* Raw tool output is not trusted analysis. */
             }
-          } catch {
-            /* Raw tool output is not trusted analysis. */
-          }
-        },
-      });
+          },
+        });
+      } finally {
+        releaseSlot();
+      }
       this.assertActive(signal);
       if (failed || !answer || Buffer.byteLength(answer) > 120_000)
         throw new AppError(

@@ -15,6 +15,7 @@ import { Workbench } from "./workbench.js";
 import { AppError } from "./types.js";
 import { redact } from "./process.js";
 import { DiscoveryService } from "./discovery.js";
+import { AgentSlots, parseAgentProcessLimit } from "./agent-slots.js";
 import { agentProviders } from "../shared/models.js";
 
 export function parseAllowedOrigins(value = ""): string[] {
@@ -102,13 +103,22 @@ export function createApp(
     frontendPort = 4310,
     staticDirectory = path.resolve("dist"),
     allowedOrigins = "",
+    agentSlots = workbench.agentSlots,
+  }: {
+    port?: number;
+    frontendPort?: number;
+    staticDirectory?: string;
+    allowedOrigins?: string;
+    agentSlots?: AgentSlots;
   } = {},
 ) {
   const insights = new ProjectInsightsService(workbench.store, {
     getModelCatalog: (provider) => workbench.models(provider),
+    agentSlots,
   });
   const discovery = new DiscoveryService(workbench.store, {
     getModelCatalog: (provider) => workbench.models(provider),
+    agentSlots,
   });
   const app = express();
   app.locals.insights = insights;
@@ -350,11 +360,14 @@ async function main() {
     );
   const allowedOrigins = process.env.BELLPR_ALLOWED_ORIGINS ?? "";
   parseAllowedOrigins(allowedOrigins);
+  const agentSlots = new AgentSlots(
+    parseAgentProcessLimit(process.env.BELLPR_MAX_AGENT_PROCESSES),
+  );
   const store = new Store(
     path.resolve(process.env.BELLPR_DATA_DIR ?? ".bellpr"),
   );
   await store.initialize();
-  const workbench = new Workbench(store);
+  const workbench = new Workbench(store, undefined, { agentSlots });
   const app = createApp(workbench, { port, frontendPort, allowedOrigins });
   const server = app.listen(port, "127.0.0.1", () =>
     console.log(`BELL-PR → http://127.0.0.1:${port}`),
