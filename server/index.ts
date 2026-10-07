@@ -301,7 +301,7 @@ export function createApp(
       res.sendFile(path.join(staticDirectory, "index.html"));
     });
   }
-  const errors: ErrorRequestHandler = (error, _req, res, _next) => {
+  const errors: ErrorRequestHandler = (error, req, res, _next) => {
     if (error instanceof z.ZodError) {
       res.status(400).json({
         error: error.issues
@@ -322,9 +322,14 @@ export function createApp(
       res.status(413).json({ error: "請求內容過大。" });
       return;
     }
+    // The stack only reaches the local journal; the client gets a generic message.
     console.error(
       "[BELL-PR]",
-      redact(error instanceof Error ? error.message : String(error)),
+      req.method,
+      req.path,
+      redact(
+        error instanceof Error ? (error.stack ?? error.message) : String(error),
+      ),
     );
     res.status(500).json({ error: "操作未完成；請檢查本機服務記錄。" });
   };
@@ -378,7 +383,9 @@ if (
 ) {
   main().catch((error) => {
     console.error(
-      redact(error instanceof Error ? error.message : String(error)),
+      redact(
+        error instanceof Error ? (error.stack ?? error.message) : String(error),
+      ),
     );
     process.exitCode = 1;
   });

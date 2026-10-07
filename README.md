@@ -181,7 +181,7 @@ tailscale serve --bg --yes --https=8443 http://127.0.0.1:8443
 
 確認 `loginctl show-user "$USER" -p Linger` 為 `Linger=yes`，服務才能在未登入及重開機後啟動；尚未啟用時需請系統管理者開啟 linger。`BELLPR_ALLOWED_ORIGINS` 只是來源檢查，不提供帳號認證；存取權限由 Tailscale 裝置與網路政策控制，不要將此代理公開到網際網路。
 
-維護可使用 `systemctl --user status bell-pr`、`systemctl --user restart bell-pr` 與 `journalctl --user -u bell-pr -n 100`。更新前確認沒有執行中的 Agent，再停止服務、備份整份 `.bellpr`、更新程式與依賴、建置後啟動。
+維護可使用 `systemctl --user status bell-pr`、`systemctl --user restart bell-pr` 與 `journalctl --user -u bell-pr -n 100`。發生未預期的錯誤（API 回傳 500 的「操作未完成」）時，服務記錄會寫入請求方法、路徑與錯誤堆疊；背景工作失敗則顯示在該工作的錯誤與系統訊息中。更新前確認沒有執行中的 Agent，再停止服務、備份整份 `.bellpr`、更新程式與依賴、建置後啟動。
 
 資料搬移必須包含完整 `.bellpr`，其中有尚未提交的檔案、Git objects/index/refs、worktree、解說與草稿。更改安裝位置時，需一併修正 `state.json` 的 repository/worktree 路徑及 Git worktree 的雙向連結，並比對檔案與 Git 差異；不能只複製 `state.json` 或重新 clone。CLI 登入狀態由目的機器提供，不隨工作資料搬移。瀏覽器示範資料與閱讀偏好保存在各網址的 localStorage，不包含在服務端備份中。
 

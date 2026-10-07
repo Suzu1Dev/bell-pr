@@ -388,8 +388,12 @@ export class Workbench {
       const job = this.execute(id)
         .catch((error) => {
           console.error(
-            "[BELL-PR] Could not persist job state:",
-            redact(String(error)),
+            `[BELL-PR] run ${id} could not persist final state:`,
+            redact(
+              error instanceof Error
+                ? (error.stack ?? error.message)
+                : String(error),
+            ),
           );
         })
         .finally(() => {
