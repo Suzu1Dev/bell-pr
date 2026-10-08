@@ -522,6 +522,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   margin-bottom: 12px;
 }
 .eyebrow {
@@ -620,16 +621,17 @@ button {
   font-size: 10px;
   color: #9aa38f;
 }
-.repo-meta .export-link {
+.export-link {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  font-size: 11px;
   color: #697361;
   text-decoration: none;
 }
-.repo-meta .export-link:hover,
-.repo-meta .export-link:focus-visible {
+.export-link:hover,
+.export-link:focus-visible {
   color: #3f4a37;
   text-decoration: underline;
 }
@@ -2888,7 +2890,6 @@ button {
   line-height: 25px;
   min-height: 25px;
 }
-.rv-code-hint,
 .rv-diff-footer {
   font-size: 11px;
 }

@@ -28,6 +28,13 @@ test("every demo file renders its name and diff lines", () => {
   }
 });
 
+test("the idle footer carries the selection hint instead of a separate hint row", () => {
+  const html = render(demoFiles[0]);
+  assert.match(html, /rv-diff-footer[^>]*>.*點選任何一行，讓 Agent 為你解說/);
+  assert.match(html, /rv-shift-hint/);
+  assert.doesNotMatch(html, /rv-code-hint/);
+});
+
 test("split view labels the before and after columns", () => {
   const html = render(demoFiles[0], "split");
   assert.match(html, /rv-diff-split/);

@@ -354,6 +354,18 @@ export default function App() {
   const insightRepo = page === "explore" ? exploreRepo : currentRepo;
   const intelligence = useProjectInsights(insightRepo?.id);
   const reading = page === "workspace" && tab === "changes";
+  // In reading mode the one-row heading clips the repo/branch text, so the
+  // export link moves up next to 新增貢獻 where it stays visible and reachable.
+  const exportLink = !demo && (
+    <a
+      className="export-link"
+      href={`/api/runs/${run.id}/export.md`}
+      download={`bell-learning-${run.id}.md`}
+    >
+      <ArrowDownToLine size={13} />
+      匯出學習紀錄（Markdown）
+    </a>
+  );
   const file = files.find((f) => f.path === selectedPath) || files[0];
   const chatLoading = loadingChats.has(`${run.id}:${file?.path}`);
   const additions = files.reduce((sum, f) => sum + f.additions, 0);
@@ -1785,6 +1797,7 @@ export default function App() {
                   <span>CONTRIBUTION WORKSPACE</span>
                   {demo && <span className="demo-pill">互動示範</span>}
                 </div>
+                {reading && exportLink}
                 <button
                   className="button secondary new-task-button"
                   onClick={() => beginContribution()}
@@ -1793,7 +1806,9 @@ export default function App() {
                 </button>
               </div>
               <div className="title-row">
-                <h1 tabIndex={-1}>{run.title}</h1>
+                <h1 tabIndex={-1} title={reading ? run.title : undefined}>
+                  {run.title}
+                </h1>
                 <span
                   className={`status-badge ${run.status === "failed" ? "error" : ""}`}
                 >
@@ -1801,7 +1816,14 @@ export default function App() {
                   {statusLabels[run.status]}
                 </span>
               </div>
-              <div className="repo-meta">
+              <div
+                className="repo-meta"
+                title={
+                  reading
+                    ? `${currentRepo?.fullName || "Repository"} · ${run.branch} → ${run.baseBranch}`
+                    : undefined
+                }
+              >
                 <span>
                   <Github size={15} />
                   {currentRepo?.fullName || "Repository"}
@@ -1818,14 +1840,7 @@ export default function App() {
                     範例資料 · 不會送出至 GitHub
                   </span>
                 ) : (
-                  <a
-                    className="export-link"
-                    href={`/api/runs/${run.id}/export.md`}
-                    download={`bell-learning-${run.id}.md`}
-                  >
-                    <ArrowDownToLine size={13} />
-                    匯出學習紀錄（Markdown）
-                  </a>
+                  !reading && exportLink
                 )}
               </div>
             </section>
