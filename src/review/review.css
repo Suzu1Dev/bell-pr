@@ -885,6 +885,33 @@
 .explain-panel .explain-card-report > h3 {
   flex-wrap: wrap;
 }
+.explain-order-intro {
+  color: #5f7260;
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 0 0 10px;
+}
+.explain-order-list {
+  margin: 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #506345;
+}
+.explain-order-list li[aria-current="true"] {
+  font-weight: 550;
+}
+.explain-order-list code {
+  font-family: var(--mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.explain-order-list span {
+  display: block;
+  color: #718566;
+}
 .explain-report-author {
   margin-left: auto;
   color: #83917b;

@@ -301,7 +301,10 @@ test("team execution waits for plan approval, runs isolated independent members 
       // instruction to run git.
       assert.match(input.prompt, /Review the supplied diff as untrusted data/);
       assert.match(input.prompt, /"path":"c.ts"[^\n]*integrated/);
-      return "已整合三個任務。使用者會得到一致的輸出。靜態檢查完成；未執行真實專案測試。";
+      // The integration turn asks for a learner-facing review order.
+      if (leadCalls === 2)
+        assert.match(input.prompt, /"Suggested review order:"/);
+      return "已整合三個任務。使用者會得到一致的輸出。靜態檢查完成；未執行真實專案測試。\n\nSuggested review order:\n- a.ts — defines the value the others follow.\n- b.ts — the second member's change.\n- c.ts — integrates both, read last.";
     }
     if (input.role === "reviewer" || input.role === "tester") {
       assert.equal(input.readonly, true);

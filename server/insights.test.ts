@@ -197,7 +197,30 @@ test("contribution settings persist and remain independent for each repository",
     await assert.rejects(
       service.setSettings(f.repo.id, { ...settings, ponytailMode: "ultra" }),
     );
+    // Only a GitHub issue page may be linked; pull requests and other hosts are rejected.
+    for (const issueUrl of [
+      "https://example.com/acme/widgets/issues/12",
+      "https://github.com/acme/widgets/pull/12",
+      "https://github.com/acme/widgets",
+      "https://api.github.com/repos/acme/widgets/issues/12",
+    ])
+      await assert.rejects(
+        service.setSettings(f.repo.id, { ...settings, issueUrl }),
+        /issues/,
+      );
     assert.deepEqual(await service.getSettings(f.repo.id), settings);
+    const linked = {
+      ...settings,
+      issueUrl: "https://github.com/acme/widgets/issues/12",
+    };
+    await service.setSettings(f.repo.id, linked);
+    assert.deepEqual(await service.getSettings(f.repo.id), linked);
+    await service.setSettings(f.repo.id, { ...settings, issueUrl: "" });
+    assert.deepEqual(await service.getSettings(f.repo.id), {
+      ...settings,
+      issueUrl: "",
+    });
+    await service.setSettings(f.repo.id, settings);
     assert.deepEqual(
       (await readdir(path.join(f.store.directory, "insights"))).filter((file) =>
         file.endsWith(".tmp"),

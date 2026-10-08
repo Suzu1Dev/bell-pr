@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowUpRight,
@@ -9,6 +9,7 @@ import {
   FileText,
   Info,
   LoaderCircle,
+  MessagesSquare,
   Quote,
   RefreshCw,
   Sparkles,
@@ -27,9 +28,28 @@ interface Props {
   busy: boolean;
   disabled?: boolean;
   demo?: boolean;
+  /** The issue the user linked in the contribution settings, if any. */
+  issueUrl?: string;
   onGenerate: () => void;
   onApply: (proposal: DraftProposal) => void;
 }
+
+/**
+ * Community etiquette the person confirms for themselves. The checkboxes
+ * are local UI state only: nothing is saved and publishing is never blocked.
+ */
+const etiquetteReminders = [
+  {
+    id: "claimed",
+    text: "是否已在 issue 留言表明要處理？",
+    why: "避免和別人做重複的工作，也讓 maintainer 知道有人接手。",
+  },
+  {
+    id: "discussed",
+    text: "專案是否要求先開 issue 討論？",
+    why: "有些專案希望先確認方向與 AI 協作是否可接受，再收 PR；先問一句，可以省下雙方審閱一份不會被接受的 PR 的時間。",
+  },
+] as const;
 
 const sourceKinds: Record<DraftSource["kind"], string> = {
   contributing: "貢獻規範",
@@ -53,10 +73,13 @@ export function DraftGuidancePanel({
   busy,
   disabled = false,
   demo = false,
+  issueUrl,
   onGenerate,
   onApply,
 }: Props) {
   const prefix = useId().replaceAll(":", "");
+  const [confirmed, setConfirmed] = useState<string[]>([]);
+  const issueLink = webLink(issueUrl);
   const proposal = preparation?.proposal;
   const sources = preparation?.context?.sources ?? [];
   const template = sources.find(
@@ -382,6 +405,49 @@ export function DraftGuidancePanel({
           </div>
         </details>
       )}
+
+      <section
+        className="draft-guidance-etiquette"
+        aria-labelledby={`draft-etiquette-${prefix}`}
+      >
+        <h3 id={`draft-etiquette-${prefix}`}>
+          <MessagesSquare size={16} /> 送出前，先和社群打個招呼
+        </h3>
+        <p>
+          開源社群重視這兩件事，是因為 maintainer
+          的時間有限：事先留言能避免兩個人改同一個問題，也讓對方在你投入前就能說「這個方向可以」或「我們不收這類變更」。這裡的勾選只是給自己的提醒，不會儲存，也不會阻擋送出。
+        </p>
+        <ul>
+          {etiquetteReminders.map((reminder) => {
+            const inputId = `draft-etiquette-${prefix}-${reminder.id}`;
+            return (
+              <li key={reminder.id}>
+                <input
+                  id={inputId}
+                  type="checkbox"
+                  checked={confirmed.includes(reminder.id)}
+                  onChange={(event) =>
+                    setConfirmed((previous) =>
+                      event.target.checked
+                        ? [...previous, reminder.id]
+                        : previous.filter((entry) => entry !== reminder.id),
+                    )
+                  }
+                />
+                <label htmlFor={inputId}>
+                  <strong>{reminder.text}</strong>
+                  <small>{reminder.why}</small>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+        {issueLink && (
+          <a href={issueLink} target="_blank" rel="noopener noreferrer">
+            開啟你填寫的 issue <ArrowUpRight size={12} />
+          </a>
+        )}
+      </section>
 
       {proposal?.policy === "linux" && (
         <p className="draft-guidance-linux">

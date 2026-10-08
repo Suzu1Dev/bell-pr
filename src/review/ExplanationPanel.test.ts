@@ -157,6 +157,26 @@ test("the reports tab renders demo reports with the static-review label and per-
   assert.match(html, /本報告提到此檔 \d+ 處/);
   // Markdown is rendered, not shown as raw asterisks.
   assert.match(html, /<strong>正確性<\/strong>/);
+  // The lead's suggested order is listed, with the open file marked.
+  assert.match(html, /Lead 建議的閱讀順序/);
+  assert.match(
+    html,
+    /<li aria-current="true"><code>src\/utils\/retry\.ts<\/code>/,
+  );
+  assert.ok(
+    html.indexOf("<code>src/types.ts</code>") <
+      html.indexOf("<code>tests/retry.test.ts</code>"),
+  );
+  assert.doesNotMatch(
+    renderToStaticMarkup(
+      createElement(ReviewReports, {
+        file: demoFiles[0],
+        reports: { implementer: "No order section." },
+        demo: false,
+      }),
+    ),
+    /建議的閱讀順序/,
+  );
   // Non-report keys stay hidden even when present.
   const extra = renderToStaticMarkup(
     createElement(ReviewReports, {

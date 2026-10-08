@@ -7,6 +7,7 @@ import { once } from "node:events";
 import { request } from "node:http";
 import { draftFingerprint, draftPrompt, parseDraftProposal } from "./drafts.js";
 import type { DraftContext, DraftProposal } from "../shared/drafts.js";
+import { defaultContributionSettings } from "../shared/insights.js";
 import type { DiffFile, Run } from "./types.js";
 import type { TeamAgentRunner } from "./team.js";
 import { Store } from "./store.js";
@@ -162,6 +163,25 @@ test("draft prompt keeps complete bounded safe diffs and distinguishes unavailab
   assert.match(prompt, /Lookup failed/);
   assert.match(prompt, /member-reported executions/);
   assert.match(prompt, /never claim there are no repository rules/);
+  // Without a user-supplied issue the prompt carries none and forbids inventing one.
+  assert.match(prompt, /"issue":null/);
+  assert.match(prompt, /never invent issues or Fixes\/Refs links/);
+  const linked = draftPrompt(
+    {
+      ...run,
+      contributionSettings: {
+        ...defaultContributionSettings,
+        issueUrl: "https://github.com/acme/widgets/issues/42",
+      },
+    },
+    [diff],
+    context,
+  );
+  assert.match(
+    linked,
+    /"issue":\{"url":"https:\/\/github\.com\/acme\/widgets\/issues\/42","number":42\}/,
+  );
+  assert.match(linked, /Only when the supplied issue is not null/);
   assert.throws(
     () => draftPrompt(run, [{ ...diff, patch: "字".repeat(40_000) }], context),
     /100 KB/,

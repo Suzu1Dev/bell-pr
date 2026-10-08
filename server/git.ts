@@ -25,6 +25,22 @@ export function parseGitHubSource(
   };
 }
 
+/** A GitHub issue page URL; pull requests, API URLs and other hosts are rejected. */
+export function parseGitHubIssueUrl(
+  source: string,
+): { owner: string; name: string; number: number; url: string } | null {
+  const match = source.match(
+    /^https:\/\/github\.com\/([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))\/([A-Za-z0-9_.-]+)\/issues\/([1-9]\d{0,9})\/?$/,
+  );
+  if (!match || match[2] === "." || match[2] === "..") return null;
+  return {
+    owner: match[1],
+    name: match[2],
+    number: Number(match[3]),
+    url: `https://github.com/${match[1]}/${match[2]}/issues/${match[3]}`,
+  };
+}
+
 export function safeRelativePath(filePath: string) {
   return (
     !!filePath &&

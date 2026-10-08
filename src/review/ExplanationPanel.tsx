@@ -12,6 +12,7 @@ import {
   FolderTree,
   HelpCircle,
   Lightbulb,
+  ListOrdered,
   LoaderCircle,
   MessageCircle,
   PenLine,
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 import type { LearnerNote } from "../../shared/explanations";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
+import { parseReviewOrder } from "../../shared/review-order";
 import type { ChatMessage, DiffFile, Run } from "../types";
 import { MarkdownContent } from "./MarkdownContent";
 import "./review.css";
@@ -164,6 +166,7 @@ export function ReviewReports({
       </small>
     </div>
   );
+  const reviewOrder = parseReviewOrder(reports?.implementer ?? "");
   if (!available.length)
     return (
       <>
@@ -186,6 +189,29 @@ export function ReviewReports({
       <p className="explain-reports-intro">
         這些是獨立靜態審查，不是執行結果；每份報告保留全文，並標示提到目前檔案的段落數。
       </p>
+      {reviewOrder.length > 0 && (
+        <section className="explain-card explain-card-order">
+          <h3>
+            <ListOrdered size={15} />
+            Lead 建議的閱讀順序
+          </h3>
+          <p className="explain-order-intro">
+            常見的讀法是先看定義與介面、再看呼叫端，測試放最前或最後；Lead
+            在整合摘要中說明了這次為何這樣排。左側檔案清單可切換「依建議順序」。
+          </p>
+          <ol className="explain-order-list">
+            {reviewOrder.map((entry) => (
+              <li
+                key={entry.path}
+                aria-current={entry.path === file.path ? "true" : undefined}
+              >
+                <code>{entry.path}</code>
+                {entry.reason && <span>{entry.reason}</span>}
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
       {rerun}
       {available.map((section) => {
         const report = reports![section.key]!;

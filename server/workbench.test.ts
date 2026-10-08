@@ -7,6 +7,7 @@ import { once } from "node:events";
 import { request } from "node:http";
 import { command, git, redact } from "./process.js";
 import {
+  parseGitHubIssueUrl,
   parseGitHubSource,
   readDiff,
   reviewFingerprint,
@@ -131,6 +132,29 @@ test("GitHub sources are normalized and remote option-like inputs rejected", () 
   );
   assert.equal(parseGitHubSource("--config=whatever"), null);
   assert.equal(parseGitHubSource("https://example.com/openai/codex"), null);
+});
+
+test("GitHub issue URLs are parsed to owner, repository and number; anything else is rejected", () => {
+  assert.deepEqual(
+    parseGitHubIssueUrl("https://github.com/openai/codex/issues/1234/"),
+    {
+      owner: "openai",
+      name: "codex",
+      number: 1234,
+      url: "https://github.com/openai/codex/issues/1234",
+    },
+  );
+  for (const invalid of [
+    "https://github.com/openai/codex/pull/1234",
+    "https://github.com/openai/codex/issues/0",
+    "https://github.com/openai/codex/issues/12#issuecomment-1",
+    "https://github.com/openai/codex/issues",
+    "http://github.com/openai/codex/issues/12",
+    "https://api.github.com/repos/openai/codex/issues/12",
+    "https://user:password@github.com/openai/codex/issues/12",
+    "--config=whatever",
+  ])
+    assert.equal(parseGitHubIssueUrl(invalid), null, invalid);
 });
 
 test("real Git diffs include tracked, added and literal bracket paths, with stable staged patches", async () => {

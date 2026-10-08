@@ -25,7 +25,12 @@ import {
 } from "../shared/insights.js";
 import type { ModelSettings } from "../shared/models.js";
 import { quoteMatches } from "./evidence.js";
-import { safeRelativePath, secretInPatch, sensitivePath } from "./git.js";
+import {
+  parseGitHubIssueUrl,
+  safeRelativePath,
+  secretInPatch,
+  sensitivePath,
+} from "./git.js";
 import { agentEnvironment, command, git, redact } from "./process.js";
 import { Store } from "./store.js";
 import { AgentSlots, defaultAgentProcessLimit } from "./agent-slots.js";
@@ -60,6 +65,16 @@ export const contributionSettingsSchema = z
     maxTeammates: z.union([z.literal(2), z.literal(3), z.literal(4)]),
     requirePlanApproval: z.boolean(),
     ponytailMode: z.enum(ponytailModes).default(defaultPonytailMode),
+    // Empty means no issue; anything else must be a GitHub issue page URL.
+    issueUrl: z
+      .string()
+      .trim()
+      .max(400)
+      .refine((value) => !value || parseGitHubIssueUrl(value) !== null, {
+        message:
+          "相關 issue 連結需為 https://github.com/<owner>/<repo>/issues/<編號>",
+      })
+      .optional(),
     ...modelSettingsSchema,
   })
   .strict();

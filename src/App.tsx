@@ -63,6 +63,7 @@ import { demoRepo, demoRun, demoFiles, demoAnswer } from "./demo";
 import type { Repo, Run, RunSummary, DiffFile, ChatMessage } from "./types";
 import { summarizeRun } from "../shared/runs";
 import { groupPrFeedback, summarizeChecks } from "../shared/pr-feedback";
+import { applyReviewOrder, parseReviewOrder } from "../shared/review-order";
 import type { DraftProposal } from "../shared/drafts";
 import type {
   ContributionOpportunity,
@@ -294,6 +295,8 @@ export default function App() {
   const [formError, setFormError] = useState("");
   const [fileSearch, setFileSearch] = useState("");
   const [onlyUnreviewed, setOnlyUnreviewed] = useState(false);
+  // Display order only: review fingerprints and the server's diff are untouched.
+  const [suggestedOrder, setSuggestedOrder] = useState(false);
   const [diffView, setDiffView] = useState<"unified" | "split">("unified");
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
   const [loadingChats, setLoadingChats] = useState<Set<string>>(new Set());
@@ -813,6 +816,15 @@ export default function App() {
           ]
         : [];
     });
+    // Prefer the issue the proposal cites; otherwise the first open issue found.
+    const issueSources = candidate.sources.filter(
+      (source) => source.kind === "issue",
+    );
+    const issueUrl = (
+      issueSources.find((source) =>
+        idea.evidence.some((item) => item.sourceId === source.id),
+      ) ?? issueSources[0]
+    )?.url;
     setTaskTitle(idea.title);
     setPrompt(
       [
@@ -837,6 +849,7 @@ export default function App() {
         .slice(0, 4000),
       acceptance: idea.acceptanceChecks.join("\n").slice(0, 4000),
       requirePlanApproval: true,
+      ...(issueUrl ? { issueUrl } : {}),
     });
     setExploreRepoId(repo.id);
     navigate("explore");
@@ -1417,7 +1430,12 @@ export default function App() {
     }
   }
 
-  const visibleFiles = files.filter(
+  const reviewOrder = parseReviewOrder(run.reports?.implementer ?? "").filter(
+    (entry) => files.some((f) => f.path === entry.path),
+  );
+  const visibleFiles = (
+    suggestedOrder ? applyReviewOrder(files, reviewOrder) : files
+  ).filter(
     (f) =>
       f.path.toLowerCase().includes(fileSearch.toLowerCase()) &&
       (!onlyUnreviewed || !run.reviewedFiles.includes(f.path)),
@@ -1925,6 +1943,19 @@ export default function App() {
                           </span>
                           只看尚未審查
                         </button>
+                        {reviewOrder.length > 0 && (
+                          <button
+                            className={`filter-toggle ${suggestedOrder ? "is-on" : ""}`}
+                            aria-pressed={suggestedOrder}
+                            title="依 Lead 整合摘要建議的閱讀順序排列；未提到的檔案維持 git 順序排在後面"
+                            onClick={() => setSuggestedOrder(!suggestedOrder)}
+                          >
+                            <span className="toggle-track">
+                              <span />
+                            </span>
+                            依建議順序
+                          </button>
+                        )}
                         <div className="file-tree">
                           <div className="tree-root">
                             <ChevronDown size={13} />
@@ -2356,6 +2387,7 @@ export default function App() {
                           !["review", "approved"].includes(run.status)
                         }
                         demo={demo}
+                        issueUrl={run.contributionSettings?.issueUrl}
                         onGenerate={prepareDraft}
                         onApply={applyDraftProposal}
                       />

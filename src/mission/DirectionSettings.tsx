@@ -237,6 +237,25 @@ export function DirectionSettings({
                 </p>
               </div>
             </div>
+            <div className="mission-form-field">
+              <label htmlFor={`${id}-issue`}>
+                相關 issue 連結 <span>選填</span>
+              </label>
+              <input
+                id={`${id}-issue`}
+                type="text"
+                inputMode="url"
+                maxLength={400}
+                value={value.issueUrl ?? ""}
+                onChange={(event) => update("issueUrl", event.target.value)}
+                placeholder="https://github.com/owner/repo/issues/123"
+                aria-describedby={`${id}-issue-help`}
+              />
+              <p id={`${id}-issue-help`} className="mission-field-note">
+                只接受 GitHub issue 頁面網址。填了之後，PR 草稿才可以寫 Fixes／Refs
+                #編號並連回這個 issue；送出前請先在 issue 留言表明要處理。
+              </p>
+            </div>
           </div>
 
         </>
