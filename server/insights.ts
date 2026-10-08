@@ -20,8 +20,10 @@ import {
   type ContributionSettings,
   type ProjectInsights,
   type RecommendationPreferences,
+  type RecommendationVerification,
 } from "../shared/insights.js";
 import type { ModelSettings } from "../shared/models.js";
+import { quoteMatches } from "./evidence.js";
 import { safeRelativePath, secretInPatch, sensitivePath } from "./git.js";
 import { agentEnvironment, command, git, redact } from "./process.js";
 import { Store } from "./store.js";
@@ -111,9 +113,24 @@ const analysisSchema = z
       .array(z.object({ path: filePath, note: text }).strict())
       .min(1)
       .max(12),
+    // Zero is valid: every recommendation may be dropped by the quote check below.
     recommendations: z
       .array(recommendationSchema)
-      .min(1)
+      .max(projectRecommendationBatchSize),
+  })
+  .strict();
+const verificationSchema = z
+  .object({
+    droppedRecommendations: z
+      .array(
+        z
+          .object({
+            id: recommendationSchema.shape.id,
+            title: recommendationSchema.shape.title,
+            reason: z.string().max(2400),
+          })
+          .strict(),
+      )
       .max(projectRecommendationBatchSize),
   })
   .strict();
@@ -165,8 +182,8 @@ const analysisJsonSchema = objectSchema({
 const persistedInsightsSchema = analysisSchema.extend({
   recommendations: z
     .array(recommendationSchema)
-    .min(1)
     .max(maxProjectRecommendations),
+  verification: verificationSchema.optional(),
   recommendationExpansion: z
     .object({
       generatedAt: z.string().datetime(),
@@ -179,6 +196,7 @@ const persistedInsightsSchema = analysisSchema.extend({
         .optional(),
       modelExecution: modelExecutionSchema.optional(),
       efficiency: efficiencyMetricsSchema.optional(),
+      verification: verificationSchema.optional(),
     })
     .strict()
     .optional(),
@@ -193,6 +211,7 @@ const persistedInsightsSchema = analysisSchema.extend({
       sampledFiles: z.number().int().min(0),
       bytes: z.number().int().min(0),
       truncatedFiles: z.number().int().min(0),
+      treeBytes: z.number().int().min(0).optional(),
     })
     .strict()
     .optional(),
@@ -236,31 +255,71 @@ async function writeJsonAtomically(file: string, value: unknown) {
   }
 }
 
+/**
+ * Why one recommendation cannot be shown: its quotes are not in the analyzed
+ * excerpts. The first 120 characters of the quote are kept so the learner can
+ * see what the model claimed without storing the unverified proposal.
+ */
+function unverifiedReason(
+  recommendation: z.infer<typeof recommendationSchema>,
+  source: Map<string, string>,
+): string | null {
+  const details = recommendation.evidenceDetails ?? [];
+  const excerpt = (quote: string) =>
+    quote.length > 120 ? `${quote.slice(0, 120)}…` : quote;
+  for (const detail of details) {
+    if (!recommendation.evidence.includes(detail.path))
+      return `引文路徑 ${detail.path} 不在這項建議的 evidence 清單：「${excerpt(detail.quote)}」`;
+    if (!quoteMatches(source.get(detail.path) ?? "", detail.quote))
+      return `引文在 ${detail.path} 找不到：「${excerpt(detail.quote)}」`;
+  }
+  const uncited = recommendation.evidence.find(
+    (file) => !details.some((detail) => detail.path === file),
+  );
+  return uncited ? `evidence 路徑 ${uncited} 缺對應引文` : null;
+}
+
+/**
+ * Checks the model's answer against what it was given. Structural problems and
+ * made-up paths reject the whole answer; a recommendation whose quotes do not
+ * match is dropped and reported, so the rest of the analysis is still saved.
+ */
 function validateAnalysis<
   S extends typeof analysisSchema | typeof recommendationsSchema,
 >(
   raw: string,
   sourceFiles: { path: string; content: string }[],
+  tree: string[],
   schema: S,
-): z.infer<S> {
+): { value: z.infer<S>; verification: RecommendationVerification } {
   let value: z.infer<S>;
   try {
     value = schema.parse(JSON.parse(raw)) as z.infer<S>;
   } catch {
     throw new AppError("AI 分析格式不完整，請重新分析；原有結果已保留。", 422);
   }
+  // Checked on the complete answer: a dropped recommendation is still model output that was seen.
+  const serialized = JSON.stringify(value);
+  if (secretInPatch(serialized) || redact(serialized) !== serialized)
+    throw new AppError("AI 回應疑似包含敏感內容，結果未儲存。", 422);
   const source = new Map(sourceFiles.map((file) => [file.path, file.content]));
-  const paths = [
-    ...("modules" in value ? value.modules.map((entry) => entry.path) : []),
-    ...("evidence" in value ? value.evidence.map((entry) => entry.path) : []),
-    ...value.recommendations.flatMap((entry) => entry.evidence),
-  ];
-  if (
-    paths.some(
-      (file) =>
-        !safeRelativePath(file) || sensitivePath(file) || !source.has(file),
-    )
-  )
+  const sampled = (file: string) =>
+    safeRelativePath(file) && !sensitivePath(file) && source.has(file);
+  // A module may describe a directory the tree proves exists; quotes still need sampled content.
+  const directory = (file: string) =>
+    file.endsWith("/") &&
+    safeRelativePath(file) &&
+    !sensitivePath(file) &&
+    tree.some((entry) => entry.startsWith(file));
+  const invented =
+    ("modules" in value &&
+      value.modules.some(
+        (entry) => !sampled(entry.path) && !directory(entry.path),
+      )) ||
+    ("evidence" in value &&
+      value.evidence.some((entry) => !sampled(entry.path))) ||
+    value.recommendations.some((entry) => !entry.evidence.every(sampled));
+  if (invented)
     throw new AppError(
       "AI 引用了未提供的檔案，請重新分析；原有結果已保留。",
       422,
@@ -271,28 +330,62 @@ function validateAnalysis<
       value.recommendations.length
   )
     throw new AppError("AI 建議的識別碼重複，請重新分析。", 422);
-  for (const recommendation of value.recommendations) {
-    const details = recommendation.evidenceDetails;
-    if (
-      !details?.length ||
-      details.some(
-        (detail) =>
-          !recommendation.evidence.includes(detail.path) ||
-          !source.get(detail.path)?.includes(detail.quote),
-      ) ||
-      recommendation.evidence.some(
-        (file) => !details.some((detail) => detail.path === file),
-      )
-    )
-      throw new AppError(
-        "AI 建議缺少可核對的原始碼引文，請重新分析；原有結果已保留。",
-        422,
-      );
+  const verification: RecommendationVerification = {
+    droppedRecommendations: [],
+  };
+  value.recommendations = value.recommendations.filter((recommendation) => {
+    const reason = unverifiedReason(recommendation, source);
+    if (reason)
+      verification.droppedRecommendations.push({
+        id: recommendation.id,
+        title: recommendation.title,
+        reason,
+      });
+    return !reason;
+  });
+  return { value, verification };
+}
+
+/** One file from each top-level directory in turn; root files form their own group. */
+function roundRobin(files: string[]) {
+  const groups = new Map<string, string[]>();
+  for (const file of files) {
+    const top = file.includes("/") ? file.slice(0, file.indexOf("/")) : "";
+    groups.set(top, [...(groups.get(top) ?? []), file]);
   }
-  const serialized = JSON.stringify(value);
-  if (secretInPatch(serialized) || redact(serialized) !== serialized)
-    throw new AppError("AI 回應疑似包含敏感內容，結果未儲存。", 422);
-  return value;
+  const queues = [...groups.values()];
+  const ordered: string[] = [];
+  for (let index = 0; ordered.length < files.length; index++)
+    for (const queue of queues) if (index < queue.length) ordered.push(queue[index]);
+  return ordered;
+}
+
+const maxTreeEntries = 1_500;
+const maxTreeBytes = 40_000;
+
+/**
+ * Every safe tracked path, so the model can see what exists beyond the sampled
+ * excerpts. Past the cap the remaining files collapse into per-directory
+ * counts, which keeps a monorepo's prompt bounded.
+ */
+export function fileTree(sorted: string[]): string[] {
+  const entries: string[] = [];
+  const collapsed = new Map<string, number>();
+  let bytes = 0;
+  for (const file of sorted) {
+    bytes += Buffer.byteLength(file) + 1;
+    if (entries.length < maxTreeEntries && bytes <= maxTreeBytes) {
+      entries.push(file);
+      continue;
+    }
+    const directory = file.includes("/")
+      ? file.slice(0, file.indexOf("/") + 1)
+      : "./";
+    collapsed.set(directory, (collapsed.get(directory) ?? 0) + 1);
+  }
+  for (const [directory, count] of collapsed)
+    entries.push(`${directory} (${count} files)`);
+  return entries;
 }
 
 function novelRecommendations(
@@ -567,11 +660,11 @@ export class ProjectInsightsService {
     signal: AbortSignal,
   ) {
     const root = await realpath(repo.path);
-    const candidates = tracked
+    const safe = tracked
       .filter((file) => safeRelativePath(file) && !sensitivePath(file))
-      .sort(
-        (a, b) => this.priority(a) - this.priority(b) || a.localeCompare(b),
-      );
+      .sort((a, b) => a.localeCompare(b));
+    const candidates = this.sampleOrder(safe);
+    const tree = fileTree(safe);
     const files: { path: string; content: string; truncated: boolean }[] = [];
     let bytes = 0;
     for (const file of candidates) {
@@ -620,11 +713,34 @@ export class ProjectInsightsService {
       );
     return {
       files,
+      tree,
       trackedFileCount: tracked.length,
       sampledFileCount: files.length,
       bytes,
       truncatedFileCount: files.filter((file) => file.truncated).length,
+      treeBytes: Buffer.byteLength(JSON.stringify(tree)),
+      // Paths the model may cite as directory modules: every safe tracked file, not only the capped tree.
+      paths: safe,
     };
+  }
+
+  /**
+   * README, package configuration and architecture documents come first in
+   * full. Below that, each tier is read one file per top-level directory in
+   * turn, so a directory of large files cannot use up the sample before the
+   * rest of the project is seen. The whole tier is still a bounded sample.
+   */
+  private sampleOrder(sorted: string[]) {
+    const tiers = new Map<number, string[]>();
+    for (const file of sorted) {
+      const tier = this.priority(file);
+      tiers.set(tier, [...(tiers.get(tier) ?? []), file]);
+    }
+    return [...tiers.keys()]
+      .sort((a, b) => a - b)
+      .flatMap((tier) =>
+        tier <= 2 ? tiers.get(tier)! : roundRobin(tiers.get(tier)!),
+      );
   }
 
   private priority(file: string) {
@@ -637,9 +753,11 @@ export class ProjectInsightsService {
       return 1;
     if (/(^|\/)(?:contributing|architecture)(?:\.[^/]+)?$/i.test(file))
       return 2;
-    if (/(^|\/)(?:src|server|app|lib|pages)\//.test(file)) return 3;
-    if (/(?:test|spec|docs)/i.test(file)) return 4;
-    return 5;
+    // Tests and docs are decided before the directory rule so server/x.test.ts is not read as core code.
+    if (/(?:test|spec|docs)/i.test(file)) return 5;
+    if (/(^|\/)(?:index|main|app|server|cli)\.[^/]+$/i.test(file)) return 3;
+    if (/(^|\/)(?:src|server|app|lib|pages)\//.test(file)) return 4;
+    return 6;
   }
 
   async generate(
@@ -732,7 +850,11 @@ export class ProjectInsightsService {
         );
       }
       this.assertActive(signal);
-      const context = await this.context(repo, version.tracked, signal);
+      const { paths: safePaths, ...context } = await this.context(
+        repo,
+        version.tracked,
+        signal,
+      );
       const modelExecution = resolveModelExecution(
         settings,
         await this.modelCatalog(settings.provider),
@@ -756,6 +878,7 @@ export class ProjectInsightsService {
           "Ground every module and recommendation in an exact supplied file path. Evidence strings must be exact paths, not line references. Do not invent issue reports, benchmark results, users, existing bugs or validation outcomes. Explicitly label inferences and questions needing verification in prose.",
           "Each recommendation MUST include evidenceDetails: [{path, quote, reason}]. For every path in its evidence list provide a quote of 12–600 characters copied EXACTLY from that file's supplied content, plus a reason connecting this observation to the proposal. Do not quote omitted text or invent source snippets. Quotes are checked literally. Distinguish the observed code from inferred user impact; a matching quote does not prove a defect.",
           "The sample is bounded to 60 tracked text files / 240 KB; omitted, sensitive, binary and untracked files were not analyzed. Mention these limits in the summary or proposals. Avoid saying an absent feature or test definitely does not exist based on this sample.",
+          "source.tree lists the other analyzable tracked paths (large trees collapse into `dir/ (N files)` counts). It only proves those paths exist: their contents were not read, so never quote them or infer what they contain. A module path may be a sampled file or a directory prefix ending in / that appears in the tree; evidence paths must be sampled files.",
           `${more ? "For each new recommendation" : `Return 1–${projectRecommendationBatchSize} actionable recommendations; for each recommendation`}, describe the observed problem or hypothesis, everyday user benefit, implementation approach, acceptance checks to run, effort and calibrated confidence. Recommendations are proposals; no work or tests have been performed. ids must be unique lowercase slugs. Each recommendation's acceptance and evidence lists must be nonempty; module/evidence lists at most 12 entries, all prose values at most 2400 characters and titles at most 160.`,
           `Use the saved contribution preferences as preferences, not evidence. Output has only ${more ? "recommendations" : "summary, purpose, audience, userJourney, modules, evidence and recommendations"}. No code fences or extra commentary.`,
           JSON.stringify({
@@ -827,9 +950,9 @@ export class ProjectInsightsService {
           "AI 分析未完成或回應過大，請重試；原有結果已保留。",
           422,
         );
-      const analysis = more
-        ? validateAnalysis(answer, context.files, recommendationsSchema)
-        : validateAnalysis(answer, context.files, analysisSchema);
+      const { value: analysis, verification } = more
+        ? validateAnalysis(answer, context.files, safePaths, recommendationsSchema)
+        : validateAnalysis(answer, context.files, safePaths, analysisSchema);
       if (
         (await this.version(repo, signal)).fingerprint !== version.fingerprint
       )
@@ -855,11 +978,13 @@ export class ProjectInsightsService {
             requestedCount,
             modelExecution,
             efficiency: metrics,
+            verification,
           },
         };
       } else {
         insights = {
           ...analysisSchema.parse(analysis),
+          verification,
           modelExecution,
           efficiency: metrics,
           generatedAt,
@@ -871,6 +996,7 @@ export class ProjectInsightsService {
             sampledFiles: context.sampledFileCount,
             bytes: context.bytes,
             truncatedFiles: context.truncatedFileCount,
+            treeBytes: context.treeBytes,
           },
         };
       }

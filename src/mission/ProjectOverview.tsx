@@ -373,6 +373,17 @@ export function ProjectOverview({
   };
   const dateLabel = analysisDate(insights?.generatedAt);
   const expansion = insights?.recommendationExpansion;
+  // Proposals whose quotes failed the server check: only their title and reason are known.
+  const droppedIdeas = [
+    ...(insights?.verification?.droppedRecommendations ?? []).map((entry) => ({
+      ...entry,
+      round: "專案分析",
+    })),
+    ...(expansion?.verification?.droppedRecommendations ?? []).map((entry) => ({
+      ...entry,
+      round: "最近一次追加",
+    })),
+  ];
   const addedIds = new Set(
     recommending || recommendationError ? [] : (expansion?.addedIds ?? []),
   );
@@ -829,6 +840,26 @@ export function ProjectOverview({
             <div className="mission-alert mission-alert-error mission-more-error" role="alert">
               <span>{preferenceError}</span>
             </div>
+          )}
+          {droppedIdeas.length > 0 && (
+            <details className="mission-dropped-ideas">
+              <summary>
+                引文核對未通過，已略過 {droppedIdeas.length} 個建議
+                <ChevronRight size={14} aria-hidden="true" />
+              </summary>
+              <p>
+                這些建議引用的原文不在送進模型的節錄中，因此只保留標題與原因；其餘分析結果照常儲存，可再「產出新建議」補足。
+              </p>
+              <ul>
+                {droppedIdeas.map((entry) => (
+                  <li key={`${entry.round}-${entry.id}`}>
+                    <strong>{entry.title}</strong>
+                    <span>{entry.round}</span>
+                    <p>{entry.reason}</p>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
           {shownIdeas.length ? (
             <>

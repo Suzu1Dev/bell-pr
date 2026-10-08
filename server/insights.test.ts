@@ -20,9 +20,18 @@ import {
   type ProjectInsights,
 } from "../shared/insights.js";
 import type { ModelCatalog } from "../shared/models.js";
-import { ProjectInsightsService } from "./insights.js";
+import { fileTree, ProjectInsightsService } from "./insights.js";
 import { command, git } from "./process.js";
 import { Store } from "./store.js";
+
+/** The JSON data object sent after the prompt sentences and before the Ponytail guidance. */
+function payload(input: string) {
+  const start = input.indexOf('{"repository"');
+  const end = input.indexOf("\n\nBELL Ponytail", start);
+  return JSON.parse(input.slice(start, end)) as {
+    source: { files: { path: string }[]; tree: string[] };
+  };
+}
 
 const validAnalysis = () => ({
   summary:
@@ -197,7 +206,17 @@ test("analysis uses bounded read-only structured Codex context and excludes secr
       "untracked-private-data",
     );
     await git(f.repository, ["add", "--", "linked.txt"]);
+    let tree: string[] = [];
     const stub = fakeCodex(validAnalysis, async (args, options) => {
+      // The tree names every safe tracked path, even unread ones, but never the sensitive .env.
+      tree = payload(options.input!).source.tree;
+      assert.deepEqual([...tree].sort(), [
+        "README.md",
+        "hello.ts",
+        "linked.txt",
+        "token.ts",
+      ]);
+      assert.match(options.input!, /source\.tree .* only proves those paths exist/);
       assert.notEqual(options.cwd, f.repository);
       assert.equal(args[args.indexOf("--sandbox") + 1], "read-only");
       assert.ok(args.includes("--ignore-user-config"));
@@ -250,6 +269,10 @@ test("analysis uses bounded read-only structured Codex context and excludes secr
       sampledFiles: 2,
       bytes: sampledBytes,
       truncatedFiles: 0,
+      treeBytes: Buffer.byteLength(JSON.stringify(tree)),
+    });
+    assert.deepEqual(result.insights.verification, {
+      droppedRecommendations: [],
     });
     assert.deepEqual(
       await new ProjectInsightsService(f.store).get(f.repo.id),
@@ -390,6 +413,7 @@ test("malformed AI output and nonexistent or sensitive evidence never replace ca
           evidenceDetails: [],
         })),
       },
+      // Sensitive content is checked on the whole answer, even inside a recommendation that would be dropped.
       {
         ...validAnalysis(),
         recommendations: validAnalysis().recommendations.map((entry) => ({
@@ -397,12 +421,17 @@ test("malformed AI output and nonexistent or sensitive evidence never replace ca
           evidenceDetails: [
             {
               path: "hello.ts",
-              quote: "a source quote that does not exist",
+              quote: "ghp_abcdefghijklmnopqrstuvwxyz is not in the source",
               reason: "Unsupported inference",
             },
           ],
         })),
       },
+      // A directory module must exist in the tree; evidence paths are always sampled files.
+      { ...validAnalysis(), modules: [{ path: "../x/", purpose: "Outside" }] },
+      { ...validAnalysis(), modules: [{ path: "nope/", purpose: "Unknown" }] },
+      { ...validAnalysis(), modules: [{ path: "hello.ts/", purpose: "File" }] },
+      { ...validAnalysis(), evidence: [{ path: "./", note: "Directory" }] },
     ];
     for (const response of responses) {
       const service = new ProjectInsightsService(f.store, {
@@ -418,6 +447,198 @@ test("malformed AI output and nonexistent or sensitive evidence never replace ca
   } finally {
     await f.cleanup();
   }
+});
+
+test("recommendations whose quotes do not match are dropped and reported while the rest of the analysis is saved", async () => {
+  const f = await fixture();
+  try {
+    const proposal = validAnalysis().recommendations[0];
+    const detail = (quote: string) => [
+      { path: "hello.ts", quote, reason: "Unsupported inference" },
+    ];
+    const cases: { answer: unknown; kept: string[]; reasons: RegExp[] }[] = [
+      {
+        answer: {
+          ...validAnalysis(),
+          recommendations: [
+            { ...proposal, evidenceDetails: detail("a source quote that does not exist") },
+          ],
+        },
+        kept: [],
+        reasons: [/^引文在 hello\.ts 找不到：「a source quote that does not exist」$/],
+      },
+      {
+        // Only whitespace may differ; case and punctuation differences are not the source text.
+        answer: {
+          ...validAnalysis(),
+          recommendations: [
+            { ...proposal, id: "rewrapped", evidenceDetails: detail("export  const\nhello =") },
+            { ...proposal, id: "case", evidenceDetails: detail("Export const hello =") },
+            { ...proposal, id: "punctuation", evidenceDetails: detail("export const hello ==") },
+            {
+              ...proposal,
+              id: "uncited",
+              evidence: ["hello.ts", "README.md"],
+              evidenceDetails: detail("export const hello ="),
+            },
+            {
+              ...proposal,
+              id: "foreign",
+              evidenceDetails: [
+                ...detail("export const hello ="),
+                { path: "README.md", quote: "A command-line greeting tool.", reason: "Not in evidence" },
+              ],
+            },
+          ],
+        },
+        kept: ["rewrapped"],
+        reasons: [
+          /^引文在 hello\.ts 找不到：「Export const hello =」$/,
+          /^引文在 hello\.ts 找不到：「export const hello ==」$/,
+          /^evidence 路徑 README\.md 缺對應引文$/,
+          /^引文路徑 README\.md 不在這項建議的 evidence 清單：「A command-line greeting tool\.」$/,
+        ],
+      },
+    ];
+    for (const entry of cases) {
+      const service = new ProjectInsightsService(f.store, {
+        getModelCatalog: async () => ({ models: [], source: "codex" }),
+        command: fakeCodex(() => entry.answer).execute,
+      });
+      const { insights } = await service.generate(f.repo.id);
+      assert.equal(insights.summary, validAnalysis().summary);
+      assert.deepEqual(insights.modules, validAnalysis().modules);
+      assert.deepEqual(insights.recommendations.map((item) => item.id), entry.kept);
+      const dropped = insights.verification!.droppedRecommendations;
+      assert.equal(dropped.length, entry.reasons.length);
+      for (const [index, reason] of entry.reasons.entries()) {
+        assert.equal(dropped[index].title, proposal.title);
+        assert.match(dropped[index].reason, reason);
+        assert.deepEqual(Object.keys(dropped[index]).sort(), ["id", "reason", "title"]);
+      }
+      // The saved cache reloads through the strict persisted schema.
+      assert.deepEqual(
+        (await new ProjectInsightsService(f.store).get(f.repo.id)).insights,
+        insights,
+      );
+    }
+    // With every recommendation dropped, asking for more is the ordinary remedy.
+    const empty = new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: fakeCodex(() => cases[0].answer).execute,
+    });
+    await empty.generate(f.repo.id);
+    const more = new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: fakeCodex(() => ({
+        recommendations: [
+          proposal,
+          { ...proposal, id: "unverified", title: "沒有依據的建議", evidenceDetails: detail("missing text") },
+        ],
+      })).execute,
+    });
+    const expanded = (await more.generateMore(f.repo.id, {})).insights;
+    assert.deepEqual(expanded.recommendations.map((item) => item.id), ["greeting-tests"]);
+    // The original analysis keeps its own verification record; the expansion gets a separate one.
+    assert.equal(expanded.verification!.droppedRecommendations.length, 1);
+    assert.deepEqual(expanded.recommendationExpansion?.addedIds, ["greeting-tests"]);
+    assert.deepEqual(expanded.recommendationExpansion?.verification, {
+      droppedRecommendations: [
+        { id: "unverified", title: "沒有依據的建議", reason: "引文在 hello.ts 找不到：「missing text」" },
+      ],
+    });
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("sampling reads entry files and every top-level directory before tests, lists the tree and accepts directory modules", async () => {
+  const f = await fixture();
+  try {
+    const files = [
+      "src/App.tsx",
+      "src/review/Panel.tsx",
+      ...Array.from({ length: 35 }, (_, n) => `server/part-${String(n).padStart(2, "0")}.ts`),
+      ...Array.from({ length: 35 }, (_, n) => `server/part-${String(n).padStart(2, "0")}.test.ts`),
+    ];
+    for (const file of files) {
+      await mkdir(path.dirname(path.join(f.repository, file)), { recursive: true });
+      await writeFile(path.join(f.repository, file), `// ${file}\nexport const name = "${file}";\n`);
+    }
+    await git(f.repository, ["add", "--", "src", "server"]);
+    await git(f.repository, ["commit", "-m", "breadth"]);
+    let sampled: string[] = [];
+    // hello.ts is tracked but 61st in line, so the answer must cite files that were actually sampled.
+    const stub = fakeCodex(
+      () => ({
+        ...validAnalysis(),
+        modules: [
+          { path: "src/review/", purpose: "差異審閱介面（目錄層級，內容未全部讀取）" },
+          { path: "server/", purpose: "API 與分析服務" },
+          { path: "src/App.tsx", purpose: "前端入口" },
+        ],
+        recommendations: validAnalysis().recommendations.map((entry) => ({
+          ...entry,
+          evidence: ["README.md"],
+          evidenceDetails: [
+            { path: "README.md", quote: "A command-line greeting tool.", reason: "README 描述工具用途。" },
+          ],
+        })),
+      }),
+      async (_args, options) => {
+        const source = payload(options.input!).source;
+        sampled = source.files.map((file) => file.path);
+        assert.ok(source.tree.includes("server/part-34.test.ts"));
+        assert.ok(!source.tree.includes(".env"));
+      },
+    );
+    const service = new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: stub.execute,
+    });
+    const { insights } = await service.generate(f.repo.id);
+    assert.equal(insights.sample?.sampledFiles, 60);
+    assert.equal(insights.sample?.trackedFiles, 4 + files.length);
+    assert.equal(sampled[0], "README.md");
+    // Entry file first, then one file per top-level directory in turn, so src/ is read before server/ is exhausted.
+    assert.equal(sampled[1], "src/App.tsx");
+    assert.deepEqual(sampled.slice(2, 4), ["server/part-00.ts", "src/review/Panel.tsx"]);
+    const firstTest = sampled.findIndex((file) => file.endsWith(".test.ts"));
+    const lastCode = sampled.map((file) => /^server\/part-\d+\.ts$/.test(file)).lastIndexOf(true);
+    assert.ok(firstTest > lastCode, `tests (${firstTest}) should follow code (${lastCode})`);
+    assert.equal(sampled.filter((file) => /^server\/part-\d+\.ts$/.test(file)).length, 35);
+    assert.ok(sampled.filter((file) => file.endsWith(".test.ts")).length < 35);
+    assert.ok(!sampled.includes("hello.ts"));
+    assert.deepEqual(
+      insights.modules.map((module) => module.path),
+      ["src/review/", "server/", "src/App.tsx"],
+    );
+    assert.deepEqual(insights.verification, { droppedRecommendations: [] });
+    assert.deepEqual(
+      (await new ProjectInsightsService(f.store).get(f.repo.id)).insights,
+      insights,
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("the file tree collapses into per-directory counts past its cap", () => {
+  const paths = [
+    ...Array.from({ length: 1_600 }, (_, n) => `src/file-${String(n).padStart(4, "0")}.ts`),
+    ...Array.from({ length: 10 }, (_, n) => `tools/tool-${n}.ts`),
+    "zzz-root.ts",
+  ].sort();
+  const tree = fileTree(paths);
+  const listed = tree.filter((entry) => !entry.endsWith(" files)"));
+  const collapsed = tree.filter((entry) => entry.endsWith(" files)"));
+  assert.equal(listed.length, 1_500);
+  assert.deepEqual(collapsed, ["src/ (100 files)", "tools/ (10 files)", "./ (1 files)"]);
+  assert.deepEqual(fileTree(["README.md", "src/a.ts"]), ["README.md", "src/a.ts"]);
+  const long = Array.from({ length: 500 }, (_, n) => `${"d".repeat(100)}/${String(n).padStart(3, "0")}.ts`);
+  const bounded = fileTree(long);
+  assert.ok(bounded.filter((entry) => !entry.endsWith(" files)")).length < 500);
+  assert.ok(Buffer.byteLength(bounded.filter((entry) => !entry.endsWith(" files)")).join("\n")) <= 40_000);
 });
 
 test("repository changes during analysis reject publication while settings writes are preserved", async () => {
@@ -844,7 +1065,7 @@ test("invalid, failed and interrupted expansion results never replace existing r
       { recommendations: [], summary: "不能覆寫全貌" },
       { recommendations: Array.from({ length: 6 }, () => proposal) },
       { recommendations: [{ ...proposal, evidence: ["missing.ts"] }] },
-      { recommendations: [{ ...proposal, evidenceDetails: [{ path: "hello.ts", quote: "a nonexistent source quote", reason: "假設" }] }] },
+      { recommendations: [{ ...proposal, evidence: ["src/"] }] },
       { recommendations: [{ ...proposal, title: "ghp_abcdefghijklmnopqrstuvwxyz" }] },
     ];
     for (const answer of responses) {

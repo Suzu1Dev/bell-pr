@@ -511,6 +511,50 @@
 .mission-more-error {
   margin-bottom: 16px;
 }
+.mission-dropped-ideas {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px dashed #dbe4d5;
+  border-radius: 8px;
+  color: var(--mission-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.mission-dropped-ideas > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 550;
+  color: #6a7c60;
+}
+.mission-dropped-ideas > summary::-webkit-details-marker {
+  display: none;
+}
+.mission-dropped-ideas[open] > summary > svg {
+  transform: rotate(90deg);
+}
+.mission-dropped-ideas ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.mission-dropped-ideas li strong {
+  font-weight: 550;
+  color: var(--mission-ink);
+}
+.mission-dropped-ideas li span {
+  margin-left: 8px;
+  font-size: 12px;
+}
+.mission-dropped-ideas li p {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
 .mission-recommendations {
   min-width: 0;
 }

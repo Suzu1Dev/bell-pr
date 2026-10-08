@@ -25,6 +25,7 @@ import {
   efficiencyMetricsSchema,
   trackEfficiency,
 } from "./efficiency.js";
+import { quoteMatches } from "./evidence.js";
 import { secretInPatch } from "./git.js";
 import {
   agentCommand,
@@ -246,6 +247,7 @@ export function parseDiscoveryResult(
   )
     throw new AppError("探索分析包含重複的機會識別，請重試。", 422);
   const opportunities: ContributionOpportunity[] = [];
+  const warnings: string[] = [];
   let excluded = 0;
   for (const opportunity of result.opportunities) {
     const repo = candidates.find(
@@ -253,28 +255,34 @@ export function parseDiscoveryResult(
     );
     if (!repo)
       throw new AppError("探索建議引用了未查證的 Repository，請重試。", 422);
-    const sources = opportunity.evidence.map((evidence) => {
-      const source = repo.sources.find((item) => item.id === evidence.sourceId);
-      if (!source || !source.content.includes(evidence.quote))
-        throw new AppError(
-          "探索建議的引用無法對應該專案的原始來源，請重試。",
-          422,
-        );
-      return source;
-    });
-    if (!sources.some((source) => source.kind === "issue"))
-      throw new AppError(
-        "每項貢獻建議都需要可核對的 issue 證據，請重試。",
-        422,
+    // An opportunity whose evidence does not hold is skipped and named, not fatal to the batch.
+    const skip = (reason: string) =>
+      warnings.push(
+        `已略過 ${opportunity.repository}「${opportunity.title}」：${reason}`,
       );
+    const unmatched = opportunity.evidence.find((evidence) => {
+      const source = repo.sources.find((item) => item.id === evidence.sourceId);
+      return !source || !quoteMatches(source.content, evidence.quote);
+    });
+    if (unmatched) {
+      skip(`引文無法對應來源 ${unmatched.sourceId}。`);
+      continue;
+    }
+    const sources = opportunity.evidence.map(
+      (evidence) =>
+        repo.sources.find((item) => item.id === evidence.sourceId)!,
+    );
+    if (!sources.some((source) => source.kind === "issue")) {
+      skip("缺少可核對的 issue 引文。");
+      continue;
+    }
     if (
       repo.sources.some((source) => source.kind === "contributing") &&
       !sources.some((source) => source.kind === "contributing")
-    )
-      throw new AppError(
-        "探索建議未引用已取得的 CONTRIBUTING 規定，請重試。",
-        422,
-      );
+    ) {
+      skip("未引用已取得的 CONTRIBUTING 規定。");
+      continue;
+    }
     if (
       (preferences.difficulty === "beginner" &&
         opportunity.difficulty !== "beginner") ||
@@ -289,10 +297,8 @@ export function parseDiscoveryResult(
       popularity: `GitHub 查詢快照：${repo.stars.toLocaleString("en-US")} stars、${repo.forks.toLocaleString("en-US")} forks，最近推送於 ${repo.pushedAt ? repo.pushedAt.slice(0, 10) : "未提供"}。人氣不能保證提案會被接受。`,
     });
   }
-  return {
-    opportunities,
-    warnings: excluded ? [`已略過 ${excluded} 項超出指定難度的建議。`] : [],
-  };
+  if (excluded) warnings.push(`已略過 ${excluded} 項超出指定難度的建議。`);
+  return { opportunities, warnings };
 }
 
 export function discoveryPrompt(

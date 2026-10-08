@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { DraftContext, DraftProposal } from "../shared/drafts.js";
 import { linuxContributionUrl } from "../shared/drafts.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
+import { quoteMatches } from "./evidence.js";
 import { redact } from "./process.js";
 
 const text = z.string().trim().min(1);
@@ -119,7 +120,7 @@ export function parseDraftProposal(
     if (
       !source ||
       source.kind === "example" ||
-      !source.content.includes(rule.quote)
+      !quoteMatches(source.content, rule.quote)
     )
       throw new AppError("PR 草稿的規範引用無法對應來源，請重新產生。", 422);
   }

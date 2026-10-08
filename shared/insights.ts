@@ -59,6 +59,14 @@ export interface RecommendationPreferences {
   hidden: string[];
 }
 
+/**
+ * Recommendations whose quotes did not match the analyzed excerpts. Only the
+ * id, title and reason are kept so the unverified proposal itself is not shown.
+ */
+export interface RecommendationVerification {
+  droppedRecommendations: { id: string; title: string; reason: string }[];
+}
+
 export interface ProjectInsights {
   modelExecution?: ModelExecution;
   efficiency?: EfficiencyMetrics;
@@ -66,15 +74,18 @@ export interface ProjectInsights {
   purpose: string;
   audience: string[];
   userJourney: string[];
+  /** A path is a sampled file or a directory prefix ending in "/" from the tracked file tree. */
   modules: { path: string; purpose: string }[];
   evidence: { path: string; note: string }[];
   recommendations: ContributionRecommendation[];
+  verification?: RecommendationVerification;
   recommendationExpansion?: {
     generatedAt: string;
     addedIds: string[];
     requestedCount?: number;
     modelExecution?: ModelExecution;
     efficiency?: EfficiencyMetrics;
+    verification?: RecommendationVerification;
   };
   generatedAt: string;
   source: "ai" | "demo";
@@ -85,6 +96,8 @@ export interface ProjectInsights {
     sampledFiles: number;
     bytes: number;
     truncatedFiles: number;
+    /** Size of the tracked path list sent alongside the excerpts; missing before it was sent. */
+    treeBytes?: number;
   };
 }
 
