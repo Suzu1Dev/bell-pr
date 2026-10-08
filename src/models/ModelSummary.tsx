@@ -27,6 +27,19 @@ export function ModelSummary({
   analysis?: boolean;
 }) {
   const label = providerLabels[execution?.provider ?? "codex"];
+  const reported = execution?.reported;
+  // Claude Code reports the resolved model in system/init; Codex reports nothing, so its text stays "未回報".
+  const modelText = !reported
+    ? execution?.model || `${label} 預設（型號未回報）`
+    : `${
+        execution.model === reported.model
+          ? reported.model
+          : `${execution.model ? `傳入 ${execution.model}` : "未傳入 --model"} → 回報 ${reported.model}`
+      }${reported.cliVersion ? `（CLI ${reported.cliVersion}）` : ""}`;
+  const modelsUsed = reported?.modelsUsed ?? [];
+  const showModelsUsed =
+    modelsUsed.length > 1 ||
+    (modelsUsed.length === 1 && modelsUsed[0] !== reported?.model);
   return (
     <section
       className="model-summary"
@@ -49,8 +62,14 @@ export function ModelSummary({
             </div>
             <div>
               <dt>模型</dt>
-              <dd>{execution.model || `${label} 預設（型號未回報）`}</dd>
+              <dd>{modelText}</dd>
             </div>
+            {showModelsUsed && (
+              <div>
+                <dt>本次執行呼叫過的模型</dt>
+                <dd>{modelsUsed.join("、")}</dd>
+              </div>
+            )}
             <div>
               <dt>思考強度</dt>
               <dd>
@@ -60,7 +79,11 @@ export function ModelSummary({
               </dd>
             </div>
           </dl>
-          <p>這是 BELL 傳入 {label} 的設定；服務端實際使用的模型未另外回報。</p>
+          <p>
+            {reported
+              ? `這是 BELL 傳入 ${label} 的設定與 ${label} CLI 回報的實際模型；回報值來自 CLI 事件，不是供應端帳單。`
+              : `這是 BELL 傳入 ${label} 的設定；服務端實際使用的模型未另外回報。`}
+          </p>
         </>
       )}
     </section>

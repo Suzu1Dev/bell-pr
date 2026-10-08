@@ -16,7 +16,7 @@ import {
 import { agentEnvironment } from "./process.js";
 import { AppError } from "./types.js";
 
-const modelId = z
+export const modelId = z
   .string()
   .trim()
   .regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/);
@@ -32,6 +32,14 @@ export const modelExecutionSchema = z.object({
   model: modelId.optional(),
   reasoningEffort: effort.optional(),
   source: z.enum(["selected", "catalog-default", "cli-default"]),
+  // Persisted insights and discovery records are parsed with this schema; unknown keys are stripped.
+  reported: z
+    .object({
+      model: modelId,
+      modelsUsed: z.array(modelId).max(20).optional(),
+      cliVersion: z.string().min(1).max(100).optional(),
+    })
+    .optional(),
 });
 
 const pageSchema = z.object({

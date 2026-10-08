@@ -4,7 +4,7 @@ import {
   type AgentProvider,
   type ModelExecution,
 } from "../shared/models.js";
-import { modelArguments, modelExecutionSchema } from "./models.js";
+import { modelArguments, modelExecutionSchema, modelId } from "./models.js";
 
 /** none: answer from the prompt only; read: inspect files; write: edit the working directory and run commands. */
 export type AgentAccess = "none" | "read" | "write";
@@ -115,6 +115,12 @@ export type AgentEvent =
   | { kind: "final"; text: string }
   | { kind: "command"; outcome: string }
   | { kind: "file-change" }
+  /** Recoverable waiting or denial the user should see now; never a failure by itself. */
+  | { kind: "notice"; message: string }
+  /** Claude Code's system/init: the resolved model and the CLI version. */
+  | { kind: "session"; model: string; cliVersion?: string }
+  /** Model IDs present in result.modelUsage; the first entry is not necessarily the main model. */
+  | { kind: "usage-by-model"; models: string[] }
   | { kind: "error"; message: string; terminal: boolean };
 
 type Json = Record<string, any>;
@@ -124,6 +130,89 @@ const blocks = (event: Json): Json[] =>
         (block: unknown) => !!block && typeof block === "object",
       )
     : [];
+const isModelId = (value: unknown): value is string =>
+  typeof value === "string" && modelId.safeParse(value).success;
+const finite = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+
+const rateLimitWindows: Record<string, string> = {
+  five_hour: "5 小時滾動視窗：用量每 5 小時依開始時間重置",
+  seven_day: "7 天滾動視窗：所有模型的每週總量",
+  seven_day_opus: "7 天滾動視窗：Opus 的每週用量",
+  seven_day_sonnet: "7 天滾動視窗：Sonnet 的每週用量",
+  seven_day_overage_included: "7 天滾動視窗：含額外用量的每週總量",
+  overage: "額外用量",
+};
+
+/** Explains a non-allowed rate_limit_event in one line; a plain "allowed" status is normal and stays silent. */
+function rateLimitNotice(info: unknown): string | undefined {
+  if (!info || typeof info !== "object") return;
+  const value = info as Json;
+  if (typeof value.status !== "string" || value.status === "allowed") return;
+  const state =
+    value.status === "rejected"
+      ? "已達上限，等待重置中"
+      : value.status === "allowed_warning"
+        ? "接近上限"
+        : `狀態 ${value.status}`;
+  const parts = [
+    typeof value.rateLimitType === "string"
+      ? (rateLimitWindows[value.rateLimitType] ?? value.rateLimitType)
+      : undefined,
+    finite(value.utilization)
+      ? `已用 ${Math.round(value.utilization * 100)}%`
+      : undefined,
+    // resetsAt is Unix time in seconds (observed 1791439800 for a same-day reset).
+    finite(value.resetsAt)
+      ? `預計 ${new Date(value.resetsAt * 1000).toLocaleString("zh-TW", { hour12: false })} 重置`
+      : undefined,
+  ].filter((part): part is string => !!part);
+  return `Claude 額度${state}${parts.length ? `（${parts.join("；")}）` : ""}。`;
+}
+
+/** Tool denials from the permission settings; tool_input is never logged. */
+function denialNotice(denial: unknown): AgentEvent | undefined {
+  if (!denial || typeof denial !== "object") return;
+  const value = denial as Json;
+  if (typeof value.tool_name !== "string" || !value.tool_name) return;
+  const reason =
+    typeof value.decision_reason === "string" && value.decision_reason
+      ? value.decision_reason
+      : typeof value.message === "string" && value.message
+        ? value.message
+        : "";
+  return {
+    kind: "notice",
+    message: `工具 ${value.tool_name} 被權限設定拒絕${reason ? `：${reason}` : "。"}`,
+  };
+}
+
+function systemNotice(value: Json): AgentEvent[] {
+  if (value.subtype === "api_retry") {
+    const parts = [
+      finite(value.attempt)
+        ? `第 ${value.attempt}${finite(value.max_retries) ? `/${value.max_retries}` : ""} 次`
+        : undefined,
+      typeof value.error === "string" && value.error
+        ? `原因 ${value.error}`
+        : undefined,
+      finite(value.retry_delay_ms)
+        ? `${Math.max(0, Math.round(value.retry_delay_ms / 1000))} 秒後重試`
+        : undefined,
+    ].filter((part): part is string => !!part);
+    return [
+      {
+        kind: "notice",
+        message: `Claude Code 重試中${parts.length ? `（${parts.join("，")}）` : ""}。`,
+      },
+    ];
+  }
+  if (value.subtype === "permission_denied") {
+    const notice = denialNotice(value);
+    return notice ? [notice] : [];
+  }
+  return [];
+}
 
 /** Maps one parsed JSONL event to the documented events BELL uses; raw tool output is never returned. */
 export function agentEventReader(provider: AgentProvider = "codex") {
@@ -155,6 +244,24 @@ export function agentEventReader(provider: AgentProvider = "codex") {
       }
       return [];
     }
+    if (value.type === "system") {
+      if (value.subtype === "init" && isModelId(value.model))
+        return [
+          {
+            kind: "session",
+            model: value.model,
+            ...(typeof value.claude_code_version === "string" &&
+            value.claude_code_version
+              ? { cliVersion: value.claude_code_version.slice(0, 100) }
+              : {}),
+          },
+        ];
+      return systemNotice(value);
+    }
+    if (value.type === "rate_limit_event") {
+      const message = rateLimitNotice(value.rate_limit_info);
+      return message ? [{ kind: "notice", message }] : [];
+    }
     if (value.type === "assistant") {
       const events: AgentEvent[] = [];
       for (const block of blocks(value)) {
@@ -181,6 +288,13 @@ export function agentEventReader(provider: AgentProvider = "codex") {
       return events;
     }
     if (value.type === "result") {
+      // Denials are listed on the result even when the turn succeeded; log them before the outcome.
+      const events: AgentEvent[] = (
+        Array.isArray(value.permission_denials) ? value.permission_denials : []
+      )
+        .slice(0, 20)
+        .map(denialNotice)
+        .filter((item): item is AgentEvent => !!item);
       if (value.is_error || value.subtype !== "success") {
         const detail =
           typeof value.result === "string" && value.result
@@ -188,22 +302,53 @@ export function agentEventReader(provider: AgentProvider = "codex") {
             : Array.isArray(value.errors)
               ? value.errors.join("；")
               : "";
-        return [
-          {
-            kind: "error",
-            terminal: true,
-            message:
-              detail ||
-              `Claude Code 工作回合失敗（${String(value.subtype ?? "unknown")}）。`,
-          },
-        ];
+        events.push({
+          kind: "error",
+          terminal: true,
+          message:
+            detail ||
+            `Claude Code 工作回合失敗（${String(value.subtype ?? "unknown")}）。`,
+        });
+        return events;
       }
+      const models =
+        value.modelUsage && typeof value.modelUsage === "object"
+          ? Object.keys(value.modelUsage).filter(isModelId).slice(0, 20)
+          : [];
+      if (models.length) events.push({ kind: "usage-by-model", models });
       const text =
         value.structured_output !== undefined
           ? JSON.stringify(value.structured_output)
           : String(value.result ?? "");
-      return text ? [{ kind: "final", text }] : [];
+      if (text) events.push({ kind: "final", text });
+      return events;
     }
     return [];
   };
+}
+
+/**
+ * Records what Claude Code reported into execution.reported. Returns true when the main
+ * model is new, so callers log it once. modelsUsed is a union: a second model is more
+ * likely a Claude Code helper call than a fallback, since BELL never passes --fallback-model.
+ */
+export function applyReportedModel(
+  execution: ModelExecution,
+  item: AgentEvent,
+): boolean {
+  if (item.kind === "session") {
+    const changed = execution.reported?.model !== item.model;
+    execution.reported = {
+      ...execution.reported,
+      model: item.model,
+      ...(item.cliVersion ? { cliVersion: item.cliVersion } : {}),
+    };
+    return changed;
+  }
+  if (item.kind === "usage-by-model" && execution.reported) {
+    execution.reported.modelsUsed = [
+      ...new Set([...(execution.reported.modelsUsed ?? []), ...item.models]),
+    ].slice(0, 20);
+  }
+  return false;
 }

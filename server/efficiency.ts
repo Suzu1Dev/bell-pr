@@ -7,9 +7,21 @@ import {
   ponytailRevision,
   type EfficiencyMetrics,
   type PonytailMode,
+  type RoleEfficiency,
 } from "../shared/efficiency.js";
 
 const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+const roleEfficiencySchema = z.object({
+  calls: count,
+  measuredCalls: count,
+  inputTokens: count,
+  cachedInputTokens: count,
+  outputTokens: count,
+  durationMs: count,
+});
+const roleKeys = Object.keys(
+  roleEfficiencySchema.shape,
+) as (keyof RoleEfficiency)[];
 export const efficiencyMetricsSchema = z.object({
   policyVersion: z.string().min(1).max(100),
   mode: z.enum(ponytailModes),
@@ -21,6 +33,7 @@ export const efficiencyMetricsSchema = z.object({
   inputTokens: count,
   cachedInputTokens: count,
   outputTokens: count,
+  byRole: z.record(z.string().min(1).max(60), roleEfficiencySchema).optional(),
 });
 
 const fullRules = readFileSync(
@@ -119,22 +132,34 @@ export function trackEfficiency(mode: PonytailMode) {
   };
 }
 
+/** Adds one call to the run total; with a role, the same counts also accumulate under byRole[role]. */
 export function addEfficiency(
   previous: EfficiencyMetrics | undefined,
   call: EfficiencyMetrics,
+  role?: string,
 ): EfficiencyMetrics {
   const total = { ...call };
-  if (!previous) return total;
-  for (const key of [
-    "calls",
-    "completedCalls",
-    "failedCalls",
-    "measuredCalls",
-    "durationMs",
-    "inputTokens",
-    "cachedInputTokens",
-    "outputTokens",
-  ] as const)
-    total[key] += previous[key];
+  if (previous) {
+    for (const key of [
+      "calls",
+      "completedCalls",
+      "failedCalls",
+      "measuredCalls",
+      "durationMs",
+      "inputTokens",
+      "cachedInputTokens",
+      "outputTokens",
+    ] as const)
+      total[key] += previous[key];
+    // Older records have no byRole; keep whatever was recorded so far.
+    if (previous.byRole) total.byRole = { ...previous.byRole };
+  }
+  if (role) {
+    const byRole = { ...total.byRole };
+    const entry = { ...byRole[role] };
+    for (const key of roleKeys) entry[key] = (entry[key] ?? 0) + call[key];
+    byRole[role] = entry as RoleEfficiency;
+    total.byRole = byRole;
+  }
   return total;
 }

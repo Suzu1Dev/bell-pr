@@ -33,6 +33,7 @@ import {
   agentEventReader,
   agentLabel,
   agentLoginCheck,
+  applyReportedModel,
 } from "./agent-cli.js";
 import {
   getModelCatalog,
@@ -806,9 +807,11 @@ export class ProjectInsightsService {
               const event = JSON.parse(line);
               efficiency.observe(event);
               for (const item of read(event)) {
+                // Notices (retries, rate limits, denials) are not failures; only error events are.
                 if (item.kind === "error") failed = true;
                 if (item.kind === "message" || item.kind === "final")
                   answer = item.text;
+                applyReportedModel(modelExecution, item);
               }
             } catch {
               /* Raw tool output is not trusted analysis. */

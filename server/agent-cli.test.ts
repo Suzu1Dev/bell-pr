@@ -7,7 +7,10 @@ import {
   agentCommand,
   agentEventReader,
   agentLoginCheck,
+  applyReportedModel,
+  type AgentEvent,
 } from "./agent-cli.js";
+import type { ModelExecution } from "../shared/models.js";
 import { agentEnvironment } from "./process.js";
 
 test("Codex arguments keep the existing sandbox, approval and schema flags", async () => {
@@ -176,10 +179,28 @@ test("Codex events keep their existing meaning", () => {
 
 test("Claude Code stream-json events map to messages, checks, edits and the final answer", () => {
   const read = agentEventReader("claude");
+  // Observed with Claude Code 2.1.292: system/init carries the resolved model and claude_code_version.
   assert.deepEqual(
-    read({ type: "system", subtype: "init", model: "claude-sonnet-5-5" }),
+    read({
+      type: "system",
+      subtype: "init",
+      model: "claude-haiku-4-5-20251001",
+      claude_code_version: "2.1.292",
+      permissionMode: "dontAsk",
+    }),
+    [
+      {
+        kind: "session",
+        model: "claude-haiku-4-5-20251001",
+        cliVersion: "2.1.292",
+      },
+    ],
+  );
+  assert.deepEqual(
+    read({ type: "system", subtype: "init", model: "bad model id" }),
     [],
   );
+  assert.deepEqual(read({ type: "system", subtype: "hook_started" }), []);
   assert.deepEqual(
     read({
       type: "assistant",
@@ -245,5 +266,210 @@ test("Claude Code stream-json events map to messages, checks, edits and the fina
         message: "Claude Code 工作回合失敗（error_max_turns）。",
       },
     ],
+  );
+});
+
+test("Claude Code result.modelUsage keys become a usage-by-model event before the final answer", () => {
+  const read = agentEventReader("claude");
+  // Observed shape: modelUsage is keyed by the resolved model ID; costUSD is never surfaced.
+  assert.deepEqual(
+    read({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      result: "done",
+      modelUsage: {
+        "claude-haiku-4-5-20251001": { inputTokens: 9, costUSD: 0.015 },
+        "claude-sonnet-4-5": { inputTokens: 1 },
+        "not a model id": { inputTokens: 1 },
+      },
+    }),
+    [
+      {
+        kind: "usage-by-model",
+        models: ["claude-haiku-4-5-20251001", "claude-sonnet-4-5"],
+      },
+      { kind: "final", text: "done" },
+    ],
+  );
+  assert.deepEqual(
+    read({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      result: "done",
+      modelUsage: {},
+    }),
+    [{ kind: "final", text: "done" }],
+  );
+  assert.deepEqual(
+    read({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      result: "done",
+      modelUsage: "junk",
+    }),
+    [{ kind: "final", text: "done" }],
+  );
+});
+
+test("Claude Code retries, rate limits and denied tools are notices, never errors", () => {
+  const read = agentEventReader("claude");
+  assert.deepEqual(
+    read({
+      type: "system",
+      subtype: "api_retry",
+      attempt: 2,
+      max_retries: 10,
+      retry_delay_ms: 4000,
+      error_status: 429,
+      error: "rate_limit",
+    }),
+    [
+      {
+        kind: "notice",
+        message: "Claude Code 重試中（第 2/10 次，原因 rate_limit，4 秒後重試）。",
+      },
+    ],
+  );
+  assert.deepEqual(read({ type: "system", subtype: "api_retry" }), [
+    { kind: "notice", message: "Claude Code 重試中。" },
+  ]);
+
+  // A normal run reports status "allowed" on every call; only warnings and rejections are shown.
+  assert.deepEqual(
+    read({
+      type: "rate_limit_event",
+      rate_limit_info: {
+        status: "allowed",
+        resetsAt: 1791439800,
+        rateLimitType: "five_hour",
+      },
+    }),
+    [],
+  );
+  const rejected = read({
+    type: "rate_limit_event",
+    rate_limit_info: {
+      status: "rejected",
+      resetsAt: 1791439800,
+      rateLimitType: "five_hour",
+      utilization: 1,
+    },
+  });
+  assert.equal(rejected.length, 1);
+  assert.equal(rejected[0].kind, "notice");
+  const message = rejected[0].kind === "notice" ? rejected[0].message : "";
+  assert.match(message, /^Claude 額度已達上限，等待重置中（5 小時滾動視窗/);
+  assert.match(message, /已用 100%/);
+  assert.match(
+    message,
+    new RegExp(
+      `預計 ${new Date(1791439800 * 1000).toLocaleString("zh-TW", { hour12: false })} 重置）。$`,
+    ),
+  );
+  assert.deepEqual(
+    read({
+      type: "rate_limit_event",
+      rate_limit_info: { status: "allowed_warning", rateLimitType: "unknown_window" },
+    }),
+    [{ kind: "notice", message: "Claude 額度接近上限（unknown_window）。" }],
+  );
+  assert.deepEqual(read({ type: "rate_limit_event" }), []);
+  assert.deepEqual(
+    read({ type: "rate_limit_event", rate_limit_info: { resetsAt: "soon" } }),
+    [],
+  );
+
+  assert.deepEqual(
+    read({
+      type: "system",
+      subtype: "permission_denied",
+      tool_name: "Bash",
+      tool_use_id: "bash-9",
+      decision_reason: "Bash(git push:*) 被 --disallowedTools 拒絕",
+      tool_input: { command: "git push" },
+      message: "Permission to use Bash has been denied",
+    }),
+    [
+      {
+        kind: "notice",
+        message: "工具 Bash 被權限設定拒絕：Bash(git push:*) 被 --disallowedTools 拒絕",
+      },
+    ],
+  );
+  assert.deepEqual(
+    read({ type: "system", subtype: "permission_denied", message: "x" }),
+    [],
+  );
+
+  // Successful turns still list denials; the final answer must survive them.
+  assert.deepEqual(
+    read({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      result: "report",
+      permission_denials: [
+        {
+          tool_name: "Bash",
+          tool_use_id: "bash-1",
+          tool_input: { command: "curl https://example.com" },
+        },
+        { tool_use_id: "bash-2" },
+      ],
+    }),
+    [
+      { kind: "notice", message: "工具 Bash 被權限設定拒絕。" },
+      { kind: "final", text: "report" },
+    ],
+  );
+  for (const item of read({
+    type: "system",
+    subtype: "api_retry",
+    attempt: 1,
+  }))
+    assert.notEqual(item.kind, "error");
+});
+
+test("reported model is recorded once per model and modelsUsed is a union", () => {
+  const execution: ModelExecution = {
+    provider: "claude",
+    model: "haiku",
+    source: "selected",
+  };
+  const session: AgentEvent = {
+    kind: "session",
+    model: "claude-haiku-4-5-20251001",
+    cliVersion: "2.1.292",
+  };
+  // Usage before a session event has nowhere to go and is ignored.
+  assert.equal(
+    applyReportedModel(execution, { kind: "usage-by-model", models: ["x-1"] }),
+    false,
+  );
+  assert.equal(execution.reported, undefined);
+  assert.equal(applyReportedModel(execution, session), true);
+  assert.equal(applyReportedModel(execution, session), false);
+  assert.equal(
+    applyReportedModel(execution, {
+      kind: "usage-by-model",
+      models: ["claude-haiku-4-5-20251001"],
+    }),
+    false,
+  );
+  applyReportedModel(execution, {
+    kind: "usage-by-model",
+    models: ["claude-sonnet-4-5", "claude-haiku-4-5-20251001"],
+  });
+  assert.deepEqual(execution.reported, {
+    model: "claude-haiku-4-5-20251001",
+    cliVersion: "2.1.292",
+    modelsUsed: ["claude-haiku-4-5-20251001", "claude-sonnet-4-5"],
+  });
+  assert.equal(
+    applyReportedModel(execution, { kind: "message", text: "hi" }),
+    false,
   );
 });
