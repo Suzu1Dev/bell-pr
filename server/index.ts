@@ -200,6 +200,14 @@ export function createApp(
   app.post("/api/runs/:id/plan/approve", async (req, res) =>
     res.json({ run: await workbench.approvePlan(req.params.id) }),
   );
+  app.post("/api/runs/:id/plan/revise", async (req, res) => {
+    const input = z
+      .object({ feedback: z.string().trim().min(1).max(4000) })
+      .parse(req.body);
+    res.json({
+      run: await workbench.revisePlan(req.params.id, input.feedback),
+    });
+  });
   app.post("/api/runs/:id/team/messages", async (req, res) => {
     const input = z
       .object({

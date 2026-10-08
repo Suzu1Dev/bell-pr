@@ -107,6 +107,79 @@
   font-size: 12px;
   color: #8c9c7c;
 }
+.team-plan-revisions {
+  margin: 14px 0 0;
+  padding: 0 0 0 18px;
+  display: grid;
+  gap: 10px;
+}
+.team-plan-revisions li {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #768969;
+}
+.team-plan-revisions strong {
+  color: #567843;
+  margin-right: 8px;
+}
+.team-plan-revisions li > span {
+  color: #96a687;
+}
+.team-plan-revisions p {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+}
+.team-plan-revisions b {
+  font-weight: 550;
+  color: #6d8459;
+}
+.team-plan-revise {
+  margin-top: 16px;
+  border-top: 1px dashed #e4ebd8;
+  padding-top: 14px;
+}
+.team-plan-revise > label {
+  display: block;
+  font-size: 13px;
+  font-weight: 550;
+  color: #567843;
+}
+.team-plan-revise > label small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.8;
+  color: #8c9c7c;
+}
+.team-plan-revise textarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid #dfe9d3;
+  border-radius: 5px;
+  margin-top: 10px;
+  padding: 9px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: #5f7a4c;
+  background: white;
+}
+.team-plan-revise textarea:disabled {
+  background: #f6f8f1;
+  color: #a4b58f;
+}
+.team-plan-revise > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-top: 10px;
+}
+.team-plan-revise > div small {
+  font-size: 11px;
+  color: #96a687;
+}
 .team-board-content {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 310px;
@@ -452,6 +525,10 @@
     flex-direction: column;
   }
   .team-plan-action {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .team-plan-revise > div {
     align-items: flex-start;
     flex-direction: column;
   }

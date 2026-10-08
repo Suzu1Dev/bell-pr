@@ -7,10 +7,14 @@ import { setTimeout as delay } from "node:timers/promises";
 import {
   claimReadyTasks,
   consumeTeamInbox,
+  contributionIntentText,
   hasTeamInbox,
+  memberReportJsonSchema,
+  parseMemberResult,
   parseTeamPlan,
   reviewDiffContext,
   scopesOverlap,
+  teamPlanJsonSchema,
   type TeamAgentRunner,
 } from "./team.js";
 import { git } from "./process.js";
@@ -187,6 +191,73 @@ test("team plans validate DAGs, concrete scopes, and preserve literal bracket fi
       /範圍/,
     );
   assert.throws(() => parseTeamPlan("invented prose", 2), /JSON/);
+  // revisionNotes is required-but-nullable in the CLI schema and optional for zod.
+  const first = JSON.parse(makePlan([{ id: "a", files: ["a.ts"] }]));
+  assert.equal(
+    parseTeamPlan(JSON.stringify({ ...first, revisionNotes: null }), 2)
+      .revisionNotes,
+    undefined,
+  );
+  assert.equal(
+    parseTeamPlan(
+      JSON.stringify({ ...first, revisionNotes: "已拆成兩個任務。" }),
+      2,
+    ).revisionNotes,
+    "已拆成兩個任務。",
+  );
+  assert.deepEqual(teamPlanJsonSchema.required, [
+    "summary",
+    "revisionNotes",
+    "tasks",
+  ]);
+});
+
+test("member results accept the structured report, the earlier string report and plain text", () => {
+  const structured = parseMemberResult(
+    JSON.stringify({
+      report: {
+        summary: "已調整輸出。",
+        checks: [{ command: "npm test", outcome: "exit 0" }],
+        tradeoffs: "也可以集中成常數；未採用，因為模組獨立。",
+        limitations: "未執行整合測試。",
+      },
+      messages: [{ to: "lead", content: "完成" }],
+    }),
+  );
+  assert.deepEqual(structured.messages, [{ to: "lead", content: "完成" }]);
+  assert.match(
+    structured.report,
+    /^已調整輸出。\n\n驗證證據[^\n]*\n- npm test → exit 0\n\n限制[^\n]*\n未執行整合測試。\n\n設計取捨[^\n]*\n也可以集中成常數/,
+  );
+  // Every object in the CLI schema is closed and fully required.
+  const report = memberReportJsonSchema.properties.report;
+  assert.equal(report.additionalProperties, false);
+  assert.deepEqual(report.required, [
+    "summary",
+    "checks",
+    "tradeoffs",
+    "limitations",
+  ]);
+
+  const legacy = parseMemberResult(
+    "```json\n" +
+      JSON.stringify({ report: "舊格式報告", messages: [] }) +
+      "\n```",
+  );
+  assert.deepEqual(legacy, { report: "舊格式報告", messages: [] });
+
+  const plain = parseMemberResult("Completed; no checks executed.");
+  assert.deepEqual(plain, {
+    report: "Completed; no checks executed.",
+    messages: [],
+  });
+
+  // Intent text keeps only the five user-written fields and skips empty ones.
+  assert.equal(contributionIntentText(undefined), "");
+  assert.equal(
+    contributionIntentText({ ...settings, targetUser: "", outcome: " " }),
+    "需求：feature\n限制：保留 API\n驗收條件：既有測試通过",
+  );
 });
 
 test("shared scheduler enforces dependencies, file ownership locks, and member capacity", () => {
@@ -284,8 +355,8 @@ test("team execution waits for plan approval, runs isolated independent members 
       assert.match(input.prompt, /complete teaching explanation/);
       // The mentor gets the user's contribution settings and the named
       // reviewer/tester reports, labelled as untrusted static review.
-      assert.match(input.prompt, /"constraints":"保留 API"/);
-      assert.match(input.prompt, /"acceptance":"既有測試通过"/);
+      assert.match(input.prompt, /限制：保留 API/);
+      assert.match(input.prompt, /驗收條件：既有測試通过/);
       assert.match(
         input.prompt,
         /UNTRUSTED DATA[^\n]*\n\{"reviewer":"獨立靜態審查：未發現問題；本輪未執行專案程式碼。","tester":"獨立靜態審查：未發現問題；本輪未執行專案程式碼。"\}/,
@@ -295,7 +366,14 @@ test("team execution waits for plan approval, runs isolated independent members 
     }
     if (input.role === "lead") {
       leadCalls++;
-      if (leadCalls === 1) return plan;
+      if (leadCalls === 1) {
+        // The person already wrote the direction; the lead plans delivery
+        // and explains its own decomposition tradeoffs.
+        assert.match(input.prompt, /do not reinvent the direction/);
+        assert.match(input.prompt, /overall design tradeoffs/);
+        assert.doesNotMatch(input.prompt, /Previous plans the user sent back/);
+        return plan;
+      }
       assert.match(input.prompt, /Keep public API|beta ready/);
       // Integration and coordination turns carry the real diff, not an
       // instruction to run git.
@@ -328,6 +406,13 @@ test("team execution waits for plan approval, runs isolated independent members 
       prompt: input.prompt,
       cwd: input.cwd,
     });
+    // Members get the person's intent and their task, not runtime settings.
+    assert.match(input.prompt, /驗收條件：既有測試通过/);
+    assert.doesNotMatch(
+      input.prompt,
+      /worktreePath|reasoningEffort|requirePlanApproval|ponytailMode/,
+    );
+    assert.match(input.prompt, /report\.tradeoffs \(設計取捨\)/);
     running.add(taskId);
     peak = Math.max(peak, running.size);
     if (taskId === "alpha" || taskId === "beta") await barrier;
@@ -360,7 +445,17 @@ test("team execution waits for plan approval, runs isolated independent members 
     }
     running.delete(taskId);
     return JSON.stringify({
-      report: `${taskId} complete; fake runner only.`,
+      report:
+        taskId === "beta"
+          ? {
+              summary: "beta complete; fake runner only.",
+              checks: [
+                { command: "npm test", outcome: "exit 0 (fake runner)" },
+              ],
+              tradeoffs: "也可以共用常數；未採用，因為模組獨立。",
+              limitations: "未執行真實專案測試。",
+            }
+          : `${taskId} complete; fake runner only.`,
       messages:
         taskId === "beta" ? [{ to: "lead", content: "beta ready" }] : [],
     });
@@ -444,6 +539,15 @@ test("team execution waits for plan approval, runs isolated independent members 
     );
     assert.equal(new Set(memberInputs.map((input) => input.cwd)).size, 3);
     assert.ok(run.team!.tasks.every((task) => task.status === "complete"));
+    // The structured report is stored as one string with labelled sections.
+    assert.match(
+      run.team!.tasks.find((task) => task.id === "beta")!.report!,
+      /^beta complete[^]*驗證證據[^]*- npm test → exit 0 \(fake runner\)[^]*限制[^]*設計取捨[^]*模組獨立/,
+    );
+    assert.equal(
+      run.team!.tasks.find((task) => task.id === "alpha")!.report,
+      "alpha complete; fake runner only.",
+    );
     assert.ok(
       run.team!.messages.every((message) => message.status === "delivered"),
     );
@@ -482,6 +586,104 @@ test("team execution waits for plan approval, runs isolated independent members 
     await assert.rejects(f.workbench.approvePlan(run.id), /沒有等待/);
   } finally {
     release();
+    await f.cleanup();
+  }
+});
+
+test("sending a plan back re-runs the lead with the feedback and previous plan, replaces tasks without duplicating members, and stops after three revisions", async () => {
+  let leadCalls = 0;
+  const leadPrompts: string[] = [];
+  const f = await fixture(async (input) => {
+    if (input.role !== "lead") throw new Error("no teammate may start");
+    leadCalls++;
+    leadPrompts.push(input.prompt);
+    if (leadCalls === 1)
+      return makePlan([{ id: "all-in-one", files: ["a.ts", "b.ts"] }]);
+    return JSON.stringify({
+      summary: `第 ${leadCalls} 版計畫`,
+      revisionNotes: leadCalls === 2 ? "已依意見拆成兩個任務。" : null,
+      tasks: ["alpha", "beta"].map((id) => ({
+        id,
+        title: id,
+        description: `Implement ${id}`,
+        files: [`${id[0]}.ts`],
+        dependsOn: [],
+      })),
+    });
+  });
+  try {
+    const run = await f.workbench.createRun(
+      f.repo.id,
+      "Improve consistent output",
+      undefined,
+      settings,
+    );
+    await waitUntil(() => run.status === "awaiting_plan", "first plan");
+    assert.deepEqual(
+      run.agents
+        .filter((agent) => /^member-/.test(agent.id))
+        .map((agent) => agent.id),
+      ["member-1"],
+    );
+    await assert.rejects(f.workbench.revisePlan(run.id, "   "), {
+      statusCode: 400,
+    });
+
+    await f.workbench.revisePlan(run.id, "請拆成兩個獨立任務。");
+    assert.notEqual(run.status, "awaiting_plan");
+    await waitUntil(
+      () => leadCalls === 2 && run.status === "awaiting_plan",
+      "revised plan",
+    );
+    assert.match(
+      leadPrompts[1],
+      /User feedback on the latest plan:\n請拆成兩個獨立任務。/,
+    );
+    assert.match(
+      leadPrompts[1],
+      /"previousTasks":\[\{"id":"all-in-one","title":"all-in-one","files":\["a.ts","b.ts"\],"dependsOn":\[\]\}\]/,
+    );
+    assert.match(leadPrompts[1], /"previousSummary":"改善使用者輸出的一致性/);
+    assert.deepEqual(
+      run.team!.tasks.map((task) => task.id),
+      ["alpha", "beta"],
+    );
+    assert.equal(run.team!.planSummary, "第 2 版計畫");
+    assert.equal(run.team!.phase, "awaiting_approval");
+    assert.equal(
+      run.team!.planRevisions![0].revisionNotes,
+      "已依意見拆成兩個任務。",
+    );
+    // Old members were removed before the planning branch inserted the new set.
+    assert.deepEqual(
+      run.agents.map((agent) => agent.id),
+      ["lead", "member-1", "member-2", "reviewer", "tester"],
+    );
+
+    await f.workbench.revisePlan(run.id, "再調整一次");
+    await waitUntil(() => leadCalls === 3 && run.status === "awaiting_plan");
+    assert.equal(run.team!.planRevisions![1].revisionNotes, undefined);
+    await f.workbench.revisePlan(run.id, "最後一次");
+    await waitUntil(() => leadCalls === 4 && run.status === "awaiting_plan");
+    await assert.rejects(f.workbench.revisePlan(run.id, "第四次"), {
+      statusCode: 409,
+      message: /已重擬 3 次/,
+    });
+    assert.equal(leadCalls, 4);
+    assert.equal(run.team!.planRevisions!.length, 3);
+    assert.deepEqual(await readDiff(run), []);
+
+    const reopened = new Store(f.store.directory);
+    await reopened.initialize();
+    assert.equal(reopened.data.runs[0].team!.planRevisions!.length, 3);
+
+    const stopped = await f.workbench.cancel(run.id);
+    assert.equal(stopped.status, "cancelled");
+    await assert.rejects(f.workbench.revisePlan(run.id, "太遲了"), {
+      statusCode: 409,
+      message: /沒有等待核准/,
+    });
+  } finally {
     await f.cleanup();
   }
 });

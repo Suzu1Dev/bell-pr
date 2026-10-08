@@ -15,9 +15,14 @@ import {
   MessageSquare,
   Play,
   ShieldCheck,
+  RotateCcw,
   Users,
 } from "lucide-react";
-import type { AgentTeam, TeamTask } from "../../shared/team";
+import {
+  maxPlanRevisions,
+  type AgentTeam,
+  type TeamTask,
+} from "../../shared/team";
 import type { Run } from "../types";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
 import { ModelSummary } from "../models/ModelSummary";
@@ -46,12 +51,15 @@ export function TeamBoard({
   run,
   demo,
   onApprove,
+  onRevise,
   onMessage,
   busy,
 }: {
   run: Run;
   demo: boolean;
   onApprove: () => void;
+  /** Sends the plan back to the lead with feedback; rejects with the server's message. */
+  onRevise: (feedback: string) => Promise<void>;
   onMessage: (to: string, content: string) => Promise<void>;
   busy: boolean;
 }) {
@@ -59,6 +67,9 @@ export function TeamBoard({
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [revising, setRevising] = useState(false);
+  const [reviseError, setReviseError] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const team = run.team;
   if (!team)
@@ -87,6 +98,8 @@ export function TeamBoard({
     !team.tasks.some((task) => task.id === recipient && canReceive(task));
   const messagingDisabled = !demo && (finished || team.phase === "planning");
   const done = team.tasks.filter((task) => task.status === "complete").length;
+  const revisions = team.planRevisions ?? [];
+  const revisionsLeft = revisions.length < maxPlanRevisions;
   const groups: { label: string; states: TeamTask["status"][] }[] = [
     { label: "待處理", states: ["pending", "ready", "blocked"] },
     { label: "進行中", states: ["running"] },
@@ -150,24 +163,121 @@ export function TeamBoard({
           </span>
         </div>
         <p>
-          {team.planSummary || "正在閱讀專案並建立有明確範圍與相依關係的計畫。"}
+          {team.planSummary ||
+            (revisions.length
+              ? "Lead 正依你的意見重新規劃。"
+              : "正在閱讀專案並建立有明確範圍與相依關係的計畫。")}
         </p>
+        {revisions.length > 0 && (
+          <ol className="team-plan-revisions" aria-label="計畫重擬紀錄">
+            {revisions.map((revision, index) => (
+              <li key={revision.createdAt}>
+                <strong>第 {index + 1} 次退回</strong>
+                <span>
+                  上一版有 {revision.previousTasks.length} 個任務：
+                  {revision.previousTasks.map((task) => task.title).join("、")}
+                </span>
+                <p>
+                  <b>你的意見：</b>
+                  {revision.feedback}
+                </p>
+                <p>
+                  <b>Lead 的調整說明：</b>
+                  {revision.revisionNotes ??
+                    (index === revisions.length - 1 &&
+                    team.phase === "planning"
+                      ? "重新規劃中…"
+                      : "Lead 未說明調整內容；請直接比對新舊任務。")}
+                </p>
+              </li>
+            ))}
+          </ol>
+        )}
         {team.phase === "awaiting_approval" && (
-          <div className="team-plan-action">
-            <span>先查看各任務的檔案範圍與相依，再允許寫入程式碼。</span>
-            <button
-              className="button primary"
-              onClick={onApprove}
-              disabled={busy}
+          <>
+            <div className="team-plan-action">
+              <span>先查看各任務的檔案範圍與相依，再允許寫入程式碼。</span>
+              <button
+                className="button primary"
+                onClick={onApprove}
+                disabled={busy || revising}
+              >
+                {busy ? (
+                  <Loader2 size={15} className="spin" />
+                ) : (
+                  <Play size={15} />
+                )}
+                確認計畫並開始開發
+              </button>
+            </div>
+            <form
+              className="team-plan-revise"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!feedback.trim() || !revisionsLeft || demo) return;
+                setRevising(true);
+                setReviseError("");
+                try {
+                  await onRevise(feedback.trim());
+                  setFeedback("");
+                } catch (cause) {
+                  setReviseError((cause as Error).message);
+                } finally {
+                  setRevising(false);
+                }
+              }}
             >
-              {busy ? (
-                <Loader2 size={15} className="spin" />
-              ) : (
-                <Play size={15} />
+              <label>
+                退回並補充意見
+                <small>
+                  拆解不合理、範圍太大、少了測試任務或相依奇怪時，寫下原因讓
+                  Lead 重擬；這是練習「怎麼拆任務」的機會。
+                </small>
+                <textarea
+                  aria-label="退回計畫的意見"
+                  value={feedback}
+                  maxLength={4000}
+                  rows={3}
+                  placeholder={
+                    revisionsLeft
+                      ? "例如：把 API 與 UI 拆成兩個任務，並加一個只負責測試的任務。"
+                      : "已達重擬上限，請核准目前計畫或取消工作。"
+                  }
+                  onChange={(e) => setFeedback(e.target.value)}
+                  disabled={!revisionsLeft || revising || busy || demo}
+                />
+              </label>
+              <div>
+                <small>
+                  已重擬 {revisions.length}/{maxPlanRevisions}
+                  ；每次重擬是一次 Lead 唯讀規劃回合
+                </small>
+                <button
+                  type="submit"
+                  className="button secondary"
+                  disabled={
+                    !feedback.trim() ||
+                    !revisionsLeft ||
+                    revising ||
+                    busy ||
+                    demo
+                  }
+                >
+                  {revising ? (
+                    <Loader2 size={15} className="spin" />
+                  ) : (
+                    <RotateCcw size={15} />
+                  )}
+                  退回並補充意見
+                </button>
+              </div>
+              {reviseError && (
+                <p className="inline-error" role="alert">
+                  {reviseError}
+                </p>
               )}
-              確認計畫並開始開發
-            </button>
-          </div>
+            </form>
+          </>
         )}
       </div>
       <div className="team-board-content">
@@ -264,7 +374,9 @@ export function TeamBoard({
             {team.phase === "planning"
               ? "Lead 正在規劃。計畫產生後，即可向成員補充指示。"
               : recipient === "lead"
-                ? "Lead 會在下一次整合回合讀取訊息；開發指示請傳給全體成員或指定隊友。"
+                ? team.phase === "awaiting_approval"
+                  ? "要調整計畫，請用上方「退回並補充意見」讓 Lead 重擬；這裡的訊息只會在整合回合被讀到。"
+                  : "Lead 會在下一次整合回合讀取訊息，不會重排計畫；開發指示請傳給全體成員或指定隊友。"
                 : "訊息在下一個工作回合送達；執行中的回合不會即時中斷。"}
           </p>
           <div className="team-messages" aria-live="polite">

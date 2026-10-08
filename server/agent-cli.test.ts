@@ -138,6 +138,31 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
   });
 });
 
+test("teammates combine write access with an output schema on both providers", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-agent-cli-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const schemaPath = path.join(directory, "report-schema.json");
+  const schema = '{"type":"object","required":["report","messages"]}';
+  await writeFile(schemaPath, schema);
+  const value = (args: string[], flag: string) => args[args.indexOf(flag) + 1];
+
+  const codex = await agentCommand(
+    { source: "cli-default" },
+    { cwd: directory, access: "write", outputSchema: schemaPath },
+  );
+  assert.equal(value(codex.args, "--sandbox"), "workspace-write");
+  assert.equal(value(codex.args, "--output-schema"), schemaPath);
+  assert.ok(!codex.args.includes("--skip-git-repo-check"));
+
+  const claude = await agentCommand(
+    { provider: "claude", source: "cli-default" },
+    { cwd: directory, access: "write", outputSchema: schemaPath },
+  );
+  assert.equal(value(claude.args, "--permission-mode"), "acceptEdits");
+  assert.equal(value(claude.args, "--json-schema"), schema);
+  assert.ok(claude.args.includes("--disallowedTools"));
+});
+
 test("agent environment never forwards an Anthropic API key", (t) => {
   const previous = process.env.ANTHROPIC_API_KEY;
   process.env.ANTHROPIC_API_KEY = "sk-ant-test";

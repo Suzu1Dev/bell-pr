@@ -25,6 +25,7 @@ import {
 } from "../shared/insights.js";
 import type { ModelSettings } from "../shared/models.js";
 import { quoteMatches } from "./evidence.js";
+import { contributionIntent } from "./team.js";
 import {
   parseGitHubIssueUrl,
   safeRelativePath,
@@ -983,7 +984,8 @@ export class ProjectInsightsService {
           JSON.stringify({
             repository: repo.fullName,
             baseSha: version.baseSha,
-            preferences: settings,
+            // Only the intent fields: model, effort and team size are not analysis preferences.
+            preferences: contributionIntent(settings),
             ...(more
               ? {
                   existingRecommendations: previous.insights!.recommendations.map(

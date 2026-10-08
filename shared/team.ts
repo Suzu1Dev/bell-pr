@@ -33,6 +33,24 @@ export interface TeamMessage {
   deliveredAt?: string;
 }
 
+/** How many times a plan can be sent back before the person must approve or cancel. */
+export const maxPlanRevisions = 3;
+
+/** One round of "send the plan back": the rejected plan, the person's feedback and the lead's reply. */
+export interface TeamPlanRevision {
+  feedback: string;
+  previousSummary: string;
+  previousTasks: {
+    id: string;
+    title: string;
+    files: string[];
+    dependsOn: string[];
+  }[];
+  createdAt: string;
+  /** Filled in once the lead's revised plan arrives; absent when the lead gave none. */
+  revisionNotes?: string;
+}
+
 export interface AgentTeam {
   config: {
     maxTeammates: 2 | 3 | 4;
@@ -54,4 +72,6 @@ export interface AgentTeam {
   tasks: TeamTask[];
   messages: TeamMessage[];
   approvedAt?: string;
+  /** Optional: runs created before plan revision existed have none. Oldest first. */
+  planRevisions?: TeamPlanRevision[];
 }

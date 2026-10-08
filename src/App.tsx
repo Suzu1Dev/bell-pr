@@ -928,6 +928,14 @@ export default function App() {
       setBusy(false);
     }
   }
+  async function reviseTeamPlan(feedback: string) {
+    // Errors surface inline next to the textarea, like team messages.
+    const result = await api<{ run: Run }>(
+      `/runs/${run.id}/plan/revise`,
+      send("POST", { feedback }),
+    );
+    if (runIdRef.current === result.run.id) setRun(result.run);
+  }
   async function sendTeamMessage(to: string, content: string) {
     if (demo) {
       setRun((previous) => ({
@@ -2315,6 +2323,7 @@ export default function App() {
                     run={run}
                     demo={demo}
                     onApprove={approveTeamPlan}
+                    onRevise={reviseTeamPlan}
                     onMessage={sendTeamMessage}
                     busy={busy}
                   />
