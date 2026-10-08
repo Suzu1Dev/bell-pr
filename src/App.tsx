@@ -59,13 +59,15 @@ import {
 } from "lucide-react";
 import { api, send } from "./api";
 import { demoRepo, demoRun, demoFiles, demoAnswer } from "./demo";
-import type { Repo, Run, DiffFile, ChatMessage } from "./types";
+import type { Repo, Run, RunSummary, DiffFile, ChatMessage } from "./types";
+import { summarizeRun } from "../shared/runs";
 import type { DraftProposal } from "../shared/drafts";
 import type {
   ContributionOpportunity,
   DiscoveryCandidate,
 } from "../shared/discovery";
 import { DiffView } from "./review/DiffView";
+import { LearningNotes } from "./learning/LearningNotes";
 import { languageBadge } from "./review/diff";
 import { providerLabels, type ModelSettings } from "../shared/models";
 import { CommandPalette } from "./navigation/CommandPalette";
@@ -135,6 +137,16 @@ const fileStatusLabels: Record<string, { badge: string; title: string }> = {
 };
 const fileStatusLabel = (status: string) =>
   fileStatusLabels[status] ?? fileStatusLabels.modified;
+
+/** Persisted Q&A keyed the way the chat state is (`${runId}:${path}`). */
+function savedMessages(run: Run): Record<string, ChatMessage[]> {
+  return Object.fromEntries(
+    Object.entries(run.conversations ?? {}).map(([filePath, conversation]) => [
+      `${run.id}:${filePath}`,
+      conversation.messages,
+    ]),
+  );
+}
 
 function loadDemo(): Run {
   try {
@@ -238,7 +250,7 @@ export default function App() {
   const [page, setPage] = useState<Page>("workspace");
   const [tab, setTab] = useState<Tab>("overview");
   const [repos, setRepos] = useState<Repo[]>([]);
-  const [runs, setRuns] = useState<Run[]>([]);
+  const [runs, setRuns] = useState<RunSummary[]>([]);
   const [run, setRun] = useState<Run>(loadDemo);
   const [files, setFiles] = useState<DiffFile[]>(demoFiles);
   const [selectedPath, setSelectedPath] = useState(demoFiles[0]?.path || "");
@@ -444,7 +456,7 @@ export default function App() {
     Promise.all([
       api<Status>("/status"),
       api<{ repos: Repo[] }>("/repos"),
-      api<{ runs: Run[] }>("/runs"),
+      api<{ runs: RunSummary[] }>("/runs"),
     ])
       .then(([s, r, jobs]) => {
         if (cancelled) return;
@@ -466,7 +478,7 @@ export default function App() {
       if (fetching) return;
       fetching = true;
       try {
-        const { runs: latest } = await api<{ runs: Run[] }>("/runs");
+        const { runs: latest } = await api<{ runs: RunSummary[] }>("/runs");
         if (!stopped) setRuns(latest);
       } catch {
         /* The current-run poll reports actionable connection errors. */
@@ -516,7 +528,9 @@ export default function App() {
         if (!cancelled && epoch === draftMutationEpoch.current) {
           setRun(updated);
           setRuns((previous) =>
-            previous.map((r) => (r.id === updated.id ? updated : r)),
+            previous.map((r) =>
+              r.id === updated.id ? summarizeRun(updated) : r,
+            ),
           );
         }
       } catch (error) {
@@ -934,6 +948,8 @@ export default function App() {
       return false;
     const sequence = ++selectionSequence.current;
     const draftAtStart = { ...editorDraft.current };
+    // Demo Q&A is answered locally and never persisted.
+    let saved: Record<string, ChatMessage[]> = {};
     try {
       if (id === demoRun.id) {
         setRun(loadDemo());
@@ -952,9 +968,10 @@ export default function App() {
         setRun(r.run);
         setFiles(f.files);
         setSelectedPath(f.files[0]?.path || "");
+        saved = savedMessages(r.run);
       }
       setTab("overview");
-      setMessages({});
+      setMessages(saved);
       setChatRequests({});
       navigate("workspace");
       return true;
@@ -1054,7 +1071,7 @@ export default function App() {
           settings: contributionSettings,
         }),
       );
-      setRuns((previous) => [created, ...previous]);
+      setRuns((previous) => [summarizeRun(created), ...previous]);
       setRun(created);
       setFiles([]);
       setMessages({});
@@ -1096,6 +1113,33 @@ export default function App() {
       notify((error as Error).message, "error");
     }
   }
+  async function saveNote(text: string) {
+    if (!file) return;
+    if (demo) {
+      // Demo notes live in local state only; no server call.
+      setRun((previous) => {
+        const notes = { ...previous.notes };
+        if (text.trim())
+          notes[file.path] = {
+            text,
+            fingerprint: file.fingerprint ?? "",
+            updatedAt: new Date().toISOString(),
+          };
+        else delete notes[file.path];
+        return { ...previous, notes };
+      });
+      return;
+    }
+    try {
+      const { run: updated } = await api<{ run: Run }>(
+        `/runs/${run.id}/notes`,
+        send("PATCH", { filePath: file.path, text }),
+      );
+      if (runIdRef.current === updated.id) setRun(updated);
+    } catch (error) {
+      notify((error as Error).message, "error");
+    }
+  }
   async function ask(question: string) {
     setShowExplanation(true);
     setFocusMode(false);
@@ -1111,7 +1155,10 @@ export default function App() {
     const targetFile = file;
     setMessages((previous) => ({
       ...previous,
-      [key]: [...(previous[key] || []), { role: "user", content: question }],
+      [key]: [
+        ...(previous[key] || []),
+        { role: "user", content: question, fingerprint: targetFile.fingerprint },
+      ],
     }));
     setLoadingChats((previous) => new Set(previous).add(key));
     try {
@@ -1127,7 +1174,11 @@ export default function App() {
         ...previous,
         [key]: [
           ...(previous[key] || []),
-          { role: "assistant", content: answer },
+          {
+            role: "assistant",
+            content: answer,
+            fingerprint: targetFile.fingerprint,
+          },
         ],
       }));
     } catch (error) {
@@ -1585,10 +1636,19 @@ export default function App() {
                 </span>
                 <span className="branch-direction">→</span>
                 <span>{run.baseBranch}</span>
-                {demo && (
+                {demo ? (
                   <span className="meta-demo">
                     範例資料 · 不會送出至 GitHub
                   </span>
+                ) : (
+                  <a
+                    className="export-link"
+                    href={`/api/runs/${run.id}/export.md`}
+                    download={`bell-learning-${run.id}.md`}
+                  >
+                    <ArrowDownToLine size={13} />
+                    匯出學習紀錄（Markdown）
+                  </a>
                 )}
               </div>
             </section>
@@ -1747,6 +1807,7 @@ export default function App() {
                     preferenceError={intelligence.preferenceError}
                     onSavePreferences={intelligence.savePreferences}
                     stale={intelligence.stale}
+                    staleDetail={intelligence.staleDetail}
                     onAnalyze={intelligence.analyze}
                     onRecommendMore={intelligence.recommendMore}
                     onChooseRecommendation={chooseRecommendation}
@@ -1858,7 +1919,7 @@ export default function App() {
                           <small>
                             {allReviewed
                               ? "所有變更都已看過，準備好送出！"
-                              : "看懂了，就勾選「已審查」。"}
+                              : "看懂了，就勾選「已審閱」。"}
                           </small>
                         </div>
                       </aside>
@@ -1963,6 +2024,7 @@ export default function App() {
                           onReview={reviewFile}
                           onAsk={ask}
                           view={diffView}
+                          hasNote={Boolean(run.notes?.[file.path]?.text)}
                         />
                       ) : (
                         <div className="empty-state">
@@ -2047,6 +2109,13 @@ export default function App() {
                                 explanationBusy={explanationRequests.has(run.id)}
                                 demo={demo}
                                 reports={run.reports}
+                                modules={
+                                  intelligence.stale
+                                    ? undefined
+                                    : intelligence.insights?.modules
+                                }
+                                note={run.notes?.[file.path]}
+                                onSaveNote={saveNote}
                               />
                             </Suspense>
                           ) : (
@@ -2279,7 +2348,7 @@ export default function App() {
                             <Circle size={18} />
                           )}
                           <span>
-                            已審查所有檔案
+                            已審閱所有檔案
                             <small>
                               {reviewedCount} / {files.length} 個檔案
                             </small>
@@ -2335,7 +2404,7 @@ export default function App() {
                 <div>
                   <span className="footer-reviewed">
                     <CheckCheck size={15} />
-                    {reviewedCount} / {files.length} 已審查
+                    {reviewedCount} / {files.length} 已審閱
                   </span>
                   {run.status === "published" && run.prUrl ? (
                     <a
@@ -2360,7 +2429,7 @@ export default function App() {
                       }
                       title={
                         !allReviewed
-                          ? "請先逐一勾選所有檔案的「已審查」"
+                          ? "請先逐一勾選所有檔案的「已審閱」"
                           : draftDirty
                             ? "請先儲存 PR 草稿"
                             : "確認變更並預覽送出"
@@ -2404,6 +2473,7 @@ export default function App() {
               preferenceError={intelligence.preferenceError}
               onSavePreferences={intelligence.savePreferences}
               stale={intelligence.stale}
+              staleDetail={intelligence.staleDetail}
               onAnalyze={intelligence.analyze}
               onRecommendMore={intelligence.recommendMore}
               onChooseRecommendation={chooseRecommendation}
@@ -2585,60 +2655,18 @@ export default function App() {
           </section>
         ) : page === "learning" ? (
           <section className="page-content">
-            <div className="page-title">
-              <div>
-                <span className="eyebrow">LEARN BY CONTRIBUTING</span>
-                <h1 tabIndex={-1}>讓看懂的程式碼，成為你的經驗。</h1>
-                <p>從這次重試機制的示範，理解實際開發中的選擇與取捨。</p>
-              </div>
-              <span className="demo-pill">示範學習內容</span>
-            </div>
-            <div className="learning-grid">
-              {[
-                {
-                  title: "指數退避",
-                  tag: "可靠性設計",
-                  text: "重試間隔不斷加倍，避免服務忙碌時，新的請求讓它更忙。",
-                  snippet: "delay = baseDelay × 2 ** attempt",
-                  index: 0,
-                },
-                {
-                  title: "可重試的錯誤",
-                  tag: "錯誤處理",
-                  text: "區分暫時性故障與永久性錯誤。500 可能恢復，401 則需要先處理身份驗證。",
-                  snippet: "status === 429 || status >= 500",
-                  index: 1,
-                },
-                {
-                  title: "用測試定義邊界",
-                  tag: "測試思維",
-                  text: "除了成功路徑，也要測試重試上限、非重試錯誤，以及取消請求。",
-                  snippet: "expect(attempts).toBe(maxRetries + 1)",
-                  index: 3,
-                },
-              ].map((note, i) => (
-                <article className="note-card" key={note.title}>
-                  <span className="note-number">0{i + 1} / 開發手記</span>
-                  <div className="note-tag">{note.tag}</div>
-                  <h2>{note.title}</h2>
-                  <p>{note.text}</p>
-                  <code>{note.snippet}</code>
-                  <button
-                    onClick={() => {
-                      chooseRun(demoRun.id).then((opened) => {
-                        if (!opened) return;
-                        setSelectedPath(
-                          demoFiles[note.index]?.path || demoFiles[0].path,
-                        );
-                        setTab("changes");
-                      });
-                    }}
-                  >
-                    回到程式碼理解它 <ArrowUpRight size={15} />
-                  </button>
-                </article>
-              ))}
-            </div>
+            <LearningNotes
+              runs={runs}
+              repos={repos}
+              demoFiles={demoFiles}
+              onOpen={(id, path) => {
+                chooseRun(id).then((opened) => {
+                  if (!opened) return;
+                  setSelectedPath(path);
+                  setTab("changes");
+                });
+              }}
+            />
             <div className="team-note">
               <MessageSquare size={25} />
               <div>
@@ -3126,7 +3154,7 @@ export default function App() {
             </div>
             <p>
               <CircleCheck size={15} />
-              {files.length} 個檔案已審查{" "}
+              {files.length} 個檔案已審閱{" "}
               <b>
                 +{additions} −{deletions}
               </b>
@@ -3232,7 +3260,7 @@ export default function App() {
               <strong>理解每個改動</strong>
               <p>
                 切換檔案閱讀 diff；點選行號，或按住 Shift 選擇一段程式碼，向
-                agent 提問。理解後勾選「已審查」。
+                agent 提問。理解後勾選「已審閱」。
               </p>
             </li>
             <li>

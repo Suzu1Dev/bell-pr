@@ -25,6 +25,8 @@ export interface DiffViewProps {
   onReview: () => void;
   onAsk: (question: string) => void;
   view: "unified" | "split";
+  /** When given and false, a soft hint invites a learner note; it never blocks the checkbox. */
+  hasNote?: boolean;
 }
 
 function Syntax({ code }: { code: string }) {
@@ -63,6 +65,7 @@ export function DiffView({
   onReview,
   onAsk,
   view,
+  hasNote,
 }: DiffViewProps) {
   const lines = useMemo(
     () => (file.blocked ? [] : parseDiff(file.patch)),
@@ -179,6 +182,9 @@ export function DiffView({
         <div className="rv-file-actions">
           <span className="rv-additions">+{file.additions}</span>
           <span className="rv-deletions">−{file.deletions}</span>
+          {hasNote === false && !reviewed && !file.blocked && (
+            <span className="rv-note-hint">還沒寫下你的理解</span>
+          )}
           <label className={`rv-reviewed ${reviewed ? "rv-reviewed-yes" : ""}`}>
             <input
               type="checkbox"

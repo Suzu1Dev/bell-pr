@@ -29,6 +29,30 @@ export const demoInsights: ProjectInsights = {
       purpose: "驗證重試成功與排除錯誤的行為；這是本次新增的示範測試。",
     },
   ],
+  readingPath: [
+    {
+      path: "README.md",
+      why: "先知道這個 client 想替誰解決什麼問題，再看程式碼才有脈絡。",
+      lookFor: "安裝方式、建立 client 的範例，以及它強調的「有型別」承諾。",
+    },
+    {
+      path: "src/types.ts",
+      why: "所有模組共用這裡的設定型別；先看型別，等於先看合約。",
+      lookFor: "client 設定與重試設定各有哪些欄位，哪些是選填。",
+    },
+    {
+      path: "src/client.ts",
+      why: "這是使用者實際呼叫的入口，請求從這裡進出。",
+      lookFor: "GET 如何組合網址、呼叫 fetch，以及目前沒有接入 retry 的位置。",
+    },
+    {
+      path: "src/utils/retry.ts",
+      why: "建議方向都圍繞它；理解它的等待策略，才能評估改法。",
+      lookFor: "重試次數、固定等待時間，以及它如何判斷是否再試。",
+    },
+  ],
+  howItFitsTogether:
+    "呼叫端依 src/types.ts 的設定建立 src/client.ts 的 client；client 的 GET 直接呼叫 fetch，把 JSON 回傳給畫面。src/utils/retry.ts 目前是獨立 helper，示範 diff 中尚未被 client 引用；「client 將來會包住 retry」是建議方向，不是現況。",
   evidence: [
     {
       path: "README.md",

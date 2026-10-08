@@ -125,31 +125,88 @@ test("discovery results require repository-specific issue and contribution-rule 
     ).opportunities[0].popularity,
     /最近推送於 未提供/,
   );
-  for (const invalid of [
-    { ...opportunity, repository: "other/project" },
-    {
-      ...opportunity,
-      evidence: [
-        { ...opportunity.evidence[0], sourceId: "other/project:issue:1" },
-      ],
-    },
-    {
-      ...opportunity,
-      evidence: [
-        { ...opportunity.evidence[0], quote: "This is an invented quote." },
-        opportunity.evidence[1],
-      ],
-    },
-    { ...opportunity, evidence: [opportunity.evidence[0]] },
-    { ...opportunity, evidence: [opportunity.evidence[1]] },
-  ])
-    assert.throws(() =>
-      parseDiscoveryResult(
-        answer([invalid]),
-        [candidate],
-        defaultDiscoveryPreferences,
-      ),
+  assert.throws(() =>
+    parseDiscoveryResult(
+      answer([{ ...opportunity, repository: "other/project" }]),
+      [candidate],
+      defaultDiscoveryPreferences,
+    ),
+  );
+  // Evidence that does not hold drops that one opportunity and names it; the batch still succeeds.
+  const unsupportedCases: [ContributionOpportunity, RegExp][] = [
+    [
+      {
+        ...opportunity,
+        evidence: [
+          { ...opportunity.evidence[0], sourceId: "other/project:issue:1" },
+          opportunity.evidence[1],
+        ],
+      },
+      /引文無法對應來源 other\/project:issue:1/,
+    ],
+    [
+      {
+        ...opportunity,
+        evidence: [
+          { ...opportunity.evidence[0], quote: "This is an invented quote." },
+          opportunity.evidence[1],
+        ],
+      },
+      /引文無法對應來源/,
+    ],
+    [
+      {
+        ...opportunity,
+        evidence: [
+          { ...opportunity.evidence[0], quote: "Keyboard shortcut instructions are unclear" },
+          opportunity.evidence[1],
+        ],
+      },
+      /引文無法對應來源/,
+    ],
+    [
+      {
+        ...opportunity,
+        evidence: [
+          { ...opportunity.evidence[0], quote: "keyboard shortcut instructions are unclear." },
+          opportunity.evidence[1],
+        ],
+      },
+      /引文無法對應來源/,
+    ],
+    [{ ...opportunity, evidence: [opportunity.evidence[0]] }, /CONTRIBUTING/],
+    [{ ...opportunity, evidence: [opportunity.evidence[1]] }, /issue 引文/],
+  ];
+  for (const [unsupported, reason] of unsupportedCases) {
+    const parsed = parseDiscoveryResult(
+      answer([unsupported, { ...opportunity, id: "kept" }]),
+      [candidate],
+      defaultDiscoveryPreferences,
     );
+    assert.deepEqual(
+      parsed.opportunities.map((item) => item.id),
+      ["kept"],
+    );
+    assert.equal(parsed.warnings.length, 1);
+    assert.match(parsed.warnings[0], /已略過 owner\/project「釐清鍵盤操作說明」/);
+    assert.match(parsed.warnings[0], reason);
+  }
+  // Whitespace-only differences still count as the same source text.
+  const rewrapped = parseDiscoveryResult(
+    answer([
+      {
+        ...opportunity,
+        evidence: [
+          { ...opportunity.evidence[0], quote: "keyboard  shortcut\ninstructions are unclear" },
+          opportunity.evidence[1],
+        ],
+      },
+    ]),
+    [candidate],
+    defaultDiscoveryPreferences,
+  );
+  assert.equal(rewrapped.opportunities.length, 1);
+  assert.deepEqual(rewrapped.warnings, []);
   assert.throws(
     () =>
       parseDiscoveryResult(

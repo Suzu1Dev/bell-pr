@@ -16,6 +16,8 @@ import { AppError } from "./types.js";
 import { redact } from "./process.js";
 import { DiscoveryService } from "./discovery.js";
 import { AgentSlots, parseAgentProcessLimit } from "./agent-slots.js";
+import { learningExport } from "./learning-export.js";
+import { summarizeRun } from "../shared/runs.js";
 import { agentProviders } from "../shared/models.js";
 
 export function parseAllowedOrigins(value = ""): string[] {
@@ -199,7 +201,8 @@ export function createApp(
     res.json({ run: await workbench.sendTeamMessage(req.params.id, input) });
   });
   app.get("/api/runs", (_req, res) => {
-    res.json({ runs: workbench.store.data.runs });
+    // Lists are polled every few seconds; the open run fetches its full record.
+    res.json({ runs: workbench.store.data.runs.map(summarizeRun) });
   });
   app.post("/api/runs", async (req, res) => {
     const { repoId, prompt, title, settings } = z
@@ -221,6 +224,18 @@ export function createApp(
   });
   app.get("/api/runs/:id", (req, res) => {
     res.json({ run: workbench.run(req.params.id) });
+  });
+  app.get("/api/runs/:id/export.md", (req, res) => {
+    const run = workbench.run(req.params.id);
+    const repo = workbench.store.data.repos.find(
+      (value) => value.id === run.repoId,
+    );
+    res.type("text/markdown");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="bell-learning-${run.id}.md"`,
+    );
+    res.send(learningExport(run, repo));
   });
   app.post("/api/runs/:id/cancel", async (req, res) => {
     res.json({ run: await workbench.cancel(req.params.id) });
@@ -267,6 +282,15 @@ export function createApp(
       })
       .parse(req.body);
     res.json({ run: await workbench.draft(req.params.id, draft) });
+  });
+  app.patch("/api/runs/:id/notes", async (req, res) => {
+    const { filePath, text } = z
+      .object({
+        filePath: z.string().min(1).max(1024),
+        text: z.string().max(2000),
+      })
+      .parse(req.body);
+    res.json({ run: await workbench.saveNote(req.params.id, filePath, text) });
   });
   app.post("/api/runs/:id/review", async (req, res) => {
     const { filePath, reviewed, fingerprint } = z

@@ -90,6 +90,15 @@ export const demoFiles: DiffFile[] = [
       concept:
         "指數退避（Exponential backoff）\n等待上限會依序變成 1 秒、2 秒、4 秒；full jitter 再從 0 到上限之間隨機選一個時間。maxDelay 則讓等待上限不超過 30 秒。",
       tip: "不是所有錯誤都值得重試。這裡保留 shouldRetry，讓呼叫端決定哪些失敗可以再試；有副作用的寫入請求還需要額外確認冪等性。",
+      alternatives:
+        "另一條路是固定間隔加上隨機抖動（例如每次 1 秒 ± 0.3 秒）：實作更簡單、等待時間可預期，但大量客戶端同時失敗時仍會在相近時間重試。這次沒採用，是因為示範的情境正是伺服器忙不過來；若重試次數很少、而且必須在固定時間內回應，固定間隔會是更好的選擇。",
+      lookup: ["exponential backoff", "full jitter", "idempotency"],
+      selfCheck: {
+        question:
+          "第三次重試（attempt = 2）時，等待時間最多可能是多少秒？為什麼不一定會等那麼久？",
+        answer:
+          "上限是 min(30, 1 × 2²) = 4 秒；但 full jitter 會在 0 到 4 秒之間隨機取值，所以實際等待可能更短。",
+      },
     },
   ),
   diff(
@@ -139,6 +148,15 @@ export const demoFiles: DiffFile[] = [
       concept:
         "錯誤分類\nHTTP 狀態碼提供失敗原因。將 Response 留在 HttpError 裡，能讓上層用狀態碼決定是否重試，同時保留除錯資訊。",
       tip: "這份示範只對 GET 啟用重試。正式上線前還應處理 Retry-After、取消訊號與 JSON 解析失敗，避免把不同類型的問題混在一起。",
+      alternatives:
+        "也可以不另外定義 HttpError，直接在 shouldRetry 裡檢查 `error.status`；程式碼更短，但失去型別保護，呼叫端也拿不到完整的 Response 來除錯。當專案已經有統一的錯誤類別時，應改成沿用那個類別而不是再新增一個。",
+      lookup: ["custom error class", "retryable HTTP status codes"],
+      selfCheck: {
+        question:
+          "伺服器回傳 404 時，這段程式會重試嗎？判斷依據是 diff 的哪一行？",
+        answer:
+          "不會。shouldRetry 只對 408、429、500、502、503、504 回傳 true，404 不在清單中，所以 HttpError 會直接被拋出。",
+      },
     },
   ),
   diff(

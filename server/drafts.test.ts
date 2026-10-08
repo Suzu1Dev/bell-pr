@@ -81,8 +81,21 @@ test("draft proposals require exact authoritative quotes, preserve template head
     parseDraftProposal(JSON.stringify(good), sourceContext).policy,
     "repository",
   );
+  // Only whitespace may differ from the source; case and punctuation are checked literally.
+  assert.equal(
+    parseDraftProposal(
+      JSON.stringify({
+        ...good,
+        rules: [{ ...good.rules[0], quote: "Use  an imperative\ntitle." }],
+      }),
+      sourceContext,
+    ).rules[0].quote,
+    "Use  an imperative\ntitle.",
+  );
   for (const invalid of [
     { ...good, rules: [{ ...good.rules[0], quote: "Invented quote" }] },
+    { ...good, rules: [{ ...good.rules[0], quote: "use an imperative title." }] },
+    { ...good, rules: [{ ...good.rules[0], quote: "Use an imperative title!" }] },
     { ...good, rules: [{ ...good.rules[0], sourceId: "missing" }] },
     {
       ...good,

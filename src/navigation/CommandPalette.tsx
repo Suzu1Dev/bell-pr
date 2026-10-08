@@ -8,12 +8,12 @@ import {
   Search,
   X,
 } from "lucide-react";
-import type { Repo, Run } from "../types";
+import type { Repo, Run, RunSummary } from "../types";
 import "./command-palette.css";
 
 export interface CommandPaletteProps {
   repos: Repo[];
-  runs: Run[];
+  runs: RunSummary[];
   currentRepoId?: string;
   currentRunId: string;
   statusLabels: Record<Run["status"], string>;

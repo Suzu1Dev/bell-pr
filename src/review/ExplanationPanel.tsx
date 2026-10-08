@@ -9,12 +9,17 @@ import {
   Eye,
   FileCode2,
   FlaskConical,
+  FolderTree,
+  HelpCircle,
   Lightbulb,
   LoaderCircle,
   MessageCircle,
+  PenLine,
   RotateCcw,
+  Shuffle,
   Sparkles,
 } from "lucide-react";
+import type { LearnerNote } from "../../shared/explanations";
 import type { ChatMessage, DiffFile, Run } from "../types";
 import { MarkdownContent } from "./MarkdownContent";
 import "./review.css";
@@ -31,6 +36,27 @@ export interface ExplanationPanelProps {
   chatRequestId?: number;
   onChatRequestHandled?: () => void;
   explanationBusy?: boolean;
+  /** Current (not stale) project modules; used only to label where the file lives. */
+  modules?: { path: string; purpose: string }[];
+  /** The learner's saved note for this file; the editor renders when onSaveNote is given. */
+  note?: LearnerNote;
+  onSaveNote?: (text: string) => Promise<void> | void;
+}
+
+/** Longest module path that is the file itself or one of its parent directories. */
+export function moduleFor(
+  filePath: string,
+  modules: { path: string; purpose: string }[] = [],
+) {
+  let best: { path: string; purpose: string } | undefined;
+  for (const module of modules) {
+    const prefix = module.path.replace(/\/+$/, "");
+    if (!prefix) continue;
+    const matches = filePath === prefix || filePath.startsWith(`${prefix}/`);
+    if (matches && (!best || prefix.length > best.path.length))
+      best = { path: prefix, purpose: module.purpose };
+  }
+  return best;
 }
 
 /** Test directories or `.test.` / `.spec.` file names. */
@@ -129,17 +155,24 @@ export function ExplanationPanel({
   chatRequestId = 0,
   onChatRequestHandled,
   explanationBusy = false,
+  modules,
+  note,
+  onSaveNote,
 }: ExplanationPanelProps) {
   const [tab, setTab] = useState<"explain" | "reports" | "chat">(
     chatRequestId ? "chat" : "explain",
   );
   const [question, setQuestion] = useState("");
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [noteDraft, setNoteDraft] = useState(note?.text ?? "");
+  const [noteSaving, setNoteSaving] = useState(false);
   const chatEnd = useRef<HTMLDivElement>(null);
   const lastMessageCount = useRef(messages.length);
   const panelId = useId();
 
   useEffect(() => {
     setQuestion("");
+    setShowAnswer(false);
     // Reports are run-level, so stay on that tab when the reader clicks through files.
     setTab((current) =>
       chatRequestId ? "chat" : current === "reports" ? "reports" : "explain",
@@ -172,11 +205,25 @@ export function ExplanationPanel({
       chatEnd.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [messages.length, loading, tab]);
 
+  useEffect(() => {
+    setNoteDraft(note?.text ?? "");
+  }, [file.path, note?.text]);
+
   function ask(value: string) {
     if (!value.trim() || loading || file.blocked) return;
     onAsk(value.trim());
     setQuestion("");
     setTab("chat");
+  }
+
+  async function saveNote() {
+    if (!onSaveNote || noteSaving) return;
+    setNoteSaving(true);
+    try {
+      await onSaveNote(noteDraft);
+    } finally {
+      setNoteSaving(false);
+    }
   }
 
   const explanation = file.explanation;
@@ -193,6 +240,12 @@ export function ExplanationPanel({
     (message) => message.role === "user",
   ).length;
   const isTestFile = testFilePattern.test(file.path);
+  const fileModule = moduleFor(file.path, modules);
+  // A saved note keeps its text when the diff moves on; the badge says so.
+  const noteStale = Boolean(
+    note && file.fingerprint && note.fingerprint !== file.fingerprint,
+  );
+  const noteDirty = noteDraft !== (note?.text ?? "");
   const presets = [
     "為什麼要這樣改？",
     "有哪些需要注意的風險？",
@@ -265,6 +318,17 @@ export function ExplanationPanel({
         <FileCode2 size={13} />
         <span title={file.path}>{file.path}</span>
       </div>
+      {fileModule && (
+        <p
+          className="explain-module"
+          title={`${fileModule.path} · ${fileModule.purpose}`}
+        >
+          <FolderTree size={12} />
+          <span>
+            所在模組 <code>{fileModule.path}</code>：{fileModule.purpose}
+          </span>
+        </p>
+      )}
       <div
         className="explain-content"
         id={`${panelId}-content`}
@@ -403,6 +467,50 @@ export function ExplanationPanel({
                   </h3>
                   <MarkdownContent>{explanation.tip}</MarkdownContent>
                 </section>
+                {explanation.alternatives && (
+                  <section className="explain-card explain-card-alternatives">
+                    <h3>
+                      <Shuffle size={15} />
+                      如果換個做法？
+                    </h3>
+                    <MarkdownContent>{explanation.alternatives}</MarkdownContent>
+                    {explanation.lookup && explanation.lookup.length > 0 && (
+                      <p className="explain-lookup">
+                        <span>可以查：</span>
+                        {explanation.lookup.map((keyword) => (
+                          <code key={keyword}>{keyword}</code>
+                        ))}
+                      </p>
+                    )}
+                  </section>
+                )}
+                {explanation.selfCheck && (
+                  <section className="explain-card explain-card-selfcheck">
+                    <h3>
+                      <HelpCircle size={15} />
+                      考考自己
+                    </h3>
+                    <MarkdownContent>
+                      {explanation.selfCheck.question}
+                    </MarkdownContent>
+                    <button
+                      type="button"
+                      className="explain-answer-toggle"
+                      aria-expanded={showAnswer}
+                      aria-controls={showAnswer ? `${panelId}-answer` : undefined}
+                      onClick={() => setShowAnswer((current) => !current)}
+                    >
+                      {showAnswer ? "收起答案" : "看答案"}
+                    </button>
+                    {showAnswer && (
+                      <div className="explain-answer" id={`${panelId}-answer`}>
+                        <MarkdownContent>
+                          {explanation.selfCheck.answer}
+                        </MarkdownContent>
+                      </div>
+                    )}
+                  </section>
+                )}
                 <p className="explain-evidence-note">
                   {demo
                     ? "示範內容不是即時 AI 推論，也不代表測試結果。"
@@ -466,6 +574,8 @@ export function ExplanationPanel({
                     "這段改了什麼？",
                     "為什麼這樣改？",
                     "帶走一個開發觀念",
+                    "如果換個做法？",
+                    "考考自己",
                   ].map((title) => (
                     <div className="explain-skeleton" key={title}>
                       <span>{title}</span>
@@ -476,6 +586,49 @@ export function ExplanationPanel({
                   ))}
                 </div>
               </div>
+            )}
+            {onSaveNote && !file.blocked && (
+              <section className="explain-card explain-card-note">
+                <h3>
+                  <PenLine size={15} />
+                  <label htmlFor={`${panelId}-note`}>我的理解</label>
+                  {noteStale && (
+                    <span className="explain-note-badge">diff 已更新</span>
+                  )}
+                </h3>
+                <p className="explain-note-intro">
+                  用自己的話寫下這份變更做了什麼、為什麼；筆記會和寫下時的 diff
+                  版本一起保存。
+                </p>
+                <textarea
+                  id={`${panelId}-note`}
+                  className="explain-note-input"
+                  rows={3}
+                  maxLength={2000}
+                  placeholder="例如：這次把固定等待改成指數退避，是為了……"
+                  value={noteDraft}
+                  onChange={(event) => setNoteDraft(event.target.value)}
+                />
+                <div className="explain-note-actions">
+                  <span>
+                    {noteStale
+                      ? "這段筆記寫於較早的 diff 版本，文字已保留；確認後重新儲存即可更新。"
+                      : demo
+                        ? "示範模式的筆記不會保存，重新整理後會消失"
+                        : note?.updatedAt
+                          ? `已儲存 · ${new Date(note.updatedAt).toLocaleString("zh-TW")}`
+                          : "尚未儲存"}
+                  </span>
+                  <button
+                    type="button"
+                    className="explain-note-save"
+                    disabled={!(noteDirty || noteStale) || noteSaving}
+                    onClick={() => void saveNote()}
+                  >
+                    {noteSaving ? "儲存中…" : "儲存筆記"}
+                  </button>
+                </div>
+              </section>
             )}
           </>
         ) : tab === "reports" ? (
@@ -512,6 +665,11 @@ export function ExplanationPanel({
               const failed =
                 message.role === "assistant" &&
                 message.content.startsWith("這次未能取得回答：");
+              // Saved turns about an earlier diff stay readable but are marked.
+              const stale =
+                message.fingerprint !== undefined &&
+                file.fingerprint !== undefined &&
+                message.fingerprint !== file.fingerprint;
               return (
                 <div
                   className={`explain-message explain-message-${message.role}${failed ? " explain-message-error" : ""}`}
@@ -535,6 +693,11 @@ export function ExplanationPanel({
                       </>
                     ) : (
                       "你"
+                    )}
+                    {stale && (
+                      <span className="explain-inline-demo explain-inline-stale">
+                        針對較舊版本
+                      </span>
                     )}
                   </div>
                   <div className="explain-message-body">

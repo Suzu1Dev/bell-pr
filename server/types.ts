@@ -1,6 +1,7 @@
 import type {
   ChangeExplanation,
   ExplanationStatus,
+  LearnerNote,
   StoredExplanation,
 } from "../shared/explanations.js";
 import type { EfficiencyMetrics } from "../shared/efficiency.js";
@@ -8,6 +9,8 @@ import type { AgentTeam } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import type { DraftPreparation } from "../shared/drafts.js";
 import type { ModelExecution } from "../shared/models.js";
+import type { FileConversation } from "../shared/chat.js";
+import type { RunDetailField } from "../shared/runs.js";
 
 export type RunStatus =
   | "queued"
@@ -58,6 +61,8 @@ export interface Run {
   draft: { title: string; body: string };
   reviewedFiles: string[];
   reviewedFingerprints: Record<string, string>;
+  /** Learner notes keyed by diff path; absent on runs saved before notes existed. */
+  notes?: Record<string, LearnerNote>;
   approvedFingerprint?: string;
   reports?: Record<string, string>;
   prUrl?: string;
@@ -67,7 +72,12 @@ export interface Run {
   headRepository?: string;
   contributionSettings?: ContributionSettings;
   team?: AgentTeam;
+  /** Follow-up Q&A per diff path; absent on runs saved before it was persisted. */
+  conversations?: Record<string, FileConversation>;
 }
+
+/** What GET /api/runs returns for each run (see shared/runs.ts). */
+export type RunSummary = Omit<Run, RunDetailField>;
 
 export interface DiffFile {
   explanation?: ChangeExplanation;

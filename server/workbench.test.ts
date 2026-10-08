@@ -27,7 +27,12 @@ async function http(
     body?: string;
   } = {},
 ) {
-  return new Promise<{ status: number; json: () => any }>((resolve, reject) => {
+  return new Promise<{
+    status: number;
+    headers: Record<string, string | string[] | undefined>;
+    json: () => any;
+    text: () => string;
+  }>((resolve, reject) => {
     const req = request(
       url,
       { method: options.method, headers: options.headers },
@@ -40,7 +45,9 @@ async function http(
         response.on("end", () =>
           resolve({
             status: response.statusCode!,
+            headers: response.headers,
             json: () => JSON.parse(body),
+            text: () => body,
           }),
         );
       },
@@ -442,6 +449,52 @@ test("HTTP API restricts localhost origins, requires JSON mutations, and validat
     assert.equal(invalid.status, 400);
     const absent = await http(`${url}/api/runs/missing`, { headers: local });
     assert.equal(absent.status, 404);
+    // The list carries summaries; the single run and the export keep the detail.
+    f.run.reports = { reviewer: "靜態審查報告" };
+    f.run.conversations = {
+      "hello.ts": {
+        fingerprint: "f1",
+        updatedAt: new Date().toISOString(),
+        messages: [
+          { role: "user", content: "這段在做什麼？", fingerprint: "f1" },
+          { role: "assistant", content: "回傳問候語。", fingerprint: "f1" },
+        ],
+      },
+    };
+    const list = await http(`${url}/api/runs`, { headers: local });
+    assert.equal(list.status, 200);
+    const [summary] = list.json().runs as Record<string, unknown>[];
+    assert.equal(summary.id, f.run.id);
+    for (const field of ["logs", "reports", "draftPreparation", "conversations"])
+      assert.equal(field in summary, false, field);
+    for (const field of ["title", "repoId", "branch", "status", "createdAt"])
+      assert.ok(field in summary, field);
+    const single = await http(`${url}/api/runs/${f.run.id}`, {
+      headers: local,
+    });
+    assert.deepEqual(single.json().run.logs, []);
+    assert.equal(
+      single.json().run.conversations["hello.ts"].messages.length,
+      2,
+    );
+    const exported = await http(`${url}/api/runs/${f.run.id}/export.md`, {
+      headers: local,
+    });
+    assert.equal(exported.status, 200);
+    assert.match(String(exported.headers["content-type"]), /^text\/markdown/);
+    assert.equal(
+      exported.headers["content-disposition"],
+      'attachment; filename="bell-learning-test-run.md"',
+    );
+    assert.match(exported.text(), /^# 學習紀錄：Improve greeting\n/);
+    assert.match(
+      exported.text(),
+      /## 問答紀錄\n\n### `hello\.ts`\n\n\*\*你：\*\*\n\n這段在做什麼？/,
+    );
+    const missingExport = await http(`${url}/api/runs/missing/export.md`, {
+      headers: local,
+    });
+    assert.equal(missingExport.status, 404);
     for (const [endpoint, body] of [
       ["review", { filePath: "hello.ts", reviewed: true }],
       ["approve", {}],
@@ -480,6 +533,71 @@ test("HTTP API restricts localhost origins, requires JSON mutations, and validat
       },
     );
     assert.equal(unknownExplanation.status, 404);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await f.cleanup();
+  }
+});
+
+test("learner notes persist with the diff fingerprint, respect the status gate and never touch review state", async () => {
+  const f = await fixture();
+  const app = createApp(f.workbench, {
+    staticDirectory: path.join(f.directory, "missing"),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing server port");
+  const url = `http://127.0.0.1:${address.port}/api/runs/${f.run.id}/notes`;
+  const patch = (body: unknown) =>
+    http(url, {
+      method: "PATCH",
+      headers: { host: "127.0.0.1:4311", "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  try {
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    const fingerprint = (await readDiff(f.run))[0].fingerprint;
+    await f.workbench.review(f.run.id, "hello.ts", true, fingerprint);
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    assert.equal(f.run.status, "approved");
+    const approved = f.run.approvedFingerprint;
+
+    const tooLong = await patch({ filePath: "hello.ts", text: "字".repeat(2001) });
+    assert.equal(tooLong.status, 400);
+    const missing = await patch({ filePath: "missing.ts", text: "筆記" });
+    assert.equal(missing.status, 404);
+
+    const saved = await patch({ filePath: "hello.ts", text: "問候語改成 after。" });
+    assert.equal(saved.status, 200);
+    const note = saved.json().run.notes["hello.ts"];
+    assert.equal(note.text, "問候語改成 after。");
+    assert.equal(note.fingerprint, fingerprint);
+    assert.ok(note.updatedAt);
+    // Notes are not reviews: approval and the review map stay as they were.
+    assert.equal(f.run.status, "approved");
+    assert.equal(f.run.approvedFingerprint, approved);
+    assert.deepEqual(f.run.reviewedFiles, ["hello.ts"]);
+
+    const reopened = new Store(f.store.directory);
+    await reopened.initialize();
+    assert.deepEqual(reopened.data.runs[0].notes, {
+      "hello.ts": JSON.parse(JSON.stringify(note)),
+    });
+
+    const cleared = await patch({ filePath: "hello.ts", text: "  " });
+    assert.equal(cleared.status, 200);
+    assert.deepEqual(cleared.json().run.notes, {});
+
+    f.run.status = "running";
+    const gated = await patch({ filePath: "hello.ts", text: "太早了" });
+    assert.equal(gated.status, 409);
+    assert.equal(f.run.notes?.["hello.ts"], undefined);
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));

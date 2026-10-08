@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import {
   maxProjectRecommendations,
+  type InsightsStaleDetail,
   type ProjectInsights,
   type RecommendationPreferences,
 } from "../../shared/insights";
@@ -10,6 +11,8 @@ import { demoInsights } from "./demo";
 interface InsightsResult {
   insights: ProjectInsights | null;
   stale: boolean;
+  /** Only sent with a stale result when git could list the changes; absent means unknown. */
+  staleDetail?: InsightsStaleDetail;
   recommendationPreferences?: RecommendationPreferences;
 }
 
@@ -102,6 +105,8 @@ export class ProjectInsightsCache {
         if (this.revisions.get(repoId) === revision)
           this.update(repoId, {
             ...result,
+            // A fresh or unknown result must not keep an older change listing.
+            staleDetail: result.staleDetail,
             recommendationPreferences: result.recommendationPreferences ?? {
               order: [],
               hidden: [],
@@ -216,6 +221,7 @@ export class ProjectInsightsCache {
         if (this.revisions.get(repoId) === revision)
           this.update(repoId, {
             ...result,
+            staleDetail: result.staleDetail,
             recommendationPreferences: result.recommendationPreferences ?? {
               order: [],
               hidden: [],

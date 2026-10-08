@@ -26,6 +26,7 @@ import {
   projectRecommendationBatchSize,
   type ContributionBrief,
   type ContributionRecommendation,
+  type InsightsStaleDetail,
   type ProjectInsights,
   type RecommendationPreferences,
 } from "../../shared/insights";
@@ -52,6 +53,8 @@ export interface ProjectOverviewProps {
   savingPreferences: boolean;
   preferenceError: string;
   stale: boolean;
+  /** Absent when the server could not list changes; the notice then says so. */
+  staleDetail?: InsightsStaleDetail;
   onAnalyze: () => void;
   onRecommendMore: () => void;
   onSavePreferences: (preferences: RecommendationPreferences) => void;
@@ -86,6 +89,25 @@ function sampleCoverage(sample: ProjectInsights["sample"]) {
   const truncated =
     sample.truncatedFiles > 0 ? `，${count(sample.truncatedFiles)} 檔節錄` : "";
   return `讀取 ${count(sample.sampledFiles)} / ${count(sample.trackedFiles)} 個追蹤檔（約 ${count(Math.max(1, Math.round(sample.bytes / 1024)))} KB${truncated}）`;
+}
+
+/**
+ * Explains how far the repository has moved from the analyzed version. Every
+ * variant still asks for a re-analysis: an unchanged cited file does not make
+ * the rest of the overview current.
+ */
+function staleNotice(baseSha: string, detail?: InsightsStaleDetail) {
+  const version = baseSha ? `分析版本 ${baseSha.slice(0, 7)}` : "分析版本";
+  if (!detail)
+    return `專案內容已更新。這份分析來自先前版本，無法列出變更明細；重新分析後再確認貢獻方向。`;
+  if (detail.changedFiles === 0)
+    return `版本已變更，但分析引用的檔案內容相同；全貌仍可能受其他變更影響，重新分析後再確認貢獻方向。`;
+  const changed = `自${version}後有至少 ${detail.changedFiles.toLocaleString("zh-TW")} 個檔案變動`;
+  if (!detail.citedChanged.length)
+    return `${changed}。分析引用的檔案未變動，但全貌仍可能受其他變更影響，重新分析後再確認貢獻方向。`;
+  // The server lists at most 12 cited files.
+  const cited = `${detail.citedChanged.length}${detail.citedChanged.length >= 12 ? " 個以上" : " 個"}`;
+  return `${changed}，其中 ${cited}是本份分析引用的檔案：${detail.citedChanged.join("、")}。重新分析後再確認貢獻方向。`;
 }
 
 function EvidencePaths({
@@ -249,6 +271,7 @@ export function ProjectOverview({
   savingPreferences,
   preferenceError,
   stale,
+  staleDetail,
   onAnalyze,
   onRecommendMore,
   onSavePreferences,
@@ -373,6 +396,17 @@ export function ProjectOverview({
   };
   const dateLabel = analysisDate(insights?.generatedAt);
   const expansion = insights?.recommendationExpansion;
+  // Proposals whose quotes failed the server check: only their title and reason are known.
+  const droppedIdeas = [
+    ...(insights?.verification?.droppedRecommendations ?? []).map((entry) => ({
+      ...entry,
+      round: "專案分析",
+    })),
+    ...(expansion?.verification?.droppedRecommendations ?? []).map((entry) => ({
+      ...entry,
+      round: "最近一次追加",
+    })),
+  ];
   const addedIds = new Set(
     recommending || recommendationError ? [] : (expansion?.addedIds ?? []),
   );
@@ -497,9 +531,7 @@ export function ProjectOverview({
       {stale && insights && (
         <div className="mission-alert" role="status">
           <RefreshCw size={15} />
-          <span>
-            專案內容已更新。這份分析來自先前版本，重新分析後再確認貢獻方向。
-          </span>
+          <span>{staleNotice(insights.baseSha, staleDetail)}</span>
         </div>
       )}
 
@@ -639,6 +671,75 @@ export function ProjectOverview({
                     )}
                   </li>
                 ))}
+              </ol>
+            </section>
+          )}
+
+          {!!insights.readingPath?.length && (
+            <section
+              className="mission-reading-path"
+              aria-labelledby="mission-reading-title"
+            >
+              <div className="mission-section-heading">
+                <div>
+                  <span className="mission-kicker">WHERE TO START READING</span>
+                  <h2 id="mission-reading-title">
+                    <BookOpen size={18} />
+                    第一次讀這個專案，建議這樣讀
+                  </h2>
+                  <p>
+                    依 Agent 讀過的抽樣檔案排出順序；每一步說明為什麼先看它、看什麼。
+                  </p>
+                </div>
+              </div>
+              {insights.howItFitsTogether && (
+                <div className="mission-reading-flow">
+                  <span>模組怎麼串起來</span>
+                  <p>{insights.howItFitsTogether}</p>
+                </div>
+              )}
+              <ol className="mission-reading-steps">
+                {insights.readingPath.map((step, index) => {
+                  const module = insights.modules.find(
+                    (entry) => entry.path === step.path,
+                  );
+                  const evidence = insights.evidence.find(
+                    (entry) => entry.path === step.path,
+                  );
+                  return (
+                    <li key={`${step.path}-${index}`}>
+                      <span className="mission-journey-number">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <code>{step.path}</code>
+                      <p>{step.why}</p>
+                      <p>
+                        <strong>看什麼</strong>
+                        {step.lookFor}
+                      </p>
+                      {(module || evidence) && (
+                        <details className="mission-reading-context">
+                          <summary>
+                            這個檔案在分析中的其他說明
+                            <ChevronRight size={14} aria-hidden="true" />
+                          </summary>
+                          {module && (
+                            <p>
+                              <strong>模組分工</strong>
+                              {module.purpose}
+                            </p>
+                          )}
+                          {evidence && (
+                            <p>
+                              <strong>分析依據</strong>
+                              {evidence.note}
+                            </p>
+                          )}
+                        </details>
+                      )}
+                    </li>
+                  );
+                })}
               </ol>
             </section>
           )}
@@ -829,6 +930,26 @@ export function ProjectOverview({
             <div className="mission-alert mission-alert-error mission-more-error" role="alert">
               <span>{preferenceError}</span>
             </div>
+          )}
+          {droppedIdeas.length > 0 && (
+            <details className="mission-dropped-ideas">
+              <summary>
+                引文核對未通過，已略過 {droppedIdeas.length} 個建議
+                <ChevronRight size={14} aria-hidden="true" />
+              </summary>
+              <p>
+                這些建議引用的原文不在送進模型的節錄中，因此只保留標題與原因；其餘分析結果照常儲存，可再「產出新建議」補足。
+              </p>
+              <ul>
+                {droppedIdeas.map((entry) => (
+                  <li key={`${entry.round}-${entry.id}`}>
+                    <strong>{entry.title}</strong>
+                    <span>{entry.round}</span>
+                    <p>{entry.reason}</p>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
           {shownIdeas.length ? (
             <>

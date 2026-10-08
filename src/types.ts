@@ -1,12 +1,18 @@
 import type {
   ChangeExplanation,
   ExplanationStatus,
+  LearnerNote,
+  StoredExplanation,
 } from "../shared/explanations";
 import type { EfficiencyMetrics } from "../shared/efficiency";
 import type { AgentTeam } from "../shared/team";
 import type { ContributionSettings } from "../shared/insights";
 import type { ModelExecution } from "../shared/models";
 import type { DraftPreparation } from "../shared/drafts";
+import type { FileConversation } from "../shared/chat";
+import type { RunDetailField } from "../shared/runs";
+
+export type { ChatMessage } from "../shared/chat";
 export interface Repo {
   id: string;
   name: string;
@@ -53,11 +59,20 @@ export interface Run {
   logs: { time: string; agent: string; message: string }[];
   draft: { title: string; body: string };
   reviewedFiles: string[];
+  /** Learner notes keyed by diff path; absent on runs saved before notes existed. */
+  notes?: Record<string, LearnerNote>;
   /** Final role answers keyed by role; also holds teammate task ids and guide answers. */
   reports?: Record<string, string>;
+  /** Stored per-file explanations keyed by path; the learning page aggregates the ready ones. */
+  explanations?: Record<string, StoredExplanation>;
   prUrl?: string;
   error?: string;
+  /** Follow-up Q&A per diff path; absent on runs saved before it was persisted. */
+  conversations?: Record<string, FileConversation>;
 }
+
+/** What GET /api/runs returns for each run (see shared/runs.ts). */
+export type RunSummary = Omit<Run, RunDetailField>;
 
 export interface DiffFile {
   fingerprint?: string;
@@ -72,9 +87,4 @@ export interface DiffFile {
   explanationError?: string;
   hunks?: unknown;
   blocked?: string;
-}
-
-export interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
 }

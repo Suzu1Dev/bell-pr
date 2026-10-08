@@ -15,6 +15,7 @@ import {
   explanationPrompt,
   guidePrompt,
   parseExplanations,
+  synchronizeExplanations,
 } from "./explanations.js";
 import type { DiffFile, Run } from "./types.js";
 import type { TeamAgentRunner } from "./team.js";
@@ -37,6 +38,14 @@ const example = {
   before: "原本提供的數字是 1。",
   after: "現在提供的數字是 2；其他顯示方式不變。",
 };
+const alternatives =
+  "也可以改成由呼叫端傳入數字；這次沒有這樣做，因為只有一個呼叫者。當數字需要依環境變動時再改採。";
+const lookup = ["dependency injection", "configuration"];
+const selfCheck = {
+  question: "這次修改後，呼叫者拿到的數字是多少？",
+  answer: "是 2；diff 只改了常數值，呼叫方式不變。",
+};
+const context = "Consistent output\nUser request:\nImprove a";
 
 test("explanations retain bounded complete diffs, exclude blocked content, and reject missing or invented file responses", () => {
   const files = Array.from({ length: 9 }, (_, i) => diff(`${i}.ts`));
@@ -48,8 +57,20 @@ test("explanations retain bounded complete diffs, exclude blocked content, and r
     explanationBatches([...files, blocked]).map((batch) => batch.length),
     [8, 1],
   );
-  const prompt = explanationPrompt(explanationBatches([blocked, files[0]])[0]);
+  const prompt = explanationPrompt(
+    explanationBatches([blocked, files[0]])[0],
+    context,
+  );
   assert.doesNotMatch(prompt, /hidden secret|\.env/);
+  // Task context is background before the diffs, never after them.
+  assert.match(
+    prompt,
+    /Task context \(background[^\n]*\nConsistent output\nUser request:\nImprove a\nProvided diffs:\n\[\{"path":"0\.ts"/,
+  );
+  assert.match(prompt, /user-stated or inferred/);
+  assert.match(prompt, /"alternatives":"at least one other viable approach/);
+  assert.match(prompt, /"lookup":\["1 to 3 searchable keywords/);
+  assert.match(prompt, /"selfCheck":\{"question":"one question/);
   assert.throws(
     () => explanationBatches([diff("huge.ts", "字".repeat(40_000))]),
     /100 KB/,
@@ -63,13 +84,31 @@ test("explanations retain bounded complete diffs, exclude blocked content, and r
         concept: "命名表達意圖",
         tip: "確認呼叫處",
         example,
+        alternatives,
+        lookup,
+        selfCheck,
       },
     ],
   };
-  assert.equal(
-    parseExplanations(JSON.stringify(answer), [files[0]])[0].summary,
-    "更清楚的輸出",
-  );
+  const parsed = parseExplanations(JSON.stringify(answer), [files[0]])[0];
+  assert.equal(parsed.summary, "更清楚的輸出");
+  assert.deepEqual(parsed.lookup, lookup);
+  assert.deepEqual(parsed.selfCheck, selfCheck);
+  // Alternatives, lookup keywords and the self-check are required on the
+  // model output side, exactly like the example.
+  for (const incomplete of [
+    { ...answer.files[0], alternatives: undefined },
+    { ...answer.files[0], lookup: [] },
+    { ...answer.files[0], lookup: ["a", "b", "c", "d"] },
+    { ...answer.files[0], selfCheck: undefined },
+    { ...answer.files[0], selfCheck: { question: "只有問題" } },
+    { ...answer.files[0], selfCheck: { ...selfCheck, answer: " " } },
+  ])
+    assert.throws(
+      () =>
+        parseExplanations(JSON.stringify({ files: [incomplete] }), [files[0]]),
+      /格式不完整/,
+    );
   for (const invalidExample of [
     undefined,
     { scenario: "情境", before: "原本" },
@@ -101,6 +140,34 @@ test("explanations retain bounded complete diffs, exclude blocked content, and r
       ),
     /完整對應/,
   );
+});
+
+test("ready cards saved without alternatives or a self-check stay ready; only a missing example migrates", () => {
+  const files = [diff("a.ts"), diff("b.ts")];
+  const legacy = {
+    summary: "舊摘要",
+    reason: "舊原因",
+    concept: "舊概念",
+    tip: "舊建議",
+  };
+  const run = {
+    explanations: {
+      "a.ts": {
+        fingerprint: files[0].fingerprint,
+        status: "ready",
+        content: { ...legacy, example },
+      },
+      "b.ts": {
+        fingerprint: files[1].fingerprint,
+        status: "ready",
+        content: legacy,
+      },
+    },
+  } as unknown as Run;
+  synchronizeExplanations(run, files);
+  assert.equal(files[0].explanationStatus, "ready");
+  assert.equal(files[0].explanation?.selfCheck, undefined);
+  assert.equal(files[1].explanationStatus, "pending");
 });
 
 test("guide prompt carries contribution context, the ready explanation card and named reports before the conversation", () => {
@@ -185,6 +252,9 @@ function response(prompt: string) {
       concept: "單一責任\n每個模組維持相同契約。",
       tip: "確認呼叫者的既有測試。",
       example,
+      alternatives,
+      lookup,
+      selfCheck,
     })),
   });
 }
@@ -259,6 +329,11 @@ test("completed runs generate one isolated batch, deduplicate callers, persist r
     assert.equal(input.readonly, true);
     assert.deepEqual(await readdir(input.cwd), ["response-schema.json"]);
     assert.doesNotMatch(input.prompt, /\.env|hidden secret|large\.txt/);
+    // The run title and the shared contribution context precede the diffs.
+    assert.match(
+      input.prompt,
+      /Consistent output\nUser request:\nImprove output consistency\nContribution settings[^\n]*\n\{\}\nProvided diffs:/,
+    );
     return response(input.prompt);
   });
   try {
@@ -277,6 +352,10 @@ test("completed runs generate one isolated batch, deduplicate callers, persist r
     assert.equal(
       first.files.find((file) => file.path === "a.ts")?.explanation?.summary,
       "更新輸出",
+    );
+    assert.deepEqual(
+      first.files.find((file) => file.path === "a.ts")?.explanation?.selfCheck,
+      selfCheck,
     );
     assert.equal(
       second.files.find((file) => file.path === ".env")?.explanationStatus,
@@ -555,6 +634,108 @@ test("a request waiting for the run lock cannot start a new explanation agent af
     assert.equal(calls, 0);
   } finally {
     release();
+    await f.cleanup();
+  }
+});
+
+test("file Q&A is saved on the run, read back after a reload, skips turns about an older diff and trims to the cap", async () => {
+  const prompts: string[] = [];
+  let answer = "第一個回答";
+  const runner: TeamAgentRunner = async (input) => {
+    assert.equal(input.role, "guide");
+    prompts.push(input.prompt);
+    return answer;
+  };
+  const f = await fixture(runner);
+  let reloaded: Workbench | undefined;
+  try {
+    const fingerprint = (await f.workbench.diff(f.run.id)).find(
+      (file) => file.path === "a.ts",
+    )!.fingerprint;
+    await f.workbench.chat(
+      f.run.id,
+      "a.ts",
+      "為什麼這樣寫？我的 token 是 ghp_1234567890abcdefghij",
+    );
+    answer = "第二個回答";
+    await f.workbench.chat(f.run.id, "a.ts", "還有別的做法嗎？");
+    assert.match(prompts[0], /Prior conversation:\n\nQuestion: 為什麼這樣寫？/);
+    // The stored question is redacted before it is fed back as context.
+    assert.match(
+      prompts[1],
+      /Prior conversation:\nUser: 為什麼這樣寫？我的 token 是 \[REDACTED\]\nMentor: 第一個回答\nQuestion: 還有別的做法嗎？\n/,
+    );
+    assert.doesNotMatch(prompts[1], /ghp_/);
+
+    const saved = new Store(f.store.directory);
+    await saved.initialize();
+    const conversation = saved.data.runs[0].conversations?.["a.ts"];
+    assert.equal(conversation?.fingerprint, fingerprint);
+    assert.ok(conversation?.updatedAt);
+    assert.deepEqual(
+      conversation?.messages.map((message) => [message.role, message.content]),
+      [
+        ["user", "為什麼這樣寫？我的 token 是 [REDACTED]"],
+        ["assistant", "第一個回答"],
+        ["user", "還有別的做法嗎？"],
+        ["assistant", "第二個回答"],
+      ],
+    );
+    assert.ok(
+      conversation?.messages.every(
+        (message) => message.fingerprint === fingerprint,
+      ),
+    );
+    assert.equal(saved.data.runs[0].conversations?.["b.ts"], undefined);
+
+    // A fresh Workbench over the saved state continues the same conversation.
+    reloaded = new Workbench(saved, runner);
+    answer = "第三個回答";
+    await reloaded.chat(f.run.id, "a.ts", "第三個問題");
+    assert.match(
+      prompts[2],
+      /Prior conversation:\nUser: 為什麼這樣寫？.*\nMentor: 第一個回答\nUser: 還有別的做法嗎？\nMentor: 第二個回答\nQuestion: 第三個問題\n/,
+    );
+
+    // A changed diff keeps the old turns on the record but out of the prompt.
+    await writeFile(
+      path.join(f.repository, "a.ts"),
+      "export const value = 3;\n",
+    );
+    answer = "新版本的回答";
+    await reloaded.chat(f.run.id, "a.ts", "新版本的問題");
+    assert.match(prompts[3], /Prior conversation:\n\nQuestion: 新版本的問題\n/);
+    const updated = saved.data.runs[0].conversations!["a.ts"];
+    assert.equal(updated.messages.length, 8);
+    assert.notEqual(updated.fingerprint, fingerprint);
+    assert.deepEqual(
+      updated.messages.map((message) => message.fingerprint === fingerprint),
+      [true, true, true, true, true, true, false, false],
+    );
+    assert.equal(updated.messages[7].fingerprint, updated.fingerprint);
+
+    // The record keeps the newest 20 turns and shortens each stored turn.
+    updated.messages = Array.from({ length: 19 }, (_, index) => ({
+      role: index % 2 ? "assistant" : "user",
+      content: `舊訊息 ${index}`,
+      fingerprint: updated.fingerprint,
+    }));
+    answer = "長".repeat(9_000);
+    const full = await reloaded.chat(f.run.id, "a.ts", "最後一問");
+    assert.equal(full.length, 9_000);
+    const capped = saved.data.runs[0].conversations!["a.ts"].messages;
+    assert.equal(capped.length, 20);
+    assert.equal(capped[0].content, "舊訊息 1");
+    assert.equal(capped[18].content, "最後一問");
+    assert.equal(capped[19].content.length, 8_000);
+    const persisted = new Store(f.store.directory);
+    await persisted.initialize();
+    assert.equal(
+      persisted.data.runs[0].conversations?.["a.ts"].messages.length,
+      20,
+    );
+  } finally {
+    await reloaded?.shutdown();
     await f.cleanup();
   }
 });

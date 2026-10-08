@@ -19,6 +19,11 @@ import {
 } from "./team.js";
 import { createTeamSnapshot, integrateTeamTask } from "./team-workspace.js";
 import type { TeamTask } from "../shared/team.js";
+import {
+  conversationContentLimit,
+  conversationMessageLimit,
+  type ChatMessage,
+} from "../shared/chat.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import { defaultPonytailMode } from "../shared/efficiency.js";
 import { addEfficiency, applyPonytail, trackEfficiency } from "./efficiency.js";
@@ -54,6 +59,14 @@ import {
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
+/** Statuses whose diff is final enough to explain, discuss and annotate. */
+const readableStatuses: Run["status"][] = [
+  "review",
+  "approved",
+  "published",
+  "failed",
+  "cancelled",
+];
 const json = <T>(value: string) => JSON.parse(value) as T;
 const networkConfig = [
   "-c",
@@ -74,10 +87,6 @@ export class Workbench {
   private jobs = new Set<Promise<void>>();
   private runJobs = new Map<string, Set<Promise<void>>>();
   private locks = new Map<string, Promise<unknown>>();
-  private conversations = new Map<
-    string,
-    { fingerprint: string; messages: string[] }
-  >();
   private explanationJobs = new Map<string, Promise<void>>();
   private draftJobs = new Map<string, Promise<void>>();
   private statusCache?: {
@@ -1075,12 +1084,7 @@ export class Workbench {
   ) {
     if (this.stopping) throw new AppError("服務正在關閉，請稍後重試。", 503);
     const run = this.run(id);
-    if (
-      !["review", "approved", "published", "failed", "cancelled"].includes(
-        run.status,
-      ) ||
-      run.publishing
-    )
+    if (!readableStatuses.includes(run.status) || run.publishing)
       throw new AppError("請等待開發完成後再產生變更解說。", 409);
     const files = await this.lock(id, () => this.diff(id));
     if (this.stopping) throw new AppError("服務正在關閉，請稍後重試。", 503);
@@ -1167,7 +1171,10 @@ export class Workbench {
           const answer = await this.runAgent(
             run,
             "explanations",
-            explanationPrompt(batch),
+            explanationPrompt(
+              batch,
+              `${run.title}\n${this.contributionContext(run)}`,
+            ),
             controller.signal,
             true,
             {
@@ -1431,24 +1438,52 @@ export class Workbench {
     });
   }
 
+  /**
+   * Saves the learner's own words about one file together with the diff
+   * fingerprint they described. Notes never change the review state: the
+   * run status and approval stay as they are, unlike review() and draft().
+   */
+  async saveNote(id: string, filePath: string, text: string) {
+    return this.lock(id, async () => {
+      const run = this.run(id);
+      if (!readableStatuses.includes(run.status))
+        throw new AppError("請等待開發完成後再寫下理解。", 409);
+      const file = (await this.diff(id)).find(
+        (value) => value.path === filePath,
+      );
+      if (!file) throw new AppError("找不到此差異檔案。", 404);
+      const notes = (run.notes ??= {});
+      if (text.trim())
+        notes[filePath] = {
+          text,
+          fingerprint: file.fingerprint,
+          updatedAt: now(),
+        };
+      else delete notes[filePath];
+      await this.store.save();
+      return run;
+    });
+  }
+
   async chat(id: string, filePath: string, question: string) {
     return this.lock(id, async () => {
       const run = this.run(id);
-      if (
-        !["review", "approved", "published", "failed", "cancelled"].includes(
-          run.status,
-        )
-      )
+      if (!readableStatuses.includes(run.status))
         throw new AppError("請等待開發完成後再追問。", 409);
       const file = (await this.diff(id)).find(
         (value) => value.path === filePath,
       );
       if (!file || file.blocked)
         throw new AppError("此檔案目前無法用於追問。", 422);
-      const key = `${id}:${filePath}`;
-      const previous = this.conversations.get(key);
-      const messages =
-        previous?.fingerprint === file.fingerprint ? previous.messages : [];
+      // The run record is the only copy of the conversation: turns about an
+      // older version of the file stay readable but are not fed back.
+      const stored = run.conversations?.[filePath]?.messages ?? [];
+      const messages = stored
+        .filter((message) => message.fingerprint === file.fingerprint)
+        .map(
+          (message) =>
+            `${message.role === "user" ? "User" : "Mentor"}: ${message.content}`,
+        );
       const controller = new AbortController();
       const controllerKey = `guide:${id}`;
       this.controllers.set(controllerKey, controller);
@@ -1469,14 +1504,22 @@ export class Workbench {
       } finally {
         this.controllers.delete(controllerKey);
       }
-      this.conversations.set(key, {
+      const turn = (role: ChatMessage["role"], content: string): ChatMessage => ({
+        role,
+        content: redact(content).slice(0, conversationContentLimit),
         fingerprint: file.fingerprint,
-        messages: [...messages, `User: ${question}`, `Mentor: ${answer}`].slice(
-          -8,
-        ),
       });
-      if (this.conversations.size > 100)
-        this.conversations.delete(this.conversations.keys().next().value!);
+      run.conversations ??= {};
+      run.conversations[filePath] = {
+        fingerprint: file.fingerprint,
+        messages: [
+          ...stored,
+          turn("user", question),
+          turn("assistant", answer),
+        ].slice(-conversationMessageLimit),
+        updatedAt: now(),
+      };
+      await this.store.save();
       return answer;
     });
   }
