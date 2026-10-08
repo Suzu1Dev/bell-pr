@@ -318,11 +318,23 @@ export default function App() {
   });
   const [draftTitle, setDraftTitle] = useState(run.draft.title);
   const [draftBody, setDraftBody] = useState(run.draft.body);
+  // Empty means "use the PR title alone", matching the server fallback.
+  const [draftCommitMessage, setDraftCommitMessage] = useState(
+    run.draft.commitMessage ?? "",
+  );
   const [draftPreview, setDraftPreview] = useState(false);
   const persistedDraft = useRef({ id: run.id, ...run.draft });
   const draftMutationEpoch = useRef(0);
-  const editorDraft = useRef({ title: draftTitle, body: draftBody });
-  editorDraft.current = { title: draftTitle, body: draftBody };
+  const editorDraft = useRef({
+    title: draftTitle,
+    body: draftBody,
+    commitMessage: draftCommitMessage,
+  });
+  editorDraft.current = {
+    title: draftTitle,
+    body: draftBody,
+    commitMessage: draftCommitMessage,
+  };
   const pendingDrafts = useRef(new Set<string>());
   const [draftRequests, setDraftRequests] = useState<Set<string>>(new Set());
   const rerunPending = useRef(new Set<string>());
@@ -376,7 +388,13 @@ export default function App() {
   const halted = ["failed", "cancelled"].includes(run.status);
   const preparingDraft = run.draftPreparation?.status === "generating";
   const draftDirty =
-    draftTitle !== run.draft.title || draftBody !== run.draft.body;
+    draftTitle !== run.draft.title ||
+    draftBody !== run.draft.body ||
+    draftCommitMessage.trim() !== (run.draft.commitMessage ?? "");
+  const commitMessageSuggestion =
+    run.draftPreparation?.status === "ready"
+      ? run.draftPreparation.proposal?.commitMessageSuggestion
+      : undefined;
   const closeModal = useCallback(() => {
     settingsRequest.current++;
     setModal(null);
@@ -462,13 +480,16 @@ export default function App() {
     // Background draft generation must not discard text the user is editing.
     if (
       previous.id !== run.id ||
-      (edited.title === previous.title && edited.body === previous.body)
+      (edited.title === previous.title &&
+        edited.body === previous.body &&
+        edited.commitMessage.trim() === (previous.commitMessage ?? ""))
     ) {
       setDraftTitle(run.draft.title);
       setDraftBody(run.draft.body);
+      setDraftCommitMessage(run.draft.commitMessage ?? "");
     }
     persistedDraft.current = { id: run.id, ...run.draft };
-  }, [run.id, run.draft.title, run.draft.body]);
+  }, [run.id, run.draft.title, run.draft.body, run.draft.commitMessage]);
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -989,7 +1010,11 @@ export default function App() {
           api<{ files: DiffFile[] }>(`/runs/${id}/diff`),
         ]);
         if (sequence !== selectionSequence.current || intent !== navigationIntent.current) return false;
-        if (editorDraft.current.title !== draftAtStart.title || editorDraft.current.body !== draftAtStart.body) {
+        if (
+          editorDraft.current.title !== draftAtStart.title ||
+          editorDraft.current.body !== draftAtStart.body ||
+          editorDraft.current.commitMessage !== draftAtStart.commitMessage
+        ) {
           notify("草稿在切換期間已更新，已保留目前任務。");
           return false;
         }
@@ -1308,27 +1333,40 @@ export default function App() {
   function applyDraftProposal(proposal: DraftProposal) {
     setDraftTitle(proposal.title);
     setDraftBody(proposal.body);
+    // Like the server's automatic apply, a message the person wrote is kept.
+    if (proposal.commitMessageSuggestion && !draftCommitMessage.trim())
+      setDraftCommitMessage(proposal.commitMessageSuggestion.message);
     setDraftPreview(true);
     notify("建議草稿已放入編輯區，確認後請儲存草稿。");
+  }
+  function applyCommitMessageSuggestion() {
+    if (!commitMessageSuggestion) return;
+    setDraftCommitMessage(commitMessageSuggestion.message);
+    notify("建議的提交訊息已放入欄位，可自行補上簽署後儲存。");
   }
   async function saveDraft() {
     if (!draftTitle.trim() || !draftBody.trim()) {
       notify("請填寫 PR 標題與說明。", "error");
       return;
     }
+    const commitMessage = draftCommitMessage.trim();
     setBusy(true);
     draftMutationEpoch.current++;
     try {
       if (demo)
         setRun((previous) => ({
           ...previous,
-          draft: { title: draftTitle, body: draftBody },
+          draft: {
+            title: draftTitle,
+            body: draftBody,
+            ...(commitMessage ? { commitMessage } : {}),
+          },
           status: "review",
         }));
       else {
         const { run: updated } = await api<{ run: Run }>(
           `/runs/${run.id}/draft`,
-          send("PATCH", { title: draftTitle, body: draftBody }),
+          send("PATCH", { title: draftTitle, body: draftBody, commitMessage }),
         );
         if (runIdRef.current === updated.id) setRun(updated);
       }
@@ -1348,7 +1386,13 @@ export default function App() {
       else {
         const { run: updated } = await api<{ run: Run }>(
           `/runs/${run.id}/approve`,
-          send("POST", { draft: { title: draftTitle, body: draftBody } }),
+          send("POST", {
+            draft: {
+              title: draftTitle,
+              body: draftBody,
+              commitMessage: draftCommitMessage.trim(),
+            },
+          }),
         );
         if (runIdRef.current !== updated.id) return;
         setRun(updated);
@@ -2442,6 +2486,48 @@ export default function App() {
                             onChange={(e) => setDraftBody(e.target.value)}
                             disabled={run.status === "published"}
                           />
+                        )}
+                        <label
+                          className="field-label"
+                          htmlFor="pr-commit-message"
+                        >
+                          提交訊息 <span>git commit</span>
+                        </label>
+                        <textarea
+                          id="pr-commit-message"
+                          className="draft-textarea draft-commit-message"
+                          aria-describedby="pr-commit-message-help"
+                          value={draftCommitMessage || draftTitle}
+                          onChange={(e) =>
+                            setDraftCommitMessage(e.target.value)
+                          }
+                          disabled={run.status === "published"}
+                        />
+                        <p id="pr-commit-message-help" className="field-help">
+                          第一行是主旨，空一行後寫說明，最後放
+                          trailers。留空時以 PR
+                          標題作為單行提交訊息。Signed-off-by
+                          等簽署由你本人輸入，BELL 與模型不會代填。
+                        </p>
+                        {commitMessageSuggestion && (
+                          <div className="commit-suggestion">
+                            <div>
+                              <strong>依專案規範建議的提交訊息</strong>
+                              <p>{commitMessageSuggestion.rationale}</p>
+                            </div>
+                            <pre>{commitMessageSuggestion.message}</pre>
+                            <div className="commit-suggestion-actions">
+                              <span>只會填入欄位，簽署仍由你補上。</span>
+                              <button
+                                type="button"
+                                className="button secondary"
+                                disabled={run.status === "published"}
+                                onClick={applyCommitMessageSuggestion}
+                              >
+                                採用建議
+                              </button>
+                            </div>
+                          </div>
                         )}
                         <div className="draft-save-row">
                           <span>

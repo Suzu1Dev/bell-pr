@@ -1473,6 +1473,53 @@ button {
   font-size: 18px;
   margin: 14px 0 8px;
 }
+.draft-commit-message {
+  min-height: 150px;
+  border-radius: 6px;
+}
+.commit-suggestion {
+  margin-top: 10px;
+  padding: 14px 16px;
+  border: 1px dashed #d4dfc9;
+  border-radius: 8px;
+  background: #fbfcf8;
+}
+.commit-suggestion strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 550;
+  color: #4f6442;
+}
+.commit-suggestion p {
+  font-size: 11px;
+  color: #7e8d70;
+  line-height: 1.8;
+  margin: 4px 0 10px;
+}
+.commit-suggestion pre {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.8;
+  color: #506244;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 12px 14px;
+  border: 1px solid #e3eadb;
+  border-radius: 6px;
+  background: white;
+  margin: 0;
+}
+.commit-suggestion-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+.commit-suggestion-actions > span {
+  font-size: 10px;
+  color: #a1ad91;
+}
 .draft-save-row {
   display: flex;
   align-items: center;

@@ -640,6 +640,97 @@ test("deleted file reviews are removed from the review map", () => {
   assert.deepEqual(run.reviewedFiles, []);
 });
 
+test("commit message edits invalidate approval like title edits, are validated over HTTP and keep old fingerprints valid", async () => {
+  const f = await fixture();
+  const app = createApp(f.workbench, {
+    staticDirectory: path.join(f.directory, "missing"),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing server port");
+  const url = `http://127.0.0.1:${address.port}/api/runs/${f.run.id}`;
+  const headers = {
+    host: "127.0.0.1:4311",
+    "content-type": "application/json",
+  };
+  try {
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    const files = await readDiff(f.run);
+    // Runs approved before the field existed must still match their fingerprint.
+    const legacy = reviewFingerprint(files, { ...f.run.draft });
+    assert.equal(
+      reviewFingerprint(files, { ...f.run.draft, commitMessage: "" }),
+      legacy,
+    );
+    assert.equal(
+      reviewFingerprint(files, { ...f.run.draft, commitMessage: "  \n" }),
+      legacy,
+    );
+    assert.notEqual(
+      reviewFingerprint(files, { ...f.run.draft, commitMessage: "fix: x" }),
+      legacy,
+    );
+    await f.workbench.review(f.run.id, "hello.ts", true, files[0].fingerprint);
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    const approved = f.run.approvedFingerprint!;
+    assert.equal(approved, legacy);
+    for (const commitMessage of ["fix: x\tbad", "fix: x\r\nbody", "a".repeat(4001)]) {
+      const rejected = await http(`${url}/draft`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ ...f.run.draft, commitMessage }),
+      });
+      assert.equal(rejected.status, 400, commitMessage.slice(0, 12));
+    }
+    assert.equal(f.run.status, "approved");
+    const edited = await http(`${url}/draft`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        ...f.run.draft,
+        commitMessage: "fix(hello): update the greeting\n\nBecause.\n",
+      }),
+    });
+    assert.equal(edited.status, 200);
+    assert.equal(
+      edited.json().run.draft.commitMessage,
+      "fix(hello): update the greeting\n\nBecause.",
+    );
+    assert.equal(f.run.status, "review");
+    assert.equal(f.run.approvedFingerprint, undefined);
+    const stale = await http(`${url}/publish`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ fingerprint: approved }),
+    });
+    assert.equal(stale.status, 409);
+    // Approval must see the message the person is looking at.
+    await assert.rejects(
+      f.workbench.approve(f.run.id, {
+        title: f.run.draft.title,
+        body: f.run.draft.body,
+      }),
+      /草稿已更新/,
+    );
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    assert.notEqual(f.run.approvedFingerprint, approved);
+    // Clearing the message returns to the title-only fingerprint.
+    await f.workbench.draft(f.run.id, { ...f.run.draft, commitMessage: "" });
+    assert.equal(f.run.draft.commitMessage, undefined);
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    assert.equal(f.run.approvedFingerprint, legacy);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await f.cleanup();
+  }
+});
+
 test("publish retry reuses the reviewed commit after a successful push and failed PR creation", async () => {
   const f = await fixture();
   const previousPath = process.env.PATH;
@@ -692,6 +783,14 @@ else if (args[0] === 'pr' && args[1] === 'create') {
       true,
       (await readDiff(f.run))[0].fingerprint,
     );
+    // The person's own message, including their sign-off, becomes the commit message.
+    const commitMessage =
+      "fix(greeting): update the exported greeting\n\nThe old text was out of date.\n\nSigned-off-by: BELL Test <test@example.invalid>";
+    await f.workbench.draft(f.run.id, {
+      ...f.run.draft,
+      commitMessage: `${commitMessage}\n`,
+    });
+    assert.equal(f.run.draft.commitMessage, commitMessage);
     await f.workbench.approve(f.run.id, { ...f.run.draft });
     process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
     const displayedFingerprint = f.run.approvedFingerprint!;
@@ -703,9 +802,31 @@ else if (args[0] === 'pr' && args[1] === 'create') {
     assert.ok(firstCommit);
     assert.equal(f.run.status, "approved");
     assert.equal(f.run.publishing, false);
-    const published = await f.workbench.publish(f.run.id, displayedFingerprint);
+    // The pushed commit cannot take a different message; the person must restore it or start over.
+    await f.workbench.draft(f.run.id, {
+      ...f.run.draft,
+      commitMessage: `${commitMessage}\n\nAmended after the push.`,
+    });
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    await assert.rejects(
+      f.workbench.publish(f.run.id, f.run.approvedFingerprint!),
+      /提交訊息/,
+    );
+    assert.equal(f.run.publishCommit, firstCommit);
+    await f.workbench.draft(f.run.id, { ...f.run.draft, commitMessage });
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    const published = await f.workbench.publish(
+      f.run.id,
+      f.run.approvedFingerprint!,
+    );
     assert.equal(published.status, "published");
     assert.equal(published.publishCommit, firstCommit);
+    assert.equal(
+      (
+        await git(f.repository, ["log", "-1", "--format=%B", firstCommit])
+      ).stdout.trim(),
+      commitMessage,
+    );
     assert.equal(
       published.prUrl,
       "https://github.com/test-owner/example/pull/1",

@@ -60,7 +60,8 @@ export interface Run {
   createdAt: string;
   agents: Agent[];
   logs: { time: string; agent: string; message: string }[];
-  draft: { title: string; body: string };
+  /** Human-written commit message; absent or empty means the PR title alone is used. */
+  draft: { title: string; body: string; commitMessage?: string };
   reviewedFiles: string[];
   /** Learner notes keyed by diff path; absent on runs saved before notes existed. */
   notes?: Record<string, LearnerNote>;

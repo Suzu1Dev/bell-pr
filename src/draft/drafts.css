@@ -505,6 +505,55 @@
   align-items: center;
 }
 
+.draft-guidance-commit {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e5ecde;
+}
+.draft-guidance-panel .draft-guidance-commit h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 550;
+  color: #4f6442;
+  margin-bottom: 10px;
+}
+.draft-guidance-commit pre {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.8;
+  color: #506244;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 12px 14px;
+  border: 1px solid #dce6d4;
+  border-radius: 6px;
+  background: white;
+  margin: 0 0 10px;
+}
+.draft-guidance-panel .draft-guidance-commit p {
+  font-size: 11px;
+  color: #7e8d70;
+  line-height: 1.8;
+}
+.draft-guidance-commit-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.draft-guidance-panel .draft-guidance-commit-why {
+  margin-top: 10px;
+  font-size: 10px;
+  color: #929e87;
+}
+.draft-guidance-commit-why code {
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
 /* The proposal and editable preview share the same readable Markdown treatment. */
 :is(.draft-guidance-panel, .draft-editor) .markdown-content {
   color: #506345;

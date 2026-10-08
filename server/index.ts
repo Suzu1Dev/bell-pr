@@ -98,6 +98,15 @@ export function localhostGuard(
   };
 }
 
+// The commit message is passed to git verbatim, so newline is the only control character allowed.
+const commitMessageField = z
+  .string()
+  .trim()
+  .max(4000)
+  .refine((value) => !/[\u0000-\u0009\u000b-\u001f\u007f]/.test(value), {
+    message: "提交訊息只能包含文字與換行。",
+  });
+
 export function createApp(
   workbench: Workbench,
   {
@@ -279,6 +288,7 @@ export function createApp(
       .object({
         title: z.string().trim().min(1).max(180),
         body: z.string().max(60_000),
+        commitMessage: commitMessageField.optional(),
       })
       .parse(req.body);
     res.json({ run: await workbench.draft(req.params.id, draft) });
@@ -318,6 +328,7 @@ export function createApp(
         draft: z.object({
           title: z.string().min(1).max(180),
           body: z.string().max(60_000),
+          commitMessage: z.string().max(4000).optional(),
         }),
       })
       .parse(req.body);

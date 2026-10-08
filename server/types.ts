@@ -59,7 +59,12 @@ export interface Run {
   createdAt: string;
   agents: Agent[];
   logs: { time: string; agent: string; message: string }[];
-  draft: { title: string; body: string };
+  /**
+   * commitMessage is the full commit message the human wrote (subject, body,
+   * trailers such as Signed-off-by). Absent or empty means the PR title alone
+   * is used, which is how runs saved before this field existed were published.
+   */
+  draft: { title: string; body: string; commitMessage?: string };
   reviewedFiles: string[];
   reviewedFingerprints: Record<string, string>;
   /** Learner notes keyed by diff path; absent on runs saved before notes existed. */

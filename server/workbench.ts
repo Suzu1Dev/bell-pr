@@ -1438,7 +1438,15 @@ export class Workbench {
           run.draft.title === startingDraft.title &&
           run.draft.body === startingDraft.body
         ) {
-          run.draft = { title: proposal.title, body: proposal.body };
+          // A message the person already wrote wins over the suggestion.
+          const commitMessage =
+            run.draft.commitMessage?.trim() ||
+            proposal.commitMessageSuggestion?.message;
+          run.draft = {
+            title: proposal.title,
+            body: proposal.body,
+            ...(commitMessage ? { commitMessage } : {}),
+          };
           this.log(
             run,
             "draft",
@@ -1481,7 +1489,13 @@ export class Workbench {
     return this.lock(id, async () => {
       const run = this.run(id);
       this.editable(run);
-      run.draft = draft;
+      // An empty message is stored as absent so the title-only fallback applies.
+      const commitMessage = draft.commitMessage?.trim();
+      run.draft = {
+        title: draft.title,
+        body: draft.body,
+        ...(commitMessage ? { commitMessage } : {}),
+      };
       run.status = "review";
       delete run.approvedFingerprint;
       await this.store.save();
@@ -1523,7 +1537,9 @@ export class Workbench {
       this.editable(run);
       if (
         displayedDraft.title !== run.draft.title ||
-        displayedDraft.body !== run.draft.body
+        displayedDraft.body !== run.draft.body ||
+        (displayedDraft.commitMessage?.trim() ?? "") !==
+          (run.draft.commitMessage ?? "")
       )
         throw new AppError(
           "PR 草稿已更新；請重新載入並確認最新標題與內容，再重新核准。",
@@ -1875,12 +1891,25 @@ export class Workbench {
               "先前發佈已建立不同的提交。請建立新工作，以避免覆寫可能已推送的分支。",
               409,
             );
+          const priorMessage = (
+            await git(run.worktreePath, ["log", "-1", "--format=%B", commit])
+          ).stdout.trim();
+          if (priorMessage !== (run.draft.commitMessage?.trim() || run.draft.title))
+            throw new AppError(
+              "先前發佈的提交已帶有不同的提交訊息，推送後無法更改。請還原提交訊息，或建立新工作。",
+              409,
+            );
         } else {
           commit = (
             await git(
               run.worktreePath,
               ["commit-tree", tree, "-p", run.baseSha],
-              { input: run.draft.title + "\n" },
+              {
+                // The person's full message (subject, body, their own trailers)
+                // or, when none was written, the title alone as before.
+                input:
+                  (run.draft.commitMessage?.trim() || run.draft.title) + "\n",
+              },
             )
           ).stdout.trim();
         }
