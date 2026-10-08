@@ -292,6 +292,9 @@ export function createApp(
       .parse(req.body);
     res.json({ run: await workbench.saveNote(req.params.id, filePath, text) });
   });
+  app.post("/api/runs/:id/review/rerun", async (req, res) => {
+    res.json({ run: await workbench.rerunReview(req.params.id) });
+  });
   app.post("/api/runs/:id/review", async (req, res) => {
     const { filePath, reviewed, fingerprint } = z
       .object({

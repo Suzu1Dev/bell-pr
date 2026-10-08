@@ -138,6 +138,26 @@ test("既有 version 1 的 state.json 可載入，中斷的工作仍會被標記
   assert.equal(run.logs[0].message, "開始分析");
 });
 
+test("重新審查途中當機時，已完成工作的審查者會被標記失敗而工作狀態不變", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const run = interruptedRun();
+  run.status = "review";
+  run.agents[0].status = "complete";
+  run.agents[1].status = "running";
+  const fixture: Database = { version: 1, repos: [repository], runs: [run] };
+  await writeFile(path.join(directory, "state.json"), JSON.stringify(fixture));
+  const store = new Store(directory);
+  await store.initialize();
+  const [loaded] = store.data.runs;
+  assert.equal(loaded.status, "review");
+  assert.equal(loaded.error, undefined);
+  assert.equal(loaded.agents[0].status, "complete");
+  assert.equal(loaded.agents[1].status, "failed");
+  assert.match(loaded.agents[1].detail, /重新審查已中斷/);
+  assert.equal(loaded.agents[2].status, "waiting");
+});
+
 test("既有 insights 快取檔可由 ProjectInsightsService 讀取", async (t) => {
   const { directory, cleanup } = await dataDirectory();
   t.after(cleanup);

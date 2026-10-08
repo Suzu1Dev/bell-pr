@@ -25,6 +25,7 @@ import {
   CircleHelp,
   Code2,
   Columns2,
+  Copy,
   ExternalLink,
   FileText,
   FolderGit2,
@@ -321,6 +322,8 @@ export default function App() {
   editorDraft.current = { title: draftTitle, body: draftBody };
   const pendingDrafts = useRef(new Set<string>());
   const [draftRequests, setDraftRequests] = useState<Set<string>>(new Set());
+  const rerunPending = useRef(new Set<string>());
+  const [rerunRequests, setRerunRequests] = useState<Set<string>>(new Set());
   const runIdRef = useRef(run.id);
   runIdRef.current = run.id;
   const selectionSequence = useRef(0);
@@ -343,6 +346,16 @@ export default function App() {
   ).length;
   const allReviewed = files.length > 0 && reviewedCount === files.length;
   const active = ["running", "queued", "awaiting_plan"].includes(run.status);
+  const editable = !demo && ["review", "approved"].includes(run.status);
+  // A learner-requested re-review keeps the run in review/approved; only the
+  // two reviewer agents report running, so poll and offer 停止 on that signal.
+  const reviewRerunning =
+    editable &&
+    run.agents.some(
+      (agent) =>
+        (agent.id === "reviewer" || agent.id === "tester") &&
+        agent.status === "running",
+    );
   // Progress strip index: 0 定義任務, 1 Agent 開發, 2 理解與審查, 3 送出貢獻;
   // 4 marks every step done. Failed and cancelled runs stay on step 02.
   const currentStep: number = (
@@ -494,7 +507,7 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    if (demo || (!active && !preparingDraft)) return;
+    if (demo || (!active && !preparingDraft && !reviewRerunning)) return;
     let cancelled = false;
     let observedStatus = run.status;
     let polling = false;
@@ -546,7 +559,7 @@ export default function App() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [run.id, demo, active, preparingDraft]);
+  }, [run.id, demo, active, preparingDraft, reviewRerunning]);
 
   const prepareExplanations = useCallback(
     async (id: string, retry = false, filePath?: string) => {
@@ -1024,6 +1037,44 @@ export default function App() {
       notify((error as Error).message, "error");
     }
   }
+  async function copyWorktreePath() {
+    if (!run.worktreePath) return;
+    try {
+      await navigator.clipboard.writeText(run.worktreePath);
+      notify("已複製工作目錄路徑");
+    } catch {
+      notify("無法使用剪貼簿，請直接選取路徑複製。", "error");
+    }
+  }
+  async function rerunReview() {
+    if (demo) {
+      notify("目前是示範資料。匯入自己的 repository 後可重新執行審查。");
+      return;
+    }
+    const id = run.id;
+    if (rerunPending.current.has(id) || reviewRerunning) return;
+    rerunPending.current.add(id);
+    setRerunRequests((previous) => new Set(previous).add(id));
+    try {
+      await api<{ run: Run }>(`/runs/${id}/review/rerun`, send("POST"));
+      // The server refreshes the diff before reviewing; show the same version.
+      const result = await api<{ files: DiffFile[] }>(`/runs/${id}/diff`);
+      const current = await api<{ run: Run }>(`/runs/${id}`);
+      if (runIdRef.current !== id) return;
+      setFiles(result.files);
+      setRun(current.run);
+      notify("已開始依目前差異重新審查，報告完成後會出現在「審查者怎麼看」。");
+    } catch (error) {
+      notify((error as Error).message, "error");
+    } finally {
+      rerunPending.current.delete(id);
+      setRerunRequests((previous) => {
+        const next = new Set(previous);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
   async function importRepo(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -1356,7 +1407,11 @@ export default function App() {
           setSelectedPath(result.files[0]?.path || "");
         }
       }
-      notify("任務已停止，工作目錄已保留。");
+      notify(
+        ["review", "approved"].includes(updated.status)
+          ? "已停止重新審查；原有報告與審閱狀態保留。"
+          : "任務已停止，工作目錄已保留。",
+      );
     } catch (error) {
       notify((error as Error).message, "error");
     }
@@ -2040,6 +2095,24 @@ export default function App() {
                           </div>
                         </div>
                       </div>
+                      {editable && run.worktreePath && (
+                        <div className="worktree-hint">
+                          <FolderGit2 size={14} />
+                          <span>
+                            你可以直接在這個目錄修改，重新整理差異後會重新解說與審閱狀態
+                          </span>
+                          <code>{run.worktreePath}</code>
+                          <button
+                            type="button"
+                            className="icon-button"
+                            aria-label="複製工作目錄路徑"
+                            title="複製工作目錄路徑"
+                            onClick={copyWorktreePath}
+                          >
+                            <Copy size={13} />
+                          </button>
+                        </div>
+                      )}
                       {file ? (
                         <DiffView
                           key={`${run.id}:${file.path}`}
@@ -2143,6 +2216,10 @@ export default function App() {
                                 feedback={run.prFeedback?.items.filter(
                                   (item) => item.path === file.path,
                                 )}
+                                onRerunReview={editable ? rerunReview : undefined}
+                                reviewBusy={
+                                  reviewRerunning || rerunRequests.has(run.id)
+                                }
                               />
                             </Suspense>
                           ) : (
@@ -2182,10 +2259,10 @@ export default function App() {
                             <p>每個角色各司其職，所有過程都在這裡。</p>
                           </div>
                         )}
-                        {active && (
+                        {(active || reviewRerunning) && (
                           <button className="button secondary" onClick={cancel}>
                             <Square size={14} />
-                            停止任務
+                            {reviewRerunning ? "停止重新審查" : "停止任務"}
                           </button>
                         )}
                       </div>

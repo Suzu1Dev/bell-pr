@@ -1056,6 +1056,37 @@ button {
 .diff-topbar-arrow {
   color: #b6bdaf;
 }
+.worktree-hint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  padding: 7px 15px;
+  border-bottom: 1px solid #e8ecdf;
+  background: #f7faf2;
+  color: #5f7260;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.worktree-hint > svg {
+  flex-shrink: 0;
+  color: #8ca780;
+}
+.worktree-hint > code {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: #46603f;
+  background: #fff;
+  border: 1px solid #e4eadf;
+  border-radius: 4px;
+  padding: 2px 6px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.worktree-hint > .icon-button {
+  width: 24px;
+  height: 24px;
+}
 .view-toggle {
   display: flex;
   background: #f0f3eb;

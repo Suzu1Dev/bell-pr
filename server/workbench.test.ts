@@ -961,3 +961,34 @@ test("model API exposes available choices, persists settings and rejects unavail
     await f.cleanup();
   }
 });
+
+test("the review rerun route exists and is gated on the run status", async () => {
+  const f = await fixture();
+  const app = createApp(f.workbench, {
+    staticDirectory: path.join(f.directory, "missing"),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing server port");
+  try {
+    // A running team already owns the reviewers; no agent CLI is started here.
+    f.run.status = "running";
+    const response = await http(
+      `http://127.0.0.1:${address.port}/api/runs/${f.run.id}/review/rerun`,
+      {
+        method: "POST",
+        headers: { host: "127.0.0.1:4311", "content-type": "application/json" },
+        body: "{}",
+      },
+    );
+    assert.equal(response.status, 409);
+    assert.match(response.json().error, /只有審閱中或已核准/);
+    assert.equal(f.run.reports, undefined);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await f.cleanup();
+  }
+});

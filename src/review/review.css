@@ -1013,6 +1013,20 @@
   text-align: center;
   padding: 28px 4px;
 }
+.explain-rerun {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-bottom: 16px;
+}
+.explain-rerun > .explain-retry {
+  margin-top: 0;
+}
+.explain-empty > .explain-rerun {
+  align-items: center;
+  margin: 14px 0 0;
+}
 .explain-chat-welcome-icon {
   height: 44px;
   width: 44px;

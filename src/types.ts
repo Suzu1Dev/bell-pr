@@ -55,6 +55,8 @@ export interface Run {
     | "cancelled";
   branch: string;
   baseBranch: string;
+  /** Local checkout the learner may edit by hand; absent on the demo run. */
+  worktreePath?: string;
   createdAt: string;
   agents: Agent[];
   logs: { time: string; agent: string; message: string }[];

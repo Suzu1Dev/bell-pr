@@ -44,6 +44,9 @@ export interface ExplanationPanelProps {
   onSaveNote?: (text: string) => Promise<void> | void;
   /** Maintainer thread comments on this file from the published PR; unlocks the response preset. */
   feedback?: PrFeedbackItem[];
+  /** Re-runs the reviewer and test analyst on the current diff; the button renders when given. */
+  onRerunReview?: () => void;
+  reviewBusy?: boolean;
 }
 
 /** Longest module path that is the file itself or one of its parent directories. */
@@ -125,14 +128,41 @@ export function ReviewReports({
   reports,
   demo,
   feedback = [],
+  onRerunReview,
+  reviewBusy = false,
 }: {
   file: DiffFile;
   reports?: Run["reports"];
   demo: boolean;
   feedback?: PrFeedbackItem[];
+  onRerunReview?: () => void;
+  reviewBusy?: boolean;
 }) {
   const available = reportSections.filter((section) =>
     reports?.[section.key]?.trim(),
+  );
+  // Demo reports are fixed text, so there is nothing to re-run there.
+  const rerun = onRerunReview && !demo && (
+    <div className="explain-rerun">
+      <button
+        type="button"
+        className="explain-retry"
+        onClick={onRerunReview}
+        disabled={reviewBusy}
+        aria-busy={reviewBusy}
+      >
+        {reviewBusy ? (
+          <LoaderCircle size={14} className="spin" />
+        ) : (
+          <RotateCcw size={14} />
+        )}
+        {reviewBusy ? "正在重新審查…" : "重新執行審查"}
+      </button>
+      <small className="explain-empty-note">
+        依工作目錄目前的差異重新執行 Reviewer 與 Test analyst（唯讀，會使用 CLI
+        用量）。報告只是建議，不會改變已審閱與核准狀態。
+      </small>
+    </div>
   );
   if (!available.length)
     return (
@@ -142,6 +172,7 @@ export function ReviewReports({
           <Eye size={28} />
           <h3>這次工作還沒有審查報告</h3>
           <p>Lead 整合、Reviewer 與 Test analyst 完成後，報告全文會放在這裡。</p>
+          {rerun}
         </div>
       </>
     );
@@ -155,6 +186,7 @@ export function ReviewReports({
       <p className="explain-reports-intro">
         這些是獨立靜態審查，不是執行結果；每份報告保留全文，並標示提到目前檔案的段落數。
       </p>
+      {rerun}
       {available.map((section) => {
         const report = reports![section.key]!;
         const mentions = reportMentionCount(report, file.path);
@@ -203,6 +235,8 @@ export function ExplanationPanel({
   note,
   onSaveNote,
   feedback = [],
+  onRerunReview,
+  reviewBusy,
 }: ExplanationPanelProps) {
   const [tab, setTab] = useState<"explain" | "reports" | "chat">(
     chatRequestId ? "chat" : "explain",
@@ -685,6 +719,8 @@ export function ExplanationPanel({
             reports={reports}
             demo={demo}
             feedback={feedback}
+            onRerunReview={onRerunReview}
+            reviewBusy={reviewBusy}
           />
         ) : (
           <div

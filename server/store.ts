@@ -39,6 +39,14 @@ export class Store {
           explanation.error = "服務重新啟動，解說產生已中斷；可重試產生解說。";
         }
       }
+      // A re-review interrupted by a crash leaves reviewer/tester agents "running" on a finished run.
+      if (!["running", "queued"].includes(run.status) && !run.publishing) {
+        for (const agent of run.agents)
+          if (agent.status === "running") {
+            agent.status = "failed";
+            agent.detail = "服務重新啟動，重新審查已中斷；原有報告保留";
+          }
+      }
       if (
         run.status === "running" ||
         run.status === "queued" ||

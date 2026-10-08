@@ -269,3 +269,26 @@ test("a blocked file explains why no explanation is available", () => {
   assert.match(html, /<p>原因<\/p>/);
   assert.doesNotMatch(html, /這段改了什麼？/);
 });
+
+test("the reports tab offers a re-review button for real runs only and shows the busy state", () => {
+  const render = (props: Record<string, unknown>) =>
+    renderToStaticMarkup(
+      createElement(ReviewReports, {
+        file: demoFiles[0],
+        reports: demoRun.reports,
+        demo: false,
+        ...props,
+      }),
+    );
+  const idle = render({ onRerunReview() {} });
+  assert.match(idle, /重新執行審查/);
+  assert.match(idle, /不會改變已審閱與核准狀態/);
+  assert.doesNotMatch(idle, /disabled=""/);
+  const busy = render({ onRerunReview() {}, reviewBusy: true });
+  assert.match(busy, /正在重新審查…/);
+  assert.match(busy, /disabled=""/);
+  // Without reports the button still renders inside the empty state.
+  assert.match(render({ onRerunReview() {}, reports: {} }), /還沒有審查報告[\s\S]*重新執行審查/);
+  assert.doesNotMatch(render({}), /重新執行審查/);
+  assert.doesNotMatch(render({ onRerunReview() {}, demo: true }), /重新執行審查/);
+});
