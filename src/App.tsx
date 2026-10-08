@@ -67,6 +67,7 @@ import type {
   DiscoveryCandidate,
 } from "../shared/discovery";
 import { DiffView } from "./review/DiffView";
+import { LearningNotes } from "./learning/LearningNotes";
 import { languageBadge } from "./review/diff";
 import { providerLabels, type ModelSettings } from "../shared/models";
 import { CommandPalette } from "./navigation/CommandPalette";
@@ -2652,60 +2653,18 @@ export default function App() {
           </section>
         ) : page === "learning" ? (
           <section className="page-content">
-            <div className="page-title">
-              <div>
-                <span className="eyebrow">LEARN BY CONTRIBUTING</span>
-                <h1 tabIndex={-1}>讓看懂的程式碼，成為你的經驗。</h1>
-                <p>從這次重試機制的示範，理解實際開發中的選擇與取捨。</p>
-              </div>
-              <span className="demo-pill">示範學習內容</span>
-            </div>
-            <div className="learning-grid">
-              {[
-                {
-                  title: "指數退避",
-                  tag: "可靠性設計",
-                  text: "重試間隔不斷加倍，避免服務忙碌時，新的請求讓它更忙。",
-                  snippet: "delay = baseDelay × 2 ** attempt",
-                  index: 0,
-                },
-                {
-                  title: "可重試的錯誤",
-                  tag: "錯誤處理",
-                  text: "區分暫時性故障與永久性錯誤。500 可能恢復，401 則需要先處理身份驗證。",
-                  snippet: "status === 429 || status >= 500",
-                  index: 1,
-                },
-                {
-                  title: "用測試定義邊界",
-                  tag: "測試思維",
-                  text: "除了成功路徑，也要測試重試上限、非重試錯誤，以及取消請求。",
-                  snippet: "expect(attempts).toBe(maxRetries + 1)",
-                  index: 3,
-                },
-              ].map((note, i) => (
-                <article className="note-card" key={note.title}>
-                  <span className="note-number">0{i + 1} / 開發手記</span>
-                  <div className="note-tag">{note.tag}</div>
-                  <h2>{note.title}</h2>
-                  <p>{note.text}</p>
-                  <code>{note.snippet}</code>
-                  <button
-                    onClick={() => {
-                      chooseRun(demoRun.id).then((opened) => {
-                        if (!opened) return;
-                        setSelectedPath(
-                          demoFiles[note.index]?.path || demoFiles[0].path,
-                        );
-                        setTab("changes");
-                      });
-                    }}
-                  >
-                    回到程式碼理解它 <ArrowUpRight size={15} />
-                  </button>
-                </article>
-              ))}
-            </div>
+            <LearningNotes
+              runs={runs}
+              repos={repos}
+              demoFiles={demoFiles}
+              onOpen={(id, path) => {
+                chooseRun(id).then((opened) => {
+                  if (!opened) return;
+                  setSelectedPath(path);
+                  setTab("changes");
+                });
+              }}
+            />
             <div className="team-note">
               <MessageSquare size={25} />
               <div>

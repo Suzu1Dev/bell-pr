@@ -2,6 +2,7 @@ import type {
   ChangeExplanation,
   ExplanationStatus,
   LearnerNote,
+  StoredExplanation,
 } from "../shared/explanations";
 import type { EfficiencyMetrics } from "../shared/efficiency";
 import type { AgentTeam } from "../shared/team";
@@ -62,6 +63,8 @@ export interface Run {
   notes?: Record<string, LearnerNote>;
   /** Final role answers keyed by role; also holds teammate task ids and guide answers. */
   reports?: Record<string, string>;
+  /** Stored per-file explanations keyed by path; the learning page aggregates the ready ones. */
+  explanations?: Record<string, StoredExplanation>;
   prUrl?: string;
   error?: string;
   /** Follow-up Q&A per diff path; absent on runs saved before it was persisted. */
