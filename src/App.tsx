@@ -945,6 +945,23 @@ export default function App() {
     );
     if (runIdRef.current === result.run.id) setRun(result.run);
   }
+  async function retryTeam(message: string) {
+    setBusy(true);
+    try {
+      const result = await api<{ run: Run }>(
+        `/runs/${run.id}/team/retry`,
+        send("POST", message ? { message } : {}),
+      );
+      if (runIdRef.current === result.run.id) setRun(result.run);
+      notify(
+        result.run.status === "awaiting_plan"
+          ? "計畫尚未核准，已回到等待核准。"
+          : "已重新排入：已整合的子任務不重跑，失敗的子任務重新開始。",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   async function sendTeamMessage(to: string, content: string) {
     if (demo) {
       setRun((previous) => ({
@@ -1484,7 +1501,9 @@ export default function App() {
       notify(
         ["review", "approved"].includes(updated.status)
           ? "已停止重新審查；原有報告與審閱狀態保留。"
-          : "任務已停止，工作目錄已保留。",
+          : updated.team?.tasks.length
+            ? "任務已停止；本次工作的目錄與失敗任務的隔離目錄保留，可重試失敗的子任務。"
+            : "任務已停止，工作目錄已保留。",
       );
     } catch (error) {
       notify((error as Error).message, "error");
@@ -2334,6 +2353,7 @@ export default function App() {
                     onApprove={approveTeamPlan}
                     onRevise={reviseTeamPlan}
                     onMessage={sendTeamMessage}
+                    onRetry={retryTeam}
                     busy={busy}
                   />
                 )}

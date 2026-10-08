@@ -38,6 +38,51 @@ test("demo team renders its phase, members, tasks and messages", () => {
   assert.equal(html.match(/應用程式觀察到/g)?.length, 1);
 });
 
+test("a failed real run offers the retry form, opens failure reasons and marks cleaned worktrees", () => {
+  const [first, second] = demoTeam.tasks;
+  const run: Run = {
+    ...demoRun,
+    status: "failed",
+    team: {
+      ...demoTeam,
+      phase: "failed",
+      tasks: [
+        { ...first, worktreePath: "/tmp/team/task-1", worktreeRemoved: true },
+        {
+          ...second,
+          status: "failed",
+          report: undefined,
+          error: "Teammate 修改了未分配的檔案 c.ts",
+          worktreePath: "/tmp/team/task-2",
+        },
+      ],
+    },
+  };
+  const html = renderToStaticMarkup(
+    createElement(TeamBoard, {
+      run,
+      demo: false,
+      onApprove() {},
+      async onMessage() {},
+      async onRevise() {},
+      async onRetry() {},
+      busy: false,
+    }),
+  );
+  assert.match(html, /重試失敗的子任務/);
+  assert.match(html, /1 個已整合的子任務不會重跑；1 個失敗或被阻擋的子任務/);
+  assert.match(html, /aria-label="給重試任務的補充說明"/);
+  assert.match(html, /獨立 worktree 已清理/);
+  assert.match(html, /查看失敗原因/);
+  assert.match(html, /aria-expanded="true"/);
+  assert.match(html, /Teammate 修改了未分配的檔案 c.ts/);
+  // Without a retry handler (or in the demo) the form stays hidden.
+  assert.doesNotMatch(
+    render({ ...demoRun, team: demoTeam }),
+    /重試失敗的子任務/,
+  );
+});
+
 test("a run without team data falls back to the legacy notice", () => {
   const html = render(demoRun);
   assert.match(html, /這是舊版流程的任務/);

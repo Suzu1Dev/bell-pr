@@ -180,6 +180,33 @@
   font-size: 11px;
   color: #96a687;
 }
+.team-plan-retry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed #dfe7d3;
+}
+.team-plan-retry > span {
+  flex-basis: 100%;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #7c8f6c;
+}
+.team-plan-retry > input {
+  flex: 1 1 240px;
+  min-width: 0;
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid #dfe7d3;
+  border-radius: 6px;
+}
+.team-plan-retry > .inline-error {
+  flex-basis: 100%;
+}
 .team-board-content {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 310px;

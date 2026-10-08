@@ -59,6 +59,55 @@ async function waitUntil(
   }
 }
 
+/** Answers the post-review draft and explanation roles so tests only script the team roles. */
+const withAuxiliaryRoles =
+  (runner: TeamAgentRunner): TeamAgentRunner =>
+  async (input) => {
+    if (input.role === "draft")
+      return JSON.stringify({
+        title: "Improve consistent output",
+        body: "## Problem\n\nOutputs differ.\n\n## Changes\n\nAlign the output.\n\n## Validation\n\nStatic review only.\n\nDeveloped with AI assistance; human review is required.",
+        policy: "linux",
+        summary: "依 Linux 投稿寫作原則整理。",
+        rules: [],
+        checklist: ["確認測試證據。"],
+        templateSourceId: "",
+      });
+    if (input.role === "explanations") {
+      const files = JSON.parse(
+        input.prompt.split("Provided diffs:\n")[1].split("\n\nBELL Ponytail")[0],
+      ) as { path: string }[];
+      return JSON.stringify({
+        files: files.map(({ path }) => ({
+          path,
+          summary: "調整輸出",
+          reason: "一致性",
+          concept: "單一責任",
+          tip: "檢查呼叫處",
+          example: {
+            scenario: "使用者查看模組提供的文字。",
+            before: "文字是各檔案原本的內容。",
+            after: "文字更新為這次任務指定的內容。",
+          },
+          alternatives: "也可以集中成一個常數；這次沒有，因為各模組獨立。",
+          lookup: ["single source of truth"],
+          selfCheck: {
+            question: "這次任務改了哪些文字？",
+            answer: "只改了各檔案輸出的字串內容。",
+          },
+        })),
+      });
+    }
+    return runner(input);
+  };
+const stubStatus = async () => ({
+  codex: true,
+  codexAuthenticated: true,
+  github: false,
+  claude: false,
+  claudeAuthenticated: false,
+});
+
 async function fixture(
   runner?: TeamAgentRunner,
   dependencies: { agentSlots?: AgentSlots } = {},
@@ -80,60 +129,13 @@ async function fixture(
   await store.initialize();
   const workbench = new Workbench(
     store,
-    runner
-      ? async (input) => {
-          if (input.role === "draft")
-            return JSON.stringify({
-              title: "Improve consistent output",
-              body: "## Problem\n\nOutputs differ.\n\n## Changes\n\nAlign the output.\n\n## Validation\n\nStatic review only.\n\nDeveloped with AI assistance; human review is required.",
-              policy: "linux",
-              summary: "依 Linux 投稿寫作原則整理。",
-              rules: [],
-              checklist: ["確認測試證據。"],
-              templateSourceId: "",
-            });
-          if (input.role === "explanations") {
-            const files = JSON.parse(
-              input.prompt
-                .split("Provided diffs:\n")[1]
-                .split("\n\nBELL Ponytail")[0],
-            ) as { path: string }[];
-            return JSON.stringify({
-              files: files.map(({ path }) => ({
-                path,
-                summary: "調整輸出",
-                reason: "一致性",
-                concept: "單一責任",
-                tip: "檢查呼叫處",
-                example: {
-                  scenario: "使用者查看模組提供的文字。",
-                  before: "文字是各檔案原本的內容。",
-                  after: "文字更新為這次任務指定的內容。",
-                },
-                alternatives: "也可以集中成一個常數；這次沒有，因為各模組獨立。",
-                lookup: ["single source of truth"],
-                selfCheck: {
-                  question: "這次任務改了哪些文字？",
-                  answer: "只改了各檔案輸出的字串內容。",
-                },
-              })),
-            });
-          }
-          return runner(input);
-        }
-      : undefined,
+    runner ? withAuxiliaryRoles(runner) : undefined,
     {
       getModelCatalog: async () => ({ models: [], source: "codex" }),
       ...dependencies,
     },
   );
-  workbench.status = async () => ({
-    codex: true,
-    codexAuthenticated: true,
-    github: false,
-    claude: false,
-    claudeAuthenticated: false,
-  });
+  workbench.status = stubStatus;
   const repo = await workbench.importRepository(repository);
   return {
     directory,
@@ -548,6 +550,16 @@ test("team execution waits for plan approval, runs isolated independent members 
       run.team!.tasks.find((task) => task.id === "alpha")!.report,
       "alpha complete; fake runner only.",
     );
+    // Integrated tasks no longer need their checkout; the path stays as a record.
+    const registered = (await git(run.worktreePath, ["worktree", "list"]))
+      .stdout;
+    for (const task of run.team!.tasks) {
+      assert.equal(task.worktreeRemoved, true);
+      assert.ok(task.worktreePath);
+      await assert.rejects(readFile(path.join(task.worktreePath!, "a.ts")));
+      assert.ok(!registered.includes(task.worktreePath!));
+    }
+    assert.ok(run.logs.some((log) => log.message.includes("已不需保留")));
     assert.ok(
       run.team!.messages.every((message) => message.status === "delivered"),
     );
@@ -721,6 +733,254 @@ test("out-of-scope member edits are retained in isolation and never enter the re
       /not-owned/,
     );
   } finally {
+    await f.cleanup();
+  }
+});
+
+/**
+ * Team roles for the retry scenarios: beta depends on alpha, and its first
+ * attempt edits c.ts outside its scope. Flip `compliant` before retrying.
+ */
+function retryScenario() {
+  const state = { compliant: false, leadCalls: 0 };
+  const memberInputs: { taskId: string; prompt: string; cwd: string }[] = [];
+  const runner: TeamAgentRunner = async (input) => {
+    if (input.role === "lead") {
+      state.leadCalls++;
+      return state.leadCalls === 1
+        ? makePlan([
+            { id: "alpha", files: ["a.ts"] },
+            { id: "beta", files: ["b.ts"], dependsOn: ["alpha"] },
+          ])
+        : "已整合兩個任務。靜態檢查完成。";
+    }
+    if (input.role === "reviewer" || input.role === "tester")
+      return "獨立靜態審查：未發現問題。";
+    const taskId = input.taskId!;
+    memberInputs.push({ taskId, prompt: input.prompt, cwd: input.cwd });
+    await writeFile(
+      path.join(input.cwd, taskId === "alpha" ? "a.ts" : "b.ts"),
+      `export const value = "${taskId}";\n`,
+    );
+    if (taskId === "beta" && !state.compliant)
+      await writeFile(
+        path.join(input.cwd, "c.ts"),
+        'export const value = "not-owned";\n',
+      );
+    return JSON.stringify({ report: `${taskId} done`, messages: [] });
+  };
+  return { state, memberInputs, runner };
+}
+const startRetryRun = (f: Awaited<ReturnType<typeof fixture>>) =>
+  f.workbench.createRun(f.repo.id, "Improve a and b", undefined, {
+    ...settings,
+    requirePlanApproval: false,
+  });
+
+test("retrying a failed run reruns only the failed task with the previous error and the briefing, reusing its worktree path", async () => {
+  const scenario = retryScenario();
+  const f = await fixture(scenario.runner);
+  try {
+    const run = await startRetryRun(f);
+    await waitUntil(() => run.status === "failed", "ownership rejection");
+    const [alpha, beta] = run.team!.tasks;
+    assert.equal(alpha.status, "complete");
+    assert.equal(beta.status, "failed");
+    const betaPath = beta.worktreePath!;
+    assert.match(
+      await readFile(path.join(betaPath, "c.ts"), "utf8"),
+      /not-owned/,
+    );
+    assert.deepEqual((await readDiff(run)).map((file) => file.path), ["a.ts"]);
+    await assert.rejects(
+      f.workbench.sendTeamMessage(run.id, { to: "beta", content: "hi" }),
+      /已停止工作/,
+    );
+
+    scenario.state.compliant = true;
+    const retried = await f.workbench.retryTeam(run.id, "只改 b.ts");
+    // drain() starts the job synchronously, so the run may already be running.
+    assert.ok(["queued", "running"].includes(retried.status), retried.status);
+    assert.equal(retried.team!.phase, "developing");
+    assert.equal(retried.error, undefined);
+    assert.equal(
+      beta.error,
+      "Teammate 修改了未分配的檔案 c.ts；差異保留在其隔離工作目錄，未整合。",
+    );
+    assert.equal(beta.worktreePath, undefined);
+    assert.equal(run.reports!.beta, undefined);
+    assert.ok(
+      run.logs.some((log) =>
+        log.message.includes("1 個已完成任務不重跑，1 個任務以新快照重新開始"),
+      ),
+    );
+    await waitUntil(
+      () => run.status === "failed" || run.status === "review",
+      "retry completion",
+    );
+    assert.equal(run.status, "review", run.error);
+    // alpha ran once in total; beta ran twice, the second time at the same path.
+    assert.deepEqual(
+      scenario.memberInputs.map((input) => input.taskId),
+      ["alpha", "beta", "beta"],
+    );
+    assert.equal(scenario.memberInputs[2].cwd, betaPath);
+    assert.match(
+      scenario.memberInputs[2].prompt,
+      /^Previous attempt failed: Teammate 修改了未分配的檔案 c.ts/,
+    );
+    assert.match(scenario.memberInputs[2].prompt, /只改 b.ts/);
+    assert.doesNotMatch(
+      scenario.memberInputs[1].prompt,
+      /Previous attempt failed/,
+    );
+    assert.equal(beta.error, undefined);
+    assert.equal(beta.status, "complete");
+    assert.equal(beta.worktreeRemoved, true);
+    assert.deepEqual(
+      (await readDiff(run)).map((file) => file.path),
+      ["a.ts", "b.ts"],
+    );
+    assert.ok(
+      run.team!.messages.every((message) => message.status === "delivered"),
+    );
+    await assert.rejects(f.workbench.retryTeam(run.id), /只有已失敗或已取消/);
+    run.status = "published";
+    await assert.rejects(f.workbench.retryTeam(run.id), /只有已失敗或已取消/);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a failed run can still be retried after the store is reloaded", async () => {
+  const scenario = retryScenario();
+  const f = await fixture(scenario.runner);
+  try {
+    const run = await startRetryRun(f);
+    await waitUntil(() => run.status === "failed", "ownership rejection");
+    await f.workbench.shutdown();
+    const reopened = new Store(f.store.directory);
+    await reopened.initialize();
+    scenario.state.compliant = true;
+    const workbench = new Workbench(
+      reopened,
+      withAuxiliaryRoles(scenario.runner),
+      { getModelCatalog: async () => ({ models: [], source: "codex" }) },
+    );
+    workbench.status = stubStatus;
+    try {
+      const resumed = await workbench.retryTeam(run.id);
+      await waitUntil(
+        () => resumed.status === "failed" || resumed.status === "review",
+        "retry completion",
+      );
+      assert.equal(resumed.status, "review", resumed.error);
+      assert.deepEqual(
+        scenario.memberInputs.map((input) => input.taskId),
+        ["alpha", "beta", "beta"],
+      );
+      assert.deepEqual(
+        (await readDiff(resumed)).map((file) => file.path),
+        ["a.ts", "b.ts"],
+      );
+    } finally {
+      await workbench.shutdown();
+    }
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("retrying with every task complete reruns only integration and review", async () => {
+  const scenario = retryScenario();
+  scenario.state.compliant = true;
+  let integrationCrashes = 1;
+  const f = await fixture(async (input) => {
+    if (
+      input.role === "lead" &&
+      scenario.state.leadCalls === 1 &&
+      integrationCrashes-- > 0
+    ) {
+      scenario.state.leadCalls++;
+      throw new Error("integration crashed");
+    }
+    return scenario.runner(input);
+  });
+  try {
+    const run = await startRetryRun(f);
+    await waitUntil(() => run.status === "failed", "integration failure");
+    assert.match(run.error!, /integration crashed/);
+    assert.ok(run.team!.tasks.every((task) => task.status === "complete"));
+    await f.workbench.retryTeam(run.id);
+    assert.ok(run.logs.some((log) => log.message.includes("直接重跑整合與獨立審查")));
+    await waitUntil(
+      () => run.status === "failed" || run.status === "review",
+      "retry completion",
+    );
+    assert.equal(run.status, "review", run.error);
+    assert.deepEqual(
+      scenario.memberInputs.map((input) => input.taskId),
+      ["alpha", "beta"],
+    );
+    assert.ok(run.reports!.reviewer);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("cancelling a retried run waits for the teammate to exit, and a running retry cannot be retried again", async () => {
+  const scenario = retryScenario();
+  let started = false;
+  let sawAbort = false;
+  let releaseExit!: () => void;
+  const exitGate = new Promise<void>((resolve) => {
+    releaseExit = resolve;
+  });
+  const f = await fixture(async (input) => {
+    if (input.taskId === "beta" && scenario.state.compliant) {
+      started = true;
+      await new Promise<void>((resolve) => {
+        if (input.signal.aborted) resolve();
+        else
+          input.signal.addEventListener("abort", () => resolve(), {
+            once: true,
+          });
+      });
+      sawAbort = true;
+      await exitGate;
+      throw new Error("cancelled");
+    }
+    return scenario.runner(input);
+  });
+  try {
+    const run = await startRetryRun(f);
+    await waitUntil(() => run.status === "failed", "ownership rejection");
+    scenario.state.compliant = true;
+    await f.workbench.retryTeam(run.id);
+    await waitUntil(() => started);
+    await assert.rejects(f.workbench.retryTeam(run.id), /只有已失敗或已取消/);
+    let returned = false;
+    const cancelling = f.workbench.cancel(run.id).then((result) => {
+      returned = true;
+      return result;
+    });
+    await waitUntil(() => sawAbort);
+    // The run already reads as cancelled, but its worker has not exited yet.
+    await assert.rejects(f.workbench.retryTeam(run.id), /仍在收尾/);
+    await delay(40);
+    assert.equal(
+      returned,
+      false,
+      "Cancellation must wait for the member's actual exit",
+    );
+    releaseExit();
+    const stopped = await cancelling;
+    assert.equal(stopped.status, "cancelled");
+    assert.equal(stopped.team!.tasks[0].status, "complete");
+    assert.equal(stopped.team!.tasks[1].status, "failed");
+    assert.deepEqual((await readDiff(run)).map((file) => file.path), ["a.ts"]);
+  } finally {
+    releaseExit();
     await f.cleanup();
   }
 });
@@ -1022,6 +1282,12 @@ test("cancelling a paused plan completes without starting any teammate", async (
     assert.equal(memberCalls, 0);
     assert.deepEqual(await readDiff(stopped), []);
     await assert.rejects(f.workbench.approvePlan(run.id), /沒有等待/);
+    // Cancelling during approval must not let a retry skip the approval step.
+    const retried = await f.workbench.retryTeam(run.id);
+    assert.equal(retried.status, "awaiting_plan");
+    assert.equal(retried.team!.phase, "awaiting_approval");
+    assert.equal(memberCalls, 0);
+    assert.equal((await f.workbench.cancel(run.id)).status, "cancelled");
   } finally {
     await f.cleanup();
   }
@@ -1286,10 +1552,7 @@ const args = process.argv.slice(2);
 const prompt = fs.readFileSync(0, 'utf8');
 fs.appendFileSync(${JSON.stringify(promptsFile)}, JSON.stringify({ args, prompt }) + '\\n');
 const emit = (item) => console.log(JSON.stringify({ type: 'item.completed', item }));
-if (args.includes('--output-schema')) {
-  console.error('fake codex: no structured output here');
-  process.exit(1);
-}
+// The schema file is accepted and ignored: this fake answers with plain JSON text.
 if (prompt.includes('You are the team lead with read-only access')) {
   emit({ type: 'agent_message', text: ${JSON.stringify(plan)} });
 } else if (prompt.includes('independent teammate working on task')) {

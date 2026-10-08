@@ -21,7 +21,11 @@ import {
   teamPlanJsonSchema,
   type TeamAgentRunner,
 } from "./team.js";
-import { createTeamSnapshot, integrateTeamTask } from "./team-workspace.js";
+import {
+  createTeamSnapshot,
+  integrateTeamTask,
+  removeTaskWorktree,
+} from "./team-workspace.js";
 import {
   maxPlanRevisions,
   maxTeamTaskChecks,
@@ -349,12 +353,7 @@ export class Workbench {
       if (!capability.codexAuthenticated)
         throw new AppError("Codex 尚未登入。請先在終端機執行 codex login。", 503);
     }
-    if (
-      this.store.data.runs.filter((run) =>
-        ["queued", "running", "awaiting_plan"].includes(run.status),
-      ).length >= 8
-    )
-      throw new AppError("最多可同時排入 8 個工作；請等待現有工作完成。", 429);
+    this.assertQueueCapacity();
     const id = newId();
     const run: Run = {
       id,
@@ -416,6 +415,16 @@ export class Workbench {
     this.queue.push(id);
     this.drain();
     return run;
+  }
+
+  /** New and retried runs share the same cap on queued, running and paused work. */
+  private assertQueueCapacity() {
+    if (
+      this.store.data.runs.filter((run) =>
+        ["queued", "running", "awaiting_plan"].includes(run.status),
+      ).length >= 8
+    )
+      throw new AppError("最多可同時排入 8 個工作；請等待現有工作完成。", 429);
   }
 
   private drain() {
@@ -761,6 +770,7 @@ export class Workbench {
   }
 
   /**
+  /**
    * Sends back to the lead a plan the person did not approve. The planning
    * branch of execute() runs again with the feedback attached; there is no
    * second planning path. Messages queued to tasks of the old plan stay in the
@@ -803,6 +813,94 @@ export class Workbench {
         run,
         "user",
         `已退回計畫並補充意見（第 ${revisions.length}/${maxPlanRevisions} 次），Lead 將依意見重新規劃。`,
+      );
+      await this.store.save();
+      this.queue.push(id);
+      this.drain();
+      return run;
+    });
+  }
+
+  /**
+   * Resumes a failed or cancelled team run instead of starting over: completed
+   * tasks keep their integrated patches, failed and blocked tasks start again
+   * from a fresh snapshot, and a run whose tasks are all complete only re-runs
+   * integration and review. An unapproved plan returns to the approval step so
+   * cancelling during approval cannot be used to skip it.
+   */
+  async retryTeam(id: string, message?: string) {
+    return this.lock(id, async () => {
+      const run = this.run(id);
+      const team = run.team;
+      if (
+        !["failed", "cancelled"].includes(run.status) ||
+        !run.baseSha ||
+        !team?.tasks.length
+      )
+        throw new AppError(
+          "只有已失敗或已取消、且 Lead 已建立計畫的團隊工作可以重試。",
+          409,
+        );
+      // A cancelled run keeps its controller until the worker has exited; the
+      // controller is dropped in the same tick as a failed status, so this is
+      // race-free where the job set (cleared later) is not.
+      if (this.controllers.has(id))
+        throw new AppError("此工作仍在收尾，請稍後再重試。", 409);
+      this.assertQueueCapacity();
+      const retried = team.tasks.filter(
+        (task) => task.status === "failed" || task.status === "blocked",
+      );
+      const kept = team.tasks.filter((task) => task.status === "complete");
+      // The same path is reused by the next attempt, so the old checkout has to
+      // go first; its unintegrated edits are discarded with it.
+      for (const task of retried)
+        await this.lock(`repository:${run.repoId}`, () =>
+          removeTaskWorktree(run, task),
+        );
+      for (const task of retried) {
+        task.status = "pending";
+        delete task.worktreePath;
+        delete task.worktreeRemoved;
+        delete task.baseSha;
+        delete task.report;
+        delete task.startedAt;
+        delete task.completedAt;
+        delete task.acceptsMessages;
+        delete run.reports?.[task.id];
+        const member = run.agents.find((agent) => agent.id === task.owner);
+        if (member) {
+          member.status = "waiting";
+          member.detail = "等待重新認領任務，使用新的獨立工作目錄";
+        }
+      }
+      claimReadyTasks(team.tasks, 0); // Recompute ready/pending without claiming.
+      delete run.error;
+      if (message) {
+        // sendTeamMessage stays closed for finished runs; the retry itself is
+        // the only way to brief the restarted tasks (or the lead when none).
+        // Queued before the approval check so a briefing is never dropped.
+        if (retried.length)
+          for (const task of retried)
+            this.queueTeamMessage(run, "user", task.id, message);
+        else this.queueTeamMessage(run, "user", "lead", message);
+      }
+      if (team.config.requirePlanApproval && !team.approvedAt) {
+        team.phase = "awaiting_approval";
+        run.status = "awaiting_plan";
+        this.log(run, "user", "要求重試；計畫尚未核准，先回到等待核准。");
+        await this.store.save();
+        return run;
+      }
+      team.phase = "developing";
+      run.status = "queued";
+      this.log(
+        run,
+        "user",
+        retried.length
+          ? `重試失敗的子任務：${kept.length} 個已完成任務不重跑，${retried.length} 個任務以新快照重新開始。`
+          : kept.length === team.tasks.length
+            ? "重試：所有子任務都已完成，直接重跑整合與獨立審查。"
+            : "重試：繼續執行尚未開始的子任務。",
       );
       await this.store.save();
       this.queue.push(id);
@@ -856,6 +954,10 @@ export class Workbench {
     signal: AbortSignal,
   ) {
     const team = run.team!;
+    // A retried task keeps the previous error until its fresh first turn can
+    // explain to the teammate why the earlier attempt was rejected.
+    const previousFailure = task.error;
+    delete task.error;
     try {
       await this.lock(`integration:${run.id}`, async () => {
         if (signal.aborted) throw new AppError("工作已取消。", 409);
@@ -906,7 +1008,9 @@ export class Workbench {
           run,
           task.owner,
           turn === 0
-            ? context
+            ? previousFailure
+              ? `Previous attempt failed: ${previousFailure}\nThis worktree is a fresh checkout; the earlier attempt's edits were discarded. Avoid the same failure.\n${context}`
+              : context
             : `${context}\nContinue this same task after receiving queued team messages. The worktree contains your prior turn's edits. Prior report:\n${task.report}`,
           signal,
           false,
@@ -957,6 +1061,24 @@ export class Workbench {
         `${task.title} 完成，${integrated.length} 個檔案通過範圍檢查並整合${integrated.length ? `：${integrated.join("、")}` : ""}。`,
         { kind: "file", detail: integrated.join("\n") },
       );
+      // The integrated diff now lives in the run worktree; a leftover checkout
+      // would only cost disk. Failed tasks keep theirs so the diff can be read.
+      try {
+        await this.lock(`repository:${run.repoId}`, () =>
+          removeTaskWorktree(run, task),
+        );
+        this.log(
+          run,
+          "system",
+          `整合後的差異已在本次工作的 worktree，${task.owner} 的獨立 checkout 已不需保留，已移除。`,
+        );
+      } catch (error) {
+        this.log(
+          run,
+          "system",
+          `無法移除 ${task.id} 的隔離工作目錄，可手動清理：${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     } catch (error) {
       task.status = "failed";
       task.acceptsMessages = false;
@@ -1250,7 +1372,11 @@ export class Workbench {
     this.controllers.get(id)?.abort();
     run.status = "cancelled";
     if (run.team) run.team.phase = "cancelled";
-    this.log(run, "system", "已要求取消；隔離工作目錄會保留。");
+    this.log(
+      run,
+      "system",
+      "已要求取消；失敗或取消任務的隔離工作目錄保留，已整合任務的目錄已自動移除。可用「重試失敗的子任務」接續。",
+    );
     await this.store.save();
     // Do not hold a run/repository/integration lock here: workers must finish
     // their cleanup and persist final task states before the HTTP response.

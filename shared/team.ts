@@ -30,6 +30,8 @@ export interface TeamTask {
   report?: string;
   error?: string;
   worktreePath?: string;
+  /** The isolated checkout was removed after integration; worktreePath stays as a record. */
+  worktreeRemoved?: boolean;
   baseSha?: string;
   startedAt?: string;
   completedAt?: string;

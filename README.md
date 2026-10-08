@@ -199,6 +199,8 @@ tailscale serve --bg --yes --https=8443 http://127.0.0.1:8443
 
 維護可使用 `systemctl --user status bell-pr`、`systemctl --user restart bell-pr` 與 `journalctl --user -u bell-pr -n 100`。發生未預期的錯誤（API 回傳 500 的「操作未完成」）時，服務記錄會寫入請求方法、路徑與錯誤堆疊；背景工作失敗則顯示在該工作的錯誤與系統訊息中。更新前確認沒有執行中的 Agent，再停止服務、備份整份 `.bellpr`、更新程式與依賴、建置後啟動。
 
+`.bellpr` 內有三類 Git 目錄：`repositories/<repo-id>` 是匯入專案的 clone（所有 worktree 的 Git objects 都在這裡）；`worktrees/<run-id>` 是每次工作用來審閱與發佈的 worktree，保存整合後的差異；`team-worktrees/<run-id>/<task-id>` 是 teammate 的隔離 checkout。子任務的差異整合後，它的隔離 checkout 會自動以 `git worktree remove --force` 移除（任務板顯示「獨立 worktree 已清理」）；失敗、被阻擋或取消的子任務會保留，方便查看未整合的差異，重試時才會丟棄。沒有清理 worktree 的 API；要手動清理時，先停止服務或確認該工作沒有在執行，用 `git -C .bellpr/repositories/<repo-id> worktree list` 查看登記，刪除不再需要的 `.bellpr/worktrees/<run-id>` 與 `.bellpr/team-worktrees/<run-id>`，再執行 `git -C .bellpr/repositories/<repo-id> worktree prune` 清掉失效登記；`state.json` 仍會保留該工作的紀錄與報告，只是不能再開啟差異或重試。磁碟空間通常不是 worktree 本身，而是 clone 或 worktree 裡被 Git 忽略的建置輸出（例如 `target/`、`node_modules/`），這些目錄可直接刪除再重新建置。
+
 資料搬移必須包含完整 `.bellpr`，其中有尚未提交的檔案、Git objects/index/refs、worktree、解說與草稿。更改安裝位置時，需一併修正 `state.json` 的 repository/worktree 路徑及 Git worktree 的雙向連結，並比對檔案與 Git 差異；不能只複製 `state.json` 或重新 clone。CLI 登入狀態由目的機器提供，不隨工作資料搬移。瀏覽器示範資料與閱讀偏好保存在各網址的 localStorage，不包含在服務端備份中。
 
 ## 本機設定
@@ -230,7 +232,7 @@ npm run dev
 
 目前版本以 GitHub 為目標平台。程式碼與 PR 內容仍需要使用者審閱；白話解說與 agent 的判斷可能出錯。Lead、Reviewer 與 Test analyst 的整合／審查回合只做靜態檢視，真正執行過的檢查應以各 teammate 報告的命令與結果為準。應用程式另外會記下每個子任務執行期間 CLI 回報的指令（只保留指令第一行、套用憑證遮罩、最多 300 字與結束碼，不擷取輸出，每個任務最多 40 筆）以及實際整合進 worktree 的檔案路徑，顯示在任務卡與執行紀錄中，並以「未受信任的資料」交給 Lead 整合、Test analyst 與 PR 草稿回合，供對照 teammate 自述的檢查；這份紀錄只能證明某個指令被執行過與其結束碼，不能證明測試內容是否正確。
 
-服務重新啟動後，中斷的工作會標記失敗，需另開新工作；目前沒有自動恢復、合併 PR 或清理 worktree 的介面。檔案問答與任務一起保存在 `state.json`，每個檔案只保留最近 20 則、每則最多 8,000 字，更早的訊息會被捨棄；提問內容在保存前會套用與日誌相同的憑證遮罩。學習筆記頁彙整各任務已產生的解說，可依關鍵字與任務篩選。
+服務重新啟動後，中斷的工作會標記失敗，不會自動恢復；Lead 已建立計畫的團隊工作可在任務板按「重試失敗的子任務」接續：已整合的子任務不重跑，失敗或被阻擋的子任務會丟棄舊的隔離目錄、從新的快照重新開始，並在第一回合得知上次失敗的原因；若所有子任務都已整合（整合或審查階段失敗），重試只重跑 Lead 整合與獨立審查。尚未核准計畫就取消的工作，重試會先回到等待核准。可選填一段說明，會排入重試成員的第一回合；已結束的工作不能再用團隊訊息。目前沒有合併 PR 或清理 worktree 的介面（手動清理見「Ubuntu 私網部署」）。檔案問答與任務一起保存在 `state.json`，每個檔案只保留最近 20 則、每則最多 8,000 字，更早的訊息會被捨棄；提問內容在保存前會套用與日誌相同的憑證遮罩。學習筆記頁彙整各任務已產生的解說，可依關鍵字與任務篩選。
 
 審閱介面適合聚焦的文字程式碼變更：單次最多 150 個檔案、整體 diff 最多 2 MB，新檔案最多 512 KB。二進位檔、新增符號連結、敏感檔案與疑似憑證會阻擋發佈，需要先移除或改以人工流程處理。這些檢查不代表完整的秘密資訊掃描。
 

@@ -14,8 +14,8 @@ import {
   Loader2,
   MessageSquare,
   Play,
-  ShieldCheck,
   RotateCcw,
+  ShieldCheck,
   Users,
 } from "lucide-react";
 import {
@@ -53,6 +53,7 @@ export function TeamBoard({
   onApprove,
   onRevise,
   onMessage,
+  onRetry,
   busy,
 }: {
   run: Run;
@@ -61,6 +62,7 @@ export function TeamBoard({
   /** Sends the plan back to the lead with feedback; rejects with the server's message. */
   onRevise: (feedback: string) => Promise<void>;
   onMessage: (to: string, content: string) => Promise<void>;
+  onRetry?: (message: string) => Promise<void>;
   busy: boolean;
 }) {
   const [recipient, setRecipient] = useState("all");
@@ -70,7 +72,12 @@ export function TeamBoard({
   const [feedback, setFeedback] = useState("");
   const [revising, setRevising] = useState(false);
   const [reviseError, setReviseError] = useState("");
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [retryMessage, setRetryMessage] = useState("");
+  const [retryError, setRetryError] = useState("");
+  // Explicit toggles win; otherwise a failed task shows its reason right away.
+  const [toggled, setToggled] = useState<Record<string, boolean>>({});
+  const isExpanded = (task: TeamTask) =>
+    toggled[task.id] ?? (task.status === "failed" && !!task.error);
   const team = run.team;
   if (!team)
     return (
@@ -100,6 +107,15 @@ export function TeamBoard({
   const done = team.tasks.filter((task) => task.status === "complete").length;
   const revisions = team.planRevisions ?? [];
   const revisionsLeft = revisions.length < maxPlanRevisions;
+  const retryable =
+    !demo &&
+    !!onRetry &&
+    ["failed", "cancelled"].includes(team.phase) &&
+    team.tasks.length > 0 &&
+    ["failed", "cancelled"].includes(run.status);
+  const retriedCount = team.tasks.filter((task) =>
+    ["failed", "blocked"].includes(task.status),
+  ).length;
   const groups: { label: string; states: TeamTask["status"][] }[] = [
     { label: "待處理", states: ["pending", "ready", "blocked"] },
     { label: "進行中", states: ["running"] },
@@ -279,6 +295,51 @@ export function TeamBoard({
             </form>
           </>
         )}
+        {retryable && (
+          <form
+            className="team-plan-retry"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setRetryError("");
+              try {
+                await onRetry!(retryMessage.trim());
+                setRetryMessage("");
+              } catch (cause) {
+                setRetryError((cause as Error).message);
+              }
+            }}
+          >
+            <span>
+              {retriedCount
+                ? `${done} 個已整合的子任務不會重跑；${retriedCount} 個失敗或被阻擋的子任務會丟棄舊的隔離目錄，從新的快照重新開始。`
+                : done === team.tasks.length
+                  ? "所有子任務都已整合；重試只會重新執行 Lead 整合與獨立審查。"
+                  : "尚有未開始的子任務；若計畫尚未核准，重試會先回到等待核准。"}
+            </span>
+            <input
+              type="text"
+              aria-label="給重試任務的補充說明"
+              placeholder="選填：給重試成員的補充說明，會在第一回合送達"
+              value={retryMessage}
+              maxLength={4000}
+              onChange={(e) => setRetryMessage(e.target.value)}
+              disabled={busy}
+            />
+            <button className="button primary" disabled={busy}>
+              {busy ? (
+                <Loader2 size={15} className="spin" />
+              ) : (
+                <RotateCcw size={15} />
+              )}
+              重試失敗的子任務
+            </button>
+            {retryError && (
+              <p className="inline-error" role="alert">
+                {retryError}
+              </p>
+            )}
+          </form>
+        )}
       </div>
       <div className="team-board-content">
         <div className="team-kanban">
@@ -319,7 +380,11 @@ export function TeamBoard({
                     <div className="team-task-owner">
                       <Bot size={13} />
                       {task.owner}
-                      <span>獨立 worktree</span>
+                      <span>
+                        {task.worktreeRemoved
+                          ? "獨立 worktree 已清理"
+                          : "獨立 worktree"}
+                      </span>
                     </div>
                     <div className="team-task-files">
                       <GitBranch size={13} />
@@ -340,14 +405,18 @@ export function TeamBoard({
                       <>
                         <button
                           className="team-report-toggle"
-                          aria-expanded={expanded === task.id}
+                          aria-expanded={isExpanded(task)}
                           onClick={() =>
-                            setExpanded(expanded === task.id ? null : task.id)
+                            setToggled({
+                              ...toggled,
+                              [task.id]: !isExpanded(task),
+                            })
                           }
                         >
-                          查看工作報告 <ChevronDown size={13} />
+                          {task.error ? "查看失敗原因" : "查看工作報告"}{" "}
+                          <ChevronDown size={13} />
                         </button>
-                        {expanded === task.id && (
+                        {isExpanded(task) && (
                           <pre className="team-task-report">
                             {task.error || task.report}
                           </pre>

@@ -55,7 +55,7 @@ export class Store {
         run.status = "failed";
         run.publishing = false;
         run.error =
-          "服務重新啟動，先前工作已中斷。工作目錄仍保留，可檢視差異並建立新工作。";
+          "服務重新啟動，先前工作已中斷。工作目錄仍保留，可檢視差異；團隊工作可在任務板重試失敗的子任務，已整合的子任務不會重跑。";
         for (const agent of run.agents)
           if (agent.status === "running") agent.status = "failed";
         if (run.team) {
@@ -63,7 +63,8 @@ export class Store {
           for (const task of run.team.tasks)
             if (task.status === "running") {
               task.status = "failed";
-              task.error = "服務重新啟動，任務已中斷；隔離工作目錄保留。";
+              task.error =
+                "服務重新啟動，任務已中斷；隔離工作目錄保留，重試時會以新快照重新開始。";
             }
         }
       }
