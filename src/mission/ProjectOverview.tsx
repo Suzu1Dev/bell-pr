@@ -79,6 +79,15 @@ function analysisDate(value?: string) {
     : "";
 }
 
+/** Caches written before coverage was recorded say so instead of showing zeros. */
+function sampleCoverage(sample: ProjectInsights["sample"]) {
+  if (!sample) return "抽樣範圍未記錄，重新分析後顯示";
+  const count = (value: number) => value.toLocaleString("zh-TW");
+  const truncated =
+    sample.truncatedFiles > 0 ? `，${count(sample.truncatedFiles)} 檔節錄` : "";
+  return `讀取 ${count(sample.sampledFiles)} / ${count(sample.trackedFiles)} 個追蹤檔（約 ${count(Math.max(1, Math.round(sample.bytes / 1024)))} KB${truncated}）`;
+}
+
 function EvidencePaths({
   paths,
   details,
@@ -589,7 +598,7 @@ export function ProjectOverview({
               <span>
                 {insights.source === "demo"
                   ? "預寫範例，未呼叫 AI"
-                  : "由來源檔案整理，推論仍需確認"}
+                  : `${sampleCoverage(insights.sample)}，推論仍需確認`}
               </span>
             </div>
             <ModelSummary

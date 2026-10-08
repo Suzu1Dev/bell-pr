@@ -1,7 +1,60 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { addEfficiency, applyPonytail, trackEfficiency } from "./efficiency.js";
+import {
+  addEfficiency,
+  applyPonytail,
+  efficiencyMetricsSchema,
+  emptyEfficiency,
+  trackEfficiency,
+} from "./efficiency.js";
+
+test("usage accumulates per role, and unreported calls count calls but not tokens", () => {
+  const usage = {
+    type: "result",
+    usage: {
+      input_tokens: 10,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 4,
+      output_tokens: 3,
+    },
+  };
+  const lead = trackEfficiency("lite");
+  lead.observe(usage);
+  let total = addEfficiency(undefined, lead.finish(true), "lead");
+  const member = trackEfficiency("lite");
+  member.observe(usage);
+  total = addEfficiency(total, member.finish(true), "member-1");
+  // A call without usage still counts as a call, never as a measured zero.
+  total = addEfficiency(total, trackEfficiency("lite").finish(false), "member-1");
+  // A call without a role leaves byRole untouched.
+  total = addEfficiency(total, trackEfficiency("lite").finish(true));
+  // Claude Code input = uncached + cache write + cache read = 14 per measured call.
+  assert.equal(total.calls, 4);
+  assert.equal(total.inputTokens, 28);
+  assert.deepEqual(Object.keys(total.byRole ?? {}), ["lead", "member-1"]);
+  assert.equal(total.byRole?.lead.inputTokens, 14);
+  assert.equal(total.byRole?.lead.cachedInputTokens, 4);
+  assert.equal(total.byRole?.lead.outputTokens, 3);
+  assert.equal(total.byRole?.["member-1"].calls, 2);
+  assert.equal(total.byRole?.["member-1"].measuredCalls, 1);
+  assert.equal(total.byRole?.["member-1"].inputTokens, 14);
+  assert.ok((total.byRole?.["member-1"].durationMs ?? -1) >= 0);
+  assert.equal(
+    addEfficiency(undefined, trackEfficiency("off").finish(true)).byRole,
+    undefined,
+  );
+  // Records saved before byRole existed still parse, and parsed byRole keeps its shape.
+  const legacy = emptyEfficiency("lite");
+  assert.deepEqual(efficiencyMetricsSchema.parse(legacy), legacy);
+  assert.deepEqual(efficiencyMetricsSchema.parse(total), total);
+  assert.ok(
+    !efficiencyMetricsSchema.safeParse({
+      ...legacy,
+      byRole: { lead: { calls: 1 } },
+    }).success,
+  );
+});
 
 test("Ponytail modes preserve role boundaries and the exact pinned full rules", async () => {
   const prompt = "Return ONLY valid JSON. Keep the assigned file scopes.";

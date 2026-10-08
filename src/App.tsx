@@ -11,6 +11,7 @@ import {
 } from "react";
 import {
   Activity,
+  AlertCircle,
   ArrowDownToLine,
   ArrowUpRight,
   BookOpen,
@@ -65,6 +66,7 @@ import type {
   DiscoveryCandidate,
 } from "../shared/discovery";
 import { DiffView } from "./review/DiffView";
+import { languageBadge } from "./review/diff";
 import { providerLabels, type ModelSettings } from "../shared/models";
 import { CommandPalette } from "./navigation/CommandPalette";
 const ExplanationPanel = lazy(() =>
@@ -126,6 +128,13 @@ const statusLabels: Record<Run["status"], string> = {
   failed: "執行失敗",
   cancelled: "已停止",
 };
+const fileStatusLabels: Record<string, { badge: string; title: string }> = {
+  added: { badge: "A", title: "新增檔案" },
+  modified: { badge: "M", title: "已修改" },
+  deleted: { badge: "D", title: "已刪除" },
+};
+const fileStatusLabel = (status: string) =>
+  fileStatusLabels[status] ?? fileStatusLabels.modified;
 
 function loadDemo(): Run {
   try {
@@ -160,9 +169,13 @@ function Modal({
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const before = document.activeElement as HTMLElement;
-    panel.current
-      ?.querySelector<HTMLElement>("input, textarea, button")
-      ?.focus();
+    // Land on the first real field or action; the close button is the
+    // panel's first <button>, so it is only the fallback.
+    const first =
+      panel.current?.querySelector<HTMLElement>(
+        "input:not(:disabled), textarea:not(:disabled), select:not(:disabled), button:not(.modal-close):not(:disabled), a[href]",
+      ) ?? panel.current?.querySelector<HTMLElement>(".modal-close");
+    first?.focus();
     const handler = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing || document.querySelector("dialog[open]")) return;
       if (event.key === "Escape") onClose();
@@ -231,7 +244,10 @@ export default function App() {
   const [selectedPath, setSelectedPath] = useState(demoFiles[0]?.path || "");
   const [status, setStatus] = useState<Status | null>(null);
   const [apiError, setApiError] = useState("");
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState<{
+    message: string;
+    tone: "success" | "error";
+  } | null>(null);
   const [commandOpen, setCommandOpen] = useState(false);
   const mainContent = useRef<HTMLElement>(null);
   const commandShortcut = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? "⌘ K" : "Ctrl K";
@@ -313,6 +329,21 @@ export default function App() {
   ).length;
   const allReviewed = files.length > 0 && reviewedCount === files.length;
   const active = ["running", "queued", "awaiting_plan"].includes(run.status);
+  // Progress strip index: 0 定義任務, 1 Agent 開發, 2 理解與審查, 3 送出貢獻;
+  // 4 marks every step done. Failed and cancelled runs stay on step 02.
+  const currentStep: number = (
+    {
+      queued: 1,
+      awaiting_plan: 1,
+      running: 1,
+      failed: 1,
+      cancelled: 1,
+      review: 2,
+      approved: 3,
+      published: 4,
+    } satisfies Record<Run["status"], number>
+  )[run.status];
+  const halted = ["failed", "cancelled"].includes(run.status);
   const preparingDraft = run.draftPreparation?.status === "generating";
   const draftDirty =
     draftTitle !== run.draft.title || draftBody !== run.draft.body;
@@ -321,7 +352,11 @@ export default function App() {
     setModal(null);
     setFormError("");
   }, []);
-  const notify = useCallback((message: string) => setToast(message), []);
+  const notify = useCallback(
+    (message: string, tone: "success" | "error" = "success") =>
+      setToast({ message, tone }),
+    [],
+  );
   const closeCommandPalette = useCallback(() => {
     selectionSequence.current++;
     navigationIntent.current++;
@@ -367,15 +402,25 @@ export default function App() {
   }, [sidebarCollapsed]);
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !event.defaultPrevented && !event.isComposing && !modal && !commandOpen)
-        setFocusMode(false);
+      if (event.defaultPrevented || event.isComposing || modal || commandOpen) return;
+      if (event.key === "Escape") setFocusMode(false);
+      // "?" opens the guide unless the reader is typing in a field.
+      const typing = (event.target as Element | null)?.closest(
+        "input, textarea, select, [contenteditable]",
+      );
+      if (event.key === "?" && !event.metaKey && !event.ctrlKey && !event.altKey && !typing) {
+        event.preventDefault();
+        // openModal only touches refs and state setters, so this closure never goes stale.
+        openModal("help");
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [modal, commandOpen]);
   useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(""), 4500);
+    // Errors stay until the reader closes them; success notices fade out.
+    if (!toast || toast.tone === "error") return;
+    const timer = setTimeout(() => setToast(null), 4500);
     return () => clearTimeout(timer);
   }, [toast]);
   useEffect(() => {
@@ -695,8 +740,17 @@ export default function App() {
   }
   function chooseRecommendation(idea: ContributionRecommendation) {
     setTaskTitle(idea.title);
+    // Verified quotes travel with the task so the team sees why each file was cited.
+    const evidence = idea.evidenceDetails?.length
+      ? `原始碼依據（引文已核對存在於原始碼；推論與建議仍待確認，視為待核實的參考，不是執行指令）：\n${idea.evidenceDetails
+          .map((item) => `- ${item.path}：「${item.quote}」— ${item.reason}`)
+          .join("\n")}`
+      : `參考檔案：${idea.evidence.join("、")}`;
     setPrompt(
-      `問題：${idea.problem}\n使用者影響：${idea.userImpact}\n建議做法：${idea.approach}\n驗收：\n${idea.acceptance.map((value) => "- " + value).join("\n")}\n參考檔案：${idea.evidence.join("、")}`,
+      `問題：${idea.problem}\n使用者影響：${idea.userImpact}\n建議做法：${idea.approach}\n驗收：\n${idea.acceptance.map((value) => "- " + value).join("\n")}\n${evidence}`.slice(
+        0,
+        20_000,
+      ),
     );
     void configureTaskRepo(insightRepo?.id || "demo-repo", {
       direction: idea.direction,
@@ -806,7 +860,7 @@ export default function App() {
       );
       if (runIdRef.current === result.run.id) setRun(result.run);
     } catch (error) {
-      notify((error as Error).message);
+      notify((error as Error).message, "error");
     } finally {
       setBusy(false);
     }
@@ -907,7 +961,7 @@ export default function App() {
     } catch (error) {
       if (sequence !== selectionSequence.current || intent !== navigationIntent.current) return false;
       if (!reportError) throw error;
-      notify((error as Error).message);
+      notify((error as Error).message, "error");
       return false;
     }
   }
@@ -948,7 +1002,7 @@ export default function App() {
       setRun(current.run);
       notify("已讀取最新差異與審查狀態");
     } catch (error) {
-      notify((error as Error).message);
+      notify((error as Error).message, "error");
     }
   }
   async function importRepo(event: FormEvent) {
@@ -1039,7 +1093,7 @@ export default function App() {
       );
       if (runIdRef.current === updated.id) setRun(updated);
     } catch (error) {
-      notify((error as Error).message);
+      notify((error as Error).message, "error");
     }
   }
   async function ask(question: string) {
@@ -1124,7 +1178,7 @@ export default function App() {
           );
       }
     } catch (error) {
-      if (runIdRef.current === id) notify((error as Error).message);
+      if (runIdRef.current === id) notify((error as Error).message, "error");
     } finally {
       pendingDrafts.current.delete(id);
       setDraftRequests((previous) => {
@@ -1142,7 +1196,7 @@ export default function App() {
   }
   async function saveDraft() {
     if (!draftTitle.trim() || !draftBody.trim()) {
-      notify("請填寫 PR 標題與說明。");
+      notify("請填寫 PR 標題與說明。", "error");
       return;
     }
     setBusy(true);
@@ -1163,7 +1217,7 @@ export default function App() {
       }
       notify("PR 草稿已儲存");
     } catch (error) {
-      notify((error as Error).message);
+      notify((error as Error).message, "error");
     } finally {
       // Discard reads begun before or during this mutation, even if they arrive later.
       draftMutationEpoch.current++;
@@ -1184,7 +1238,7 @@ export default function App() {
       }
       openModal("publish");
     } catch (error) {
-      notify((error as Error).message);
+      notify((error as Error).message, "error");
     } finally {
       setBusy(false);
     }
@@ -1229,7 +1283,7 @@ export default function App() {
       }
       notify("任務已停止，工作目錄已保留。");
     } catch (error) {
-      notify((error as Error).message);
+      notify((error as Error).message, "error");
     }
   }
 
@@ -1383,6 +1437,7 @@ export default function App() {
           <button
             className="nav-item"
             title="使用指南"
+            aria-keyshortcuts="?"
             onClick={() => openModal("help")}
           >
             <CircleHelp size={17} />
@@ -1564,14 +1619,9 @@ export default function App() {
                   icon: GitPullRequest,
                 },
               ].map((step, index) => {
-                const currentStep = active
-                  ? 1
-                  : run.status === "published"
-                    ? 3
-                    : 2;
                 return (
                   <div
-                    className={`workflow-step ${index === currentStep ? "current" : ""} ${index < currentStep ? "done" : ""}`}
+                    className={`workflow-step ${index === currentStep && !halted ? "current" : ""} ${index < currentStep ? "done" : ""}`}
                     key={step.n}
                   >
                     <span className="step-icon">
@@ -1584,7 +1634,11 @@ export default function App() {
                     <div>
                       <span className="step-number">{step.n}</span>
                       <strong>{step.title}</strong>
-                      <small>{step.description}</small>
+                      <small>
+                        {index === 1 && currentStep === 1
+                          ? statusLabels[run.status]
+                          : step.description}
+                      </small>
                     </div>
                     {index < 3 && (
                       <ChevronRight className="step-chevron" size={16} />
@@ -1615,6 +1669,8 @@ export default function App() {
                 >
                   <button
                     role="tab"
+                    id="workspace-tab-overview"
+                    aria-controls="workspace-panel"
                     tabIndex={tab === "overview" ? 0 : -1}
                     aria-selected={tab === "overview"}
                     className={tab === "overview" ? "selected" : ""}
@@ -1628,6 +1684,8 @@ export default function App() {
                   </button>
                   <button
                     role="tab"
+                    id="workspace-tab-changes"
+                    aria-controls="workspace-panel"
                     tabIndex={tab === "changes" ? 0 : -1}
                     aria-selected={tab === "changes"}
                     className={tab === "changes" ? "selected" : ""}
@@ -1638,6 +1696,8 @@ export default function App() {
                   </button>
                   <button
                     role="tab"
+                    id="workspace-tab-activity"
+                    aria-controls="workspace-panel"
                     tabIndex={tab === "activity" ? 0 : -1}
                     aria-selected={tab === "activity"}
                     className={tab === "activity" ? "selected" : ""}
@@ -1648,6 +1708,8 @@ export default function App() {
                   </button>
                   <button
                     role="tab"
+                    id="workspace-tab-draft"
+                    aria-controls="workspace-panel"
                     tabIndex={tab === "draft" ? 0 : -1}
                     aria-selected={tab === "draft"}
                     className={tab === "draft" ? "selected" : ""}
@@ -1665,577 +1727,597 @@ export default function App() {
                   <span>{demo ? "範例審查" : "人工審查"}</span>
                 </div>
               </div>
-              {tab === "overview" && currentRepo && (
-                <ProjectOverview
-                  repo={currentRepo}
-                  run={run}
-                  insights={intelligence.insights}
-                  brief={demo ? demoContributionBrief : contributionBrief(run)}
-                  loading={intelligence.loading}
-                  error={intelligence.error}
-                  recommending={intelligence.recommending}
-                  recommendationError={intelligence.recommendationError}
-                  recommendationPreferences={intelligence.recommendationPreferences}
-                  savingPreferences={intelligence.savingPreferences}
-                  preferenceError={intelligence.preferenceError}
-                  onSavePreferences={intelligence.savePreferences}
-                  stale={intelligence.stale}
-                  onAnalyze={intelligence.analyze}
-                  onRecommendMore={intelligence.recommendMore}
-                  onChooseRecommendation={chooseRecommendation}
-                  onReadCode={() => setTab("changes")}
-                />
-              )}
-              {tab === "changes" && (
-                <div
-                  ref={reviewGridRef}
-                  className={`review-grid ${!showFiles ? "files-hidden" : ""} ${!showExplanation ? "explanation-hidden" : ""}`}
-                >
-                  {showFiles && (
-                    <aside className="file-panel">
-                      <div className="file-panel-heading">
-                        <strong>
-                          變更的檔案 <span>{files.length}</span>
-                        </strong>
-                        <ListTree size={16} />
-                      </div>
-                      <label className="file-search">
-                        <Search size={14} />
-                        <input
-                          placeholder="搜尋檔案…"
-                          aria-label="搜尋變更檔案"
-                          value={fileSearch}
-                          onChange={(e) => setFileSearch(e.target.value)}
-                        />
-                        <kbd>⌕</kbd>
-                      </label>
-                      <button
-                        className={`filter-toggle ${onlyUnreviewed ? "is-on" : ""}`}
-                        onClick={() => setOnlyUnreviewed(!onlyUnreviewed)}
-                      >
-                        <span className="toggle-track">
-                          <span />
-                        </span>
-                        只看尚未審查
-                      </button>
-                      <div className="file-tree">
-                        <div className="tree-root">
-                          <ChevronDown size={13} />
-                          <FolderGit2 size={15} />
-                          {currentRepo?.name || "repository"}
-                        </div>
-                        {visibleFiles.map((f) => (
-                          <button
-                            key={f.path}
-                            title={f.path}
-                            className={`file-item ${file?.path === f.path ? "selected" : ""}`}
-                            onClick={() => {
-                              if (f.path !== selectedPath)
-                                setChatRequests((previous) => ({
-                                  ...previous,
-                                  [`${run.id}:${f.path}`]: 0,
-                                }));
-                              setSelectedPath(f.path);
-                            }}
-                          >
-                            <span
-                              className={`file-type ${f.path.endsWith(".md") ? "markdown" : ""}`}
-                            >
-                              {f.path.endsWith(".md") ? "M↓" : "TS"}
-                            </span>
-                            <span className="file-name">
-                              {f.path.split("/").pop()}
-                              <small>
-                                {f.path.includes("/")
-                                  ? f.path.slice(0, f.path.lastIndexOf("/"))
-                                  : "/"}
-                              </small>
-                            </span>
-                            {run.reviewedFiles.includes(f.path) ? (
-                              <CircleCheck
-                                className="file-reviewed"
-                                size={14}
-                              />
-                            ) : (
-                              <span className="file-modified">
-                                {f.status === "added" ? "A" : "M"}
-                              </span>
-                            )}
-                          </button>
-                        ))}
-                        {!visibleFiles.length && (
-                          <p className="file-empty">
-                            {active ? "等待 agent 產生變更" : "沒有符合的檔案"}
-                          </p>
-                        )}
-                      </div>
-                      <div className="review-progress">
-                        <div>
-                          <span>審查進度</span>
-                          <strong>
-                            {reviewedCount}
-                            <span> / {files.length}</span>
-                          </strong>
-                        </div>
-                        <div className="progress-track">
-                          <span
-                            style={{
-                              width: `${files.length ? (reviewedCount / files.length) * 100 : 0}%`,
-                            }}
-                          />
-                        </div>
-                        <small>
-                          {allReviewed
-                            ? "所有變更都已看過，準備好送出！"
-                            : "看懂了，就勾選「已審查」。"}
-                        </small>
-                      </div>
-                    </aside>
-                  )}
-                  <section className="diff-panel">
-                    <div className="diff-topbar">
-                      <span>
-                        <GitBranch size={14} /> {run.baseBranch}{" "}
-                        <span className="diff-topbar-arrow">←</span>{" "}
-                        {run.branch}
-                      </span>
-                      <div className="diff-toolbar-actions">
-                        <button
-                          className="icon-button"
-                          aria-label={
-                            showFiles ? "收合檔案清單" : "顯示檔案清單"
-                          }
-                          title="切換檔案清單"
-                          onClick={() => setShowFiles(!showFiles)}
-                        >
-                          <PanelLeftClose size={16} />
-                        </button>
-                        <div className="code-size-control">
-                          <button
-                            aria-label="縮小程式碼字體"
-                            disabled={codeFont <= 12}
-                            onClick={() => changeCodeFont(-1)}
-                          >
-                            <Minus size={13} />
-                          </button>
-                          <span>{codeFont}</span>
-                          <button
-                            aria-label="放大程式碼字體"
-                            disabled={codeFont >= 20}
-                            onClick={() => changeCodeFont(1)}
-                          >
-                            <Plus size={13} />
-                          </button>
-                        </div>
-                        <button
-                          className="icon-button"
-                          aria-label={
-                            showExplanation ? "收合解說面板" : "顯示解說面板"
-                          }
-                          title="切換解說面板"
-                          onClick={() => setShowExplanation(!showExplanation)}
-                        >
-                          {showExplanation ? (
-                            <PanelRightClose size={16} />
-                          ) : (
-                            <PanelRightOpen size={16} />
-                          )}
-                        </button>
-                        <button
-                          className="icon-button"
-                          aria-label={
-                            focusMode ? "離開專注模式" : "進入專注模式"
-                          }
-                          title="專注閱讀"
-                          onClick={() => setFocusMode(!focusMode)}
-                        >
-                          {focusMode ? (
-                            <Minimize2 size={16} />
-                          ) : (
-                            <Maximize2 size={16} />
-                          )}
-                        </button>
-                        <button
-                          className="icon-button"
-                          aria-label="重新整理差異"
-                          title="重新整理差異"
-                          onClick={refreshRun}
-                          disabled={active}
-                        >
-                          <RefreshCw size={14} />
-                        </button>
-                        <div className="view-toggle" aria-label="Diff 顯示模式">
-                          <button
-                            aria-label="統一檢視"
-                            title="統一檢視"
-                            className={diffView === "unified" ? "selected" : ""}
-                            onClick={() => setDiffView("unified")}
-                          >
-                            <ListTree size={15} />
-                          </button>
-                          <button
-                            aria-label="並排檢視"
-                            title="並排檢視"
-                            className={diffView === "split" ? "selected" : ""}
-                            onClick={() => setDiffView("split")}
-                          >
-                            <Columns2 size={15} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    {file ? (
-                      <DiffView
-                        key={`${run.id}:${file.path}`}
-                        file={file}
-                        reviewed={run.reviewedFiles.includes(file.path)}
-                        onReview={reviewFile}
-                        onAsk={ask}
-                        view={diffView}
-                      />
-                    ) : (
-                      <div className="empty-state">
-                        <div className="empty-icon">
-                          {active ? <Loader2 className="spin" /> : <Code2 />}
-                        </div>
-                        <h3>
-                          {active
-                            ? "Agent team 正在準備你的變更"
-                            : "尚無程式碼變更"}
-                        </h3>
-                        <p>
-                          {run.error ||
-                            "在 Agent 動態查看執行過程，完成後即可在這裡審查。"}
-                        </p>
-                        <button
-                          className="button secondary"
-                          onClick={() => setTab("activity")}
-                        >
-                          查看 Agent 動態
-                        </button>
-                      </div>
-                    )}
-                  </section>
-                  {showExplanation && (
-                    <>
-                      <div
-                        className="pane-resizer"
-                        role="separator"
-                        aria-label="調整解說面板寬度"
-                        aria-orientation="vertical"
-                        aria-valuemin={280}
-                        aria-valuemax={520}
-                        aria-valuenow={explanationWidth}
-                        tabIndex={0}
-                        onPointerDown={startResize}
-                        onKeyDown={(event) => {
-                          if (event.key === "ArrowLeft") {
-                            event.preventDefault();
-                            setExplanationWidth((value) =>
-                              Math.min(520, value + 20),
-                            );
-                          }
-                          if (event.key === "ArrowRight") {
-                            event.preventDefault();
-                            setExplanationWidth((value) =>
-                              Math.max(280, value - 20),
-                            );
-                          }
-                        }}
-                      />
-                      <aside className="explanation-wrap">
-                        {file ? (
-                          <Suspense
-                            fallback={
-                              <div className="empty-state" role="status">
-                                <Loader2 className="spin" />
-                                <p>正在準備閱讀面板…</p>
-                              </div>
-                            }
-                          >
-                            <ExplanationPanel
-                              key={`${run.id}:${file.path}`}
-                              file={file}
-                              messages={
-                                messages[`${run.id}:${file.path}`] || []
-                              }
-                              loading={chatLoading}
-                              onAsk={ask}
-                              onRetryExplanation={() =>
-                                prepareExplanations(run.id, true, file.path)
-                              }
-                              chatRequestId={
-                                chatRequests[`${run.id}:${file.path}`] || 0
-                              }
-                              onChatRequestHandled={() =>
-                                setChatRequests((previous) => ({
-                                  ...previous,
-                                  [`${run.id}:${file.path}`]: 0,
-                                }))
-                              }
-                              explanationBusy={explanationRequests.has(run.id)}
-                              demo={demo}
-                            />
-                          </Suspense>
-                        ) : (
-                          <div className="empty-state">
-                            <Sparkles />
-                            <h3>理解，從改動開始。</h3>
-                            <p>選取變更的檔案，就能詢問背後的設計與取捨。</p>
-                          </div>
-                        )}
-                      </aside>
-                    </>
-                  )}
-                </div>
-              )}
-              {tab === "activity" && (
-                <TeamBoard
-                  key={run.id}
-                  run={run}
-                  demo={demo}
-                  onApprove={approveTeamPlan}
-                  onMessage={sendTeamMessage}
-                  busy={busy}
-                />
-              )}
-              {tab === "activity" && (
-                <div className="activity-layout">
-                  <div className="activity-main">
-                    <div className="section-heading">
-                      <div>
-                        <h2>你的 Agent team</h2>
-                        <p>每個角色各司其職，所有過程都在這裡。</p>
-                      </div>
-                      {active && (
-                        <button className="button secondary" onClick={cancel}>
-                          <Square size={14} />
-                          停止任務
-                        </button>
-                      )}
-                    </div>
-                    <div className="agent-grid">
-                      {run.agents.map((agent, index) => (
-                        <div
-                          className={`agent-card ${agent.status}`}
-                          key={agent.id}
-                        >
-                          <div className={`agent-avatar color-${index}`}>
-                            <Bot size={22} />
-                          </div>
-                          <div>
-                            <strong>{agent.name}</strong>
-                            <span>{agent.role}</span>
-                          </div>
-                          <span className="agent-state">
-                            {agent.status === "complete" ? (
-                              <CircleCheck size={17} />
-                            ) : agent.status === "running" ? (
-                              <Loader2 className="spin" size={17} />
-                            ) : (
-                              <Circle size={17} />
-                            )}
-                          </span>
-                          <p>{agent.detail}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="activity-log-heading">
-                      <h3>執行紀錄</h3>
-                      <span>
-                        {demo
-                          ? "示範紀錄"
-                          : active
-                            ? "每 2.5 秒更新"
-                            : "任務紀錄"}
-                      </span>
-                    </div>
-                    <div className="activity-log">
-                      {run.logs.map((log, index) => (
-                        <div className="log-line" key={index}>
-                          <span className="log-time">
-                            {new Date(log.time).toLocaleTimeString("zh-TW", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              second: "2-digit",
-                            })}
-                          </span>
-                          <span className="log-agent">{log.agent}</span>
-                          <p>{log.message}</p>
-                        </div>
-                      ))}
-                      {!run.logs.length && (
-                        <p className="muted">任務開始後會在此顯示紀錄。</p>
-                      )}
-                    </div>
-                    {run.error && <p className="inline-error">{run.error}</p>}
-                  </div>
-                  <aside className="task-brief">
-                    <span className="eyebrow">MISSION BRIEF</span>
-                    <h3>這次的貢獻目標</h3>
-                    <p>{run.prompt}</p>
-                    <div className="brief-meta">
-                      <GitBranch size={16} />
-                      <span>{run.branch}</span>
-                    </div>
-                    <div className="callout">
-                      <ShieldCheck size={18} />
-                      <p>
-                        開發在獨立的 Git worktree
-                        中執行。審查完成後，由你決定何時送出。
-                      </p>
-                    </div>
-                  </aside>
-                </div>
-              )}
-              {tab === "draft" && (
-                <div className="draft-workspace">
-                  <Suspense
-                    fallback={<p className="muted">正在載入草稿規範…</p>}
+              <div
+                role="tabpanel"
+                id="workspace-panel"
+                aria-labelledby={`workspace-tab-${tab}`}
+              >
+                {tab === "overview" && currentRepo && (
+                  <ProjectOverview
+                    repo={currentRepo}
+                    run={run}
+                    insights={intelligence.insights}
+                    brief={demo ? demoContributionBrief : contributionBrief(run)}
+                    loading={intelligence.loading}
+                    error={intelligence.error}
+                    recommending={intelligence.recommending}
+                    recommendationError={intelligence.recommendationError}
+                    recommendationPreferences={intelligence.recommendationPreferences}
+                    savingPreferences={intelligence.savingPreferences}
+                    preferenceError={intelligence.preferenceError}
+                    onSavePreferences={intelligence.savePreferences}
+                    stale={intelligence.stale}
+                    onAnalyze={intelligence.analyze}
+                    onRecommendMore={intelligence.recommendMore}
+                    onChooseRecommendation={chooseRecommendation}
+                    onReadCode={() => setTab("changes")}
+                  />
+                )}
+                {tab === "changes" && (
+                  <div
+                    ref={reviewGridRef}
+                    className={`review-grid ${!showFiles ? "files-hidden" : ""} ${!showExplanation ? "explanation-hidden" : ""}`}
                   >
-                    <DraftGuidancePanel
-                      preparation={run.draftPreparation}
-                      busy={draftRequests.has(run.id)}
-                      disabled={
-                        active ||
-                        busy ||
-                        !["review", "approved"].includes(run.status)
-                      }
-                      demo={demo}
-                      onGenerate={prepareDraft}
-                      onApply={applyDraftProposal}
-                    />
-                  </Suspense>
-                  <div className="draft-layout">
-                    <div className="draft-editor">
-                      <div className="section-heading">
-                        <div>
-                          <h2>讓好的改動，也有好的說明。</h2>
-                          <p>調整草稿，讓維護者輕鬆理解你的貢獻。</p>
+                    {showFiles && (
+                      <aside className="file-panel">
+                        <div className="file-panel-heading">
+                          <strong>
+                            變更的檔案 <span>{files.length}</span>
+                          </strong>
+                          <ListTree size={16} />
                         </div>
-                        <span className="draft-label">DRAFT PR</span>
-                      </div>
-                      <label className="field-label" htmlFor="pr-title">
-                        Pull Request 標題
-                      </label>
-                      <input
-                        id="pr-title"
-                        className="text-input draft-title"
-                        value={draftTitle}
-                        onChange={(e) => setDraftTitle(e.target.value)}
-                        disabled={run.status === "published"}
-                      />
-                      <div className="editor-toolbar">
-                        <div>
+                        <label className="file-search">
+                          <Search size={14} />
+                          <input
+                            placeholder="搜尋檔案…"
+                            aria-label="搜尋變更檔案"
+                            value={fileSearch}
+                            onChange={(e) => setFileSearch(e.target.value)}
+                          />
+                          <kbd>⌕</kbd>
+                        </label>
+                        <button
+                          className={`filter-toggle ${onlyUnreviewed ? "is-on" : ""}`}
+                          onClick={() => setOnlyUnreviewed(!onlyUnreviewed)}
+                        >
+                          <span className="toggle-track">
+                            <span />
+                          </span>
+                          只看尚未審查
+                        </button>
+                        <div className="file-tree">
+                          <div className="tree-root">
+                            <ChevronDown size={13} />
+                            <FolderGit2 size={15} />
+                            {currentRepo?.name || "repository"}
+                          </div>
+                          {visibleFiles.map((f) => (
+                            <button
+                              key={f.path}
+                              title={f.path}
+                              className={`file-item ${file?.path === f.path ? "selected" : ""}`}
+                              onClick={() => {
+                                if (f.path !== selectedPath)
+                                  setChatRequests((previous) => ({
+                                    ...previous,
+                                    [`${run.id}:${f.path}`]: 0,
+                                  }));
+                                setSelectedPath(f.path);
+                              }}
+                            >
+                              <span
+                                className={`file-type ${f.language === "Markdown" ? "markdown" : ""}`}
+                                title={f.language}
+                              >
+                                {languageBadge(f.language)}
+                              </span>
+                              <span className="file-name">
+                                {f.path.split("/").pop()}
+                                <small>
+                                  {f.path.includes("/")
+                                    ? f.path.slice(0, f.path.lastIndexOf("/"))
+                                    : "/"}
+                                </small>
+                              </span>
+                              {run.reviewedFiles.includes(f.path) ? (
+                                <CircleCheck
+                                  className="file-reviewed"
+                                  size={14}
+                                />
+                              ) : (
+                                <span
+                                  className={`file-modified ${f.status === "deleted" ? "file-deleted" : ""}`}
+                                  title={fileStatusLabel(f.status).title}
+                                >
+                                  {fileStatusLabel(f.status).badge}
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                          {!visibleFiles.length && (
+                            <p className="file-empty">
+                              {active ? "等待 agent 產生變更" : "沒有符合的檔案"}
+                            </p>
+                          )}
+                        </div>
+                        <div className="review-progress">
+                          <div>
+                            <span>審查進度</span>
+                            <strong>
+                              {reviewedCount}
+                              <span> / {files.length}</span>
+                            </strong>
+                          </div>
+                          <div className="progress-track">
+                            <span
+                              style={{
+                                width: `${files.length ? (reviewedCount / files.length) * 100 : 0}%`,
+                              }}
+                            />
+                          </div>
+                          <small>
+                            {allReviewed
+                              ? "所有變更都已看過，準備好送出！"
+                              : "看懂了，就勾選「已審查」。"}
+                          </small>
+                        </div>
+                      </aside>
+                    )}
+                    <section className="diff-panel">
+                      <div className="diff-topbar">
+                        <span>
+                          <GitBranch size={14} /> {run.baseBranch}{" "}
+                          <span className="diff-topbar-arrow">←</span>{" "}
+                          {run.branch}
+                        </span>
+                        <div className="diff-toolbar-actions">
                           <button
-                            className={!draftPreview ? "selected" : ""}
-                            onClick={() => setDraftPreview(false)}
+                            className="icon-button"
+                            aria-label={
+                              showFiles ? "收合檔案清單" : "顯示檔案清單"
+                            }
+                            title="切換檔案清單"
+                            onClick={() => setShowFiles(!showFiles)}
                           >
-                            編輯
+                            <PanelLeftClose size={16} />
+                          </button>
+                          <div className="code-size-control">
+                            <button
+                              aria-label="縮小程式碼字體"
+                              disabled={codeFont <= 12}
+                              onClick={() => changeCodeFont(-1)}
+                            >
+                              <Minus size={13} />
+                            </button>
+                            <span>{codeFont}</span>
+                            <button
+                              aria-label="放大程式碼字體"
+                              disabled={codeFont >= 20}
+                              onClick={() => changeCodeFont(1)}
+                            >
+                              <Plus size={13} />
+                            </button>
+                          </div>
+                          <button
+                            className="icon-button"
+                            aria-label={
+                              showExplanation ? "收合解說面板" : "顯示解說面板"
+                            }
+                            title="切換解說面板"
+                            onClick={() => setShowExplanation(!showExplanation)}
+                          >
+                            {showExplanation ? (
+                              <PanelRightClose size={16} />
+                            ) : (
+                              <PanelRightOpen size={16} />
+                            )}
                           </button>
                           <button
-                            className={draftPreview ? "selected" : ""}
-                            onClick={() => setDraftPreview(true)}
+                            className="icon-button"
+                            aria-label={
+                              focusMode ? "離開專注模式" : "進入專注模式"
+                            }
+                            title="專注閱讀"
+                            onClick={() => setFocusMode(!focusMode)}
                           >
-                            預覽
+                            {focusMode ? (
+                              <Minimize2 size={16} />
+                            ) : (
+                              <Maximize2 size={16} />
+                            )}
                           </button>
+                          <button
+                            className="icon-button"
+                            aria-label="重新整理差異"
+                            title="重新整理差異"
+                            onClick={refreshRun}
+                            disabled={active}
+                          >
+                            <RefreshCw size={14} />
+                          </button>
+                          <div className="view-toggle" aria-label="Diff 顯示模式">
+                            <button
+                              aria-label="統一檢視"
+                              title="統一檢視"
+                              className={diffView === "unified" ? "selected" : ""}
+                              onClick={() => setDiffView("unified")}
+                            >
+                              <ListTree size={15} />
+                            </button>
+                            <button
+                              aria-label="並排檢視"
+                              title="並排檢視"
+                              className={diffView === "split" ? "selected" : ""}
+                              onClick={() => setDiffView("split")}
+                            >
+                              <Columns2 size={15} />
+                            </button>
+                          </div>
                         </div>
-                        <span>Markdown</span>
                       </div>
-                      {draftPreview ? (
-                        <div className="markdown-preview">
-                          <Suspense fallback={<p>正在載入預覽…</p>}>
-                            <MarkdownContent>{draftBody}</MarkdownContent>
-                          </Suspense>
-                        </div>
-                      ) : (
-                        <textarea
-                          className="draft-textarea"
-                          aria-label="PR 說明"
-                          value={draftBody}
-                          onChange={(e) => setDraftBody(e.target.value)}
-                          disabled={run.status === "published"}
+                      {file ? (
+                        <DiffView
+                          key={`${run.id}:${file.path}`}
+                          file={file}
+                          reviewed={run.reviewedFiles.includes(file.path)}
+                          onReview={reviewFile}
+                          onAsk={ask}
+                          view={diffView}
                         />
+                      ) : (
+                        <div className="empty-state">
+                          <div className="empty-icon">
+                            {active ? <Loader2 className="spin" /> : <Code2 />}
+                          </div>
+                          <h3>
+                            {active
+                              ? "Agent team 正在準備你的變更"
+                              : "尚無程式碼變更"}
+                          </h3>
+                          <p>
+                            {run.error ||
+                              "在 Agent 動態查看執行過程，完成後即可在這裡審查。"}
+                          </p>
+                          <button
+                            className="button secondary"
+                            onClick={() => setTab("activity")}
+                          >
+                            查看 Agent 動態
+                          </button>
+                        </div>
                       )}
-                      <div className="draft-save-row">
+                    </section>
+                    {showExplanation && (
+                      <>
+                        <div
+                          className="pane-resizer"
+                          role="separator"
+                          aria-label="調整解說面板寬度"
+                          aria-orientation="vertical"
+                          aria-valuemin={280}
+                          aria-valuemax={520}
+                          aria-valuenow={explanationWidth}
+                          tabIndex={0}
+                          onPointerDown={startResize}
+                          onKeyDown={(event) => {
+                            if (event.key === "ArrowLeft") {
+                              event.preventDefault();
+                              setExplanationWidth((value) =>
+                                Math.min(520, value + 20),
+                              );
+                            }
+                            if (event.key === "ArrowRight") {
+                              event.preventDefault();
+                              setExplanationWidth((value) =>
+                                Math.max(280, value - 20),
+                              );
+                            }
+                          }}
+                        />
+                        <aside className="explanation-wrap">
+                          {file ? (
+                            <Suspense
+                              fallback={
+                                <div className="empty-state" role="status">
+                                  <Loader2 className="spin" />
+                                  <p>正在準備閱讀面板…</p>
+                                </div>
+                              }
+                            >
+                              <ExplanationPanel
+                                key={`${run.id}:${file.path}`}
+                                file={file}
+                                messages={
+                                  messages[`${run.id}:${file.path}`] || []
+                                }
+                                loading={chatLoading}
+                                onAsk={ask}
+                                onRetryExplanation={() =>
+                                  prepareExplanations(run.id, true, file.path)
+                                }
+                                chatRequestId={
+                                  chatRequests[`${run.id}:${file.path}`] || 0
+                                }
+                                onChatRequestHandled={() =>
+                                  setChatRequests((previous) => ({
+                                    ...previous,
+                                    [`${run.id}:${file.path}`]: 0,
+                                  }))
+                                }
+                                explanationBusy={explanationRequests.has(run.id)}
+                                demo={demo}
+                                reports={run.reports}
+                              />
+                            </Suspense>
+                          ) : (
+                            <div className="empty-state">
+                              <Sparkles />
+                              <h3>理解，從改動開始。</h3>
+                              <p>選取變更的檔案，就能詢問背後的設計與取捨。</p>
+                            </div>
+                          )}
+                        </aside>
+                      </>
+                    )}
+                  </div>
+                )}
+                {tab === "activity" && (
+                  <TeamBoard
+                    key={run.id}
+                    run={run}
+                    demo={demo}
+                    onApprove={approveTeamPlan}
+                    onMessage={sendTeamMessage}
+                    busy={busy}
+                  />
+                )}
+                {tab === "activity" && (
+                  <div className="activity-layout">
+                    <div className="activity-main">
+                      <div className="section-heading">
+                        {run.team ? (
+                          <div>
+                            <h2>執行過程</h2>
+                            <p>任務板在上方；完整紀錄、錯誤訊息與停止操作保留在這裡。</p>
+                          </div>
+                        ) : (
+                          <div>
+                            <h2>你的 Agent team</h2>
+                            <p>每個角色各司其職，所有過程都在這裡。</p>
+                          </div>
+                        )}
+                        {active && (
+                          <button className="button secondary" onClick={cancel}>
+                            <Square size={14} />
+                            停止任務
+                          </button>
+                        )}
+                      </div>
+                      {!run.team && (
+                        <div className="agent-grid">
+                          {run.agents.map((agent, index) => (
+                            <div
+                              className={`agent-card ${agent.status}`}
+                              key={agent.id}
+                            >
+                              <div className={`agent-avatar color-${index}`}>
+                                <Bot size={22} />
+                              </div>
+                              <div>
+                                <strong>{agent.name}</strong>
+                                <span>{agent.role}</span>
+                              </div>
+                              <span className="agent-state">
+                                {agent.status === "complete" ? (
+                                  <CircleCheck size={17} />
+                                ) : agent.status === "running" ? (
+                                  <Loader2 className="spin" size={17} />
+                                ) : (
+                                  <Circle size={17} />
+                                )}
+                              </span>
+                              <p>{agent.detail}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="activity-log-heading">
+                        <h3>執行紀錄</h3>
                         <span>
                           {demo
-                            ? "示範草稿儲存在此瀏覽器"
-                            : "草稿儲存在本機工作空間"}
+                            ? "示範紀錄"
+                            : active
+                              ? "每 2.5 秒更新"
+                              : "任務紀錄"}
                         </span>
-                        <button
-                          className="button primary"
-                          disabled={
-                            busy || !draftDirty || run.status === "published"
-                          }
-                          onClick={saveDraft}
-                        >
-                          {busy ? (
-                            <Loader2 className="spin" size={15} />
-                          ) : (
-                            <Check size={15} />
-                          )}
-                          儲存草稿
-                        </button>
                       </div>
+                      <div className="activity-log">
+                        {run.logs.map((log, index) => (
+                          <div className="log-line" key={index}>
+                            <span className="log-time">
+                              {new Date(log.time).toLocaleTimeString("zh-TW", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                second: "2-digit",
+                              })}
+                            </span>
+                            <span className="log-agent">{log.agent}</span>
+                            <p>{log.message}</p>
+                          </div>
+                        ))}
+                        {!run.logs.length && (
+                          <p className="muted">任務開始後會在此顯示紀錄。</p>
+                        )}
+                      </div>
+                      {run.error && <p className="inline-error">{run.error}</p>}
                     </div>
-                    <aside className="publish-checklist">
-                      <div className="checklist-icon">
-                        <GitPullRequest size={24} />
+                    <aside className="task-brief">
+                      <span className="eyebrow">MISSION BRIEF</span>
+                      <h3>這次的貢獻目標</h3>
+                      <p>{run.prompt}</p>
+                      <div className="brief-meta">
+                        <GitBranch size={16} />
+                        <span>{run.branch}</span>
                       </div>
-                      <h3>送出前，最後看一眼。</h3>
-                      <p>一份清楚的 PR，是一次好合作的開始。</p>
-                      <div
-                        className={
-                          allReviewed
-                            ? "checklist-item checked"
-                            : "checklist-item"
-                        }
-                      >
-                        {allReviewed ? (
-                          <CircleCheck size={18} />
-                        ) : (
-                          <Circle size={18} />
-                        )}
-                        <span>
-                          已審查所有檔案
-                          <small>
-                            {reviewedCount} / {files.length} 個檔案
-                          </small>
-                        </span>
-                      </div>
-                      <div
-                        className={
-                          !draftDirty
-                            ? "checklist-item checked"
-                            : "checklist-item"
-                        }
-                      >
-                        {!draftDirty ? (
-                          <CircleCheck size={18} />
-                        ) : (
-                          <Circle size={18} />
-                        )}
-                        <span>
-                          PR 草稿已儲存
-                          <small>
-                            {draftDirty
-                              ? "有尚未儲存的編輯"
-                              : "可隨時返回調整內容"}
-                          </small>
-                        </span>
-                      </div>
-                      <div className="checklist-item">
+                      <div className="callout">
                         <ShieldCheck size={18} />
-                        <span>
-                          以 Draft PR 送出
-                          <small>送出後仍可在 GitHub 繼續編輯</small>
-                        </span>
+                        <p>
+                          開發在獨立的 Git worktree
+                          中執行。審查完成後，由你決定何時送出。
+                        </p>
                       </div>
                     </aside>
                   </div>
-                </div>
-              )}
+                )}
+                {tab === "draft" && (
+                  <div className="draft-workspace">
+                    <Suspense
+                      fallback={<p className="muted">正在載入草稿規範…</p>}
+                    >
+                      <DraftGuidancePanel
+                        preparation={run.draftPreparation}
+                        busy={draftRequests.has(run.id)}
+                        disabled={
+                          active ||
+                          busy ||
+                          !["review", "approved"].includes(run.status)
+                        }
+                        demo={demo}
+                        onGenerate={prepareDraft}
+                        onApply={applyDraftProposal}
+                      />
+                    </Suspense>
+                    <div className="draft-layout">
+                      <div className="draft-editor">
+                        <div className="section-heading">
+                          <div>
+                            <h2>讓好的改動，也有好的說明。</h2>
+                            <p>調整草稿，讓維護者輕鬆理解你的貢獻。</p>
+                          </div>
+                          <span className="draft-label">DRAFT PR</span>
+                        </div>
+                        <label className="field-label" htmlFor="pr-title">
+                          Pull Request 標題
+                        </label>
+                        <input
+                          id="pr-title"
+                          className="text-input draft-title"
+                          value={draftTitle}
+                          onChange={(e) => setDraftTitle(e.target.value)}
+                          disabled={run.status === "published"}
+                        />
+                        <div className="editor-toolbar">
+                          <div>
+                            <button
+                              className={!draftPreview ? "selected" : ""}
+                              onClick={() => setDraftPreview(false)}
+                            >
+                              編輯
+                            </button>
+                            <button
+                              className={draftPreview ? "selected" : ""}
+                              onClick={() => setDraftPreview(true)}
+                            >
+                              預覽
+                            </button>
+                          </div>
+                          <span>Markdown</span>
+                        </div>
+                        {draftPreview ? (
+                          <div className="markdown-preview">
+                            <Suspense fallback={<p>正在載入預覽…</p>}>
+                              <MarkdownContent>{draftBody}</MarkdownContent>
+                            </Suspense>
+                          </div>
+                        ) : (
+                          <textarea
+                            className="draft-textarea"
+                            aria-label="PR 說明"
+                            value={draftBody}
+                            onChange={(e) => setDraftBody(e.target.value)}
+                            disabled={run.status === "published"}
+                          />
+                        )}
+                        <div className="draft-save-row">
+                          <span>
+                            {demo
+                              ? "示範草稿儲存在此瀏覽器"
+                              : "草稿儲存在本機工作空間"}
+                          </span>
+                          <button
+                            className="button primary"
+                            disabled={
+                              busy || !draftDirty || run.status === "published"
+                            }
+                            onClick={saveDraft}
+                          >
+                            {busy ? (
+                              <Loader2 className="spin" size={15} />
+                            ) : (
+                              <Check size={15} />
+                            )}
+                            儲存草稿
+                          </button>
+                        </div>
+                      </div>
+                      <aside className="publish-checklist">
+                        <div className="checklist-icon">
+                          <GitPullRequest size={24} />
+                        </div>
+                        <h3>送出前，最後看一眼。</h3>
+                        <p>一份清楚的 PR，是一次好合作的開始。</p>
+                        <div
+                          className={
+                            allReviewed
+                              ? "checklist-item checked"
+                              : "checklist-item"
+                          }
+                        >
+                          {allReviewed ? (
+                            <CircleCheck size={18} />
+                          ) : (
+                            <Circle size={18} />
+                          )}
+                          <span>
+                            已審查所有檔案
+                            <small>
+                              {reviewedCount} / {files.length} 個檔案
+                            </small>
+                          </span>
+                        </div>
+                        <div
+                          className={
+                            !draftDirty
+                              ? "checklist-item checked"
+                              : "checklist-item"
+                          }
+                        >
+                          {!draftDirty ? (
+                            <CircleCheck size={18} />
+                          ) : (
+                            <Circle size={18} />
+                          )}
+                          <span>
+                            PR 草稿已儲存
+                            <small>
+                              {draftDirty
+                                ? "有尚未儲存的編輯"
+                                : "可隨時返回調整內容"}
+                            </small>
+                          </span>
+                        </div>
+                        <div className="checklist-item">
+                          <ShieldCheck size={18} />
+                          <span>
+                            以 Draft PR 送出
+                            <small>送出後仍可在 GitHub 繼續編輯</small>
+                          </span>
+                        </div>
+                      </aside>
+                    </div>
+                  </div>
+                )}
+              </div>
               <footer className="review-footer">
                 <div>
                   <span className="footer-spark">
@@ -2584,7 +2666,7 @@ export default function App() {
                       setApiError("");
                       notify("連線狀態已更新");
                     })
-                    .catch((e) => notify(e.message));
+                    .catch((e) => notify(e.message, "error"));
                 }}
               >
                 重新檢查連線
@@ -2718,10 +2800,19 @@ export default function App() {
         />
       )}
       {toast && (
-        <div className="toast" role="status">
-          <CircleCheck size={18} />
-          {toast}
-          <button aria-label="關閉通知" onClick={() => setToast("")}>
+        // role="alert" is announced immediately (assertive); role="status"
+        // waits for the screen reader to finish what it is saying (polite).
+        <div
+          className={`toast ${toast.tone === "error" ? "toast-error" : ""}`}
+          role={toast.tone === "error" ? "alert" : "status"}
+        >
+          {toast.tone === "error" ? (
+            <AlertCircle size={18} />
+          ) : (
+            <CircleCheck size={18} />
+          )}
+          {toast.message}
+          <button aria-label="關閉通知" onClick={() => setToast(null)}>
             <X size={14} />
           </button>
         </div>

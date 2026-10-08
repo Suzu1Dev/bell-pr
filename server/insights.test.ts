@@ -237,6 +237,20 @@ test("analysis uses bounded read-only structured Codex context and excludes secr
       result.insights.baseSha,
       (await git(f.repository, ["rev-parse", "HEAD"])).stdout.trim(),
     );
+    // Five tracked files; .env (sensitive path), token.ts (secret literal) and the symlink are skipped.
+    const sampledBytes = (
+      await Promise.all(
+        ["hello.ts", "README.md"].map((file) =>
+          readFile(path.join(f.repository, file)),
+        ),
+      )
+    ).reduce((total, buffer) => total + buffer.byteLength, 0);
+    assert.deepEqual(result.insights.sample, {
+      trackedFiles: 5,
+      sampledFiles: 2,
+      bytes: sampledBytes,
+      truncatedFiles: 0,
+    });
     assert.deepEqual(
       await new ProjectInsightsService(f.store).get(f.repo.id),
       result,
@@ -759,6 +773,8 @@ test("more recommendations request five new proposals per call, append atomicall
     const { recommendations: _old, ...originalOverview } = original;
     const { recommendations: _new, recommendationExpansion: _expansion, ...expandedOverview } = expanded;
     assert.deepEqual(expandedOverview, originalOverview);
+    assert.deepEqual(expanded.sample, original.sample);
+    assert.equal(expanded.sample?.sampledFiles, 2);
     assert.equal((await service.getSettings(f.repo.id)).outcome, "產出期間更新的偏好");
     assert.deepEqual((await new ProjectInsightsService(f.store).get(f.repo.id)).insights, expanded);
 

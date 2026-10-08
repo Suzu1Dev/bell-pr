@@ -40,6 +40,56 @@ test("calls without reported usage show 未回報 instead of zero", () => {
   assert.match(html, /僅加總已回報部分/);
 });
 
+test("byRole renders a collapsible table with teammates merged and unreported roles marked", () => {
+  const html = render({
+    metrics: {
+      ...metrics,
+      byRole: {
+        "member-2": {
+          calls: 1,
+          measuredCalls: 1,
+          inputTokens: 2_000,
+          cachedInputTokens: 500,
+          outputTokens: 100,
+          durationMs: 1_000,
+        },
+        "member-1": {
+          calls: 2,
+          measuredCalls: 1,
+          inputTokens: 1_000,
+          cachedInputTokens: 0,
+          outputTokens: 50,
+          durationMs: 500,
+        },
+        lead: {
+          calls: 1,
+          measuredCalls: 0,
+          inputTokens: 0,
+          cachedInputTokens: 0,
+          outputTokens: 0,
+          durationMs: 2_000,
+        },
+        custom: {
+          calls: 1,
+          measuredCalls: 1,
+          inputTokens: 7,
+          cachedInputTokens: 0,
+          outputTokens: 1,
+          durationMs: 10,
+        },
+      },
+    },
+  });
+  assert.match(html, /<details class="efficiency-roles"><summary>依角色分項（3 類）/);
+  const rows = [...html.matchAll(/<tr><th scope="row">([^<]+)<\/th>/g)].map(
+    (match) => match[1],
+  );
+  assert.deepEqual(rows, ["Lead（規劃與整合）", "Teammates", "custom"]);
+  assert.match(html, /Lead（規劃與整合）<\/th><td>1（回報 0）<\/td><td>未回報<\/td>/);
+  assert.match(html, /Teammates<\/th><td>3（回報 2）<\/td><td>3,000<\/td><td>500<\/td><td>150<\/td><td>1\.5 秒<\/td>/);
+  assert.doesNotMatch(render({ metrics }), /efficiency-roles/);
+});
+
 test("demo and unmeasured runs report no measurement", () => {
   assert.match(render({ metrics, demo: true }), /尚無實測；示範內容未呼叫 AI/);
   assert.match(render({ mode: "off" }), /尚無實測；執行後會顯示/);

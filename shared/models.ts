@@ -40,4 +40,12 @@ export interface ModelExecution {
   model?: string;
   reasoningEffort?: ReasoningEffort;
   source: "selected" | "catalog-default" | "cli-default";
+  /** What the CLI itself reported (Claude Code only so far); absent for Codex and older records. */
+  reported?: {
+    /** Resolved model ID from system/init, e.g. claude-haiku-4-5-20251001 for the alias haiku. */
+    model: string;
+    /** Every model ID present in result.modelUsage, union over the calls of one run. */
+    modelsUsed?: string[];
+    cliVersion?: string;
+  };
 }

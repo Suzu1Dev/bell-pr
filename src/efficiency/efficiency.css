@@ -58,6 +58,44 @@
   line-height: 1.8;
   color: #627258;
 }
+.efficiency-roles {
+  margin-top: 10px;
+  font-size: 12px;
+}
+.efficiency-roles > summary {
+  cursor: pointer;
+  color: #526c43;
+}
+.efficiency-roles-scroll {
+  overflow-x: auto;
+}
+.efficiency-roles table {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+}
+.efficiency-roles th,
+.efficiency-roles td {
+  padding: 5px 8px 5px 0;
+  border-bottom: 1px solid #e3ebdc;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.efficiency-roles thead th {
+  color: #607155;
+  font-weight: 500;
+}
+.efficiency-roles tbody th {
+  font-weight: 550;
+}
+.efficiency-roles td {
+  font: 500 12px/1.6 var(--mono, monospace);
+}
+.efficiency-roles tbody th,
+.efficiency-roles th:first-child {
+  white-space: normal;
+}
 .mission-project-card > .efficiency-summary {
   margin-top: 16px;
   background: #ffffff85;

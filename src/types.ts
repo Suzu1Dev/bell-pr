@@ -53,6 +53,8 @@ export interface Run {
   logs: { time: string; agent: string; message: string }[];
   draft: { title: string; body: string };
   reviewedFiles: string[];
+  /** Final role answers keyed by role; also holds teammate task ids and guide answers. */
+  reports?: Record<string, string>;
   prUrl?: string;
   error?: string;
 }

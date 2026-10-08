@@ -13,6 +13,7 @@ import path from "node:path";
 import {
   explanationBatches,
   explanationPrompt,
+  guidePrompt,
   parseExplanations,
 } from "./explanations.js";
 import type { DiffFile, Run } from "./types.js";
@@ -102,6 +103,76 @@ test("explanations retain bounded complete diffs, exclude blocked content, and r
   );
 });
 
+test("guide prompt carries contribution context, the ready explanation card and named reports before the conversation", () => {
+  const run = {
+    prompt: "Improve a",
+    reports: {
+      reviewer: `審查：${"r".repeat(7000)}`,
+      tester: "測試分析：缺少邊界案例",
+      implementer: "整合摘要",
+      guide: "先前的導師回答",
+      alpha: '{"report":"teammate json"}',
+    },
+  } as unknown as Run;
+  const base = {
+    contributionContext: "User request:\nImprove a\nContribution settings:\n{}",
+    run,
+    messages: [] as string[],
+    question: "為什麼這樣寫？",
+  };
+  const pending = guidePrompt({
+    ...base,
+    file: {
+      ...diff("a.ts"),
+      explanationStatus: "pending",
+      explanation: { summary: "舊卡片", reason: "", concept: "", tip: "" },
+    },
+  });
+  assert.match(pending, /Contribution settings:\n\{\}/);
+  assert.doesNotMatch(pending, /User task:/);
+  assert.match(pending, /Current diff \(JSON\):\n\{"path":"a\.ts","patch":"\+example"\}/);
+  assert.match(pending, /not generated yet\):\nnull\n/);
+  assert.doesNotMatch(pending, /舊卡片/);
+  assert.match(pending, /UNTRUSTED DATA/);
+  assert.match(pending, /"tester":"測試分析：缺少邊界案例"/);
+  assert.doesNotMatch(pending, /整合摘要|先前的導師回答|teammate json/);
+  assert.equal(pending.match(/r{7000}/), null);
+  assert.match(pending, /審查：r{5997}"/);
+  assert.match(pending, /Prior conversation:\n\nQuestion: 為什麼這樣寫？$/);
+  assert.ok(
+    pending.indexOf("UNTRUSTED DATA") < pending.indexOf("Prior conversation:"),
+  );
+
+  const ready = guidePrompt({
+    ...base,
+    run: { ...run, reports: undefined },
+    messages: ["User: 之前的問題", "Mentor: 之前的回答"],
+    file: {
+      ...diff("a.ts"),
+      explanationStatus: "ready",
+      explanation: {
+        summary: "更新輸出",
+        reason: "改善一致性",
+        concept: "單一責任",
+        tip: "確認呼叫者",
+        example,
+      },
+    },
+  });
+  assert.match(
+    ready,
+    /do not restate it; null when not generated yet\):\n\{"summary":"更新輸出","reason":"改善一致性","concept":"單一責任","tip":"確認呼叫者"\}/,
+  );
+  assert.doesNotMatch(ready, /使用者打開頁面/);
+  assert.match(ready, /\{"reviewer":null,"tester":null\}/);
+  assert.match(
+    ready,
+    /Prior conversation:\nUser: 之前的問題\nMentor: 之前的回答\nQuestion:/,
+  );
+  assert.match(ready, /answer the question directly first/);
+  assert.match(ready, /English terms in parentheses/);
+});
+
 function response(prompt: string) {
   const files = JSON.parse(
     prompt.split("Provided diffs:\n")[1].split("\n\nBELL Ponytail")[0],
@@ -179,6 +250,9 @@ test("completed runs generate one isolated batch, deduplicate callers, persist r
     });
     if (input.role === "guide") {
       assert.match(input.prompt, /Prior conversation:\n\nQuestion:/);
+      // The synchronized card for a.ts is attached; the example stays out.
+      assert.match(input.prompt, /"summary":"更新輸出"/);
+      assert.doesNotMatch(input.prompt, /使用者打開頁面/);
       return "獨立的追問回答";
     }
     calls++;

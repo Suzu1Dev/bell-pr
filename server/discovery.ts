@@ -26,7 +26,11 @@ import {
   trackEfficiency,
 } from "./efficiency.js";
 import { secretInPatch } from "./git.js";
-import { agentCommand, agentEventReader } from "./agent-cli.js";
+import {
+  agentCommand,
+  agentEventReader,
+  applyReportedModel,
+} from "./agent-cli.js";
 import {
   getModelCatalog,
   modelExecutionSchema,
@@ -550,9 +554,12 @@ export class DiscoveryService {
               const event = JSON.parse(line);
               efficiency?.observe(event);
               for (const item of read(event)) {
+                // Notices (retries, rate limits, denials) are not failures; only error events are.
                 if (item.kind === "error") failed = true;
                 if (item.kind === "message" || item.kind === "final")
                   answer = item.text;
+                if (job.modelExecution)
+                  applyReportedModel(job.modelExecution, item);
               }
             } catch {
               /* Only structured agent messages are candidates for analysis output. */

@@ -18,4 +18,16 @@ export interface EfficiencyMetrics {
   inputTokens: number;
   cachedInputTokens: number;
   outputTokens: number;
+  /** Same provider-reported counts split by the calling role (lead, member-N, reviewer, …); absent on older records. */
+  byRole?: Record<string, RoleEfficiency>;
 }
+
+export type RoleEfficiency = Pick<
+  EfficiencyMetrics,
+  | "calls"
+  | "measuredCalls"
+  | "inputTokens"
+  | "cachedInputTokens"
+  | "outputTokens"
+  | "durationMs"
+>;

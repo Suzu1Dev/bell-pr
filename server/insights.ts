@@ -33,6 +33,7 @@ import {
   agentEventReader,
   agentLabel,
   agentLoginCheck,
+  applyReportedModel,
 } from "./agent-cli.js";
 import {
   getModelCatalog,
@@ -186,6 +187,15 @@ const persistedInsightsSchema = analysisSchema.extend({
   generatedAt: z.string().datetime(),
   source: z.literal("ai"),
   baseSha: z.string().regex(/^[a-f0-9]{40,64}$/),
+  sample: z
+    .object({
+      trackedFiles: z.number().int().min(0),
+      sampledFiles: z.number().int().min(0),
+      bytes: z.number().int().min(0),
+      truncatedFiles: z.number().int().min(0),
+    })
+    .strict()
+    .optional(),
 });
 const recommendationIdsSchema = z
   .array(recommendationSchema.shape.id)
@@ -612,6 +622,8 @@ export class ProjectInsightsService {
       files,
       trackedFileCount: tracked.length,
       sampledFileCount: files.length,
+      bytes,
+      truncatedFileCount: files.filter((file) => file.truncated).length,
     };
   }
 
@@ -795,9 +807,11 @@ export class ProjectInsightsService {
               const event = JSON.parse(line);
               efficiency.observe(event);
               for (const item of read(event)) {
+                // Notices (retries, rate limits, denials) are not failures; only error events are.
                 if (item.kind === "error") failed = true;
                 if (item.kind === "message" || item.kind === "final")
                   answer = item.text;
+                applyReportedModel(modelExecution, item);
               }
             } catch {
               /* Raw tool output is not trusted analysis. */
@@ -851,6 +865,13 @@ export class ProjectInsightsService {
           generatedAt,
           source: "ai",
           baseSha: version.baseSha,
+          // Recorded outside the strict analysis schema: the model never reports its own coverage.
+          sample: {
+            trackedFiles: context.trackedFileCount,
+            sampledFiles: context.sampledFileCount,
+            bytes: context.bytes,
+            truncatedFiles: context.truncatedFileCount,
+          },
         };
       }
       let recommendationPreferences!: RecommendationPreferences;
