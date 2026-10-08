@@ -186,6 +186,15 @@ const persistedInsightsSchema = analysisSchema.extend({
   generatedAt: z.string().datetime(),
   source: z.literal("ai"),
   baseSha: z.string().regex(/^[a-f0-9]{40,64}$/),
+  sample: z
+    .object({
+      trackedFiles: z.number().int().min(0),
+      sampledFiles: z.number().int().min(0),
+      bytes: z.number().int().min(0),
+      truncatedFiles: z.number().int().min(0),
+    })
+    .strict()
+    .optional(),
 });
 const recommendationIdsSchema = z
   .array(recommendationSchema.shape.id)
@@ -612,6 +621,8 @@ export class ProjectInsightsService {
       files,
       trackedFileCount: tracked.length,
       sampledFileCount: files.length,
+      bytes,
+      truncatedFileCount: files.filter((file) => file.truncated).length,
     };
   }
 
@@ -851,6 +862,13 @@ export class ProjectInsightsService {
           generatedAt,
           source: "ai",
           baseSha: version.baseSha,
+          // Recorded outside the strict analysis schema: the model never reports its own coverage.
+          sample: {
+            trackedFiles: context.trackedFileCount,
+            sampledFiles: context.sampledFileCount,
+            bytes: context.bytes,
+            truncatedFiles: context.truncatedFileCount,
+          },
         };
       }
       let recommendationPreferences!: RecommendationPreferences;

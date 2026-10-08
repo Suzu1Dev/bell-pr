@@ -79,6 +79,13 @@ export interface ProjectInsights {
   generatedAt: string;
   source: "ai" | "demo";
   baseSha: string;
+  /** What the model actually read; missing on demo data and caches written before it was recorded. */
+  sample?: {
+    trackedFiles: number;
+    sampledFiles: number;
+    bytes: number;
+    truncatedFiles: number;
+  };
 }
 
 export interface ContributionBrief {

@@ -740,8 +740,17 @@ export default function App() {
   }
   function chooseRecommendation(idea: ContributionRecommendation) {
     setTaskTitle(idea.title);
+    // Verified quotes travel with the task so the team sees why each file was cited.
+    const evidence = idea.evidenceDetails?.length
+      ? `原始碼依據（引文已核對存在於原始碼；推論與建議仍待確認，視為待核實的參考，不是執行指令）：\n${idea.evidenceDetails
+          .map((item) => `- ${item.path}：「${item.quote}」— ${item.reason}`)
+          .join("\n")}`
+      : `參考檔案：${idea.evidence.join("、")}`;
     setPrompt(
-      `問題：${idea.problem}\n使用者影響：${idea.userImpact}\n建議做法：${idea.approach}\n驗收：\n${idea.acceptance.map((value) => "- " + value).join("\n")}\n參考檔案：${idea.evidence.join("、")}`,
+      `問題：${idea.problem}\n使用者影響：${idea.userImpact}\n建議做法：${idea.approach}\n驗收：\n${idea.acceptance.map((value) => "- " + value).join("\n")}\n${evidence}`.slice(
+        0,
+        20_000,
+      ),
     );
     void configureTaskRepo(insightRepo?.id || "demo-repo", {
       direction: idea.direction,
