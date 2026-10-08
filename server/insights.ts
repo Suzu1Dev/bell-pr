@@ -25,6 +25,7 @@ import {
 } from "../shared/insights.js";
 import type { ModelSettings } from "../shared/models.js";
 import { quoteMatches } from "./evidence.js";
+import { contributionIntent } from "./team.js";
 import {
   parseGitHubIssueUrl,
   safeRelativePath,
@@ -35,13 +36,19 @@ import { agentEnvironment, command, git, redact } from "./process.js";
 import { Store } from "./store.js";
 import { AgentSlots, defaultAgentProcessLimit } from "./agent-slots.js";
 import { AppError, type Repository } from "./types.js";
-import { defaultPonytailMode, ponytailModes } from "../shared/efficiency.js";
+import {
+  defaultPonytailMode,
+  ponytailModes,
+  type EfficiencyMetrics,
+} from "../shared/efficiency.js";
 import {
   agentCommand,
   agentEventReader,
   agentLabel,
   agentLoginCheck,
   applyReportedModel,
+  retryTransientAuth,
+  type TransientSleep,
 } from "./agent-cli.js";
 import {
   getModelCatalog,
@@ -50,6 +57,7 @@ import {
   resolveModelExecution,
 } from "./models.js";
 import {
+  addEfficiency,
   applyPonytail,
   efficiencyMetricsSchema,
   trackEfficiency,
@@ -484,6 +492,7 @@ export class ProjectInsightsService {
   private execute: typeof command;
   private modelCatalog: typeof getModelCatalog;
   private slots: AgentSlots;
+  private sleep?: TransientSleep;
 
   constructor(
     public store: Store,
@@ -491,9 +500,12 @@ export class ProjectInsightsService {
       command?: typeof command;
       getModelCatalog?: typeof getModelCatalog;
       agentSlots?: AgentSlots;
+      /** Wait between retries of an analysis that lost the OAuth refresh race. */
+      sleep?: TransientSleep;
     } = {},
   ) {
     this.execute = dependencies.command ?? command;
+    this.sleep = dependencies.sleep;
     this.modelCatalog = dependencies.getModelCatalog ?? getModelCatalog;
     this.slots =
       dependencies.agentSlots ?? new AgentSlots(defaultAgentProcessLimit);
@@ -983,7 +995,8 @@ export class ProjectInsightsService {
           JSON.stringify({
             repository: repo.fullName,
             baseSha: version.baseSha,
-            preferences: settings,
+            // Only the intent fields: model, effort and team size are not analysis preferences.
+            preferences: contributionIntent(settings),
             ...(more
               ? {
                   existingRecommendations: previous.insights!.recommendations.map(
@@ -1006,7 +1019,9 @@ export class ProjectInsightsService {
       let answer = "";
       let failed = false;
       this.assertActive(signal);
-      const efficiency = trackEfficiency(mode);
+      let efficiency!: ReturnType<typeof trackEfficiency>;
+      // Attempts that lost the OAuth refresh race count as failed calls next to the final one.
+      let retriedAttempts: EfficiencyMetrics | undefined;
       const cli = await agentCommand(modelExecution, {
         cwd: temporary,
         access: "none",
@@ -1014,35 +1029,61 @@ export class ProjectInsightsService {
         skipGitRepoCheck: true,
       });
       const read = agentEventReader(modelExecution.provider);
-      const releaseSlot = await this.slots.acquire(signal);
-      try {
-        await this.execute(cli.executable, cli.args, {
-          input,
-          cwd: temporary,
-          env: agentEnvironment(),
+      await retryTransientAuth(
+        async () => {
+          answer = "";
+          failed = false;
+          let retryable = false;
+          efficiency = trackEfficiency(mode);
+          const releaseSlot = await this.slots.acquire(signal);
+          try {
+            await this.execute(cli.executable, cli.args, {
+              input,
+              cwd: temporary,
+              env: agentEnvironment(),
+              signal,
+              timeoutMs: 240_000,
+              maxBytes: 1_000_000,
+              onLine: (line, stream) => {
+                if (stream !== "stdout") return;
+                try {
+                  const event = JSON.parse(line);
+                  efficiency.observe(event);
+                  for (const item of read(event)) {
+                    // Notices (retries, rate limits, denials) are not failures; only error events are.
+                    if (item.kind === "error") {
+                      failed = true;
+                      retryable = item.retryable === true;
+                    }
+                    if (item.kind === "message" || item.kind === "final")
+                      answer = item.text;
+                    applyReportedModel(modelExecution, item);
+                  }
+                } catch {
+                  /* Raw tool output is not trusted analysis. */
+                }
+              },
+            }).catch((error: unknown) => {
+              // claude exits non-zero after losing the OAuth refresh race; its result event
+              // (flushed before the rejection) already classified the attempt as retryable.
+              if (!retryable) throw error;
+            });
+          } finally {
+            releaseSlot();
+          }
+          return { retryable };
+        },
+        {
           signal,
-          timeoutMs: 240_000,
-          maxBytes: 1_000_000,
-          onLine: (line, stream) => {
-            if (stream !== "stdout") return;
-            try {
-              const event = JSON.parse(line);
-              efficiency.observe(event);
-              for (const item of read(event)) {
-                // Notices (retries, rate limits, denials) are not failures; only error events are.
-                if (item.kind === "error") failed = true;
-                if (item.kind === "message" || item.kind === "final")
-                  answer = item.text;
-                applyReportedModel(modelExecution, item);
-              }
-            } catch {
-              /* Raw tool output is not trusted analysis. */
-            }
+          sleep: this.sleep,
+          onRetry: () => {
+            retriedAttempts = addEfficiency(
+              retriedAttempts,
+              efficiency.finish(false),
+            );
           },
-        });
-      } finally {
-        releaseSlot();
-      }
+        },
+      );
       this.assertActive(signal);
       if (failed || !answer || Buffer.byteLength(answer) > 120_000)
         throw new AppError(
@@ -1061,7 +1102,7 @@ export class ProjectInsightsService {
         );
       let insights: ProjectInsights;
       const generatedAt = new Date().toISOString();
-      const metrics = efficiency.finish(true);
+      const metrics = addEfficiency(retriedAttempts, efficiency.finish(true));
       if (more) {
         const original = previous.insights!;
         const added = novelRecommendations(

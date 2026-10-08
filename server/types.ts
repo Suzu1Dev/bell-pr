@@ -42,6 +42,19 @@ export interface Agent {
   detail: string;
 }
 
+/**
+ * One activity-log line. Entries saved before `kind` existed have none and
+ * are plain messages; `detail` carries the exit code of a command or the
+ * paths of a file entry.
+ */
+export interface RunLogEntry {
+  time: string;
+  agent: string;
+  message: string;
+  kind?: "message" | "command" | "file" | "status" | "notice";
+  detail?: string;
+}
+
 export interface Run {
   draftPreparation?: DraftPreparation;
   modelExecution?: ModelExecution;
@@ -58,7 +71,7 @@ export interface Run {
   worktreePath: string;
   createdAt: string;
   agents: Agent[];
-  logs: { time: string; agent: string; message: string }[];
+  logs: RunLogEntry[];
   /**
    * commitMessage is the full commit message the human wrote (subject, body,
    * trailers such as Signed-off-by). Absent or empty means the PR title alone

@@ -22,6 +22,7 @@ import {
 import type { ModelCatalog } from "../shared/models.js";
 import { fileTree, ProjectInsightsService } from "./insights.js";
 import { command, git } from "./process.js";
+import { AppError } from "./types.js";
 import { Store } from "./store.js";
 
 /** The JSON data object sent after the prompt sentences and before the Ponytail guidance. */
@@ -1373,6 +1374,120 @@ test("recommendation APIs validate display preferences and keep them separate fr
     await service.shutdown();
     await app.locals.insights.shutdown();
     await app.locals.discovery.shutdown();
+    await f.cleanup();
+  }
+});
+
+test("Claude Code analysis retries once after losing the OAuth refresh lock and exiting non-zero, counting both calls; other API errors fail at once", async () => {
+  const f = await fixture();
+  const refreshRace =
+    "Failed to refresh OAuth token: another Claude Code process is refreshing it or exited mid-refresh. This is usually transient; retry in a minute, and if it persists close other Claude Code processes or sign in again";
+  const waits: number[] = [];
+  let analyses = 0;
+  const claude =
+    (
+      respond: (
+        emit: (event: unknown) => void,
+        invocation: number,
+      ) => void,
+    ): typeof command =>
+    async (executable, args, options = {}) => {
+      if (executable === "claude" && args[0] === "-p")
+        respond(
+          (event) => options.onLine?.(JSON.stringify(event), "stdout"),
+          ++analyses,
+        );
+      return { stdout: "", stderr: "", code: 0 };
+    };
+  const sleep = async (ms: number) => {
+    waits.push(ms);
+  };
+  const service = new ProjectInsightsService(f.store, {
+    sleep,
+    command: claude((emit, invocation) => {
+      if (invocation === 1) {
+        emit({
+          type: "assistant",
+          message: { content: [{ type: "text", text: refreshRace }] },
+          error: "server_error",
+          is_api_error_message: true,
+        });
+        emit({
+          type: "result",
+          subtype: "success",
+          is_error: true,
+          terminal_reason: "api_error",
+          result: refreshRace,
+          usage: {
+            input_tokens: 0,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
+            output_tokens: 0,
+          },
+          modelUsage: {},
+        });
+        // command() flushes the events above through onLine, then rejects on claude's exit code 1.
+        throw new AppError(`claude 執行失敗：${refreshRace}`, 422);
+      }
+      emit({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        result: "",
+        structured_output: validAnalysis(),
+        usage: {
+          input_tokens: 10,
+          cache_creation_input_tokens: 200,
+          cache_read_input_tokens: 300,
+          output_tokens: 40,
+        },
+      });
+    }),
+  });
+  const plain = new ProjectInsightsService(f.store, {
+    sleep,
+    command: claude((emit) => {
+      emit({
+        type: "result",
+        subtype: "success",
+        is_error: true,
+        terminal_reason: "api_error",
+        result: "API Error: 500 Internal server error",
+      });
+      throw new AppError(
+        "claude 執行失敗：API Error: 500 Internal server error",
+        422,
+      );
+    }),
+  });
+  try {
+    await service.setSettings(f.repo.id, {
+      ...defaultContributionSettings,
+      provider: "claude",
+    });
+    const result = await service.generate(f.repo.id);
+    assert.equal(analyses, 2);
+    assert.deepEqual(waits, [15_000]);
+    assert.equal(result.insights.recommendations.length, 1);
+    assert.equal(result.insights.efficiency?.calls, 2);
+    assert.equal(result.insights.efficiency?.failedCalls, 1);
+    assert.equal(result.insights.efficiency?.completedCalls, 1);
+    assert.equal(result.insights.efficiency?.measuredCalls, 2);
+    assert.equal(result.insights.efficiency?.inputTokens, 510);
+    analyses = 0;
+    waits.length = 0;
+    await assert.rejects(
+      plain.generate(f.repo.id),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 422 &&
+        error.message === "claude 執行失敗：API Error: 500 Internal server error",
+    );
+    assert.equal(analyses, 1);
+    assert.equal(waits.length, 0);
+  } finally {
+    await service.shutdown();
+    await plain.shutdown();
     await f.cleanup();
   }
 });

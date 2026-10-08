@@ -3,15 +3,18 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import {
   agentCommand,
   agentEventReader,
   agentLoginCheck,
   applyReportedModel,
+  retryTransientAuth,
   type AgentEvent,
 } from "./agent-cli.js";
 import type { ModelExecution } from "../shared/models.js";
 import { agentEnvironment } from "./process.js";
+import { AppError } from "./types.js";
 
 test("Codex arguments keep the existing sandbox, approval and schema flags", async () => {
   assert.deepEqual(
@@ -138,6 +141,31 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
   });
 });
 
+test("teammates combine write access with an output schema on both providers", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-agent-cli-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const schemaPath = path.join(directory, "report-schema.json");
+  const schema = '{"type":"object","required":["report","messages"]}';
+  await writeFile(schemaPath, schema);
+  const value = (args: string[], flag: string) => args[args.indexOf(flag) + 1];
+
+  const codex = await agentCommand(
+    { source: "cli-default" },
+    { cwd: directory, access: "write", outputSchema: schemaPath },
+  );
+  assert.equal(value(codex.args, "--sandbox"), "workspace-write");
+  assert.equal(value(codex.args, "--output-schema"), schemaPath);
+  assert.ok(!codex.args.includes("--skip-git-repo-check"));
+
+  const claude = await agentCommand(
+    { provider: "claude", source: "cli-default" },
+    { cwd: directory, access: "write", outputSchema: schemaPath },
+  );
+  assert.equal(value(claude.args, "--permission-mode"), "acceptEdits");
+  assert.equal(value(claude.args, "--json-schema"), schema);
+  assert.ok(claude.args.includes("--disallowedTools"));
+});
+
 test("agent environment never forwards an Anthropic API key", (t) => {
   const previous = process.env.ANTHROPIC_API_KEY;
   process.env.ANTHROPIC_API_KEY = "sk-ant-test";
@@ -157,6 +185,7 @@ test("Codex events keep their existing meaning", () => {
     }),
     [{ kind: "message", text: "report" }],
   );
+  // Without a command string the event keeps its old shape.
   assert.deepEqual(
     read({
       type: "item.completed",
@@ -164,9 +193,57 @@ test("Codex events keep their existing meaning", () => {
     }),
     [{ kind: "command", outcome: "exit 1" }],
   );
+  // The command is kept (first line, redacted, ≤300 chars); aggregated_output never is.
+  const executed = read({
+    type: "item.completed",
+    item: {
+      type: "command_execution",
+      command: `export GITHUB_TOKEN=ghp_0123456789abcdef0123 && npm test -- a.test.ts\nrm -rf /tmp/${"x".repeat(400)}`,
+      aggregated_output: "SECRET-OUTPUT",
+      exit_code: 0,
+    },
+  });
+  assert.deepEqual(executed, [
+    {
+      kind: "command",
+      outcome: "exit 0",
+      command: "export GITHUB_TOKEN=[REDACTED] && npm test -- a.test.ts",
+    },
+  ]);
+  assert.doesNotMatch(JSON.stringify(executed), /SECRET-OUTPUT|ghp_0123/);
+  assert.equal(
+    (
+      read({
+        type: "item.completed",
+        item: {
+          type: "command_execution",
+          command: "y".repeat(500),
+          exit_code: 0,
+        },
+      })[0] as { command: string }
+    ).command.length,
+    300,
+  );
   assert.deepEqual(
     read({ type: "item.completed", item: { type: "file_change" } }),
     [{ kind: "file-change" }],
+  );
+  assert.deepEqual(
+    read({
+      type: "item.completed",
+      item: {
+        type: "file_change",
+        changes: [
+          { path: "src/a.ts", kind: "update" },
+          { path: "docs/b.md", kind: "add" },
+          { kind: "delete" },
+        ],
+      },
+    }),
+    [
+      { kind: "file-change", path: "src/a.ts" },
+      { kind: "file-change", path: "docs/b.md" },
+    ],
   );
   assert.deepEqual(read({ type: "turn.failed", error: { message: "boom" } }), [
     { kind: "error", terminal: true, message: "boom" },
@@ -211,24 +288,54 @@ test("Claude Code stream-json events map to messages, checks, edits and the fina
           { type: "tool_use", id: "bash-1", name: "Bash", input: {} },
           { type: "tool_use", id: "write-1", name: "Write", input: {} },
           { type: "tool_use", id: "read-1", name: "Read", input: {} },
+          {
+            type: "tool_use",
+            id: "bash-2",
+            name: "Bash",
+            input: {
+              command: "npm test -- --token sk-abcdefghijklmnop0123\ncat out.log",
+              description: "Run tests",
+            },
+          },
+          {
+            type: "tool_use",
+            id: "edit-1",
+            name: "Edit",
+            input: { file_path: "/work/tree/src/a.ts", old_string: "secret" },
+          },
         ],
       },
     }),
     [{ kind: "message", text: "Running tests." }],
   );
-  assert.deepEqual(
-    read({
-      type: "user",
-      message: {
-        content: [
-          { type: "tool_result", tool_use_id: "bash-1", is_error: true },
-          { type: "tool_result", tool_use_id: "write-1" },
-          { type: "tool_result", tool_use_id: "read-1", content: "secret" },
-        ],
-      },
-    }),
-    [{ kind: "command", outcome: "失敗" }, { kind: "file-change" }],
-  );
+  // Tool inputs are recalled when their results arrive; missing inputs keep the old shape and result content is never returned.
+  const results = read({
+    type: "user",
+    message: {
+      content: [
+        { type: "tool_result", tool_use_id: "bash-1", is_error: true },
+        { type: "tool_result", tool_use_id: "write-1" },
+        { type: "tool_result", tool_use_id: "read-1", content: "secret" },
+        {
+          type: "tool_result",
+          tool_use_id: "bash-2",
+          content: "TEST OUTPUT",
+        },
+        { type: "tool_result", tool_use_id: "edit-1" },
+      ],
+    },
+  });
+  assert.deepEqual(results, [
+    { kind: "command", outcome: "失敗" },
+    { kind: "file-change" },
+    {
+      kind: "command",
+      outcome: "成功",
+      command: "npm test -- --token [REDACTED]",
+    },
+    { kind: "file-change", path: "/work/tree/src/a.ts" },
+  ]);
+  assert.doesNotMatch(JSON.stringify(results), /TEST OUTPUT|secret|cat out/);
   assert.deepEqual(
     read({
       type: "result",
@@ -472,4 +579,139 @@ test("reported model is recorded once per model and modelsUsed is a union", () =
     applyReportedModel(execution, { kind: "message", text: "hi" }),
     false,
   );
+});
+
+const refreshRace =
+  "Failed to refresh OAuth token: another Claude Code process is refreshing it or exited mid-refresh. This is usually transient; retry in a minute, and if it persists close other Claude Code processes or sign in again";
+
+test("losing the Claude Code OAuth refresh lock is a retryable terminal error; other API errors are not", () => {
+  const read = agentEventReader("claude");
+  // Claude Code sends the same text as an assistant message first; it stays an ordinary message.
+  assert.deepEqual(
+    read({
+      type: "assistant",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: refreshRace }],
+      },
+      error: "server_error",
+      is_api_error_message: true,
+      session_id: "03489f4f-4a7d-4154-b21e-f1ceb6da7c59",
+    }),
+    [{ kind: "message", text: refreshRace }],
+  );
+  assert.deepEqual(
+    read({
+      type: "result",
+      subtype: "success",
+      is_error: true,
+      terminal_reason: "api_error",
+      duration_api_ms: 0,
+      num_turns: 1,
+      result: refreshRace,
+      usage: {
+        input_tokens: 0,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+        output_tokens: 0,
+      },
+      modelUsage: {},
+      permission_denials: [],
+      total_cost_usd: 0,
+    }),
+    [{ kind: "error", terminal: true, message: refreshRace, retryable: true }],
+  );
+  assert.deepEqual(
+    read({
+      type: "result",
+      subtype: "error_during_execution",
+      is_error: true,
+      terminal_reason: "api_error",
+      errors: [refreshRace],
+    }),
+    [{ kind: "error", terminal: true, message: refreshRace, retryable: true }],
+  );
+  assert.deepEqual(
+    read({
+      type: "result",
+      subtype: "success",
+      is_error: true,
+      terminal_reason: "api_error",
+      result: "API Error: 500 Internal server error",
+    }),
+    [
+      {
+        kind: "error",
+        terminal: true,
+        message: "API Error: 500 Internal server error",
+      },
+    ],
+  );
+});
+
+test("retryTransientAuth reruns a retryable attempt up to twice with the production backoff and stops on abort", async () => {
+  const waits: number[] = [];
+  const notices: string[] = [];
+  let attempts = 0;
+  const controller = new AbortController();
+  const sleep = async (ms: number) => {
+    waits.push(ms);
+  };
+  assert.deepEqual(
+    await retryTransientAuth(
+      async () => ({ retryable: ++attempts < 3, attempt: attempts }),
+      { signal: controller.signal, sleep, onRetry: (n) => notices.push(n) },
+    ),
+    { retryable: false, attempt: 3 },
+  );
+  assert.deepEqual(waits, [15_000, 45_000]);
+  assert.deepEqual(notices, [
+    "Claude Code 正在更新登入憑證（其他行程持有更新鎖），15 秒後重試（第 2/3 次）。",
+    "Claude Code 正在更新登入憑證（其他行程持有更新鎖），45 秒後重試（第 3/3 次）。",
+  ]);
+  // A third retryable result is returned as is; the caller turns it into the final failure.
+  attempts = 0;
+  waits.length = 0;
+  assert.deepEqual(
+    await retryTransientAuth(
+      async () => ({ retryable: true, attempt: ++attempts }),
+      { signal: controller.signal, sleep },
+    ),
+    { retryable: true, attempt: 3 },
+  );
+  assert.deepEqual(waits, [15_000, 45_000]);
+  assert.deepEqual(
+    await retryTransientAuth(async () => ({ retryable: false, attempt: 1 }), {
+      signal: controller.signal,
+      sleep,
+    }),
+    { retryable: false, attempt: 1 },
+  );
+  assert.deepEqual(waits, [15_000, 45_000]);
+  // Cancelling during the wait rejects with the run cancellation and never starts the next attempt.
+  attempts = 0;
+  await assert.rejects(
+    retryTransientAuth(async () => ({ retryable: true, attempt: ++attempts }), {
+      signal: controller.signal,
+      sleep: async () => {
+        controller.abort();
+      },
+    }),
+    (error: unknown) =>
+      error instanceof AppError &&
+      error.statusCode === 409 &&
+      error.message === "工作已取消。",
+  );
+  assert.equal(attempts, 1);
+  // The real wait honours the signal as well.
+  const aborted = new AbortController();
+  attempts = 0;
+  const pending = retryTransientAuth(
+    async () => ({ retryable: true, attempt: ++attempts }),
+    { signal: aborted.signal },
+  );
+  await delay(5);
+  aborted.abort();
+  await assert.rejects(pending, /工作已取消/);
+  assert.equal(attempts, 1);
 });

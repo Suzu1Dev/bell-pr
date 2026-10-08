@@ -2,7 +2,37 @@ import { z } from "zod";
 import { AppError, type DiffFile } from "./types.js";
 import { safeRelativePath, sensitivePath } from "./git.js";
 import type { AgentTeam, TeamTask } from "../shared/team.js";
+import type { ContributionSettings } from "../shared/insights.js";
 import type { ModelExecution } from "../shared/models.js";
+
+/**
+ * The five settings that describe what the person wants. Provider, model,
+ * effort, Ponytail mode and team size are runtime configuration the roles
+ * never need, so prompts receive only this projection.
+ */
+export function contributionIntent(settings: ContributionSettings | undefined) {
+  const { direction, targetUser, outcome, constraints, acceptance } =
+    settings ?? ({} as Partial<ContributionSettings>);
+  return { direction, targetUser, outcome, constraints, acceptance };
+}
+
+/** Labelled lines for prompts; empty fields are skipped, no settings yields "". */
+export function contributionIntentText(
+  settings: ContributionSettings | undefined,
+) {
+  const intent = contributionIntent(settings);
+  const labels: [keyof typeof intent, string][] = [
+    ["direction", "需求"],
+    ["targetUser", "目標使用者"],
+    ["outcome", "預期結果"],
+    ["constraints", "限制"],
+    ["acceptance", "驗收條件"],
+  ];
+  return labels
+    .filter(([key]) => intent[key]?.trim())
+    .map(([key, label]) => `${label}：${intent[key]!.trim()}`)
+    .join("\n");
+}
 
 export interface TeamAgentInput {
   role: string;
@@ -25,7 +55,79 @@ const taskSchema = z.object({
 const planSchema = z.object({
   summary: z.string().trim().min(1).max(6000),
   tasks: z.array(taskSchema).min(1).max(8),
+  /** Lead's explanation of what changed after the person sent a plan back; null/absent on a first plan. */
+  revisionNotes: z.string().trim().max(4000).nullish(),
 });
+
+/**
+ * Hand-written JSON Schemas for the CLIs' structured output (Codex
+ * --output-schema, Claude Code --json-schema), mirroring explanationJsonSchema:
+ * every object closed, every property required, nullable where optional.
+ * Lengths and the DAG/scope rules stay with the zod schemas above and below.
+ */
+export const teamPlanJsonSchema = {
+  type: "object",
+  properties: {
+    summary: { type: "string" },
+    revisionNotes: { type: ["string", "null"] },
+    tasks: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+          description: { type: "string" },
+          files: { type: "array", items: { type: "string" } },
+          dependsOn: { type: "array", items: { type: "string" } },
+        },
+        required: ["id", "title", "description", "files", "dependsOn"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["summary", "revisionNotes", "tasks"],
+  additionalProperties: false,
+};
+
+export const memberReportJsonSchema = {
+  type: "object",
+  properties: {
+    report: {
+      type: "object",
+      properties: {
+        summary: { type: "string" },
+        checks: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              command: { type: "string" },
+              outcome: { type: "string" },
+            },
+            required: ["command", "outcome"],
+            additionalProperties: false,
+          },
+        },
+        tradeoffs: { type: "string" },
+        limitations: { type: "string" },
+      },
+      required: ["summary", "checks", "tradeoffs", "limitations"],
+      additionalProperties: false,
+    },
+    messages: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { to: { type: "string" }, content: { type: "string" } },
+        required: ["to", "content"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["report", "messages"],
+  additionalProperties: false,
+};
 
 function jsonText(text: string) {
   return text
@@ -99,6 +201,7 @@ export function parseTeamPlan(answer: string, maxTeammates: number) {
   parsed.tasks.forEach((task) => visit(task.id));
   return {
     summary: parsed.summary,
+    revisionNotes: parsed.revisionNotes || undefined,
     tasks: parsed.tasks.map((task, index): TeamTask => ({
       ...task,
       files: [...new Set(task.files)],
@@ -224,25 +327,83 @@ export function hasTeamInbox(
   );
 }
 
-/** Plain-text reports remain valid; structured messages are optional. */
-export function parseMemberResult(answer: string) {
+/** Longest report kept on a task; the same bound the old plain-string shape had. */
+const memberReportLimit = 24000;
+
+const structuredReportSchema = z.object({
+  summary: z.string().trim().min(1).max(memberReportLimit),
+  checks: z
+    .array(
+      z.object({
+        command: z.string().trim().min(1).max(600),
+        outcome: z.string().trim().min(1).max(600),
+      }),
+    )
+    .max(40),
+  tradeoffs: z.string().trim().max(6000),
+  limitations: z.string().trim().max(6000),
+});
+
+const memberResultSchema = z.object({
+  // The structured report (memberReportJsonSchema) or the earlier single string.
+  report: z.union([
+    z.string().min(1).max(memberReportLimit),
+    structuredReportSchema,
+  ]),
+  messages: z
+    .array(
+      z.object({
+        to: z.string().min(1).max(80),
+        content: z.string().min(1).max(2000),
+      }),
+    )
+    .max(8)
+    .default([]),
+});
+
+/**
+ * Renders a structured report as the single report string the board, the
+ * draft prompt and the lead already read. Checks and limitations come before
+ * the tradeoffs so a truncated excerpt still keeps the evidence.
+ */
+export function formatMemberReport(
+  report: z.infer<typeof structuredReportSchema>,
+) {
+  const checks = report.checks.length
+    ? report.checks
+        .map((check) => `- ${check.command} → ${check.outcome}`)
+        .join("\n")
+    : "（成員未回報任何實際執行的檢查）";
+  return [
+    report.summary,
+    `驗證證據（成員自述的執行結果）：\n${checks}`,
+    `限制與未達成的驗收條件：\n${report.limitations || "（未回報）"}`,
+    `設計取捨（考慮過但未採用的做法）：\n${report.tradeoffs || "（未回報）"}`,
+  ]
+    .join("\n\n")
+    .slice(0, memberReportLimit);
+}
+
+/**
+ * Accepts the structured shape, the earlier { report: string, messages }
+ * shape and plain text. Plain text keeps Codex edge cases and the test stubs
+ * working; Claude Code's schema failures end without text, so they surface as
+ * "no report" rather than falling through here.
+ */
+export function parseMemberResult(answer: string): {
+  report: string;
+  messages: { to: string; content: string }[];
+} {
   try {
-    const value = z
-      .object({
-        report: z.string().min(1).max(24000),
-        messages: z
-          .array(
-            z.object({
-              to: z.string().min(1).max(80),
-              content: z.string().min(1).max(2000),
-            }),
-          )
-          .max(8)
-          .default([]),
-      })
-      .parse(JSON.parse(jsonText(answer)));
-    return value;
+    const value = memberResultSchema.parse(JSON.parse(jsonText(answer)));
+    return {
+      report:
+        typeof value.report === "string"
+          ? value.report
+          : formatMemberReport(value.report),
+      messages: value.messages,
+    };
   } catch {
-    return { report: answer, messages: [] };
+    return { report: answer.slice(0, memberReportLimit), messages: [] };
   }
 }

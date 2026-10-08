@@ -1,10 +1,13 @@
 import { readFile } from "node:fs/promises";
+import { setTimeout as delay } from "node:timers/promises";
 import {
   providerLabels,
   type AgentProvider,
   type ModelExecution,
 } from "../shared/models.js";
 import { modelArguments, modelExecutionSchema, modelId } from "./models.js";
+import { AppError } from "./types.js";
+import { redact } from "./secrets.js";
 
 /** none: answer from the prompt only; read: inspect files; write: edit the working directory and run commands. */
 export type AgentAccess = "none" | "read" | "write";
@@ -113,15 +116,21 @@ export type AgentEvent =
   | { kind: "message"; text: string }
   /** Claude Code's terminal answer, including validated structured output. */
   | { kind: "final"; text: string }
-  | { kind: "command"; outcome: string }
-  | { kind: "file-change" }
+  /** command is the first line the agent ran, redacted and cut to 300 characters; absent when the CLI gave none. */
+  | { kind: "command"; outcome: string; command?: string }
+  /** path is as the CLI reported it (Claude Code: absolute); the integrated paths come from the diff, not from here. */
+  | { kind: "file-change"; path?: string }
   /** Recoverable waiting or denial the user should see now; never a failure by itself. */
   | { kind: "notice"; message: string }
   /** Claude Code's system/init: the resolved model and the CLI version. */
   | { kind: "session"; model: string; cliVersion?: string }
   /** Model IDs present in result.modelUsage; the first entry is not necessarily the main model. */
   | { kind: "usage-by-model"; models: string[] }
-  | { kind: "error"; message: string; terminal: boolean };
+  /** retryable: the invocation lost Claude Code's OAuth refresh lock to another process; a rerun usually succeeds. */
+  | { kind: "error"; message: string; terminal: boolean; retryable?: boolean };
+
+/** Claude Code reports this when another process holds ~/.claude/.oauth_refresh.lock while the token is expired. */
+const oauthRefreshRace = /Failed to refresh OAuth token/;
 
 type Json = Record<string, any>;
 const blocks = (event: Json): Json[] =>
@@ -134,6 +143,19 @@ const isModelId = (value: unknown): value is string =>
   typeof value === "string" && modelId.safeParse(value).success;
 const finite = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
+
+/**
+ * A command or path for the log: first line only, credential shapes masked,
+ * at most 300 characters. redact() does not know flag forms such as
+ * `--token xyz`, which is why continuation lines are dropped rather than kept.
+ */
+function summarize(value: unknown): string | undefined {
+  if (typeof value !== "string") return;
+  const line = redact(value).split(/\r?\n/, 1)[0].trim();
+  return line ? line.slice(0, 300) : undefined;
+}
+const withField = <K extends string>(key: K, value: string | undefined) =>
+  value === undefined ? {} : ({ [key]: value } as Record<K, string>);
 
 const rateLimitWindows: Record<string, string> = {
   five_hour: "5 小時滾動視窗：用量每 5 小時依開始時間重置",
@@ -214,9 +236,14 @@ function systemNotice(value: Json): AgentEvent[] {
   return [];
 }
 
-/** Maps one parsed JSONL event to the documented events BELL uses; raw tool output is never returned. */
+/**
+ * Maps one parsed JSONL event to the documented events BELL uses. Command
+ * strings and edited paths are kept (summarized); raw tool output, Codex
+ * aggregated_output and tool_result content are never returned.
+ */
 export function agentEventReader(provider: AgentProvider = "codex") {
-  const toolNames = new Map<string, string>();
+  // Claude Code reports a tool's input on tool_use and its outcome on a later tool_result, keyed by id.
+  const tools = new Map<string, { name: string; summary?: string }>();
   return (event: unknown): AgentEvent[] => {
     if (!event || typeof event !== "object") return [];
     const value = event as Json;
@@ -225,9 +252,22 @@ export function agentEventReader(provider: AgentProvider = "codex") {
       if (value.type === "item.completed" && item?.type === "agent_message")
         return [{ kind: "message", text: String(item.text ?? "") }];
       if (value.type === "item.completed" && item?.type === "command_execution")
-        return [{ kind: "command", outcome: `exit ${item.exit_code ?? "?"}` }];
-      if (value.type === "item.completed" && item?.type === "file_change")
-        return [{ kind: "file-change" }];
+        return [
+          {
+            kind: "command",
+            outcome: `exit ${item.exit_code ?? "?"}`,
+            ...withField("command", summarize(item.command)),
+          },
+        ];
+      if (value.type === "item.completed" && item?.type === "file_change") {
+        const paths = (Array.isArray(item.changes) ? item.changes : [])
+          .slice(0, 20)
+          .map((change: Json) => summarize(change?.path))
+          .filter((path: string | undefined): path is string => !!path);
+        return paths.length
+          ? paths.map((path: string) => ({ kind: "file-change", path }))
+          : [{ kind: "file-change" }];
+      }
       if (value.type === "error" || value.type === "turn.failed") {
         const terminal = value.type === "turn.failed";
         return [
@@ -267,8 +307,20 @@ export function agentEventReader(provider: AgentProvider = "codex") {
       for (const block of blocks(value)) {
         if (block.type === "text" && block.text)
           events.push({ kind: "message", text: String(block.text) });
-        if (block.type === "tool_use" && typeof block.id === "string")
-          toolNames.set(block.id, String(block.name));
+        if (block.type === "tool_use" && typeof block.id === "string") {
+          const name = String(block.name);
+          const input = block.input && typeof block.input === "object" ? block.input : {};
+          tools.set(block.id, {
+            name,
+            summary: summarize(
+              name === "Bash"
+                ? input.command
+                : name === "Edit" || name === "Write"
+                  ? input.file_path
+                  : undefined,
+            ),
+          });
+        }
       }
       return events;
     }
@@ -276,14 +328,18 @@ export function agentEventReader(provider: AgentProvider = "codex") {
       const events: AgentEvent[] = [];
       for (const block of blocks(value)) {
         if (block.type !== "tool_result") continue;
-        const name = toolNames.get(block.tool_use_id);
-        if (name === "Bash")
+        const tool = tools.get(block.tool_use_id);
+        if (tool?.name === "Bash")
           events.push({
             kind: "command",
             outcome: block.is_error ? "失敗" : "成功",
+            ...withField("command", tool.summary),
           });
-        else if ((name === "Edit" || name === "Write") && !block.is_error)
-          events.push({ kind: "file-change" });
+        else if (
+          (tool?.name === "Edit" || tool?.name === "Write") &&
+          !block.is_error
+        )
+          events.push({ kind: "file-change", ...withField("path", tool.summary) });
       }
       return events;
     }
@@ -302,12 +358,16 @@ export function agentEventReader(provider: AgentProvider = "codex") {
             : Array.isArray(value.errors)
               ? value.errors.join("；")
               : "";
+        const retryable =
+          (value.is_error === true || value.terminal_reason === "api_error") &&
+          oauthRefreshRace.test(detail);
         events.push({
           kind: "error",
           terminal: true,
           message:
             detail ||
             `Claude Code 工作回合失敗（${String(value.subtype ?? "unknown")}）。`,
+          ...(retryable ? { retryable: true } : {}),
         });
         return events;
       }
@@ -351,4 +411,51 @@ export function applyReportedModel(
     ].slice(0, 20);
   }
   return false;
+}
+
+/** Waits before the second and third attempt of a turn that lost the OAuth refresh race. */
+export const transientRetryDelays: readonly number[] = [15_000, 45_000];
+
+export type TransientSleep = (ms: number, signal: AbortSignal) => Promise<void>;
+
+export interface TransientRetryOptions {
+  signal: AbortSignal;
+  /** Receives the Traditional Chinese notice before each wait. */
+  onRetry?: (notice: string) => void;
+  /** Test seam; the default waits for real and rejects with the 409 cancellation on abort. */
+  sleep?: TransientSleep;
+}
+
+const waitFor: TransientSleep = async (ms, signal) => {
+  try {
+    await delay(ms, undefined, { signal });
+  } catch {
+    throw new AppError("工作已取消。", 409);
+  }
+};
+
+/**
+ * Runs one CLI invocation and repeats it while it ends with a retryable
+ * terminal error, up to two more times. Every attempt is a separate
+ * invocation: the caller acquires and releases its process slot and records
+ * efficiency inside attempt(), so nobody is blocked during the wait. The last
+ * result is returned as is; the caller decides what a failure means.
+ */
+export async function retryTransientAuth<T extends { retryable?: boolean }>(
+  attempt: () => Promise<T>,
+  options: TransientRetryOptions,
+): Promise<T> {
+  const sleep = options.sleep ?? waitFor;
+  const total = transientRetryDelays.length + 1;
+  for (let index = 0; ; index++) {
+    const result = await attempt();
+    const ms = transientRetryDelays[index];
+    if (!result.retryable || ms === undefined || options.signal.aborted)
+      return result;
+    options.onRetry?.(
+      `Claude Code 正在更新登入憑證（其他行程持有更新鎖），${Math.round(ms / 1000)} 秒後重試（第 ${index + 2}/${total} 次）。`,
+    );
+    await sleep(ms, options.signal);
+    if (options.signal.aborted) throw new AppError("工作已取消。", 409);
+  }
 }

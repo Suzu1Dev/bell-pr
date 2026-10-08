@@ -61,12 +61,39 @@ export async function createTeamSnapshot(
   }
 }
 
-/** Only a task's declared, reviewable changes may enter the human-review workspace. */
+/**
+ * Drops a teammate's isolated checkout once it is no longer needed: after its
+ * patch was integrated, or before a failed task starts over at the same path.
+ * Teammates never commit, so the worktree is always dirty and needs --force.
+ * Callers hold the repository lock; a directory already deleted by hand only
+ * leaves a stale registration, which prune clears.
+ */
+export async function removeTaskWorktree(run: Run, task: TeamTask) {
+  if (!task.worktreePath) return;
+  try {
+    await git(run.worktreePath, [
+      "worktree",
+      "remove",
+      "--force",
+      task.worktreePath,
+    ]);
+  } catch {
+    await rm(task.worktreePath, { recursive: true, force: true });
+    await git(run.worktreePath, ["worktree", "prune"]);
+  }
+  task.worktreeRemoved = true;
+}
+
+/**
+ * Only a task's declared, reviewable changes may enter the human-review
+ * workspace. Returns the repository-relative paths that were applied so the
+ * run can record which files each task really changed.
+ */
 export async function integrateTeamTask(
   run: Run,
   task: TeamTask,
   signal?: AbortSignal,
-) {
+): Promise<string[]> {
   if (signal?.aborted) throw new AppError("工作已取消。", 409);
   if (!task.worktreePath || !task.baseSha)
     throw new AppError("任務缺少隔離工作目錄。", 422);
@@ -95,7 +122,7 @@ export async function integrateTeamTask(
         422,
       );
   }
-  if (!files.length) return 0;
+  if (!files.length) return [];
   const patch = files.map((file) => file.patch).join("\n");
   await git(
     run.worktreePath,
@@ -106,5 +133,5 @@ export async function integrateTeamTask(
     input: patch,
     signal,
   });
-  return files.length;
+  return files.map((file) => file.path);
 }

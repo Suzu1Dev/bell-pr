@@ -355,10 +355,11 @@ test("completed runs generate one isolated batch, deduplicate callers, persist r
     assert.equal(input.readonly, true);
     assert.deepEqual(await readdir(input.cwd), ["response-schema.json"]);
     assert.doesNotMatch(input.prompt, /\.env|hidden secret|large\.txt/);
-    // The run title and the shared contribution context precede the diffs.
+    // The run title and the shared contribution context precede the diffs;
+    // a run without settings carries no intent lines at all.
     assert.match(
       input.prompt,
-      /Consistent output\nUser request:\nImprove output consistency\nContribution settings[^\n]*\n\{\}\nProvided diffs:/,
+      /Consistent output\nUser request:\nImprove output consistency\nProvided diffs:/,
     );
     return response(input.prompt);
   });

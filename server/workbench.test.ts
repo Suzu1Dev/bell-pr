@@ -15,6 +15,7 @@ import {
   sensitivePath,
 } from "./git.js";
 import { Store } from "./store.js";
+import { AgentSlots } from "./agent-slots.js";
 import { Workbench } from "./workbench.js";
 import { createApp } from "./index.js";
 import { AppError, type Run } from "./types.js";
@@ -1134,6 +1135,176 @@ test("the review rerun route exists and is gated on the run status", async () =>
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
+    await f.cleanup();
+  }
+});
+
+test("a Claude Code turn that lost the OAuth refresh lock and exited non-zero is retried with the slot released, counted as a failed call and cancellable while waiting", async () => {
+  const f = await fixture();
+  try {
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    f.run.modelExecution = { source: "cli-default", provider: "claude" };
+    // The mentor has no agent card in real runs; one is added here to observe the status line.
+    f.run.agents.push({
+      id: "guide",
+      name: "Guide",
+      role: "mentor",
+      status: "waiting",
+      detail: "",
+    });
+    const refreshRace =
+      "Failed to refresh OAuth token: another Claude Code process is refreshing it or exited mid-refresh. This is usually transient; retry in a minute, and if it persists close other Claude Code processes or sign in again";
+    const notice =
+      "Claude Code 正在更新登入憑證（其他行程持有更新鎖），15 秒後重試（第 2/3 次）。";
+    type Options = NonNullable<Parameters<typeof command>[2]>;
+    const emit = (options: Options, event: unknown) =>
+      options.onLine?.(JSON.stringify(event), "stdout");
+    const emitRace = (options: Options) => {
+      emit(options, {
+        type: "assistant",
+        message: { content: [{ type: "text", text: refreshRace }] },
+        error: "server_error",
+        is_api_error_message: true,
+      });
+      emit(options, {
+        type: "result",
+        subtype: "success",
+        is_error: true,
+        terminal_reason: "api_error",
+        duration_api_ms: 0,
+        num_turns: 1,
+        result: refreshRace,
+        usage: {
+          input_tokens: 0,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+          output_tokens: 0,
+        },
+        modelUsage: {},
+      });
+    };
+    // command() flushes the events above through onLine, then rejects on claude's exit code 1.
+    const exitFailure = (tail: string) =>
+      new AppError(`claude 執行失敗：${tail}`, 422);
+    const slots = new AgentSlots(1);
+    const waits: number[] = [];
+    const prompts: string[] = [];
+    const workbench = new Workbench(f.store, undefined, {
+      agentSlots: slots,
+      sleep: async (ms) => {
+        waits.push(ms);
+        // Waiting holds no slot, so other agents keep running; the card shows the wait.
+        assert.equal(slots.active, 0);
+        assert.equal(f.run.agents[0].detail, notice);
+      },
+      command: async (executable, args, options = {}) => {
+        assert.equal(executable, "claude");
+        assert.equal(args[0], "-p");
+        assert.equal(slots.active, 1);
+        prompts.push(options.input!);
+        if (prompts.length === 1) {
+          emitRace(options);
+          throw exitFailure(refreshRace);
+        } else
+          emit(options, {
+            type: "result",
+            subtype: "success",
+            is_error: false,
+            result: "這一行改了匯出的字串。",
+            usage: {
+              input_tokens: 10,
+              cache_creation_input_tokens: 0,
+              cache_read_input_tokens: 5,
+              output_tokens: 4,
+            },
+          });
+        return { stdout: "", stderr: "", code: 0 };
+      },
+    });
+    const answer = await workbench.chat(f.run.id, "hello.ts", "這個檔案改了什麼？");
+    assert.equal(answer, "這一行改了匯出的字串。");
+    // The same call is repeated: identical prompt, one wait of the first backoff step.
+    assert.equal(prompts.length, 2);
+    assert.equal(prompts[0], prompts[1]);
+    assert.deepEqual(waits, [15_000]);
+    assert.ok(
+      f.run.logs.some(
+        (entry) =>
+          entry.agent === "guide" &&
+          entry.kind === "notice" &&
+          entry.message === notice,
+      ),
+    );
+    assert.equal(f.run.efficiency?.calls, 2);
+    assert.equal(f.run.efficiency?.failedCalls, 1);
+    assert.equal(f.run.efficiency?.completedCalls, 1);
+    assert.equal(f.run.efficiency?.inputTokens, 15);
+    assert.equal(f.run.efficiency?.byRole?.guide.calls, 2);
+    assert.equal(
+      f.run.conversations?.["hello.ts"]?.messages.at(-1)?.content,
+      answer,
+    );
+    assert.equal(f.run.agents[0].detail, "已完成，報告可供審閱");
+
+    // Any other API error still fails the turn at once with command()'s own message.
+    let invocations = 0;
+    waits.length = 0;
+    const plain = new Workbench(f.store, undefined, {
+      sleep: async (ms) => {
+        waits.push(ms);
+      },
+      command: async (_executable, _args, options = {}) => {
+        invocations++;
+        emit(options, {
+          type: "result",
+          subtype: "success",
+          is_error: true,
+          terminal_reason: "api_error",
+          result: "API Error: 500 Internal server error",
+        });
+        throw exitFailure("API Error: 500 Internal server error");
+      },
+    });
+    await assert.rejects(
+      plain.chat(f.run.id, "hello.ts", "再問一次"),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 422 &&
+        error.message === "claude 執行失敗：API Error: 500 Internal server error",
+    );
+    assert.equal(invocations, 1);
+    assert.equal(waits.length, 0);
+    assert.equal(f.run.efficiency?.failedCalls, 2);
+
+    // Stopping during the second wait cancels the turn with 409 and starts no third invocation.
+    invocations = 0;
+    const racing = new Workbench(f.store, undefined, {
+      sleep: async (ms) => {
+        waits.push(ms);
+        if (waits.length === 2) await racing.shutdown();
+      },
+      command: async (_executable, _args, options = {}) => {
+        invocations++;
+        emitRace(options);
+        throw exitFailure(refreshRace);
+      },
+    });
+    await assert.rejects(
+      racing.chat(f.run.id, "hello.ts", "第三次"),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 409 &&
+        error.message === "工作已取消。",
+    );
+    assert.equal(invocations, 2);
+    assert.deepEqual(waits, [15_000, 45_000]);
+    assert.equal(f.run.efficiency?.calls, 5);
+    assert.equal(f.run.efficiency?.failedCalls, 4);
+    assert.equal(f.run.efficiency?.completedCalls, 1);
+  } finally {
     await f.cleanup();
   }
 });

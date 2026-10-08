@@ -1323,6 +1323,40 @@ button {
   overflow-wrap: anywhere;
   max-width: 100%;
 }
+.log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.log-filter-chip {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: #80976b;
+  background: #f4f8ee;
+  border: 1px solid #e0e8d6;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.log-filter-chip.is-on {
+  color: white;
+  background: #65966a;
+  border-color: #65966a;
+}
+.log-command {
+  font-family: var(--mono);
+  color: #4f6342;
+  background: #f2f6ec;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.log-detail {
+  margin-left: 8px;
+  color: #a1aa94;
+}
+.log-status p {
+  color: #a1aa94;
+}
 .task-brief {
   padding: 28px 22px;
   background: #fcfdf9;

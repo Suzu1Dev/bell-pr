@@ -13,14 +13,16 @@ import path from "node:path";
 import { z } from "zod";
 import {
   defaultDiscoveryPreferences,
+  discoverySorts,
   type ContributionOpportunity,
   type DiscoveryCandidate,
   type DiscoveryJob,
   type DiscoveryPreferences,
 } from "../shared/discovery.js";
-import { ponytailModes } from "../shared/efficiency.js";
+import { ponytailModes, type EfficiencyMetrics } from "../shared/efficiency.js";
 import type { ModelCatalog } from "../shared/models.js";
 import {
+  addEfficiency,
   applyPonytail,
   efficiencyMetricsSchema,
   trackEfficiency,
@@ -31,6 +33,8 @@ import {
   agentCommand,
   agentEventReader,
   applyReportedModel,
+  retryTransientAuth,
+  type TransientSleep,
 } from "./agent-cli.js";
 import {
   getModelCatalog,
@@ -67,6 +71,7 @@ export const discoveryPreferencesSchema = z
       .min(0)
       .max(1_000_000)
       .default(defaultDiscoveryPreferences.minStars),
+    sort: z.enum(discoverySorts).default(defaultDiscoveryPreferences.sort),
     ponytailMode: z
       .enum(ponytailModes)
       .default(defaultDiscoveryPreferences.ponytailMode),
@@ -332,6 +337,7 @@ export class DiscoveryService {
   private modelCatalog: typeof getModelCatalog;
   private collect: typeof collectDiscoveryCandidates;
   private slots: AgentSlots;
+  private sleep?: TransientSleep;
   private file: string;
   constructor(
     private store: Store,
@@ -340,10 +346,13 @@ export class DiscoveryService {
       getModelCatalog?: typeof getModelCatalog;
       collectCandidates?: typeof collectDiscoveryCandidates;
       agentSlots?: AgentSlots;
+      /** Wait between retries of an analysis that lost the OAuth refresh race. */
+      sleep?: TransientSleep;
     } = {},
   ) {
     this.file = path.join(store.directory, "discovery.json");
     this.execute = dependencies.command ?? command;
+    this.sleep = dependencies.sleep;
     this.modelCatalog = dependencies.getModelCatalog ?? getModelCatalog;
     this.collect = dependencies.collectCandidates ?? collectDiscoveryCandidates;
     this.slots =
@@ -453,6 +462,8 @@ export class DiscoveryService {
   private async perform(job: DiscoveryJob, signal: AbortSignal) {
     let temporary: string | undefined;
     let efficiency: ReturnType<typeof trackEfficiency> | undefined;
+    // Attempts that lost the OAuth refresh race are failed calls recorded before the wait.
+    let attempts: EfficiencyMetrics | undefined;
     let completed = false;
     try {
       this.assertActive(signal);
@@ -537,7 +548,6 @@ export class DiscoveryService {
       });
       let answer = "";
       let failed = false;
-      efficiency = trackEfficiency(job.preferences.ponytailMode);
       const cli = await agentCommand(job.modelExecution, {
         cwd: temporary,
         access: "none",
@@ -545,36 +555,63 @@ export class DiscoveryService {
         skipGitRepoCheck: true,
       });
       const read = agentEventReader(job.modelExecution.provider);
-      const releaseSlot = await this.slots.acquire(signal);
-      try {
-        await this.execute(cli.executable, cli.args, {
-          cwd: temporary,
-          input: discoveryPrompt(eligible, job.preferences),
+      const input = discoveryPrompt(eligible, job.preferences);
+      await retryTransientAuth(
+        async () => {
+          answer = "";
+          failed = false;
+          let retryable = false;
+          efficiency = trackEfficiency(job.preferences.ponytailMode);
+          const releaseSlot = await this.slots.acquire(signal);
+          try {
+            await this.execute(cli.executable, cli.args, {
+              cwd: temporary,
+              input,
+              signal,
+              env: agentEnvironment(),
+              timeoutMs: 240_000,
+              maxBytes: 1_000_000,
+              onLine: (line, stream) => {
+                if (stream !== "stdout") return;
+                try {
+                  const event = JSON.parse(line);
+                  efficiency?.observe(event);
+                  for (const item of read(event)) {
+                    // Notices (retries, rate limits, denials) are not failures; only error events are.
+                    if (item.kind === "error") {
+                      failed = true;
+                      retryable = item.retryable === true;
+                    }
+                    if (item.kind === "message" || item.kind === "final")
+                      answer = item.text;
+                    if (job.modelExecution)
+                      applyReportedModel(job.modelExecution, item);
+                  }
+                } catch {
+                  /* Only structured agent messages are candidates for analysis output. */
+                }
+              },
+            }).catch((error: unknown) => {
+              // claude exits non-zero after losing the OAuth refresh race; its result event
+              // (flushed before the rejection) already classified the attempt as retryable.
+              if (!retryable) throw error;
+            });
+          } finally {
+            releaseSlot();
+          }
+          return { retryable };
+        },
+        {
           signal,
-          env: agentEnvironment(),
-          timeoutMs: 240_000,
-          maxBytes: 1_000_000,
-          onLine: (line, stream) => {
-            if (stream !== "stdout") return;
-            try {
-              const event = JSON.parse(line);
-              efficiency?.observe(event);
-              for (const item of read(event)) {
-                // Notices (retries, rate limits, denials) are not failures; only error events are.
-                if (item.kind === "error") failed = true;
-                if (item.kind === "message" || item.kind === "final")
-                  answer = item.text;
-                if (job.modelExecution)
-                  applyReportedModel(job.modelExecution, item);
-              }
-            } catch {
-              /* Only structured agent messages are candidates for analysis output. */
-            }
+          sleep: this.sleep,
+          onRetry: (notice) => {
+            attempts = addEfficiency(attempts, efficiency!.finish(false));
+            efficiency = undefined;
+            job.message = notice;
+            void this.save().catch(() => undefined);
           },
-        });
-      } finally {
-        releaseSlot();
-      }
+        },
+      );
       this.assertActive(signal);
       if (
         failed ||
@@ -609,7 +646,9 @@ export class DiscoveryService {
           ).slice(0, 2400);
       job.message = signal.aborted ? "探索已取消" : "探索未完成";
     } finally {
-      if (efficiency) job.efficiency = efficiency.finish(completed);
+      if (efficiency)
+        attempts = addEfficiency(attempts, efficiency.finish(completed));
+      if (attempts) job.efficiency = attempts;
       job.completedAt = new Date().toISOString();
       if (temporary)
         await rm(temporary, { recursive: true, force: true }).catch(

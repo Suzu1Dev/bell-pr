@@ -228,6 +228,62 @@ test("draft prompt keeps complete bounded safe diffs and distinguishes unavailab
     /"issue":\{"url":"https:\/\/github\.com\/acme\/widgets\/issues\/42","number":42\}/,
   );
   assert.match(linked, /Only when the supplied issue is not null/);
+  // Member reports carry what the application observed next to what the member claimed; tasks saved without checks send empty lists.
+  const withTeam = draftPrompt(
+    {
+      ...run,
+      team: {
+        config: {
+          maxTeammates: 2,
+          requirePlanApproval: false,
+          provider: "codex",
+          protocol: "bell-shared-tasks",
+          messageDelivery: "between-turns",
+        },
+        phase: "complete",
+        planSummary: "plan",
+        messages: [],
+        tasks: [
+          {
+            id: "alpha",
+            title: "alpha",
+            description: "Implement alpha",
+            owner: "member-1",
+            files: ["src/a.ts"],
+            dependsOn: [],
+            status: "complete",
+            report: "自述：已執行 npm test。",
+            checks: [{ command: "npm test -- a.test.ts", outcome: "exit 1" }],
+            integratedFiles: ["src/a.ts"],
+          },
+          {
+            id: "legacy",
+            title: "legacy",
+            description: "Saved before checks existed",
+            owner: "member-2",
+            files: ["src/b.ts"],
+            dependsOn: [],
+            status: "complete",
+            report: "舊任務報告。",
+          },
+        ],
+      },
+    },
+    [diff],
+    context,
+  );
+  assert.match(
+    withTeam,
+    /"observedChecksNote":"application-observed command executions, exit codes only, no output captured/,
+  );
+  assert.match(
+    withTeam,
+    /"id":"alpha"[^\n]*"observedChecks":\[\{"command":"npm test -- a.test.ts","outcome":"exit 1"\}\],"integratedFiles":\["src\/a.ts"\]/,
+  );
+  assert.match(
+    withTeam,
+    /"id":"legacy"[^\n]*"observedChecks":\[\],"integratedFiles":\[\]/,
+  );
   assert.throws(
     () => draftPrompt(run, [{ ...diff, patch: "字".repeat(40_000) }], context),
     /100 KB/,

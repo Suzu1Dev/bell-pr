@@ -11,6 +11,8 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import type { command } from "./process.js";
+import { AppError } from "./types.js";
 import {
   defaultDiscoveryPreferences,
   type DiscoveryCandidate,
@@ -95,6 +97,7 @@ test("discovery preferences are strict, bounded and default to beginner preferen
     { language: "TypeScript stars:0" },
     { language: "$(echo hi)" },
     { difficulty: "expert" },
+    { sort: "forks" },
     { minStars: -1 },
     { minStars: 1_000_001 },
     { minStars: "50" },
@@ -106,6 +109,14 @@ test("discovery preferences are strict, bounded and default to beginner preferen
   assert.equal(
     discoveryPreferencesSchema.parse({ language: "C++", minStars: 0 }).language,
     "C++",
+  );
+  // Preferences saved before the sort field existed keep loading with the old order.
+  const { sort, ...legacy } = defaultDiscoveryPreferences;
+  assert.equal(sort, "updated");
+  assert.equal(discoveryPreferencesSchema.parse(legacy).sort, "updated");
+  assert.equal(
+    discoveryPreferencesSchema.parse({ sort: "relevance" }).sort,
+    "relevance",
   );
 });
 
@@ -614,5 +625,172 @@ test("terminal jobs wait for persistence before reads and concurrent restarts pr
     releaseInference();
     releasePersistence();
     await f.cleanup();
+  }
+});
+
+test("discovery retries a Claude Code analysis that lost the OAuth refresh lock and exited non-zero, shows the wait and can be cancelled during it", async () => {
+  const refreshRace =
+    "Failed to refresh OAuth token: another Claude Code process is refreshing it or exited mid-refresh. This is usually transient; retry in a minute, and if it persists close other Claude Code processes or sign in again";
+  const claudeCatalog = async () => ({
+    source: "claude" as const,
+    models: [
+      {
+        id: "sonnet",
+        name: "Sonnet",
+        description: "Fixture",
+        isDefault: true,
+        reasoningEfforts: ["low" as const],
+        defaultReasoningEffort: "low" as const,
+      },
+    ],
+  });
+  const emitRace = (options: Parameters<typeof command>[2]) => {
+    options?.onLine?.(
+      JSON.stringify({
+        type: "assistant",
+        message: { content: [{ type: "text", text: refreshRace }] },
+        error: "server_error",
+        is_api_error_message: true,
+      }),
+      "stdout",
+    );
+    options?.onLine?.(
+      JSON.stringify({
+        type: "result",
+        subtype: "success",
+        is_error: true,
+        terminal_reason: "api_error",
+        result: refreshRace,
+        usage: {
+          input_tokens: 0,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+          output_tokens: 0,
+        },
+        modelUsage: {},
+      }),
+      "stdout",
+    );
+  };
+  // command() flushes the events above through onLine, then rejects on claude's exit code 1.
+  const exitFailure = (tail: string) =>
+    new AppError(`claude 執行失敗：${tail}`, 422);
+  const waits: number[] = [];
+  const messages: string[] = [];
+  let calls = 0;
+  const f = await fixture({
+    getModelCatalog: claudeCatalog,
+    sleep: async (ms) => {
+      waits.push(ms);
+      messages.push((await f.service.get()).job!.message);
+    },
+    command: async (executable, _args, options) => {
+      calls++;
+      assert.equal(executable, "claude");
+      if (calls === 1) {
+        emitRace(options);
+        throw exitFailure(refreshRace);
+      }
+      options?.onLine?.(
+        JSON.stringify({
+          type: "result",
+          subtype: "success",
+          is_error: false,
+          result: answer(),
+          usage: {
+            input_tokens: 100,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 60,
+            output_tokens: 20,
+          },
+        }),
+        "stdout",
+      );
+      return { stdout: "", stderr: "", code: 0 };
+    },
+  });
+  try {
+    await f.service.start({ provider: "claude" });
+    const job = await finished(f.service);
+    assert.equal(job.status, "ready");
+    assert.equal(job.opportunities.length, 1);
+    assert.equal(calls, 2);
+    assert.deepEqual(waits, [15_000]);
+    assert.deepEqual(messages, [
+      "Claude Code 正在更新登入憑證（其他行程持有更新鎖），15 秒後重試（第 2/3 次）。",
+    ]);
+    assert.equal(job.modelExecution?.provider, "claude");
+    assert.equal(job.efficiency?.calls, 2);
+    assert.equal(job.efficiency?.failedCalls, 1);
+    assert.equal(job.efficiency?.completedCalls, 1);
+    assert.equal(job.efficiency?.cachedInputTokens, 60);
+  } finally {
+    await f.cleanup();
+  }
+
+  // Cancelling while waiting ends the job as cancelled without another invocation.
+  calls = 0;
+  waits.length = 0;
+  const cancelled = await fixture({
+    getModelCatalog: claudeCatalog,
+    sleep: async (ms) => {
+      waits.push(ms);
+      const stop = cancelled.service.cancel();
+      await delay(1);
+      assert.equal(calls, 1);
+      void stop;
+    },
+    command: async (_executable, _args, options) => {
+      calls++;
+      emitRace(options);
+      throw exitFailure(refreshRace);
+    },
+  });
+  try {
+    await cancelled.service.start({ provider: "claude" });
+    const job = await finished(cancelled.service);
+    assert.equal(job.status, "cancelled");
+    assert.equal(calls, 1);
+    assert.deepEqual(waits, [15_000]);
+    assert.equal(job.efficiency?.calls, 1);
+    assert.equal(job.efficiency?.failedCalls, 1);
+  } finally {
+    await cancelled.cleanup();
+  }
+
+  // Any other API error plus the non-zero exit fails at once with command()'s own message.
+  calls = 0;
+  waits.length = 0;
+  const plain = await fixture({
+    getModelCatalog: claudeCatalog,
+    sleep: async (ms) => {
+      waits.push(ms);
+    },
+    command: async (_executable, _args, options) => {
+      calls++;
+      options?.onLine?.(
+        JSON.stringify({
+          type: "result",
+          subtype: "success",
+          is_error: true,
+          terminal_reason: "api_error",
+          result: "API Error: 500 Internal server error",
+        }),
+        "stdout",
+      );
+      throw exitFailure("API Error: 500 Internal server error");
+    },
+  });
+  try {
+    await plain.service.start({ provider: "claude" });
+    const job = await finished(plain.service);
+    assert.equal(job.status, "failed");
+    assert.equal(job.error, "claude 執行失敗：API Error: 500 Internal server error");
+    assert.equal(calls, 1);
+    assert.deepEqual(waits, []);
+    assert.equal(job.efficiency?.calls, 1);
+    assert.equal(job.efficiency?.failedCalls, 1);
+  } finally {
+    await plain.cleanup();
   }
 });

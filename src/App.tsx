@@ -295,6 +295,8 @@ export default function App() {
   const [formError, setFormError] = useState("");
   const [fileSearch, setFileSearch] = useState("");
   const [onlyUnreviewed, setOnlyUnreviewed] = useState(false);
+  // Activity-log filter by agent id; falls back to all when the open run has no such agent.
+  const [logFilter, setLogFilter] = useState("all");
   // Display order only: review fingerprints and the server's diff are untouched.
   const [suggestedOrder, setSuggestedOrder] = useState(false);
   const [diffView, setDiffView] = useState<"unified" | "split">("unified");
@@ -361,6 +363,13 @@ export default function App() {
   ).length;
   const allReviewed = files.length > 0 && reviewedCount === files.length;
   const active = ["running", "queued", "awaiting_plan"].includes(run.status);
+  const activeLogFilter = run.agents.some((agent) => agent.id === logFilter)
+    ? logFilter
+    : "all";
+  const visibleLogs =
+    activeLogFilter === "all"
+      ? run.logs
+      : run.logs.filter((log) => log.agent === activeLogFilter);
   const editable = !demo && ["review", "approved"].includes(run.status);
   // A learner-requested re-review keeps the run in review/approved; only the
   // two reviewer agents report running, so poll and offer 停止 on that signal.
@@ -928,6 +937,31 @@ export default function App() {
       setBusy(false);
     }
   }
+  async function reviseTeamPlan(feedback: string) {
+    // Errors surface inline next to the textarea, like team messages.
+    const result = await api<{ run: Run }>(
+      `/runs/${run.id}/plan/revise`,
+      send("POST", { feedback }),
+    );
+    if (runIdRef.current === result.run.id) setRun(result.run);
+  }
+  async function retryTeam(message: string) {
+    setBusy(true);
+    try {
+      const result = await api<{ run: Run }>(
+        `/runs/${run.id}/team/retry`,
+        send("POST", message ? { message } : {}),
+      );
+      if (runIdRef.current === result.run.id) setRun(result.run);
+      notify(
+        result.run.status === "awaiting_plan"
+          ? "計畫尚未核准，已回到等待核准。"
+          : "已重新排入：已整合的子任務不重跑，失敗的子任務重新開始。",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   async function sendTeamMessage(to: string, content: string) {
     if (demo) {
       setRun((previous) => ({
@@ -1467,7 +1501,9 @@ export default function App() {
       notify(
         ["review", "approved"].includes(updated.status)
           ? "已停止重新審查；原有報告與審閱狀態保留。"
-          : "任務已停止，工作目錄已保留。",
+          : updated.team?.tasks.length
+            ? "任務已停止；本次工作的目錄與失敗任務的隔離目錄保留，可重試失敗的子任務。"
+            : "任務已停止，工作目錄已保留。",
       );
     } catch (error) {
       notify((error as Error).message, "error");
@@ -2315,7 +2351,9 @@ export default function App() {
                     run={run}
                     demo={demo}
                     onApprove={approveTeamPlan}
+                    onRevise={reviseTeamPlan}
                     onMessage={sendTeamMessage}
+                    onRetry={retryTeam}
                     busy={busy}
                   />
                 )}
@@ -2379,9 +2417,36 @@ export default function App() {
                               : "任務紀錄"}
                         </span>
                       </div>
+                      {run.agents.length > 0 && run.logs.length > 0 && (
+                        <div
+                          className="log-filters"
+                          role="group"
+                          aria-label="依角色篩選執行紀錄"
+                        >
+                          {[
+                            { id: "all", label: "全部" },
+                            ...run.agents.map((agent) => ({
+                              id: agent.id,
+                              label: agent.id,
+                            })),
+                          ].map((chip) => (
+                            <button
+                              key={chip.id}
+                              className={`log-filter-chip ${activeLogFilter === chip.id ? "is-on" : ""}`}
+                              aria-pressed={activeLogFilter === chip.id}
+                              onClick={() => setLogFilter(chip.id)}
+                            >
+                              {chip.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       <div className="activity-log">
-                        {run.logs.map((log, index) => (
-                          <div className="log-line" key={index}>
+                        {visibleLogs.map((log, index) => (
+                          <div
+                            className={`log-line ${log.kind ? `log-${log.kind}` : ""}`}
+                            key={index}
+                          >
                             <span className="log-time">
                               {new Date(log.time).toLocaleTimeString("zh-TW", {
                                 hour: "2-digit",
@@ -2390,11 +2455,24 @@ export default function App() {
                               })}
                             </span>
                             <span className="log-agent">{log.agent}</span>
-                            <p>{log.message}</p>
+                            {log.kind === "command" ? (
+                              // The command the CLI reported, with its exit code; no output was captured.
+                              <p>
+                                <code className="log-command">{log.message}</code>
+                                {log.detail && (
+                                  <span className="log-detail">{log.detail}</span>
+                                )}
+                              </p>
+                            ) : (
+                              <p>{log.message}</p>
+                            )}
                           </div>
                         ))}
                         {!run.logs.length && (
                           <p className="muted">任務開始後會在此顯示紀錄。</p>
+                        )}
+                        {run.logs.length > 0 && !visibleLogs.length && (
+                          <p className="muted">這個角色目前沒有紀錄。</p>
                         )}
                       </div>
                       {run.error && <p className="inline-error">{run.error}</p>}
