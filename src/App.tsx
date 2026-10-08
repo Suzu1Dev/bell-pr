@@ -295,6 +295,8 @@ export default function App() {
   const [formError, setFormError] = useState("");
   const [fileSearch, setFileSearch] = useState("");
   const [onlyUnreviewed, setOnlyUnreviewed] = useState(false);
+  // Activity-log filter by agent id; falls back to all when the open run has no such agent.
+  const [logFilter, setLogFilter] = useState("all");
   // Display order only: review fingerprints and the server's diff are untouched.
   const [suggestedOrder, setSuggestedOrder] = useState(false);
   const [diffView, setDiffView] = useState<"unified" | "split">("unified");
@@ -361,6 +363,13 @@ export default function App() {
   ).length;
   const allReviewed = files.length > 0 && reviewedCount === files.length;
   const active = ["running", "queued", "awaiting_plan"].includes(run.status);
+  const activeLogFilter = run.agents.some((agent) => agent.id === logFilter)
+    ? logFilter
+    : "all";
+  const visibleLogs =
+    activeLogFilter === "all"
+      ? run.logs
+      : run.logs.filter((log) => log.agent === activeLogFilter);
   const editable = !demo && ["review", "approved"].includes(run.status);
   // A learner-requested re-review keeps the run in review/approved; only the
   // two reviewer agents report running, so poll and offer 停止 on that signal.
@@ -2388,9 +2397,36 @@ export default function App() {
                               : "任務紀錄"}
                         </span>
                       </div>
+                      {run.agents.length > 0 && run.logs.length > 0 && (
+                        <div
+                          className="log-filters"
+                          role="group"
+                          aria-label="依角色篩選執行紀錄"
+                        >
+                          {[
+                            { id: "all", label: "全部" },
+                            ...run.agents.map((agent) => ({
+                              id: agent.id,
+                              label: agent.id,
+                            })),
+                          ].map((chip) => (
+                            <button
+                              key={chip.id}
+                              className={`log-filter-chip ${activeLogFilter === chip.id ? "is-on" : ""}`}
+                              aria-pressed={activeLogFilter === chip.id}
+                              onClick={() => setLogFilter(chip.id)}
+                            >
+                              {chip.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       <div className="activity-log">
-                        {run.logs.map((log, index) => (
-                          <div className="log-line" key={index}>
+                        {visibleLogs.map((log, index) => (
+                          <div
+                            className={`log-line ${log.kind ? `log-${log.kind}` : ""}`}
+                            key={index}
+                          >
                             <span className="log-time">
                               {new Date(log.time).toLocaleTimeString("zh-TW", {
                                 hour: "2-digit",
@@ -2399,11 +2435,24 @@ export default function App() {
                               })}
                             </span>
                             <span className="log-agent">{log.agent}</span>
-                            <p>{log.message}</p>
+                            {log.kind === "command" ? (
+                              // The command the CLI reported, with its exit code; no output was captured.
+                              <p>
+                                <code className="log-command">{log.message}</code>
+                                {log.detail && (
+                                  <span className="log-detail">{log.detail}</span>
+                                )}
+                              </p>
+                            ) : (
+                              <p>{log.message}</p>
+                            )}
                           </div>
                         ))}
                         {!run.logs.length && (
                           <p className="muted">任務開始後會在此顯示紀錄。</p>
+                        )}
+                        {run.logs.length > 0 && !visibleLogs.length && (
+                          <p className="muted">這個角色目前沒有紀錄。</p>
                         )}
                       </div>
                       {run.error && <p className="inline-error">{run.error}</p>}

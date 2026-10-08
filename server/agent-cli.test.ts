@@ -182,6 +182,7 @@ test("Codex events keep their existing meaning", () => {
     }),
     [{ kind: "message", text: "report" }],
   );
+  // Without a command string the event keeps its old shape.
   assert.deepEqual(
     read({
       type: "item.completed",
@@ -189,9 +190,57 @@ test("Codex events keep their existing meaning", () => {
     }),
     [{ kind: "command", outcome: "exit 1" }],
   );
+  // The command is kept (first line, redacted, ≤300 chars); aggregated_output never is.
+  const executed = read({
+    type: "item.completed",
+    item: {
+      type: "command_execution",
+      command: `export GITHUB_TOKEN=ghp_0123456789abcdef0123 && npm test -- a.test.ts\nrm -rf /tmp/${"x".repeat(400)}`,
+      aggregated_output: "SECRET-OUTPUT",
+      exit_code: 0,
+    },
+  });
+  assert.deepEqual(executed, [
+    {
+      kind: "command",
+      outcome: "exit 0",
+      command: "export GITHUB_TOKEN=[REDACTED] && npm test -- a.test.ts",
+    },
+  ]);
+  assert.doesNotMatch(JSON.stringify(executed), /SECRET-OUTPUT|ghp_0123/);
+  assert.equal(
+    (
+      read({
+        type: "item.completed",
+        item: {
+          type: "command_execution",
+          command: "y".repeat(500),
+          exit_code: 0,
+        },
+      })[0] as { command: string }
+    ).command.length,
+    300,
+  );
   assert.deepEqual(
     read({ type: "item.completed", item: { type: "file_change" } }),
     [{ kind: "file-change" }],
+  );
+  assert.deepEqual(
+    read({
+      type: "item.completed",
+      item: {
+        type: "file_change",
+        changes: [
+          { path: "src/a.ts", kind: "update" },
+          { path: "docs/b.md", kind: "add" },
+          { kind: "delete" },
+        ],
+      },
+    }),
+    [
+      { kind: "file-change", path: "src/a.ts" },
+      { kind: "file-change", path: "docs/b.md" },
+    ],
   );
   assert.deepEqual(read({ type: "turn.failed", error: { message: "boom" } }), [
     { kind: "error", terminal: true, message: "boom" },
@@ -236,24 +285,54 @@ test("Claude Code stream-json events map to messages, checks, edits and the fina
           { type: "tool_use", id: "bash-1", name: "Bash", input: {} },
           { type: "tool_use", id: "write-1", name: "Write", input: {} },
           { type: "tool_use", id: "read-1", name: "Read", input: {} },
+          {
+            type: "tool_use",
+            id: "bash-2",
+            name: "Bash",
+            input: {
+              command: "npm test -- --token sk-abcdefghijklmnop0123\ncat out.log",
+              description: "Run tests",
+            },
+          },
+          {
+            type: "tool_use",
+            id: "edit-1",
+            name: "Edit",
+            input: { file_path: "/work/tree/src/a.ts", old_string: "secret" },
+          },
         ],
       },
     }),
     [{ kind: "message", text: "Running tests." }],
   );
-  assert.deepEqual(
-    read({
-      type: "user",
-      message: {
-        content: [
-          { type: "tool_result", tool_use_id: "bash-1", is_error: true },
-          { type: "tool_result", tool_use_id: "write-1" },
-          { type: "tool_result", tool_use_id: "read-1", content: "secret" },
-        ],
-      },
-    }),
-    [{ kind: "command", outcome: "失敗" }, { kind: "file-change" }],
-  );
+  // Tool inputs are recalled when their results arrive; missing inputs keep the old shape and result content is never returned.
+  const results = read({
+    type: "user",
+    message: {
+      content: [
+        { type: "tool_result", tool_use_id: "bash-1", is_error: true },
+        { type: "tool_result", tool_use_id: "write-1" },
+        { type: "tool_result", tool_use_id: "read-1", content: "secret" },
+        {
+          type: "tool_result",
+          tool_use_id: "bash-2",
+          content: "TEST OUTPUT",
+        },
+        { type: "tool_result", tool_use_id: "edit-1" },
+      ],
+    },
+  });
+  assert.deepEqual(results, [
+    { kind: "command", outcome: "失敗" },
+    { kind: "file-change" },
+    {
+      kind: "command",
+      outcome: "成功",
+      command: "npm test -- --token [REDACTED]",
+    },
+    { kind: "file-change", path: "/work/tree/src/a.ts" },
+  ]);
+  assert.doesNotMatch(JSON.stringify(results), /TEST OUTPUT|secret|cat out/);
   assert.deepEqual(
     read({
       type: "result",

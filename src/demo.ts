@@ -340,17 +340,17 @@ export const demoRun: Run = {
   logs: [
     {
       time: "09:30",
-      agent: "Planner",
+      agent: "planner",
       message: "示範：將任務拆成重試工具、HTTP 整合、測試與文件。",
     },
     {
       time: "09:32",
-      agent: "Developer",
+      agent: "developer",
       message: "示範：使用指數退避搭配 full jitter，並限制最大等待時間。",
     },
     {
       time: "09:34",
-      agent: "Reviewer",
+      agent: "reviewer",
       message: "示範：標示 API 相容性與測試覆蓋範圍，等待人工確認。",
     },
   ],

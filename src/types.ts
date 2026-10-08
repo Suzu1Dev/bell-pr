@@ -33,6 +33,16 @@ export interface Agent {
   detail: string;
 }
 
+/** One activity-log line; entries saved before `kind` existed are plain messages. */
+export interface RunLogEntry {
+  time: string;
+  agent: string;
+  message: string;
+  kind?: "message" | "command" | "file" | "status" | "notice";
+  /** Exit code of a command entry or the paths of a file entry. */
+  detail?: string;
+}
+
 export interface Run {
   draftPreparation?: DraftPreparation;
   modelExecution?: ModelExecution;
@@ -59,7 +69,7 @@ export interface Run {
   worktreePath?: string;
   createdAt: string;
   agents: Agent[];
-  logs: { time: string; agent: string; message: string }[];
+  logs: RunLogEntry[];
   /** Human-written commit message; absent or empty means the PR title alone is used. */
   draft: { title: string; body: string; commitMessage?: string };
   reviewedFiles: string[];

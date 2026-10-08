@@ -1266,3 +1266,140 @@ test("re-running the review on a hand-edited worktree stores fresh reports, keep
     await f.cleanup();
   }
 });
+
+test("a fake Codex CLI's JSONL commands and edits become structured log entries, task checks and integrated paths", async () => {
+  // No agentRunner stub: the Workbench spawns `codex` from PATH, which is this
+  // Node script. It answers by role (recognized from the prompt), edits a.ts in
+  // the task worktree and reports two commands, one of them with a token.
+  const f = await fixture();
+  const previousPath = process.env.PATH;
+  const bin = path.join(f.directory, "bin");
+  await mkdir(bin);
+  const promptsFile = path.join(bin, "prompts.jsonl");
+  const plan = makePlan([{ id: "alpha", files: ["a.ts"] }]);
+  await writeFile(
+    path.join(bin, "codex"),
+    `#!/usr/bin/env node
+const fs = require('node:fs');
+const path = require('node:path');
+const args = process.argv.slice(2);
+const prompt = fs.readFileSync(0, 'utf8');
+fs.appendFileSync(${JSON.stringify(promptsFile)}, JSON.stringify({ args, prompt }) + '\\n');
+const emit = (item) => console.log(JSON.stringify({ type: 'item.completed', item }));
+if (args.includes('--output-schema')) {
+  console.error('fake codex: no structured output here');
+  process.exit(1);
+}
+if (prompt.includes('You are the team lead with read-only access')) {
+  emit({ type: 'agent_message', text: ${JSON.stringify(plan)} });
+} else if (prompt.includes('independent teammate working on task')) {
+  fs.writeFileSync(path.join(process.cwd(), 'a.ts'), 'export const value = "alpha";\\n');
+  emit({ type: 'command_execution', command: 'npm test -- a.test.ts\\ncat /tmp/out.log', aggregated_output: 'SECRET-OUTPUT', exit_code: 0 });
+  emit({ type: 'command_execution', command: 'curl -H "Authorization: token ghp_0123456789abcdef0123" https://example.invalid', exit_code: 7 });
+  emit({ type: 'file_change', changes: [{ path: 'a.ts', kind: 'update' }] });
+  emit({ type: 'agent_message', text: JSON.stringify({ report: 'alpha 完成；fake codex 自述執行了 npm test。', messages: [] }) });
+} else {
+  emit({ type: 'agent_message', text: '靜態審查：未發現問題。\\n\\nSuggested review order:\\n- a.ts — the only change.' });
+}
+`,
+    { mode: 0o700 },
+  );
+  try {
+    process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
+    const run = await f.workbench.createRun(
+      f.repo.id,
+      "Record what really ran",
+      "Fake codex",
+      { ...settings, requirePlanApproval: false },
+    );
+    await waitUntil(
+      () => run.status === "review" || run.status === "failed",
+      "fake codex team completion",
+    );
+    assert.equal(run.status, "review", run.error);
+    const task = run.team!.tasks[0];
+    assert.equal(task.status, "complete");
+    // Observed checks: first line only, token masked, exit codes kept, no output.
+    assert.deepEqual(task.checks, [
+      { command: "npm test -- a.test.ts", outcome: "exit 0" },
+      {
+        command:
+          'curl -H "Authorization: token [REDACTED]" https://example.invalid',
+        outcome: "exit 7",
+      },
+    ]);
+    assert.deepEqual(task.integratedFiles, ["a.ts"]);
+    const memberLogs = run.logs.filter((log) => log.agent === "member-1");
+    assert.deepEqual(
+      memberLogs
+        .filter((log) => log.kind === "command")
+        .map(({ message, detail }) => ({ message, detail })),
+      [
+        { message: "npm test -- a.test.ts", detail: "exit 0" },
+        {
+          message:
+            'curl -H "Authorization: token [REDACTED]" https://example.invalid',
+          detail: "exit 7",
+        },
+      ],
+    );
+    assert.deepEqual(
+      memberLogs
+        .filter((log) => log.kind === "file")
+        .map(({ message, detail }) => ({ message, detail })),
+      [
+        { message: "已更新 a.ts。", detail: "a.ts" },
+        {
+          message: "alpha 完成，1 個檔案通過範圍檢查並整合：a.ts。",
+          detail: "a.ts",
+        },
+      ],
+    );
+    assert.ok(memberLogs.some((log) => log.kind === "status"));
+    assert.ok(
+      memberLogs.some((log) => !log.kind && log.message.includes("alpha 完成；")),
+      "the member's answer stays a plain message",
+    );
+    assert.doesNotMatch(JSON.stringify(run), /SECRET-OUTPUT|ghp_0123|cat \/tmp/);
+    // The lead integration and test analyst prompts receive the same facts, labelled as untrusted and output-free.
+    const prompts = (await readFile(promptsFile, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { args: string[]; prompt: string });
+    const integration = prompts.find((entry) =>
+      entry.prompt.includes("You are the lead integrating"),
+    );
+    const tester = prompts.find((entry) =>
+      entry.prompt.includes("independent read-only test analyst"),
+    );
+    const reviewer = prompts.find((entry) =>
+      entry.prompt.includes("independent read-only code reviewer"),
+    );
+    for (const entry of [integration, tester]) {
+      assert.ok(entry);
+      assert.match(
+        entry.prompt,
+        /application-observed command executions, exit codes only, no output captured/,
+      );
+      assert.match(
+        entry.prompt,
+        /\{"id":"alpha","checks":\[\{"command":"npm test -- a.test.ts","outcome":"exit 0"\},\{"command":"curl -H \\"Authorization: token \[REDACTED\]\\" https:\/\/example.invalid","outcome":"exit 7"\}\],"integratedFiles":\["a.ts"\]\}/,
+      );
+    }
+    assert.ok(reviewer);
+    assert.doesNotMatch(reviewer.prompt, /application-observed/);
+    // The saved state carries the new optional fields. state.json is read
+    // directly: a second Store writing into the same directory would race
+    // with the background explanation and draft jobs' saves.
+    const saved = JSON.parse(
+      await readFile(path.join(f.store.directory, "state.json"), "utf8"),
+    ) as { runs: Run[] };
+    const savedTask = saved.runs.find((entry) => entry.id === run.id)!.team!
+      .tasks[0];
+    assert.deepEqual(savedTask.checks, task.checks);
+    assert.deepEqual(savedTask.integratedFiles, ["a.ts"]);
+  } finally {
+    process.env.PATH = previousPath;
+    await f.cleanup();
+  }
+});

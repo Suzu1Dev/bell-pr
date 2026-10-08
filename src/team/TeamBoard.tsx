@@ -330,6 +330,12 @@ export function TeamBoard({
                         先完成 {task.dependsOn.join("、")}
                       </div>
                     )}
+                    {task.integratedFiles && task.integratedFiles.length > 0 && (
+                      <div className="team-task-files team-task-integrated">
+                        <GitMerge size={13} />
+                        <span>已整合：{task.integratedFiles.join("、")}</span>
+                      </div>
+                    )}
                     {(task.report || task.error) && (
                       <>
                         <button
@@ -347,6 +353,22 @@ export function TeamBoard({
                           </pre>
                         )}
                       </>
+                    )}
+                    {task.checks && task.checks.length > 0 && (
+                      // What BELL saw the CLI run, to compare with the checks the report claims; exit codes only.
+                      <details className="team-task-checks">
+                        <summary>
+                          應用程式觀察到 {task.checks.length} 次指令執行（只有結束碼，未擷取輸出；可與報告自述的檢查對照）
+                        </summary>
+                        <ul>
+                          {task.checks.map((check, index) => (
+                            <li key={index}>
+                              <code>{check.command}</code>
+                              <span>{check.outcome}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
                     )}
                   </article>
                 ))}
@@ -531,6 +553,11 @@ export const demoTeam: AgentTeam = {
       status: "complete",
       report:
         "示範報告：新增可配置的重試策略與型別。實際執行證據請以真實任務報告為準。",
+      checks: [
+        { command: "npm test -- retry", outcome: "exit 0" },
+        { command: "npx tsc --noEmit", outcome: "exit 0" },
+      ],
+      integratedFiles: ["src/utils/retry.ts", "src/types.ts"],
     },
     {
       id: "task-2",

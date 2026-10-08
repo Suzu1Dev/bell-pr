@@ -3,6 +3,21 @@ import type { AgentProvider } from "./models.js";
 export type TeamTaskStatus =
   "pending" | "ready" | "running" | "complete" | "failed" | "blocked";
 
+/** Oldest entries are kept once a task reaches this many observed commands. */
+export const maxTeamTaskChecks = 40;
+
+/**
+ * One command execution the CLI reported while a teammate worked. This is what
+ * the application saw, not what the teammate wrote in its report: the two are
+ * shown side by side so a learner can compare them. Output is never captured.
+ */
+export interface TeamCheck {
+  /** First line of the command, credential shapes masked, at most 300 characters. */
+  command: string;
+  /** Exit code (Codex) or success/failure wording (Claude Code). */
+  outcome: string;
+}
+
 export interface TeamTask {
   id: string;
   title: string;
@@ -19,6 +34,10 @@ export interface TeamTask {
   startedAt?: string;
   completedAt?: string;
   acceptsMessages?: boolean;
+  /** Commands the CLI reported during this task; absent on tasks saved before it existed or when none were seen. */
+  checks?: TeamCheck[];
+  /** Repository-relative paths the application applied to the review worktree; absent before this field existed. */
+  integratedFiles?: string[];
 }
 
 export interface TeamMessage {

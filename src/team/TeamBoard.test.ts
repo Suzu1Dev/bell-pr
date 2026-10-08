@@ -31,6 +31,11 @@ test("demo team renders its phase, members, tasks and messages", () => {
   assert.match(html, /團隊協作示範/);
   // The plan was never sent back, so no revision history or form appears.
   assert.doesNotMatch(html, /退回並補充意見/);
+  // Application-observed checks and integrated paths sit on the task card; tasks without them render nothing extra.
+  assert.match(html, /應用程式觀察到 2 次指令執行/);
+  assert.match(html, /<code>npm test -- retry<\/code><span>exit 0<\/span>/);
+  assert.match(html, /已整合：src\/utils\/retry.ts、src\/types.ts/);
+  assert.equal(html.match(/應用程式觀察到/g)?.length, 1);
 });
 
 test("a run without team data falls back to the legacy notice", () => {

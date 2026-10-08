@@ -295,6 +295,42 @@
   margin-top: 14px;
   padding: 0;
 }
+.team-task-integrated {
+  color: #779c58;
+}
+.team-task-checks {
+  margin-top: 12px;
+  font-size: 11px;
+  color: #8ea578;
+}
+.team-task-checks > summary {
+  cursor: pointer;
+  line-height: 1.7;
+}
+.team-task-checks ul {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+.team-task-checks li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.team-task-checks code {
+  color: #4f6342;
+  background: #f2f6ec;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.team-task-checks li > span {
+  color: #a1aa94;
+  white-space: nowrap;
+}
 .team-task-report {
   font:
     12px/1.9 "Noto Sans TC",
