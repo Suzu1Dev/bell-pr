@@ -3,15 +3,18 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import {
   agentCommand,
   agentEventReader,
   agentLoginCheck,
   applyReportedModel,
+  retryTransientAuth,
   type AgentEvent,
 } from "./agent-cli.js";
 import type { ModelExecution } from "../shared/models.js";
 import { agentEnvironment } from "./process.js";
+import { AppError } from "./types.js";
 
 test("Codex arguments keep the existing sandbox, approval and schema flags", async () => {
   assert.deepEqual(
@@ -576,4 +579,139 @@ test("reported model is recorded once per model and modelsUsed is a union", () =
     applyReportedModel(execution, { kind: "message", text: "hi" }),
     false,
   );
+});
+
+const refreshRace =
+  "Failed to refresh OAuth token: another Claude Code process is refreshing it or exited mid-refresh. This is usually transient; retry in a minute, and if it persists close other Claude Code processes or sign in again";
+
+test("losing the Claude Code OAuth refresh lock is a retryable terminal error; other API errors are not", () => {
+  const read = agentEventReader("claude");
+  // Claude Code sends the same text as an assistant message first; it stays an ordinary message.
+  assert.deepEqual(
+    read({
+      type: "assistant",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: refreshRace }],
+      },
+      error: "server_error",
+      is_api_error_message: true,
+      session_id: "03489f4f-4a7d-4154-b21e-f1ceb6da7c59",
+    }),
+    [{ kind: "message", text: refreshRace }],
+  );
+  assert.deepEqual(
+    read({
+      type: "result",
+      subtype: "success",
+      is_error: true,
+      terminal_reason: "api_error",
+      duration_api_ms: 0,
+      num_turns: 1,
+      result: refreshRace,
+      usage: {
+        input_tokens: 0,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+        output_tokens: 0,
+      },
+      modelUsage: {},
+      permission_denials: [],
+      total_cost_usd: 0,
+    }),
+    [{ kind: "error", terminal: true, message: refreshRace, retryable: true }],
+  );
+  assert.deepEqual(
+    read({
+      type: "result",
+      subtype: "error_during_execution",
+      is_error: true,
+      terminal_reason: "api_error",
+      errors: [refreshRace],
+    }),
+    [{ kind: "error", terminal: true, message: refreshRace, retryable: true }],
+  );
+  assert.deepEqual(
+    read({
+      type: "result",
+      subtype: "success",
+      is_error: true,
+      terminal_reason: "api_error",
+      result: "API Error: 500 Internal server error",
+    }),
+    [
+      {
+        kind: "error",
+        terminal: true,
+        message: "API Error: 500 Internal server error",
+      },
+    ],
+  );
+});
+
+test("retryTransientAuth reruns a retryable attempt up to twice with the production backoff and stops on abort", async () => {
+  const waits: number[] = [];
+  const notices: string[] = [];
+  let attempts = 0;
+  const controller = new AbortController();
+  const sleep = async (ms: number) => {
+    waits.push(ms);
+  };
+  assert.deepEqual(
+    await retryTransientAuth(
+      async () => ({ retryable: ++attempts < 3, attempt: attempts }),
+      { signal: controller.signal, sleep, onRetry: (n) => notices.push(n) },
+    ),
+    { retryable: false, attempt: 3 },
+  );
+  assert.deepEqual(waits, [15_000, 45_000]);
+  assert.deepEqual(notices, [
+    "Claude Code 正在更新登入憑證（其他行程持有更新鎖），15 秒後重試（第 2/3 次）。",
+    "Claude Code 正在更新登入憑證（其他行程持有更新鎖），45 秒後重試（第 3/3 次）。",
+  ]);
+  // A third retryable result is returned as is; the caller turns it into the final failure.
+  attempts = 0;
+  waits.length = 0;
+  assert.deepEqual(
+    await retryTransientAuth(
+      async () => ({ retryable: true, attempt: ++attempts }),
+      { signal: controller.signal, sleep },
+    ),
+    { retryable: true, attempt: 3 },
+  );
+  assert.deepEqual(waits, [15_000, 45_000]);
+  assert.deepEqual(
+    await retryTransientAuth(async () => ({ retryable: false, attempt: 1 }), {
+      signal: controller.signal,
+      sleep,
+    }),
+    { retryable: false, attempt: 1 },
+  );
+  assert.deepEqual(waits, [15_000, 45_000]);
+  // Cancelling during the wait rejects with the run cancellation and never starts the next attempt.
+  attempts = 0;
+  await assert.rejects(
+    retryTransientAuth(async () => ({ retryable: true, attempt: ++attempts }), {
+      signal: controller.signal,
+      sleep: async () => {
+        controller.abort();
+      },
+    }),
+    (error: unknown) =>
+      error instanceof AppError &&
+      error.statusCode === 409 &&
+      error.message === "工作已取消。",
+  );
+  assert.equal(attempts, 1);
+  // The real wait honours the signal as well.
+  const aborted = new AbortController();
+  attempts = 0;
+  const pending = retryTransientAuth(
+    async () => ({ retryable: true, attempt: ++attempts }),
+    { signal: aborted.signal },
+  );
+  await delay(5);
+  aborted.abort();
+  await assert.rejects(pending, /工作已取消/);
+  assert.equal(attempts, 1);
 });

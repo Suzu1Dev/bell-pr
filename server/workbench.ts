@@ -56,6 +56,8 @@ import {
   agentLabel,
   agentLoginCheck,
   applyReportedModel,
+  retryTransientAuth,
+  type TransientSleep,
 } from "./agent-cli.js";
 import type { AgentProvider } from "../shared/models.js";
 import {
@@ -134,6 +136,10 @@ export class Workbench {
       getModelCatalog?: typeof getModelCatalog;
       collectDraftContext?: typeof collectDraftContext;
       agentSlots?: AgentSlots;
+      /** Agent CLI invocations only; Git and gh keep using the real command. */
+      command?: typeof command;
+      /** Wait between retries of a turn that lost the OAuth refresh race. */
+      sleep?: TransientSleep;
     } = {},
   ) {
     this.agentSlots =
@@ -531,38 +537,54 @@ export class Workbench {
       { kind: "status" },
     );
     let efficiency: ReturnType<typeof trackEfficiency> | undefined;
+    /** Each CLI invocation is one call; a retried attempt is recorded as failed before the wait. */
+    const recordEfficiency = (done: boolean) => {
+      if (!efficiency) return;
+      run.efficiency = addEfficiency(
+        run.efficiency,
+        efficiency.finish(done),
+        role,
+      );
+      efficiency = undefined;
+    };
     const answerLimit = context.outputSchema ? 80_000 : 24_000;
     const cwd = context.cwd ?? run.worktreePath;
+    const execute = this.dependencies.command ?? command;
     let completed = false;
     let answer = "";
     let terminalFailure: string | undefined;
+    let retryable = false;
     let lastSave = 0;
-    let releaseSlot: (() => void) | undefined;
-    try {
-      await this.store.save();
+    /** One invocation. The slot is held only while the process runs, never across a retry wait. */
+    const invoke = async () => {
+      answer = "";
+      terminalFailure = undefined;
+      retryable = false;
       if (this.agentSlots.active >= this.agentSlots.limit) {
         const waiting = `等待其他 Agent 完成（${this.agentSlots.waiting + 1} 個排隊中）`;
         if (agent) agent.detail = waiting;
         this.log(run, role, `${waiting}。`, { kind: "status" });
       }
-      releaseSlot = await this.agentSlots.acquire(signal);
-      if (agent) agent.detail = `正在執行 ${label}…`;
-      // Queue time is not agent time: measure from the moment the slot is held.
-      const call = trackEfficiency(mode);
-      efficiency = call;
-      if (this.agentRunner) {
-        answer = redact(
-          await this.agentRunner({
-            role,
-            taskId: context.taskId,
-            prompt: fullPrompt,
-            cwd,
-            readonly,
-            signal,
-            modelExecution,
-          }),
-        ).slice(0, answerLimit);
-      } else {
+      const releaseSlot = await this.agentSlots.acquire(signal);
+      try {
+        if (agent) agent.detail = `正在執行 ${label}…`;
+        // Queue time is not agent time: measure from the moment the slot is held.
+        const call = trackEfficiency(mode);
+        efficiency = call;
+        if (this.agentRunner) {
+          answer = redact(
+            await this.agentRunner({
+              role,
+              taskId: context.taskId,
+              prompt: fullPrompt,
+              cwd,
+              readonly,
+              signal,
+              modelExecution,
+            }),
+          ).slice(0, answerLimit);
+          return { retryable };
+        }
         const cli = await agentCommand(modelExecution, {
           cwd,
           access: readonly ? "read" : "write",
@@ -570,7 +592,7 @@ export class Workbench {
           skipGitRepoCheck: context.isolated,
         });
         const read = agentEventReader(modelExecution.provider);
-        await command(cli.executable, cli.args, {
+        await execute(cli.executable, cli.args, {
           input: fullPrompt,
           cwd,
           signal,
@@ -646,7 +668,10 @@ export class Workbench {
                       { kind: "status" },
                     );
                 } else if (item.kind === "error") {
-                  if (item.terminal) terminalFailure = redact(item.message);
+                  if (item.terminal) {
+                    terminalFailure = redact(item.message);
+                    retryable = item.retryable === true;
+                  }
                   this.log(run, role, redact(item.message));
                 }
               }
@@ -658,8 +683,27 @@ export class Workbench {
               /* Only documented JSONL events are used; never return raw tool output. */
             }
           },
+        }).catch((error: unknown) => {
+          // claude exits non-zero after losing the OAuth refresh race; its result event
+          // (flushed before the rejection) already classified the attempt as retryable.
+          if (!retryable) throw error;
         });
+        return { retryable };
+      } finally {
+        releaseSlot();
       }
+    };
+    try {
+      await this.store.save();
+      await retryTransientAuth(invoke, {
+        signal,
+        sleep: this.dependencies.sleep,
+        onRetry: (notice) => {
+          recordEfficiency(false);
+          if (agent) agent.detail = notice;
+          this.log(run, role, notice, { kind: "notice" });
+        },
+      });
       if (signal.aborted) throw new AppError("工作已取消。", 409);
       if (terminalFailure) throw new AppError(terminalFailure, 422);
       if (!answer.trim())
@@ -681,13 +725,7 @@ export class Workbench {
       }
       throw error;
     } finally {
-      releaseSlot?.();
-      if (efficiency)
-        run.efficiency = addEfficiency(
-          run.efficiency,
-          efficiency.finish(completed),
-          role,
-        );
+      recordEfficiency(completed);
       await this.store.save();
     }
   }

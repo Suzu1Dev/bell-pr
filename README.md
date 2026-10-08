@@ -141,6 +141,7 @@ PR 草稿會優先採用目標專案的 `CONTRIBUTING`、PR 模板與相關投�
 - 執行時加上 `--strict-mcp-config`，不載入 claude.ai 連接器（Gmail、Drive 等）或其他 MCP 伺服器，避免 Agent 讀到不可信內容時被誘導使用你的帳號服務。
 - 執行時加上 `--setting-sources user`，只載入使用者層級的設定（依 Claude Code 對 `user` 來源的定義，包含 `~/.claude/settings.json`、使用者 hooks 與 `~/.claude/CLAUDE.md`）；匯入專案裡的 `.claude/settings.json`、`.claude/settings.local.json` 與專案 `CLAUDE.md` 則不載入。`claude -p` 不會顯示信任資料夾的確認對話，BELL 又是在匯入的第三方 repository 的 worktree 中執行 Agent，因此必須由 BELL 自己關掉這些來源。實測：匯入專案 `.claude/settings.json` 中的 SessionStart hook 在加上此旗標後沒有執行（拿掉旗標則會執行），專案 `CLAUDE.md` 的內容也不再出現在模型的回應中。
 - 用量以 Claude Code 回報的 tokens 計算：輸入 = 未快取輸入 + 快取寫入 + 快取讀取，快取欄位只計快取讀取。`total_cost_usd` 對訂閱帳戶沒有意義，不會顯示。訂閱有使用額度限制，多位 teammates 同時執行時較快達到上限，達到時任務會顯示 Claude Code 回報的錯誤。等待期間不再只能等逾時：Claude Code 的 `api_retry` 重試與狀態不是 `allowed` 的 `rate_limit_event`（接近或達到 5 小時／7 天視窗上限，含預計重置時間）會即時出現在任務日誌與成員卡片；實測每次 `claude -p` 執行都會送出一筆 `status: allowed` 的 `rate_limit_event`，這種正常狀態不顯示。用量另依角色（Lead、Teammates、Reviewer、Tester、PR 草稿、解說、追問）分項累計，在用量區塊展開「依角色分項」查看，同樣只列 CLI 回報的 tokens 與呼叫次數。`BELLPR_MAX_AGENT_PROCESSES`（預設 3）限制所有工作、專案分析與探索同時執行的 CLI 行程數，超過的呼叫排隊等待：工作中的 Agent 會顯示「等待其他 Agent 完成」，專案分析與探索則維持原本的進度訊息。
+- Claude Code 的登入憑證約每 8 小時更新一次；多個 `claude -p` 行程在同一時刻啟動時只有一個能更新憑證，其餘會回報暫時性錯誤「Failed to refresh OAuth token」，BELL 會把這種回合最多再重試兩次（先等 15 秒、再等 45 秒，等待期間不佔用行程名額），並在任務日誌與成員卡片記錄重試，探索則顯示在進度訊息；專案分析同樣重試但沒有進度訊息。只有這種錯誤會重試，其他 API 錯誤仍照原樣失敗，每次嘗試都計入用量的呼叫次數。
 
 ## Ponytail 效率規則
 
