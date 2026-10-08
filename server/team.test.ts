@@ -22,7 +22,7 @@ import { git } from "./process.js";
 import { readDiff } from "./git.js";
 import { Workbench } from "./workbench.js";
 import { Store } from "./store.js";
-import type { DiffFile, Run } from "./types.js";
+import type { AppError, DiffFile, Run } from "./types.js";
 import type { AgentTeam, TeamTask } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import { ProjectInsightsService } from "./insights.js";
@@ -111,7 +111,7 @@ const stubStatus = async () => ({
 
 async function fixture(
   runner?: TeamAgentRunner,
-  dependencies: { agentSlots?: AgentSlots } = {},
+  dependencies: { agentSlots?: AgentSlots; maxActiveRuns?: number } = {},
 ) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-team-test-"));
   const repository = path.join(directory, "repo");
@@ -1368,6 +1368,99 @@ test("cancelling a queued run does not wait for or abort other active runs", asy
     assert.equal(first.efficiency?.calls, 1);
     assert.equal(first.efficiency?.failedCalls, 1);
     assert.equal(first.efficiency?.measuredCalls, 0);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+/** A lead that blocks until its run is cancelled, recording each worktree it starts in. */
+const blockingRunner =
+  (started: Set<string>): TeamAgentRunner =>
+  async (input) => {
+    started.add(input.cwd);
+    await new Promise<void>((_, reject) => {
+      if (input.signal.aborted) reject(new Error("cancelled"));
+      else
+        input.signal.addEventListener(
+          "abort",
+          () => reject(new Error("cancelled")),
+          { once: true },
+        );
+    });
+    return "unreachable";
+  };
+
+test("maxActiveRuns 3 executes three queued runs at once in separate worktrees", async () => {
+  const started = new Set<string>();
+  const f = await fixture(blockingRunner(started), { maxActiveRuns: 3 });
+  try {
+    const runs = [];
+    for (const title of ["First", "Second", "Third", "Fourth"])
+      runs.push(
+        await f.workbench.createRun(f.repo.id, title, undefined, settings),
+      );
+    await waitUntil(() => started.size === 3, "three concurrent runs");
+    await delay(100);
+    assert.equal(started.size, 3);
+    assert.deepEqual(
+      runs.map((run) => run.status),
+      ["running", "running", "running", "queued"],
+    );
+    assert.equal(new Set(runs.map((run) => run.worktreePath)).size, 4);
+    assert.equal(new Set(runs.map((run) => run.branch)).size, 4);
+    await f.workbench.cancel(runs[0].id);
+    await waitUntil(() => started.size === 4, "queued run promoted");
+    assert.equal(runs[3].status, "running");
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("maxActiveRuns 1 serialises queued runs", async () => {
+  const started = new Set<string>();
+  const f = await fixture(blockingRunner(started), { maxActiveRuns: 1 });
+  try {
+    const first = await f.workbench.createRun(
+      f.repo.id,
+      "First",
+      undefined,
+      settings,
+    );
+    const second = await f.workbench.createRun(
+      f.repo.id,
+      "Second",
+      undefined,
+      settings,
+    );
+    await waitUntil(() => started.size === 1, "first run");
+    await delay(100);
+    assert.equal(started.size, 1);
+    assert.equal(first.status, "running");
+    assert.equal(second.status, "queued");
+    await f.workbench.cancel(first.id);
+    await waitUntil(() => started.size === 2, "second run");
+    assert.equal(second.status, "running");
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("the queue cap follows maxActiveRuns and the 429 message states the number", async () => {
+  const started = new Set<string>();
+  const f = await fixture(blockingRunner(started), { maxActiveRuns: 5 });
+  try {
+    for (let index = 0; index < 10; index++)
+      await f.workbench.createRun(
+        f.repo.id,
+        `Run ${index}`,
+        undefined,
+        settings,
+      );
+    await assert.rejects(
+      f.workbench.createRun(f.repo.id, "Overflow", undefined, settings),
+      (error: AppError) =>
+        error.statusCode === 429 && /10 個工作/.test(error.message),
+    );
   } finally {
     await f.cleanup();
   }

@@ -15,7 +15,11 @@ import { Workbench } from "./workbench.js";
 import { AppError } from "./types.js";
 import { redact } from "./process.js";
 import { DiscoveryService } from "./discovery.js";
-import { AgentSlots, parseAgentProcessLimit } from "./agent-slots.js";
+import {
+  AgentSlots,
+  parseActiveRunLimit,
+  parseAgentProcessLimit,
+} from "./agent-slots.js";
 import { learningExport } from "./learning-export.js";
 import { summarizeRun } from "../shared/runs.js";
 import { agentProviders } from "../shared/models.js";
@@ -138,7 +142,8 @@ export function createApp(
   app.use(localhostGuard([port, frontendPort], allowedOrigins));
   app.use(express.json({ limit: "160kb", strict: true }));
   app.get("/api/status", async (_req, res) => {
-    res.json(await workbench.status());
+    // CLI checks stay behind the 10-second cache; the limits are static config.
+    res.json({ ...(await workbench.status()), limits: workbench.limits });
   });
   app.get("/api/models", async (req, res) => {
     // Without a provider the Codex catalog is returned, as before.
@@ -421,11 +426,15 @@ async function main() {
   const agentSlots = new AgentSlots(
     parseAgentProcessLimit(process.env.BELLPR_MAX_AGENT_PROCESSES),
   );
+  const maxActiveRuns = parseActiveRunLimit(process.env.BELLPR_MAX_ACTIVE_RUNS);
   const store = new Store(
     path.resolve(process.env.BELLPR_DATA_DIR ?? ".bellpr"),
   );
   await store.initialize();
-  const workbench = new Workbench(store, undefined, { agentSlots });
+  const workbench = new Workbench(store, undefined, {
+    agentSlots,
+    maxActiveRuns,
+  });
   const app = createApp(workbench, { port, frontendPort, allowedOrigins });
   const server = app.listen(port, "127.0.0.1", () =>
     console.log(`BELL-PR → http://127.0.0.1:${port}`),

@@ -42,7 +42,11 @@ import type { ContributionSettings } from "../shared/insights.js";
 import { defaultPonytailMode } from "../shared/efficiency.js";
 import { addEfficiency, applyPonytail, trackEfficiency } from "./efficiency.js";
 import { Store } from "./store.js";
-import { AgentSlots, defaultAgentProcessLimit } from "./agent-slots.js";
+import {
+  AgentSlots,
+  defaultActiveRunLimit,
+  defaultAgentProcessLimit,
+} from "./agent-slots.js";
 import {
   AppError,
   type Repository,
@@ -129,6 +133,8 @@ export class Workbench {
   };
   /** Shared by every agent CLI call, including project analysis and discovery. */
   readonly agentSlots: AgentSlots;
+  /** How many runs drain() executes at once; each run still takes CLI slots per agent. */
+  readonly maxActiveRuns: number;
   constructor(
     public store: Store,
     private agentRunner?: TeamAgentRunner,
@@ -136,6 +142,7 @@ export class Workbench {
       getModelCatalog?: typeof getModelCatalog;
       collectDraftContext?: typeof collectDraftContext;
       agentSlots?: AgentSlots;
+      maxActiveRuns?: number;
       /** Agent CLI invocations only; Git and gh keep using the real command. */
       command?: typeof command;
       /** Wait between retries of a turn that lost the OAuth refresh race. */
@@ -144,6 +151,23 @@ export class Workbench {
   ) {
     this.agentSlots =
       dependencies.agentSlots ?? new AgentSlots(defaultAgentProcessLimit);
+    this.maxActiveRuns = dependencies.maxActiveRuns ?? defaultActiveRunLimit;
+    if (!Number.isInteger(this.maxActiveRuns) || this.maxActiveRuns < 1)
+      throw new Error("Workbench maxActiveRuns must be a positive integer.");
+  }
+
+  /** Queued, running and paused runs together; grows with the active limit. */
+  get maxQueuedRuns() {
+    return Math.max(8, this.maxActiveRuns * 2);
+  }
+
+  /** Reported by GET /api/status so the settings page can show the configured caps. */
+  get limits() {
+    return {
+      maxActiveRuns: this.maxActiveRuns,
+      maxAgentProcesses: this.agentSlots.limit,
+      maxQueued: this.maxQueuedRuns,
+    };
   }
 
   models(provider?: AgentProvider) {
@@ -428,14 +452,17 @@ export class Workbench {
     if (
       this.store.data.runs.filter((run) =>
         ["queued", "running", "awaiting_plan"].includes(run.status),
-      ).length >= 8
+      ).length >= this.maxQueuedRuns
     )
-      throw new AppError("最多可同時排入 8 個工作；請等待現有工作完成。", 429);
+      throw new AppError(
+        `最多可同時排入 ${this.maxQueuedRuns} 個工作；請等待現有工作完成。`,
+        429,
+      );
   }
 
   private drain() {
     if (this.stopping) return;
-    while (this.active < 2 && this.queue.length) {
+    while (this.active < this.maxActiveRuns && this.queue.length) {
       const id = this.queue.shift()!;
       if (this.run(id).status !== "queued") continue;
       this.active++;

@@ -122,6 +122,11 @@ type Status = {
   claudeAuthenticated?: boolean;
   github: boolean;
   githubUser?: string;
+  limits?: {
+    maxActiveRuns: number;
+    maxAgentProcesses: number;
+    maxQueued: number;
+  };
 };
 const statusLabels: Record<Run["status"], string> = {
   queued: "等待執行",
@@ -3287,6 +3292,38 @@ export default function App() {
                 </div>
                 <span className="service-status connected">Local-first</span>
               </div>
+            </div>
+            <div className="settings-card">
+              <div className="settings-service">
+                <div className="service-icon">
+                  <Workflow size={24} />
+                </div>
+                <div>
+                  <h3>同時進行的工作數</h3>
+                  <p>多個專案（或同一專案）的工作可以同時執行並各自發佈 PR</p>
+                </div>
+              </div>
+              <div className="setup-command">
+                <span>同時執行的工作上限（BELLPR_MAX_ACTIVE_RUNS）</span>
+                <code>{status?.limits?.maxActiveRuns ?? "—"}</code>
+              </div>
+              <div className="setup-command">
+                <span>Agent CLI 行程上限（BELLPR_MAX_AGENT_PROCESSES）</span>
+                <code>{status?.limits?.maxAgentProcesses ?? "—"}</code>
+              </div>
+              <div className="setup-command">
+                <span>排隊上限（執行中、等待執行與等待確認計畫合計）</span>
+                <code>{status?.limits?.maxQueued ?? "—"}</code>
+              </div>
+              <p className="muted">
+                每個工作的 teammates、Reviewer 與 Test analyst 各需要一個 CLI
+                行程，因此 BELLPR_MAX_AGENT_PROCESSES
+                決定實際能同時進行多少；訂閱的使用額度才是真正的上限，BELL
+                只重試 OAuth 更新的競爭，不重試額度錯誤。同一個 repository
+                的多個工作彼此獨立，各自使用自己的 worktree
+                與分支。修改這些值需編輯環境檔並重新啟動服務（systemd 部署為
+                ~/.config/bell-pr/environment）。
+              </p>
             </div>
           </section>
         )}

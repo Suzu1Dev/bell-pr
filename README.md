@@ -81,7 +81,7 @@ claude auth login   # 只在要改用 Claude Code 時需要
 
 Lead 的計畫與每位 teammate 的工作報告都以輸出結構（Codex `--output-schema`、Claude Code `--json-schema`）回傳：Lead 的摘要需說明整體設計取捨，若需求已寫明問題、影響、做法與驗收，Lead 會以此為方向而非重新發想；teammate 報告固定有摘要、自述實際執行的檢查與結果、限制與未達成的驗收條件，以及「設計取捨」（考慮過但未採用的做法）；任務 ID 會先正規化為以字母開頭、最長 64 字的小寫字母、數字與連字號，計畫格式不符時錯誤訊息會標示出問題的欄位名稱。各角色的提示詞只帶需求、目標使用者、預期結果、限制與驗收條件，不再附上模型、思考強度等執行設定；Lead 規劃時仍會收到 teammate 人數上限以便分組。
 
-應用程式將通過範圍檢查的變更整合回本次工作的 worktree，交由 Lead 唯讀檢視，再由 Reviewer 與 Test analyst 平行審查。Lead 會區分團隊回報的實測、自己的靜態檢查與未完成事項。這三份報告會在審閱畫面的「審查者怎麼看」保留全文，並標示為獨立靜態審查而非執行結果。最多有 2 個貢獻工作同時執行；執行、排隊與等待計畫確認的工作合計最多 8 個。
+應用程式將通過範圍檢查的變更整合回本次工作的 worktree，交由 Lead 唯讀檢視，再由 Reviewer 與 Test analyst 平行審查。Lead 會區分團隊回報的實測、自己的靜態檢查與未完成事項。這三份報告會在審閱畫面的「審查者怎麼看」保留全文，並標示為獨立靜態審查而非執行結果。同時執行的貢獻工作數由 `BELLPR_MAX_ACTIVE_RUNS` 決定（預設 2，可設 1–8）；執行、排隊與等待計畫確認的工作合計上限為 8 與該值兩倍取大者，超過時建立工作會回應 429。不同 repository 或同一個 repository 的多個工作彼此獨立：每個工作有自己的 worktree 與分支，共用 clone 上的 fetch 與 worktree 建立／移除依 repository 鎖依序執行，commit 與 push 則在各自的 worktree 進行，因此可以分別發佈多個 PR。實際能同時進行多少仍受 `BELLPR_MAX_AGENT_PROCESSES` 與訂閱額度限制。
 
 啟用「開發前，先讓我確認計畫」時，規劃完成後停在等待確認狀態，不會啟動實作。覺得拆解不合理（範圍太大、少了測試任務、相依奇怪）時，可在計畫區塊用「退回並補充意見」寫下原因：Lead 會收到上一版計畫與你的意見重新規劃，並在「Lead 的調整說明」交代改了什麼；每個工作最多退回 3 次，畫面顯示「已重擬 n/3」，每次重擬是一次 Lead 唯讀規劃回合。退回重擬後，先前排給特定任務的訊息留在原任務 ID 下，不會自動轉送給新計畫的任務。取消這個選項則會自動依計畫開始開發；兩種模式都會在發佈前要求人工審閱。
 
@@ -224,6 +224,7 @@ npm run dev
 | `BELLPR_DATA_DIR`      | `.bellpr` | 本機工作資料位置，可使用絕對路徑。                                         |
 | `BELLPR_ALLOWED_ORIGINS` | 空值 | 額外允許的精確 HTTP(S) origin，以逗號分隔；僅供已有存取控制、保留 Host 的私網代理使用。 |
 | `BELLPR_MAX_AGENT_PROCESSES` | `3` | 同時執行的 Agent CLI 行程上限（1–32），涵蓋所有工作、專案分析與探索；超過時後續 Agent 排隊等待。 |
+| `BELLPR_MAX_ACTIVE_RUNS` | `2` | 同時執行的貢獻工作上限（1–8）；排隊上限為 8 與此值兩倍取大者。每個工作的 teammates、Reviewer 與 Test analyst 各需要一個 CLI 行程，實際並行程度仍受 `BELLPR_MAX_AGENT_PROCESSES` 與訂閱額度限制。目前值顯示在「連線與設定」頁；systemd 部署修改 `~/.config/bell-pr/environment` 後需重新啟動服務。 |
 
 `.bellpr` 與 `.env` 已排除於 Git 追蹤外。請妥善保留工作資料；刪除資料目錄會移除其中的 repository、工作目錄與紀錄。
 
