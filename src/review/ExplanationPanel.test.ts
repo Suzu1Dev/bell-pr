@@ -68,6 +68,27 @@ test("test files get a reading hint and extra presets while source files keep th
   assert.match(chat(testFile), /這個測試在保護什麼行為？/);
 });
 
+test("saved answers about an older diff are marked instead of dropped", () => {
+  const html = renderToStaticMarkup(
+    createElement(ExplanationPanel, {
+      file: { ...demoFiles[0], fingerprint: "new" },
+      messages: [
+        { role: "user", content: "舊問題", fingerprint: "old" },
+        { role: "assistant", content: "舊回答", fingerprint: "old" },
+        { role: "user", content: "新問題", fingerprint: "new" },
+        { role: "assistant", content: "尚未送出的本機回答" },
+      ],
+      loading: false,
+      onAsk() {},
+      demo: false,
+      chatRequestId: 1,
+    }),
+  );
+  assert.equal(html.match(/針對較舊版本/g)?.length, 2);
+  for (const content of ["舊問題", "舊回答", "新問題", "尚未送出的本機回答"])
+    assert.match(html, new RegExp(content));
+});
+
 test("the reports tab renders demo reports with the static-review label and per-file mention counts", () => {
   assert.ok(demoRun.reports?.reviewer, "demo fixture must carry reports");
   const html = renderToStaticMarkup(

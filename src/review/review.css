@@ -1118,6 +1118,10 @@
   color: #8b987c;
   border-radius: 4px;
 }
+.explain-inline-stale {
+  background: #f6efe1;
+  color: #9a7b3c;
+}
 .explain-panel .explain-message-body {
   white-space: normal;
   overflow-wrap: anywhere;

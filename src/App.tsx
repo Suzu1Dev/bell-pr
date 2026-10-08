@@ -59,7 +59,8 @@ import {
 } from "lucide-react";
 import { api, send } from "./api";
 import { demoRepo, demoRun, demoFiles, demoAnswer } from "./demo";
-import type { Repo, Run, DiffFile, ChatMessage } from "./types";
+import type { Repo, Run, RunSummary, DiffFile, ChatMessage } from "./types";
+import { summarizeRun } from "../shared/runs";
 import type { DraftProposal } from "../shared/drafts";
 import type {
   ContributionOpportunity,
@@ -135,6 +136,16 @@ const fileStatusLabels: Record<string, { badge: string; title: string }> = {
 };
 const fileStatusLabel = (status: string) =>
   fileStatusLabels[status] ?? fileStatusLabels.modified;
+
+/** Persisted Q&A keyed the way the chat state is (`${runId}:${path}`). */
+function savedMessages(run: Run): Record<string, ChatMessage[]> {
+  return Object.fromEntries(
+    Object.entries(run.conversations ?? {}).map(([filePath, conversation]) => [
+      `${run.id}:${filePath}`,
+      conversation.messages,
+    ]),
+  );
+}
 
 function loadDemo(): Run {
   try {
@@ -238,7 +249,7 @@ export default function App() {
   const [page, setPage] = useState<Page>("workspace");
   const [tab, setTab] = useState<Tab>("overview");
   const [repos, setRepos] = useState<Repo[]>([]);
-  const [runs, setRuns] = useState<Run[]>([]);
+  const [runs, setRuns] = useState<RunSummary[]>([]);
   const [run, setRun] = useState<Run>(loadDemo);
   const [files, setFiles] = useState<DiffFile[]>(demoFiles);
   const [selectedPath, setSelectedPath] = useState(demoFiles[0]?.path || "");
@@ -444,7 +455,7 @@ export default function App() {
     Promise.all([
       api<Status>("/status"),
       api<{ repos: Repo[] }>("/repos"),
-      api<{ runs: Run[] }>("/runs"),
+      api<{ runs: RunSummary[] }>("/runs"),
     ])
       .then(([s, r, jobs]) => {
         if (cancelled) return;
@@ -466,7 +477,7 @@ export default function App() {
       if (fetching) return;
       fetching = true;
       try {
-        const { runs: latest } = await api<{ runs: Run[] }>("/runs");
+        const { runs: latest } = await api<{ runs: RunSummary[] }>("/runs");
         if (!stopped) setRuns(latest);
       } catch {
         /* The current-run poll reports actionable connection errors. */
@@ -516,7 +527,9 @@ export default function App() {
         if (!cancelled && epoch === draftMutationEpoch.current) {
           setRun(updated);
           setRuns((previous) =>
-            previous.map((r) => (r.id === updated.id ? updated : r)),
+            previous.map((r) =>
+              r.id === updated.id ? summarizeRun(updated) : r,
+            ),
           );
         }
       } catch (error) {
@@ -934,6 +947,8 @@ export default function App() {
       return false;
     const sequence = ++selectionSequence.current;
     const draftAtStart = { ...editorDraft.current };
+    // Demo Q&A is answered locally and never persisted.
+    let saved: Record<string, ChatMessage[]> = {};
     try {
       if (id === demoRun.id) {
         setRun(loadDemo());
@@ -952,9 +967,10 @@ export default function App() {
         setRun(r.run);
         setFiles(f.files);
         setSelectedPath(f.files[0]?.path || "");
+        saved = savedMessages(r.run);
       }
       setTab("overview");
-      setMessages({});
+      setMessages(saved);
       setChatRequests({});
       navigate("workspace");
       return true;
@@ -1054,7 +1070,7 @@ export default function App() {
           settings: contributionSettings,
         }),
       );
-      setRuns((previous) => [created, ...previous]);
+      setRuns((previous) => [summarizeRun(created), ...previous]);
       setRun(created);
       setFiles([]);
       setMessages({});
@@ -1138,7 +1154,10 @@ export default function App() {
     const targetFile = file;
     setMessages((previous) => ({
       ...previous,
-      [key]: [...(previous[key] || []), { role: "user", content: question }],
+      [key]: [
+        ...(previous[key] || []),
+        { role: "user", content: question, fingerprint: targetFile.fingerprint },
+      ],
     }));
     setLoadingChats((previous) => new Set(previous).add(key));
     try {
@@ -1154,7 +1173,11 @@ export default function App() {
         ...previous,
         [key]: [
           ...(previous[key] || []),
-          { role: "assistant", content: answer },
+          {
+            role: "assistant",
+            content: answer,
+            fingerprint: targetFile.fingerprint,
+          },
         ],
       }));
     } catch (error) {
@@ -1612,10 +1635,19 @@ export default function App() {
                 </span>
                 <span className="branch-direction">→</span>
                 <span>{run.baseBranch}</span>
-                {demo && (
+                {demo ? (
                   <span className="meta-demo">
                     範例資料 · 不會送出至 GitHub
                   </span>
+                ) : (
+                  <a
+                    className="export-link"
+                    href={`/api/runs/${run.id}/export.md`}
+                    download={`bell-learning-${run.id}.md`}
+                  >
+                    <ArrowDownToLine size={13} />
+                    匯出學習紀錄（Markdown）
+                  </a>
                 )}
               </div>
             </section>

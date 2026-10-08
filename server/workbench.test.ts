@@ -27,7 +27,12 @@ async function http(
     body?: string;
   } = {},
 ) {
-  return new Promise<{ status: number; json: () => any }>((resolve, reject) => {
+  return new Promise<{
+    status: number;
+    headers: Record<string, string | string[] | undefined>;
+    json: () => any;
+    text: () => string;
+  }>((resolve, reject) => {
     const req = request(
       url,
       { method: options.method, headers: options.headers },
@@ -40,7 +45,9 @@ async function http(
         response.on("end", () =>
           resolve({
             status: response.statusCode!,
+            headers: response.headers,
             json: () => JSON.parse(body),
+            text: () => body,
           }),
         );
       },
@@ -442,6 +449,52 @@ test("HTTP API restricts localhost origins, requires JSON mutations, and validat
     assert.equal(invalid.status, 400);
     const absent = await http(`${url}/api/runs/missing`, { headers: local });
     assert.equal(absent.status, 404);
+    // The list carries summaries; the single run and the export keep the detail.
+    f.run.reports = { reviewer: "靜態審查報告" };
+    f.run.conversations = {
+      "hello.ts": {
+        fingerprint: "f1",
+        updatedAt: new Date().toISOString(),
+        messages: [
+          { role: "user", content: "這段在做什麼？", fingerprint: "f1" },
+          { role: "assistant", content: "回傳問候語。", fingerprint: "f1" },
+        ],
+      },
+    };
+    const list = await http(`${url}/api/runs`, { headers: local });
+    assert.equal(list.status, 200);
+    const [summary] = list.json().runs as Record<string, unknown>[];
+    assert.equal(summary.id, f.run.id);
+    for (const field of ["logs", "reports", "draftPreparation", "conversations"])
+      assert.equal(field in summary, false, field);
+    for (const field of ["title", "repoId", "branch", "status", "createdAt"])
+      assert.ok(field in summary, field);
+    const single = await http(`${url}/api/runs/${f.run.id}`, {
+      headers: local,
+    });
+    assert.deepEqual(single.json().run.logs, []);
+    assert.equal(
+      single.json().run.conversations["hello.ts"].messages.length,
+      2,
+    );
+    const exported = await http(`${url}/api/runs/${f.run.id}/export.md`, {
+      headers: local,
+    });
+    assert.equal(exported.status, 200);
+    assert.match(String(exported.headers["content-type"]), /^text\/markdown/);
+    assert.equal(
+      exported.headers["content-disposition"],
+      'attachment; filename="bell-learning-test-run.md"',
+    );
+    assert.match(exported.text(), /^# 學習紀錄：Improve greeting\n/);
+    assert.match(
+      exported.text(),
+      /## 問答紀錄\n\n### `hello\.ts`\n\n\*\*你：\*\*\n\n這段在做什麼？/,
+    );
+    const missingExport = await http(`${url}/api/runs/missing/export.md`, {
+      headers: local,
+    });
+    assert.equal(missingExport.status, 404);
     for (const [endpoint, body] of [
       ["review", { filePath: "hello.ts", reviewed: true }],
       ["approve", {}],

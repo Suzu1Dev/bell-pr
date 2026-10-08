@@ -8,6 +8,10 @@ import type { AgentTeam } from "../shared/team";
 import type { ContributionSettings } from "../shared/insights";
 import type { ModelExecution } from "../shared/models";
 import type { DraftPreparation } from "../shared/drafts";
+import type { FileConversation } from "../shared/chat";
+import type { RunDetailField } from "../shared/runs";
+
+export type { ChatMessage } from "../shared/chat";
 export interface Repo {
   id: string;
   name: string;
@@ -60,7 +64,12 @@ export interface Run {
   reports?: Record<string, string>;
   prUrl?: string;
   error?: string;
+  /** Follow-up Q&A per diff path; absent on runs saved before it was persisted. */
+  conversations?: Record<string, FileConversation>;
 }
+
+/** What GET /api/runs returns for each run (see shared/runs.ts). */
+export type RunSummary = Omit<Run, RunDetailField>;
 
 export interface DiffFile {
   fingerprint?: string;
@@ -75,9 +84,4 @@ export interface DiffFile {
   explanationError?: string;
   hunks?: unknown;
   blocked?: string;
-}
-
-export interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
 }

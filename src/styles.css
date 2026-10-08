@@ -620,6 +620,19 @@ button {
   font-size: 10px;
   color: #9aa38f;
 }
+.repo-meta .export-link {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #697361;
+  text-decoration: none;
+}
+.repo-meta .export-link:hover,
+.repo-meta .export-link:focus-visible {
+  color: #3f4a37;
+  text-decoration: underline;
+}
 .button {
   display: inline-flex;
   align-items: center;

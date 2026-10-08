@@ -665,6 +665,11 @@ export function ExplanationPanel({
               const failed =
                 message.role === "assistant" &&
                 message.content.startsWith("這次未能取得回答：");
+              // Saved turns about an earlier diff stay readable but are marked.
+              const stale =
+                message.fingerprint !== undefined &&
+                file.fingerprint !== undefined &&
+                message.fingerprint !== file.fingerprint;
               return (
                 <div
                   className={`explain-message explain-message-${message.role}${failed ? " explain-message-error" : ""}`}
@@ -688,6 +693,11 @@ export function ExplanationPanel({
                       </>
                     ) : (
                       "你"
+                    )}
+                    {stale && (
+                      <span className="explain-inline-demo explain-inline-stale">
+                        針對較舊版本
+                      </span>
                     )}
                   </div>
                   <div className="explain-message-body">
