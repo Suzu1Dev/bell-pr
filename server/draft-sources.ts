@@ -90,7 +90,8 @@ function parseTree(output: string): Entry[] {
     });
 }
 
-function validPrUrl(
+/** True when `value` is the PR's own URL, or (with `comment`) a review/comment anchor on it. */
+export function validPrUrl(
   value: unknown,
   repositoryUrl: string,
   number: number,

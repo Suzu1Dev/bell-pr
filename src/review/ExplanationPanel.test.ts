@@ -68,6 +68,57 @@ test("test files get a reading hint and extra presets while source files keep th
   assert.match(chat(testFile), /這個測試在保護什麼行為？/);
 });
 
+test("maintainer thread comments add the response preset and a read-only section in the reports tab", () => {
+  const feedback = [
+    {
+      kind: "thread" as const,
+      author: "maintainer",
+      authorAssociation: "MEMBER",
+      body: "Use a named constant <here>.",
+      path: demoFiles[0].path,
+      line: 4,
+      isResolved: false,
+      url: "https://github.com/o/r/pull/1#discussion_r1",
+      createdAt: "2026-10-07T00:00:00Z",
+    },
+  ];
+  const chat = renderToStaticMarkup(
+    createElement(ExplanationPanel, {
+      file: demoFiles[0],
+      messages: [],
+      loading: false,
+      onAsk() {},
+      demo: true,
+      chatRequestId: 1,
+      feedback,
+    }),
+  );
+  assert.match(chat, /維護者這個意見對應 diff 哪幾行？有哪些回應方式與取捨？/);
+  assert.doesNotMatch(
+    renderToStaticMarkup(
+      createElement(ExplanationPanel, {
+        file: demoFiles[0],
+        messages: [],
+        loading: false,
+        onAsk() {},
+        demo: true,
+        chatRequestId: 1,
+        feedback: [],
+      }),
+    ),
+    /維護者這個意見/,
+  );
+  const reports = renderToStaticMarkup(
+    createElement(ReviewReports, { file: demoFiles[0], reports: {}, demo: false, feedback }),
+  );
+  assert.match(reports, /維護者對此檔的留言/);
+  assert.match(reports, /來自 GitHub，唯讀/);
+  assert.match(reports, /第 4 行/);
+  // Comment text is escaped plain text, never interpreted as markup.
+  assert.match(reports, /Use a named constant &lt;here&gt;\./);
+  assert.match(reports, /這次工作還沒有審查報告/);
+});
+
 test("saved answers about an older diff are marked instead of dropped", () => {
   const html = renderToStaticMarkup(
     createElement(ExplanationPanel, {
@@ -106,6 +157,26 @@ test("the reports tab renders demo reports with the static-review label and per-
   assert.match(html, /本報告提到此檔 \d+ 處/);
   // Markdown is rendered, not shown as raw asterisks.
   assert.match(html, /<strong>正確性<\/strong>/);
+  // The lead's suggested order is listed, with the open file marked.
+  assert.match(html, /Lead 建議的閱讀順序/);
+  assert.match(
+    html,
+    /<li aria-current="true"><code>src\/utils\/retry\.ts<\/code>/,
+  );
+  assert.ok(
+    html.indexOf("<code>src/types.ts</code>") <
+      html.indexOf("<code>tests/retry.test.ts</code>"),
+  );
+  assert.doesNotMatch(
+    renderToStaticMarkup(
+      createElement(ReviewReports, {
+        file: demoFiles[0],
+        reports: { implementer: "No order section." },
+        demo: false,
+      }),
+    ),
+    /建議的閱讀順序/,
+  );
   // Non-report keys stay hidden even when present.
   const extra = renderToStaticMarkup(
     createElement(ReviewReports, {
@@ -217,4 +288,27 @@ test("a blocked file explains why no explanation is available", () => {
   assert.match(html, /目前無法解說此檔案/);
   assert.match(html, /<p>原因<\/p>/);
   assert.doesNotMatch(html, /這段改了什麼？/);
+});
+
+test("the reports tab offers a re-review button for real runs only and shows the busy state", () => {
+  const render = (props: Record<string, unknown>) =>
+    renderToStaticMarkup(
+      createElement(ReviewReports, {
+        file: demoFiles[0],
+        reports: demoRun.reports,
+        demo: false,
+        ...props,
+      }),
+    );
+  const idle = render({ onRerunReview() {} });
+  assert.match(idle, /重新執行審查/);
+  assert.match(idle, /不會改變已審閱與核准狀態/);
+  assert.doesNotMatch(idle, /disabled=""/);
+  const busy = render({ onRerunReview() {}, reviewBusy: true });
+  assert.match(busy, /正在重新審查…/);
+  assert.match(busy, /disabled=""/);
+  // Without reports the button still renders inside the empty state.
+  assert.match(render({ onRerunReview() {}, reports: {} }), /還沒有審查報告[\s\S]*重新執行審查/);
+  assert.doesNotMatch(render({}), /重新執行審查/);
+  assert.doesNotMatch(render({ onRerunReview() {}, demo: true }), /重新執行審查/);
 });

@@ -437,6 +437,63 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.draft-guidance-etiquette {
+  margin-top: 20px;
+  padding: 14px 16px;
+  border: 1px solid #e4ebdd;
+  border-radius: 8px;
+  background: #f7faf4;
+}
+.draft-guidance-panel .draft-guidance-etiquette h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 550;
+  color: #48693a;
+}
+.draft-guidance-panel .draft-guidance-etiquette > p {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.8;
+  color: #6f815f;
+}
+.draft-guidance-etiquette ul {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: grid;
+  gap: 10px;
+}
+.draft-guidance-etiquette li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+.draft-guidance-etiquette li input {
+  margin-top: 3px;
+  accent-color: #65966a;
+}
+.draft-guidance-etiquette li label strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 550;
+  color: #506345;
+}
+.draft-guidance-etiquette li label small {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 1.7;
+  color: #8b9980;
+}
+.draft-guidance-etiquette > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 12px;
+  font-size: 11px;
+}
 .draft-guidance-panel .draft-guidance-linux {
   margin-top: 16px;
   font-size: 10px;
@@ -446,6 +503,55 @@
   display: inline-flex;
   gap: 2px;
   align-items: center;
+}
+
+.draft-guidance-commit {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e5ecde;
+}
+.draft-guidance-panel .draft-guidance-commit h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 550;
+  color: #4f6442;
+  margin-bottom: 10px;
+}
+.draft-guidance-commit pre {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.8;
+  color: #506244;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 12px 14px;
+  border: 1px solid #dce6d4;
+  border-radius: 6px;
+  background: white;
+  margin: 0 0 10px;
+}
+.draft-guidance-panel .draft-guidance-commit p {
+  font-size: 11px;
+  color: #7e8d70;
+  line-height: 1.8;
+}
+.draft-guidance-commit-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.draft-guidance-panel .draft-guidance-commit-why {
+  margin-top: 10px;
+  font-size: 10px;
+  color: #929e87;
+}
+.draft-guidance-commit-why code {
+  font-family: var(--mono);
+  font-size: 10px;
 }
 
 /* The proposal and editable preview share the same readable Markdown treatment. */

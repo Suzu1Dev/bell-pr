@@ -23,6 +23,12 @@ export interface ContributionSettings extends ModelSettings {
   maxTeammates: 2 | 3 | 4;
   requirePlanApproval: boolean;
   ponytailMode?: PonytailMode;
+  /**
+   * The GitHub issue this contribution addresses
+   * (https://github.com/<owner>/<repo>/issues/<number>); empty or absent
+   * means none. Only a supplied issue may appear as Fixes/Refs in the PR draft.
+   */
+  issueUrl?: string;
 }
 
 export const defaultContributionSettings: ContributionSettings = {

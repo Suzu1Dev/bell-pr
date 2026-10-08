@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowUpRight,
@@ -7,8 +7,10 @@ import {
   Circle,
   ClipboardList,
   FileText,
+  GitCommitHorizontal,
   Info,
   LoaderCircle,
+  MessagesSquare,
   Quote,
   RefreshCw,
   Sparkles,
@@ -27,9 +29,28 @@ interface Props {
   busy: boolean;
   disabled?: boolean;
   demo?: boolean;
+  /** The issue the user linked in the contribution settings, if any. */
+  issueUrl?: string;
   onGenerate: () => void;
   onApply: (proposal: DraftProposal) => void;
 }
+
+/**
+ * Community etiquette the person confirms for themselves. The checkboxes
+ * are local UI state only: nothing is saved and publishing is never blocked.
+ */
+const etiquetteReminders = [
+  {
+    id: "claimed",
+    text: "是否已在 issue 留言表明要處理？",
+    why: "避免和別人做重複的工作，也讓 maintainer 知道有人接手。",
+  },
+  {
+    id: "discussed",
+    text: "專案是否要求先開 issue 討論？",
+    why: "有些專案希望先確認方向與 AI 協作是否可接受，再收 PR；先問一句，可以省下雙方審閱一份不會被接受的 PR 的時間。",
+  },
+] as const;
 
 const sourceKinds: Record<DraftSource["kind"], string> = {
   contributing: "貢獻規範",
@@ -53,10 +74,13 @@ export function DraftGuidancePanel({
   busy,
   disabled = false,
   demo = false,
+  issueUrl,
   onGenerate,
   onApply,
 }: Props) {
   const prefix = useId().replaceAll(":", "");
+  const [confirmed, setConfirmed] = useState<string[]>([]);
+  const issueLink = webLink(issueUrl);
   const proposal = preparation?.proposal;
   const sources = preparation?.context?.sources ?? [];
   const template = sources.find(
@@ -313,6 +337,57 @@ export function DraftGuidancePanel({
               <ArrowDownToLine size={15} /> 套用建議草稿
             </button>
           </div>
+
+          {proposal.commitMessageSuggestion && (
+            <div className="draft-guidance-commit">
+              <h3>
+                <GitCommitHorizontal size={16} /> 提交訊息建議
+              </h3>
+              <pre>{proposal.commitMessageSuggestion.message}</pre>
+              <p>{proposal.commitMessageSuggestion.rationale}</p>
+              {proposal.commitMessageSuggestion.sources.length > 0 && (
+                <p className="draft-guidance-commit-sources">
+                  依據：
+                  {proposal.commitMessageSuggestion.sources.map((id) => {
+                    const sourceIndex = sources.findIndex(
+                      (source) => source.id === id,
+                    );
+                    const source = sources[sourceIndex];
+                    const url = webLink(source?.url);
+                    return source ? (
+                      <a
+                        key={id}
+                        className="draft-guidance-source-link"
+                        href={url ?? `#${sourceAnchor(sourceIndex)}`}
+                        {...(url
+                          ? { target: "_blank", rel: "noopener noreferrer" }
+                          : {})}
+                      >
+                        <FileText size={12} />
+                        {source.label}
+                        {url && <ArrowUpRight size={12} />}
+                      </a>
+                    ) : (
+                      <span key={id} className="draft-guidance-source-missing">
+                        未附可核對的來源
+                      </span>
+                    );
+                  })}
+                </p>
+              )}
+              <p className="draft-guidance-commit-why">
+                為什麼專案會要求 <code>type(scope)</code> 或
+                sign-off？採用 Conventional Commits 的專案靠主旨的{" "}
+                <code>type(scope): 說明</code>{" "}
+                自動產生變更日誌並決定版本號，commitlint 會在 CI
+                擋下不符格式的提交；採用 DCO 的專案要求每個 commit 附上{" "}
+                <code>Signed-off-by: 姓名 &lt;email&gt;</code>
+                ，表示你有權以該授權貢獻這段程式碼，DCO bot 檢查的是 commit
+                trailer，不是 PR
+                說明。這份建議只整理規範要求的格式；簽署是你本人的聲明，請在「提交訊息」欄位自行輸入，模型不會代填。
+              </p>
+            </div>
+          )}
         </>
       )}
 
@@ -383,6 +458,49 @@ export function DraftGuidancePanel({
         </details>
       )}
 
+      <section
+        className="draft-guidance-etiquette"
+        aria-labelledby={`draft-etiquette-${prefix}`}
+      >
+        <h3 id={`draft-etiquette-${prefix}`}>
+          <MessagesSquare size={16} /> 送出前，先和社群打個招呼
+        </h3>
+        <p>
+          開源社群重視這兩件事，是因為 maintainer
+          的時間有限：事先留言能避免兩個人改同一個問題，也讓對方在你投入前就能說「這個方向可以」或「我們不收這類變更」。這裡的勾選只是給自己的提醒，不會儲存，也不會阻擋送出。
+        </p>
+        <ul>
+          {etiquetteReminders.map((reminder) => {
+            const inputId = `draft-etiquette-${prefix}-${reminder.id}`;
+            return (
+              <li key={reminder.id}>
+                <input
+                  id={inputId}
+                  type="checkbox"
+                  checked={confirmed.includes(reminder.id)}
+                  onChange={(event) =>
+                    setConfirmed((previous) =>
+                      event.target.checked
+                        ? [...previous, reminder.id]
+                        : previous.filter((entry) => entry !== reminder.id),
+                    )
+                  }
+                />
+                <label htmlFor={inputId}>
+                  <strong>{reminder.text}</strong>
+                  <small>{reminder.why}</small>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+        {issueLink && (
+          <a href={issueLink} target="_blank" rel="noopener noreferrer">
+            開啟你填寫的 issue <ArrowUpRight size={12} />
+          </a>
+        )}
+      </section>
+
       {proposal?.policy === "linux" && (
         <p className="draft-guidance-linux">
           以{" "}
@@ -418,7 +536,7 @@ export const demoDraftPreparation: DraftPreparation = {
         label: "貢獻規範（示範）",
         path: "CONTRIBUTING.md",
         content:
-          "# 示範貢獻規範\n\n標題應直接描述使用者會得到的改善。\n\n測試段落應區分已執行的檢查與仍需驗證的項目。",
+          "# 示範貢獻規範\n\n標題應直接描述使用者會得到的改善。\n\n測試段落應區分已執行的檢查與仍需驗證的項目。\n\n提交訊息主旨使用 type(scope): 說明 的格式，空一行後說明原因。",
       },
       {
         id: "demo-template",
@@ -454,5 +572,12 @@ export const demoDraftPreparation: DraftPreparation = {
       "填入真正執行過的測試指令與結果。",
       "核對重試上限及不應重試的操作範圍。",
     ],
+    commitMessageSuggestion: {
+      message:
+        "fix(client): retry temporary read failures with backoff\n\nTemporary network errors forced users to repeat read requests.\nRetry only idempotent reads, cap the attempts and keep the final\nerror message when the retries are exhausted.",
+      rationale:
+        "示範貢獻規範要求主旨使用 type(scope): 說明 的格式，並在空一行後說明原因；這份建議不含任何簽署欄位。",
+      sources: ["demo-contributing"],
+    },
   },
 };

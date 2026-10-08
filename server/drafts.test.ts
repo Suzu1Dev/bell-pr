@@ -7,6 +7,7 @@ import { once } from "node:events";
 import { request } from "node:http";
 import { draftFingerprint, draftPrompt, parseDraftProposal } from "./drafts.js";
 import type { DraftContext, DraftProposal } from "../shared/drafts.js";
+import { defaultContributionSettings } from "../shared/insights.js";
 import type { DiffFile, Run } from "./types.js";
 import type { TeamAgentRunner } from "./team.js";
 import { Store } from "./store.js";
@@ -119,6 +120,52 @@ test("draft proposals require exact authoritative quotes, preserve template head
     assert.throws(() =>
       parseDraftProposal(JSON.stringify(invalid), sourceContext),
     );
+  // A commit message suggestion cites supplied sources and never signs for the person.
+  const suggestion = {
+    message: "docs(value): update the exported value\n\nExplain why.",
+    rationale: "Contributing 要求主旨使用祈使句。",
+    sources: ["guide"],
+  };
+  const suggested = parseDraftProposal(
+    JSON.stringify({ ...good, commitMessageSuggestion: suggestion }),
+    sourceContext,
+  );
+  assert.deepEqual(suggested.commitMessageSuggestion, suggestion);
+  assert.equal(
+    "commitMessageSuggestion" in
+      parseDraftProposal(
+        JSON.stringify({ ...good, commitMessageSuggestion: null }),
+        sourceContext,
+      ),
+    false,
+  );
+  for (const [invalid, reason] of [
+    [
+      {
+        ...suggestion,
+        message: `${suggestion.message}\n\nSigned-off-by: Somebody <somebody@example.invalid>`,
+      },
+      /署名/,
+    ],
+    [
+      {
+        ...suggestion,
+        message: `${suggestion.message}\nCo-authored-by: Somebody <somebody@example.invalid>`,
+      },
+      /署名/,
+    ],
+    [{ ...suggestion, sources: ["merged"] }, /來源不存在/],
+    [{ ...suggestion, sources: ["missing"] }, /來源不存在/],
+    [{ ...suggestion, message: "" }, /格式不完整/],
+  ] as const)
+    assert.throws(
+      () =>
+        parseDraftProposal(
+          JSON.stringify({ ...good, commitMessageSuggestion: invalid }),
+          sourceContext,
+        ),
+      reason,
+    );
   assert.throws(
     () =>
       parseDraftProposal(
@@ -162,6 +209,25 @@ test("draft prompt keeps complete bounded safe diffs and distinguishes unavailab
   assert.match(prompt, /Lookup failed/);
   assert.match(prompt, /member-reported executions/);
   assert.match(prompt, /never claim there are no repository rules/);
+  // Without a user-supplied issue the prompt carries none and forbids inventing one.
+  assert.match(prompt, /"issue":null/);
+  assert.match(prompt, /never invent issues or Fixes\/Refs links/);
+  const linked = draftPrompt(
+    {
+      ...run,
+      contributionSettings: {
+        ...defaultContributionSettings,
+        issueUrl: "https://github.com/acme/widgets/issues/42",
+      },
+    },
+    [diff],
+    context,
+  );
+  assert.match(
+    linked,
+    /"issue":\{"url":"https:\/\/github\.com\/acme\/widgets\/issues\/42","number":42\}/,
+  );
+  assert.match(linked, /Only when the supplied issue is not null/);
   assert.throws(
     () => draftPrompt(run, [{ ...diff, patch: "字".repeat(40_000) }], context),
     /100 KB/,
@@ -346,6 +412,33 @@ test("automatic proposal applies only while the original review draft and approv
     });
   } finally {
     release?.();
+    await f.cleanup();
+  }
+});
+
+test("automatic proposal fills an empty commit message from the suggestion and keeps one the person wrote", async () => {
+  const suggestion = {
+    message: "feat(value): update the exported value\n\nExplain why.",
+    rationale: "依預設寫作原則。",
+    sources: [],
+  };
+  const f = await fixture(async () =>
+    JSON.stringify({ ...proposal, commitMessageSuggestion: suggestion }),
+  );
+  try {
+    await automatic(f.workbench, f.run.id);
+    assert.deepEqual(f.run.draft, {
+      title: proposal.title,
+      body: proposal.body,
+      commitMessage: suggestion.message,
+    });
+    const own = `${proposal.title}\n\nSigned-off-by: BELL Test <test@example.invalid>`;
+    await f.workbench.draft(f.run.id, { ...f.run.draft, commitMessage: own });
+    delete f.run.draftPreparation;
+    await automatic(f.workbench, f.run.id);
+    assert.equal(f.store.data.runs[0].draftPreparation?.status, "ready");
+    assert.equal(f.run.draft.commitMessage, own);
+  } finally {
     await f.cleanup();
   }
 });

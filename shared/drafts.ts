@@ -29,6 +29,19 @@ export interface DraftProposal {
   rules: DraftRule[];
   checklist: string[];
   templateSourceId: string;
+  /**
+   * A commit message following the conventions found in the supplied sources
+   * (type(scope) subjects, body wrapping, issue references). The human applies
+   * it by choice; it never carries Signed-off-by or any other person trailer.
+   */
+  commitMessageSuggestion?: CommitMessageSuggestion;
+}
+
+export interface CommitMessageSuggestion {
+  message: string;
+  rationale: string;
+  /** Ids of the supplied sources whose rules shaped the message. */
+  sources: string[];
 }
 
 export interface DraftPreparation {

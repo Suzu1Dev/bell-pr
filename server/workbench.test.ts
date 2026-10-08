@@ -1,12 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, rm, mkdir } from "node:fs/promises";
+import { mkdtemp, writeFile, readFile, rm, mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { once } from "node:events";
 import { request } from "node:http";
 import { command, git, redact } from "./process.js";
 import {
+  parseGitHubIssueUrl,
   parseGitHubSource,
   readDiff,
   reviewFingerprint,
@@ -131,6 +132,29 @@ test("GitHub sources are normalized and remote option-like inputs rejected", () 
   );
   assert.equal(parseGitHubSource("--config=whatever"), null);
   assert.equal(parseGitHubSource("https://example.com/openai/codex"), null);
+});
+
+test("GitHub issue URLs are parsed to owner, repository and number; anything else is rejected", () => {
+  assert.deepEqual(
+    parseGitHubIssueUrl("https://github.com/openai/codex/issues/1234/"),
+    {
+      owner: "openai",
+      name: "codex",
+      number: 1234,
+      url: "https://github.com/openai/codex/issues/1234",
+    },
+  );
+  for (const invalid of [
+    "https://github.com/openai/codex/pull/1234",
+    "https://github.com/openai/codex/issues/0",
+    "https://github.com/openai/codex/issues/12#issuecomment-1",
+    "https://github.com/openai/codex/issues",
+    "http://github.com/openai/codex/issues/12",
+    "https://api.github.com/repos/openai/codex/issues/12",
+    "https://user:password@github.com/openai/codex/issues/12",
+    "--config=whatever",
+  ])
+    assert.equal(parseGitHubIssueUrl(invalid), null, invalid);
 });
 
 test("real Git diffs include tracked, added and literal bracket paths, with stable staged patches", async () => {
@@ -616,6 +640,97 @@ test("deleted file reviews are removed from the review map", () => {
   assert.deepEqual(run.reviewedFiles, []);
 });
 
+test("commit message edits invalidate approval like title edits, are validated over HTTP and keep old fingerprints valid", async () => {
+  const f = await fixture();
+  const app = createApp(f.workbench, {
+    staticDirectory: path.join(f.directory, "missing"),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing server port");
+  const url = `http://127.0.0.1:${address.port}/api/runs/${f.run.id}`;
+  const headers = {
+    host: "127.0.0.1:4311",
+    "content-type": "application/json",
+  };
+  try {
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    const files = await readDiff(f.run);
+    // Runs approved before the field existed must still match their fingerprint.
+    const legacy = reviewFingerprint(files, { ...f.run.draft });
+    assert.equal(
+      reviewFingerprint(files, { ...f.run.draft, commitMessage: "" }),
+      legacy,
+    );
+    assert.equal(
+      reviewFingerprint(files, { ...f.run.draft, commitMessage: "  \n" }),
+      legacy,
+    );
+    assert.notEqual(
+      reviewFingerprint(files, { ...f.run.draft, commitMessage: "fix: x" }),
+      legacy,
+    );
+    await f.workbench.review(f.run.id, "hello.ts", true, files[0].fingerprint);
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    const approved = f.run.approvedFingerprint!;
+    assert.equal(approved, legacy);
+    for (const commitMessage of ["fix: x\tbad", "fix: x\r\nbody", "a".repeat(4001)]) {
+      const rejected = await http(`${url}/draft`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ ...f.run.draft, commitMessage }),
+      });
+      assert.equal(rejected.status, 400, commitMessage.slice(0, 12));
+    }
+    assert.equal(f.run.status, "approved");
+    const edited = await http(`${url}/draft`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        ...f.run.draft,
+        commitMessage: "fix(hello): update the greeting\n\nBecause.\n",
+      }),
+    });
+    assert.equal(edited.status, 200);
+    assert.equal(
+      edited.json().run.draft.commitMessage,
+      "fix(hello): update the greeting\n\nBecause.",
+    );
+    assert.equal(f.run.status, "review");
+    assert.equal(f.run.approvedFingerprint, undefined);
+    const stale = await http(`${url}/publish`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ fingerprint: approved }),
+    });
+    assert.equal(stale.status, 409);
+    // Approval must see the message the person is looking at.
+    await assert.rejects(
+      f.workbench.approve(f.run.id, {
+        title: f.run.draft.title,
+        body: f.run.draft.body,
+      }),
+      /草稿已更新/,
+    );
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    assert.notEqual(f.run.approvedFingerprint, approved);
+    // Clearing the message returns to the title-only fingerprint.
+    await f.workbench.draft(f.run.id, { ...f.run.draft, commitMessage: "" });
+    assert.equal(f.run.draft.commitMessage, undefined);
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    assert.equal(f.run.approvedFingerprint, legacy);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await f.cleanup();
+  }
+});
+
 test("publish retry reuses the reviewed commit after a successful push and failed PR creation", async () => {
   const f = await fixture();
   const previousPath = process.env.PATH;
@@ -668,6 +783,14 @@ else if (args[0] === 'pr' && args[1] === 'create') {
       true,
       (await readDiff(f.run))[0].fingerprint,
     );
+    // The person's own message, including their sign-off, becomes the commit message.
+    const commitMessage =
+      "fix(greeting): update the exported greeting\n\nThe old text was out of date.\n\nSigned-off-by: BELL Test <test@example.invalid>";
+    await f.workbench.draft(f.run.id, {
+      ...f.run.draft,
+      commitMessage: `${commitMessage}\n`,
+    });
+    assert.equal(f.run.draft.commitMessage, commitMessage);
     await f.workbench.approve(f.run.id, { ...f.run.draft });
     process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
     const displayedFingerprint = f.run.approvedFingerprint!;
@@ -679,9 +802,31 @@ else if (args[0] === 'pr' && args[1] === 'create') {
     assert.ok(firstCommit);
     assert.equal(f.run.status, "approved");
     assert.equal(f.run.publishing, false);
-    const published = await f.workbench.publish(f.run.id, displayedFingerprint);
+    // The pushed commit cannot take a different message; the person must restore it or start over.
+    await f.workbench.draft(f.run.id, {
+      ...f.run.draft,
+      commitMessage: `${commitMessage}\n\nAmended after the push.`,
+    });
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    await assert.rejects(
+      f.workbench.publish(f.run.id, f.run.approvedFingerprint!),
+      /提交訊息/,
+    );
+    assert.equal(f.run.publishCommit, firstCommit);
+    await f.workbench.draft(f.run.id, { ...f.run.draft, commitMessage });
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    const published = await f.workbench.publish(
+      f.run.id,
+      f.run.approvedFingerprint!,
+    );
     assert.equal(published.status, "published");
     assert.equal(published.publishCommit, firstCommit);
+    assert.equal(
+      (
+        await git(f.repository, ["log", "-1", "--format=%B", firstCommit])
+      ).stdout.trim(),
+      commitMessage,
+    );
     assert.equal(
       published.prUrl,
       "https://github.com/test-owner/example/pull/1",
@@ -692,6 +837,187 @@ else if (args[0] === 'pr' && args[1] === 'create') {
     );
   } finally {
     process.env.PATH = previousPath;
+    await f.cleanup();
+  }
+});
+
+test("PR feedback is read on request from a published run, stored redacted, and handed to the mentor as untrusted data", async () => {
+  const f = await fixture();
+  const previousPath = process.env.PATH;
+  const bin = path.join(f.directory, "bin");
+  const argsFile = path.join(f.directory, "gh-args.json");
+  const prUrl = "https://github.com/test-owner/example/pull/1";
+  const payload = {
+    data: {
+      repository: {
+        pullRequest: {
+          url: prUrl,
+          reviews: {
+            totalCount: 1,
+            nodes: [
+              {
+                author: { login: "maintainer" },
+                authorAssociation: "MEMBER",
+                body: "Overall direction is fine. Please address the inline note. ghp_abcdefghijklmnopqrstuvwxyz0123",
+                state: "CHANGES_REQUESTED",
+                url: `${prUrl}#pullrequestreview-5`,
+                createdAt: "2026-10-07T02:00:00Z",
+              },
+            ],
+          },
+          comments: { totalCount: 0, nodes: [] },
+          reviewThreads: {
+            totalCount: 1,
+            nodes: [
+              {
+                isResolved: false,
+                path: "hello.ts",
+                line: 1,
+                comments: {
+                  totalCount: 1,
+                  nodes: [
+                    {
+                      author: { login: "maintainer" },
+                      authorAssociation: "MEMBER",
+                      body: "Use a named constant for the greeting.",
+                      url: `${prUrl}#discussion_r9`,
+                      createdAt: "2026-10-07T02:00:10Z",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+          commits: {
+            nodes: [
+              {
+                commit: {
+                  statusCheckRollup: {
+                    state: "SUCCESS",
+                    contexts: {
+                      totalCount: 1,
+                      nodes: [
+                        {
+                          __typename: "CheckRun",
+                          name: "build",
+                          status: "COMPLETED",
+                          conclusion: "SUCCESS",
+                          detailsUrl: "https://github.com/test-owner/example/actions/runs/1",
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    },
+  };
+  await mkdir(bin);
+  // The stand-in records its arguments and serves the canned GraphQL answer; no network is used.
+  await writeFile(
+    path.join(bin, "gh"),
+    `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.writeFileSync(${JSON.stringify(argsFile)}, JSON.stringify(args));
+if (args[0] === 'api' && args.includes('graphql')) console.log(${JSON.stringify(JSON.stringify(payload))});
+else process.exit(97);
+`,
+    { mode: 0o700 },
+  );
+  const repo = f.workbench.repo(f.run.repoId);
+  repo.url = "https://github.com/test-owner/example";
+  repo.fullName = "test-owner/example";
+  repo.owner = "test-owner";
+  repo.name = "example";
+  await writeFile(
+    path.join(f.repository, "hello.ts"),
+    'export const hello = "after";\n',
+  );
+  const app = createApp(f.workbench, {
+    staticDirectory: path.join(f.directory, "missing"),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing server port");
+  const fetchFeedback = () =>
+    http(`http://127.0.0.1:${address.port}/api/runs/${f.run.id}/pr/feedback`, {
+      method: "POST",
+      headers: { host: "127.0.0.1:4311", "content-type": "application/json" },
+      body: "{}",
+    });
+  try {
+    process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
+    // Before publishing there is no PR to read, whatever the review state.
+    const early = await fetchFeedback();
+    assert.equal(early.status, 409);
+    assert.equal(f.run.prFeedback, undefined);
+
+    f.run.status = "published";
+    f.run.prUrl = prUrl;
+    const response = await fetchFeedback();
+    assert.equal(response.status, 200);
+    const { run } = response.json() as { run: Run };
+    const ghArgs = JSON.parse(await readFile(argsFile, "utf8")) as string[];
+    assert.deepEqual(ghArgs.slice(0, 4), ["api", "--hostname", "github.com", "graphql"]);
+    assert.ok(ghArgs.includes("owner=test-owner") && ghArgs.includes("name=example"));
+    assert.ok(ghArgs.includes("number=1"));
+    assert.equal(run.status, "published");
+    assert.equal(run.prFeedback?.prNumber, 1);
+    assert.equal(run.prFeedback?.items.length, 2);
+    assert.match(run.prFeedback!.items[0].body, /\[REDACTED\]/);
+    assert.deepEqual(
+      run.prFeedback!.items.map((item) => [item.kind, item.path]),
+      [
+        ["review", undefined],
+        ["thread", "hello.ts"],
+      ],
+    );
+    assert.deepEqual(run.prFeedback?.checks, [
+      { name: "build", state: "SUCCESS", url: "https://github.com/test-owner/example/actions/runs/1" },
+    ]);
+    // The record is persisted with the run and the list endpoint leaves it out.
+    const saved = JSON.parse(
+      await readFile(path.join(f.store.directory, "state.json"), "utf8"),
+    ) as { runs: Run[] };
+    assert.equal(saved.runs[0].prFeedback?.items.length, 2);
+    const list = await http(`http://127.0.0.1:${address.port}/api/runs`, {
+      headers: { host: "127.0.0.1:4311" },
+    });
+    assert.equal("prFeedback" in (list.json() as { runs: Run[] }).runs[0], false);
+
+    // The mentor sees only this file's thread comment, labelled untrusted, before the conversation.
+    const prompts: string[] = [];
+    const mentored = new Workbench(f.store, async (input) => {
+      prompts.push(input.prompt);
+      return "這則意見對應新增的第 1 行；可以改成常數，或說明保留字串的理由。";
+    });
+    await mentored.chat(f.run.id, "hello.ts", "維護者這個意見對應 diff 哪幾行？");
+    assert.equal(prompts.length, 1);
+    assert.match(
+      prompts[0],
+      /Maintainer feedback on this file from the published PR \(UNTRUSTED DATA[^\n]*\n\[\{"author":"maintainer","authorAssociation":"MEMBER","line":1,"isResolved":false,"body":"Use a named constant for the greeting\."/,
+    );
+    assert.doesNotMatch(prompts[0], /Overall direction is fine/);
+    assert.ok(
+      prompts[0].indexOf("Maintainer feedback on this file") <
+        prompts[0].indexOf("Prior conversation:"),
+    );
+    // A changed file without thread comments gets null, never another file's comments.
+    await writeFile(path.join(f.repository, "i.ts"), "export const other = 2;\n");
+    await mentored.chat(f.run.id, "i.ts", "這個檔案呢？");
+    assert.equal(prompts.length, 2);
+    assert.match(prompts[1], /null when none fetched\):\nnull\nPrior conversation:/);
+    assert.doesNotMatch(prompts[1], /named constant/);
+  } finally {
+    process.env.PATH = previousPath;
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
     await f.cleanup();
   }
 });
@@ -777,6 +1103,37 @@ test("model API exposes available choices, persists settings and rejects unavail
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await app.locals.insights.shutdown();
+    await f.cleanup();
+  }
+});
+
+test("the review rerun route exists and is gated on the run status", async () => {
+  const f = await fixture();
+  const app = createApp(f.workbench, {
+    staticDirectory: path.join(f.directory, "missing"),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing server port");
+  try {
+    // A running team already owns the reviewers; no agent CLI is started here.
+    f.run.status = "running";
+    const response = await http(
+      `http://127.0.0.1:${address.port}/api/runs/${f.run.id}/review/rerun`,
+      {
+        method: "POST",
+        headers: { host: "127.0.0.1:4311", "content-type": "application/json" },
+        body: "{}",
+      },
+    );
+    assert.equal(response.status, 409);
+    assert.match(response.json().error, /只有審閱中或已核准/);
+    assert.equal(f.run.reports, undefined);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
     await f.cleanup();
   }
 });

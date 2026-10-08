@@ -885,6 +885,33 @@
 .explain-panel .explain-card-report > h3 {
   flex-wrap: wrap;
 }
+.explain-order-intro {
+  color: #5f7260;
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 0 0 10px;
+}
+.explain-order-list {
+  margin: 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #506345;
+}
+.explain-order-list li[aria-current="true"] {
+  font-weight: 550;
+}
+.explain-order-list code {
+  font-family: var(--mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.explain-order-list span {
+  display: block;
+  color: #718566;
+}
 .explain-report-author {
   margin-left: auto;
   color: #83917b;
@@ -1012,6 +1039,20 @@
 .explain-empty {
   text-align: center;
   padding: 28px 4px;
+}
+.explain-rerun {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-bottom: 16px;
+}
+.explain-rerun > .explain-retry {
+  margin-top: 0;
+}
+.explain-empty > .explain-rerun {
+  align-items: center;
+  margin: 14px 0 0;
 }
 .explain-chat-welcome-icon {
   height: 44px;
@@ -1452,4 +1493,43 @@
   .rv-hunk code {
     padding-left: 20px;
   }
+}
+.explain-feedback-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.explain-feedback-list li {
+  padding: 10px 12px;
+  border: 1px solid var(--review-border);
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+.explain-feedback-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 11px;
+  color: #718566;
+}
+.explain-feedback-head strong {
+  color: var(--review-ink);
+}
+.explain-feedback-head a {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--review-green);
+  text-decoration: none;
+}
+.explain-feedback-list p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

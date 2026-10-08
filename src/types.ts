@@ -10,6 +10,7 @@ import type { ContributionSettings } from "../shared/insights";
 import type { ModelExecution } from "../shared/models";
 import type { DraftPreparation } from "../shared/drafts";
 import type { FileConversation } from "../shared/chat";
+import type { PrFeedback } from "../shared/pr-feedback";
 import type { RunDetailField } from "../shared/runs";
 
 export type { ChatMessage } from "../shared/chat";
@@ -54,10 +55,13 @@ export interface Run {
     | "cancelled";
   branch: string;
   baseBranch: string;
+  /** Local checkout the learner may edit by hand; absent on the demo run. */
+  worktreePath?: string;
   createdAt: string;
   agents: Agent[];
   logs: { time: string; agent: string; message: string }[];
-  draft: { title: string; body: string };
+  /** Human-written commit message; absent or empty means the PR title alone is used. */
+  draft: { title: string; body: string; commitMessage?: string };
   reviewedFiles: string[];
   /** Learner notes keyed by diff path; absent on runs saved before notes existed. */
   notes?: Record<string, LearnerNote>;
@@ -66,6 +70,8 @@ export interface Run {
   /** Stored per-file explanations keyed by path; the learning page aggregates the ready ones. */
   explanations?: Record<string, StoredExplanation>;
   prUrl?: string;
+  /** Maintainer feedback read from the PR on request; absent until the learner fetches it. */
+  prFeedback?: PrFeedback;
   error?: string;
   /** Follow-up Q&A per diff path; absent on runs saved before it was persisted. */
   conversations?: Record<string, FileConversation>;

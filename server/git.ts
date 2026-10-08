@@ -25,6 +25,22 @@ export function parseGitHubSource(
   };
 }
 
+/** A GitHub issue page URL; pull requests, API URLs and other hosts are rejected. */
+export function parseGitHubIssueUrl(
+  source: string,
+): { owner: string; name: string; number: number; url: string } | null {
+  const match = source.match(
+    /^https:\/\/github\.com\/([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))\/([A-Za-z0-9_.-]+)\/issues\/([1-9]\d{0,9})\/?$/,
+  );
+  if (!match || match[2] === "." || match[2] === "..") return null;
+  return {
+    owner: match[1],
+    name: match[2],
+    number: Number(match[3]),
+    url: `https://github.com/${match[1]}/${match[2]}/issues/${match[3]}`,
+  };
+}
+
 export function safeRelativePath(filePath: string) {
   return (
     !!filePath &&
@@ -238,11 +254,21 @@ export async function readDiff(
   return files.sort((a, b) => a.path.localeCompare(b.path));
 }
 
+/**
+ * An edited commit message invalidates approval exactly like title or body.
+ * The key is added only when a message is set, so fingerprints approved
+ * before the field existed (title and body only) keep matching.
+ */
 export function reviewFingerprint(files: DiffFile[], draft: Run["draft"]) {
+  const commitMessage = draft.commitMessage?.trim();
   return digest(
     JSON.stringify({
       files: files.map((file) => [file.path, file.fingerprint]),
-      draft,
+      draft: {
+        title: draft.title,
+        body: draft.body,
+        ...(commitMessage ? { commitMessage } : {}),
+      },
     }),
   );
 }

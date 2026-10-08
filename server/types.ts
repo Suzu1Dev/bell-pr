@@ -10,6 +10,7 @@ import type { ContributionSettings } from "../shared/insights.js";
 import type { DraftPreparation } from "../shared/drafts.js";
 import type { ModelExecution } from "../shared/models.js";
 import type { FileConversation } from "../shared/chat.js";
+import type { PrFeedback } from "../shared/pr-feedback.js";
 import type { RunDetailField } from "../shared/runs.js";
 
 export type RunStatus =
@@ -58,7 +59,12 @@ export interface Run {
   createdAt: string;
   agents: Agent[];
   logs: { time: string; agent: string; message: string }[];
-  draft: { title: string; body: string };
+  /**
+   * commitMessage is the full commit message the human wrote (subject, body,
+   * trailers such as Signed-off-by). Absent or empty means the PR title alone
+   * is used, which is how runs saved before this field existed were published.
+   */
+  draft: { title: string; body: string; commitMessage?: string };
   reviewedFiles: string[];
   reviewedFingerprints: Record<string, string>;
   /** Learner notes keyed by diff path; absent on runs saved before notes existed. */
@@ -66,6 +72,8 @@ export interface Run {
   approvedFingerprint?: string;
   reports?: Record<string, string>;
   prUrl?: string;
+  /** Maintainer feedback read from the PR on request; absent until the learner fetches it. */
+  prFeedback?: PrFeedback;
   error?: string;
   publishing?: boolean;
   publishCommit?: string;

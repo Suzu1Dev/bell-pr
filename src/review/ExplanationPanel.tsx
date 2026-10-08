@@ -12,6 +12,7 @@ import {
   FolderTree,
   HelpCircle,
   Lightbulb,
+  ListOrdered,
   LoaderCircle,
   MessageCircle,
   PenLine,
@@ -20,6 +21,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { LearnerNote } from "../../shared/explanations";
+import type { PrFeedbackItem } from "../../shared/pr-feedback";
+import { parseReviewOrder } from "../../shared/review-order";
 import type { ChatMessage, DiffFile, Run } from "../types";
 import { MarkdownContent } from "./MarkdownContent";
 import "./review.css";
@@ -41,6 +44,11 @@ export interface ExplanationPanelProps {
   /** The learner's saved note for this file; the editor renders when onSaveNote is given. */
   note?: LearnerNote;
   onSaveNote?: (text: string) => Promise<void> | void;
+  /** Maintainer thread comments on this file from the published PR; unlocks the response preset. */
+  feedback?: PrFeedbackItem[];
+  /** Re-runs the reviewer and test analyst on the current diff; the button renders when given. */
+  onRerunReview?: () => void;
+  reviewBusy?: boolean;
 }
 
 /** Longest module path that is the file itself or one of its parent directories. */
@@ -82,28 +90,98 @@ export function reportMentionCount(report: string, filePath: string) {
     ).length;
 }
 
+/** Thread comments on the current file, shown as plain text: other people's words, not Markdown to trust. */
+export function MaintainerFeedback({ items }: { items: PrFeedbackItem[] }) {
+  if (!items.length) return null;
+  return (
+    <section className="explain-card explain-card-report">
+      <h3>
+        <MessageCircle size={15} />
+        維護者對此檔的留言
+        <span className="explain-report-author">{items.length} 則</span>
+      </h3>
+      <p className="explain-report-meta">
+        <span className="explain-report-badge">來自 GitHub，唯讀</span>
+        <span>回覆請到 PR 頁面；BELL 不會代你留言。</span>
+      </p>
+      <ul className="explain-feedback-list">
+        {items.map((item) => (
+          <li key={item.url}>
+            <div className="explain-feedback-head">
+              <strong>{item.author}</strong>
+              <span>{item.authorAssociation}</span>
+              {typeof item.line === "number" && <span>第 {item.line} 行</span>}
+              {item.isResolved && <span>已解決</span>}
+              <a href={item.url} target="_blank" rel="noopener noreferrer">
+                開啟
+                <ArrowUpRight size={12} />
+              </a>
+            </div>
+            <p>{item.body}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function ReviewReports({
   file,
   reports,
   demo,
+  feedback = [],
+  onRerunReview,
+  reviewBusy = false,
 }: {
   file: DiffFile;
   reports?: Run["reports"];
   demo: boolean;
+  feedback?: PrFeedbackItem[];
+  onRerunReview?: () => void;
+  reviewBusy?: boolean;
 }) {
   const available = reportSections.filter((section) =>
     reports?.[section.key]?.trim(),
   );
+  // Demo reports are fixed text, so there is nothing to re-run there.
+  const rerun = onRerunReview && !demo && (
+    <div className="explain-rerun">
+      <button
+        type="button"
+        className="explain-retry"
+        onClick={onRerunReview}
+        disabled={reviewBusy}
+        aria-busy={reviewBusy}
+      >
+        {reviewBusy ? (
+          <LoaderCircle size={14} className="spin" />
+        ) : (
+          <RotateCcw size={14} />
+        )}
+        {reviewBusy ? "正在重新審查…" : "重新執行審查"}
+      </button>
+      <small className="explain-empty-note">
+        依工作目錄目前的差異重新執行 Reviewer 與 Test analyst（唯讀，會使用 CLI
+        用量）。報告只是建議，不會改變已審閱與核准狀態。
+      </small>
+    </div>
+  );
+  const reviewOrder = parseReviewOrder(reports?.implementer ?? "");
   if (!available.length)
     return (
-      <div className="explain-empty">
-        <Eye size={28} />
-        <h3>這次工作還沒有審查報告</h3>
-        <p>Lead 整合、Reviewer 與 Test analyst 完成後，報告全文會放在這裡。</p>
-      </div>
+      <>
+        <MaintainerFeedback items={feedback} />
+        <div className="explain-empty">
+          <Eye size={28} />
+          <h3>這次工作還沒有審查報告</h3>
+          <p>Lead 整合、Reviewer 與 Test analyst 完成後，報告全文會放在這裡。</p>
+          {rerun}
+        </div>
+      </>
     );
   return (
     <>
+      <MaintainerFeedback items={feedback} />
       <div className="explain-ready-label">
         <Check size={13} />
         {demo ? "示範報告 · 預先整理的內容" : "團隊回報的完整內容"}
@@ -111,6 +189,30 @@ export function ReviewReports({
       <p className="explain-reports-intro">
         這些是獨立靜態審查，不是執行結果；每份報告保留全文，並標示提到目前檔案的段落數。
       </p>
+      {reviewOrder.length > 0 && (
+        <section className="explain-card explain-card-order">
+          <h3>
+            <ListOrdered size={15} />
+            Lead 建議的閱讀順序
+          </h3>
+          <p className="explain-order-intro">
+            常見的讀法是先看定義與介面、再看呼叫端，測試放最前或最後；Lead
+            在整合摘要中說明了這次為何這樣排。左側檔案清單可切換「依建議順序」。
+          </p>
+          <ol className="explain-order-list">
+            {reviewOrder.map((entry) => (
+              <li
+                key={entry.path}
+                aria-current={entry.path === file.path ? "true" : undefined}
+              >
+                <code>{entry.path}</code>
+                {entry.reason && <span>{entry.reason}</span>}
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+      {rerun}
       {available.map((section) => {
         const report = reports![section.key]!;
         const mentions = reportMentionCount(report, file.path);
@@ -158,6 +260,9 @@ export function ExplanationPanel({
   modules,
   note,
   onSaveNote,
+  feedback = [],
+  onRerunReview,
+  reviewBusy,
 }: ExplanationPanelProps) {
   const [tab, setTab] = useState<"explain" | "reports" | "chat">(
     chatRequestId ? "chat" : "explain",
@@ -257,6 +362,9 @@ export function ExplanationPanel({
         ]
       : []),
     ...(isTestFile ? ["這個測試在保護什麼行為？"] : []),
+    ...(feedback.length
+      ? ["維護者這個意見對應 diff 哪幾行？有哪些回應方式與取捨？"]
+      : []),
   ];
 
   return (
@@ -632,7 +740,14 @@ export function ExplanationPanel({
             )}
           </>
         ) : tab === "reports" ? (
-          <ReviewReports file={file} reports={reports} demo={demo} />
+          <ReviewReports
+            file={file}
+            reports={reports}
+            demo={demo}
+            feedback={feedback}
+            onRerunReview={onRerunReview}
+            reviewBusy={reviewBusy}
+          />
         ) : (
           <div
             className="explain-chat"

@@ -25,6 +25,7 @@ import {
   CircleHelp,
   Code2,
   Columns2,
+  Copy,
   ExternalLink,
   FileText,
   FolderGit2,
@@ -61,6 +62,8 @@ import { api, send } from "./api";
 import { demoRepo, demoRun, demoFiles, demoAnswer } from "./demo";
 import type { Repo, Run, RunSummary, DiffFile, ChatMessage } from "./types";
 import { summarizeRun } from "../shared/runs";
+import { groupPrFeedback, summarizeChecks } from "../shared/pr-feedback";
+import { applyReviewOrder, parseReviewOrder } from "../shared/review-order";
 import type { DraftProposal } from "../shared/drafts";
 import type {
   ContributionOpportunity,
@@ -288,9 +291,12 @@ export default function App() {
   const [explanationWidth, setExplanationWidth] = useState(340);
   const reviewGridRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [fileSearch, setFileSearch] = useState("");
   const [onlyUnreviewed, setOnlyUnreviewed] = useState(false);
+  // Display order only: review fingerprints and the server's diff are untouched.
+  const [suggestedOrder, setSuggestedOrder] = useState(false);
   const [diffView, setDiffView] = useState<"unified" | "split">("unified");
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
   const [loadingChats, setLoadingChats] = useState<Set<string>>(new Set());
@@ -312,13 +318,27 @@ export default function App() {
   });
   const [draftTitle, setDraftTitle] = useState(run.draft.title);
   const [draftBody, setDraftBody] = useState(run.draft.body);
+  // Empty means "use the PR title alone", matching the server fallback.
+  const [draftCommitMessage, setDraftCommitMessage] = useState(
+    run.draft.commitMessage ?? "",
+  );
   const [draftPreview, setDraftPreview] = useState(false);
   const persistedDraft = useRef({ id: run.id, ...run.draft });
   const draftMutationEpoch = useRef(0);
-  const editorDraft = useRef({ title: draftTitle, body: draftBody });
-  editorDraft.current = { title: draftTitle, body: draftBody };
+  const editorDraft = useRef({
+    title: draftTitle,
+    body: draftBody,
+    commitMessage: draftCommitMessage,
+  });
+  editorDraft.current = {
+    title: draftTitle,
+    body: draftBody,
+    commitMessage: draftCommitMessage,
+  };
   const pendingDrafts = useRef(new Set<string>());
   const [draftRequests, setDraftRequests] = useState<Set<string>>(new Set());
+  const rerunPending = useRef(new Set<string>());
+  const [rerunRequests, setRerunRequests] = useState<Set<string>>(new Set());
   const runIdRef = useRef(run.id);
   runIdRef.current = run.id;
   const selectionSequence = useRef(0);
@@ -341,6 +361,16 @@ export default function App() {
   ).length;
   const allReviewed = files.length > 0 && reviewedCount === files.length;
   const active = ["running", "queued", "awaiting_plan"].includes(run.status);
+  const editable = !demo && ["review", "approved"].includes(run.status);
+  // A learner-requested re-review keeps the run in review/approved; only the
+  // two reviewer agents report running, so poll and offer 停止 on that signal.
+  const reviewRerunning =
+    editable &&
+    run.agents.some(
+      (agent) =>
+        (agent.id === "reviewer" || agent.id === "tester") &&
+        agent.status === "running",
+    );
   // Progress strip index: 0 定義任務, 1 Agent 開發, 2 理解與審查, 3 送出貢獻;
   // 4 marks every step done. Failed and cancelled runs stay on step 02.
   const currentStep: number = (
@@ -358,7 +388,13 @@ export default function App() {
   const halted = ["failed", "cancelled"].includes(run.status);
   const preparingDraft = run.draftPreparation?.status === "generating";
   const draftDirty =
-    draftTitle !== run.draft.title || draftBody !== run.draft.body;
+    draftTitle !== run.draft.title ||
+    draftBody !== run.draft.body ||
+    draftCommitMessage.trim() !== (run.draft.commitMessage ?? "");
+  const commitMessageSuggestion =
+    run.draftPreparation?.status === "ready"
+      ? run.draftPreparation.proposal?.commitMessageSuggestion
+      : undefined;
   const closeModal = useCallback(() => {
     settingsRequest.current++;
     setModal(null);
@@ -444,13 +480,16 @@ export default function App() {
     // Background draft generation must not discard text the user is editing.
     if (
       previous.id !== run.id ||
-      (edited.title === previous.title && edited.body === previous.body)
+      (edited.title === previous.title &&
+        edited.body === previous.body &&
+        edited.commitMessage.trim() === (previous.commitMessage ?? ""))
     ) {
       setDraftTitle(run.draft.title);
       setDraftBody(run.draft.body);
+      setDraftCommitMessage(run.draft.commitMessage ?? "");
     }
     persistedDraft.current = { id: run.id, ...run.draft };
-  }, [run.id, run.draft.title, run.draft.body]);
+  }, [run.id, run.draft.title, run.draft.body, run.draft.commitMessage]);
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -492,7 +531,7 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    if (demo || (!active && !preparingDraft)) return;
+    if (demo || (!active && !preparingDraft && !reviewRerunning)) return;
     let cancelled = false;
     let observedStatus = run.status;
     let polling = false;
@@ -544,7 +583,7 @@ export default function App() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [run.id, demo, active, preparingDraft]);
+  }, [run.id, demo, active, preparingDraft, reviewRerunning]);
 
   const prepareExplanations = useCallback(
     async (id: string, retry = false, filePath?: string) => {
@@ -798,6 +837,15 @@ export default function App() {
           ]
         : [];
     });
+    // Prefer the issue the proposal cites; otherwise the first open issue found.
+    const issueSources = candidate.sources.filter(
+      (source) => source.kind === "issue",
+    );
+    const issueUrl = (
+      issueSources.find((source) =>
+        idea.evidence.some((item) => item.sourceId === source.id),
+      ) ?? issueSources[0]
+    )?.url;
     setTaskTitle(idea.title);
     setPrompt(
       [
@@ -822,6 +870,7 @@ export default function App() {
         .slice(0, 4000),
       acceptance: idea.acceptanceChecks.join("\n").slice(0, 4000),
       requirePlanApproval: true,
+      ...(issueUrl ? { issueUrl } : {}),
     });
     setExploreRepoId(repo.id);
     navigate("explore");
@@ -961,7 +1010,11 @@ export default function App() {
           api<{ files: DiffFile[] }>(`/runs/${id}/diff`),
         ]);
         if (sequence !== selectionSequence.current || intent !== navigationIntent.current) return false;
-        if (editorDraft.current.title !== draftAtStart.title || editorDraft.current.body !== draftAtStart.body) {
+        if (
+          editorDraft.current.title !== draftAtStart.title ||
+          editorDraft.current.body !== draftAtStart.body ||
+          editorDraft.current.commitMessage !== draftAtStart.commitMessage
+        ) {
           notify("草稿在切換期間已更新，已保留目前任務。");
           return false;
         }
@@ -1020,6 +1073,44 @@ export default function App() {
       notify("已讀取最新差異與審查狀態");
     } catch (error) {
       notify((error as Error).message, "error");
+    }
+  }
+  async function copyWorktreePath() {
+    if (!run.worktreePath) return;
+    try {
+      await navigator.clipboard.writeText(run.worktreePath);
+      notify("已複製工作目錄路徑");
+    } catch {
+      notify("無法使用剪貼簿，請直接選取路徑複製。", "error");
+    }
+  }
+  async function rerunReview() {
+    if (demo) {
+      notify("目前是示範資料。匯入自己的 repository 後可重新執行審查。");
+      return;
+    }
+    const id = run.id;
+    if (rerunPending.current.has(id) || reviewRerunning) return;
+    rerunPending.current.add(id);
+    setRerunRequests((previous) => new Set(previous).add(id));
+    try {
+      await api<{ run: Run }>(`/runs/${id}/review/rerun`, send("POST"));
+      // The server refreshes the diff before reviewing; show the same version.
+      const result = await api<{ files: DiffFile[] }>(`/runs/${id}/diff`);
+      const current = await api<{ run: Run }>(`/runs/${id}`);
+      if (runIdRef.current !== id) return;
+      setFiles(result.files);
+      setRun(current.run);
+      notify("已開始依目前差異重新審查，報告完成後會出現在「審查者怎麼看」。");
+    } catch (error) {
+      notify((error as Error).message, "error");
+    } finally {
+      rerunPending.current.delete(id);
+      setRerunRequests((previous) => {
+        const next = new Set(previous);
+        next.delete(id);
+        return next;
+      });
     }
   }
   async function importRepo(event: FormEvent) {
@@ -1242,27 +1333,40 @@ export default function App() {
   function applyDraftProposal(proposal: DraftProposal) {
     setDraftTitle(proposal.title);
     setDraftBody(proposal.body);
+    // Like the server's automatic apply, a message the person wrote is kept.
+    if (proposal.commitMessageSuggestion && !draftCommitMessage.trim())
+      setDraftCommitMessage(proposal.commitMessageSuggestion.message);
     setDraftPreview(true);
     notify("建議草稿已放入編輯區，確認後請儲存草稿。");
+  }
+  function applyCommitMessageSuggestion() {
+    if (!commitMessageSuggestion) return;
+    setDraftCommitMessage(commitMessageSuggestion.message);
+    notify("建議的提交訊息已放入欄位，可自行補上簽署後儲存。");
   }
   async function saveDraft() {
     if (!draftTitle.trim() || !draftBody.trim()) {
       notify("請填寫 PR 標題與說明。", "error");
       return;
     }
+    const commitMessage = draftCommitMessage.trim();
     setBusy(true);
     draftMutationEpoch.current++;
     try {
       if (demo)
         setRun((previous) => ({
           ...previous,
-          draft: { title: draftTitle, body: draftBody },
+          draft: {
+            title: draftTitle,
+            body: draftBody,
+            ...(commitMessage ? { commitMessage } : {}),
+          },
           status: "review",
         }));
       else {
         const { run: updated } = await api<{ run: Run }>(
           `/runs/${run.id}/draft`,
-          send("PATCH", { title: draftTitle, body: draftBody }),
+          send("PATCH", { title: draftTitle, body: draftBody, commitMessage }),
         );
         if (runIdRef.current === updated.id) setRun(updated);
       }
@@ -1282,7 +1386,13 @@ export default function App() {
       else {
         const { run: updated } = await api<{ run: Run }>(
           `/runs/${run.id}/approve`,
-          send("POST", { draft: { title: draftTitle, body: draftBody } }),
+          send("POST", {
+            draft: {
+              title: draftTitle,
+              body: draftBody,
+              commitMessage: draftCommitMessage.trim(),
+            },
+          }),
         );
         if (runIdRef.current !== updated.id) return;
         setRun(updated);
@@ -1316,6 +1426,28 @@ export default function App() {
       setBusy(false);
     }
   }
+  // Read-only and only on request: no timer refreshes maintainer feedback.
+  async function fetchPrFeedback() {
+    if (demo) {
+      notify("示範模式不會連線 GitHub 讀取回饋。");
+      return;
+    }
+    setFeedbackLoading(true);
+    try {
+      const { run: updated } = await api<{ run: Run }>(
+        `/runs/${run.id}/pr/feedback`,
+        send("POST"),
+      );
+      if (runIdRef.current === updated.id) setRun(updated);
+      notify(
+        `已讀取 ${updated.prFeedback?.items.length ?? 0} 則維護者回饋。`,
+      );
+    } catch (error) {
+      notify((error as Error).message, "error");
+    } finally {
+      setFeedbackLoading(false);
+    }
+  }
   async function cancel() {
     try {
       const { run: updated } = await api<{ run: Run }>(
@@ -1332,13 +1464,22 @@ export default function App() {
           setSelectedPath(result.files[0]?.path || "");
         }
       }
-      notify("任務已停止，工作目錄已保留。");
+      notify(
+        ["review", "approved"].includes(updated.status)
+          ? "已停止重新審查；原有報告與審閱狀態保留。"
+          : "任務已停止，工作目錄已保留。",
+      );
     } catch (error) {
       notify((error as Error).message, "error");
     }
   }
 
-  const visibleFiles = files.filter(
+  const reviewOrder = parseReviewOrder(run.reports?.implementer ?? "").filter(
+    (entry) => files.some((f) => f.path === entry.path),
+  );
+  const visibleFiles = (
+    suggestedOrder ? applyReviewOrder(files, reviewOrder) : files
+  ).filter(
     (f) =>
       f.path.toLowerCase().includes(fileSearch.toLowerCase()) &&
       (!onlyUnreviewed || !run.reviewedFiles.includes(f.path)),
@@ -1846,6 +1987,19 @@ export default function App() {
                           </span>
                           只看尚未審查
                         </button>
+                        {reviewOrder.length > 0 && (
+                          <button
+                            className={`filter-toggle ${suggestedOrder ? "is-on" : ""}`}
+                            aria-pressed={suggestedOrder}
+                            title="依 Lead 整合摘要建議的閱讀順序排列；未提到的檔案維持 git 順序排在後面"
+                            onClick={() => setSuggestedOrder(!suggestedOrder)}
+                          >
+                            <span className="toggle-track">
+                              <span />
+                            </span>
+                            依建議順序
+                          </button>
+                        )}
                         <div className="file-tree">
                           <div className="tree-root">
                             <ChevronDown size={13} />
@@ -2016,6 +2170,24 @@ export default function App() {
                           </div>
                         </div>
                       </div>
+                      {editable && run.worktreePath && (
+                        <div className="worktree-hint">
+                          <FolderGit2 size={14} />
+                          <span>
+                            你可以直接在這個目錄修改，重新整理差異後會重新解說與審閱狀態
+                          </span>
+                          <code>{run.worktreePath}</code>
+                          <button
+                            type="button"
+                            className="icon-button"
+                            aria-label="複製工作目錄路徑"
+                            title="複製工作目錄路徑"
+                            onClick={copyWorktreePath}
+                          >
+                            <Copy size={13} />
+                          </button>
+                        </div>
+                      )}
                       {file ? (
                         <DiffView
                           key={`${run.id}:${file.path}`}
@@ -2116,6 +2288,13 @@ export default function App() {
                                 }
                                 note={run.notes?.[file.path]}
                                 onSaveNote={saveNote}
+                                feedback={run.prFeedback?.items.filter(
+                                  (item) => item.path === file.path,
+                                )}
+                                onRerunReview={editable ? rerunReview : undefined}
+                                reviewBusy={
+                                  reviewRerunning || rerunRequests.has(run.id)
+                                }
                               />
                             </Suspense>
                           ) : (
@@ -2155,10 +2334,10 @@ export default function App() {
                             <p>每個角色各司其職，所有過程都在這裡。</p>
                           </div>
                         )}
-                        {active && (
+                        {(active || reviewRerunning) && (
                           <button className="button secondary" onClick={cancel}>
                             <Square size={14} />
-                            停止任務
+                            {reviewRerunning ? "停止重新審查" : "停止任務"}
                           </button>
                         )}
                       </div>
@@ -2252,6 +2431,7 @@ export default function App() {
                           !["review", "approved"].includes(run.status)
                         }
                         demo={demo}
+                        issueUrl={run.contributionSettings?.issueUrl}
                         onGenerate={prepareDraft}
                         onApply={applyDraftProposal}
                       />
@@ -2306,6 +2486,48 @@ export default function App() {
                             onChange={(e) => setDraftBody(e.target.value)}
                             disabled={run.status === "published"}
                           />
+                        )}
+                        <label
+                          className="field-label"
+                          htmlFor="pr-commit-message"
+                        >
+                          提交訊息 <span>git commit</span>
+                        </label>
+                        <textarea
+                          id="pr-commit-message"
+                          className="draft-textarea draft-commit-message"
+                          aria-describedby="pr-commit-message-help"
+                          value={draftCommitMessage || draftTitle}
+                          onChange={(e) =>
+                            setDraftCommitMessage(e.target.value)
+                          }
+                          disabled={run.status === "published"}
+                        />
+                        <p id="pr-commit-message-help" className="field-help">
+                          第一行是主旨，空一行後寫說明，最後放
+                          trailers。留空時以 PR
+                          標題作為單行提交訊息。Signed-off-by
+                          等簽署由你本人輸入，BELL 與模型不會代填。
+                        </p>
+                        {commitMessageSuggestion && (
+                          <div className="commit-suggestion">
+                            <div>
+                              <strong>依專案規範建議的提交訊息</strong>
+                              <p>{commitMessageSuggestion.rationale}</p>
+                            </div>
+                            <pre>{commitMessageSuggestion.message}</pre>
+                            <div className="commit-suggestion-actions">
+                              <span>只會填入欄位，簽署仍由你補上。</span>
+                              <button
+                                type="button"
+                                className="button secondary"
+                                disabled={run.status === "published"}
+                                onClick={applyCommitMessageSuggestion}
+                              >
+                                採用建議
+                              </button>
+                            </div>
+                          </div>
                         )}
                         <div className="draft-save-row">
                           <span>
@@ -2384,6 +2606,167 @@ export default function App() {
                         </div>
                       </aside>
                     </div>
+                    {run.status === "published" && run.prUrl && (
+                      <section
+                        className="pr-feedback"
+                        aria-labelledby="pr-feedback-title"
+                      >
+                        <div className="section-heading">
+                          <div>
+                            <h2 id="pr-feedback-title">維護者回饋</h2>
+                            <p>
+                              按下按鈕才會讀取 PR 上的 review、留言與 CI
+                              結果；BELL 只讀不回，回覆請到 GitHub。
+                            </p>
+                          </div>
+                          <div className="pr-feedback-actions">
+                            <a
+                              className="button secondary"
+                              href={run.prUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <Github size={15} />
+                              查看 Pull Request
+                              <ExternalLink size={13} />
+                            </a>
+                            <button
+                              className="button primary"
+                              disabled={feedbackLoading}
+                              onClick={fetchPrFeedback}
+                            >
+                              {feedbackLoading ? (
+                                <Loader2 className="spin" size={15} />
+                              ) : (
+                                <RefreshCw size={15} />
+                              )}
+                              {run.prFeedback ? "重新讀取回饋" : "讀取回饋"}
+                            </button>
+                          </div>
+                        </div>
+                        {run.prFeedback ? (
+                          <>
+                            <p className="pr-feedback-meta">
+                              讀取時間{" "}
+                              {new Date(run.prFeedback.fetchedAt).toLocaleString(
+                                "zh-TW",
+                              )}
+                              {run.prFeedback.checks && (
+                                <>
+                                  {" · CI "}
+                                  {(() => {
+                                    const checks = summarizeChecks(
+                                      run.prFeedback.checks,
+                                    );
+                                    return checks.total
+                                      ? `${checks.total} 項檢查：${checks.success} 成功、${checks.pending} 進行中、${checks.failed} 失敗`
+                                      : "尚無檢查";
+                                  })()}
+                                  {run.prFeedback.checksState &&
+                                    `（整體 ${run.prFeedback.checksState}）`}
+                                </>
+                              )}
+                            </p>
+                            {run.prFeedback.checks?.some(
+                              (check) =>
+                                !["SUCCESS", "NEUTRAL", "SKIPPED"].includes(
+                                  check.state.toUpperCase(),
+                                ),
+                            ) && (
+                              <ul className="pr-feedback-checks">
+                                {run.prFeedback.checks
+                                  .filter(
+                                    (check) =>
+                                      !["SUCCESS", "NEUTRAL", "SKIPPED"].includes(
+                                        check.state.toUpperCase(),
+                                      ),
+                                  )
+                                  .map((check) => (
+                                    <li key={`${check.name}:${check.url ?? ""}`}>
+                                      <span>{check.name}</span>
+                                      <b>{check.state}</b>
+                                      {check.url && (
+                                        <a
+                                          href={check.url}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                        >
+                                          詳情
+                                        </a>
+                                      )}
+                                    </li>
+                                  ))}
+                              </ul>
+                            )}
+                            {run.prFeedback.warnings?.map((warning) => (
+                              <p className="pr-feedback-warning" key={warning}>
+                                {warning}
+                              </p>
+                            ))}
+                            {run.prFeedback.items.length === 0 && (
+                              <p className="muted">
+                                目前還沒有 review 或留言。維護者回應通常需要幾天到幾週；可以先準備回覆思路。
+                              </p>
+                            )}
+                            {groupPrFeedback(run.prFeedback.items).map(
+                              (group) => (
+                                <div
+                                  className="pr-feedback-group"
+                                  key={group.path ?? "general"}
+                                >
+                                  <div className="pr-feedback-group-head">
+                                    <strong>
+                                      {group.path ?? "整體 review 與對話"}
+                                    </strong>
+                                    {group.path &&
+                                      files.some(
+                                        (f) => f.path === group.path,
+                                      ) && (
+                                        <button
+                                          className="button secondary"
+                                          onClick={() => {
+                                            setSelectedPath(group.path!);
+                                            setTab("changes");
+                                          }}
+                                        >
+                                          在程式碼變更開啟
+                                        </button>
+                                      )}
+                                  </div>
+                                  <ul>
+                                    {group.items.map((item) => (
+                                      <li key={item.url}>
+                                        <div className="pr-feedback-item-head">
+                                          <strong>{item.author}</strong>
+                                          <span>{item.authorAssociation}</span>
+                                          {item.state && <span>{item.state}</span>}
+                                          {typeof item.line === "number" && (
+                                            <span>第 {item.line} 行</span>
+                                          )}
+                                          {item.isResolved && <span>已解決</span>}
+                                          <a
+                                            href={item.url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                          >
+                                            在 GitHub 開啟
+                                          </a>
+                                        </div>
+                                        <p>{item.body}</p>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ),
+                            )}
+                          </>
+                        ) : (
+                          <p className="muted">
+                            尚未讀取。按「讀取回饋」會向 GitHub 查詢一次，不會自動更新。
+                          </p>
+                        )}
+                      </section>
+                    )}
                   </div>
                 )}
               </div>
