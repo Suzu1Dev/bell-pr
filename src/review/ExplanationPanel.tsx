@@ -20,6 +20,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { LearnerNote } from "../../shared/explanations";
+import type { PrFeedbackItem } from "../../shared/pr-feedback";
 import type { ChatMessage, DiffFile, Run } from "../types";
 import { MarkdownContent } from "./MarkdownContent";
 import "./review.css";
@@ -41,6 +42,8 @@ export interface ExplanationPanelProps {
   /** The learner's saved note for this file; the editor renders when onSaveNote is given. */
   note?: LearnerNote;
   onSaveNote?: (text: string) => Promise<void> | void;
+  /** Maintainer thread comments on this file from the published PR; unlocks the response preset. */
+  feedback?: PrFeedbackItem[];
 }
 
 /** Longest module path that is the file itself or one of its parent directories. */
@@ -82,28 +85,69 @@ export function reportMentionCount(report: string, filePath: string) {
     ).length;
 }
 
+/** Thread comments on the current file, shown as plain text: other people's words, not Markdown to trust. */
+export function MaintainerFeedback({ items }: { items: PrFeedbackItem[] }) {
+  if (!items.length) return null;
+  return (
+    <section className="explain-card explain-card-report">
+      <h3>
+        <MessageCircle size={15} />
+        維護者對此檔的留言
+        <span className="explain-report-author">{items.length} 則</span>
+      </h3>
+      <p className="explain-report-meta">
+        <span className="explain-report-badge">來自 GitHub，唯讀</span>
+        <span>回覆請到 PR 頁面；BELL 不會代你留言。</span>
+      </p>
+      <ul className="explain-feedback-list">
+        {items.map((item) => (
+          <li key={item.url}>
+            <div className="explain-feedback-head">
+              <strong>{item.author}</strong>
+              <span>{item.authorAssociation}</span>
+              {typeof item.line === "number" && <span>第 {item.line} 行</span>}
+              {item.isResolved && <span>已解決</span>}
+              <a href={item.url} target="_blank" rel="noopener noreferrer">
+                開啟
+                <ArrowUpRight size={12} />
+              </a>
+            </div>
+            <p>{item.body}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function ReviewReports({
   file,
   reports,
   demo,
+  feedback = [],
 }: {
   file: DiffFile;
   reports?: Run["reports"];
   demo: boolean;
+  feedback?: PrFeedbackItem[];
 }) {
   const available = reportSections.filter((section) =>
     reports?.[section.key]?.trim(),
   );
   if (!available.length)
     return (
-      <div className="explain-empty">
-        <Eye size={28} />
-        <h3>這次工作還沒有審查報告</h3>
-        <p>Lead 整合、Reviewer 與 Test analyst 完成後，報告全文會放在這裡。</p>
-      </div>
+      <>
+        <MaintainerFeedback items={feedback} />
+        <div className="explain-empty">
+          <Eye size={28} />
+          <h3>這次工作還沒有審查報告</h3>
+          <p>Lead 整合、Reviewer 與 Test analyst 完成後，報告全文會放在這裡。</p>
+        </div>
+      </>
     );
   return (
     <>
+      <MaintainerFeedback items={feedback} />
       <div className="explain-ready-label">
         <Check size={13} />
         {demo ? "示範報告 · 預先整理的內容" : "團隊回報的完整內容"}
@@ -158,6 +202,7 @@ export function ExplanationPanel({
   modules,
   note,
   onSaveNote,
+  feedback = [],
 }: ExplanationPanelProps) {
   const [tab, setTab] = useState<"explain" | "reports" | "chat">(
     chatRequestId ? "chat" : "explain",
@@ -257,6 +302,9 @@ export function ExplanationPanel({
         ]
       : []),
     ...(isTestFile ? ["這個測試在保護什麼行為？"] : []),
+    ...(feedback.length
+      ? ["維護者這個意見對應 diff 哪幾行？有哪些回應方式與取捨？"]
+      : []),
   ];
 
   return (
@@ -632,7 +680,12 @@ export function ExplanationPanel({
             )}
           </>
         ) : tab === "reports" ? (
-          <ReviewReports file={file} reports={reports} demo={demo} />
+          <ReviewReports
+            file={file}
+            reports={reports}
+            demo={demo}
+            feedback={feedback}
+          />
         ) : (
           <div
             className="explain-chat"

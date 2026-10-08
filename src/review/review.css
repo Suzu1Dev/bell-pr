@@ -1453,3 +1453,42 @@
     padding-left: 20px;
   }
 }
+.explain-feedback-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.explain-feedback-list li {
+  padding: 10px 12px;
+  border: 1px solid var(--review-border);
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+.explain-feedback-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 11px;
+  color: #718566;
+}
+.explain-feedback-head strong {
+  color: var(--review-ink);
+}
+.explain-feedback-head a {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--review-green);
+  text-decoration: none;
+}
+.explain-feedback-list p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

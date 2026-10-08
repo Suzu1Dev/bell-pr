@@ -61,6 +61,7 @@ import { api, send } from "./api";
 import { demoRepo, demoRun, demoFiles, demoAnswer } from "./demo";
 import type { Repo, Run, RunSummary, DiffFile, ChatMessage } from "./types";
 import { summarizeRun } from "../shared/runs";
+import { groupPrFeedback, summarizeChecks } from "../shared/pr-feedback";
 import type { DraftProposal } from "../shared/drafts";
 import type {
   ContributionOpportunity,
@@ -288,6 +289,7 @@ export default function App() {
   const [explanationWidth, setExplanationWidth] = useState(340);
   const reviewGridRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [fileSearch, setFileSearch] = useState("");
   const [onlyUnreviewed, setOnlyUnreviewed] = useState(false);
@@ -1316,6 +1318,28 @@ export default function App() {
       setBusy(false);
     }
   }
+  // Read-only and only on request: no timer refreshes maintainer feedback.
+  async function fetchPrFeedback() {
+    if (demo) {
+      notify("示範模式不會連線 GitHub 讀取回饋。");
+      return;
+    }
+    setFeedbackLoading(true);
+    try {
+      const { run: updated } = await api<{ run: Run }>(
+        `/runs/${run.id}/pr/feedback`,
+        send("POST"),
+      );
+      if (runIdRef.current === updated.id) setRun(updated);
+      notify(
+        `已讀取 ${updated.prFeedback?.items.length ?? 0} 則維護者回饋。`,
+      );
+    } catch (error) {
+      notify((error as Error).message, "error");
+    } finally {
+      setFeedbackLoading(false);
+    }
+  }
   async function cancel() {
     try {
       const { run: updated } = await api<{ run: Run }>(
@@ -2116,6 +2140,9 @@ export default function App() {
                                 }
                                 note={run.notes?.[file.path]}
                                 onSaveNote={saveNote}
+                                feedback={run.prFeedback?.items.filter(
+                                  (item) => item.path === file.path,
+                                )}
                               />
                             </Suspense>
                           ) : (
@@ -2384,6 +2411,167 @@ export default function App() {
                         </div>
                       </aside>
                     </div>
+                    {run.status === "published" && run.prUrl && (
+                      <section
+                        className="pr-feedback"
+                        aria-labelledby="pr-feedback-title"
+                      >
+                        <div className="section-heading">
+                          <div>
+                            <h2 id="pr-feedback-title">維護者回饋</h2>
+                            <p>
+                              按下按鈕才會讀取 PR 上的 review、留言與 CI
+                              結果；BELL 只讀不回，回覆請到 GitHub。
+                            </p>
+                          </div>
+                          <div className="pr-feedback-actions">
+                            <a
+                              className="button secondary"
+                              href={run.prUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <Github size={15} />
+                              查看 Pull Request
+                              <ExternalLink size={13} />
+                            </a>
+                            <button
+                              className="button primary"
+                              disabled={feedbackLoading}
+                              onClick={fetchPrFeedback}
+                            >
+                              {feedbackLoading ? (
+                                <Loader2 className="spin" size={15} />
+                              ) : (
+                                <RefreshCw size={15} />
+                              )}
+                              {run.prFeedback ? "重新讀取回饋" : "讀取回饋"}
+                            </button>
+                          </div>
+                        </div>
+                        {run.prFeedback ? (
+                          <>
+                            <p className="pr-feedback-meta">
+                              讀取時間{" "}
+                              {new Date(run.prFeedback.fetchedAt).toLocaleString(
+                                "zh-TW",
+                              )}
+                              {run.prFeedback.checks && (
+                                <>
+                                  {" · CI "}
+                                  {(() => {
+                                    const checks = summarizeChecks(
+                                      run.prFeedback.checks,
+                                    );
+                                    return checks.total
+                                      ? `${checks.total} 項檢查：${checks.success} 成功、${checks.pending} 進行中、${checks.failed} 失敗`
+                                      : "尚無檢查";
+                                  })()}
+                                  {run.prFeedback.checksState &&
+                                    `（整體 ${run.prFeedback.checksState}）`}
+                                </>
+                              )}
+                            </p>
+                            {run.prFeedback.checks?.some(
+                              (check) =>
+                                !["SUCCESS", "NEUTRAL", "SKIPPED"].includes(
+                                  check.state.toUpperCase(),
+                                ),
+                            ) && (
+                              <ul className="pr-feedback-checks">
+                                {run.prFeedback.checks
+                                  .filter(
+                                    (check) =>
+                                      !["SUCCESS", "NEUTRAL", "SKIPPED"].includes(
+                                        check.state.toUpperCase(),
+                                      ),
+                                  )
+                                  .map((check) => (
+                                    <li key={`${check.name}:${check.url ?? ""}`}>
+                                      <span>{check.name}</span>
+                                      <b>{check.state}</b>
+                                      {check.url && (
+                                        <a
+                                          href={check.url}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                        >
+                                          詳情
+                                        </a>
+                                      )}
+                                    </li>
+                                  ))}
+                              </ul>
+                            )}
+                            {run.prFeedback.warnings?.map((warning) => (
+                              <p className="pr-feedback-warning" key={warning}>
+                                {warning}
+                              </p>
+                            ))}
+                            {run.prFeedback.items.length === 0 && (
+                              <p className="muted">
+                                目前還沒有 review 或留言。維護者回應通常需要幾天到幾週；可以先準備回覆思路。
+                              </p>
+                            )}
+                            {groupPrFeedback(run.prFeedback.items).map(
+                              (group) => (
+                                <div
+                                  className="pr-feedback-group"
+                                  key={group.path ?? "general"}
+                                >
+                                  <div className="pr-feedback-group-head">
+                                    <strong>
+                                      {group.path ?? "整體 review 與對話"}
+                                    </strong>
+                                    {group.path &&
+                                      files.some(
+                                        (f) => f.path === group.path,
+                                      ) && (
+                                        <button
+                                          className="button secondary"
+                                          onClick={() => {
+                                            setSelectedPath(group.path!);
+                                            setTab("changes");
+                                          }}
+                                        >
+                                          在程式碼變更開啟
+                                        </button>
+                                      )}
+                                  </div>
+                                  <ul>
+                                    {group.items.map((item) => (
+                                      <li key={item.url}>
+                                        <div className="pr-feedback-item-head">
+                                          <strong>{item.author}</strong>
+                                          <span>{item.authorAssociation}</span>
+                                          {item.state && <span>{item.state}</span>}
+                                          {typeof item.line === "number" && (
+                                            <span>第 {item.line} 行</span>
+                                          )}
+                                          {item.isResolved && <span>已解決</span>}
+                                          <a
+                                            href={item.url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                          >
+                                            在 GitHub 開啟
+                                          </a>
+                                        </div>
+                                        <p>{item.body}</p>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ),
+                            )}
+                          </>
+                        ) : (
+                          <p className="muted">
+                            尚未讀取。按「讀取回饋」會向 GitHub 查詢一次，不會自動更新。
+                          </p>
+                        )}
+                      </section>
+                    )}
                   </div>
                 )}
               </div>

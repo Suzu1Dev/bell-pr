@@ -10,6 +10,7 @@ import type { ContributionSettings } from "../shared/insights.js";
 import type { DraftPreparation } from "../shared/drafts.js";
 import type { ModelExecution } from "../shared/models.js";
 import type { FileConversation } from "../shared/chat.js";
+import type { PrFeedback } from "../shared/pr-feedback.js";
 import type { RunDetailField } from "../shared/runs.js";
 
 export type RunStatus =
@@ -66,6 +67,8 @@ export interface Run {
   approvedFingerprint?: string;
   reports?: Record<string, string>;
   prUrl?: string;
+  /** Maintainer feedback read from the PR on request; absent until the learner fetches it. */
+  prFeedback?: PrFeedback;
   error?: string;
   publishing?: boolean;
   publishCommit?: string;

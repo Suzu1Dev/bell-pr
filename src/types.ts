@@ -10,6 +10,7 @@ import type { ContributionSettings } from "../shared/insights";
 import type { ModelExecution } from "../shared/models";
 import type { DraftPreparation } from "../shared/drafts";
 import type { FileConversation } from "../shared/chat";
+import type { PrFeedback } from "../shared/pr-feedback";
 import type { RunDetailField } from "../shared/runs";
 
 export type { ChatMessage } from "../shared/chat";
@@ -66,6 +67,8 @@ export interface Run {
   /** Stored per-file explanations keyed by path; the learning page aggregates the ready ones. */
   explanations?: Record<string, StoredExplanation>;
   prUrl?: string;
+  /** Maintainer feedback read from the PR on request; absent until the learner fetches it. */
+  prFeedback?: PrFeedback;
   error?: string;
   /** Follow-up Q&A per diff path; absent on runs saved before it was persisted. */
   conversations?: Record<string, FileConversation>;

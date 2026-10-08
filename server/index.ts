@@ -320,6 +320,11 @@ export function createApp(
       .parse(req.body);
     res.json({ run: await workbench.approve(req.params.id, draft) });
   });
+  // Button-triggered read of the published PR's reviews, comments and CI;
+  // nothing polls it and nothing is ever posted back to GitHub.
+  app.post("/api/runs/:id/pr/feedback", async (req, res) => {
+    res.json({ run: await workbench.fetchPrFeedback(req.params.id) });
+  });
   app.post("/api/runs/:id/publish", async (req, res) => {
     const { fingerprint } = z
       .object({ fingerprint: z.string().regex(/^[a-f0-9]{64}$/) })

@@ -232,6 +232,32 @@ test("guide prompt carries contribution context, the ready explanation card and 
   );
   assert.doesNotMatch(ready, /使用者打開頁面/);
   assert.match(ready, /\{"reviewer":null,"tester":null\}/);
+  // Without fetched feedback the section is null; with it, the mentor gets the
+  // comment as untrusted data between the reports and the conversation.
+  assert.match(ready, /null when none fetched\):\nnull\nPrior conversation:/);
+  const withFeedback = guidePrompt({
+    ...base,
+    file: diff("a.ts"),
+    feedback: [
+      {
+        kind: "thread",
+        author: "maintainer",
+        authorAssociation: "MEMBER",
+        body: `Rename this.${"x".repeat(3_000)}`,
+        path: "a.ts",
+        line: 3,
+        isResolved: false,
+        url: "https://github.com/o/r/pull/1#discussion_r1",
+        createdAt: "2026-10-07T00:00:00Z",
+      },
+    ],
+  });
+  assert.match(
+    withFeedback,
+    /UNTRUSTED DATA: other people's comments[^\n]*\n\[\{"author":"maintainer","authorAssociation":"MEMBER","line":3,"isResolved":false,"body":"Rename this\.x+","url":"https:\/\/github\.com\/o\/r\/pull\/1#discussion_r1"\}\]\nPrior conversation:/,
+  );
+  assert.equal(withFeedback.match(/x{3000}/), null);
+  assert.match(withFeedback, /never draft a reply as if it were sent/);
   assert.match(
     ready,
     /Prior conversation:\nUser: 之前的問題\nMentor: 之前的回答\nQuestion:/,

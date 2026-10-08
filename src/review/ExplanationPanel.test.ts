@@ -68,6 +68,57 @@ test("test files get a reading hint and extra presets while source files keep th
   assert.match(chat(testFile), /這個測試在保護什麼行為？/);
 });
 
+test("maintainer thread comments add the response preset and a read-only section in the reports tab", () => {
+  const feedback = [
+    {
+      kind: "thread" as const,
+      author: "maintainer",
+      authorAssociation: "MEMBER",
+      body: "Use a named constant <here>.",
+      path: demoFiles[0].path,
+      line: 4,
+      isResolved: false,
+      url: "https://github.com/o/r/pull/1#discussion_r1",
+      createdAt: "2026-10-07T00:00:00Z",
+    },
+  ];
+  const chat = renderToStaticMarkup(
+    createElement(ExplanationPanel, {
+      file: demoFiles[0],
+      messages: [],
+      loading: false,
+      onAsk() {},
+      demo: true,
+      chatRequestId: 1,
+      feedback,
+    }),
+  );
+  assert.match(chat, /維護者這個意見對應 diff 哪幾行？有哪些回應方式與取捨？/);
+  assert.doesNotMatch(
+    renderToStaticMarkup(
+      createElement(ExplanationPanel, {
+        file: demoFiles[0],
+        messages: [],
+        loading: false,
+        onAsk() {},
+        demo: true,
+        chatRequestId: 1,
+        feedback: [],
+      }),
+    ),
+    /維護者這個意見/,
+  );
+  const reports = renderToStaticMarkup(
+    createElement(ReviewReports, { file: demoFiles[0], reports: {}, demo: false, feedback }),
+  );
+  assert.match(reports, /維護者對此檔的留言/);
+  assert.match(reports, /來自 GitHub，唯讀/);
+  assert.match(reports, /第 4 行/);
+  // Comment text is escaped plain text, never interpreted as markup.
+  assert.match(reports, /Use a named constant &lt;here&gt;\./);
+  assert.match(reports, /這次工作還沒有審查報告/);
+});
+
 test("saved answers about an older diff are marked instead of dropped", () => {
   const html = renderToStaticMarkup(
     createElement(ExplanationPanel, {

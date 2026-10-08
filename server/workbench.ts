@@ -49,6 +49,7 @@ import {
 } from "./explanations.js";
 
 import { collectDraftContext } from "./draft-sources.js";
+import { parsePrFeedback, prFeedbackQuery, prNumberOf } from "./pr-feedback.js";
 import {
   draftFingerprint,
   draftJsonSchema,
@@ -1484,6 +1485,10 @@ export class Workbench {
           (message) =>
             `${message.role === "user" ? "User" : "Mentor"}: ${message.content}`,
         );
+      // Only thread comments attached to this file reach the mentor.
+      const feedback = (run.prFeedback?.items ?? []).filter(
+        (item) => item.path === file.path,
+      );
       const controller = new AbortController();
       const controllerKey = `guide:${id}`;
       this.controllers.set(controllerKey, controller);
@@ -1498,6 +1503,7 @@ export class Workbench {
             file,
             messages,
             question,
+            feedback,
           }),
           controller.signal,
         );
@@ -1521,6 +1527,60 @@ export class Workbench {
       };
       await this.store.save();
       return answer;
+    });
+  }
+
+  /**
+   * Reads the published PR's reviews, comments, threads and CI once, on the
+   * learner's request. Read-only: BELL never replies or resolves anything on
+   * GitHub, and nothing polls this. The run status is unchanged.
+   */
+  async fetchPrFeedback(id: string) {
+    return this.lock(id, async () => {
+      const run = this.run(id);
+      if (run.status !== "published" || !run.prUrl)
+        throw new AppError("PR 尚未送出，還沒有維護者回饋可以讀取。", 409);
+      const repo = this.repo(run.repoId);
+      const remote = parseGitHubSource(repo.url);
+      const prNumber = remote && prNumberOf(run.prUrl, remote.url);
+      if (!remote || !prNumber)
+        throw new AppError("PR 網址與此 Repository 不一致，無法讀取回饋。", 422);
+      const result = await command(
+        "gh",
+        [
+          "api",
+          "--hostname",
+          "github.com",
+          "graphql",
+          "-f",
+          `query=${prFeedbackQuery}`,
+          "-f",
+          `owner=${remote.owner}`,
+          "-f",
+          `name=${remote.name}`,
+          "-F",
+          `number=${prNumber}`,
+        ],
+        { cwd: repo.path, timeoutMs: 20_000, maxBytes: 4_000_000 },
+      );
+      let response: unknown;
+      try {
+        response = JSON.parse(result.stdout);
+      } catch {
+        throw new AppError("GitHub 回應不是有效的 JSON。", 502);
+      }
+      run.prFeedback = parsePrFeedback(response, {
+        repositoryUrl: remote.url,
+        prNumber,
+        fetchedAt: now(),
+      });
+      this.log(
+        run,
+        "system",
+        `已讀取 PR #${prNumber} 的維護者回饋：${run.prFeedback.items.length} 則。`,
+      );
+      await this.store.save();
+      return run;
     });
   }
 

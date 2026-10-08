@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, rm, mkdir } from "node:fs/promises";
+import { mkdtemp, writeFile, readFile, rm, mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { once } from "node:events";
@@ -692,6 +692,187 @@ else if (args[0] === 'pr' && args[1] === 'create') {
     );
   } finally {
     process.env.PATH = previousPath;
+    await f.cleanup();
+  }
+});
+
+test("PR feedback is read on request from a published run, stored redacted, and handed to the mentor as untrusted data", async () => {
+  const f = await fixture();
+  const previousPath = process.env.PATH;
+  const bin = path.join(f.directory, "bin");
+  const argsFile = path.join(f.directory, "gh-args.json");
+  const prUrl = "https://github.com/test-owner/example/pull/1";
+  const payload = {
+    data: {
+      repository: {
+        pullRequest: {
+          url: prUrl,
+          reviews: {
+            totalCount: 1,
+            nodes: [
+              {
+                author: { login: "maintainer" },
+                authorAssociation: "MEMBER",
+                body: "Overall direction is fine. Please address the inline note. ghp_abcdefghijklmnopqrstuvwxyz0123",
+                state: "CHANGES_REQUESTED",
+                url: `${prUrl}#pullrequestreview-5`,
+                createdAt: "2026-10-07T02:00:00Z",
+              },
+            ],
+          },
+          comments: { totalCount: 0, nodes: [] },
+          reviewThreads: {
+            totalCount: 1,
+            nodes: [
+              {
+                isResolved: false,
+                path: "hello.ts",
+                line: 1,
+                comments: {
+                  totalCount: 1,
+                  nodes: [
+                    {
+                      author: { login: "maintainer" },
+                      authorAssociation: "MEMBER",
+                      body: "Use a named constant for the greeting.",
+                      url: `${prUrl}#discussion_r9`,
+                      createdAt: "2026-10-07T02:00:10Z",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+          commits: {
+            nodes: [
+              {
+                commit: {
+                  statusCheckRollup: {
+                    state: "SUCCESS",
+                    contexts: {
+                      totalCount: 1,
+                      nodes: [
+                        {
+                          __typename: "CheckRun",
+                          name: "build",
+                          status: "COMPLETED",
+                          conclusion: "SUCCESS",
+                          detailsUrl: "https://github.com/test-owner/example/actions/runs/1",
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    },
+  };
+  await mkdir(bin);
+  // The stand-in records its arguments and serves the canned GraphQL answer; no network is used.
+  await writeFile(
+    path.join(bin, "gh"),
+    `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.writeFileSync(${JSON.stringify(argsFile)}, JSON.stringify(args));
+if (args[0] === 'api' && args.includes('graphql')) console.log(${JSON.stringify(JSON.stringify(payload))});
+else process.exit(97);
+`,
+    { mode: 0o700 },
+  );
+  const repo = f.workbench.repo(f.run.repoId);
+  repo.url = "https://github.com/test-owner/example";
+  repo.fullName = "test-owner/example";
+  repo.owner = "test-owner";
+  repo.name = "example";
+  await writeFile(
+    path.join(f.repository, "hello.ts"),
+    'export const hello = "after";\n',
+  );
+  const app = createApp(f.workbench, {
+    staticDirectory: path.join(f.directory, "missing"),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing server port");
+  const fetchFeedback = () =>
+    http(`http://127.0.0.1:${address.port}/api/runs/${f.run.id}/pr/feedback`, {
+      method: "POST",
+      headers: { host: "127.0.0.1:4311", "content-type": "application/json" },
+      body: "{}",
+    });
+  try {
+    process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
+    // Before publishing there is no PR to read, whatever the review state.
+    const early = await fetchFeedback();
+    assert.equal(early.status, 409);
+    assert.equal(f.run.prFeedback, undefined);
+
+    f.run.status = "published";
+    f.run.prUrl = prUrl;
+    const response = await fetchFeedback();
+    assert.equal(response.status, 200);
+    const { run } = response.json() as { run: Run };
+    const ghArgs = JSON.parse(await readFile(argsFile, "utf8")) as string[];
+    assert.deepEqual(ghArgs.slice(0, 4), ["api", "--hostname", "github.com", "graphql"]);
+    assert.ok(ghArgs.includes("owner=test-owner") && ghArgs.includes("name=example"));
+    assert.ok(ghArgs.includes("number=1"));
+    assert.equal(run.status, "published");
+    assert.equal(run.prFeedback?.prNumber, 1);
+    assert.equal(run.prFeedback?.items.length, 2);
+    assert.match(run.prFeedback!.items[0].body, /\[REDACTED\]/);
+    assert.deepEqual(
+      run.prFeedback!.items.map((item) => [item.kind, item.path]),
+      [
+        ["review", undefined],
+        ["thread", "hello.ts"],
+      ],
+    );
+    assert.deepEqual(run.prFeedback?.checks, [
+      { name: "build", state: "SUCCESS", url: "https://github.com/test-owner/example/actions/runs/1" },
+    ]);
+    // The record is persisted with the run and the list endpoint leaves it out.
+    const saved = JSON.parse(
+      await readFile(path.join(f.store.directory, "state.json"), "utf8"),
+    ) as { runs: Run[] };
+    assert.equal(saved.runs[0].prFeedback?.items.length, 2);
+    const list = await http(`http://127.0.0.1:${address.port}/api/runs`, {
+      headers: { host: "127.0.0.1:4311" },
+    });
+    assert.equal("prFeedback" in (list.json() as { runs: Run[] }).runs[0], false);
+
+    // The mentor sees only this file's thread comment, labelled untrusted, before the conversation.
+    const prompts: string[] = [];
+    const mentored = new Workbench(f.store, async (input) => {
+      prompts.push(input.prompt);
+      return "這則意見對應新增的第 1 行；可以改成常數，或說明保留字串的理由。";
+    });
+    await mentored.chat(f.run.id, "hello.ts", "維護者這個意見對應 diff 哪幾行？");
+    assert.equal(prompts.length, 1);
+    assert.match(
+      prompts[0],
+      /Maintainer feedback on this file from the published PR \(UNTRUSTED DATA[^\n]*\n\[\{"author":"maintainer","authorAssociation":"MEMBER","line":1,"isResolved":false,"body":"Use a named constant for the greeting\."/,
+    );
+    assert.doesNotMatch(prompts[0], /Overall direction is fine/);
+    assert.ok(
+      prompts[0].indexOf("Maintainer feedback on this file") <
+        prompts[0].indexOf("Prior conversation:"),
+    );
+    // A changed file without thread comments gets null, never another file's comments.
+    await writeFile(path.join(f.repository, "i.ts"), "export const other = 2;\n");
+    await mentored.chat(f.run.id, "i.ts", "這個檔案呢？");
+    assert.equal(prompts.length, 2);
+    assert.match(prompts[1], /null when none fetched\):\nnull\nPrior conversation:/);
+    assert.doesNotMatch(prompts[1], /named constant/);
+  } finally {
+    process.env.PATH = previousPath;
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
     await f.cleanup();
   }
 });
