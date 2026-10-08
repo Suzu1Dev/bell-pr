@@ -10,6 +10,7 @@ import {
   contributionIntentText,
   hasTeamInbox,
   memberReportJsonSchema,
+  normaliseTaskId,
   parseMemberResult,
   parseTeamPlan,
   reviewDiffContext,
@@ -149,6 +150,116 @@ async function fixture(
     },
   };
 }
+
+test("task ids are normalised before validation and format problems name the field", async () => {
+  // A real Claude opus plan: the 44-character id used to fail the 40-character regex.
+  const fixture = await readFile(
+    path.join(import.meta.dirname, "fixtures", "lead-plan.json"),
+    "utf8",
+  );
+  const real = parseTeamPlan(fixture, 3);
+  assert.deepEqual(
+    real.tasks.map((task) => task.id),
+    [
+      "tighten-default-browser-uitest",
+      "default-browser-settings-helper",
+      "route-onboarding-to-default-browser-settings",
+    ],
+  );
+  assert.deepEqual(real.tasks[2].dependsOn, [
+    "default-browser-settings-helper",
+    "tighten-default-browser-uitest",
+  ]);
+  assert.equal(real.tasks[2].status, "pending");
+
+  assert.equal(
+    normaliseTaskId("Route Onboarding_To Settings!"),
+    "route-onboarding-to-settings",
+  );
+  assert.equal(normaliseTaskId("1-setup"), "task-1-setup");
+  assert.equal(normaliseTaskId("--"), "task");
+  assert.equal(normaliseTaskId("a".repeat(70)), "a".repeat(64));
+  // Truncation never leaves a trailing hyphen behind.
+  assert.equal(normaliseTaskId(`${"a".repeat(63)}-b`), "a".repeat(63));
+
+  const mixed = parseTeamPlan(
+    makePlan([
+      { id: "Route Onboarding_To Settings", files: ["a.ts"] },
+      {
+        id: "Tests",
+        files: ["b.ts"],
+        dependsOn: ["Route Onboarding_To Settings"],
+      },
+    ]),
+    2,
+  );
+  assert.equal(mixed.tasks[0].id, "route-onboarding-to-settings");
+  assert.deepEqual(mixed.tasks[1].dependsOn, ["route-onboarding-to-settings"]);
+  assert.equal(mixed.tasks[1].status, "pending");
+
+  const long = "x".repeat(70);
+  const collided = parseTeamPlan(
+    makePlan([
+      { id: "Alpha", files: ["a.ts"] },
+      { id: "alpha", files: ["b.ts"], dependsOn: ["Alpha"] },
+      { id: "ALPHA", files: ["c.ts"], dependsOn: ["alpha"] },
+      { id: long, files: ["d.ts"] },
+      { id: `${long}y`, files: ["e.ts"], dependsOn: [long] },
+    ]),
+    2,
+  );
+  assert.deepEqual(
+    collided.tasks.map((task) => task.id),
+    ["alpha", "alpha-2", "alpha-3", "x".repeat(64), `${"x".repeat(62)}-2`],
+  );
+  assert.deepEqual(collided.tasks[1].dependsOn, ["alpha"]);
+  assert.deepEqual(collided.tasks[2].dependsOn, ["alpha-2"]);
+  assert.deepEqual(collided.tasks[4].dependsOn, ["x".repeat(64)]);
+
+  assert.throws(
+    () =>
+      parseTeamPlan(
+        makePlan([{ id: "a", files: ["a.ts"], dependsOn: ["Missing Task"] }]),
+        2,
+      ),
+    /依賴/,
+  );
+  for (const reserved of ["LEAD", "Member 1", "User"])
+    assert.throws(
+      () => parseTeamPlan(makePlan([{ id: reserved, files: ["a.ts"] }]), 2),
+      /保留/,
+    );
+
+  const plan = JSON.parse(
+    makePlan([
+      { id: "a", files: ["a.ts"] },
+      { id: "b", files: ["b.ts"] },
+    ]),
+  );
+  plan.tasks[1].description = "長".repeat(4001);
+  assert.throws(
+    () => parseTeamPlan(JSON.stringify(plan), 2),
+    (error: unknown) => {
+      assert.equal(
+        (error as Error).message,
+        "Lead 回傳的計畫不符合格式（tasks[1].description：超過 4000 字）；請調整需求後重試。",
+      );
+      return true;
+    },
+  );
+  plan.tasks[1].description = "ok";
+  plan.tasks[1].files = [];
+  assert.throws(
+    () => parseTeamPlan(JSON.stringify(plan), 2),
+    /（tasks\[1\]\.files：不可為空）/,
+  );
+  delete plan.summary;
+  assert.throws(
+    () => parseTeamPlan(JSON.stringify(plan), 2),
+    /（summary：應為 string，收到 undefined）/,
+  );
+  assert.throws(() => parseTeamPlan("invented prose", 2), /JSON/);
+});
 
 test("team plans validate DAGs, concrete scopes, and preserve literal bracket filenames", () => {
   const parsed = parseTeamPlan(

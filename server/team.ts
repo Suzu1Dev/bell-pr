@@ -45,8 +45,10 @@ export interface TeamAgentInput {
 }
 export type TeamAgentRunner = (input: TeamAgentInput) => Promise<string>;
 
+/** Task ids appear in member names, logs and messages, so they stay bounded. */
+const taskIdLimit = 64;
 const taskSchema = z.object({
-  id: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
+  id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().min(1).max(4000),
   files: z.array(z.string().min(1).max(300)).min(1).max(30),
@@ -146,16 +148,116 @@ export function scopesOverlap(left: string[], right: string[]) {
   );
 }
 
+/**
+ * Maps whatever the lead wrote as a task id onto the id grammar: lowercase
+ * letters, digits and hyphens, starting with a letter, at most `limit`
+ * characters. Leads often return longer or differently cased ids, and the CLI
+ * output schemas cannot carry the pattern, so BELL normalises instead of
+ * rejecting.
+ */
+export function normaliseTaskId(id: string, limit = taskIdLimit) {
+  let normalised = id
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (!/^[a-z]/.test(normalised)) normalised = `task-${normalised}`;
+  return normalised.slice(0, limit).replace(/-+$/, "");
+}
+
+/**
+ * Rewrites every task id and dependsOn entry of a raw plan through
+ * normaliseTaskId before validation. Ids that collide after normalisation get
+ * "-2", "-3"… so references keep resolving to one task; a dependsOn that names
+ * no task is left for the dependency check to report.
+ */
+function normalisePlanIds(raw: unknown) {
+  const tasks = (raw as { tasks?: unknown } | null)?.tasks;
+  if (!raw || typeof raw !== "object" || !Array.isArray(tasks)) return raw;
+  const mapping = new Map<string, string>();
+  const used = new Set<string>();
+  for (const task of tasks) {
+    if (!task || typeof task !== "object") continue;
+    const id = (task as { id?: unknown }).id;
+    if (typeof id !== "string" || mapping.has(id)) continue;
+    const base = normaliseTaskId(id);
+    let unique = base;
+    for (let n = 2; used.has(unique); n += 1) {
+      const suffix = `-${n}`;
+      unique = `${base.slice(0, taskIdLimit - suffix.length)}${suffix}`;
+    }
+    used.add(unique);
+    mapping.set(id, unique);
+  }
+  const resolve = (id: unknown) =>
+    typeof id === "string" ? (mapping.get(id) ?? normaliseTaskId(id)) : id;
+  return {
+    ...raw,
+    tasks: tasks.map((task) => {
+      if (!task || typeof task !== "object") return task;
+      const { id, dependsOn } = task as { id?: unknown; dependsOn?: unknown };
+      return {
+        ...task,
+        id: resolve(id),
+        dependsOn: Array.isArray(dependsOn)
+          ? dependsOn.map(resolve)
+          : dependsOn,
+      };
+    }),
+  };
+}
+
+/**
+ * One zod issue as a "tasks[2].description"-style path plus a Traditional
+ * Chinese reason, so the 422 names the field instead of the whole plan.
+ */
+function describePlanIssue(issue: z.ZodIssue) {
+  const path =
+    issue.path
+      .map((part, index) =>
+        typeof part === "number" ? `[${part}]` : index ? `.${part}` : part,
+      )
+      .join("") || "計畫";
+  const unit = (type: string | undefined) => (type === "array" ? "項" : "字");
+  let reason: string;
+  switch (issue.code) {
+    case z.ZodIssueCode.too_big:
+      reason = `超過 ${issue.maximum} ${unit(issue.type)}`;
+      break;
+    case z.ZodIssueCode.too_small:
+      reason =
+        issue.minimum === 1
+          ? "不可為空"
+          : `至少 ${issue.minimum} ${unit(issue.type)}`;
+      break;
+    case z.ZodIssueCode.invalid_type:
+      reason = `應為 ${issue.expected}，收到 ${issue.received}`;
+      break;
+    case z.ZodIssueCode.invalid_string:
+      reason = "格式不正確";
+      break;
+    default:
+      reason = issue.message;
+  }
+  return `${path}：${reason}`;
+}
+
 export function parseTeamPlan(answer: string, maxTeammates: number) {
-  let parsed: z.infer<typeof planSchema>;
+  let raw: unknown;
   try {
-    parsed = planSchema.parse(JSON.parse(jsonText(answer)));
+    raw = JSON.parse(jsonText(answer));
   } catch {
     throw new AppError(
       "Lead 未回傳有效的任務計畫 JSON，請調整需求後重試。",
       422,
     );
   }
+  const result = planSchema.safeParse(normalisePlanIds(raw));
+  if (!result.success)
+    throw new AppError(
+      `Lead 回傳的計畫不符合格式（${describePlanIssue(result.error.issues[0])}）；請調整需求後重試。`,
+      422,
+    );
+  const parsed = result.data;
   const ids = new Set(parsed.tasks.map((task) => task.id));
   const reserved = new Set([
     "lead",

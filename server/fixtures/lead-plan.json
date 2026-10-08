@@ -1,0 +1,40 @@
+{
+  "summary": "【專案目的】mozilla-mobile/firefox-ios 是 Firefox for iOS 的原始碼庫（同庫還有 Focus 與 BrowserKit）。這次要處理的是 Firefox 新手引導中「設為預設瀏覽器」的流程。\n（以下為實際計畫摘要的節錄；完整摘要共 2,842 字。）",
+  "revisionNotes": null,
+  "tasks": [
+    {
+      "id": "tighten-default-browser-uitest",
+      "title": "收緊 XCUITest：斷言「Go to Settings」直接落在預設瀏覽器設定，並記錄 Before 重現結果",
+      "description": "實作：在 IOSSettingsAppScreen 新增斷言方法（例如 assertLandedOnDefaultBrowserSettings()）。點完「Go to Settings」、Settings app 到前景後，不做任何導覽或返回，就在合理的 timeout 內確認畫面已是預設瀏覽器的設定位置。落點依維護…",
+      "files": [
+        "firefox-ios/firefox-ios-tests/Tests/XCUITests/PageScreens/IOSSettingsAppScreen.swift",
+        "firefox-ios/firefox-ios-tests/Tests/XCUITests/ModernKitOnboardingTests.swift"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "default-browser-settings-helper",
+      "title": "在 ApplicationHelper 新增 openDefaultBrowserSettings()，與通用 openSettings() 分開",
+      "description": "實作：在 ApplicationHelper protocol 新增 `@MainActor func openDefaultBrowserSettings()`，並在 DefaultApplicationHelper 實作。建議寫法：`if #available(iOS 18.3, *)` 時使用 UIApplica…",
+      "files": [
+        "firefox-ios/Client/ApplicationHelper.swift",
+        "firefox-ios/firefox-ios-tests/Tests/ClientTests/Mocks/MockApplicationHelper.swift"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "route-onboarding-to-default-browser-settings",
+      "title": "將新手引導的 Go to Settings 改呼叫新方法，更新單元測試並完成跨版本驗證",
+      "description": "實作：OnboardingInstructionPopupViewController.primaryAction() 的 `.openIosFxSettings` 分支改呼叫 DefaultApplicationHelper().openDefaultBrowserSettings()，didTapButton 與…",
+      "files": [
+        "firefox-ios/Client/Frontend/Onboarding/Views/OnboardingInstructionPopupViewController.swift",
+        "firefox-ios/Client/Frontend/Onboarding/Protocols/OnboardingService.swift",
+        "firefox-ios/firefox-ios-tests/Tests/ClientTests/OnboardingTests/OnboardingServiceTests.swift"
+      ],
+      "dependsOn": [
+        "default-browser-settings-helper",
+        "tighten-default-browser-uitest"
+      ]
+    }
+  ]
+}
