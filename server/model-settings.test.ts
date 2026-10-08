@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -90,6 +90,16 @@ test("settings API shares one model and effort across repositories without start
     assert.deepEqual((await reloadedApi("/model-settings")).body.settings, balanced);
   }
   assert.equal((await reloadedApi("/model-settings", { ...balanced, direction: "docs" })).status, 400);
+  assert.deepEqual((await reloadedApi(`/repos/${first.id}/settings`)).body.settings, { ...firstSettings, ...balanced });
+  // Web access is part of the shared model settings: saved through either path, kept on reload, and legacy files without it still parse.
+  const web = { ...balanced, webAccess: true };
+  assert.deepEqual(await reloadedApi("/model-settings", web), { status: 200, body: { settings: web } });
+  assert.deepEqual((await reloadedApi(`/repos/${second.id}/settings`)).body.settings, { ...secondSettings, ...web });
+  assert.deepEqual((await reloadedApi(`/repos/${first.id}/settings`, { ...firstSettings, ...balanced, webAccess: false })).body.settings, { ...firstSettings, ...balanced, webAccess: false });
+  assert.deepEqual((await reloadedApi("/model-settings")).body.settings, { ...balanced, webAccess: false });
+  assert.equal((await reloadedApi("/model-settings", { ...balanced, webAccess: "yes" })).status, 400);
+  await writeFile(path.join(directory, "model-settings.json"), JSON.stringify(balanced));
+  assert.deepEqual((await reloadedApi("/model-settings")).body.settings, balanced);
   assert.deepEqual((await reloadedApi(`/repos/${first.id}/settings`)).body.settings, { ...firstSettings, ...balanced });
   assert.deepEqual(await reloadedApi("/runs"), { status: 200, body: { runs: [] } });
   assert.deepEqual(store.data.runs, []);

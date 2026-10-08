@@ -166,6 +166,164 @@ test("teammates combine write access with an output schema on both providers", a
   assert.ok(claude.args.includes("--disallowedTools"));
 });
 
+test("web access adds Claude Code's WebSearch/WebFetch and Codex live search for read and write access only", async () => {
+  const value = (args: string[], flag: string) => args[args.indexOf(flag) + 1];
+  const claude = { provider: "claude" as const, source: "cli-default" as const };
+  const codex = { source: "cli-default" as const };
+  for (const access of ["read", "write"] as const) {
+    // Verified with Claude Code 2.1.292: the init event then lists WebFetch and WebSearch among the tools.
+    const on = await agentCommand(claude, { cwd: "/work/tree", access, web: true });
+    const tools =
+      access === "read" ? "Read,Grep,Glob" : "Read,Grep,Glob,Edit,Write,Bash";
+    const allowed = access === "read" ? "Read Grep Glob" : "Read Grep Glob Bash";
+    assert.equal(value(on.args, "--tools"), `${tools},WebSearch,WebFetch`);
+    assert.equal(value(on.args, "--allowedTools"), `${allowed} WebSearch WebFetch`);
+    assert.ok(on.args.includes("--strict-mcp-config"));
+    assert.equal(value(on.args, "--setting-sources"), "user");
+    const off = await agentCommand(claude, { cwd: "/work/tree", access, web: false });
+    assert.equal(value(off.args, "--tools"), tools);
+    assert.equal(value(off.args, "--allowedTools"), allowed);
+    assert.deepEqual(await agentCommand(claude, { cwd: "/work/tree", access }), off);
+    // Codex 0.159 `exec` rejects --search; the live search config override is the only addition.
+    const codexOn = await agentCommand(codex, { cwd: "/work/tree", access, web: true });
+    const codexOff = await agentCommand(codex, { cwd: "/work/tree", access });
+    const index = codexOn.args.indexOf('web_search="live"');
+    assert.ok(index > 0 && codexOn.args[index - 1] === "-c");
+    assert.deepEqual(
+      codexOn.args.filter((_arg, position) => position !== index - 1 && position !== index),
+      codexOff.args,
+    );
+    assert.ok(!codexOn.args.includes("--search"));
+    assert.doesNotMatch(JSON.stringify(codexOff.args), /web_search/);
+  }
+  // curl and wget stay denied with web on: WebFetch is the sanctioned way to read a page.
+  const write = await agentCommand(claude, { cwd: "/work/tree", access: "write", web: true });
+  const denied = write.args.indexOf("--disallowedTools");
+  assert.deepEqual(write.args.slice(denied + 1, denied + 5), [
+    "Bash(git push:*)",
+    "Bash(gh:*)",
+    "Bash(curl:*)",
+    "Bash(wget:*)",
+  ]);
+  assert.equal(value(write.args, "--permission-mode"), "acceptEdits");
+  // Analysis and discovery use "none": the flag never reaches the CLI there.
+  for (const execution of [claude, codex]) {
+    const none = await agentCommand(execution, { cwd: "/work/tree", access: "none", web: true });
+    assert.deepEqual(none, await agentCommand(execution, { cwd: "/work/tree", access: "none" }));
+    assert.doesNotMatch(JSON.stringify(none.args), /WebSearch|WebFetch|web_search/);
+  }
+});
+
+test("web tool use becomes a web event with the query or URL only, on both providers", () => {
+  const claude = agentEventReader("claude");
+  // Observed with Claude Code 2.1.292 (haiku, read access + web): tool_use inputs carry query / url.
+  assert.deepEqual(
+    claude({
+      type: "assistant",
+      message: {
+        content: [
+          { type: "text", text: "Searching." },
+          {
+            type: "tool_use",
+            id: "search-1",
+            name: "WebSearch",
+            input: { query: "Node.js LTS stable version nodejs.org", mode: "standard" },
+          },
+          {
+            type: "tool_use",
+            id: "fetch-1",
+            name: "WebFetch",
+            input: {
+              url: "https://nodejs.org/?token=ghp_0123456789abcdef0123",
+              prompt: "What is the current LTS major version?",
+            },
+          },
+          { type: "tool_use", id: "search-2", name: "WebSearch", input: {} },
+        ],
+      },
+    }),
+    [
+      { kind: "message", text: "Searching." },
+      { kind: "web", action: "search", detail: "Node.js LTS stable version nodejs.org" },
+      { kind: "web", action: "fetch", detail: "https://nodejs.org/?token=[REDACTED]" },
+    ],
+  );
+  // The tool_result holds page content: it is never returned.
+  assert.deepEqual(
+    claude({
+      type: "user",
+      message: {
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: "search-1",
+            content: "Web search results for query: SECRET-PAGE",
+          },
+          { type: "tool_result", tool_use_id: "fetch-1", content: "PAGE CONTENT" },
+        ],
+      },
+    }),
+    [],
+  );
+  const long = claude({
+    type: "assistant",
+    message: {
+      content: [
+        { type: "tool_use", id: "search-3", name: "WebSearch", input: { query: "q".repeat(500) } },
+      ],
+    },
+  })[0] as { detail: string };
+  assert.equal(long.detail.length, 200);
+
+  const codex = agentEventReader("codex");
+  // Observed with Codex 0.159: the started item has an empty query; the completed one carries it in
+  // item.query and action.query (documented as action.queries); results are never returned.
+  assert.deepEqual(
+    codex({
+      type: "item.started",
+      item: { id: "exec-1", type: "web_search", query: "", action: { type: "other" } },
+    }),
+    [],
+  );
+  assert.deepEqual(
+    codex({
+      type: "item.completed",
+      item: {
+        id: "exec-1",
+        type: "web_search",
+        query: "site:nodejs.org current latest LTS Node.js download",
+        action: { type: "search", query: "site:nodejs.org current latest LTS Node.js download" },
+        results: [{ type: "text_result", domain: "nodejs.org", snippet: "SECRET-SNIPPET" }],
+      },
+    }),
+    [
+      {
+        kind: "web",
+        action: "search",
+        detail: "site:nodejs.org current latest LTS Node.js download",
+      },
+    ],
+  );
+  assert.deepEqual(
+    codex({
+      type: "item.completed",
+      item: {
+        type: "web_search",
+        query: "",
+        action: { type: "search", queries: ["node lts", "", "node release schedule"] },
+      },
+    }),
+    [{ kind: "web", action: "search", detail: "node lts / node release schedule" }],
+  );
+  assert.deepEqual(
+    codex({
+      type: "item.completed",
+      item: { type: "web_search", query: "", action: { type: "other" } },
+    }),
+    [],
+  );
+});
+
 test("agent environment never forwards an Anthropic API key", (t) => {
   const previous = process.env.ANTHROPIC_API_KEY;
   process.env.ANTHROPIC_API_KEY = "sk-ant-test";

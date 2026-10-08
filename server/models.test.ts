@@ -9,6 +9,7 @@ import {
   claudeModelCatalog,
   getModelCatalog,
   modelArguments,
+  modelExecutionSchema,
   modelSettingsSchema,
   parseModelPage,
   readModelCatalog,
@@ -257,4 +258,42 @@ test("Claude Code settings resolve against its static aliases and record the pro
   assert.throws(() =>
     z.object(modelSettingsSchema).parse({ provider: "openai" }),
   );
+});
+
+test("webAccess is optional in the shared settings and recorded on the execution only when enabled", () => {
+  assert.deepEqual(z.object(modelSettingsSchema).parse({ webAccess: true }), {
+    model: "",
+    reasoningEffort: "",
+    webAccess: true,
+  });
+  assert.throws(() => z.object(modelSettingsSchema).parse({ webAccess: "yes" }));
+  assert.deepEqual(resolveModelExecution({ webAccess: true }, catalog), {
+    webAccess: true,
+    model: "codex-example",
+    reasoningEffort: "medium",
+    source: "catalog-default",
+  });
+  assert.deepEqual(
+    resolveModelExecution(
+      { provider: "claude", model: "opus", webAccess: true },
+      claudeModelCatalog,
+    ),
+    { provider: "claude", webAccess: true, model: "opus", source: "selected" },
+  );
+  assert.deepEqual(
+    resolveModelExecution(
+      { provider: "claude", webAccess: true },
+      { source: "claude", models: [] },
+    ),
+    { provider: "claude", webAccess: true, source: "cli-default" },
+  );
+  for (const settings of [{}, { webAccess: false }])
+    assert.equal("webAccess" in resolveModelExecution(settings, catalog), false);
+  const execution = {
+    model: "codex-example",
+    webAccess: true,
+    source: "selected" as const,
+  };
+  assert.deepEqual(modelExecutionSchema.parse(execution), execution);
+  assert.deepEqual(modelArguments(execution), ["--model", "codex-example"]);
 });

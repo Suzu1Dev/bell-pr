@@ -1763,6 +1763,8 @@ if (prompt.includes('You are the team lead with read-only access')) {
   fs.writeFileSync(path.join(process.cwd(), 'a.ts'), 'export const value = "alpha";\\n');
   emit({ type: 'command_execution', command: 'npm test -- a.test.ts\\ncat /tmp/out.log', aggregated_output: 'SECRET-OUTPUT', exit_code: 0 });
   emit({ type: 'command_execution', command: 'curl -H "Authorization: token ghp_0123456789abcdef0123" https://example.invalid', exit_code: 7 });
+  // Shape observed with Codex 0.159 live search: the query repeats in action.query; results stay out of the log.
+  emit({ type: 'web_search', query: 'site:nodejs.org LTS schedule', action: { type: 'search', query: 'site:nodejs.org LTS schedule' }, results: [{ type: 'text_result', snippet: 'SECRET-SNIPPET' }] });
   emit({ type: 'file_change', changes: [{ path: 'a.ts', kind: 'update' }] });
   emit({ type: 'agent_message', text: JSON.stringify({ report: 'alpha 完成；fake codex 自述執行了 npm test。', messages: [] }) });
 } else {
@@ -1777,8 +1779,9 @@ if (prompt.includes('You are the team lead with read-only access')) {
       f.repo.id,
       "Record what really ran",
       "Fake codex",
-      { ...settings, requirePlanApproval: false },
+      { ...settings, requirePlanApproval: false, webAccess: true },
     );
+    assert.equal(run.modelExecution?.webAccess, true);
     await waitUntil(
       () => run.status === "review" || run.status === "failed",
       "fake codex team completion",
@@ -1827,7 +1830,25 @@ if (prompt.includes('You are the team lead with read-only access')) {
       memberLogs.some((log) => !log.kind && log.message.includes("alpha 完成；")),
       "the member's answer stays a plain message",
     );
-    assert.doesNotMatch(JSON.stringify(run), /SECRET-OUTPUT|ghp_0123|cat \/tmp/);
+    // Web access: the opening line says so, and a search is logged by its query only.
+    assert.ok(
+      memberLogs.some(
+        (log) => log.kind === "status" && /開始工作。.*；已允許上網。/.test(log.message),
+      ),
+    );
+    assert.deepEqual(
+      memberLogs
+        .filter((log) => log.message.startsWith("搜尋網路："))
+        .map(({ kind, message, detail }) => ({ kind, message, detail })),
+      [
+        {
+          kind: "status",
+          message: "搜尋網路：site:nodejs.org LTS schedule",
+          detail: "site:nodejs.org LTS schedule",
+        },
+      ],
+    );
+    assert.doesNotMatch(JSON.stringify(run), /SECRET-OUTPUT|SECRET-SNIPPET|ghp_0123|cat \/tmp/);
     // The lead integration and test analyst prompts receive the same facts, labelled as untrusted and output-free.
     const prompts = (await readFile(promptsFile, "utf8"))
       .trim()
@@ -1855,6 +1876,32 @@ if (prompt.includes('You are the team lead with read-only access')) {
     }
     assert.ok(reviewer);
     assert.doesNotMatch(reviewer.prompt, /application-observed/);
+    // Every team role ran with live search and the one-sentence web rule; isolated roles stay offline.
+    const member = prompts.find((entry) =>
+      entry.prompt.includes("independent teammate working on task"),
+    );
+    for (const entry of [integration, tester, reviewer, member]) {
+      assert.ok(entry);
+      const index = entry.args.indexOf('web_search="live"');
+      assert.ok(index > 0 && entry.args[index - 1] === "-c", entry.args.join(" "));
+      assert.match(entry.prompt, /Web access is enabled: .* untrusted data/);
+    }
+    // The explanation and draft roles start in the background once the run is in review.
+    let isolated: { args: string[]; prompt: string }[] = [];
+    const deadline = Date.now() + 8000;
+    while (!isolated.length && Date.now() < deadline) {
+      await delay(20);
+      isolated = (await readFile(promptsFile, "utf8"))
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as { args: string[]; prompt: string })
+        .filter((entry) => entry.args.includes("--skip-git-repo-check"));
+    }
+    assert.ok(isolated.length > 0, "an isolated role ran");
+    for (const entry of isolated) {
+      assert.ok(!entry.args.includes('web_search="live"'), entry.args.join(" "));
+      assert.doesNotMatch(entry.prompt, /Web access is enabled/);
+    }
     // The saved state carries the new optional fields. state.json is read
     // directly: a second Store writing into the same directory would race
     // with the background explanation and draft jobs' saves.

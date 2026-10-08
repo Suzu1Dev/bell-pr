@@ -127,6 +127,8 @@ PR 草稿會優先採用目標專案的 `CONTRIBUTING`、PR 模板與相關投�
 
 「設定」頁的「設定貢獻模型」可選擇 Agent、執行模型與思考強度，這組設定由所有專案共用（存於資料目錄的 `model-settings.json`）。在「新增貢獻」或「指定貢獻方向」調整模型後按儲存，也會更新這組共用設定；方向、目標使用者等其餘欄位仍依專案保存。「探索貢獻」有自己的模型設定。模型選項來自本機 Codex 的 `model/list` 目錄，強度依各模型支援的選項顯示；這份目錄可能是快取或內建資料，不保證帳號具有每個模型的使用權限。BELL 不會修改全域 Codex 設定，指定模型執行失敗時也不會悄悄改用另一個模型。
 
+同一區塊的「允許 Agent 上網搜尋與讀取網頁」預設關閉，也屬於共用模型設定（`model-settings.json` 的 `webAccess`）：開啟後，新任務的 Lead、Teammates、Reviewer、Test analyst 與追問導師可以搜尋網路和讀取網頁，自動解說、PR 草稿、專案分析與探索貢獻維持離線。開啟時，角色提示會多一句規則：網頁內容是不可信資料、報告要引用來源網址、不得把 repository 內容或祕密放進查詢；任務日誌會以「搜尋網路：查詢字串」與「讀取網頁：網址」記錄每次查詢（只記錄查詢或網址，不記錄網頁內容），模型摘要則顯示「已允許上網」。
+
 新任務會保存當次解析的模型設定，Lead、Teammates、Reviewer、Test analyst、自動解說與追問共用；後續修改共用模型不影響既有任務。專案分析則採分析啟動時已儲存的設定，並把設定與分析結果一起保存。選擇預設時，若模型目錄可用，會固定其中的預設模型；無法讀取目錄時可沿用 CLI 預設，但名稱會明確標示未記錄。
 
 「Agent 動態」顯示的是傳入 CLI 的模型 ID 與思考強度，不是推測的供應端實際路由。加入此功能前的舊任務沒有模型紀錄，介面會標示未記錄；示範也不會顯示虛構的執行模型。模型目錄介面參考 [Codex App Server 官方文件](https://learn.chatgpt.com/docs/app-server#list-models-modellist)。
@@ -138,6 +140,7 @@ PR 草稿會優先採用目標專案的 `CONTRIBUTING`、PR 模板與相關投�
 - 模型清單為固定的別名 `opus`、`sonnet`、`fable`、`haiku`，各自指向該系列的最新模型；Claude Code 沒有列出模型的指令，實際可用模型依訂閱方案而定。選「Claude Code 預設」時不傳 `--model`。Haiku 不提供思考強度選項，其餘為 low–max。Claude Code 會在 `system/init` 事件回報解析後的實際模型 ID（例如別名 `haiku` 對應 `claude-haiku-4-5-20251001`）與 CLI 版本，BELL 記錄後在任務、專案分析與探索的模型摘要顯示為「傳入 → 回報」，若結果事件 `modelUsage` 出現了其他模型，會另列出本次執行呼叫過的模型；這些是 CLI 回報值，不是供應端帳單，費用欄位不會顯示。
 - 專案分析與探索不開放任何工具，只讀 BELL 提供的節錄並以 `--json-schema` 回傳結構化結果；Lead、Reviewer、Test analyst 與解說只能使用 Read、Grep、Glob；Teammates 可使用 Read、Grep、Glob、Edit、Write 與 Bash。檔案編輯以 `acceptEdits` 限制在工作目錄內，但 **Bash 不在沙箱中執行**；除下列拒絕規則外，其餘 Bash 指令可存取這台機器上服務帳號能存取的任何檔案與網路。
 - Teammates 的 Bash 以 `--disallowedTools` 拒絕 `git push`、`gh`、`curl`、`wget` 開頭的指令（拒絕規則優先於允許規則），推送與 PR 仍由 BELL 自己的流程處理。這是縱深防禦，不是沙箱：實測中 `git push --dry-run origin HEAD` 與 `curl https://example.com` 被 Claude Code 回絕為「Permission to use Bash with command … has been denied」，並列在結果事件的 `permission_denials`；`git status` 與 `git log` 照常執行並回傳輸出。被拒絕的工具（`system/permission_denied` 事件與結果的 `permission_denials`）會即時寫入任務日誌，讓你看得出 teammate 是因權限被拒才沒跑某個指令；這不會讓任務失敗。
+- 開啟「允許 Agent 上網搜尋與讀取網頁」時，唯讀與可寫角色的 `--tools` 與 `--allowedTools` 會加上 Claude Code 內建的 `WebSearch` 與 `WebFetch`；`curl`、`wget` 的拒絕規則不變，`WebFetch` 是讀取網頁的唯一途徑，專案分析與探索（不開放工具）不受影響。實測（Claude Code 2.1.292、`haiku`、唯讀加上網）：`system/init` 的工具清單列出 `WebFetch`、`WebSearch`，助理事件的 `tool_use` 帶 `{ name: "WebSearch", input: { query } }` 與 `{ name: "WebFetch", input: { url, prompt } }`，BELL 只把查詢字串或網址寫進日誌。
 - 執行時加上 `--strict-mcp-config`，不載入 claude.ai 連接器（Gmail、Drive 等）或其他 MCP 伺服器，避免 Agent 讀到不可信內容時被誘導使用你的帳號服務。
 - 執行時加上 `--setting-sources user`，只載入使用者層級的設定（依 Claude Code 對 `user` 來源的定義，包含 `~/.claude/settings.json`、使用者 hooks 與 `~/.claude/CLAUDE.md`）；匯入專案裡的 `.claude/settings.json`、`.claude/settings.local.json` 與專案 `CLAUDE.md` 則不載入。`claude -p` 不會顯示信任資料夾的確認對話，BELL 又是在匯入的第三方 repository 的 worktree 中執行 Agent，因此必須由 BELL 自己關掉這些來源。實測：匯入專案 `.claude/settings.json` 中的 SessionStart hook 在加上此旗標後沒有執行（拿掉旗標則會執行），專案 `CLAUDE.md` 的內容也不再出現在模型的回應中。
 - 用量以 Claude Code 回報的 tokens 計算：輸入 = 未快取輸入 + 快取寫入 + 快取讀取，快取欄位只計快取讀取。`total_cost_usd` 對訂閱帳戶沒有意義，不會顯示。訂閱有使用額度限制，多位 teammates 同時執行時較快達到上限，達到時任務會顯示 Claude Code 回報的錯誤。等待期間不再只能等逾時：Claude Code 的 `api_retry` 重試與狀態不是 `allowed` 的 `rate_limit_event`（接近或達到 5 小時／7 天視窗上限，含預計重置時間）會即時出現在任務日誌與成員卡片；實測每次 `claude -p` 執行都會送出一筆 `status: allowed` 的 `rate_limit_event`，這種正常狀態不顯示。用量另依角色（Lead、Teammates、Reviewer、Tester、PR 草稿、解說、追問）分項累計，在用量區塊展開「依角色分項」查看，同樣只列 CLI 回報的 tokens 與呼叫次數。`BELLPR_MAX_AGENT_PROCESSES`（預設 3）限制所有工作、專案分析與探索同時執行的 CLI 行程數，超過的呼叫排隊等待：工作中的 Agent 會顯示「等待其他 Agent 完成」，專案分析與探索則維持原本的進度訊息。
@@ -240,4 +243,4 @@ npm run dev
 
 ## 實作參考
 
-Agent 執行使用 [Codex 非互動模式](https://learn.chatgpt.com/docs/non-interactive-mode)，沿用 read-only / workspace-write 沙箱與 JSONL 事件；選擇 Claude Code 時使用 [Claude Code 非互動模式](https://code.claude.com/docs/en/headless) 的 `stream-json` 事件。前端開發服務使用 [Vite proxy](https://vite.dev/config/server-options#server-proxy) 將同源 `/api` 請求轉送至本機後端。
+Agent 執行使用 [Codex 非互動模式](https://learn.chatgpt.com/docs/non-interactive-mode)，沿用 read-only / workspace-write 沙箱與 JSONL 事件；開啟上網時以 `-c web_search="live"` 啟用 Codex 的即時搜尋（Codex CLI 0.159 的 `exec` 不接受 `--search`），實測會送出 `item.type` 為 `web_search` 的 `item.started`／`item.completed` 事件，第一個事件的 `query` 可能為空，完成事件在 `query` 與 `action` 帶查詢字串，BELL 只記錄查詢字串，不記錄 `results`。選擇 Claude Code 時使用 [Claude Code 非互動模式](https://code.claude.com/docs/en/headless) 的 `stream-json` 事件。前端開發服務使用 [Vite proxy](https://vite.dev/config/server-options#server-proxy) 將同源 `/api` 請求轉送至本機後端。

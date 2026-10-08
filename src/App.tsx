@@ -3448,8 +3448,8 @@ export default function App() {
             >
               <DirectionSettings
                 value={{ ...defaultContributionSettings, ...modelSettings }}
-                onChange={({ provider, model, reasoningEffort }) => {
-                  setModelSettings({ provider, model, reasoningEffort });
+                onChange={({ provider, model, reasoningEffort, webAccess }) => {
+                  setModelSettings({ provider, model, reasoningEffort, webAccess });
                   setSettingsNotice("");
                   setFormError("");
                 }}
