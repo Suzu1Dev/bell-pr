@@ -35,6 +35,33 @@ test("split view labels the before and after columns", () => {
   assert.match(html, /變更後/);
 });
 
+test("the note hint appears only when a note is known to be missing and never disables the checkbox", () => {
+  const withHint = renderToStaticMarkup(
+    createElement(DiffView, {
+      file: demoFiles[0],
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "unified",
+      hasNote: false,
+    }),
+  );
+  assert.match(withHint, /還沒寫下你的理解/);
+  assert.doesNotMatch(withHint, /<input type="checkbox"[^>]*disabled/);
+  const withNote = renderToStaticMarkup(
+    createElement(DiffView, {
+      file: demoFiles[0],
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "unified",
+      hasNote: true,
+    }),
+  );
+  assert.doesNotMatch(withNote, /還沒寫下你的理解/);
+  assert.doesNotMatch(render(demoFiles[0]), /還沒寫下你的理解/);
+});
+
 test("a blocked file shows the reason and disables review", () => {
   const html = render({ ...demoFiles[0], blocked: "原因" });
   assert.match(html, /這個檔案目前無法審閱/);

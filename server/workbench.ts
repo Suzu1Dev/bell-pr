@@ -54,6 +54,14 @@ import {
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
+/** Statuses whose diff is final enough to explain, discuss and annotate. */
+const readableStatuses: Run["status"][] = [
+  "review",
+  "approved",
+  "published",
+  "failed",
+  "cancelled",
+];
 const json = <T>(value: string) => JSON.parse(value) as T;
 const networkConfig = [
   "-c",
@@ -1075,12 +1083,7 @@ export class Workbench {
   ) {
     if (this.stopping) throw new AppError("服務正在關閉，請稍後重試。", 503);
     const run = this.run(id);
-    if (
-      !["review", "approved", "published", "failed", "cancelled"].includes(
-        run.status,
-      ) ||
-      run.publishing
-    )
+    if (!readableStatuses.includes(run.status) || run.publishing)
       throw new AppError("請等待開發完成後再產生變更解說。", 409);
     const files = await this.lock(id, () => this.diff(id));
     if (this.stopping) throw new AppError("服務正在關閉，請稍後重試。", 503);
@@ -1167,7 +1170,10 @@ export class Workbench {
           const answer = await this.runAgent(
             run,
             "explanations",
-            explanationPrompt(batch),
+            explanationPrompt(
+              batch,
+              `${run.title}\n${this.contributionContext(run)}`,
+            ),
             controller.signal,
             true,
             {
@@ -1431,14 +1437,37 @@ export class Workbench {
     });
   }
 
+  /**
+   * Saves the learner's own words about one file together with the diff
+   * fingerprint they described. Notes never change the review state: the
+   * run status and approval stay as they are, unlike review() and draft().
+   */
+  async saveNote(id: string, filePath: string, text: string) {
+    return this.lock(id, async () => {
+      const run = this.run(id);
+      if (!readableStatuses.includes(run.status))
+        throw new AppError("請等待開發完成後再寫下理解。", 409);
+      const file = (await this.diff(id)).find(
+        (value) => value.path === filePath,
+      );
+      if (!file) throw new AppError("找不到此差異檔案。", 404);
+      const notes = (run.notes ??= {});
+      if (text.trim())
+        notes[filePath] = {
+          text,
+          fingerprint: file.fingerprint,
+          updatedAt: now(),
+        };
+      else delete notes[filePath];
+      await this.store.save();
+      return run;
+    });
+  }
+
   async chat(id: string, filePath: string, question: string) {
     return this.lock(id, async () => {
       const run = this.run(id);
-      if (
-        !["review", "approved", "published", "failed", "cancelled"].includes(
-          run.status,
-        )
-      )
+      if (!readableStatuses.includes(run.status))
         throw new AppError("請等待開發完成後再追問。", 409);
       const file = (await this.diff(id)).find(
         (value) => value.path === filePath,

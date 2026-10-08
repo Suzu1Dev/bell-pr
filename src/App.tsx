@@ -1096,6 +1096,33 @@ export default function App() {
       notify((error as Error).message, "error");
     }
   }
+  async function saveNote(text: string) {
+    if (!file) return;
+    if (demo) {
+      // Demo notes live in local state only; no server call.
+      setRun((previous) => {
+        const notes = { ...previous.notes };
+        if (text.trim())
+          notes[file.path] = {
+            text,
+            fingerprint: file.fingerprint ?? "",
+            updatedAt: new Date().toISOString(),
+          };
+        else delete notes[file.path];
+        return { ...previous, notes };
+      });
+      return;
+    }
+    try {
+      const { run: updated } = await api<{ run: Run }>(
+        `/runs/${run.id}/notes`,
+        send("PATCH", { filePath: file.path, text }),
+      );
+      if (runIdRef.current === updated.id) setRun(updated);
+    } catch (error) {
+      notify((error as Error).message, "error");
+    }
+  }
   async function ask(question: string) {
     setShowExplanation(true);
     setFocusMode(false);
@@ -1858,7 +1885,7 @@ export default function App() {
                           <small>
                             {allReviewed
                               ? "所有變更都已看過，準備好送出！"
-                              : "看懂了，就勾選「已審查」。"}
+                              : "看懂了，就勾選「已審閱」。"}
                           </small>
                         </div>
                       </aside>
@@ -1963,6 +1990,7 @@ export default function App() {
                           onReview={reviewFile}
                           onAsk={ask}
                           view={diffView}
+                          hasNote={Boolean(run.notes?.[file.path]?.text)}
                         />
                       ) : (
                         <div className="empty-state">
@@ -2047,6 +2075,13 @@ export default function App() {
                                 explanationBusy={explanationRequests.has(run.id)}
                                 demo={demo}
                                 reports={run.reports}
+                                modules={
+                                  intelligence.stale
+                                    ? undefined
+                                    : intelligence.insights?.modules
+                                }
+                                note={run.notes?.[file.path]}
+                                onSaveNote={saveNote}
                               />
                             </Suspense>
                           ) : (
@@ -2279,7 +2314,7 @@ export default function App() {
                             <Circle size={18} />
                           )}
                           <span>
-                            已審查所有檔案
+                            已審閱所有檔案
                             <small>
                               {reviewedCount} / {files.length} 個檔案
                             </small>
@@ -2335,7 +2370,7 @@ export default function App() {
                 <div>
                   <span className="footer-reviewed">
                     <CheckCheck size={15} />
-                    {reviewedCount} / {files.length} 已審查
+                    {reviewedCount} / {files.length} 已審閱
                   </span>
                   {run.status === "published" && run.prUrl ? (
                     <a
@@ -2360,7 +2395,7 @@ export default function App() {
                       }
                       title={
                         !allReviewed
-                          ? "請先逐一勾選所有檔案的「已審查」"
+                          ? "請先逐一勾選所有檔案的「已審閱」"
                           : draftDirty
                             ? "請先儲存 PR 草稿"
                             : "確認變更並預覽送出"
@@ -3126,7 +3161,7 @@ export default function App() {
             </div>
             <p>
               <CircleCheck size={15} />
-              {files.length} 個檔案已審查{" "}
+              {files.length} 個檔案已審閱{" "}
               <b>
                 +{additions} −{deletions}
               </b>
@@ -3232,7 +3267,7 @@ export default function App() {
               <strong>理解每個改動</strong>
               <p>
                 切換檔案閱讀 diff；點選行號，或按住 Shift 選擇一段程式碼，向
-                agent 提問。理解後勾選「已審查」。
+                agent 提問。理解後勾選「已審閱」。
               </p>
             </li>
             <li>

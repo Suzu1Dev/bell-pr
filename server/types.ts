@@ -1,6 +1,7 @@
 import type {
   ChangeExplanation,
   ExplanationStatus,
+  LearnerNote,
   StoredExplanation,
 } from "../shared/explanations.js";
 import type { EfficiencyMetrics } from "../shared/efficiency.js";
@@ -58,6 +59,8 @@ export interface Run {
   draft: { title: string; body: string };
   reviewedFiles: string[];
   reviewedFingerprints: Record<string, string>;
+  /** Learner notes keyed by diff path; absent on runs saved before notes existed. */
+  notes?: Record<string, LearnerNote>;
   approvedFingerprint?: string;
   reports?: Record<string, string>;
   prUrl?: string;

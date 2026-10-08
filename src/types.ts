@@ -1,6 +1,7 @@
 import type {
   ChangeExplanation,
   ExplanationStatus,
+  LearnerNote,
 } from "../shared/explanations";
 import type { EfficiencyMetrics } from "../shared/efficiency";
 import type { AgentTeam } from "../shared/team";
@@ -53,6 +54,8 @@ export interface Run {
   logs: { time: string; agent: string; message: string }[];
   draft: { title: string; body: string };
   reviewedFiles: string[];
+  /** Learner notes keyed by diff path; absent on runs saved before notes existed. */
+  notes?: Record<string, LearnerNote>;
   /** Final role answers keyed by role; also holds teammate task ids and guide answers. */
   reports?: Record<string, string>;
   prUrl?: string;

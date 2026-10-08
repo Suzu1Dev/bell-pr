@@ -487,6 +487,71 @@ test("HTTP API restricts localhost origins, requires JSON mutations, and validat
   }
 });
 
+test("learner notes persist with the diff fingerprint, respect the status gate and never touch review state", async () => {
+  const f = await fixture();
+  const app = createApp(f.workbench, {
+    staticDirectory: path.join(f.directory, "missing"),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing server port");
+  const url = `http://127.0.0.1:${address.port}/api/runs/${f.run.id}/notes`;
+  const patch = (body: unknown) =>
+    http(url, {
+      method: "PATCH",
+      headers: { host: "127.0.0.1:4311", "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  try {
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    const fingerprint = (await readDiff(f.run))[0].fingerprint;
+    await f.workbench.review(f.run.id, "hello.ts", true, fingerprint);
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    assert.equal(f.run.status, "approved");
+    const approved = f.run.approvedFingerprint;
+
+    const tooLong = await patch({ filePath: "hello.ts", text: "字".repeat(2001) });
+    assert.equal(tooLong.status, 400);
+    const missing = await patch({ filePath: "missing.ts", text: "筆記" });
+    assert.equal(missing.status, 404);
+
+    const saved = await patch({ filePath: "hello.ts", text: "問候語改成 after。" });
+    assert.equal(saved.status, 200);
+    const note = saved.json().run.notes["hello.ts"];
+    assert.equal(note.text, "問候語改成 after。");
+    assert.equal(note.fingerprint, fingerprint);
+    assert.ok(note.updatedAt);
+    // Notes are not reviews: approval and the review map stay as they were.
+    assert.equal(f.run.status, "approved");
+    assert.equal(f.run.approvedFingerprint, approved);
+    assert.deepEqual(f.run.reviewedFiles, ["hello.ts"]);
+
+    const reopened = new Store(f.store.directory);
+    await reopened.initialize();
+    assert.deepEqual(reopened.data.runs[0].notes, {
+      "hello.ts": JSON.parse(JSON.stringify(note)),
+    });
+
+    const cleared = await patch({ filePath: "hello.ts", text: "  " });
+    assert.equal(cleared.status, 200);
+    assert.deepEqual(cleared.json().run.notes, {});
+
+    f.run.status = "running";
+    const gated = await patch({ filePath: "hello.ts", text: "太早了" });
+    assert.equal(gated.status, 409);
+    assert.equal(f.run.notes?.["hello.ts"], undefined);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await f.cleanup();
+  }
+});
+
 test("deleted file reviews are removed from the review map", () => {
   const run = {
     reviewedFingerprints: { "old.ts": "stale" },

@@ -268,6 +268,15 @@ export function createApp(
       .parse(req.body);
     res.json({ run: await workbench.draft(req.params.id, draft) });
   });
+  app.patch("/api/runs/:id/notes", async (req, res) => {
+    const { filePath, text } = z
+      .object({
+        filePath: z.string().min(1).max(1024),
+        text: z.string().max(2000),
+      })
+      .parse(req.body);
+    res.json({ run: await workbench.saveNote(req.params.id, filePath, text) });
+  });
   app.post("/api/runs/:id/review", async (req, res) => {
     const { filePath, reviewed, fingerprint } = z
       .object({
