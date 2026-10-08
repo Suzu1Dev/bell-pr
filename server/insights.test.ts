@@ -40,6 +40,20 @@ const validAnalysis = () => ({
   audience: ["使用命令列的開發者"],
   userJourney: ["執行工具", "讀取輸出的問候文字"],
   modules: [{ path: "hello.ts", purpose: "組合問候文字" }],
+  readingPath: [
+    {
+      path: "README.md",
+      why: "先知道工具要解決什麼問題。",
+      lookFor: "工具的定位與執行方式。",
+    },
+    {
+      path: "hello.ts",
+      why: "整個專案只有這個模組產生輸出。",
+      lookFor: "匯出的常數如何組成問候文字。",
+    },
+  ],
+  howItFitsTogether:
+    "README.md 描述的命令列用法最終輸出 hello.ts 匯出的常數；此取樣沒有看到其他模組引用它，呼叫方式屬於推論。",
   evidence: [{ path: "README.md", note: "描述工具用途與執行方式" }],
   recommendations: [
     {
@@ -228,6 +242,10 @@ test("analysis uses bounded read-only structured Codex context and excludes secr
       );
       assert.equal(schema.additionalProperties, false);
       assert.ok(schema.required.includes("recommendations"));
+      assert.ok(schema.required.includes("readingPath"));
+      assert.ok(schema.required.includes("howItFitsTogether"));
+      assert.match(options.input!, /readingPath lists 3–8 supplied files/);
+      assert.match(options.input!, /Explicitly label inferences/);
       assert.match(options.input!, /untrusted DATA/);
       assert.match(options.input!, /BELL Ponytail efficiency guidance/);
       assert.match(options.input!, /mode=lite/);
@@ -298,14 +316,21 @@ test("cached analysis is stale after dirty content or HEAD changes, including ed
       getModelCatalog: async () => ({ models: [], source: "codex" }),
       command: stub.execute,
     });
-    await service.generate(f.repo.id);
+    const original = await service.generate(f.repo.id);
     await writeFile(
       path.join(f.repository, "hello.ts"),
       'export const hello = "first";\n',
     );
-    assert.equal((await service.get(f.repo.id)).stale, true);
+    // The edited file is cited by modules, readingPath and evidenceDetails, listed once.
+    assert.deepEqual(await service.get(f.repo.id), {
+      ...original,
+      stale: true,
+      staleDetail: { changedFiles: 1, citedChanged: ["hello.ts"] },
+    });
     await service.generate(f.repo.id);
-    assert.equal((await service.get(f.repo.id)).stale, false);
+    const fresh = await service.get(f.repo.id);
+    assert.equal(fresh.stale, false);
+    assert.equal("staleDetail" in fresh, false);
     await writeFile(
       path.join(f.repository, "hello.ts"),
       'export const hello = "other";\n',
@@ -314,7 +339,65 @@ test("cached analysis is stale after dirty content or HEAD changes, including ed
     await service.generate(f.repo.id);
     await git(f.repository, ["add", "--", "hello.ts"]);
     await git(f.repository, ["commit", "-m", "update greeting"]);
-    assert.equal((await service.get(f.repo.id)).stale, true);
+    assert.deepEqual((await service.get(f.repo.id)).staleDetail, {
+      changedFiles: 1,
+      citedChanged: ["hello.ts"],
+    });
+    // A new commit without content changes: stale, but nothing cited differs.
+    await service.generate(f.repo.id);
+    await git(f.repository, ["commit", "--allow-empty", "-m", "empty"]);
+    const afterEmptyCommit = await service.get(f.repo.id);
+    assert.equal(afterEmptyCommit.stale, true);
+    assert.deepEqual(afterEmptyCommit.staleDetail, {
+      changedFiles: 0,
+      citedChanged: [],
+    });
+    // A staged file the analysis never cited counts without appearing in citedChanged.
+    await writeFile(path.join(f.repository, "notes.txt"), "scratch\n");
+    await git(f.repository, ["add", "--", "notes.txt"]);
+    assert.deepEqual((await service.get(f.repo.id)).staleDetail, {
+      changedFiles: 1,
+      citedChanged: [],
+    });
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a stale analysis whose base commit is unknown reports stale without a change listing, and caches without a reading path still load", async () => {
+  const f = await fixture();
+  try {
+    const service = new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: fakeCodex().execute,
+    });
+    const original = await service.generate(f.repo.id);
+    const directory = path.join(f.store.directory, "insights");
+    const cachePath = path.join(
+      directory,
+      (await readdir(directory)).find((file) => file.endsWith(".json"))!,
+    );
+    const cache = JSON.parse(await readFile(cachePath, "utf8"));
+    cache.insights.baseSha = "0123456789abcdef0123456789abcdef01234567";
+    delete cache.insights.readingPath;
+    delete cache.insights.howItFitsTogether;
+    await writeFile(cachePath, JSON.stringify(cache));
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "rebased";\n',
+    );
+    const result = await service.get(f.repo.id);
+    const {
+      readingPath: _readingPath,
+      howItFitsTogether: _flow,
+      ...legacyInsights
+    } = original.insights;
+    assert.deepEqual(result, {
+      ...original,
+      insights: { ...legacyInsights, baseSha: cache.insights.baseSha },
+      stale: true,
+    });
+    assert.equal("staleDetail" in result, false);
   } finally {
     await f.cleanup();
   }
@@ -398,6 +481,14 @@ test("malformed AI output and nonexistent or sensitive evidence never replace ca
         ...validAnalysis(),
         modules: [{ path: "../outside.txt", purpose: "Outside repository" }],
       },
+      {
+        ...validAnalysis(),
+        readingPath: [
+          { path: "missing.ts", why: "Invented file", lookFor: "Nothing" },
+        ],
+      },
+      // Two files were sampled, so a single reading step is too short.
+      { ...validAnalysis(), readingPath: validAnalysis().readingPath.slice(0, 1) },
       { ...validAnalysis(), purpose: "ghp_abcdefghijklmnopqrstuvwxyz" },
       {
         ...validAnalysis(),
@@ -576,6 +667,11 @@ test("sampling reads entry files and every top-level directory before tests, lis
           { path: "src/review/", purpose: "差異審閱介面（目錄層級，內容未全部讀取）" },
           { path: "server/", purpose: "API 與分析服務" },
           { path: "src/App.tsx", purpose: "前端入口" },
+        ],
+        readingPath: [
+          { path: "README.md", why: "先知道工具要解決什麼問題。", lookFor: "定位與執行方式。" },
+          { path: "src/App.tsx", why: "前端入口。", lookFor: "頁面如何組成。" },
+          { path: "server/part-00.ts", why: "伺服器端的第一個模組。", lookFor: "匯出的常數如何被使用。" },
         ],
         recommendations: validAnalysis().recommendations.map((entry) => ({
           ...entry,
@@ -1050,7 +1146,7 @@ test("more recommendations require an unchanged prior analysis and reject client
     await writeFile(path.join(f.repository, "hello.ts"), 'export const hello = "updated";\n');
     await assert.rejects(service.generateMore(f.repo.id, {}), (error: any) => error.statusCode === 409);
     assert.equal(stub.calls.length, calls);
-    assert.deepEqual(await service.get(f.repo.id), { ...original, stale: true });
+    assert.deepEqual(await service.get(f.repo.id), { ...original, stale: true, staleDetail: { changedFiles: 1, citedChanged: ["hello.ts"] } });
   } finally {
     await f.cleanup();
   }
@@ -1085,7 +1181,7 @@ test("invalid, failed and interrupted expansion results never replace existing r
       await writeFile(path.join(f.repository, "hello.ts"), 'export const hello = "changed during expansion";\n');
     }).execute, getModelCatalog: async () => ({ source: "codex", models: [] }) });
     await assert.rejects(changed.generateMore(f.repo.id, {}), (error: any) => error.statusCode === 409);
-    assert.deepEqual(await changed.get(f.repo.id), { ...original, stale: true });
+    assert.deepEqual(await changed.get(f.repo.id), { ...original, stale: true, staleDetail: { changedFiles: 1, citedChanged: ["hello.ts"] } });
   } finally {
     await f.cleanup();
   }

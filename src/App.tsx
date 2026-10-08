@@ -1807,6 +1807,7 @@ export default function App() {
                     preferenceError={intelligence.preferenceError}
                     onSavePreferences={intelligence.savePreferences}
                     stale={intelligence.stale}
+                    staleDetail={intelligence.staleDetail}
                     onAnalyze={intelligence.analyze}
                     onRecommendMore={intelligence.recommendMore}
                     onChooseRecommendation={chooseRecommendation}
@@ -2472,6 +2473,7 @@ export default function App() {
               preferenceError={intelligence.preferenceError}
               onSavePreferences={intelligence.savePreferences}
               stale={intelligence.stale}
+              staleDetail={intelligence.staleDetail}
               onAnalyze={intelligence.analyze}
               onRecommendMore={intelligence.recommendMore}
               onChooseRecommendation={chooseRecommendation}

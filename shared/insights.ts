@@ -76,6 +76,10 @@ export interface ProjectInsights {
   userJourney: string[];
   /** A path is a sampled file or a directory prefix ending in "/" from the tracked file tree. */
   modules: { path: string; purpose: string }[];
+  /** Suggested first read, in order; missing on demo data and caches written before it was requested. */
+  readingPath?: { path: string; why: string; lookFor: string }[];
+  /** One main data flow traced through the sampled files; inferences are labelled in prose. */
+  howItFitsTogether?: string;
   evidence: { path: string; note: string }[];
   recommendations: ContributionRecommendation[];
   verification?: RecommendationVerification;
@@ -99,6 +103,17 @@ export interface ProjectInsights {
     /** Size of the tracked path list sent alongside the excerpts; missing before it was sent. */
     treeBytes?: number;
   };
+}
+
+/**
+ * What changed since the analyzed commit when a cached analysis is stale.
+ * Present only when git could list the difference; absent means unknown, not zero.
+ */
+export interface InsightsStaleDetail {
+  /** Tracked files whose content differs from the analyzed commit; untracked files are not counted. */
+  changedFiles: number;
+  /** Changed files the analysis cites (modules, evidence, reading path, verified quotes), at most 12. */
+  citedChanged: string[];
 }
 
 export interface ContributionBrief {

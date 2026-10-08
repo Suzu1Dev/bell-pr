@@ -243,6 +243,85 @@
   right: 10px;
   color: #b1c1aa;
 }
+.mission-reading-path {
+  padding: 3px 0;
+}
+.mission-reading-flow {
+  margin-bottom: 14px;
+  padding: 15px 18px;
+  border: 1px solid var(--mission-border);
+  border-radius: 9px;
+  background: #f8faf4;
+}
+.mission-reading-flow > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #698761;
+}
+.mission-reading-flow p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.85;
+  color: #4b5f50;
+}
+.mission-reading-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--mission-border);
+  border-radius: 9px;
+  background: #fff;
+  overflow: hidden;
+}
+.mission-reading-steps li {
+  padding: 17px 20px;
+  border-bottom: 1px solid #e6ebe3;
+}
+.mission-reading-steps li:last-child {
+  border-bottom: none;
+}
+.mission-reading-steps code {
+  display: block;
+  margin-top: 4px;
+  font: 500 12px/1.6 var(--mono, monospace);
+  color: #456448;
+  overflow-wrap: anywhere;
+}
+.mission-reading-steps p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #4b5f50;
+}
+.mission-reading-steps p strong,
+.mission-reading-context p strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #698761;
+}
+.mission-reading-context {
+  margin-top: 10px;
+}
+.mission-reading-context summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+  color: #64735e;
+}
+.mission-reading-context summary::-webkit-details-marker {
+  display: none;
+}
+.mission-reading-context[open] summary svg {
+  transform: rotate(90deg);
+}
+.mission-reading-context p {
+  margin-top: 8px;
+  color: #66735f;
+}
 .mission-project-details {
   display: grid;
   grid-template-columns: 1fr 1fr;
