@@ -9,10 +9,9 @@ export class Store {
 
   async initialize() {
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
+    const statePath = path.join(this.directory, "state.json");
     try {
-      const data = JSON.parse(
-        await readFile(path.join(this.directory, "state.json"), "utf8"),
-      ) as Database;
+      const data = JSON.parse(await readFile(statePath, "utf8")) as Database;
       if (
         data.version !== 1 ||
         !Array.isArray(data.repos) ||
@@ -21,7 +20,12 @@ export class Store {
         throw new Error("Invalid state format");
       this.data = data;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      // A missing file is a first start; anything else names the file (no auto-repair).
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT")
+        throw new Error(
+          `無法讀取 ${statePath}：${error instanceof Error ? error.message : String(error)}。請檢查檔案是否為有效 JSON（version 1）。`,
+          { cause: error },
+        );
     }
     for (const run of this.data.runs) {
       if (run.draftPreparation?.status === "generating") {

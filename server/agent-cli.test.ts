@@ -87,6 +87,8 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
   ]);
   assert.ok(none.args.includes("--no-session-persistence"));
   assert.ok(none.args.includes("--strict-mcp-config"));
+  assert.equal(value(none.args, "--setting-sources"), "user");
+  assert.ok(!none.args.includes("--disallowedTools"));
   assert.equal(value(none.args, "--model"), "sonnet");
   assert.equal(value(none.args, "--effort"), "high");
   assert.equal(value(none.args, "--tools"), "");
@@ -102,6 +104,8 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
   assert.ok(!read.args.includes("--effort"));
   assert.equal(value(read.args, "--tools"), "Read,Grep,Glob");
   assert.equal(value(read.args, "--permission-mode"), "dontAsk");
+  assert.equal(value(read.args, "--setting-sources"), "user");
+  assert.ok(!read.args.includes("--disallowedTools"));
 
   const write = await agentCommand(
     { provider: "claude", source: "cli-default" },
@@ -110,6 +114,14 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
   assert.equal(value(write.args, "--tools"), "Read,Grep,Glob,Edit,Write,Bash");
   assert.equal(value(write.args, "--allowedTools"), "Read Grep Glob Bash");
   assert.equal(value(write.args, "--permission-mode"), "acceptEdits");
+  assert.equal(value(write.args, "--setting-sources"), "user");
+  const denied = write.args.indexOf("--disallowedTools");
+  assert.deepEqual(write.args.slice(denied + 1, denied + 5), [
+    "Bash(git push:*)",
+    "Bash(gh:*)",
+    "Bash(curl:*)",
+    "Bash(wget:*)",
+  ]);
 
   await assert.rejects(
     agentCommand(

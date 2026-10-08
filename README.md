@@ -120,9 +120,11 @@ PR 草稿會優先採用目標專案的 `CONTRIBUTING`、PR 模板與相關投�
 模型設定的「Agent」可改選 **Claude Code**，所有專案共用。BELL 直接呼叫本機 `claude -p`，沿用 `claude auth login` 的 Claude 訂閱登入；傳給 Agent 的環境變數不包含 `ANTHROPIC_API_KEY`，因此不會改走 API 計費。「設定」頁會顯示 Claude Code CLI 是否已安裝與登入。
 
 - 模型清單為固定的別名 `opus`、`sonnet`、`fable`、`haiku`，各自指向該系列的最新模型；Claude Code 沒有列出模型的指令，實際可用模型依訂閱方案而定。選「Claude Code 預設」時不傳 `--model`。Haiku 不提供思考強度選項，其餘為 low–max。
-- 專案分析與探索不開放任何工具，只讀 BELL 提供的節錄並以 `--json-schema` 回傳結構化結果；Lead、Reviewer、Test analyst 與解說只能使用 Read、Grep、Glob；Teammates 可使用 Read、Grep、Glob、Edit、Write 與 Bash。檔案編輯以 `acceptEdits` 限制在工作目錄內，但 **Bash 不在沙箱中執行**，可存取這台機器上服務帳號能存取的任何檔案與網路。
-- 執行時加上 `--strict-mcp-config`，不載入 claude.ai 連接器（Gmail、Drive 等）或其他 MCP 伺服器，避免 Agent 讀到不可信內容時被誘導使用你的帳號服務。其餘 Claude Code 設定照常載入，包括使用者 hooks、`CLAUDE.md`，以及匯入專案中的 `CLAUDE.md` 與 `.claude/settings.json`。
-- 用量以 Claude Code 回報的 tokens 計算：輸入 = 未快取輸入 + 快取寫入 + 快取讀取，快取欄位只計快取讀取。`total_cost_usd` 對訂閱帳戶沒有意義，不會顯示。訂閱有使用額度限制，多位 teammates 同時執行時較快達到上限，達到時任務會顯示 Claude Code 回報的錯誤。
+- 專案分析與探索不開放任何工具，只讀 BELL 提供的節錄並以 `--json-schema` 回傳結構化結果；Lead、Reviewer、Test analyst 與解說只能使用 Read、Grep、Glob；Teammates 可使用 Read、Grep、Glob、Edit、Write 與 Bash。檔案編輯以 `acceptEdits` 限制在工作目錄內，但 **Bash 不在沙箱中執行**；除下列拒絕規則外，其餘 Bash 指令可存取這台機器上服務帳號能存取的任何檔案與網路。
+- Teammates 的 Bash 以 `--disallowedTools` 拒絕 `git push`、`gh`、`curl`、`wget` 開頭的指令（拒絕規則優先於允許規則），推送與 PR 仍由 BELL 自己的流程處理。這是縱深防禦，不是沙箱：實測中 `git push --dry-run origin HEAD` 與 `curl https://example.com` 被 Claude Code 回絕為「Permission to use Bash with command … has been denied」，並列在結果事件的 `permission_denials`；`git status` 與 `git log` 照常執行並回傳輸出。
+- 執行時加上 `--strict-mcp-config`，不載入 claude.ai 連接器（Gmail、Drive 等）或其他 MCP 伺服器，避免 Agent 讀到不可信內容時被誘導使用你的帳號服務。
+- 執行時加上 `--setting-sources user`，只載入使用者層級的設定（依 Claude Code 對 `user` 來源的定義，包含 `~/.claude/settings.json`、使用者 hooks 與 `~/.claude/CLAUDE.md`）；匯入專案裡的 `.claude/settings.json`、`.claude/settings.local.json` 與專案 `CLAUDE.md` 則不載入。`claude -p` 不會顯示信任資料夾的確認對話，BELL 又是在匯入的第三方 repository 的 worktree 中執行 Agent，因此必須由 BELL 自己關掉這些來源。實測：匯入專案 `.claude/settings.json` 中的 SessionStart hook 在加上此旗標後沒有執行（拿掉旗標則會執行），專案 `CLAUDE.md` 的內容也不再出現在模型的回應中。
+- 用量以 Claude Code 回報的 tokens 計算：輸入 = 未快取輸入 + 快取寫入 + 快取讀取，快取欄位只計快取讀取。`total_cost_usd` 對訂閱帳戶沒有意義，不會顯示。訂閱有使用額度限制，多位 teammates 同時執行時較快達到上限，達到時任務會顯示 Claude Code 回報的錯誤。`BELLPR_MAX_AGENT_PROCESSES`（預設 3）限制所有工作、專案分析與探索同時執行的 CLI 行程數，超過的呼叫排隊等待：工作中的 Agent 會顯示「等待其他 Agent 完成」，專案分析與探索則維持原本的進度訊息。
 
 ## Ponytail 效率規則
 
@@ -145,7 +147,11 @@ npm run build
 npm start
 ```
 
-`npm run build` 執行 TypeScript 檢查並建立前端資產。`npm test` 執行後端與 diff 解析的自動化測試。
+`npm run build` 執行 TypeScript 檢查並建立前端資產。`npm test` 以 Node.js 內建的 test runner（透過 `tsx`）執行 `server/*.test.ts` 與 `src/**/*.test.ts`，新增到 `src/` 任一子目錄的 `*.test.ts` 都會被納入。測試只需要 Node.js、Git 與基本的系統工具，不會呼叫 `codex`、`claude` 或 `gh`。
+
+前端除了 diff 解析的純函式測試與 Markdown 渲染測試外，另有 `DiffView`、`ExplanationPanel`、`TeamBoard` 與 `EfficiencySummary` 的 smoke tests：用 `react-dom/server` 的 `renderToStaticMarkup` 把示範資料渲染成 HTML，再檢查畫面文字是否存在。這些元件在模組層級匯入 `.css`，應用程式中由 Vite 處理樣式匯入，但 Node.js 不認得 `.css` 副檔名；因此 `npm test` 會先載入 `test/css-stub.mjs`，以 `node:module` 的 `register()` 將所有 `*.css` 匯入解析為空模組。這只影響測試，不影響建置。
+
+`.github/workflows/ci.yml` 會在 push 與 pull request 時於 `ubuntu-latest`、Node.js 22 執行 `npm ci`、`npm run build` 與 `npm test`。`package.json` 的 `engines.node` 設為 `>=22`；專案沒有啟用 `engine-strict`，較舊的 Node.js 在 `npm install` 時只會收到警告而不會被阻擋，實際執行仍需要 Node.js 22 以上。本輪未加入 Prettier 或 ESLint。
 
 建置完成後，正式模式由同一個 Node.js 服務提供網頁與 API，開啟 <http://127.0.0.1:4311>。
 
@@ -175,7 +181,7 @@ tailscale serve --bg --yes --https=8443 http://127.0.0.1:8443
 
 確認 `loginctl show-user "$USER" -p Linger` 為 `Linger=yes`，服務才能在未登入及重開機後啟動；尚未啟用時需請系統管理者開啟 linger。`BELLPR_ALLOWED_ORIGINS` 只是來源檢查，不提供帳號認證；存取權限由 Tailscale 裝置與網路政策控制，不要將此代理公開到網際網路。
 
-維護可使用 `systemctl --user status bell-pr`、`systemctl --user restart bell-pr` 與 `journalctl --user -u bell-pr -n 100`。更新前確認沒有執行中的 Agent，再停止服務、備份整份 `.bellpr`、更新程式與依賴、建置後啟動。
+維護可使用 `systemctl --user status bell-pr`、`systemctl --user restart bell-pr` 與 `journalctl --user -u bell-pr -n 100`。發生未預期的錯誤（API 回傳 500 的「操作未完成」）時，服務記錄會寫入請求方法、路徑與錯誤堆疊；背景工作失敗則顯示在該工作的錯誤與系統訊息中。更新前確認沒有執行中的 Agent，再停止服務、備份整份 `.bellpr`、更新程式與依賴、建置後啟動。
 
 資料搬移必須包含完整 `.bellpr`，其中有尚未提交的檔案、Git objects/index/refs、worktree、解說與草稿。更改安裝位置時，需一併修正 `state.json` 的 repository/worktree 路徑及 Git worktree 的雙向連結，並比對檔案與 Git 差異；不能只複製 `state.json` 或重新 clone。CLI 登入狀態由目的機器提供，不隨工作資料搬移。瀏覽器示範資料與閱讀偏好保存在各網址的 localStorage，不包含在服務端備份中。
 
@@ -198,6 +204,7 @@ npm run dev
 | `BELLPR_FRONTEND_PORT` | `4310`    | API 允許的開發網頁來源埠。修改時需同步 `package.json` 的 `dev:web`。       |
 | `BELLPR_DATA_DIR`      | `.bellpr` | 本機工作資料位置，可使用絕對路徑。                                         |
 | `BELLPR_ALLOWED_ORIGINS` | 空值 | 額外允許的精確 HTTP(S) origin，以逗號分隔；僅供已有存取控制、保留 Host 的私網代理使用。 |
+| `BELLPR_MAX_AGENT_PROCESSES` | `3` | 同時執行的 Agent CLI 行程上限（1–32），涵蓋所有工作、專案分析與探索；超過時後續 Agent 排隊等待。 |
 
 `.bellpr` 與 `.env` 已排除於 Git 追蹤外。請妥善保留工作資料；刪除資料目錄會移除其中的 repository、工作目錄與紀錄。
 

@@ -19,6 +19,7 @@ import { Store } from "./store.js";
 import type { AgentTeam, TeamTask } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import { ProjectInsightsService } from "./insights.js";
+import { AgentSlots } from "./agent-slots.js";
 
 const settings: ContributionSettings = {
   direction: "feature",
@@ -52,7 +53,10 @@ async function waitUntil(
   }
 }
 
-async function fixture(runner?: TeamAgentRunner) {
+async function fixture(
+  runner?: TeamAgentRunner,
+  dependencies: { agentSlots?: AgentSlots } = {},
+) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-team-test-"));
   const repository = path.join(directory, "repo");
   await mkdir(repository);
@@ -106,7 +110,10 @@ async function fixture(runner?: TeamAgentRunner) {
           return runner(input);
         }
       : undefined,
-    { getModelCatalog: async () => ({ models: [], source: "codex" }) },
+    {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      ...dependencies,
+    },
   );
   workbench.status = async () => ({
     codex: true,
@@ -779,6 +786,78 @@ test("cancelling a paused plan completes without starting any teammate", async (
     assert.deepEqual(await readDiff(stopped), []);
     await assert.rejects(f.workbench.approvePlan(run.id), /沒有等待/);
   } finally {
+    await f.cleanup();
+  }
+});
+
+test("shared agent slots bound simultaneous CLI invocations across teammates while every task completes", async () => {
+  const slots = new AgentSlots(2);
+  const running = new Set<string>();
+  let peak = 0;
+  let leadCalls = 0;
+  let saturated = false;
+  const files: Record<string, string> = {
+    alpha: "a.ts",
+    beta: "b.ts",
+    gamma: "c.ts",
+    delta: "d.ts",
+  };
+  const plan = makePlan(
+    Object.entries(files).map(([id, file]) => ({ id, files: [file] })),
+  );
+  const f = await fixture(
+    async (input) => {
+      if (input.role === "lead") {
+        leadCalls++;
+        return leadCalls === 1 ? plan : "已整合四個任務。靜態檢查完成。";
+      }
+      if (input.role === "reviewer" || input.role === "tester")
+        return "獨立靜態審查：未發現問題。";
+      const taskId = input.taskId!;
+      running.add(taskId);
+      peak = Math.max(peak, running.size);
+      // Hold the first pair until the other two members are queued for a slot.
+      await waitUntil(() => {
+        saturated ||= running.size + slots.waiting === 4;
+        return saturated;
+      }, "queued teammates");
+      await writeFile(
+        path.join(input.cwd, files[taskId]),
+        `export const value = "${taskId}";\n`,
+      );
+      running.delete(taskId);
+      return JSON.stringify({
+        report: `${taskId} complete; fake runner only.`,
+        messages: [],
+      });
+    },
+    { agentSlots: slots },
+  );
+  try {
+    const run = await f.workbench.createRun(
+      f.repo.id,
+      "Four independent tasks",
+      undefined,
+      { ...settings, maxTeammates: 4, requirePlanApproval: false },
+    );
+    await waitUntil(
+      () => run.status === "failed" || run.status === "review",
+      "team completion",
+    );
+    assert.equal(run.status, "review", run.error);
+    assert.equal(peak, 2);
+    assert.ok(run.team!.tasks.every((task) => task.status === "complete"));
+    assert.deepEqual(
+      (await readDiff(run)).map((file) => file.path),
+      ["a.ts", "b.ts", "c.ts", "d.ts"],
+    );
+    assert.ok(
+      run.logs.some((log) => log.message.includes("等待其他 Agent 完成")),
+    );
+    assert.equal(slots.active, 0);
+    assert.equal(slots.waiting, 0);
+  } finally {
+    saturated = true;
     await f.cleanup();
   }
 });

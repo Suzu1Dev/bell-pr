@@ -15,6 +15,7 @@ import { Workbench } from "./workbench.js";
 import { AppError } from "./types.js";
 import { redact } from "./process.js";
 import { DiscoveryService } from "./discovery.js";
+import { AgentSlots, parseAgentProcessLimit } from "./agent-slots.js";
 import { agentProviders } from "../shared/models.js";
 
 export function parseAllowedOrigins(value = ""): string[] {
@@ -102,13 +103,22 @@ export function createApp(
     frontendPort = 4310,
     staticDirectory = path.resolve("dist"),
     allowedOrigins = "",
+    agentSlots = workbench.agentSlots,
+  }: {
+    port?: number;
+    frontendPort?: number;
+    staticDirectory?: string;
+    allowedOrigins?: string;
+    agentSlots?: AgentSlots;
   } = {},
 ) {
   const insights = new ProjectInsightsService(workbench.store, {
     getModelCatalog: (provider) => workbench.models(provider),
+    agentSlots,
   });
   const discovery = new DiscoveryService(workbench.store, {
     getModelCatalog: (provider) => workbench.models(provider),
+    agentSlots,
   });
   const app = express();
   app.locals.insights = insights;
@@ -301,7 +311,7 @@ export function createApp(
       res.sendFile(path.join(staticDirectory, "index.html"));
     });
   }
-  const errors: ErrorRequestHandler = (error, _req, res, _next) => {
+  const errors: ErrorRequestHandler = (error, req, res, _next) => {
     if (error instanceof z.ZodError) {
       res.status(400).json({
         error: error.issues
@@ -322,9 +332,14 @@ export function createApp(
       res.status(413).json({ error: "請求內容過大。" });
       return;
     }
+    // The stack only reaches the local journal; the client gets a generic message.
     console.error(
       "[BELL-PR]",
-      redact(error instanceof Error ? error.message : String(error)),
+      req.method,
+      req.path,
+      redact(
+        error instanceof Error ? (error.stack ?? error.message) : String(error),
+      ),
     );
     res.status(500).json({ error: "操作未完成；請檢查本機服務記錄。" });
   };
@@ -345,11 +360,14 @@ async function main() {
     );
   const allowedOrigins = process.env.BELLPR_ALLOWED_ORIGINS ?? "";
   parseAllowedOrigins(allowedOrigins);
+  const agentSlots = new AgentSlots(
+    parseAgentProcessLimit(process.env.BELLPR_MAX_AGENT_PROCESSES),
+  );
   const store = new Store(
     path.resolve(process.env.BELLPR_DATA_DIR ?? ".bellpr"),
   );
   await store.initialize();
-  const workbench = new Workbench(store);
+  const workbench = new Workbench(store, undefined, { agentSlots });
   const app = createApp(workbench, { port, frontendPort, allowedOrigins });
   const server = app.listen(port, "127.0.0.1", () =>
     console.log(`BELL-PR → http://127.0.0.1:${port}`),
@@ -378,7 +396,9 @@ if (
 ) {
   main().catch((error) => {
     console.error(
-      redact(error instanceof Error ? error.message : String(error)),
+      redact(
+        error instanceof Error ? (error.stack ?? error.message) : String(error),
+      ),
     );
     process.exitCode = 1;
   });

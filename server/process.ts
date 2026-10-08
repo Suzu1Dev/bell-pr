@@ -1,18 +1,8 @@
 import { spawn } from "node:child_process";
+import { redact } from "./secrets.js";
 import { AppError } from "./types.js";
 
-export function redact(text: string): string {
-  return text
-    .replace(
-      /\b(?:gh[pousr]_[A-Za-z0-9_]{16,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{16,})\b/g,
-      "[REDACTED]",
-    )
-    .replace(/(https?:\/\/)[^\s/@]+:[^\s/@]+@/g, "$1[REDACTED]@")
-    .replace(
-      /((?:api[_-]?key|access[_-]?token|password|secret)\s*[:=]\s*["']?)[^\s"',;]{8,}/gi,
-      "$1[REDACTED]",
-    );
-}
+export { redact };
 
 /** ANTHROPIC_API_KEY is deliberately excluded so Claude Code uses the signed-in subscription, not API billing. */
 export function agentEnvironment(): NodeJS.ProcessEnv {

@@ -2,7 +2,10 @@ import { createHash } from "node:crypto";
 import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
 import { git } from "./process.js";
+import { secretInPatch } from "./secrets.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
+
+export { secretInPatch };
 
 export const digest = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -40,14 +43,6 @@ export function sensitivePath(filePath: string): boolean {
     /(^|\/)(?:node_modules|\.bellpr|\.ssh|\.aws|\.codex|\.git)(?:\/|$)/.test(
       filePath,
     )
-  );
-}
-
-export function secretInPatch(patch: string): boolean {
-  return (
-    /\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|AKIA[A-Z0-9]{16})\b/.test(
-      patch,
-    ) || /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(patch)
   );
 }
 
