@@ -199,15 +199,6 @@ export function DiffView({
           </label>
         </div>
       </div>
-      {!file.blocked && (
-        <div className="rv-code-hint">
-          <MousePointer2 size={12} />
-          <span>點選任何一行，讓 Agent 為你解說</span>
-          <span className="rv-shift-hint">
-            <kbd>shift</kbd> 多行選取
-          </span>
-        </div>
-      )}
       {file.blocked || lines.length === 0 ? (
         <div className="rv-empty">
           <Code2 size={28} />
@@ -269,7 +260,10 @@ export function DiffView({
             </>
           ) : (
             <>
-              <Code2 size={13} /> 每一段變更，都是學習的起點
+              <MousePointer2 size={13} /> 點選任何一行，讓 Agent 為你解說
+              <span className="rv-shift-hint">
+                <kbd>Shift</kbd> 可多行選取
+              </span>
             </>
           )}
         </span>

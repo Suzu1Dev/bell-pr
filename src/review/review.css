@@ -160,20 +160,6 @@
   font-size: 10px;
   white-space: nowrap;
 }
-.rv-code-hint {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 17px;
-  font-size: 10px;
-  color: #8a948a;
-  border-bottom: 1px solid #edf0ea;
-  background: #fff;
-  flex-shrink: 0;
-}
-.rv-code-hint > svg {
-  color: #96a094;
-}
 .rv-shift-hint {
   display: flex;
   align-items: center;

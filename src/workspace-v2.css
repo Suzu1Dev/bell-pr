@@ -136,11 +136,10 @@
   height: 33px;
 }
 .is-reading .rv-file-header {
-  min-height: 48px;
+  min-height: 40px;
 }
-.is-reading .rv-code-hint {
-  padding: 8px 16px;
-  font-size: 11px;
+.is-reading .rv-diff-footer {
+  min-height: 30px;
 }
 .is-reading .rv-code-scroll {
   max-height: none;
@@ -154,7 +153,7 @@
   min-height: 0;
 }
 .is-reading .diff-topbar {
-  height: 47px;
+  height: 38px;
   flex-shrink: 0;
   gap: 8px;
 }
@@ -271,14 +270,106 @@
     width: 100%;
     padding-bottom: 20px;
   }
+  /* Reading layout: the shell is one viewport tall and the code grid takes
+     whatever the compact chrome above and below it leaves, so the page never
+     scrolls and no magic height constants have to track the chrome. */
+  .is-reading .main-shell {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  .is-reading .topbar {
+    height: 44px;
+    flex-shrink: 0;
+  }
+  .is-reading .workspace-heading {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    padding: 6px 20px;
+    flex-shrink: 0;
+  }
+  .is-reading .heading-top {
+    order: 3;
+    margin: 0 0 0 auto;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .is-reading .heading-top .eyebrow > svg,
+  .is-reading .heading-top .eyebrow > span:not(.demo-pill) {
+    display: none;
+  }
+  .is-reading .heading-top .demo-pill {
+    margin-left: 0;
+  }
+  .is-reading .title-row {
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+    min-width: 0;
+    gap: 10px;
+  }
+  .is-reading .title-row h1 {
+    font-size: 18px;
+    line-height: 1.4;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .is-reading .repo-meta {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .is-reading .repo-meta > span,
+  .is-reading .repo-meta > a {
+    vertical-align: middle;
+  }
+  .is-reading .repo-meta i {
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .is-reading .meta-demo {
+    margin-left: 8px;
+  }
+  .is-reading .review-area {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 6px;
+  }
+  .is-reading .review-toolbar {
+    height: 40px;
+    flex-shrink: 0;
+  }
+  .is-reading .review-area > [role="tabpanel"] {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .is-reading .review-footer {
+    padding: 3px 15px;
+    flex-shrink: 0;
+  }
+  .is-reading .file-panel-heading {
+    height: 40px;
+  }
   .is-reading .review-grid {
     display: grid;
     grid-template-columns: 190px minmax(0, 1fr) 6px var(
         --explanation-width,
         340px
       );
-    height: calc(100dvh - 297px);
-    min-height: 470px;
+    flex: 1;
+    height: auto;
+    min-height: 300px;
     align-items: stretch;
   }
   .is-reading .review-grid.files-hidden {
@@ -317,16 +408,21 @@
   .is-focused .main-shell {
     margin-left: 0;
   }
+  /* Focus mode hides the tab row (it comes back with Esc or the 離開專注模式
+     button); the review footer stays so the reviewed count and 確認並準備 PR
+     remain visible. */
+  .is-focused .review-toolbar {
+    display: none;
+  }
   .is-focused .review-area {
-    margin: 8px;
+    margin: 0;
+    border-radius: 0;
   }
   .is-focused .review-grid,
   .is-focused .review-grid.files-hidden,
   .is-focused .review-grid.explanation-hidden,
   .is-focused .review-grid.files-hidden.explanation-hidden {
     grid-template-columns: minmax(0, 1fr);
-    height: calc(100dvh - 140px);
-    min-height: 420px;
   }
   .is-focused .diff-topbar > span {
     font-size: 12px;
@@ -341,11 +437,9 @@
         --explanation-width,
         340px
       );
-    height: calc(100dvh - 310px);
   }
   .is-focused .review-grid {
     grid-template-columns: minmax(0, 1fr);
-    height: calc(100dvh - 140px);
   }
 }
 @media (min-width: 761px) and (max-width: 1100px) {
@@ -361,9 +455,15 @@
   .is-reading .review-grid.files-hidden.explanation-hidden {
     grid-template-columns: minmax(0, 1fr);
   }
+  .is-reading:not(.is-sidebar-collapsed):not(.is-focused)
+    .review-area
+    > [role="tabpanel"] {
+    overflow-y: auto;
+  }
   .is-reading:not(.is-sidebar-collapsed):not(.is-focused) .review-grid {
     grid-template-columns: 155px minmax(0, 1fr);
-    grid-template-rows: minmax(470px, calc(100dvh - 297px)) auto;
+    grid-template-rows: minmax(470px, 70dvh) auto;
+    flex: none;
     height: auto;
     min-height: 0;
   }
@@ -391,7 +491,7 @@
   .is-reading .diff-topbar {
     justify-content: flex-end;
     height: auto;
-    min-height: 47px;
+    min-height: 38px;
     padding-top: 6px;
     padding-bottom: 6px;
   }
