@@ -1,7 +1,9 @@
-import type {
-  DiscoveryCandidate,
-  DiscoveryPreferences,
-  DiscoverySource,
+import {
+  discoverySorts,
+  type DiscoveryCandidate,
+  type DiscoveryPreferences,
+  type DiscoverySort,
+  type DiscoverySource,
 } from "../shared/discovery.js";
 import { parseGitHubSource, safeRelativePath, sensitivePath } from "./git.js";
 import { command, redact } from "./process.js";
@@ -35,6 +37,8 @@ function searchQuery(preferences: DiscoveryPreferences) {
     throw new AppError("最低 stars 必須介於 0 到 1,000,000。", 422);
   if (!["any", "beginner", "intermediate"].includes(preferences.difficulty))
     throw new AppError("無效的探索難度。", 422);
+  if (!discoverySorts.includes(preferences.sort))
+    throw new AppError("無效的探索排序。", 422);
   // User text is reduced to quoted literal words; qualifiers come only from this code.
   const words =
     preferences.interests.match(/[\p{L}\p{N}][\p{L}\p{N}+#._-]*/gu) ?? [];
@@ -55,6 +59,17 @@ function searchQuery(preferences: DiscoveryPreferences) {
         : []),
   ].join(" ");
 }
+
+// GitHub's best match has no sort parameter; the other orders are explicit and descending.
+function sortArguments(sort: DiscoverySort) {
+  return sort === "relevance" ? [] : ["-f", `sort=${sort}`, "-f", "order=desc"];
+}
+
+const sortDescriptions: Record<DiscoverySort, string> = {
+  relevance: "GitHub 相關度（best match）最高",
+  updated: "最近更新",
+  stars: "星數最多",
+};
 
 function repositoryQuery(difficulty: DiscoveryPreferences["difficulty"]) {
   const label =
@@ -218,10 +233,7 @@ export async function collectDiscoveryCandidates(
         "search/repositories",
         "-f",
         `q=${query}`,
-        "-f",
-        "sort=updated",
-        "-f",
-        "order=desc",
+        ...sortArguments(preferences.sort),
         "-f",
         "per_page=12",
       ],
@@ -278,7 +290,7 @@ export async function collectDiscoveryCandidates(
       ],
     };
   warnings.push(
-    "最多取樣 6 個最近更新的專案，每個最多 3 個開啟中的 issue 與每則最後 3 則留言；標籤不保證實際難度或仍可認領。文件僅讀取 GitHub community profile 識別的根目錄、.github、docs 內 README、CONTRIBUTING 與 PR 模板，未讀取帳號共用規範、多模板目錄及外部連結。",
+    `最多取樣 6 個${sortDescriptions[preferences.sort]}的專案，每個最多 3 個開啟中的 issue 與每則最後 3 則留言；標籤不保證實際難度或仍可認領。文件僅讀取 GitHub community profile 識別的根目錄、.github、docs 內 README、CONTRIBUTING 與 PR 模板，未讀取帳號共用規範、多模板目錄及外部連結。`,
   );
   for (const found of repositories) {
     active();

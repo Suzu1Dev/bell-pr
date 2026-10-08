@@ -1,11 +1,16 @@
 import type { EfficiencyMetrics, PonytailMode } from "./efficiency.js";
 import type { ModelExecution, ModelSettings } from "./models.js";
 
+/** GitHub search order: "relevance" is GitHub best match (no sort parameter). */
+export const discoverySorts = ["relevance", "updated", "stars"] as const;
+export type DiscoverySort = (typeof discoverySorts)[number];
+
 export interface DiscoveryPreferences extends ModelSettings {
   interests: string;
   language: string;
   difficulty: "any" | "beginner" | "intermediate";
   minStars: number;
+  sort: DiscoverySort;
   ponytailMode: PonytailMode;
 }
 
@@ -14,6 +19,8 @@ export const defaultDiscoveryPreferences: DiscoveryPreferences = {
   language: "",
   difficulty: "beginner",
   minStars: 50,
+  // "updated" keeps the long-standing behaviour; saved discovery.json files predate this field.
+  sort: "updated",
   ponytailMode: "lite",
   model: "",
   reasoningEffort: "",

@@ -98,7 +98,7 @@
 }
 .discovery-fields {
   display: grid;
-  grid-template-columns: 2fr 1.25fr 1.15fr 0.85fr;
+  grid-template-columns: 2fr 1.2fr 1.1fr 1.2fr 0.8fr;
   gap: 16px;
   border: 0;
   padding: 0;
@@ -566,6 +566,10 @@
   .discovery-fields {
     grid-template-columns: 1fr 1fr;
   }
+  /* Five fields: interests take a full row so the four others fill two pairs. */
+  .discovery-interest {
+    grid-column: 1/-1;
+  }
   .discovery-hero h1 {
     font-size: 32px;
   }
@@ -611,9 +615,6 @@
   }
   .discovery-fields {
     gap: 17px 12px;
-  }
-  .discovery-interest {
-    grid-column: 1/-1;
   }
   .discovery-form-footer {
     align-items: flex-start;

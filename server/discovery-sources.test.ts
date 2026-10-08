@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { defaultDiscoveryPreferences } from "../shared/discovery.js";
+import {
+  defaultDiscoveryPreferences,
+  type DiscoveryPreferences,
+} from "../shared/discovery.js";
 import { collectDiscoveryCandidates } from "./discovery-sources.js";
 import { command } from "./process.js";
 
@@ -197,6 +200,47 @@ test("discovery filters public repositories and returns verified metrics, immuta
   assert.ok(
     result.warnings.some((warning) => warning.includes("帳號共用規範")),
   );
+});
+
+test("the chosen sort decides the GitHub search order and the sampling warning", async () => {
+  const stub = fakeGithub();
+  // The search is the first request of every run; later calls fetch metadata and documents.
+  const searchArguments = (run: number) =>
+    stub.calls
+      .filter((call) => call.args[5] === "search/repositories")
+      [run].args.filter((arg) => /^(sort|order)=/.test(arg));
+  const updated = await collectDiscoveryCandidates(preferences, {
+    command: stub.execute,
+  });
+  assert.deepEqual(searchArguments(0), ["sort=updated", "order=desc"]);
+  assert.ok(
+    updated.warnings.some((warning) => warning.includes("6 個最近更新的專案")),
+  );
+  const stars = await collectDiscoveryCandidates(
+    { ...preferences, sort: "stars" },
+    { command: stub.execute },
+  );
+  assert.deepEqual(searchArguments(1), ["sort=stars", "order=desc"]);
+  assert.ok(
+    stars.warnings.some((warning) => warning.includes("6 個星數最多的專案")),
+  );
+  const relevance = await collectDiscoveryCandidates(
+    { ...preferences, sort: "relevance" },
+    { command: stub.execute },
+  );
+  assert.deepEqual(searchArguments(2), []);
+  assert.ok(
+    relevance.warnings.some((warning) => warning.includes("best match")),
+  );
+  const invalid = fakeGithub();
+  await assert.rejects(
+    collectDiscoveryCandidates(
+      { ...preferences, sort: "forks" as DiscoveryPreferences["sort"] },
+      { command: invalid.execute },
+    ),
+    /排序/,
+  );
+  assert.equal(invalid.calls.length, 0);
 });
 
 test("keywords cannot inject search qualifiers or shell commands and invalid filters make no request", async () => {

@@ -95,6 +95,7 @@ test("discovery preferences are strict, bounded and default to beginner preferen
     { language: "TypeScript stars:0" },
     { language: "$(echo hi)" },
     { difficulty: "expert" },
+    { sort: "forks" },
     { minStars: -1 },
     { minStars: 1_000_001 },
     { minStars: "50" },
@@ -106,6 +107,14 @@ test("discovery preferences are strict, bounded and default to beginner preferen
   assert.equal(
     discoveryPreferencesSchema.parse({ language: "C++", minStars: 0 }).language,
     "C++",
+  );
+  // Preferences saved before the sort field existed keep loading with the old order.
+  const { sort, ...legacy } = defaultDiscoveryPreferences;
+  assert.equal(sort, "updated");
+  assert.equal(discoveryPreferencesSchema.parse(legacy).sort, "updated");
+  assert.equal(
+    discoveryPreferencesSchema.parse({ sort: "relevance" }).sort,
+    "relevance",
   );
 });
 

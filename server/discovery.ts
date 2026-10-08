@@ -13,6 +13,7 @@ import path from "node:path";
 import { z } from "zod";
 import {
   defaultDiscoveryPreferences,
+  discoverySorts,
   type ContributionOpportunity,
   type DiscoveryCandidate,
   type DiscoveryJob,
@@ -67,6 +68,7 @@ export const discoveryPreferencesSchema = z
       .min(0)
       .max(1_000_000)
       .default(defaultDiscoveryPreferences.minStars),
+    sort: z.enum(discoverySorts).default(defaultDiscoveryPreferences.sort),
     ponytailMode: z
       .enum(ponytailModes)
       .default(defaultDiscoveryPreferences.ponytailMode),

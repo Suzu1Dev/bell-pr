@@ -40,6 +40,11 @@ const difficultyLabels = {
   intermediate: "中等",
   advanced: "進階",
 };
+const sortLabels: Record<DiscoveryPreferences["sort"], string> = {
+  updated: "最近更新",
+  relevance: "相關度",
+  stars: "星數",
+};
 const phaseSteps = ["searching", "screening", "analyzing"] as const;
 const date = (value: string) =>
   value
@@ -284,6 +289,29 @@ export default function DiscoveryPanel({
               <option value="intermediate">中等以下</option>
               <option value="any">不限難度</option>
             </select>
+          </label>
+          <label>
+            搜尋排序
+            <select
+              value={preferences.sort}
+              onChange={(event) =>
+                update({
+                  sort: event.target.value as DiscoveryPreferences["sort"],
+                })
+              }
+            >
+              {(Object.keys(sortLabels) as DiscoveryPreferences["sort"][]).map(
+                (value) => (
+                  <option key={value} value={value}>
+                    {sortLabels[value]}
+                  </option>
+                ),
+              )}
+            </select>
+            <small>
+              最近更新：反映近期活動，但結果隨專案更新而變動。相關度：GitHub best
+              match，可能含久未維護的專案，已排除封存專案並顯示最近推送時間。星數：知名度高，競爭與審查門檻也較高。
+            </small>
           </label>
           <label>
             最低星數
@@ -543,7 +571,7 @@ export default function DiscoveryPanel({
               <p>
                 {previous
                   ? `這是 ${date(previous.createdAt)} 的結果，未反映本次搜尋。`
-                  : "依來源與適合程度整理的提案；實作前仍需確認 issue 最新狀態與維護者意願。"}
+                  : `依你選的「${sortLabels[job?.preferences.sort ?? "updated"]}」排序取 12 個候選、驗證後最多 6 個；順序由分析整理，不是 GitHub 全站排名。實作前仍需確認 issue 最新狀態與維護者意願。`}
               </p>
             </div>
             <span className="discovery-count">
