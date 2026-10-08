@@ -68,3 +68,14 @@ export function parseAgentProcessLimit(value: string | undefined): number {
     throw new Error("BELLPR_MAX_AGENT_PROCESSES must be between 1 and 32.");
   return limit;
 }
+
+export const defaultActiveRunLimit = 2;
+
+/** Parses BELLPR_MAX_ACTIVE_RUNS; an unset variable means the default. */
+export function parseActiveRunLimit(value: string | undefined): number {
+  if (value === undefined) return defaultActiveRunLimit;
+  const limit = Number(value);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 8)
+    throw new Error("BELLPR_MAX_ACTIVE_RUNS must be between 1 and 8.");
+  return limit;
+}

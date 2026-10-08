@@ -4,6 +4,7 @@ import {
   Cpu,
   FileText,
   Gauge,
+  Globe,
   Lightbulb,
   Settings2,
   ShieldCheck,
@@ -388,6 +389,24 @@ export function DirectionSettings({
             </p>
           </div>
         </div>
+        <label className="mission-plan-option">
+          <input
+            type="checkbox"
+            checked={value.webAccess === true}
+            onChange={(event) => update("webAccess", event.target.checked)}
+            aria-describedby={`${id}-web-help`}
+          />
+          <span className="mission-plan-copy">
+            <strong>
+              <Globe size={16} />
+              允許 Agent 上網搜尋與讀取網頁
+            </strong>
+            <small id={`${id}-web-help`}>
+              套用到 Lead、Teammates、Reviewer、Test analyst
+              與追問導師；專案分析與探索貢獻維持離線。網頁內容視為不可信資料；Claude Code 的 curl、wget 仍被拒絕。
+            </small>
+          </span>
+        </label>
         {modelError && (
           <div className="mission-model-error" role="status">
             <span>{modelError} 已儲存的選擇會保留。</span>

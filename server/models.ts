@@ -26,11 +26,13 @@ export const modelSettingsSchema = {
   provider: provider.optional(),
   model: modelId.or(z.literal("")).default(""),
   reasoningEffort: effort.or(z.literal("")).default(""),
+  webAccess: z.boolean().optional(),
 };
 export const modelExecutionSchema = z.object({
   provider: provider.optional(),
   model: modelId.optional(),
   reasoningEffort: effort.optional(),
+  webAccess: z.boolean().optional(),
   source: z.enum(["selected", "catalog-default", "cli-default"]),
   // Persisted insights and discovery records are parsed with this schema; unknown keys are stripped.
   reported: z
@@ -307,8 +309,11 @@ export function resolveModelExecution(
   const selected = parsed.data;
   if ((selected.provider ?? "codex") !== catalog.source)
     throw new AppError("模型目錄與所選 Agent 不一致，請重新載入後再選擇。", 400);
-  const recordedProvider =
-    catalog.source === "codex" ? {} : { provider: catalog.source };
+  const recordedProvider = {
+    ...(catalog.source === "codex" ? {} : { provider: catalog.source }),
+    // Off is the default, so only an enabled flag is recorded on the run.
+    ...(selected.webAccess ? { webAccess: true } : {}),
+  };
   const model = selected.model
     ? catalog.models.find((item) => item.id === selected.model)
     : catalog.models.find((item) => item.isDefault);

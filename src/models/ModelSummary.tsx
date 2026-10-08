@@ -78,6 +78,12 @@ export function ModelSummary({
                   : `${label} 預設`}
               </dd>
             </div>
+            {execution.webAccess && (
+              <div>
+                <dt>網路</dt>
+                <dd>已允許上網</dd>
+              </div>
+            )}
           </dl>
           <p>
             {reported

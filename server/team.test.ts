@@ -22,7 +22,7 @@ import { git } from "./process.js";
 import { readDiff } from "./git.js";
 import { Workbench } from "./workbench.js";
 import { Store } from "./store.js";
-import type { DiffFile, Run } from "./types.js";
+import type { AppError, DiffFile, Run } from "./types.js";
 import type { AgentTeam, TeamTask } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import { ProjectInsightsService } from "./insights.js";
@@ -111,7 +111,7 @@ const stubStatus = async () => ({
 
 async function fixture(
   runner?: TeamAgentRunner,
-  dependencies: { agentSlots?: AgentSlots } = {},
+  dependencies: { agentSlots?: AgentSlots; maxActiveRuns?: number } = {},
 ) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-team-test-"));
   const repository = path.join(directory, "repo");
@@ -1373,6 +1373,99 @@ test("cancelling a queued run does not wait for or abort other active runs", asy
   }
 });
 
+/** A lead that blocks until its run is cancelled, recording each worktree it starts in. */
+const blockingRunner =
+  (started: Set<string>): TeamAgentRunner =>
+  async (input) => {
+    started.add(input.cwd);
+    await new Promise<void>((_, reject) => {
+      if (input.signal.aborted) reject(new Error("cancelled"));
+      else
+        input.signal.addEventListener(
+          "abort",
+          () => reject(new Error("cancelled")),
+          { once: true },
+        );
+    });
+    return "unreachable";
+  };
+
+test("maxActiveRuns 3 executes three queued runs at once in separate worktrees", async () => {
+  const started = new Set<string>();
+  const f = await fixture(blockingRunner(started), { maxActiveRuns: 3 });
+  try {
+    const runs = [];
+    for (const title of ["First", "Second", "Third", "Fourth"])
+      runs.push(
+        await f.workbench.createRun(f.repo.id, title, undefined, settings),
+      );
+    await waitUntil(() => started.size === 3, "three concurrent runs");
+    await delay(100);
+    assert.equal(started.size, 3);
+    assert.deepEqual(
+      runs.map((run) => run.status),
+      ["running", "running", "running", "queued"],
+    );
+    assert.equal(new Set(runs.map((run) => run.worktreePath)).size, 4);
+    assert.equal(new Set(runs.map((run) => run.branch)).size, 4);
+    await f.workbench.cancel(runs[0].id);
+    await waitUntil(() => started.size === 4, "queued run promoted");
+    assert.equal(runs[3].status, "running");
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("maxActiveRuns 1 serialises queued runs", async () => {
+  const started = new Set<string>();
+  const f = await fixture(blockingRunner(started), { maxActiveRuns: 1 });
+  try {
+    const first = await f.workbench.createRun(
+      f.repo.id,
+      "First",
+      undefined,
+      settings,
+    );
+    const second = await f.workbench.createRun(
+      f.repo.id,
+      "Second",
+      undefined,
+      settings,
+    );
+    await waitUntil(() => started.size === 1, "first run");
+    await delay(100);
+    assert.equal(started.size, 1);
+    assert.equal(first.status, "running");
+    assert.equal(second.status, "queued");
+    await f.workbench.cancel(first.id);
+    await waitUntil(() => started.size === 2, "second run");
+    assert.equal(second.status, "running");
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("the queue cap follows maxActiveRuns and the 429 message states the number", async () => {
+  const started = new Set<string>();
+  const f = await fixture(blockingRunner(started), { maxActiveRuns: 5 });
+  try {
+    for (let index = 0; index < 10; index++)
+      await f.workbench.createRun(
+        f.repo.id,
+        `Run ${index}`,
+        undefined,
+        settings,
+      );
+    await assert.rejects(
+      f.workbench.createRun(f.repo.id, "Overflow", undefined, settings),
+      (error: AppError) =>
+        error.statusCode === 429 && /10 個工作/.test(error.message),
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test("cancelling a paused plan completes without starting any teammate", async () => {
   let memberCalls = 0;
   const f = await fixture(async (input) => {
@@ -1670,6 +1763,8 @@ if (prompt.includes('You are the team lead with read-only access')) {
   fs.writeFileSync(path.join(process.cwd(), 'a.ts'), 'export const value = "alpha";\\n');
   emit({ type: 'command_execution', command: 'npm test -- a.test.ts\\ncat /tmp/out.log', aggregated_output: 'SECRET-OUTPUT', exit_code: 0 });
   emit({ type: 'command_execution', command: 'curl -H "Authorization: token ghp_0123456789abcdef0123" https://example.invalid', exit_code: 7 });
+  // Shape observed with Codex 0.159 live search: the query repeats in action.query; results stay out of the log.
+  emit({ type: 'web_search', query: 'site:nodejs.org LTS schedule', action: { type: 'search', query: 'site:nodejs.org LTS schedule' }, results: [{ type: 'text_result', snippet: 'SECRET-SNIPPET' }] });
   emit({ type: 'file_change', changes: [{ path: 'a.ts', kind: 'update' }] });
   emit({ type: 'agent_message', text: JSON.stringify({ report: 'alpha 完成；fake codex 自述執行了 npm test。', messages: [] }) });
 } else {
@@ -1684,8 +1779,9 @@ if (prompt.includes('You are the team lead with read-only access')) {
       f.repo.id,
       "Record what really ran",
       "Fake codex",
-      { ...settings, requirePlanApproval: false },
+      { ...settings, requirePlanApproval: false, webAccess: true },
     );
+    assert.equal(run.modelExecution?.webAccess, true);
     await waitUntil(
       () => run.status === "review" || run.status === "failed",
       "fake codex team completion",
@@ -1734,7 +1830,25 @@ if (prompt.includes('You are the team lead with read-only access')) {
       memberLogs.some((log) => !log.kind && log.message.includes("alpha 完成；")),
       "the member's answer stays a plain message",
     );
-    assert.doesNotMatch(JSON.stringify(run), /SECRET-OUTPUT|ghp_0123|cat \/tmp/);
+    // Web access: the opening line says so, and a search is logged by its query only.
+    assert.ok(
+      memberLogs.some(
+        (log) => log.kind === "status" && /開始工作。.*；已允許上網。/.test(log.message),
+      ),
+    );
+    assert.deepEqual(
+      memberLogs
+        .filter((log) => log.message.startsWith("搜尋網路："))
+        .map(({ kind, message, detail }) => ({ kind, message, detail })),
+      [
+        {
+          kind: "status",
+          message: "搜尋網路：site:nodejs.org LTS schedule",
+          detail: "site:nodejs.org LTS schedule",
+        },
+      ],
+    );
+    assert.doesNotMatch(JSON.stringify(run), /SECRET-OUTPUT|SECRET-SNIPPET|ghp_0123|cat \/tmp/);
     // The lead integration and test analyst prompts receive the same facts, labelled as untrusted and output-free.
     const prompts = (await readFile(promptsFile, "utf8"))
       .trim()
@@ -1762,6 +1876,32 @@ if (prompt.includes('You are the team lead with read-only access')) {
     }
     assert.ok(reviewer);
     assert.doesNotMatch(reviewer.prompt, /application-observed/);
+    // Every team role ran with live search and the one-sentence web rule; isolated roles stay offline.
+    const member = prompts.find((entry) =>
+      entry.prompt.includes("independent teammate working on task"),
+    );
+    for (const entry of [integration, tester, reviewer, member]) {
+      assert.ok(entry);
+      const index = entry.args.indexOf('web_search="live"');
+      assert.ok(index > 0 && entry.args[index - 1] === "-c", entry.args.join(" "));
+      assert.match(entry.prompt, /Web access is enabled: .* untrusted data/);
+    }
+    // The explanation and draft roles start in the background once the run is in review.
+    let isolated: { args: string[]; prompt: string }[] = [];
+    const deadline = Date.now() + 8000;
+    while (!isolated.length && Date.now() < deadline) {
+      await delay(20);
+      isolated = (await readFile(promptsFile, "utf8"))
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as { args: string[]; prompt: string })
+        .filter((entry) => entry.args.includes("--skip-git-repo-check"));
+    }
+    assert.ok(isolated.length > 0, "an isolated role ran");
+    for (const entry of isolated) {
+      assert.ok(!entry.args.includes('web_search="live"'), entry.args.join(" "));
+      assert.doesNotMatch(entry.prompt, /Web access is enabled/);
+    }
     // The saved state carries the new optional fields. state.json is read
     // directly: a second Store writing into the same directory would race
     // with the background explanation and draft jobs' saves.

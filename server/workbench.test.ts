@@ -436,6 +436,55 @@ test("process output is bounded and cancellation terminates a running command", 
   assert.equal(redact("ghp_" + "a".repeat(36)), "[REDACTED]");
 });
 
+test("GET /api/status reports the configured run, process and queue limits", async () => {
+  const f = await fixture();
+  const workbench = new Workbench(f.store, undefined, {
+    agentSlots: new AgentSlots(5),
+    maxActiveRuns: 3,
+  });
+  // Stub the CLI probes so the test never spawns codex, claude or gh.
+  workbench.status = async () => ({
+    codex: false,
+    codexAuthenticated: false,
+    claude: false,
+    claudeAuthenticated: false,
+    github: false,
+  });
+  const app = createApp(workbench, {
+    staticDirectory: path.join(f.directory, "missing"),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing server port");
+  try {
+    const response = await http(`http://127.0.0.1:${address.port}/api/status`, {
+      headers: { host: "127.0.0.1:4311" },
+    });
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as { codex: boolean; limits: unknown };
+    assert.equal(body.codex, false);
+    assert.deepEqual(body.limits, {
+      maxActiveRuns: 3,
+      maxAgentProcesses: 5,
+      maxQueued: 8,
+    });
+    assert.deepEqual(new Workbench(f.store).limits, {
+      maxActiveRuns: 2,
+      maxAgentProcesses: 3,
+      maxQueued: 8,
+    });
+    assert.equal(
+      new Workbench(f.store, undefined, { maxActiveRuns: 6 }).limits.maxQueued,
+      12,
+    );
+  } finally {
+    server.close();
+    await rm(f.directory, { recursive: true, force: true });
+  }
+});
+
 test("HTTP API restricts localhost origins, requires JSON mutations, and validates input", async () => {
   const f = await fixture();
   const app = createApp(f.workbench, {

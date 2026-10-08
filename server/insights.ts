@@ -278,8 +278,13 @@ const sharedModelSettingsSchema = z.object(modelSettingsSchema).strict();
 
 /** Model choices are shared by every project; legacy per-project values are ignored. */
 function withoutModel(settings: ContributionSettings) {
-  const { provider: _provider, model: _model, reasoningEffort: _effort, ...project } =
-    settings;
+  const {
+    provider: _provider,
+    model: _model,
+    reasoningEffort: _effort,
+    webAccess: _webAccess,
+    ...project
+  } = settings;
   return project;
 }
 
@@ -624,6 +629,9 @@ export class ProjectInsightsService {
       ...(settings.provider ? { provider: settings.provider } : {}),
       model: settings.model,
       reasoningEffort: settings.reasoningEffort,
+      ...(settings.webAccess === undefined
+        ? {}
+        : { webAccess: settings.webAccess }),
     });
     await this.update(repoId, (cache) => {
       cache.settings = contributionSettingsSchema.parse(project);

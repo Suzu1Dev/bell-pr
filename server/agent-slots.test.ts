@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
-import { AgentSlots, parseAgentProcessLimit } from "./agent-slots.js";
+import {
+  AgentSlots,
+  parseActiveRunLimit,
+  parseAgentProcessLimit,
+} from "./agent-slots.js";
 import { AppError } from "./types.js";
 
 test("slots respect the limit and grant waiters in FIFO order", async () => {
@@ -80,4 +84,12 @@ test("BELLPR_MAX_AGENT_PROCESSES defaults to 3 and rejects values outside 1-32",
   for (const invalid of ["0", "33", "two", "", "2.5"])
     assert.throws(() => parseAgentProcessLimit(invalid), /1 and 32/);
   assert.throws(() => new AgentSlots(0), /positive integer/);
+});
+
+test("BELLPR_MAX_ACTIVE_RUNS defaults to 2 and rejects values outside 1-8", () => {
+  assert.equal(parseActiveRunLimit(undefined), 2);
+  assert.equal(parseActiveRunLimit("1"), 1);
+  assert.equal(parseActiveRunLimit("8"), 8);
+  for (const invalid of ["0", "9", "two", "", "1.5"])
+    assert.throws(() => parseActiveRunLimit(invalid), /1 and 8/);
 });

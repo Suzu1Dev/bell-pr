@@ -20,43 +20,52 @@ export interface AgentCommandOptions {
   outputSchema?: string;
   /** Codex only: allow a working directory outside a Git repository. */
   skipGitRepoCheck?: boolean;
+  /** Web search and page fetching for "read" and "write"; "none" never gets it. */
+  web?: boolean;
 }
 
 export const agentLabel = (provider: AgentProvider = "codex") =>
   providerLabels[provider];
 
-const claudeAccess: Record<AgentAccess, string[]> = {
-  none: ["--tools", "", "--permission-mode", "dontAsk"],
-  read: [
+/** Claude Code's built-in web tools; WebFetch is the sanctioned way to read a page, curl/wget stay denied. */
+const claudeWebTools = ["WebSearch", "WebFetch"];
+
+function claudeAccess(access: AgentAccess, web: boolean): string[] {
+  if (access === "none") return ["--tools", "", "--permission-mode", "dontAsk"];
+  const tools =
+    access === "read"
+      ? ["Read", "Grep", "Glob"]
+      : ["Read", "Grep", "Glob", "Edit", "Write", "Bash"];
+  const allowed =
+    access === "read" ? ["Read", "Grep", "Glob"] : ["Read", "Grep", "Glob", "Bash"];
+  const extra = web ? claudeWebTools : [];
+  return [
     "--tools",
-    "Read,Grep,Glob",
+    [...tools, ...extra].join(","),
     "--allowedTools",
-    "Read Grep Glob",
+    [...allowed, ...extra].join(" "),
     "--permission-mode",
-    "dontAsk",
-  ],
-  // acceptEdits approves file edits inside the working directory only; Bash is not sandboxed.
-  // Deny rules win over allow rules: pushing, GitHub CLI and raw downloads stay with BELL's own flow.
-  write: [
-    "--tools",
-    "Read,Grep,Glob,Edit,Write,Bash",
-    "--allowedTools",
-    "Read Grep Glob Bash",
-    "--permission-mode",
-    "acceptEdits",
-    "--disallowedTools",
-    "Bash(git push:*)",
-    "Bash(gh:*)",
-    "Bash(curl:*)",
-    "Bash(wget:*)",
-  ],
-};
+    access === "read" ? "dontAsk" : "acceptEdits",
+    // acceptEdits approves file edits inside the working directory only; Bash is not sandboxed.
+    // Deny rules win over allow rules: pushing, GitHub CLI and raw downloads stay with BELL's own flow.
+    ...(access === "write"
+      ? [
+          "--disallowedTools",
+          "Bash(git push:*)",
+          "Bash(gh:*)",
+          "Bash(curl:*)",
+          "Bash(wget:*)",
+        ]
+      : []),
+  ];
+}
 
 /** The prompt is always written to stdin; a shell is never used. */
 export async function agentCommand(
   execution: ModelExecution,
   options: AgentCommandOptions,
 ): Promise<{ executable: string; args: string[] }> {
+  const web = options.web === true && options.access !== "none";
   if (execution.provider === "claude") {
     const value = modelExecutionSchema.parse(execution);
     return {
@@ -74,7 +83,7 @@ export async function agentCommand(
         "user",
         ...(value.model ? ["--model", value.model] : []),
         ...(value.reasoningEffort ? ["--effort", value.reasoningEffort] : []),
-        ...claudeAccess[options.access],
+        ...claudeAccess(options.access, web),
         ...(options.outputSchema
           ? ["--json-schema", await readFile(options.outputSchema, "utf8")]
           : []),
@@ -92,6 +101,8 @@ export async function agentCommand(
       options.access === "write" ? "workspace-write" : "read-only",
       "-c",
       'approval_policy="never"',
+      // Codex 0.159 `exec` has no --search flag; live search is a config override.
+      ...(web ? ["-c", 'web_search="live"'] : []),
       ...(options.skipGitRepoCheck ? ["--skip-git-repo-check"] : []),
       "--json",
       "--color",
@@ -122,6 +133,8 @@ export type AgentEvent =
   | { kind: "file-change"; path?: string }
   /** Recoverable waiting or denial the user should see now; never a failure by itself. */
   | { kind: "notice"; message: string }
+  /** detail is the search query or the fetched URL, redacted and cut to 200 characters. */
+  | { kind: "web"; action: "search" | "fetch"; detail: string }
   /** Claude Code's system/init: the resolved model and the CLI version. */
   | { kind: "session"; model: string; cliVersion?: string }
   /** Model IDs present in result.modelUsage; the first entry is not necessarily the main model. */
@@ -156,6 +169,15 @@ function summarize(value: unknown): string | undefined {
 }
 const withField = <K extends string>(key: K, value: string | undefined) =>
   value === undefined ? {} : ({ [key]: value } as Record<K, string>);
+
+/** A search query or URL for the log; absent when the CLI gave none. */
+function webEvent(
+  action: "search" | "fetch",
+  detail: unknown,
+): AgentEvent[] {
+  const text = summarize(detail);
+  return text ? [{ kind: "web", action, detail: text.slice(0, 200) }] : [];
+}
 
 const rateLimitWindows: Record<string, string> = {
   five_hour: "5 小時滾動視窗：用量每 5 小時依開始時間重置",
@@ -268,6 +290,15 @@ export function agentEventReader(provider: AgentProvider = "codex") {
           ? paths.map((path: string) => ({ kind: "file-change", path }))
           : [{ kind: "file-change" }];
       }
+      if (value.type === "item.completed" && item?.type === "web_search") {
+        // Codex 0.159: item.query may be empty; the action then carries the query (observed as a
+        // string in action.query, documented as action.queries). Results are never read.
+        const action = item.action && typeof item.action === "object" ? item.action : {};
+        const queries = (
+          Array.isArray(action.queries) ? action.queries : [action.query]
+        ).filter((query: unknown) => typeof query === "string" && query);
+        return webEvent("search", item.query || queries.join(" / "));
+      }
       if (value.type === "error" || value.type === "turn.failed") {
         const terminal = value.type === "turn.failed";
         return [
@@ -310,6 +341,9 @@ export function agentEventReader(provider: AgentProvider = "codex") {
         if (block.type === "tool_use" && typeof block.id === "string") {
           const name = String(block.name);
           const input = block.input && typeof block.input === "object" ? block.input : {};
+          // Web tools are logged when requested: their tool_result holds page content, which is never read.
+          if (name === "WebSearch") events.push(...webEvent("search", input.query));
+          if (name === "WebFetch") events.push(...webEvent("fetch", input.url));
           tools.set(block.id, {
             name,
             summary: summarize(

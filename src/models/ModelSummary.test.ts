@@ -62,3 +62,14 @@ test("a reported Claude Code model shows the passed alias, the resolved model an
   assert.match(same, /<dd>claude-sonnet-4-5<\/dd>/);
   assert.doesNotMatch(same, /→|本次執行呼叫過的模型/);
 });
+
+test("web access is shown only when the run recorded it", () => {
+  const on = render({
+    execution: { provider: "claude", model: "sonnet", webAccess: true, source: "selected" },
+  });
+  assert.match(on, /<dt>網路<\/dt><dd>已允許上網<\/dd>/);
+  const off = render({
+    execution: { provider: "claude", model: "sonnet", source: "selected" },
+  });
+  assert.doesNotMatch(off, /已允許上網/);
+});

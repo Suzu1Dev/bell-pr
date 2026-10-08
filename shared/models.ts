@@ -20,6 +20,8 @@ export interface ModelSettings {
   provider?: AgentProvider;
   model?: string;
   reasoningEffort?: ReasoningEffort | "";
+  /** Lets run roles search the web and fetch pages; off when absent. Analysis and discovery never get it. */
+  webAccess?: boolean;
 }
 export interface ModelOption {
   id: string;
@@ -39,6 +41,8 @@ export interface ModelExecution {
   provider?: AgentProvider;
   model?: string;
   reasoningEffort?: ReasoningEffort;
+  /** Recorded only when the run was created with web access on. */
+  webAccess?: boolean;
   source: "selected" | "catalog-default" | "cli-default";
   /** What the CLI itself reported (Claude Code only so far); absent for Codex and older records. */
   reported?: {
