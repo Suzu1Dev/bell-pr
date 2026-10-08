@@ -71,6 +71,36 @@ export function parseDiff(patch: string): DiffLine[] {
 
 export type SplitRow = { left?: DiffLine; right?: DiffLine; hunk?: DiffLine };
 
+/**
+ * Short badges keyed by the language names server/git.ts languageFor emits.
+ * JSON gets its own badge so it never collides with JavaScript's "JS".
+ */
+export const languageBadges: Record<string, string> = {
+  TypeScript: "TS",
+  TSX: "TSX",
+  JavaScript: "JS",
+  JSX: "JSX",
+  Python: "PY",
+  Rust: "RS",
+  Go: "GO",
+  CSS: "CSS",
+  SCSS: "SCS",
+  JSON: "JSN",
+  Markdown: "MD",
+  YAML: "YML",
+  HTML: "HTM",
+  Shell: "SH",
+  SQL: "SQL",
+  Ruby: "RB",
+  Java: "JAV",
+  Text: "TXT",
+};
+
+/** Badge of at most three characters; unknown languages fall back to their first two letters. */
+export function languageBadge(language: string): string {
+  return languageBadges[language] ?? language.trim().slice(0, 2).toUpperCase();
+}
+
 /** Keep context questions within the chat API's 8,000-character limit. */
 export function selectionQuestion(path: string, lines: DiffLine[]): string {
   const header = `請用白話解釋 ${path} 中選取的 ${lines.length} 行程式碼，說明它們的用途、變更原因與需要注意的地方。\n\n`;

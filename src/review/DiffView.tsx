@@ -10,7 +10,13 @@ import {
   X,
 } from "lucide-react";
 import type { DiffFile } from "../types";
-import { parseDiff, selectionQuestion, splitDiff, type DiffLine } from "./diff";
+import {
+  languageBadges,
+  parseDiff,
+  selectionQuestion,
+  splitDiff,
+  type DiffLine,
+} from "./diff";
 import "./review.css";
 
 export interface DiffViewProps {
@@ -81,15 +87,8 @@ export function DiffView({
   const selectedIds = new Set(selectedLines.map((line) => line.id));
   const paths = file.path.split("/");
   const name = paths.pop();
-  const languageLabel =
-    (
-      {
-        TypeScript: "TS",
-        JavaScript: "JS",
-        Markdown: "MD",
-        Python: "PY",
-      } as Record<string, string>
-    )[file.language] ?? file.language;
+  // The header has room for the full name when no short badge is defined.
+  const languageLabel = languageBadges[file.language] ?? file.language;
 
   function select(line: DiffLine, extend: boolean) {
     setSelection((current) =>

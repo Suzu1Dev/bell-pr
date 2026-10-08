@@ -936,7 +936,7 @@ button {
   border: 1px solid #dbe8ea;
   border-radius: 2px;
   padding: 1px 2px;
-  width: 19px;
+  min-width: 19px;
   text-align: center;
 }
 .file-type.markdown {
@@ -963,6 +963,9 @@ button {
   font-size: 9px;
   color: #a7a567;
   font-family: var(--mono);
+}
+.file-modified.file-deleted {
+  color: #b86b6b;
 }
 .file-reviewed {
   color: #659563;
@@ -2060,6 +2063,13 @@ button {
   color: #c3d2b5;
   margin-left: 12px;
 }
+.toast-error {
+  background: #5a2a2a;
+  border-color: #7d4343;
+}
+.toast-error > button {
+  color: #e4c4c4;
+}
 .connection-banner {
   padding: 12px 34px;
   display: flex;
@@ -2518,7 +2528,7 @@ button {
   }
   .file-type {
     font-size: 7px;
-    width: 17px;
+    min-width: 17px;
   }
   .review-progress {
     display: none;

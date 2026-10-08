@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseDiff, selectionQuestion, splitDiff } from "./diff";
+import {
+  languageBadge,
+  languageBadges,
+  parseDiff,
+  selectionQuestion,
+  splitDiff,
+} from "./diff";
 import { demoFiles } from "../demo";
 
 test("unified diff preserves independent old and new line offsets across hunks", () => {
@@ -89,4 +95,16 @@ test("demo diff counts match their displayed patches and hunk line counts", () =
       file.path,
     );
   }
+});
+
+test("language badges stay within three characters and keep JSON apart from JavaScript", () => {
+  for (const badge of Object.values(languageBadges))
+    assert.ok(badge.length <= 3, badge);
+  assert.equal(languageBadge("TypeScript"), "TS");
+  assert.equal(languageBadge("Markdown"), "MD");
+  assert.notEqual(languageBadge("JSON"), languageBadge("JavaScript"));
+  assert.equal(languageBadge("Text"), "TXT");
+  // server/git.ts returns the raw extension for languages it does not name.
+  assert.equal(languageBadge("toml"), "TO");
+  assert.equal(languageBadge(""), "");
 });
