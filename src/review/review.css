@@ -511,7 +511,8 @@
 }
 .explain-tabs {
   display: flex;
-  gap: 22px;
+  flex-wrap: wrap;
+  gap: 0 16px;
   flex-shrink: 0;
   padding: 0 18px;
   border-bottom: 1px solid var(--review-border);
@@ -703,6 +704,54 @@
   font-size: 11px;
   line-height: 1.8;
   margin: 18px 4px 0;
+}
+.explain-test-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: -6px 0 14px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: #f3f7ef;
+  color: #46603f;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.explain-test-hint > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.explain-reports-intro {
+  color: #5f7260;
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 0 0 14px;
+}
+.explain-panel .explain-card-report > h3 {
+  flex-wrap: wrap;
+}
+.explain-report-author {
+  margin-left: auto;
+  color: #83917b;
+  font-size: 11px;
+  font-weight: 500;
+}
+.explain-report-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: -4px 0 12px;
+  color: #718566;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.explain-report-badge {
+  padding: 1px 6px;
+  border: 1px solid #ebe5d1;
+  border-radius: 4px;
+  background: #f5f3e9;
+  color: #857746;
 }
 .explain-followup {
   flex-shrink: 0;

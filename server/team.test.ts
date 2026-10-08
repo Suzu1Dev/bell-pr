@@ -274,6 +274,15 @@ test("team execution waits for plan approval, runs isolated independent members 
     assert.match(input.prompt, /required response format/);
     if (input.role === "guide") {
       assert.match(input.prompt, /complete teaching explanation/);
+      // The mentor gets the user's contribution settings and the named
+      // reviewer/tester reports, labelled as untrusted static review.
+      assert.match(input.prompt, /"constraints":"保留 API"/);
+      assert.match(input.prompt, /"acceptance":"既有測試通过"/);
+      assert.match(
+        input.prompt,
+        /UNTRUSTED DATA[^\n]*\n\{"reviewer":"獨立靜態審查：未發現問題；本輪未執行專案程式碼。","tester":"獨立靜態審查：未發現問題；本輪未執行專案程式碼。"\}/,
+      );
+      assert.match(input.prompt, /Prior conversation:\n\nQuestion: 請解釋這個改動/);
       return "這個改動讓三個模組產生一致輸出；這是模擬教學回答。";
     }
     if (input.role === "lead") {

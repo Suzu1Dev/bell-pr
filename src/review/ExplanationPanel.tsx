@@ -6,14 +6,16 @@ import {
   ArrowUpRight,
   BookOpen,
   Check,
+  Eye,
   FileCode2,
+  FlaskConical,
   Lightbulb,
   LoaderCircle,
   MessageCircle,
   RotateCcw,
   Sparkles,
 } from "lucide-react";
-import type { ChatMessage, DiffFile } from "../types";
+import type { ChatMessage, DiffFile, Run } from "../types";
 import { MarkdownContent } from "./MarkdownContent";
 import "./review.css";
 
@@ -23,10 +25,97 @@ export interface ExplanationPanelProps {
   loading: boolean;
   onAsk: (question: string) => void;
   demo: boolean;
+  /** Final role reports; only named keys are shown (see reportSections). */
+  reports?: Run["reports"];
   onRetryExplanation?: () => void;
   chatRequestId?: number;
   onChatRequestHandled?: () => void;
   explanationBusy?: boolean;
+}
+
+/** Test directories or `.test.` / `.spec.` file names. */
+const testFilePattern =
+  /(^|\/)(test|tests|__tests__|spec)(\/|\.)|\.(test|spec)\./;
+
+// Explicit keys only: run.reports also stores teammate JSON, task ids and the
+// mentor's own answers, which are not review reports.
+const reportSections = [
+  { key: "implementer", title: "Lead 整合摘要", author: "Atlas · Team lead" },
+  { key: "reviewer", title: "程式審查", author: "Lens · Reviewer" },
+  { key: "tester", title: "測試分析", author: "Scout · Test analyst" },
+] as const;
+
+/** Paragraphs (split on blank lines) that mention the path or its basename. */
+export function reportMentionCount(report: string, filePath: string) {
+  const basename = filePath.split("/").pop() || filePath;
+  return report
+    .split(/\n\s*\n/)
+    .filter(
+      (paragraph) =>
+        paragraph.includes(filePath) || paragraph.includes(basename),
+    ).length;
+}
+
+export function ReviewReports({
+  file,
+  reports,
+  demo,
+}: {
+  file: DiffFile;
+  reports?: Run["reports"];
+  demo: boolean;
+}) {
+  const available = reportSections.filter((section) =>
+    reports?.[section.key]?.trim(),
+  );
+  if (!available.length)
+    return (
+      <div className="explain-empty">
+        <Eye size={28} />
+        <h3>這次工作還沒有審查報告</h3>
+        <p>Lead 整合、Reviewer 與 Test analyst 完成後，報告全文會放在這裡。</p>
+      </div>
+    );
+  return (
+    <>
+      <div className="explain-ready-label">
+        <Check size={13} />
+        {demo ? "示範報告 · 預先整理的內容" : "團隊回報的完整內容"}
+      </div>
+      <p className="explain-reports-intro">
+        這些是獨立靜態審查，不是執行結果；每份報告保留全文，並標示提到目前檔案的段落數。
+      </p>
+      {available.map((section) => {
+        const report = reports![section.key]!;
+        const mentions = reportMentionCount(report, file.path);
+        return (
+          <section className="explain-card explain-card-report" key={section.key}>
+            <h3>
+              <Eye size={15} />
+              {section.title}
+              <span className="explain-report-author">{section.author}</span>
+            </h3>
+            <p className="explain-report-meta">
+              <span className="explain-report-badge">
+                獨立靜態審查，非執行結果
+              </span>
+              <span>
+                {mentions
+                  ? `本報告提到此檔 ${mentions} 處`
+                  : "此報告未直接提到本檔"}
+              </span>
+            </p>
+            <MarkdownContent>{report}</MarkdownContent>
+          </section>
+        );
+      })}
+      <p className="explain-evidence-note">
+        {demo
+          ? "示範報告不是即時 AI 推論，也不代表測試結果。"
+          : "報告內容由各角色靜態檢視產生；實測結果以報告中明確列出的指令與輸出為準。"}
+      </p>
+    </>
+  );
 }
 
 export function ExplanationPanel({
@@ -35,12 +124,13 @@ export function ExplanationPanel({
   loading,
   onAsk,
   demo,
+  reports,
   onRetryExplanation,
   chatRequestId = 0,
   onChatRequestHandled,
   explanationBusy = false,
 }: ExplanationPanelProps) {
-  const [tab, setTab] = useState<"explain" | "chat">(
+  const [tab, setTab] = useState<"explain" | "reports" | "chat">(
     chatRequestId ? "chat" : "explain",
   );
   const [question, setQuestion] = useState("");
@@ -50,7 +140,10 @@ export function ExplanationPanel({
 
   useEffect(() => {
     setQuestion("");
-    setTab(chatRequestId ? "chat" : "explain");
+    // Reports are run-level, so stay on that tab when the reader clicks through files.
+    setTab((current) =>
+      chatRequestId ? "chat" : current === "reports" ? "reports" : "explain",
+    );
     lastMessageCount.current = messages.length;
   }, [file.path]);
 
@@ -99,10 +192,18 @@ export function ExplanationPanel({
   const questionCount = messages.filter(
     (message) => message.role === "user",
   ).length;
+  const isTestFile = testFilePattern.test(file.path);
   const presets = [
     "為什麼要這樣改？",
     "有哪些需要注意的風險？",
     "要怎麼測試這段程式碼？",
+    ...(explanation
+      ? [
+          "這個觀念在專案其他地方還能用在哪？",
+          "如果不這樣改，還有哪些做法？各有什麼取捨？",
+        ]
+      : []),
+    ...(isTestFile ? ["這個測試在保護什麼行為？"] : []),
   ];
 
   return (
@@ -131,6 +232,18 @@ export function ExplanationPanel({
         >
           <BookOpen size={14} />
           變更解說
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id={`${panelId}-reports`}
+          aria-selected={tab === "reports"}
+          aria-controls={`${panelId}-content`}
+          className={tab === "reports" ? "explain-tab-active" : ""}
+          onClick={() => setTab("reports")}
+        >
+          <Eye size={14} />
+          審查者怎麼看
         </button>
         <button
           type="button"
@@ -178,6 +291,13 @@ export function ExplanationPanel({
                     ? "示範解說 · 預先整理的學習內容"
                     : "已依這份 diff 自動整理"}
                 </div>
+                {isTestFile && (
+                  <p className="explain-test-hint">
+                    <FlaskConical size={13} />
+                    測試就是行為規格：先讀 it/test 描述，再對照 expect
+                    看它保護哪個邊界。
+                  </p>
+                )}
                 <section className="explain-card explain-card-example">
                   <h3>
                     <MessageCircle size={15} />
@@ -358,6 +478,8 @@ export function ExplanationPanel({
               </div>
             )}
           </>
+        ) : tab === "reports" ? (
+          <ReviewReports file={file} reports={reports} demo={demo} />
         ) : (
           <div
             className="explain-chat"
@@ -433,7 +555,7 @@ export function ExplanationPanel({
           </div>
         )}
       </div>
-      {tab === "explain" ? (
+      {tab !== "chat" ? (
         <div className="explain-followup">
           <button
             type="button"

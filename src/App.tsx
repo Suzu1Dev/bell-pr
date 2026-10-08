@@ -2037,6 +2037,7 @@ export default function App() {
                                 }
                                 explanationBusy={explanationRequests.has(run.id)}
                                 demo={demo}
+                                reports={run.reports}
                               />
                             </Suspense>
                           ) : (
