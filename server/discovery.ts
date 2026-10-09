@@ -46,6 +46,13 @@ import { agentEnvironment, command, redact } from "./process.js";
 import { collectDiscoveryCandidates } from "./discovery-sources.js";
 import { Store } from "./store.js";
 import { AgentSlots, defaultAgentProcessLimit } from "./agent-slots.js";
+import {
+  agentTimeoutMs,
+  defaultAgentTimeoutScale,
+  describeAgentTimeout,
+  hasExtendedAgentTimeout,
+  withAgentTimeoutHint,
+} from "./agent-timeouts.js";
 import { AppError } from "./types.js";
 
 export const discoveryPreferencesSchema = z
@@ -338,6 +345,7 @@ export class DiscoveryService {
   private collect: typeof collectDiscoveryCandidates;
   private slots: AgentSlots;
   private sleep?: TransientSleep;
+  private timeoutScale: number;
   private file: string;
   constructor(
     private store: Store,
@@ -346,6 +354,8 @@ export class DiscoveryService {
       getModelCatalog?: typeof getModelCatalog;
       collectCandidates?: typeof collectDiscoveryCandidates;
       agentSlots?: AgentSlots;
+      /** BELLPR_AGENT_TIMEOUT_SCALE; multiplies every agent turn timeout. */
+      agentTimeoutScale?: number;
       /** Wait between retries of an analysis that lost the OAuth refresh race. */
       sleep?: TransientSleep;
     } = {},
@@ -357,6 +367,8 @@ export class DiscoveryService {
     this.collect = dependencies.collectCandidates ?? collectDiscoveryCandidates;
     this.slots =
       dependencies.agentSlots ?? new AgentSlots(defaultAgentProcessLimit);
+    this.timeoutScale =
+      dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
   }
   private initialize() {
     this.initialization ??= (async () => {
@@ -534,11 +546,16 @@ export class DiscoveryService {
         return;
       }
       job.phase = "analyzing";
-      job.message = "已取得真實 GitHub 來源，正在分析適合的貢獻機會";
       job.modelExecution = resolveModelExecution(
         job.preferences,
         await this.modelCatalog(job.preferences.provider),
       );
+      const timeoutMs = agentTimeoutMs(
+        "discovery",
+        job.modelExecution,
+        this.timeoutScale,
+      );
+      job.message = `已取得真實 GitHub 來源，正在分析適合的貢獻機會${hasExtendedAgentTimeout(job.modelExecution) ? `（${describeAgentTimeout(timeoutMs)}）` : ""}`;
       this.assertActive(signal);
       await this.save();
       temporary = await mkdtemp(path.join(tmpdir(), "bell-discovery-"));
@@ -569,7 +586,7 @@ export class DiscoveryService {
               input,
               signal,
               env: agentEnvironment(),
-              timeoutMs: 240_000,
+              timeoutMs,
               maxBytes: 1_000_000,
               onLine: (line, stream) => {
                 if (stream !== "stdout") return;
@@ -594,7 +611,8 @@ export class DiscoveryService {
             }).catch((error: unknown) => {
               // claude exits non-zero after losing the OAuth refresh race; its result event
               // (flushed before the rejection) already classified the attempt as retryable.
-              if (!retryable) throw error;
+              if (!retryable)
+                throw withAgentTimeoutHint(error, cli.executable, timeoutMs);
             });
           } finally {
             releaseSlot();

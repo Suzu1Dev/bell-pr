@@ -1,0 +1,98 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  agentTimeoutMs,
+  describeAgentTimeout,
+  hasExtendedAgentTimeout,
+  maxAgentTimeoutMs,
+  parseAgentTimeoutScale,
+  withAgentTimeoutHint,
+} from "./agent-timeouts.js";
+import { AppError } from "./types.js";
+
+const codex = { provider: "codex" as const };
+const claude = { provider: "claude" as const };
+
+test("Codex without an effort factor keeps the baseline per kind", () => {
+  assert.equal(agentTimeoutMs("analysis", codex), 240_000);
+  assert.equal(agentTimeoutMs("discovery", codex), 240_000);
+  assert.equal(agentTimeoutMs("explanations", codex), 600_000);
+  assert.equal(agentTimeoutMs("draft", codex), 600_000);
+  assert.equal(agentTimeoutMs("read", codex), 600_000);
+  assert.equal(agentTimeoutMs("write", codex), 1_800_000);
+  for (const reasoningEffort of ["low", "medium", "high"] as const)
+    assert.equal(agentTimeoutMs("analysis", { ...codex, reasoningEffort }), 240_000);
+});
+
+test("Claude multiplies by 2.5 and xhigh/max apply to both providers", () => {
+  assert.equal(agentTimeoutMs("analysis", claude), 600_000);
+  assert.equal(agentTimeoutMs("read", claude), 1_500_000);
+  assert.equal(agentTimeoutMs("write", claude), 4_500_000);
+  assert.equal(
+    agentTimeoutMs("analysis", { ...claude, reasoningEffort: "xhigh" }),
+    900_000,
+  );
+  assert.equal(
+    agentTimeoutMs("analysis", { ...claude, reasoningEffort: "max" }),
+    1_200_000,
+  );
+  assert.equal(
+    agentTimeoutMs("analysis", { ...codex, reasoningEffort: "xhigh" }),
+    360_000,
+  );
+  assert.equal(
+    agentTimeoutMs("draft", { ...codex, reasoningEffort: "max" }),
+    1_200_000,
+  );
+});
+
+test("the scale multiplies, results round to whole seconds and never exceed two hours", () => {
+  assert.equal(agentTimeoutMs("analysis", codex, 2), 480_000);
+  assert.equal(agentTimeoutMs("analysis", codex, 0.5), 120_000);
+  // 240 × 1.0001 = 240.024 s rounds to 240 s; 240 × 1.0021 = 240.504 s rounds up.
+  assert.equal(agentTimeoutMs("analysis", codex, 1.0001), 240_000);
+  assert.equal(agentTimeoutMs("analysis", codex, 1.0021), 241_000);
+  assert.equal(agentTimeoutMs("write", claude, 10), maxAgentTimeoutMs);
+  assert.equal(
+    agentTimeoutMs("write", { ...claude, reasoningEffort: "max" }),
+    maxAgentTimeoutMs,
+  );
+  assert.equal(maxAgentTimeoutMs, 7_200_000);
+});
+
+test("only Claude or xhigh/max turns announce the longer wait", () => {
+  assert.equal(hasExtendedAgentTimeout(codex), false);
+  assert.equal(hasExtendedAgentTimeout({ ...codex, reasoningEffort: "high" }), false);
+  assert.equal(hasExtendedAgentTimeout({ ...codex, reasoningEffort: "xhigh" }), true);
+  assert.equal(hasExtendedAgentTimeout({ ...codex, reasoningEffort: "max" }), true);
+  assert.equal(hasExtendedAgentTimeout(claude), true);
+  assert.equal(describeAgentTimeout(900_000), "最多等待 15 分鐘");
+  assert.equal(describeAgentTimeout(2_250_000), "最多等待 37.5 分鐘");
+});
+
+test("only command()'s 504 is replaced with the actionable timeout message", () => {
+  const replaced = withAgentTimeoutHint(
+    new AppError("claude 執行逾時。", 504),
+    "claude",
+    900_000,
+  );
+  assert.ok(replaced instanceof AppError);
+  assert.equal(replaced.statusCode, 504);
+  assert.equal(
+    replaced.message,
+    "claude 執行逾時（已等待 15 分鐘）。較高的思考強度或大型專案需要更久；可降低思考強度、改用較快的模型，或提高 BELLPR_AGENT_TIMEOUT_SCALE。",
+  );
+  const failure = new AppError("codex 執行失敗：exit 1", 422);
+  assert.equal(withAgentTimeoutHint(failure, "codex", 240_000), failure);
+  const plain = new Error("boom");
+  assert.equal(withAgentTimeoutHint(plain, "codex", 240_000), plain);
+});
+
+test("BELLPR_AGENT_TIMEOUT_SCALE defaults to 1 and accepts 0.5-10", () => {
+  assert.equal(parseAgentTimeoutScale(undefined), 1);
+  assert.equal(parseAgentTimeoutScale("0.5"), 0.5);
+  assert.equal(parseAgentTimeoutScale("2.5"), 2.5);
+  assert.equal(parseAgentTimeoutScale("10"), 10);
+  for (const invalid of ["0", "0.4", "11", "-1", "two", "", " ", "NaN", "Infinity"])
+    assert.throws(() => parseAgentTimeoutScale(invalid), /0\.5 and 10/);
+});

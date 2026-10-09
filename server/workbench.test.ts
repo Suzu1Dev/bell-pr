@@ -1357,3 +1357,88 @@ test("a Claude Code turn that lost the OAuth refresh lock and exited non-zero is
     await f.cleanup();
   }
 });
+
+test("agent turns use the Codex read budget by default and a longer, announced one for Claude Code at xhigh", async () => {
+  const f = await fixture();
+  try {
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    const timeouts: number[] = [];
+    let timeOut = false;
+    const workbench = new Workbench(f.store, undefined, {
+      command: async (executable, _args, options = {}) => {
+        timeouts.push(options.timeoutMs!);
+        if (timeOut) throw new AppError(`${executable} 執行逾時。`, 504);
+        options.onLine?.(
+          JSON.stringify(
+            executable === "claude"
+              ? {
+                  type: "result",
+                  subtype: "success",
+                  is_error: false,
+                  result: "改了匯出的字串。",
+                }
+              : {
+                  type: "item.completed",
+                  item: { type: "agent_message", text: "改了匯出的字串。" },
+                },
+          ),
+          "stdout",
+        );
+        return { stdout: "", stderr: "", code: 0 };
+      },
+    });
+    await workbench.chat(f.run.id, "hello.ts", "這個檔案改了什麼？");
+    assert.deepEqual(timeouts, [600_000]);
+    const started = () =>
+      f.run.logs.filter(
+        (entry) => entry.agent === "guide" && entry.message.includes("開始工作"),
+      );
+    assert.doesNotMatch(started().at(-1)!.message, /最多等待/);
+
+    f.run.modelExecution = {
+      source: "selected",
+      provider: "claude",
+      model: "opus",
+      reasoningEffort: "xhigh",
+    };
+    await workbench.chat(f.run.id, "hello.ts", "再問一次");
+    // 600 s × 2.5 (Claude) × 1.5 (xhigh) = 2250 s.
+    assert.deepEqual(timeouts, [600_000, 2_250_000]);
+    assert.match(started().at(-1)!.message, /；最多等待 37\.5 分鐘。/);
+
+    timeOut = true;
+    await assert.rejects(
+      workbench.chat(f.run.id, "hello.ts", "第三次"),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 504 &&
+        error.message ===
+          "claude 執行逾時（已等待 37.5 分鐘）。較高的思考強度或大型專案需要更久；可降低思考強度、改用較快的模型，或提高 BELLPR_AGENT_TIMEOUT_SCALE。",
+    );
+
+    const scaled = new Workbench(f.store, undefined, {
+      agentTimeoutScale: 4,
+      command: async (_executable, _args, options = {}) => {
+        timeouts.push(options.timeoutMs!);
+        options.onLine?.(
+          JSON.stringify({
+            type: "result",
+            subtype: "success",
+            is_error: false,
+            result: "改了匯出的字串。",
+          }),
+          "stdout",
+        );
+        return { stdout: "", stderr: "", code: 0 };
+      },
+    });
+    await scaled.chat(f.run.id, "hello.ts", "第四次");
+    // 2250 s × 4 = 9000 s, clamped to two hours.
+    assert.equal(timeouts.at(-1), 7_200_000);
+  } finally {
+    await f.cleanup();
+  }
+});

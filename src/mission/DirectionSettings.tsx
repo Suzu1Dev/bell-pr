@@ -385,7 +385,7 @@ export function DirectionSettings({
             <p id={`${id}-reasoning-help`} className="mission-field-note">
               {unknownEffort && !loadingModels
                 ? "已儲存的強度未在此模型的清單中，請重新選擇。"
-                : "只列出所選模型支援的強度；提高強度可能增加等待與用量。"}
+                : "只列出所選模型支援的強度；較高的強度每回合需要更久、用量也較多，BELL 會為 Claude Code 以及 xhigh、max 強度延長等待時間。"}
             </p>
           </div>
         </div>

@@ -259,7 +259,7 @@ test("analysis uses bounded read-only structured Codex context and excludes secr
       assert.equal(args[args.indexOf("--sandbox") + 1], "read-only");
       assert.ok(args.includes("--ignore-user-config"));
       assert.ok(args.includes("--skip-git-repo-check"));
-      assert.ok(options.timeoutMs! <= 240_000);
+      assert.equal(options.timeoutMs, 240_000);
       assert.ok(options.maxBytes! <= 1_000_000);
       const schema = JSON.parse(
         await readFile(args[args.indexOf("--output-schema") + 1], "utf8"),
@@ -1488,6 +1488,69 @@ test("Claude Code analysis retries once after losing the OAuth refresh lock and 
   } finally {
     await service.shutdown();
     await plain.shutdown();
+    await f.cleanup();
+  }
+});
+
+test("analysis waits longer for Claude Code at xhigh and explains a timeout with the minutes waited", async () => {
+  const f = await fixture();
+  const timeouts: number[] = [];
+  let timeOut = false;
+  const execute: typeof command = async (executable, args, options = {}) => {
+    if (executable === "claude" && args[0] === "-p") {
+      timeouts.push(options.timeoutMs!);
+      if (timeOut) throw new AppError("claude 執行逾時。", 504);
+      options.onLine?.(
+        JSON.stringify({
+          type: "result",
+          subtype: "success",
+          is_error: false,
+          result: "",
+          structured_output: validAnalysis(),
+          usage: {
+            input_tokens: 10,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
+            output_tokens: 40,
+          },
+        }),
+        "stdout",
+      );
+    }
+    return { stdout: "", stderr: "", code: 0 };
+  };
+  const service = new ProjectInsightsService(f.store, { command: execute });
+  try {
+    await service.setSettings(f.repo.id, {
+      ...defaultContributionSettings,
+      provider: "claude",
+      model: "opus",
+      reasoningEffort: "xhigh",
+    });
+    await service.generate(f.repo.id);
+    // 240 s × 2.5 (Claude) × 1.5 (xhigh) = 900 s.
+    assert.deepEqual(timeouts, [900_000]);
+    timeOut = true;
+    await assert.rejects(
+      service.generate(f.repo.id),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 504 &&
+        error.message ===
+          "claude 執行逾時（已等待 15 分鐘）。較高的思考強度或大型專案需要更久；可降低思考強度、改用較快的模型，或提高 BELLPR_AGENT_TIMEOUT_SCALE。",
+    );
+    // The earlier result is kept.
+    assert.equal((await service.get(f.repo.id)).insights?.source, "ai");
+    const scaled = new ProjectInsightsService(f.store, {
+      command: execute,
+      agentTimeoutScale: 2,
+    });
+    timeOut = false;
+    await scaled.generate(f.repo.id);
+    assert.equal(timeouts.at(-1), 1_800_000);
+    await scaled.shutdown();
+  } finally {
+    await service.shutdown();
     await f.cleanup();
   }
 });

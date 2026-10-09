@@ -35,6 +35,13 @@ import {
 import { agentEnvironment, command, git, redact } from "./process.js";
 import { Store } from "./store.js";
 import { AgentSlots, defaultAgentProcessLimit } from "./agent-slots.js";
+import {
+  agentTimeoutMs,
+  defaultAgentTimeoutScale,
+  describeAgentTimeout,
+  hasExtendedAgentTimeout,
+  withAgentTimeoutHint,
+} from "./agent-timeouts.js";
 import { AppError, type Repository } from "./types.js";
 import {
   defaultPonytailMode,
@@ -498,6 +505,7 @@ export class ProjectInsightsService {
   private modelCatalog: typeof getModelCatalog;
   private slots: AgentSlots;
   private sleep?: TransientSleep;
+  private timeoutScale: number;
 
   constructor(
     public store: Store,
@@ -505,6 +513,8 @@ export class ProjectInsightsService {
       command?: typeof command;
       getModelCatalog?: typeof getModelCatalog;
       agentSlots?: AgentSlots;
+      /** BELLPR_AGENT_TIMEOUT_SCALE; multiplies every agent turn timeout. */
+      agentTimeoutScale?: number;
       /** Wait between retries of an analysis that lost the OAuth refresh race. */
       sleep?: TransientSleep;
     } = {},
@@ -514,6 +524,8 @@ export class ProjectInsightsService {
     this.modelCatalog = dependencies.getModelCatalog ?? getModelCatalog;
     this.slots =
       dependencies.agentSlots ?? new AgentSlots(defaultAgentProcessLimit);
+    this.timeoutScale =
+      dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
   }
 
   private repository(id: string): Repository {
@@ -1037,6 +1049,16 @@ export class ProjectInsightsService {
         skipGitRepoCheck: true,
       });
       const read = agentEventReader(modelExecution.provider);
+      const timeoutMs = agentTimeoutMs(
+        "analysis",
+        modelExecution,
+        this.timeoutScale,
+      );
+      // The analysis request has no progress channel, so the wait is only visible in the server log.
+      if (hasExtendedAgentTimeout(modelExecution))
+        console.log(
+          `專案分析 ${repo.fullName}（${agentLabel(modelExecution.provider)}${modelExecution.model ? ` ${modelExecution.model}` : ""}${modelExecution.reasoningEffort ? ` ${modelExecution.reasoningEffort}` : ""}）開始，${describeAgentTimeout(timeoutMs)}。`,
+        );
       await retryTransientAuth(
         async () => {
           answer = "";
@@ -1050,7 +1072,7 @@ export class ProjectInsightsService {
               cwd: temporary,
               env: agentEnvironment(),
               signal,
-              timeoutMs: 240_000,
+              timeoutMs,
               maxBytes: 1_000_000,
               onLine: (line, stream) => {
                 if (stream !== "stdout") return;
@@ -1074,7 +1096,8 @@ export class ProjectInsightsService {
             }).catch((error: unknown) => {
               // claude exits non-zero after losing the OAuth refresh race; its result event
               // (flushed before the rejection) already classified the attempt as retryable.
-              if (!retryable) throw error;
+              if (!retryable)
+                throw withAgentTimeoutHint(error, cli.executable, timeoutMs);
             });
           } finally {
             releaseSlot();

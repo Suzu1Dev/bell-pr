@@ -131,11 +131,13 @@ PR 草稿會優先採用目標專案的 `CONTRIBUTING`、PR 模板與相關投�
 
 新任務會保存當次解析的模型設定，Lead、Teammates、Reviewer、Test analyst、自動解說與追問共用；後續修改共用模型不影響既有任務。專案分析則採分析啟動時已儲存的設定，並把設定與分析結果一起保存。選擇預設時，若模型目錄可用，會固定其中的預設模型；無法讀取目錄時可沿用 CLI 預設，但名稱會明確標示未記錄。
 
+思考強度越高，每回合等待越久；BELL 依 Agent 與強度延長逾時：基準（Codex、非 xhigh/max）為專案分析與探索 240 秒、唯讀回合 600 秒、可寫回合 1800 秒，Claude Code 乘 2.5，xhigh 乘 1.5、max 乘 2，最多 2 小時，可用 `BELLPR_AGENT_TIMEOUT_SCALE` 整體調整。選了 Claude Code 或 xhigh、max 時，任務日誌的開始行與探索進度訊息會顯示「最多等待 N 分鐘」；逾時的錯誤訊息會列出已等待的分鐘數並提示可降低強度、改用較快的模型或調高倍率。
+
 「Agent 動態」顯示的是傳入 CLI 的模型 ID 與思考強度，不是推測的供應端實際路由。加入此功能前的舊任務沒有模型紀錄，介面會標示未記錄；示範也不會顯示虛構的執行模型。模型目錄介面參考 [Codex App Server 官方文件](https://learn.chatgpt.com/docs/app-server#list-models-modellist)。
 
 ### 改用 Claude Code
 
-模型設定的「Agent」可改選 **Claude Code**，所有專案共用。BELL 直接呼叫本機 `claude -p`，沿用 `claude auth login` 的 Claude 訂閱登入；傳給 Agent 的環境變數不包含 `ANTHROPIC_API_KEY`，因此不會改走 API 計費。「設定」頁會顯示 Claude Code CLI 是否已安裝與登入。
+模型設定的「Agent」可改選 **Claude Code**，所有專案共用。BELL 直接呼叫本機 `claude -p`，沿用 `claude auth login` 的 Claude 訂閱登入；傳給 Agent 的環境變數不包含 `ANTHROPIC_API_KEY`，因此不會改走 API 計費。「設定」頁會顯示 Claude Code CLI 是否已安裝與登入。Claude Code 每回合通常比 Codex 預設慢，BELL 對 Claude Code 的回合逾時為基準的 2.5 倍（見「模型與思考強度」），任務日誌與探索進度訊息會顯示最多等待的分鐘數，專案分析則寫入伺服器記錄。
 
 - 模型清單為固定的別名 `opus`、`sonnet`、`fable`、`haiku`，各自指向該系列的最新模型；Claude Code 沒有列出模型的指令，實際可用模型依訂閱方案而定。選「Claude Code 預設」時不傳 `--model`。Haiku 不提供思考強度選項，其餘為 low–max。Claude Code 會在 `system/init` 事件回報解析後的實際模型 ID（例如別名 `haiku` 對應 `claude-haiku-4-5-20251001`）與 CLI 版本，BELL 記錄後在任務、專案分析與探索的模型摘要顯示為「傳入 → 回報」，若結果事件 `modelUsage` 出現了其他模型，會另列出本次執行呼叫過的模型；這些是 CLI 回報值，不是供應端帳單，費用欄位不會顯示。
 - 專案分析與探索不開放任何工具，只讀 BELL 提供的節錄並以 `--json-schema` 回傳結構化結果；Lead、Reviewer、Test analyst 與解說只能使用 Read、Grep、Glob；Teammates 可使用 Read、Grep、Glob、Edit、Write 與 Bash。檔案編輯以 `acceptEdits` 限制在工作目錄內，但 **Bash 不在沙箱中執行**；除下列拒絕規則外，其餘 Bash 指令可存取這台機器上服務帳號能存取的任何檔案與網路。
@@ -228,6 +230,7 @@ npm run dev
 | `BELLPR_ALLOWED_ORIGINS` | 空值 | 額外允許的精確 HTTP(S) origin，以逗號分隔；僅供已有存取控制、保留 Host 的私網代理使用。 |
 | `BELLPR_MAX_AGENT_PROCESSES` | `3` | 同時執行的 Agent CLI 行程上限（1–32），涵蓋所有工作、專案分析與探索；超過時後續 Agent 排隊等待。 |
 | `BELLPR_MAX_ACTIVE_RUNS` | `2` | 同時執行的貢獻工作上限（1–8）；排隊上限為 8 與此值兩倍取大者。每個工作的 teammates、Reviewer 與 Test analyst 各需要一個 CLI 行程，實際並行程度仍受 `BELLPR_MAX_AGENT_PROCESSES` 與訂閱額度限制。目前值顯示在「連線與設定」頁；systemd 部署修改 `~/.config/bell-pr/environment` 後需重新啟動服務。 |
+| `BELLPR_AGENT_TIMEOUT_SCALE` | `1` | Agent 單一回合逾時的倍率（0.5–10）。基準為專案分析與探索 240 秒、唯讀回合（Lead、Reviewer、Test analyst、解說、PR 草稿、追問）600 秒、可寫回合（Teammates）1800 秒；Claude Code 再乘 2.5，思考強度 xhigh 乘 1.5、max 乘 2，結果取整秒且最多 2 小時。逾時訊息會列出已等待的分鐘數。 |
 
 `.bellpr` 與 `.env` 已排除於 Git 追蹤外。請妥善保留工作資料；刪除資料目錄會移除其中的 repository、工作目錄與紀錄。
 

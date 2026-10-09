@@ -794,3 +794,97 @@ test("discovery retries a Claude Code analysis that lost the OAuth refresh lock 
     await plain.cleanup();
   }
 });
+
+test("discovery passes the Codex baseline timeout and a longer, announced wait for Claude Code at xhigh", async () => {
+  const timeouts: number[] = [];
+  const plain = await fixture({
+    command: async (_executable, _args, options) => {
+      timeouts.push(options!.timeoutMs!);
+      options?.onLine?.(
+        JSON.stringify({
+          type: "item.completed",
+          item: { type: "agent_message", text: answer() },
+        }),
+        "stdout",
+      );
+      return { stdout: "", stderr: "", code: 0 };
+    },
+  });
+  try {
+    await plain.service.start({});
+    const job = await finished(plain.service);
+    assert.equal(job.status, "ready");
+    assert.deepEqual(timeouts, [240_000]);
+    assert.doesNotMatch(job.message, /最多等待/);
+  } finally {
+    await plain.cleanup();
+  }
+  timeouts.length = 0;
+  const messages: string[] = [];
+  let timeOut = false;
+  const claude = await fixture({
+    getModelCatalog: async () => ({
+      source: "claude" as const,
+      models: [
+        {
+          id: "opus",
+          name: "Opus",
+          description: "Fixture",
+          isDefault: true,
+          reasoningEfforts: ["high" as const, "xhigh" as const],
+          defaultReasoningEffort: "high" as const,
+        },
+      ],
+    }),
+    command: async (executable, _args, options) => {
+      assert.equal(executable, "claude");
+      timeouts.push(options!.timeoutMs!);
+      messages.push((await claude.service.get()).job!.message);
+      if (timeOut) throw new AppError("claude 執行逾時。", 504);
+      options?.onLine?.(
+        JSON.stringify({
+          type: "result",
+          subtype: "success",
+          is_error: false,
+          result: answer(),
+          usage: {
+            input_tokens: 100,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
+            output_tokens: 20,
+          },
+        }),
+        "stdout",
+      );
+      return { stdout: "", stderr: "", code: 0 };
+    },
+  });
+  try {
+    await claude.service.start({
+      provider: "claude",
+      model: "opus",
+      reasoningEffort: "xhigh",
+    });
+    const job = await finished(claude.service);
+    assert.equal(job.status, "ready");
+    // 240 s × 2.5 (Claude) × 1.5 (xhigh) = 900 s.
+    assert.deepEqual(timeouts, [900_000]);
+    assert.deepEqual(messages, [
+      "已取得真實 GitHub 來源，正在分析適合的貢獻機會（最多等待 15 分鐘）",
+    ]);
+    timeOut = true;
+    await claude.service.start({
+      provider: "claude",
+      model: "opus",
+      reasoningEffort: "xhigh",
+    });
+    const failed = await finished(claude.service);
+    assert.equal(failed.status, "failed");
+    assert.equal(
+      failed.error,
+      "claude 執行逾時（已等待 15 分鐘）。較高的思考強度或大型專案需要更久；可降低思考強度、改用較快的模型，或提高 BELLPR_AGENT_TIMEOUT_SCALE。",
+    );
+  } finally {
+    await claude.cleanup();
+  }
+});
