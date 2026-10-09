@@ -20,6 +20,7 @@ import {
   parseActiveRunLimit,
   parseAgentProcessLimit,
 } from "./agent-slots.js";
+import { parseAgentTimeoutScale } from "./agent-timeouts.js";
 import { learningExport } from "./learning-export.js";
 import { summarizeRun } from "../shared/runs.js";
 import { agentProviders } from "../shared/models.js";
@@ -119,21 +120,25 @@ export function createApp(
     staticDirectory = path.resolve("dist"),
     allowedOrigins = "",
     agentSlots = workbench.agentSlots,
+    agentTimeoutScale = workbench.agentTimeoutScale,
   }: {
     port?: number;
     frontendPort?: number;
     staticDirectory?: string;
     allowedOrigins?: string;
     agentSlots?: AgentSlots;
+    agentTimeoutScale?: number;
   } = {},
 ) {
   const insights = new ProjectInsightsService(workbench.store, {
     getModelCatalog: (provider) => workbench.models(provider),
     agentSlots,
+    agentTimeoutScale,
   });
   const discovery = new DiscoveryService(workbench.store, {
     getModelCatalog: (provider) => workbench.models(provider),
     agentSlots,
+    agentTimeoutScale,
   });
   const app = express();
   app.locals.insights = insights;
@@ -427,6 +432,9 @@ async function main() {
     parseAgentProcessLimit(process.env.BELLPR_MAX_AGENT_PROCESSES),
   );
   const maxActiveRuns = parseActiveRunLimit(process.env.BELLPR_MAX_ACTIVE_RUNS);
+  const agentTimeoutScale = parseAgentTimeoutScale(
+    process.env.BELLPR_AGENT_TIMEOUT_SCALE,
+  );
   const store = new Store(
     path.resolve(process.env.BELLPR_DATA_DIR ?? ".bellpr"),
   );
@@ -434,6 +442,7 @@ async function main() {
   const workbench = new Workbench(store, undefined, {
     agentSlots,
     maxActiveRuns,
+    agentTimeoutScale,
   });
   const app = createApp(workbench, { port, frontendPort, allowedOrigins });
   const server = app.listen(port, "127.0.0.1", () =>

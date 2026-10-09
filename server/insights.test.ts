@@ -259,7 +259,7 @@ test("analysis uses bounded read-only structured Codex context and excludes secr
       assert.equal(args[args.indexOf("--sandbox") + 1], "read-only");
       assert.ok(args.includes("--ignore-user-config"));
       assert.ok(args.includes("--skip-git-repo-check"));
-      assert.ok(options.timeoutMs! <= 240_000);
+      assert.equal(options.timeoutMs, 240_000);
       assert.ok(options.maxBytes! <= 1_000_000);
       const schema = JSON.parse(
         await readFile(args[args.indexOf("--output-schema") + 1], "utf8"),
@@ -743,6 +743,132 @@ test("sampling reads entry files and every top-level directory before tests, lis
   }
 });
 
+test("citations of tracked but unsampled files are kept, marked or dropped by field, and only an emptied section rejects the analysis", async () => {
+  const f = await fixture();
+  try {
+    // README, src/App.tsx and the server files fill the 60-file sample; hello.ts is tracked but unread.
+    const files = [
+      "src/App.tsx",
+      ...Array.from({ length: 60 }, (_, n) => `server/part-${String(n).padStart(2, "0")}.ts`),
+    ];
+    for (const file of files) {
+      await mkdir(path.dirname(path.join(f.repository, file)), { recursive: true });
+      await writeFile(path.join(f.repository, file), `// ${file}\nexport const name = "${file}";\n`);
+    }
+    await git(f.repository, ["add", "--", "src", "server"]);
+    await git(f.repository, ["commit", "-m", "breadth"]);
+    const proposal = validAnalysis().recommendations[0];
+    const readme = {
+      ...proposal,
+      evidence: ["README.md"],
+      evidenceDetails: [
+        { path: "README.md", quote: "A command-line greeting tool.", reason: "README 描述工具用途。" },
+      ],
+    };
+    const cite = (id: string, file: string) => ({
+      ...readme,
+      id,
+      evidence: [file],
+      evidenceDetails: [{ ...readme.evidenceDetails[0], path: file }],
+    });
+    let sampled: string[] = [];
+    const stub = fakeCodex(
+      () => ({
+        ...validAnalysis(),
+        modules: [
+          { path: "src/App.tsx", purpose: "前端入口" },
+          { path: "hello.ts", purpose: "問候文字（清單中存在，內容未讀）" },
+          { path: "server/", purpose: "伺服器端模組" },
+          { path: "nope/thing.ts", purpose: "不存在的檔案" },
+        ],
+        readingPath: [
+          { path: "README.md", why: "先知道工具要解決什麼問題。", lookFor: "定位與執行方式。" },
+          { path: "src/App.tsx", why: "前端入口。", lookFor: "頁面如何組成。" },
+          { path: "hello.ts", why: "問候文字的來源。", lookFor: "匯出的常數。" },
+          { path: "nope.ts", why: "不存在的檔案。", lookFor: "什麼都看不到。" },
+        ],
+        evidence: [
+          { path: "README.md", note: "描述工具用途與執行方式" },
+          { path: "hello.ts", note: "內容未讀，不能當依據" },
+          { path: ".env", note: "敏感路徑" },
+        ],
+        recommendations: [readme, cite("unsampled", "hello.ts"), cite("invented", "nope.ts")],
+      }),
+      async (_args, options) => {
+        sampled = payload(options.input!).source.files.map((file) => file.path);
+      },
+    );
+    const service = new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: stub.execute,
+    });
+    const { insights } = await service.generate(f.repo.id);
+    assert.equal(sampled.length, 60);
+    assert.ok(!sampled.includes("hello.ts"));
+    assert.deepEqual(
+      insights.modules.map((module) => module.path),
+      ["src/App.tsx", "hello.ts", "server/"],
+    );
+    assert.deepEqual(insights.readingPath, [
+      { path: "README.md", why: "先知道工具要解決什麼問題。", lookFor: "定位與執行方式。" },
+      { path: "src/App.tsx", why: "前端入口。", lookFor: "頁面如何組成。" },
+      { path: "hello.ts", why: "問候文字的來源。", lookFor: "匯出的常數。", sampled: false },
+    ]);
+    assert.deepEqual(insights.evidence, [{ path: "README.md", note: "描述工具用途與執行方式" }]);
+    assert.deepEqual(insights.recommendations.map((entry) => entry.id), ["greeting-tests"]);
+    assert.deepEqual(insights.verification, {
+      droppedRecommendations: [
+        { id: "unsampled", title: proposal.title, reason: "引用了未抽樣的檔案 hello.ts" },
+        { id: "invented", title: proposal.title, reason: "引用了未提供的檔案 nope.ts" },
+      ],
+      droppedPaths: [
+        { field: "modules", path: "nope/thing.ts", reason: "引用了未提供的檔案 nope/thing.ts" },
+        { field: "readingPath", path: "nope.ts", reason: "引用了未提供的檔案 nope.ts" },
+        { field: "evidence", path: "hello.ts", reason: "引用了未抽樣的檔案 hello.ts" },
+        { field: "evidence", path: ".env", reason: "引用了未提供的檔案 .env" },
+      ],
+    });
+    // The saved cache reloads through the strict persisted schema.
+    const saved = await new ProjectInsightsService(f.store).get(f.repo.id);
+    assert.deepEqual(saved.insights, insights);
+    // Rejection names the first emptied section and its first dropped path; the saved analysis stays.
+    const rejected: { answer: unknown; message: string }[] = [
+      {
+        answer: {
+          ...validAnalysis(),
+          modules: [{ path: "nope/a.ts", purpose: "不存在" }, { path: "nope/b.ts", purpose: "不存在" }],
+          readingPath: [{ path: "nope.ts", why: "不存在的檔案。", lookFor: "什麼都看不到。" }],
+        },
+        message: "AI 分析引用了未提供的檔案（modules：nope/a.ts），請重新分析；原有結果已保留。",
+      },
+      {
+        answer: {
+          ...validAnalysis(),
+          readingPath: [{ path: "nope.ts", why: "不存在的檔案。", lookFor: "什麼都看不到。" }],
+        },
+        message: "AI 分析引用了未提供的檔案（readingPath：nope.ts），請重新分析；原有結果已保留。",
+      },
+      {
+        answer: { ...validAnalysis(), evidence: [{ path: "hello.ts", note: "內容未讀" }] },
+        message: "AI 分析引用了未提供的檔案（evidence：hello.ts），請重新分析；原有結果已保留。",
+      },
+    ];
+    for (const entry of rejected) {
+      const again = new ProjectInsightsService(f.store, {
+        getModelCatalog: async () => ({ models: [], source: "codex" }),
+        command: fakeCodex(() => entry.answer).execute,
+      });
+      await assert.rejects(
+        again.generate(f.repo.id),
+        (error: any) => error.statusCode === 422 && error.message === entry.message,
+      );
+      assert.deepEqual(await again.get(f.repo.id), saved);
+    }
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test("the file tree collapses into per-directory counts past its cap", () => {
   const paths = [
     ...Array.from({ length: 1_600 }, (_, n) => `src/file-${String(n).padStart(4, "0")}.ts`),
@@ -1179,13 +1305,29 @@ test("more recommendations require an unchanged prior analysis and reject client
 test("invalid, failed and interrupted expansion results never replace existing recommendations", async () => {
   const f = await fixture();
   try {
-    const original = await new ProjectInsightsService(f.store, { command: fakeCodex().execute, getModelCatalog: async () => ({ source: "codex", models: [] }) }).generate(f.repo.id);
+    const first = (await new ProjectInsightsService(f.store, { command: fakeCodex().execute, getModelCatalog: async () => ({ source: "codex", models: [] }) }).generate(f.repo.id)).insights;
     const proposal = validAnalysis().recommendations[0];
+    // Evidence outside the sample drops the one proposal, as in the first analysis; the original list stays.
+    const unsampled = new ProjectInsightsService(f.store, {
+      command: fakeCodex(() => ({
+        recommendations: [
+          { ...proposal, id: "missing", evidence: ["missing.ts"] },
+          { ...proposal, id: "directory", evidence: ["src/"] },
+        ],
+      })).execute,
+      getModelCatalog: async () => ({ source: "codex", models: [] }),
+    });
+    const expanded = (await unsampled.generateMore(f.repo.id, {})).insights;
+    assert.deepEqual(expanded.recommendations, first.recommendations);
+    assert.deepEqual(expanded.recommendationExpansion?.addedIds, []);
+    assert.deepEqual(
+      expanded.recommendationExpansion?.verification?.droppedRecommendations.map((entry) => entry.reason),
+      ["引用了未提供的檔案 missing.ts", "引用了未提供的檔案 src/"],
+    );
+    const original = await unsampled.get(f.repo.id);
     const responses = [
       { recommendations: [], summary: "不能覆寫全貌" },
       { recommendations: Array.from({ length: 6 }, () => proposal) },
-      { recommendations: [{ ...proposal, evidence: ["missing.ts"] }] },
-      { recommendations: [{ ...proposal, evidence: ["src/"] }] },
       { recommendations: [{ ...proposal, title: "ghp_abcdefghijklmnopqrstuvwxyz" }] },
     ];
     for (const answer of responses) {
@@ -1488,6 +1630,69 @@ test("Claude Code analysis retries once after losing the OAuth refresh lock and 
   } finally {
     await service.shutdown();
     await plain.shutdown();
+    await f.cleanup();
+  }
+});
+
+test("analysis waits longer for Claude Code at xhigh and explains a timeout with the minutes waited", async () => {
+  const f = await fixture();
+  const timeouts: number[] = [];
+  let timeOut = false;
+  const execute: typeof command = async (executable, args, options = {}) => {
+    if (executable === "claude" && args[0] === "-p") {
+      timeouts.push(options.timeoutMs!);
+      if (timeOut) throw new AppError("claude 執行逾時。", 504);
+      options.onLine?.(
+        JSON.stringify({
+          type: "result",
+          subtype: "success",
+          is_error: false,
+          result: "",
+          structured_output: validAnalysis(),
+          usage: {
+            input_tokens: 10,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
+            output_tokens: 40,
+          },
+        }),
+        "stdout",
+      );
+    }
+    return { stdout: "", stderr: "", code: 0 };
+  };
+  const service = new ProjectInsightsService(f.store, { command: execute });
+  try {
+    await service.setSettings(f.repo.id, {
+      ...defaultContributionSettings,
+      provider: "claude",
+      model: "opus",
+      reasoningEffort: "xhigh",
+    });
+    await service.generate(f.repo.id);
+    // 240 s × 2.5 (Claude) × 1.5 (xhigh) = 900 s.
+    assert.deepEqual(timeouts, [900_000]);
+    timeOut = true;
+    await assert.rejects(
+      service.generate(f.repo.id),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 504 &&
+        error.message ===
+          "claude 執行逾時（已等待 15 分鐘）。較高的思考強度或大型專案需要更久；可降低思考強度、改用較快的模型，或提高 BELLPR_AGENT_TIMEOUT_SCALE。",
+    );
+    // The earlier result is kept.
+    assert.equal((await service.get(f.repo.id)).insights?.source, "ai");
+    const scaled = new ProjectInsightsService(f.store, {
+      command: execute,
+      agentTimeoutScale: 2,
+    });
+    timeOut = false;
+    await scaled.generate(f.repo.id);
+    assert.equal(timeouts.at(-1), 1_800_000);
+    await scaled.shutdown();
+  } finally {
+    await service.shutdown();
     await f.cleanup();
   }
 });

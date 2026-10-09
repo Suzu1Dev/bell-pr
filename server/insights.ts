@@ -35,6 +35,13 @@ import {
 import { agentEnvironment, command, git, redact } from "./process.js";
 import { Store } from "./store.js";
 import { AgentSlots, defaultAgentProcessLimit } from "./agent-slots.js";
+import {
+  agentTimeoutMs,
+  defaultAgentTimeoutScale,
+  describeAgentTimeout,
+  hasExtendedAgentTimeout,
+  withAgentTimeoutHint,
+} from "./agent-timeouts.js";
 import { AppError, type Repository } from "./types.js";
 import {
   defaultPonytailMode,
@@ -124,9 +131,19 @@ const recommendationsSchema = z
   })
   .strict();
 // The prompt asks for 3–8 steps; the floor stays at 1 so a repository with
-// fewer sampled files than that can still be analyzed.
+// fewer sampled files than that can still be analyzed. `sampled` is set by
+// validateAnalysis, never by the model: the JSON schema sent to it omits the key.
 const readingPathSchema = z
-  .array(z.object({ path: filePath, why: text, lookFor: text }).strict())
+  .array(
+    z
+      .object({
+        path: filePath,
+        why: text,
+        lookFor: text,
+        sampled: z.boolean().optional(),
+      })
+      .strict(),
+  )
   .min(1)
   .max(8);
 const analysisSchema = z
@@ -164,6 +181,19 @@ const verificationSchema = z
           .strict(),
       )
       .max(projectRecommendationBatchSize),
+    // At most every module, reading step and evidence note of one analysis.
+    droppedPaths: z
+      .array(
+        z
+          .object({
+            field: z.enum(["modules", "readingPath", "evidence"]),
+            path: filePath,
+            reason: z.string().max(2400),
+          })
+          .strict(),
+      )
+      .max(32)
+      .optional(),
   })
   .strict();
 
@@ -300,14 +330,50 @@ async function writeJsonAtomically(file: string, value: unknown) {
 }
 
 /**
- * Why one recommendation cannot be shown: its quotes are not in the analyzed
- * excerpts. The first 120 characters of the quote are kept so the learner can
- * see what the model claimed without storing the unverified proposal.
+ * Where a cited path came from: a file whose content was sent, a tracked file
+ * the tree only lists, a directory prefix the tree proves, or nowhere safe
+ * (not tracked, outside the repository or a sensitive path).
+ */
+type Citation = "sampled" | "known" | "directory" | "unknown";
+type DroppedPath = NonNullable<
+  RecommendationVerification["droppedPaths"]
+>[number];
+
+function classifyCitation(
+  file: string,
+  source: Map<string, string>,
+  tree: Set<string>,
+): Citation {
+  if (!safeRelativePath(file) || sensitivePath(file)) return "unknown";
+  if (source.has(file)) return "sampled";
+  if (file.endsWith("/")) {
+    for (const entry of tree) if (entry.startsWith(file)) return "directory";
+    return "unknown";
+  }
+  return tree.has(file) ? "known" : "unknown";
+}
+
+function citationReason(citation: Citation, file: string): string {
+  return citation === "known"
+    ? `引用了未抽樣的檔案 ${file}`
+    : `引用了未提供的檔案 ${file}`;
+}
+
+/**
+ * Why one recommendation cannot be shown: it cites a file whose content was
+ * not read, or its quotes are not in the analyzed excerpts. The first 120
+ * characters of the quote are kept so the learner can see what the model
+ * claimed without storing the unverified proposal.
  */
 function unverifiedReason(
   recommendation: z.infer<typeof recommendationSchema>,
   source: Map<string, string>,
+  cite: (file: string) => Citation,
 ): string | null {
+  for (const file of recommendation.evidence) {
+    const citation = cite(file);
+    if (citation !== "sampled") return citationReason(citation, file);
+  }
   const details = recommendation.evidenceDetails ?? [];
   const excerpt = (quote: string) =>
     quote.length > 120 ? `${quote.slice(0, 120)}…` : quote;
@@ -324,9 +390,13 @@ function unverifiedReason(
 }
 
 /**
- * Checks the model's answer against what it was given. Structural problems and
- * made-up paths reject the whole answer; a recommendation whose quotes do not
- * match is dropped and reported, so the rest of the analysis is still saved.
+ * Checks the model's answer against what it was given. Structural problems
+ * reject the whole answer. The model sees every tracked path but only the
+ * sampled contents, so a module may cite a tracked file or directory and a
+ * reading step may cite a tracked file (marked `sampled: false`); evidence
+ * notes and recommendation quotes still need sampled content. Entries that
+ * fail are dropped and recorded, and the answer is rejected only when a
+ * required section has nothing left.
  */
 function validateAnalysis<
   S extends typeof analysisSchema | typeof recommendationsSchema,
@@ -347,38 +417,48 @@ function validateAnalysis<
   if (secretInPatch(serialized) || redact(serialized) !== serialized)
     throw new AppError("AI 回應疑似包含敏感內容，結果未儲存。", 422);
   const source = new Map(sourceFiles.map((file) => [file.path, file.content]));
-  const sampled = (file: string) =>
-    safeRelativePath(file) && !sensitivePath(file) && source.has(file);
-  // A module may describe a directory the tree proves exists; quotes still need sampled content.
-  const directory = (file: string) =>
-    file.endsWith("/") &&
-    safeRelativePath(file) &&
-    !sensitivePath(file) &&
-    tree.some((entry) => entry.startsWith(file));
-  const invented =
-    ("modules" in value &&
-      value.modules.some(
-        (entry) => !sampled(entry.path) && !directory(entry.path),
-      )) ||
-    ("readingPath" in value &&
-      value.readingPath.some((entry) => !sampled(entry.path))) ||
-    ("evidence" in value &&
-      value.evidence.some((entry) => !sampled(entry.path))) ||
-    value.recommendations.some((entry) => !entry.evidence.every(sampled));
-  if (invented)
-    throw new AppError(
-      "AI 引用了未提供的檔案，請重新分析；原有結果已保留。",
-      422,
+  const known = new Set(tree);
+  const cite = (file: string) => classifyCitation(file, source, known);
+  const droppedPaths: DroppedPath[] = [];
+  const keep = <T extends { path: string }>(
+    field: DroppedPath["field"],
+    entries: T[],
+    accepted: Citation[],
+  ) =>
+    entries.filter((entry) => {
+      const citation = cite(entry.path);
+      if (accepted.includes(citation)) return true;
+      droppedPaths.push({
+        field,
+        path: entry.path,
+        reason: citationReason(citation, entry.path),
+      });
+      return false;
+    });
+  if ("modules" in value) {
+    value.modules = keep("modules", value.modules, ["sampled", "known", "directory"]);
+    value.readingPath = keep("readingPath", value.readingPath, ["sampled", "known"]).map(
+      ({ path, why, lookFor }) =>
+        cite(path) === "known"
+          ? { path, why, lookFor, sampled: false }
+          : { path, why, lookFor },
     );
-  // The prompt asks for 3–8 reading steps; tiny samples cannot provide three.
-  if (
-    "readingPath" in value &&
-    value.readingPath.length < Math.min(3, sourceFiles.length)
-  )
-    throw new AppError(
-      "AI 分析的建議閱讀順序過短，請重新分析；原有結果已保留。",
-      422,
-    );
+    value.evidence = keep("evidence", value.evidence, ["sampled"]);
+    for (const field of ["modules", "readingPath", "evidence"] as const) {
+      const first = droppedPaths.find((entry) => entry.field === field);
+      if (value[field].length || !first) continue;
+      throw new AppError(
+        `AI 分析引用了未提供的檔案（${field}：${first.path}），請重新分析；原有結果已保留。`,
+        422,
+      );
+    }
+    // The prompt asks for 3–8 reading steps; tiny samples cannot provide three.
+    if (value.readingPath.length < Math.min(3, sourceFiles.length))
+      throw new AppError(
+        "AI 分析的建議閱讀順序過短，請重新分析；原有結果已保留。",
+        422,
+      );
+  }
   if (
     schema === analysisSchema &&
     new Set(value.recommendations.map((entry) => entry.id)).size !==
@@ -388,8 +468,9 @@ function validateAnalysis<
   const verification: RecommendationVerification = {
     droppedRecommendations: [],
   };
+  if (droppedPaths.length) verification.droppedPaths = droppedPaths;
   value.recommendations = value.recommendations.filter((recommendation) => {
-    const reason = unverifiedReason(recommendation, source);
+    const reason = unverifiedReason(recommendation, source, cite);
     if (reason)
       verification.droppedRecommendations.push({
         id: recommendation.id,
@@ -498,6 +579,7 @@ export class ProjectInsightsService {
   private modelCatalog: typeof getModelCatalog;
   private slots: AgentSlots;
   private sleep?: TransientSleep;
+  private timeoutScale: number;
 
   constructor(
     public store: Store,
@@ -505,6 +587,8 @@ export class ProjectInsightsService {
       command?: typeof command;
       getModelCatalog?: typeof getModelCatalog;
       agentSlots?: AgentSlots;
+      /** BELLPR_AGENT_TIMEOUT_SCALE; multiplies every agent turn timeout. */
+      agentTimeoutScale?: number;
       /** Wait between retries of an analysis that lost the OAuth refresh race. */
       sleep?: TransientSleep;
     } = {},
@@ -514,6 +598,8 @@ export class ProjectInsightsService {
     this.modelCatalog = dependencies.getModelCatalog ?? getModelCatalog;
     this.slots =
       dependencies.agentSlots ?? new AgentSlots(defaultAgentProcessLimit);
+    this.timeoutScale =
+      dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
   }
 
   private repository(id: string): Repository {
@@ -1037,6 +1123,16 @@ export class ProjectInsightsService {
         skipGitRepoCheck: true,
       });
       const read = agentEventReader(modelExecution.provider);
+      const timeoutMs = agentTimeoutMs(
+        "analysis",
+        modelExecution,
+        this.timeoutScale,
+      );
+      // The analysis request has no progress channel, so the wait is only visible in the server log.
+      if (hasExtendedAgentTimeout(modelExecution))
+        console.log(
+          `專案分析 ${repo.fullName}（${agentLabel(modelExecution.provider)}${modelExecution.model ? ` ${modelExecution.model}` : ""}${modelExecution.reasoningEffort ? ` ${modelExecution.reasoningEffort}` : ""}）開始，${describeAgentTimeout(timeoutMs)}。`,
+        );
       await retryTransientAuth(
         async () => {
           answer = "";
@@ -1050,7 +1146,7 @@ export class ProjectInsightsService {
               cwd: temporary,
               env: agentEnvironment(),
               signal,
-              timeoutMs: 240_000,
+              timeoutMs,
               maxBytes: 1_000_000,
               onLine: (line, stream) => {
                 if (stream !== "stdout") return;
@@ -1074,7 +1170,8 @@ export class ProjectInsightsService {
             }).catch((error: unknown) => {
               // claude exits non-zero after losing the OAuth refresh race; its result event
               // (flushed before the rejection) already classified the attempt as retryable.
-              if (!retryable) throw error;
+              if (!retryable)
+                throw withAgentTimeoutHint(error, cli.executable, timeoutMs);
             });
           } finally {
             releaseSlot();

@@ -48,6 +48,14 @@ import {
   defaultAgentProcessLimit,
 } from "./agent-slots.js";
 import {
+  type AgentTimeoutKind,
+  agentTimeoutMs,
+  defaultAgentTimeoutScale,
+  describeAgentTimeout,
+  hasExtendedAgentTimeout,
+  withAgentTimeoutHint,
+} from "./agent-timeouts.js";
+import {
   AppError,
   type Repository,
   type Run,
@@ -138,6 +146,8 @@ export class Workbench {
   readonly agentSlots: AgentSlots;
   /** How many runs drain() executes at once; each run still takes CLI slots per agent. */
   readonly maxActiveRuns: number;
+  /** BELLPR_AGENT_TIMEOUT_SCALE; multiplies every agent turn timeout. */
+  readonly agentTimeoutScale: number;
   constructor(
     public store: Store,
     private agentRunner?: TeamAgentRunner,
@@ -146,6 +156,7 @@ export class Workbench {
       collectDraftContext?: typeof collectDraftContext;
       agentSlots?: AgentSlots;
       maxActiveRuns?: number;
+      agentTimeoutScale?: number;
       /** Agent CLI invocations only; Git and gh keep using the real command. */
       command?: typeof command;
       /** Wait between retries of a turn that lost the OAuth refresh race. */
@@ -155,6 +166,8 @@ export class Workbench {
     this.agentSlots =
       dependencies.agentSlots ?? new AgentSlots(defaultAgentProcessLimit);
     this.maxActiveRuns = dependencies.maxActiveRuns ?? defaultActiveRunLimit;
+    this.agentTimeoutScale =
+      dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
     if (!Number.isInteger(this.maxActiveRuns) || this.maxActiveRuns < 1)
       throw new Error("Workbench maxActiveRuns must be a positive integer.");
   }
@@ -540,6 +553,8 @@ export class Workbench {
       isolated?: boolean;
       /** Receives each command the CLI reports, up to maxTeamTaskChecks entries. */
       checks?: TeamCheck[];
+      /** Named budget for isolated roles; other turns use the read or write budget. */
+      timeout?: Extract<AgentTimeoutKind, "explanations" | "draft">;
     } = {},
   ) {
     const modelExecution = run.modelExecution ?? {
@@ -567,10 +582,15 @@ export class Workbench {
       role,
       readonly,
     );
+    const timeoutMs = agentTimeoutMs(
+      context.timeout ?? (readonly ? "read" : "write"),
+      modelExecution,
+      this.agentTimeoutScale,
+    );
     this.log(
       run,
       role,
-      `${agent?.name ?? "Guide"} 開始工作。模型：${modelExecution.model ?? `${label} CLI 預設（未記錄模型）`}；推理：${modelExecution.reasoningEffort ?? "模型預設"}${web ? "；已允許上網" : ""}。${inbox.length ? ` 已在回合起點收到 ${inbox.length} 則團隊訊息。` : ""}`,
+      `${agent?.name ?? "Guide"} 開始工作。模型：${modelExecution.model ?? `${label} CLI 預設（未記錄模型）`}；推理：${modelExecution.reasoningEffort ?? "模型預設"}${web ? "；已允許上網" : ""}${hasExtendedAgentTimeout(modelExecution) ? `；${describeAgentTimeout(timeoutMs)}` : ""}。${inbox.length ? ` 已在回合起點收到 ${inbox.length} 則團隊訊息。` : ""}`,
       { kind: "status" },
     );
     let efficiency: ReturnType<typeof trackEfficiency> | undefined;
@@ -634,7 +654,7 @@ export class Workbench {
           input: fullPrompt,
           cwd,
           signal,
-          timeoutMs: readonly ? 600_000 : 1_800_000,
+          timeoutMs,
           maxBytes: 8_000_000,
           env: agentEnvironment(),
           onLine: (line, stream) => {
@@ -732,7 +752,8 @@ export class Workbench {
         }).catch((error: unknown) => {
           // claude exits non-zero after losing the OAuth refresh race; its result event
           // (flushed before the rejection) already classified the attempt as retryable.
-          if (!retryable) throw error;
+          if (!retryable)
+            throw withAgentTimeoutHint(error, cli.executable, timeoutMs);
         });
         return { retryable };
       } finally {
@@ -1665,6 +1686,7 @@ export class Workbench {
               cwd: temporary,
               outputSchema,
               isolated: true,
+              timeout: "explanations",
             },
           );
           const generated = parseExplanations(answer, batch);
@@ -1789,7 +1811,7 @@ export class Workbench {
         prompt,
         controller.signal,
         true,
-        { cwd: temporary, outputSchema, isolated: true },
+        { cwd: temporary, outputSchema, isolated: true, timeout: "draft" },
       );
       const proposal = parseDraftProposal(answer, preparation.context);
       await this.lock(run.id, async () => {
