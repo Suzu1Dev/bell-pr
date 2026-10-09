@@ -287,6 +287,16 @@
   color: #456448;
   overflow-wrap: anywhere;
 }
+.mission-reading-unsampled {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border: 1px dashed #dbe4d5;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6a7c60;
+}
 .mission-reading-steps p {
   margin: 6px 0 0;
   font-size: 14px;

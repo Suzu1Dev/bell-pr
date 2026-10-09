@@ -96,3 +96,25 @@ test("the stale notice reports changed and cited files, and never suggests skipp
   }
   assert.doesNotMatch(render({ insights: analyzed }), /重新分析後再確認貢獻方向/);
 });
+
+test("unsampled reading steps are marked and dropped citations are listed; old caches show neither", () => {
+  const [first, ...rest] = analyzed.readingPath ?? [];
+  const html = render({
+    insights: {
+      ...analyzed,
+      readingPath: [{ ...first, sampled: false }, ...rest],
+      verification: {
+        droppedRecommendations: [],
+        droppedPaths: [
+          { field: "evidence", path: "hello.ts", reason: "引用了未抽樣的檔案 hello.ts" },
+        ],
+      },
+    },
+  });
+  assert.match(html, /未抽樣，內容未讀/);
+  assert.match(html, /因引用未抽樣／不存在的檔案而略過 1 項說明/);
+  assert.match(html, /hello\.ts/);
+  const legacy = render({ insights: analyzed });
+  assert.doesNotMatch(legacy, /未抽樣，內容未讀/);
+  assert.doesNotMatch(legacy, /因引用未抽樣／不存在的檔案而略過/);
+});

@@ -407,6 +407,13 @@ export function ProjectOverview({
       round: "最近一次追加",
     })),
   ];
+  // Modules, reading steps and evidence notes the server removed for citing files outside the sample.
+  const droppedPaths = insights?.verification?.droppedPaths ?? [];
+  const droppedPathField = {
+    modules: "模組分工",
+    readingPath: "閱讀順序",
+    evidence: "分析依據",
+  } as const;
   const addedIds = new Set(
     recommending || recommendationError ? [] : (expansion?.addedIds ?? []),
   );
@@ -712,6 +719,11 @@ export function ProjectOverview({
                         {String(index + 1).padStart(2, "0")}
                       </span>
                       <code>{step.path}</code>
+                      {step.sampled === false && (
+                        <span className="mission-reading-unsampled">
+                          未抽樣，內容未讀
+                        </span>
+                      )}
                       <p>{step.why}</p>
                       <p>
                         <strong>看什麼</strong>
@@ -945,6 +957,26 @@ export function ProjectOverview({
                   <li key={`${entry.round}-${entry.id}`}>
                     <strong>{entry.title}</strong>
                     <span>{entry.round}</span>
+                    <p>{entry.reason}</p>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          {droppedPaths.length > 0 && (
+            <details className="mission-dropped-ideas">
+              <summary>
+                因引用未抽樣／不存在的檔案而略過 {droppedPaths.length} 項說明
+                <ChevronRight size={14} aria-hidden="true" />
+              </summary>
+              <p>
+                模型只讀過抽樣檔案的內容，其餘路徑只知道存在；依據必須來自讀過的檔案，不在清單中的路徑則無法核對。其餘分析結果照常儲存。
+              </p>
+              <ul>
+                {droppedPaths.map((entry, index) => (
+                  <li key={`${entry.field}-${entry.path}-${index}`}>
+                    <strong>{droppedPathField[entry.field]}</strong>
+                    <span>{entry.path}</span>
                     <p>{entry.reason}</p>
                   </li>
                 ))}

@@ -71,6 +71,16 @@ export interface RecommendationPreferences {
  */
 export interface RecommendationVerification {
   droppedRecommendations: { id: string; title: string; reason: string }[];
+  /**
+   * Modules, reading steps and evidence notes removed for citing a file whose
+   * content was not read or that is not in the tree; absent when nothing was
+   * dropped and on caches written before it was recorded.
+   */
+  droppedPaths?: {
+    field: "modules" | "readingPath" | "evidence";
+    path: string;
+    reason: string;
+  }[];
 }
 
 export interface ProjectInsights {
@@ -82,8 +92,12 @@ export interface ProjectInsights {
   userJourney: string[];
   /** A path is a sampled file or a directory prefix ending in "/" from the tracked file tree. */
   modules: { path: string; purpose: string }[];
-  /** Suggested first read, in order; missing on demo data and caches written before it was requested. */
-  readingPath?: { path: string; why: string; lookFor: string }[];
+  /**
+   * Suggested first read, in order; missing on demo data and caches written
+   * before it was requested. `sampled: false` marks a tracked file whose
+   * content was not read; absent means the file was sampled.
+   */
+  readingPath?: { path: string; why: string; lookFor: string; sampled?: boolean }[];
   /** One main data flow traced through the sampled files; inferences are labelled in prose. */
   howItFitsTogether?: string;
   evidence: { path: string; note: string }[];
