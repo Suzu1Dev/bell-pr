@@ -255,12 +255,13 @@ export async function readDiff(
 }
 
 /**
- * An edited commit message invalidates approval exactly like title or body.
- * The key is added only when a message is set, so fingerprints approved
- * before the field existed (title and body only) keep matching.
+ * An edited commit message or GitHub branch invalidates approval exactly like
+ * title or body. Each key is added only when set, so fingerprints approved
+ * before the fields existed (title and body only) keep matching.
  */
 export function reviewFingerprint(files: DiffFile[], draft: Run["draft"]) {
   const commitMessage = draft.commitMessage?.trim();
+  const publishBranch = draft.publishBranch?.trim();
   return digest(
     JSON.stringify({
       files: files.map((file) => [file.path, file.fingerprint]),
@@ -268,6 +269,7 @@ export function reviewFingerprint(files: DiffFile[], draft: Run["draft"]) {
         title: draft.title,
         body: draft.body,
         ...(commitMessage ? { commitMessage } : {}),
+        ...(publishBranch ? { publishBranch } : {}),
       },
     }),
   );

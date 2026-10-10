@@ -304,7 +304,7 @@ export const demoRun: Run = {
   prompt:
     "為 SDK 的 GET 請求加入指數退避與 jitter，保留可設定的重試次數，補上測試和使用文件。",
   status: "review",
-  branch: "feat/smart-retry",
+  branch: "fix/smart-retry",
   baseBranch: "main",
   createdAt: "2026-10-03T01:30:00.000Z",
   agents: [

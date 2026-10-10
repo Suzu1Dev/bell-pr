@@ -70,8 +70,16 @@ export interface Run {
   createdAt: string;
   agents: Agent[];
   logs: RunLogEntry[];
-  /** Human-written commit message; absent or empty means the PR title alone is used. */
-  draft: { title: string; body: string; commitMessage?: string };
+  /**
+   * Human-written commit message; absent or empty means the PR title alone is used.
+   * publishBranch is the branch pushed to GitHub; absent means `branch`.
+   */
+  draft: {
+    title: string;
+    body: string;
+    commitMessage?: string;
+    publishBranch?: string;
+  };
   reviewedFiles: string[];
   /** Learner notes keyed by diff path; absent on runs saved before notes existed. */
   notes?: Record<string, LearnerNote>;
@@ -80,6 +88,8 @@ export interface Run {
   /** Stored per-file explanations keyed by path; the learning page aggregates the ready ones. */
   explanations?: Record<string, StoredExplanation>;
   prUrl?: string;
+  /** The GitHub branch a publish already pushed to; the branch field is locked once set. */
+  publishedBranch?: string;
   /** Maintainer feedback read from the PR on request; absent until the learner fetches it. */
   prFeedback?: PrFeedback;
   error?: string;

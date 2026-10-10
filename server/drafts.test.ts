@@ -5,8 +5,31 @@ import os from "node:os";
 import path from "node:path";
 import { once } from "node:events";
 import { request } from "node:http";
-import { draftFingerprint, draftPrompt, parseDraftProposal } from "./drafts.js";
-import type { DraftContext, DraftProposal } from "../shared/drafts.js";
+import {
+  draftFingerprint,
+  draftJsonSchema,
+  draftPrompt,
+  parseDraftProposal,
+} from "./drafts.js";
+import {
+  validBranchName,
+  type DraftContext,
+  type DraftProposal,
+  type DraftSource,
+} from "../shared/drafts.js";
+import {
+  brevityRule,
+  draftPreflight,
+  draftProseWords,
+  draftTaskItems,
+  draftWordBudget,
+  findDraftPlaceholders,
+  issueRule,
+  markdownProse,
+  referencesIssue,
+  sameDraftProse,
+  setDraftTaskItem,
+} from "../shared/draft-checks.js";
 import { defaultContributionSettings } from "../shared/insights.js";
 import type { DiffFile, Run } from "./types.js";
 import type { TeamAgentRunner } from "./team.js";
@@ -631,4 +654,391 @@ test("draft prepare HTTP API returns a proposal without applying and rejects aut
     await app.locals.insights.shutdown();
     await f.cleanup();
   }
+});
+
+/** The shape of the opencode PR template and the body BELL published as Suzu1Dev/opencode#1. */
+const opencodeTemplate =
+  "### Issue for this PR\n\nCloses #\n\n### Type of change\n\n- [ ] Bug fix\n- [ ] Documentation\n\n### What does this PR do?\n\nPlease provide a description of the issue.\n\n### How did you verify your code works?\n\n### Checklist\n\n- [ ] I have tested my changes locally\n- [ ] I have not included unrelated changes in this PR\n";
+const opencodeSources: DraftSource[] = [
+  {
+    id: "base:CONTRIBUTING.md",
+    kind: "contributing",
+    label: "CONTRIBUTING.md",
+    content:
+      "## Pull Request Expectations\n\n**All PRs must reference an existing issue.** Before opening a PR, open an issue.\n\n### No AI-Generated Walls of Text\n\n- Explain what changed and why in your own words\n",
+  },
+  {
+    id: "base:.github/pull_request_template.md",
+    kind: "template",
+    label: ".github/pull_request_template.md",
+    content: opencodeTemplate,
+  },
+];
+const leakedBody = [
+  "### Issue for this PR",
+  "",
+  "_TODO: No issue is linked yet. Open one and link it here before submitting._",
+  "",
+  "### Type of change",
+  "",
+  "- [ ] Bug fix",
+  "- [ ] Documentation",
+  "",
+  "### What does this PR do?",
+  "",
+  "Fixes the startup instructions in the package README.",
+  "",
+  "### How did you verify your code works?",
+  "",
+  "Still to run with Bun 1.3+ in a clean clone (results go here):",
+  "- `bun install && bun run dev --help`: _TODO_",
+  "",
+  "### Checklist",
+  "",
+  "- [ ] I have tested my changes locally",
+  "- [ ] I have not included unrelated changes in this PR",
+].join("\n");
+
+test("placeholders meant for the person are found in prose only, including underscored TODO markers", () => {
+  assert.deepEqual(
+    findDraftPlaceholders(leakedBody).map((item) => item.line),
+    [3, 16, 17],
+  );
+  assert.deepEqual(
+    findDraftPlaceholders("### Issue for this PR\n\nCloses #\n\nFixes #12").map(
+      (item) => item.line,
+    ),
+    [3],
+  );
+  // Quoted code, fenced blocks and HTML comments are material, not open items.
+  assert.deepEqual(
+    findDraftPlaceholders(
+      "Removes the stale `TODO` note and the TODOs list.\n```\n// TODO: later\n````\n<!-- TODO:\nmore -->\nDone.",
+    ),
+    [],
+  );
+  // Only marker shapes are open slots; prose about TODO comments or files is not.
+  for (const text of [
+    "_TODO: add the output_",
+    "*TBD*",
+    "TODO: run the tests",
+    "- TBD",
+    "Exit code: TBD",
+    "(TODO)",
+    "Fixes # (issue)",
+    "> **Resolves** #[number]",
+    "Issue: #___",
+    "Closes #XXX",
+  ])
+    assert.equal(findDraftPlaceholders(text).length, 1, text);
+  for (const text of [
+    "Resolves the FIXME in parse.ts.",
+    "Moves the roadmap into TODO.md and renames TODO_LIST.",
+    "- [ ] I have removed any TODO comments from my changes",
+    "## TODO",
+    "See (TODO.md).",
+    "Fixes #12 (partially)",
+    "Fix: # of retries reduced",
+    "- Fix #include guard",
+  ])
+    assert.deepEqual(findDraftPlaceholders(text), [], text);
+  // "<!--" quoted in code does not hide the rest; fences in nested lists stay code.
+  assert.equal(
+    findDraftPlaceholders("Strips `<!--` comments.\n_TODO_").length,
+    1,
+  );
+  assert.deepEqual(
+    markdownProse("  - Run:\n    ```sh\n    # TODO later\n    ```\nDone"),
+    ["  - Run:", "", "", "", "Done"],
+  );
+});
+
+test("task items keep their heading, ignore code, and are ticked one line at a time", () => {
+  const body = `${leakedBody}\n\n\`\`\`md\n- [ ] not a real item\n\`\`\``;
+  const items = draftTaskItems(body);
+  assert.deepEqual(
+    items.map((item) => [item.heading, item.text, item.checked]),
+    [
+      ["Type of change", "Bug fix", false],
+      ["Type of change", "Documentation", false],
+      ["Checklist", "I have tested my changes locally", false],
+      ["Checklist", "I have not included unrelated changes in this PR", false],
+    ],
+  );
+  const documentation = items[1];
+  const ticked = setDraftTaskItem(body, documentation.line, true);
+  assert.equal(ticked.split("\n")[documentation.line - 1], "- [x] Documentation");
+  assert.deepEqual(
+    draftTaskItems(ticked).filter((item) => item.checked).map((item) => item.text),
+    ["Documentation"],
+  );
+  assert.equal(setDraftTaskItem(ticked, documentation.line, false), body);
+  // A line that is not a task item is left alone.
+  assert.equal(setDraftTaskItem(body, 1, true), body);
+});
+
+test("issue and brevity rules are quoted from contributing and template sources only", () => {
+  assert.equal(
+    issueRule(opencodeSources)?.quote,
+    "All PRs must reference an existing issue. Before opening a PR, open an issue.",
+  );
+  assert.equal(
+    issueRule([opencodeSources[1]])?.quote,
+    "Closes #",
+  );
+  assert.equal(brevityRule(opencodeSources)?.quote, "No AI-Generated Walls of Text");
+  assert.equal(draftWordBudget(opencodeSources), 150);
+  assert.equal(draftWordBudget([]), 300);
+  const readme: DraftSource = {
+    id: "base:README.md",
+    kind: "documentation",
+    label: "README.md",
+    content: "Every PR must reference an issue. Write in your own words.",
+  };
+  assert.equal(issueRule([readme]), undefined);
+  assert.equal(brevityRule([readme]), undefined);
+  const contributing = (content: string): DraftSource[] => [
+    { id: "c", kind: "contributing", label: "CONTRIBUTING.md", content },
+  ];
+  for (const rule of [
+    "Every pull request must be linked to an issue.",
+    "Each PR must reference an issue.",
+    "Every PR needs a linked issue.",
+    "PRs without a linked issue will be closed.",
+  ])
+    assert.ok(issueRule(contributing(rule)), rule);
+  assert.equal(
+    issueRule(
+      contributing(
+        "All PRs should have a clear description of the issue they solve.",
+      ),
+    ),
+    undefined,
+  );
+  assert.equal(
+    issueRule([
+      { ...opencodeSources[1], content: "## Related\n\nFixes # (issue)\n" },
+    ])?.quote,
+    "Fixes # (issue)",
+  );
+  assert.ok(referencesIssue("Closes #12"));
+  assert.ok(referencesIssue("Refs acme/widgets#7"));
+  assert.ok(referencesIssue("See https://github.com/acme/widgets/issues/7"));
+  assert.ok(!referencesIssue("Closes #\n`#12` in code"));
+  assert.equal(draftProseWords("## Heading words\n\n- [ ] task words\n\nThree prose words."), 3);
+  assert.equal(draftProseWords("修正說明"), 4);
+});
+
+test("preflight blocks unfinished text and asks the person to confirm empty boxes, a missing issue and unrevised model text", () => {
+  const checks = draftPreflight({
+    body: leakedBody,
+    sources: opencodeSources,
+    proposalBody: leakedBody,
+  });
+  assert.deepEqual(
+    checks.map((check) => [check.id, check.kind]),
+    [
+      ["placeholder", "block"],
+      ["unchecked", "confirm"],
+      ["issue", "confirm"],
+      ["brevity", "confirm"],
+    ],
+  );
+  assert.match(checks[0].details[0], /第 3 行/);
+  assert.deepEqual(checks[1].details, [
+    "Type of change：2 項都未勾",
+    "Checklist：2 項都未勾",
+  ]);
+  const finished = leakedBody
+    .replace(/_TODO: No issue.*_/, "Closes #42")
+    .replace(/Still to run[\s\S]*?_TODO_/, "Not run yet: `bun run dev --help`.")
+    .replace("- [ ] Documentation", "- [x] Documentation")
+    .replace("- [ ] I have not", "- [x] I have not");
+  // Ticking one box per group, linking the issue and rewriting leaves nothing to confirm.
+  assert.deepEqual(
+    draftPreflight({
+      body: finished,
+      sources: opencodeSources,
+      proposalBody: leakedBody,
+    }),
+    [],
+  );
+  // Ticking boxes in BELL is not a rewrite: the unrevised-text confirmation stays.
+  const shortProposal = opencodeTemplate
+    .replace("Closes #", "No issue is linked yet.")
+    .replace("Please provide a description of the issue.", "Fixes the README.");
+  const ticked = setDraftTaskItem(
+    shortProposal,
+    draftTaskItems(shortProposal)[1].line,
+    true,
+  );
+  assert.ok(sameDraftProse(ticked, shortProposal));
+  assert.ok(!sameDraftProse(`${ticked}\nMore.`, shortProposal));
+  assert.deepEqual(
+    draftPreflight({
+      body: ticked,
+      sources: opencodeSources,
+      proposalBody: shortProposal,
+    }).map((check) => check.id),
+    ["unchecked", "issue", "brevity"],
+  );
+  // Without collected sources only the text itself is checked.
+  assert.deepEqual(
+    draftPreflight({ body: "A finished description." }),
+    [],
+  );
+});
+
+test("GitHub branch names follow a conservative Git subset", () => {
+  for (const name of ["readme-startup", "bellpr-c4bc3a23", "feat/smart-retry", "v1.2_fix"])
+    assert.ok(validBranchName(name), name);
+  for (const name of ["", "HEAD", "-x", "a..b", "x.lock", "x.", "feat/", "/x", "a//b", "bad name", "a~b", "a:b", "x.lock/y", "分支"])
+    assert.ok(!validBranchName(name), name);
+});
+
+test("draft proposals that put the person's to-dos into the published body are rejected", () => {
+  for (const body of [
+    `${proposal.body}\n\n_TODO: add the output_`,
+    `Closes #\n\n${proposal.body}`,
+    `${proposal.body}\n\nResults go here.`,
+  ])
+    assert.throws(
+      () => parseDraftProposal(JSON.stringify({ ...proposal, body }), context),
+      /待辦事項/,
+    );
+  assert.equal(
+    parseDraftProposal(
+      JSON.stringify({ ...proposal, body: `${proposal.body}\n\nRemoves the stale \`TODO\` note.` }),
+      context,
+    ).policy,
+    "linux",
+  );
+  // A template item about TODO comments, kept verbatim as the prompt asks, is not a slot.
+  const template = "## Checklist\n\n- [ ] I have removed any TODO comments from my changes\n";
+  assert.equal(
+    parseDraftProposal(
+      JSON.stringify({
+        ...proposal,
+        policy: "repository",
+        templateSourceId: "template",
+        body: `${template}\nUpdates the value.`,
+      }),
+      {
+        ...context,
+        sources: [
+          { id: "template", kind: "template", label: "PR template", content: template },
+        ],
+      },
+    ).policy,
+    "repository",
+  );
+  // The output schema states the same 24-item limits the parser enforces.
+  const properties = draftJsonSchema.properties as Record<string, { maxItems?: number }>;
+  assert.equal(properties.rules.maxItems, 24);
+  assert.equal(properties.checklist.maxItems, 24);
+});
+
+test("draft prompt routes the person's to-dos to the checklist and passes the branch and word budget", () => {
+  const prompt = draftPrompt(
+    { title: "Update", prompt: "Update value", reports: {}, branch: "bellpr-abc12345" },
+    [diff],
+    context,
+  );
+  assert.match(prompt, /published to GitHub verbatim/);
+  assert.match(prompt, /goes ONLY into checklist/);
+  assert.match(prompt, /"headBranch":"bellpr-abc12345"/);
+  assert.match(prompt, /"bodyWordBudget":300/);
+  assert.match(prompt, /"brevityRule":null/);
+  const branded = draftPrompt(
+    {
+      title: "Update",
+      prompt: "Update value",
+      reports: {},
+      branch: "bellpr-abc12345",
+      draft: { title: "t", body: "b", publishBranch: "readme-startup" },
+    },
+    [diff],
+    { ...context, sources: opencodeSources },
+  );
+  assert.match(branded, /"headBranch":"readme-startup"/);
+  assert.match(branded, /"bodyWordBudget":150/);
+  assert.match(
+    branded,
+    /"brevityRule":\{"sourceId":"base:CONTRIBUTING.md","quote":"No AI-Generated Walls of Text"\}/,
+  );
+  assert.match(branded, /Sources of kind automation/);
+});
+
+test("only what GitHub renders as code or a comment is skipped, so odd indents cannot hide unfinished text", () => {
+  // Each body would hide the later TODO and empty issue line with a line-based scanner.
+  for (const [name, body, lines] of [
+    ["top-level indented fence", "Intro\n\n    ```js\n    code\n\n_TODO_\nCloses #", [6, 7]],
+    ["indented comment opener", "Example template:\n\n    <!-- describe here\n\n_TODO_\nCloses #", [5, 6]],
+    ["unclosed mid-line comment", "Escapes `<` in <!-- markers now.\n\n## Testing\nTODO: run tests\nCloses #", [4, 5]],
+    ["backticks in an info string", "```js``` blocks keep their language.\n\n_TODO_", [3]],
+    ["unclosed fence in a list item", "- Steps:\n  ```\n  npm test\n\n## Testing\n_TODO_", [6]],
+  ] as const)
+    assert.deepEqual(
+      findDraftPlaceholders(body).map((item) => item.line),
+      lines,
+      name,
+    );
+  // Real comments, inline or as a block, are still hidden like GitHub hides them.
+  assert.deepEqual(
+    findDraftPlaceholders(
+      "Text <!-- TODO: hidden --> more.\n<!--\nTODO: block\n-->\n    TODO: indented code\nDone",
+    ),
+    [],
+  );
+  // A task item after an unclosed fence in a list is still offered for ticking.
+  assert.deepEqual(
+    draftTaskItems("- Steps:\n  ```\n  npm test\n\n## Testing\n- [ ] tests pass").map(
+      (item) => [item.heading, item.text],
+    ),
+    [["Testing", "tests pass"]],
+  );
+});
+
+test("ordered task items and ordered issue slots are handled like bulleted ones", () => {
+  const ordered = "## Checklist\n\n1. [ ] Tests pass\n2) [ ] Docs updated\n";
+  const items = draftTaskItems(ordered);
+  assert.deepEqual(
+    items.map((item) => [item.heading, item.text, item.checked]),
+    [
+      ["Checklist", "Tests pass", false],
+      ["Checklist", "Docs updated", false],
+    ],
+  );
+  const ticked = setDraftTaskItem(ordered, items[0].line, true);
+  assert.equal(ticked.split("\n")[2], "1. [x] Tests pass");
+  assert.ok(sameDraftProse(ticked, ordered));
+  assert.deepEqual(
+    draftPreflight({ body: ordered }).map((check) => check.id),
+    ["unchecked"],
+  );
+  assert.deepEqual(draftPreflight({ body: ticked }), []);
+  assert.deepEqual(
+    findDraftPlaceholders("1. [ ] TBD: owner\n1. Closes #\n1) Fixes # (issue)").map(
+      (item) => item.line,
+    ),
+    [1, 2, 3],
+  );
+  assert.equal(
+    issueRule([
+      { id: "t", kind: "template", label: "T", content: "## Issue\n\n1. Closes #\n" },
+    ])?.quote,
+    "1. Closes #",
+  );
+  // Quotes keep code the rule cites, rather than the blanked prose.
+  assert.equal(
+    issueRule([
+      {
+        id: "c",
+        kind: "contributing",
+        label: "C",
+        content: "Every PR must reference an issue with `Fixes #123`.",
+      },
+    ])?.quote,
+    "Every PR must reference an issue with `Fixes #123`.",
+  );
 });

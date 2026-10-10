@@ -1,7 +1,13 @@
 export interface DraftSource {
   id: string;
   kind:
-    "contributing" | "template" | "documentation" | "maintainer" | "example";
+    | "contributing"
+    | "template"
+    | "documentation"
+    | "maintainer"
+    | "example"
+    /** A repository workflow that checks pull requests automatically. */
+    | "automation";
   label: string;
   url?: string;
   path?: string;
@@ -55,3 +61,19 @@ export interface DraftPreparation {
 
 export const linuxContributionUrl =
   "https://docs.kernel.org/process/submitting-patches.html";
+
+/**
+ * A conservative subset of Git branch names that GitHub accepts: ASCII words
+ * joined by "/", ".", "_" or "-"; no "..", no ".lock" or "." at the end, not HEAD.
+ */
+export function validBranchName(name: string) {
+  // Comparing with the target branch happens where it is known (Workbench.draft and publish).
+  return (
+    name.length <= 100 &&
+    name !== "HEAD" &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/.test(name) &&
+    !name.includes("..") &&
+    !/(?:\.lock|\.)$/.test(name) &&
+    !/\.lock\//.test(name)
+  );
+}

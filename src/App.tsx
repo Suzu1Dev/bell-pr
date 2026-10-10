@@ -64,7 +64,11 @@ import type { Repo, Run, RunSummary, DiffFile, ChatMessage } from "./types";
 import { summarizeRun } from "../shared/runs";
 import { groupPrFeedback, summarizeChecks } from "../shared/pr-feedback";
 import { applyReviewOrder, parseReviewOrder } from "../shared/review-order";
-import type { DraftProposal } from "../shared/drafts";
+import { validBranchName, type DraftProposal } from "../shared/drafts";
+import type { DraftCheck, DraftTaskItem } from "../shared/draft-checks";
+
+/** The draft checks bring a Markdown parser, so they load beside the first screen. */
+type DraftChecks = typeof import("../shared/draft-checks");
 import type {
   ContributionOpportunity,
   DiscoveryCandidate,
@@ -329,6 +333,22 @@ export default function App() {
   const [draftCommitMessage, setDraftCommitMessage] = useState(
     run.draft.commitMessage ?? "",
   );
+  // Empty means "push the run's own branch", matching the server fallback.
+  const [draftPublishBranch, setDraftPublishBranch] = useState(
+    run.draft.publishBranch ?? "",
+  );
+  // Preflight items confirmed in the publish dialog; never saved.
+  const [acknowledged, setAcknowledged] = useState<string[]>([]);
+  const [draftChecks, setDraftChecks] = useState<DraftChecks>();
+  useEffect(() => {
+    let cancelled = false;
+    void import("../shared/draft-checks").then((module) => {
+      if (!cancelled) setDraftChecks(module);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [draftPreview, setDraftPreview] = useState(false);
   const persistedDraft = useRef({ id: run.id, ...run.draft });
   const draftMutationEpoch = useRef(0);
@@ -336,11 +356,13 @@ export default function App() {
     title: draftTitle,
     body: draftBody,
     commitMessage: draftCommitMessage,
+    publishBranch: draftPublishBranch,
   });
   editorDraft.current = {
     title: draftTitle,
     body: draftBody,
     commitMessage: draftCommitMessage,
+    publishBranch: draftPublishBranch,
   };
   const pendingDrafts = useRef(new Set<string>());
   const [draftRequests, setDraftRequests] = useState<Set<string>>(new Set());
@@ -416,7 +438,47 @@ export default function App() {
   const draftDirty =
     draftTitle !== run.draft.title ||
     draftBody !== run.draft.body ||
-    draftCommitMessage.trim() !== (run.draft.commitMessage ?? "");
+    draftCommitMessage.trim() !== (run.draft.commitMessage ?? "") ||
+    draftPublishBranch.trim() !== (run.draft.publishBranch ?? "");
+  // The same checks the server runs before approving and publishing; empty
+  // until the checks module has loaded, and the server enforces them anyway.
+  const draftSources = run.draftPreparation?.context?.sources;
+  const proposalBody = run.draftPreparation?.proposal?.body;
+  const draftUnfinished = draftChecks
+    ?.draftPreflight({ body: draftBody })
+    .find((check) => check.kind === "block");
+  const draftTasks: DraftTaskItem[] = draftChecks?.draftTaskItems(draftBody) ?? [];
+  const draftTaskGroups = [
+    ...draftTasks
+      .reduce(
+        (groups, item) =>
+          groups.set(item.heading, [...(groups.get(item.heading) ?? []), item]),
+        new Map<string, typeof draftTasks>(),
+      )
+      .entries(),
+  ];
+  // Ticking template boxes is not a rewrite of the model's text.
+  const draftIsProposal =
+    !!proposalBody?.trim() &&
+    !!draftChecks?.sameDraftProse(draftBody, proposalBody);
+  const publishBranchError = !draftPublishBranch.trim()
+    ? ""
+    : !validBranchName(draftPublishBranch.trim())
+      ? "分支名稱只能用英數字與 . _ - /，不能有 ..，也不能以 . 或 .lock 結尾。"
+      : draftPublishBranch.trim().toLowerCase() === run.baseBranch.toLowerCase()
+        ? `不能用目標分支 ${run.baseBranch}，否則會直接推送到目標分支而不是建立 PR。`
+        : "";
+  const publishBranchInvalid = !!publishBranchError;
+  const publishChecks: DraftCheck[] =
+    draftChecks?.draftPreflight({
+      body: run.draft.body,
+      sources: draftSources,
+      proposalBody,
+    }) ?? [];
+  const publishBlocked = publishChecks.find((check) => check.kind === "block");
+  const publishConfirmations = publishChecks.filter(
+    (check) => check.kind === "confirm",
+  );
   const commitMessageSuggestion =
     run.draftPreparation?.status === "ready"
       ? run.draftPreparation.proposal?.commitMessageSuggestion
@@ -508,14 +570,22 @@ export default function App() {
       previous.id !== run.id ||
       (edited.title === previous.title &&
         edited.body === previous.body &&
-        edited.commitMessage.trim() === (previous.commitMessage ?? ""))
+        edited.commitMessage.trim() === (previous.commitMessage ?? "") &&
+        edited.publishBranch.trim() === (previous.publishBranch ?? ""))
     ) {
       setDraftTitle(run.draft.title);
       setDraftBody(run.draft.body);
       setDraftCommitMessage(run.draft.commitMessage ?? "");
+      setDraftPublishBranch(run.draft.publishBranch ?? "");
     }
     persistedDraft.current = { id: run.id, ...run.draft };
-  }, [run.id, run.draft.title, run.draft.body, run.draft.commitMessage]);
+  }, [
+    run.id,
+    run.draft.title,
+    run.draft.body,
+    run.draft.commitMessage,
+    run.draft.publishBranch,
+  ]);
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -1064,7 +1134,8 @@ export default function App() {
         if (
           editorDraft.current.title !== draftAtStart.title ||
           editorDraft.current.body !== draftAtStart.body ||
-          editorDraft.current.commitMessage !== draftAtStart.commitMessage
+          editorDraft.current.commitMessage !== draftAtStart.commitMessage ||
+          editorDraft.current.publishBranch !== draftAtStart.publishBranch
         ) {
           notify("草稿在切換期間已更新，已保留目前任務。");
           return false;
@@ -1400,7 +1471,12 @@ export default function App() {
       notify("請填寫 PR 標題與說明。", "error");
       return;
     }
+    if (publishBranchInvalid) {
+      notify(`GitHub 分支：${publishBranchError}`, "error");
+      return;
+    }
     const commitMessage = draftCommitMessage.trim();
+    const publishBranch = draftPublishBranch.trim();
     setBusy(true);
     draftMutationEpoch.current++;
     try {
@@ -1411,13 +1487,19 @@ export default function App() {
             title: draftTitle,
             body: draftBody,
             ...(commitMessage ? { commitMessage } : {}),
+            ...(publishBranch ? { publishBranch } : {}),
           },
           status: "review",
         }));
       else {
         const { run: updated } = await api<{ run: Run }>(
           `/runs/${run.id}/draft`,
-          send("PATCH", { title: draftTitle, body: draftBody, commitMessage }),
+          send("PATCH", {
+            title: draftTitle,
+            body: draftBody,
+            commitMessage,
+            publishBranch,
+          }),
         );
         if (runIdRef.current === updated.id) setRun(updated);
       }
@@ -1442,12 +1524,14 @@ export default function App() {
               title: draftTitle,
               body: draftBody,
               commitMessage: draftCommitMessage.trim(),
+              publishBranch: draftPublishBranch.trim(),
             },
           }),
         );
         if (runIdRef.current !== updated.id) return;
         setRun(updated);
       }
+      setAcknowledged([]);
       openModal("publish");
     } catch (error) {
       notify((error as Error).message, "error");
@@ -1466,7 +1550,7 @@ export default function App() {
     try {
       const result = await api<{ run: Run; url?: string }>(
         `/runs/${run.id}/publish`,
-        send("POST", { fingerprint: run.approvedFingerprint }),
+        send("POST", { fingerprint: run.approvedFingerprint, acknowledged }),
       );
       setRun(result.run);
       closeModal();
@@ -2532,6 +2616,14 @@ export default function App() {
                         issueUrl={run.contributionSettings?.issueUrl}
                         onGenerate={prepareDraft}
                         onApply={applyDraftProposal}
+                        applied={
+                          !!run.draftPreparation?.proposal &&
+                          draftTitle === run.draftPreparation.proposal.title &&
+                          !!draftChecks?.sameDraftProse(
+                            draftBody,
+                            run.draftPreparation.proposal.body,
+                          )
+                        }
                       />
                     </Suspense>
                     <div className="draft-layout">
@@ -2543,6 +2635,29 @@ export default function App() {
                           </div>
                           <span className="draft-label">DRAFT PR</span>
                         </div>
+                        {!demo && run.status !== "published" && draftIsProposal && (
+                          <div className="draft-origin-notice" role="status">
+                            <AlertCircle size={16} />
+                            <p>
+                              下方說明是 BELL
+                              依專案規範產生的建議原文，你還沒有修改。這段文字會原樣送到
+                              GitHub：送出前請用自己的話確認內容，待辦事項留在上方的核對清單，不要寫進說明。
+                            </p>
+                          </div>
+                        )}
+                        {!demo &&
+                          run.status !== "published" &&
+                          !draftBody.trim() &&
+                          !preparingDraft && (
+                            <div className="draft-origin-notice" role="status">
+                              <AlertCircle size={16} />
+                              <p>
+                                還沒有 PR
+                                說明。可以在上方產生並套用建議草稿，或用自己的話寫下改了什麼、為什麼，以及實際執行過哪些檢查。Agent
+                                的完整報告在「審查者怎麼看」。
+                              </p>
+                            </div>
+                          )}
                         <label className="field-label" htmlFor="pr-title">
                           Pull Request 標題
                         </label>
@@ -2607,6 +2722,38 @@ export default function App() {
                           標題作為單行提交訊息。Signed-off-by
                           等簽署由你本人輸入，BELL 與模型不會代填。
                         </p>
+                        <label
+                          className="field-label"
+                          htmlFor="pr-publish-branch"
+                        >
+                          GitHub 分支 <span>git push</span>
+                        </label>
+                        <input
+                          id="pr-publish-branch"
+                          className="text-input"
+                          value={draftPublishBranch}
+                          placeholder={run.branch}
+                          spellCheck={false}
+                          aria-describedby="pr-publish-branch-help"
+                          aria-invalid={publishBranchInvalid}
+                          onChange={(e) => setDraftPublishBranch(e.target.value)}
+                          disabled={
+                            run.status === "published" || !!run.publishedBranch
+                          }
+                        />
+                        <p id="pr-publish-branch-help" className="field-help">
+                          推送到 GitHub 時使用的分支名稱，留空時使用{" "}
+                          <code>{run.branch}</code>
+                          。有些專案規定分支命名，例如不能有斜線或 feat/
+                          前綴，請依核對清單調整。本機工作分支不會改名。
+                          {run.publishedBranch &&
+                            " 已推送到 GitHub 後不能再改分支，以免重複建立 PR。"}
+                        </p>
+                        {publishBranchInvalid && (
+                          <p role="alert" className="inline-error">
+                            {publishBranchError}
+                          </p>
+                        )}
                         {commitMessageSuggestion && (
                           <div className="commit-suggestion">
                             <div>
@@ -2695,11 +2842,75 @@ export default function App() {
                             </small>
                           </span>
                         </div>
+                        <div
+                          className={
+                            draftBody.trim() && !draftUnfinished
+                              ? "checklist-item checked"
+                              : "checklist-item"
+                          }
+                        >
+                          {draftBody.trim() && !draftUnfinished ? (
+                            <CircleCheck size={18} />
+                          ) : (
+                            <Circle size={18} />
+                          )}
+                          <span>
+                            說明沒有待填寫的內容
+                            <small>
+                              {!draftBody.trim()
+                                ? "還沒有說明"
+                                : draftUnfinished
+                                  ? draftUnfinished.details.join("\n")
+                                  : "TODO 與待填空格不會送到 GitHub"}
+                            </small>
+                          </span>
+                        </div>
+                        {draftTaskGroups.length > 0 && (
+                          <fieldset
+                            className="draft-task-items"
+                            disabled={run.status === "published" || busy}
+                          >
+                            <legend>說明中的勾選項目</legend>
+                            <p>
+                              只勾你真正完成或確認的項目。BELL
+                              和模型不會替你勾；勾選會直接改寫左側說明，記得儲存。
+                            </p>
+                            {draftTaskGroups.map(([heading, items]) => (
+                              <div key={`${heading}:${items[0].line}`}>
+                                <strong>{heading || "未分段"}</strong>
+                                {items.map((item) => (
+                                  <label key={item.line}>
+                                    <input
+                                      type="checkbox"
+                                      checked={item.checked}
+                                      onChange={(event) => {
+                                        const checked = event.target.checked;
+                                        setDraftBody((body) =>
+                                          draftChecks
+                                            ? draftChecks.setDraftTaskItem(
+                                                body,
+                                                item.line,
+                                                checked,
+                                              )
+                                            : body,
+                                        );
+                                      }}
+                                    />
+                                    <span>{item.text}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            ))}
+                          </fieldset>
+                        )}
                         <div className="checklist-item">
                           <ShieldCheck size={18} />
                           <span>
                             以 Draft PR 送出
-                            <small>送出後仍可在 GitHub 繼續編輯</small>
+                            <small>
+                              送出後仍可在 GitHub
+                              繼續編輯；專案的自動檢查對 Draft PR 一樣會執行。
+                            </small>
                           </span>
                         </div>
                       </aside>
@@ -2764,7 +2975,17 @@ export default function App() {
                                     `（整體 ${run.prFeedback.checksState}）`}
                                 </>
                               )}
+                              {!!run.prFeedback.labels?.length &&
+                                ` · 標籤：${run.prFeedback.labels.join("、")}`}
                             </p>
+                            {run.prFeedback.labels?.some((label) =>
+                              label.startsWith("needs:"),
+                            ) && (
+                              <p className="pr-feedback-warning">
+                                PR 被加上「needs:」開頭的標籤，通常代表專案的自動檢查認為還有項目沒完成；即使
+                                CI 顯示成功也一樣。請看下方機器人的留言，並在 GitHub 上修改說明。
+                              </p>
+                            )}
                             {run.prFeedback.checks?.some(
                               (check) =>
                                 !["SUCCESS", "NEUTRAL", "SKIPPED"].includes(
@@ -2906,6 +3127,7 @@ export default function App() {
                         active ||
                         busy ||
                         draftDirty ||
+                        (!demo && !!draftUnfinished) ||
                         !["review", "approved"].includes(run.status)
                       }
                       title={
@@ -2913,7 +3135,9 @@ export default function App() {
                           ? "請先逐一勾選所有檔案的「已審閱」"
                           : draftDirty
                             ? "請先儲存 PR 草稿"
-                            : "確認變更並預覽送出"
+                            : !demo && draftUnfinished
+                              ? "PR 說明還有待填寫的內容，請先改成事實或刪除"
+                              : "確認變更並預覽送出"
                       }
                       onClick={approve}
                     >
@@ -3661,7 +3885,7 @@ export default function App() {
             <h3>{run.draft.title}</h3>
             <div>
               <GitBranch size={14} />
-              {run.branch}
+              {run.draft.publishBranch || run.branch}
               <span>→</span>
               {run.baseBranch}
             </div>
@@ -3682,6 +3906,56 @@ export default function App() {
               </p>
             </div>
           )}
+          {!demo && (
+            <details className="publish-body-preview" open>
+              <summary>
+                會送到 GitHub 的 PR 說明
+                {draftChecks &&
+                  `（約 ${draftChecks.draftProseWords(run.draft.body)} 字）`}
+              </summary>
+              <div className="markdown-preview">
+                <Suspense fallback={<p>正在載入預覽…</p>}>
+                  <MarkdownContent>{run.draft.body}</MarkdownContent>
+                </Suspense>
+              </div>
+            </details>
+          )}
+          {!demo && publishBlocked && (
+            <p role="alert" className="inline-error">
+              {[publishBlocked.message, ...publishBlocked.details].join("\n")}
+            </p>
+          )}
+          {!demo && publishConfirmations.length > 0 && (
+            <fieldset className="publish-confirmations">
+              <legend>送出前請逐項確認</legend>
+              {publishConfirmations.map((check) => (
+                <label key={check.id}>
+                  <input
+                    type="checkbox"
+                    checked={acknowledged.includes(check.id)}
+                    onChange={(event) =>
+                      setAcknowledged((previous) =>
+                        event.target.checked
+                          ? [...previous, check.id]
+                          : previous.filter((id) => id !== check.id),
+                      )
+                    }
+                  />
+                  <span>
+                    {check.message}
+                    {check.details.map((detail) => (
+                      <small key={detail}>{detail}</small>
+                    ))}
+                  </span>
+                </label>
+              ))}
+              <p>
+                勾選只代表你知道這些項目還沒處理、願意照目前的說明送出。BELL
+                不會因此改動說明或替你勾選任何項目，這些確認也不會寫進
+                PR。想先修改，請按「返回編輯草稿」。
+              </p>
+            </fieldset>
+          )}
           {formError && (
             <p role="alert" className="inline-error">
               {formError}
@@ -3699,7 +3973,15 @@ export default function App() {
             </button>
             <button
               className="button primary"
-              disabled={busy}
+              disabled={
+                busy ||
+                (!demo &&
+                  (!draftChecks ||
+                    !!publishBlocked ||
+                    publishConfirmations.some(
+                      (check) => !acknowledged.includes(check.id),
+                    )))
+              }
               onClick={publish}
             >
               {busy ? (

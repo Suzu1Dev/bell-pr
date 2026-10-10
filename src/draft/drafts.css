@@ -727,3 +727,19 @@
     padding: 16px;
   }
 }
+
+.draft-guidance-issue-rule {
+  margin: 12px 0 0;
+  padding: 10px 13px;
+  border-left: 3px solid #e2cf9a;
+  background: #fbf8ed;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #6f5f38;
+  overflow-wrap: anywhere;
+}
+.draft-guidance-issue-rule small {
+  display: block;
+  font-size: 11px;
+  color: #8a7850;
+}

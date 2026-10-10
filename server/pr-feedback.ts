@@ -16,6 +16,7 @@ export const prFeedbackQuery = `query BellPrFeedback($owner: String!, $name: Str
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       url
+      labels(first: 100) { totalCount nodes { name } }
       reviews(last: ${pageSize}) {
         totalCount
         nodes { author { login } authorAssociation body state url createdAt }
@@ -198,10 +199,23 @@ export function parsePrFeedback(
   });
   partial(rollup?.contexts, "CI 檢查");
 
+  const labels = nodes(pr.labels)
+    .map((label) => text(label?.name).slice(0, 100))
+    .filter(Boolean);
+  // Labels come back oldest-created first, so a recent needs: label may be the one left out.
+  const labelTotal = pr.labels?.totalCount;
+  if (
+    Number.isSafeInteger(labelTotal) &&
+    labelTotal > nodes(pr.labels).length
+  )
+    warn(
+      `PR 標籤只讀取 ${nodes(pr.labels).length} 個，共 ${labelTotal} 個；未列出的標籤可能包含 needs: 開頭的標籤。`,
+    );
   return {
     fetchedAt: options.fetchedAt,
     prNumber: options.prNumber,
     items,
+    ...(labels.length ? { labels } : {}),
     ...(text(rollup?.state) ? { checksState: rollup.state } : {}),
     ...(rollup ? { checks } : {}),
     ...(warnings.length ? { warnings } : {}),
