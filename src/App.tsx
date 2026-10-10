@@ -64,15 +64,11 @@ import type { Repo, Run, RunSummary, DiffFile, ChatMessage } from "./types";
 import { summarizeRun } from "../shared/runs";
 import { groupPrFeedback, summarizeChecks } from "../shared/pr-feedback";
 import { applyReviewOrder, parseReviewOrder } from "../shared/review-order";
-import {
-  draftPreflight,
-  draftProseWords,
-  draftTaskItems,
-  sameDraftProse,
-  setDraftTaskItem,
-  validBranchName,
-  type DraftProposal,
-} from "../shared/drafts";
+import { validBranchName, type DraftProposal } from "../shared/drafts";
+import type { DraftCheck, DraftTaskItem } from "../shared/draft-checks";
+
+/** The draft checks bring a Markdown parser, so they load beside the first screen. */
+type DraftChecks = typeof import("../shared/draft-checks");
 import type {
   ContributionOpportunity,
   DiscoveryCandidate,
@@ -343,6 +339,16 @@ export default function App() {
   );
   // Preflight items confirmed in the publish dialog; never saved.
   const [acknowledged, setAcknowledged] = useState<string[]>([]);
+  const [draftChecks, setDraftChecks] = useState<DraftChecks>();
+  useEffect(() => {
+    let cancelled = false;
+    void import("../shared/draft-checks").then((module) => {
+      if (!cancelled) setDraftChecks(module);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [draftPreview, setDraftPreview] = useState(false);
   const persistedDraft = useRef({ id: run.id, ...run.draft });
   const draftMutationEpoch = useRef(0);
@@ -434,13 +440,14 @@ export default function App() {
     draftBody !== run.draft.body ||
     draftCommitMessage.trim() !== (run.draft.commitMessage ?? "") ||
     draftPublishBranch.trim() !== (run.draft.publishBranch ?? "");
-  // The same checks the server runs before approving and publishing.
+  // The same checks the server runs before approving and publishing; empty
+  // until the checks module has loaded, and the server enforces them anyway.
   const draftSources = run.draftPreparation?.context?.sources;
   const proposalBody = run.draftPreparation?.proposal?.body;
-  const draftUnfinished = draftPreflight({ body: draftBody }).find(
-    (check) => check.kind === "block",
-  );
-  const draftTasks = draftTaskItems(draftBody);
+  const draftUnfinished = draftChecks
+    ?.draftPreflight({ body: draftBody })
+    .find((check) => check.kind === "block");
+  const draftTasks: DraftTaskItem[] = draftChecks?.draftTaskItems(draftBody) ?? [];
   const draftTaskGroups = [
     ...draftTasks
       .reduce(
@@ -452,7 +459,8 @@ export default function App() {
   ];
   // Ticking template boxes is not a rewrite of the model's text.
   const draftIsProposal =
-    !!proposalBody?.trim() && sameDraftProse(draftBody, proposalBody);
+    !!proposalBody?.trim() &&
+    !!draftChecks?.sameDraftProse(draftBody, proposalBody);
   const publishBranchError = !draftPublishBranch.trim()
     ? ""
     : !validBranchName(draftPublishBranch.trim())
@@ -461,11 +469,12 @@ export default function App() {
         ? `不能用目標分支 ${run.baseBranch}，否則會直接推送到目標分支而不是建立 PR。`
         : "";
   const publishBranchInvalid = !!publishBranchError;
-  const publishChecks = draftPreflight({
-    body: run.draft.body,
-    sources: draftSources,
-    proposalBody,
-  });
+  const publishChecks: DraftCheck[] =
+    draftChecks?.draftPreflight({
+      body: run.draft.body,
+      sources: draftSources,
+      proposalBody,
+    }) ?? [];
   const publishBlocked = publishChecks.find((check) => check.kind === "block");
   const publishConfirmations = publishChecks.filter(
     (check) => check.kind === "confirm",
@@ -2610,7 +2619,7 @@ export default function App() {
                         applied={
                           !!run.draftPreparation?.proposal &&
                           draftTitle === run.draftPreparation.proposal.title &&
-                          sameDraftProse(
+                          !!draftChecks?.sameDraftProse(
                             draftBody,
                             run.draftPreparation.proposal.body,
                           )
@@ -2877,11 +2886,13 @@ export default function App() {
                                       onChange={(event) => {
                                         const checked = event.target.checked;
                                         setDraftBody((body) =>
-                                          setDraftTaskItem(
-                                            body,
-                                            item.line,
-                                            checked,
-                                          ),
+                                          draftChecks
+                                            ? draftChecks.setDraftTaskItem(
+                                                body,
+                                                item.line,
+                                                checked,
+                                              )
+                                            : body,
                                         );
                                       }}
                                     />
@@ -3898,8 +3909,9 @@ export default function App() {
           {!demo && (
             <details className="publish-body-preview" open>
               <summary>
-                會送到 GitHub 的 PR 說明（約 {draftProseWords(run.draft.body)}{" "}
-                字）
+                會送到 GitHub 的 PR 說明
+                {draftChecks &&
+                  `（約 ${draftChecks.draftProseWords(run.draft.body)} 字）`}
               </summary>
               <div className="markdown-preview">
                 <Suspense fallback={<p>正在載入預覽…</p>}>
@@ -3964,7 +3976,8 @@ export default function App() {
               disabled={
                 busy ||
                 (!demo &&
-                  (!!publishBlocked ||
+                  (!draftChecks ||
+                    !!publishBlocked ||
                     publishConfirmations.some(
                       (check) => !acknowledged.includes(check.id),
                     )))

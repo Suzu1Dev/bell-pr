@@ -15,8 +15,8 @@ import {
   RefreshCw,
   Sparkles,
 } from "lucide-react";
+import { issueRule } from "../../shared/draft-checks";
 import {
-  issueRule,
   linuxContributionUrl,
   type DraftPreparation,
   type DraftProposal,

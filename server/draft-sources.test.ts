@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { collectDraftContext } from "./draft-sources.js";
+import { collectDraftContext, pullRequestGate } from "./draft-sources.js";
 import { command, git } from "./process.js";
 
 const json = (value: unknown) => ({
@@ -545,4 +545,29 @@ test("pull-request workflows never crowd account-wide guidance out of the shared
   } finally {
     await f.cleanup();
   }
+});
+
+test("only the workflow's top-level on decides whether it runs on pull requests", () => {
+  const checks =
+    "\njobs:\n  check:\n    steps:\n      - run: echo ${{ github.event.pull_request.title }}\n";
+  for (const on of [
+    "on: [push, pull_request]",
+    "on: pull_request",
+    '"on": [push, pull_request]',
+    "'on': pull_request_target",
+    "on:\n  - push\n  - pull_request",
+    "on:\n  push:\n  pull_request_target:\n    types: [opened, edited]",
+    "on: { pull_request: { types: [opened] } }",
+    "---\non:\n  pull_request:",
+  ])
+    assert.ok(pullRequestGate(on + checks), on);
+  for (const on of [
+    "on: [push] # pull_request runs in ci.yml",
+    "on:\n  workflow_dispatch:\n    inputs:\n      pull_request:\n        required: true",
+    "on: push\nenv:\n  pull_request: 1",
+    "on:\n  workflow_call:\n    inputs:\n      pull_request:\n        type: number",
+  ])
+    assert.ok(!pullRequestGate(on + checks), on);
+  // A pull request trigger alone is ordinary CI, not a submission check.
+  assert.ok(!pullRequestGate("on: pull_request\njobs:\n  test:\n    steps:\n      - run: npm test\n"));
 });

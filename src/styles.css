@@ -2216,6 +2216,8 @@ button {
   cursor: pointer;
 }
 .publish-body-preview .markdown-preview {
+  /* The base preview keeps a 310px minimum; this one shrinks to short text. */
+  min-height: 0;
   max-height: 260px;
   overflow: auto;
   margin: 0;

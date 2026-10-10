@@ -260,14 +260,29 @@ test("missing or mismatched PRs and GraphQL errors are reported as application e
 });
 
 test("PR labels are kept, so a compliance label shows even when its check run succeeded", () => {
-  assert.match(prFeedbackQuery, /labels\(first: 20\) \{ nodes \{ name \} \}/);
+  assert.match(
+    prFeedbackQuery,
+    /labels\(first: 100\) \{ totalCount nodes \{ name \} \}/,
+  );
   const payload = graphqlPayload();
   (payload.data.repository.pullRequest as Record<string, unknown>).labels = {
+    totalCount: 3,
     nodes: [{ name: "needs:compliance" }, { name: "" }, {}],
   };
-  assert.deepEqual(parsePrFeedback(payload, options).labels, [
-    "needs:compliance",
-  ]);
+  const feedback = parsePrFeedback(payload, options);
+  assert.deepEqual(feedback.labels, ["needs:compliance"]);
+  assert.ok(!feedback.warnings?.some((warning) => warning.includes("標籤")));
+  // A cut-off label list says so, since the missing one may be a needs: label.
+  const many = graphqlPayload();
+  (many.data.repository.pullRequest as Record<string, unknown>).labels = {
+    totalCount: 120,
+    nodes: Array.from({ length: 100 }, (_, index) => ({ name: `area:${index}` })),
+  };
+  assert.ok(
+    parsePrFeedback(many, options).warnings?.some((warning) =>
+      warning.includes("PR 標籤只讀取 100 個，共 120 個"),
+    ),
+  );
   // Reads without labels keep the earlier shape.
   assert.equal("labels" in parsePrFeedback(graphqlPayload(), options), false);
 });

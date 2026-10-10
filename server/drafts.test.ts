@@ -12,6 +12,12 @@ import {
   parseDraftProposal,
 } from "./drafts.js";
 import {
+  validBranchName,
+  type DraftContext,
+  type DraftProposal,
+  type DraftSource,
+} from "../shared/drafts.js";
+import {
   brevityRule,
   draftPreflight,
   draftProseWords,
@@ -23,11 +29,7 @@ import {
   referencesIssue,
   sameDraftProse,
   setDraftTaskItem,
-  validBranchName,
-  type DraftContext,
-  type DraftProposal,
-  type DraftSource,
-} from "../shared/drafts.js";
+} from "../shared/draft-checks.js";
 import { defaultContributionSettings } from "../shared/insights.js";
 import type { DiffFile, Run } from "./types.js";
 import type { TeamAgentRunner } from "./team.js";
@@ -965,4 +967,78 @@ test("draft prompt routes the person's to-dos to the checklist and passes the br
     /"brevityRule":\{"sourceId":"base:CONTRIBUTING.md","quote":"No AI-Generated Walls of Text"\}/,
   );
   assert.match(branded, /Sources of kind automation/);
+});
+
+test("only what GitHub renders as code or a comment is skipped, so odd indents cannot hide unfinished text", () => {
+  // Each body would hide the later TODO and empty issue line with a line-based scanner.
+  for (const [name, body, lines] of [
+    ["top-level indented fence", "Intro\n\n    ```js\n    code\n\n_TODO_\nCloses #", [6, 7]],
+    ["indented comment opener", "Example template:\n\n    <!-- describe here\n\n_TODO_\nCloses #", [5, 6]],
+    ["unclosed mid-line comment", "Escapes `<` in <!-- markers now.\n\n## Testing\nTODO: run tests\nCloses #", [4, 5]],
+    ["backticks in an info string", "```js``` blocks keep their language.\n\n_TODO_", [3]],
+    ["unclosed fence in a list item", "- Steps:\n  ```\n  npm test\n\n## Testing\n_TODO_", [6]],
+  ] as const)
+    assert.deepEqual(
+      findDraftPlaceholders(body).map((item) => item.line),
+      lines,
+      name,
+    );
+  // Real comments, inline or as a block, are still hidden like GitHub hides them.
+  assert.deepEqual(
+    findDraftPlaceholders(
+      "Text <!-- TODO: hidden --> more.\n<!--\nTODO: block\n-->\n    TODO: indented code\nDone",
+    ),
+    [],
+  );
+  // A task item after an unclosed fence in a list is still offered for ticking.
+  assert.deepEqual(
+    draftTaskItems("- Steps:\n  ```\n  npm test\n\n## Testing\n- [ ] tests pass").map(
+      (item) => [item.heading, item.text],
+    ),
+    [["Testing", "tests pass"]],
+  );
+});
+
+test("ordered task items and ordered issue slots are handled like bulleted ones", () => {
+  const ordered = "## Checklist\n\n1. [ ] Tests pass\n2) [ ] Docs updated\n";
+  const items = draftTaskItems(ordered);
+  assert.deepEqual(
+    items.map((item) => [item.heading, item.text, item.checked]),
+    [
+      ["Checklist", "Tests pass", false],
+      ["Checklist", "Docs updated", false],
+    ],
+  );
+  const ticked = setDraftTaskItem(ordered, items[0].line, true);
+  assert.equal(ticked.split("\n")[2], "1. [x] Tests pass");
+  assert.ok(sameDraftProse(ticked, ordered));
+  assert.deepEqual(
+    draftPreflight({ body: ordered }).map((check) => check.id),
+    ["unchecked"],
+  );
+  assert.deepEqual(draftPreflight({ body: ticked }), []);
+  assert.deepEqual(
+    findDraftPlaceholders("1. [ ] TBD: owner\n1. Closes #\n1) Fixes # (issue)").map(
+      (item) => item.line,
+    ),
+    [1, 2, 3],
+  );
+  assert.equal(
+    issueRule([
+      { id: "t", kind: "template", label: "T", content: "## Issue\n\n1. Closes #\n" },
+    ])?.quote,
+    "1. Closes #",
+  );
+  // Quotes keep code the rule cites, rather than the blanked prose.
+  assert.equal(
+    issueRule([
+      {
+        id: "c",
+        kind: "contributing",
+        label: "C",
+        content: "Every PR must reference an issue with `Fixes #123`.",
+      },
+    ])?.quote,
+    "Every PR must reference an issue with `Fixes #123`.",
+  );
 });

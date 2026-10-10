@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { DraftContext, DraftProposal } from "../shared/drafts.js";
+import { linuxContributionUrl } from "../shared/drafts.js";
 import {
   brevityRule,
   draftWordBudget,
   findDraftPlaceholders,
-  linuxContributionUrl,
-} from "../shared/drafts.js";
+} from "../shared/draft-checks.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
 import { quoteMatches } from "./evidence.js";
 import { parseGitHubIssueUrl } from "./git.js";

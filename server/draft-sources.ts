@@ -55,14 +55,46 @@ function documentKind(file: string): DocumentKind | undefined {
 }
 
 /**
+ * True when the workflow's top-level `on` lists pull_request or
+ * pull_request_target, inline (`on: [push, pull_request]`) or as a block key
+ * or sequence item. A `pull_request:` key elsewhere, such as a dispatch input,
+ * a step's `with:` or a comment, is not a trigger.
+ */
+function runsOnPullRequests(content: string) {
+  const lines = content.replace(/\r/g, "").split("\n");
+  const key = /^(?:on|"on"|'on')\s*:/;
+  const start = lines.findIndex((line) => key.test(line));
+  if (start < 0) return false;
+  const inline = lines[start]
+    .replace(key, "")
+    .replace(/\s#.*$/, "")
+    .trim();
+  if (inline)
+    return /(?:^|[\s[{,])["']?pull_request(?:_target)?["']?(?=[\s\]},:]|$)/.test(
+      inline,
+    );
+  let indent = -1;
+  for (const line of lines.slice(start + 1)) {
+    if (!line.trim() || /^\s*#/.test(line)) continue;
+    const depth = line.length - line.trimStart().length;
+    if (depth === 0) break;
+    if (indent < 0) indent = depth;
+    if (
+      depth === indent &&
+      /^\s*(?:-\s+)?["']?pull_request(?:_target)?["']?\s*(?::|$|\s#)/.test(line)
+    )
+      return true;
+  }
+  return false;
+}
+
+/**
  * A workflow that runs on pull requests and inspects their title or body,
  * labels them, or lints titles and commits: machine-enforced submission rules.
  */
 export function pullRequestGate(content: string) {
   return (
-    /^\s*(?:on\s*:.*\bpull_request(?:_target)?\b|pull_request(?:_target)?\s*:)/m.test(
-      content,
-    ) &&
+    runsOnPullRequests(content) &&
     /\b(?:pull_request|pr)\.(?:body|title)\b|closingIssuesReferences|\baddLabels\b|semantic-pull-request|commitlint/.test(
       content,
     )

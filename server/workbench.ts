@@ -82,7 +82,8 @@ import {
 } from "./explanations.js";
 
 import { collectDraftContext } from "./draft-sources.js";
-import { draftPreflight, validBranchName } from "../shared/drafts.js";
+import { validBranchName } from "../shared/drafts.js";
+import { draftPreflight } from "../shared/draft-checks.js";
 import { parsePrFeedback, prFeedbackQuery, prNumberOf } from "./pr-feedback.js";
 import {
   draftFingerprint,
