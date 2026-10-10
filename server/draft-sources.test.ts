@@ -403,3 +403,146 @@ test("cancellation and invalid revisions do not turn into absent-rule claims", a
     await f.cleanup();
   }
 });
+
+test("root agent guides and pull-request-checking workflows are collected after written guidance", async () => {
+  const pushOnly = Object.fromEntries(
+    Array.from({ length: 15 }, (_, index) => [
+      `.github/workflows/a${String(index).padStart(2, "0")}.yml`,
+      "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n",
+    ]),
+  );
+  const f = await fixture({
+    "README.md": "A test project.",
+    "CONTRIBUTING.md": "Please try to follow the style guide in AGENTS.md.",
+    "AGENTS.md":
+      "## Branch Names\n\nDo not use slashes or type prefixes such as `feat/`.",
+    "docs/agents.md": "Not an agent guide at the root.",
+    ...pushOnly,
+    ".github/workflows/deploy.yml":
+      "on:\n  pull_request:\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n",
+    ".github/workflows/pr-standards.yml":
+      "on:\n  pull_request_target:\n    types: [opened, edited]\njobs:\n  check:\n    steps:\n      - uses: actions/github-script@v7\n        with:\n          script: |\n            const body = pr.body || '';\n            if (checked < 2) await addLabel('needs:compliance');\n",
+    ".github/workflows/leak.yml":
+      "on: [pull_request]\nenv:\n  TOKEN: ghp_abcdefghijklmnopqrstuvwxyz0123456789\njobs:\n  check:\n    steps:\n      - run: echo \"${{ github.event.pull_request.title }}\"\n",
+  });
+  try {
+    const stub = stubGithub(() => {
+      throw new Error("offline");
+    });
+    const context = await collectDraftContext(f.repo, f.run, {
+      execute: stub.execute,
+    });
+    assert.deepEqual(
+      context.sources.map((source) => [source.id, source.kind]),
+      [
+        ["base:CONTRIBUTING.md", "contributing"],
+        ["base:AGENTS.md", "documentation"],
+        ["base:README.md", "documentation"],
+        ["base:.github/workflows/pr-standards.yml", "automation"],
+      ],
+    );
+    assert.match(
+      context.sources[3].url ?? "",
+      /\/blob\/[a-f0-9]{40}\/\.github\/workflows\/pr-standards\.yml$/,
+    );
+    // A workflow that checks PRs but carries a credential is skipped like any other source.
+    assert.ok(
+      context.warnings.some(
+        (warning) => warning.includes("leak.yml") && warning.includes("敏感資訊"),
+      ),
+    );
+    assert.ok(context.warnings.some((warning) => warning.includes("AGENTS.md")));
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("workflow scanning is bounded and says what was left unchecked", async () => {
+  const gate =
+    "on:\n  pull_request:\njobs:\n  check:\n    steps:\n      - run: test -n \"${{ github.event.pull_request.body }}\"\n";
+  const f = await fixture({
+    "README.md": "A test project.",
+    ...Object.fromEntries(
+      Array.from({ length: 5 }, (_, index) => [
+        `.github/workflows/gate${index}.yml`,
+        gate,
+      ]),
+    ),
+  });
+  try {
+    const stub = stubGithub(() => {
+      throw new Error("offline");
+    });
+    const context = await collectDraftContext(f.repo, f.run, {
+      execute: stub.execute,
+    });
+    assert.equal(
+      context.sources.filter((source) => source.kind === "automation").length,
+      3,
+    );
+    assert.ok(
+      context.warnings.some((warning) =>
+        warning.includes("其餘 2 個 workflow 尚未檢查"),
+      ),
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("pull-request workflows never crowd account-wide guidance out of the shared limits", async () => {
+  const big = "Project notes. ".repeat(800);
+  const gate = `on:\n  pull_request_target:\njobs:\n  check:\n    steps:\n      - run: echo "\${{ github.event.pull_request.body }}"\n# ${"padding ".repeat(1500)}\n`;
+  const f = await fixture({
+    "README.md": big,
+    "AGENTS.md": big,
+    "CLAUDE.md": big,
+    "docs/README.md": big,
+    ".github/workflows/a.yml": gate,
+    ".github/workflows/b.yml": gate,
+    ".github/workflows/c.yml": gate,
+  });
+  try {
+    const stub = stubGithub((args) => {
+      if (args.includes("graphql")) return metadata("Organization");
+      const endpoint = args.at(-1)!;
+      if (endpoint === "repos/owner/.github")
+        return { private: false, default_branch: "main" };
+      if (endpoint.includes("/git/ref/"))
+        return { object: { type: "commit", sha: defaultSha } };
+      if (endpoint.includes("/git/trees/"))
+        return {
+          sha: treeSha,
+          tree: [
+            { path: "CONTRIBUTING.md", type: "blob", mode: "100644", sha: blobSha, size: 40 },
+            { path: "PULL_REQUEST_TEMPLATE.md", type: "blob", mode: "100644", sha: "d".repeat(40), size: 30 },
+          ],
+        };
+      return {
+        encoding: "base64",
+        content: Buffer.from(
+          endpoint.endsWith(blobSha)
+            ? "All PRs must reference an existing issue."
+            : "## Summary\n\nCloses #\n",
+        ).toString("base64"),
+      };
+    });
+    const context = await collectDraftContext(f.repo, f.run, {
+      execute: stub.execute,
+    });
+    assert.deepEqual(
+      context.sources
+        .filter((source) => source.id.startsWith("org:"))
+        .map((source) => source.kind)
+        .sort(),
+      ["contributing", "template"],
+    );
+    // Workflows still fill what is left, after the written guidance.
+    const kinds = context.sources.map((source) => source.kind);
+    assert.ok(kinds.includes("automation"));
+    assert.ok(kinds.lastIndexOf("documentation") < kinds.indexOf("automation"));
+    assert.ok(kinds.indexOf("contributing") < kinds.indexOf("automation"));
+  } finally {
+    await f.cleanup();
+  }
+});

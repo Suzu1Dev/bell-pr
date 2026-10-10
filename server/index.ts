@@ -24,6 +24,7 @@ import { parseAgentTimeoutScale } from "./agent-timeouts.js";
 import { learningExport } from "./learning-export.js";
 import { summarizeRun } from "../shared/runs.js";
 import { agentProviders } from "../shared/models.js";
+import { validBranchName } from "../shared/drafts.js";
 
 export function parseAllowedOrigins(value = ""): string[] {
   if (!value.trim()) return [];
@@ -110,6 +111,16 @@ const commitMessageField = z
   .max(4000)
   .refine((value) => !/[\u0000-\u0009\u000b-\u001f\u007f]/.test(value), {
     message: "提交訊息只能包含文字與換行。",
+  });
+
+// The GitHub branch is pushed as a refspec; empty means the run's own branch.
+const publishBranchField = z
+  .string()
+  .trim()
+  .max(100)
+  .refine((value) => !value || validBranchName(value), {
+    message:
+      "GitHub 分支名稱只能用英數字與 . _ - /，不能有 ..，也不能以 . 或 .lock 結尾。",
   });
 
 export function createApp(
@@ -314,6 +325,7 @@ export function createApp(
         title: z.string().trim().min(1).max(180),
         body: z.string().max(60_000),
         commitMessage: commitMessageField.optional(),
+        publishBranch: publishBranchField.optional(),
       })
       .parse(req.body);
     res.json({ run: await workbench.draft(req.params.id, draft) });
@@ -354,6 +366,7 @@ export function createApp(
           title: z.string().min(1).max(180),
           body: z.string().max(60_000),
           commitMessage: z.string().max(4000).optional(),
+          publishBranch: z.string().max(100).optional(),
         }),
       })
       .parse(req.body);
@@ -365,10 +378,16 @@ export function createApp(
     res.json({ run: await workbench.fetchPrFeedback(req.params.id) });
   });
   app.post("/api/runs/:id/publish", async (req, res) => {
-    const { fingerprint } = z
-      .object({ fingerprint: z.string().regex(/^[a-f0-9]{64}$/) })
+    const { fingerprint, acknowledged } = z
+      .object({
+        fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+        // Preflight item ids the person confirmed in the publish dialog.
+        acknowledged: z.array(z.string().max(40)).max(16).optional(),
+      })
       .parse(req.body);
-    res.json({ run: await workbench.publish(req.params.id, fingerprint) });
+    res.json({
+      run: await workbench.publish(req.params.id, fingerprint, acknowledged),
+    });
   });
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "找不到 API。" });

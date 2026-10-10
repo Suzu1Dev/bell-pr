@@ -82,6 +82,7 @@ import {
 } from "./explanations.js";
 
 import { collectDraftContext } from "./draft-sources.js";
+import { draftPreflight, validBranchName } from "../shared/drafts.js";
 import { parsePrFeedback, prFeedbackQuery, prNumberOf } from "./pr-feedback.js";
 import {
   draftFingerprint,
@@ -407,7 +408,8 @@ export class Workbench {
       title: title || prompt.slice(0, 72),
       prompt,
       status: "queued",
-      branch: `bellpr/${id.slice(0, 8)}`,
+      // Every run branch uses the fix/ prefix; the GitHub branch field can override it per run.
+      branch: `fix/${id.slice(0, 8)}`,
       baseBranch: repo.defaultBranch,
       baseSha: "",
       worktreePath: path.join(this.store.directory, "worktrees", id),
@@ -1406,11 +1408,8 @@ export class Workbench {
         );
       }
       run.reports!.implementer = implementation;
-      run.draft.body =
-        `## Summary\n\n${implementation}\n\n## Review\n\n${run.reports?.reviewer ?? ""}\n\n## Test analysis\n\n${run.reports?.tester ?? ""}\n\n---\nDeveloped with BELL-PR Agent Team. Human review required before merging.`.slice(
-          0,
-          60_000,
-        );
+      // The body stays empty until the draft agent proposes one: the agents'
+      // reports remain on the review tab and are not a PR description.
       const automaticDraft = { ...run.draft };
       run.status = "review";
       run.draftPreparation = {
@@ -1841,11 +1840,14 @@ export class Workbench {
             title: proposal.title,
             body: proposal.body,
             ...(commitMessage ? { commitMessage } : {}),
+            ...(run.draft.publishBranch
+              ? { publishBranch: run.draft.publishBranch }
+              : {}),
           };
           this.log(
             run,
             "draft",
-            "已依專案投稿規範準備 PR 草稿，等待人工審閱與編輯。",
+            "已把 PR 草稿建議放進編輯區。這是模型寫的原文，送出前請用自己的話確認內容，並處理核對清單與勾選項目。",
           );
         } else {
           this.log(
@@ -1886,10 +1888,33 @@ export class Workbench {
       this.editable(run);
       // An empty message is stored as absent so the title-only fallback applies.
       const commitMessage = draft.commitMessage?.trim();
+      // Likewise an empty GitHub branch falls back to the run's own branch.
+      const publishBranch = draft.publishBranch?.trim();
+      if (publishBranch && !validBranchName(publishBranch))
+        throw new AppError(
+          "GitHub 分支名稱只能用英數字與 . _ - /，不能有 ..，也不能以 . 或 .lock 結尾。",
+          422,
+        );
+      // Pushing the reviewed commit to the target branch would skip the PR entirely.
+      if (publishBranch?.toLowerCase() === run.baseBranch.toLowerCase())
+        throw new AppError(
+          `GitHub 分支不能是目標分支 ${run.baseBranch}，否則會直接推送到目標分支而不是建立 PR；請用新的分支名稱。`,
+          422,
+        );
+      // After a push, another branch would let a retry open a second PR.
+      if (
+        run.publishedBranch &&
+        (publishBranch || run.branch) !== run.publishedBranch
+      )
+        throw new AppError(
+          `先前發佈已推送到 GitHub 分支 ${run.publishedBranch}，推送後不能改分支，以免重複建立 PR。請還原分支名稱，或建立新工作。`,
+          409,
+        );
       run.draft = {
         title: draft.title,
         body: draft.body,
         ...(commitMessage ? { commitMessage } : {}),
+        ...(publishBranch ? { publishBranch } : {}),
       };
       run.status = "review";
       delete run.approvedFingerprint;
@@ -1934,7 +1959,9 @@ export class Workbench {
         displayedDraft.title !== run.draft.title ||
         displayedDraft.body !== run.draft.body ||
         (displayedDraft.commitMessage?.trim() ?? "") !==
-          (run.draft.commitMessage ?? "")
+          (run.draft.commitMessage ?? "") ||
+        (displayedDraft.publishBranch?.trim() ?? "") !==
+          (run.draft.publishBranch ?? "")
       )
         throw new AppError(
           "PR 草稿已更新；請重新載入並確認最新標題與內容，再重新核准。",
@@ -1953,6 +1980,14 @@ export class Workbench {
       }
       if (!run.draft.title.trim() || !run.draft.body.trim())
         throw new AppError("請先填寫 PR 標題與內容。", 422);
+      const unfinished = draftPreflight({ body: run.draft.body }).find(
+        (check) => check.kind === "block",
+      );
+      if (unfinished)
+        throw new AppError(
+          [unfinished.message, ...unfinished.details].join("\n"),
+          422,
+        );
       run.approvedFingerprint = reviewFingerprint(files, run.draft);
       run.status = "approved";
       await this.store.save();
@@ -2105,7 +2140,16 @@ export class Workbench {
     });
   }
 
-  async publish(id: string, displayedFingerprint: string) {
+  /**
+   * `acknowledged` lists the preflight items the person confirmed in the
+   * publish dialog. They are recomputed here from the saved draft, so a stale
+   * or partial list is rejected before anything is pushed.
+   */
+  async publish(
+    id: string,
+    displayedFingerprint: string,
+    acknowledged: string[] = [],
+  ) {
     return this.lock(id, async () => {
       const run = this.run(id);
       if (
@@ -2139,6 +2183,40 @@ export class Workbench {
         )
       )
         throw new AppError("最新差異尚未全部審閱。", 409);
+      const headBranch = run.draft.publishBranch || run.branch;
+      if (
+        run.draft.publishBranch &&
+        headBranch.toLowerCase() === run.baseBranch.toLowerCase()
+      )
+        throw new AppError(
+          `GitHub 分支不能是目標分支 ${run.baseBranch}；請修改分支名稱並重新核准。`,
+          422,
+        );
+      if (run.publishedBranch && run.publishedBranch !== headBranch)
+        throw new AppError(
+          `先前發佈已推送到 GitHub 分支 ${run.publishedBranch}；請還原分支名稱，或建立新工作。`,
+          409,
+        );
+      // Runs approved before these checks existed are held to them as well.
+      const checks = draftPreflight({
+        body: run.draft.body,
+        sources: run.draftPreparation?.context?.sources,
+        proposalBody: run.draftPreparation?.proposal?.body,
+      });
+      const blocking = checks.find((check) => check.kind === "block");
+      if (blocking)
+        throw new AppError(
+          [blocking.message, ...blocking.details].join("\n"),
+          422,
+        );
+      const unconfirmed = checks.filter(
+        (check) => check.kind === "confirm" && !acknowledged.includes(check.id),
+      );
+      if (unconfirmed.length)
+        throw new AppError(
+          `送出前請在預覽視窗逐項確認：${unconfirmed.map((check) => check.message).join(" ")}`,
+          422,
+        );
       run.publishing = true;
       delete run.error;
       await this.store.save();
@@ -2359,11 +2437,13 @@ export class Workbench {
             "push",
             "--",
             `https://github.com/${headRepository}.git`,
-            `${commit}:refs/heads/${run.branch}`,
+            `${commit}:refs/heads/${headBranch}`,
           ],
           { timeoutMs: 120_000 },
         );
-        const headRef = `${headOwner}:${run.branch}`;
+        run.publishedBranch = headBranch;
+        await this.store.save();
+        const headRef = `${headOwner}:${headBranch}`;
         const existing = json<{ url: string; headRefOid: string }[]>(
           (
             await command("gh", [

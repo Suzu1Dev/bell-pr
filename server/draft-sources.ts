@@ -12,6 +12,8 @@ const maximumFiles = 16;
 const maximumFileBytes = 12_000;
 const maximumReadBytes = 128_000;
 const maximumTotalBytes = 80_000;
+const maximumWorkflowScans = 40;
+const maximumAutomationSources = 3;
 const allowedAssociations = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 const shaPattern = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/;
 type DocumentKind = "contributing" | "template" | "documentation";
@@ -35,6 +37,9 @@ function documentKind(file: string): DocumentKind | undefined {
   const name = parts.at(-1)!;
   const stem = name.replace(/\.(?:md|markdown|rst|txt|adoc|org)$/i, "");
   if (stem === "contributing") return "contributing";
+  // Agent guides such as AGENTS.md often hold the branch and commit rules CONTRIBUTING links to.
+  if (parts.length === 1 && (stem === "agents" || stem === "claude"))
+    return "documentation";
   if (
     stem === "pull_request_template" ||
     (parts.includes("pull_request_template") &&
@@ -47,6 +52,21 @@ function documentKind(file: string): DocumentKind | undefined {
     )
   )
     return "documentation";
+}
+
+/**
+ * A workflow that runs on pull requests and inspects their title or body,
+ * labels them, or lints titles and commits: machine-enforced submission rules.
+ */
+export function pullRequestGate(content: string) {
+  return (
+    /^\s*(?:on\s*:.*\bpull_request(?:_target)?\b|pull_request(?:_target)?\s*:)/m.test(
+      content,
+    ) &&
+    /\b(?:pull_request|pr)\.(?:body|title)\b|closingIssuesReferences|\baddLabels\b|semantic-pull-request|commitlint/.test(
+      content,
+    )
+  );
 }
 
 const priority = (file: Entry) => {
@@ -227,6 +247,7 @@ export async function collectDraftContext(
     source: "base" | "org",
     read: () => Promise<string>,
     url?: string,
+    kind: DraftSource["kind"] = documentKind(entry.path)!,
   ) => {
     const label = source === "base" ? entry.path : `共用預設 · ${entry.path}`;
     if (entry.type !== "blob" || !["100644", "100755"].includes(entry.mode)) {
@@ -249,7 +270,7 @@ export async function collectDraftContext(
     try {
       addSource({
         id: `${source}:${entry.path}`,
-        kind: documentKind(entry.path)!,
+        kind,
         label,
         path: entry.path,
         url,
@@ -262,10 +283,12 @@ export async function collectDraftContext(
   };
 
   warn(
-    "本機規範搜尋範圍為基準版本的根目錄、.github、docs 與 documentation 內常見貢獻指南、README、維護者文件及 PR 模板；未追蹤文件中的外部連結。",
+    "本機規範搜尋範圍為基準版本的根目錄、.github、docs 與 documentation 內常見貢獻指南、README、維護者文件及 PR 模板，根目錄的 AGENTS.md／CLAUDE.md，以及 .github/workflows 中會自動檢查 PR 的流程；未追蹤文件中的外部連結。",
   );
   const localKinds = new Set<DocumentKind>();
   let localChecked = false;
+  // Set once the base tree is read; run after all written guidance.
+  let scanWorkflows = async () => {};
   try {
     const tree = parseTree(
       (await gitRead(["ls-tree", "--full-tree", "-r", "-l", "-z", run.baseSha]))
@@ -277,29 +300,74 @@ export async function collectDraftContext(
       .sort(
         (a, b) => priority(a) - priority(b) || a.path.localeCompare(b.path),
       );
+    const show = async (file: string) =>
+      (
+        await gitRead(
+          ["show", "--no-ext-diff", "--no-textconv", `${run.baseSha}:${file}`],
+          maximumReadBytes + 2_000,
+        )
+      ).stdout;
+    const blobUrl = (file: string) =>
+      remote
+        ? `${remote.url}/blob/${run.baseSha}/${file.split("/").map(encodeURIComponent).join("/")}`
+        : undefined;
     for (const entry of candidates) {
       localKinds.add(documentKind(entry.path)!);
-      const url = remote
-        ? `${remote.url}/blob/${run.baseSha}/${entry.path.split("/").map(encodeURIComponent).join("/")}`
-        : undefined;
       await readDocument(
         entry,
         "base",
-        async () =>
-          (
-            await gitRead(
-              [
-                "show",
-                "--no-ext-diff",
-                "--no-textconv",
-                `${run.baseSha}:${entry.path}`,
-              ],
-              maximumReadBytes + 2_000,
-            )
-          ).stdout,
-        url,
+        () => show(entry.path),
+        blobUrl(entry.path),
       );
     }
+    // Workflows are read after local and account-default written guidance,
+    // so they never crowd it out of the shared 16-file and 80 KB limits.
+    scanWorkflows = async () => {
+      const workflows = tree
+        .filter(
+          (entry) =>
+            /^\.github\/workflows\/[^/]+\.ya?ml$/i.test(entry.path) &&
+            entry.type === "blob" &&
+            ["100644", "100755"].includes(entry.mode) &&
+            Number.isSafeInteger(entry.size) &&
+            entry.size >= 0 &&
+            entry.size <= maximumReadBytes,
+        )
+        .sort((a, b) => a.path.localeCompare(b.path));
+      let automation = 0;
+      for (const [index, entry] of workflows.entries()) {
+        if (automation >= maximumAutomationSources) {
+          warn(
+            `自動檢查流程最多收錄 ${maximumAutomationSources} 份；其餘 ${workflows.length - index} 個 workflow 尚未檢查。`,
+          );
+          break;
+        }
+        if (index >= maximumWorkflowScans) {
+          warn(
+            `.github/workflows 有 ${workflows.length} 個檔案，只檢查了前 ${maximumWorkflowScans} 個是否會自動檢查 PR。`,
+          );
+          break;
+        }
+        active();
+        let content: string;
+        try {
+          content = await show(entry.path);
+        } catch {
+          active();
+          warn(`${entry.path} 讀取失敗，尚未確認它是否會自動檢查 PR。`);
+          continue;
+        }
+        if (!pullRequestGate(content)) continue;
+        automation++;
+        await readDocument(
+          entry,
+          "base",
+          async () => content,
+          blobUrl(entry.path),
+          "automation",
+        );
+      }
+    };
   } catch {
     active();
     warn("無法讀取任務基準版本的規範文件；不能據此判定專案沒有規範。");
@@ -309,6 +377,7 @@ export async function collectDraftContext(
     warn(
       "未提供可驗證的 github.com 專案網址，尚未檢查 GitHub 維護者討論與帳號共用預設規範。",
     );
+    await scanWorkflows();
     return context;
   }
 
@@ -428,6 +497,8 @@ export async function collectDraftContext(
         warn("帳號共用 .github 預設規範讀取失敗；尚未確認是否存在適用規範。");
     }
   }
+
+  await scanWorkflows();
 
   if (metadata) {
     warn(

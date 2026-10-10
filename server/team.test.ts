@@ -62,8 +62,9 @@ async function waitUntil(
 
 /** Answers the post-review draft and explanation roles so tests only script the team roles. */
 const withAuxiliaryRoles =
-  (runner: TeamAgentRunner): TeamAgentRunner =>
+  (runner: TeamAgentRunner, draft?: TeamAgentRunner): TeamAgentRunner =>
   async (input) => {
+    if (input.role === "draft" && draft) return draft(input);
     if (input.role === "draft")
       return JSON.stringify({
         title: "Improve consistent output",
@@ -111,7 +112,15 @@ const stubStatus = async () => ({
 
 async function fixture(
   runner?: TeamAgentRunner,
-  dependencies: { agentSlots?: AgentSlots; maxActiveRuns?: number } = {},
+  {
+    draft,
+    ...dependencies
+  }: {
+    agentSlots?: AgentSlots;
+    maxActiveRuns?: number;
+    /** Replaces the default draft proposal answer. */
+    draft?: TeamAgentRunner;
+  } = {},
 ) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-team-test-"));
   const repository = path.join(directory, "repo");
@@ -130,7 +139,7 @@ async function fixture(
   await store.initialize();
   const workbench = new Workbench(
     store,
-    runner ? withAuxiliaryRoles(runner) : undefined,
+    runner ? withAuxiliaryRoles(runner, draft) : undefined,
     {
       getModelCatalog: async () => ({ models: [], source: "codex" }),
       ...dependencies,
@@ -958,6 +967,37 @@ test("retrying a failed run reruns only the failed task with the previous error 
     await assert.rejects(f.workbench.retryTeam(run.id), /只有已失敗或已取消/);
     run.status = "published";
     await assert.rejects(f.workbench.retryTeam(run.id), /只有已失敗或已取消/);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a finished run gets a fix/ branch, and its PR description comes only from the draft proposal", async () => {
+  const scenario = retryScenario();
+  scenario.state.compliant = true;
+  const f = await fixture(scenario.runner, {
+    draft: async () => {
+      throw new Error("draft failed");
+    },
+  });
+  try {
+    const run = await startRetryRun(f);
+    assert.match(run.branch, /^fix\/[0-9a-f]{8}$/);
+    await waitUntil(
+      () => run.draftPreparation?.status === "failed",
+      "draft failure",
+    );
+    assert.equal(run.status, "review", run.error);
+    // The agents' reports stay on the review tab; they are not a PR description.
+    assert.ok(run.reports!.reviewer);
+    assert.equal(run.draft.body, "");
+    const files = await readDiff(run);
+    for (const file of files)
+      await f.workbench.review(run.id, file.path, true, file.fingerprint);
+    await assert.rejects(
+      f.workbench.approve(run.id, { ...run.draft }),
+      /請先填寫/,
+    );
   } finally {
     await f.cleanup();
   }

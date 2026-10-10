@@ -2131,6 +2131,133 @@ button {
   font-weight: 400;
   margin-left: auto;
 }
+/* Draft text that would reach GitHub unfinished or unrevised. */
+.draft-origin-notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: #fbf8ed;
+  border: 1px solid #eee7d1;
+  color: #7d6a3f;
+}
+.draft-origin-notice > svg {
+  flex: none;
+  margin-top: 3px;
+}
+.draft-origin-notice p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.checklist-item small {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.draft-task-items {
+  margin: 24px 0 0;
+  padding: 14px 0 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  min-width: 0;
+}
+.draft-task-items legend {
+  padding: 0;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--ink);
+}
+.draft-task-items > p {
+  margin: 6px 0 10px;
+  font-size: 11px;
+  line-height: 1.8;
+  color: #99a48c;
+}
+.draft-task-items > div {
+  margin-top: 12px;
+}
+.draft-task-items strong {
+  display: block;
+  font-size: 11px;
+  font-weight: 550;
+  color: #70806a;
+  margin-bottom: 4px;
+}
+.draft-task-items label,
+.publish-confirmations label {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 4px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+.draft-task-items input,
+.publish-confirmations input {
+  flex: none;
+  margin-top: 3px;
+  accent-color: var(--green);
+}
+.draft-task-items span {
+  overflow-wrap: anywhere;
+}
+.publish-body-preview {
+  margin-top: 16px;
+  border: 1px solid #e5ebdb;
+  border-radius: 8px;
+}
+.publish-body-preview summary {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #6f8360;
+  cursor: pointer;
+}
+.publish-body-preview .markdown-preview {
+  max-height: 260px;
+  overflow: auto;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid #edf0e7;
+  border-radius: 0 0 8px 8px;
+}
+.publish-confirmations {
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  border: 1px solid #eee7d1;
+  border-radius: 8px;
+  background: #fffcf3;
+  min-width: 0;
+}
+.publish-confirmations legend {
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 550;
+  color: #7d6a3f;
+}
+.publish-confirmations label + label {
+  border-top: 1px dashed #eee7d1;
+  margin-top: 4px;
+  padding-top: 8px;
+}
+.publish-confirmations span {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.publish-confirmations small {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: #8a7850;
+}
+.publish-confirmations > p {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.8;
+  color: #99a48c;
+}
 .inline-error {
   padding: 12px 14px;
   font-size: 12px;

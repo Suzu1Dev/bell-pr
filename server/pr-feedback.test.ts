@@ -258,3 +258,16 @@ test("missing or mismatched PRs and GraphQL errors are reported as application e
   assert.equal(feedback.checks, undefined);
   assert.equal(feedback.checksState, undefined);
 });
+
+test("PR labels are kept, so a compliance label shows even when its check run succeeded", () => {
+  assert.match(prFeedbackQuery, /labels\(first: 20\) \{ nodes \{ name \} \}/);
+  const payload = graphqlPayload();
+  (payload.data.repository.pullRequest as Record<string, unknown>).labels = {
+    nodes: [{ name: "needs:compliance" }, { name: "" }, {}],
+  };
+  assert.deepEqual(parsePrFeedback(payload, options).labels, [
+    "needs:compliance",
+  ]);
+  // Reads without labels keep the earlier shape.
+  assert.equal("labels" in parsePrFeedback(graphqlPayload(), options), false);
+});

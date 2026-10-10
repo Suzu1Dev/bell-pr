@@ -852,6 +852,12 @@ else if (args[0] === 'pr' && args[1] === 'create') {
     assert.ok(firstCommit);
     assert.equal(f.run.status, "approved");
     assert.equal(f.run.publishing, false);
+    // The push went through, so a retry must reuse that branch or it would open a second PR.
+    assert.equal(f.run.publishedBranch, f.run.branch);
+    await assert.rejects(
+      f.workbench.draft(f.run.id, { ...f.run.draft, publishBranch: "other-branch" }),
+      (error: AppError) => error.statusCode === 409 && /不能改分支/.test(error.message),
+    );
     // The pushed commit cannot take a different message; the person must restore it or start over.
     await f.workbench.draft(f.run.id, {
       ...f.run.draft,
@@ -1439,6 +1445,245 @@ test("agent turns use the Codex read budget by default and a longer, announced o
     // 2250 s × 4 = 9000 s, clamped to two hours.
     assert.equal(timeouts.at(-1), 7_200_000);
   } finally {
+    await f.cleanup();
+  }
+});
+
+test("approval blocks unfinished PR text, publish needs the person's confirmations and pushes the chosen GitHub branch", async () => {
+  const f = await fixture();
+  const previousPath = process.env.PATH;
+  try {
+    const realGit = (await command("which", ["git"])).stdout.trim();
+    const bin = path.join(f.directory, "bin");
+    await mkdir(bin);
+    const calls = path.join(f.directory, "remote-calls");
+    // Local stand-ins record every remote operation; nothing reaches GitHub.
+    await writeFile(
+      path.join(bin, "git"),
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const { spawnSync } = require('node:child_process');
+const args = process.argv.slice(2);
+if (args.includes('push')) { fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(['git', ...args]) + '\\n'); process.exit(0); }
+const result = spawnSync(${JSON.stringify(realGit)}, args, { stdio: 'inherit', env: process.env });
+process.exit(result.status ?? 1);
+`,
+      { mode: 0o700 },
+    );
+    await writeFile(
+      path.join(bin, "gh"),
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+if (args[0] === 'api' && args[1] === 'user') console.log('test-owner');
+else if (args[0] === 'api') console.log(${JSON.stringify(f.baseSha)});
+else if (args[0] === 'repo' && args[1] === 'view') console.log(JSON.stringify({viewerPermission:'WRITE',defaultBranchRef:{name:'main'}}));
+else if (args[0] === 'pr' && args[1] === 'list') console.log('[]');
+else if (args[0] === 'pr' && args[1] === 'create') {
+  fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(['gh', ...args]) + '\\n');
+  console.log('https://github.com/test-owner/example/pull/1');
+} else process.exit(97);
+`,
+      { mode: 0o700 },
+    );
+    const repo = f.workbench.repo(f.run.repoId);
+    repo.url = "https://github.com/test-owner/example";
+    repo.fullName = "test-owner/example";
+    repo.owner = "test-owner";
+    repo.name = "example";
+    const template =
+      "### Issue for this PR\n\nCloses #\n\n### Type of change\n\n- [ ] Bug fix\n- [ ] Documentation\n";
+    const proposalBody =
+      "### Issue for this PR\n\n_TODO: link an issue_\n\n### Type of change\n\n- [ ] Bug fix\n- [ ] Documentation\n";
+    f.run.draftPreparation = {
+      status: "ready",
+      fingerprint: "f".repeat(64),
+      context: {
+        checkedAt: new Date().toISOString(),
+        baseSha: f.baseSha,
+        warnings: [],
+        sources: [
+          {
+            id: "base:CONTRIBUTING.md",
+            kind: "contributing",
+            label: "CONTRIBUTING.md",
+            content: "All PRs must reference an existing issue.",
+          },
+          {
+            id: "base:.github/pull_request_template.md",
+            kind: "template",
+            label: ".github/pull_request_template.md",
+            content: template,
+          },
+        ],
+      },
+      proposal: {
+        title: "fix: update the greeting",
+        body: proposalBody,
+        policy: "repository",
+        summary: "依專案範本整理。",
+        rules: [],
+        checklist: ["請先開 issue。"],
+        templateSourceId: "base:.github/pull_request_template.md",
+      },
+    };
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    const files = await readDiff(f.run);
+    await f.workbench.review(f.run.id, "hello.ts", true, files[0].fingerprint);
+    // Text meant for the person cannot be approved.
+    await f.workbench.draft(f.run.id, { title: "fix: update the greeting", body: proposalBody });
+    await assert.rejects(
+      f.workbench.approve(f.run.id, { ...f.run.draft }),
+      (error: AppError) => error.statusCode === 422 && /待填寫/.test(error.message),
+    );
+    assert.equal(f.run.status, "review");
+    assert.equal(f.run.approvedFingerprint, undefined);
+    // A run approved before this check existed is still stopped before anything is pushed.
+    f.run.approvedFingerprint = reviewFingerprint(files, f.run.draft);
+    f.run.status = "approved";
+    process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
+    await assert.rejects(
+      f.workbench.publish(f.run.id, f.run.approvedFingerprint),
+      /待填寫/,
+    );
+    assert.ok(!f.run.publishing);
+    assert.equal(f.run.publishCommit, undefined);
+    // GitHub branch names are validated and empty means the run's own branch.
+    await assert.rejects(
+      f.workbench.draft(f.run.id, { ...f.run.draft, publishBranch: "feat/" }),
+      /分支名稱/,
+    );
+    // The target branch itself would skip the PR: the push would fast-forward it.
+    f.run.branch = "bellpr-test0001";
+    await assert.rejects(
+      f.workbench.draft(f.run.id, { ...f.run.draft, publishBranch: "Main" }),
+      (error: AppError) => error.statusCode === 422 && /目標分支/.test(error.message),
+    );
+    // A saved draft from elsewhere is still stopped before anything is pushed.
+    const saved = { ...f.run.draft };
+    f.run.draft = {
+      title: f.run.draft.title,
+      body: template.replace("Closes #", "No issue is linked yet."),
+      publishBranch: "main",
+    };
+    f.run.approvedFingerprint = reviewFingerprint(files, f.run.draft);
+    await assert.rejects(
+      f.workbench.publish(f.run.id, f.run.approvedFingerprint),
+      /目標分支/,
+    );
+    assert.ok(!f.run.publishing);
+    f.run.draft = saved;
+    f.run.branch = "main";
+    const finished = template.replace("Closes #", "No issue is linked yet.");
+    await f.workbench.draft(f.run.id, {
+      title: "fix: update the greeting",
+      body: finished,
+      publishBranch: " update-greeting ",
+    });
+    assert.equal(f.run.draft.publishBranch, "update-greeting");
+    // The branch is part of what the person approves.
+    await assert.rejects(
+      f.workbench.approve(f.run.id, { ...f.run.draft, publishBranch: "" }),
+      /草稿已更新/,
+    );
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    assert.notEqual(
+      f.run.approvedFingerprint,
+      reviewFingerprint(files, { ...f.run.draft, publishBranch: undefined }),
+    );
+    const fingerprint = f.run.approvedFingerprint!;
+    // Empty boxes and the missing issue each need the person's confirmation.
+    for (const acknowledged of [[], ["unchecked"], ["issue", "unknown"]])
+      await assert.rejects(
+        f.workbench.publish(f.run.id, fingerprint, acknowledged),
+        (error: AppError) =>
+          error.statusCode === 422 && /逐項確認/.test(error.message),
+      );
+    assert.ok(!f.run.publishing);
+    assert.equal(f.run.publishCommit, undefined);
+    await assert.rejects(readFile(calls, "utf8"), /ENOENT/);
+    const published = await f.workbench.publish(f.run.id, fingerprint, [
+      "unchecked",
+      "issue",
+    ]);
+    assert.equal(published.status, "published");
+    assert.equal(published.publishedBranch, "update-greeting");
+    const remote = (await readFile(calls, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as string[]);
+    assert.ok(
+      remote[0].at(-1)!.endsWith(":refs/heads/update-greeting"),
+      remote[0].join(" "),
+    );
+    const create = remote.find((call) => call[0] === "gh")!;
+    assert.equal(create[create.indexOf("--head") + 1], "test-owner:update-greeting");
+    // The local review branch keeps its name.
+    assert.equal(
+      (await git(f.repository, ["symbolic-ref", "--short", "HEAD"])).stdout.trim(),
+      f.run.branch,
+    );
+  } finally {
+    process.env.PATH = previousPath;
+    await f.cleanup();
+  }
+});
+
+test("the GitHub branch field is validated over HTTP and leaves older approval fingerprints unchanged", async () => {
+  const f = await fixture();
+  const app = createApp(f.workbench, {
+    staticDirectory: path.join(f.directory, "missing"),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing server port");
+  const url = `http://127.0.0.1:${address.port}/api/runs/${f.run.id}`;
+  const headers = {
+    host: "127.0.0.1:4311",
+    "content-type": "application/json",
+  };
+  try {
+    const files = await readDiff(f.run);
+    const legacy = reviewFingerprint(files, { ...f.run.draft });
+    assert.equal(
+      reviewFingerprint(files, { ...f.run.draft, publishBranch: "" }),
+      legacy,
+    );
+    for (const publishBranch of ["bad name", "a..b", "x.lock", "HEAD", "a".repeat(101)]) {
+      const rejected = await http(`${url}/draft`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ ...f.run.draft, publishBranch }),
+      });
+      assert.equal(rejected.status, 400, publishBranch.slice(0, 12));
+    }
+    const saved = await http(`${url}/draft`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ ...f.run.draft, publishBranch: "readme-startup" }),
+    });
+    assert.equal(saved.status, 200);
+    assert.equal(saved.json().run.draft.publishBranch, "readme-startup");
+    const cleared = await http(`${url}/draft`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ ...f.run.draft, publishBranch: "" }),
+    });
+    assert.equal("publishBranch" in cleared.json().run.draft, false);
+    const malformed = await http(`${url}/publish`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ fingerprint: "a".repeat(64), acknowledged: "issue" }),
+    });
+    assert.equal(malformed.status, 400);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
     await f.cleanup();
   }
 });

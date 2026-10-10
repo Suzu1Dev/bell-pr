@@ -33,6 +33,11 @@ export interface PrFeedback {
   items: PrFeedbackItem[];
   /** Overall statusCheckRollup state (SUCCESS, FAILURE, PENDING, …) when GitHub reports one. */
   checksState?: string;
+  /**
+   * PR label names, such as a compliance bot's "needs:compliance". A bot can
+   * label a PR while its own check run still succeeds. Absent on older reads.
+   */
+  labels?: string[];
   checks?: PrCheck[];
   warnings?: string[];
 }

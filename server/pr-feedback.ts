@@ -16,6 +16,7 @@ export const prFeedbackQuery = `query BellPrFeedback($owner: String!, $name: Str
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       url
+      labels(first: 20) { nodes { name } }
       reviews(last: ${pageSize}) {
         totalCount
         nodes { author { login } authorAssociation body state url createdAt }
@@ -198,10 +199,14 @@ export function parsePrFeedback(
   });
   partial(rollup?.contexts, "CI 檢查");
 
+  const labels = nodes(pr.labels)
+    .map((label) => text(label?.name).slice(0, 100))
+    .filter(Boolean);
   return {
     fetchedAt: options.fetchedAt,
     prNumber: options.prNumber,
     items,
+    ...(labels.length ? { labels } : {}),
     ...(text(rollup?.state) ? { checksState: rollup.state } : {}),
     ...(rollup ? { checks } : {}),
     ...(warnings.length ? { warnings } : {}),

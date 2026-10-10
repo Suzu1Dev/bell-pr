@@ -76,8 +76,14 @@ export interface Run {
    * commitMessage is the full commit message the human wrote (subject, body,
    * trailers such as Signed-off-by). Absent or empty means the PR title alone
    * is used, which is how runs saved before this field existed were published.
+   * publishBranch is the branch name pushed to GitHub; absent means `branch`.
    */
-  draft: { title: string; body: string; commitMessage?: string };
+  draft: {
+    title: string;
+    body: string;
+    commitMessage?: string;
+    publishBranch?: string;
+  };
   reviewedFiles: string[];
   reviewedFingerprints: Record<string, string>;
   /** Learner notes keyed by diff path; absent on runs saved before notes existed. */
@@ -90,6 +96,8 @@ export interface Run {
   error?: string;
   publishing?: boolean;
   publishCommit?: string;
+  /** The GitHub branch the publish commit was pushed to; absent until a push succeeds. */
+  publishedBranch?: string;
   headRepository?: string;
   contributionSettings?: ContributionSettings;
   team?: AgentTeam;

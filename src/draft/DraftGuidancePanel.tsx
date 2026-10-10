@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import {
+  issueRule,
   linuxContributionUrl,
   type DraftPreparation,
   type DraftProposal,
@@ -33,6 +34,8 @@ interface Props {
   issueUrl?: string;
   onGenerate: () => void;
   onApply: (proposal: DraftProposal) => void;
+  /** True while the editor holds this proposal's title and body unchanged. */
+  applied?: boolean;
 }
 
 /**
@@ -58,6 +61,7 @@ const sourceKinds: Record<DraftSource["kind"], string> = {
   documentation: "專案文件",
   maintainer: "維護者指引",
   example: "參考案例",
+  automation: "自動檢查",
 };
 
 function webLink(value?: string) {
@@ -77,6 +81,7 @@ export function DraftGuidancePanel({
   issueUrl,
   onGenerate,
   onApply,
+  applied = false,
 }: Props) {
   const prefix = useId().replaceAll(":", "");
   const [confirmed, setConfirmed] = useState<string[]>([]);
@@ -86,6 +91,7 @@ export function DraftGuidancePanel({
   const template = sources.find(
     (source) => source.id === proposal?.templateSourceId,
   );
+  const issueRequirement = issueRule(sources);
   const checkedAt = preparation?.context?.checkedAt;
   const checkedDate = checkedAt ? new Date(checkedAt) : undefined;
   const generating = busy || preparation?.status === "generating";
@@ -327,14 +333,18 @@ export function DraftGuidancePanel({
             </div>
           </details>
           <div className="draft-guidance-apply">
-            <p>套用後仍可編輯，儲存後才更新草稿。</p>
+            <p>
+              {applied
+                ? "下方編輯區就是這份建議的原文。說明會原樣送到 GitHub，請用自己的話確認後再送出。"
+                : "套用後仍可編輯，儲存後才更新草稿。"}
+            </p>
             <button
               type="button"
               className="button primary"
               onClick={() => onApply(proposal)}
-              disabled={disabled || generating || !ready}
+              disabled={disabled || generating || !ready || applied}
             >
-              <ArrowDownToLine size={15} /> 套用建議草稿
+              <ArrowDownToLine size={15} /> {applied ? "已套用" : "套用建議草稿"}
             </button>
           </div>
 
@@ -494,6 +504,15 @@ export function DraftGuidancePanel({
             );
           })}
         </ul>
+        {issueRequirement && (
+          <p className="draft-guidance-issue-rule" role="note">
+            <strong>這個專案的規範：</strong>「{issueRequirement.quote}」
+            <small>
+              來源：{issueRequirement.label}。沒有連結 issue
+              時，送出前會請你再確認一次。
+            </small>
+          </p>
+        )}
         {issueLink && (
           <a href={issueLink} target="_blank" rel="noopener noreferrer">
             開啟你填寫的 issue <ArrowUpRight size={12} />
