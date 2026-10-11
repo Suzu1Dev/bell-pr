@@ -54,7 +54,7 @@ const commitMessageSuggestionJsonSchema = {
   additionalProperties: false,
 };
 /** Any "<Something>-by:" trailer certifies a person's involvement; only that person may add it. */
-const personTrailer = /^\s*[A-Za-z-]+-by\s*:/im;
+export const personTrailer = /^\s*[A-Za-z-]+-by\s*:/im;
 export const draftJsonSchema = {
   type: "object",
   properties: {

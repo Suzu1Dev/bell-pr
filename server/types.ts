@@ -12,6 +12,7 @@ import type { ModelExecution } from "../shared/models.js";
 import type { FileConversation } from "../shared/chat.js";
 import type { PrFeedback } from "../shared/pr-feedback.js";
 import type { RunDetailField } from "../shared/runs.js";
+import type { FollowUpRound } from "../shared/followups.js";
 
 export type RunStatus =
   | "queued"
@@ -98,6 +99,8 @@ export interface Run {
   publishCommit?: string;
   /** The GitHub branch the publish commit was pushed to; absent until a push succeeds. */
   publishedBranch?: string;
+  /** Rounds of changes after maintainer review, oldest first; absent until the first one. */
+  followUps?: FollowUpRound[];
   headRepository?: string;
   contributionSettings?: ContributionSettings;
   team?: AgentTeam;

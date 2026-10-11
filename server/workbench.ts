@@ -57,6 +57,7 @@ import {
 } from "./agent-timeouts.js";
 import {
   AppError,
+  type DiffFile,
   type Repository,
   type Run,
   type RunLogEntry,
@@ -83,7 +84,16 @@ import {
 
 import { collectDraftContext } from "./draft-sources.js";
 import { validBranchName } from "../shared/drafts.js";
-import { draftPreflight } from "../shared/draft-checks.js";
+import {
+  draftPreflight,
+  findDraftPlaceholders,
+} from "../shared/draft-checks.js";
+import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
+import {
+  followUpJsonSchema,
+  followUpPrompt,
+  parseFollowUpResult,
+} from "./followups.js";
 import { parsePrFeedback, prFeedbackQuery, prNumberOf } from "./pr-feedback.js";
 import {
   draftFingerprint,
@@ -133,6 +143,7 @@ export class Workbench {
   private draftJobs = new Map<string, Promise<void>>();
   /** Learner-requested reviewer/tester reruns; one per run, aborted through controllers[run.id]. */
   private reviewJobs = new Map<string, Promise<void>>();
+  private followUpJobs = new Map<string, Promise<void>>();
   private statusCache?: {
     time: number;
     value: {
@@ -1472,6 +1483,13 @@ export class Workbench {
       await Promise.allSettled([rerun]);
       return run;
     }
+    const followUp = this.followUpJobs.get(id);
+    if (followUp) {
+      // The PR stays published; the round keeps any edits for review or discard.
+      this.controllers.get(id)?.abort();
+      await Promise.allSettled([followUp]);
+      return run;
+    }
     if (!["queued", "running", "awaiting_plan"].includes(run.status))
       throw new AppError("只有排隊、等待計畫核准或執行中的工作可取消。", 409);
     this.controllers.get(id)?.abort();
@@ -1741,6 +1759,11 @@ export class Workbench {
       if (this.stopping) throw new AppError("服務正在關閉，請稍後重試。", 503);
       const run = this.run(id);
       this.editable(run);
+      if (activeFollowUp(run.followUps))
+        throw new AppError(
+          "這輪修正只推送新的 commit，不會更新 PR 說明，因此不需要產生草稿建議。",
+          409,
+        );
       const files = await this.diff(id);
       if (this.stopping) throw new AppError("服務正在關閉，請稍後重試。", 503);
       pending = this.draftJobs.get(id);
@@ -1887,6 +1910,14 @@ export class Workbench {
     return this.lock(id, async () => {
       const run = this.run(id);
       this.editable(run);
+      if (
+        activeFollowUp(run.followUps) &&
+        (draft.title !== run.draft.title || draft.body !== run.draft.body)
+      )
+        throw new AppError(
+          "這輪修正只推送新的 commit，PR 標題與說明維持原樣，不能在這裡修改。",
+          409,
+        );
       // An empty message is stored as absent so the title-only fallback applies.
       const commitMessage = draft.commitMessage?.trim();
       // Likewise an empty GitHub branch falls back to the run's own branch.
@@ -1981,14 +2012,31 @@ export class Workbench {
       }
       if (!run.draft.title.trim() || !run.draft.body.trim())
         throw new AppError("請先填寫 PR 標題與內容。", 422);
-      const unfinished = draftPreflight({ body: run.draft.body }).find(
-        (check) => check.kind === "block",
-      );
-      if (unfinished)
-        throw new AppError(
-          [unfinished.message, ...unfinished.details].join("\n"),
-          422,
+      // A follow-up round pushes only a commit, so its message is what goes out.
+      const round = activeFollowUp(run.followUps);
+      if (round) {
+        const message = run.draft.commitMessage?.trim();
+        if (!message || findDraftPlaceholders(message).length)
+          throw new AppError(
+            "請填好這輪修正的提交訊息，不要留下待填寫的內容。",
+            422,
+          );
+        const unreviewable = await this.unreviewableRoundPaths(
+          run,
+          round,
+          files,
         );
+        if (unreviewable.length) throw this.unreviewableError(unreviewable);
+      } else {
+        const unfinished = draftPreflight({ body: run.draft.body }).find(
+          (check) => check.kind === "block",
+        );
+        if (unfinished)
+          throw new AppError(
+            [unfinished.message, ...unfinished.details].join("\n"),
+            422,
+          );
+      }
       run.approvedFingerprint = reviewFingerprint(files, run.draft);
       run.status = "approved";
       await this.store.save();
@@ -2184,6 +2232,13 @@ export class Workbench {
         )
       )
         throw new AppError("最新差異尚未全部審閱。", 409);
+      const round = activeFollowUp(run.followUps);
+      if (round) return this.publishFollowUp(run, round, files);
+      if (run.prUrl)
+        throw new AppError(
+          "這個 PR 已經送出；要推送新的修改，請從維護者回饋開始一輪修正。",
+          409,
+        );
       const headBranch = run.draft.publishBranch || run.branch;
       if (
         run.draft.publishBranch &&
@@ -2276,85 +2331,7 @@ export class Workbench {
           previousHead,
         ]);
 
-        // Build a fresh index from the reviewed base, then stage only explicitly reviewed paths.
-        // commit-tree produces one clean commit, excluding any unreviewed intermediate agent history.
-        const indexPath = path.join(
-          this.store.directory,
-          `publish-index-${run.id}`,
-        );
-        const indexEnv = {
-          ...process.env,
-          GIT_INDEX_FILE: indexPath,
-          GIT_TERMINAL_PROMPT: "0",
-        };
-        await git(run.worktreePath, ["read-tree", run.baseSha], {
-          env: indexEnv,
-        });
-        await git(
-          run.worktreePath,
-          [
-            "--literal-pathspecs",
-            "add",
-            "--",
-            ...files.map((file) => file.path),
-          ],
-          { env: indexEnv },
-        );
-        const stagedFiles = (
-          await git(
-            run.worktreePath,
-            [
-              "diff",
-              "--cached",
-              "--no-ext-diff",
-              "--no-textconv",
-              "--no-renames",
-              "--name-only",
-              "-z",
-              run.baseSha,
-              "--",
-            ],
-            { env: indexEnv },
-          )
-        ).stdout
-          .split("\0")
-          .filter(Boolean)
-          .sort();
-        if (
-          JSON.stringify(stagedFiles) !==
-          JSON.stringify(files.map((file) => file.path).sort())
-        )
-          throw new AppError("準備提交的檔案與已核准差異不同。", 409);
-        for (const file of files) {
-          const stagedPatch = (
-            await git(
-              run.worktreePath,
-              [
-                "--literal-pathspecs",
-                "diff",
-                "--cached",
-                "--no-ext-diff",
-                "--no-textconv",
-                "--no-renames",
-                run.baseSha,
-                "--",
-                file.path,
-              ],
-              { env: indexEnv },
-            )
-          ).stdout;
-          if (stagedPatch !== file.patch)
-            throw new AppError(
-              `${file.path} 在準備提交時變更，請重新審閱。`,
-              409,
-            );
-        }
-        const latest = await readDiff(run);
-        if (reviewFingerprint(latest, run.draft) !== run.approvedFingerprint)
-          throw new AppError("檔案在發佈準備期间變更，請重新審閱。", 409);
-        const tree = (
-          await git(run.worktreePath, ["write-tree"], { env: indexEnv })
-        ).stdout.trim();
+        const tree = await this.reviewedTree(run, files);
         let commit = run.publishCommit;
         if (commit) {
           const priorTree = (
@@ -2509,6 +2486,611 @@ export class Workbench {
       }
       return run;
     });
+  }
+
+  /**
+   * Starts a round of changes on a published PR from the maintainer feedback
+   * the person selected. One writable agent edits the run's checkout, which
+   * still holds the pushed PR head; the person then reviews, approves and
+   * pushes the result as one more commit on the same branch.
+   */
+  async startFollowUp(
+    id: string,
+    input: { feedbackUrls: string[]; note?: string },
+  ) {
+    if (this.stopping) throw new AppError("服務正在關閉，請稍後重試。", 503);
+    return this.lock(id, async () => {
+      const run = this.run(id);
+      if (activeFollowUp(run.followUps))
+        throw new AppError("這個工作已有一輪修正在進行。", 409);
+      // A round that just ended may still be cleaning up outside the lock.
+      await this.followUpJobs.get(id)?.catch(() => undefined);
+      if (this.followUpJobs.has(id) || this.controllers.has(id))
+        throw new AppError("這個工作已有一輪修正或審查在進行。", 409);
+      if (
+        run.status !== "published" ||
+        !run.prUrl ||
+        !run.publishCommit ||
+        !run.headRepository ||
+        run.publishing
+      )
+        throw new AppError("只有已送出 PR 的工作可以依 review 繼續修正。", 409);
+      const feedbackUrls = [...new Set(input.feedbackUrls)];
+      const items = run.prFeedback?.items ?? [];
+      if (feedbackUrls.some((url) => !items.some((item) => item.url === url)))
+        throw new AppError(
+          "選取的回饋不在最近一次讀取的結果中；請重新讀取回饋後再選。",
+          409,
+        );
+      const note = input.note?.trim();
+      if (!feedbackUrls.length && !note)
+        throw new AppError("請至少選一則回饋，或寫下這輪要修正的內容。", 422);
+      // The checkout must still be exactly the pushed PR head.
+      const head = (
+        await git(run.worktreePath, ["rev-parse", "HEAD"])
+      ).stdout.trim();
+      if (head !== run.publishCommit || (await this.worktreeDirty(run)))
+        throw new AppError(
+          "工作目錄和已推送的 PR 內容不一致；請先還原工作目錄裡的修改再開始修正。",
+          409,
+        );
+      // Rounds build on BELL's last push; refuse before the agent spends any time.
+      this.assertRemoteHead(
+        run,
+        await this.remoteBranchHead(run),
+        run.publishCommit,
+      );
+      const round: FollowUpRound = {
+        id: newId().slice(0, 8),
+        requestedAt: now(),
+        feedbackUrls,
+        ...(note ? { note } : {}),
+        status: "running",
+        parentCommit: run.publishCommit,
+      };
+      (run.followUps ??= []).push(round);
+      if (!run.agents.some((agent) => agent.id === "followup"))
+        run.agents.push({
+          id: "followup",
+          name: "Mend",
+          role: "Review follow-up",
+          status: "waiting",
+          detail: "依維護者回饋修正",
+        });
+      // Only this round's own message may be pushed: the agent's or the person's.
+      const { commitMessage: _previous, ...draft } = run.draft;
+      run.draft = draft;
+      run.status = "running";
+      delete run.approvedFingerprint;
+      delete run.error;
+      this.log(
+        run,
+        "user",
+        `要求依 ${feedbackUrls.length} 則維護者回饋${note ? "與補充說明" : ""}進行第 ${run.followUps.length} 輪修正。`,
+      );
+      const controller = new AbortController();
+      this.controllers.set(id, controller);
+      const job = this.runFollowUp(run, round, controller).finally(() => {
+        this.followUpJobs.delete(id);
+        this.jobs.delete(job);
+      });
+      this.followUpJobs.set(id, job);
+      this.jobs.add(job);
+      await this.store.save();
+      return run;
+    });
+  }
+
+  /** Tracked changes or new files in the run's checkout compared with HEAD. */
+  private async worktreeDirty(run: Run) {
+    return !!(
+      await git(run.worktreePath, [
+        "status",
+        "--porcelain",
+        "--untracked-files=all",
+      ])
+    ).stdout.trim();
+  }
+
+  /** The commit GitHub's PR branch points at now; empty when the branch is gone. */
+  private async remoteBranchHead(run: Run) {
+    const branch = run.publishedBranch ?? run.branch;
+    const output = (
+      await git(
+        run.worktreePath,
+        [
+          ...networkConfig,
+          "ls-remote",
+          "--",
+          `https://github.com/${run.headRepository}.git`,
+          `refs/heads/${branch}`,
+        ],
+        { timeoutMs: 60_000 },
+      )
+    ).stdout;
+    return /^([0-9a-f]{40,64})\s/m.exec(output)?.[1] ?? "";
+  }
+
+  /** BELL never force-pushes, so it can only build on the commit GitHub has. */
+  private assertRemoteHead(run: Run, remoteHead: string, expected: string) {
+    if (remoteHead === expected) return;
+    const branch = run.publishedBranch ?? run.branch;
+    throw new AppError(
+      remoteHead
+        ? `GitHub 上的 PR 分支 ${branch} 已有 BELL 以外的提交（例如在 GitHub 上套用建議、維護者推送或更新分支），BELL 不會覆蓋，也無法接續修正；請在 GitHub 上處理，或放棄這輪修正。`
+        : `GitHub 上找不到 PR 分支 ${branch}，無法推送修正。`,
+      409,
+    );
+  }
+
+  /**
+   * Puts the run's branch back on the round's parent if the agent committed,
+   * reset or switched branches despite the prompt. Its final files stay in
+   * the checkout as uncommitted changes, so they are reviewed like any edit.
+   */
+  private async restoreFollowUpHead(run: Run, round: FollowUpRound) {
+    const ref = (
+      await git(run.worktreePath, ["symbolic-ref", "-q", "HEAD"], {
+        allowedCodes: [0, 1],
+      })
+    ).stdout.trim();
+    const head = (
+      await git(run.worktreePath, ["rev-parse", "HEAD"])
+    ).stdout.trim();
+    if (ref === `refs/heads/${run.branch}` && head === round.parentCommit)
+      return false;
+    if (ref !== `refs/heads/${run.branch}`)
+      await git(run.worktreePath, [
+        "symbolic-ref",
+        "HEAD",
+        `refs/heads/${run.branch}`,
+      ]);
+    await git(run.worktreePath, ["reset", "-q", "--mixed", round.parentCommit]);
+    return true;
+  }
+
+  /** The pushed commit's message, shown again once a round ends without a commit. */
+  private async restoreParentMessage(run: Run, round: FollowUpRound) {
+    const message = (
+      await git(run.worktreePath, [
+        "log",
+        "-1",
+        "--format=%B",
+        round.parentCommit,
+      ])
+    ).stdout.trim();
+    const { commitMessage: _round, ...draft } = run.draft;
+    run.draft =
+      message && message !== draft.title
+        ? { ...draft, commitMessage: message }
+        : draft;
+  }
+
+  /**
+   * Paths whose pushed content a round changed but the review list cannot
+   * show: a file put back to its base version or deleted drops out of the
+   * diff against the base, yet it would change the pushed commit.
+   */
+  private async unreviewableRoundPaths(
+    run: Run,
+    round: FollowUpRound,
+    files: DiffFile[],
+    tree?: string,
+  ) {
+    const changed = (
+      await git(
+        run.worktreePath,
+        tree
+          ? ["diff-tree", "-r", "--no-renames", "--name-only", "-z", round.parentCommit, tree]
+          : ["diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", round.parentCommit, "--"],
+      )
+    ).stdout
+      .split("\0")
+      .filter(Boolean);
+    const listed = new Set(files.map((file) => file.path));
+    return changed.filter((filePath) => !listed.has(filePath));
+  }
+
+  private unreviewableError(paths: string[]) {
+    return new AppError(
+      `這輪修正把已推送的檔案改回原始版本或刪除：${paths.slice(0, 10).join("、")}。這類修改無法在 BELL 逐檔審閱，因此不會推送；請還原這些檔案或放棄這輪修正。`,
+      409,
+    );
+  }
+
+  private async runFollowUp(
+    run: Run,
+    round: FollowUpRound,
+    controller: AbortController,
+  ) {
+    let temporary: string | undefined;
+    const checks: TeamCheck[] = [];
+    const roundNumber = (run.followUps?.indexOf(round) ?? 0) + 1;
+    const committedNote =
+      "Agent 自行建立了 commit 或切換了分支；已還原到已推送的 PR，修改保留在工作目錄供你審閱。";
+    try {
+      const files = await readDiff(run);
+      temporary = await mkdtemp(path.join(os.tmpdir(), "bell-followup-"));
+      const outputSchema = path.join(temporary, "followup-schema.json");
+      await writeFile(outputSchema, JSON.stringify(followUpJsonSchema), {
+        mode: 0o600,
+      });
+      const previousCommitMessage = (
+        await git(run.worktreePath, [
+          "log",
+          "-1",
+          "--format=%B",
+          round.parentCommit,
+        ])
+      ).stdout.trim();
+      const answer = await this.runAgent(
+        run,
+        "followup",
+        followUpPrompt({
+          boundaries: teamBoundaries,
+          contributionContext: this.contributionContext(run),
+          pullRequest: {
+            url: run.prUrl!,
+            title: run.draft.title,
+            body: run.draft.body,
+          },
+          previousCommitMessage,
+          feedback: (run.prFeedback?.items ?? []).filter((item) =>
+            round.feedbackUrls.includes(item.url),
+          ),
+          note: round.note,
+          changedFiles: files.map((file) => file.path),
+        }),
+        controller.signal,
+        false,
+        { outputSchema, checks },
+      );
+      const result = parseFollowUpResult(answer, round.feedbackUrls);
+      await this.lock(run.id, async () => {
+        round.report = result.summary;
+        round.addressed = result.addressed;
+        round.notAddressed = result.notAddressed;
+        // Commands the application saw run, not the agent's own list.
+        if (checks.length) round.checks = checks;
+        const moved = await this.restoreFollowUpHead(run, round);
+        if (!(await this.worktreeDirty(run))) {
+          round.status = "failed";
+          round.error =
+            "Agent 沒有修改任何檔案；請看下方的說明，必要時調整選取的回饋或補充說明再試一次。";
+          await this.restoreParentMessage(run, round);
+          run.status = "published";
+          this.log(run, "followup", round.error);
+          return;
+        }
+        if (moved) round.error = committedNote;
+        // An empty message is stored as absent; the person then writes one.
+        const { commitMessage: _empty, ...draft } = run.draft;
+        run.draft = result.commitMessage
+          ? { ...draft, commitMessage: result.commitMessage }
+          : draft;
+        // Re-read the diff first, so reviews of the files this round changed are
+        // cleared before anything can see the run as ready for review.
+        await this.diff(run.id);
+        round.status = "review";
+        run.status = "review";
+        this.log(
+          run,
+          "system",
+          `第 ${roundNumber} 輪修正完成，請逐檔審閱這輪改到的檔案，確認提交訊息後再推送。${moved ? committedNote : ""}`,
+        );
+      });
+    } catch (error) {
+      await this.lock(run.id, async () => {
+        const reason = controller.signal.aborted
+          ? "這輪修正已停止"
+          : redact(error instanceof Error ? error.message : "這輪修正未完成");
+        await this.restoreFollowUpHead(run, round).catch(() => undefined);
+        // Edits already made stay for review or discard; a clean checkout is simply published again.
+        const dirty = await this.worktreeDirty(run).catch(() => true);
+        round.status = dirty
+          ? "review"
+          : controller.signal.aborted
+            ? "cancelled"
+            : "failed";
+        round.error = dirty
+          ? `${reason}；工作目錄保留了部分修改，可以審閱、寫好提交訊息後推送，或放棄這輪修正。`
+          : reason;
+        if (dirty) await this.diff(run.id).catch(() => undefined);
+        else await this.restoreParentMessage(run, round).catch(() => undefined);
+        run.status = dirty ? "review" : "published";
+        this.log(run, "system", round.error);
+      });
+    } finally {
+      const agent = run.agents.find((value) => value.id === "followup");
+      if (agent) {
+        const ready = round.status === "review";
+        agent.status = ready ? "complete" : "failed";
+        agent.detail = ready ? "修正完成，等待審閱" : "修正中斷或沒有修改";
+      }
+      if (this.controllers.get(run.id) === controller)
+        this.controllers.delete(run.id);
+      if (temporary) await rm(temporary, { recursive: true, force: true });
+      await this.store.save();
+    }
+  }
+
+  /** Throws the round's edits away and returns the checkout to the pushed PR head. */
+  async discardFollowUp(id: string) {
+    return this.lock(id, async () => {
+      const run = this.run(id);
+      const round = activeFollowUp(run.followUps);
+      if (
+        !round ||
+        round.status !== "review" ||
+        run.publishing ||
+        !["review", "approved"].includes(run.status)
+      )
+        throw new AppError("目前沒有可以放棄的修正。", 409);
+      if (round.commit) {
+        // A commit is only safe to drop when GitHub does not have it.
+        if ((await this.remoteBranchHead(run)) === round.commit)
+          throw new AppError(
+            "這輪修正已推送到 GitHub；請再按一次推送，讓 BELL 記錄完成。",
+            409,
+          );
+        await git(run.worktreePath, [
+          "update-ref",
+          `refs/heads/${run.branch}`,
+          round.parentCommit,
+        ]);
+        delete round.commit;
+      }
+      await git(run.worktreePath, ["reset", "--hard", round.parentCommit]);
+      // Ignored files such as build output stay; only the round's new files go.
+      await git(run.worktreePath, ["clean", "-fd"]);
+      await this.restoreParentMessage(run, round);
+      round.status = "discarded";
+      run.status = "published";
+      delete run.approvedFingerprint;
+      const files = await this.diff(id);
+      // The checkout is the pushed head again, whose files were all reviewed before it was pushed.
+      run.reviewedFingerprints = Object.fromEntries(
+        files
+          .filter((file) => !file.blocked)
+          .map((file) => [file.path, file.fingerprint]),
+      );
+      run.reviewedFiles = Object.keys(run.reviewedFingerprints);
+      this.log(run, "user", "已放棄這輪修正，工作目錄回到已推送的 PR 內容。");
+      await this.store.save();
+      return run;
+    });
+  }
+
+  /**
+   * Pushes an approved follow-up round as one commit on top of the PR head.
+   * The PR title and description are left alone, and nothing is force-pushed:
+   * GitHub's branch is checked before a commit is made, and the push itself
+   * is a plain fast-forward.
+   */
+  private async publishFollowUp(
+    run: Run,
+    round: FollowUpRound,
+    files: DiffFile[],
+  ) {
+    const message = run.draft.commitMessage?.trim();
+    if (!message) throw new AppError("請填寫這輪修正的提交訊息。", 422);
+    if (findDraftPlaceholders(message).length)
+      throw new AppError("提交訊息還有待填寫的內容，請改好再推送。", 422);
+    if (!run.prUrl || !run.headRepository)
+      throw new AppError("找不到這個 PR 的推送位置，無法推送修正。", 409);
+    const branch = run.publishedBranch ?? run.branch;
+    const roundNumber = (run.followUps?.indexOf(round) ?? 0) + 1;
+    const finish = (commit: string) => {
+      round.status = "published";
+      round.publishedAt = now();
+      run.publishCommit = commit;
+      run.status = "published";
+      this.log(
+        run,
+        "system",
+        `已把第 ${roundNumber} 輪修正推送到 PR 分支 ${branch}（${commit.slice(0, 7)}）。`,
+      );
+    };
+    run.publishing = true;
+    delete run.error;
+    await this.store.save();
+    try {
+      const head = (
+        await git(run.worktreePath, ["symbolic-ref", "--short", "HEAD"])
+      ).stdout.trim();
+      if (head !== run.branch)
+        throw new AppError("工作分支已改變，已停止推送。", 409);
+      const previousHead = (
+        await git(run.worktreePath, ["rev-parse", "HEAD"])
+      ).stdout.trim();
+      if (previousHead !== round.parentCommit && previousHead !== round.commit)
+        throw new AppError("工作分支的提交已改變，已停止推送。", 409);
+      const remoteHead = await this.remoteBranchHead(run);
+      // A retry after the push landed but before BELL recorded it.
+      if (round.commit && remoteHead === round.commit) {
+        finish(round.commit);
+        return run;
+      }
+      // Checked before anything local changes, so a refusal leaves the round discardable.
+      this.assertRemoteHead(run, remoteHead, round.parentCommit);
+      const state = (
+        await command("gh", [
+          "pr",
+          "view",
+          run.prUrl,
+          "--json",
+          "state",
+          "--jq",
+          ".state",
+        ])
+      ).stdout.trim();
+      if (state !== "OPEN")
+        throw new AppError(
+          `這個 PR 已${state === "MERGED" ? "合併" : "關閉"}，不能再推送修正。`,
+          409,
+        );
+      const tree = await this.reviewedTree(run, files);
+      const parentTree = (
+        await git(run.worktreePath, ["rev-parse", `${round.parentCommit}^{tree}`])
+      ).stdout.trim();
+      if (tree === parentTree)
+        throw new AppError(
+          "這輪沒有新的修改可以推送；可以放棄這輪修正。",
+          422,
+        );
+      const unreviewable = await this.unreviewableRoundPaths(
+        run,
+        round,
+        files,
+        tree,
+      );
+      if (unreviewable.length) throw this.unreviewableError(unreviewable);
+      let commit = round.commit;
+      if (commit) {
+        // A retry after the commit was made: it must be the same reviewed content.
+        const [priorTree, priorParent, priorMessage] = await Promise.all([
+          git(run.worktreePath, ["rev-parse", `${commit}^{tree}`]),
+          git(run.worktreePath, ["rev-parse", `${commit}^`]),
+          git(run.worktreePath, ["log", "-1", "--format=%B", commit]),
+        ]);
+        if (
+          priorTree.stdout.trim() !== tree ||
+          priorParent.stdout.trim() !== round.parentCommit ||
+          priorMessage.stdout.trim() !== message
+        )
+          throw new AppError(
+            "這輪修正先前已建立不同內容的 commit；請還原修改與提交訊息後再推送，或放棄這輪修正。",
+            409,
+          );
+      } else {
+        commit = (
+          await git(
+            run.worktreePath,
+            ["commit-tree", tree, "-p", round.parentCommit],
+            { input: `${message}\n` },
+          )
+        ).stdout.trim();
+      }
+      if (previousHead !== commit)
+        await git(run.worktreePath, [
+          "update-ref",
+          `refs/heads/${run.branch}`,
+          commit,
+          previousHead,
+        ]);
+      await git(run.worktreePath, ["read-tree", commit]);
+      round.commit = commit;
+      await this.store.save();
+      // A plain push: GitHub rejects it if the branch moved since the check above.
+      await git(
+        run.worktreePath,
+        [
+          ...networkConfig,
+          "push",
+          "--",
+          `https://github.com/${run.headRepository}.git`,
+          `${commit}:refs/heads/${branch}`,
+        ],
+        { timeoutMs: 120_000 },
+      );
+      finish(commit);
+    } catch (error) {
+      run.error = redact(error instanceof Error ? error.message : "推送失敗。");
+      this.log(run, "system", run.error);
+      throw error;
+    } finally {
+      run.publishing = false;
+      await this.store.save();
+    }
+    return run;
+  }
+
+  /**
+   * Builds a fresh index from the reviewed base and stages only the reviewed
+   * paths, checking each staged patch against what the person approved.
+   * commit-tree then produces one clean commit, excluding any unreviewed
+   * intermediate agent history.
+   */
+  private async reviewedTree(run: Run, files: DiffFile[]) {
+    // Build a fresh index from the reviewed base, then stage only explicitly reviewed paths.
+    // commit-tree produces one clean commit, excluding any unreviewed intermediate agent history.
+    const indexPath = path.join(
+      this.store.directory,
+      `publish-index-${run.id}`,
+    );
+    const indexEnv = {
+      ...process.env,
+      GIT_INDEX_FILE: indexPath,
+      GIT_TERMINAL_PROMPT: "0",
+    };
+    await git(run.worktreePath, ["read-tree", run.baseSha], {
+      env: indexEnv,
+    });
+    await git(
+      run.worktreePath,
+      [
+        "--literal-pathspecs",
+        "add",
+        "--",
+        ...files.map((file) => file.path),
+      ],
+      { env: indexEnv },
+    );
+    const stagedFiles = (
+      await git(
+        run.worktreePath,
+        [
+          "diff",
+          "--cached",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--no-renames",
+          "--name-only",
+          "-z",
+          run.baseSha,
+          "--",
+        ],
+        { env: indexEnv },
+      )
+    ).stdout
+      .split("\0")
+      .filter(Boolean)
+      .sort();
+    if (
+      JSON.stringify(stagedFiles) !==
+      JSON.stringify(files.map((file) => file.path).sort())
+    )
+      throw new AppError("準備提交的檔案與已核准差異不同。", 409);
+    for (const file of files) {
+      const stagedPatch = (
+        await git(
+          run.worktreePath,
+          [
+            "--literal-pathspecs",
+            "diff",
+            "--cached",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--no-renames",
+            run.baseSha,
+            "--",
+            file.path,
+          ],
+          { env: indexEnv },
+        )
+      ).stdout;
+      if (stagedPatch !== file.patch)
+        throw new AppError(
+          `${file.path} 在準備提交時變更，請重新審閱。`,
+          409,
+        );
+    }
+    const latest = await readDiff(run);
+    if (reviewFingerprint(latest, run.draft) !== run.approvedFingerprint)
+      throw new AppError("檔案在發佈準備期间變更，請重新審閱。", 409);
+    return (
+      await git(run.worktreePath, ["write-tree"], { env: indexEnv })
+    ).stdout.trim();
   }
 
   async shutdown() {

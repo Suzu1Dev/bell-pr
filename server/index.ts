@@ -25,6 +25,10 @@ import { learningExport } from "./learning-export.js";
 import { summarizeRun } from "../shared/runs.js";
 import { agentProviders } from "../shared/models.js";
 import { validBranchName } from "../shared/drafts.js";
+import {
+  followUpFeedbackLimit,
+  followUpNoteLimit,
+} from "../shared/followups.js";
 
 export function parseAllowedOrigins(value = ""): string[] {
   if (!value.trim()) return [];
@@ -376,6 +380,21 @@ export function createApp(
   // nothing polls it and nothing is ever posted back to GitHub.
   app.post("/api/runs/:id/pr/feedback", async (req, res) => {
     res.json({ run: await workbench.fetchPrFeedback(req.params.id) });
+  });
+  app.post("/api/runs/:id/follow-ups", async (req, res) => {
+    const input = z
+      .object({
+        feedbackUrls: z
+          .array(z.string().url().max(1024))
+          .max(followUpFeedbackLimit),
+        note: z.string().max(followUpNoteLimit).optional(),
+      })
+      .strict()
+      .parse(req.body);
+    res.json({ run: await workbench.startFollowUp(req.params.id, input) });
+  });
+  app.post("/api/runs/:id/follow-ups/discard", async (req, res) => {
+    res.json({ run: await workbench.discardFollowUp(req.params.id) });
   });
   app.post("/api/runs/:id/publish", async (req, res) => {
     const { fingerprint, acknowledged } = z

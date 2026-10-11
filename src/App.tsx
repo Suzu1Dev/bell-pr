@@ -66,6 +66,8 @@ import { groupPrFeedback, summarizeChecks } from "../shared/pr-feedback";
 import { applyReviewOrder, parseReviewOrder } from "../shared/review-order";
 import { validBranchName, type DraftProposal } from "../shared/drafts";
 import type { DraftCheck, DraftTaskItem } from "../shared/draft-checks";
+import { activeFollowUp, followUpNoteLimit } from "../shared/followups";
+import { FollowUpRounds } from "./draft/FollowUpRounds";
 
 /** The draft checks bring a Markdown parser, so they load beside the first screen. */
 type DraftChecks = typeof import("../shared/draft-checks");
@@ -339,6 +341,20 @@ export default function App() {
   );
   // Preflight items confirmed in the publish dialog; never saved.
   const [acknowledged, setAcknowledged] = useState<string[]>([]);
+  // Feedback picked for the next review follow-up round, and the person's note.
+  const [followUpSelection, setFollowUpSelection] = useState<string[]>([]);
+  const [followUpNote, setFollowUpNote] = useState("");
+  useEffect(() => {
+    setFollowUpSelection([]);
+    setFollowUpNote("");
+  }, [run.id]);
+  useEffect(() => {
+    const current = new Set(run.prFeedback?.items.map((item) => item.url) ?? []);
+    setFollowUpSelection((previous) => {
+      const kept = previous.filter((url) => current.has(url));
+      return kept.length === previous.length ? previous : kept;
+    });
+  }, [run.prFeedback]);
   const [draftChecks, setDraftChecks] = useState<DraftChecks>();
   useEffect(() => {
     let cancelled = false;
@@ -469,12 +485,19 @@ export default function App() {
         ? `不能用目標分支 ${run.baseBranch}，否則會直接推送到目標分支而不是建立 PR。`
         : "";
   const publishBranchInvalid = !!publishBranchError;
-  const publishChecks: DraftCheck[] =
-    draftChecks?.draftPreflight({
-      body: run.draft.body,
-      sources: draftSources,
-      proposalBody,
-    }) ?? [];
+  // A follow-up round pushes only a commit: the PR title and description stay.
+  const followUp = activeFollowUp(run.followUps);
+  const commitMessageUnfinished =
+    !!followUp &&
+    (!draftCommitMessage.trim() ||
+      !!draftChecks?.findDraftPlaceholders(draftCommitMessage).length);
+  const publishChecks: DraftCheck[] = followUp
+    ? []
+    : (draftChecks?.draftPreflight({
+        body: run.draft.body,
+        sources: draftSources,
+        proposalBody,
+      }) ?? []);
   const publishBlocked = publishChecks.find((check) => check.kind === "block");
   const publishConfirmations = publishChecks.filter(
     (check) => check.kind === "confirm",
@@ -657,7 +680,8 @@ export default function App() {
           if (!cancelled && epoch === draftMutationEpoch.current) {
             setFiles(changed);
             setSelectedPath(changed[0]?.path || "");
-            if (updated.status === "review") setTab("overview");
+            if (updated.status === "review")
+              setTab(activeFollowUp(updated.followUps) ? "draft" : "overview");
           }
         }
         if (!cancelled && epoch === draftMutationEpoch.current) {
@@ -1547,6 +1571,7 @@ export default function App() {
     }
     setBusy(true);
     setFormError("");
+    const pushingRound = !!followUp;
     try {
       const result = await api<{ run: Run; url?: string }>(
         `/runs/${run.id}/publish`,
@@ -1554,9 +1579,20 @@ export default function App() {
       );
       setRun(result.run);
       closeModal();
-      notify("GitHub Draft PR 已建立");
+      notify(
+        pushingRound
+          ? "已把這輪修正推送到 PR，分支上多了一個 commit。"
+          : "GitHub Draft PR 已建立",
+      );
     } catch (error) {
       setFormError((error as Error).message);
+      // A refused push may have saved the round's state; show it next to the error.
+      if (pushingRound)
+        void api<{ run: Run }>(`/runs/${run.id}`)
+          .then(({ run: latest }) => {
+            if (runIdRef.current === latest.id) setRun(latest);
+          })
+          .catch(() => undefined);
     } finally {
       setBusy(false);
     }
@@ -1583,7 +1619,54 @@ export default function App() {
       setFeedbackLoading(false);
     }
   }
+  async function startFollowUp() {
+    setBusy(true);
+    try {
+      const { run: updated } = await api<{ run: Run }>(
+        `/runs/${run.id}/follow-ups`,
+        send("POST", {
+          feedbackUrls: followUpSelection,
+          ...(followUpNote.trim() ? { note: followUpNote.trim() } : {}),
+        }),
+      );
+      if (runIdRef.current !== updated.id) return;
+      setRun(updated);
+      setFollowUpSelection([]);
+      setFollowUpNote("");
+      setTab("activity");
+      notify("已開始依回饋修正，完成後會請你審閱這輪的修改。");
+    } catch (error) {
+      notify((error as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function discardFollowUp() {
+    if (
+      !window.confirm(
+        "放棄這輪修正？工作目錄裡這輪的修改會被移除，回到已推送的 PR 內容。",
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const { run: updated } = await api<{ run: Run }>(
+        `/runs/${run.id}/follow-ups/discard`,
+        send("POST"),
+      );
+      if (runIdRef.current !== updated.id) return;
+      setRun(updated);
+      const result = await api<{ files: DiffFile[] }>(`/runs/${updated.id}/diff`);
+      if (runIdRef.current === updated.id) setFiles(result.files);
+      notify("已放棄這輪修正。");
+    } catch (error) {
+      notify((error as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
   async function cancel() {
+    const stoppingRound = followUp?.status === "running" && !reviewRerunning;
     try {
       const { run: updated } = await api<{ run: Run }>(
         `/runs/${run.id}/cancel`,
@@ -1600,7 +1683,11 @@ export default function App() {
         }
       }
       notify(
-        ["review", "approved"].includes(updated.status)
+        stoppingRound
+          ? activeFollowUp(updated.followUps)
+            ? "這輪修正已停止；工作目錄保留了部分修改，請審閱、寫好提交訊息後推送，或放棄這輪修正。"
+            : "這輪修正已停止，沒有修改任何檔案；PR 維持原狀。"
+          : ["review", "approved"].includes(updated.status)
           ? "已停止重新審查；原有報告與審閱狀態保留。"
           : updated.team?.tasks.length
             ? "任務已停止；本次工作的目錄與失敗任務的隔離目錄保留，可重試失敗的子任務。"
@@ -2601,6 +2688,20 @@ export default function App() {
                 )}
                 {tab === "draft" && (
                   <div className="draft-workspace">
+                    {!!run.followUps?.length && (
+                      <FollowUpRounds
+                        rounds={run.followUps}
+                        headRepository={run.headRepository}
+                        feedback={run.prFeedback?.items}
+                        busy={busy || active}
+                        onDiscard={
+                          followUp && ["review", "approved"].includes(run.status)
+                            ? discardFollowUp
+                            : undefined
+                        }
+                      />
+                    )}
+                    {!followUp && (
                     <Suspense
                       fallback={<p className="muted">正在載入草稿規範…</p>}
                     >
@@ -2626,6 +2727,7 @@ export default function App() {
                         }
                       />
                     </Suspense>
+                    )}
                     <div className="draft-layout">
                       <div className="draft-editor">
                         <div className="section-heading">
@@ -2635,7 +2737,16 @@ export default function App() {
                           </div>
                           <span className="draft-label">DRAFT PR</span>
                         </div>
-                        {!demo && run.status !== "published" && draftIsProposal && (
+                        {followUp && (
+                          <div className="draft-origin-notice" role="status">
+                            <AlertCircle size={16} />
+                            <p>
+                              這輪修正只會在 PR 分支加上一個新的
+                              commit，PR 標題與說明維持原樣。請先在「程式碼變更」審閱這輪改到的檔案，再確認下方的提交訊息。
+                            </p>
+                          </div>
+                        )}
+                        {!demo && !followUp && run.status !== "published" && draftIsProposal && (
                           <div className="draft-origin-notice" role="status">
                             <AlertCircle size={16} />
                             <p>
@@ -2646,6 +2757,7 @@ export default function App() {
                           </div>
                         )}
                         {!demo &&
+                          !followUp &&
                           run.status !== "published" &&
                           !draftBody.trim() &&
                           !preparingDraft && (
@@ -2666,7 +2778,7 @@ export default function App() {
                           className="text-input draft-title"
                           value={draftTitle}
                           onChange={(e) => setDraftTitle(e.target.value)}
-                          disabled={run.status === "published"}
+                          disabled={run.status === "published" || !!followUp}
                         />
                         <div className="editor-toolbar">
                           <div>
@@ -2697,30 +2809,35 @@ export default function App() {
                             aria-label="PR 說明"
                             value={draftBody}
                             onChange={(e) => setDraftBody(e.target.value)}
-                            disabled={run.status === "published"}
+                            disabled={run.status === "published" || !!followUp}
                           />
                         )}
                         <label
                           className="field-label"
                           htmlFor="pr-commit-message"
                         >
-                          提交訊息 <span>git commit</span>
+                          {followUp ? "這輪修正的提交訊息" : "提交訊息"}{" "}
+                          <span>git commit</span>
                         </label>
                         <textarea
                           id="pr-commit-message"
                           className="draft-textarea draft-commit-message"
                           aria-describedby="pr-commit-message-help"
-                          value={draftCommitMessage || draftTitle}
+                          value={
+                            followUp
+                              ? draftCommitMessage
+                              : draftCommitMessage || draftTitle
+                          }
                           onChange={(e) =>
                             setDraftCommitMessage(e.target.value)
                           }
                           disabled={run.status === "published"}
                         />
                         <p id="pr-commit-message-help" className="field-help">
-                          第一行是主旨，空一行後寫說明，最後放
-                          trailers。留空時以 PR
-                          標題作為單行提交訊息。Signed-off-by
-                          等簽署由你本人輸入，BELL 與模型不會代填。
+                          {followUp
+                            ? "這段訊息會成為 PR 分支上的新 commit，必須填寫，請確認它說明了這輪處理的 review 意見。第一行是主旨，空一行後寫說明，最後放 trailers。"
+                            : "第一行是主旨，空一行後寫說明，最後放 trailers。留空時以 PR 標題作為單行提交訊息。"}
+                          Signed-off-by 等簽署由你本人輸入，BELL 與模型不會代填。
                         </p>
                         <label
                           className="field-label"
@@ -2738,7 +2855,9 @@ export default function App() {
                           aria-invalid={publishBranchInvalid}
                           onChange={(e) => setDraftPublishBranch(e.target.value)}
                           disabled={
-                            run.status === "published" || !!run.publishedBranch
+                            run.status === "published" ||
+                            !!run.publishedBranch ||
+                            !!followUp
                           }
                         />
                         <p id="pr-publish-branch-help" className="field-help">
@@ -2754,7 +2873,7 @@ export default function App() {
                             {publishBranchError}
                           </p>
                         )}
-                        {commitMessageSuggestion && (
+                        {commitMessageSuggestion && !followUp && (
                           <div className="commit-suggestion">
                             <div>
                               <strong>依專案規範建議的提交訊息</strong>
@@ -2842,6 +2961,30 @@ export default function App() {
                             </small>
                           </span>
                         </div>
+                        {followUp ? (
+                          <div
+                            className={
+                              commitMessageUnfinished
+                                ? "checklist-item"
+                                : "checklist-item checked"
+                            }
+                          >
+                            {commitMessageUnfinished ? (
+                              <Circle size={18} />
+                            ) : (
+                              <CircleCheck size={18} />
+                            )}
+                            <span>
+                              這輪的提交訊息已填好
+                              <small>
+                                {commitMessageUnfinished
+                                  ? "請寫下這輪處理了哪些 review 意見"
+                                  : "推送時會成為 PR 分支上的新 commit"}
+                              </small>
+                            </span>
+                          </div>
+                        ) : (
+                        <>
                         <div
                           className={
                             draftBody.trim() && !draftUnfinished
@@ -2903,15 +3046,27 @@ export default function App() {
                             ))}
                           </fieldset>
                         )}
+                        </>
+                        )}
                         <div className="checklist-item">
                           <ShieldCheck size={18} />
-                          <span>
-                            以 Draft PR 送出
-                            <small>
-                              送出後仍可在 GitHub
-                              繼續編輯；專案的自動檢查對 Draft PR 一樣會執行。
-                            </small>
-                          </span>
+                          {followUp ? (
+                            <span>
+                              推送到同一個 PR
+                              <small>
+                                只加上新的 commit，不會 force push，也不會改 PR
+                                標題與說明。
+                              </small>
+                            </span>
+                          ) : (
+                            <span>
+                              以 Draft PR 送出
+                              <small>
+                                送出後仍可在 GitHub
+                                繼續編輯；專案的自動檢查對 Draft PR 一樣會執行。
+                              </small>
+                            </span>
+                          )}
                         </div>
                       </aside>
                     </div>
@@ -3028,7 +3183,7 @@ export default function App() {
                               </p>
                             )}
                             {groupPrFeedback(run.prFeedback.items).map(
-                              (group) => (
+                              (group, groupIndex) => (
                                 <div
                                   className="pr-feedback-group"
                                   key={group.path ?? "general"}
@@ -3053,9 +3208,33 @@ export default function App() {
                                       )}
                                   </div>
                                   <ul>
-                                    {group.items.map((item) => (
+                                    {group.items.map((item, itemIndex) => (
                                       <li key={item.url}>
                                         <div className="pr-feedback-item-head">
+                                          {!followUp && (
+                                            <input
+                                              type="checkbox"
+                                              aria-label={`把 ${item.author}${group.path ? ` 在 ${group.path}` : ""}${typeof item.line === "number" ? ` 第 ${item.line} 行` : ""} 的回饋納入下一輪修正`}
+                                              aria-describedby={`pr-feedback-body-${groupIndex}-${itemIndex}`}
+                                              checked={followUpSelection.includes(
+                                                item.url,
+                                              )}
+                                              disabled={busy}
+                                              onChange={(event) => {
+                                                const checked =
+                                                  event.target.checked;
+                                                setFollowUpSelection(
+                                                  (previous) =>
+                                                    checked
+                                                      ? [...previous, item.url]
+                                                      : previous.filter(
+                                                          (url) =>
+                                                            url !== item.url,
+                                                        ),
+                                                );
+                                              }}
+                                            />
+                                          )}
                                           <strong>{item.author}</strong>
                                           <span>{item.authorAssociation}</span>
                                           {item.state && <span>{item.state}</span>}
@@ -3071,12 +3250,61 @@ export default function App() {
                                             在 GitHub 開啟
                                           </a>
                                         </div>
-                                        <p>{item.body}</p>
+                                        <p
+                                          id={`pr-feedback-body-${groupIndex}-${itemIndex}`}
+                                        >
+                                          {item.body}
+                                        </p>
                                       </li>
                                     ))}
                                   </ul>
                                 </div>
                               ),
+                            )}
+                            {!followUp && (
+                              <div className="follow-up-start">
+                                <h3>依回饋繼續修正</h3>
+                                <p>
+                                  勾選上方要處理的回饋，必要時補一句說明。一位
+                                  Agent
+                                  會在原本的工作目錄修改；完成後你逐檔審閱、確認提交訊息，再以新的
+                                  commit 推到同一個 PR。PR
+                                  標題與說明不會改，回覆 reviewer 請在 GitHub
+                                  上自己處理。
+                                </p>
+                                <label
+                                  className="field-label"
+                                  htmlFor="follow-up-note"
+                                >
+                                  補充說明 <span>選填</span>
+                                </label>
+                                <textarea
+                                  id="follow-up-note"
+                                  className="text-input follow-up-note-input"
+                                  value={followUpNote}
+                                  maxLength={followUpNoteLimit}
+                                  placeholder="例如：只處理命名的建議，測試的部分我會另外回覆"
+                                  onChange={(event) =>
+                                    setFollowUpNote(event.target.value)
+                                  }
+                                  disabled={busy}
+                                />
+                                <button
+                                  className="button primary"
+                                  disabled={
+                                    busy ||
+                                    feedbackLoading ||
+                                    (!followUpSelection.length &&
+                                      !followUpNote.trim())
+                                  }
+                                  onClick={startFollowUp}
+                                >
+                                  <Play size={15} />
+                                  {followUpSelection.length
+                                    ? `依選取的 ${followUpSelection.length} 則回饋修正`
+                                    : "依補充說明修正"}
+                                </button>
+                              </div>
                             )}
                           </>
                         ) : (
@@ -3127,7 +3355,8 @@ export default function App() {
                         active ||
                         busy ||
                         draftDirty ||
-                        (!demo && !!draftUnfinished) ||
+                        (!demo &&
+                          (followUp ? commitMessageUnfinished : !!draftUnfinished)) ||
                         !["review", "approved"].includes(run.status)
                       }
                       title={
@@ -3135,14 +3364,18 @@ export default function App() {
                           ? "請先逐一勾選所有檔案的「已審閱」"
                           : draftDirty
                             ? "請先儲存 PR 草稿"
-                            : !demo && draftUnfinished
-                              ? "PR 說明還有待填寫的內容，請先改成事實或刪除"
-                              : "確認變更並預覽送出"
+                            : followUp && commitMessageUnfinished
+                              ? "請先填好這輪修正的提交訊息"
+                              : !demo && draftUnfinished
+                                ? "PR 說明還有待填寫的內容，請先改成事實或刪除"
+                                : followUp
+                                  ? "確認這輪修正並預覽推送"
+                                  : "確認變更並預覽送出"
                       }
                       onClick={approve}
                     >
                       <Check size={16} />
-                      確認並準備 PR
+                      {followUp ? "確認並準備推送" : "確認並準備 PR"}
                       <ChevronRight size={15} />
                     </button>
                   )}
@@ -3869,11 +4102,19 @@ export default function App() {
       )}
       {modal === "publish" && (
         <Modal
-          title={demo ? "你的示範貢獻，準備好了。" : "將這次貢獻送上 GitHub。"}
+          title={
+            demo
+              ? "你的示範貢獻，準備好了。"
+              : followUp
+                ? "把這輪修正推到 PR。"
+                : "將這次貢獻送上 GitHub。"
+          }
           subtitle={
             demo
               ? "你已完成所有檔案的審查。以下是 PR 的送出預覽。"
-              : "這會推送審查過的分支，並在目標 repository 建立 Draft PR。"
+              : followUp
+                ? "這會在 PR 分支加上一個新的 commit，PR 標題與說明不變，也不會覆蓋 GitHub 上的其他提交。"
+                : "這會推送審查過的分支，並在目標 repository 建立 Draft PR。"
           }
           onClose={closeModal}
         >
@@ -3885,7 +4126,9 @@ export default function App() {
             <h3>{run.draft.title}</h3>
             <div>
               <GitBranch size={14} />
-              {run.draft.publishBranch || run.branch}
+              {followUp
+                ? run.publishedBranch ?? run.branch
+                : run.draft.publishBranch || run.branch}
               <span>→</span>
               {run.baseBranch}
             </div>
@@ -3906,7 +4149,13 @@ export default function App() {
               </p>
             </div>
           )}
-          {!demo && (
+          {!demo && followUp && (
+            <div className="publish-commit-preview">
+              <strong>這輪的提交訊息</strong>
+              <pre>{run.draft.commitMessage}</pre>
+            </div>
+          )}
+          {!demo && !followUp && (
             <details className="publish-body-preview" open>
               <summary>
                 會送到 GitHub 的 PR 說明
@@ -3989,7 +4238,13 @@ export default function App() {
               ) : (
                 <GitPullRequest size={16} />
               )}{" "}
-              {demo ? "完成示範審查" : busy ? "正在送出…" : "送出 Draft PR"}
+              {demo
+                ? "完成示範審查"
+                : busy
+                  ? "正在送出…"
+                  : followUp
+                    ? "推送這輪修正"
+                    : "送出 Draft PR"}
             </button>
           </div>
         </Modal>
