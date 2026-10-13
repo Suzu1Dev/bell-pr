@@ -153,6 +153,9 @@ function checkTracked() {
     "git",
     [
       "grep",
+      // color.ui=always would wrap paths and matches in escape codes, which
+      // breaks the parsing and hides a port that follows a letter-ending code.
+      "--no-color",
       "-z",
       "-n",
       "-I",
@@ -311,12 +314,19 @@ function selfTest() {
     write("untracked.txt", `${id.user}\n`);
 
     // Tracked text files only; the root lockfile and binaries are skipped.
-    let result = check();
-    assert.equal(result.status, 1, result.stderr);
-    assert.deepEqual(result.lines, [
+    const expected = [
       "docs/contact.md:3  (handle)",
       "server/config.ts:2  (user, tailnet, port)",
-    ]);
+    ];
+    let result = check();
+    assert.equal(result.status, 1, result.stderr);
+    assert.deepEqual(result.lines, expected);
+
+    // A user's git config that forces color must not change the findings.
+    git("config", "color.ui", "always");
+    result = check();
+    assert.equal(result.status, 1, result.stderr);
+    assert.deepEqual(result.lines, expected);
 
     // Allowlisted findings pass; an entry that matches nothing warns.
     write(
