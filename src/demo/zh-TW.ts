@@ -114,8 +114,10 @@ const zhTW: DemoContent = buildDemoContent({
     prompt:
       "為 SDK 的 GET 請求加入指數退避與 jitter，保留可設定的重試次數，補上測試和使用文件。",
     agents: {
-      planner: { role: "任務規劃", detail: "已完成示範開發計畫" },
-      developer: { role: "程式開發", detail: "已產生 3 個核心檔案的示範變更" },
+      lead: { role: "任務規劃", detail: "已完成示範開發計畫" },
+      "member-1": { role: "程式開發", detail: "已產生 3 個核心檔案的示範變更" },
+      "member-2": { role: "程式開發", detail: "已產生 src/client.ts 的示範變更" },
+      "member-3": { role: "程式開發", detail: "已產生 README.md 的示範變更" },
       reviewer: { role: "品質審查", detail: "已整理示範審閱重點" },
       tester: { role: "測試驗證", detail: "已準備測試範例；未實際執行" },
     },

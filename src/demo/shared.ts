@@ -215,22 +215,24 @@ export const run = {
   baseBranch: "main",
   createdAt: "2026-10-03T01:30:00.000Z",
   agents: [
-    { id: "planner", name: "Planner", status: "complete" },
-    { id: "developer", name: "Developer", status: "complete" },
-    { id: "reviewer", name: "Reviewer", status: "complete" },
-    { id: "tester", name: "Tester", status: "complete" },
+    { id: "lead", name: "Atlas", status: "complete" },
+    { id: "member-1", name: "Teammate 1", status: "complete" },
+    { id: "member-2", name: "Teammate 2", status: "complete" },
+    { id: "member-3", name: "Teammate 3", status: "complete" },
+    { id: "reviewer", name: "Lens", status: "complete" },
+    { id: "tester", name: "Scout", status: "complete" },
   ],
   /** Each entry's copy is keyed by `key`. */
   logs: [
     {
       key: "plan",
       time: "2026-10-03T09:30:00+08:00",
-      agent: "planner",
+      agent: "lead",
     },
     {
       key: "implement",
       time: "2026-10-03T09:32:00+08:00",
-      agent: "developer",
+      agent: "member-1",
     },
     {
       key: "review",

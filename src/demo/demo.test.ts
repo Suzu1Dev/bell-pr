@@ -197,3 +197,27 @@ test("every activity log time formats as a time, never 'Invalid Date'", () => {
     }
   }
 });
+
+test("the agent cards, activity log and team board name the same agents", () => {
+  for (const locale of locales) {
+    const { run, team } = getDemo(locale);
+    const agents = run.agents.map((agent) => agent.id);
+    assert.deepEqual(agents, [
+      "lead",
+      "member-1",
+      "member-2",
+      "member-3",
+      "reviewer",
+      "tester",
+    ]);
+    for (const log of run.logs) assert.ok(agents.includes(log.agent), log.agent);
+    for (const task of team.tasks) assert.ok(agents.includes(task.owner), task.owner);
+    const tasks = team.tasks.map((task) => task.id);
+    for (const message of team.messages) {
+      assert.ok(agents.includes(message.from), message.from);
+      assert.ok(["all", "lead", ...tasks].includes(message.to), message.to);
+      for (const id of [...message.recipients, ...message.deliveredTo])
+        assert.ok(tasks.includes(id), id);
+    }
+  }
+});
