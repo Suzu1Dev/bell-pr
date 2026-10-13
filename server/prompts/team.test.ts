@@ -6,6 +6,7 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { git } from "../process.js";
 import { Store } from "../store.js";
+import { log } from "../log.js";
 import { defaultActiveRunLimit } from "../agent-slots.js";
 import { Workbench } from "../workbench.js";
 import {
@@ -602,12 +603,13 @@ test("a review rerun whose last save fails is logged instead of rejecting unhand
   const unhandled: unknown[] = [];
   const onUnhandled = (reason: unknown) => unhandled.push(reason);
   process.on("unhandledRejection", onUnhandled);
-  const stderr: string[] = [];
-  const write = process.stderr.write;
-  process.stderr.write = ((chunk: string | Uint8Array) => {
-    stderr.push(String(chunk));
-    return true;
-  }) as typeof process.stderr.write;
+  // Spy on the logger API rather than its output, which the real logger
+  // writes to a log file instead of stderr.
+  const errors: [string, Record<string, unknown> | undefined][] = [];
+  const logError = log.error;
+  log.error = (msg, fields) => {
+    errors.push([msg, fields]);
+  };
   const save = store.save.bind(store);
   let failing = false;
   store.save = async () => {
@@ -619,24 +621,18 @@ test("a review rerun whose last save fails is logged instead of rejecting unhand
     // Every save after the rerun started fails, including the job's last one.
     failing = true;
     release();
-    await waitUntil(
-      () => stderr.some((line) => line.includes("rerun review failed")),
-      "the logged rerun failure",
-    );
+    await waitUntil(() => errors.length > 0, "the logged rerun failure");
     await delay(20);
     assert.deepEqual(unhandled, []);
-    const line = stderr.find((entry) => entry.includes("rerun review failed"))!;
-    assert.match(line, /^\S+ ERROR rerun review failed \{/);
-    assert.deepEqual(JSON.parse(line.slice(line.indexOf("{"))), {
-      runId: run.id,
-      error: "Error: disk full",
-    });
+    assert.deepEqual(errors, [
+      ["rerun review failed", { runId: run.id, error: "Error: disk full" }],
+    ]);
     // The rerun let go of the run: its status is unchanged and a new rerun starts.
     assert.equal(run.status, "review");
     failing = false;
     await workbench.rerunReview(run.id);
   } finally {
-    process.stderr.write = write;
+    log.error = logError;
     process.off("unhandledRejection", onUnhandled);
     failing = false;
     release();
