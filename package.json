@@ -9,6 +9,7 @@
     "dev:server": "tsx watch server/index.ts",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "start": "tsx server/index.ts",
     "test": "tsx --import ./test/css-stub.mjs --test \"server/**/*.test.ts\" \"shared/**/*.test.ts\" \"src/**/*.test.ts\"",
     "audit": "node scripts/audit.mjs"
