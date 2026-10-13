@@ -113,6 +113,23 @@ test("text colors map to text tokens, which meet 4.5:1, even when far", () => {
   assert.equal(output, ".faint { color: var(--color-text-muted); }");
 });
 
+test("light grey text stays grey instead of taking the accent hue", () => {
+  const css = [
+    ".help { color: #a8b497; }",
+    ".tag { color: #8ea173; }",
+    ".code { color: #506244; }",
+  ].join("\n");
+  const { output } = tokenizer.tokenizeCss(css, tokens);
+  assert.equal(
+    output,
+    [
+      ".help { color: var(--color-text-muted); }",
+      ".tag { color: var(--color-accent-600); }",
+      ".code { color: var(--color-accent-700); }",
+    ].join("\n"),
+  );
+});
+
 test("checkCss reports what must not come back", () => {
   const small = 10;
   const cdn = ["https://fonts", "googleapis", "com/css2?family=X"].join(".");

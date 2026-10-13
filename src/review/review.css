@@ -997,7 +997,7 @@
 }
 .explain-input-bottom button:disabled {
   background: var(--color-accent-100);
-  color: var(--color-accent-600);
+  color: var(--color-text-muted);
   cursor: default;
 }
 .explain-panel .explain-disclaimer {

@@ -14,9 +14,10 @@
 // - maps each color literal (hex, rgb(), `white`, `black`) to the nearest token by
 //   CIEDE2000 distance in CIELAB, choosing only among the tokens meant for
 //   the declaring property (see `pools`). Text colors therefore always land on
-//   a text token, and every text token meets 4.5:1 on the light backgrounds.
-//   A non-text color farther than `maxDeltaE` from every candidate stays as
-//   it is and is reported as unmapped;
+//   a text token, and every text token meets 4.5:1 on the light backgrounds;
+//   a light grey stays grey (see `greyChroma`). A non-text color farther than
+//   `maxDeltaE` from every candidate stays as it is and is reported as
+//   unmapped;
 // - replaces translucent shadows with --shadow-1/2/3 by blur radius, and
 //   translucent fills with --color-overlay or a color-mix() of a token;
 // - folds component-level custom properties that hold a color or a font
@@ -34,11 +35,20 @@ const tokensPath = "src/theme/tokens.css";
 
 /**
  * Fill and line colors farther than this (CIEDE2000) from every candidate
- * stay as they are and are reported. Text and control colors always map.
+ * stay as they are and are reported. Text and control colors always map
+ * (see `greyChroma` for grey text that has no close match).
  */
 export const maxDeltaE = 12;
 /** Text at least this light (CIELAB L*) sits on a dark fill. */
 const inverseTextLightness = 81;
+/**
+ * Text below this chroma (CIELAB C*) is grey. A light sage grey that has to
+ * darken to 4.5:1 is about as far from --color-accent-600 as from
+ * --color-text-muted, so when no text token is within `maxDeltaE` and the
+ * nearest one is an accent, it maps to a neutral text token (`pools.grey`):
+ * muted text stays grey instead of turning olive.
+ */
+const greyChroma = 20;
 
 // Candidate tokens per kind of property, without the --color- prefix.
 // Order breaks ties between tokens that share a value.
@@ -57,6 +67,7 @@ export const pools = {
     "violet",
   ],
   inverse: ["text-inverse", "text-inverse-muted"],
+  grey: ["text", "text-secondary", "text-muted"],
   surface: [
     "surface",
     "bg",
@@ -575,11 +586,16 @@ function rewriteFonts(property, value, notes) {
 function colorToken(rgb, pool, declaration, tokens) {
   const override = overrideFor(declaration.selector, declaration.property, tokens);
   if (override) return { name: override, distance: 0, override: true };
-  const candidates =
-    pool === "text" && toLab(rgb).L >= inverseTextLightness
-      ? pools.inverse
-      : pools[pool];
-  return nearestToken(rgb, candidates, tokens);
+  if (pool !== "text") return nearestToken(rgb, pools[pool], tokens);
+  const lab = toLab(rgb);
+  if (lab.L >= inverseTextLightness)
+    return nearestToken(rgb, pools.inverse, tokens);
+  const best = nearestToken(rgb, pools.text, tokens);
+  const lightGrey =
+    Math.hypot(lab.a, lab.b) < greyChroma && best.distance > maxDeltaE;
+  return lightGrey && best.name.startsWith("--color-accent-")
+    ? nearestToken(rgb, pools.grey, tokens)
+    : best;
 }
 
 /**

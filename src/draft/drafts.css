@@ -54,7 +54,7 @@
 .draft-guidance-eyebrow {
   font: var(--text-2xs) var(--font-mono);
   letter-spacing: 1.3px;
-  color: var(--color-accent-600);
+  color: var(--color-text-muted);
   margin-bottom: 5px;
 }
 .draft-guidance-panel .draft-guidance-heading h2 {
@@ -85,7 +85,7 @@
 }
 .draft-guidance-badge.is-demo {
   background: var(--color-surface-muted);
-  color: var(--color-accent-600);
+  color: var(--color-text-muted);
   border-color: var(--color-border);
 }
 .draft-guidance-badge.is-fallback {
@@ -195,7 +195,7 @@
 .draft-guidance-number {
   font: var(--text-2xs) var(--font-mono);
   padding-top: 5px;
-  color: var(--color-accent-600);
+  color: var(--color-text-muted);
 }
 .draft-guidance-rules li p {
   line-height: 1.9;
@@ -654,7 +654,7 @@
 }
 :is(.draft-guidance-panel, .draft-editor) .markdown-image-note {
   font-size: var(--text-2xs);
-  color: var(--color-accent-600);
+  color: var(--color-text-muted);
   font-style: italic;
 }
 

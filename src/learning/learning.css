@@ -28,7 +28,7 @@
 .learning-count {
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
-  color: var(--color-accent-600);
+  color: var(--color-text-muted);
   padding-bottom: 10px;
 }
 .learning-note-tip {
@@ -46,10 +46,10 @@
   gap: 4px 10px;
   margin-top: 12px;
   font-size: var(--text-2xs);
-  color: var(--color-accent-600);
+  color: var(--color-text-muted);
 }
 .learning-note-meta dt {
-  color: var(--color-accent-600);
+  color: var(--color-text-muted);
 }
 .learning-note-meta dd {
   margin: 0;
@@ -60,7 +60,7 @@
   padding: 36px 20px;
   border: 1px dashed var(--color-border);
   border-radius: 9px;
-  color: var(--color-accent-600);
+  color: var(--color-text-muted);
 }
 .learning-empty h2 {
   font-size: 17px;

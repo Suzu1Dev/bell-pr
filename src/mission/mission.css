@@ -353,7 +353,7 @@
   display: none;
 }
 .mission-detail-block summary > svg:first-child {
-  color: var(--color-accent-600);
+  color: var(--color-text-muted);
 }
 .mission-detail-block summary > svg:last-child {
   color: var(--color-text-muted);

@@ -355,7 +355,7 @@
 }
 .discovery-rank {
   font: var(--text-sm) var(--font-mono);
-  color: var(--color-accent-600);
+  color: var(--color-text-muted);
   line-height: 24px;
 }
 .discovery-repo-link {
