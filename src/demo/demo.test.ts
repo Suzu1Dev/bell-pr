@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { locales } from "../../shared/i18n/locale";
+import { intlLocale, locales } from "../../shared/i18n/locale";
 import { demoDraftPreparation as panelDraftPreparation } from "../draft/DraftGuidancePanel";
 import {
   demoContributionBrief as missionBrief,
@@ -85,6 +85,18 @@ function structure(value: unknown, key = ""): unknown {
   return value;
 }
 
+/** Every timestamp field in the fixtures, as [where, value]. */
+function timestamps(value: unknown, where = ""): [string, unknown][] {
+  if (Array.isArray(value))
+    return value.flatMap((item, index) => timestamps(item, `${where}[${index}]`));
+  if (!value || typeof value !== "object") return [];
+  return Object.entries(value).flatMap(([name, item]) =>
+    /At$|^time$/.test(name)
+      ? [[`${where}.${name}`, item] as [string, unknown]]
+      : timestamps(item, `${where}.${name}`),
+  );
+}
+
 const answerText = (topic: DemoAnswerTopic, file: DiffFile) => {
   const answer = getDemo("zh-TW").answers.find((item) => item.topic === topic);
   assert.ok(answer, `zh-TW has a ${topic} answer`);
@@ -152,5 +164,36 @@ test("every locale has one generic answer and stateless keyword tables", () => {
     );
     for (const answer of answers)
       assert.doesNotMatch(answer.keywords.flags, /[gy]/, `${locale} ${answer.topic}`);
+  }
+});
+
+test("no fixture timestamp parses to an invalid Date", () => {
+  for (const locale of locales) {
+    const found = timestamps(getDemo(locale));
+    // run.createdAt, three log times, generatedAt, two messages, checkedAt.
+    assert.ok(found.length >= 8, `${locale}: ${found.length} timestamps`);
+    for (const [where, value] of found) {
+      assert.equal(typeof value, "string", `${locale} ${where}`);
+      assert.ok(
+        !Number.isNaN(new Date(value as string).getTime()),
+        `${locale} ${where} = ${value}`,
+      );
+    }
+  }
+});
+
+test("every activity log time formats as a time, never 'Invalid Date'", () => {
+  for (const locale of locales) {
+    const format = new Intl.DateTimeFormat(intlLocale(locale), {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    for (const log of getDemo(locale).run.logs) {
+      const date = new Date(log.time);
+      // format() throws a RangeError on an invalid Date.
+      assert.match(format.format(date), /\d{2}:\d{2}:\d{2}/, log.time);
+      assert.notEqual(date.toLocaleTimeString(intlLocale(locale)), "Invalid Date");
+    }
   }
 });

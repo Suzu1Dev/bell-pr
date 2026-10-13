@@ -222,9 +222,21 @@ export const run = {
   ],
   /** Each entry's copy is keyed by `key`. */
   logs: [
-    { key: "plan", time: "09:30", agent: "planner" },
-    { key: "implement", time: "09:32", agent: "developer" },
-    { key: "review", time: "09:34", agent: "reviewer" },
+    {
+      key: "plan",
+      time: "2026-10-03T09:30:00+08:00",
+      agent: "planner",
+    },
+    {
+      key: "implement",
+      time: "2026-10-03T09:32:00+08:00",
+      agent: "developer",
+    },
+    {
+      key: "review",
+      time: "2026-10-03T09:34:00+08:00",
+      agent: "reviewer",
+    },
   ],
   draft: {
     title: "feat: add exponential backoff and jitter to GET retries",
