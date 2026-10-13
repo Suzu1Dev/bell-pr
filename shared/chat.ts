@@ -4,6 +4,8 @@ export interface ChatMessage {
   content: string;
   /** Diff fingerprint the turn was about; absent on unsent local turns. */
   fingerprint?: string;
+  /** Client-built failure turn; never persisted by the server today. */
+  failed?: boolean;
 }
 
 /** Persisted conversation for one file of a run (`Run.conversations[path]`). */

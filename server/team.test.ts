@@ -23,7 +23,7 @@ import { readDiff } from "./git.js";
 import { Workbench } from "./workbench.js";
 import { Store } from "./store.js";
 import type { AppError, DiffFile, Run } from "./types.js";
-import type { AgentTeam, TeamTask } from "../shared/team.js";
+import type { AgentTeam } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import { ProjectInsightsService } from "./insights.js";
 import { AgentSlots } from "./agent-slots.js";

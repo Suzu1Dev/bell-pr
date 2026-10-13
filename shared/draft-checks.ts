@@ -159,6 +159,7 @@ function findRule(sources: DraftSource[], pattern: RegExp) {
           .slice(0, 200),
       };
   }
+  return undefined;
 }
 
 /** True when two bodies differ at most in which task items are ticked; ticking is not a rewrite. */

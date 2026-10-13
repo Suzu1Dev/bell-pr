@@ -20,7 +20,6 @@ import {
   type DiscoveryPreferences,
 } from "../shared/discovery.js";
 import { ponytailModes, type EfficiencyMetrics } from "../shared/efficiency.js";
-import type { ModelCatalog } from "../shared/models.js";
 import {
   addEfficiency,
   applyPonytail,
@@ -54,6 +53,7 @@ import {
   withAgentTimeoutHint,
 } from "./agent-timeouts.js";
 import { AppError } from "./types.js";
+import { lenientRead } from "./persisted-schema.js";
 
 export const discoveryPreferencesSchema = z
   .object({
@@ -376,10 +376,10 @@ export class DiscoveryService {
       try {
         if ((await stat(this.file)).size > 2_000_000)
           throw new AppError("探索結果檔案過大，無法安全載入。", 422);
-        const cached = z
-          .object({ version: z.literal(1), job: jobSchema.nullable() })
-          .strict()
-          .parse(JSON.parse(await readFile(this.file, "utf8")));
+        // The file may come from a newer build: read it leniently.
+        const cached = lenientRead(
+          z.object({ version: z.literal(1), job: jobSchema.nullable() }),
+        ).parse(JSON.parse(await readFile(this.file, "utf8")));
         this.job = cached.job;
         if (this.job?.status === "running") {
           this.job.status = "failed";

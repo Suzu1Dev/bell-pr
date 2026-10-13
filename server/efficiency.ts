@@ -108,6 +108,7 @@ function reportedUsage(event: unknown) {
     if (!Number.isSafeInteger(input)) return;
     return { input, cached: cacheRead, output };
   }
+  return undefined;
 }
 
 /** One exec invocation is one call; repeated terminal events replace, not add, usage. */
