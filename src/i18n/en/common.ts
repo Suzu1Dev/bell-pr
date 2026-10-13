@@ -1,0 +1,66 @@
+/**
+ * Labels that several parts of the UI share (English). Components read them
+ * through `useT("common")` instead of importing each other's label maps.
+ */
+import type { Locale } from "../../../shared/i18n/locale";
+import type { ReasoningEffort } from "../../../shared/models";
+import { product } from "../../../shared/product";
+import type { TeamTaskStatus } from "../../../shared/team";
+import type { RunStatus } from "../../../shared/types";
+
+const common = {
+  runStatus: {
+    queued: "Queued",
+    awaiting_plan: "Awaiting plan approval",
+    running: "In progress",
+    review: "Ready for your review",
+    approved: "Approved",
+    published: "PR published",
+    failed: "Failed",
+    cancelled: "Stopped",
+  } satisfies Record<RunStatus, string>,
+  /** Per diff file status: `badge` is Git's status letter, `title` its tooltip. */
+  fileStatus: {
+    added: { badge: "A", title: "New file" },
+    modified: { badge: "M", title: "Modified" },
+    deleted: { badge: "D", title: "Deleted" },
+  },
+  reasoningEffort: {
+    none: "Off",
+    minimal: "Minimal",
+    low: "Low",
+    medium: "Medium",
+    high: "High",
+    xhigh: "Extra high",
+    max: "Max",
+    ultra: "Ultra",
+  } satisfies Record<ReasoningEffort, string>,
+  teamTaskStatus: {
+    pending: "Waiting on dependencies",
+    ready: "Ready to claim",
+    running: "In progress",
+    complete: "Integrated",
+    failed: "Failed",
+    blocked: "Blocked",
+  } satisfies Record<TeamTaskStatus, string>,
+  actions: {
+    cancel: "Cancel",
+    save: "Save",
+    close: "Close",
+    copy: "Copy",
+    retry: "Retry",
+    learnMore: "Learn more",
+  },
+  language: { label: "Language" },
+  /** Each language in its own script (autonyms), the same in every locale. */
+  languageNames: {
+    en: "English",
+    "zh-TW": "繁體中文", // i18n-allow: autonym
+  } satisfies Record<Locale, string>,
+  errors: {
+    serverUnreachable: `Cannot reach the local ${product.name} service. Is it still running?`,
+    generic: "Something went wrong. Please try again.",
+  },
+};
+
+export default common;
