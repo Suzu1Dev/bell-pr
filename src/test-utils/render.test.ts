@@ -35,6 +35,9 @@ test("renderEn and renderZh pin the locale, dictionary and formatters", () => {
 test("assertNoHan accepts English text with typographic punctuation", () => {
   assertNoHan(renderEn(createElement(Status)));
   assertNoHan("BELL PR — “quoted”, it’s… café 😀 ①");
+  // The middle dot lists Han among its script extensions, but English uses
+  // it as a separator.
+  assertNoHan("TRIAL · 14d");
 });
 
 test("assertNoHan rejects Han characters and CJK punctuation", () => {

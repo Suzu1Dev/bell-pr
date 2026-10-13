@@ -34,8 +34,9 @@ export function renderEn(element: ReactElement): string {
 
 // The same characters scripts/check-i18n.mjs reports: Han (by script
 // extension, so marks such as the ideographic comma count) and the CJK
-// punctuation and full-width blocks, U+3000-303F and U+FF00-FFEF.
-const cjk = /[\p{Script_Extensions=Han}\u3000-\u303F\uFF00-\uFFEF]/u;
+// punctuation and full-width blocks, U+3000-303F and U+FF00-FFEF. The Latin
+// middle dot U+00B7, which English uses as a separator, is not one of them.
+const cjk = /(?!\u00B7)[\p{Script_Extensions=Han}\u3000-\u303F\uFF00-\uFFEF]/u;
 
 /**
  * Fails when `text` contains Han characters or CJK punctuation, which means

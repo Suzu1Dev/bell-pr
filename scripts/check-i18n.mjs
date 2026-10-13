@@ -25,7 +25,9 @@ const defaultTargets = ["src", "server", "shared", "index.html"];
 // Han by script extension, so marks that Han text uses (such as U+3001) count
 // too, plus the CJK symbols and punctuation block and the half-width and
 // full-width forms block, whose punctuation (such as U+FF1B) is Script=Common.
-const cjk = /[\p{Script_Extensions=Han}\u3000-\u303F\uFF00-\uFFEF]/u;
+// The Latin middle dot U+00B7 also lists Han among its script extensions, but
+// English text uses it as a separator ("Free \u00B7 Pro"), so it never counts.
+const cjk = /(?!\u00B7)[\p{Script_Extensions=Han}\u3000-\u303F\uFF00-\uFFEF]/u;
 const allowReasons = new Set(["autonym", "parser"]);
 const pragma = /\bi18n-allow\b(:?)[ \t]*([\w-]*)/g;
 const htmlLangEn = /<html\b[^>]*\slang\s*=\s*(["']?)en\1(?=[\s>/])/i;

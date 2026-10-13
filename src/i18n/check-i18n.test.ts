@@ -35,7 +35,7 @@ before(() => {
   );
   write(
     "src/clean.tsx",
-    'export const text = "BELL PR — “quoted”, it’s… café";\n',
+    'export const text = "BELL PR — “quoted”, it’s… café";\nexport const chip = "Free · Pro";\n',
   );
   write(
     "src/pragma.ts",
@@ -171,6 +171,7 @@ test("assertNoHan and the checker flag the same characters", () => {
     0x2014, // em dash
     0x2026, // ellipsis
     0x2019, // right single quotation mark
+    0xb7, // middle dot, Han by script extension but an English separator
     0xe9, // e with acute
     0x1f600, // emoji
   ];
@@ -199,4 +200,5 @@ test("assertNoHan and the checker flag the same characters", () => {
   assert.ok(flagged.has(0x4e2d) && flagged.has(0x20000) && flagged.has(0x3001));
   assert.ok(flagged.has(0xff1b) && flagged.has(0x3000));
   assert.ok(!flagged.has(0x3042) && !flagged.has(0xac00) && !flagged.has(0x2014));
+  assert.ok(!flagged.has(0xb7));
 });
