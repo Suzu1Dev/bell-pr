@@ -11,24 +11,24 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 11px;
-  color: #8ea173;
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
   min-width: 200px;
 }
 .learning-filters input,
 .learning-filters select {
   font: inherit;
-  font-size: 13px;
+  font-size: var(--text-sm);
   padding: 8px 10px;
-  border: 1px solid #e3e8da;
+  border: 1px solid var(--color-border);
   border-radius: 7px;
-  background: #fff;
+  background: var(--color-surface);
   color: inherit;
 }
 .learning-count {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: #a1af91;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
   padding-bottom: 10px;
 }
 .learning-note-tip {
@@ -36,20 +36,20 @@
 }
 .learning-note-tip strong {
   display: block;
-  font-size: 10px;
+  font-size: var(--text-2xs);
   letter-spacing: 1px;
-  color: #8ea173;
+  color: var(--color-accent-600);
 }
 .learning-note-meta {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 4px 10px;
   margin-top: 12px;
-  font-size: 11px;
-  color: #99a68a;
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
 }
 .learning-note-meta dt {
-  color: #a1af91;
+  color: var(--color-accent-600);
 }
 .learning-note-meta dd {
   margin: 0;
@@ -58,9 +58,9 @@
 .learning-empty {
   text-align: center;
   padding: 36px 20px;
-  border: 1px dashed #e3e8da;
+  border: 1px dashed var(--color-border);
   border-radius: 9px;
-  color: #99a68a;
+  color: var(--color-accent-600);
 }
 .learning-empty h2 {
   font-size: 17px;
@@ -69,7 +69,7 @@
   color: inherit;
 }
 .learning-empty p {
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.8;
 }
 .learning-demo {
@@ -83,14 +83,14 @@
   font-weight: 550;
 }
 .learning-demo-label {
-  font-size: 9px;
-  color: #8ea173;
-  background: #f3f7ec;
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
+  background: var(--color-accent-50);
   padding: 4px 7px;
   border-radius: 3px;
 }
 .learning-demo > p {
-  color: #99a18f;
-  font-size: 13px;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
   margin: 8px 0 18px;
 }

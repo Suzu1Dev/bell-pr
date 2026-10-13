@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -135,4 +137,100 @@ test("checkCss reports what must not come back", () => {
       "4 color literal white",
     ],
   );
+});
+
+test("every stylesheet outside src/theme uses the tokens", () => {
+  const result = spawnSync(process.execPath, [scriptPath, "--check"], {
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
+test("tokens.css defines the documented tokens", () => {
+  const colors = [
+    "bg",
+    "surface",
+    "surface-sunken",
+    "border",
+    "border-strong",
+    "text",
+    "text-secondary",
+    "text-muted",
+    "brand-700",
+    "brand-600",
+    "brand-500",
+    "brand-100",
+    "brand-50",
+    "success",
+    "success-bg",
+    "warning",
+    "warning-bg",
+    "danger",
+    "danger-bg",
+    "info",
+    "info-bg",
+    "diff-add-bg",
+    "diff-add-fg",
+    "diff-del-bg",
+    "diff-del-fg",
+    "diff-selected",
+  ];
+  for (const name of colors)
+    assert.ok(tokens.get(`--color-${name}`)?.rgb, `--color-${name}`);
+  assert.equal(tokens.get("--color-brand-600").value, "#1f6d50");
+  const scale = { "2xs": 11, xs: 12, sm: 13, md: 14, lg: 16, xl: 20, "2xl": 28, "3xl": 36 };
+  for (const [step, px] of Object.entries(scale))
+    assert.equal(tokens.get(`--text-${step}`)?.value, `${px}px`);
+  for (let step = 1; step <= 10; step++)
+    assert.equal(tokens.get(`--space-${step}`)?.value, `${step * 4}px`);
+  for (const name of ["--radius-sm", "--radius-md", "--radius-lg", "--radius-pill", "--shadow-1", "--shadow-2", "--shadow-3", "--font-sans", "--font-mono"])
+    assert.ok(tokens.has(name), name);
+  assert.equal(
+    tokens.get("--focus-ring").value,
+    "0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-brand-600)",
+  );
+});
+
+test("text tokens meet WCAG AA on every light background token", () => {
+  const pairs: { fg: string; bg: string; ratio: number }[] =
+    tokenizer.contrastReport(tokens);
+  const failing = pairs.filter((pair) => pair.ratio < 4.5);
+  assert.deepEqual(failing, []);
+  const muted = (bg: string) =>
+    pairs.find((pair) => pair.fg === "text-muted" && pair.bg === bg)!.ratio;
+  assert.ok(muted("bg") >= 4.5 && muted("surface") >= 4.5);
+});
+
+test("fonts.css self-hosts woff2 files of the latin subsets only", () => {
+  const css = readFileSync(path.join(root, "src/theme/fonts.css"), "utf8");
+  const faces = css.match(/@font-face\s*\{[^}]*\}/g) ?? [];
+  assert.equal(faces.length, 8);
+  const weights = new Set<string>();
+  for (const face of faces) {
+    const urls = [...face.matchAll(/url\("([^"]+)"\)/g)].map((match) => match[1]);
+    assert.equal(urls.length, 1, face);
+    const [url] = urls;
+    assert.match(url, /^@fontsource(-variable)?\/[\w-]+\/files\/[\w-]+-latin(-ext)?-[\w-]+\.woff2$/);
+    assert.ok(existsSync(path.join(root, "node_modules", url)), url);
+    assert.match(face, /font-display: swap;/);
+    assert.match(face, /unicode-range: U\+/);
+    if (url.includes("ibm-plex-mono")) weights.add(/font-weight: (\d+);/.exec(face)![1]);
+  }
+  assert.deepEqual([...weights].sort(), ["400", "500", "600"]);
+  assert.doesNotMatch(css.replace(/\/\*[\s\S]*?\*\//g, ""), /https?:|\.woff\b/);
+});
+
+test("styles.css loads the tokens first and the fonts second", () => {
+  const css = readFileSync(path.join(root, "src/styles.css"), "utf8");
+  assert.deepEqual(css.split("\n").slice(0, 2), [
+    '@import "./theme/tokens.css";',
+    '@import "./theme/fonts.css";',
+  ]);
+});
+
+test("Traditional Chinese text uses the system CJK fonts", () => {
+  const css = readFileSync(path.join(root, "src/theme/tokens.css"), "utf8");
+  const zh = /:lang\(zh-Hant\)\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+  assert.match(zh, /--font-sans: var\(--font-sans-base\), "PingFang TC", "Microsoft JhengHei",\s+"Noto Sans CJK TC", "Noto Sans TC", sans-serif;/);
+  assert.match(css, /:root,\n\[lang\] \{\n {2}font-family: var\(--font-sans\);/);
 });
