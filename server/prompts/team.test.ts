@@ -6,9 +6,29 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { git } from "../process.js";
 import { Store } from "../store.js";
-import { Workbench } from "../workbench.js";
+import {
+  Workbench,
+  contributionContext,
+  coordinationPrompt,
+  independentReviewContext,
+  integrationPrompt,
+  leadPlanPrompt,
+  memberPrompt,
+  memberTurnPrompt,
+  observedChecksContext,
+  reviewerPrompt,
+  teamBoundaries,
+  testerPrompt,
+  webBoundaries,
+} from "../workbench.js";
 import type { TeamAgentInput, TeamAgentRunner } from "../team.js";
+import type { DiffFile } from "../types.js";
 import type { ContributionSettings } from "../../shared/insights.js";
+import type {
+  AgentTeam,
+  TeamPlanRevision,
+  TeamTask,
+} from "../../shared/team.js";
 
 /**
  * Fixtures hold each prompt as its lines, so a wording change shows up as a
@@ -268,6 +288,176 @@ async function recordMessagePrompts() {
   );
   return prompts;
 }
+
+/** Small fixed inputs that reach every branch of the prompt builders. */
+function builderPrompts() {
+  const run = {
+    prompt: "Make the greeting consistent.",
+    contributionSettings: settings,
+    baseSha: "0123456789abcdef0123456789abcdef01234567",
+    reports: {
+      reviewer: "Reviewer: no correctness issues.",
+      tester: "Tester: the greeting check is missing for b.ts.",
+    },
+  };
+  const tasks: TeamTask[] = [
+    {
+      id: "alpha",
+      title: "Update a.ts",
+      description: "Change the greeting in a.ts.",
+      owner: "member-1",
+      files: ["a.ts"],
+      dependsOn: [],
+      status: "complete",
+      report: "alpha: a.ts updated; npm test passed.",
+      checks: [{ command: "npm test", outcome: "exit 0" }],
+      integratedFiles: ["a.ts"],
+    },
+    {
+      id: "beta",
+      title: "Update b.ts",
+      description: "Change the greeting in b.ts and lib/.",
+      owner: "member-2",
+      files: ["b.ts", "lib/"],
+      dependsOn: ["alpha"],
+      status: "running",
+    },
+    {
+      id: "gamma",
+      title: "Update c.ts",
+      description: "Change the greeting in c.ts.",
+      owner: "member-1",
+      files: ["c.ts"],
+      dependsOn: ["beta"],
+      status: "pending",
+    },
+  ];
+  const team: AgentTeam = {
+    config: {
+      maxTeammates: 2,
+      requirePlanApproval: true,
+      provider: "codex",
+      protocol: "bell-shared-tasks",
+      messageDelivery: "between-turns",
+    },
+    phase: "developing",
+    planSummary: "Align the greeting.",
+    tasks,
+    messages: [
+      {
+        id: "message-1",
+        from: "member-1",
+        to: "lead",
+        content: "lib/ also prints the greeting.",
+        createdAt: "2025-01-01T00:00:00.000Z",
+        status: "queued",
+        recipients: ["lead"],
+        deliveredTo: [],
+      },
+      {
+        id: "message-2",
+        from: "user",
+        to: "beta",
+        content: "Keep the old export name.",
+        createdAt: "2025-01-01T00:01:00.000Z",
+        status: "delivered",
+        recipients: ["beta"],
+        deliveredTo: ["beta"],
+      },
+    ],
+  };
+  const revisions: TeamPlanRevision[] = [
+    {
+      feedback: "Split lib/ into its own task.",
+      previousSummary: "One task for everything.",
+      previousTasks: [
+        { id: "all", title: "Everything", files: ["a.ts", "b.ts"], dependsOn: [] },
+      ],
+      createdAt: "2025-01-01T00:02:00.000Z",
+    },
+    {
+      feedback: "Name the check each task runs.",
+      previousSummary: "Two tasks.",
+      previousTasks: [
+        { id: "alpha", title: "Update a.ts", files: ["a.ts"], dependsOn: [] },
+        { id: "beta", title: "Update b.ts", files: ["b.ts"], dependsOn: ["alpha"] },
+      ],
+      createdAt: "2025-01-01T00:03:00.000Z",
+      revisionNotes: "Added the check.",
+    },
+  ];
+  const diffFile = (path: string, patch: string): DiffFile => ({
+    path,
+    language: "typescript",
+    additions: 1,
+    deletions: 1,
+    status: "modified",
+    patch,
+    fingerprint: `fingerprint-${path}`,
+    hunks: [],
+  });
+  const files = [
+    diffFile(
+      "a.ts",
+      '@@ -1 +1 @@\n-export const greeting = "hi";\n+export const greeting = "hello";\n',
+    ),
+    { ...diffFile(".env", ""), blocked: "Sensitive file; excluded from the PR." },
+  ];
+  const diffContext = "<diff context>";
+  const reviewContext = "<review context>";
+  const brief = "<member brief>";
+  return {
+    teamBoundaries,
+    webBoundaries,
+    contributionContext: contributionContext(run),
+    "contributionContext:no-intent": contributionContext({
+      prompt: run.prompt,
+      contributionSettings: undefined,
+    }),
+    observedChecksContext: observedChecksContext(team),
+    independentReviewContext: independentReviewContext(
+      run,
+      files,
+      "Lead: the greeting is aligned.",
+    ),
+    "independentReviewContext:no-lead-report": independentReviewContext(
+      run,
+      files,
+      undefined,
+    ),
+    reviewer: reviewerPrompt(reviewContext),
+    tester: testerPrompt(reviewContext, team),
+    "tester:no-team": testerPrompt(reviewContext, undefined),
+    leadPlan: leadPlanPrompt(teamBoundaries, run, 2, []),
+    "leadPlan:revised": leadPlanPrompt(teamBoundaries, run, 4, revisions),
+    "member:beta": memberPrompt(teamBoundaries, run, team, tasks[1]),
+    "member:gamma": memberPrompt(teamBoundaries, run, team, tasks[2]),
+    "memberTurn:first": memberTurnPrompt(brief, 0, undefined, undefined),
+    "memberTurn:after-failure": memberTurnPrompt(
+      brief,
+      0,
+      "Changed c.ts, which beta does not own.",
+      undefined,
+    ),
+    "memberTurn:continue": memberTurnPrompt(
+      brief,
+      1,
+      undefined,
+      "beta: b.ts updated.",
+    ),
+    integration: integrationPrompt(teamBoundaries, run, team, diffContext),
+    coordination: coordinationPrompt(
+      teamBoundaries,
+      run,
+      diffContext,
+      "Lead: the greeting is aligned.",
+    ),
+  };
+}
+
+test("the prompt builders return exactly the recorded prompts", async () => {
+  assert.deepEqual(builderPrompts(), await fixture("team-prompts.json"));
+});
 
 test("a team run with a revised plan and a retried task sends exactly the recorded prompts", async () => {
   assert.deepEqual(
