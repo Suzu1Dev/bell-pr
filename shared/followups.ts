@@ -22,7 +22,7 @@ export interface FollowUpRound {
   report?: string;
   addressed?: { url: string; change: string }[];
   notAddressed?: { url: string; reason: string }[];
-  /** Commands the agent reported running, with outcomes. */
+  /** Commands BELL saw the agent run, with outcomes; not the agent's own list. */
   checks?: { command: string; outcome: string }[];
   commit?: string;
   publishedAt?: string;

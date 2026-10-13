@@ -58,6 +58,28 @@ test("the follow-up result keeps only selected feedback and never carries a pers
     () => parseFollowUpResult("not json", []),
     (error: AppError) => error.statusCode === 422,
   );
+  // An answer the output schema accepts is kept even when parts are off:
+  // a long command outcome, empty entries, twenty items plus the note, a huge message.
+  const urls = Array.from({ length: 20 }, (_, index) => `${prUrl}#discussion_r${index + 10}`);
+  const tolerant = parseFollowUpResult(
+    JSON.stringify({
+      summary: `  ${"改".repeat(9_000)}  `,
+      addressed: [
+        ...urls.map((url) => ({ url, change: "處理了。" })),
+        { url: "", change: "照補充說明處理。" },
+        { url: urls[0], change: "   " },
+      ],
+      notAddressed: [{ url: urls[1], reason: "x".repeat(2_000) }],
+      checks: [{ command: "npm test", outcome: "通過 ".repeat(100) }],
+      commitMessage: "Fix\n\n" + "y".repeat(4_100),
+    }),
+    urls,
+  );
+  assert.equal(tolerant.summary.length, 8_000);
+  assert.equal(tolerant.addressed.length, 21);
+  assert.equal(tolerant.addressed.at(-1)!.url, "");
+  assert.equal(tolerant.notAddressed[0].reason.length, 1_200);
+  assert.equal(tolerant.commitMessage, "");
   const prompt = followUpPrompt({
     boundaries: "BOUNDARIES",
     contributionContext: "CONTEXT",

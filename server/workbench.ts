@@ -2708,6 +2708,7 @@ export class Workbench {
     const roundNumber = (run.followUps?.indexOf(round) ?? 0) + 1;
     const committedNote =
       "Agent 自行建立了 commit 或切換了分支；已還原到已推送的 PR，修改保留在工作目錄供你審閱。";
+    let succeeded = false;
     try {
       const files = await readDiff(run);
       temporary = await mkdtemp(path.join(os.tmpdir(), "bell-followup-"));
@@ -2773,6 +2774,7 @@ export class Workbench {
         await this.diff(run.id);
         round.status = "review";
         run.status = "review";
+        succeeded = true;
         this.log(
           run,
           "system",
@@ -2784,6 +2786,8 @@ export class Workbench {
         const reason = controller.signal.aborted
           ? "這輪修正已停止"
           : redact(error instanceof Error ? error.message : "這輪修正未完成");
+        // What BELL saw the agent run is evidence even when its answer is lost.
+        if (checks.length) round.checks = checks;
         await this.restoreFollowUpHead(run, round).catch(() => undefined);
         // Edits already made stay for review or discard; a clean checkout is simply published again.
         const dirty = await this.worktreeDirty(run).catch(() => true);
@@ -2803,9 +2807,12 @@ export class Workbench {
     } finally {
       const agent = run.agents.find((value) => value.id === "followup");
       if (agent) {
-        const ready = round.status === "review";
-        agent.status = ready ? "complete" : "failed";
-        agent.detail = ready ? "修正完成，等待審閱" : "修正中斷或沒有修改";
+        agent.status = succeeded ? "complete" : "failed";
+        agent.detail = succeeded
+          ? "修正完成，等待審閱"
+          : round.status === "review"
+            ? "修正中斷，修改保留待審閱"
+            : "修正中斷或沒有修改";
       }
       if (this.controllers.get(run.id) === controller)
         this.controllers.delete(run.id);

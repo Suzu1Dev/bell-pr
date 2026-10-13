@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { followUpFeedbackLimit } from "../shared/followups.js";
 import type { PrFeedbackItem } from "../shared/pr-feedback.js";
 import { personTrailer } from "./drafts.js";
 import { redact } from "./process.js";
@@ -12,13 +13,21 @@ const entry = (field: "change" | "reason") => ({
   additionalProperties: false,
 });
 
-/** What the follow-up agent returns after editing the PR branch checkout. */
+// One entry per selected feedback item, plus one for the person's note.
+const entryLimit = followUpFeedbackLimit + 1;
+const commitMessageLimit = 4_000;
+
+/**
+ * What the follow-up agent returns after editing the PR branch checkout.
+ * Like the other agent schemas, it bounds no string lengths: the CLIs differ
+ * in which length keywords they accept, so lengths are handled while parsing.
+ */
 export const followUpJsonSchema = {
   type: "object",
   properties: {
     summary: { type: "string" },
-    addressed: { type: "array", items: entry("change"), maxItems: 20 },
-    notAddressed: { type: "array", items: entry("reason"), maxItems: 20 },
+    addressed: { type: "array", items: entry("change"), maxItems: entryLimit },
+    notAddressed: { type: "array", items: entry("reason"), maxItems: entryLimit },
     checks: {
       type: "array",
       items: {
@@ -35,44 +44,44 @@ export const followUpJsonSchema = {
   additionalProperties: false,
 };
 
-const text = (max: number) => z.string().trim().min(1).max(max);
-const resultSchema = z
-  .object({
-    summary: text(8_000),
-    addressed: z
-      .array(z.object({ url: z.string().max(1024), change: text(1_200) }).strict())
-      .max(20),
-    notAddressed: z
-      .array(z.object({ url: z.string().max(1024), reason: text(1_200) }).strict())
-      .max(20),
-    checks: z
-      .array(
-        z
-          .object({ command: z.string().max(300), outcome: z.string().max(200) })
-          .strict(),
-      )
-      .max(40),
-    commitMessage: z.string().max(4_000),
-  })
-  .strict();
+const clipped = (max: number) =>
+  z
+    .string()
+    .trim()
+    .transform((value) => value.slice(0, max));
+const resultSchema = z.object({
+  summary: clipped(8_000),
+  addressed: z.array(z.object({ url: z.string(), change: clipped(1_200) })),
+  notAddressed: z.array(z.object({ url: z.string(), reason: clipped(1_200) })),
+  // The agent's own list is not kept: the round stores the commands BELL saw run.
+  checks: z.unknown(),
+  commitMessage: z.string(),
+});
 
-export type FollowUpResult = z.infer<typeof resultSchema>;
+export type FollowUpResult = {
+  summary: string;
+  addressed: { url: string; change: string }[];
+  notAddressed: { url: string; reason: string }[];
+  commitMessage: string;
+};
 
 /**
- * Validates the agent's answer. The code is already edited by then, so small
- * slips are corrected instead of failing the round: entries about feedback
- * that was not selected are dropped ("" stands for the person's note), and
- * person trailers such as Signed-off-by are removed from the commit message.
+ * Validates the agent's answer. The code is already edited by then, so slips
+ * are corrected instead of failing the round: overlong text is cut, empty
+ * entries and entries about feedback that was not selected are dropped (""
+ * stands for the person's note), and person trailers such as Signed-off-by
+ * are removed from the commit message. A message that is still too long is
+ * left empty rather than cut, so the person writes it.
  */
 export function parseFollowUpResult(
   answer: string,
   selectedUrls: string[],
 ): FollowUpResult {
-  let result: FollowUpResult;
+  let result: z.infer<typeof resultSchema>;
   try {
     result = resultSchema.parse(JSON.parse(jsonText(answer)));
   } catch {
-    throw new AppError("修正結果格式不完整；工作目錄的修改仍保留，可審閱後決定推送或放棄。", 422);
+    throw new AppError("Agent 回傳的修正結果格式不完整", 422);
   }
   const known = (url: string) => url === "" || selectedUrls.includes(url);
   const commitMessage = result.commitMessage
@@ -81,11 +90,15 @@ export function parseFollowUpResult(
     .join("\n")
     .trim();
   return {
-    ...result,
-    addressed: result.addressed.filter((item) => known(item.url)),
-    notAddressed: result.notAddressed.filter((item) => known(item.url)),
-    // Empty when every line was a trailer: the person then writes the message.
-    commitMessage,
+    summary: result.summary,
+    addressed: result.addressed
+      .filter((item) => item.change && known(item.url))
+      .slice(0, entryLimit),
+    notAddressed: result.notAddressed
+      .filter((item) => item.reason && known(item.url))
+      .slice(0, entryLimit),
+    // Empty when every line was a trailer or it is too long: the person then writes it.
+    commitMessage: commitMessage.length > commitMessageLimit ? "" : commitMessage,
   };
 }
 
