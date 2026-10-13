@@ -1358,8 +1358,8 @@ button {
 }
 .log-filter-chip.is-on {
   color: var(--color-text-inverse);
-  background: var(--color-accent-500);
-  border-color: var(--color-accent-500);
+  background: var(--color-accent-600);
+  border-color: var(--color-accent-600);
 }
 .log-command {
   font-family: var(--font-mono);
