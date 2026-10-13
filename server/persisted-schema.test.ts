@@ -275,6 +275,19 @@ test("recursive and shared sub-schemas are rebuilt once and stay lenient", () =>
   });
 });
 
+test("a lazy schema is rebuilt once, not on every parse", () => {
+  let built = 0;
+  const item: z.ZodType<{ name: string }> = z.lazy(() => {
+    built += 1;
+    return z.object({ name: z.string().max(2) }).strict();
+  });
+  const lenient = lenientRead(z.array(item));
+  const items = Array.from({ length: 5 }, () => ({ name: "abc", extra: 1 }));
+  for (let parse = 0; parse < 3; parse += 1)
+    assert.deepEqual(lenient.parse(items), items.map(() => ({ name: "abc" })));
+  assert.equal(built, 1);
+});
+
 test("the original schema is left unchanged", () => {
   const schema = z.object({ text: z.string().max(2) }).strict();
   lenientRead(schema);

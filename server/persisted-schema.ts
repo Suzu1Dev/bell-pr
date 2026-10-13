@@ -137,7 +137,13 @@ export function lenientRead<T extends z.ZodTypeAny>(
       });
     if (node instanceof z.ZodLazy) {
       const getter = node._def.getter;
-      return new z.ZodLazy({ ...node._def, getter: () => lenient(getter()) });
+      // zod calls the getter on every parse, and an inline getter returns a
+      // new schema each time; rebuild it once instead of on every call.
+      let resolved: z.ZodTypeAny | undefined;
+      return new z.ZodLazy({
+        ...node._def,
+        getter: () => (resolved ??= lenient(getter())),
+      });
     }
     if (node instanceof z.ZodPipeline)
       return new z.ZodPipeline({
