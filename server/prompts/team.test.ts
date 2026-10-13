@@ -109,6 +109,27 @@ async function teamRun(
   runner: (input: TeamAgentInput, workbench: Workbench) => Promise<string>,
   scenario: (workbench: Workbench, repoId: string) => Promise<void>,
 ) {
+  // The diffs in the prompts must not depend on the developer's own Git
+  // settings, such as core.abbrev in the patch index lines.
+  const gitConfig = {
+    GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL,
+    GIT_CONFIG_NOSYSTEM: process.env.GIT_CONFIG_NOSYSTEM,
+  };
+  process.env.GIT_CONFIG_GLOBAL = os.devNull;
+  process.env.GIT_CONFIG_NOSYSTEM = "1";
+  try {
+    await runIsolatedTeam(runner, scenario);
+  } finally {
+    for (const [key, value] of Object.entries(gitConfig))
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+  }
+}
+
+async function runIsolatedTeam(
+  runner: (input: TeamAgentInput, workbench: Workbench) => Promise<string>,
+  scenario: (workbench: Workbench, repoId: string) => Promise<void>,
+) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-prompts-test-"));
   const repository = path.join(directory, "repo");
   await mkdir(repository);
