@@ -48,9 +48,24 @@ export class Store {
             agent.detail = "服務重新啟動，重新審查已中斷；原有報告保留";
           }
       }
+      // An interrupted conflict resolution keeps its edits for review.
+      if (run.sync?.resolving && run.status === "running") {
+        run.sync.resolving = false;
+        run.sync.report =
+          "服務重新啟動，解衝突已中斷；已改的檔案保留，可以自行完成，或再請 Agent 處理。";
+        run.status = "review";
+        for (const agent of run.agents)
+          if (agent.status === "running") agent.status = "failed";
+        continue;
+      }
       // An interrupted follow-up round leaves the published PR intact: its
       // edits stay in the checkout for review, push or discard.
       const round = activeFollowUp(run.followUps);
+      if (round?.resolving) {
+        round.resolving = false;
+        round.report =
+          "服務重新啟動，解衝突已中斷；已改的檔案保留，可以自行完成，或再請 Agent 處理。";
+      }
       if (round && (run.status === "running" || run.publishing)) {
         if (round.status === "running") {
           round.status = "review";

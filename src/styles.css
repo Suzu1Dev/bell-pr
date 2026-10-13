@@ -3524,3 +3524,75 @@ button {
     margin-left: 0;
   }
 }
+
+/* Where the contribution stands against its target branch, and its conflicts. */
+.sync-panel {
+  margin: 0 28px 20px;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fcfdf9;
+}
+.sync-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.sync-panel h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 550;
+}
+.sync-panel p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #6f8360;
+  overflow-wrap: anywhere;
+}
+.sync-panel-meta {
+  color: #99a48c;
+}
+.sync-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.sync-conflicts {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #eee7d1;
+  border-radius: 8px;
+  background: #fffcf3;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.sync-conflicts strong {
+  font-weight: 550;
+  color: #8a7850;
+}
+.sync-conflicts ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.sync-conflicts .sync-report {
+  white-space: pre-wrap;
+  color: #5d7350;
+}
+.sync-conflicts .button {
+  margin-top: 10px;
+}
+@media (max-width: 760px) {
+  .sync-panel {
+    margin: 0 16px 16px;
+  }
+  .sync-panel-head {
+    flex-direction: column;
+  }
+  .sync-panel-actions {
+    justify-content: flex-start;
+  }
+}

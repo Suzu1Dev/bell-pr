@@ -1669,3 +1669,30 @@
     transition: none;
   }
 }
+
+/* Updating BELL's clone sits next to the analysis button. */
+.mission-overview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  max-width: 420px;
+}
+.mission-update-help {
+  flex-basis: 100%;
+  margin: 0;
+  text-align: right;
+  color: var(--mission-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+@media (max-width: 760px) {
+  .mission-overview-actions {
+    justify-content: flex-start;
+    max-width: none;
+  }
+  .mission-update-help {
+    text-align: left;
+  }
+}

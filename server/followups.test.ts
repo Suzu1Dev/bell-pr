@@ -416,14 +416,17 @@ test("a follow-up push never overwrites other commits on the PR branch and stops
     await f.workbench.publish(f.run.id, f.run.approvedFingerprint!);
     assert.equal(round.status, "published");
     assert.equal(f.run.publishCommit, round.commit);
-    // A new round is refused up front while GitHub has commits BELL did not push.
+    // GitHub has commits BELL did not push: BELL must take them over before a
+    // new round, which this stand-in remote cannot serve (server/sync.test.ts
+    // covers taking them over against a real repository). No round starts.
     await f.setPrState("OPEN");
     await f.setRemoteHead("c".repeat(40));
+    const rounds = f.run.followUps!.length;
     await assert.rejects(
       f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackItem.url] }),
-      /BELL 以外的提交/,
     );
     assert.equal(f.run.status, "published");
+    assert.equal(f.run.followUps!.length, rounds);
   } finally {
     await f.cleanup();
   }
@@ -600,11 +603,13 @@ test("a push interrupted after the commit is recorded can be retried, and a comm
     await f.workbench.publish(f.run.id, f.run.approvedFingerprint!);
     assert.equal(second.status, "published");
     assert.equal(f.run.publishCommit, second.commit);
-    // GitHub now has a commit BELL did not push, so the next round is refused up front.
+    // GitHub now has a commit BELL did not push and cannot fetch here: no round starts.
+    const rounds = f.run.followUps!.length;
     await assert.rejects(
       f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackItem.url] }),
-      /BELL 以外的提交/,
     );
+    assert.equal(f.run.status, "published");
+    assert.equal(f.run.followUps!.length, rounds);
   } finally {
     await f.cleanup();
   }

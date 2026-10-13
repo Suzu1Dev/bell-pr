@@ -72,6 +72,7 @@ import {
   followUpNoteLimit,
 } from "../shared/followups";
 import { FollowUpRounds } from "./draft/FollowUpRounds";
+import { SyncPanel } from "./draft/SyncPanel";
 
 /** The draft checks bring a Markdown parser, so they load beside the first screen. */
 type DraftChecks = typeof import("../shared/draft-checks");
@@ -268,6 +269,7 @@ export default function App() {
   const [page, setPage] = useState<Page>("workspace");
   const [tab, setTab] = useState<Tab>("overview");
   const [repos, setRepos] = useState<Repo[]>([]);
+  const [updatingRepo, setUpdatingRepo] = useState(false);
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [run, setRun] = useState<Run>(loadDemo);
   const [files, setFiles] = useState<DiffFile[]>(demoFiles);
@@ -685,7 +687,11 @@ export default function App() {
             setFiles(changed);
             setSelectedPath(changed[0]?.path || "");
             if (updated.status === "review")
-              setTab(activeFollowUp(updated.followUps) ? "draft" : "overview");
+              setTab(
+                activeFollowUp(updated.followUps) || updated.sync
+                  ? "draft"
+                  : "overview",
+              );
           }
         }
         if (!cancelled && epoch === draftMutationEpoch.current) {
@@ -1623,6 +1629,101 @@ export default function App() {
       setFeedbackLoading(false);
     }
   }
+  async function updateRepo(target: Repo) {
+    setUpdatingRepo(true);
+    try {
+      const result = await api<{
+        repo: Repo;
+        from: string;
+        to: string;
+        updated: boolean;
+      }>(`/repos/${target.id}/update`, send("POST"));
+      setRepos((previous) =>
+        previous.map((repo) => (repo.id === result.repo.id ? result.repo : repo)),
+      );
+      await intelligence.reload();
+      notify(
+        result.updated
+          ? `已更新到最新版本（${result.to.slice(0, 7)}）。專案分析若標示過期，請重新分析；新的貢獻會從最新版本開始。`
+          : "已是最新版本。",
+      );
+    } catch (error) {
+      notify((error as Error).message, "error");
+    } finally {
+      setUpdatingRepo(false);
+    }
+  }
+  /** Re-reads the diff after a sync, an undo or a discard moved the checkout. */
+  async function refreshFiles(id: string) {
+    const result = await api<{ files: DiffFile[] }>(`/runs/${id}/diff`);
+    if (runIdRef.current === id) setFiles(result.files);
+  }
+  async function syncToLatest() {
+    setBusy(true);
+    try {
+      const result = await api<{ run: Run; updated: boolean; conflicts: string[] }>(
+        `/runs/${run.id}/sync`,
+        send("POST"),
+      );
+      if (runIdRef.current !== result.run.id) return;
+      setRun(result.run);
+      await refreshFiles(result.run.id);
+      notify(
+        !result.updated
+          ? `已是 ${run.baseBranch} 的最新版本，不需要同步。`
+          : result.conflicts.length
+            ? `已同步，但 ${result.conflicts.length} 個檔案有衝突；解決後才能核准。`
+            : result.run.prUrl
+              ? "已把最新目標分支合併進 PR，審閱後推送一個合併 commit。"
+              : "已同步到最新目標分支；改到的檔案請重新審閱。",
+        result.conflicts.length ? "error" : "success",
+      );
+    } catch (error) {
+      notify((error as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function resolveSyncConflicts() {
+    setBusy(true);
+    try {
+      const { run: updated } = await api<{ run: Run }>(
+        `/runs/${run.id}/sync/resolve`,
+        send("POST"),
+      );
+      if (runIdRef.current !== updated.id) return;
+      setRun(updated);
+      setTab("activity");
+      notify("Agent 正在解決衝突，完成後請逐檔審閱。");
+    } catch (error) {
+      notify((error as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function undoSync() {
+    if (
+      !window.confirm(
+        "復原同步？工作會回到同步前的內容與基準，同步後在工作目錄做的修改會被移除。",
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const { run: updated } = await api<{ run: Run }>(
+        `/runs/${run.id}/sync/undo`,
+        send("POST"),
+      );
+      if (runIdRef.current !== updated.id) return;
+      setRun(updated);
+      await refreshFiles(updated.id);
+      notify("已復原同步。");
+    } catch (error) {
+      notify((error as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
   async function startFollowUp() {
     setBusy(true);
     try {
@@ -2184,6 +2285,12 @@ export default function App() {
                     onRecommendMore={intelligence.recommendMore}
                     onChooseRecommendation={chooseRecommendation}
                     onReadCode={() => setTab("changes")}
+                    onUpdateRepo={
+                      !demo && currentRepo?.updatable
+                        ? () => void updateRepo(currentRepo)
+                        : undefined
+                    }
+                    updatingRepo={updatingRepo}
                   />
                 )}
                 {tab === "changes" && (
@@ -2692,6 +2799,15 @@ export default function App() {
                 )}
                 {tab === "draft" && (
                   <div className="draft-workspace">
+                    {!demo && (
+                      <SyncPanel
+                        run={run}
+                        busy={busy}
+                        onSync={() => void syncToLatest()}
+                        onResolve={() => void resolveSyncConflicts()}
+                        onUndo={() => void undoSync()}
+                      />
+                    )}
                     {!!run.followUps?.length && (
                       <FollowUpRounds
                         rounds={run.followUps}
@@ -2745,8 +2861,9 @@ export default function App() {
                           <div className="draft-origin-notice" role="status">
                             <AlertCircle size={16} />
                             <p>
-                              這輪修正只會在 PR 分支加上一個新的
-                              commit，PR 標題與說明維持原樣。請先在「程式碼變更」審閱這輪改到的檔案，再確認下方的提交訊息。
+                              {followUp.kind === "sync"
+                                ? "這次同步會在 PR 分支加上一個合併 commit，PR 標題與說明維持原樣。請先在「程式碼變更」審閱目標分支改到的檔案，再確認下方的提交訊息。"
+                                : "這輪修正只會在 PR 分支加上一個新的 commit，PR 標題與說明維持原樣。請先在「程式碼變更」審閱這輪改到的檔案，再確認下方的提交訊息。"}
                             </p>
                           </div>
                         )}
@@ -3441,6 +3558,12 @@ export default function App() {
               onChooseRecommendation={chooseRecommendation}
               onReadCode={() => setTab("changes")}
               onStartContribution={() => beginContribution(exploreRepo.id)}
+              onUpdateRepo={
+                exploreRepo.updatable
+                  ? () => void updateRepo(exploreRepo)
+                  : undefined
+              }
+              updatingRepo={updatingRepo}
             />
           </section>
         ) : page === "discovery" ? (
@@ -4129,14 +4252,18 @@ export default function App() {
           title={
             demo
               ? "你的示範貢獻，準備好了。"
-              : followUp
-                ? "把這輪修正推到 PR。"
-                : "將這次貢獻送上 GitHub。"
+              : followUp?.kind === "sync"
+                ? "把同步結果推到 PR。"
+                : followUp
+                  ? "把這輪修正推到 PR。"
+                  : "將這次貢獻送上 GitHub。"
           }
           subtitle={
             demo
               ? "你已完成所有檔案的審查。以下是 PR 的送出預覽。"
-              : followUp
+              : followUp?.kind === "sync"
+                ? "這會在 PR 分支加上一個合併 commit，把目標分支的最新版本帶進 PR；PR 標題與說明不變，也不會 force push。"
+                : followUp
                 ? "這會在 PR 分支加上一個新的 commit，PR 標題與說明不變，也不會覆蓋 GitHub 上的其他提交。"
                 : "這會推送審查過的分支，並在目標 repository 建立 Draft PR。"
           }

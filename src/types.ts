@@ -13,6 +13,7 @@ import type { FileConversation } from "../shared/chat";
 import type { PrFeedback } from "../shared/pr-feedback";
 import type { RunDetailField } from "../shared/runs";
 import type { FollowUpRound } from "../shared/followups";
+import type { BaseSync } from "../shared/sync";
 
 export type { ChatMessage } from "../shared/chat";
 export interface Repo {
@@ -24,6 +25,10 @@ export interface Repo {
   defaultBranch: string;
   url: string;
   language?: string;
+  /** When the person last updated BELL's clone to the latest default branch. */
+  updatedAt?: string;
+  /** Whether BELL owns the clone and may update it; computed by the API, not stored. */
+  updatable?: boolean;
 }
 
 export interface Agent {
@@ -66,6 +71,10 @@ export interface Run {
     | "cancelled";
   branch: string;
   baseBranch: string;
+  /** The target-branch commit the contribution is measured against; absent on the demo run. */
+  baseSha?: string;
+  /** True while BELL pushes to GitHub. */
+  publishing?: boolean;
   /** Local checkout the learner may edit by hand; absent on the demo run. */
   worktreePath?: string;
   createdAt: string;
@@ -95,6 +104,8 @@ export interface Run {
   headRepository?: string;
   /** Rounds of changes after maintainer review, oldest first; absent until the first one. */
   followUps?: FollowUpRound[];
+  /** The last move of an unpublished run onto a newer target-branch commit. */
+  sync?: BaseSync;
   /** Maintainer feedback read from the PR on request; absent until the learner fetches it. */
   prFeedback?: PrFeedback;
   error?: string;

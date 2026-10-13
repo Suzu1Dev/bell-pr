@@ -13,6 +13,7 @@ import type { FileConversation } from "../shared/chat.js";
 import type { PrFeedback } from "../shared/pr-feedback.js";
 import type { RunDetailField } from "../shared/runs.js";
 import type { FollowUpRound } from "../shared/followups.js";
+import type { BaseSync } from "../shared/sync.js";
 
 export type RunStatus =
   | "queued"
@@ -33,6 +34,8 @@ export interface Repository {
   defaultBranch: string;
   url: string;
   language?: string;
+  /** When the person last updated BELL's clone to the latest default branch. */
+  updatedAt?: string;
 }
 
 export interface Agent {
@@ -101,6 +104,8 @@ export interface Run {
   publishedBranch?: string;
   /** Rounds of changes after maintainer review, oldest first; absent until the first one. */
   followUps?: FollowUpRound[];
+  /** The last move of an unpublished run onto a newer target-branch commit. */
+  sync?: BaseSync;
   headRepository?: string;
   contributionSettings?: ContributionSettings;
   team?: AgentTeam;
