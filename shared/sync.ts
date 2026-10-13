@@ -12,6 +12,8 @@ export interface BaseSync {
   snapshot: string;
   /** Files the merge could not combine; they hold conflict markers until resolved. */
   conflicts: string[];
+  /** The conflicts still holding markers when the diff was last read. */
+  unresolved?: string[];
   /** Review marks before the sync, restored on undo where the file is unchanged. */
   reviewedFingerprints?: Record<string, string>;
   /** How the agent resolved the conflicts, in Traditional Chinese. */

@@ -2802,7 +2802,7 @@ export default function App() {
                     {!demo && (
                       <SyncPanel
                         run={run}
-                        busy={busy || active}
+                        busy={busy}
                         onSync={() => void syncToLatest()}
                         onResolve={() => void resolveSyncConflicts()}
                         onUndo={() => void undoSync()}

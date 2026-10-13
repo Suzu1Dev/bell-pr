@@ -70,3 +70,24 @@ test("a published PR syncs only when no round is open, and has no undo", () => {
   assert.ok(disabled(busyRound, "同步到最新目標分支"));
   assert.match(busyRound, /有一輪修正在進行/);
 });
+
+test("resolved conflicts drop the agent action, and a run awaiting plan approval can sync", () => {
+  const sync = {
+    at: "2026-10-13T01:00:00Z",
+    from: "b".repeat(40),
+    to: "a".repeat(40),
+    snapshot: "c".repeat(40),
+    conflicts: ["src/a.ts", "src/b.ts"],
+  };
+  const partly = render({ ...base, sync: { ...sync, unresolved: ["src/b.ts"] } });
+  assert.match(partly, /src\/a\.ts<\/code> · 已解決/);
+  assert.doesNotMatch(partly, /src\/b\.ts<\/code> · 已解決/);
+  assert.match(partly, /<code>this contribution<\/code>/);
+  assert.ok(!disabled(partly, "請 Agent 解決衝突"));
+  const done = render({ ...base, sync: { ...sync, unresolved: [] } });
+  assert.match(done, /衝突標記都已移除/);
+  assert.doesNotMatch(done, /請 Agent 解決衝突/);
+  const planning = render({ ...base, status: "awaiting_plan", sync });
+  assert.ok(!disabled(planning, "同步到最新目標分支"));
+  assert.ok(disabled(planning, "請 Agent 解決衝突"));
+});

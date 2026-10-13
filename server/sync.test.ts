@@ -11,6 +11,7 @@ import { git } from "./process.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
 import { readDiff } from "./git.js";
+import { labelConflictMarkers } from "./sync.js";
 import { AppError, type Run } from "./types.js";
 import type { TeamAgentRunner } from "./team.js";
 
@@ -230,7 +231,13 @@ test("sync conflicts are labelled, block approval until resolved, and the sync c
     await assert.rejects(f.workbench.undoSync(f.run.id), /沒有可以復原/);
     // Sync again and resolve by hand: approval then goes through.
     await f.workbench.syncRun(f.run.id);
+    assert.deepEqual(f.run.sync!.unresolved, ["hello.ts"]);
+    // A further sync waits until these conflicts are resolved.
+    await f.github.upstreamCommit({ "other.ts": "other, later\n" });
+    await assert.rejects(f.workbench.syncRun(f.run.id), /衝突標記：hello\.ts/);
     await f.write("hello.ts", "line one\nline two, theirs and mine\nline three\n");
+    await f.workbench.diff(f.run.id);
+    assert.deepEqual(f.run.sync!.unresolved, []);
     await f.reviewAll();
     await f.workbench.approve(f.run.id, { ...f.run.draft });
     assert.equal(f.run.status, "approved");
@@ -251,6 +258,63 @@ test("a run still waiting for plan approval moves to the latest base with nothin
     assert.equal(await f.read("other.ts"), "other, upstream\n");
   } finally {
     await f.cleanup();
+  }
+});
+
+test("a sync whose conflicts cannot be marked, or after a publish that stopped halfway, is refused and changes nothing", async () => {
+  const f = await unpublishedRun();
+  try {
+    // The contribution deletes a file the target branch changed.
+    await rm(path.join(f.run.worktreePath, "other.ts"));
+    await f.write("hello.ts", "line one\nline two, mine\nline three\n");
+    const oldBase = f.run.baseSha;
+    await f.github.upstreamCommit({ "other.ts": "other, upstream\n" });
+    await assert.rejects(
+      f.workbench.syncRun(f.run.id),
+      (error: AppError) =>
+        error.statusCode === 409 && /無法用衝突標記表示/.test(error.message) && /other\.ts/.test(error.message),
+    );
+    assert.equal(f.run.baseSha, oldBase);
+    assert.equal(f.run.sync, undefined);
+    assert.equal((await git(f.run.worktreePath, ["rev-parse", "HEAD"])).stdout.trim(), oldBase);
+    await assert.rejects(readFile(path.join(f.run.worktreePath, "other.ts")));
+    assert.equal(
+      (await git(f.run.worktreePath, ["rev-parse", "--verify", "-q", "refs/bellpr/sync/sync-run"], { allowedCodes: [0, 1] })).stdout,
+      "",
+    );
+    // A commit left by a publish that failed after making it may be on GitHub already.
+    f.run.publishCommit = oldBase;
+    await assert.rejects(f.workbench.syncRun(f.run.id), /先前的發佈已建立提交/);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("conflict labels keep the bytes of non-UTF-8 files and CRLF line ends", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-sync-label-"));
+  try {
+    const ours = "a".repeat(40);
+    const theirs = "b".repeat(40);
+    const big5 = Buffer.from([0xa4, 0xa4, 0xa4, 0xe5]);
+    const file = (top: string, bottom: string) =>
+      Buffer.concat([
+        Buffer.from(`title `),
+        big5,
+        Buffer.from(`\r\n<<<<<<< ${top}\r\n`),
+        big5,
+        Buffer.from(`\r\n=======\r\nx\r\n>>>>>>> ${bottom}\r\n`),
+      ]);
+    await writeFile(path.join(directory, "zh.txt"), file(ours, theirs));
+    await labelConflictMarkers(directory, ["zh.txt"], {
+      [ours]: "latest main (aaaaaaa)",
+      [theirs]: "this contribution",
+    });
+    assert.deepEqual(
+      await readFile(path.join(directory, "zh.txt")),
+      file("latest main (aaaaaaa)", "this contribution"),
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
   }
 });
 
@@ -423,6 +487,55 @@ test("a conflicting PR sync can be discarded, or resolved by the agent and pushe
   }
 });
 
+test("a PR sync takes in files the target branch added, also after the agent commits while resolving", async () => {
+  const f = await publishedRun(async (input) => {
+    await writeFile(path.join(input.cwd, "hello.ts"), "line one\nline two, theirs and mine\nline three\n");
+    await git(input.cwd, ["commit", "-qam", "agent commit"]);
+    return JSON.stringify({ summary: "合併兩邊。", files: [{ path: "hello.ts", resolution: "合併成一行。" }] });
+  });
+  try {
+    const prHead = f.run.publishCommit!;
+    const upstream = await f.github.upstreamCommit({
+      "hello.ts": "line one\nline two, theirs\nline three\n",
+      "brand-new.ts": "new upstream\n",
+    });
+    await f.workbench.syncRun(f.run.id);
+    const round = f.run.followUps!.at(-1)!;
+    assert.deepEqual(round.unresolved, ["hello.ts"]);
+    // Upstream's new file is part of the base, not something the PR deletes.
+    assert.deepEqual(
+      (await readDiff(f.run)).map((file) => `${file.path}:${file.status}`),
+      ["hello.ts:modified"],
+    );
+    await f.workbench.resolveConflicts(f.run.id);
+    await until(() => f.run.status === "review");
+    assert.equal((await git(f.run.worktreePath, ["rev-parse", "HEAD"])).stdout.trim(), prHead);
+    assert.deepEqual(round.unresolved, []);
+    assert.deepEqual(
+      (await readDiff(f.run)).map((file) => `${file.path}:${file.status}`),
+      ["hello.ts:modified"],
+    );
+    await f.reviewAll();
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    await f.workbench.publish(f.run.id, f.run.approvedFingerprint!);
+    const merge = await f.github.head("fix/sync0001");
+    assert.deepEqual(await parentsOf(f.repo.path, merge), [prHead, upstream]);
+    assert.equal((await git(f.repo.path, ["show", `${merge}:brand-new.ts`])).stdout, "new upstream\n");
+    assert.equal((await git(f.run.worktreePath, ["status", "--porcelain", "--untracked-files=all"])).stdout, "");
+
+    // The target deleting a file this PR changed cannot be marked: nothing moves.
+    const pushed = f.run.publishCommit!;
+    await f.github.upstreamCommit({ "hello.ts": null });
+    await assert.rejects(f.workbench.syncRun(f.run.id), /無法用衝突標記表示.*hello\.ts/);
+    assert.equal(f.run.status, "published");
+    assert.equal(f.run.followUps!.at(-1), round);
+    assert.equal((await git(f.run.worktreePath, ["rev-parse", "HEAD"])).stdout.trim(), pushed);
+    assert.equal((await git(f.run.worktreePath, ["status", "--porcelain", "--untracked-files=all"])).stdout, "");
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test("commits pushed to the PR branch on GitHub are taken over before a round; rewritten history is refused", async () => {
   const f = await publishedRun(async (input) => {
     await writeFile(path.join(input.cwd, "hello.ts"), "line one\nline two, reviewed\nline three\n");
@@ -454,7 +567,13 @@ test("commits pushed to the PR branch on GitHub are taken over before a round; r
     assert.equal(adopted.commit, theirs);
     assert.equal(adopted.parentCommit, bellPush);
     await until(() => f.run.status === "review");
-    const round = f.run.followUps![1];
+    assert.equal(f.run.followUps![1].parentCommit, theirs);
+    // Discarding the round leaves the taken-over file still to be reviewed.
+    await f.workbench.discardFollowUp(f.run.id);
+    assert.deepEqual(f.run.reviewedFiles, ["hello.ts"]);
+    await f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackUrl] });
+    await until(() => f.run.status === "review");
+    const round = f.run.followUps![2];
     assert.equal(round.parentCommit, theirs);
     // The adopted change is reviewed together with the round's own.
     assert.deepEqual((await readDiff(f.run)).map((file) => file.path), ["hello.ts", "notes.md"]);

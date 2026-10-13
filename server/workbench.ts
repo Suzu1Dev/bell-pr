@@ -93,6 +93,7 @@ import {
   checkoutTreeOnto,
   conflictJsonSchema,
   conflictPrompt,
+  conflictsWithoutMarkers,
   filesWithConflictMarkers,
   labelConflictMarkers,
   mergeCommits,
@@ -115,9 +116,15 @@ import {
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
+/** A first publish that stopped after making its commit, which may already be on GitHub. */
+const partlyPublished =
+  "先前的發佈已建立提交，可能已推送到 GitHub，因此不能再同步或復原同步；請從最新版本建立新工作。";
+const unmarkedConflicts = (files: string[]) =>
+  `這些檔案的衝突無法用衝突標記表示（一邊刪除、另一邊修改，或兩邊都改了二進位檔），BELL 不會替你選邊：${files.join("、")}。`;
 /** What a sync records about its conflicts, on a run or on a PR's sync round. */
 type ConflictHolder = {
   conflicts: string[];
+  unresolved?: string[];
   report?: string;
   resolutions?: { path: string; resolution: string }[];
   resolving?: boolean;
@@ -367,12 +374,15 @@ export class Workbench {
           "這個工作還有 Agent、審查或解說在進行；請等它完成再同步。",
           409,
         );
+      if (run.publishCommit) throw new AppError(partlyPublished, 409);
       const repo = this.repo(run.repoId);
       const head = (
         await git(run.worktreePath, ["rev-parse", "HEAD"])
       ).stdout.trim();
       if (head !== run.baseSha)
         throw new AppError("工作分支的提交和記錄的基準不一致，已停止同步。", 409);
+      // The last sync's conflicts are tracked only until the next one.
+      await this.assertConflictsResolved(run);
       const target = await this.lock(`repository:${repo.id}`, () =>
         this.fetchBranchCommit(repo, run.baseBranch),
       );
@@ -385,18 +395,28 @@ export class Workbench {
         run.worktreePath,
         path.join(this.store.directory, `sync-index-${run.id}`),
       );
-      // Keeps the snapshot reachable for undo, outside every branch.
-      await git(run.worktreePath, [
-        "update-ref",
-        `refs/bellpr/sync/${run.id}`,
-        snapshot,
-      ]);
       const merged = await mergeCommits(
         run.worktreePath,
         target,
         snapshot,
         run.baseSha,
       );
+      const unmarked = await conflictsWithoutMarkers(
+        run.worktreePath,
+        merged.tree,
+        merged.conflicts,
+      );
+      if (unmarked.length)
+        throw new AppError(
+          `${unmarkedConflicts(unmarked)}工作沒有變動；可以先把這次對它們的修改或刪除還原，同步後再重做。`,
+          409,
+        );
+      // Keeps the snapshot reachable for undo, outside every branch.
+      await git(run.worktreePath, [
+        "update-ref",
+        `refs/bellpr/sync/${run.id}`,
+        snapshot,
+      ]);
       await git(run.worktreePath, [
         "update-ref",
         `refs/heads/${run.branch}`,
@@ -480,7 +500,20 @@ export class Workbench {
       return { run, updated: false, conflicts: [] as string[] };
     }
     const merged = await mergeCommits(run.worktreePath, run.publishCommit, target);
-    await checkoutTreeOnto(run.worktreePath, merged.tree, run.publishCommit);
+    const unmarked = await conflictsWithoutMarkers(
+      run.worktreePath,
+      merged.tree,
+      merged.conflicts,
+    );
+    if (unmarked.length)
+      throw new AppError(
+        `${unmarkedConflicts(unmarked)}PR 沒有變動；請在本機用 git 把 ${run.baseBranch} 合併進 PR 分支並推送，BELL 之後會接續這些提交。`,
+        409,
+      );
+    // HEAD stays at the PR head, the parent of the merge commit. The index
+    // holds the target branch, the new base the diff is read from, so files
+    // the target added are not taken for files this PR deletes.
+    await checkoutTreeOnto(run.worktreePath, merged.tree, target);
     await labelConflictMarkers(run.worktreePath, merged.conflicts, {
       [run.publishCommit]: "this pull request",
       [target]: `latest ${run.baseBranch} (${target.slice(0, 7)})`,
@@ -615,10 +648,13 @@ export class Workbench {
           "這個工作還有 Agent、審查或解說在進行；請等它完成再復原。",
           409,
         );
+      if (run.publishCommit) throw new AppError(partlyPublished, 409);
       await git(run.worktreePath, ["rev-parse", "--verify", `${sync.snapshot}^{commit}`]);
       const head = (
         await git(run.worktreePath, ["rev-parse", "HEAD"])
       ).stdout.trim();
+      if (head !== run.baseSha)
+        throw new AppError("工作分支的提交和記錄的基準不一致，已停止復原。", 409);
       await git(run.worktreePath, [
         "update-ref",
         `refs/heads/${run.branch}`,
@@ -732,7 +768,7 @@ export class Workbench {
       );
       const result = parseConflictResult(answer, files);
       await this.lock(run.id, async () => {
-        const moved = await this.restoreAgentHead(run, head);
+        const moved = await this.restoreSyncHead(run, head);
         const open = await filesWithConflictMarkers(run.worktreePath, holder.conflicts);
         resolved = !open.length;
         holder.report = [
@@ -755,7 +791,7 @@ export class Workbench {
       });
     } catch (error) {
       await this.lock(run.id, async () => {
-        await this.restoreAgentHead(run, head).catch(() => undefined);
+        await this.restoreSyncHead(run, head).catch(() => undefined);
         holder.report = controller.signal.aborted
             ? "已停止解衝突；已改的檔案保留，可以自行完成，或再請 Agent 處理。"
             : `${redact(error instanceof Error ? error.message : "解衝突未完成")}；已改的檔案保留，可以自行完成，或再請 Agent 處理。`;
@@ -775,6 +811,16 @@ export class Workbench {
       if (temporary) await rm(temporary, { recursive: true, force: true });
       await this.store.save();
     }
+  }
+
+  /**
+   * Puts HEAD back after a conflict agent moved it. The index returns to the
+   * base the diff is read from, which for a PR's sync round is not HEAD.
+   */
+  private async restoreSyncHead(run: Run, head: string) {
+    const moved = await this.restoreAgentHead(run, head);
+    if (moved) await git(run.worktreePath, ["read-tree", run.baseSha]);
+    return moved;
   }
 
   /**
@@ -800,7 +846,7 @@ export class Workbench {
       : [];
     if (open.length)
       throw new AppError(
-        `這些檔案還有合併衝突標記：${open.join("、")}。請解決衝突（也可以請 Agent 解決）後再核准。`,
+        `這些檔案還有合併衝突標記：${open.join("、")}。請先解決衝突（也可以請 Agent 解決）。`,
         409,
       );
   }
@@ -2155,6 +2201,13 @@ export class Workbench {
     if (run.status !== "published") {
       synchronizeReview(run, files);
     }
+    // Lets the page show which conflicts are left after edits outside BELL.
+    const conflict = this.conflictHolder(run);
+    if (conflict)
+      conflict.holder.unresolved = await filesWithConflictMarkers(
+        run.worktreePath,
+        conflict.holder.conflicts,
+      );
     await this.store.save();
     return files;
   }
@@ -2873,7 +2926,9 @@ export class Workbench {
         ).stdout.trim();
         if (remoteSha !== run.baseSha)
           throw new AppError(
-            "目標分支已有新提交；請先在 PR 草稿頁按「同步到最新目標分支」，審閱後再送出。",
+            run.publishCommit
+              ? `目標分支已有新提交；${partlyPublished}`
+              : "目標分支已有新提交；請先在 PR 草稿頁按「同步到最新目標分支」，審閱後再送出。",
             409,
           );
         const head = (
@@ -3452,10 +3507,29 @@ export class Workbench {
       delete run.approvedFingerprint;
       delete run.error;
       const files = await this.diff(id);
-      // The checkout is the pushed head again, whose files were all reviewed before it was pushed.
+      // The checkout is the pushed head again, whose files were all reviewed
+      // before it was pushed, except files changed by commits taken over from
+      // GitHub since the last reviewed push.
+      const unreviewed = new Set<string>();
+      const pushed = run.followUps!.filter(
+        (entry) => entry !== round && entry.status === "published",
+      );
+      for (const entry of pushed.reverse()) {
+        if (!entry.adopted || !entry.commit) break;
+        const changed = await git(run.worktreePath, [
+          "diff",
+          "--name-only",
+          "-z",
+          "--no-renames",
+          entry.parentCommit,
+          entry.commit,
+        ]);
+        for (const file of changed.stdout.split("\0").filter(Boolean))
+          unreviewed.add(file);
+      }
       run.reviewedFingerprints = Object.fromEntries(
         files
-          .filter((file) => !file.blocked)
+          .filter((file) => !file.blocked && !unreviewed.has(file.path))
           .map((file) => [file.path, file.fingerprint]),
       );
       run.reviewedFiles = Object.keys(run.reviewedFingerprints);

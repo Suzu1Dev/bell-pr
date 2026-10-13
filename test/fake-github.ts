@@ -5,15 +5,15 @@
  * like the real thing; gh answers the few API calls BELL makes for PRs.
  * Nothing leaves the machine.
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { command, git } from "../server/process.js";
 
 export interface FakeGitHub {
   url: string;
   bare: string;
-  /** Commits files on the default branch, as if upstream merged something. */
-  upstreamCommit(files: Record<string, string>, message?: string): Promise<string>;
+  /** Commits files on the default branch, as if upstream merged something; null deletes. */
+  upstreamCommit(files: Record<string, string | null>, message?: string): Promise<string>;
   /** Commits files on a branch of the remote, as if someone pushed to it. */
   pushToBranch(branch: string, files: Record<string, string>, message?: string): Promise<string>;
   head(branch: string): Promise<string>;
@@ -47,8 +47,12 @@ export async function fakeGitHub(
   await git(scratch, ["config", "user.name", "Upstream"]);
   await git(scratch, ["config", "user.email", "upstream@example.invalid"]);
   await git(scratch, ["checkout", "-q", "-b", defaultBranch]);
-  const commitFiles = async (files: Record<string, string>, message: string) => {
+  const commitFiles = async (files: Record<string, string | null>, message: string) => {
     for (const [file, content] of Object.entries(files)) {
+      if (content === null) {
+        await rm(path.join(scratch, file));
+        continue;
+      }
       await mkdir(path.dirname(path.join(scratch, file)), { recursive: true });
       await writeFile(path.join(scratch, file), content);
     }

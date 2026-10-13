@@ -25,6 +25,8 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
   const syncRound = round?.kind === "sync" ? round : undefined;
   const holder = published ? syncRound : run.sync;
   const conflicts = holder?.conflicts ?? [];
+  // Read by the server whenever the diff is; until then every conflict is open.
+  const open = holder?.unresolved ?? conflicts;
   const running = run.status === "running" || !!holder?.resolving;
   const canSync =
     !busy &&
@@ -38,7 +40,7 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
     !busy &&
     ["review", "approved", "awaiting_plan"].includes(run.status);
   const canResolve =
-    conflicts.length > 0 && !busy && ["review", "approved"].includes(run.status);
+    open.length > 0 && !busy && ["review", "approved"].includes(run.status);
   return (
     <section className="sync-panel" aria-labelledby="sync-panel-title">
       <div className="sync-panel-head">
@@ -87,15 +89,22 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
             {conflicts.map((file) => (
               <li key={file}>
                 <code>{file}</code>
+                {!open.includes(file) && " · 已解決"}
               </li>
             ))}
           </ul>
-          <p>
-            檔案裡標示 <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt; latest {run.baseBranch}</code>{" "}
-            的是目標分支現在的內容，另一邊是{published ? "這個 PR" : "這次的貢獻"}
-            。衝突標記全部移除前不能核准；可以在工作目錄自己改，或請 Agent
-            解決，改完仍要逐檔審閱。
-          </p>
+          {open.length ? (
+            <p>
+              檔案裡標示 <code>latest {run.baseBranch}</code>{" "}
+              的一邊是目標分支現在的內容，標示{" "}
+              <code>{published ? "this pull request" : "this contribution"}</code>{" "}
+              的一邊是{published ? "這個 PR" : "這次的貢獻"}
+              。衝突標記全部移除前不能核准；可以在工作目錄自己改，改完到「程式碼變更」重新整理差異，或請
+              Agent 解決。改過的檔案仍要逐檔審閱。
+            </p>
+          ) : (
+            <p>衝突標記都已移除；改過的檔案仍要逐檔審閱。</p>
+          )}
           {holder?.report && <p className="sync-report">{holder.report}</p>}
           {!!holder?.resolutions?.length && (
             <ul className="sync-resolutions">
@@ -106,19 +115,21 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
               ))}
             </ul>
           )}
-          <button
-            type="button"
-            className="button primary"
-            onClick={onResolve}
-            disabled={!canResolve || running}
-          >
-            {running ? (
-              <LoaderCircle className="spin" size={15} />
-            ) : (
-              <Wand2 size={15} />
-            )}
-            {running ? "Agent 正在解衝突…" : "請 Agent 解決衝突"}
-          </button>
+          {(open.length > 0 || running) && (
+            <button
+              type="button"
+              className="button primary"
+              onClick={onResolve}
+              disabled={!canResolve || running}
+            >
+              {running ? (
+                <LoaderCircle className="spin" size={15} />
+              ) : (
+                <Wand2 size={15} />
+              )}
+              {running ? "Agent 正在解衝突…" : "請 Agent 解決衝突"}
+            </button>
+          )}
         </div>
       )}
     </section>

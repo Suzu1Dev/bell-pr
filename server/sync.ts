@@ -68,13 +68,53 @@ export async function mergeCommits(
 }
 
 /**
- * Makes the checkout's files match `tree` while HEAD and the index stay at
- * `head`, so the difference reads as uncommitted changes, which is how BELL
- * keeps a contribution until it is published.
+ * Conflicts git could not mark: a file deleted on one side and changed on
+ * the other, or a binary file changed on both. git keeps one side without
+ * markers, so nothing would stop that side from being published unseen.
  */
-export async function checkoutTreeOnto(cwd: string, tree: string, head: string) {
+export async function conflictsWithoutMarkers(
+  cwd: string,
+  tree: string,
+  conflicts: string[],
+) {
+  if (!conflicts.length) return [];
+  const result = await git(
+    cwd,
+    [
+      "--literal-pathspecs",
+      "grep",
+      "-l",
+      "-z",
+      "-G",
+      "-e",
+      "^<<<<<<< ",
+      "-e",
+      "^>>>>>>> ",
+      "-e",
+      "^=======$",
+      tree,
+      "--",
+      ...conflicts,
+    ],
+    { allowedCodes: [0, 1] },
+  );
+  const marked = new Set(
+    result.stdout
+      .split("\0")
+      .filter(Boolean)
+      .map((entry) => entry.slice(tree.length + 1)),
+  );
+  return conflicts.filter((file) => !marked.has(file));
+}
+
+/**
+ * Makes the checkout's files match `tree` while the index holds `base`, so
+ * the difference reads as uncommitted changes against it, which is how BELL
+ * keeps a contribution until it is published. HEAD is not moved.
+ */
+export async function checkoutTreeOnto(cwd: string, tree: string, base: string) {
   await git(cwd, ["read-tree", "-u", "--reset", tree]);
-  await git(cwd, ["read-tree", head]);
+  await git(cwd, ["read-tree", base]);
 }
 
 const conflictMarker = /^(?:<{7}|>{7})(?: |$)|^={7}$/m;
@@ -90,7 +130,11 @@ export async function filesWithConflictMarkers(cwd: string, files: string[]) {
   return open;
 }
 
-/** Replaces the commit ids git writes after conflict markers with readable labels. */
+/**
+ * Replaces the commit ids git writes after conflict markers with readable
+ * labels. Files are read as latin1, one character per byte, so text in any
+ * encoding (Big5, Shift-JIS, …) is written back byte for byte.
+ */
 export async function labelConflictMarkers(
   cwd: string,
   files: string[],
@@ -99,14 +143,16 @@ export async function labelConflictMarkers(
   for (const file of files) {
     if (!safeRelativePath(file)) continue;
     const full = path.join(cwd, file);
-    const content = await readFile(full, "utf8").catch(() => undefined);
+    const content = await readFile(full, "latin1").catch(() => undefined);
     if (content === undefined) continue;
     const labelled = content.replace(
-      /^(<{7}|>{7}) ([0-9a-f]{40,64})$/gm,
-      (line, marker: string, commit: string) =>
-        labels[commit] ? `${marker} ${labels[commit]}` : line,
+      /^(<{7}|>{7}) ([0-9a-f]{40,64})(\r?)$/gm,
+      (line, marker: string, commit: string, cr: string) =>
+        labels[commit]
+          ? `${marker} ${Buffer.from(labels[commit]).toString("latin1")}${cr}`
+          : line,
     );
-    if (labelled !== content) await writeFile(full, labelled);
+    if (labelled !== content) await writeFile(full, labelled, "latin1");
   }
 }
 
@@ -169,7 +215,7 @@ export function conflictPrompt(input: {
   conflicts: string[];
 }) {
   return `${input.boundaries}
-You are resolving merge conflicts left after BELL moved this contribution onto the latest ${input.baseBranch}. Work only in this checkout. These files hold conflict markers: ${JSON.stringify(input.conflicts)}. In each block, the side after "<<<<<<< latest ${input.baseBranch}" is the target branch as it is now and the side before ">>>>>>> this contribution" is the person's change. Keep the target branch's new work and re-apply the contribution's intent on top of it; when the two truly contradict, keep the target branch's behaviour and explain what of the contribution could not be kept. Edit only these files, except for the smallest follow-on edit a rename or signature change on the target branch forces in a file the contribution already changes. Remove every conflict marker. Run relevant existing checks. Do not commit, stage or change .git.
+You are resolving merge conflicts left after BELL moved this contribution onto the latest ${input.baseBranch}. Work only in this checkout. These files hold conflict markers: ${JSON.stringify(input.conflicts)}. In each block, the side labelled "latest ${input.baseBranch}" is the target branch as it is now and the side labelled "this contribution" or "this pull request" is the person's change; either side may come first. Keep the target branch's new work and re-apply the contribution's intent on top of it; when the two truly contradict, keep the target branch's behaviour and explain what of the contribution could not be kept. Edit only these files, except for the smallest follow-on edit a rename or signature change on the target branch forces in a file the contribution already changes. Remove every conflict marker. Run relevant existing checks. Do not commit, stage or change .git.
 Return JSON: summary (Traditional Chinese: how you resolved the conflicts and anything the person should check) and files [{path, resolution}] with one Traditional Chinese sentence per resolved file.
 ${input.contributionContext}
 Task: ${JSON.stringify(input.task)}`;

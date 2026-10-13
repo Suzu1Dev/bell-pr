@@ -38,6 +38,8 @@ export interface FollowUpRound {
   previousBase?: string;
   /** Files a sync round's merge could not combine; they hold markers until resolved. */
   conflicts?: string[];
+  /** The conflicts still holding markers when the diff was last read. */
+  unresolved?: string[];
   /** Per-file conflict resolutions the agent described. */
   resolutions?: { path: string; resolution: string }[];
   /** True while an agent resolves this round's conflicts; a restart clears it. */
