@@ -131,7 +131,8 @@ export const memberReportJsonSchema = {
   additionalProperties: false,
 };
 
-function jsonText(text: string) {
+/** An agent's JSON answer without the Markdown fence some CLIs wrap it in. */
+export function jsonText(text: string) {
   return text
     .trim()
     .replace(/^```(?:json)?\s*\n?/, "")

@@ -3343,3 +3343,184 @@ button {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* Review follow-up rounds: picking feedback, the round history and its push preview. */
+.pr-feedback-item-head input {
+  accent-color: var(--green);
+  margin: 0 2px 0 0;
+}
+.follow-up-start {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #e4ecda;
+  border-radius: 8px;
+  background: #f7faf2;
+}
+.follow-up-start h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 550;
+}
+.follow-up-start > p {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #6f8360;
+}
+.follow-up-note-input {
+  display: block;
+  width: 100%;
+  min-height: 72px;
+  margin-bottom: 12px;
+  resize: vertical;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.follow-up-rounds {
+  margin: 0 28px 20px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fcfdf9;
+}
+.follow-up-rounds h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 550;
+}
+.follow-up-rounds > p {
+  margin: 6px 0 12px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #7f8c74;
+}
+.follow-up-rounds ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.follow-up-rounds ol > li {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.follow-up-rounds ol > li.is-review,
+.follow-up-rounds ol > li.is-running {
+  border-color: #e2cf9a;
+  background: #fffcf3;
+}
+.follow-up-round-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.follow-up-status {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--green-light);
+  color: var(--green);
+  font-size: 11px;
+}
+.follow-up-round-head time {
+  margin-left: auto;
+  color: #99a48c;
+  font-size: 11px;
+}
+.follow-up-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.follow-up-feedback a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: #5d7350;
+  font-size: 11px;
+  text-decoration: none;
+}
+.follow-up-note,
+.follow-up-report,
+.follow-up-error,
+.follow-up-commit {
+  margin: 8px 0 0;
+}
+.follow-up-report {
+  white-space: pre-wrap;
+}
+.follow-up-error {
+  color: #985b3e;
+}
+.follow-up-list {
+  margin-top: 8px;
+}
+.follow-up-list strong {
+  font-size: 11px;
+  font-weight: 550;
+  color: #70806a;
+}
+.follow-up-list ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.follow-up-list li span {
+  margin-right: 6px;
+  color: #99a48c;
+}
+.follow-up-list.is-open strong {
+  color: #8a7850;
+}
+.follow-up-commit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #6f8360;
+}
+.follow-up-rounds ol > li > .button {
+  margin-top: 10px;
+}
+.publish-commit-preview {
+  margin-top: 16px;
+}
+.publish-commit-preview strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 550;
+  color: #6f8360;
+}
+.publish-commit-preview pre {
+  margin: 0;
+  padding: 12px 14px;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid #e5ebdb;
+  border-radius: 8px;
+  background: #fbfdf7;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .follow-up-rounds {
+    margin: 0 16px 16px;
+  }
+  .follow-up-round-head time {
+    margin-left: 0;
+  }
+}

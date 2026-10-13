@@ -12,6 +12,7 @@ import type { DraftPreparation } from "../shared/drafts";
 import type { FileConversation } from "../shared/chat";
 import type { PrFeedback } from "../shared/pr-feedback";
 import type { RunDetailField } from "../shared/runs";
+import type { FollowUpRound } from "../shared/followups";
 
 export type { ChatMessage } from "../shared/chat";
 export interface Repo {
@@ -90,6 +91,10 @@ export interface Run {
   prUrl?: string;
   /** The GitHub branch a publish already pushed to; the branch field is locked once set. */
   publishedBranch?: string;
+  /** owner/name the PR branch was pushed to: the target repository or the person's fork. */
+  headRepository?: string;
+  /** Rounds of changes after maintainer review, oldest first; absent until the first one. */
+  followUps?: FollowUpRound[];
   /** Maintainer feedback read from the PR on request; absent until the learner fetches it. */
   prFeedback?: PrFeedback;
   error?: string;

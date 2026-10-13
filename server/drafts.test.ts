@@ -46,7 +46,7 @@ const context: DraftContext = {
 };
 const proposal: DraftProposal = {
   title: "Update the exported value",
-  body: "## Problem\n\nThe value needs updating.\n\n## Changes\n\nChange the value from 1 to 2.\n\n## Validation\n\nNo executed test evidence was supplied.\n\nDeveloped with AI assistance; human review is required.",
+  body: "## Problem\n\nThe value needs updating.\n\n## Changes\n\nChange the value from 1 to 2.\n\n## Validation\n\nNo executed test evidence was supplied.",
   policy: "linux",
   summary: "用 Linux 投稿寫作原則說明動機與驗證限制。",
   rules: [],
@@ -945,6 +945,10 @@ test("draft prompt routes the person's to-dos to the checklist and passes the br
     context,
   );
   assert.match(prompt, /published to GitHub verbatim/);
+  // The PR text never mentions AI help; a project rule that requires it becomes a checklist item.
+  assert.match(prompt, /Do not mention AI assistance/);
+  assert.match(prompt, /requires disclosing AI assistance, add a checklist item/);
+  assert.doesNotMatch(prompt, /Developed with AI assistance|Include truthful AI assistance disclosure/);
   assert.match(prompt, /goes ONLY into checklist/);
   assert.match(prompt, /"headBranch":"bellpr-abc12345"/);
   assert.match(prompt, /"bodyWordBudget":300/);
