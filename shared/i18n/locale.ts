@@ -61,11 +61,29 @@ export interface Formatters {
 
 const memo = new Map<Locale, Formatters>();
 
+// Date options that choose what to show; any of them replaces the defaults.
+const dateFields = [
+  "dateStyle",
+  "timeStyle",
+  "weekday",
+  "era",
+  "year",
+  "month",
+  "day",
+  "dayPeriod",
+  "hour",
+  "minute",
+  "second",
+  "fractionalSecondDigits",
+  "timeZoneName",
+] as const;
+
 /**
- * Formatters for one locale. Options passed to a date formatter replace its
- * default fields; zh-TW still uses the 24-hour clock unless the options set
- * `hour12` or `hourCycle`. An invalid date returns the raw input (a string
- * or number as given, "" for an invalid Date object), never "Invalid Date".
+ * Formatters for one locale. Date options that choose fields or styles
+ * replace the formatter's defaults; others, such as `timeZone`, add to them.
+ * zh-TW uses the 24-hour clock unless the options set `hour12` or
+ * `hourCycle`. An invalid date returns the raw input (a string or number as
+ * given, "" for an invalid Date object), never "Invalid Date".
  */
 export function formatters(locale: Locale): Formatters {
   const existing = memo.get(locale);
@@ -84,6 +102,15 @@ export function formatters(locale: Locale): Formatters {
       options.hour12 !== undefined ||
       options.hourCycle !== undefined;
     return keepCaller ? options : { ...options, hour12: false };
+  }
+  function withDefaults(
+    options: Intl.DateTimeFormatOptions | undefined,
+    defaults: Intl.DateTimeFormatOptions,
+  ) {
+    if (!options) return defaults;
+    return dateFields.some((field) => options[field] !== undefined)
+      ? options
+      : { ...defaults, ...options };
   }
   function formatDate(value: DateInput, options: Intl.DateTimeFormatOptions) {
     const date = value instanceof Date ? value : new Date(value);
@@ -106,24 +133,21 @@ export function formatters(locale: Locale): Formatters {
       return format.format(value);
     },
     date(value, options) {
-      return formatDate(value, options ?? { dateStyle: "medium" });
+      return formatDate(value, withDefaults(options, { dateStyle: "medium" }));
     },
     time(value, options) {
-      return formatDate(
-        value,
-        clock(
-          options ?? {
-            hour: locale === "zh-TW" ? "2-digit" : "numeric",
-            minute: "2-digit",
-          },
-        ),
-      );
+      const defaults: Intl.DateTimeFormatOptions = {
+        hour: locale === "zh-TW" ? "2-digit" : "numeric",
+        minute: "2-digit",
+      };
+      return formatDate(value, clock(withDefaults(options, defaults)));
     },
     dateTime(value, options) {
-      return formatDate(
-        value,
-        clock(options ?? { dateStyle: "medium", timeStyle: "short" }),
-      );
+      const defaults: Intl.DateTimeFormatOptions = {
+        dateStyle: "medium",
+        timeStyle: "short",
+      };
+      return formatDate(value, clock(withDefaults(options, defaults)));
     },
     relative(value, unit) {
       const format = instance(
