@@ -1,0 +1,55 @@
+# BELL PR as a systemd user service (Linux).
+#
+# The service runs as your own user, so it uses the git, gh, codex and claude
+# sign-ins of that user. Install BELL PR first (npm install -g bell-pr), then
+# copy this file to ~/.config/systemd/user/bell-pr.service and run:
+#
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now bell-pr
+#
+# Signing in: the service never opens a browser, and the sign-in session
+# lives only in memory, so every start or restart signs all browsers out.
+# After each start or restart, run `bell-pr open` in a terminal on this
+# machine to get a one-time sign-in link.
+#
+# Settings: put BELLPR_* variables (see .env.example) in
+# ~/.config/bell-pr/environment, one NAME=value per line, and keep that file
+# private with chmod 600. The file is optional.
+#
+# PATH: the service only sees the PATH set below. If node, bell-pr, git, gh,
+# codex or claude live somewhere else (for example under nvm), add that
+# directory with `systemctl --user edit bell-pr`:
+#
+#   [Service]
+#   Environment=PATH=<that directory>:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+#
+# To keep the service running after you log out, and to start it at boot,
+# enable lingering for your user (this needs administrator rights):
+#
+#   sudo loginctl enable-linger "$USER"
+#
+# Logs: journalctl --user -u bell-pr
+#
+# BELL PR listens on 127.0.0.1 only. Do not expose it to the internet.
+
+[Unit]
+Description=BELL PR contribution workbench
+# Give up after 5 failed starts in 5 minutes instead of restarting forever,
+# for example when another program already uses the port.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env bell-pr start --no-open
+Environment=PATH=%h/.local/bin:%h/.npm-global/bin:/usr/local/bin:/usr/bin:/bin
+Environment=NODE_ENV=production
+EnvironmentFile=-%h/.config/bell-pr/environment
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillMode=control-group
+UMask=0077
+
+[Install]
+WantedBy=default.target
