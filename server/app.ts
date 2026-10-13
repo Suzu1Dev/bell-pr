@@ -11,6 +11,8 @@ import type { AgentSlots } from "./agent-slots.js";
 import { localhostGuard, parseAllowedOrigins } from "./http-guard.js";
 import type { LicenseService } from "./license.js";
 import type { ApiErrorBody } from "../shared/errors.js";
+import { parseLocale } from "../shared/i18n/locale.js";
+import { currentLocale, sm, withLocale } from "./i18n/index.js";
 import { registerAppSettingsRoutes } from "./routes/app-settings.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerDiscoveryRoutes } from "./routes/discovery.js";
@@ -109,6 +111,16 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   app.locals.insights = insights;
   app.locals.discovery = discovery;
   app.disable("x-powered-by");
+  // Each request runs in its own locale: X-Bell-Locale, then ?locale=, then
+  // the server default. Everything the request starts inherits it.
+  app.use((req, _res, next) => {
+    withLocale(
+      parseLocale(req.get("x-bell-locale")) ??
+        parseLocale(String(req.query.locale ?? "")) ??
+        currentLocale(),
+      next,
+    );
+  });
   app.use(
     localhostGuard({
       ports: [port, frontendPort],
@@ -147,7 +159,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   registerAppSettingsRoutes(app, deps);
   registerLicenseRoutes(app, deps);
   app.use("/api", (_req, res) => {
-    res.status(404).json({ error: "找不到 API。" });
+    res.status(404).json({ error: sm().common.notFound });
   });
   if (existsSync(staticDirectory)) {
     app.use(express.static(staticDirectory, { index: false }));

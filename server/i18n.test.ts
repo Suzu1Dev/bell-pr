@@ -397,3 +397,146 @@ test("fixedLicense('pro') and the trial never throw", () => {
   assert.equal(fixedLicense("pro").entitlements().maxActiveRuns, 2);
   assert.throws(() => fixedLicense("pro", { maxActiveRuns: 0 }), RangeError);
 });
+
+test("each request sees its own X-Bell-Locale inside async handlers", async () => {
+  let arrived = 0;
+  let release = () => {};
+  const bothArrived = new Promise<void>((resolve) => (release = resolve));
+  const { call, close } = await startApp((workbench) => {
+    workbench.status = (async () => {
+      const before = currentLocale();
+      if (++arrived === 2) release();
+      // Both requests are in flight before either one reads its locale again.
+      await bothArrived;
+      await delay(5);
+      return { before, after: currentLocale() };
+    }) as unknown as Workbench["status"];
+    workbench.importRepository = async (source) => ({
+      id: "repo",
+      name: currentLocale(),
+      owner: "local",
+      fullName: `local/${source}`,
+      path: "/tmp/repo",
+      defaultBranch: "main",
+      url: "",
+    });
+  });
+  try {
+    const [english, chinese] = await Promise.all([
+      call("/api/status", { headers: { "x-bell-locale": "en" } }),
+      call("/api/status", { headers: { "x-bell-locale": "zh-TW" } }),
+    ]);
+    assert.equal(english.status, 200);
+    assert.deepEqual([english.body.before, english.body.after], ["en", "en"]);
+    assert.deepEqual(
+      [chinese.body.before, chinese.body.after],
+      ["zh-TW", "zh-TW"],
+    );
+    // The locale survives JSON body parsing too.
+    for (const locale of ["en", "zh-TW"]) {
+      const created = await call("/api/repos", {
+        method: "POST",
+        headers: { "x-bell-locale": locale },
+        body: { source: "project" },
+      });
+      assert.equal(created.status, 201);
+      assert.equal((created.body.repo as { name: string }).name, locale);
+    }
+  } finally {
+    await close();
+  }
+});
+
+test("a request without X-Bell-Locale uses ?locale=, then the default source, then BELLPR_LOCALE", async () => {
+  const { call, close } = await startApp((workbench) => {
+    workbench.status = (async () => ({
+      locale: currentLocale(),
+    })) as unknown as Workbench["status"];
+  });
+  const localeOf = async (pathname: string, headers = {}) =>
+    (await call(pathname, { headers })).body.locale;
+  try {
+    await withEnvLocale("zh-TW", async () => {
+      assert.equal(await localeOf("/api/status?locale=en"), "en");
+      assert.equal(await localeOf("/api/status?locale=zh-Hant"), "zh-TW");
+      assert.equal(
+        await localeOf("/api/status?locale=en", { "x-bell-locale": "zh-TW" }),
+        "zh-TW",
+      );
+      // An unsupported header falls through to the query.
+      assert.equal(
+        await localeOf("/api/status?locale=en", { "x-bell-locale": "fr" }),
+        "en",
+      );
+      assert.equal(await localeOf("/api/status?locale=ja"), "zh-TW");
+      assert.equal(await localeOf("/api/status"), "zh-TW");
+    });
+    await withEnvLocale("en", async () => {
+      setDefaultLocaleSource(() => "zh-TW");
+      assert.equal(await localeOf("/api/status"), "zh-TW");
+      assert.equal(await localeOf("/api/status?locale=en"), "en");
+      setDefaultLocaleSource(() => undefined);
+      assert.equal(await localeOf("/api/status"), "en");
+    });
+  } finally {
+    await close();
+  }
+});
+
+test("error messages follow the request locale", async () => {
+  const { call, close } = await startApp();
+  try {
+    const missing = (locale: string) =>
+      call("/api/missing", { headers: { "x-bell-locale": locale } });
+    assert.deepEqual(await missing("en"), {
+      status: 404,
+      body: { error: en.common.notFound },
+    });
+    assert.deepEqual(await missing("zh-TW"), {
+      status: 404,
+      body: { error: "找不到 API。" },
+    });
+  } finally {
+    await close();
+  }
+  const cancelledRun = await startApp((workbench) => {
+    workbench.run = () => {
+      throw new AppError((m) => m.common.cancelled, 409);
+    };
+  });
+  try {
+    const answer = (locale: string) =>
+      cancelledRun.call("/api/runs/any", {
+        headers: { "x-bell-locale": locale },
+      });
+    assert.deepEqual(await answer("en"), {
+      status: 409,
+      body: { error: en.common.cancelled },
+    });
+    assert.deepEqual(await answer("zh-TW"), {
+      status: 409,
+      body: { error: "工作已取消。" },
+    });
+  } finally {
+    await cancelledRun.close();
+  }
+  const pro = await startApp((workbench) => {
+    workbench.run = () => {
+      fixedLicense("free").assertFeature("prFeedback");
+      throw new Error("unreachable");
+    };
+  });
+  try {
+    const english = await pro.call("/api/runs/any", {
+      headers: { "x-bell-locale": "en" },
+    });
+    assert.equal(english.status, 402);
+    assert.doesNotMatch(String(english.body.error), han);
+    const chinese = await pro.call("/api/runs/any", {
+      headers: { "x-bell-locale": "zh-TW" },
+    });
+    assert.match(String(chinese.body.error), han);
+  } finally {
+    await pro.close();
+  }
+});
