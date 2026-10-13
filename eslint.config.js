@@ -37,7 +37,7 @@ export default defineConfig(
     },
   },
   {
-    // Node: the server, scripts, tests helpers and root config files.
+    // Node: the server, scripts, test helpers and root config files.
     files: ["server/**", "scripts/**", "test/**", "*.{ts,mjs,js}"],
     languageOptions: { globals: globals.node },
   },
@@ -49,11 +49,27 @@ export default defineConfig(
   {
     files: ["src/**"],
     languageOptions: { globals: globals.browser },
+    rules: {
+      // zod stays out of the UI bundle: the client imports these as types.
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "^zod$|(^|/)shared/app-settings(\\.js)?$",
+              allowTypeImports: true,
+              message: "Use `import type`; zod must not enter the UI bundle.",
+            },
+          ],
+        },
+      ],
+    },
   },
   {
-    // UI tests run under node:test.
+    // UI tests run under node:test and are not bundled.
     files: ["src/**/*.test.{ts,tsx}"],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
+    rules: { "@typescript-eslint/no-restricted-imports": "off" },
   },
   {
     // Existing violations; do not mass-fix. These recommended rules already
