@@ -71,6 +71,10 @@ export interface Run {
     | "cancelled";
   branch: string;
   baseBranch: string;
+  /** The target-branch commit the contribution is measured against; absent on the demo run. */
+  baseSha?: string;
+  /** True while BELL pushes to GitHub. */
+  publishing?: boolean;
   /** Local checkout the learner may edit by hand; absent on the demo run. */
   worktreePath?: string;
   createdAt: string;

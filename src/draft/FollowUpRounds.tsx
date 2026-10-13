@@ -50,7 +50,14 @@ export function FollowUpRounds({
           return (
             <li key={round.id} className={`is-${round.status}`}>
               <div className="follow-up-round-head">
-                <strong>第 {number} 輪</strong>
+                <strong>
+                  第 {number} 輪
+                  {round.adopted
+                    ? " · 接續 GitHub 上的提交"
+                    : round.kind === "sync"
+                      ? " · 同步目標分支"
+                      : ""}
+                </strong>
                 <span className="follow-up-status">{statusLabels[round.status]}</span>
                 <time dateTime={round.requestedAt}>
                   {new Date(round.requestedAt).toLocaleString("zh-TW")}
@@ -74,6 +81,20 @@ export function FollowUpRounds({
                 </p>
               )}
               {round.report && <p className="follow-up-report">{round.report}</p>}
+              {!!round.conflicts?.length && (
+                <div className="follow-up-list is-open">
+                  <strong>合併衝突</strong>
+                  <ul>
+                    {round.conflicts.map((file) => (
+                      <li key={file}>
+                        <code>{file}</code>
+                        {round.resolutions?.find((entry) => entry.path === file)
+                          ?.resolution ?? ""}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {!!round.addressed?.length && (
                 <div className="follow-up-list">
                   <strong>已處理</strong>
