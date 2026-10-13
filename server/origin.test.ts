@@ -65,6 +65,20 @@ test("origin configuration accepts precise HTTP(S) origins and rejects ambiguous
       value,
     );
   }
+  // A list entry is exactly one origin; an empty entry or two origins in one
+  // entry fail the same way.
+  for (const allowedOrigins of [
+    [""],
+    [" "],
+    [remoteOrigin, ""],
+    [`${remoteOrigin},https://example.com`],
+  ]) {
+    assert.throws(
+      () => localhostGuard({ ports: [4311], allowedOrigins, publicPaths: [] }),
+      /BELLPR_ALLOWED_ORIGINS/,
+      JSON.stringify(allowedOrigins),
+    );
+  }
 });
 
 test("localhost guard allows only local hosts and origins and JSON mutations", async () => {

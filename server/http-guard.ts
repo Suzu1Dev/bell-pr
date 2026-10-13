@@ -1,5 +1,8 @@
 import type { RequestHandler } from "express";
 
+const invalidOrigins =
+  "BELLPR_ALLOWED_ORIGINS must contain comma-separated HTTP(S) origins without credentials, paths, queries, fragments, or wildcards.";
+
 export function parseAllowedOrigins(value = ""): string[] {
   if (!value.trim()) return [];
   return value.split(",").map((entry) => {
@@ -20,9 +23,7 @@ export function parseAllowedOrigins(value = ""): string[] {
         throw new Error("Invalid origin");
       return url.origin;
     } catch {
-      throw new Error(
-        "BELLPR_ALLOWED_ORIGINS must contain comma-separated HTTP(S) origins without credentials, paths, queries, fragments, or wildcards.",
-      );
+      throw new Error(invalidOrigins);
     }
   });
 }
@@ -32,7 +33,8 @@ export interface GuardOptions {
   ports: number[];
   /**
    * Extra trusted origins, such as a TLS proxy in front of BELL PR. Each
-   * entry follows the BELLPR_ALLOWED_ORIGINS rules; an invalid one throws.
+   * entry is one origin under the BELLPR_ALLOWED_ORIGINS rules; an invalid
+   * one throws.
    */
   allowedOrigins: string[];
   /** The session secret requests must carry. Accepted but unused until 3B. */
@@ -50,10 +52,14 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
     ]),
   );
   const localOrigins = new Set([...localHosts].map((host) => `http://${host}`));
-  // Joined, the list reads like BELLPR_ALLOWED_ORIGINS, so an empty or
-  // malformed entry fails exactly as it would there.
+  // Each entry is exactly one origin: an empty entry or a comma-separated
+  // list in one entry throws like a malformed origin.
   const allowedOrigins = new Set(
-    parseAllowedOrigins(opts.allowedOrigins.join(",")),
+    opts.allowedOrigins.map((entry) => {
+      const origins = parseAllowedOrigins(entry);
+      if (origins.length !== 1) throw new Error(invalidOrigins);
+      return origins[0];
+    }),
   );
   const allowedHosts = new Set([
     ...localHosts,
