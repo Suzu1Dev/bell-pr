@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { intlLocale, locales } from "../../shared/i18n/locale";
+import { formatters, intlLocale, locales } from "../../shared/i18n/locale";
 import { demoDraftPreparation as panelDraftPreparation } from "../draft/DraftGuidancePanel";
 import {
   demoContributionBrief as missionBrief,
@@ -8,6 +8,7 @@ import {
 } from "../mission/demo";
 import { demoTeam as boardTeam } from "../team/TeamBoard";
 import type { DiffFile } from "../types";
+import { getSampleDiscoveryJob } from "./discovery";
 import {
   demoAnswer,
   demoContributionBrief,
@@ -23,7 +24,8 @@ import {
 
 // String values under these keys are structure (ids, paths, times, enum
 // values, code), so every locale must carry the same value. Any other string
-// is copy and only its presence is compared.
+// is copy and only its presence is compared. The discovery entry is copy
+// only: getSampleDiscoveryJob() takes its structure from shared.ts.
 const structuralKeys = new Set([
   "agent",
   "baseBranch",
@@ -73,15 +75,20 @@ const structuralKeys = new Set([
 ]);
 
 /** The demo with its copy blanked out: what every locale must share. */
-function structure(value: unknown, key = ""): unknown {
+function structure(value: unknown, key = "", copyOnly = false): unknown {
   if (typeof value === "function") return "<function>";
   if (value instanceof RegExp) return "<RegExp>";
-  if (Array.isArray(value)) return value.map((item) => structure(item, key));
+  if (Array.isArray(value))
+    return value.map((item) => structure(item, key, copyOnly));
   if (value && typeof value === "object")
     return Object.fromEntries(
-      Object.entries(value).map(([name, item]) => [name, structure(item, name)]),
+      Object.entries(value).map(([name, item]) => [
+        name,
+        structure(item, name, copyOnly || key === "discovery"),
+      ]),
     );
-  if (typeof value === "string" && !structuralKeys.has(key)) return "<copy>";
+  if (typeof value === "string" && (copyOnly || !structuralKeys.has(key)))
+    return "<copy>";
   return value;
 }
 
@@ -169,9 +176,13 @@ test("every locale has one generic answer and stateless keyword tables", () => {
 
 test("no fixture timestamp parses to an invalid Date", () => {
   for (const locale of locales) {
-    const found = timestamps(getDemo(locale));
-    // run.createdAt, three log times, generatedAt, two messages, checkedAt.
-    assert.ok(found.length >= 8, `${locale}: ${found.length} timestamps`);
+    const found = [
+      ...timestamps(getDemo(locale)),
+      ...timestamps(getSampleDiscoveryJob(locale), "discovery"),
+    ];
+    // run.createdAt, three log times, generatedAt, two messages, checkedAt,
+    // and the discovery job's two times and three pushedAt dates.
+    assert.ok(found.length >= 13, `${locale}: ${found.length} timestamps`);
     for (const [where, value] of found) {
       assert.equal(typeof value, "string", `${locale} ${where}`);
       assert.ok(
@@ -251,4 +262,73 @@ test("the demo timeline runs forward from the analysis to the draft check", () =
       assert.ok(sent >= started && sent <= finished, message.createdAt);
     }
   }
+});
+
+test("the sample discovery job holds together like a live result", () => {
+  for (const locale of locales) {
+    const job = getSampleDiscoveryJob(locale);
+    assert.equal(job.status, "ready");
+    assert.equal(job.phase, "complete");
+    assert.ok(job.message && job.preferences.interests && job.warnings.length);
+    assert.ok(job.candidates.length >= 2 && job.candidates.length <= 3);
+    assert.equal(job.opportunities.length, job.candidates.length);
+    const created = Date.parse(job.createdAt);
+    assert.ok(created < Date.parse(job.completedAt ?? ""));
+    for (const candidate of job.candidates)
+      assert.ok(Date.parse(candidate.pushedAt) < created, candidate.pushedAt);
+    for (const opportunity of job.opportunities) {
+      const candidate = job.candidates.find(
+        (item) => item.fullName === opportunity.repository,
+      );
+      assert.ok(candidate, opportunity.repository);
+      for (const field of [
+        opportunity.title,
+        opportunity.summary,
+        opportunity.userNeed,
+        opportunity.contributionRules,
+        opportunity.feasibility,
+        opportunity.effort,
+      ])
+        assert.ok(field.trim(), `${locale} ${opportunity.id}`);
+      for (const list of [
+        opportunity.firstSteps,
+        opportunity.acceptanceChecks,
+        opportunity.risks,
+      ])
+        assert.ok(list.length && list.every((item) => item.trim()));
+      assert.ok(
+        opportunity.popularity.includes(formatters(locale).number(candidate.stars)),
+      );
+      // The live pipeline drops an opportunity without these citations.
+      const cited = opportunity.evidence.map((evidence) => {
+        const source = candidate.sources.find(
+          (item) => item.id === evidence.sourceId,
+        );
+        assert.ok(source, evidence.sourceId);
+        assert.ok(source.content.includes(evidence.quote), evidence.quote);
+        assert.equal(typeof evidence.reason, "string");
+        assert.ok(evidence.reason.trim(), `${locale} ${evidence.sourceId}`);
+        return source.kind;
+      });
+      assert.ok(cited.includes("issue"), opportunity.id);
+      if (candidate.sources.some((source) => source.kind === "contributing"))
+        assert.ok(cited.includes("contributing"), opportunity.id);
+    }
+  }
+});
+
+test("the sample repositories are fictional and link nowhere", () => {
+  const job = getSampleDiscoveryJob("zh-TW");
+  for (const candidate of job.candidates) {
+    // Each owner was checked with `gh api users/<owner>` (404) when added.
+    assert.match(candidate.fullName, /^[a-z]+-sample\/[a-z-]+$/);
+    assert.equal(candidate.url, "");
+    for (const source of candidate.sources) assert.equal(source.url, "");
+  }
+  // Every call builds a fresh job, so a caller may change its copy.
+  job.candidates[0].sources.length = 0;
+  job.opportunities[0].firstSteps.push("changed");
+  const again = getSampleDiscoveryJob("zh-TW");
+  assert.ok(again.candidates[0].sources.length > 0);
+  assert.ok(!again.opportunities[0].firstSteps.includes("changed"));
 });

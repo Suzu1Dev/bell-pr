@@ -352,6 +352,111 @@ const zhTW: DemoContent = buildDemoContent({
         `${answerPrefix}${file.path}\n\n${file.explanation?.summary ?? "這個檔案包含本次任務的程式變更。"}\n\n${file.explanation?.concept ?? ""}\n\n這是依檔案與關鍵字挑選的教學範例，不是對所選程式碼的即時推論。連接真實任務後，追問會交給設定的模型處理。`,
     },
   ],
+  discovery: {
+    interests: "開發者工具、文件、無障礙",
+    message: ({ count }) =>
+      `示範：找到 ${count} 項有來源支持的貢獻機會；仍需確認維護者意願與實作範圍。`,
+    warnings: [
+      "這是示範結果：專案、issue 與引文皆為虛構，未查詢 GitHub，也未呼叫 AI 模型。",
+    ],
+    popularity: ({ stars, forks, pushedAt }) =>
+      `示範快照：${stars} stars、${forks} forks，最近推送於 ${pushedAt}。人氣不能保證提案會被接受。`,
+    opportunities: {
+      "markwell-link-positions": {
+        title: "讓失效連結的警告標出行號與欄位",
+        summary:
+          "失效連結的警告目前只有檔名，讀者得在長文件裡自己找。標題規則已經會輸出 `file:line:column`，把同樣的位置資訊接到連結規則，是範圍清楚的第一個貢獻。",
+        userNeed:
+          "維護文件網站的人修正失效連結時，可以直接跳到出錯的那一行，不必手動搜尋整頁內容。",
+        contributionRules:
+          "動手前先在 issue 留言認領，避免兩個人修同一件事；每個規則變更都要在 `test/fixtures/` 補上範例，並更新 `CHANGELOG.md`；送出前執行 `npm test` 與 `npm run lint`。",
+        feasibility:
+          "issue 已說明期望的輸出格式，標題規則也有現成的位置資訊可以參考；變更集中在單一規則與它的測試，適合第一次參與這個專案。",
+        effort:
+          "約半天到一天：閱讀標題規則如何取得位置、修改連結規則的輸出，再補上測試範例。",
+        firstSteps: [
+          "在 #57 留言，說明打算沿用標題規則的位置格式。",
+          "找出標題規則取得行號與欄位的程式，確認連結規則能否拿到相同的節點位置。",
+          "在 `test/fixtures/` 新增一份含失效連結的範例文件。",
+        ],
+        acceptanceChecks: [
+          "失效連結的警告以 `file:line:column` 開頭，位置與連結實際所在相符。",
+          "既有的連結與標題測試全部通過。",
+          "`CHANGELOG.md` 記錄這次輸出格式的變更。",
+        ],
+        risks: [
+          "輸出格式改變，可能影響解析舊格式的 CI 腳本；需要確認維護者是否視為不相容變更。",
+          "動手前請確認 issue 仍未被他人認領。",
+        ],
+        reasons: [
+          "issue 直接提出需求，並指出標題規則已有相同格式，可以作為實作參考。",
+          "規範要求規則變更附上測試範例與 CHANGELOG，這決定了這次貢獻的完整範圍。",
+        ],
+      },
+      "cronwise-wrapping-ranges": {
+        title: "修正跨週末星期範圍的下次執行時間",
+        summary:
+          "README 說明 `5-1` 代表星期五到星期一，文字說明也正確，但預覽下次執行時間時漏掉了星期六和星期日。問題很可能出在展開範圍的函式。",
+        userNeed:
+          "用 cronwise 確認排程的人，會依預覽結果判斷任務何時執行；漏掉週末，會讓他們誤以為週末不會執行。",
+        contributionRules:
+          "送出 pull request 前先開立或認領 issue；每修正一種運算式，都要在 `tests/test_schedule.py` 補上測試；CI 會檢查 `pytest` 與 `ruff`。",
+        feasibility:
+          "issue 已指出可疑的函式，README 也明確定義了跨週範圍的預期行為；需要理解範圍展開與排程計算，難度略高於入門。",
+        effort:
+          "約一到兩天：重現問題、修正範圍展開，並為跨週範圍與一般範圍各補一組測試。",
+        firstSteps: [
+          "在本機用 `0 22 * * 5-1` 重現 #112 的結果。",
+          "閱讀 `expand_range()`，找出起點大於終點時的處理方式。",
+          "在 #112 留言認領，並說明修正方向。",
+        ],
+        acceptanceChecks: [
+          "`5-1` 的下次執行時間依序包含星期五、六、日、一。",
+          "`1-5` 等一般範圍的結果不變。",
+          "`pytest` 與 `ruff` 在本機通過。",
+        ],
+        risks: [
+          "分鐘與小時欄位可能也使用同一個範圍展開函式，修改前要確認不會影響其他欄位。",
+          "需要確認維護者是否希望一併處理月份等其他欄位的跨界範圍。",
+        ],
+        reasons: [
+          "回報者指出可疑的實作位置，讓第一步調查有明確的起點。",
+          "規範要求每個修正都附上測試，驗收時需要新增測試案例。",
+          "README 明確定義 `5-1` 的意義，證明預期行為是星期五到星期一。",
+        ],
+      },
+      "huecheck-skipped-variables": {
+        title: "略過 CSS 變數時，告訴使用者略過了哪些宣告",
+        summary:
+          "使用 `var(--name)` 設定的顏色會被直接略過，程式仍以 0 結束。issue 建議先加上警告，列出被略過的宣告；這比完整解析 CSS 變數小得多。",
+        userNeed:
+          "依賴設計系統的團隊以為檢查全部通過，其實部分顏色從未被檢查；警告能讓他們看見結果的盲點。",
+        contributionRules:
+          "這個專案沒有 CONTRIBUTING 文件；請先在 issue 留言，確認維護者接受「先加警告」的做法，再依照既有的程式風格提交。",
+        feasibility:
+          "issue 已提出範圍明確的第一步，README 也承認目前不支援 CSS 變數；只需要在略過時收集並輸出宣告，不必實作變數解析。",
+        effort:
+          "約半天：找到略過 `var()` 的位置、收集宣告並輸出警告，再補一個測試。",
+        firstSteps: [
+          "在 #88 留言，確認維護者偏好先加警告，而不是直接解析變數。",
+          "找出讀取顏色時略過 `var()` 的程式位置。",
+          "準備一份含 `var(--text-muted)` 的 CSS 測試檔。",
+        ],
+        acceptanceChecks: [
+          "遇到 `var()` 顏色時輸出警告，並列出檔名與宣告。",
+          "沒有使用 CSS 變數的檔案，輸出維持不變。",
+        ],
+        risks: [
+          "略過宣告時是否要改變結束代碼，需要先和維護者確認。",
+          "沒有 CONTRIBUTING 文件，測試與提交慣例需要從既有的 pull request 推斷。",
+        ],
+        reasons: [
+          "issue 直接建議以警告作為第一步，界定了這次貢獻的範圍。",
+          "README 確認目前不解析 CSS 變數，說明這是已知限制，不是使用錯誤。",
+        ],
+      },
+    },
+  },
 });
 
 export default zhTW;

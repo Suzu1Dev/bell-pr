@@ -16,6 +16,7 @@ import type {
   DemoLogKey,
   DemoMessageId,
   DemoModulePath,
+  DemoOpportunityId,
   DemoReadingPath,
   DemoRecommendationId,
   DemoTaskId,
@@ -34,6 +35,36 @@ export interface DemoAnswer {
   text: (params: { file: DiffFile }) => string;
 }
 
+/** The copy of one sample discovery opportunity (see shared.ts). */
+export interface DemoOpportunityCopy {
+  title: string;
+  summary: string;
+  userNeed: string;
+  contributionRules: string;
+  feasibility: string;
+  effort: string;
+  firstSteps: string[];
+  acceptanceChecks: string[];
+  risks: string[];
+  /** Why each quote supports the opportunity, in the order of its evidence. */
+  reasons: string[];
+}
+
+/** The copy of the sample discovery job that getSampleDiscoveryJob() builds. */
+export interface DemoDiscoveryCopy {
+  /** What the sample search asked for, as a person would type it. */
+  interests: string;
+  message: (params: { count: number }) => string;
+  warnings: string[];
+  /** The numbers arrive formatted for the locale; pushedAt is YYYY-MM-DD. */
+  popularity: (params: {
+    stars: string;
+    forks: string;
+    pushedAt: string;
+  }) => string;
+  opportunities: Record<DemoOpportunityId, DemoOpportunityCopy>;
+}
+
 /** Everything the demo shows, in one locale. */
 export interface DemoContent {
   repo: Repo;
@@ -45,6 +76,8 @@ export interface DemoContent {
   team: AgentTeam;
   draftPreparation: DraftPreparation;
   answers: DemoAnswer[];
+  /** The copy of the sample discovery job; see discovery.ts. */
+  discovery: DemoDiscoveryCopy;
   // The samples below are optional until they are written.
   /** Sample maintainer feedback and CI checks on the demo's published PR. */
   prFeedback?: PrFeedback;
@@ -109,4 +142,5 @@ export interface DemoCopy {
     };
   };
   answers: DemoAnswer[];
+  discovery: DemoDiscoveryCopy;
 }

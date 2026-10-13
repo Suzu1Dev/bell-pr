@@ -386,6 +386,182 @@ export const draftPreparation = {
 export type DemoDraftSourceId =
   (typeof draftPreparation.sources)[number]["id"];
 
+/**
+ * The sample discovery job: fictional repositories, issues and quotes that
+ * stand in for live results. No owner exists on GitHub (`gh api users/<owner>`
+ * returns 404) and every URL is empty, so nothing links to a real or
+ * claimable page. The repository documents are English, as a real project's
+ * would be; the analysis around them is copy. Like a live result, every
+ * opportunity quotes an issue, quotes CONTRIBUTING.md when the repository has
+ * one, and each quote is taken verbatim from its source.
+ */
+export const sampleDiscovery = {
+  id: "sample-discovery",
+  createdAt: "2026-10-02T20:00:00+08:00",
+  completedAt: "2026-10-02T20:03:00+08:00",
+  preferences: { difficulty: "any", minStars: 50, sort: "updated" },
+  candidates: [
+    {
+      fullName: "markwell-sample/markwell",
+      url: "",
+      description:
+        "A Markdown linter that checks documentation links, heading levels and code fences.",
+      language: "TypeScript",
+      stars: 1840,
+      forks: 132,
+      pushedAt: "2026-09-29T14:12:00Z",
+      openIssues: 47,
+      sources: [
+        {
+          id: "markwell-sample/markwell:file:CONTRIBUTING.md",
+          kind: "contributing",
+          title: "CONTRIBUTING.md",
+          url: "",
+          content:
+            "# Contributing\n\nComment on the issue you want to take before you start, so two people do not fix the same thing.\n\nEvery rule change needs a fixture in `test/fixtures/` and an entry in `CHANGELOG.md`.\n\nRun `npm test` and `npm run lint` before you open a pull request.",
+        },
+        {
+          id: "markwell-sample/markwell:issue:57",
+          kind: "issue",
+          title: "#57 Broken link warnings do not say where the link is",
+          url: "",
+          content:
+            "Broken link warnings do not say where the link is\n\nWhen a relative link is broken, markwell prints `docs/setup.md: broken link ./instal.md`. On a long page I have to search for the link by hand.\n\nThe heading rules already print `file:line:column`. Could the link rule do the same?",
+        },
+      ],
+      warnings: [],
+    },
+    {
+      fullName: "cronwise-sample/cronwise",
+      url: "",
+      description:
+        "Explains cron expressions in plain language and previews the next run times.",
+      language: "Python",
+      stars: 960,
+      forks: 71,
+      pushedAt: "2026-10-01T08:45:00Z",
+      openIssues: 23,
+      sources: [
+        {
+          id: "cronwise-sample/cronwise:file:README.md",
+          kind: "readme",
+          title: "README.md",
+          url: "",
+          content:
+            "# cronwise\n\nTurn a cron expression into a plain-language sentence and preview the next run times.\n\n```python\nfrom cronwise import explain\nexplain(\"0 9 * * 1-5\")  # At 09:00, Monday through Friday\n```\n\nDay-of-week ranges may wrap around the end of the week, so `5-1` means Friday through Monday.",
+        },
+        {
+          id: "cronwise-sample/cronwise:file:CONTRIBUTING.md",
+          kind: "contributing",
+          title: "CONTRIBUTING.md",
+          url: "",
+          content:
+            "# Contributing to cronwise\n\nPlease open or claim an issue before you send a pull request.\n\nAdd a test to `tests/test_schedule.py` for every expression you fix.\n\nWe use `pytest` and `ruff`; both must pass in CI.",
+        },
+        {
+          id: "cronwise-sample/cronwise:issue:112",
+          kind: "issue",
+          title: "#112 Next run times skip the weekend for a wrapping range",
+          url: "",
+          content:
+            "Next run times skip the weekend for a wrapping range\n\n`explain(\"0 22 * * 5-1\")` correctly says \"At 22:00, Friday through Monday\", but `next_runs()` only returns Fridays and Mondays. Saturday and Sunday are missing.\n\nI think `expand_range()` assumes the start is smaller than the end.",
+        },
+      ],
+      warnings: [],
+    },
+    {
+      fullName: "huecheck-sample/huecheck",
+      url: "",
+      description:
+        "A command-line tool that checks text colors in CSS files against WCAG contrast ratios.",
+      language: "Go",
+      stars: 410,
+      forks: 38,
+      pushedAt: "2026-09-24T19:30:00Z",
+      openIssues: 12,
+      sources: [
+        {
+          id: "huecheck-sample/huecheck:file:README.md",
+          kind: "readme",
+          title: "README.md",
+          url: "",
+          content:
+            "# huecheck\n\nhuecheck reads CSS files and reports text colors whose contrast with the background is below the WCAG AA ratio.\n\n```sh\nhuecheck ./styles\n```\n\nCustom properties such as `var(--text-muted)` are not resolved yet.",
+        },
+        {
+          id: "huecheck-sample/huecheck:issue:88",
+          kind: "issue",
+          title: "#88 Colors set through custom properties are skipped without a warning",
+          url: "",
+          content:
+            "Colors set through custom properties are skipped without a warning\n\nA rule like `color: var(--text-muted)` is ignored and huecheck still exits with 0. Most design systems define their colors this way, so a clean run can hide real contrast problems.\n\nA first step could be a warning that lists the skipped declarations.",
+        },
+      ],
+      warnings: [],
+    },
+  ],
+  opportunities: [
+    {
+      id: "markwell-link-positions",
+      repository: "markwell-sample/markwell",
+      difficulty: "beginner",
+      evidence: [
+        {
+          sourceId: "markwell-sample/markwell:issue:57",
+          quote:
+            "The heading rules already print `file:line:column`. Could the link rule do the same?",
+        },
+        {
+          sourceId: "markwell-sample/markwell:file:CONTRIBUTING.md",
+          quote:
+            "Every rule change needs a fixture in `test/fixtures/` and an entry in `CHANGELOG.md`.",
+        },
+      ],
+    },
+    {
+      id: "cronwise-wrapping-ranges",
+      repository: "cronwise-sample/cronwise",
+      difficulty: "intermediate",
+      evidence: [
+        {
+          sourceId: "cronwise-sample/cronwise:issue:112",
+          quote:
+            "I think `expand_range()` assumes the start is smaller than the end.",
+        },
+        {
+          sourceId: "cronwise-sample/cronwise:file:CONTRIBUTING.md",
+          quote:
+            "Add a test to `tests/test_schedule.py` for every expression you fix.",
+        },
+        {
+          sourceId: "cronwise-sample/cronwise:file:README.md",
+          quote:
+            "Day-of-week ranges may wrap around the end of the week, so `5-1` means Friday through Monday.",
+        },
+      ],
+    },
+    {
+      id: "huecheck-skipped-variables",
+      repository: "huecheck-sample/huecheck",
+      difficulty: "beginner",
+      evidence: [
+        {
+          sourceId: "huecheck-sample/huecheck:issue:88",
+          quote:
+            "A first step could be a warning that lists the skipped declarations.",
+        },
+        {
+          sourceId: "huecheck-sample/huecheck:file:README.md",
+          quote:
+            "Custom properties such as `var(--text-muted)` are not resolved yet.",
+        },
+      ],
+    },
+  ],
+} as const;
+export type DemoOpportunityId =
+  (typeof sampleDiscovery.opportunities)[number]["id"];
+
 /** Joins the shared structure with one locale's copy. */
 export function buildDemoContent(copy: DemoCopy): DemoContent {
   return {
@@ -524,5 +700,6 @@ export function buildDemoContent(copy: DemoCopy): DemoContent {
       },
     },
     answers: copy.answers,
+    discovery: copy.discovery,
   };
 }
