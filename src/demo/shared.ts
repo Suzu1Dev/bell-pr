@@ -344,7 +344,7 @@ export const team = {
       id: "m1",
       from: "lead",
       to: "all",
-      createdAt: "2026-10-03T01:20:00+08:00",
+      createdAt: "2026-10-03T09:31:00+08:00",
       status: "delivered",
       recipients: ["task-1", "task-2", "task-3", "task-4"],
       deliveredTo: ["task-1", "task-2", "task-3", "task-4"],
@@ -353,7 +353,7 @@ export const team = {
       id: "m2",
       from: "member-1",
       to: "task-2",
-      createdAt: "2026-10-03T01:24:00+08:00",
+      createdAt: "2026-10-03T09:33:00+08:00",
       status: "delivered",
       recipients: ["task-2"],
       deliveredTo: ["task-2"],
@@ -367,7 +367,7 @@ export type DemoMessageId = (typeof team.messages)[number]["id"];
 export const draftPreparation = {
   status: "ready",
   fingerprint: "demo-draft-guidance",
-  checkedAt: "2026-10-03T00:00:00.000Z",
+  checkedAt: "2026-10-03T01:36:00.000Z",
   baseSha: "demo",
   sources: [
     { id: "demo-contributing", kind: "contributing", path: "CONTRIBUTING.md" },

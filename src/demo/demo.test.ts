@@ -233,3 +233,22 @@ test("the suggested commit subject is the PR title", () => {
     );
   }
 });
+
+test("the demo timeline runs forward from the analysis to the draft check", () => {
+  for (const locale of locales) {
+    const { insights, run, team, draftPreparation } = getDemo(locale);
+    const times = [
+      insights.generatedAt,
+      run.createdAt,
+      ...run.logs.map((log) => log.time),
+      draftPreparation.context?.checkedAt ?? "",
+    ].map((value) => new Date(value).getTime());
+    assert.deepEqual(times, [...times].sort((a, b) => a - b), locale);
+    const started = new Date(run.createdAt).getTime();
+    const finished = times[times.length - 1];
+    for (const message of team.messages) {
+      const sent = new Date(message.createdAt).getTime();
+      assert.ok(sent >= started && sent <= finished, message.createdAt);
+    }
+  }
+});
