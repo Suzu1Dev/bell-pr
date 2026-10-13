@@ -20,6 +20,11 @@ export default defineConfig(
     ".vite-cache/",
     "coverage/",
     "node_modules/",
+    // Gitignored local output. .bellpr/ is the default data directory and
+    // holds clones of other projects.
+    ".bellpr/",
+    "output/",
+    ".playwright-cli/",
   ]),
   {
     files: ["**/*.{ts,tsx,mjs,js}"],
@@ -37,8 +42,17 @@ export default defineConfig(
     },
   },
   {
-    // Node: the server, scripts, test helpers and root config files.
-    files: ["server/**", "scripts/**", "test/**", "*.{ts,mjs,js}"],
+    // Node: the server, scripts, test helpers, root config files and the
+    // command, e2e and tooling folders later work adds.
+    files: [
+      "server/**",
+      "scripts/**",
+      "test/**",
+      "bin/**",
+      "e2e/**",
+      "tools/**",
+      "*.{ts,mjs,js}",
+    ],
     languageOptions: { globals: globals.node },
   },
   {
