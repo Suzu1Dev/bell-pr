@@ -5,6 +5,7 @@ import { request, type IncomingHttpHeaders } from "node:http";
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
+import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import express from "express";
@@ -13,8 +14,18 @@ import { createApp } from "./index.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
 
-const remoteOrigin = "https://your-host.your-tailnet.ts.net:8443";
+const remoteOrigin = "https://bell.example.internal:8443";
 const remoteHost = new URL(remoteOrigin).host;
+
+/** A port the OS reports free on 127.0.0.1, released before it is returned. */
+async function freePort() {
+  const probe = createServer();
+  probe.listen(0, "127.0.0.1");
+  await once(probe, "listening");
+  const { port } = probe.address() as AddressInfo;
+  await new Promise<void>((resolve) => probe.close(() => resolve()));
+  return port;
+}
 
 test("origin configuration accepts precise HTTP(S) origins and rejects ambiguous values", () => {
   assert.deepEqual(parseAllowedOrigins(), []);
@@ -333,7 +344,7 @@ test("invalid origin configuration fails startup before creating application dat
         cwd: path.resolve(import.meta.dirname, ".."),
         env: {
           ...process.env,
-          BELLPR_PORT: "8443",
+          BELLPR_PORT: String(await freePort()),
           BELLPR_FRONTEND_PORT: "4310",
           BELLPR_ALLOWED_ORIGINS: "https://*.example.com",
           BELLPR_DATA_DIR: dataDirectory,
