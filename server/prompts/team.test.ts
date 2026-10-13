@@ -23,7 +23,7 @@ import {
   webBoundaries,
 } from "./team.js";
 import type { TeamAgentInput, TeamAgentRunner } from "../team.js";
-import type { DiffFile } from "../types.js";
+import type { DiffFile, Run } from "../types.js";
 import type { ContributionSettings } from "../../shared/insights.js";
 import { freeEntitlements, proEntitlements } from "../../shared/plans.js";
 import type {
@@ -517,6 +517,109 @@ test("without an entitlements source the Workbench grants Pro at its own run lim
     assert.equal(JSON.stringify(store.data), saved);
     assert.equal(free.entitlements(), freeEntitlements);
   } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("a review rerun whose last save fails is logged instead of rejecting unhandled", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-rerun-test-"));
+  const repository = path.join(directory, "repo");
+  await mkdir(repository);
+  await git(repository, ["init", "-b", "main"]);
+  await git(repository, ["config", "user.name", "BELL Test"]);
+  await git(repository, ["config", "user.email", "test@example.invalid"]);
+  await writeFile(path.join(repository, "a.ts"), "export const value = 1;\n");
+  await git(repository, ["add", "."]);
+  await git(repository, ["commit", "-m", "initial"]);
+  const baseSha = (await git(repository, ["rev-parse", "HEAD"])).stdout.trim();
+  const store = new Store(path.join(directory, "state"));
+  await store.initialize();
+  let release!: () => void;
+  const reviewed = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const workbench = new Workbench(store, async (input) => {
+    await reviewed;
+    return `${input.role} report: no issues found.`;
+  });
+  const repo = await workbench.importRepository(repository);
+  const run: Run = {
+    id: "rerun-run",
+    repoId: repo.id,
+    title: "Update value",
+    prompt: "Update the exported value",
+    status: "review",
+    branch: "main",
+    baseBranch: "main",
+    baseSha,
+    worktreePath: repository,
+    createdAt: new Date().toISOString(),
+    agents: [
+      {
+        id: "reviewer",
+        name: "Lens",
+        role: "Reviewer",
+        status: "complete",
+        detail: "",
+      },
+      {
+        id: "tester",
+        name: "Scout",
+        role: "Test analyst",
+        status: "complete",
+        detail: "",
+      },
+    ],
+    logs: [],
+    draft: { title: "Update value", body: "" },
+    reviewedFiles: [],
+    reviewedFingerprints: {},
+  };
+  store.data.runs.push(run);
+  await writeFile(path.join(repository, "a.ts"), "export const value = 2;\n");
+
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown) => unhandled.push(reason);
+  process.on("unhandledRejection", onUnhandled);
+  const stderr: string[] = [];
+  const write = process.stderr.write;
+  process.stderr.write = ((chunk: string | Uint8Array) => {
+    stderr.push(String(chunk));
+    return true;
+  }) as typeof process.stderr.write;
+  const save = store.save.bind(store);
+  let failing = false;
+  store.save = async () => {
+    if (failing) throw new Error("disk full");
+    return save();
+  };
+  try {
+    await workbench.rerunReview(run.id);
+    // Every save after the rerun started fails, including the job's last one.
+    failing = true;
+    release();
+    await waitUntil(
+      () => stderr.some((line) => line.includes("rerun review failed")),
+      "the logged rerun failure",
+    );
+    await delay(20);
+    assert.deepEqual(unhandled, []);
+    const line = stderr.find((entry) => entry.includes("rerun review failed"))!;
+    assert.match(line, /^\S+ ERROR rerun review failed \{/);
+    assert.deepEqual(JSON.parse(line.slice(line.indexOf("{"))), {
+      runId: run.id,
+      error: "Error: disk full",
+    });
+    // The rerun let go of the run: its status is unchanged and a new rerun starts.
+    assert.equal(run.status, "review");
+    failing = false;
+    await workbench.rerunReview(run.id);
+  } finally {
+    process.stderr.write = write;
+    process.off("unhandledRejection", onUnhandled);
+    failing = false;
+    release();
+    await workbench.shutdown();
     await rm(directory, { recursive: true, force: true });
   }
 });

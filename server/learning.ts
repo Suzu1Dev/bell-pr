@@ -15,6 +15,7 @@ import {
   type ChatMessage,
 } from "../shared/chat.js";
 import { AppError, type Run } from "./types.js";
+import { log } from "./log.js";
 import {
   explanationBatches,
   explanationJsonSchema,
@@ -110,9 +111,15 @@ export async function rerunReview(ctx: WorkbenchContext, id: string) {
       ctx.reviewJobs.delete(id);
       await ctx.store.save();
     }
-  })().finally(() => {
-    ctx.jobs.delete(job);
-  });
+  })()
+    // Nothing awaits this job until shutdown or cancel; a failed save above
+    // must not become an unhandled rejection that stops the server.
+    .catch((error) =>
+      log.error("rerun review failed", { runId: id, error: String(error) }),
+    )
+    .finally(() => {
+      ctx.jobs.delete(job);
+    });
   ctx.reviewJobs.set(id, job);
   ctx.jobs.add(job);
   await ctx.store.save();
