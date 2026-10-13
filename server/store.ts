@@ -61,6 +61,11 @@ export class Store {
       // An interrupted follow-up round leaves the published PR intact: its
       // edits stay in the checkout for review, push or discard.
       const round = activeFollowUp(run.followUps);
+      if (round?.resolving) {
+        round.resolving = false;
+        round.report =
+          "服務重新啟動，解衝突已中斷；已改的檔案保留，可以自行完成，或再請 Agent 處理。";
+      }
       if (round && (run.status === "running" || run.publishing)) {
         if (round.status === "running") {
           round.status = "review";

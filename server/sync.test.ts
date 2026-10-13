@@ -196,7 +196,8 @@ test("an unpublished run syncs onto the latest target branch, keeps its changes 
     assert.equal(f.run.status, "published");
     const pushed = await f.github.head("fix/sync0001");
     assert.equal((await git(f.repo.path, ["rev-parse", `${pushed}^`])).stdout.trim(), upstream);
-    await assert.rejects(f.workbench.syncRun(f.run.id), /修正輪/);
+    // Once published, a sync merges into the PR; it already has the latest base.
+    assert.equal((await f.workbench.syncRun(f.run.id)).updated, false);
   } finally {
     await f.cleanup();
   }
@@ -334,6 +335,142 @@ test("an agent resolves sync conflicts for review, leftover markers keep blockin
     assert.equal(saved.status, "review");
     assert.equal(saved.sync!.resolving, false);
     assert.match(saved.sync!.report!, /服務重新啟動/);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+/** A run published as a PR through the fake GitHub. */
+async function publishedRun(runner?: TeamAgentRunner) {
+  const f = await unpublishedRun("review", runner);
+  await f.write("hello.ts", "line one\nline two, mine\nline three\n");
+  await f.reviewAll();
+  await f.workbench.approve(f.run.id, { ...f.run.draft });
+  await f.workbench.publish(f.run.id, f.run.approvedFingerprint!, ["unchecked", "issue", "brevity"]);
+  assert.equal(f.run.status, "published");
+  return f;
+}
+
+const parentsOf = async (cwd: string, commit: string) =>
+  (await git(cwd, ["rev-list", "--parents", "-n", "1", commit])).stdout.trim().split(/\s+/).slice(1);
+
+test("a published PR takes the latest target branch as one reviewed merge commit, never a second PR", async () => {
+  const f = await publishedRun();
+  try {
+    const prHead = f.run.publishCommit!;
+    const upstream = await f.github.upstreamCommit({ "other.ts": "other, upstream\n" });
+    const result = await f.workbench.syncRun(f.run.id);
+    assert.equal(result.updated, true);
+    const round = f.run.followUps!.at(-1)!;
+    assert.equal(round.kind, "sync");
+    assert.equal(round.mergeParent, upstream);
+    assert.equal(f.run.status, "review");
+    assert.equal(f.run.baseSha, upstream);
+    assert.equal(f.run.draft.commitMessage, "Merge branch 'main' into fix/sync0001");
+    // Measured from the merged-in target, the PR still changes only hello.ts.
+    assert.deepEqual((await readDiff(f.run)).map((file) => file.path), ["hello.ts"]);
+    await f.reviewAll();
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    await f.workbench.publish(f.run.id, f.run.approvedFingerprint!);
+    assert.equal(round.status, "published");
+    const merge = await f.github.head("fix/sync0001");
+    assert.equal(merge, f.run.publishCommit);
+    assert.deepEqual(await parentsOf(f.repo.path, merge), [prHead, upstream]);
+    const creates = (await f.github.calls()).filter((call) => call[0] === "gh" && call[2] === "create");
+    assert.equal(creates.length, 1);
+    assert.equal((await f.workbench.syncRun(f.run.id)).updated, false);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a conflicting PR sync can be discarded, or resolved by the agent and pushed after review", async () => {
+  const f = await publishedRun(async (input) => {
+    assert.equal(input.role, "sync");
+    await writeFile(path.join(input.cwd, "hello.ts"), "line one\nline two, theirs and mine\nline three\n");
+    return JSON.stringify({ summary: "合併兩邊。", files: [{ path: "hello.ts", resolution: "合併成一行。" }] });
+  });
+  try {
+    const prHead = f.run.publishCommit!;
+    const oldBase = f.run.baseSha;
+    const upstream = await f.github.upstreamCommit({ "hello.ts": "line one\nline two, theirs\nline three\n" });
+    assert.deepEqual((await f.workbench.syncRun(f.run.id)).conflicts, ["hello.ts"]);
+    assert.match(await f.read("hello.ts"), /^<<<<<<< this pull request$/m);
+    await f.reviewAll();
+    await assert.rejects(f.workbench.approve(f.run.id, { ...f.run.draft }), /衝突標記/);
+    // Discarding returns to the pushed PR and its old base.
+    await f.workbench.discardFollowUp(f.run.id);
+    assert.equal(f.run.status, "published");
+    assert.equal(f.run.baseSha, oldBase);
+    assert.equal(await f.read("hello.ts"), "line one\nline two, mine\nline three\n");
+    // Sync again, let the agent resolve, review and push.
+    await f.workbench.syncRun(f.run.id);
+    await f.workbench.resolveConflicts(f.run.id);
+    await until(() => f.run.status === "review");
+    const round = f.run.followUps!.at(-1)!;
+    assert.deepEqual(round.resolutions, [{ path: "hello.ts", resolution: "合併成一行。" }]);
+    await f.reviewAll();
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    await f.workbench.publish(f.run.id, f.run.approvedFingerprint!);
+    const merge = await f.github.head("fix/sync0001");
+    assert.deepEqual(await parentsOf(f.repo.path, merge), [prHead, upstream]);
+    assert.equal(
+      (await git(f.repo.path, ["show", `${merge}:hello.ts`])).stdout,
+      "line one\nline two, theirs and mine\nline three\n",
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("commits pushed to the PR branch on GitHub are taken over before a round; rewritten history is refused", async () => {
+  const f = await publishedRun(async (input) => {
+    await writeFile(path.join(input.cwd, "hello.ts"), "line one\nline two, reviewed\nline three\n");
+    return JSON.stringify({ summary: "改了第二行。", addressed: [], notAddressed: [], checks: [], commitMessage: "Polish line two" });
+  });
+  try {
+    const bellPush = f.run.publishCommit!;
+    const theirs = await f.github.pushToBranch("fix/sync0001", { "notes.md": "Suggested on GitHub.\n" });
+    const feedbackUrl = `${f.run.prUrl}#discussion_r1`;
+    f.run.prFeedback = {
+      fetchedAt: new Date().toISOString(),
+      prNumber: 1,
+      items: [
+        {
+          kind: "thread",
+          author: "maintainer",
+          authorAssociation: "MEMBER",
+          body: "Polish line two.",
+          path: "hello.ts",
+          line: 2,
+          url: feedbackUrl,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    };
+    await f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackUrl] });
+    const adopted = f.run.followUps![0];
+    assert.equal(adopted.adopted, true);
+    assert.equal(adopted.commit, theirs);
+    assert.equal(adopted.parentCommit, bellPush);
+    await until(() => f.run.status === "review");
+    const round = f.run.followUps![1];
+    assert.equal(round.parentCommit, theirs);
+    // The adopted change is reviewed together with the round's own.
+    assert.deepEqual((await readDiff(f.run)).map((file) => file.path), ["hello.ts", "notes.md"]);
+    await f.reviewAll();
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    await f.workbench.publish(f.run.id, f.run.approvedFingerprint!);
+    assert.deepEqual(await parentsOf(f.repo.path, await f.github.head("fix/sync0001")), [theirs]);
+
+    // History that no longer contains BELL's push is refused.
+    const mainHead = await f.github.head("main");
+    await git(f.repo.path, ["--git-dir", f.github.bare, "update-ref", "refs/heads/fix/sync0001", mainHead]);
+    await assert.rejects(
+      f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackUrl] }),
+      /改寫了 BELL 推送過的歷史/,
+    );
+    assert.equal(f.run.status, "published");
   } finally {
     await f.cleanup();
   }

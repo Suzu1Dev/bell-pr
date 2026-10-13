@@ -115,6 +115,13 @@ import {
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
+/** What a sync records about its conflicts, on a run or on a PR's sync round. */
+type ConflictHolder = {
+  conflicts: string[];
+  report?: string;
+  resolutions?: { path: string; resolution: string }[];
+  resolving?: boolean;
+};
 /** Statuses whose diff is final enough to explain, discuss and annotate. */
 const readableStatuses: Run["status"][] = [
   "review",
@@ -346,11 +353,7 @@ export class Workbench {
     if (this.stopping) throw new AppError("服務正在關閉，請稍後重試。", 503);
     return this.lock(id, async () => {
       const run = this.run(id);
-      if (run.prUrl)
-        throw new AppError(
-          "這個工作已送出 PR；同步已送出的 PR 請使用修正輪。",
-          409,
-        );
+      if (run.prUrl) return this.syncPublishedRun(run);
       if (
         !["review", "approved", "awaiting_plan"].includes(run.status) ||
         run.publishing
@@ -429,6 +432,172 @@ export class Workbench {
     });
   }
 
+  /**
+   * Merges the latest target branch into a published PR as a sync round. The
+   * merge result waits in the checkout for review like any round, and goes
+   * out as one merge commit on top of the PR head, without force.
+   */
+  private async syncPublishedRun(run: Run) {
+    if (
+      run.status !== "published" ||
+      run.publishing ||
+      !run.publishCommit ||
+      !run.headRepository
+    )
+      throw new AppError("只有已送出的 PR 可以同步目標分支。", 409);
+    if (activeFollowUp(run.followUps))
+      throw new AppError("這個 PR 已有一輪修正在進行；完成或放棄後再同步。", 409);
+    if (this.runBusy(run.id))
+      throw new AppError(
+        "這個工作還有 Agent、審查或解說在進行；請等它完成再同步。",
+        409,
+      );
+    const head = (
+      await git(run.worktreePath, ["rev-parse", "HEAD"])
+    ).stdout.trim();
+    if (head !== run.publishCommit || (await this.worktreeDirty(run)))
+      throw new AppError(
+        "工作目錄和已推送的 PR 內容不一致；請先還原工作目錄裡的修改再同步。",
+        409,
+      );
+    await this.adoptRemoteCommits(run);
+    this.assertRemoteHead(run, await this.remoteBranchHead(run), run.publishCommit);
+    const repo = this.repo(run.repoId);
+    const target = await this.lock(`repository:${repo.id}`, () =>
+      this.fetchBranchCommit(repo, run.baseBranch),
+    );
+    const contained =
+      (
+        await git(
+          run.worktreePath,
+          ["merge-base", "--is-ancestor", target, run.publishCommit],
+          { allowedCodes: [0, 1] },
+        )
+      ).code === 0;
+    if (contained) {
+      this.log(run, "user", `已確認 PR 已包含 ${run.baseBranch} 的最新版本。`);
+      await this.store.save();
+      return { run, updated: false, conflicts: [] as string[] };
+    }
+    const merged = await mergeCommits(run.worktreePath, run.publishCommit, target);
+    await checkoutTreeOnto(run.worktreePath, merged.tree, run.publishCommit);
+    await labelConflictMarkers(run.worktreePath, merged.conflicts, {
+      [run.publishCommit]: "this pull request",
+      [target]: `latest ${run.baseBranch} (${target.slice(0, 7)})`,
+    });
+    const round: FollowUpRound = {
+      id: newId().slice(0, 8),
+      kind: "sync",
+      requestedAt: now(),
+      feedbackUrls: [],
+      status: "review",
+      parentCommit: run.publishCommit,
+      mergeParent: target,
+      previousBase: run.baseSha,
+      conflicts: merged.conflicts,
+    };
+    (run.followUps ??= []).push(round);
+    // The PR's diff is now measured from the target branch it contains.
+    run.baseSha = target;
+    run.draft = {
+      ...run.draft,
+      commitMessage: `Merge branch '${run.baseBranch}' into ${run.publishedBranch ?? run.branch}`,
+    };
+    run.status = "review";
+    delete run.approvedFingerprint;
+    delete run.error;
+    await this.diff(run.id);
+    this.log(
+      run,
+      "user",
+      merged.conflicts.length
+        ? `已把 ${run.baseBranch} 最新版本（${target.slice(0, 7)}）合併進 PR，${merged.conflicts.length} 個檔案有衝突需要解決：${merged.conflicts.join("、")}。`
+        : `已把 ${run.baseBranch} 最新版本（${target.slice(0, 7)}）合併進 PR，沒有衝突；審閱後會推送一個合併 commit。`,
+    );
+    await this.store.save();
+    return { run, updated: true, conflicts: merged.conflicts };
+  }
+
+  /**
+   * Takes over commits pushed to the PR branch outside BELL (a suggestion
+   * applied on GitHub, "Update branch", a maintainer's push) when they build
+   * on BELL's last push: the checkout moves to GitHub's head and the PR's
+   * diff base becomes where it meets the target branch. Their changes are
+   * reviewed with the next round. Rewritten history is refused.
+   */
+  private async adoptRemoteCommits(run: Run) {
+    const remoteHead = await this.remoteBranchHead(run);
+    if (!remoteHead || remoteHead === run.publishCommit) return false;
+    const branch = run.publishedBranch ?? run.branch;
+    await git(
+      run.worktreePath,
+      [
+        ...networkConfig,
+        "fetch",
+        "--no-tags",
+        "--no-recurse-submodules",
+        `https://github.com/${run.headRepository}.git`,
+        `refs/heads/${branch}`,
+      ],
+      { timeoutMs: 120_000 },
+    );
+    const fetched = (
+      await git(run.worktreePath, ["rev-parse", "--verify", "FETCH_HEAD^{commit}"])
+    ).stdout.trim();
+    const builds =
+      (
+        await git(
+          run.worktreePath,
+          ["merge-base", "--is-ancestor", run.publishCommit!, fetched],
+          { allowedCodes: [0, 1] },
+        )
+      ).code === 0;
+    if (!builds)
+      throw new AppError(
+        `GitHub 上的 PR 分支 ${branch} 改寫了 BELL 推送過的歷史（例如 force push），BELL 無法接續；請在 GitHub 上處理。`,
+        409,
+      );
+    const repo = this.repo(run.repoId);
+    const target = await this.lock(`repository:${repo.id}`, () =>
+      this.fetchBranchCommit(repo, run.baseBranch),
+    );
+    const base = (
+      await git(run.worktreePath, ["merge-base", fetched, target])
+    ).stdout.trim();
+    const count = Number(
+      (
+        await git(run.worktreePath, [
+          "rev-list",
+          "--count",
+          `${run.publishCommit}..${fetched}`,
+        ])
+      ).stdout.trim(),
+    );
+    // The checkout is clean (callers check), so moving it loses nothing.
+    await git(run.worktreePath, ["reset", "-q", "--hard", fetched]);
+    (run.followUps ??= []).push({
+      id: newId().slice(0, 8),
+      kind: "sync",
+      requestedAt: now(),
+      feedbackUrls: [],
+      status: "published",
+      parentCommit: run.publishCommit!,
+      commit: fetched,
+      publishedAt: now(),
+      adopted: true,
+      report: `接續了 GitHub 上 BELL 以外的 ${count} 個提交；這些改動會在下一輪一起審閱。`,
+    });
+    run.publishCommit = fetched;
+    run.baseSha = base;
+    this.log(
+      run,
+      "system",
+      `已接續 GitHub 上 PR 分支 ${branch} 的 ${count} 個提交（例如在 GitHub 上套用建議或 Update branch）；這些改動會在下一輪一起審閱。`,
+    );
+    await this.store.save();
+    return true;
+  }
+
   /** Returns an unpublished run to the checkout and base it had before the last sync. */
   async undoSync(id: string) {
     return this.lock(id, async () => {
@@ -480,14 +649,14 @@ export class Workbench {
     if (this.stopping) throw new AppError("服務正在關閉，請稍後重試。", 503);
     return this.lock(id, async () => {
       const run = this.run(id);
-      const sync = run.sync;
+      const target = this.conflictHolder(run);
       if (
-        !sync ||
-        run.prUrl ||
+        !target ||
         run.publishing ||
         !["review", "approved"].includes(run.status)
       )
         throw new AppError("目前沒有需要解決的同步衝突。", 409);
+      const sync = target.holder;
       if (this.runBusy(id))
         throw new AppError(
           "這個工作還有 Agent、審查或解說在進行；請等它完成再解衝突。",
@@ -513,7 +682,13 @@ export class Workbench {
       this.log(run, "user", `要求 Agent 解決 ${open.length} 個檔案的合併衝突：${open.join("、")}。`);
       const controller = new AbortController();
       this.controllers.set(id, controller);
-      const job = this.runConflictResolution(run, open, controller).finally(() => {
+      const job = this.runConflictResolution(
+        run,
+        open,
+        controller,
+        sync,
+        target.head,
+      ).finally(() => {
         this.conflictJobs.delete(id);
         this.jobs.delete(job);
       });
@@ -528,6 +703,8 @@ export class Workbench {
     run: Run,
     files: string[],
     controller: AbortController,
+    holder: ConflictHolder,
+    head: string,
   ) {
     let temporary: string | undefined;
     let resolved = false;
@@ -555,18 +732,17 @@ export class Workbench {
       );
       const result = parseConflictResult(answer, files);
       await this.lock(run.id, async () => {
-        const sync = run.sync!;
-        const moved = await this.restoreAgentHead(run, run.baseSha);
-        const open = await filesWithConflictMarkers(run.worktreePath, sync.conflicts);
+        const moved = await this.restoreAgentHead(run, head);
+        const open = await filesWithConflictMarkers(run.worktreePath, holder.conflicts);
         resolved = !open.length;
-        sync.report = [
+        holder.report = [
           result.summary,
           moved ? committedNote : "",
           open.length ? `仍有衝突標記：${open.join("、")}。` : "",
         ]
           .filter(Boolean)
           .join("\n");
-        sync.resolutions = result.resolutions;
+        holder.resolutions = result.resolutions;
         await this.diff(run.id);
         run.status = "review";
         this.log(
@@ -579,17 +755,16 @@ export class Workbench {
       });
     } catch (error) {
       await this.lock(run.id, async () => {
-        await this.restoreAgentHead(run, run.baseSha).catch(() => undefined);
-        if (run.sync)
-          run.sync.report = controller.signal.aborted
+        await this.restoreAgentHead(run, head).catch(() => undefined);
+        holder.report = controller.signal.aborted
             ? "已停止解衝突；已改的檔案保留，可以自行完成，或再請 Agent 處理。"
             : `${redact(error instanceof Error ? error.message : "解衝突未完成")}；已改的檔案保留，可以自行完成，或再請 Agent 處理。`;
         await this.diff(run.id).catch(() => undefined);
         run.status = "review";
-        this.log(run, "system", run.sync?.report ?? "解衝突未完成。");
+        this.log(run, "system", holder.report ?? "解衝突未完成。");
       });
     } finally {
-      if (run.sync) run.sync.resolving = false;
+      holder.resolving = false;
       const agent = run.agents.find((value) => value.id === "sync");
       if (agent) {
         agent.status = resolved ? "complete" : "failed";
@@ -602,10 +777,26 @@ export class Workbench {
     }
   }
 
+  /**
+   * The sync whose conflicts are open: an unpublished run's, or a published
+   * PR's sync round, with the commit its checkout must sit on.
+   */
+  private conflictHolder(
+    run: Run,
+  ): { holder: ConflictHolder; head: string } | undefined {
+    if (!run.prUrl)
+      return run.sync ? { holder: run.sync, head: run.baseSha } : undefined;
+    const round = activeFollowUp(run.followUps);
+    return round?.kind === "sync" && round.conflicts
+      ? { holder: round as ConflictHolder, head: round.parentCommit }
+      : undefined;
+  }
+
   /** Approval and publishing wait until a sync's conflicts are resolved. */
   private async assertConflictsResolved(run: Run) {
-    const open = run.sync?.conflicts.length
-      ? await filesWithConflictMarkers(run.worktreePath, run.sync.conflicts)
+    const conflicts = this.conflictHolder(run)?.holder.conflicts ?? [];
+    const open = conflicts.length
+      ? await filesWithConflictMarkers(run.worktreePath, conflicts)
       : [];
     if (open.length)
       throw new AppError(
@@ -2903,11 +3094,13 @@ export class Workbench {
           "工作目錄和已推送的 PR 內容不一致；請先還原工作目錄裡的修改再開始修正。",
           409,
         );
-      // Rounds build on BELL's last push; refuse before the agent spends any time.
+      // Rounds build on the PR head: take over commits added on GitHub, and
+      // refuse rewritten history before the agent spends any time.
+      await this.adoptRemoteCommits(run);
       this.assertRemoteHead(
         run,
         await this.remoteBranchHead(run),
-        run.publishCommit,
+        run.publishCommit!,
       );
       const round: FollowUpRound = {
         id: newId().slice(0, 8),
@@ -3075,12 +3268,14 @@ export class Workbench {
     files: DiffFile[],
     tree?: string,
   ) {
+    // A sync round's tree is the target branch plus the reviewed files.
+    const base = round.mergeParent ?? round.parentCommit;
     const changed = (
       await git(
         run.worktreePath,
         tree
-          ? ["diff-tree", "-r", "--no-renames", "--name-only", "-z", round.parentCommit, tree]
-          : ["diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", round.parentCommit, "--"],
+          ? ["diff-tree", "-r", "--no-renames", "--name-only", "-z", base, tree]
+          : ["diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", base, "--"],
       )
     ).stdout
       .split("\0")
@@ -3250,6 +3445,7 @@ export class Workbench {
       await git(run.worktreePath, ["reset", "--hard", round.parentCommit]);
       // Ignored files such as build output stay; only the round's new files go.
       await git(run.worktreePath, ["clean", "-fd"]);
+      if (round.previousBase) run.baseSha = round.previousBase;
       await this.restoreParentMessage(run, round);
       round.status = "discarded";
       run.status = "published";
@@ -3282,6 +3478,7 @@ export class Workbench {
   ) {
     const message = run.draft.commitMessage?.trim();
     if (!message) throw new AppError("請填寫這輪修正的提交訊息。", 422);
+    await this.assertConflictsResolved(run);
     if (findDraftPlaceholders(message).length)
       throw new AppError("提交訊息還有待填寫的內容，請改好再推送。", 422);
     if (!run.prUrl || !run.headRepository)
@@ -3357,14 +3554,15 @@ export class Workbench {
       let commit = round.commit;
       if (commit) {
         // A retry after the commit was made: it must be the same reviewed content.
-        const [priorTree, priorParent, priorMessage] = await Promise.all([
+        const [priorTree, priorParents, priorMessage] = await Promise.all([
           git(run.worktreePath, ["rev-parse", `${commit}^{tree}`]),
-          git(run.worktreePath, ["rev-parse", `${commit}^`]),
+          git(run.worktreePath, ["rev-list", "--parents", "-n", "1", commit]),
           git(run.worktreePath, ["log", "-1", "--format=%B", commit]),
         ]);
         if (
           priorTree.stdout.trim() !== tree ||
-          priorParent.stdout.trim() !== round.parentCommit ||
+          priorParents.stdout.trim().split(/\s+/).slice(1).join(" ") !==
+            [round.parentCommit, round.mergeParent].filter(Boolean).join(" ") ||
           priorMessage.stdout.trim() !== message
         )
           throw new AppError(
@@ -3375,7 +3573,13 @@ export class Workbench {
         commit = (
           await git(
             run.worktreePath,
-            ["commit-tree", tree, "-p", round.parentCommit],
+            [
+              "commit-tree",
+              tree,
+              "-p",
+              round.parentCommit,
+              ...(round.mergeParent ? ["-p", round.mergeParent] : []),
+            ],
             { input: `${message}\n` },
           )
         ).stdout.trim();

@@ -5,6 +5,11 @@
  */
 export interface FollowUpRound {
   id: string;
+  /**
+   * review: changes from maintainer feedback. sync: the latest target branch
+   * merged into the PR, pushed as a merge commit. Absent means review.
+   */
+  kind?: "review" | "sync";
   requestedAt: string;
   /** URLs of the PR feedback items (reviews, comments, threads) the person selected. */
   feedbackUrls: string[];
@@ -27,6 +32,18 @@ export interface FollowUpRound {
   commit?: string;
   publishedAt?: string;
   error?: string;
+  /** A sync round's second parent: the target-branch commit merged in. */
+  mergeParent?: string;
+  /** A sync round's base before it, restored if the round is discarded. */
+  previousBase?: string;
+  /** Files a sync round's merge could not combine; they hold markers until resolved. */
+  conflicts?: string[];
+  /** Per-file conflict resolutions the agent described. */
+  resolutions?: { path: string; resolution: string }[];
+  /** True while an agent resolves this round's conflicts; a restart clears it. */
+  resolving?: boolean;
+  /** Commits pushed on GitHub outside BELL that BELL took over; nothing was pushed. */
+  adopted?: boolean;
 }
 
 export const followUpFeedbackLimit = 20;
