@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { command, agentEnvironment, redact } from "./process.js";
 import { readDiff, synchronizeReview } from "./git.js";
@@ -28,17 +26,12 @@ import type { AgentProvider } from "../shared/models.js";
 import { synchronizeExplanations } from "./explanations.js";
 
 import { collectDraftContext } from "./draft-sources.js";
-import {
-  draftFingerprint,
-  draftJsonSchema,
-  draftPrompt,
-  parseDraftProposal,
-  synchronizeDraftPreparation,
-} from "./drafts.js";
+import { synchronizeDraftPreparation } from "./drafts.js";
 import * as repositories from "./repositories.js";
 import * as executor from "./run-executor.js";
 import * as publishing from "./publish.js";
 import * as learning from "./learning.js";
+import * as drafting from "./draft-jobs.js";
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
@@ -74,6 +67,8 @@ export interface WorkbenchContext {
     agentRunner?: TeamAgentRunner;
     /** Wait between retries of a turn that lost the OAuth refresh race. */
     sleep?: TransientSleep;
+    /** Reads the target project's contribution rules for the PR draft. */
+    collectDraftContext?: typeof collectDraftContext;
   };
   /** True once shutdown() has begun; no new background work starts. */
   stopping(): boolean;
@@ -95,11 +90,7 @@ export interface WorkbenchContext {
   /** Starts the run's PR draft preparation, or waits for the one running. */
   prepareRunDraft(
     id: string,
-    options: {
-      refresh?: boolean;
-      automatic?: boolean;
-      startingDraft?: Run["draft"];
-    },
+    options: drafting.DraftOptions,
   ): Promise<{ run: Run }>;
 }
 
@@ -169,6 +160,7 @@ export class Workbench {
         command: dependencies.command,
         agentRunner,
         sleep: dependencies.sleep,
+        collectDraftContext: dependencies.collectDraftContext,
       },
       stopping: () => this.stopping,
       log: executor.appendRunLog,
@@ -643,154 +635,9 @@ export class Workbench {
 
   private async prepareRunDraft(
     id: string,
-    options: {
-      refresh?: boolean;
-      automatic?: boolean;
-      startingDraft?: Run["draft"];
-    } = {},
+    options: drafting.DraftOptions = {},
   ) {
-    if (this.stopping) throw new AppError("服務正在關閉，請稍後重試。", 503);
-    let pending: Promise<void> | undefined;
-    await this.lock(id, async () => {
-      if (this.stopping) throw new AppError("服務正在關閉，請稍後重試。", 503);
-      const run = this.run(id);
-      this.editable(run);
-      const files = await this.diff(id);
-      if (this.stopping) throw new AppError("服務正在關閉，請稍後重試。", 503);
-      pending = this.draftJobs.get(id);
-      if (pending) return;
-      if (
-        !options.refresh &&
-        run.draftPreparation?.status === "ready" &&
-        run.draftPreparation.fingerprint === draftFingerprint(run, files)
-      )
-        return;
-      const job = this.generateDraft(
-        run,
-        files,
-        !!options.automatic,
-        options.startingDraft,
-      ).finally(() => {
-        this.draftJobs.delete(id);
-        this.jobs.delete(job);
-      });
-      pending = job;
-      this.draftJobs.set(id, job);
-      this.jobs.add(job);
-    });
-    await pending;
-    return { run: this.run(id) };
-  }
-
-  private async generateDraft(
-    run: Run,
-    files: Awaited<ReturnType<typeof readDiff>>,
-    automatic: boolean,
-    initialDraft?: Run["draft"],
-  ) {
-    const controller = new AbortController();
-    const key = `draft:${run.id}`;
-    this.controllers.set(key, controller);
-    const fingerprint = draftFingerprint(run, files);
-    const startingDraft = initialDraft ?? { ...run.draft };
-    const preparation: NonNullable<Run["draftPreparation"]> = {
-      ...(run.draftPreparation?.fingerprint === fingerprint
-        ? run.draftPreparation
-        : {}),
-      status: "generating",
-      fingerprint,
-    };
-    delete preparation.error;
-    run.draftPreparation = preparation;
-    let temporary: string | undefined;
-    try {
-      await this.store.save();
-      if (controller.signal.aborted)
-        throw new AppError("PR 草稿產生已取消。", 409);
-      preparation.context = await (
-        this.dependencies.collectDraftContext ?? collectDraftContext
-      )(this.repo(run.repoId), run, { signal: controller.signal });
-      if (controller.signal.aborted)
-        throw new AppError("PR 草稿產生已取消。", 409);
-      const prompt = draftPrompt(run, files, preparation.context);
-      temporary = await mkdtemp(path.join(os.tmpdir(), "bell-draft-"));
-      const outputSchema = path.join(temporary, "response-schema.json");
-      await writeFile(outputSchema, JSON.stringify(draftJsonSchema), {
-        mode: 0o600,
-      });
-      await this.store.save();
-      const answer = await executor.runAgent(
-        this.context,
-        run,
-        "draft",
-        prompt,
-        controller.signal,
-        true,
-        { cwd: temporary, outputSchema, isolated: true, timeout: "draft" },
-      );
-      const proposal = parseDraftProposal(answer, preparation.context);
-      await this.lock(run.id, async () => {
-        const currentFiles = await readDiff(run);
-        if (fingerprint !== draftFingerprint(run, currentFiles)) {
-          preparation.status = "stale";
-          preparation.error =
-            "程式碼差異已更新；請重新產生符合目前變更的 PR 草稿建議。";
-          return;
-        }
-        preparation.status = "ready";
-        preparation.proposal = proposal;
-        preparation.generatedAt = now();
-        if (
-          automatic &&
-          run.status === "review" &&
-          !run.publishing &&
-          !run.approvedFingerprint &&
-          run.draft.title === startingDraft.title &&
-          run.draft.body === startingDraft.body
-        ) {
-          // A message the person already wrote wins over the suggestion.
-          const commitMessage =
-            run.draft.commitMessage?.trim() ||
-            proposal.commitMessageSuggestion?.message;
-          run.draft = {
-            title: proposal.title,
-            body: proposal.body,
-            ...(commitMessage ? { commitMessage } : {}),
-            ...(run.draft.publishBranch
-              ? { publishBranch: run.draft.publishBranch }
-              : {}),
-          };
-          this.log(
-            run,
-            "draft",
-            "已把 PR 草稿建議放進編輯區。這是模型寫的原文，送出前請用自己的話確認內容，並處理核對清單與勾選項目。",
-          );
-        } else {
-          this.log(
-            run,
-            "draft",
-            "PR 草稿建議已準備完成，現有草稿保留；可在 PR 草稿區檢視並套用。",
-          );
-        }
-      });
-    } catch (error) {
-      if (preparation.status !== "stale") {
-        preparation.status = "failed";
-        preparation.error = controller.signal.aborted
-          ? "PR 草稿建議產生已中斷；現有草稿與已完成變更仍保留，可重新產生。"
-          : redact(
-              error instanceof Error
-                ? error.message
-                : "PR 草稿建議產生失敗，請重試。",
-            );
-      }
-      this.log(run, "draft", preparation.error ?? "PR 草稿建議未完成。");
-    } finally {
-      if (this.controllers.get(key) === controller)
-        this.controllers.delete(key);
-      if (temporary) await rm(temporary, { recursive: true, force: true });
-      await this.store.save();
-    }
+    return drafting.prepareRunDraft(this.context, id, options);
   }
 
   editable(run: Run) {
