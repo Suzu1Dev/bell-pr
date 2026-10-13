@@ -609,3 +609,53 @@ test("a push interrupted after the commit is recorded can be retried, and a comm
     await f.cleanup();
   }
 });
+
+test("an agent that switches branches or detaches HEAD is put back on the PR branch with its edits reviewable", async () => {
+  let switchTo: string[] = [];
+  let content = "";
+  const f = await publishedFixture(async (input) => {
+    await git(input.cwd, switchTo);
+    await writeFile(path.join(input.cwd, "hello.ts"), `export const hello = "${content}";\n`);
+    await git(input.cwd, ["commit", "-qam", "agent commit"]);
+    return JSON.stringify({
+      summary: "改了問候語。",
+      addressed: [],
+      notAddressed: [],
+      checks: [],
+      commitMessage: `Say ${content}`,
+    });
+  });
+  try {
+    for (const [args, label] of [
+      [["checkout", "-q", "-b", "agent-side"], "side"],
+      [["checkout", "-q", "--detach"], "detached"],
+    ] as const) {
+      switchTo = [...args];
+      content = label;
+      const parent = f.run.publishCommit!;
+      await f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackItem.url] });
+      await settled(f.run);
+      const round = f.run.followUps!.at(-1)!;
+      assert.equal(round.status, "review", label);
+      assert.match(round.error!, /切換了分支/, label);
+      assert.equal(
+        (await git(f.repository, ["symbolic-ref", "HEAD"])).stdout.trim(),
+        `refs/heads/${f.run.branch}`,
+        label,
+      );
+      assert.equal((await git(f.repository, ["rev-parse", "HEAD"])).stdout.trim(), parent, label);
+      assert.match((await git(f.repository, ["status", "--porcelain"])).stdout, /hello\.ts/, label);
+      await f.reviewAll();
+      await f.workbench.approve(f.run.id, { ...f.run.draft });
+      await f.workbench.publish(f.run.id, f.run.approvedFingerprint!);
+      assert.equal(round.status, "published", label);
+      assert.equal(
+        (await git(f.repository, ["rev-parse", `${f.run.publishCommit}^`])).stdout.trim(),
+        parent,
+        label,
+      );
+    }
+  } finally {
+    await f.cleanup();
+  }
+});
