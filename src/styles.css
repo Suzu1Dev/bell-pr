@@ -880,7 +880,7 @@ button {
   min-width: 0;
   border: 0;
   font-size: var(--text-2xs);
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   background: transparent;
 }
 .file-search input::placeholder {
