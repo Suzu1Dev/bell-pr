@@ -64,7 +64,6 @@ import { applyReviewOrder, parseReviewOrder } from "../../shared/review-order";
 import { DiffView } from "../review/DiffView";
 import { LearningNotes } from "../learning/LearningNotes";
 import { languageBadge } from "../review/diff";
-import { providerLabels } from "../../shared/models";
 import { CommandPalette } from "../navigation/CommandPalette";
 const ExplanationPanel = lazy(() =>
   import("../review/ExplanationPanel").then((module) => ({
@@ -86,12 +85,16 @@ const DiscoveryPanel = lazy(() => import("../discovery/DiscoveryPanel"));
 
 import {
   ProjectOverview,
-  DirectionSettings,
   demoContributionBrief,
 } from "../mission";
 import { useProjectInsights } from "../mission/useProjectInsights";
 import { TeamBoard } from "../team/TeamBoard";
 import { Modal } from "../modals/Modal";
+import { HelpModal } from "../modals/HelpModal";
+import { NewTaskModal } from "../modals/NewTaskModal";
+import { RunsModal } from "../modals/RunsModal";
+import { ImportRepoModal } from "../repos/ImportRepoModal";
+import { ModelSettingsModal } from "../settings/ModelSettingsModal";
 import { fileStatusLabel, statusLabels } from "./labels";
 import { useAppData, type Status } from "./hooks/useAppData";
 import { useDraftEditor } from "./hooks/useDraftEditor";
@@ -100,7 +103,6 @@ import { loadDemo, useRunActions } from "./hooks/useRunActions";
 import { useRunPolling } from "./hooks/useRunPolling";
 import { useTaskSetup } from "./hooks/useTaskSetup";
 import {
-  defaultContributionSettings,
   type ContributionBrief,
 } from "../../shared/insights";
 
@@ -453,27 +455,10 @@ export default function App() {
   const {
     source,
     setSource,
-    taskRepoId,
-    prompt,
-    setPrompt,
-    taskTitle,
-    setTaskTitle,
-    contributionSettings,
-    modelSettings,
-    setModelSettings,
-    settingsLoading,
-    settingsReady,
-    settingsNotice,
-    setSettingsNotice,
-    settingsSaveButton,
-    configureTaskRepo,
     beginContribution,
     configureContributionModels,
-    saveModelSettings,
-    changeContributionSettings,
     chooseRecommendation,
     chooseOpportunity,
-    saveDirection,
   } = setup;
   const actions = useRunActions({
     run,
@@ -2522,289 +2507,36 @@ export default function App() {
         </div>
       )}
       {modal === "import" && (
-        <Modal
-          title="帶入你的下一個貢獻。"
-          subtitle="貼上 GitHub 連結，或選擇本機 Git 專案的完整路徑。"
-          onClose={closeModal}
-        >
-          <form onSubmit={importRepo}>
-            <label className="field-label" htmlFor="repo-source">
-              Repository 來源
-            </label>
-            <div className="input-with-icon">
-              <Github size={18} />
-              <input
-                id="repo-source"
-                className="text-input"
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
-                placeholder="https://github.com/owner/repository"
-                required
-                autoComplete="off"
-              />
-            </div>
-            <p className="field-help">
-              也支援 /Users/你的名稱/projects/repository
-            </p>
-            <div className="callout">
-              <FolderGit2 size={18} />
-              <p>
-                GitHub 專案會下載至本機；後續開發使用獨立
-                worktree，保留原專案狀態。
-              </p>
-            </div>
-            {formError && (
-              <p role="alert" className="inline-error">
-                {formError}
-              </p>
-            )}
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="button secondary"
-                onClick={closeModal}
-              >
-                稍後再說
-              </button>
-              <button
-                type="submit"
-                className="button primary"
-                disabled={busy || !source.trim()}
-              >
-                {busy ? (
-                  <Loader2 size={16} className="spin" />
-                ) : (
-                  <ArrowDownToLine size={16} />
-                )}{" "}
-                {busy ? "正在匯入…" : "匯入 Repository"}
-              </button>
-            </div>
-          </form>
-        </Modal>
+        <ImportRepoModal
+          source={source}
+          setSource={setSource}
+          busy={busy}
+          formError={formError}
+          importRepo={importRepo}
+          closeModal={closeModal}
+        />
       )}
       {modal === "models" && (
-        <Modal
-          wide
-          title="設定貢獻模型"
-          subtitle="所有專案共用的 Agent、模型與思考強度，套用到之後建立的任務與專案分析。"
-          onClose={closeModal}
-        >
-          <form onSubmit={(event) => {
-            event.preventDefault();
-            void saveModelSettings();
-          }}>
-            {settingsLoading && (
-              <p className="field-help" role="status">正在載入模型設定…</p>
-            )}
-            {!settingsLoading && !settingsReady && (
-              <button
-                type="button"
-                className="save-direction-button"
-                onClick={() => void configureContributionModels()}
-              >
-                重新載入模型設定
-              </button>
-            )}
-            <fieldset
-              className="direction-settings-container"
-              disabled={busy || settingsLoading || !settingsReady}
-            >
-              <DirectionSettings
-                value={{ ...defaultContributionSettings, ...modelSettings }}
-                onChange={({ provider, model, reasoningEffort, webAccess }) => {
-                  setModelSettings({ provider, model, reasoningEffort, webAccess });
-                  setSettingsNotice("");
-                  setFormError("");
-                }}
-                modelsOnly
-                compact
-              />
-            </fieldset>
-            {formError && (
-              <p role="alert" className="inline-error">{formError}</p>
-            )}
-            {settingsNotice && (
-              <p role="status" className="model-settings-saved">
-                <CircleCheck size={16} />{settingsNotice}
-              </p>
-            )}
-            <div className="modal-actions">
-              <button type="button" className="button secondary" onClick={closeModal}>
-                關閉
-              </button>
-              <button
-                ref={settingsSaveButton}
-                type="submit"
-                className="button primary"
-                disabled={busy || settingsLoading || !settingsReady}
-              >
-                {busy ? <Loader2 size={16} className="spin" /> : <Check size={16} />}
-                {busy ? "正在儲存…" : "儲存設定"}
-              </button>
-            </div>
-          </form>
-        </Modal>
+        <ModelSettingsModal
+          setup={setup}
+          busy={busy}
+          formError={formError}
+          setFormError={setFormError}
+          closeModal={closeModal}
+        />
       )}
       {modal === "task" && (
-        <Modal
-          wide
-          title="把想法交給你的 Agent team。"
-          subtitle="描述你想改善什麼，以及完成後應該有的行為。"
-          onClose={closeModal}
-        >
-          <form onSubmit={startTask}>
-            <label className="field-label" htmlFor="task-repo">
-              目標 Repository
-            </label>
-            <select
-              id="task-repo"
-              className="text-input"
-              value={taskRepoId}
-              disabled={busy}
-              onChange={(e) => configureTaskRepo(e.target.value)}
-              required
-            >
-              <option value="" disabled>
-                選擇 Repository
-              </option>
-              {[...repos, demoRepo].map((repo) => (
-                <option value={repo.id} key={repo.id}>
-                  {repo.fullName}
-                  {repo.id === "demo-repo" ? "（示範）" : ""}
-                </option>
-              ))}
-            </select>
-            <div className="task-repo-actions">
-              <button type="button" onClick={() => openModal("import")}>
-                <Plus size={13} />
-                匯入其他專案
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  closeModal();
-                  setExploreRepoId(taskRepoId);
-                  navigate("explore");
-                }}
-              >
-                <Sparkles size={13} />
-                先看 AI 推薦方向
-              </button>
-            </div>
-            {taskRepoId === "demo-repo" && (
-              <p className="task-demo-note">
-                示範設定可以自由調整；不會啟動真實 agent。請匯入你的 repository
-                開始開發。
-              </p>
-            )}
-            {settingsLoading && (
-              <p className="field-help" role="status">
-                正在載入這個專案的貢獻設定…
-              </p>
-            )}
-            {!settingsLoading && !settingsReady && (
-              <button
-                type="button"
-                className="save-direction-button"
-                onClick={() => configureTaskRepo(taskRepoId)}
-              >
-                重新載入專案設定
-              </button>
-            )}
-            <fieldset
-              className="direction-settings-container"
-              disabled={busy || settingsLoading || !settingsReady}
-            >
-              <DirectionSettings
-                value={contributionSettings}
-                onChange={changeContributionSettings}
-                compact
-              />
-            </fieldset>
-            <button
-              type="button"
-              className="save-direction-button"
-              disabled={
-                busy || !taskRepoId || settingsLoading || !settingsReady
-              }
-              onClick={saveDirection}
-            >
-              <Check size={14} />
-              儲存為預設設定
-            </button>
-            <label className="field-label" htmlFor="task-title">
-              任務名稱 <span>選填</span>
-            </label>
-            <input
-              id="task-title"
-              className="text-input"
-              placeholder="例如：為 API client 加入智慧重試"
-              value={taskTitle}
-              onChange={(e) => setTaskTitle(e.target.value)}
-            />
-            <label className="field-label" htmlFor="task-prompt">
-              這次想完成什麼？
-            </label>
-            <textarea
-              id="task-prompt"
-              className="text-input task-prompt"
-              placeholder="描述需求、相關檔案、預期行為與驗收方式…"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              required
-              minLength={10}
-            />
-            <div className="task-team-preview">
-              <Bot size={16} />
-              <span>Team lead</span>
-              <ChevronRight size={12} />
-              <span>{contributionSettings.maxTeammates} 位 Teammates</span>
-              <ChevronRight size={12} />
-              <span>Reviewer + Test analyst</span>
-            </div>
-            <p className="field-help">
-              會使用本機{" "}
-              {providerLabels[contributionSettings.provider ?? "codex"]}{" "}
-              帳號執行任務，消耗對應用量。完成後等待你審查。
-            </p>
-            {formError && (
-              <p role="alert" className="inline-error">
-                {formError}
-              </p>
-            )}
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="button secondary"
-                onClick={closeModal}
-              >
-                取消
-              </button>
-              <button
-                className="button primary"
-                type="submit"
-                disabled={
-                  busy ||
-                  settingsLoading ||
-                  !settingsReady ||
-                  !taskRepoId ||
-                  prompt.trim().length < 10
-                }
-              >
-                {busy ? (
-                  <Loader2 size={16} className="spin" />
-                ) : (
-                  <Play size={16} />
-                )}
-                {taskRepoId === "demo-repo"
-                  ? "儲存示範方向"
-                  : contributionSettings.requirePlanApproval
-                    ? "產生團隊計畫"
-                    : "啟動 Agent team"}
-              </button>
-            </div>
-          </form>
-        </Modal>
+        <NewTaskModal
+          setup={setup}
+          repos={repos}
+          busy={busy}
+          formError={formError}
+          startTask={startTask}
+          closeModal={closeModal}
+          openModal={openModal}
+          navigate={navigate}
+          setExploreRepoId={setExploreRepoId}
+        />
       )}
       {modal === "publish" && (
         <Modal
@@ -2934,79 +2666,15 @@ export default function App() {
         </Modal>
       )}
       {modal === "runs" && (
-        <Modal
-          wide
-          title="每一個想法，都有進度。"
-          subtitle="切換任務以查看開發狀態、程式碼變更與 PR 草稿。"
-          onClose={closeModal}
-        >
-          <div className="all-runs">
-            {[...runs, demoRun].map((job) => (
-              <button
-                className="run-list-row"
-                key={job.id}
-                onClick={() => {
-                  closeModal();
-                  void chooseRun(job.id);
-                }}
-              >
-                <GitPullRequest size={20} />
-                <span>
-                  <strong>{job.title}</strong>
-                  <small>
-                    {job.id === demoRun.id
-                      ? "互動示範"
-                      : repos.find((repo) => repo.id === job.repoId)
-                          ?.fullName}{" "}
-                    · {job.branch}
-                  </small>
-                </span>
-                <em>{statusLabels[job.status]}</em>
-                <ChevronRight size={15} />
-              </button>
-            ))}
-          </div>
-          <button
-            className="button primary full-width"
-            onClick={() => beginContribution()}
-          >
-            <Plus size={15} />
-            新增貢獻
-          </button>
-        </Modal>
+        <RunsModal
+          runs={runs}
+          repos={repos}
+          chooseRun={chooseRun}
+          beginContribution={beginContribution}
+          closeModal={closeModal}
+        />
       )}
-      {modal === "help" && (
-        <Modal
-          title="從想法，到你的下一個 PR。"
-          subtitle="四個步驟，把開發、審查與學習串在一起。"
-          onClose={closeModal}
-        >
-          <ol className="guide-list">
-            <li>
-              <strong>帶入 Repository</strong>
-              <p>匯入 GitHub 連結或本機路徑，選擇要貢獻的專案。</p>
-            </li>
-            <li>
-              <strong>指揮 Agent team</strong>
-              <p>清楚描述需求，讓規劃、開發與審查角色完成分工。</p>
-            </li>
-            <li>
-              <strong>理解每個改動</strong>
-              <p>
-                切換檔案閱讀 diff；點選行號，或按住 Shift 選擇一段程式碼，向
-                agent 提問。理解後勾選「已審閱」。
-              </p>
-            </li>
-            <li>
-              <strong>編輯並送出 PR</strong>
-              <p>調整標題與說明，儲存草稿，完成所有檔案審查後確認送出。</p>
-            </li>
-          </ol>
-          <button className="button primary full-width" onClick={closeModal}>
-            開始探索
-          </button>
-        </Modal>
-      )}
+      {modal === "help" && <HelpModal closeModal={closeModal} />}
     </div>
   );
 }
