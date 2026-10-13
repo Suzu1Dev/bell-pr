@@ -177,33 +177,9 @@ npm start
 
 建置完成後，正式模式由同一個 Node.js 服務提供網頁與 API，開啟 <http://127.0.0.1:4311>。
 
-## Ubuntu 私網部署
+## 資料目錄與維護
 
-`deploy/bell-pr.service` 提供 systemd 使用者服務，預設安裝於 `~/apps/bell-pr`。在 Ubuntu 使用 Node.js 22 以上、Git、GitHub CLI 與已登入的 Codex CLI 或 Claude Code CLI（服務以同一使用者執行時，會沿用 `~/.claude` 的登入）；服務的 PATH 包含 `~/.local/bin`。執行 `npm ci` 後建置，保留開發依賴，因為正式啟動仍使用 `tsx`。
-
-```sh
-cd ~/apps/bell-pr
-npm ci
-npm run build
-npm test
-mkdir -p ~/.config/bell-pr ~/.config/systemd/user
-cp deploy/environment.example ~/.config/bell-pr/environment
-chmod 600 ~/.config/bell-pr/environment
-# 編輯環境檔：確認資料目錄、私網 origin 與自己的 Git 姓名／email
-cp deploy/bell-pr.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now bell-pr
-```
-
-`your-host` 的入口設定為 `https://your-host.your-tailnet.ts.net:8443`，必須連入可存取該機器的 Tailscale 私網。Node.js 只監聽 `127.0.0.1:8443`，由 Tailscale Serve 提供 HTTPS。由具備 Tailscale 管理權限的帳號執行下列命令；此設定只新增 `8443` 入口，不重設其他 Serve 服務：
-
-```sh
-tailscale serve --bg --yes --https=8443 http://127.0.0.1:8443
-```
-
-確認 `loginctl show-user "$USER" -p Linger` 為 `Linger=yes`，服務才能在未登入及重開機後啟動；尚未啟用時需請系統管理者開啟 linger。`BELLPR_ALLOWED_ORIGINS` 只是來源檢查，不提供帳號認證；存取權限由 Tailscale 裝置與網路政策控制，不要將此代理公開到網際網路。
-
-維護可使用 `systemctl --user status bell-pr`、`systemctl --user restart bell-pr` 與 `journalctl --user -u bell-pr -n 100`。發生未預期的錯誤（API 回傳 500 的「操作未完成」）時，服務記錄會寫入請求方法、路徑與錯誤堆疊；背景工作失敗則顯示在該工作的錯誤與系統訊息中。更新前確認沒有執行中的 Agent，再停止服務、備份整份 `.bellpr`、更新程式與依賴、建置後啟動。
+發生未預期的錯誤（API 回傳 500 的「操作未完成」）時，伺服器會在標準錯誤輸出（stderr）寫入請求方法、路徑與錯誤堆疊；背景工作失敗則顯示在該工作的錯誤與系統訊息中。更新前確認沒有執行中的 Agent，再停止服務、備份整份 `.bellpr`、更新程式與依賴、建置後啟動。
 
 `.bellpr` 內有三類 Git 目錄：`repositories/<repo-id>` 是匯入專案的 clone（所有 worktree 的 Git objects 都在這裡）；`worktrees/<run-id>` 是每次工作用來審閱與發佈的 worktree，保存整合後的差異；`team-worktrees/<run-id>/<task-id>` 是 teammate 的隔離 checkout。子任務的差異整合後，它的隔離 checkout 會自動以 `git worktree remove --force` 移除（任務板顯示「獨立 worktree 已清理」）；失敗、被阻擋或取消的子任務會保留，方便查看未整合的差異，重試時才會丟棄。沒有清理 worktree 的 API；要手動清理時，先停止服務或確認該工作沒有在執行，用 `git -C .bellpr/repositories/<repo-id> worktree list` 查看登記，刪除不再需要的 `.bellpr/worktrees/<run-id>` 與 `.bellpr/team-worktrees/<run-id>`，再執行 `git -C .bellpr/repositories/<repo-id> worktree prune` 清掉失效登記；`state.json` 仍會保留該工作的紀錄與報告，只是不能再開啟差異或重試。磁碟空間通常不是 worktree 本身，而是 clone 或 worktree 裡被 Git 忽略的建置輸出（例如 `target/`、`node_modules/`），這些目錄可直接刪除再重新建置。
 
@@ -240,7 +216,7 @@ npm run dev
 
 目前版本以 GitHub 為目標平台。程式碼與 PR 內容仍需要使用者審閱；白話解說與 agent 的判斷可能出錯。Lead、Reviewer 與 Test analyst 的整合／審查回合只做靜態檢視，真正執行過的檢查應以各 teammate 報告的命令與結果為準。應用程式另外會記下每個子任務執行期間 CLI 回報的指令（只保留指令第一行、套用憑證遮罩、最多 300 字與結束碼，不擷取輸出，每個任務最多 40 筆）以及實際整合進 worktree 的檔案路徑，顯示在任務卡與執行紀錄中，並以「未受信任的資料」交給 Lead 整合、Test analyst 與 PR 草稿回合，供對照 teammate 自述的檢查；這份紀錄只能證明某個指令被執行過與其結束碼，不能證明測試內容是否正確。
 
-服務重新啟動後，中斷的工作會標記失敗，不會自動恢復；Lead 已建立計畫的團隊工作可在任務板按「重試失敗的子任務」接續：已整合的子任務不重跑，失敗或被阻擋的子任務會丟棄舊的隔離目錄、從新的快照重新開始，並在第一回合得知上次失敗的原因；若所有子任務都已整合（整合或審查階段失敗），重試只重跑 Lead 整合與獨立審查。尚未核准計畫就取消的工作，重試會先回到等待核准。可選填一段說明，會排入重試成員的第一回合；已結束的工作不能再用團隊訊息。目前沒有合併 PR 或清理 worktree 的介面（手動清理見「Ubuntu 私網部署」）。檔案問答與任務一起保存在 `state.json`，每個檔案只保留最近 20 則、每則最多 8,000 字，更早的訊息會被捨棄；提問內容在保存前會套用與日誌相同的憑證遮罩。學習筆記頁彙整各任務已產生的解說，可依關鍵字與任務篩選。
+服務重新啟動後，中斷的工作會標記失敗，不會自動恢復；Lead 已建立計畫的團隊工作可在任務板按「重試失敗的子任務」接續：已整合的子任務不重跑，失敗或被阻擋的子任務會丟棄舊的隔離目錄、從新的快照重新開始，並在第一回合得知上次失敗的原因；若所有子任務都已整合（整合或審查階段失敗），重試只重跑 Lead 整合與獨立審查。尚未核准計畫就取消的工作，重試會先回到等待核准。可選填一段說明，會排入重試成員的第一回合；已結束的工作不能再用團隊訊息。目前沒有合併 PR 或清理 worktree 的介面（手動清理見「資料目錄與維護」）。檔案問答與任務一起保存在 `state.json`，每個檔案只保留最近 20 則、每則最多 8,000 字，更早的訊息會被捨棄；提問內容在保存前會套用與日誌相同的憑證遮罩。學習筆記頁彙整各任務已產生的解說，可依關鍵字與任務篩選。
 
 審閱介面適合聚焦的文字程式碼變更：單次最多 150 個檔案、整體 diff 最多 2 MB，新檔案最多 512 KB。二進位檔、新增符號連結、敏感檔案與疑似憑證會阻擋發佈，需要先移除或改以人工流程處理。這些檢查不代表完整的秘密資訊掃描。
 
