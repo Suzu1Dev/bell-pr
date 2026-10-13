@@ -478,6 +478,7 @@ export function useRunActions({
           {
             role: "assistant",
             content: `這次未能取得回答：${(error as Error).message}`,
+            failed: true,
           },
         ],
       }));
