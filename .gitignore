@@ -8,3 +8,31 @@ output/
 .playwright-cli/
 .DS_Store
 .vite-cache/
+
+# Build output
+build/
+
+# Keys and certificates never enter the repository
+*.pem
+*.key
+
+# Test and screenshot output
+e2e/output/
+test-results/
+playwright-report/
+.ui-baseline/
+
+# Landing site build and media (deployed separately, never committed)
+site/dist/
+site/media/
+
+# Promo video project: dependencies, renders, footage and the music copy
+marketing/promo-video/node_modules/
+marketing/promo-video/out/
+marketing/promo-video/public/footage/
+marketing/promo-video/public/music/
+
+# Rendered media and music anywhere
+*.mp3
+*.mp4
+*.webm
