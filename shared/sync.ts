@@ -16,4 +16,8 @@ export interface BaseSync {
   reviewedFingerprints?: Record<string, string>;
   /** How the agent resolved the conflicts, in Traditional Chinese. */
   report?: string;
+  /** Per-file resolutions the agent described. */
+  resolutions?: { path: string; resolution: string }[];
+  /** True while an agent resolves the conflicts; a restart clears it. */
+  resolving?: boolean;
 }

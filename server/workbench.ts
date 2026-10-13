@@ -91,9 +91,12 @@ import {
 import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
 import {
   checkoutTreeOnto,
+  conflictJsonSchema,
+  conflictPrompt,
   filesWithConflictMarkers,
   labelConflictMarkers,
   mergeCommits,
+  parseConflictResult,
   snapshotCheckout,
 } from "./sync.js";
 import {
@@ -151,6 +154,7 @@ export class Workbench {
   /** Learner-requested reviewer/tester reruns; one per run, aborted through controllers[run.id]. */
   private reviewJobs = new Map<string, Promise<void>>();
   private followUpJobs = new Map<string, Promise<void>>();
+  private conflictJobs = new Map<string, Promise<void>>();
   private statusCache?: {
     time: number;
     value: {
@@ -323,6 +327,7 @@ export class Workbench {
   private runBusy(id: string) {
     return (
       this.followUpJobs.has(id) ||
+      this.conflictJobs.has(id) ||
       this.reviewJobs.has(id) ||
       [...this.controllers.keys()].some(
         (key) => key === id || key.endsWith(`:${id}`),
@@ -464,6 +469,137 @@ export class Workbench {
       await this.store.save();
       return run;
     });
+  }
+
+  /**
+   * Has one writable agent resolve the conflict markers a sync left in an
+   * unpublished run. Whether markers remain is then read from the files; the
+   * run returns to review either way, so the person reviews the result.
+   */
+  async resolveConflicts(id: string) {
+    if (this.stopping) throw new AppError("服務正在關閉，請稍後重試。", 503);
+    return this.lock(id, async () => {
+      const run = this.run(id);
+      const sync = run.sync;
+      if (
+        !sync ||
+        run.prUrl ||
+        run.publishing ||
+        !["review", "approved"].includes(run.status)
+      )
+        throw new AppError("目前沒有需要解決的同步衝突。", 409);
+      if (this.runBusy(id))
+        throw new AppError(
+          "這個工作還有 Agent、審查或解說在進行；請等它完成再解衝突。",
+          409,
+        );
+      const open = await filesWithConflictMarkers(run.worktreePath, sync.conflicts);
+      if (!open.length)
+        throw new AppError("衝突標記都已解決，不需要再請 Agent 處理。", 409);
+      if (!run.agents.some((agent) => agent.id === "sync"))
+        run.agents.push({
+          id: "sync",
+          name: "Weave",
+          role: "Merge conflicts",
+          status: "waiting",
+          detail: "解決同步後的合併衝突",
+        });
+      sync.resolving = true;
+      delete sync.report;
+      delete sync.resolutions;
+      run.status = "running";
+      delete run.approvedFingerprint;
+      delete run.error;
+      this.log(run, "user", `要求 Agent 解決 ${open.length} 個檔案的合併衝突：${open.join("、")}。`);
+      const controller = new AbortController();
+      this.controllers.set(id, controller);
+      const job = this.runConflictResolution(run, open, controller).finally(() => {
+        this.conflictJobs.delete(id);
+        this.jobs.delete(job);
+      });
+      this.conflictJobs.set(id, job);
+      this.jobs.add(job);
+      await this.store.save();
+      return run;
+    });
+  }
+
+  private async runConflictResolution(
+    run: Run,
+    files: string[],
+    controller: AbortController,
+  ) {
+    let temporary: string | undefined;
+    let resolved = false;
+    const committedNote =
+      "Agent 自行建立了 commit 或切換了分支；已還原，修改保留在工作目錄供你審閱。";
+    try {
+      temporary = await mkdtemp(path.join(os.tmpdir(), "bell-conflicts-"));
+      const outputSchema = path.join(temporary, "conflict-schema.json");
+      await writeFile(outputSchema, JSON.stringify(conflictJsonSchema), {
+        mode: 0o600,
+      });
+      const answer = await this.runAgent(
+        run,
+        "sync",
+        conflictPrompt({
+          boundaries: teamBoundaries,
+          contributionContext: this.contributionContext(run),
+          task: { title: run.title, prompt: run.prompt },
+          baseBranch: run.baseBranch,
+          conflicts: files,
+        }),
+        controller.signal,
+        false,
+        { outputSchema },
+      );
+      const result = parseConflictResult(answer, files);
+      await this.lock(run.id, async () => {
+        const sync = run.sync!;
+        const moved = await this.restoreAgentHead(run, run.baseSha);
+        const open = await filesWithConflictMarkers(run.worktreePath, sync.conflicts);
+        resolved = !open.length;
+        sync.report = [
+          result.summary,
+          moved ? committedNote : "",
+          open.length ? `仍有衝突標記：${open.join("、")}。` : "",
+        ]
+          .filter(Boolean)
+          .join("\n");
+        sync.resolutions = result.resolutions;
+        await this.diff(run.id);
+        run.status = "review";
+        this.log(
+          run,
+          "system",
+          resolved
+            ? "Agent 已解決合併衝突，請逐檔審閱這些檔案。"
+            : `Agent 處理後仍有衝突標記：${open.join("、")}；可以自行修改，或再請 Agent 處理。`,
+        );
+      });
+    } catch (error) {
+      await this.lock(run.id, async () => {
+        await this.restoreAgentHead(run, run.baseSha).catch(() => undefined);
+        if (run.sync)
+          run.sync.report = controller.signal.aborted
+            ? "已停止解衝突；已改的檔案保留，可以自行完成，或再請 Agent 處理。"
+            : `${redact(error instanceof Error ? error.message : "解衝突未完成")}；已改的檔案保留，可以自行完成，或再請 Agent 處理。`;
+        await this.diff(run.id).catch(() => undefined);
+        run.status = "review";
+        this.log(run, "system", run.sync?.report ?? "解衝突未完成。");
+      });
+    } finally {
+      if (run.sync) run.sync.resolving = false;
+      const agent = run.agents.find((value) => value.id === "sync");
+      if (agent) {
+        agent.status = resolved ? "complete" : "failed";
+        agent.detail = resolved ? "衝突已解決，等待審閱" : "仍有衝突或已中斷";
+      }
+      if (this.controllers.get(run.id) === controller)
+        this.controllers.delete(run.id);
+      if (temporary) await rm(temporary, { recursive: true, force: true });
+      await this.store.save();
+    }
   }
 
   /** Approval and publishing wait until a sync's conflicts are resolved. */
@@ -1707,6 +1843,13 @@ export class Workbench {
       await Promise.allSettled([rerun]);
       return run;
     }
+    const resolving = this.conflictJobs.get(id);
+    if (resolving) {
+      // Edits made so far stay; the run returns to review either way.
+      this.controllers.get(id)?.abort();
+      await Promise.allSettled([resolving]);
+      return run;
+    }
     const followUp = this.followUpJobs.get(id);
     if (followUp) {
       // The PR stays published; the round keeps any edits for review or discard.
@@ -2880,11 +3023,11 @@ export class Workbench {
   }
 
   /**
-   * Puts the run's branch back on the round's parent if the agent committed,
+   * Puts the run's branch back on `commit` if a writable agent committed,
    * reset or switched branches despite the prompt. Its final files stay in
    * the checkout as uncommitted changes, so they are reviewed like any edit.
    */
-  private async restoreFollowUpHead(run: Run, round: FollowUpRound) {
+  private async restoreAgentHead(run: Run, commit: string) {
     const ref = (
       await git(run.worktreePath, ["symbolic-ref", "-q", "HEAD"], {
         allowedCodes: [0, 1],
@@ -2893,15 +3036,14 @@ export class Workbench {
     const head = (
       await git(run.worktreePath, ["rev-parse", "HEAD"])
     ).stdout.trim();
-    if (ref === `refs/heads/${run.branch}` && head === round.parentCommit)
-      return false;
+    if (ref === `refs/heads/${run.branch}` && head === commit) return false;
     if (ref !== `refs/heads/${run.branch}`)
       await git(run.worktreePath, [
         "symbolic-ref",
         "HEAD",
         `refs/heads/${run.branch}`,
       ]);
-    await git(run.worktreePath, ["reset", "-q", "--mixed", round.parentCommit]);
+    await git(run.worktreePath, ["reset", "-q", "--mixed", commit]);
     return true;
   }
 
@@ -3009,7 +3151,7 @@ export class Workbench {
         round.notAddressed = result.notAddressed;
         // Commands the application saw run, not the agent's own list.
         if (checks.length) round.checks = checks;
-        const moved = await this.restoreFollowUpHead(run, round);
+        const moved = await this.restoreAgentHead(run, round.parentCommit);
         if (!(await this.worktreeDirty(run))) {
           round.status = "failed";
           round.error =
@@ -3044,7 +3186,9 @@ export class Workbench {
           : redact(error instanceof Error ? error.message : "這輪修正未完成");
         // What BELL saw the agent run is evidence even when its answer is lost.
         if (checks.length) round.checks = checks;
-        await this.restoreFollowUpHead(run, round).catch(() => undefined);
+        await this.restoreAgentHead(run, round.parentCommit).catch(
+          () => undefined,
+        );
         // Edits already made stay for review or discard; a clean checkout is simply published again.
         const dirty = await this.worktreeDirty(run).catch(() => true);
         round.status = dirty

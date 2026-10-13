@@ -12,6 +12,7 @@ import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
 import { readDiff } from "./git.js";
 import { AppError, type Run } from "./types.js";
+import type { TeamAgentRunner } from "./team.js";
 
 async function getJson(url: string) {
   return new Promise<any>((resolve, reject) => {
@@ -100,7 +101,10 @@ const identity = {
 };
 
 /** An unpublished run on BELL's clone of a fake GitHub repository. */
-async function unpublishedRun(status: Run["status"] = "review") {
+async function unpublishedRun(
+  status: Run["status"] = "review",
+  runner?: TeamAgentRunner,
+) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-sync-run-"));
   const github = await fakeGitHub(directory, {
     files: {
@@ -114,7 +118,7 @@ async function unpublishedRun(status: Run["status"] = "review") {
   Object.assign(process.env, identity);
   const store = new Store(path.join(directory, "state"));
   await store.initialize();
-  const workbench = new Workbench(store);
+  const workbench = new Workbench(store, runner);
   const repo = await workbench.importRepository(github.url);
   const baseSha = (await git(repo.path, ["rev-parse", "HEAD"])).stdout.trim();
   const worktreePath = path.join(store.directory, "worktrees", "sync-run");
@@ -244,6 +248,92 @@ test("a run still waiting for plan approval moves to the latest base with nothin
     assert.equal(f.run.baseSha, upstream);
     assert.deepEqual(await readDiff(f.run), []);
     assert.equal(await f.read("other.ts"), "other, upstream\n");
+  } finally {
+    await f.cleanup();
+  }
+});
+
+async function until(predicate: () => boolean) {
+  const end = Date.now() + 8000;
+  while (!predicate()) {
+    if (Date.now() > end) throw new Error("timed out");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
+
+test("an agent resolves sync conflicts for review, leftover markers keep blocking, and stopping or restarting keeps the edits", async () => {
+  let behaviour: "resolve" | "partial" | "commit" | "wait" = "resolve";
+  let prompt = "";
+  let entered = () => {};
+  const f = await unpublishedRun("review", async (input) => {
+    assert.equal(input.role, "sync");
+    assert.equal(input.readonly, false);
+    prompt = input.prompt;
+    const file = path.join(input.cwd, "hello.ts");
+    if (behaviour === "wait") {
+      await writeFile(file, "line one\nline two, half done\nline three\n");
+      entered();
+      await new Promise<void>((_, reject) =>
+        input.signal.addEventListener("abort", () => reject(new Error("Cancelled")), { once: true }),
+      );
+    }
+    if (behaviour !== "partial")
+      await writeFile(file, "line one\nline two, theirs and mine\nline three\n");
+    if (behaviour === "commit") await git(input.cwd, ["commit", "-qam", "agent commit"]);
+    return JSON.stringify({
+      summary: "保留目標分支的文字，再加上這次的修改。",
+      files: [{ path: "hello.ts", resolution: "兩邊的改動合併成一行。" }],
+    });
+  });
+  try {
+    await f.write("hello.ts", "line one\nline two, mine\nline three\n");
+    await f.github.upstreamCommit({ "hello.ts": "line one\nline two, theirs\nline three\n" });
+    await f.workbench.syncRun(f.run.id);
+    // Leftover markers keep approval blocked and are named in the report.
+    behaviour = "partial";
+    await f.workbench.resolveConflicts(f.run.id);
+    assert.equal(f.run.status, "running");
+    await until(() => f.run.status === "review");
+    assert.match(prompt, /hello\.ts/);
+    assert.match(prompt, /latest main/);
+    assert.match(f.run.sync!.report!, /仍有衝突標記：hello\.ts/);
+    await f.reviewAll();
+    await assert.rejects(f.workbench.approve(f.run.id, { ...f.run.draft }), /衝突標記/);
+    // An agent that commits is undone; its resolution waits for review.
+    behaviour = "commit";
+    await f.workbench.resolveConflicts(f.run.id);
+    await until(() => f.run.status === "review");
+    assert.equal((await git(f.run.worktreePath, ["rev-parse", "HEAD"])).stdout.trim(), f.run.baseSha);
+    assert.match(f.run.sync!.report!, /自行建立了 commit/);
+    assert.deepEqual(f.run.sync!.resolutions, [{ path: "hello.ts", resolution: "兩邊的改動合併成一行。" }]);
+    assert.equal(await f.read("hello.ts"), "line one\nline two, theirs and mine\nline three\n");
+    await assert.rejects(f.workbench.resolveConflicts(f.run.id), /都已解決/);
+    await f.reviewAll();
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    assert.equal(f.run.status, "approved");
+
+    // Stopping keeps the half-done edit and returns to review.
+    await f.workbench.undoSync(f.run.id);
+    await f.workbench.syncRun(f.run.id);
+    behaviour = "wait";
+    const started = new Promise<void>((resolve) => (entered = resolve));
+    await f.workbench.resolveConflicts(f.run.id);
+    await started;
+    await f.workbench.cancel(f.run.id);
+    assert.equal(f.run.status, "review");
+    assert.match(f.run.sync!.report!, /已停止解衝突/);
+    assert.equal(await f.read("hello.ts"), "line one\nline two, half done\nline three\n");
+
+    // A restart in the middle of a resolution returns the run to review.
+    f.run.status = "running";
+    f.run.sync!.resolving = true;
+    await f.store.save();
+    const reopened = new Store(f.store.directory);
+    await reopened.initialize();
+    const saved = reopened.data.runs[0];
+    assert.equal(saved.status, "review");
+    assert.equal(saved.sync!.resolving, false);
+    assert.match(saved.sync!.report!, /服務重新啟動/);
   } finally {
     await f.cleanup();
   }

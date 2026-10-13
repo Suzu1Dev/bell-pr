@@ -109,3 +109,68 @@ export async function labelConflictMarkers(
     if (labelled !== content) await writeFile(full, labelled);
   }
 }
+
+/** What the conflict-resolving agent returns after editing the checkout. */
+export const conflictJsonSchema = {
+  type: "object",
+  properties: {
+    summary: { type: "string" },
+    files: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { path: { type: "string" }, resolution: { type: "string" } },
+        required: ["path", "resolution"],
+        additionalProperties: false,
+      },
+      maxItems: 150,
+    },
+  },
+  required: ["summary", "files"],
+  additionalProperties: false,
+};
+
+/**
+ * Reads the agent's account leniently: the files are already edited, and
+ * whether markers remain is checked on disk, not taken from this answer.
+ */
+export function parseConflictResult(answer: string, conflicts: string[]) {
+  let value: unknown;
+  try {
+    value = JSON.parse(
+      answer
+        .trim()
+        .replace(/^```(?:json)?\s*\n?/, "")
+        .replace(/\n?```$/, ""),
+    );
+  } catch {
+    throw new AppError("Agent 回傳的解衝突結果格式不完整", 422);
+  }
+  const record = (value ?? {}) as { summary?: unknown; files?: unknown };
+  const text = (input: unknown, max: number) =>
+    typeof input === "string" ? input.trim().slice(0, max) : "";
+  return {
+    summary: text(record.summary, 8_000),
+    resolutions: (Array.isArray(record.files) ? record.files : [])
+      .map((entry) => ({
+        path: text((entry as { path?: unknown })?.path, 1_024),
+        resolution: text((entry as { resolution?: unknown })?.resolution, 1_200),
+      }))
+      .filter((entry) => entry.resolution && conflicts.includes(entry.path)),
+  };
+}
+
+/** The writable turn that resolves merge conflict markers left by a sync. */
+export function conflictPrompt(input: {
+  boundaries: string;
+  contributionContext: string;
+  task: { title: string; prompt: string };
+  baseBranch: string;
+  conflicts: string[];
+}) {
+  return `${input.boundaries}
+You are resolving merge conflicts left after BELL moved this contribution onto the latest ${input.baseBranch}. Work only in this checkout. These files hold conflict markers: ${JSON.stringify(input.conflicts)}. In each block, the side after "<<<<<<< latest ${input.baseBranch}" is the target branch as it is now and the side before ">>>>>>> this contribution" is the person's change. Keep the target branch's new work and re-apply the contribution's intent on top of it; when the two truly contradict, keep the target branch's behaviour and explain what of the contribution could not be kept. Edit only these files, except for the smallest follow-on edit a rename or signature change on the target branch forces in a file the contribution already changes. Remove every conflict marker. Run relevant existing checks. Do not commit, stage or change .git.
+Return JSON: summary (Traditional Chinese: how you resolved the conflicts and anything the person should check) and files [{path, resolution}] with one Traditional Chinese sentence per resolved file.
+${input.contributionContext}
+Task: ${JSON.stringify(input.task)}`;
+}
