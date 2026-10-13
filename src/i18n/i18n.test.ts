@@ -7,6 +7,7 @@ import {
   type Locale,
   type Translation,
 } from "../../shared/i18n/locale";
+import { assertNoHan } from "../test-utils/render";
 import en from "./en";
 import {
   LocaleProvider,
@@ -328,6 +329,13 @@ test("both locales register every namespace with the same keys", () => {
   assert.deepEqual(shape(zhTW), shape(en));
   for (const value of Object.values(zhTW.common.runStatus))
     assert.ok(value.trim());
+});
+
+test("the English dictionary has no Han text except language names", () => {
+  const { languageNames, ...common } = en.common;
+  assertNoHan(JSON.stringify({ ...en, common }));
+  assert.deepEqual(languageNames, { en: "English", "zh-TW": "繁體中文" });
+  assert.deepEqual(zhTW.common.languageNames, languageNames);
 });
 
 test("a translation missing a key or taking other parameters does not compile", () => {
