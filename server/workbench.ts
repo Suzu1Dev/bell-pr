@@ -2611,6 +2611,36 @@ export class Workbench {
     return /^([0-9a-f]{40,64})\s/m.exec(output)?.[1] ?? "";
   }
 
+  /**
+   * Whether the PR on GitHub contains `commit`, also when its branch moved on
+   * or was deleted after a merge. Errors propagate, so callers refuse rather
+   * than guess.
+   */
+  private async prHasCommit(run: Run, commit: string) {
+    if ((await this.remoteBranchHead(run).catch(() => "")) === commit)
+      return true;
+    const source = parseGitHubSource(this.repo(run.repoId).url);
+    const number = source ? prNumberOf(run.prUrl, source.url) : undefined;
+    if (!source || !number)
+      throw new AppError("無法確認這輪修正是否已推送到 PR。", 502);
+    const commits = (
+      await command(
+        "gh",
+        [
+          "api",
+          `repos/${source.fullName}/pulls/${number}/commits`,
+          "--paginate",
+          "--jq",
+          ".[].sha",
+        ],
+        { timeoutMs: 30_000 },
+      )
+    ).stdout
+      .split("\n")
+      .map((line) => line.trim());
+    return commits.includes(commit);
+  }
+
   /** BELL never force-pushes, so it can only build on the commit GitHub has. */
   private assertRemoteHead(run: Run, remoteHead: string, expected: string) {
     if (remoteHead === expected) return;
@@ -2834,10 +2864,10 @@ export class Workbench {
       )
         throw new AppError("目前沒有可以放棄的修正。", 409);
       if (round.commit) {
-        // A commit is only safe to drop when GitHub does not have it.
-        if ((await this.remoteBranchHead(run)) === round.commit)
+        // A commit is only safe to drop when the PR on GitHub does not have it.
+        if (await this.prHasCommit(run, round.commit))
           throw new AppError(
-            "這輪修正已推送到 GitHub；請再按一次推送，讓 BELL 記錄完成。",
+            "這輪修正已推送到 PR；請再按一次推送，讓 BELL 記錄完成。",
             409,
           );
         await git(run.worktreePath, [
@@ -2854,6 +2884,7 @@ export class Workbench {
       round.status = "discarded";
       run.status = "published";
       delete run.approvedFingerprint;
+      delete run.error;
       const files = await this.diff(id);
       // The checkout is the pushed head again, whose files were all reviewed before it was pushed.
       run.reviewedFingerprints = Object.fromEntries(
@@ -2912,12 +2943,13 @@ export class Workbench {
       ).stdout.trim();
       if (previousHead !== round.parentCommit && previousHead !== round.commit)
         throw new AppError("工作分支的提交已改變，已停止推送。", 409);
-      const remoteHead = await this.remoteBranchHead(run);
-      // A retry after the push landed but before BELL recorded it.
-      if (round.commit && remoteHead === round.commit) {
+      // A retry after the push landed but before BELL recorded it, also when
+      // the branch moved on or the PR was merged since.
+      if (round.commit && (await this.prHasCommit(run, round.commit))) {
         finish(round.commit);
         return run;
       }
+      const remoteHead = await this.remoteBranchHead(run);
       // Checked before anything local changes, so a refusal leaves the round discardable.
       this.assertRemoteHead(run, remoteHead, round.parentCommit);
       const state = (
@@ -2978,6 +3010,10 @@ export class Workbench {
           )
         ).stdout.trim();
       }
+      // Recorded before the branch moves, so an interruption from here on can
+      // be retried (HEAD may be the parent or this commit) or discarded.
+      round.commit = commit;
+      await this.store.save();
       if (previousHead !== commit)
         await git(run.worktreePath, [
           "update-ref",
@@ -2986,8 +3022,6 @@ export class Workbench {
           previousHead,
         ]);
       await git(run.worktreePath, ["read-tree", commit]);
-      round.commit = commit;
-      await this.store.save();
       // A plain push: GitHub rejects it if the branch moved since the check above.
       await git(
         run.worktreePath,

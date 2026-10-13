@@ -147,6 +147,8 @@ async function publishedFixture(runner: TeamAgentRunner) {
   const remoteHead = path.join(directory, "remote-head");
   const prState = path.join(directory, "pr-state");
   const pushFail = path.join(directory, "push-fail");
+  const pushLandsThenFails = path.join(directory, "push-lands-then-fails");
+  const prCommits = path.join(directory, "pr-commits");
   await writeFile(prState, "OPEN");
   const realGit = (await command("which", ["git"])).stdout.trim();
   await writeFile(
@@ -160,6 +162,7 @@ if (args.includes('push')) {
   record();
   if (fs.existsSync(${JSON.stringify(pushFail)})) { console.error('simulated push failure'); process.exit(1); }
   fs.writeFileSync(${JSON.stringify(remoteHead)}, args.at(-1).split(':')[0]);
+  if (fs.existsSync(${JSON.stringify(pushLandsThenFails)})) { console.error('simulated lost push response'); process.exit(1); }
   process.exit(0);
 }
 if (args.includes('ls-remote')) {
@@ -181,6 +184,7 @@ const fs = require('node:fs');
 const args = process.argv.slice(2);
 fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(['gh', ...args]) + '\\n');
 if (args[0] === 'api' && args[1] === 'user') console.log('test-owner');
+else if (args[0] === 'api' && String(args[1]).endsWith('/pulls/1/commits')) console.log(fs.existsSync(${JSON.stringify(prCommits)}) ? fs.readFileSync(${JSON.stringify(prCommits)}, 'utf8') : '');
 else if (args[0] === 'api') console.log(${JSON.stringify(baseSha)});
 else if (args[0] === 'repo' && args[1] === 'view') console.log(JSON.stringify({viewerPermission:'WRITE',defaultBranchRef:{name:'main'}}));
 else if (args[0] === 'pr' && args[1] === 'list') console.log('[]');
@@ -228,6 +232,11 @@ else process.exit(97);
     setPrState: (state: string) => writeFile(prState, state),
     failPushes: (fail: boolean) =>
       fail ? writeFile(pushFail, "1") : rm(pushFail, { force: true }),
+    loseNextPushResponse: (lose: boolean) =>
+      lose
+        ? writeFile(pushLandsThenFails, "1")
+        : rm(pushLandsThenFails, { force: true }),
+    setPrCommits: (shas: string[]) => writeFile(prCommits, shas.join("\n")),
     cleanup: async () => {
       process.env.PATH = previousPath;
       await workbench.shutdown();
@@ -532,6 +541,69 @@ test("a round that reverts or deletes pushed files cannot be approved, and an ag
     assert.equal(
       (await git(f.repository, ["rev-parse", `${f.run.publishCommit}^`])).stdout.trim(),
       firstCommit,
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a push interrupted after the commit is recorded can be retried, and a commit already in the PR is settled, never discarded", async () => {
+  let content = "one";
+  const f = await publishedFixture(async (input) => {
+    await writeFile(path.join(input.cwd, "hello.ts"), `export const hello = "${content}";\n`);
+    return JSON.stringify({
+      summary: "改了問候語。",
+      addressed: [],
+      notAddressed: [],
+      checks: [],
+      commitMessage: `Say ${content}`,
+    });
+  });
+  try {
+    const firstCommit = f.run.publishCommit!;
+    const round = async () => {
+      await f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackItem.url] });
+      await settled(f.run);
+      await f.reviewAll();
+      await f.workbench.approve(f.run.id, { ...f.run.draft });
+      return f.run.followUps!.at(-1)!;
+    };
+    // The branch moves, then updating the index fails: the commit is already recorded.
+    const first = await round();
+    const lock = path.join(f.repository, ".git", "index.lock");
+    await writeFile(lock, "");
+    await assert.rejects(f.workbench.publish(f.run.id, f.run.approvedFingerprint!));
+    await rm(lock);
+    assert.ok(first.commit);
+    assert.equal((await git(f.repository, ["rev-parse", "HEAD"])).stdout.trim(), first.commit);
+    await f.workbench.publish(f.run.id, f.run.approvedFingerprint!);
+    assert.equal(first.status, "published");
+    assert.equal(f.run.publishCommit, first.commit);
+    assert.equal(
+      (await git(f.repository, ["rev-parse", `${first.commit}^`])).stdout.trim(),
+      firstCommit,
+    );
+
+    // The push lands but its response is lost, then somebody pushes on top.
+    content = "two";
+    const second = await round();
+    await f.loseNextPushResponse(true);
+    await assert.rejects(
+      f.workbench.publish(f.run.id, f.run.approvedFingerprint!),
+      /lost push response/,
+    );
+    await f.loseNextPushResponse(false);
+    const theirs = "d".repeat(40);
+    await f.setRemoteHead(theirs);
+    await f.setPrCommits([firstCommit, first.commit!, second.commit!, theirs]);
+    await assert.rejects(f.workbench.discardFollowUp(f.run.id), /已推送到 PR/);
+    await f.workbench.publish(f.run.id, f.run.approvedFingerprint!);
+    assert.equal(second.status, "published");
+    assert.equal(f.run.publishCommit, second.commit);
+    // GitHub now has a commit BELL did not push, so the next round is refused up front.
+    await assert.rejects(
+      f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackItem.url] }),
+      /BELL 以外的提交/,
     );
   } finally {
     await f.cleanup();

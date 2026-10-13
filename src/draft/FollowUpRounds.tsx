@@ -131,7 +131,8 @@ export function FollowUpRounds({
                     : " 已建立，尚未確認推送"}
                 </p>
               )}
-              {round.status === "review" && onDiscard && !round.commit && (
+              {/* With a commit, the server checks GitHub before allowing it. */}
+              {round.status === "review" && onDiscard && (
                 <button
                   type="button"
                   className="button secondary"
