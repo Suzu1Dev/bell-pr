@@ -82,7 +82,7 @@ date of purchase unless your order states otherwise
 After the Update Period ends, you may keep using the Pro Feature Set in the
 Builds released within it. Builds released later run with the Free Feature
 Set unless you renew. If your License Key carries an expiry date, the Pro
-Feature Set ends on that date, after a grace period of 7 days.
+Feature Set ends 7 days after that date (a grace period).
 
 4.3 **Named Users.** Each seat belongs to one Named User at a time. You may
 reassign a seat permanently to a different person, for example when someone
