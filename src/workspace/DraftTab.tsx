@@ -14,6 +14,7 @@ import {
 import type { DiffFile, Run } from "../types";
 import { groupPrFeedback, summarizeChecks } from "../../shared/pr-feedback";
 import type { Tab } from "../app/AppShell";
+import { ErrorBoundary } from "../app/ErrorBoundary";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
 import type { RunActions } from "../app/hooks/useRunActions";
 
@@ -112,31 +113,33 @@ export function DraftTab({
   const { feedbackLoading, fetchPrFeedback } = actions;
   return (
     <div className="draft-workspace">
-      <Suspense
-        fallback={<p className="muted">正在載入草稿規範…</p>}
-      >
-        <DraftGuidancePanel
-          preparation={run.draftPreparation}
-          busy={draftRequests.has(run.id)}
-          disabled={
-            active ||
-            busy ||
-            !["review", "approved"].includes(run.status)
-          }
-          demo={demo}
-          issueUrl={run.contributionSettings?.issueUrl}
-          onGenerate={prepareDraft}
-          onApply={applyDraftProposal}
-          applied={
-            !!run.draftPreparation?.proposal &&
-            draftTitle === run.draftPreparation.proposal.title &&
-            !!draftChecks?.sameDraftProse(
-              draftBody,
-              run.draftPreparation.proposal.body,
-            )
-          }
-        />
-      </Suspense>
+      <ErrorBoundary resetKey={run.id}>
+        <Suspense
+          fallback={<p className="muted">正在載入草稿規範…</p>}
+        >
+          <DraftGuidancePanel
+            preparation={run.draftPreparation}
+            busy={draftRequests.has(run.id)}
+            disabled={
+              active ||
+              busy ||
+              !["review", "approved"].includes(run.status)
+            }
+            demo={demo}
+            issueUrl={run.contributionSettings?.issueUrl}
+            onGenerate={prepareDraft}
+            onApply={applyDraftProposal}
+            applied={
+              !!run.draftPreparation?.proposal &&
+              draftTitle === run.draftPreparation.proposal.title &&
+              !!draftChecks?.sameDraftProse(
+                draftBody,
+                run.draftPreparation.proposal.body,
+              )
+            }
+          />
+        </Suspense>
+      </ErrorBoundary>
       <div className="draft-layout">
         <div className="draft-editor">
           <div className="section-heading">
@@ -198,9 +201,11 @@ export function DraftTab({
           </div>
           {draftPreview ? (
             <div className="markdown-preview">
-              <Suspense fallback={<p>正在載入預覽…</p>}>
-                <MarkdownContent>{draftBody}</MarkdownContent>
-              </Suspense>
+              <ErrorBoundary resetKey={run.id}>
+                <Suspense fallback={<p>正在載入預覽…</p>}>
+                  <MarkdownContent>{draftBody}</MarkdownContent>
+                </Suspense>
+              </ErrorBoundary>
             </div>
           ) : (
             <textarea

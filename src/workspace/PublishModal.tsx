@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { DiffFile, Repo, Run } from "../types";
 import type { Tab } from "../app/AppShell";
+import { ErrorBoundary } from "../app/ErrorBoundary";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
 import { Modal } from "../modals/Modal";
 import { MarkdownContent } from "./DraftTab";
@@ -104,9 +105,11 @@ export function PublishModal({
               `（約 ${draftChecks.draftProseWords(run.draft.body)} 字）`}
           </summary>
           <div className="markdown-preview">
-            <Suspense fallback={<p>正在載入預覽…</p>}>
-              <MarkdownContent>{run.draft.body}</MarkdownContent>
-            </Suspense>
+            <ErrorBoundary>
+              <Suspense fallback={<p>正在載入預覽…</p>}>
+                <MarkdownContent>{run.draft.body}</MarkdownContent>
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </details>
       )}

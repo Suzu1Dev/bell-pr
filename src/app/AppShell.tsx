@@ -33,6 +33,7 @@ import { ModelSettingsModal } from "../settings/ModelSettingsModal";
 import { SettingsPage } from "../settings/SettingsPage";
 import { PublishModal } from "../workspace/PublishModal";
 import { WorkspacePage } from "../workspace/WorkspacePage";
+import { ErrorBoundary, listenForPreloadErrors } from "./ErrorBoundary";
 import { statusLabels } from "./labels";
 import { Sidebar } from "./Sidebar";
 import { Toasts, type Toast } from "./Toasts";
@@ -63,7 +64,18 @@ export type ModalName =
   | null;
 export type Notify = (message: string, tone?: "success" | "error") => void;
 
+// Registered on load, before the first render can request a lazy chunk.
+listenForPreloadErrors();
+
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppShell />
+    </ErrorBoundary>
+  );
+}
+
+function AppShell() {
   const [page, setPage] = useState<Page>("workspace");
   const [tab, setTab] = useState<Tab>("overview");
   const {

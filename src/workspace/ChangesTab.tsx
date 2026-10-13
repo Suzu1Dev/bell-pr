@@ -32,6 +32,7 @@ import { DiffView } from "../review/DiffView";
 import { languageBadge } from "../review/diff";
 import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { Tab } from "../app/AppShell";
+import { ErrorBoundary } from "../app/ErrorBoundary";
 import { fileStatusLabel } from "../app/labels";
 import type { RunActions } from "../app/hooks/useRunActions";
 
@@ -482,53 +483,55 @@ export function ChangesTab({
           />
           <aside className="explanation-wrap">
             {file ? (
-              <Suspense
-                fallback={
-                  <div className="empty-state" role="status">
-                    <Loader2 className="spin" />
-                    <p>正在準備閱讀面板…</p>
-                  </div>
-                }
-              >
-                <ExplanationPanel
-                  key={`${run.id}:${file.path}`}
-                  file={file}
-                  messages={
-                    messages[`${run.id}:${file.path}`] || []
+              <ErrorBoundary resetKey={`${run.id}:${file.path}`}>
+                <Suspense
+                  fallback={
+                    <div className="empty-state" role="status">
+                      <Loader2 className="spin" />
+                      <p>正在準備閱讀面板…</p>
+                    </div>
                   }
-                  loading={chatLoading}
-                  onAsk={ask}
-                  onRetryExplanation={() =>
-                    prepareExplanations(run.id, true, file.path)
-                  }
-                  chatRequestId={
-                    chatRequests[`${run.id}:${file.path}`] || 0
-                  }
-                  onChatRequestHandled={() =>
-                    setChatRequests((previous) => ({
-                      ...previous,
-                      [`${run.id}:${file.path}`]: 0,
-                    }))
-                  }
-                  explanationBusy={explanationRequests.has(run.id)}
-                  demo={demo}
-                  reports={run.reports}
-                  modules={
-                    intelligence.stale
-                      ? undefined
-                      : intelligence.insights?.modules
-                  }
-                  note={run.notes?.[file.path]}
-                  onSaveNote={saveNote}
-                  feedback={run.prFeedback?.items.filter(
-                    (item) => item.path === file.path,
-                  )}
-                  onRerunReview={editable ? rerunReview : undefined}
-                  reviewBusy={
-                    reviewRerunning || rerunRequests.has(run.id)
-                  }
-                />
-              </Suspense>
+                >
+                  <ExplanationPanel
+                    key={`${run.id}:${file.path}`}
+                    file={file}
+                    messages={
+                      messages[`${run.id}:${file.path}`] || []
+                    }
+                    loading={chatLoading}
+                    onAsk={ask}
+                    onRetryExplanation={() =>
+                      prepareExplanations(run.id, true, file.path)
+                    }
+                    chatRequestId={
+                      chatRequests[`${run.id}:${file.path}`] || 0
+                    }
+                    onChatRequestHandled={() =>
+                      setChatRequests((previous) => ({
+                        ...previous,
+                        [`${run.id}:${file.path}`]: 0,
+                      }))
+                    }
+                    explanationBusy={explanationRequests.has(run.id)}
+                    demo={demo}
+                    reports={run.reports}
+                    modules={
+                      intelligence.stale
+                        ? undefined
+                        : intelligence.insights?.modules
+                    }
+                    note={run.notes?.[file.path]}
+                    onSaveNote={saveNote}
+                    feedback={run.prFeedback?.items.filter(
+                      (item) => item.path === file.path,
+                    )}
+                    onRerunReview={editable ? rerunReview : undefined}
+                    reviewBusy={
+                      reviewRerunning || rerunRequests.has(run.id)
+                    }
+                  />
+                </Suspense>
+              </ErrorBoundary>
             ) : (
               <div className="empty-state">
                 <Sparkles />
