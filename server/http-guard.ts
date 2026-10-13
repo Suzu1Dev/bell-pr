@@ -27,19 +27,34 @@ export function parseAllowedOrigins(value = ""): string[] {
   });
 }
 
-export function localhostGuard(
-  ports: number[],
-  configuredOrigins = "",
-): RequestHandler {
+export interface GuardOptions {
+  /** Ports whose localhost, 127.0.0.1 and [::1] hosts are trusted. */
+  ports: number[];
+  /**
+   * Extra trusted origins, such as a TLS proxy in front of BELL PR. Each
+   * entry follows the BELLPR_ALLOWED_ORIGINS rules; an invalid one throws.
+   */
+  allowedOrigins: string[];
+  /** The session secret requests must carry. Accepted but unused until 3B. */
+  sessionToken?: string;
+  /** Paths reachable without a session. Accepted but unused until 3B. */
+  publicPaths: string[];
+}
+
+export function localhostGuard(opts: GuardOptions): RequestHandler {
   const localHosts = new Set(
-    ports.flatMap((port) => [
+    opts.ports.flatMap((port) => [
       `localhost:${port}`,
       `127.0.0.1:${port}`,
       `[::1]:${port}`,
     ]),
   );
   const localOrigins = new Set([...localHosts].map((host) => `http://${host}`));
-  const allowedOrigins = new Set(parseAllowedOrigins(configuredOrigins));
+  // Joined, the list reads like BELLPR_ALLOWED_ORIGINS, so an empty or
+  // malformed entry fails exactly as it would there.
+  const allowedOrigins = new Set(
+    parseAllowedOrigins(opts.allowedOrigins.join(",")),
+  );
   const allowedHosts = new Set([
     ...localHosts,
     ...[...allowedOrigins].map((origin) => new URL(origin).host),

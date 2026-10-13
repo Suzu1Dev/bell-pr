@@ -24,8 +24,6 @@ import { summarizeRun } from "../shared/runs.js";
 import { agentProviders } from "../shared/models.js";
 import { validBranchName } from "../shared/drafts.js";
 
-export { localhostGuard, parseAllowedOrigins };
-
 // The commit message is passed to git verbatim, so newline is the only control character allowed.
 const commitMessageField = z
   .string()
@@ -77,7 +75,13 @@ export function createApp(
   app.locals.insights = insights;
   app.locals.discovery = discovery;
   app.disable("x-powered-by");
-  app.use(localhostGuard([port, frontendPort], allowedOrigins));
+  app.use(
+    localhostGuard({
+      ports: [port, frontendPort],
+      allowedOrigins: parseAllowedOrigins(allowedOrigins),
+      publicPaths: ["/api/health", "/auth"],
+    }),
+  );
   app.use(express.json({ limit: "160kb", strict: true }));
   app.get("/api/status", async (_req, res) => {
     // CLI checks stay behind the 10-second cache; the limits are static config.
