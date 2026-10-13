@@ -17,7 +17,20 @@ import type { TaskSetup } from "../app/hooks/useTaskSetup";
 import { Modal } from "./Modal";
 
 interface NewTaskModalProps {
-  setup: TaskSetup;
+  setup: Pick<
+    TaskSetup,
+    | "taskRepoId"
+    | "prompt"
+    | "setPrompt"
+    | "taskTitle"
+    | "setTaskTitle"
+    | "contributionSettings"
+    | "settingsLoading"
+    | "settingsReady"
+    | "configureTaskRepo"
+    | "changeContributionSettings"
+    | "saveDirection"
+  >;
   repos: Repo[];
   busy: boolean;
   formError: string;

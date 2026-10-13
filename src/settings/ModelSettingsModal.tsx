@@ -6,7 +6,18 @@ import type { TaskSetup } from "../app/hooks/useTaskSetup";
 import { Modal } from "../modals/Modal";
 
 interface ModelSettingsModalProps {
-  setup: TaskSetup;
+  setup: Pick<
+    TaskSetup,
+    | "modelSettings"
+    | "setModelSettings"
+    | "settingsLoading"
+    | "settingsReady"
+    | "settingsNotice"
+    | "setSettingsNotice"
+    | "settingsSaveButton"
+    | "configureContributionModels"
+    | "saveModelSettings"
+  >;
   busy: boolean;
   formError: string;
   setFormError: Dispatch<SetStateAction<string>>;
