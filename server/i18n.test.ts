@@ -8,6 +8,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import type { Locale } from "../shared/i18n/locale.js";
+import { reasoningEfforts, type ModelSettings } from "../shared/models.js";
+import { proFeatures, type ProFeature } from "../shared/plans.js";
 import { createApp } from "./app.js";
 import {
   cancelled,
@@ -19,6 +21,7 @@ import {
 } from "./i18n/index.js";
 import en from "./i18n/en/index.js";
 import zhTW from "./i18n/zh-TW/index.js";
+import { fixedLicense } from "./license.js";
 import { Store } from "./store.js";
 import { AppError } from "./types.js";
 import { Workbench } from "./workbench.js";
@@ -313,4 +316,84 @@ test("the error handler serializes an AppError's code, params, fixes and details
       await close();
     }
   }
+});
+
+/** Asserts that `fn` throws the 402 pro_required AppError for `feature`. */
+function assertProRequired(fn: () => void, feature: ProFeature, plan = "free") {
+  assert.throws(fn, (error) => {
+    assert.ok(error instanceof AppError);
+    assert.equal(error.statusCode, 402);
+    assert.equal(error.code, "pro_required");
+    assert.equal(error.details?.feature, feature);
+    assert.equal(error.details?.plan, plan);
+    return true;
+  });
+}
+
+test("fixedLicense('free') answers every Pro feature with a 402 pro_required", async () => {
+  const free = fixedLicense("free");
+  assert.equal(free.entitlements().plan, "free");
+  assert.equal(free.entitlements().maxActiveRuns, 1);
+  assert.equal(free.entitlements().maxTeammates, 2);
+  assert.equal(free.summary().plan, "free");
+  assertProRequired(() => free.assertFeature("discovery"), "discovery");
+  for (const feature of proFeatures)
+    assertProRequired(() => free.assertFeature(feature), feature);
+  const blocked: [ModelSettings, ProFeature][] = [
+    [{ webAccess: true }, "webAccess"],
+    [{ reasoningEffort: "xhigh" }, "deepReasoning"],
+    [{ reasoningEffort: "max" }, "deepReasoning"],
+    [
+      { provider: "claude", model: "opus", reasoningEffort: "ultra" },
+      "deepReasoning",
+    ],
+  ];
+  for (const [settings, feature] of blocked)
+    assertProRequired(() => free.assertModelEntitlement(settings), feature);
+  // Raw selections only: "Default" effort and web access off stay Free.
+  for (const settings of [
+    {},
+    { webAccess: false },
+    { reasoningEffort: "" },
+    { reasoningEffort: "none" },
+    { reasoningEffort: "high" },
+    { provider: "codex", model: "gpt-5", reasoningEffort: "medium" },
+  ] satisfies ModelSettings[]) {
+    assert.doesNotThrow(() => free.assertModelEntitlement(settings));
+  }
+  const { call, close } = await startApp((workbench) => {
+    workbench.run = () => {
+      free.assertFeature("discovery");
+      throw new Error("unreachable");
+    };
+  });
+  try {
+    const response = await call("/api/runs/any");
+    assert.equal(response.status, 402);
+    assert.equal(typeof response.body.error, "string");
+    assert.equal(response.body.code, "pro_required");
+    assert.equal(response.body.feature, "discovery");
+    assert.equal(response.body.plan, "free");
+  } finally {
+    await close();
+  }
+});
+
+test("fixedLicense('pro') and the trial never throw", () => {
+  for (const plan of ["pro", "trial"] as const) {
+    const license = fixedLicense(plan, { maxActiveRuns: 4 });
+    assert.equal(license.entitlements().plan, plan);
+    assert.equal(license.entitlements().maxActiveRuns, 4);
+    assert.equal(license.entitlements().maxTeammates, 4);
+    assert.equal(license.summary().plan, plan);
+    assert.equal(license.summary().status, "active");
+    for (const feature of proFeatures)
+      assert.doesNotThrow(() => license.assertFeature(feature));
+    for (const reasoningEffort of reasoningEfforts)
+      assert.doesNotThrow(() =>
+        license.assertModelEntitlement({ reasoningEffort, webAccess: true }),
+      );
+  }
+  assert.equal(fixedLicense("pro").entitlements().maxActiveRuns, 2);
+  assert.throws(() => fixedLicense("pro", { maxActiveRuns: 0 }), RangeError);
 });
