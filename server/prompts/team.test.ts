@@ -6,6 +6,7 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { git } from "../process.js";
 import { Store } from "../store.js";
+import { defaultActiveRunLimit } from "../agent-slots.js";
 import { Workbench } from "../workbench.js";
 import {
   contributionContext,
@@ -24,6 +25,7 @@ import {
 import type { TeamAgentInput, TeamAgentRunner } from "../team.js";
 import type { DiffFile } from "../types.js";
 import type { ContributionSettings } from "../../shared/insights.js";
+import { freeEntitlements, proEntitlements } from "../../shared/plans.js";
 import type {
   AgentTeam,
   TeamPlanRevision,
@@ -471,4 +473,50 @@ test("team messages add the continuation, inbox and coordination prompts exactly
     await recordMessagePrompts(),
     await fixture("team-message-prompts.json"),
   );
+});
+
+/*
+ * Workbench additions that came with moving these prompts out of
+ * workbench.ts: the entitlements stub and the guarded review rerun.
+ */
+
+test("without an entitlements source the Workbench grants Pro at its own run limit, and entitlementsChanged changes nothing", async () => {
+  const directory = await mkdtemp(
+    path.join(os.tmpdir(), "bell-entitlements-test-"),
+  );
+  try {
+    const store = new Store(directory);
+    await store.initialize();
+    const plain = new Workbench(store);
+    assert.deepEqual(
+      plain.entitlements(),
+      proEntitlements(defaultActiveRunLimit),
+    );
+    const wider = new Workbench(store, undefined, { maxActiveRuns: 5 });
+    assert.deepEqual(wider.entitlements(), proEntitlements(5));
+    assert.deepEqual(wider.limits, {
+      maxActiveRuns: 5,
+      maxAgentProcesses: wider.agentSlots.limit,
+      maxQueued: 10,
+    });
+
+    // An injected source is kept as given and not consulted yet.
+    let reads = 0;
+    const free = new Workbench(store, undefined, {
+      entitlements: () => {
+        reads++;
+        return freeEntitlements;
+      },
+    });
+    const saved = JSON.stringify(store.data);
+    assert.equal(plain.entitlementsChanged(), undefined);
+    assert.equal(free.entitlementsChanged(), undefined);
+    assert.equal(reads, 0);
+    assert.equal(free.maxActiveRuns, defaultActiveRunLimit);
+    assert.deepEqual(free.limits, plain.limits);
+    assert.equal(JSON.stringify(store.data), saved);
+    assert.equal(free.entitlements(), freeEntitlements);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });

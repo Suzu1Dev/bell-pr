@@ -22,6 +22,7 @@ import {
 import { getModelCatalog, resolveModelExecution } from "./models.js";
 import { agentLoginCheck, type TransientSleep } from "./agent-cli.js";
 import type { AgentProvider } from "../shared/models.js";
+import { proEntitlements, type Entitlements } from "../shared/plans.js";
 import { synchronizeExplanations } from "./explanations.js";
 
 import { collectDraftContext } from "./draft-sources.js";
@@ -126,6 +127,11 @@ export class Workbench {
   readonly maxActiveRuns: number;
   /** BELLPR_AGENT_TIMEOUT_SCALE; multiplies every agent turn timeout. */
   readonly agentTimeoutScale: number;
+  /**
+   * What the current plan allows. Nothing reads it yet: the queue and the
+   * team size apply it once licensing lands, so runs behave as before.
+   */
+  readonly entitlements: () => Entitlements;
   private readonly context: WorkbenchContext;
   constructor(
     public store: Store,
@@ -140,6 +146,8 @@ export class Workbench {
       command?: typeof command;
       /** Wait between retries of a turn that lost the OAuth refresh race. */
       sleep?: TransientSleep;
+      /** The plan's limits; Pro with maxActiveRuns when absent (library and tests). */
+      entitlements?: () => Entitlements;
     } = {},
   ) {
     this.agentSlots =
@@ -149,6 +157,8 @@ export class Workbench {
       dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
     if (!Number.isInteger(this.maxActiveRuns) || this.maxActiveRuns < 1)
       throw new Error("Workbench maxActiveRuns must be a positive integer.");
+    this.entitlements =
+      dependencies.entitlements ?? (() => proEntitlements(this.maxActiveRuns));
     // Callbacks go through `this` so a replaced method (as tests do) applies.
     this.context = {
       store: this.store,
@@ -396,6 +406,9 @@ export class Workbench {
       this.runJobs.set(id, pending);
     }
   }
+
+  /** 4A: drain the queue when entitlements change. */
+  entitlementsChanged(): void {}
 
   /** Appends to the run's own log through the context (see appendRunLog). */
   private log(
