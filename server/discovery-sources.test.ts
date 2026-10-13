@@ -288,6 +288,7 @@ test("partial failures preserve verified candidates and distinguish missing resu
       return { errors: [{ message: "unavailable" }] };
     if (endpoint.endsWith("community/profile")) throw new Error("HTTP 503");
     if (endpoint.endsWith("readme")) throw new Error("HTTP 404");
+    return undefined;
   });
   const result = await collectDiscoveryCandidates(preferences, {
     command: stub.execute,
@@ -363,6 +364,7 @@ test("remote content cannot redirect requests and sensitive or foreign evidence 
       };
     if (endpoint.endsWith("readme"))
       return document("README.md", "Binary\0data");
+    return undefined;
   });
   const result = await collectDiscoveryCandidates(preferences, {
     command: stub.execute,
@@ -411,6 +413,7 @@ test("candidate count, source size and requests stay bounded while issues retain
         decodeURIComponent(endpoint.split("/contents/")[1]),
         "Document. ".repeat(2_000),
       );
+    return undefined;
   });
   const result = await collectDiscoveryCandidates(preferences, {
     command: stub.execute,

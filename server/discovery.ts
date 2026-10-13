@@ -20,7 +20,6 @@ import {
   type DiscoveryPreferences,
 } from "../shared/discovery.js";
 import { ponytailModes, type EfficiencyMetrics } from "../shared/efficiency.js";
-import type { ModelCatalog } from "../shared/models.js";
 import {
   addEfficiency,
   applyPonytail,

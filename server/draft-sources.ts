@@ -52,6 +52,7 @@ function documentKind(file: string): DocumentKind | undefined {
     )
   )
     return "documentation";
+  return undefined;
 }
 
 /**
