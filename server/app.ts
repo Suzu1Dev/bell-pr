@@ -16,6 +16,7 @@ import { localhostGuard, parseAllowedOrigins } from "./http-guard.js";
 import { summarizeRun } from "../shared/runs.js";
 import { agentProviders } from "../shared/models.js";
 import { validBranchName } from "../shared/drafts.js";
+import type { ApiErrorBody } from "../shared/errors.js";
 
 // The commit message is passed to git verbatim, so newline is the only control character allowed.
 const commitMessageField = z
@@ -35,6 +36,33 @@ const publishBranchField = z
     message:
       "GitHub 分支名稱只能用英數字與 . _ - /，不能有 ..，也不能以 . 或 .lock 結尾。",
   });
+
+/** Masks secrets in string values, which may quote command output. */
+function redactValues<T extends Record<string, unknown>>(values?: T) {
+  if (!values) return undefined;
+  return Object.fromEntries(
+    Object.entries(values).map(([key, value]) => [
+      key,
+      typeof value === "string" ? redact(value) : value,
+    ]),
+  ) as T;
+}
+
+/**
+ * The JSON body for an AppError: the message plus whatever structure it
+ * carries. Details come first so they can never replace the message or
+ * the code; absent fields are left out, so an error without a code still
+ * sends only `{error}`.
+ */
+function appErrorBody(error: AppError): ApiErrorBody {
+  return {
+    ...redactValues(error.details),
+    error: redact(error.message),
+    code: error.code,
+    params: redactValues(error.params),
+    fixes: error.fixes,
+  };
+}
 
 export function createApp(
   workbench: Workbench,
@@ -327,7 +355,7 @@ export function createApp(
       return;
     }
     if (error instanceof AppError) {
-      res.status(error.statusCode).json({ error: redact(error.message) });
+      res.status(error.statusCode).json(appErrorBody(error));
       return;
     }
     if (error?.type === "entity.parse.failed") {
