@@ -66,7 +66,11 @@ import { groupPrFeedback, summarizeChecks } from "../shared/pr-feedback";
 import { applyReviewOrder, parseReviewOrder } from "../shared/review-order";
 import { validBranchName, type DraftProposal } from "../shared/drafts";
 import type { DraftCheck, DraftTaskItem } from "../shared/draft-checks";
-import { activeFollowUp, followUpNoteLimit } from "../shared/followups";
+import {
+  activeFollowUp,
+  followUpFeedbackLimit,
+  followUpNoteLimit,
+} from "../shared/followups";
 import { FollowUpRounds } from "./draft/FollowUpRounds";
 
 /** The draft checks bring a Markdown parser, so they load beside the first screen. */
@@ -2823,6 +2827,7 @@ export default function App() {
                           id="pr-commit-message"
                           className="draft-textarea draft-commit-message"
                           aria-describedby="pr-commit-message-help"
+                          maxLength={4000}
                           value={
                             followUp
                               ? draftCommitMessage
@@ -3219,7 +3224,15 @@ export default function App() {
                                               checked={followUpSelection.includes(
                                                 item.url,
                                               )}
-                                              disabled={busy}
+                                              // At the limit only selected items stay changeable.
+                                              disabled={
+                                                busy ||
+                                                (!followUpSelection.includes(
+                                                  item.url,
+                                                ) &&
+                                                  followUpSelection.length >=
+                                                    followUpFeedbackLimit)
+                                              }
                                               onChange={(event) => {
                                                 const checked =
                                                   event.target.checked;
@@ -3272,6 +3285,14 @@ export default function App() {
                                   標題與說明不會改，回覆 reviewer 請在 GitHub
                                   上自己處理。
                                 </p>
+                                <p
+                                  className="field-help"
+                                  id="follow-up-limit"
+                                  role="status"
+                                >
+                                  一輪最多 {followUpFeedbackLimit} 則回饋，已選{" "}
+                                  {followUpSelection.length} 則。
+                                </p>
                                 <label
                                   className="field-label"
                                   htmlFor="follow-up-note"
@@ -3291,9 +3312,12 @@ export default function App() {
                                 />
                                 <button
                                   className="button primary"
+                                  aria-describedby="follow-up-limit"
                                   disabled={
                                     busy ||
                                     feedbackLoading ||
+                                    followUpSelection.length >
+                                      followUpFeedbackLimit ||
                                     (!followUpSelection.length &&
                                       !followUpNote.trim())
                                   }

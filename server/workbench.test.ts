@@ -535,11 +535,21 @@ test("HTTP API restricts localhost origins, requires JSON mutations, and validat
         ],
       },
     };
+    f.run.followUps = [
+      {
+        id: "r1",
+        requestedAt: new Date().toISOString(),
+        feedbackUrls: [],
+        note: "Rename it.",
+        status: "failed",
+        parentCommit: f.baseSha,
+      },
+    ];
     const list = await http(`${url}/api/runs`, { headers: local });
     assert.equal(list.status, 200);
     const [summary] = list.json().runs as Record<string, unknown>[];
     assert.equal(summary.id, f.run.id);
-    for (const field of ["logs", "reports", "draftPreparation", "conversations"])
+    for (const field of ["logs", "reports", "draftPreparation", "conversations", "followUps"])
       assert.equal(field in summary, false, field);
     for (const field of ["title", "repoId", "branch", "status", "createdAt"])
       assert.ok(field in summary, field);
