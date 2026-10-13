@@ -40,11 +40,8 @@ import {
   PanelRightOpen,
   PanelLeftClose,
   PanelLeftOpen,
-  Target,
   Globe2,
   Minus,
-  MessageSquare,
-  Play,
   Plus,
   RefreshCw,
   Search,
@@ -56,13 +53,21 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { api } from "../api";
+// Stylesheets enter the bundle in import order and later rules win ties.
+// These keep the order the single App component produced, before the
+// modules below pull the same files in a different order.
+import "../review/review.css";
+import "../learning/learning.css";
+import "../navigation/command-palette.css";
+import "../efficiency/efficiency.css";
+import "../models/models.css";
+import "../mission/mission.css";
+import "../team/team.css";
 import { demoRepo, demoRun, demoFiles } from "../demo";
 import type { Run, DiffFile } from "../types";
 import { groupPrFeedback, summarizeChecks } from "../../shared/pr-feedback";
 import { applyReviewOrder, parseReviewOrder } from "../../shared/review-order";
 import { DiffView } from "../review/DiffView";
-import { LearningNotes } from "../learning/LearningNotes";
 import { languageBadge } from "../review/diff";
 import { CommandPalette } from "../navigation/CommandPalette";
 const ExplanationPanel = lazy(() =>
@@ -81,7 +86,6 @@ const MarkdownContent = lazy(() =>
     default: module.MarkdownContent,
   })),
 );
-const DiscoveryPanel = lazy(() => import("../discovery/DiscoveryPanel"));
 
 import {
   ProjectOverview,
@@ -91,12 +95,18 @@ import { useProjectInsights } from "../mission/useProjectInsights";
 import { TeamBoard } from "../team/TeamBoard";
 import { Modal } from "../modals/Modal";
 import { HelpModal } from "../modals/HelpModal";
+import { DiscoveryPage } from "../pages/DiscoveryPage";
+import { LearningPage } from "../pages/LearningPage";
+import { TeamPage } from "../pages/TeamPage";
+import { ExplorePage } from "../repos/ExplorePage";
+import { ReposPage } from "../repos/ReposPage";
+import { SettingsPage } from "../settings/SettingsPage";
 import { NewTaskModal } from "../modals/NewTaskModal";
 import { RunsModal } from "../modals/RunsModal";
 import { ImportRepoModal } from "../repos/ImportRepoModal";
 import { ModelSettingsModal } from "../settings/ModelSettingsModal";
 import { fileStatusLabel, statusLabels } from "./labels";
-import { useAppData, type Status } from "./hooks/useAppData";
+import { useAppData } from "./hooks/useAppData";
 import { useDraftEditor } from "./hooks/useDraftEditor";
 import { useExplanations } from "./hooks/useExplanations";
 import { loadDemo, useRunActions } from "./hooks/useRunActions";
@@ -2075,405 +2085,43 @@ export default function App() {
             </section>
           </>
         ) : page === "explore" && exploreRepo ? (
-          <section className="page-content explore-page">
-            <div className="page-title">
-              <div>
-                <span className="eyebrow">REPOSITORY EXPLORER</span>
-                <h1 tabIndex={-1}>{exploreRepo.fullName}</h1>
-                <p>先了解使用者與問題，再決定這次貢獻的方向。</p>
-              </div>
-              <button
-                className="button primary"
-                onClick={() => beginContribution(exploreRepo.id)}
-              >
-                <Target size={16} />
-                指定貢獻方向
-              </button>
-            </div>
-            <ProjectOverview
-              repo={exploreRepo}
-              insights={intelligence.insights}
-              loading={intelligence.loading}
-              error={intelligence.error}
-              recommending={intelligence.recommending}
-              recommendationError={intelligence.recommendationError}
-              recommendationPreferences={intelligence.recommendationPreferences}
-              savingPreferences={intelligence.savingPreferences}
-              preferenceError={intelligence.preferenceError}
-              onSavePreferences={intelligence.savePreferences}
-              stale={intelligence.stale}
-              staleDetail={intelligence.staleDetail}
-              onAnalyze={intelligence.analyze}
-              onRecommendMore={intelligence.recommendMore}
-              onChooseRecommendation={chooseRecommendation}
-              onReadCode={() => setTab("changes")}
-              onStartContribution={() => beginContribution(exploreRepo.id)}
-            />
-          </section>
+          <ExplorePage
+            exploreRepo={exploreRepo}
+            intelligence={intelligence}
+            beginContribution={beginContribution}
+            chooseRecommendation={chooseRecommendation}
+            setTab={setTab}
+          />
         ) : page === "discovery" ? (
-          <section className="page-content">
-            <Suspense
-              fallback={<div className="empty-state">正在載入貢獻探索…</div>}
-            >
-              <DiscoveryPanel onChoose={chooseOpportunity} />
-            </Suspense>
-          </section>
+          <DiscoveryPage chooseOpportunity={chooseOpportunity} />
         ) : page === "repos" ? (
-          <section className="page-content">
-            <div className="page-title">
-              <div>
-                <span className="eyebrow">YOUR REPOSITORIES</span>
-                <h1 tabIndex={-1}>下一個貢獻，從這裡開始。</h1>
-                <p>帶入你在意的專案，讓想法成為真正的改動。</p>
-              </div>
-              <button
-                className="button primary"
-                onClick={() => openModal("import")}
-              >
-                <Plus size={16} />
-                匯入 Repository
-              </button>
-            </div>
-            <button
-              className="discovery-entry"
-              onClick={() => navigate("discovery")}
-            >
-              <span className="discovery-entry-icon">
-                <Sparkles size={24} />
-              </span>
-              <span>
-                <strong>還沒決定要貢獻哪個專案？</strong>
-                <small>
-                  讓 AI 從 GitHub 找出有需求、適合你起步的開發機會。
-                </small>
-              </span>
-              <span className="discovery-entry-action">
-                推薦貢獻項目 <ArrowUpRight size={17} />
-              </span>
-            </button>
-            <div className="repository-grid">
-              {[...repos, demoRepo].map((repo) => (
-                <article className="repository-card" key={repo.id}>
-                  <div className="repository-card-top">
-                    <span className="repo-icon">
-                      <FolderGit2 size={24} />
-                    </span>
-                    {repo.id === demoRepo.id ? (
-                      <span className="demo-pill">示範專案</span>
-                    ) : (
-                      <span className="repo-ready">
-                        <Check size={13} />
-                        已匯入
-                      </span>
-                    )}
-                  </div>
-                  <span className="repo-owner">{repo.owner}</span>
-                  <h2>{repo.name}</h2>
-                  <p>
-                    {repo.id === demoRepo.id
-                      ? "透過 SDK 智慧重試的範例，體驗一次完整的貢獻與審查。"
-                      : repo.path}
-                  </p>
-                  <div className="repository-meta">
-                    <span>
-                      <span className="language-dot" />
-                      {repo.language || "Git repository"}
-                    </span>
-                    <span>
-                      <GitBranch size={13} />
-                      {repo.defaultBranch}
-                    </span>
-                  </div>
-                  <button
-                    className="button secondary"
-                    onClick={() => {
-                      if (repo.id === demoRepo.id) chooseRun(demoRun.id);
-                      else {
-                        setExploreRepoId(repo.id);
-                        navigate("explore");
-                      }
-                    }}
-                  >
-                    {repo.id === demoRepo.id
-                      ? "探索示範工作台"
-                      : "了解專案與貢獻方向"}
-                    <ArrowUpRight size={15} />
-                  </button>
-                </article>
-              ))}
-              <button
-                className="repository-add"
-                onClick={() => openModal("import")}
-              >
-                <Plus size={27} />
-                <strong>加入你的 Repository</strong>
-                <span>GitHub 連結或本機 Git 專案</span>
-              </button>
-            </div>
-          </section>
+          <ReposPage
+            repos={repos}
+            openModal={openModal}
+            navigate={navigate}
+            chooseRun={chooseRun}
+            setExploreRepoId={setExploreRepoId}
+          />
         ) : page === "team" ? (
-          <section className="page-content">
-            <div className="page-title">
-              <div>
-                <span className="eyebrow">BUILT TO COLLABORATE</span>
-                <h1 tabIndex={-1}>一個目標，一支 Agent team。</h1>
-                <p>從拆解問題到交叉審查，讓專業分工融入你的開發流程。</p>
-              </div>
-              <button
-                className="button primary"
-                onClick={() => beginContribution()}
-              >
-                <Play size={15} />
-                指派新任務
-              </button>
-            </div>
-            <div className="team-pipeline">
-              {[
-                {
-                  name: "Team lead",
-                  role: "共享計畫與相依拆解",
-                  text: "依貢獻方向建立任務板，明確指定檔案範圍與相依，讓你先確認計畫。",
-                  scope: "規劃 · 指派 · 整合",
-                  icon: ListTree,
-                },
-                {
-                  name: "Teammates",
-                  role: "獨立上下文與並行開發",
-                  text: "每位成員有獨立工作目錄；先完成相依任務，互不衝突的工作可同時執行。",
-                  scope: "2–4 位 · 共享任務板",
-                  icon: Code2,
-                },
-                {
-                  name: "Team inbox",
-                  role: "成員之間能交換發現",
-                  text: "傳送給 Lead、任務成員或全體；訊息在下一個工作回合送達，可追蹤送達狀態。",
-                  scope: "共享訊息 · 保留記錄",
-                  icon: MessageSquare,
-                },
-                {
-                  name: "Review & tests",
-                  role: "整合後的獨立審查",
-                  text: "受檔案範圍約束的變更依序整合，再由獨立審查者與測試分析員檢查結果。",
-                  scope: "品質檢查 · 人工送出",
-                  icon: Activity,
-                },
-              ].map((agent, index) => (
-                <article key={agent.name} className="team-role">
-                  <span className="role-number">0{index + 1}</span>
-                  <div className={`agent-avatar color-${index}`}>
-                    <agent.icon size={26} />
-                  </div>
-                  <h2>{agent.name}</h2>
-                  <strong>{agent.role}</strong>
-                  <p>{agent.text}</p>
-                  <span className="role-scope">{agent.scope}</span>
-                </article>
-              ))}
-            </div>
-            <div className="team-note">
-              <ShieldCheck size={25} />
-              <div>
-                <strong>Agent 負責開發，你保有最後決定權。</strong>
-                <p>
-                  使用本機 Codex 或 Claude Code CLI
-                  登入狀態。每個任務有獨立分支，完成後進入審查，不會自動建立
-                  PR。
-                </p>
-              </div>
-            </div>
-          </section>
+          <TeamPage beginContribution={beginContribution} />
         ) : page === "learning" ? (
-          <section className="page-content">
-            <LearningNotes
-              runs={runs}
-              repos={repos}
-              demoFiles={demoFiles}
-              onOpen={(id, path) => {
-                chooseRun(id).then((opened) => {
-                  if (!opened) return;
-                  setSelectedPath(path);
-                  setTab("changes");
-                });
-              }}
-            />
-            <div className="team-note">
-              <MessageSquare size={25} />
-              <div>
-                <strong>你的下一個問題，就是下一個進步。</strong>
-                <p>
-                  在工作台選取程式碼並提問。對話依檔案保留於目前工作階段，讓每個問題都有上下文。
-                </p>
-              </div>
-            </div>
-          </section>
+          <LearningPage
+            runs={runs}
+            repos={repos}
+            chooseRun={chooseRun}
+            setSelectedPath={setSelectedPath}
+            setTab={setTab}
+          />
         ) : (
-          <section className="page-content settings-page">
-            <div className="page-title">
-              <div>
-                <span className="eyebrow">CONNECTIONS</span>
-                <h1 tabIndex={-1}>讓工作環境準備就緒。</h1>
-                <p>沿用本機 CLI 的登入狀態，憑證不會儲存在瀏覽器。</p>
-              </div>
-              <button
-                className="button secondary"
-                onClick={() => {
-                  api<Status>("/status")
-                    .then((s) => {
-                      setStatus(s);
-                      setApiError("");
-                      notify("連線狀態已更新");
-                    })
-                    .catch((e) => notify(e.message, "error"));
-                }}
-              >
-                重新檢查連線
-              </button>
-            </div>
-            <div className="settings-card">
-              <div className="settings-service">
-                <div className="service-icon">
-                  <Bot size={24} />
-                </div>
-                <div>
-                  <h3>Codex CLI</h3>
-                  <p>執行 agent team、程式碼解說與追問</p>
-                </div>
-                <span
-                  className={`service-status ${status?.codex && status?.codexAuthenticated ? "connected" : ""}`}
-                >
-                  {status?.codex && status?.codexAuthenticated
-                    ? "已就緒"
-                    : status?.codex
-                      ? "尚未登入"
-                      : "尚未安裝"}
-                </span>
-              </div>
-              <div className="setup-command">
-                <span>在終端機完成登入</span>
-                <code>codex login</code>
-              </div>
-            </div>
-            <div className="settings-card">
-              <div className="settings-service">
-                <div className="service-icon">
-                  <Bot size={24} />
-                </div>
-                <div>
-                  <h3>Claude Code CLI</h3>
-                  <p>可在模型設定改用 Claude，沿用你的 Claude 訂閱登入</p>
-                </div>
-                <span
-                  className={`service-status ${status?.claude && status?.claudeAuthenticated ? "connected" : ""}`}
-                >
-                  {status?.claude && status?.claudeAuthenticated
-                    ? "已就緒"
-                    : status?.claude
-                      ? "尚未登入"
-                      : "尚未安裝"}
-                </span>
-              </div>
-              <div className="setup-command">
-                <span>在終端機完成登入</span>
-                <code>claude auth login</code>
-              </div>
-            </div>
-            <div className="settings-card">
-              <div className="settings-service">
-                <div className="service-icon">
-                  <Sparkles size={24} />
-                </div>
-                <div>
-                  <h3>模型與思考強度</h3>
-                  <p>所有專案共用一組設定，既有任務保留當次設定。</p>
-                </div>
-              </div>
-              <div className="setup-command">
-                <button
-                  className="button secondary"
-                  onClick={configureContributionModels}
-                >
-                  設定貢獻模型
-                </button>
-                <button
-                  className="button ghost"
-                  onClick={() => {
-                    setTab("activity");
-                    navigate("workspace");
-                  }}
-                >
-                  查看目前任務模型
-                </button>
-              </div>
-            </div>
-            <div className="settings-card">
-              <div className="settings-service">
-                <div className="service-icon">
-                  <Github size={24} />
-                </div>
-                <div>
-                  <h3>GitHub CLI</h3>
-                  <p>
-                    {status?.githubUser
-                      ? `以 ${status.githubUser} 連線`
-                      : "匯入專案、推送分支與建立 Draft PR"}
-                  </p>
-                </div>
-                <span
-                  className={`service-status ${status?.github ? "connected" : ""}`}
-                >
-                  {status?.github ? "已連線" : "尚未登入"}
-                </span>
-              </div>
-              <div className="setup-command">
-                <span>在終端機完成授權</span>
-                <code>gh auth login</code>
-              </div>
-            </div>
-            <div className="settings-card">
-              <div className="settings-service">
-                <div className="service-icon">
-                  <Terminal size={24} />
-                </div>
-                <div>
-                  <h3>本機工作空間</h3>
-                  <p>Repository 與任務資料保存在執行本服務的電腦</p>
-                </div>
-                <span className="service-status connected">Local-first</span>
-              </div>
-            </div>
-            <div className="settings-card">
-              <div className="settings-service">
-                <div className="service-icon">
-                  <Workflow size={24} />
-                </div>
-                <div>
-                  <h3>同時進行的工作數</h3>
-                  <p>多個專案（或同一專案）的工作可以同時執行並各自發佈 PR</p>
-                </div>
-              </div>
-              <div className="setup-command">
-                <span>同時執行的工作上限（BELLPR_MAX_ACTIVE_RUNS）</span>
-                <code>{status?.limits?.maxActiveRuns ?? "—"}</code>
-              </div>
-              <div className="setup-command">
-                <span>Agent CLI 行程上限（BELLPR_MAX_AGENT_PROCESSES）</span>
-                <code>{status?.limits?.maxAgentProcesses ?? "—"}</code>
-              </div>
-              <div className="setup-command">
-                <span>排隊上限（執行中、等待執行與等待確認計畫合計）</span>
-                <code>{status?.limits?.maxQueued ?? "—"}</code>
-              </div>
-              <p className="muted">
-                每個工作的 teammates、Reviewer 與 Test analyst 各需要一個 CLI
-                行程，因此 BELLPR_MAX_AGENT_PROCESSES
-                決定實際能同時進行多少；訂閱的使用額度才是真正的上限，BELL
-                只重試 OAuth 更新的競爭，不重試額度錯誤。同一個 repository
-                的多個工作彼此獨立，各自使用自己的 worktree
-                與分支。修改這些值需編輯環境檔並重新啟動服務（systemd 部署為
-                ~/.config/bell-pr/environment）。
-              </p>
-            </div>
-          </section>
+          <SettingsPage
+            status={status}
+            setStatus={setStatus}
+            setApiError={setApiError}
+            notify={notify}
+            configureContributionModels={configureContributionModels}
+            setTab={setTab}
+            navigate={navigate}
+          />
         )}
       </main>
       {commandOpen && (
