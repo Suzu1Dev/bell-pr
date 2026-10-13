@@ -221,3 +221,15 @@ test("the agent cards, activity log and team board name the same agents", () => 
     }
   }
 });
+
+test("the suggested commit subject is the PR title", () => {
+  for (const locale of locales) {
+    const { run, draftPreparation } = getDemo(locale);
+    const message = draftPreparation.proposal?.commitMessageSuggestion?.message;
+    assert.equal(message?.split("\n")[0], run.draft.title, locale);
+    assert.equal(
+      run.draft.title,
+      "feat(client): add exponential backoff and jitter to GET retries",
+    );
+  }
+});

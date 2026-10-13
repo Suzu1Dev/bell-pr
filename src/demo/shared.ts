@@ -241,7 +241,7 @@ export const run = {
     },
   ],
   draft: {
-    title: "feat: add exponential backoff and jitter to GET retries",
+    title: "feat(client): add exponential backoff and jitter to GET retries",
     body: "## Summary\n\n- Add configurable exponential backoff with full jitter.\n- Retry temporary GET failures and preserve HTTP error details.\n- Add example retry tests and document the new configuration.\n\n## Compatibility\n\n`retry.delay` is renamed to `retry.baseDelay`; callers must update their configuration.\n\n## Validation\n\nThis is demonstration content. Tests have not been executed against a real repository.\n\n## Review notes\n\nConfirm parameter validation, maximum retry coverage, cancellation behavior and Retry-After handling before production use.",
   },
 } as const;
@@ -380,7 +380,7 @@ export const draftPreparation = {
   policy: "repository",
   templateSourceId: "demo-template",
   commitMessage:
-    "fix(client): retry temporary read failures with backoff\n\nTemporary network errors forced users to repeat read requests.\nRetry only idempotent reads, cap the attempts and keep the final\nerror message when the retries are exhausted.",
+    "feat(client): add exponential backoff and jitter to GET retries\n\nTemporary network errors forced users to repeat read requests.\nRetry only idempotent reads, cap the attempts and keep the final\nerror message when the retries are exhausted.",
   commitSources: ["demo-contributing"],
 } as const;
 export type DemoDraftSourceId =
