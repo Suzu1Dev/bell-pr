@@ -11,7 +11,14 @@ import type { AgentSlots } from "./agent-slots.js";
 import { localhostGuard, parseAllowedOrigins } from "./http-guard.js";
 import type { LicenseService } from "./license.js";
 import type { ApiErrorBody } from "../shared/errors.js";
+import { registerAppSettingsRoutes } from "./routes/app-settings.js";
+import { registerAuthRoutes } from "./routes/auth.js";
 import { registerDiscoveryRoutes } from "./routes/discovery.js";
+import { registerDoctorRoutes } from "./routes/doctor.js";
+import { registerHealthRoutes } from "./routes/health.js";
+import { registerLearningRoutes } from "./routes/learning.js";
+import { registerLicenseRoutes } from "./routes/license.js";
+import { registerMaintenanceRoutes } from "./routes/maintenance.js";
 import { registerModelSettingsRoutes } from "./routes/model-settings.js";
 import { registerReposRoutes } from "./routes/repos.js";
 import { registerReviewRoutes } from "./routes/review.js";
@@ -130,6 +137,15 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   registerModelSettingsRoutes(app, deps);
   registerRunsRoutes(app, deps);
   registerReviewRoutes(app, deps);
+  // Route modules that later work fills in, in a fixed order, so none of
+  // them needs to edit this list.
+  registerHealthRoutes(app, deps);
+  registerAuthRoutes(app, deps);
+  registerMaintenanceRoutes(app, deps);
+  registerLearningRoutes(app, deps);
+  registerDoctorRoutes(app, deps);
+  registerAppSettingsRoutes(app, deps);
+  registerLicenseRoutes(app, deps);
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "找不到 API。" });
   });
