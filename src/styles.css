@@ -971,9 +971,9 @@ button {
   text-align: center;
 }
 .file-type.markdown {
-  color: var(--color-info);
-  background: var(--color-info-bg);
-  border-color: var(--color-info-border);
+  color: var(--color-text-muted);
+  background: var(--color-surface-sunken);
+  border-color: var(--color-border);
 }
 .file-name {
   font-family: var(--font-mono);

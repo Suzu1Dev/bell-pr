@@ -151,6 +151,10 @@ export const overrides = [
   { selector: /^\.toast$/, property: "border", token: "accent-700" },
   { selector: /^\.toast-error$/, property: "background", token: "danger" },
   { selector: /^\.toast-error$/, property: "border-color", token: "danger" },
+  // Markdown files keep a grey badge next to the blue badge of code files.
+  { selector: /^\.file-type\.markdown$/, property: "color", token: "text-muted" },
+  { selector: /^\.file-type\.markdown$/, property: "background", token: "surface-sunken" },
+  { selector: /^\.file-type\.markdown$/, property: "border", token: "border" },
   // Text selection has its own token.
   { selector: /^::selection$/, property: "background", token: "selection" },
 ];
