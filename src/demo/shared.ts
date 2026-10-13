@@ -11,8 +11,8 @@ import type { DemoContent, DemoCopy } from "./types";
 export const repo: Repo = {
   id: "demo-repo",
   name: "open-fetch",
-  owner: "acme-labs",
-  fullName: "acme-labs/open-fetch",
+  owner: "openfetch-sample",
+  fullName: "openfetch-sample/open-fetch",
   path: "",
   defaultBranch: "main",
   url: "",
