@@ -6,6 +6,7 @@ import type { DraftPreparation } from "./drafts.js";
 import type { ModelExecution } from "./models.js";
 import type { FileConversation } from "./chat.js";
 import type { PrFeedback } from "./pr-feedback.js";
+import type { Locale } from "./i18n/locale.js";
 
 export type RunStatus =
   | "queued"
@@ -101,4 +102,24 @@ export interface RunCore {
   team?: AgentTeam;
   /** Follow-up Q&A per diff path; absent on runs saved before it was persisted. */
   conversations?: Record<string, FileConversation>;
+  /**
+   * The UI locale when the run was created. Agent output and the run's own
+   * messages follow it; absent on runs created before it was recorded, which
+   * use the current locale.
+   */
+  locale?: Locale;
+  /**
+   * True when a Claude Code write agent of this run ran without the OS
+   * sandbox because the user allowed unsandboxed agents. Absent when every
+   * agent ran sandboxed and on runs saved before it was recorded.
+   */
+  unsandboxed?: boolean;
+  /**
+   * When storage cleanup removed this run's worktree (ISO time). The run,
+   * its notes and its explanations stay readable; absent while the worktree
+   * exists.
+   */
+  workspaceRemovedAt?: string;
+  /** Disk use of the run's worktree in bytes at the last measurement; absent when not measured. */
+  workspaceBytes?: number;
 }
