@@ -13,8 +13,9 @@ the text below, as a bracketed placeholder that starts with OWNER.
 - [ ] **Seller** (section 1): the seller's legal name, legal form and postal
   address.
 - [ ] **Seller disclosures** (section 1): any seller information the law
-  requires you to publish, such as an Impressum or a 特定商取引法に基づく表記
-  page, or delete the sentence.
+  requires you to publish, such as a German Impressum or the seller
+  disclosure required by Japan's Act on Specified Commercial Transactions,
+  or delete the sentence.
 - [ ] **Merchant of Record** (section 2.1): the payment provider.
 - [ ] **Support contact** (section 9).
 
