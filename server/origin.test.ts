@@ -268,6 +268,58 @@ test("configured proxy supports same-origin JSON API requests without weakening 
   }
 });
 
+test("createApp also takes the allowed origins as a list", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "bell-pr-origin-list-"));
+  const workbench = new Workbench(new Store(directory));
+  const staticDirectory = path.join(directory, "missing");
+  assert.throws(
+    () => createApp(workbench, { allowedOrigins: ["*"], staticDirectory }),
+    /BELLPR_ALLOWED_ORIGINS/,
+  );
+  const app = createApp(workbench, {
+    allowedOrigins: [remoteOrigin, "https://second.example"],
+    staticDirectory,
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Missing port");
+  const get = (headers: Record<string, string>) =>
+    new Promise<number>((resolve, reject) => {
+      const req = request(
+        `http://127.0.0.1:${address.port}/api/repos`,
+        { headers },
+        (res) => {
+          res.resume();
+          res.on("end", () => resolve(res.statusCode!));
+        },
+      );
+      req.on("error", reject);
+      req.end();
+    });
+  try {
+    assert.equal(await get({ host: remoteHost, origin: remoteOrigin }), 200);
+    assert.equal(
+      await get({
+        host: "second.example",
+        origin: "https://second.example",
+      }),
+      200,
+    );
+    assert.equal(
+      await get({ host: remoteHost, origin: "https://second.example" }),
+      403,
+    );
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await workbench.shutdown();
+    await app.locals.insights.shutdown();
+    await app.locals.discovery.shutdown();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("invalid origin configuration fails startup before creating application data", async () => {
   const directory = await mkdtemp(
     path.join(tmpdir(), "bell-pr-origin-startup-"),

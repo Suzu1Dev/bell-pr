@@ -12,7 +12,7 @@ import { parseAgentTimeoutScale } from "./agent-timeouts.js";
 import { parseAllowedOrigins } from "./http-guard.js";
 import { createApp } from "./app.js";
 
-export { createApp };
+export { createApp, type AppOptions } from "./app.js";
 
 async function main() {
   const port = Number(process.env.BELLPR_PORT ?? 4311);

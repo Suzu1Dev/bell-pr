@@ -13,6 +13,7 @@ import { DiscoveryService } from "./discovery.js";
 import type { AgentSlots } from "./agent-slots.js";
 import { learningExport } from "./learning-export.js";
 import { localhostGuard, parseAllowedOrigins } from "./http-guard.js";
+import type { LicenseService } from "./license.js";
 import { summarizeRun } from "../shared/runs.js";
 import { agentProviders } from "../shared/models.js";
 import { validBranchName } from "../shared/drafts.js";
@@ -64,24 +65,48 @@ function appErrorBody(error: AppError): ApiErrorBody {
   };
 }
 
-export function createApp(
-  workbench: Workbench,
-  {
+/**
+ * How createApp is configured. Every field is optional: the server entry
+ * point and tests set what they need, and later work only fills in values.
+ */
+export interface AppOptions {
+  /** The built UI; `dist` under the working directory by default. */
+  staticDirectory?: string;
+  /**
+   * Extra trusted origins, such as a TLS proxy in front of BELL PR: the
+   * comma-separated BELLPR_ALLOWED_ORIGINS value or a list. Invalid
+   * origins throw.
+   */
+  allowedOrigins?: string | string[];
+  /** The API port, 4311 by default; its local hosts are trusted. */
+  port?: number;
+  /** The UI dev server port, 4310 by default; also trusted. */
+  frontendPort?: number;
+  /** CLI slots for analysis and discovery; the Workbench's by default. */
+  agentSlots?: AgentSlots;
+  /** Scales analysis and discovery timeouts; the Workbench's by default. */
+  agentTimeoutScale?: number;
+  /** The session secret for sign-in; passed to the guard. */
+  sessionToken?: string;
+  /** The plan in effect, for Pro gating; route modules get it too. */
+  license?: LicenseService;
+  /** The app version the API reports. */
+  version?: string;
+  /** Development mode, with the UI dev server in front. */
+  dev?: boolean;
+  /** The public URL when BELL PR is served through a proxy. */
+  publicUrl?: string;
+}
+
+export function createApp(workbench: Workbench, options: AppOptions = {}) {
+  const {
     port = 4311,
     frontendPort = 4310,
     staticDirectory = path.resolve("dist"),
     allowedOrigins = "",
     agentSlots = workbench.agentSlots,
     agentTimeoutScale = workbench.agentTimeoutScale,
-  }: {
-    port?: number;
-    frontendPort?: number;
-    staticDirectory?: string;
-    allowedOrigins?: string;
-    agentSlots?: AgentSlots;
-    agentTimeoutScale?: number;
-  } = {},
-) {
+  } = options;
   const insights = new ProjectInsightsService(workbench.store, {
     getModelCatalog: (provider) => workbench.models(provider),
     agentSlots,
@@ -99,7 +124,11 @@ export function createApp(
   app.use(
     localhostGuard({
       ports: [port, frontendPort],
-      allowedOrigins: parseAllowedOrigins(allowedOrigins),
+      allowedOrigins:
+        typeof allowedOrigins === "string"
+          ? parseAllowedOrigins(allowedOrigins)
+          : allowedOrigins,
+      sessionToken: options.sessionToken,
       publicPaths: ["/api/health", "/auth"],
     }),
   );
