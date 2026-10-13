@@ -6,8 +6,8 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { git } from "../process.js";
 import { Store } from "../store.js";
+import { Workbench } from "../workbench.js";
 import {
-  Workbench,
   contributionContext,
   coordinationPrompt,
   independentReviewContext,
@@ -20,7 +20,7 @@ import {
   teamBoundaries,
   testerPrompt,
   webBoundaries,
-} from "../workbench.js";
+} from "./team.js";
 import type { TeamAgentInput, TeamAgentRunner } from "../team.js";
 import type { DiffFile } from "../types.js";
 import type { ContributionSettings } from "../../shared/insights.js";
