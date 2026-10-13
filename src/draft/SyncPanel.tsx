@@ -27,7 +27,8 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
   const conflicts = holder?.conflicts ?? [];
   // Read by the server whenever the diff is; until then every conflict is open.
   const open = holder?.unresolved ?? conflicts;
-  const running = run.status === "running" || !!holder?.resolving;
+  // Only the conflict agent; a run's team can also be running after a sync.
+  const running = !!holder?.resolving;
   const canSync =
     !busy &&
     !run.publishing &&

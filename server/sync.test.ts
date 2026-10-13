@@ -11,7 +11,7 @@ import { git } from "./process.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
 import { readDiff } from "./git.js";
-import { labelConflictMarkers } from "./sync.js";
+import { filesWithConflictMarkers, labelConflictMarkers } from "./sync.js";
 import { AppError, type Run } from "./types.js";
 import type { TeamAgentRunner } from "./team.js";
 
@@ -290,9 +290,32 @@ test("a sync whose conflicts cannot be marked, or after a publish that stopped h
   }
 });
 
-test("conflict labels keep the bytes of non-UTF-8 files and CRLF line ends", async () => {
+test("a sync honours the conflict-marker-size attribute of the checkout", async () => {
+  const f = await unpublishedRun();
+  try {
+    await f.write(".gitattributes", "*.ts conflict-marker-size=20\n");
+    await f.write("hello.ts", "line one\nline two, mine\nline three\n");
+    await f.github.upstreamCommit({ "hello.ts": "line one\nline two, theirs\nline three\n" });
+    assert.deepEqual((await f.workbench.syncRun(f.run.id)).conflicts, ["hello.ts"]);
+    const conflicted = await f.read("hello.ts");
+    assert.match(conflicted, /^<{20} latest main \([0-9a-f]{7}\)$/m);
+    assert.match(conflicted, /^>{20} this contribution$/m);
+    assert.deepEqual(f.run.sync!.unresolved, ["hello.ts"]);
+    await f.reviewAll();
+    await assert.rejects(f.workbench.approve(f.run.id, { ...f.run.draft }), /衝突標記/);
+    await f.write("hello.ts", "line one\nline two, theirs and mine\nline three\n");
+    await f.reviewAll();
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    assert.deepEqual(f.run.sync!.unresolved, []);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("conflict labels keep the bytes of non-UTF-8 files and CRLF line ends, at each file's marker width", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-sync-label-"));
   try {
+    await git(directory, ["init", "-q"]);
     const ours = "a".repeat(40);
     const theirs = "b".repeat(40);
     const big5 = Buffer.from([0xa4, 0xa4, 0xa4, 0xe5]);
@@ -313,6 +336,23 @@ test("conflict labels keep the bytes of non-UTF-8 files and CRLF line ends", asy
       await readFile(path.join(directory, "zh.txt")),
       file("latest main (aaaaaaa)", "this contribution"),
     );
+    // A conflict-marker-size attribute changes the width git writes and BELL reads.
+    await writeFile(path.join(directory, ".gitattributes"), "*.adoc conflict-marker-size=12\n");
+    const wide = (top: string, bottom: string) =>
+      `Title\n=======\n${"<".repeat(12)} ${top}\nours\n${"=".repeat(12)}\ntheirs\n${">".repeat(12)} ${bottom}\n`;
+    await writeFile(path.join(directory, "doc.adoc"), wide(ours, theirs));
+    await labelConflictMarkers(directory, ["doc.adoc"], {
+      [ours]: "latest main (aaaaaaa)",
+      [theirs]: "this contribution",
+    });
+    assert.equal(
+      await readFile(path.join(directory, "doc.adoc"), "utf8"),
+      wide("latest main (aaaaaaa)", "this contribution"),
+    );
+    assert.deepEqual(await filesWithConflictMarkers(directory, ["doc.adoc", "zh.txt"]), ["doc.adoc", "zh.txt"]);
+    // A seven-character heading underline is not a marker in a file whose markers are wider.
+    await writeFile(path.join(directory, "doc.adoc"), "Title\n=======\nresolved\n");
+    assert.deepEqual(await filesWithConflictMarkers(directory, ["doc.adoc"]), []);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -522,6 +562,13 @@ test("a PR sync takes in files the target branch added, also after the agent com
     assert.deepEqual(await parentsOf(f.repo.path, merge), [prHead, upstream]);
     assert.equal((await git(f.repo.path, ["show", `${merge}:brand-new.ts`])).stdout, "new upstream\n");
     assert.equal((await git(f.run.worktreePath, ["status", "--porcelain", "--untracked-files=all"])).stdout, "");
+
+    // A target that already holds all of the PR's changes leaves nothing to merge.
+    const before = f.run.followUps!.length;
+    await f.github.upstreamCommit({ "hello.ts": "line one\nline two, theirs and mine\nline three\n" });
+    await assert.rejects(f.workbench.syncRun(f.run.id), /已經包含這個 PR 的全部修改/);
+    assert.equal(f.run.followUps!.length, before);
+    assert.equal(f.run.status, "published");
 
     // The target deleting a file this PR changed cannot be marked: nothing moves.
     const pushed = f.run.publishCommit!;

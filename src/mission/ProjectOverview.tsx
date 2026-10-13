@@ -488,6 +488,7 @@ export function ProjectOverview({
     expansion?.requestedCount !== undefined &&
     addedIds.size < expansion.requestedCount;
   const moreDisabled =
+    updatingRepo ||
     loading ||
     recommending ||
     savingPreferences ||
@@ -519,7 +520,7 @@ export function ProjectOverview({
               type="button"
               className="mission-button mission-button-secondary"
               onClick={onUpdateRepo}
-              disabled={updatingRepo || loading || recommending}
+              disabled={updatingRepo || loading || recommending || savingPreferences}
               aria-describedby="mission-update-help"
             >
               {updatingRepo ? (
@@ -559,7 +560,7 @@ export function ProjectOverview({
           <button
             type="button"
             onClick={onAnalyze}
-            disabled={loading || recommending || savingPreferences}
+            disabled={loading || recommending || savingPreferences || updatingRepo}
           >
             重試
             <RefreshCw size={13} />
@@ -612,6 +613,7 @@ export function ProjectOverview({
               type="button"
               className="mission-button mission-button-primary"
               onClick={onAnalyze}
+              disabled={updatingRepo}
             >
               <Sparkles size={16} />
               開始專案分析

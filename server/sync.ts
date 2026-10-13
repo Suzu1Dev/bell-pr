@@ -68,6 +68,27 @@ export async function mergeCommits(
 }
 
 /**
+ * The width git writes each file's conflict markers in: 7, unless the
+ * checkout's `conflict-marker-size` attribute sets another. merge-tree reads
+ * the same attributes, so markers are always looked for at the width written.
+ */
+async function markerWidths(cwd: string, files: string[]) {
+  const widths = new Map<string, number>();
+  if (!files.length) return widths;
+  const fields = (
+    await git(cwd, ["check-attr", "-z", "conflict-marker-size", "--", ...files])
+  ).stdout.split("\0");
+  for (let index = 0; index + 2 < fields.length; index += 3) {
+    const width = Number(fields[index + 2]);
+    if (Number.isInteger(width) && width > 0) widths.set(fields[index], width);
+  }
+  return widths;
+}
+
+const markerLine = (width: number) =>
+  new RegExp(`^(?:<{${width}}|>{${width}})(?: |\\r?$)|^={${width}}\\r?$`, "m");
+
+/**
  * Conflicts git could not mark: a file deleted on one side and changed on
  * the other, or a binary file changed on both. git keeps one side without
  * markers, so nothing would stop that side from being published unseen.
@@ -77,33 +98,37 @@ export async function conflictsWithoutMarkers(
   tree: string,
   conflicts: string[],
 ) {
-  if (!conflicts.length) return [];
-  const result = await git(
-    cwd,
-    [
-      "--literal-pathspecs",
-      "grep",
-      "-l",
-      "-z",
-      "-G",
-      "-e",
-      "^<<<<<<< ",
-      "-e",
-      "^>>>>>>> ",
-      "-e",
-      "^=======$",
-      tree,
-      "--",
-      ...conflicts,
-    ],
-    { allowedCodes: [0, 1] },
-  );
-  const marked = new Set(
-    result.stdout
-      .split("\0")
-      .filter(Boolean)
-      .map((entry) => entry.slice(tree.length + 1)),
-  );
+  const widths = await markerWidths(cwd, conflicts);
+  const byWidth = new Map<number, string[]>();
+  for (const file of conflicts) {
+    const width = widths.get(file) ?? 7;
+    byWidth.set(width, [...(byWidth.get(width) ?? []), file]);
+  }
+  const marked = new Set<string>();
+  for (const [width, files] of byWidth) {
+    const result = await git(
+      cwd,
+      [
+        "--literal-pathspecs",
+        "grep",
+        "-l",
+        "-z",
+        "-G",
+        "-e",
+        `^${"<".repeat(width)} `,
+        "-e",
+        `^${">".repeat(width)} `,
+        "-e",
+        `^${"=".repeat(width)}$`,
+        tree,
+        "--",
+        ...files,
+      ],
+      { allowedCodes: [0, 1] },
+    );
+    for (const entry of result.stdout.split("\0").filter(Boolean))
+      marked.add(entry.slice(tree.length + 1));
+  }
   return conflicts.filter((file) => !marked.has(file));
 }
 
@@ -117,15 +142,14 @@ export async function checkoutTreeOnto(cwd: string, tree: string, base: string) 
   await git(cwd, ["read-tree", base]);
 }
 
-const conflictMarker = /^(?:<{7}|>{7})(?: |$)|^={7}$/m;
-
 /** The conflicted files that still hold conflict markers. */
 export async function filesWithConflictMarkers(cwd: string, files: string[]) {
+  const safe = files.filter((file) => safeRelativePath(file));
+  const widths = await markerWidths(cwd, safe);
   const open: string[] = [];
-  for (const file of files) {
-    if (!safeRelativePath(file)) continue;
+  for (const file of safe) {
     const content = await readFile(path.join(cwd, file), "utf8").catch(() => "");
-    if (conflictMarker.test(content)) open.push(file);
+    if (markerLine(widths.get(file) ?? 7).test(content)) open.push(file);
   }
   return open;
 }
@@ -140,13 +164,15 @@ export async function labelConflictMarkers(
   files: string[],
   labels: Record<string, string>,
 ) {
-  for (const file of files) {
-    if (!safeRelativePath(file)) continue;
+  const safe = files.filter((file) => safeRelativePath(file));
+  const widths = await markerWidths(cwd, safe);
+  for (const file of safe) {
     const full = path.join(cwd, file);
     const content = await readFile(full, "latin1").catch(() => undefined);
     if (content === undefined) continue;
+    const width = widths.get(file) ?? 7;
     const labelled = content.replace(
-      /^(<{7}|>{7}) ([0-9a-f]{40,64})(\r?)$/gm,
+      new RegExp(`^(<{${width}}|>{${width}}) ([0-9a-f]{40,64})(\\r?)$`, "gm"),
       (line, marker: string, commit: string, cr: string) =>
         labels[commit]
           ? `${marker} ${Buffer.from(labels[commit]).toString("latin1")}${cr}`

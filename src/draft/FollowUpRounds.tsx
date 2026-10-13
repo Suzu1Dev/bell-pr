@@ -87,7 +87,7 @@ export function FollowUpRounds({
                   <ul>
                     {round.conflicts.map((file) => (
                       <li key={file}>
-                        <code>{file}</code>
+                        <code>{file}</code>{" "}
                         {round.resolutions?.find((entry) => entry.path === file)
                           ?.resolution ?? ""}
                       </li>

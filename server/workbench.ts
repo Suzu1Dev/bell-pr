@@ -330,7 +330,15 @@ export class Workbench {
           409,
         );
       if (from !== to)
-        await git(repo.path, ["checkout", "-q", "-B", repo.defaultBranch, to]);
+        // An ignored local file in the way stops the update instead of being overwritten.
+        await git(repo.path, [
+          "checkout",
+          "-q",
+          "--no-overwrite-ignore",
+          "-B",
+          repo.defaultBranch,
+          to,
+        ]);
       repo.updatedAt = now();
       await this.store.save();
       return { repo, from, to, updated: from !== to };
@@ -508,6 +516,15 @@ export class Workbench {
     if (unmarked.length)
       throw new AppError(
         `${unmarkedConflicts(unmarked)}PR 沒有變動；請在本機用 git 把 ${run.baseBranch} 合併進 PR 分支並推送，BELL 之後會接續這些提交。`,
+        409,
+      );
+    const targetTree = (
+      await git(run.worktreePath, ["rev-parse", `${target}^{tree}`])
+    ).stdout.trim();
+    // An empty round could never be approved, and the PR would change nothing.
+    if (merged.tree === targetTree)
+      throw new AppError(
+        `${run.baseBranch} 已經包含這個 PR 的全部修改，合併後沒有差異，所以沒有同步；PR 沒有變動，可以考慮關閉它。`,
         409,
       );
     // HEAD stays at the PR head, the parent of the merge commit. The index
