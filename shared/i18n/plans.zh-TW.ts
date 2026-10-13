@@ -20,7 +20,7 @@ const plans: Translation<typeof en> = {
         "每次分析最多 5 個建議，可重新分析。降級後，已產生的建議（最多 30 個）仍會保留。",
     },
     moreRecommendations: {
-      label: "更多建議（「再產生 5 個」，每個專案最多 30 個）",
+      label: "更多建議（「產出 5 個新建議」，每個專案最多 30 個）",
       limit: "免費：5 個。Pro：每個專案最多 30 個。",
     },
     teamSize: {
