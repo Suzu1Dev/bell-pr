@@ -90,6 +90,13 @@ import {
 } from "../shared/draft-checks.js";
 import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
 import {
+  checkoutTreeOnto,
+  filesWithConflictMarkers,
+  labelConflictMarkers,
+  mergeCommits,
+  snapshotCheckout,
+} from "./sync.js";
+import {
   followUpJsonSchema,
   followUpPrompt,
   parseFollowUpResult,
@@ -310,6 +317,165 @@ export class Workbench {
       await this.store.save();
       return { repo, from, to, updated: from !== to };
     });
+  }
+
+  /** Agents, reviews, drafts, explanations or questions still working on this run. */
+  private runBusy(id: string) {
+    return (
+      this.followUpJobs.has(id) ||
+      this.reviewJobs.has(id) ||
+      [...this.controllers.keys()].some(
+        (key) => key === id || key.endsWith(`:${id}`),
+      )
+    );
+  }
+
+  /**
+   * Moves an unpublished run onto the latest commit of its target branch.
+   * The checkout is saved as a local snapshot commit first, then three-way
+   * merged with the new base; the result stays uncommitted on top of it, so
+   * the person reviews it like any change. Conflicts are left as markers that
+   * block approval until resolved, and the sync can be undone.
+   */
+  async syncRun(id: string) {
+    if (this.stopping) throw new AppError("服務正在關閉，請稍後重試。", 503);
+    return this.lock(id, async () => {
+      const run = this.run(id);
+      if (run.prUrl)
+        throw new AppError(
+          "這個工作已送出 PR；同步已送出的 PR 請使用修正輪。",
+          409,
+        );
+      if (
+        !["review", "approved", "awaiting_plan"].includes(run.status) ||
+        run.publishing
+      )
+        throw new AppError(
+          "只有審閱中、已核准或等待計畫核准的工作可以同步到最新目標分支。",
+          409,
+        );
+      if (this.runBusy(id))
+        throw new AppError(
+          "這個工作還有 Agent、審查或解說在進行；請等它完成再同步。",
+          409,
+        );
+      const repo = this.repo(run.repoId);
+      const head = (
+        await git(run.worktreePath, ["rev-parse", "HEAD"])
+      ).stdout.trim();
+      if (head !== run.baseSha)
+        throw new AppError("工作分支的提交和記錄的基準不一致，已停止同步。", 409);
+      const target = await this.lock(`repository:${repo.id}`, () =>
+        this.fetchBranchCommit(repo, run.baseBranch),
+      );
+      if (target === run.baseSha) {
+        this.log(run, "user", `已確認 ${run.baseBranch} 沒有新提交，工作已是最新。`);
+        await this.store.save();
+        return { run, updated: false, conflicts: [] as string[] };
+      }
+      const snapshot = await snapshotCheckout(
+        run.worktreePath,
+        path.join(this.store.directory, `sync-index-${run.id}`),
+      );
+      // Keeps the snapshot reachable for undo, outside every branch.
+      await git(run.worktreePath, [
+        "update-ref",
+        `refs/bellpr/sync/${run.id}`,
+        snapshot,
+      ]);
+      const merged = await mergeCommits(
+        run.worktreePath,
+        target,
+        snapshot,
+        run.baseSha,
+      );
+      await git(run.worktreePath, [
+        "update-ref",
+        `refs/heads/${run.branch}`,
+        target,
+        head,
+      ]);
+      await checkoutTreeOnto(run.worktreePath, merged.tree, target);
+      await labelConflictMarkers(run.worktreePath, merged.conflicts, {
+        [target]: `latest ${run.baseBranch} (${target.slice(0, 7)})`,
+        [snapshot]: "this contribution",
+      });
+      run.sync = {
+        at: now(),
+        from: run.baseSha,
+        to: target,
+        snapshot,
+        conflicts: merged.conflicts,
+        reviewedFingerprints: { ...run.reviewedFingerprints },
+      };
+      run.baseSha = target;
+      if (run.status === "approved") run.status = "review";
+      delete run.approvedFingerprint;
+      await this.diff(id);
+      this.log(
+        run,
+        "user",
+        merged.conflicts.length
+          ? `已同步到 ${run.baseBranch} 最新版本（${target.slice(0, 7)}），${merged.conflicts.length} 個檔案有衝突需要解決：${merged.conflicts.join("、")}。`
+          : `已同步到 ${run.baseBranch} 最新版本（${target.slice(0, 7)}），沒有衝突；改到的檔案需要重新審閱。`,
+      );
+      await this.store.save();
+      return { run, updated: true, conflicts: merged.conflicts };
+    });
+  }
+
+  /** Returns an unpublished run to the checkout and base it had before the last sync. */
+  async undoSync(id: string) {
+    return this.lock(id, async () => {
+      const run = this.run(id);
+      const sync = run.sync;
+      if (
+        !sync ||
+        run.prUrl ||
+        run.publishing ||
+        !["review", "approved", "awaiting_plan"].includes(run.status)
+      )
+        throw new AppError("目前沒有可以復原的同步。", 409);
+      if (this.runBusy(id))
+        throw new AppError(
+          "這個工作還有 Agent、審查或解說在進行；請等它完成再復原。",
+          409,
+        );
+      await git(run.worktreePath, ["rev-parse", "--verify", `${sync.snapshot}^{commit}`]);
+      const head = (
+        await git(run.worktreePath, ["rev-parse", "HEAD"])
+      ).stdout.trim();
+      await git(run.worktreePath, [
+        "update-ref",
+        `refs/heads/${run.branch}`,
+        sync.from,
+        head,
+      ]);
+      await checkoutTreeOnto(run.worktreePath, `${sync.snapshot}^{tree}`, sync.from);
+      await git(run.worktreePath, ["update-ref", "-d", `refs/bellpr/sync/${run.id}`]);
+      run.baseSha = sync.from;
+      // Marks come back for files whose diff is the one reviewed before the sync.
+      run.reviewedFingerprints = { ...(sync.reviewedFingerprints ?? {}) };
+      delete run.sync;
+      if (run.status === "approved") run.status = "review";
+      delete run.approvedFingerprint;
+      await this.diff(id);
+      this.log(run, "user", "已復原同步，工作回到同步前的內容與基準。");
+      await this.store.save();
+      return run;
+    });
+  }
+
+  /** Approval and publishing wait until a sync's conflicts are resolved. */
+  private async assertConflictsResolved(run: Run) {
+    const open = run.sync?.conflicts.length
+      ? await filesWithConflictMarkers(run.worktreePath, run.sync.conflicts)
+      : [];
+    if (open.length)
+      throw new AppError(
+        `這些檔案還有合併衝突標記：${open.join("、")}。請解決衝突（也可以請 Agent 解決）後再核准。`,
+        409,
+      );
   }
 
   async status() {
@@ -2070,6 +2236,7 @@ export class Workbench {
       }
       if (!run.draft.title.trim() || !run.draft.body.trim())
         throw new AppError("請先填寫 PR 標題與內容。", 422);
+      await this.assertConflictsResolved(run);
       // A follow-up round pushes only a commit, so its message is what goes out.
       const round = activeFollowUp(run.followUps);
       if (round) {
@@ -2297,6 +2464,7 @@ export class Workbench {
           "這個 PR 已經送出；要推送新的修改，請從維護者回饋開始一輪修正。",
           409,
         );
+      await this.assertConflictsResolved(run);
       const headBranch = run.draft.publishBranch || run.branch;
       if (
         run.draft.publishBranch &&
@@ -2371,7 +2539,7 @@ export class Workbench {
         ).stdout.trim();
         if (remoteSha !== run.baseSha)
           throw new AppError(
-            "目標分支已有新提交，請從最新版本建立新工作再審閱。",
+            "目標分支已有新提交；請先在 PR 草稿頁按「同步到最新目標分支」，審閱後再送出。",
             409,
           );
         const head = (

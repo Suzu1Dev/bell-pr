@@ -392,6 +392,12 @@ export function createApp(
   app.post("/api/runs/:id/pr/feedback", async (req, res) => {
     res.json({ run: await workbench.fetchPrFeedback(req.params.id) });
   });
+  app.post("/api/runs/:id/sync", async (req, res) => {
+    res.json(await workbench.syncRun(req.params.id));
+  });
+  app.post("/api/runs/:id/sync/undo", async (req, res) => {
+    res.json({ run: await workbench.undoSync(req.params.id) });
+  });
   app.post("/api/runs/:id/follow-ups", async (req, res) => {
     const input = z
       .object({

@@ -13,6 +13,7 @@ import type { FileConversation } from "../shared/chat";
 import type { PrFeedback } from "../shared/pr-feedback";
 import type { RunDetailField } from "../shared/runs";
 import type { FollowUpRound } from "../shared/followups";
+import type { BaseSync } from "../shared/sync";
 
 export type { ChatMessage } from "../shared/chat";
 export interface Repo {
@@ -99,6 +100,8 @@ export interface Run {
   headRepository?: string;
   /** Rounds of changes after maintainer review, oldest first; absent until the first one. */
   followUps?: FollowUpRound[];
+  /** The last move of an unpublished run onto a newer target-branch commit. */
+  sync?: BaseSync;
   /** Maintainer feedback read from the PR on request; absent until the learner fetches it. */
   prFeedback?: PrFeedback;
   error?: string;
