@@ -1,0 +1,7 @@
+# Justified exceptions for scripts/check-personal-info.mjs, one per line:
+#
+#   <path>:<pattern id>  # <reason>
+#
+# <path> is relative to the repository root. <pattern id> is one of the ids
+# defined in the script (user, tailnet, handle, port); never write the
+# identifier itself. Every entry needs a reason. Keep the list empty.
