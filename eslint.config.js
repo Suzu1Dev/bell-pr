@@ -70,7 +70,7 @@ export default defineConfig(
         {
           patterns: [
             {
-              regex: "^zod$|(^|/)shared/app-settings(\\.js)?$",
+              regex: "^zod(/.*)?$|(^|/)shared/app-settings(\\.js)?$",
               allowTypeImports: true,
               message: "Use `import type`; zod must not enter the UI bundle.",
             },
