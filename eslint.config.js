@@ -28,6 +28,12 @@ export default defineConfig(
     rules: {
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
+      // `interface Run extends RunCore {}` names a side's own view of a
+      // shared type and leaves room for side-only fields.
+      "@typescript-eslint/no-empty-object-type": [
+        "error",
+        { allowInterfaces: "with-single-extends" },
+      ],
     },
   },
   {
