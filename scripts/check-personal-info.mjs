@@ -270,8 +270,13 @@ function checkPack() {
 function selfTest() {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "bellpr-personal-info-"));
   const repo = path.join(temp, "repo");
+  // Drop GIT_DIR, GIT_INDEX_FILE and the like, which a git hook or the
+  // caller may set: they would point the fixture commands at another
+  // repository and stage the fixtures there.
   const env = {
-    ...process.env,
+    ...Object.fromEntries(
+      Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
+    ),
     GIT_CONFIG_NOSYSTEM: "1",
     GIT_CONFIG_GLOBAL: os.devNull,
   };
