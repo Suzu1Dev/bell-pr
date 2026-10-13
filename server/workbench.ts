@@ -454,9 +454,8 @@ export class Workbench {
   }
 
   /**
-  /**
    * Sends back to the lead a plan the person did not approve. The planning
-   * branch of execute() runs again with the feedback attached; there is no
+   * branch of executeRun() runs again with the feedback attached; there is no
    * second planning path. Messages queued to tasks of the old plan stay in the
    * inbox under their old task ids and are not forwarded.
    */
