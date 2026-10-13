@@ -25,9 +25,11 @@ usage is unknown, not zero.
 
 Persisted data must stay readable by older builds. Every new field written to
 `state.json`, the insights cache, or discovery jobs is optional; the shared
-type, the server zod schema (including the strict `persisted*` schemas), and the
-frontend type change in the same commit. `Database.version` stays 1, and the
-fixtures in `server/store.test.ts` must keep loading without migration.
+type, the server zod schema, and the frontend type change in the same commit.
+Agent-output, request-input and write schemas stay strict; persisted reads go
+through `lenientRead` (`server/persisted-schema.ts`), so files written by newer
+builds still load in older builds. `Database.version` stays 1, and the fixtures
+in `server/store.test.ts` must keep loading without migration.
 
 The BELL runtime adds its own versioned Ponytail policy to each Agent invocation.
 Do not copy efficiency rules into contribution worktrees or outgoing PRs, or
