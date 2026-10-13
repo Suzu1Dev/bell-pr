@@ -34,3 +34,36 @@ in `server/store.test.ts` must keep loading without migration.
 The BELL runtime adds its own versioned Ponytail policy to each Agent invocation.
 Do not copy efficiency rules into contribution worktrees or outgoing PRs, or
 remove output schema, cancellation, or approval controls to enable a plugin.
+
+## Product rules
+
+BELL PR is sold as a product. Every change also follows these rules:
+
+1. No user-facing literal outside the i18n dictionaries. Run
+   `node scripts/check-i18n.mjs`.
+2. Set the Agents' output language only through `server/prompt-language.ts`.
+   PR titles and bodies stay English unless the target project's rules say
+   otherwise.
+3. Gate Pro features only through `shared/plans.ts` plus `requirePro` or
+   `assertModelEntitlement`. Never gate reads of existing data (GET of runs,
+   diff, insights, discovery results, notes, the learning page, status),
+   cancel, or the continuation of an existing run. The single explicit
+   exception is `GET /api/runs/:id/export.md`, which generates a new document.
+4. No personal infrastructure strings (the owner's user, host or tailnet
+   names, private ports or home paths) in tracked files. Run
+   `node scripts/check-personal-info.mjs`.
+5. New persisted files (`license.json`, `app-settings.json`, `children.json`)
+   follow the same optional-field rule as `state.json`. Persisted read schemas
+   are lenient (strip mode and relaxed caps, through
+   `server/persisted-schema.ts`), while agent-output and request schemas stay
+   strict. Agent-output caps may only rise within the lenient read caps. Never
+   add a value to a persisted enum or union.
+6. `.agents/` and `AGENTS.md` are for developing BELL PR only and are excluded
+   from the npm package.
+7. Every new dependency needs a stated reason. No new runtime server dependency
+   without the owner's sign-off.
+8. Product identity, URLs and e-mail addresses come only from
+   `shared/product.ts`. An empty value means hide the link or degrade
+   gracefully; never invent one.
+9. No repo-wide reformatting. Keep diffs minimal so that cherry-picks from the
+   upstream repository stay feasible.
