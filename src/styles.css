@@ -42,16 +42,34 @@ button,
 a {
   touch-action: manipulation;
 }
-button:focus-visible,
-a:focus-visible {
-  outline: 3px solid var(--color-brand-300);
-  outline-offset: 3px;
+/* Keyboard focus: one ring for every interactive element. The rule's
+   specificity is (0,3,0): :root lifts it above component rules that set
+   their own box-shadow, and :where() keeps the tabindex test from raising
+   it further. A field inside a wrapper that rings on :focus-within opts out
+   with :root .wrapper field:focus-visible { box-shadow: none; }, which is
+   (0,3,1). Forced-colors mode drops box-shadow and shows the transparent
+   outline instead. */
+:root
+  :is(
+    button,
+    a,
+    input,
+    textarea,
+    select,
+    summary,
+    :where([tabindex]:not([tabindex="-1"])),
+    [role="tab"],
+    [role="separator"],
+    .rv-line
+  ):focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
 }
-input:focus,
-textarea:focus,
-select:focus {
-  outline: 2px solid var(--color-brand-300);
-  outline-offset: 1px;
+/* Diff rows sit in a scroll container that would clip an outer ring. Same
+   specificity as the rule above, so it has to come after it. */
+:root .rv-line:focus-visible {
+  box-shadow: var(--focus-ring-inset);
 }
 a {
   color: inherit;
@@ -864,13 +882,16 @@ button {
   font-size: var(--text-2xs);
   color: var(--color-text-muted);
   background: transparent;
-  outline: 0;
 }
 .file-search input::placeholder {
   color: var(--color-text-muted);
 }
 .file-search:focus-within {
   border-color: var(--color-accent-500);
+  box-shadow: var(--focus-ring);
+}
+:root .file-search input:focus-visible {
+  box-shadow: none;
 }
 .file-search kbd {
   font-family: var(--font-mono);

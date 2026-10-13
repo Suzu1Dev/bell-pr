@@ -169,11 +169,11 @@
 .command-palette-search input::placeholder {
   color: var(--color-text-muted);
 }
-.command-palette-search input:focus {
-  outline: none;
+:root .command-palette-search input:focus-visible {
+  box-shadow: none;
 }
 .command-palette-search:focus-within {
-  box-shadow: inset 0 -2px var(--color-accent-300);
+  box-shadow: inset 0 -2px var(--color-brand-600);
 }
 .command-palette-results-heading {
   display: flex;

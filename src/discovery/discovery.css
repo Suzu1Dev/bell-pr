@@ -143,10 +143,6 @@
   color: var(--color-text-muted);
   line-height: 1.6;
 }
-.discovery-page summary:focus-visible {
-  outline: 2px solid var(--color-brand-300);
-  outline-offset: 4px;
-}
 .discovery-advanced[open] summary {
   margin-bottom: 18px;
 }

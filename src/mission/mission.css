@@ -774,10 +774,10 @@
   scroll-snap-align: start;
   overflow-wrap: anywhere;
 }
-.mission-idea-list:focus-visible,
 .mission-idea:focus-visible {
-  outline: 2px solid var(--color-brand-600);
-  outline-offset: 3px;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
 }
 .mission-idea-new {
   border-color: var(--color-brand-300);
@@ -818,12 +818,6 @@
   border-color: var(--color-accent-200);
   background: var(--color-diff-add-bg);
   color: var(--color-brand-600);
-}
-.mission-idea-utilities button:focus-visible,
-.mission-hidden-ideas button:focus-visible,
-.mission-hidden-ideas > summary:focus-visible {
-  outline: 2px solid var(--color-brand-600);
-  outline-offset: 2px;
 }
 .mission-idea-utilities .mission-idea-drag-handle:not(:disabled) {
   cursor: grab;
@@ -1233,8 +1227,9 @@
 }
 .mission-direction:has(input:focus-visible),
 .mission-team-choice:has(input:focus-visible) {
-  outline: 3px solid var(--color-brand-300);
+  outline: 2px solid transparent;
   outline-offset: 2px;
+  box-shadow: var(--focus-ring);
 }
 .mission-direction > span {
   display: flex;

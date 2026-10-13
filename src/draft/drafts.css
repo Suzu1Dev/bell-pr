@@ -29,13 +29,6 @@
 .draft-guidance-panel summary::-webkit-details-marker {
   display: none;
 }
-.draft-guidance-panel summary:focus-visible,
-.draft-guidance-panel a:focus-visible,
-.draft-guidance-panel pre:focus-visible {
-  outline: 2px solid var(--color-brand-500);
-  outline-offset: 4px;
-  border-radius: 3px;
-}
 .draft-guidance-panel svg {
   flex-shrink: 0;
 }

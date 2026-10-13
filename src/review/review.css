@@ -16,13 +16,6 @@
 .explain-panel button {
   cursor: pointer;
 }
-.rv-diff button:focus-visible,
-.rv-line:focus-visible,
-.explain-panel button:focus-visible,
-.explain-panel textarea:focus-visible {
-  outline: 2px solid var(--color-brand-500);
-  outline-offset: 3px;
-}
 .rv-diff {
   display: flex;
   flex-direction: column;
@@ -132,8 +125,9 @@
   background: var(--color-surface);
 }
 .rv-reviewed input:focus-visible + .rv-review-check {
-  outline: 2px solid var(--color-brand-500);
-  outline-offset: 3px;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
 }
 .rv-reviewed-yes {
   color: var(--color-brand-600);
@@ -769,12 +763,6 @@
 .explain-note-save:hover:not(:disabled) {
   background: var(--color-violet-bg);
 }
-.explain-answer-toggle:focus-visible,
-.explain-note-save:focus-visible,
-.explain-note-input:focus-visible {
-  outline: 2px solid var(--color-brand-500);
-  outline-offset: 2px;
-}
 .explain-answer {
   margin-top: 12px;
   padding: 10px 12px;
@@ -961,7 +949,10 @@
 }
 .explain-input-box:focus-within {
   border-color: var(--color-brand-300);
-  box-shadow: 0 0 0 3px var(--color-diff-add-bg);
+  box-shadow: var(--focus-ring);
+}
+:root .explain-input-box textarea:focus-visible {
+  box-shadow: none;
 }
 .explain-panel .explain-input-box textarea {
   width: 100%;
@@ -974,7 +965,6 @@
   color: var(--color-accent-700);
   font-size: var(--text-sm);
   line-height: 1.7;
-  outline: none !important;
 }
 .explain-input-box textarea::placeholder {
   color: var(--color-text-muted);
@@ -1335,10 +1325,6 @@
   color: var(--color-brand-600);
   text-decoration: underline;
   text-underline-offset: 3px;
-}
-.explain-panel .markdown-content a:focus-visible {
-  outline: 2px solid var(--color-brand-500);
-  outline-offset: 3px;
 }
 .explain-panel .markdown-content hr {
   border: 0;

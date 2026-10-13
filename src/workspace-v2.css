@@ -119,7 +119,6 @@
 .pane-resizer:hover,
 .pane-resizer:focus-visible {
   background: var(--color-accent-300);
-  outline: none;
 }
 .is-reading .rv-line {
   font-size: var(--code-size, 14px);
