@@ -50,7 +50,11 @@ export interface Formatters {
   dateTime(value: DateInput, options?: Intl.DateTimeFormatOptions): string;
   /** For example `relative(-1, "day")` is "yesterday". */
   relative(value: number, unit: Intl.RelativeTimeFormatUnit): string;
-  /** Joins items with the locale's separators, as in "a, b, and c". */
+  /**
+   * Joins items with the locale's separators, as in "a, b, and c".
+   * `type: "unit"` gives a plain enumeration without a conjunction: "a, b, c"
+   * in en, items separated by the ideographic comma in zh-TW.
+   */
   list(
     items: readonly string[],
     options?: { type?: "conjunction" | "unit" },
@@ -158,13 +162,26 @@ export function formatters(locale: Locale): Formatters {
       return format.format(value, unit);
     },
     list(items, options = {}) {
-      const type = options.type ?? "conjunction";
-      const format = instance(
+      const conjunction = instance(
         "list",
-        { type },
-        () => new Intl.ListFormat(tag, { type, style: "long" }),
+        { type: "conjunction" },
+        () => new Intl.ListFormat(tag, { type: "conjunction", style: "long" }),
       );
-      return format.format(items);
+      if ((options.type ?? "conjunction") === "conjunction")
+        return conjunction.format(items);
+      // CLDR's "unit" pattern is meant for measures and joins zh-TW items
+      // with bare spaces. A plain enumeration repeats the separator that the
+      // conjunction pattern puts between the leading items instead: ", " in
+      // en and the ideographic comma (U+3001) in zh-TW.
+      const separator = instance(
+        "listSeparator",
+        {},
+        () =>
+          conjunction
+            .formatToParts(["a", "b", "c"])
+            .find((part) => part.type === "literal")?.value ?? ", ",
+      );
+      return items.join(separator);
     },
     plural(n) {
       return instance("plural", {}, () => new Intl.PluralRules(tag)).select(n);

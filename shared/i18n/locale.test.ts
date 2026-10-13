@@ -68,6 +68,29 @@ test("list joins items with each locale's separators", () => {
   assert.equal(zh.list(["甲", "乙"]), "甲和乙");
 });
 
+test("unit lists enumerate without a conjunction in both locales", () => {
+  const en = formatters("en");
+  const zh = formatters("zh-TW");
+  assert.equal(en.list(["a", "b"], { type: "unit" }), "a, b");
+  assert.equal(en.list(["a"], { type: "unit" }), "a");
+  assert.equal(en.list([], { type: "unit" }), "");
+  // The legacy zh-TW UI joins files and models with the ideographic comma.
+  assert.equal(
+    zh.list(["src/a.ts", "src/b.ts", "src/c.ts"], { type: "unit" }),
+    "src/a.ts、src/b.ts、src/c.ts",
+  );
+  assert.equal(
+    zh.list(["claude-sonnet-4-5", "claude-haiku-4-5-20251001"], {
+      type: "unit",
+    }),
+    "claude-sonnet-4-5、claude-haiku-4-5-20251001",
+  );
+  assert.equal(zh.list(["src/a.ts"], { type: "unit" }), "src/a.ts");
+  assert.equal(zh.list([], { type: "unit" }), "");
+  // Each type keeps its own result after the other one ran.
+  assert.equal(zh.list(["甲", "乙"]), "甲和乙");
+});
+
 test("plural gives the locale's plural category", () => {
   const en = formatters("en");
   assert.equal(en.plural(1), "one");
