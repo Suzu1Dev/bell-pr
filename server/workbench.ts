@@ -2,8 +2,7 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { command, agentEnvironment, redact } from "./process.js";
 import { readDiff, synchronizeReview } from "./git.js";
-import { claimReadyTasks, type TeamAgentRunner } from "./team.js";
-import { removeTaskWorktree } from "./team-workspace.js";
+import type { TeamAgentRunner } from "./team.js";
 import { maxPlanRevisions } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import { Store } from "./store.js";
@@ -72,6 +71,10 @@ export interface WorkbenchContext {
   };
   /** True once shutdown() has begun; no new background work starts. */
   stopping(): boolean;
+  /** Throws 429 once queued, running and paused runs reach the cap. */
+  assertQueueCapacity(): void;
+  /** Queues the run and starts it as soon as the active limit allows. */
+  enqueue(id: string): void;
   /** Appends to the run's own log, which is saved with the run. */
   log(
     run: Run,
@@ -163,6 +166,11 @@ export class Workbench {
         collectDraftContext: dependencies.collectDraftContext,
       },
       stopping: () => this.stopping,
+      assertQueueCapacity: () => this.assertQueueCapacity(),
+      enqueue: (id) => {
+        this.queue.push(id);
+        this.drain();
+      },
       log: executor.appendRunLog,
       run: (id) => this.run(id),
       repo: (id) => this.repo(id),
@@ -484,99 +492,8 @@ export class Workbench {
     });
   }
 
-  /**
-   * Resumes a failed or cancelled team run instead of starting over: completed
-   * tasks keep their integrated patches, failed and blocked tasks start again
-   * from a fresh snapshot, and a run whose tasks are all complete only re-runs
-   * integration and review. An unapproved plan returns to the approval step so
-   * cancelling during approval cannot be used to skip it.
-   */
   async retryTeam(id: string, message?: string) {
-    return this.lock(id, async () => {
-      const run = this.run(id);
-      const team = run.team;
-      if (
-        !["failed", "cancelled"].includes(run.status) ||
-        !run.baseSha ||
-        !team?.tasks.length
-      )
-        throw new AppError(
-          "只有已失敗或已取消、且 Lead 已建立計畫的團隊工作可以重試。",
-          409,
-        );
-      // A cancelled run keeps its controller until the worker has exited; the
-      // controller is dropped in the same tick as a failed status, so this is
-      // race-free where the job set (cleared later) is not.
-      if (this.controllers.has(id))
-        throw new AppError("此工作仍在收尾，請稍後再重試。", 409);
-      this.assertQueueCapacity();
-      const retried = team.tasks.filter(
-        (task) => task.status === "failed" || task.status === "blocked",
-      );
-      const kept = team.tasks.filter((task) => task.status === "complete");
-      // The same path is reused by the next attempt, so the old checkout has to
-      // go first; its unintegrated edits are discarded with it.
-      for (const task of retried)
-        await this.lock(`repository:${run.repoId}`, () =>
-          removeTaskWorktree(run, task),
-        );
-      for (const task of retried) {
-        task.status = "pending";
-        delete task.worktreePath;
-        delete task.worktreeRemoved;
-        delete task.baseSha;
-        delete task.report;
-        delete task.startedAt;
-        delete task.completedAt;
-        delete task.acceptsMessages;
-        delete run.reports?.[task.id];
-        const member = run.agents.find((agent) => agent.id === task.owner);
-        if (member) {
-          member.status = "waiting";
-          member.detail = "等待重新認領任務，使用新的獨立工作目錄";
-        }
-      }
-      claimReadyTasks(team.tasks, 0); // Recompute ready/pending without claiming.
-      delete run.error;
-      if (message) {
-        // sendTeamMessage stays closed for finished runs; the retry itself is
-        // the only way to brief the restarted tasks (or the lead when none).
-        // Queued before the approval check so a briefing is never dropped.
-        if (retried.length)
-          for (const task of retried)
-            executor.queueTeamMessage(
-              this.context,
-              run,
-              "user",
-              task.id,
-              message,
-            );
-        else
-          executor.queueTeamMessage(this.context, run, "user", "lead", message);
-      }
-      if (team.config.requirePlanApproval && !team.approvedAt) {
-        team.phase = "awaiting_approval";
-        run.status = "awaiting_plan";
-        this.log(run, "user", "要求重試；計畫尚未核准，先回到等待核准。");
-        await this.store.save();
-        return run;
-      }
-      team.phase = "developing";
-      run.status = "queued";
-      this.log(
-        run,
-        "user",
-        retried.length
-          ? `重試失敗的子任務：${kept.length} 個已完成任務不重跑，${retried.length} 個任務以新快照重新開始。`
-          : kept.length === team.tasks.length
-            ? "重試：所有子任務都已完成，直接重跑整合與獨立審查。"
-            : "重試：繼續執行尚未開始的子任務。",
-      );
-      await this.store.save();
-      this.queue.push(id);
-      this.drain();
-      return run;
-    });
+    return executor.retryTeam(this.context, id, message);
   }
 
   async cancel(id: string) {
