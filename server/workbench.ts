@@ -226,6 +226,92 @@ export class Workbench {
     }
   }
 
+  /**
+   * BELL's own clone of a GitHub repository, which it may update. A local
+   * import is the person's checkout and is never changed.
+   */
+  managedClone(repo: Repository) {
+    return (
+      !!repo.url &&
+      repo.path.startsWith(path.join(this.store.directory, "repositories") + path.sep)
+    );
+  }
+
+  /**
+   * The latest commit of `branch`: fetched from GitHub, or the local branch
+   * for a repository without one. FETCH_HEAD is shared by the clone, so
+   * callers hold the repository lock.
+   */
+  private async fetchBranchCommit(
+    repo: Repository,
+    branch: string,
+    signal?: AbortSignal,
+  ) {
+    if (!repo.url)
+      return (
+        await git(
+          repo.path,
+          ["rev-parse", "--verify", `refs/heads/${branch}^{commit}`],
+          { signal },
+        )
+      ).stdout.trim();
+    await git(
+      repo.path,
+      [
+        ...networkConfig,
+        "fetch",
+        "--no-tags",
+        "--no-recurse-submodules",
+        `${repo.url}.git`,
+        `refs/heads/${branch}`,
+      ],
+      { signal, timeoutMs: 120_000 },
+    );
+    return (
+      await git(repo.path, ["rev-parse", "--verify", "FETCH_HEAD^{commit}"], {
+        signal,
+      })
+    ).stdout.trim();
+  }
+
+  /**
+   * Moves BELL's clone to the latest default branch, so the project overview
+   * and analysis describe the current project. New runs fetch the latest
+   * base on their own; existing runs keep their worktrees.
+   */
+  async updateRepository(id: string) {
+    const repo = this.repo(id);
+    if (!this.managedClone(repo))
+      throw new AppError(
+        "這是你本機的 repository，BELL 不會更動它；請在終端機自行 git pull 後再重新分析。",
+        409,
+      );
+    return this.lock(`repository:${repo.id}`, async () => {
+      const from = (
+        await git(repo.path, ["rev-parse", "--verify", "HEAD"])
+      ).stdout.trim();
+      const to = await this.fetchBranchCommit(repo, repo.defaultBranch);
+      if (
+        (
+          await git(repo.path, [
+            "status",
+            "--porcelain",
+            "--untracked-files=no",
+          ])
+        ).stdout.trim()
+      )
+        throw new AppError(
+          "BELL 的專案副本有未預期的修改，已停止更新；請檢查後再試。",
+          409,
+        );
+      if (from !== to)
+        await git(repo.path, ["checkout", "-q", "-B", repo.defaultBranch, to]);
+      repo.updatedAt = now();
+      await this.store.save();
+      return { repo, from, to, updated: from !== to };
+    });
+  }
+
   async status() {
     if (this.statusCache && Date.now() - this.statusCache.time < 10_000)
       return this.statusCache.value;
@@ -1286,39 +1372,11 @@ export class Workbench {
         this.log(run, "system", "建立獨立 Git worktree。");
         await this.store.save();
         await this.lock(`repository:${repo.id}`, async () => {
-          if (repo.url) {
-            await git(
-              repo.path,
-              [
-                ...networkConfig,
-                "fetch",
-                "--no-tags",
-                "--no-recurse-submodules",
-                `${repo.url}.git`,
-                `refs/heads/${run.baseBranch}`,
-              ],
-              { signal, timeoutMs: 120_000 },
-            );
-            run.baseSha = (
-              await git(
-                repo.path,
-                ["rev-parse", "--verify", "FETCH_HEAD^{commit}"],
-                { signal },
-              )
-            ).stdout.trim();
-          } else {
-            run.baseSha = (
-              await git(
-                repo.path,
-                [
-                  "rev-parse",
-                  "--verify",
-                  `refs/heads/${run.baseBranch}^{commit}`,
-                ],
-                { signal },
-              )
-            ).stdout.trim();
-          }
+          run.baseSha = await this.fetchBranchCommit(
+            repo,
+            run.baseBranch,
+            signal,
+          );
           await mkdir(path.dirname(run.worktreePath), {
             recursive: true,
             mode: 0o700,

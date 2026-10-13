@@ -277,5 +277,11 @@ export function useProjectInsights(repoId?: string) {
     [cache, repoId],
   );
 
-  return { ...state, analyze, recommendMore, savePreferences };
+  // Reads the analysis again, for example after BELL's clone was updated.
+  const reload = useCallback(
+    () => (repoId ? cache.load(repoId) : Promise.resolve()),
+    [cache, repoId],
+  );
+
+  return { ...state, analyze, recommendMore, savePreferences, reload };
 }

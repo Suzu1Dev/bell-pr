@@ -24,6 +24,10 @@ export interface Repo {
   defaultBranch: string;
   url: string;
   language?: string;
+  /** When the person last updated BELL's clone to the latest default branch. */
+  updatedAt?: string;
+  /** Whether BELL owns the clone and may update it; computed by the API, not stored. */
+  updatable?: boolean;
 }
 
 export interface Agent {

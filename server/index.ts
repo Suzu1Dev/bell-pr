@@ -12,7 +12,7 @@ import {
 } from "./insights.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
-import { AppError } from "./types.js";
+import { AppError, type Repository } from "./types.js";
 import { redact } from "./process.js";
 import { DiscoveryService } from "./discovery.js";
 import {
@@ -184,14 +184,25 @@ export function createApp(
   app.post("/api/discovery/cancel", async (_req, res) => {
     res.json(await discovery.cancel());
   });
+  // `updatable` tells the UI whether BELL owns the clone; it is not stored.
+  const presentRepo = (repo: Repository) => ({
+    ...repo,
+    updatable: workbench.managedClone(repo),
+  });
   app.get("/api/repos", (_req, res) => {
-    res.json({ repos: workbench.store.data.repos });
+    res.json({ repos: workbench.store.data.repos.map(presentRepo) });
   });
   app.post("/api/repos", async (req, res) => {
     const { source } = z
       .object({ source: z.string().trim().min(1).max(4096) })
       .parse(req.body);
-    res.status(201).json({ repo: await workbench.importRepository(source) });
+    res
+      .status(201)
+      .json({ repo: presentRepo(await workbench.importRepository(source)) });
+  });
+  app.post("/api/repos/:id/update", async (req, res) => {
+    const result = await workbench.updateRepository(req.params.id);
+    res.json({ ...result, repo: presentRepo(result.repo) });
   });
   app.get("/api/repos/:id/insights", async (req, res) =>
     res.json(await insights.get(req.params.id)),

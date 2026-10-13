@@ -33,6 +33,8 @@ export interface Repository {
   defaultBranch: string;
   url: string;
   language?: string;
+  /** When the person last updated BELL's clone to the latest default branch. */
+  updatedAt?: string;
 }
 
 export interface Agent {

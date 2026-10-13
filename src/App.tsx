@@ -268,6 +268,7 @@ export default function App() {
   const [page, setPage] = useState<Page>("workspace");
   const [tab, setTab] = useState<Tab>("overview");
   const [repos, setRepos] = useState<Repo[]>([]);
+  const [updatingRepo, setUpdatingRepo] = useState(false);
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [run, setRun] = useState<Run>(loadDemo);
   const [files, setFiles] = useState<DiffFile[]>(demoFiles);
@@ -1623,6 +1624,30 @@ export default function App() {
       setFeedbackLoading(false);
     }
   }
+  async function updateRepo(target: Repo) {
+    setUpdatingRepo(true);
+    try {
+      const result = await api<{
+        repo: Repo;
+        from: string;
+        to: string;
+        updated: boolean;
+      }>(`/repos/${target.id}/update`, send("POST"));
+      setRepos((previous) =>
+        previous.map((repo) => (repo.id === result.repo.id ? result.repo : repo)),
+      );
+      await intelligence.reload();
+      notify(
+        result.updated
+          ? `已更新到最新版本（${result.to.slice(0, 7)}）。專案分析若標示過期，請重新分析；新的貢獻會從最新版本開始。`
+          : "已是最新版本。",
+      );
+    } catch (error) {
+      notify((error as Error).message, "error");
+    } finally {
+      setUpdatingRepo(false);
+    }
+  }
   async function startFollowUp() {
     setBusy(true);
     try {
@@ -2184,6 +2209,12 @@ export default function App() {
                     onRecommendMore={intelligence.recommendMore}
                     onChooseRecommendation={chooseRecommendation}
                     onReadCode={() => setTab("changes")}
+                    onUpdateRepo={
+                      !demo && currentRepo?.updatable
+                        ? () => void updateRepo(currentRepo)
+                        : undefined
+                    }
+                    updatingRepo={updatingRepo}
                   />
                 )}
                 {tab === "changes" && (
@@ -3441,6 +3472,12 @@ export default function App() {
               onChooseRecommendation={chooseRecommendation}
               onReadCode={() => setTab("changes")}
               onStartContribution={() => beginContribution(exploreRepo.id)}
+              onUpdateRepo={
+                exploreRepo.updatable
+                  ? () => void updateRepo(exploreRepo)
+                  : undefined
+              }
+              updatingRepo={updatingRepo}
             />
           </section>
         ) : page === "discovery" ? (
