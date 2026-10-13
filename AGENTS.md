@@ -16,7 +16,8 @@ ownership, and human review before publishing. BELL is a learning tool: retain
 requested explanations, examples, and tradeoffs. Efficiency rules must not remove
 features or weaken evidence required by structured Agent responses.
 
-Use focused tests for changed behavior and run `npm run build`. Run `npm test`
+Use focused tests for changed behavior and run `npm run build` and
+`npm run lint` (warnings are allowed; errors are not). Run `npm test`
 when changing Agent orchestration, Git/PR operations, persistence, or API contracts.
 Do not run expensive repeated checks after they pass without a new reason.
 Do not claim token, monetary, or runtime performance savings without comparable
