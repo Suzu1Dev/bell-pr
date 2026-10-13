@@ -20,7 +20,7 @@ const plans = {
     analysis: {
       label: "Project analysis with verified recommendations",
       limit:
-        "Up to 5 recommendations per analysis; re-analysis is allowed. Recommendations you already generated stay visible after a downgrade.",
+        "Up to 5 recommendations per analysis; re-analysis is allowed. Recommendations you already generated (up to 30) stay visible after a downgrade.",
     },
     moreRecommendations: {
       label: 'More recommendations ("Generate 5 more", up to 30 per project)',

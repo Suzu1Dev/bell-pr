@@ -17,7 +17,7 @@ const plans: Translation<typeof en> = {
     analysis: {
       label: "專案分析與經驗證的建議",
       limit:
-        "每次分析最多 5 個建議，可重新分析。降級後，已產生的建議仍會保留。",
+        "每次分析最多 5 個建議，可重新分析。降級後，已產生的建議（最多 30 個）仍會保留。",
     },
     moreRecommendations: {
       label: "更多建議（「再產生 5 個」，每個專案最多 30 個）",
