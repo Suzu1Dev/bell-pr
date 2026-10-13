@@ -43,6 +43,7 @@ import {
   withAgentTimeoutHint,
 } from "./agent-timeouts.js";
 import { AppError, type Repository } from "./types.js";
+import { lenientRead } from "./persisted-schema.js";
 import {
   defaultPonytailMode,
   ponytailModes,
@@ -303,8 +304,11 @@ const cacheSchema = z.object({
   }),
 });
 type Cache = z.infer<typeof cacheSchema>;
+// Cache files may come from a newer build: read them leniently.
+const persistedCacheSchema = lenientRead(cacheSchema);
 
 const sharedModelSettingsSchema = z.object(modelSettingsSchema).strict();
+const persistedModelSettingsSchema = lenientRead(sharedModelSettingsSchema);
 
 /** Model choices are shared by every project; legacy per-project values are ignored. */
 function withoutModel(settings: ContributionSettings) {
@@ -622,7 +626,7 @@ export class ProjectInsightsService {
 
   private async read(id: string): Promise<Cache> {
     try {
-      return cacheSchema.parse(
+      return persistedCacheSchema.parse(
         JSON.parse(await readFile(this.cachePath(id), "utf8")),
       );
     } catch (error) {
@@ -667,7 +671,7 @@ export class ProjectInsightsService {
   async getModelSettings(): Promise<ModelSettings> {
     await this.modelWrite.catch(() => undefined);
     try {
-      return sharedModelSettingsSchema.parse(
+      return persistedModelSettingsSchema.parse(
         JSON.parse(await readFile(this.modelSettingsPath, "utf8")),
       );
     } catch (error) {
