@@ -656,7 +656,7 @@ test("draft prepare HTTP API returns a proposal without applying and rejects aut
   }
 });
 
-/** The shape of the opencode PR template and the body BELL published as Suzu1Dev/opencode#1. */
+/** The shape of the opencode PR template and the body BELL published as example-org/example-repo#1. */
 const opencodeTemplate =
   "### Issue for this PR\n\nCloses #\n\n### Type of change\n\n- [ ] Bug fix\n- [ ] Documentation\n\n### What does this PR do?\n\nPlease provide a description of the issue.\n\n### How did you verify your code works?\n\n### Checklist\n\n- [ ] I have tested my changes locally\n- [ ] I have not included unrelated changes in this PR\n";
 const opencodeSources: DraftSource[] = [
