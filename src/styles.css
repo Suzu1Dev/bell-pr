@@ -89,7 +89,7 @@ svg {
   flex-shrink: 0;
 }
 ::selection {
-  background: var(--color-brand-200);
+  background: var(--color-selection);
 }
 button {
   transition:
