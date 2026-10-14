@@ -180,14 +180,16 @@ test(
   async () => {
     await withDataDir(async (dataDir, directory) => {
       // Stand-ins for open (macOS) and xdg-open that record their arguments,
-      // as another user would read them in the process list.
+      // as another user would read them in the process list. The file
+      // appears whole, through a rename, so the wait below never reads it
+      // half written.
       const bin = path.join(directory, "bin");
       const argvFile = path.join(directory, "opener-argv");
       mkdirSync(bin);
       for (const name of ["open", "xdg-open"])
         writeFileSync(
           path.join(bin, name),
-          `#!/bin/sh\nprintf '%s\\n' "$@" > '${argvFile}'\n`,
+          `#!/bin/sh\nprintf '%s\\n' "$@" > '${argvFile}.tmp' && mv '${argvFile}.tmp' '${argvFile}'\n`,
           { mode: 0o755 },
         );
       const previousPath = process.env.PATH;
