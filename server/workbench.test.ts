@@ -423,8 +423,8 @@ test("the base version around a modified file is served only for the current, re
     const files = await readDiff(f.run);
     const print = (file: string) =>
       files.find((entry) => entry.path === file)!.fingerprint;
-    const query = (file: string, fingerprint: string) =>
-      `${url}?${new URLSearchParams({ path: file, fingerprint })}`;
+    const query = (file: string, fingerprint: string, base = f.run.baseSha!) =>
+      `${url}?${new URLSearchParams({ path: file, fingerprint, base })}`;
 
     const ok = await http(query("hello.ts", print("hello.ts")), { headers: local });
     assert.equal(ok.status, 200);
@@ -432,10 +432,17 @@ test("the base version around a modified file is served only for the current, re
     // An older diff, a whole new file, a blocked file and an unknown path are refused.
     const stale = await http(query("hello.ts", "0".repeat(64)), { headers: local });
     assert.equal(stale.status, 409);
+    // A base that moved since the diff was read (a sync) is refused too.
+    const moved = await http(query("hello.ts", print("hello.ts"), "a".repeat(40)), { headers: local });
+    assert.equal(moved.status, 409);
     assert.equal((await http(query("new.ts", print("new.ts")), { headers: local })).status, 409);
     assert.equal((await http(query(".env", print(".env")), { headers: local })).status, 409);
     assert.equal((await http(query("missing.ts", print("hello.ts")), { headers: local })).status, 404);
     assert.equal((await http(`${url}?path=hello.ts`, { headers: local })).status, 400);
+    assert.equal(
+      (await http(`${url}?${new URLSearchParams({ path: "hello.ts", fingerprint: print("hello.ts") })}`, { headers: local })).status,
+      400,
+    );
     assert.equal(
       (await http(`${query("hello.ts", print("hello.ts"))}&extra=1`, { headers: local })).status,
       400,
@@ -458,9 +465,23 @@ test("the base version around a modified file is served only for the current, re
     const changed = (await readDiff(f.run)).find((entry) => entry.path === "secret.ts")!;
     assert.equal(changed.blocked, undefined);
     await assert.rejects(
-      f.workbench.contextLines(f.run.id, "secret.ts", changed.fingerprint),
+      f.workbench.contextLines(f.run.id, "secret.ts", changed.fingerprint, f.run.baseSha!),
       (error: AppError) => error.statusCode === 422 && /憑證/.test(error.message),
     );
+
+    // A password assignment is not a blocking secret, but it is masked line by line.
+    const config = path.join(f.repository, "config.ts");
+    const settings = ['const password = "hunter2-correct-horse";', ...body];
+    await writeFile(config, settings.join("\n") + "\n");
+    await git(f.repository, ["add", "--", "config.ts"]);
+    await git(f.repository, ["commit", "-m", "config"]);
+    f.run.baseSha = (await git(f.repository, ["rev-parse", "HEAD"])).stdout.trim();
+    await writeFile(config, [...settings.slice(0, -1), "const last = 0;"].join("\n") + "\n");
+    const configured = (await readDiff(f.run)).find((entry) => entry.path === "config.ts")!;
+    const { lines } = await f.workbench.contextLines(f.run.id, "config.ts", configured.fingerprint, f.run.baseSha!);
+    assert.equal(lines.length, settings.length);
+    assert.doesNotMatch(lines[0], /hunter2/);
+    assert.match(lines[0], /\[REDACTED\]/);
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));

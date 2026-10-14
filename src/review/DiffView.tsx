@@ -83,8 +83,15 @@ export function DiffView({
     () => (file.blocked ? [] : parseDiff(file.patch)),
     [file.patch, file.blocked],
   );
-  // Added and deleted files are whole in the patch; only a modified one has code around it.
-  const readable = !!onLoadBase && file.status === "modified" && !file.blocked;
+  // Added and deleted files are whole in the patch; only a modified one has
+  // code around it, and only with a hunk to place it (not a mode change)
+  // and as a regular file (a submodule, mode 160000, is a commit).
+  const readable =
+    !!onLoadBase &&
+    file.status === "modified" &&
+    !file.blocked &&
+    parsed.some((line) => line.kind === "hunk") &&
+    !/^index [0-9a-f]+\.\.[0-9a-f]+ 160000$/m.test(file.patch);
   const [base, setBase] = useState<string[] | null>(null);
   const [reveal, setReveal] = useState<Reveal>({});
   const [whole, setWhole] = useState(false);

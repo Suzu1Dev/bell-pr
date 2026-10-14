@@ -1245,6 +1245,7 @@ export default function App() {
     const query = new URLSearchParams({
       path: target.path,
       fingerprint: target.fingerprint ?? "",
+      base: run.baseSha ?? "",
     });
     const { lines } = await api<{ lines: string[] }>(
       `/runs/${runId}/context?${query}`,
@@ -2539,7 +2540,7 @@ export default function App() {
                       )}
                       {file ? (
                         <DiffView
-                          key={`${run.id}:${file.path}`}
+                          key={`${run.id}:${file.path}:${run.baseSha ?? ""}`}
                           file={file}
                           reviewed={run.reviewedFiles.includes(file.path)}
                           onReview={reviewFile}
@@ -2547,7 +2548,7 @@ export default function App() {
                           view={diffView}
                           hasNote={Boolean(run.notes?.[file.path]?.text)}
                           onLoadBase={
-                            !demo && file.fingerprint
+                            !demo && file.fingerprint && run.baseSha
                               ? () => loadBaseLines(run.id, file)
                               : undefined
                           }
