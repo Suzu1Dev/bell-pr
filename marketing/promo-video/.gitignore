@@ -1,0 +1,10 @@
+# Dependencies, renders, captured footage and the licensed music copy.
+# The MP3 and the renders must never be committed (see MUSIC-LICENSE.md).
+node_modules/
+out/
+public/footage/
+public/music/
+public/brand-assets/
+*.mp3
+*.mp4
+*.webm
