@@ -144,6 +144,11 @@ test("English role table keeps the order, merges teammates and marks partial rep
   });
   assert.match(one, /<summary>By role \(1 group\)<\/summary>/);
   assert.match(one, /<th scope="row">Reviewer<\/th><td>1<\/td>/);
+  // Unknown roles keep their raw key, even one named like an object method.
+  assert.match(
+    renderEnglish({ metrics: { ...metrics, byRole: { constructor: byRole.custom } } }),
+    /<th scope="row">constructor<\/th>/,
+  );
 });
 
 test("English sample and unmeasured runs report no measurement", () => {

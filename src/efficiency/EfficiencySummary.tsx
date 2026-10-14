@@ -11,7 +11,7 @@ import "./efficiency.css";
 
 type RoleGroup = keyof Messages["efficiency"]["roles"];
 /** Display order of the role groups; member-N teammates collapse into one row. */
-const roleOrder: readonly RoleGroup[] = [
+const roleOrder: readonly string[] = [
   "lead",
   "member",
   "reviewer",
@@ -21,9 +21,7 @@ const roleOrder: readonly RoleGroup[] = [
   "guide",
   "followup",
   "sync",
-];
-const isRoleGroup = (key: string): key is RoleGroup =>
-  (roleOrder as readonly string[]).includes(key);
+] satisfies RoleGroup[];
 const roleGroup = (role: string) =>
   /^member-\d+$/.test(role) ? "member" : role;
 
@@ -51,7 +49,7 @@ export function groupByRole(byRole: Record<string, RoleEfficiency>) {
   return [...groups.entries()]
     .sort(([a], [b]) => {
       const rank = (key: string) =>
-        isRoleGroup(key) ? roleOrder.indexOf(key) : roleOrder.length;
+        roleOrder.includes(key) ? roleOrder.indexOf(key) : roleOrder.length;
       return rank(a) - rank(b) || a.localeCompare(b);
     })
     .map(([key, entry]) => ({ key, ...entry }));
@@ -78,7 +76,8 @@ export function EfficiencySummary({
   const tokens = (value: number | undefined) =>
     measured && value !== undefined ? fmt.number(value) : t.notReported;
   const seconds = (ms: number) => t.seconds({ seconds: ms / 1000 });
-  const roleLabel = (key: string) => (isRoleGroup(key) ? t.roles[key] : key);
+  const roleLabel = (key: string) =>
+    Object.hasOwn(t.roles, key) ? t.roles[key as RoleGroup] : key;
   const rows = data?.byRole ? groupByRole(data.byRole) : [];
   return (
     <section className="efficiency-summary" aria-label={heading}>
