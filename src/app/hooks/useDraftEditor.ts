@@ -18,6 +18,23 @@ import type { Notify } from "../AppShell";
 /** The draft checks bring a Markdown parser, so they load beside the first screen. */
 type DraftChecks = typeof import("../../../shared/draft-checks");
 
+/**
+ * The checks the publish dialog shows: the server's list when it has been
+ * read (it also covers the commit e-mail, this computer's folders and the
+ * changed CI files, which only the server knows), plus any check computed
+ * here that it does not name.
+ */
+export function mergePublishChecks(
+  local: DraftCheck[],
+  server: DraftCheck[] | undefined,
+): DraftCheck[] {
+  if (!server) return local;
+  return [
+    ...server,
+    ...local.filter((check) => !server.some((item) => item.id === check.id)),
+  ];
+}
+
 interface DraftEditorOptions {
   run: Run;
   setRun: Dispatch<SetStateAction<Run>>;
@@ -56,6 +73,12 @@ export function useDraftEditor({
   );
   // Preflight items confirmed in the publish dialog; never saved.
   const [acknowledged, setAcknowledged] = useState<string[]>([]);
+  // The server's publish checks for one approval (GET /runs/:id/preflight).
+  const [serverChecks, setServerChecks] = useState<{
+    runId: string;
+    fingerprint?: string;
+    checks: DraftCheck[];
+  }>();
   const [draftChecks, setDraftChecks] = useState<DraftChecks>();
   useEffect(() => {
     let cancelled = false;
@@ -125,14 +148,20 @@ export function useDraftEditor({
       !!draftChecks?.findDraftPlaceholders(draftCommitMessage).length);
   const publishChecks: DraftCheck[] = followUp
     ? []
-    : (draftChecks?.draftPreflight(
-        {
-          body: run.draft.body,
-          sources: draftSources,
-          proposalBody,
-        },
-        locale,
-      ) ?? []);
+    : mergePublishChecks(
+        draftChecks?.draftPreflight(
+          {
+            body: run.draft.body,
+            sources: draftSources,
+            proposalBody,
+          },
+          locale,
+        ) ?? [],
+        serverChecks?.runId === run.id &&
+          serverChecks.fingerprint === run.approvedFingerprint
+          ? serverChecks.checks
+          : undefined,
+      );
   const publishBlocked = publishChecks.find((check) => check.kind === "block");
   const publishConfirmations = publishChecks.filter(
     (check) => check.kind === "confirm",
@@ -200,6 +229,22 @@ export function useDraftEditor({
         next.delete(id);
         return next;
       });
+    }
+  }
+  /**
+   * Reads the checks the server runs before publishing this approval, so
+   * the publish dialog can ask for every confirmation it needs. On failure
+   * the local checks stay, and publishing names anything they miss.
+   */
+  async function loadPublishChecks(id: string, fingerprint?: string) {
+    try {
+      const { checks } = await api<{ checks: DraftCheck[] }>(
+        `/runs/${id}/preflight`,
+      );
+      if (runIdRef.current === id)
+        setServerChecks({ runId: id, fingerprint, checks });
+    } catch {
+      if (runIdRef.current === id) setServerChecks(undefined);
     }
   }
   function applyDraftProposal(proposal: DraftProposal) {
@@ -289,6 +334,7 @@ export function useDraftEditor({
     commitMessageUnfinished,
     publishBlocked,
     publishConfirmations,
+    loadPublishChecks,
     commitMessageSuggestion,
     prepareDraft,
     applyDraftProposal,

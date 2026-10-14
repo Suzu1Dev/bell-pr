@@ -128,6 +128,7 @@ export function useRunActions({
     draftPublishBranch,
     acknowledged,
     setAcknowledged,
+    loadPublishChecks,
     followUp,
   } = draft;
   const t = useT("workspace").notices;
@@ -562,6 +563,10 @@ export function useRunActions({
         );
         if (runIdRef.current !== updated.id) return;
         setRun(updated);
+        // The dialog asks for every confirmation the server will want.
+        if (!followUp)
+          await loadPublishChecks(updated.id, updated.approvedFingerprint);
+        if (runIdRef.current !== updated.id) return;
       }
       setAcknowledged([]);
       openModal("publish");
