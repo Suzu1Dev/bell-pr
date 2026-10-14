@@ -8,7 +8,11 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfm } from "micromark-extension-gfm";
 import type { DraftSource } from "./drafts.js";
+import en from "./i18n/draft-checks.en.js";
+import zhTW from "./i18n/draft-checks.zh-TW.js";
 import type { Locale } from "./i18n/locale.js";
+
+const dictionaries: Record<Locale, typeof en> = { en, "zh-TW": zhTW };
 
 /**
  * Lines of a Markdown body with code (fenced, indented and inline) and HTML
@@ -250,14 +254,15 @@ export interface DraftCheck {
 /**
  * Checks the text that will be sent to GitHub. Shared by the draft tab, the
  * publish dialog and the server so all three agree. It reports what is still
- * open; it never ticks a box or edits the text. `_locale` will choose the
- * language of the messages; it has no effect yet.
+ * open; it never ticks a box or edits the text. `locale` chooses the language
+ * of the messages; the ids and kinds are the same in every locale.
  */
 export function draftPreflight(input: {
   body: string;
   sources?: DraftSource[];
   proposalBody?: string;
-}, _locale?: Locale): DraftCheck[] {
+}, locale: Locale = "en"): DraftCheck[] {
+  const m = dictionaries[locale];
   const sources = input.sources ?? [];
   const checks: DraftCheck[] = [];
   const placeholders = findDraftPlaceholders(input.body);
@@ -265,10 +270,10 @@ export function draftPreflight(input: {
     checks.push({
       id: "placeholder",
       kind: "block",
-      message: `PR 說明還有 ${placeholders.length} 處待填寫的內容。這段文字會原樣送到 GitHub；請改成目前的事實或刪除，待辦事項留在核對清單。若是在描述 TODO 註解或檔案本身，請用反引號包起來，例如 \`TODO\`。`,
+      message: m.placeholder({ count: placeholders.length }),
       details: placeholders
         .slice(0, 5)
-        .map((item) => `第 ${item.line} 行：「${item.text}」`),
+        .map((item) => m.placeholderLine({ line: item.line, text: item.text })),
     });
   const groups = new Map<string, DraftTaskItem[]>();
   for (const item of draftTaskItems(input.body))
@@ -280,11 +285,12 @@ export function draftPreflight(input: {
     checks.push({
       id: "unchecked",
       kind: "confirm",
-      message:
-        "這些段落的勾選項目全部沒有勾，會原樣送出。專案的範本或自動檢查可能要求勾選；只勾你真正完成或確認的項目。",
-      details: empty.map(
-        ([heading, items]) =>
-          `${heading || "（無標題）"}：${items.length} 項都未勾`,
+      message: m.unchecked,
+      details: empty.map(([heading, items]) =>
+        m.uncheckedSection({
+          heading: heading || m.noHeading,
+          count: items.length,
+        }),
       ),
     });
   const issue = issueRule(sources);
@@ -292,9 +298,8 @@ export function draftPreflight(input: {
     checks.push({
       id: "issue",
       kind: "confirm",
-      message:
-        "專案規範要求 PR 連結既有的 issue，這份說明沒有引用任何 issue。",
-      details: [`${issue.label}：「${issue.quote}」`],
+      message: m.issue,
+      details: [m.ruleQuote(issue)],
     });
   const brevity = brevityRule(sources);
   if (brevity) {
@@ -308,9 +313,9 @@ export function draftPreflight(input: {
         id: "brevity",
         kind: "confirm",
         message: unrevised
-          ? "這份說明仍是未改寫的 BELL 建議原文，而專案要求用自己的話寫簡短的說明。"
-          : `這份說明約 ${words} 字，超過 BELL 建議的 ${budget} 字；專案要求簡短的說明。`,
-        details: [`${brevity.label}：「${brevity.quote}」`],
+          ? m.brevityUnrevised
+          : m.brevityOver({ words, budget }),
+        details: [m.ruleQuote(brevity)],
       });
   }
   return checks;

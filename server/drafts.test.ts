@@ -37,6 +37,7 @@ import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
 import { createApp } from "./index.js";
 import { git } from "./process.js";
+import { assertNoHan } from "../src/test-utils/render.js";
 
 const context: DraftContext = {
   sources: [],
@@ -830,11 +831,14 @@ test("issue and brevity rules are quoted from contributing and template sources 
 });
 
 test("preflight blocks unfinished text and asks the person to confirm empty boxes, a missing issue and unrevised model text", () => {
-  const checks = draftPreflight({
-    body: leakedBody,
-    sources: opencodeSources,
-    proposalBody: leakedBody,
-  });
+  const checks = draftPreflight(
+    {
+      body: leakedBody,
+      sources: opencodeSources,
+      proposalBody: leakedBody,
+    },
+    "zh-TW",
+  );
   assert.deepEqual(
     checks.map((check) => [check.id, check.kind]),
     [
@@ -886,6 +890,64 @@ test("preflight blocks unfinished text and asks the person to confirm empty boxe
   assert.deepEqual(
     draftPreflight({ body: "A finished description." }),
     [],
+  );
+});
+
+test("preflight messages default to English, keep their ids and quote the rules without Han", () => {
+  const checks = draftPreflight({
+    body: leakedBody,
+    sources: opencodeSources,
+    proposalBody: leakedBody,
+  });
+  assert.deepEqual(
+    checks.map((check) => check.id),
+    ["placeholder", "unchecked", "issue", "brevity"],
+  );
+  for (const check of checks)
+    for (const text of [check.message, ...check.details]) assertNoHan(text);
+  assert.match(checks[0].message, /^The PR description still has 3 unfinished spots\./);
+  assert.equal(
+    checks[0].details[0],
+    'Line 3: "_TODO: No issue is linked yet. Open one and link it here before submitting._"',
+  );
+  assert.deepEqual(checks[1].details, [
+    "Type of change: all 2 items are unticked",
+    "Checklist: all 2 items are unticked",
+  ]);
+  assert.match(checks[2].message, /does not reference one\.$/);
+  assert.deepEqual(checks[2].details, [
+    'CONTRIBUTING.md: "All PRs must reference an existing issue. Before opening a PR, open an issue."',
+  ]);
+  assert.match(checks[3].message, /still BELL's suggested text, unrevised/);
+  assert.deepEqual(checks[3].details, [
+    'CONTRIBUTING.md: "No AI-Generated Walls of Text"',
+  ]);
+  // One unticked box under no heading, and a body over the word budget.
+  const long = draftPreflight({
+    body: `- [ ] Tested\n\n${"word ".repeat(200)}`,
+    sources: opencodeSources,
+  });
+  assert.deepEqual(long.find((check) => check.id === "unchecked")?.details, [
+    "(no heading): its 1 item is unticked",
+  ]);
+  assert.match(
+    long.find((check) => check.id === "brevity")?.message ?? "",
+    /^This description is about 200 words, more than the 150 BELL suggests/,
+  );
+  // The same checks in zh-TW differ only in their text.
+  const zh = draftPreflight(
+    { body: leakedBody, sources: opencodeSources, proposalBody: leakedBody },
+    "zh-TW",
+  );
+  assert.deepEqual(
+    zh.map(({ id, kind }) => [id, kind]),
+    checks.map(({ id, kind }) => [id, kind]),
+  );
+  assert.equal(zh[0].details[0], "第 3 行：「_TODO: No issue is linked yet. Open one and link it here before submitting._」");
+  assert.deepEqual(
+    draftPreflight({ body: "- [ ] Tested", sources: opencodeSources }, "zh-TW")
+      .find((check) => check.id === "unchecked")?.details,
+    ["（無標題）：1 項都未勾"],
   );
 });
 
