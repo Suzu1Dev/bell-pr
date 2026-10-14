@@ -1,11 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { ModelSummary } from "./ModelSummary";
+import en from "../i18n/en";
+import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
+import { ModelSummary, reasoningLabels } from "./ModelSummary";
 
-const render = (props: Parameters<typeof ModelSummary>[0]) =>
-  renderToStaticMarkup(createElement(ModelSummary, props));
+type Props = Parameters<typeof ModelSummary>[0];
+
+const render = (props: Props) => renderZh(createElement(ModelSummary, props));
+
+/** Renders in English and checks that no zh-TW text is left. */
+const renderEnglish = (props: Props) => {
+  const html = renderEn(createElement(ModelSummary, props));
+  assertNoHan(html);
+  return html;
+};
 
 test("Codex and records without a reported model keep the 未回報 wording", () => {
   const codex = render({ execution: { source: "cli-default" } });
@@ -72,4 +81,66 @@ test("web access is shown only when the run recorded it", () => {
     execution: { provider: "claude", model: "sonnet", source: "selected" },
   });
   assert.doesNotMatch(off, /已允許上網/);
+});
+
+test("English renders say what was passed and what the CLI reported", () => {
+  const codex = renderEnglish({ execution: { source: "cli-default" } });
+  assert.match(codex, /aria-label="Model settings for this run"/);
+  assert.match(codex, /<strong>Run model<\/strong>/);
+  assert.match(codex, /<dd>Codex default \(model not reported\)<\/dd>/);
+  assert.match(codex, /<dt>Reasoning effort<\/dt><dd>Codex default<\/dd>/);
+  assert.match(codex, /The model the service actually used was not reported\./);
+  assert.match(codex, /settings BELL PR passed to Codex/);
+
+  const claude = renderEnglish({
+    execution: {
+      provider: "claude",
+      model: "haiku",
+      reasoningEffort: "xhigh",
+      webAccess: true,
+      source: "selected",
+      reported: {
+        model: "claude-haiku-4-5-20251001",
+        cliVersion: "2.1.292",
+        modelsUsed: ["claude-haiku-4-5-20251001", "claude-sonnet-4-5"],
+      },
+    },
+  });
+  assert.match(
+    claude,
+    /<dd>Passed haiku → reported claude-haiku-4-5-20251001 \(CLI 2\.1\.292\)<\/dd>/,
+  );
+  assert.match(
+    claude,
+    /<dt>Models called during this run<\/dt><dd>claude-haiku-4-5-20251001, claude-sonnet-4-5<\/dd>/,
+  );
+  assert.match(claude, /<dd>Extra high · xhigh<\/dd>/);
+  assert.match(claude, /<dt>Network<\/dt><dd>Web access allowed<\/dd>/);
+  assert.match(claude, /the model the Claude Code CLI reported/);
+
+  const cliDefault = renderEnglish({
+    execution: {
+      provider: "claude",
+      source: "cli-default",
+      reported: { model: "claude-sonnet-4-5" },
+    },
+  });
+  assert.match(cliDefault, /<dd>No --model passed → reported claude-sonnet-4-5<\/dd>/);
+});
+
+test("English analysis, sample and unrecorded summaries", () => {
+  const sample = renderEnglish({ demo: true, analysis: true });
+  assert.match(sample, /aria-label="Model settings for this analysis"/);
+  assert.match(sample, /<strong>Analysis model<\/strong>/);
+  assert.match(sample, /Sample content\. No model has run yet\./);
+  assert.match(
+    renderEnglish({ analysis: true }),
+    /This analysis did not record its model\./,
+  );
+  assert.match(renderEnglish({}), /This older run did not record its model\./);
+});
+
+test("the deprecated reasoningLabels alias is the English common labels", () => {
+  assert.equal(reasoningLabels, en.common.reasoningEffort);
+  assert.equal(reasoningLabels.xhigh, "Extra high");
 });
