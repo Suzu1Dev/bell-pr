@@ -188,7 +188,7 @@ test("the mode chip reads Efficiency mode and opens the Ponytail credit and link
   assert.match(
     html,
     new RegExp(
-      `<details class="efficiency-mode"><summary title="[^"]+">Efficiency mode: Lean<svg[\\s\\S]*?</svg></summary><div class="efficiency-credit" role="note"><p>The efficiency modes build on Ponytail ${ponytailVersion} by DietrichGebert \\(MIT license\\)\\. Lean gives the agents a short adaptation of its principles, Full gives them its complete rules, and Off adds neither\\.</p><a href="${ponytailSource}" target="_blank" rel="noreferrer">Ponytail upstream project<svg`,
+      `<details class="efficiency-mode"><summary title="[^"]+">Efficiency mode: Lean<svg[\\s\\S]*?</svg></summary><div class="efficiency-credit" role="note" tabindex="-1"><p>The efficiency modes build on Ponytail ${ponytailVersion} by DietrichGebert \\(MIT license\\)\\. Lean gives the agents a short adaptation of its principles, Full gives them its complete rules, and Off adds neither\\.</p><a href="${ponytailSource}" target="_blank" rel="noreferrer">Ponytail upstream project<svg`,
     ),
   );
   assert.match(renderEnglish({ mode: "full" }), /Efficiency mode: Full/);

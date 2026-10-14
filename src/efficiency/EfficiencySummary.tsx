@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Gauge, ArrowUpRight, Info } from "lucide-react";
 import {
   ponytailSource,
@@ -85,6 +86,13 @@ export function EfficiencySummary({
     Object.hasOwn(t.roles, key) ? t.roles[key as RoleGroup] : key;
   const rows = data?.byRole ? groupByRole(data.byRole) : [];
   const credit = t.credit.text({ version: ponytailVersion });
+  const toggletip = useRef<HTMLDetailsElement>(null);
+  const closeCredit = (focusChip: boolean) => {
+    const details = toggletip.current;
+    if (!details?.open) return;
+    details.open = false;
+    if (focusChip) details.querySelector("summary")?.focus();
+  };
   return (
     <section
       className={`efficiency-summary ${data?.calls ? "" : "is-empty"}`}
@@ -99,12 +107,26 @@ export function EfficiencySummary({
         {recordedMode && (
           // A toggletip: the chip shows the credit on hover and opens it,
           // with the upstream link, on click or Enter.
-          <details className="efficiency-mode">
+          // Escape or moving focus away closes it again.
+          <details
+            className="efficiency-mode"
+            ref={toggletip}
+            onKeyDown={(event) => {
+              if (event.key !== "Escape" || !toggletip.current?.open) return;
+              event.stopPropagation();
+              closeCredit(true);
+            }}
+            onBlur={(event) => {
+              if (!toggletip.current?.contains(event.relatedTarget as Node | null))
+                closeCredit(false);
+            }}
+          >
             <summary title={credit}>
               {t.modeLabel({ mode: t.modes[recordedMode] })}
               <Info size={12} aria-hidden="true" />
             </summary>
-            <div className="efficiency-credit" role="note">
+            {/* Focusable, so selecting its text does not close it. */}
+            <div className="efficiency-credit" role="note" tabIndex={-1}>
               <p>{credit}</p>
               <a href={ponytailSource} target="_blank" rel="noreferrer">
                 {t.credit.link}
