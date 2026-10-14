@@ -177,6 +177,9 @@ const m: Translation<typeof en> = {
     draftPrHelp:
       "送出後仍可在 GitHub 繼續編輯；專案的自動檢查對 Draft PR 一樣會執行。",
   },
+  published: {
+    publishing: "正在開啟範例 Draft PR…",
+  },
   feedback: {
     title: "維護者回饋",
     intro: `按下按鈕才會讀取 PR 上的 review、留言與 CI 結果；${product.name} 只讀不回，回覆請到 GitHub。`,
@@ -269,10 +272,9 @@ const m: Translation<typeof en> = {
     rerunStarted:
       "已開始依目前差異重新審查，報告完成後會出現在「審查者怎麼看」。",
     imported: ({ name }) => `已匯入 ${name}`,
-    demoDirectionSaved:
-      "示範方向設定已儲存。匯入自己的 repository 後即可啟動真實團隊。",
+    demoPlaybackStarted:
+      "範例團隊開始工作：這裡播放預先寫好的執行過程，不會啟動 agent，也不會送出任何內容到 GitHub。",
     chatFailed: ({ message }) => `這次未能取得回答：${message}`,
-    demoPublished: "示範審查已完成！匯入你的 repository，即可建立真正的 PR。",
     roundPushed: "已把這輪修正推送到 PR，分支上多了一個 commit。",
     prCreated: "GitHub Draft PR 已建立",
     feedbackRead: ({ count }) => `已讀取 ${count} 則維護者回饋。`,

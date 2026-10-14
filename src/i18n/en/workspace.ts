@@ -202,6 +202,10 @@ const workspace = {
     draftPrHelp:
       "You can keep editing on GitHub afterwards; the project's automated checks run on Draft PRs too.",
   },
+  /** The sample's Draft PR; its card's words come from the demo content. */
+  published: {
+    publishing: "Opening the sample Draft PR…",
+  },
   feedback: {
     title: "Maintainer feedback",
     intro: `Reviews, comments and CI results on the PR are read only when you press the button. ${product.name} only reads them; reply on GitHub.`,
@@ -343,13 +347,11 @@ const workspace = {
     rerunStarted:
       "Re-review started on the current diff. The report appears in the explanation panel when it is done.",
     imported: ({ name }: { name: string }) => `Imported ${name}`,
-    demoDirectionSaved:
-      "Demo direction saved. Import your own repository to start a real team.",
+    demoPlaybackStarted:
+      "The sample team is starting: a prewritten run plays here, with no agent and nothing sent to GitHub.",
     /** A chat turn that failed; `ChatMessage.failed` marks it. */
     chatFailed: ({ message }: { message: string }) =>
       `Could not get an answer this time: ${message}`,
-    demoPublished:
-      "Demo review complete! Import your repository to open a real PR.",
     roundPushed: "Pushed this round to the PR: the branch has one more commit.",
     prCreated: "GitHub Draft PR created",
     feedbackRead: ({ count }: { count: number }) =>

@@ -4,6 +4,7 @@ import {
   type ContributionSettings,
 } from "../../../shared/insights";
 import { getDemo } from "../../demo";
+import { demoPrUrl } from "../../demo/playback";
 import type { Run } from "../../types";
 
 // The demo keeps the reader's review progress, draft and direction settings
@@ -33,18 +34,33 @@ function write(key: string, value: unknown) {
   }
 }
 
-/** The demo run in `locale`, with the review progress and draft kept for it. */
+/** The sample's Draft PR, "opened" from `run`'s draft; nothing is on GitHub. */
+function samplePr(run: Run): Partial<Run> {
+  return {
+    prUrl: demoPrUrl,
+    publishedBranch: run.draft.publishBranch || run.branch,
+  };
+}
+
+/**
+ * The demo run in `locale`, with the review progress and draft kept for
+ * it; a sample PR the reader opened stays open.
+ */
 export function loadDemo(locale: Locale): Run {
   const { run, team } = getDemo(locale);
   const fresh: Run = { ...run, team: structuredClone(team) };
   const saved = read(demoRunKey(locale)) as Partial<Run> | null;
   if (saved?.id !== run.id) return fresh;
-  return {
+  const kept: Run = {
     ...fresh,
     reviewedFiles: Array.isArray(saved.reviewedFiles) ? saved.reviewedFiles : [],
     draft: saved.draft || run.draft,
-    status: saved.status === "approved" ? "approved" : "review",
+    status:
+      saved.status === "approved" || saved.status === "published"
+        ? saved.status
+        : "review",
   };
+  return kept.status === "published" ? { ...kept, ...samplePr(kept) } : kept;
 }
 
 /**
@@ -53,18 +69,24 @@ export function loadDemo(locale: Locale): Run {
  * shown in the new locale.
  */
 export function demoRunInLocale(previous: Run, locale: Locale): Run {
-  const { run, team, draftPreparation } = getDemo(locale);
+  const { run, team, draftPreparation, prFeedback } = getDemo(locale);
   if (previous.id !== run.id) return previous;
-  return {
+  // A sample PR on its way is shown opened: no playback finishes it now.
+  const published = previous.status === "published" || !!previous.publishing;
+  const next: Run = {
     ...run,
     team: structuredClone(team),
     reviewedFiles: previous.reviewedFiles,
     draft: previous.draft,
-    status: previous.status,
+    status: published ? "published" : previous.status,
     notes: previous.notes,
     draftPreparation:
       previous.draftPreparation && structuredClone(draftPreparation),
+    ...(previous.prFeedback && prFeedback
+      ? { prFeedback: structuredClone(prFeedback) }
+      : {}),
   };
+  return published ? { ...next, ...samplePr(next) } : next;
 }
 
 /** Remembers the demo run's progress for `locale`. */

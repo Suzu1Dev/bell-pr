@@ -7,7 +7,7 @@ import type { PrFeedbackItem } from "../../shared/pr-feedback";
 import { getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Run } from "../types";
-import { DraftTab } from "./DraftTab";
+import { DraftTab, SamplePublishedCard } from "./DraftTab";
 
 type Props = Parameters<typeof DraftTab>[0];
 
@@ -386,4 +386,35 @@ test("the sample shows its fictional feedback with a PRO chip and links to nothi
   assert.match(tag(html, /aria-describedby="follow-up-limit"/), /disabled=""/);
   assert.match(html, /The sample starts no round\./);
   assertNoHan(html);
+});
+
+test("the published sample shows its own card, which says nothing reached GitHub", () => {
+  const demo = getDemo("en");
+  const published = {
+    ...demo.run,
+    status: "published" as const,
+    prUrl: "#demo-pr",
+    publishedBranch: "retry-backoff",
+  };
+  const html = renderEn(element({ demo: true, run: published }));
+  assert.match(html, /<section class="sample-published" role="status" aria-labelledby="sample-published-title">/);
+  assert.ok(html.includes(`<h2 id="sample-published-title">${demo.publishedCard!.title}</h2>`));
+  assert.ok(html.includes(demo.publishedCard!.note));
+  assert.match(html, /<code>retry-backoff<\/code> → <code>main<\/code>/);
+  assertNoHan(html);
+  // While the playback pushes, it says so instead.
+  const pushing = renderEn(
+    createElement(SamplePublishedCard, {
+      run: { ...demo.run, status: "approved", publishing: true },
+    }),
+  );
+  assert.match(pushing, /Opening the sample Draft PR…/);
+  assert.doesNotMatch(pushing, /sample-published-title/);
+  // Before it is published, and for a real run, there is no card.
+  assert.equal(renderEn(createElement(SamplePublishedCard, { run: demo.run })), "");
+  assert.doesNotMatch(renderEn(element()), /sample-published/);
+  assert.match(
+    renderZh(createElement(SamplePublishedCard, { run: { ...published, ...getDemo("zh-TW").run, status: "published" } })),
+    new RegExp(getDemo("zh-TW").publishedCard!.title),
+  );
 });

@@ -12,7 +12,8 @@ import {
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
-import { useFormat, useT } from "../i18n";
+import { getDemo } from "../demo";
+import { useFormat, useLocale, useT } from "../i18n";
 import { ProBadge } from "../license/ProBadge";
 import { requestUpgrade } from "../license/useEntitlements";
 import type { DiffFile, Run } from "../types";
@@ -91,6 +92,47 @@ interface DraftTabProps {
 }
 
 /**
+ * The sample's Draft PR once the demo "publishes" it: the demo's own card,
+ * which says that nothing was created on GitHub, with the branch and the
+ * title it would carry. While the playback pushes, it says so.
+ */
+export function SamplePublishedCard({ run }: { run: Run }) {
+  const t = useT("workspace").published;
+  const [locale] = useLocale();
+  const card = getDemo(locale).publishedCard;
+  if (run.publishing)
+    return (
+      <section className="sample-published is-pending" role="status">
+        <Loader2 className="spin" size={18} aria-hidden="true" />
+        <p>{t.publishing}</p>
+      </section>
+    );
+  if (run.status !== "published" || !card) return null;
+  return (
+    <section
+      className="sample-published"
+      role="status"
+      aria-labelledby="sample-published-title"
+    >
+      <span className="sample-published-icon">
+        <GitPullRequest size={20} aria-hidden="true" />
+      </span>
+      <div>
+        <h2 id="sample-published-title">{card.title}</h2>
+        <p>{card.note}</p>
+        <p className="sample-published-meta">
+          <strong>{run.draft.title}</strong>
+          <span>
+            <code>{run.publishedBranch ?? run.branch}</code> →{" "}
+            <code>{run.baseBranch}</code>
+          </span>
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/**
  * The PR draft tab: the target branch and syncing, review follow-up rounds,
  * contribution guide, draft editor, checklist and feedback.
  */
@@ -157,6 +199,7 @@ export function DraftTab({
   } = rounds;
   return (
     <div className="draft-workspace">
+      {demo && <SamplePublishedCard run={run} />}
       {/* A run has a base only once its checkout exists; a queued run has nothing to sync. */}
       {!demo && !!run.baseSha && (
         <SyncPanel

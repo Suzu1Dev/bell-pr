@@ -470,7 +470,8 @@ export function WorkspacePage({
                 total: files.length,
               })}
             </span>
-            {run.status === "published" && run.prUrl ? (
+            {/* The sample PR exists nowhere: its button just stays off. */}
+            {run.status === "published" && run.prUrl && !demo ? (
               <a
                 className="button primary"
                 href={run.prUrl}
@@ -488,6 +489,7 @@ export function WorkspacePage({
                   !allReviewed ||
                   active ||
                   busy ||
+                  !!run.publishing ||
                   draftDirty ||
                   (!demo &&
                     (followUp ? commitMessageUnfinished : !!draftUnfinished)) ||

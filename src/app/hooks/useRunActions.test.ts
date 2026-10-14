@@ -3,7 +3,12 @@ import test from "node:test";
 import { assertNoHan } from "../../test-utils/render";
 import en from "../../i18n/en";
 import zhTW from "../../i18n/zh-TW";
-import { readRunFiles, runPath, stopNotice } from "./useRunActions";
+import {
+  mergePlaybackRun,
+  readRunFiles,
+  runPath,
+  stopNotice,
+} from "./useRunActions";
 import type { Run } from "../../types";
 
 const zh = zhTW.workspace.notices;
@@ -128,4 +133,71 @@ test("a run id is escaped in its API path, so it cannot name another route", asy
   }) as typeof fetch;
   await readRunFiles("x/../../status");
   assert.deepEqual(asked, ["/api/runs/x%2F..%2F..%2Fstatus/diff"]);
+});
+
+test("a playback step brings the run's progress and keeps what the reader did", () => {
+  const team = {
+    config: {
+      maxTeammates: 2 as const,
+      requirePlanApproval: true,
+      provider: "codex" as const,
+      protocol: "bell-shared-tasks" as const,
+      messageDelivery: "between-turns" as const,
+    },
+    phase: "developing" as const,
+    planSummary: "Plan",
+    tasks: [],
+    messages: [
+      {
+        id: "m1",
+        from: "lead",
+        to: "all",
+        content: "Brief",
+        createdAt: "2026-10-13T00:00:01Z",
+        status: "delivered" as const,
+        recipients: [],
+        deliveredTo: [],
+      },
+    ],
+  };
+  const typed = {
+    ...team.messages[0],
+    id: "u1",
+    from: "user",
+    content: "Keep the old option working",
+    status: "queued" as const,
+  };
+  const previous: Run = {
+    ...base,
+    id: "demo-run",
+    reviewedFiles: ["a.ts"],
+    draft: { title: "Mine", body: "My words", publishBranch: "my-branch" },
+    notes: { "a.ts": { text: "note", fingerprint: "f", updatedAt: "2026-10-13T00:00:00Z" } },
+    team: { ...team, messages: [...team.messages, typed] },
+  };
+  const step: Run = {
+    ...base,
+    id: "demo-run",
+    status: "published",
+    prUrl: "#demo-pr",
+    publishedBranch: "fix/abc",
+    reports: { reviewer: "Looks fine" },
+    team,
+  };
+  const merged = mergePlaybackRun(previous, step);
+  assert.equal(merged.status, "published");
+  assert.equal(merged.prUrl, "#demo-pr");
+  assert.deepEqual(merged.reports, { reviewer: "Looks fine" });
+  assert.deepEqual(merged.reviewedFiles, ["a.ts"]);
+  assert.equal(merged.draft.body, "My words");
+  assert.equal(merged.notes?.["a.ts"].text, "note");
+  // The sample PR goes out under the branch the reader chose.
+  assert.equal(merged.publishedBranch, "my-branch");
+  // The playback's messages first, then what the reader typed to the team.
+  assert.deepEqual(merged.team?.messages.map((message) => message.id), ["m1", "u1"]);
+  // A step that already lists a message does not list it twice.
+  assert.equal(
+    mergePlaybackRun(previous, { ...step, team: previous.team }).team?.messages.length,
+    2,
+  );
 });
