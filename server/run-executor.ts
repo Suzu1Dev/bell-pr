@@ -2,7 +2,7 @@
  * Runs a contribution for the Workbench queue: one agent CLI turn
  * (runAgent), the run log, team messages, and the team phases in order:
  * the lead's plan, the members in their own worktrees, integration, and the
- * independent reviewer and test analyst. retryTeam resumes a failed or
+ * independent reviewer and test analyst. team-retry.ts resumes a failed or
  * cancelled run from its task board.
  */
 import { randomUUID } from "node:crypto";
@@ -797,95 +797,4 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
       );
     await ctx.store.save();
   }
-}
-
-/**
- * Resumes a failed or cancelled team run instead of starting over: completed
- * tasks keep their integrated patches, failed and blocked tasks start again
- * from a fresh snapshot, and a run whose tasks are all complete only re-runs
- * integration and review. An unapproved plan returns to the approval step so
- * cancelling during approval cannot be used to skip it.
- */
-export async function retryTeam(
-  ctx: WorkbenchContext,
-  id: string,
-  message?: string,
-) {
-  return ctx.lock(id, async () => {
-    const run = ctx.run(id);
-    const team = run.team;
-    if (
-      !["failed", "cancelled"].includes(run.status) ||
-      !run.baseSha ||
-      !team?.tasks.length
-    )
-      throw new AppError((m) => m.run.team.retryNotAllowed, 409);
-    // A cancelled run keeps its controller until the worker has exited; the
-    // controller is dropped in the same tick as a failed status, so this is
-    // race-free where the job set (cleared later) is not.
-    if (ctx.controllers.has(id))
-      throw new AppError((m) => m.run.team.stillStopping, 409);
-    ctx.assertQueueCapacity();
-    const retried = team.tasks.filter(
-      (task) => task.status === "failed" || task.status === "blocked",
-    );
-    const kept = team.tasks.filter((task) => task.status === "complete");
-    // The same path is reused by the next attempt, so the old checkout has to
-    // go first; its unintegrated edits are discarded with it.
-    for (const task of retried)
-      await ctx.lock(`repository:${run.repoId}`, () =>
-        removeTaskWorktree(run, task),
-      );
-    for (const task of retried) {
-      task.status = "pending";
-      delete task.worktreePath;
-      delete task.worktreeRemoved;
-      delete task.baseSha;
-      delete task.report;
-      delete task.startedAt;
-      delete task.completedAt;
-      delete task.acceptsMessages;
-      delete run.reports?.[task.id];
-      const member = run.agents.find((agent) => agent.id === task.owner);
-      if (member) {
-        member.status = "waiting";
-        member.detail = sm().run.agents.memberRetry;
-      }
-    }
-    claimReadyTasks(team.tasks, 0); // Recompute ready/pending without claiming.
-    delete run.error;
-    if (message) {
-      // sendTeamMessage stays closed for finished runs; the retry itself is
-      // the only way to brief the restarted tasks (or the lead when none).
-      // Queued before the approval check so a briefing is never dropped.
-      if (retried.length)
-        for (const task of retried)
-          queueTeamMessage(ctx, run, "user", task.id, message);
-      else queueTeamMessage(ctx, run, "user", "lead", message);
-    }
-    if (team.config.requirePlanApproval && !team.approvedAt) {
-      team.phase = "awaiting_approval";
-      run.status = "awaiting_plan";
-      ctx.log(run, "user", sm().run.team.retryAwaitingApproval);
-      await ctx.store.save();
-      return run;
-    }
-    team.phase = "developing";
-    run.status = "queued";
-    ctx.log(
-      run,
-      "user",
-      retried.length
-        ? sm().run.team.retryTasks({
-            kept: kept.length,
-            retried: retried.length,
-          })
-        : kept.length === team.tasks.length
-          ? sm().run.team.retryIntegration
-          : sm().run.team.retryPending,
-    );
-    await ctx.store.save();
-    ctx.enqueue(id);
-    return run;
-  });
 }

@@ -31,6 +31,7 @@ import { collectDraftContext } from "./draft-sources.js";
 import { synchronizeDraftPreparation } from "./drafts.js";
 import * as repositories from "./repositories.js";
 import * as executor from "./run-executor.js";
+import { retryTeam } from "./team-retry.js";
 import * as publishing from "./publish.js";
 import * as learning from "./learning.js";
 import * as drafting from "./draft-jobs.js";
@@ -526,7 +527,7 @@ export class Workbench {
   }
 
   async retryTeam(id: string, message?: string) {
-    return executor.retryTeam(this.context, id, message);
+    return retryTeam(this.context, id, message);
   }
 
   async cancel(id: string) {
