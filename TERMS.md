@@ -182,7 +182,7 @@ with web access may use. <!-- claim:TERMS-34 -->
 | Learning record export (Markdown) | Pro | Free: not available (the notes page stays Free) |
 | Maintainer feedback, CI coaching and AI follow-up rounds | Pro | Free: not available; the sample project shows example feedback labelled PRO. Follow-up rounds already on a run stay readable after a downgrade, and an open round can still be reviewed, pushed, stopped or discarded. |
 | Discovery (GitHub-wide recommendations) | Pro | Free: labelled sample results only. Results you already have stay readable, and a running discovery can still be cancelled. |
-| Web access for agents | Pro | Free: off. Pro: on, limited to an allowlist of domains |
+| Web access for agents | Pro | Free: off. Pro: off until you turn it on. Claude Code may then open pages on GitHub's own sites only; the Codex CLI uses OpenAI's web search. |
 | Deep reasoning efforts (xhigh, max, ultra) | Pro | Free: choose none to high. Leaving the effort on "Default" uses the model's own default effort on every plan. |
 | Providers, model choice, Efficiency modes | Free | Codex CLI and Claude Code, all models, all efficiency modes |
 | Sample project / demo (Pro features shown with sample data) | Free | Sample data in your browser only |

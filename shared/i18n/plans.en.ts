@@ -78,7 +78,8 @@ const plans = {
     },
     webAccess: {
       label: "Web access for agents",
-      limit: "Free: off. Pro: on, limited to an allowlist of domains",
+      limit:
+        "Free: off. Pro: off until you turn it on. Claude Code may then open pages on GitHub's own sites only; the Codex CLI uses OpenAI's web search.",
     },
     deepReasoning: {
       label: "Deep reasoning efforts (xhigh, max, ultra)",

@@ -73,7 +73,8 @@ const plans: Translation<typeof en> = {
     },
     webAccess: {
       label: "Agent 網路存取",
-      limit: "免費：關閉。Pro：開啟，僅限允許清單中的網域",
+      limit:
+        "免費：關閉。Pro：預設關閉，由你自行開啟。開啟後，Claude Code 只能開啟 GitHub 自家網站的頁面；Codex CLI 使用 OpenAI 的網路搜尋。",
     },
     deepReasoning: {
       label: "深度思考強度（xhigh、max、ultra）",

@@ -115,11 +115,12 @@ own. The legal texts already describe the shipped behavior.
    generated tables of the site, the READMEs and TERMS.md) promises 12
    months from purchase. The owner should issue pools close to the sale, use
    a longer `--updates-months`, or change the copy.
-3. **Web access copy.** The plan copy says "Pro: on, limited to an allowlist
-   of domains". Only Claude Code's WebFetch has a domain allowlist
-   (`server/agent-cli.ts:38`); Codex's live web search has none
-   (`server/agent-cli.ts:205`). The copy in `shared/i18n/plans.{en,zh-TW}.ts`
-   should say so.
+3. **Web access copy.** Fixed after the merge: the plan copy said "Pro: on,
+   limited to an allowlist of domains", but web access is off until the
+   person turns it on, only Claude Code's WebFetch has a domain allowlist
+   (`server/agent-cli.ts:38`), and Codex's live web search has none
+   (`server/agent-cli.ts:205`). `shared/i18n/plans.{en,zh-TW}.ts` now say
+   so, and the generated tables are rebuilt.
 4. **Claim markers in the app.** Fixed after the merge:
    `scripts/generate-third-party-notices.mjs` now leaves HTML comments (the
    `claim:` and generated-region markers) out of the `dist/legal/*.txt`
