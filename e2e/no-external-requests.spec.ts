@@ -8,6 +8,8 @@ const routes = [
   "#/runs/demo-run/activity",
   "#/runs/demo-run/draft",
   "#/home",
+  "#/demo",
+  "#/about",
   "#/repos",
   "#/repos/demo-repo",
   "#/discover",
