@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import * as draftChecks from "../../shared/draft-checks";
 import type { DraftCheck } from "../../shared/draft-checks";
 import { demoFiles, demoRepo, demoRun } from "../demo";
+import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Run } from "../types";
 import { PublishModal } from "./PublishModal";
 
@@ -19,9 +19,8 @@ const run: Run = {
   draft: { title: "Add retry backoff", body: "## Summary\n\nRetries GET requests." },
 };
 
-const render = (props: Partial<Props> = {}, draft: Partial<Props["draft"]> = {}) =>
-  renderToStaticMarkup(
-    createElement(PublishModal, {
+const element = (props: Partial<Props> = {}, draft: Partial<Props["draft"]> = {}) =>
+  createElement(PublishModal, {
       run,
       files: demoFiles,
       demo: false,
@@ -43,8 +42,10 @@ const render = (props: Partial<Props> = {}, draft: Partial<Props["draft"]> = {})
       closeModal() {},
       setTab() {},
       ...props,
-    }),
-  );
+    });
+
+const render = (props: Partial<Props> = {}, draft: Partial<Props["draft"]> = {}) =>
+  renderZh(element(props, draft));
 
 const confirm: DraftCheck = {
   id: "brevity",
@@ -163,4 +164,62 @@ test("a follow-up round previews its commit and pushes to the PR branch instead 
   );
   assert.match(sync, /<h2 id="modal-title">把同步結果推到 PR。<\/h2>/);
   assert.match(sync, /這會在 PR 分支加上一個合併 commit/);
+});
+
+const round = {
+  id: "r2",
+  requestedAt: "2026-10-11T01:00:00Z",
+  feedbackUrls: [],
+  status: "review" as const,
+  parentCommit: "b".repeat(40),
+};
+const roundRun: Run = {
+  ...run,
+  prUrl: "https://github.com/openfetch-sample/open-fetch/pull/3",
+  publishedBranch: "retry-backoff",
+  draft: { ...run.draft, commitMessage: "Rename the option" },
+  followUps: [round],
+};
+
+test("the publish dialog reads in English with no Chinese left", () => {
+  const html = renderEn(element());
+  assert.match(html, /<h2 id="modal-title">Send this contribution to GitHub\.<\/h2>/);
+  assert.ok(html.includes(`${demoFiles.length} files reviewed`));
+  assert.match(html, /PR description sent to GitHub \(about \d+ words?\)/);
+  assert.match(html, /Loading the preview…/);
+  assert.match(html, /<button class="button primary">.*Submit Draft PR<\/button>/);
+  assert.match(html, />Back to the draft<\/button>/);
+  assert.match(html, /aria-label="Close dialog"/);
+  assertNoHan(html);
+
+  const confirmations = renderEn(
+    element(
+      { formError: "Push failed" },
+      {
+        publishConfirmations: [
+          { ...confirm, message: "The description is short", details: ["Make sure maintainers can follow it"] },
+        ],
+      },
+    ),
+  );
+  assert.match(confirmations, /<legend>Confirm each item before submitting<\/legend>/);
+  assertNoHan(confirmations);
+
+  const demo = renderEn(element({ demo: true }));
+  assert.match(demo, /Your demo contribution is ready\./);
+  assert.match(demo, /Finish the demo review/);
+  assertNoHan(demo);
+});
+
+test("an open round's publish dialog reads in English with no Chinese left", () => {
+  const html = renderEn(element({ run: roundRun }, { followUp: round }));
+  assert.match(html, /<h2 id="modal-title">Push this round to the PR\.<\/h2>/);
+  assert.match(html, /<strong>This round&#x27;s commit message<\/strong><pre>Rename the option<\/pre>/);
+  assert.match(html, /<button class="button primary">.*Push this round<\/button>/);
+  assertNoHan(html);
+
+  const sync = renderEn(element({ run: roundRun }, { followUp: { ...round, kind: "sync" } }));
+  assert.match(sync, /<h2 id="modal-title">Push the sync to the PR\.<\/h2>/);
+  assertNoHan(sync);
+  assert.match(renderEn(element({ busy: true })), /Submitting…/);
 });

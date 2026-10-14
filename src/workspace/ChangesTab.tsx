@@ -26,6 +26,7 @@ import {
   Search,
   Sparkles,
 } from "lucide-react";
+import { useT } from "../i18n";
 import type { DiffFile, Repo, Run } from "../types";
 import { applyReviewOrder, parseReviewOrder } from "../../shared/review-order";
 import { DiffView } from "../review/DiffView";
@@ -137,6 +138,8 @@ export function ChangesTab({
   prepareExplanations,
   actions,
 }: ChangesTabProps) {
+  const t = useT("workspace").changes;
+  const fileStatus = useT("common").fileStatus;
   const {
     messages,
     chatRequests,
@@ -197,15 +200,15 @@ export function ChangesTab({
         <aside className="file-panel">
           <div className="file-panel-heading">
             <strong>
-              變更的檔案 <span>{files.length}</span>
+              {t.files} <span>{files.length}</span>
             </strong>
             <ListTree size={16} />
           </div>
           <label className="file-search">
             <Search size={14} />
             <input
-              placeholder="搜尋檔案…"
-              aria-label="搜尋變更檔案"
+              placeholder={t.searchPlaceholder}
+              aria-label={t.searchLabel}
               value={fileSearch}
               onChange={(e) => setFileSearch(e.target.value)}
             />
@@ -218,26 +221,26 @@ export function ChangesTab({
             <span className="toggle-track">
               <span />
             </span>
-            只看尚未審查
+            {t.onlyUnreviewed}
           </button>
           {reviewOrder.length > 0 && (
             <button
               className={`filter-toggle ${suggestedOrder ? "is-on" : ""}`}
               aria-pressed={suggestedOrder}
-              title="依 Lead 整合摘要建議的閱讀順序排列；未提到的檔案維持 git 順序排在後面"
+              title={t.suggestedOrderTitle}
               onClick={() => setSuggestedOrder(!suggestedOrder)}
             >
               <span className="toggle-track">
                 <span />
               </span>
-              依建議順序
+              {t.suggestedOrder}
             </button>
           )}
           <div className="file-tree">
             <div className="tree-root">
               <ChevronDown size={13} />
               <FolderGit2 size={15} />
-              {currentRepo?.name || "repository"}
+              {currentRepo?.name || t.repositoryFallback}
             </div>
             {visibleFiles.map((f) => (
               <button
@@ -275,22 +278,22 @@ export function ChangesTab({
                 ) : (
                   <span
                     className={`file-modified ${f.status === "deleted" ? "file-deleted" : ""}`}
-                    title={fileStatusLabel(f.status).title}
+                    title={fileStatusLabel(fileStatus, f.status).title}
                   >
-                    {fileStatusLabel(f.status).badge}
+                    {fileStatusLabel(fileStatus, f.status).badge}
                   </span>
                 )}
               </button>
             ))}
             {!visibleFiles.length && (
               <p className="file-empty">
-                {active ? "等待 agent 產生變更" : "沒有符合的檔案"}
+                {active ? t.waitingForChanges : t.noMatches}
               </p>
             )}
           </div>
           <div className="review-progress">
             <div>
-              <span>審查進度</span>
+              <span>{t.progress}</span>
               <strong>
                 {reviewedCount}
                 <span> / {files.length}</span>
@@ -304,9 +307,7 @@ export function ChangesTab({
               />
             </div>
             <small>
-              {allReviewed
-                ? "所有變更都已看過，準備好送出！"
-                : "看懂了，就勾選「已審閱」。"}
+              {allReviewed ? t.allReviewed : t.reviewHint}
             </small>
           </div>
         </aside>
@@ -321,17 +322,15 @@ export function ChangesTab({
           <div className="diff-toolbar-actions">
             <button
               className="icon-button"
-              aria-label={
-                showFiles ? "收合檔案清單" : "顯示檔案清單"
-              }
-              title="切換檔案清單"
+              aria-label={showFiles ? t.hideFiles : t.showFiles}
+              title={t.toggleFiles}
               onClick={() => setShowFiles(!showFiles)}
             >
               <PanelLeftClose size={16} />
             </button>
             <div className="code-size-control">
               <button
-                aria-label="縮小程式碼字體"
+                aria-label={t.smallerCode}
                 disabled={codeFont <= 12}
                 onClick={() => changeCodeFont(-1)}
               >
@@ -339,7 +338,7 @@ export function ChangesTab({
               </button>
               <span>{codeFont}</span>
               <button
-                aria-label="放大程式碼字體"
+                aria-label={t.largerCode}
                 disabled={codeFont >= 20}
                 onClick={() => changeCodeFont(1)}
               >
@@ -349,9 +348,9 @@ export function ChangesTab({
             <button
               className="icon-button"
               aria-label={
-                showExplanation ? "收合解說面板" : "顯示解說面板"
+                showExplanation ? t.hideExplanation : t.showExplanation
               }
-              title="切換解說面板"
+              title={t.toggleExplanation}
               onClick={() => setShowExplanation(!showExplanation)}
             >
               {showExplanation ? (
@@ -362,10 +361,8 @@ export function ChangesTab({
             </button>
             <button
               className="icon-button"
-              aria-label={
-                focusMode ? "離開專注模式" : "進入專注模式"
-              }
-              title="專注閱讀"
+              aria-label={focusMode ? t.exitFocus : t.enterFocus}
+              title={t.focus}
               onClick={() => setFocusMode(!focusMode)}
             >
               {focusMode ? (
@@ -376,25 +373,25 @@ export function ChangesTab({
             </button>
             <button
               className="icon-button"
-              aria-label="重新整理差異"
-              title="重新整理差異"
+              aria-label={t.refresh}
+              title={t.refresh}
               onClick={refreshRun}
               disabled={active}
             >
               <RefreshCw size={14} />
             </button>
-            <div className="view-toggle" aria-label="Diff 顯示模式">
+            <div className="view-toggle" aria-label={t.viewMode}>
               <button
-                aria-label="統一檢視"
-                title="統一檢視"
+                aria-label={t.unified}
+                title={t.unified}
                 className={diffView === "unified" ? "selected" : ""}
                 onClick={() => setDiffView("unified")}
               >
                 <ListTree size={15} />
               </button>
               <button
-                aria-label="並排檢視"
-                title="並排檢視"
+                aria-label={t.split}
+                title={t.split}
                 className={diffView === "split" ? "selected" : ""}
                 onClick={() => setDiffView("split")}
               >
@@ -406,15 +403,13 @@ export function ChangesTab({
         {editable && run.worktreePath && (
           <div className="worktree-hint">
             <FolderGit2 size={14} />
-            <span>
-              你可以直接在這個目錄修改，重新整理差異後會重新解說與審閱狀態
-            </span>
+            <span>{t.worktreeHint}</span>
             <code>{run.worktreePath}</code>
             <button
               type="button"
               className="icon-button"
-              aria-label="複製工作目錄路徑"
-              title="複製工作目錄路徑"
+              aria-label={t.copyWorktree}
+              title={t.copyWorktree}
               onClick={copyWorktreePath}
             >
               <Copy size={13} />
@@ -436,20 +431,13 @@ export function ChangesTab({
             <div className="empty-icon">
               {active ? <Loader2 className="spin" /> : <Code2 />}
             </div>
-            <h3>
-              {active
-                ? "Agent team 正在準備你的變更"
-                : "尚無程式碼變更"}
-            </h3>
-            <p>
-              {run.error ||
-                "在 Agent 動態查看執行過程，完成後即可在這裡審查。"}
-            </p>
+            <h3>{active ? t.preparing : t.noChanges}</h3>
+            <p>{run.error || t.noChangesHint}</p>
             <button
               className="button secondary"
               onClick={() => setTab("activity")}
             >
-              查看 Agent 動態
+              {t.viewActivity}
             </button>
           </div>
         )}
@@ -459,7 +447,7 @@ export function ChangesTab({
           <div
             className="pane-resizer"
             role="separator"
-            aria-label="調整解說面板寬度"
+            aria-label={t.resize}
             aria-orientation="vertical"
             aria-valuemin={280}
             aria-valuemax={520}
@@ -488,7 +476,7 @@ export function ChangesTab({
                   fallback={
                     <div className="empty-state" role="status">
                       <Loader2 className="spin" />
-                      <p>正在準備閱讀面板…</p>
+                      <p>{t.loadingPanel}</p>
                     </div>
                   }
                 >
@@ -535,8 +523,8 @@ export function ChangesTab({
             ) : (
               <div className="empty-state">
                 <Sparkles />
-                <h3>理解，從改動開始。</h3>
-                <p>選取變更的檔案，就能詢問背後的設計與取捨。</p>
+                <h3>{t.emptyTitle}</h3>
+                <p>{t.emptyText}</p>
               </div>
             )}
           </aside>

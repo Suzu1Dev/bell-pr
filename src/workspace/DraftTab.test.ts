@@ -4,7 +4,8 @@ import { createElement } from "react";
 import * as draftChecks from "../../shared/draft-checks";
 import type { FollowUpRound } from "../../shared/followups";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
-import { renderZh } from "../test-utils/render";
+import { withoutElement } from "../app/test-markup";
+import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Run } from "../types";
 import { DraftTab } from "./DraftTab";
 
@@ -75,13 +76,12 @@ const inRound: Run = {
   followUps: [pushed, open],
 };
 
-const render = (
+const element = (
   props: Partial<Props> = {},
   draft: Partial<Props["draft"]> = {},
   rounds: Partial<Props["rounds"]> = {},
 ) =>
-  renderZh(
-    createElement(DraftTab, {
+  createElement(DraftTab, {
       run: published,
       files: [],
       demo: false,
@@ -134,7 +134,20 @@ const render = (
         ...rounds,
       },
       ...props,
-    }),
+    });
+
+const render = (
+  props: Partial<Props> = {},
+  draft: Partial<Props["draft"]> = {},
+  rounds: Partial<Props["rounds"]> = {},
+) => renderZh(element(props, draft, rounds));
+
+// The sync panel and the round history belong to the draft panels, which
+// are translated and tested in English on their own.
+const ownMarkup = (html: string) =>
+  withoutElement(
+    withoutElement(html, 'class="sync-panel"'),
+    'class="follow-up-rounds"',
   );
 
 /** The opening tag of the first element whose attributes match `marker`. */
@@ -224,4 +237,99 @@ test("the target branch panel waits until the run has a checkout to sync", () =>
     assert.doesNotMatch(html, /同步到最新目標分支/, status);
   }
   assert.match(render({ run: { ...unpublished, status: "review" } }), /同步到最新目標分支/);
+});
+
+test("an open follow-up round's draft tab reads in English with no Chinese left", () => {
+  const html = renderEn(
+    element({ run: inRound }, { followUp: open, commitMessageUnfinished: true }),
+  );
+  assert.match(html, /This round adds one new commit to the PR branch/);
+  assert.match(html, /This round&#x27;s commit message <span>git commit<\/span>/);
+  assert.match(html, /This round&#x27;s commit message is written<small>Write which review comments this round addresses<\/small>/);
+  assert.match(html, /Push to the same PR/);
+  assert.match(tag(html, /aria-label="PR description"/), /disabled=""/);
+  // The run's own branch sits inside the help sentence as code.
+  assert.match(html, /Left empty, <code>fix\/run1<\/code> is used\./);
+  assert.match(html, /Once pushed to GitHub, the branch can no longer change/);
+  assertNoHan(ownMarkup(html));
+
+  const sync = renderEn(
+    element(
+      { run: { ...inRound, followUps: [pushed, { ...open, kind: "sync" }] } },
+      { followUp: { ...open, kind: "sync" }, draftCommitMessage: "Merge branch 'main' into fix/run1" },
+    ),
+  );
+  assert.match(sync, /This sync adds one merge commit to the PR branch/);
+  assertNoHan(ownMarkup(sync));
+});
+
+test("maintainer feedback and the next round's form read in English with no Chinese left", () => {
+  const picked = renderEn(element({}, {}, { followUpSelection: [items[0].url] }));
+  assert.match(picked, /Keep fixing from feedback/);
+  assert.match(
+    tag(picked, /aria-label="Include maintainer&#x27;s feedback on line 1 of hello\.ts in the next round"/),
+    /checked=""/,
+  );
+  assert.match(tag(picked, /aria-label="Include reviewer&#x27;s feedback in the next round"/), /type="checkbox"/);
+  assert.match(picked, /Up to 20 comments per round; 1 selected\./);
+  assert.match(picked, /Fix the 1 selected comment</);
+  assert.match(picked, /Note <span>Optional<\/span>/);
+  assert.match(picked, /<span>Line 1<\/span>/);
+  assert.match(picked, /Read at /);
+  assertNoHan(ownMarkup(picked));
+  assert.match(
+    renderEn(element({}, {}, { followUpSelection: [items[0].url, items[1].url] })),
+    /Fix the 2 selected comments</,
+  );
+
+  // A new run's draft: the guide, the checklist and the Draft PR notes.
+  const unpublished: Run = {
+    ...published,
+    status: "review",
+    prUrl: undefined,
+    publishedBranch: undefined,
+    followUps: undefined,
+    prFeedback: undefined,
+  };
+  const draft = renderEn(
+    element(
+      { run: unpublished, files: [], reviewedCount: 0 },
+      { draftBody: "", draftDirty: true },
+    ),
+  );
+  assert.match(draft, /Loading the draft guidelines…/);
+  assert.match(draft, /There is no PR description yet\./);
+  assert.match(draft, /0 \/ 0 files/);
+  assert.match(draft, /There are unsaved edits/);
+  assert.match(draft, /Submit as a Draft PR/);
+  assertNoHan(ownMarkup(draft));
+});
+
+test("the feedback summary formats the time, the checks and the labels for the locale", () => {
+  const withChecks: Run = {
+    ...published,
+    prFeedback: {
+      ...published.prFeedback!,
+      items: [],
+      checksState: "FAILURE",
+      checks: [
+        { name: "build", state: "SUCCESS" },
+        { name: "lint", state: "FAILURE", url: "https://ci.example/1" },
+      ],
+      labels: ["needs: tests", "docs"],
+    },
+  };
+  const english = renderEn(element({ run: withChecks }));
+  assert.match(
+    english,
+    /Read at [^<]*2026[^<]* · CI 2 checks: 1 passed, 0 in progress, 1 failed \(overall FAILURE\) · Labels: needs: tests, docs</,
+  );
+  assert.match(english, /The PR has a label that starts with “needs:”/);
+  assert.match(english, /No reviews or comments yet\./);
+  assertNoHan(ownMarkup(english));
+  const chinese = render({ run: withChecks });
+  assert.match(
+    chinese,
+    /讀取時間 [^<]*2026[^<]* · CI 2 項檢查：1 成功、0 進行中、1 失敗（整體 FAILURE） · 標籤：needs: tests、docs</,
+  );
 });

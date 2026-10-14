@@ -34,7 +34,6 @@ import { SettingsPage } from "../settings/SettingsPage";
 import { PublishModal } from "../workspace/PublishModal";
 import { WorkspacePage } from "../workspace/WorkspacePage";
 import { ErrorBoundary, listenForPreloadErrors } from "./ErrorBoundary";
-import { statusLabels } from "./labels";
 import { Sidebar } from "./Sidebar";
 import { Toasts, type Toast } from "./Toasts";
 import { Topbar } from "./Topbar";
@@ -513,7 +512,6 @@ function AppShell() {
           runs={[...runs, { ...demoRun, status: demo ? run.status : demoRun.status }]}
           currentRepoId={insightRepo?.id}
           currentRunId={run.id}
-          statusLabels={statusLabels}
           onClose={closeCommandPalette}
           onSelectRun={openPaletteRun}
           onSelectRepo={openPaletteRepo}

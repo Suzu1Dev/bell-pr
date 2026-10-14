@@ -8,7 +8,8 @@ import {
   Search,
   X,
 } from "lucide-react";
-import type { Repo, Run, RunSummary } from "../types";
+import { useT } from "../i18n";
+import type { Repo, RunSummary } from "../types";
 import "./command-palette.css";
 
 export interface CommandPaletteProps {
@@ -16,7 +17,6 @@ export interface CommandPaletteProps {
   runs: RunSummary[];
   currentRepoId?: string;
   currentRunId: string;
-  statusLabels: Record<Run["status"], string>;
   onClose: () => void;
   onSelectRun: (id: string) => Promise<boolean>;
   onSelectRepo: (id: string) => void;
@@ -27,11 +27,12 @@ export function CommandPalette({
   runs,
   currentRepoId,
   currentRunId,
-  statusLabels,
   onClose,
   onSelectRun,
   onSelectRepo,
 }: CommandPaletteProps) {
+  const t = useT("app").commandPalette;
+  const statusLabels = useT("common").runStatus;
   const dialog = useRef<HTMLDialogElement>(null);
   const search = useRef<HTMLInputElement>(null);
   const projectList = useRef<HTMLDivElement>(null);
@@ -121,7 +122,7 @@ export function CommandPalette({
       }
     } catch (cause) {
       if (mounted.current) {
-        setError(cause instanceof Error ? cause.message : "無法開啟這項貢獻，請重試。");
+        setError(cause instanceof Error ? cause.message : t.openFailed);
       }
     } finally {
       activating.current = false;
@@ -174,15 +175,15 @@ export function CommandPalette({
       <header className="command-palette-header">
         <div>
           <span className="command-palette-mark"><GitPullRequest size={17} aria-hidden="true" /></span>
-          <h2 id={titleId}>切換專案與貢獻</h2>
+          <h2 id={titleId}>{t.title}</h2>
         </div>
-        <button type="button" className="command-palette-close" aria-label="關閉快速切換" onClick={onClose}>
+        <button type="button" className="command-palette-close" aria-label={t.close} onClick={onClose}>
           <X size={17} aria-hidden="true" />
         </button>
       </header>
       <div className="command-palette-body">
-        <nav className="command-palette-projects" aria-label="選擇專案">
-          <div className="command-palette-section-label">專案 <span>{repos.length}</span></div>
+        <nav className="command-palette-projects" aria-label={t.chooseProject}>
+          <div className="command-palette-section-label">{t.projects} <span>{repos.length}</span></div>
           <div ref={projectList} className="command-palette-project-list">
             {repos.map((repo) => {
               const count = runs.filter((run) => run.repoId === repo.id).length;
@@ -191,7 +192,11 @@ export function CommandPalette({
                   type="button"
                   key={repo.id}
                   aria-pressed={selectedRepo?.id === repo.id}
-                  aria-label={`${repo.fullName}，${count} 項貢獻${repo.id === currentRepoId ? "，目前專案" : ""}`}
+                  aria-label={t.project({
+                    name: repo.fullName,
+                    count,
+                    current: repo.id === currentRepoId,
+                  })}
                   disabled={!!loadingId}
                   onClick={() => selectProject(repo.id)}
                 >
@@ -201,24 +206,24 @@ export function CommandPalette({
                 </button>
               );
             })}
-            {!repos.length && <p className="command-palette-no-projects">尚未匯入專案</p>}
+            {!repos.length && <p className="command-palette-no-projects">{t.noProjects}</p>}
           </div>
         </nav>
-        <section className="command-palette-contributions" aria-label="貢獻清單">
+        <section className="command-palette-contributions" aria-label={t.contributionList}>
           <div className="command-palette-search">
             <Search size={18} aria-hidden="true" />
             <input
               ref={search}
               type="text"
               role="combobox"
-              aria-label="搜尋所選專案的貢獻"
+              aria-label={t.search}
               aria-autocomplete="list"
               aria-expanded="true"
               aria-controls={listId}
               aria-activedescendant={highlightedRun ? optionId(highlightedRun.id) : undefined}
               autoComplete="off"
               spellCheck={false}
-              placeholder="搜尋貢獻…"
+              placeholder={t.searchPlaceholder}
               value={query}
               readOnly={!!loadingId}
               onChange={(event) => {
@@ -228,13 +233,13 @@ export function CommandPalette({
               onCompositionStart={() => { composing.current = true; }}
               onCompositionEnd={() => { composing.current = false; }}
             />
-            {loadingId && <Loader2 size={17} className="command-palette-spin" aria-label="正在開啟" />}
+            {loadingId && <Loader2 size={17} className="command-palette-spin" aria-label={t.opening} />}
           </div>
           <div className="command-palette-results-heading">
-            <span title={selectedRepo?.fullName}>{selectedRepo?.fullName ?? "貢獻"}</span>
-            <span>{filteredRuns.length} 項</span>
+            <span title={selectedRepo?.fullName}>{selectedRepo?.fullName ?? t.resultsFallback}</span>
+            <span>{t.resultCount({ count: filteredRuns.length })}</span>
           </div>
-          <div id={listId} role="listbox" aria-label="符合條件的貢獻" className="command-palette-results" aria-busy={!!loadingId}>
+          <div id={listId} role="listbox" aria-label={t.results} className="command-palette-results" aria-busy={!!loadingId}>
             {filteredRuns.map((run) => (
               <button
                 type="button"
@@ -258,15 +263,15 @@ export function CommandPalette({
                   <strong>{run.title}</strong>
                   <span><i aria-hidden="true" />{statusLabels[run.status]}<small title={run.branch}>{run.branch}</small></span>
                 </span>
-                {run.id === currentRunId ? <span className="command-palette-current"><Check size={12} aria-hidden="true" />目前</span> : <ArrowUpRight size={15} className="command-palette-open-icon" aria-hidden="true" />}
+                {run.id === currentRunId ? <span className="command-palette-current"><Check size={12} aria-hidden="true" />{t.current}</span> : <ArrowUpRight size={15} className="command-palette-open-icon" aria-hidden="true" />}
               </button>
             ))}
           </div>
           {!filteredRuns.length && (
             <div className="command-palette-empty" role="status">
               <GitPullRequest size={24} aria-hidden="true" />
-              <strong>{query.trim() ? "沒有符合的貢獻" : "這個專案還沒有貢獻"}</strong>
-              <p>{query.trim() ? "試試其他關鍵字。" : "先看看專案全貌與值得改善的方向。"}</p>
+              <strong>{query.trim() ? t.noMatches : t.noContributions}</strong>
+              <p>{query.trim() ? t.tryOtherWords : t.lookAtOverview}</p>
             </div>
           )}
           {error && <p className="command-palette-error" role="alert">{error}</p>}
@@ -283,16 +288,16 @@ export function CommandPalette({
                 onClose();
               }}
             >
-              <FolderGit2 size={15} aria-hidden="true" /><span>開啟專案全貌</span><ArrowUpRight size={14} aria-hidden="true" />
+              <FolderGit2 size={15} aria-hidden="true" /><span>{t.openOverview}</span><ArrowUpRight size={14} aria-hidden="true" />
             </button>
           )}
         </section>
       </div>
-      <footer className="command-palette-footer" aria-label="鍵盤快捷鍵">
-        <span><kbd>↑</kbd><kbd>↓</kbd>選擇貢獻</span>
-        <span><kbd>↵</kbd>開啟</span>
-        <span><kbd>{"{"}</kbd><kbd>{"}"}</kbd>切換專案</span>
-        <span><kbd>Esc</kbd>關閉</span>
+      <footer className="command-palette-footer" aria-label={t.shortcuts}>
+        <span><kbd>↑</kbd><kbd>↓</kbd>{t.selectHint}</span>
+        <span><kbd>↵</kbd>{t.openHint}</span>
+        <span><kbd>{"{"}</kbd><kbd>{"}"}</kbd>{t.switchProjectHint}</span>
+        <span><kbd>Esc</kbd>{t.closeHint}</span>
       </footer>
     </dialog>
   );

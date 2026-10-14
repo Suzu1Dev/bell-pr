@@ -12,6 +12,7 @@ import {
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
+import { useFormat, useT } from "../i18n";
 import type { DiffFile, Run } from "../types";
 import { groupPrFeedback, summarizeChecks } from "../../shared/pr-feedback";
 import {
@@ -100,6 +101,12 @@ export function DraftTab({
   actions,
   rounds,
 }: DraftTabProps) {
+  const t = useT("workspace");
+  const optional = useT("common").optional;
+  const fmt = useFormat();
+  // The run's own branch is shown as code inside the help sentence.
+  const [branchHelpBefore, branchHelpAfter = ""] =
+    t.draft.branchHelp.split("{branch}");
   const {
     draftTitle,
     setDraftTitle,
@@ -167,7 +174,7 @@ export function DraftTab({
       {!followUp && (
       <ErrorBoundary resetKey={run.id}>
         <Suspense
-          fallback={<p className="muted">正在載入草稿規範…</p>}
+          fallback={<p className="muted">{t.draft.loadingGuide}</p>}
         >
           <DraftGuidancePanel
             preparation={run.draftPreparation}
@@ -197,29 +204,25 @@ export function DraftTab({
         <div className="draft-editor">
           <div className="section-heading">
             <div>
-              <h2>讓好的改動，也有好的說明。</h2>
-              <p>調整草稿，讓維護者輕鬆理解你的貢獻。</p>
+              <h2>{t.draft.heading}</h2>
+              <p>{t.draft.subheading}</p>
             </div>
-            <span className="draft-label">DRAFT PR</span>
+            <span className="draft-label">{t.draft.label}</span>
           </div>
           {followUp && (
             <div className="draft-origin-notice" role="status">
               <AlertCircle size={16} />
               <p>
                 {followUp.kind === "sync"
-                  ? "這次同步會在 PR 分支加上一個合併 commit，PR 標題與說明維持原樣。請先在「程式碼變更」審閱目標分支改到的檔案，再確認下方的提交訊息。"
-                  : "這輪修正只會在 PR 分支加上一個新的 commit，PR 標題與說明維持原樣。請先在「程式碼變更」審閱這輪改到的檔案，再確認下方的提交訊息。"}
+                  ? t.draft.syncNotice
+                  : t.draft.roundNotice}
               </p>
             </div>
           )}
           {!demo && !followUp && run.status !== "published" && draftIsProposal && (
             <div className="draft-origin-notice" role="status">
               <AlertCircle size={16} />
-              <p>
-                下方說明是 BELL
-                依專案規範產生的建議原文，你還沒有修改。這段文字會原樣送到
-                GitHub：送出前請用自己的話確認內容，待辦事項留在上方的核對清單，不要寫進說明。
-              </p>
+              <p>{t.draft.proposalNotice}</p>
             </div>
           )}
           {!demo &&
@@ -229,15 +232,11 @@ export function DraftTab({
             !preparingDraft && (
               <div className="draft-origin-notice" role="status">
                 <AlertCircle size={16} />
-                <p>
-                  還沒有 PR
-                  說明。可以在上方產生並套用建議草稿，或用自己的話寫下改了什麼、為什麼，以及實際執行過哪些檢查。Agent
-                  的完整報告在「審查者怎麼看」。
-                </p>
+                <p>{t.draft.emptyNotice}</p>
               </div>
             )}
           <label className="field-label" htmlFor="pr-title">
-            Pull Request 標題
+            {t.draft.titleLabel}
           </label>
           <input
             id="pr-title"
@@ -252,13 +251,13 @@ export function DraftTab({
                 className={!draftPreview ? "selected" : ""}
                 onClick={() => setDraftPreview(false)}
               >
-                編輯
+                {t.draft.edit}
               </button>
               <button
                 className={draftPreview ? "selected" : ""}
                 onClick={() => setDraftPreview(true)}
               >
-                預覽
+                {t.draft.preview}
               </button>
             </div>
             <span>Markdown</span>
@@ -266,7 +265,7 @@ export function DraftTab({
           {draftPreview ? (
             <div className="markdown-preview">
               <ErrorBoundary resetKey={run.id}>
-                <Suspense fallback={<p>正在載入預覽…</p>}>
+                <Suspense fallback={<p>{t.loadingPreview}</p>}>
                   <MarkdownContent>{draftBody}</MarkdownContent>
                 </Suspense>
               </ErrorBoundary>
@@ -274,7 +273,7 @@ export function DraftTab({
           ) : (
             <textarea
               className="draft-textarea"
-              aria-label="PR 說明"
+              aria-label={t.draft.bodyLabel}
               value={draftBody}
               onChange={(e) => setDraftBody(e.target.value)}
               disabled={run.status === "published" || !!followUp}
@@ -284,7 +283,7 @@ export function DraftTab({
             className="field-label"
             htmlFor="pr-commit-message"
           >
-            {followUp ? "這輪修正的提交訊息" : "提交訊息"}{" "}
+            {followUp ? t.draft.commitLabelRound : t.draft.commitLabel}{" "}
             <span>git commit</span>
           </label>
           <textarea
@@ -303,16 +302,13 @@ export function DraftTab({
             disabled={run.status === "published"}
           />
           <p id="pr-commit-message-help" className="field-help">
-            {followUp
-              ? "這段訊息會成為 PR 分支上的新 commit，必須填寫，請確認它說明了這輪處理的 review 意見。第一行是主旨，空一行後寫說明，最後放 trailers。"
-              : "第一行是主旨，空一行後寫說明，最後放 trailers。留空時以 PR 標題作為單行提交訊息。"}
-            Signed-off-by 等簽署由你本人輸入，BELL 與模型不會代填。
+            {followUp ? t.draft.commitHelpRound : t.draft.commitHelp}
           </p>
           <label
             className="field-label"
             htmlFor="pr-publish-branch"
           >
-            GitHub 分支 <span>git push</span>
+            {t.draft.branchLabel} <span>git push</span>
           </label>
           <input
             id="pr-publish-branch"
@@ -330,12 +326,10 @@ export function DraftTab({
             }
           />
           <p id="pr-publish-branch-help" className="field-help">
-            推送到 GitHub 時使用的分支名稱，留空時使用{" "}
+            {branchHelpBefore}
             <code>{run.branch}</code>
-            。有些專案規定分支命名，例如不能有斜線或 feat/
-            前綴，請依核對清單調整。本機工作分支不會改名。
-            {run.publishedBranch &&
-              " 已推送到 GitHub 後不能再改分支，以免重複建立 PR。"}
+            {branchHelpAfter}
+            {run.publishedBranch && t.draft.branchLocked}
           </p>
           {publishBranchInvalid && (
             <p role="alert" className="inline-error">
@@ -345,28 +339,26 @@ export function DraftTab({
           {commitMessageSuggestion && !followUp && (
             <div className="commit-suggestion">
               <div>
-                <strong>依專案規範建議的提交訊息</strong>
+                <strong>{t.draft.suggestionTitle}</strong>
                 <p>{commitMessageSuggestion.rationale}</p>
               </div>
               <pre>{commitMessageSuggestion.message}</pre>
               <div className="commit-suggestion-actions">
-                <span>只會填入欄位，簽署仍由你補上。</span>
+                <span>{t.draft.suggestionNote}</span>
                 <button
                   type="button"
                   className="button secondary"
                   disabled={run.status === "published"}
                   onClick={applyCommitMessageSuggestion}
                 >
-                  採用建議
+                  {t.draft.useSuggestion}
                 </button>
               </div>
             </div>
           )}
           <div className="draft-save-row">
             <span>
-              {demo
-                ? "示範草稿儲存在此瀏覽器"
-                : "草稿儲存在本機工作空間"}
+              {demo ? t.draft.savedInBrowser : t.draft.savedLocally}
             </span>
             <button
               className="button primary"
@@ -380,7 +372,7 @@ export function DraftTab({
               ) : (
                 <Check size={15} />
               )}
-              儲存草稿
+              {t.draft.save}
             </button>
           </div>
         </div>
@@ -388,8 +380,8 @@ export function DraftTab({
           <div className="checklist-icon">
             <GitPullRequest size={24} />
           </div>
-          <h3>送出前，最後看一眼。</h3>
-          <p>一份清楚的 PR，是一次好合作的開始。</p>
+          <h3>{t.checklist.title}</h3>
+          <p>{t.checklist.text}</p>
           <div
             className={
               allReviewed
@@ -403,9 +395,12 @@ export function DraftTab({
               <Circle size={18} />
             )}
             <span>
-              已審閱所有檔案
+              {t.checklist.allReviewed}
               <small>
-                {reviewedCount} / {files.length} 個檔案
+                {t.checklist.files({
+                  reviewed: reviewedCount,
+                  total: files.length,
+                })}
               </small>
             </span>
           </div>
@@ -422,11 +417,9 @@ export function DraftTab({
               <Circle size={18} />
             )}
             <span>
-              PR 草稿已儲存
+              {t.checklist.saved}
               <small>
-                {draftDirty
-                  ? "有尚未儲存的編輯"
-                  : "可隨時返回調整內容"}
+                {draftDirty ? t.checklist.unsaved : t.checklist.canAdjust}
               </small>
             </span>
           </div>
@@ -444,11 +437,11 @@ export function DraftTab({
                 <CircleCheck size={18} />
               )}
               <span>
-                這輪的提交訊息已填好
+                {t.checklist.commitReady}
                 <small>
                   {commitMessageUnfinished
-                    ? "請寫下這輪處理了哪些 review 意見"
-                    : "推送時會成為 PR 分支上的新 commit"}
+                    ? t.checklist.commitMissing
+                    : t.checklist.commitBecomes}
                 </small>
               </span>
             </div>
@@ -467,13 +460,13 @@ export function DraftTab({
               <Circle size={18} />
             )}
             <span>
-              說明沒有待填寫的內容
+              {t.checklist.noPlaceholders}
               <small>
                 {!draftBody.trim()
-                  ? "還沒有說明"
+                  ? t.checklist.noDescription
                   : draftUnfinished
                     ? draftUnfinished.details.join("\n")
-                    : "TODO 與待填空格不會送到 GitHub"}
+                    : t.checklist.placeholdersStay}
               </small>
             </span>
           </div>
@@ -482,14 +475,11 @@ export function DraftTab({
               className="draft-task-items"
               disabled={run.status === "published" || busy}
             >
-              <legend>說明中的勾選項目</legend>
-              <p>
-                只勾你真正完成或確認的項目。BELL
-                和模型不會替你勾；勾選會直接改寫左側說明，記得儲存。
-              </p>
+              <legend>{t.checklist.taskItems}</legend>
+              <p>{t.checklist.taskItemsHelp}</p>
               {draftTaskGroups.map(([heading, items]) => (
                 <div key={`${heading}:${items[0].line}`}>
-                  <strong>{heading || "未分段"}</strong>
+                  <strong>{heading || t.checklist.noSection}</strong>
                   {items.map((item) => (
                     <label key={item.line}>
                       <input
@@ -521,19 +511,13 @@ export function DraftTab({
             <ShieldCheck size={18} />
             {followUp ? (
               <span>
-                推送到同一個 PR
-                <small>
-                  只加上新的 commit，不會 force push，也不會改 PR
-                  標題與說明。
-                </small>
+                {t.checklist.samePr}
+                <small>{t.checklist.samePrHelp}</small>
               </span>
             ) : (
               <span>
-                以 Draft PR 送出
-                <small>
-                  送出後仍可在 GitHub
-                  繼續編輯；專案的自動檢查對 Draft PR 一樣會執行。
-                </small>
+                {t.checklist.draftPr}
+                <small>{t.checklist.draftPrHelp}</small>
               </span>
             )}
           </div>
@@ -546,11 +530,8 @@ export function DraftTab({
         >
           <div className="section-heading">
             <div>
-              <h2 id="pr-feedback-title">維護者回饋</h2>
-              <p>
-                按下按鈕才會讀取 PR 上的 review、留言與 CI
-                結果；BELL 只讀不回，回覆請到 GitHub。
-              </p>
+              <h2 id="pr-feedback-title">{t.feedback.title}</h2>
+              <p>{t.feedback.intro}</p>
             </div>
             <div className="pr-feedback-actions">
               <a
@@ -560,7 +541,7 @@ export function DraftTab({
                 rel="noreferrer"
               >
                 <Github size={15} />
-                查看 Pull Request
+                {t.feedback.viewPullRequest}
                 <ExternalLink size={13} />
               </a>
               <button
@@ -573,42 +554,37 @@ export function DraftTab({
                 ) : (
                   <RefreshCw size={15} />
                 )}
-                {run.prFeedback ? "重新讀取回饋" : "讀取回饋"}
+                {run.prFeedback ? t.feedback.fetchAgain : t.feedback.fetch}
               </button>
             </div>
           </div>
           {run.prFeedback ? (
             <>
               <p className="pr-feedback-meta">
-                讀取時間{" "}
-                {new Date(run.prFeedback.fetchedAt).toLocaleString(
-                  "zh-TW",
-                )}
-                {run.prFeedback.checks && (
-                  <>
-                    {" · CI "}
-                    {(() => {
-                      const checks = summarizeChecks(
-                        run.prFeedback.checks,
-                      );
+                {[
+                  t.feedback.fetchedAt({
+                    time: fmt.dateTime(run.prFeedback.fetchedAt),
+                  }),
+                  run.prFeedback.checks &&
+                    (() => {
+                      const checks = summarizeChecks(run.prFeedback.checks);
+                      const state = run.prFeedback.checksState || undefined;
                       return checks.total
-                        ? `${checks.total} 項檢查：${checks.success} 成功、${checks.pending} 進行中、${checks.failed} 失敗`
-                        : "尚無檢查";
-                    })()}
-                    {run.prFeedback.checksState &&
-                      `（整體 ${run.prFeedback.checksState}）`}
-                  </>
-                )}
-                {!!run.prFeedback.labels?.length &&
-                  ` · 標籤：${run.prFeedback.labels.join("、")}`}
+                        ? t.feedback.checks({ ...checks, state })
+                        : t.feedback.noChecks({ state });
+                    })(),
+                  !!run.prFeedback.labels?.length &&
+                    t.feedback.labels({
+                      labels: fmt.list(run.prFeedback.labels, { type: "unit" }),
+                    }),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </p>
               {run.prFeedback.labels?.some((label) =>
                 label.startsWith("needs:"),
               ) && (
-                <p className="pr-feedback-warning">
-                  PR 被加上「needs:」開頭的標籤，通常代表專案的自動檢查認為還有項目沒完成；即使
-                  CI 顯示成功也一樣。請看下方機器人的留言，並在 GitHub 上修改說明。
-                </p>
+                <p className="pr-feedback-warning">{t.feedback.needsLabel}</p>
               )}
               {run.prFeedback.checks?.some(
                 (check) =>
@@ -634,7 +610,7 @@ export function DraftTab({
                             target="_blank"
                             rel="noreferrer"
                           >
-                            詳情
+                            {t.feedback.details}
                           </a>
                         )}
                       </li>
@@ -647,9 +623,7 @@ export function DraftTab({
                 </p>
               ))}
               {run.prFeedback.items.length === 0 && (
-                <p className="muted">
-                  目前還沒有 review 或留言。維護者回應通常需要幾天到幾週；可以先準備回覆思路。
-                </p>
+                <p className="muted">{t.feedback.noItems}</p>
               )}
               {groupPrFeedback(run.prFeedback.items).map(
                 (group, groupIndex) => (
@@ -659,7 +633,7 @@ export function DraftTab({
                   >
                     <div className="pr-feedback-group-head">
                       <strong>
-                        {group.path ?? "整體 review 與對話"}
+                        {group.path ?? t.feedback.general}
                       </strong>
                       {group.path &&
                         files.some(
@@ -672,7 +646,7 @@ export function DraftTab({
                               setTab("changes");
                             }}
                           >
-                            在程式碼變更開啟
+                            {t.feedback.openInChanges}
                           </button>
                         )}
                     </div>
@@ -683,7 +657,14 @@ export function DraftTab({
                             {!followUp && (
                               <input
                                 type="checkbox"
-                                aria-label={`把 ${item.author}${group.path ? ` 在 ${group.path}` : ""}${typeof item.line === "number" ? ` 第 ${item.line} 行` : ""} 的回饋納入下一輪修正`}
+                                aria-label={t.feedback.include({
+                                  author: item.author,
+                                  path: group.path,
+                                  line:
+                                    typeof item.line === "number"
+                                      ? item.line
+                                      : undefined,
+                                })}
                                 aria-describedby={`pr-feedback-body-${groupIndex}-${itemIndex}`}
                                 checked={followUpSelection.includes(item.url)}
                                 // At the limit only selected items stay changeable.
@@ -709,15 +690,17 @@ export function DraftTab({
                             <span>{item.authorAssociation}</span>
                             {item.state && <span>{item.state}</span>}
                             {typeof item.line === "number" && (
-                              <span>第 {item.line} 行</span>
+                              <span>{t.feedback.line({ line: item.line })}</span>
                             )}
-                            {item.isResolved && <span>已解決</span>}
+                            {item.isResolved && (
+                              <span>{t.feedback.resolved}</span>
+                            )}
                             <a
                               href={item.url}
                               target="_blank"
                               rel="noreferrer"
                             >
-                              在 GitHub 開啟
+                              {t.feedback.openOnGitHub}
                             </a>
                           </div>
                           <p
@@ -733,32 +716,27 @@ export function DraftTab({
               )}
               {!followUp && (
                 <div className="follow-up-start">
-                  <h3>依回饋繼續修正</h3>
-                  <p>
-                    勾選上方要處理的回饋，必要時補一句說明。一位
-                    Agent
-                    會在原本的工作目錄修改；完成後你逐檔審閱、確認提交訊息，再以新的
-                    commit 推到同一個 PR。PR
-                    標題與說明不會改，回覆 reviewer 請在 GitHub
-                    上自己處理。
-                  </p>
+                  <h3>{t.followUp.title}</h3>
+                  <p>{t.followUp.intro}</p>
                   <p
                     className="field-help"
                     id="follow-up-limit"
                     role="status"
                   >
-                    一輪最多 {followUpFeedbackLimit} 則回饋，已選{" "}
-                    {followUpSelection.length} 則。
+                    {t.followUp.limit({
+                      limit: followUpFeedbackLimit,
+                      selected: followUpSelection.length,
+                    })}
                   </p>
                   <label className="field-label" htmlFor="follow-up-note">
-                    補充說明 <span>選填</span>
+                    {t.followUp.note} <span>{optional}</span>
                   </label>
                   <textarea
                     id="follow-up-note"
                     className="text-input follow-up-note-input"
                     value={followUpNote}
                     maxLength={followUpNoteLimit}
-                    placeholder="例如：只處理命名的建議，測試的部分我會另外回覆"
+                    placeholder={t.followUp.placeholder}
                     onChange={(event) => setFollowUpNote(event.target.value)}
                     disabled={busy}
                   />
@@ -775,16 +753,16 @@ export function DraftTab({
                   >
                     <Play size={15} />
                     {followUpSelection.length
-                      ? `依選取的 ${followUpSelection.length} 則回饋修正`
-                      : "依補充說明修正"}
+                      ? t.followUp.startSelected({
+                          count: followUpSelection.length,
+                        })
+                      : t.followUp.startNote}
                   </button>
                 </div>
               )}
             </>
           ) : (
-            <p className="muted">
-              尚未讀取。按「讀取回饋」會向 GitHub 查詢一次，不會自動更新。
-            </p>
+            <p className="muted">{t.feedback.notFetched}</p>
           )}
         </section>
       )}

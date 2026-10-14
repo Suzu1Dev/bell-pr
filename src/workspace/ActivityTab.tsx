@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Square,
 } from "lucide-react";
+import { useFormat, useT } from "../i18n";
 import type { Run } from "../types";
 import { TeamBoard } from "../team/TeamBoard";
 import type { RunActions } from "../app/hooks/useRunActions";
@@ -42,6 +43,8 @@ export function ActivityTab({
   setLogFilter,
   actions,
 }: ActivityTabProps) {
+  const t = useT("workspace").activity;
+  const fmt = useFormat();
   const {
     approveTeamPlan,
     reviseTeamPlan,
@@ -73,19 +76,19 @@ export function ActivityTab({
           <div className="section-heading">
             {run.team ? (
               <div>
-                <h2>執行過程</h2>
-                <p>任務板在上方；完整紀錄、錯誤訊息與停止操作保留在這裡。</p>
+                <h2>{t.runTitle}</h2>
+                <p>{t.runText}</p>
               </div>
             ) : (
               <div>
-                <h2>你的 Agent team</h2>
-                <p>每個角色各司其職，所有過程都在這裡。</p>
+                <h2>{t.teamTitle}</h2>
+                <p>{t.teamText}</p>
               </div>
             )}
             {(active || reviewRerunning) && (
               <button className="button secondary" onClick={cancel}>
                 <Square size={14} />
-                {reviewRerunning ? "停止重新審查" : "停止任務"}
+                {reviewRerunning ? t.stopReview : t.stopTask}
               </button>
             )}
           </div>
@@ -118,23 +121,17 @@ export function ActivityTab({
             </div>
           )}
           <div className="activity-log-heading">
-            <h3>執行紀錄</h3>
-            <span>
-              {demo
-                ? "示範紀錄"
-                : active
-                  ? "每 2.5 秒更新"
-                  : "任務紀錄"}
-            </span>
+            <h3>{t.log}</h3>
+            <span>{demo ? t.demoLog : active ? t.live : t.taskLog}</span>
           </div>
           {run.agents.length > 0 && run.logs.length > 0 && (
             <div
               className="log-filters"
               role="group"
-              aria-label="依角色篩選執行紀錄"
+              aria-label={t.filterLabel}
             >
               {[
-                { id: "all", label: "全部" },
+                { id: "all", label: t.all },
                 ...run.agents.map((agent) => ({
                   id: agent.id,
                   label: agent.id,
@@ -158,7 +155,7 @@ export function ActivityTab({
                 key={index}
               >
                 <span className="log-time">
-                  {new Date(log.time).toLocaleTimeString("zh-TW", {
+                  {fmt.time(log.time, {
                     hour: "2-digit",
                     minute: "2-digit",
                     second: "2-digit",
@@ -179,17 +176,17 @@ export function ActivityTab({
               </div>
             ))}
             {!run.logs.length && (
-              <p className="muted">任務開始後會在此顯示紀錄。</p>
+              <p className="muted">{t.emptyLog}</p>
             )}
             {run.logs.length > 0 && !visibleLogs.length && (
-              <p className="muted">這個角色目前沒有紀錄。</p>
+              <p className="muted">{t.emptyFilter}</p>
             )}
           </div>
           {run.error && <p className="inline-error">{run.error}</p>}
         </div>
         <aside className="task-brief">
-          <span className="eyebrow">MISSION BRIEF</span>
-          <h3>這次的貢獻目標</h3>
+          <span className="eyebrow">{t.eyebrow}</span>
+          <h3>{t.goal}</h3>
           <p>{run.prompt}</p>
           <div className="brief-meta">
             <GitBranch size={16} />
@@ -197,10 +194,7 @@ export function ActivityTab({
           </div>
           <div className="callout">
             <ShieldCheck size={18} />
-            <p>
-              開發在獨立的 Git worktree
-              中執行。審查完成後，由你決定何時送出。
-            </p>
+            <p>{t.isolation}</p>
           </div>
         </aside>
       </div>
