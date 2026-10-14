@@ -465,6 +465,7 @@ test("erasing all data needs ERASE, waits for running work, and keeps settings a
     "state.quarantine.json",
     "state.json.corrupt-2026-10-01T00-00-00-000Z",
     "team-index-1234",
+    "author-emails.json",
   ];
   for (const name of erased) await writeFile(path.join(f.dataDir, name), "{}");
   await mkdir(path.join(f.dataDir, "insights"), { recursive: true });

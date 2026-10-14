@@ -322,6 +322,8 @@ const erasedEntries = [
   "insights",
   "discovery.json",
   "state.quarantine.json",
+  // Digests of the commit e-mail addresses confirmed when publishing.
+  "author-emails.json",
 ];
 
 /**
