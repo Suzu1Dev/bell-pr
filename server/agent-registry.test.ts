@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
+import { once } from "node:events";
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
+import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
@@ -13,6 +15,8 @@ import {
   reapOrphanedAgents,
   writeChildren,
 } from "./agent-registry.js";
+import { resolveConfig } from "./config.js";
+import { startServer } from "./index.js";
 import { readModelCatalog } from "./models.js";
 import { command, setSpawnObserver } from "./process.js";
 
@@ -234,6 +238,52 @@ test("reapOrphanedAgents stops recorded agent groups, escalates to SIGKILL and l
       } catch {
         // Already gone.
       }
+    await temp.cleanup();
+  }
+});
+
+test("a fake long-running agent recorded in children.json is stopped at the next startup", { skip: !posix }, async () => {
+  const temp = await tempDir();
+  const dataDir = path.join(temp.directory, "data");
+  mkdirSync(dataDir);
+  writeFileSync(path.join(temp.directory, "index.html"), "<!doctype html>");
+  const agent = orphan(script(path.join(temp.bin, "codex"), "#!/bin/sh\nsleep 300\n"));
+  const port = await (async () => {
+    const probe = createServer().listen(0, "127.0.0.1");
+    await once(probe, "listening");
+    const { port } = probe.address() as AddressInfo;
+    await new Promise<void>((resolve) => probe.close(() => resolve()));
+    return port;
+  })();
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    writeFileSync(
+      path.join(dataDir, "children.json"),
+      JSON.stringify({
+        version: 1,
+        children: [
+          { pgid: agent.pid, executable: "codex", startedAt: new Date().toISOString(), note: "a field from a newer build" },
+        ],
+      }),
+    );
+    const server = await startServer({
+      config: resolveConfig({ port, dataDir }, { BELLPR_STATIC_DIR: temp.directory }),
+      handleExit: false,
+      print: () => {},
+    });
+    try {
+      assert.equal(await exitOf(agent), "SIGTERM");
+      // The registry starts over with what this process runs.
+      assert.deepEqual(readChildren(path.join(dataDir, "children.json")), []);
+    } finally {
+      await server.shutdown();
+    }
+  } finally {
+    try {
+      process.kill(-agent.pid!, "SIGKILL");
+    } catch {
+      // Already gone.
+    }
     await temp.cleanup();
   }
 });
