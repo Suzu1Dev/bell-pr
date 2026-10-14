@@ -1247,6 +1247,8 @@ test("issue signs keys that BELL PR accepts, records them in the ledger and issu
     ["--kid", "test-2026", "--key", pem, "--seats", "0"],
     ["--kid", "test-2026", "--key", pem, "--seats", "1", "--email", "not-an-email"],
     ["--kid", "test-2026", "--key", pem, "--seats", "1", "--expires", "2020-01-01"],
+    // A time without its offset is not a format a key's payload accepts.
+    ["--kid", "test-2026", "--key", pem, "--seats", "1", "--expires", "2027-12-31T10:00"],
     ["--kid", "test-2026", "--key", pem, "--seats", "1", "--expires", "2027-01-01", "--updates-months", "6"],
     ["--kid", "test-2026", "--key", path.join(keys, "missing.pem"), "--seats", "1"],
     ["--kid", "test-2026", "--key", pem, "--seats", "1", "--ledger", path.join(repoRoot, "ledger.csv")],

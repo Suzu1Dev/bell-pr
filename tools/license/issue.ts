@@ -23,6 +23,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import {
+  licensePayloadSchema,
   verifyLicenseKey,
   type LicensePayload,
 } from "../../server/license.js";
@@ -136,8 +137,12 @@ export async function main(
     let upd: string | undefined;
     if (values.expires !== undefined) {
       const expires = Date.parse(values.expires);
-      if (!/^\d{4}-\d{2}-\d{2}/.test(values.expires) || !Number.isFinite(expires))
-        throw new UsageError("--expires must be an ISO date such as 2027-12-31.");
+      // The formats a key's payload accepts: a date, or a time with its offset.
+      const format = licensePayloadSchema.shape.exp.safeParse(values.expires);
+      if (!format.success || !Number.isFinite(expires))
+        throw new UsageError(
+          "--expires must be an ISO date such as 2027-12-31, or a time with its offset such as 2027-12-31T23:59:59Z.",
+        );
       if (expires <= now.getTime())
         throw new UsageError("--expires must be in the future.");
       exp = values.expires;
