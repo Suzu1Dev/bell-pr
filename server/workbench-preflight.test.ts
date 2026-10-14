@@ -17,7 +17,7 @@ import { runDoctor } from "./doctor.js";
 import { readDiff } from "./git.js";
 import { withLocale } from "./i18n/index.js";
 import { analysisRunning, ProjectInsightsService } from "./insights.js";
-import { fixedLicense } from "./license.js";
+import { fixedLicense, OfflineLicenseService } from "./license.js";
 import { command, git } from "./process.js";
 import { cloneGitHubRepository } from "./repositories.js";
 import { Store } from "./store.js";
@@ -343,6 +343,39 @@ test("on the Free plan a second run stays queued and a 3-teammate request runs w
   const pro = await workbench.createRun(repo.id, `${prompt} with Pro`, undefined, settings);
   assert.equal(pro.team?.config.maxTeammates, 3);
   assert.equal(pro.logs.some((entry) => entry.kind === "notice"), false);
+});
+
+test("starting the trial through the license route starts a queued run, and the plan keeps the configured run limit", async (t) => {
+  const f = await temporary(t);
+  const dataDir = path.join(f.directory, "data");
+  await mkdir(dataDir, { recursive: true });
+  // The service startServer uses: a fresh data directory is Free.
+  const license = new OfflineLicenseService(dataDir, { publicKeys: {}, revoked: [], quiet: true });
+  await license.initialize();
+  const { workbench, repo } = await workbenchWithProject(f, {
+    maxActiveRuns: 2,
+    entitlements: () => license.entitlements(),
+  });
+  const { call } = await serve(f, workbench, { license });
+  const first = await workbench.createRun(repo.id, prompt);
+  const second = await workbench.createRun(repo.id, `${prompt} again`);
+  assert.equal(first.status, "running");
+  await delay(200);
+  assert.equal(second.status, "queued");
+  assert.equal((await call("GET", "/api/status")).body.limits.effectiveMaxActiveRuns, 1);
+
+  const trial = await call("POST", "/api/license/trial", {});
+  assert.equal(trial.status, 200);
+  assert.equal(trial.body.license.plan, "trial");
+  // Started by the trial itself, not by another run finishing.
+  assert.equal(second.status, "running");
+  assert.equal(first.status, "running");
+  assert.equal((await call("GET", "/api/status")).body.limits.effectiveMaxActiveRuns, 2);
+  // The trial's limit is the ceiling, so a raised setting applies at once.
+  assert.equal((await call("PUT", "/api/app-settings", { maxActiveRuns: 3 })).status, 200);
+  assert.equal((await call("GET", "/api/status")).body.limits.effectiveMaxActiveRuns, 3);
+  const third = await workbench.createRun(repo.id, `${prompt} once more`);
+  assert.equal(third.status, "running");
 });
 
 test("analysis and discovery follow a changed agent timeout scale", async (t) => {
