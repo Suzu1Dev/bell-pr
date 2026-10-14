@@ -37,8 +37,6 @@ import {
   baseUrl,
   browserHost,
   dataPaths,
-  isLoopbackHost,
-  isWildcardHost,
   resolveConfig,
   type Config,
   type StartFlags,
@@ -482,12 +480,6 @@ export async function startServer(
       print(messages.legacyDataDir({ dataDir: config.dataDir }));
     if (!existsSync(path.join(config.staticDir, "index.html")))
       log.warn(messages.uiMissing({ path: config.staticDir }));
-    if (
-      !config.publicUrl &&
-      !isLoopbackHost(config.host) &&
-      !isWildcardHost(config.host)
-    )
-      log.warn(messages.publicUrlNeeded({ host: config.host }));
 
     // Before the store marks interrupted runs failed, stop their agents.
     await reapOrphanedAgents(paths.children);

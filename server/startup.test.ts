@@ -194,6 +194,9 @@ test("resolveConfig refuses settings that cannot work, in the request locale", (
       [{ host: "bad host" }, {}, /--host/],
       [{ dev: true, host: "0.0.0.0" }, {}, /Development mode turns sign-in off/],
       [{}, { BELLPR_DEV: "1", BELLPR_HOST: "192.168.1.5" }, /Development mode/],
+      // Another address needs the public URL, or the guard refuses every request.
+      [{ host: "192.168.1.5" }, {}, /To listen on 192\.168\.1\.5, set BELLPR_PUBLIC_URL/],
+      [{}, { BELLPR_HOST: "bell.lan" }, /BELLPR_PUBLIC_URL/],
       [{}, { BELLPR_PUBLIC_URL: "https://bell.example.com/sub" }, /BELLPR_PUBLIC_URL/],
       [{}, { BELLPR_PUBLIC_URL: "ftp://bell.example.com" }, /BELLPR_PUBLIC_URL/],
       [{}, { BELLPR_PUBLIC_URL: "https://user:pw@bell.example.com" }, /BELLPR_PUBLIC_URL/],
@@ -249,7 +252,15 @@ test("resolveConfig prints links for the address BELL PR listens on", () => {
   assert.equal(url("::1"), "http://[::1]:5000");
   assert.equal(url("[::1]"), "http://[::1]:5000");
   assert.equal(url("LocalHost"), "http://localhost:5000");
-  assert.equal(url("192.168.1.5"), "http://192.168.1.5:5000");
+  assert.equal(
+    baseUrl(
+      resolveConfig(
+        { host: "192.168.1.5", port: 5000 },
+        { BELLPR_PUBLIC_URL: "https://bell.example.com" },
+      ),
+    ),
+    "https://bell.example.com",
+  );
   // The guard trusts localhost, 127.0.0.1 and [::1] by name; another
   // loopback address becomes an allowed origin.
   assert.deepEqual(resolveConfig({ host: "::1", port: 5000 }, {}).allowedOrigins, []);

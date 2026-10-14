@@ -55,6 +55,8 @@ const m: Translation<typeof en> = {
       `BELLPR_PUBLIC_URL 必須是瀏覽器連到 ${name} 的位址，例如 https://bell.example.com：使用 http 或 https，不含路徑、查詢字串或使用者名稱；這台電腦以外的位址必須使用 https。「${value}」不符合。`,
     devNeedsLoopback: ({ host }) =>
       `開發模式會關閉登入，因此只能在這台電腦上監聽。請改用 --host 127.0.0.1，不要使用 ${host}。`,
+    publicUrlRequired: ({ host }) =>
+      `要在 ${host} 監聽，請把 BELLPR_PUBLIC_URL 設為瀏覽器連到 ${name} 的 HTTPS 位址，例如反向代理後的 https://bell.example.com；沒有設定時，所有請求都會被拒絕。若只在這台電腦上使用 ${name}，請讓 --host 保持 127.0.0.1。`,
   },
   start: {
     startup: ({ version, url }) => `${name} ${version} → ${url}`,
@@ -74,8 +76,6 @@ const m: Translation<typeof en> = {
     uiMissingTitle: `${name}：網頁介面尚未建置`,
     uiMissingPage:
       `${name} 的網頁介面尚未建置。請在 ${name} 原始碼資料夾執行 npm run build，再重新啟動 ${name}。`,
-    publicUrlNeeded: ({ host }) =>
-      `${name} 在 ${host} 監聽。瀏覽器必須透過 BELLPR_PUBLIC_URL 設定的 HTTPS 位址連線；連到其他位址的請求會被拒絕。`,
   },
   open: {
     notRunning: `${name} 沒有在執行。請用 \`${bin}\` 啟動。`,

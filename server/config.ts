@@ -252,6 +252,11 @@ export function resolveConfig(
   const publicUrl = setting(env.BELLPR_PUBLIC_URL)
     ? parsePublicUrl(setting(env.BELLPR_PUBLIC_URL)!)
     : undefined;
+  // The request guard accepts this computer's addresses and the public URL
+  // only: on another address without one, every request would be refused,
+  // the printed sign-in link included.
+  if (!publicUrl && !isLoopbackHost(host) && !isWildcardHost(host))
+    throw new ConfigError(sm().cli.config.publicUrlRequired({ host }));
   const configured = parsed(() => parseAllowedOrigins(env.BELLPR_ALLOWED_ORIGINS ?? ""));
   // Only append an origin that is set: an empty entry throws.
   const allowedOrigins = [

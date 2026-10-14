@@ -68,6 +68,9 @@ export default {
       `BELLPR_PUBLIC_URL must be the address browsers use for ${name}, such as https://bell.example.com: http or https, with no path, query or user name, and https for any address other than this computer. "${value}" is not.`,
     devNeedsLoopback: ({ host }: { host: string }) =>
       `Development mode turns sign-in off, so it only listens on this computer. Use --host 127.0.0.1 instead of ${host}.`,
+    /** A host other than this computer or all addresses, without BELLPR_PUBLIC_URL. */
+    publicUrlRequired: ({ host }: { host: string }) =>
+      `To listen on ${host}, set BELLPR_PUBLIC_URL to the HTTPS address browsers use to reach ${name}, such as https://bell.example.com behind a reverse proxy; without it every request would be refused. To use ${name} on this computer only, leave --host at 127.0.0.1.`,
   },
   /** `bell-pr start`. */
   start: {
@@ -93,9 +96,6 @@ export default {
     uiMissingTitle: `${name}: web interface not built`,
     uiMissingPage:
       `The ${name} web interface is not built. Run npm run build in the ${name} source folder, then start ${name} again.`,
-    /** A host other than this computer or all addresses, without BELLPR_PUBLIC_URL. */
-    publicUrlNeeded: ({ host }: { host: string }) =>
-      `${name} listens on ${host}. Browsers must reach it through the HTTPS address set in BELLPR_PUBLIC_URL; requests to other addresses are refused.`,
   },
   /** `bell-pr open`. */
   open: {
