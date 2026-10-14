@@ -96,7 +96,7 @@ interface Facts {
   codexAuth?: AgentAuthFacts;
   claude: ToolFacts;
   claudeAuth?: AgentAuthFacts;
-  sandbox?: SandboxDetection & { allowed: boolean };
+  sandbox?: SandboxDetection;
   dataDir?: {
     path: string;
     exists: boolean;
@@ -417,10 +417,7 @@ async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
     codex.state === "ok" ? probeCodexAuth(exec) : undefined,
     claude.state === "ok" ? probeClaudeAuth(exec) : undefined,
     claude.state === "ok"
-      ? detectClaudeSandbox().then(
-          (detection) => ({ ...detection, allowed: allowUnsandboxedAgents() }),
-          () => undefined,
-        )
+      ? detectClaudeSandbox().catch(() => undefined)
       : undefined,
   ]);
   return {
@@ -682,6 +679,8 @@ function buildReport(
     });
     if (provider === "claude") {
       const sandbox = facts.sandbox;
+      // Read for each report, so a changed opt-in shows before the next probe.
+      const allowed = allowUnsandboxedAgents();
       add({
         id: "claude-sandbox",
         required: false,
@@ -689,7 +688,7 @@ function buildReport(
           ? { status: "skip" }
           : sandbox.available
             ? { status: "ok", detail: m.sandboxReady }
-            : sandbox.allowed
+            : allowed
               ? { status: "warn", reason: "allowed", detail: m.sandboxAllowed }
               : {
                   status: "warn",

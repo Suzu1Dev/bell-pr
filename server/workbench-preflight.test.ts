@@ -433,6 +433,12 @@ test("Claude-only setups default the provider to claude without writing model-se
     (await call("PUT", "/api/app-settings", { allowUnsandboxedAgents: true })).status,
     200,
   );
+  // The checklist shows the opt-in at once, from the probe results it has.
+  const allowed = (await call("GET", "/api/doctor")).body as DoctorReport;
+  assert.equal(
+    allowed.checks.find((check) => check.id === "claude-sandbox")?.reason,
+    "allowed",
+  );
   const created = await call("POST", "/api/runs", { repoId, prompt });
   assert.equal(created.status, 202, JSON.stringify(created.body));
   assert.equal(created.body.run.modelExecution.provider, "claude");
