@@ -302,6 +302,32 @@ test("on Free, discovery carries the PRO badge in the navigation and on Home", a
   }
 });
 
+test("the environment is probed again only while Home shows how to fix it", async ({ page }) => {
+  // The servers' agent CLIs are fakes, so no AI provider is ready: a
+  // required check fails, and a view that helps fix it re-checks every 5 s.
+  await page.clock.install();
+  const probes: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/api/doctor") probes.push(url.search);
+  });
+  /** Every request the page sent so far has been seen once this answers. */
+  const settle = () => page.evaluate(() => fetch("/api/health").then(() => undefined));
+
+  await page.goto("/#/repos");
+  await expect(page.locator(".readiness-not-ready")).toBeVisible();
+  await page.clock.runFor(16_000);
+  await settle();
+  expect(probes.filter((search) => search.includes("refresh=1"))).toEqual([]);
+
+  await sidebarButton(page, app.pages.home).click();
+  await expect(page.locator(".setup-checklist")).toBeVisible();
+  await page.clock.runFor(6_000);
+  await expect
+    .poll(() => probes.filter((search) => search.includes("refresh=1")).length)
+    .toBeGreaterThan(0);
+});
+
 test("presenting masks the GitHub login and the paths in the shell, Home and About", async ({ browser }) => {
   // The data dir is a temporary one, under /tmp or the system's temp folder.
   const server = await launchServer();

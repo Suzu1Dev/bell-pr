@@ -150,14 +150,26 @@ function AppRoot() {
   // First, so it listens before the first request is sent.
   const [sessionEnded, setSessionEnded] = useSessionEnded();
   const data = useAppData();
-  const doctor = useDoctor();
+  // Decided once: settings that change later never bring Welcome back.
+  const [view, setView] = useState<StartView>("pending");
+  // Every page uses the environment report (the readiness pill, About's
+  // data directory). useDoctor probes again every 5 s while a required
+  // check fails, which runs the CLI probes (`gh api user` among them), so
+  // that only goes on while a view that helps fix the environment shows:
+  // Welcome, and Home's summary or the new-task dialog (see AppShell).
+  const [doctorLive, setDoctorLive] = useState(false);
+  const [doctorSettled, setDoctorSettled] = useState(false);
+  const doctor = useDoctor({
+    enabled: !doctorSettled || doctorLive || view === "welcome",
+  });
+  useEffect(() => {
+    if (doctor.report || doctor.error) setDoctorSettled(true);
+  }, [doctor.report, doctor.error]);
   const presentation = usePresentation();
   const route = useHashRoute();
   useEffect(() => {
     if (!route) navigateTo({ name: "home" }, { replace: true });
   }, [route]);
-  // Decided once: settings that change later never bring Welcome back.
-  const [view, setView] = useState<StartView>("pending");
   const next = startView(data);
   if (view === "pending" && next !== "pending") setView(next);
   const [initialModal, setInitialModal] = useState<ModalName>(null);
@@ -213,6 +225,7 @@ function AppRoot() {
     <AppShell
       data={data}
       doctor={doctor}
+      onDoctorLive={setDoctorLive}
       initialModal={initialModal}
       sessionNotice={sessionNotice}
     />
@@ -353,11 +366,14 @@ interface WorkspaceView {
 function AppShell({
   data,
   doctor,
+  onDoctorLive,
   initialModal = null,
   sessionNotice,
 }: {
   data: AppData;
   doctor: DoctorState;
+  /** Told whether a view that helps fix the environment shows (see AppRoot). */
+  onDoctorLive?: (live: boolean) => void;
   /** A dialog to open at once, such as the import the welcome flow chose. */
   initialModal?: ModalName;
   /** Shown above the page while the sign-in session has ended. */
@@ -795,6 +811,12 @@ function AppShell({
     reloadInsights: intelligence.reload,
     notify,
   });
+
+  // Home's environment summary and the new-task dialog follow the
+  // environment while the person fixes it; elsewhere the report stays.
+  const doctorLive =
+    (page === "home" && !presentation.present) || modal === "task";
+  useEffect(() => onDoctorLive?.(doctorLive), [doctorLive, onDoctorLive]);
 
   // The workbench remembers the run it showed last, for Home and the next visit.
   useEffect(() => {
