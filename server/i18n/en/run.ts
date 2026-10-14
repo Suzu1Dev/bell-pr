@@ -584,6 +584,12 @@ export default {
     importSource:
       "Enter a GitHub HTTPS URL or the absolute path of a local repository.",
     bare: "Choose a repository that has a working directory.",
+    /** A local path that names no folder; `path` is absolute, with ~/ expanded. */
+    pathMissing: ({ path }: { path: string }) =>
+      `There is no folder at ${path} on the computer ${product.name} runs on. Check the path; ~/ is the home directory of the user ${product.name} runs as.`,
+    /** A local folder that Git does not see as part of a working tree. */
+    notGitRepository: ({ path }: { path: string }) =>
+      `${path} is not inside a Git repository. Enter the folder of a Git checkout, the one that holds its .git folder.`,
     /** A local-only project: BELL cloned it at import, and it has no GitHub source. */
     localNotUpdated:
       `This project has no GitHub source, so ${product.name} has nothing to update its copy from. To work on newer code, update your own checkout, then remove the project here and import it again.`,

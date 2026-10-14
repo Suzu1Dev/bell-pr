@@ -4,7 +4,7 @@
  * the Git worktree each run works in.
  */
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdir, realpath, rm } from "node:fs/promises";
+import { lstat, mkdir, realpath, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { command, git, gitNetwork } from "./process.js";
@@ -216,6 +216,41 @@ export async function completePartialClone(
   }
 }
 
+/**
+ * The real path of the local folder `source` names. A path that does not
+ * exist or is not a folder is a mistake in the input (400), not a failure.
+ */
+async function localFolder(source: string) {
+  try {
+    const folder = await realpath(source);
+    if ((await stat(folder)).isDirectory()) return folder;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT" && code !== "ENOTDIR") throw error;
+  }
+  throw new AppError((m) => m.run.repos.pathMissing({ path: source }));
+}
+
+/**
+ * The top folder of the working tree `folder` is in. Git's own "not a git
+ * repository" (its raw stderr) becomes a 400 that names `source`; any other
+ * failure, such as a missing git with its setup code, is kept.
+ */
+async function workingTreeOf(folder: string, source: string) {
+  try {
+    return (await git(folder, ["rev-parse", "--show-toplevel"])).stdout.trim();
+  } catch (error) {
+    const stderr = error instanceof AppError ? error.details?.stderr : undefined;
+    if (typeof stderr === "string" && /not a git repository/i.test(stderr))
+      throw new AppError(
+        (m) => m.run.repos.notGitRepository({ path: source }),
+        400,
+        { cause: error },
+      );
+    throw error;
+  }
+}
+
 /** The branch origin's HEAD names, else the branch checked out. */
 async function defaultBranchOf(directory: string) {
   try {
@@ -287,9 +322,7 @@ export async function importRepository(
       if (!path.isAbsolute(source))
         throw new AppError((m) => m.run.repos.importSource);
       const checkout = await realpath(
-        (
-          await git(await realpath(source), ["rev-parse", "--show-toplevel"])
-        ).stdout.trim(),
+        await workingTreeOf(await localFolder(source), source),
       );
       // Imported by an earlier build, which worked in the checkout itself.
       const legacy = ctx.store.data.repos.find((repo) => repo.path === checkout);

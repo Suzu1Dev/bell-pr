@@ -344,6 +344,10 @@ const m: Translation<typeof en> = {
     notFound: "找不到 Repository。",
     importSource: "請輸入 GitHub HTTPS URL 或本機 Repository 的絕對路徑。",
     bare: "請選擇有工作目錄的 Repository。",
+    pathMissing: ({ path }) =>
+      `${product.name} 執行的電腦上沒有 ${path} 這個資料夾。請檢查路徑；~/ 代表執行 ${product.name} 的使用者的家目錄。`,
+    notGitRepository: ({ path }) =>
+      `${path} 不在任何 Git repository 中。請輸入 Git 專案的資料夾，也就是含有 .git 資料夾的那一個。`,
     localNotUpdated:
       `這個專案沒有 GitHub 來源，${product.name} 無從更新它的副本。若要使用較新的程式碼，請先更新你自己的 repository，再在這裡移除專案並重新匯入。`,
     checkoutNotUpdated:

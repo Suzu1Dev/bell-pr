@@ -104,6 +104,48 @@ test("an import accepts owner/repo and clones GitHub in full", async (t) => {
   assert.equal(store.data.repos.length, 0);
 });
 
+test("a local path that is missing, not a folder or outside Git is refused with a 400 that says so", async (t) => {
+  const f = await temporary(t);
+  const store = new Store(path.join(f.directory, "data"));
+  await store.initialize();
+  const workbench = new Workbench(store);
+  f.defer(() => workbench.shutdown());
+  // ~/ is the home directory of the user BELL PR runs as.
+  const home = path.join(f.directory, "home");
+  await mkdir(home);
+  const previousHome = process.env.HOME;
+  process.env.HOME = home;
+  f.defer(() => {
+    process.env.HOME = previousHome;
+  });
+  const missing = path.join(home, "projects", "repository");
+  const file = path.join(home, "notes.txt");
+  await writeFile(file, "notes\n");
+  const plain = path.join(home, "plain");
+  await mkdir(plain);
+  const refused = async (source: string, locale: "en" | "zh-TW", message: RegExp) => {
+    const error = await withLocale(locale, () => workbench.importRepository(source)).then(
+      () => assert.fail(`${source} was imported`),
+      (error: unknown) => error,
+    );
+    assert.ok(error instanceof AppError, String(error));
+    assert.equal(error.statusCode, 400);
+    assert.match(error.message, message);
+  };
+  const escaped = (value: string) => value.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+  for (const source of ["~/projects/repository", missing, path.join(file, "repository")])
+    await refused(
+      source,
+      "en",
+      new RegExp(`^There is no folder at ${escaped(source.replace(/^~/, home))} on the computer BELL PR runs on\\.`),
+    );
+  await refused(file, "en", new RegExp(`^There is no folder at ${escaped(file)} `));
+  await refused(missing, "zh-TW", /^BELL PR 執行的電腦上沒有 .+ 這個資料夾。/);
+  await refused(plain, "en", new RegExp(`^${escaped(plain)} is not inside a Git repository\\.`));
+  await refused(plain, "zh-TW", /不在任何 Git repository 中/);
+  assert.equal(store.data.repos.length, 0);
+});
+
 test("a clone that takes too long stops with clone_timeout, its advice and no leftovers", async (t) => {
   const f = await temporary(t);
   const destination = path.join(f.directory, "repositories", "octo-org-hello-0000");
