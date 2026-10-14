@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { followUpFeedbackLimit } from "../shared/followups.js";
-import { personTrailer } from "./drafts.js";
+import { commitMessageControl, personTrailer } from "./drafts.js";
 import { jsonText } from "./team.js";
 import { AppError } from "./types.js";
 
@@ -68,8 +68,9 @@ export type FollowUpResult = {
  * are corrected instead of failing the round: overlong text is cut, empty
  * entries and entries about feedback that was not selected are dropped (""
  * stands for the person's note), and person trailers such as Signed-off-by
- * are removed from the commit message. A message that is still too long is
- * left empty rather than cut, so the person writes it.
+ * are removed from the commit message. A message that is still too long, or
+ * that holds a control character other than newline (git takes it verbatim),
+ * is left empty rather than cut, so the person writes it.
  */
 export function parseFollowUpResult(
   answer: string,
@@ -83,6 +84,7 @@ export function parseFollowUpResult(
   }
   const known = (url: string) => url === "" || selectedUrls.includes(url);
   const commitMessage = result.commitMessage
+    .replace(/\r\n/g, "\n")
     .split("\n")
     .filter((line) => !personTrailer.test(line))
     .join("\n")
@@ -95,7 +97,12 @@ export function parseFollowUpResult(
     notAddressed: result.notAddressed
       .filter((item) => item.reason && known(item.url))
       .slice(0, entryLimit),
-    // Empty when every line was a trailer or it is too long: the person then writes it.
-    commitMessage: commitMessage.length > commitMessageLimit ? "" : commitMessage,
+    // Empty when every line was a trailer, it is too long or it holds a
+    // control character such as an escape sequence: the person then writes it.
+    commitMessage:
+      commitMessage.length > commitMessageLimit ||
+      commitMessageControl.test(commitMessage)
+        ? ""
+        : commitMessage,
   };
 }

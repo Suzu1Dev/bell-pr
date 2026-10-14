@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { z } from "zod";
 import { validBranchName } from "../../shared/drafts.js";
+import { commitMessageControl } from "../drafts.js";
 import { learningExport } from "../learning-export.js";
 import type { RouteDeps } from "./types.js";
 
@@ -9,7 +10,7 @@ const commitMessageField = z
   .string()
   .trim()
   .max(4000)
-  .refine((value) => !/[\u0000-\u0009\u000b-\u001f\u007f]/.test(value), {
+  .refine((value) => !commitMessageControl.test(value), {
     message: "提交訊息只能包含文字與換行。",
   });
 
@@ -121,7 +122,8 @@ export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
         draft: z.object({
           title: z.string().min(1).max(180),
           body: z.string().max(60_000),
-          commitMessage: z.string().max(4000).optional(),
+          // A stored message can come from an agent, so approval checks it like an edit.
+          commitMessage: commitMessageField.optional(),
           publishBranch: z.string().max(100).optional(),
         }),
       })

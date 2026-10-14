@@ -141,6 +141,16 @@ test("sync, follow-up and clone update routes validate input and answer refusals
   const discard = await call(port, "POST", "/api/runs/review/follow-ups/discard", {});
   assert.equal(discard.status, 409);
   assert.match(String(discard.json.error), /沒有可以放棄的修正/);
+  // Approval checks the commit message like an edit does, since an agent may have written it.
+  const escaped = await call(port, "POST", "/api/runs/review/approve", {
+    draft: {
+      title: "fix: update hello",
+      body: "Changes hello.",
+      commitMessage: "Fix x\u001b]8;;https://evil.example\u0007click",
+    },
+  });
+  assert.equal(escaped.status, 400);
+  assert.match(String(escaped.json.error), /提交訊息只能包含文字與換行/);
   // Mutations go through the same guard as every other route.
   const plain = await call(port, "POST", "/api/runs/review/sync", {}, "text/plain");
   assert.equal(plain.status, 415);

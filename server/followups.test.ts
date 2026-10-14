@@ -81,6 +81,21 @@ test("the follow-up result keeps only selected feedback and never carries a pers
   assert.equal(tolerant.addressed.at(-1)!.url, "");
   assert.equal(tolerant.notAddressed[0].reason.length, 1_200);
   assert.equal(tolerant.commitMessage, "");
+  // git takes the message verbatim: hidden escape sequences leave it to the
+  // person, while Windows line endings are only normalized.
+  const withMessage = (commitMessage: string) =>
+    parseFollowUpResult(
+      JSON.stringify({ ...JSON.parse(answer), commitMessage }),
+      [feedbackItem.url],
+    ).commitMessage;
+  assert.equal(
+    withMessage(
+      "Fix x\u001b]8;;https://evil.example\u0007click\u001b]8;;\u0007\n\nbody\u0008\u0008",
+    ),
+    "",
+  );
+  assert.equal(withMessage("Fix x\n\n\tindented"), "");
+  assert.equal(withMessage("Fix x\r\n\r\nBody line."), "Fix x\n\nBody line.");
   const prompt = followUpPrompt({
     boundaries: "BOUNDARIES",
     contributionContext: "CONTEXT",

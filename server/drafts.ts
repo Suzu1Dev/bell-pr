@@ -55,6 +55,8 @@ const commitMessageSuggestionJsonSchema = {
 };
 /** Any "<Something>-by:" trailer certifies a person's involvement; only that person may add it. */
 export const personTrailer = /^\s*[A-Za-z-]+-by\s*:/im;
+/** A commit message is passed to git verbatim, so newline is the only control character allowed. */
+export const commitMessageControl = /[\u0000-\u0009\u000b-\u001f\u007f]/;
 export const draftJsonSchema = {
   type: "object",
   properties: {
