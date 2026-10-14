@@ -341,10 +341,18 @@ export async function main(
       ctx.stderr.write(`${error.message}\n`);
       return error instanceof StartupError ? error.exitCode : 1;
     }
+    // A system error (EACCES, ENOSPC...) says enough; anything else is a
+    // bug, and the stack helps to report it.
+    const systemError =
+      error instanceof Error && typeof (error as NodeJS.ErrnoException).code === "string";
     ctx.stderr.write(
       `${sm().cli.start.failed({
         reason: redact(
-          error instanceof Error ? (error.stack ?? error.message) : String(error),
+          error instanceof Error
+            ? systemError
+              ? error.message
+              : (error.stack ?? error.message)
+            : String(error),
         ),
       })}\n`,
     );

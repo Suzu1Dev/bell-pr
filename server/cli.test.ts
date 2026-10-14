@@ -251,6 +251,29 @@ test("bell-pr start runs the server with the flags and --env-file settings", asy
   });
 });
 
+test("bell-pr start explains a data directory it cannot create, then frees the port", { skip: process.getuid?.() === 0 }, async () => {
+  await withDataDir(async (_dataDir, directory) => {
+    const readOnly = path.join(directory, "read-only");
+    mkdirSync(readOnly, { mode: 0o555 });
+    const port = await freePort();
+    const result = await cli([
+      "start",
+      "--port",
+      String(port),
+      "--data-dir",
+      path.join(readOnly, "data"),
+    ], { startOptions: { handleExit: false } });
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /^BELL PR did not start: EACCES: permission denied, mkdir/);
+    // A system error needs no stack trace.
+    assert.doesNotMatch(result.stderr, /\n\s+at /);
+    // The port is released again.
+    const probe = createServer().listen(port, "127.0.0.1");
+    await once(probe, "listening");
+    await new Promise<void>((resolve) => probe.close(() => resolve()));
+  });
+});
+
 test("the browser opens only in an interactive terminal outside CI and containers", () => {
   const tty = { write: () => true, isTTY: true };
   const inContainer = existsSync("/.dockerenv") || existsSync("/run/.containerenv");
