@@ -21,21 +21,29 @@ import { log } from "./log.js";
 import { lenientRead } from "./persisted-schema.js";
 import { setSpawnObserver, type SpawnObserver } from "./process.js";
 
-const childSchema = z.object({
+/**
+ * One recorded process group. Like every persisted file, every field but
+ * the group id is optional, and the file is read leniently, so a newer
+ * build's file still loads. This build always writes all of them.
+ */
+export const childSchema = z.object({
   /** The process group, which is the pid of the detached agent CLI. */
   pgid: z.number().int().positive(),
   /** codex or claude. */
-  executable: z.string().min(1).max(200),
+  executable: z.string().min(1).max(200).optional(),
   /** When BELL PR started it (ISO). */
-  startedAt: z.string().min(1).max(40),
+  startedAt: z.string().min(1).max(40).optional(),
 });
 const childrenSchema = z.object({
-  version: z.number().int().positive(),
-  children: z.array(childSchema).max(1000),
+  version: z.number().int().positive().optional(),
+  // Entries are checked one by one, so one bad entry does not hide the rest.
+  children: z.array(z.unknown()).max(1000).optional(),
 });
+const childReadSchema = lenientRead(childSchema);
 const childrenReadSchema = lenientRead(childrenSchema);
 
-export type AgentChild = z.infer<typeof childSchema>;
+export type AgentChild = Required<z.infer<typeof childSchema>>;
+type RecordedChild = z.infer<typeof childSchema>;
 
 const agentExecutable = /^(codex|claude)(\.exe|\.cmd)?$/i;
 /** codex or claude as the program, or in its path (npm installs run under node). */
@@ -51,16 +59,20 @@ export function isAgentCommand(argv: readonly string[]): boolean {
   return argv.slice(0, 2).some((part) => agentPath.test(part));
 }
 
-export function readChildren(file: string): AgentChild[] {
+/** The groups recorded in children.json; nothing when it is missing or unreadable. */
+export function readChildren(file: string): RecordedChild[] {
+  let value: unknown;
   try {
-    const parsed = childrenReadSchema.safeParse(
-      JSON.parse(readFileSync(file, "utf8")),
-    );
-    return parsed.success ? parsed.data.children : [];
+    value = JSON.parse(readFileSync(file, "utf8"));
   } catch {
-    // Missing or unreadable: nothing was recorded.
     return [];
   }
+  const parsed = childrenReadSchema.safeParse(value);
+  if (!parsed.success) return [];
+  return (parsed.data.children ?? []).flatMap((entry) => {
+    const child = childReadSchema.safeParse(entry);
+    return child.success ? [child.data] : [];
+  });
 }
 
 export function writeChildren(file: string, children: AgentChild[]): void {
@@ -188,11 +200,14 @@ function signalGroup(pgid: number, signal: NodeJS.Signals): boolean {
 
 export interface ReapResult {
   /** Groups sent SIGTERM. */
-  terminated: AgentChild[];
+  terminated: RecordedChild[];
   /** Groups that were still alive after the grace period and got SIGKILL. */
-  killed: AgentChild[];
-  /** Recorded groups left alone: from an earlier boot, or not an agent CLI. */
-  skipped: AgentChild[];
+  killed: RecordedChild[];
+  /**
+   * Recorded groups left alone: from an earlier boot (or no start time), or
+   * no longer running an agent CLI.
+   */
+  skipped: RecordedChild[];
 }
 
 /**
@@ -219,7 +234,7 @@ export async function reapOrphanedAgents(
       (member) => member.argv.length > 0,
     );
     if (!members.length) continue;
-    const startedAt = Date.parse(child.startedAt);
+    const startedAt = Date.parse(child.startedAt ?? "");
     if (
       child.pgid <= 1 ||
       !Number.isFinite(startedAt) ||

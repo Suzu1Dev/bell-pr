@@ -2,13 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
-import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, statSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   AgentRegistry,
+  childSchema,
   isAgentCommand,
   isAgentExecutable,
   readChildren,
@@ -18,6 +19,7 @@ import {
 import { resolveConfig } from "./config.js";
 import { startServer } from "./index.js";
 import { readModelCatalog } from "./models.js";
+import { lenientRead } from "./persisted-schema.js";
 import { command, setSpawnObserver } from "./process.js";
 
 const posix = process.platform !== "win32";
@@ -144,7 +146,7 @@ test("AgentRegistry records running agent process groups in children.json and dr
       const [child] = readChildren(file);
       assert.equal(child.executable, "codex");
       assert.ok(child.pgid > 1);
-      assert.ok(Math.abs(Date.parse(child.startedAt) - Date.now()) < 5000);
+      assert.ok(Math.abs(Date.parse(child.startedAt!) - Date.now()) < 5000);
       await running;
     });
     assert.deepEqual(readChildren(file), []);
@@ -288,26 +290,45 @@ test("a fake long-running agent recorded in children.json is stopped at the next
   }
 });
 
-test("children.json reads leniently: unknown fields are dropped and garbage means nothing recorded", async () => {
+test("children.json reads leniently: unknown fields and bad entries are dropped, garbage means nothing recorded", async () => {
   const temp = await tempDir();
   const file = path.join(temp.directory, "children.json");
   try {
     assert.deepEqual(readChildren(file), []);
     writeFileSync(file, "not json");
     assert.deepEqual(readChildren(file), []);
+    writeFileSync(file, JSON.stringify({ version: 1, children: "nope" }));
+    assert.deepEqual(readChildren(file), []);
     writeFileSync(
       file,
       JSON.stringify({
         version: 2,
         future: true,
-        children: [{ pgid: 42, executable: "codex", startedAt: "2026-01-01T00:00:00.000Z", extra: 1 }],
+        children: [
+          // Group ids above any pid_max, so no real process can match.
+          { pgid: 99999998, executable: "codex", startedAt: "2026-01-01T00:00:00.000Z", extra: 1 },
+          { pgid: "not a number" },
+          { pgid: 99999999 },
+        ],
       }),
     );
     assert.deepEqual(readChildren(file), [
-      { pgid: 42, executable: "codex", startedAt: "2026-01-01T00:00:00.000Z" },
+      { pgid: 99999998, executable: "codex", startedAt: "2026-01-01T00:00:00.000Z" },
+      { pgid: 99999999 },
     ]);
-    assert.match(readFileSync(file, "utf8"), /future/);
+    // Groups that are gone are passed over without a signal.
+    const result = await reapOrphanedAgents(file, { graceMs: 0 });
+    assert.deepEqual(result, { terminated: [], killed: [], skipped: [] });
   } finally {
     await temp.cleanup();
   }
+});
+
+test("an older build that lacks a children.json field still reads entries that have it", () => {
+  // Simulates a build whose schema has no startedAt yet.
+  const older = lenientRead(childSchema.omit({ startedAt: true }));
+  assert.deepEqual(
+    older.parse({ pgid: 7, executable: "claude", startedAt: "2026-01-01T00:00:00.000Z" }),
+    { pgid: 7, executable: "claude" },
+  );
 });
