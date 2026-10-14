@@ -353,7 +353,7 @@ const mission = {
         `Model default${effort ? ` · ${effort}` : ""}`,
       unknownEffort:
         "The saved effort is not in this model's list. Choose again.",
-      effortHelp: `Only the efforts the selected model supports are listed. Higher efforts take longer per turn and use more; ${product.name} waits longer for Claude Code and for the xhigh and max efforts.`,
+      effortHelp: `Only the efforts the selected model supports are listed. Higher efforts take longer per turn and use more of your account's usage; ${product.name} waits longer for Claude Code and for the xhigh and max efforts.`,
       webAccess: "Let Agents search the web and read pages",
       webAccessHelp:
         "Applies to the Lead, Teammates, Reviewer, Test analyst and the follow-up tutor; project analysis and discovery stay offline. Web content is treated as untrusted data, and Claude Code's curl and wget stay blocked.",
