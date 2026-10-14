@@ -27,7 +27,7 @@ const pages = {
         name: "Teammates",
         role: "Separate contexts, parallel work",
         text: "Each teammate has its own worktree; dependencies finish first, and work that does not conflict runs at the same time.",
-        scope: "2–4 teammates · Shared task board",
+        scope: "2 teammates on Free, up to 4 on Pro · Shared task board",
       },
       inbox: {
         name: "Team inbox",
