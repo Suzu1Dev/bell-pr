@@ -689,6 +689,19 @@ test("the 402 body names the feature, the plan and the reason, and no upgrade li
     assert.deepEqual(response.body, proRequiredBody("discovery"));
     assert.equal("upgradeUrl" in response.body, false);
   }
+  // Once the owner sets purchaseUrl, the 402 links to it.
+  const purchaseUrl = product.purchaseUrl;
+  Object.assign(product, { purchaseUrl: "https://shop.example/bell-pr" });
+  try {
+    const { call } = await serve(t, fixedLicense("free"));
+    const response = await call("POST", "/discovery", {});
+    assert.deepEqual(response.body, {
+      ...proRequiredBody("discovery"),
+      upgradeUrl: "https://shop.example/bell-pr",
+    });
+  } finally {
+    Object.assign(product, { purchaseUrl });
+  }
 });
 
 test("Free gates only what creates Pro work and never a read", async (t) => {
