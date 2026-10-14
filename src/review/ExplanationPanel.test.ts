@@ -351,10 +351,10 @@ test("a failed chat turn is recognised by its flag, not by its text", () => {
   assert.match(unflagged, /這次未能取得回答：Agent 逾時/);
 });
 
-// English renders. The English demo is a copy of the zh-TW one until its own
-// words land (2F), so these tests keep its files and diffs but put neutral
-// English text where the demo's explanations and reports would go: what they
-// check is the panel's own text.
+// English renders. These tests take the English demo's files and diffs but
+// give them an explanation and reports of their own, so what they check is
+// the panel's own text, whatever the demo's copy says. The demo itself is
+// checked at the end of this file.
 const englishDemo = getDemo("en");
 const englishExplanation: ChangeExplanation = {
   summary: "Failed requests now wait a little longer before each retry.",
@@ -750,40 +750,35 @@ test("every English review message is free of Han for any count", () => {
   for (const text of texts) assertNoHan(text);
 });
 
-// The demo's own words are English once 2F replaces the placeholder; the
-// wave-2 merge runs this test with that demo.
-const englishDemoReady = englishDemo !== getDemo("zh-TW");
-
-test(
-  "an English render of the demo has no Han",
-  { skip: !englishDemoReady && "the English demo is still the zh-TW placeholder" },
-  () => {
-    for (const file of englishDemo.files) {
-      for (const chatRequestId of [0, 1])
-        assertNoHan(
-          renderEn(
-            createElement(ExplanationPanel, {
-              file,
-              messages: [],
-              loading: false,
-              onAsk() {},
-              demo: true,
-              chatRequestId,
-            }),
-          ),
-        );
-      assertNoHan(
-        renderEn(
-          createElement(ReviewReports, {
-            file,
-            reports: englishDemo.run.reports,
-            demo: true,
-            feedback: englishDemo.prFeedback?.items.filter(
-              (item) => item.path === file.path,
-            ),
-          }),
-        ),
+test("an English render of the demo has no Han and labels its text as a sample", () => {
+  for (const file of englishDemo.files) {
+    for (const chatRequestId of [0, 1]) {
+      const html = renderEn(
+        createElement(ExplanationPanel, {
+          file,
+          messages: [],
+          loading: false,
+          onAsk() {},
+          demo: true,
+          chatRequestId,
+        }),
       );
+      assertNoHan(html);
+      if (!chatRequestId && file.explanation)
+        assert.ok(html.includes("Sample · prewritten, no AI call"), file.path);
+      assert.ok(!html.includes("AI-generated"), file.path);
     }
-  },
-);
+    const reports = renderEn(
+      createElement(ReviewReports, {
+        file,
+        reports: englishDemo.run.reports,
+        demo: true,
+        feedback: englishDemo.prFeedback?.items.filter(
+          (item) => item.path === file.path,
+        ),
+      }),
+    );
+    assertNoHan(reports);
+    assert.ok(reports.includes("Sample · prewritten, no AI call"), file.path);
+  }
+});
