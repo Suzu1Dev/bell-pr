@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useRef,
   useState,
   type Dispatch,
@@ -7,12 +8,14 @@ import {
   type SetStateAction,
 } from "react";
 import { api, send } from "../../api";
-import { demoRun, demoFiles, demoAnswer } from "../../demo";
+import { demoAnswer, getDemo } from "../../demo";
+import { useLocale, useT, type Messages } from "../../i18n";
 import type { Repo, Run, RunSummary, DiffFile, ChatMessage } from "../../types";
+import type { Locale } from "../../../shared/i18n/locale";
 import { summarizeRun } from "../../../shared/runs";
 import { activeFollowUp } from "../../../shared/followups";
-import { demoTeam } from "../../team/TeamBoard";
 import type { ModalName, Notify, Page, Tab } from "../AppShell";
+import { loadDemo, saveDemo, saveDemoSettings } from "./demoStorage";
 import type { DraftEditor } from "./useDraftEditor";
 import type { TaskSetup } from "./useTaskSetup";
 
@@ -26,42 +29,28 @@ function savedMessages(run: Run): Record<string, ChatMessage[]> {
   );
 }
 
+type Notices = Messages["workspace"]["notices"];
+
 /**
  * What stopping a run reports, from the run as it was when the person pressed
- * stop and the run the server returned.
+ * stop and the run the server returned, in the language of `notices`.
  */
-export function stopNotice(before: Run, updated: Run, reviewRerunning: boolean) {
+export function stopNotice(
+  before: Run,
+  updated: Run,
+  reviewRerunning: boolean,
+  notices: Notices,
+) {
   const round = activeFollowUp(before.followUps);
   // The conflict agent of a sync, on the run itself or on a PR's sync round.
-  if (before.sync?.resolving || round?.resolving)
-    return "已停止解衝突；已改的檔案保留，可以自行完成，或再請 Agent 處理。";
+  if (before.sync?.resolving || round?.resolving) return notices.stopResolving;
   if (round?.status === "running" && !reviewRerunning)
     return activeFollowUp(updated.followUps)
-      ? "這輪修正已停止；工作目錄保留了部分修改，請審閱、寫好提交訊息後推送，或放棄這輪修正。"
-      : "這輪修正已停止，沒有修改任何檔案；PR 維持原狀。";
+      ? notices.stopRoundKept
+      : notices.stopRoundEmpty;
   if (["review", "approved"].includes(updated.status))
-    return "已停止重新審查；原有報告與審閱狀態保留。";
-  return updated.team?.tasks.length
-    ? "任務已停止；本次工作的目錄與失敗任務的隔離目錄保留，可重試失敗的子任務。"
-    : "任務已停止，工作目錄已保留。";
-}
-
-/** The demo run with the review progress and draft this browser kept. */
-export function loadDemo(): Run {
-  try {
-    const saved = JSON.parse(localStorage.getItem("bellpr-demo-run") || "null");
-    return saved?.id === demoRun.id
-      ? {
-          ...demoRun,
-          team: structuredClone(demoTeam),
-          reviewedFiles: saved.reviewedFiles || [],
-          draft: saved.draft || demoRun.draft,
-          status: saved.status === "approved" ? "approved" : "review",
-        }
-      : { ...demoRun, team: structuredClone(demoTeam) };
-  } catch {
-    return { ...demoRun, team: structuredClone(demoTeam) };
-  }
+    return notices.stopReview;
+  return updated.team?.tasks.length ? notices.stopTeam : notices.stopTask;
 }
 
 interface RunActionsOptions {
@@ -136,6 +125,9 @@ export function useRunActions({
     setAcknowledged,
     followUp,
   } = draft;
+  const t = useT("workspace").notices;
+  const [locale] = useLocale();
+  const demoContent = getDemo(locale);
   const {
     source,
     setSource,
@@ -157,6 +149,58 @@ export function useRunActions({
   const rerunPending = useRef(new Set<string>());
   const [rerunRequests, setRerunRequests] = useState<Set<string>>(new Set());
   const chatLoading = loadingChats.has(`${run.id}:${file?.path}`);
+  // The locale the open demo run's text is in; its progress is kept under it.
+  const demoLocale = useRef(locale);
+  useEffect(() => {
+    if (demo) saveDemo(demoLocale.current, run);
+  }, [demo, run]);
+  // After a language switch, show the open run again so the text the server
+  // writes for a request follows the new locale. The demo takes the new
+  // locale's fixtures and keeps the reader's progress.
+  const shownLocale = useRef(locale);
+  const showInLocale = useRef((next: Locale) => void next);
+  showInLocale.current = (next: Locale) => {
+    if (demo) {
+      const content = getDemo(next);
+      demoLocale.current = next;
+      setRun((previous) =>
+        previous.id === content.run.id
+          ? {
+              ...content.run,
+              team: structuredClone(content.team),
+              reviewedFiles: previous.reviewedFiles,
+              draft: previous.draft,
+              status: previous.status,
+              notes: previous.notes,
+            }
+          : previous,
+      );
+      setFiles(content.files);
+      return;
+    }
+    void reloadRun(run.id);
+  };
+  useEffect(() => {
+    if (shownLocale.current === locale) return;
+    shownLocale.current = locale;
+    showInLocale.current(locale);
+  }, [locale]);
+  /** Reads the run and its diff again without a notice; errors stay quiet. */
+  async function reloadRun(id: string) {
+    const epoch = draft.draftMutationEpoch.current;
+    try {
+      const [current, diff] = await Promise.all([
+        api<{ run: Run }>(`/runs/${id}`),
+        api<{ files: DiffFile[] }>(`/runs/${id}/diff`),
+      ]);
+      if (runIdRef.current !== id) return;
+      setFiles(diff.files);
+      // A draft saved meanwhile is newer than this read.
+      if (epoch === draft.draftMutationEpoch.current) setRun(current.run);
+    } catch {
+      // The open-run poll and the next action report connection problems.
+    }
+  }
   async function approveTeamPlan() {
     setBusy(true);
     try {
@@ -189,8 +233,8 @@ export function useRunActions({
       if (runIdRef.current === result.run.id) setRun(result.run);
       notify(
         result.run.status === "awaiting_plan"
-          ? "計畫尚未核准，已回到等待核准。"
-          : "已重新排入：已整合的子任務不重跑，失敗的子任務重新開始。",
+          ? t.retryAwaitingPlan
+          : t.retryQueued,
       );
     } finally {
       setBusy(false);
@@ -201,9 +245,9 @@ export function useRunActions({
       setRun((previous) => ({
         ...previous,
         team: {
-          ...(previous.team || demoTeam),
+          ...(previous.team || demoContent.team),
           messages: [
-            ...(previous.team || demoTeam).messages,
+            ...(previous.team || demoContent.team).messages,
             {
               id: crypto.randomUUID(),
               from: "user",
@@ -232,20 +276,17 @@ export function useRunActions({
       navigate("workspace");
       return true;
     }
-    if (
-      draftDirty &&
-      !window.confirm("PR 草稿尚未儲存。確定切換任務並捨棄這次編輯？")
-    )
-      return false;
+    if (draftDirty && !window.confirm(t.discardDraftConfirm)) return false;
     const sequence = ++selectionSequence.current;
     const draftAtStart = { ...editorDraft.current };
     // Demo Q&A is answered locally and never persisted.
     let saved: Record<string, ChatMessage[]> = {};
     try {
-      if (id === demoRun.id) {
-        setRun(loadDemo());
-        setFiles(demoFiles);
-        setSelectedPath(demoFiles[0].path);
+      if (id === demoContent.run.id) {
+        demoLocale.current = locale;
+        setRun(loadDemo(locale));
+        setFiles(demoContent.files);
+        setSelectedPath(demoContent.files[0]?.path || "");
       } else {
         const [r, f] = await Promise.all([
           api<{ run: Run }>(`/runs/${id}`),
@@ -258,7 +299,7 @@ export function useRunActions({
           editorDraft.current.commitMessage !== draftAtStart.commitMessage ||
           editorDraft.current.publishBranch !== draftAtStart.publishBranch
         ) {
-          notify("草稿在切換期間已更新，已保留目前任務。");
+          notify(t.draftChangedWhileSwitching);
           return false;
         }
         setRun(r.run);
@@ -280,7 +321,7 @@ export function useRunActions({
   }
   async function refreshRun() {
     if (demo) {
-      notify("目前是示範資料。匯入自己的 repository 後可讀取真實差異。");
+      notify(t.demoRefresh);
       return;
     }
     const id = run.id;
@@ -290,7 +331,7 @@ export function useRunActions({
       if (runIdRef.current !== id) return;
       setFiles(result.files);
       setRun(current.run);
-      notify("已讀取最新差異與審查狀態");
+      notify(t.refreshed);
     } catch (error) {
       notify((error as Error).message, "error");
     }
@@ -299,14 +340,14 @@ export function useRunActions({
     if (!run.worktreePath) return;
     try {
       await navigator.clipboard.writeText(run.worktreePath);
-      notify("已複製工作目錄路徑");
+      notify(t.copiedWorktree);
     } catch {
-      notify("無法使用剪貼簿，請直接選取路徑複製。", "error");
+      notify(t.clipboardUnavailable, "error");
     }
   }
   async function rerunReview() {
     if (demo) {
-      notify("目前是示範資料。匯入自己的 repository 後可重新執行審查。");
+      notify(t.demoRerun);
       return;
     }
     const id = run.id;
@@ -321,7 +362,7 @@ export function useRunActions({
       if (runIdRef.current !== id) return;
       setFiles(result.files);
       setRun(current.run);
-      notify("已開始依目前差異重新審查，報告完成後會出現在「審查者怎麼看」。");
+      notify(t.rerunStarted);
     } catch (error) {
       notify((error as Error).message, "error");
     } finally {
@@ -351,7 +392,7 @@ export function useRunActions({
       closeModal();
       setExploreRepoId(repo.id);
       navigate("explore");
-      notify(`已匯入 ${repo.fullName}`);
+      notify(t.imported({ name: repo.fullName }));
     } catch (error) {
       setFormError((error as Error).message);
     } finally {
@@ -361,13 +402,10 @@ export function useRunActions({
   async function startTask(event: FormEvent) {
     event.preventDefault();
     if (!settingsReady || settingsLoading) return;
-    if (taskRepoId === "demo-repo") {
-      localStorage.setItem(
-        "bellpr-demo-settings",
-        JSON.stringify(contributionSettings),
-      );
+    if (taskRepoId === demoContent.repo.id) {
+      saveDemoSettings(locale, contributionSettings);
       closeModal();
-      notify("示範方向設定已儲存。匯入自己的 repository 後即可啟動真實團隊。");
+      notify(t.demoDirectionSaved);
       return;
     }
     setBusy(true);
@@ -474,7 +512,7 @@ export function useRunActions({
     setLoadingChats((previous) => new Set(previous).add(key));
     try {
       const answer = demo
-        ? demoAnswer(targetFile, question)
+        ? demoAnswer(targetFile, question, locale)
         : (
             await api<{ answer: string }>(
               `/runs/${targetRun}/chat`,
@@ -499,7 +537,7 @@ export function useRunActions({
           ...(previous[key] || []),
           {
             role: "assistant",
-            content: `這次未能取得回答：${(error as Error).message}`,
+            content: t.chatFailed({ message: (error as Error).message }),
             failed: true,
           },
         ],
@@ -543,7 +581,7 @@ export function useRunActions({
   async function publish() {
     if (demo) {
       closeModal();
-      notify("示範審查已完成！匯入你的 repository，即可建立真正的 PR。");
+      notify(t.demoPublished);
       return;
     }
     setBusy(true);
@@ -556,11 +594,7 @@ export function useRunActions({
       );
       setRun(result.run);
       closeModal();
-      notify(
-        pushingRound
-          ? "已把這輪修正推送到 PR，分支上多了一個 commit。"
-          : "GitHub Draft PR 已建立",
-      );
+      notify(pushingRound ? t.roundPushed : t.prCreated);
     } catch (error) {
       setFormError((error as Error).message);
       // A refused push may have saved the round's state; show it next to the error.
@@ -577,7 +611,7 @@ export function useRunActions({
   // Read-only and only on request: no timer refreshes maintainer feedback.
   async function fetchPrFeedback() {
     if (demo) {
-      notify("示範模式不會連線 GitHub 讀取回饋。");
+      notify(t.demoFeedback);
       return;
     }
     setFeedbackLoading(true);
@@ -588,7 +622,7 @@ export function useRunActions({
       );
       if (runIdRef.current === updated.id) setRun(updated);
       notify(
-        `已讀取 ${updated.prFeedback?.items.length ?? 0} 則維護者回饋。`,
+        t.feedbackRead({ count: updated.prFeedback?.items.length ?? 0 }),
       );
     } catch (error) {
       notify((error as Error).message, "error");
@@ -612,7 +646,7 @@ export function useRunActions({
           setSelectedPath(result.files[0]?.path || "");
         }
       }
-      notify(stopNotice(run, updated, reviewRerunning));
+      notify(stopNotice(run, updated, reviewRerunning, t));
     } catch (error) {
       notify((error as Error).message, "error");
     }
