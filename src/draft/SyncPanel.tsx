@@ -1,6 +1,8 @@
 import { GitMerge, LoaderCircle, Undo2, Wand2 } from "lucide-react";
 import { activeFollowUp } from "../../shared/followups";
+import { useFormat, useT } from "../i18n";
 import type { Run } from "../types";
+import { rich } from "./rich";
 
 interface Props {
   run: Run;
@@ -13,6 +15,13 @@ interface Props {
 
 const short = (commit?: string) => commit?.slice(0, 7) ?? "";
 
+// The labels the server writes into the conflict markers; they name the
+// sides in the files themselves, so they stay as written.
+const sideLabels = {
+  published: "this pull request",
+  unpublished: "this contribution",
+};
+
 /**
  * Where the contribution stands against its target branch, and the way to
  * catch up: an unpublished run moves onto the latest base, a published PR
@@ -20,6 +29,8 @@ const short = (commit?: string) => commit?.slice(0, 7) ?? "";
  * files no longer hold markers, which the server checks before approval.
  */
 export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
+  const t = useT("draft").sync;
+  const fmt = useFormat();
   const published = !!run.prUrl;
   const round = activeFollowUp(run.followUps);
   const syncRound = round?.kind === "sync" ? round : undefined;
@@ -42,10 +53,10 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
     published || running
       ? ""
       : open.length
-        ? "上一次同步的衝突解決前不能再同步。"
+        ? t.waitConflicts
         : syncable
           ? ""
-          : "只有審閱中、已核准或等待計畫核准的工作可以同步到最新目標分支。";
+          : t.waitStatus;
   const canUndo =
     !published &&
     !!run.sync &&
@@ -57,26 +68,25 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
     <section className="sync-panel" aria-labelledby="sync-panel-title">
       <div className="sync-panel-head">
         <div>
-          <h2 id="sync-panel-title">目標分支</h2>
+          <h2 id="sync-panel-title">{t.title}</h2>
           <p>
-            這個貢獻以 <code>{run.baseBranch}</code> 的{" "}
-            <code>{short(run.baseSha)}</code> 為基準。
-            {published
-              ? "同步會把最新版本合併進 PR：審閱後推送一個合併 commit，不會 force push，PR 說明也不變。"
-              : "同步會把這次的修改移到最新版本上；目標分支改過的檔案需要重新審閱，可以復原。"}
+            {rich(published ? t.intro.published : t.intro.unpublished, {
+              branch: <code>{run.baseBranch}</code>,
+              commit: <code>{short(run.baseSha)}</code>,
+            })}
           </p>
           {!published && run.sync && (
             <p className="sync-panel-meta">
-              上次同步：<code>{short(run.sync.from)}</code> 到{" "}
-              <code>{short(run.sync.to)}</code>，
-              {new Date(run.sync.at).toLocaleString("zh-TW")}
+              {rich(t.lastSync, {
+                from: <code>{short(run.sync.from)}</code>,
+                to: <code>{short(run.sync.to)}</code>,
+                date: fmt.dateTime(run.sync.at),
+              })}
             </p>
           )}
           {waitNote && <p className="sync-panel-meta">{waitNote}</p>}
           {published && round && !syncRound && (
-            <p className="sync-panel-meta">
-              這個 PR 有一輪修正在進行；完成或放棄後才能同步。
-            </p>
+            <p className="sync-panel-meta">{t.roundOpen}</p>
           )}
         </div>
         <div className="sync-panel-actions">
@@ -86,37 +96,46 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
             onClick={onSync}
             disabled={!canSync}
           >
-            <GitMerge size={15} /> 同步到最新目標分支
+            <GitMerge size={15} /> {t.sync}
           </button>
           {canUndo && (
             <button type="button" className="button secondary" onClick={onUndo}>
-              <Undo2 size={15} /> 復原同步
+              <Undo2 size={15} /> {t.undo}
             </button>
           )}
         </div>
       </div>
       {conflicts.length > 0 && (
         <div className="sync-conflicts" role="status">
-          <strong>合併衝突</strong>
+          <strong>{t.conflicts}</strong>
           <ul>
             {conflicts.map((file) => (
               <li key={file}>
                 <code>{file}</code>
-                {!open.includes(file) && " · 已解決"}
+                {!open.includes(file) && ` · ${t.resolved}`}
               </li>
             ))}
           </ul>
           {open.length ? (
             <p>
-              檔案裡標示 <code>latest {run.baseBranch}</code>{" "}
-              的一邊是目標分支現在的內容，標示{" "}
-              <code>{published ? "this pull request" : "this contribution"}</code>{" "}
-              的一邊是{published ? "這個 PR" : "這次的貢獻"}
-              。衝突標記全部移除前不能核准；可以在工作目錄自己改，改完到「程式碼變更」重新整理差異，或請
-              Agent 解決。改過的檔案仍要逐檔審閱。
+              {rich(
+                published
+                  ? t.conflictHelp.published
+                  : t.conflictHelp.unpublished,
+                {
+                  latest: <code>latest {run.baseBranch}</code>,
+                  ours: (
+                    <code>
+                      {published
+                        ? sideLabels.published
+                        : sideLabels.unpublished}
+                    </code>
+                  ),
+                },
+              )}
             </p>
           ) : (
-            <p>衝突標記都已移除；改過的檔案仍要逐檔審閱。</p>
+            <p>{t.allResolved}</p>
           )}
           {holder?.report && <p className="sync-report">{holder.report}</p>}
           {!!holder?.resolutions?.length && (
@@ -140,7 +159,7 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
               ) : (
                 <Wand2 size={15} />
               )}
-              {running ? "Agent 正在解衝突…" : "請 Agent 解決衝突"}
+              {running ? t.resolving : t.resolve}
             </button>
           )}
         </div>

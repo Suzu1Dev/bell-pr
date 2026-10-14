@@ -1,1 +1,209 @@
-export default {};
+/**
+ * The PR draft tab's panels (English): the rule-aware draft guidance, syncing
+ * with the target branch and the rounds of changes made after maintainer
+ * review. Messages whose parameters are elements (a `<code>` branch name, a
+ * link) are rendered with `rich()` from src/draft/rich.tsx.
+ */
+import type { DraftSource } from "../../../shared/drafts";
+import type { FollowUpRound } from "../../../shared/followups";
+
+const draft = {
+  /** DraftGuidancePanel: the project's rules, the suggested draft and its sources. */
+  guidance: {
+    eyebrow: "CONTRIBUTION GUIDE",
+    title: "Write a PR that maintainers can follow",
+    intro:
+      "Read the contribution rules and the template first, then turn this contribution into a clear draft.",
+    status: {
+      generating:
+        "Reading the contribution guidelines and the PR template and matching them against this change. You can keep editing the draft below.",
+      failed:
+        "The draft suggestion could not be prepared this time. Try again later; your edits below are kept.",
+      stale:
+        "The changes were updated, so this suggestion needs to be prepared again. Generate a new suggestion before you apply it.",
+    },
+    generate: {
+      generating: "Preparing…",
+      retry: "Try again",
+      refresh: "Refresh the suggestion",
+      demo: "View the sample draft suggestion",
+      first: "Suggest a draft from the project's rules",
+    },
+    demoBadge: "Sample data",
+    policy: {
+      repository: "Follows the project's rules",
+      linux: "Linux principles · adapted for PRs",
+    },
+    empty: {
+      rules: "Checks the rules and the template",
+      sources: "Cites a source for each suggestion",
+      choice: "You choose what to apply",
+      demo: "Try the whole flow with sample documents; nothing is read from or changed in a remote project.",
+      real: "For runs whose changes are done; older runs can add a draft suggestion here too.",
+    },
+    warnings: "What was read and what to confirm",
+    rules: {
+      title: "What this draft is based on",
+      defaultTitle: "Default writing principles",
+      noSource: "No source to check against",
+      quote: "View the original wording",
+      /** The fallback principles, adapted from the Linux kernel's patch guidelines. */
+      linuxPrinciples: [
+        "A specific, concise title that says what changes.",
+        "The problem and how it affects users.",
+        "The reasoning, design trade-offs and limitations of the change.",
+        "An honest record of what was verified and what is still open.",
+      ],
+      template: ({ template }: { template: string }) =>
+        `Sections follow the template “${template}”. The template adds no further writing rules, so check that each section fits this change.`,
+      noRules:
+        "No further writing rules were found; check the draft's sections against the source documents.",
+    },
+    checks: {
+      title: "Confirm before you publish",
+      intro: "These are reminders to check, not checks that were done.",
+    },
+    preview: "Preview the suggested draft",
+    apply: {
+      appliedNote:
+        "The editor below holds this suggestion's text unchanged. The description is sent to GitHub as it is, so put it in your own words before you publish.",
+      note: "You can still edit after applying; the draft is updated when you save.",
+      applied: "Applied",
+      apply: "Apply the suggested draft",
+    },
+    commit: {
+      title: "Suggested commit message",
+      /** Label in front of the source links. */
+      sources: "Based on:",
+      /** Code examples shown inside `why`. */
+      code: {
+        typeScope: "type(scope)",
+        subject: "type(scope): summary",
+        signOff: "Signed-off-by: Your Name <email>",
+      },
+      why: ({
+        typeScope,
+        subject,
+        signOff,
+      }: {
+        typeScope: string;
+        subject: string;
+        signOff: string;
+      }) =>
+        `Why do projects ask for ${typeScope} or a sign-off? Projects that use Conventional Commits generate their changelog and choose the version number from subjects such as ${subject}, and commitlint rejects commits in any other format in CI. Projects that use the DCO require every commit to carry ${signOff}, which states that you have the right to contribute the code under the project's license; the DCO bot checks the commit trailer, not the PR description. This suggestion only lays out the format the rules ask for. The sign-off is your own statement, so type it into the commit message field yourself; the model never fills it in.`,
+    },
+    meta: {
+      base: ({ commit }: { commit: string }) => `Base ${commit}`,
+      checked: ({ time }: { time: string }) => `Checked ${time}`,
+    },
+    sources: {
+      title: "Source documents",
+      count: ({ count }: { count: number }) =>
+        count === 1 ? "1 document" : `${count} documents`,
+      kinds: {
+        contributing: "Contribution guidelines",
+        template: "PR template",
+        documentation: "Project documentation",
+        maintainer: "Maintainer guidance",
+        example: "Reference example",
+        automation: "Automated check",
+      } satisfies Record<DraftSource["kind"], string>,
+      usedTemplate: "Template used for this draft",
+      open: "Open the source document",
+      textLabel: ({ label }: { label: string }) => `${label}, original text`,
+    },
+    etiquette: {
+      title: "Before you publish, say hello to the community",
+      intro:
+        "Open-source communities care about these two things because maintainers' time is limited: commenting first keeps two people from fixing the same problem, and lets the maintainers say “this direction works” or “we don't take this kind of change” before you put in the work. These checkboxes are reminders for you only; they are not saved and do not block publishing.",
+      reminders: {
+        claimed: {
+          text: "Did you comment on the issue to say you are working on it?",
+          why: "It avoids duplicate work and lets the maintainers know someone has picked it up.",
+        },
+        discussed: {
+          text: "Does the project ask you to open an issue for discussion first?",
+          why: "Some projects want to agree on the direction, and on whether AI-assisted work is welcome, before they take a PR. Asking first can save both sides from reviewing a PR that will not be accepted.",
+        },
+      },
+      /** Bold label in front of the quoted rule; it ends with its own separator. */
+      rule: "This project's rule: ",
+      quote: ({ quote }: { quote: string }) => `“${quote}”`,
+      ruleSource: ({ source }: { source: string }) =>
+        `Source: ${source}. Without a linked issue, you are asked to confirm once more before publishing.`,
+      openIssue: "Open the issue you linked",
+    },
+    linux: {
+      note: ({ guide }: { guide: string }) =>
+        `The motivation, change and verification principles in the ${guide} serve as a fallback, adapted to the GitHub PR format. Sign-off lines such as Signed-off-by must be confirmed by you and are never filled in automatically.`,
+      guide: "Linux kernel's patch submission guidelines",
+    },
+  },
+  /** SyncPanel: where the contribution stands against its target branch. */
+  sync: {
+    title: "Target branch",
+    intro: {
+      published: ({ branch, commit }: { branch: string; commit: string }) =>
+        `This contribution is based on ${branch} at ${commit}. Syncing merges the latest version into the PR: after your review a merge commit is pushed, nothing is force-pushed and the PR description stays the same.`,
+      unpublished: ({ branch, commit }: { branch: string; commit: string }) =>
+        `This contribution is based on ${branch} at ${commit}. Syncing moves these changes onto the latest version; files that the target branch changed need another review, and you can undo the sync.`,
+    },
+    lastSync: ({ from, to, date }: { from: string; to: string; date: string }) =>
+      `Last sync: ${from} to ${to}, ${date}`,
+    waitConflicts:
+      "Resolve the conflicts from the last sync before you sync again.",
+    waitStatus:
+      "Only runs in review, approved or waiting for plan approval can sync to the latest target branch.",
+    roundOpen:
+      "A follow-up round is in progress on this PR; finish or discard it before you sync.",
+    sync: "Sync to the latest target branch",
+    undo: "Undo sync",
+    conflicts: "Merge conflicts",
+    resolved: "resolved",
+    conflictHelp: {
+      published: ({ latest, ours }: { latest: string; ours: string }) =>
+        `In each file, the side marked ${latest} is the target branch's current content and the side marked ${ours} is this pull request. You cannot approve until every conflict marker is removed: edit the files in the working directory yourself and then refresh the diff on the Code changes tab, or ask the agent to resolve them. Changed files still need a file-by-file review.`,
+      unpublished: ({ latest, ours }: { latest: string; ours: string }) =>
+        `In each file, the side marked ${latest} is the target branch's current content and the side marked ${ours} is this contribution. You cannot approve until every conflict marker is removed: edit the files in the working directory yourself and then refresh the diff on the Code changes tab, or ask the agent to resolve them. Changed files still need a file-by-file review.`,
+    },
+    allResolved:
+      "All conflict markers are removed; changed files still need a file-by-file review.",
+    resolving: "The agent is resolving the conflicts…",
+    resolve: "Ask the agent to resolve the conflicts",
+  },
+  /** FollowUpRounds: the rounds of changes after maintainer review. */
+  followUps: {
+    title: "Changes made after review",
+    intro:
+      "Each round you review and approve becomes a new commit on the PR branch. The PR title and description stay as they are, and you still reply to reviewers on GitHub yourself.",
+    status: {
+      running: "Making changes",
+      review: "Waiting for review and push",
+      published: "Pushed",
+      failed: "Not completed",
+      cancelled: "Stopped",
+      discarded: "Discarded",
+    } satisfies Record<FollowUpRound["status"], string>,
+    round: ({ number }: { number: number }) => `Round ${number}`,
+    /** Follows the round number for commits made on GitHub that the app took over. */
+    adopted: "Picked up from GitHub",
+    /** Follows the round number for a round that merged the target branch. */
+    syncRound: "Target branch sync",
+    /** Names an item that came from the person's own note rather than a review. */
+    yourNote: "Your note",
+    /** Names a review item that is no longer in the latest feedback. */
+    feedback: "Feedback",
+    note: ({ note }: { note: string }) => `Your note: ${note}`,
+    conflicts: "Merge conflicts",
+    addressed: "Addressed",
+    notAddressed: "Not changed; needs your judgment",
+    checks: "Commands that actually ran",
+    pushed: ({ commit, date }: { commit: string; date: string }) =>
+      `${commit} pushed ${date}`,
+    notPushed: ({ commit }: { commit: string }) =>
+      `${commit} created; the push is not confirmed yet`,
+    discard: "Discard this round",
+  },
+};
+
+export default draft;

@@ -24,28 +24,12 @@ import {
 } from "../../shared/team";
 import type { Run } from "../types";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
+import { useFormat, useT } from "../i18n";
 import { ModelSummary } from "../models/ModelSummary";
 import { providerLabels } from "../../shared/models";
+import { teamLanes } from "./lanes";
 import "./team.css";
 
-const taskLabels = {
-  pending: "等待相依",
-  ready: "可認領",
-  running: "進行中",
-  complete: "已整合",
-  failed: "失敗",
-  blocked: "已阻擋",
-};
-const phaseLabels = {
-  planning: "Lead 正在規劃",
-  awaiting_approval: "等待你確認開發計畫",
-  developing: "Teammates 協作中",
-  integrating: "Lead 整合中",
-  reviewing: "交叉審查中",
-  complete: "團隊工作已完成",
-  failed: "需要處理執行問題",
-  cancelled: "團隊已停止",
-};
 export function TeamBoard({
   run,
   demo,
@@ -64,6 +48,9 @@ export function TeamBoard({
   onRetry?: (message: string) => Promise<void>;
   busy: boolean;
 }) {
+  const t = useT("team");
+  const taskLabels = useT("common").teamTaskStatus;
+  const fmt = useFormat();
   const [recipient, setRecipient] = useState("all");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -85,11 +72,8 @@ export function TeamBoard({
         <div className="team-legacy">
           <Users size={24} />
           <div>
-            <h3>這是舊版流程的任務</h3>
-            <p>
-              新建立的任務會使用共享任務板、相依排程與獨立 teammate
-              工作目錄。以下保留原本的執行紀錄。
-            </p>
+            <h3>{t.legacy.title}</h3>
+            <p>{t.legacy.body}</p>
           </div>
         </div>
       </div>
@@ -115,26 +99,25 @@ export function TeamBoard({
   const retriedCount = team.tasks.filter((task) =>
     ["failed", "blocked"].includes(task.status),
   ).length;
-  const groups: { label: string; states: TeamTask["status"][] }[] = [
-    { label: "待處理", states: ["pending", "ready", "blocked"] },
-    { label: "進行中", states: ["running"] },
-    { label: "已完成", states: ["complete", "failed"] },
-  ];
   return (
-    <section className="team-board" aria-label="共享任務與團隊訊息">
+    <section className="team-board" aria-label={t.boardLabel}>
       <div className="team-board-header">
         <div>
-          <span className="eyebrow">SHARED TASKS · INDEPENDENT CONTEXTS</span>
-          <h2>一起開發，有分工也有對話。</h2>
-          <p>Lead 拆解與整合，每位 teammate 有自己的工作目錄與上下文。</p>
+          <span className="eyebrow">{t.eyebrow}</span>
+          <h2>{t.title}</h2>
+          <p>{t.intro}</p>
         </div>
         <div className="team-runtime-badge">
           <Bot size={16} />
           <span>
             {demo
-              ? "團隊協作示範"
-              : `${providerLabels[team.config.provider]} · BELL 協作引擎`}
-            <small>最多 {team.config.maxTeammates} 位成員同時工作</small>
+              ? t.runtime.demo
+              : t.runtime.engine({
+                  provider: providerLabels[team.config.provider],
+                })}
+            <small>
+              {t.runtime.capacity({ count: team.config.maxTeammates })}
+            </small>
           </span>
         </div>
       </div>
@@ -147,22 +130,24 @@ export function TeamBoard({
       <div className="team-flow">
         <span>
           <ListChecks size={18} />
-          Lead 規劃
+          {t.flow.plan}
         </span>
         <i />
         <span>
           <ShieldCheck size={18} />
-          {team.config.requirePlanApproval ? "你確認計畫" : "自動執行計畫"}
+          {team.config.requirePlanApproval
+            ? t.flow.approve
+            : t.flow.autoApprove}
         </span>
         <i />
         <span>
           <Users size={18} />
-          Teammates 並行
+          {t.flow.parallel}
         </span>
         <i />
         <span>
           <GitMerge size={18} />
-          整合與審查
+          {t.flow.integrate}
         </span>
       </div>
       <div
@@ -171,38 +156,39 @@ export function TeamBoard({
         <div className="team-plan-heading">
           <h3>
             <Layers3 size={18} />
-            {phaseLabels[team.phase]}
+            {t.phase[team.phase]}
           </h3>
-          <span>
-            {done} / {team.tasks.length} 子任務完成
-          </span>
+          <span>{t.progress({ done, total: team.tasks.length })}</span>
         </div>
         <p>
           {team.planSummary ||
-            (revisions.length
-              ? "Lead 正依你的意見重新規劃。"
-              : "正在閱讀專案並建立有明確範圍與相依關係的計畫。")}
+            (revisions.length ? t.plan.replanning : t.plan.reading)}
         </p>
         {revisions.length > 0 && (
-          <ol className="team-plan-revisions" aria-label="計畫重擬紀錄">
+          <ol className="team-plan-revisions" aria-label={t.revisions.label}>
             {revisions.map((revision, index) => (
               <li key={revision.createdAt}>
-                <strong>第 {index + 1} 次退回</strong>
+                <strong>{t.revisions.title({ number: index + 1 })}</strong>
                 <span>
-                  上一版有 {revision.previousTasks.length} 個任務：
-                  {revision.previousTasks.map((task) => task.title).join("、")}
+                  {t.revisions.previousTasks({
+                    count: revision.previousTasks.length,
+                    titles: fmt.list(
+                      revision.previousTasks.map((task) => task.title),
+                      { type: "unit" },
+                    ),
+                  })}
                 </span>
                 <p>
-                  <b>你的意見：</b>
+                  <b>{t.revisions.feedback}</b>
                   {revision.feedback}
                 </p>
                 <p>
-                  <b>Lead 的調整說明：</b>
+                  <b>{t.revisions.notes}</b>
                   {revision.revisionNotes ??
                     (index === revisions.length - 1 &&
                     team.phase === "planning"
-                      ? "重新規劃中…"
-                      : "Lead 未說明調整內容；請直接比對新舊任務。")}
+                      ? t.revisions.replanning
+                      : t.revisions.noNotes)}
                 </p>
               </li>
             ))}
@@ -211,7 +197,7 @@ export function TeamBoard({
         {team.phase === "awaiting_approval" && (
           <>
             <div className="team-plan-action">
-              <span>先查看各任務的檔案範圍與相依，再允許寫入程式碼。</span>
+              <span>{t.approval.hint}</span>
               <button
                 className="button primary"
                 onClick={onApprove}
@@ -222,7 +208,7 @@ export function TeamBoard({
                 ) : (
                   <Play size={15} />
                 )}
-                確認計畫並開始開發
+                {t.approval.approve}
               </button>
             </div>
             <form
@@ -243,20 +229,17 @@ export function TeamBoard({
               }}
             >
               <label>
-                退回並補充意見
-                <small>
-                  拆解不合理、範圍太大、少了測試任務或相依奇怪時，寫下原因讓
-                  Lead 重擬；這是練習「怎麼拆任務」的機會。
-                </small>
+                {t.revise.action}
+                <small>{t.revise.hint}</small>
                 <textarea
-                  aria-label="退回計畫的意見"
+                  aria-label={t.revise.label}
                   value={feedback}
                   maxLength={4000}
                   rows={3}
                   placeholder={
                     revisionsLeft
-                      ? "例如：把 API 與 UI 拆成兩個任務，並加一個只負責測試的任務。"
-                      : "已達重擬上限，請核准目前計畫或取消工作。"
+                      ? t.revise.placeholder
+                      : t.revise.limitReached
                   }
                   onChange={(e) => setFeedback(e.target.value)}
                   disabled={!revisionsLeft || revising || busy || demo}
@@ -264,8 +247,10 @@ export function TeamBoard({
               </label>
               <div>
                 <small>
-                  已重擬 {revisions.length}/{maxPlanRevisions}
-                  ；每次重擬是一次 Lead 唯讀規劃回合
+                  {t.revise.counter({
+                    count: revisions.length,
+                    max: maxPlanRevisions,
+                  })}
                 </small>
                 <button
                   type="submit"
@@ -283,7 +268,7 @@ export function TeamBoard({
                   ) : (
                     <RotateCcw size={15} />
                   )}
-                  退回並補充意見
+                  {t.revise.action}
                 </button>
               </div>
               {reviseError && (
@@ -310,15 +295,15 @@ export function TeamBoard({
           >
             <span>
               {retriedCount
-                ? `${done} 個已整合的子任務不會重跑；${retriedCount} 個失敗或被阻擋的子任務會丟棄舊的隔離目錄，從新的快照重新開始。`
+                ? t.retry.partial({ kept: done, retried: retriedCount })
                 : done === team.tasks.length
-                  ? "所有子任務都已整合；重試只會重新執行 Lead 整合與獨立審查。"
-                  : "尚有未開始的子任務；若計畫尚未核准，重試會先回到等待核准。"}
+                  ? t.retry.integrationOnly
+                  : t.retry.notStarted}
             </span>
             <input
               type="text"
-              aria-label="給重試任務的補充說明"
-              placeholder="選填：給重試成員的補充說明，會在第一回合送達"
+              aria-label={t.retry.label}
+              placeholder={t.retry.placeholder}
               value={retryMessage}
               maxLength={4000}
               onChange={(e) => setRetryMessage(e.target.value)}
@@ -330,7 +315,7 @@ export function TeamBoard({
               ) : (
                 <RotateCcw size={15} />
               )}
-              重試失敗的子任務
+              {t.retry.action}
             </button>
             {retryError && (
               <p className="inline-error" role="alert">
@@ -342,10 +327,10 @@ export function TeamBoard({
       </div>
       <div className="team-board-content">
         <div className="team-kanban">
-          {groups.map((group) => (
-            <section className="team-lane" key={group.label}>
+          {teamLanes.map((group) => (
+            <section className="team-lane" key={group.id}>
               <h3>
-                {group.label}
+                {t.lanes[group.id]}
                 <span>
                   {
                     team.tasks.filter((task) =>
@@ -381,23 +366,34 @@ export function TeamBoard({
                       {task.owner}
                       <span>
                         {task.worktreeRemoved
-                          ? "獨立 worktree 已清理"
-                          : "獨立 worktree"}
+                          ? t.task.worktreeRemoved
+                          : t.task.worktree}
                       </span>
                     </div>
                     <div className="team-task-files">
                       <GitBranch size={13} />
-                      <span>{task.files.join("、") || "規劃中"}</span>
+                      <span>
+                        {fmt.list(task.files, { type: "unit" }) ||
+                          t.task.filesPending}
+                      </span>
                     </div>
                     {task.dependsOn.length > 0 && (
                       <div className="team-task-deps">
-                        先完成 {task.dependsOn.join("、")}
+                        {t.task.dependsOn({
+                          tasks: fmt.list(task.dependsOn, { type: "unit" }),
+                        })}
                       </div>
                     )}
                     {task.integratedFiles && task.integratedFiles.length > 0 && (
                       <div className="team-task-files team-task-integrated">
                         <GitMerge size={13} />
-                        <span>已整合：{task.integratedFiles.join("、")}</span>
+                        <span>
+                          {t.task.integrated({
+                            files: fmt.list(task.integratedFiles, {
+                              type: "unit",
+                            }),
+                          })}
+                        </span>
                       </div>
                     )}
                     {(task.report || task.error) && (
@@ -412,7 +408,7 @@ export function TeamBoard({
                             })
                           }
                         >
-                          {task.error ? "查看失敗原因" : "查看工作報告"}{" "}
+                          {task.error ? t.task.showError : t.task.showReport}{" "}
                           <ChevronDown size={13} />
                         </button>
                         {isExpanded(task) && (
@@ -426,7 +422,7 @@ export function TeamBoard({
                       // What BELL saw the CLI run, to compare with the checks the report claims; exit codes only.
                       <details className="team-task-checks">
                         <summary>
-                          應用程式觀察到 {task.checks.length} 次指令執行（只有結束碼，未擷取輸出；可與報告自述的檢查對照）
+                          {t.task.checks({ count: task.checks.length })}
                         </summary>
                         <ul>
                           {task.checks.map((check, index) => (
@@ -444,9 +440,9 @@ export function TeamBoard({
                 group.states.includes(task.status),
               ) && (
                 <div className="team-lane-empty">
-                  {group.label === "進行中"
-                    ? "目前沒有正在執行的子任務"
-                    : "目前沒有任務"}
+                  {group.id === "running"
+                    ? t.laneEmpty.running
+                    : t.laneEmpty.other}
                 </div>
               )}
             </section>
@@ -456,18 +452,20 @@ export function TeamBoard({
           <div className="team-mailbox-heading">
             <h3>
               <MessageSquare size={17} />
-              團隊對話
+              {t.mailbox.title}
             </h3>
             <span>{team.messages.length}</span>
           </div>
           <p className="team-delivery-note">
             {team.phase === "planning"
-              ? "Lead 正在規劃。計畫產生後，即可向成員補充指示。"
+              ? t.mailbox.delivery.planning
               : recipient === "lead"
                 ? team.phase === "awaiting_approval"
-                  ? "要調整計畫，請用上方「退回並補充意見」讓 Lead 重擬；這裡的訊息只會在整合回合被讀到。"
-                  : "Lead 會在下一次整合回合讀取訊息，不會重排計畫；開發指示請傳給全體成員或指定隊友。"
-                : "訊息在下一個工作回合送達；執行中的回合不會即時中斷。"}
+                  ? t.mailbox.delivery.leadDuringApproval({
+                      action: t.revise.action,
+                    })
+                  : t.mailbox.delivery.lead
+                : t.mailbox.delivery.members}
           </p>
           <div className="team-messages" aria-live="polite">
             {team.messages.map((item) => (
@@ -476,13 +474,14 @@ export function TeamBoard({
                 className={`team-message from-${item.from === "user" ? "user" : "agent"}`}
               >
                 <div>
-                  <strong>{item.from === "user" ? "你" : item.from}</strong>
-                  <span>→ {item.to === "all" ? "全體成員" : item.to}</span>
-                  <time>
-                    {new Date(item.createdAt).toLocaleTimeString("zh-TW", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                  <strong>
+                    {item.from === "user" ? t.mailbox.you : item.from}
+                  </strong>
+                  <span>
+                    → {item.to === "all" ? t.mailbox.everyone : item.to}
+                  </span>
+                  <time dateTime={item.createdAt}>
+                    {fmt.time(item.createdAt)}
                   </time>
                 </div>
                 <p>{item.content}</p>
@@ -492,15 +491,15 @@ export function TeamBoard({
                   ) : (
                     <Check size={11} />
                   )}{" "}
-                  {item.status === "queued" ? "等待下一回合" : "已送達"}
-                  {demo ? " · 示範" : ""}
+                  {item.status === "queued"
+                    ? t.mailbox.queued
+                    : t.mailbox.delivered}
+                  {demo ? ` · ${t.mailbox.sample}` : ""}
                 </small>
               </article>
             ))}
             {!team.messages.length && (
-              <p className="team-messages-empty">
-                補充限制、詢問設計，或提醒成員注意相依變更。
-              </p>
+              <p className="team-messages-empty">{t.mailbox.empty}</p>
             )}
           </div>
           <form
@@ -522,33 +521,36 @@ export function TeamBoard({
             }}
           >
             <label>
-              傳送給
+              {t.mailbox.sendTo}
               <select
-                aria-label="團隊訊息收件人"
+                aria-label={t.mailbox.recipientLabel}
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
                 disabled={messagingDisabled}
               >
-                <option value="lead">Team lead</option>
-                <option value="all">全體成員</option>
+                <option value="lead">{t.mailbox.teamLead}</option>
+                <option value="all">{t.mailbox.everyone}</option>
                 {team.tasks.map((task) => (
                   <option
                     value={task.id}
                     key={task.id}
                     disabled={!demo && !canReceive(task)}
                   >
-                    {task.owner} · {task.title}
-                    {!demo && !canReceive(task) ? "（已停止收件）" : ""}
+                    {!demo && !canReceive(task)
+                      ? t.mailbox.closedRecipient({
+                          name: `${task.owner} · ${task.title}`,
+                        })
+                      : `${task.owner} · ${task.title}`}
                   </option>
                 ))}
               </select>
             </label>
             <textarea
-              aria-label="團隊訊息"
+              aria-label={t.mailbox.messageLabel}
               placeholder={
                 finished && !demo
-                  ? "此團隊已結束，可在程式碼閱讀區追問。"
-                  : "例如：請保留目前的 API 相容性…"
+                  ? t.mailbox.finishedPlaceholder
+                  : t.mailbox.placeholder
               }
               value={message}
               maxLength={4000}
@@ -558,7 +560,7 @@ export function TeamBoard({
             />
             <div>
               <small>
-                {demo ? "示範訊息僅保留在畫面" : "傳送會留存在任務記錄"}
+                {demo ? t.mailbox.demoHint : t.mailbox.hint}
               </small>
               <button
                 className="button primary"
@@ -568,7 +570,7 @@ export function TeamBoard({
                   unavailableRecipient ||
                   messagingDisabled
                 }
-                aria-label="傳送團隊訊息"
+                aria-label={t.mailbox.send}
               >
                 {sending ? (
                   <Loader2 className="spin" size={16} />
@@ -579,7 +581,7 @@ export function TeamBoard({
             </div>
             {unavailableRecipient && (
               <p className="inline-error" role="status">
-                這個任務已停止收件，請選擇 Lead 或其他成員。
+                {t.mailbox.unavailable}
               </p>
             )}
             {error && (
@@ -592,9 +594,7 @@ export function TeamBoard({
       </div>
       <p className="team-protocol-note">
         <ShieldCheck size={14} />
-        BELL 使用共享任務、獨立工作目錄及回合間訊息協作。這是由{" "}
-        {providerLabels[team.config.provider]} 逐回合驅動的 BELL
-        實作，並非 Claude Code 原生 Agent Teams。
+        {t.protocolNote({ provider: providerLabels[team.config.provider] })}
       </p>
     </section>
   );

@@ -1,6 +1,8 @@
 import { ExternalLink, GitCommitHorizontal, Undo2 } from "lucide-react";
 import type { FollowUpRound } from "../../shared/followups";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
+import { useFormat, useT } from "../i18n";
+import { rich } from "./rich";
 
 interface Props {
   rounds: FollowUpRound[];
@@ -13,15 +15,6 @@ interface Props {
   busy?: boolean;
 }
 
-const statusLabels: Record<FollowUpRound["status"], string> = {
-  running: "修正中",
-  review: "等待審閱與推送",
-  published: "已推送",
-  failed: "沒有完成",
-  cancelled: "已停止",
-  discarded: "已放棄",
-};
-
 /** Rounds of changes made after maintainer review, newest first. */
 export function FollowUpRounds({
   rounds,
@@ -30,20 +23,31 @@ export function FollowUpRounds({
   onDiscard,
   busy = false,
 }: Props) {
+  const t = useT("draft").followUps;
+  const fmt = useFormat();
   const label = (url: string) => {
-    if (!url) return "你的補充說明";
+    if (!url) return t.yourNote;
     const item = feedback.find((entry) => entry.url === url);
     return item
       ? `${item.author}${item.path ? ` · ${item.path}${typeof item.line === "number" ? `:${item.line}` : ""}` : ""}`
-      : "回饋";
+      : t.feedback;
   };
+  const commitLink = (commit: string) =>
+    headRepository ? (
+      <a
+        href={`https://github.com/${headRepository}/commit/${commit}`}
+        target="_blank"
+        rel="noreferrer"
+      >
+        {commit.slice(0, 7)}
+      </a>
+    ) : (
+      <code>{commit.slice(0, 7)}</code>
+    );
   return (
     <section className="follow-up-rounds" aria-labelledby="follow-up-rounds-title">
-      <h2 id="follow-up-rounds-title">依 review 修正的紀錄</h2>
-      <p>
-        每一輪經你審閱、核准後，會成為 PR 分支上的一個新 commit；PR
-        標題與說明維持原樣，回覆 reviewer 仍由你在 GitHub 上處理。
-      </p>
+      <h2 id="follow-up-rounds-title">{t.title}</h2>
+      <p>{t.intro}</p>
       <ol>
         {[...rounds].reverse().map((round) => {
           const number = rounds.indexOf(round) + 1;
@@ -51,16 +55,16 @@ export function FollowUpRounds({
             <li key={round.id} className={`is-${round.status}`}>
               <div className="follow-up-round-head">
                 <strong>
-                  第 {number} 輪
+                  {t.round({ number })}
                   {round.adopted
-                    ? " · 接續 GitHub 上的提交"
+                    ? ` · ${t.adopted}`
                     : round.kind === "sync"
-                      ? " · 同步目標分支"
+                      ? ` · ${t.syncRound}`
                       : ""}
                 </strong>
-                <span className="follow-up-status">{statusLabels[round.status]}</span>
+                <span className="follow-up-status">{t.status[round.status]}</span>
                 <time dateTime={round.requestedAt}>
-                  {new Date(round.requestedAt).toLocaleString("zh-TW")}
+                  {fmt.dateTime(round.requestedAt)}
                 </time>
               </div>
               {!!round.feedbackUrls.length && (
@@ -74,7 +78,9 @@ export function FollowUpRounds({
                   ))}
                 </ul>
               )}
-              {round.note && <p className="follow-up-note">補充說明：{round.note}</p>}
+              {round.note && (
+                <p className="follow-up-note">{t.note({ note: round.note })}</p>
+              )}
               {round.error && (
                 <p className="follow-up-error" role="status">
                   {round.error}
@@ -83,7 +89,7 @@ export function FollowUpRounds({
               {round.report && <p className="follow-up-report">{round.report}</p>}
               {!!round.conflicts?.length && (
                 <div className="follow-up-list is-open">
-                  <strong>合併衝突</strong>
+                  <strong>{t.conflicts}</strong>
                   <ul>
                     {round.conflicts.map((file) => (
                       <li key={file}>
@@ -97,7 +103,7 @@ export function FollowUpRounds({
               )}
               {!!round.addressed?.length && (
                 <div className="follow-up-list">
-                  <strong>已處理</strong>
+                  <strong>{t.addressed}</strong>
                   <ul>
                     {round.addressed.map((item, index) => (
                       <li key={`${item.url}-${index}`}>
@@ -110,7 +116,7 @@ export function FollowUpRounds({
               )}
               {!!round.notAddressed?.length && (
                 <div className="follow-up-list is-open">
-                  <strong>沒有修改，需要你判斷</strong>
+                  <strong>{t.notAddressed}</strong>
                   <ul>
                     {round.notAddressed.map((item, index) => (
                       <li key={`${item.url}-${index}`}>
@@ -123,7 +129,7 @@ export function FollowUpRounds({
               )}
               {!!round.checks?.length && (
                 <div className="follow-up-list">
-                  <strong>實際執行的指令</strong>
+                  <strong>{t.checks}</strong>
                   <ul>
                     {round.checks.map((check, index) => (
                       <li key={`${check.command}-${index}`}>
@@ -136,20 +142,12 @@ export function FollowUpRounds({
               {round.commit && (
                 <p className="follow-up-commit">
                   <GitCommitHorizontal size={14} />
-                  {headRepository ? (
-                    <a
-                      href={`https://github.com/${headRepository}/commit/${round.commit}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {round.commit.slice(0, 7)}
-                    </a>
-                  ) : (
-                    <code>{round.commit.slice(0, 7)}</code>
-                  )}
                   {round.publishedAt
-                    ? ` 已推送 ${new Date(round.publishedAt).toLocaleString("zh-TW")}`
-                    : " 已建立，尚未確認推送"}
+                    ? rich(t.pushed, {
+                        commit: commitLink(round.commit),
+                        date: fmt.dateTime(round.publishedAt),
+                      })
+                    : rich(t.notPushed, { commit: commitLink(round.commit) })}
                 </p>
               )}
               {/* With a commit, the server checks GitHub before allowing it. */}
@@ -160,7 +158,7 @@ export function FollowUpRounds({
                   disabled={busy}
                   onClick={onDiscard}
                 >
-                  <Undo2 size={14} /> 放棄這輪修改
+                  <Undo2 size={14} /> {t.discard}
                 </button>
               )}
             </li>
