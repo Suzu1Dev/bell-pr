@@ -5,6 +5,7 @@
  * as a DemoCopy, and buildDemoContent() joins the two, so every locale shares
  * the same ids, paths and times.
  */
+import { ponytailPolicyVersion, type EfficiencyMetrics } from "../../shared/efficiency";
 import type { ContributionRecommendation } from "../../shared/insights";
 import type { DiffFile, Repo } from "../types";
 import type {
@@ -245,6 +246,23 @@ export const run = {
       agent: "reviewer",
     },
   ],
+  /**
+   * The efficiency mode the sample team ran in, recorded like a real run's.
+   * The sample called no AI, so every count is zero and the summary shows
+   * no usage.
+   */
+  efficiency: {
+    policyVersion: ponytailPolicyVersion,
+    mode: "lite",
+    calls: 0,
+    completedCalls: 0,
+    failedCalls: 0,
+    measuredCalls: 0,
+    durationMs: 0,
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+  } satisfies EfficiencyMetrics,
   draft: {
     title: "feat(client): add exponential backoff and jitter to GET retries",
     body: "## Summary\n\n- Add configurable exponential backoff with full jitter.\n- Retry temporary GET failures and preserve HTTP error details.\n- Add example retry tests and document the new configuration.\n\n## Compatibility\n\n`retry.delay` is renamed to `retry.baseDelay`; callers must update their configuration.\n\n## Validation\n\nThis is demonstration content. Tests have not been executed against a real repository.\n\n## Review notes\n\nConfirm parameter validation, maximum retry coverage, cancellation behavior and Retry-After handling before production use.",
@@ -701,6 +719,7 @@ export function buildDemoContent(copy: DemoCopy): DemoContent {
       draft: { ...run.draft },
       reviewedFiles: [],
       reports: { ...copy.run.reports },
+      efficiency: { ...run.efficiency },
     },
     insights: {
       summary: copy.insights.summary,
