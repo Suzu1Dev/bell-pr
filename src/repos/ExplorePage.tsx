@@ -5,6 +5,7 @@ import type { Repo } from "../types";
 import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { ContributionRecommendation } from "../../shared/insights";
 import type { Tab } from "../app/AppShell";
+import { ErrorBoundary } from "../app/ErrorBoundary";
 
 // The overview is the largest view in the app; it loads with its first visit.
 const ProjectOverview = lazy(() =>
@@ -51,6 +52,7 @@ export function ExplorePage({
           {t.chooseDirection}
         </button>
       </div>
+      <ErrorBoundary resetKey={exploreRepo.id}>
       <Suspense fallback={null}>
       <ProjectOverview
         repo={exploreRepo}
@@ -74,6 +76,7 @@ export function ExplorePage({
         updatingRepo={updatingRepo}
       />
       </Suspense>
+      </ErrorBoundary>
     </section>
   );
 }

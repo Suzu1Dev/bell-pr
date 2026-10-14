@@ -41,6 +41,11 @@ function reportSessionEnd(body: ApiErrorBody) {
   if (proceed) window.location?.reload();
 }
 
+/** Whether a request found the session ended; it stays true until a reload. */
+export function sessionEnded() {
+  return sessionEndReported;
+}
+
 interface ApiErrorInit {
   status: number;
   code?: ErrorCode;

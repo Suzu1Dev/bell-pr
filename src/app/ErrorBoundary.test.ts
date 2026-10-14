@@ -89,28 +89,36 @@ function fakeStorage() {
     storage: {
       getItem: (key: string) => values.get(key) ?? null,
       setItem: (key: string, value: string) => void values.set(key, value),
+      removeItem: (key: string) => void values.delete(key),
     },
   };
 }
 
-test("a failed chunk load reloads once per tab session, then lets the boundary show", () => {
+/** Lets the session check that reloadOnPreloadError started finish. */
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+const signedIn = async () => true;
+const live = () => false;
+
+test("a failed chunk load reloads once per tab session, then lets the boundary show", async () => {
   const { values, storage } = fakeStorage();
   let prevented = 0;
   let reloads = 0;
   const event = { preventDefault: () => void prevented++ };
   const reload = () => void reloads++;
 
-  assert.equal(reloadOnPreloadError(event, () => storage, reload), true);
+  assert.equal(reloadOnPreloadError(event, () => storage, reload, signedIn, live), true);
   assert.equal(prevented, 1);
+  await settle();
   assert.equal(reloads, 1);
   assert.equal(values.size, 1);
 
-  assert.equal(reloadOnPreloadError(event, () => storage, reload), false);
+  assert.equal(reloadOnPreloadError(event, () => storage, reload, signedIn, live), false);
+  await settle();
   assert.equal(prevented, 1);
   assert.equal(reloads, 1);
 });
 
-test("without working session storage a failed chunk load never reloads", () => {
+test("without working session storage a failed chunk load never reloads", async () => {
   let prevented = 0;
   let reloads = 0;
   const event = { preventDefault: () => void prevented++ };
@@ -123,10 +131,40 @@ test("without working session storage a failed chunk load never reloads", () => 
     setItem: () => {
       throw new Error("QuotaExceededError");
     },
+    removeItem() {},
   };
 
-  assert.equal(reloadOnPreloadError(event, blocked, reload), false);
-  assert.equal(reloadOnPreloadError(event, () => readOnly, reload), false);
+  assert.equal(reloadOnPreloadError(event, blocked, reload, signedIn, live), false);
+  assert.equal(reloadOnPreloadError(event, () => readOnly, reload, signedIn, live), false);
+  await settle();
   assert.equal(prevented, 0);
   assert.equal(reloads, 0);
+});
+
+test("an ended session never reloads into the sign-in page", async () => {
+  const { values, storage } = fakeStorage();
+  let prevented = 0;
+  let reloads = 0;
+  let checks = 0;
+  const event = { preventDefault: () => void prevented++ };
+  const reload = () => void reloads++;
+  const check = async () => {
+    checks++;
+    return true;
+  };
+
+  // Known ended: the error goes to the boundary as it is.
+  assert.equal(reloadOnPreloadError(event, () => storage, reload, check, () => true), false);
+  await settle();
+  assert.deepEqual([prevented, reloads, checks, values.size], [0, 0, 0, 0]);
+
+  // Found ended by the check (or the server did not answer): no reload,
+  // and a later failure may still reload once the session works again.
+  const signedOut = async () => false;
+  assert.equal(reloadOnPreloadError(event, () => storage, reload, signedOut, live), true);
+  await settle();
+  assert.deepEqual([prevented, reloads, values.size], [1, 0, 0]);
+  assert.equal(reloadOnPreloadError(event, () => storage, reload, check, live), true);
+  await settle();
+  assert.deepEqual([prevented, reloads, checks, values.size], [2, 1, 1, 1]);
 });

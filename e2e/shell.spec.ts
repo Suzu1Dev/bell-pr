@@ -525,6 +525,39 @@ test("an ended session keeps the page and says how to sign in again", async ({ p
   await expect(notice).toHaveCount(0);
 });
 
+test("after the session ends, a view whose code cannot load keeps the page and the typed text", async ({ browser }) => {
+  const server = await launchServer({ seed });
+  const { page, close } = await openOn(browser, server);
+  const [run] = seededState(server.dataDir).runs;
+  const typed = "Typed before the session ended";
+  try {
+    await page.goto(`/#/runs/${run.id}/draft`);
+    await page.locator("#pr-title").fill(typed);
+    let loads = 0;
+    page.on("load", () => loads++);
+    // The session ends; code that was not loaded yet now comes back as
+    // the sign-in page, which must not replace the page.
+    await page.context().clearCookies();
+    await page.locator("#workspace-tab-overview").click();
+    const notice = page.getByRole("alert").filter({ hasText: app.sessionEnded.title });
+    const fallback = page.getByRole("alert").filter({ hasText: app.errorBoundary.title });
+    await expect(notice).toBeVisible({ timeout: 15_000 });
+    await expect(fallback).toBeVisible();
+    await page.locator("#workspace-tab-draft").click();
+    await expect(page.locator("#pr-title")).toHaveValue(typed);
+
+    await sidebarButton(page, app.pages.settings).click();
+    await expect(fallback).toBeVisible();
+    await expect(notice).toBeVisible();
+    await page.goBack();
+    await expect(page.locator("#pr-title")).toHaveValue(typed);
+    expect(loads).toBe(0);
+  } finally {
+    await close();
+    await server.stop();
+  }
+});
+
 test("Home and the sidebar fit at 1440 and 390 px in both languages", async ({ page }) => {
   for (const locale of locales)
     for (const width of [1440, 390]) {

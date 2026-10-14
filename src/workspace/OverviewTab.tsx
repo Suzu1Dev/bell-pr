@@ -8,6 +8,7 @@ import type {
   ContributionRecommendation,
 } from "../../shared/insights";
 import type { Tab } from "../app/AppShell";
+import { ErrorBoundary } from "../app/ErrorBoundary";
 
 // The overview is the largest view in the app; it loads with its first visit.
 const ProjectOverview = lazy(() =>
@@ -63,6 +64,9 @@ export function OverviewTab({
   const t = useT("workspace");
   const [locale] = useLocale();
   return (
+    // A chunk that fails to load stops at this tab; the draft and the
+    // review keep what the person typed.
+    <ErrorBoundary resetKey={run.id}>
     <Suspense fallback={null}>
     <ProjectOverview
       repo={currentRepo}
@@ -91,5 +95,6 @@ export function OverviewTab({
       updatingRepo={updatingRepo}
     />
     </Suspense>
+    </ErrorBoundary>
   );
 }

@@ -1138,6 +1138,9 @@ function AppShell({
             setTab={setTab}
           />
         ) : (
+          // A chunk that fails to load stops at this page, so the shell
+          // and what the person typed elsewhere stay.
+          <ErrorBoundary>
           <Suspense fallback={null}>
             <SettingsPage
               status={status}
@@ -1150,6 +1153,7 @@ function AppShell({
               onAppSettingsSaved={(view) => setAppSettings(view.settings)}
             />
           </Suspense>
+          </ErrorBoundary>
         )}
       </main>
       {commandOpen && (
