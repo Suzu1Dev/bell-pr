@@ -30,7 +30,7 @@ const m: Translation<typeof en> = {
       "你允許 Claude agent 不經作業系統沙箱執行，因此這次任務的 agent 可能讀取或修改工作資料夾以外的檔案。請更仔細地檢查它的變更。可在安全設定中為之後的任務關閉這個選項。",
   },
   runNotices: {
-    queuedFree: "排隊中：Free 一次只執行一個貢獻任務",
+    queuedFree: "排隊中：免費方案一次只執行一個貢獻任務",
     queuedUpgrade: "升級 Pro 可同時執行多個",
     workspaceRemoved: "為了釋出磁碟空間，這次任務的檔案已清除；報告與筆記仍會保留。",
   },

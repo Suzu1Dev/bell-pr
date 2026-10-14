@@ -125,8 +125,8 @@ const m: Translation<typeof en> = {
       help: "0.5 到 10。大型專案或較高的思考強度逾時時，請調高它。",
     },
     effective: ({ configured, effective }) =>
-      `設定為 ${number(configured)}，實際為 ${number(effective)}（Free）。`,
-    freeHint: "Free 一次執行一個貢獻，其他的排隊等待；Pro 依你在這裡的設定同時執行。",
+      `設定為 ${number(configured)}，實際為 ${number(effective)}（免費方案）。`,
+    freeHint: "免費方案一次執行一個貢獻，其他的排隊等待；Pro 依你在這裡的設定同時執行。",
     queue: ({ count }) => `執行中、排隊中與等待確認計畫的工作合計最多 ${number(count)} 個。`,
     usage:
       "同時執行多個 Agent 會更快消耗你在服務提供者的帳戶用量。在個人 Claude 方案上大量平行使用，可能超出該方案預期的個人使用範圍。",

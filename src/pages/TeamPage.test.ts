@@ -16,6 +16,6 @@ test("the agent team page reads in English with no Chinese left", () => {
   );
   assert.match(
     renderZh(createElement(TeamPage, { beginContribution() {} })),
-    /Free 2 位，Pro 最多 4 位 · 共享任務板/,
+    /免費方案 2 位，Pro 最多 4 位 · 共享任務板/,
   );
 });

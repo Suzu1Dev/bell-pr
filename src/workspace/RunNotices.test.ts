@@ -29,7 +29,7 @@ test("a run queued on Free says why, with the PRO badge and a way to upgrade", (
   assertNoHan(html);
   assert.match(
     renderZh(createElement(RunNotices, { run, queuedOnFree: true })),
-    /排隊中：Free 一次只執行一個貢獻任務/,
+    /排隊中：免費方案一次只執行一個貢獻任務/,
   );
 });
 

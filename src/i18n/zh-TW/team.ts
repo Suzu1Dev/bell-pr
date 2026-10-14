@@ -17,7 +17,7 @@ const m: Translation<typeof en> = {
     engine: ({ provider }) => `${provider} · ${product.name} 協作引擎`,
     capacity: ({ count }) => `最多 ${count} 位成員同時工作`,
     planLimit: {
-      free: ({ count }) => `Free 方案：最多 ${count} 位成員同時工作`,
+      free: ({ count }) => `免費方案：最多 ${count} 位成員同時工作`,
       trial: ({ count }) => `Pro 試用：最多 ${count} 位成員同時工作`,
       pro: ({ count }) => `Pro：最多 ${count} 位成員同時工作`,
     },

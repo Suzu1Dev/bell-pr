@@ -350,7 +350,7 @@ test("Performance edits the limits, shows what Free runs and marks a locked limi
         onSaved() {},
       }),
     ),
-    /設定為 2，實際為 1（Free）。/,
+    /設定為 2，實際為 1（免費方案）。/,
   );
   // Until the settings and the limits arrive the form waits.
   const waiting = renderEn(

@@ -544,7 +544,7 @@ test("the runtime badge shows the plan's member limit from the entitlements", ()
   );
   assert.match(
     renderZh(board(run, false, undefined, freeEntitlements)),
-    /Free 方案：最多 2 位成員同時工作/,
+    /免費方案：最多 2 位成員同時工作/,
   );
 });
 

@@ -21,7 +21,7 @@ const m: Translation<typeof en> = {
     discover: {
       title: "找一個想貢獻的專案",
       text: "在 GitHub 上搜尋歡迎你這類協助的專案。",
-      textFree: "Free 方案可看範例結果；搜尋 GitHub 需要 Pro 或 14 天試用。",
+      textFree: "免費方案可看範例結果；搜尋 GitHub 需要 Pro 或 14 天試用。",
     },
   },
   setup: {

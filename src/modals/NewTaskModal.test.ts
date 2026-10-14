@@ -240,5 +240,5 @@ test("the dialog states the team size each plan allows", () => {
     renderEn(element()),
     /<p class="field-help task-team-limit">Free: 2 teammates · Pro: up to 4<\/p>/,
   );
-  assert.match(renderZh(element()), /Free：2 位 Teammates · Pro：最多 4 位/);
+  assert.match(renderZh(element()), /免費：2 位 Teammates · Pro：最多 4 位/);
 });
