@@ -1,120 +1,136 @@
-import type { ChangeExplanation } from "./explanations.js";
+import type { Locale } from "./i18n/locale.js";
+import en from "./i18n/learning-export.en.js";
+import zhTW from "./i18n/learning-export.zh-TW.js";
 import type { Repository, RunCore } from "./types.js";
+
+type Messages = typeof en;
+const dictionaries: Record<Locale, Messages> = { en, "zh-TW": zhTW };
 
 /**
  * Markdown learning record for one run: what was asked, how the team planned
  * it, what each file's explanation taught, the follow-up Q&A, the PR and the
  * provider-reported usage. Pure: it only reads the run and repository, so
- * the server export and the client-side demo export share it.
+ * the server export and the client-side demo export share it. `locale`
+ * chooses the record's own headings and labels; the run's text is copied as
+ * it was written.
  */
-export function buildLearningExport(run: RunCore, repo?: Repository): string {
+export function buildLearningExport(
+  run: RunCore,
+  repo: Repository | undefined,
+  locale: Locale,
+): string {
+  const m = dictionaries[locale];
   const sections = [
-    header(run, repo),
-    section("任務描述", run.prompt),
-    section("團隊計畫", run.team?.planSummary),
-    section("檔案解說", explanationSection(run)),
-    section("問答紀錄", conversationSection(run)),
+    header(m, run, repo),
+    section(m.sections.task, run.prompt),
+    section(m.sections.plan, run.team?.planSummary),
+    section(m.sections.explanations, explanationSection(m, run)),
+    section(m.sections.conversations, conversationSection(m, run)),
     section(
-      "Pull Request",
-      run.prUrl ? `[${run.prUrl}](${run.prUrl})` : "尚未送出 PR。",
+      m.sections.pullRequest,
+      run.prUrl ? `[${run.prUrl}](${run.prUrl})` : m.noPullRequest,
     ),
-    section("Agent 用量", efficiencySection(run)),
+    section(m.sections.usage, efficiencySection(m, run)),
   ];
   return `${sections.filter(Boolean).join("\n\n")}\n`;
 }
 
-function header(run: RunCore, repo?: Repository) {
+function header(m: Messages, run: RunCore, repo?: Repository) {
   const meta = [
-    repo ? `- Repository：${repo.fullName}` : undefined,
-    `- 分支：${run.branch} → ${run.baseBranch}`,
-    `- 建立時間：${run.createdAt}`,
-    `- 狀態：${run.status}`,
+    repo ? m.repository({ fullName: repo.fullName }) : undefined,
+    m.branch({ branch: run.branch, baseBranch: run.baseBranch }),
+    m.createdAt({ createdAt: run.createdAt }),
+    m.status({ status: run.status }),
   ].filter(Boolean);
-  return `# 學習紀錄：${run.title}\n\n> 本紀錄的解說、問答與審查內容由 agent 產生，可能有誤；程式碼與結論仍需自行驗證。\n\n${meta.join("\n")}`;
+  return `${m.title({ title: run.title })}\n\n${m.disclaimer}\n\n${meta.join("\n")}`;
 }
 
 function section(title: string, body?: string) {
   return body?.trim() ? `## ${title}\n\n${body.trim()}` : "";
 }
 
-/** Labels for the explanation card; alternatives, lookup and selfCheck exist only on newer records. */
-const explanationFields: [keyof ChangeExplanation, string][] = [
-  ["summary", "改了什麼"],
-  ["reason", "為什麼改"],
-  ["concept", "開發觀念"],
-  ["tip", "審閱提醒"],
-  ["alternatives", "其他做法"],
-  ["lookup", "可以查"],
-];
+/** The explanation card fields in export order; alternatives and lookup exist only on newer records. */
+const explanationFields = [
+  "summary",
+  "reason",
+  "concept",
+  "tip",
+  "alternatives",
+  "lookup",
+] as const;
 
-function explanationSection(run: RunCore) {
+function explanationSection(m: Messages, run: RunCore) {
   const entries = Object.entries(run.explanations ?? {});
-  if (!entries.length) return "尚未產生解說。";
+  if (!entries.length) return m.noExplanations;
   return entries
     .map(([filePath, stored]) => {
       const lines = [`### \`${filePath}\``];
       const content = stored.content;
       if (stored.status !== "ready" || !content) {
-        lines.push(`解說狀態：${stored.status}${stored.error ? `（${stored.error}）` : ""}`);
+        lines.push(
+          stored.error
+            ? m.explanationStatusWithError({
+                status: stored.status,
+                error: stored.error,
+              })
+            : m.explanationStatus({ status: stored.status }),
+        );
         return lines.join("\n\n");
       }
-      if (content.example) {
-        const { scenario, before, after } = content.example;
-        lines.push(
-          `**白話文舉例**\n\n- 情境：${scenario}\n- 修改前：${before}\n- 修改後：${after}`,
-        );
-      }
-      for (const [key, label] of explanationFields) {
+      if (content.example) lines.push(m.example(content.example));
+      for (const key of explanationFields) {
         const value = content[key];
         const text = Array.isArray(value)
           ? value.map((item) => `- ${String(item)}`).join("\n")
           : typeof value === "string"
             ? value
             : "";
-        if (text.trim()) lines.push(`**${label}**\n\n${text}`);
+        if (text.trim()) lines.push(`**${m.fields[key]}**\n\n${text}`);
       }
-      if (content.selfCheck)
-        lines.push(
-          `**考考自己**\n\n問題：${content.selfCheck.question}\n\n答案：${content.selfCheck.answer}`,
-        );
+      if (content.selfCheck) lines.push(m.selfCheck(content.selfCheck));
       return lines.join("\n\n");
     })
     .join("\n\n");
 }
 
-function conversationSection(run: RunCore) {
+function conversationSection(m: Messages, run: RunCore) {
   const entries = Object.entries(run.conversations ?? {}).filter(
     ([, conversation]) => conversation.messages.length,
   );
-  if (!entries.length) return "沒有問答紀錄。";
+  if (!entries.length) return m.noConversations;
   return entries
     .map(([filePath, conversation]) => {
       const turns = conversation.messages.map((message) => {
         const stale =
           message.fingerprint !== undefined &&
           message.fingerprint !== conversation.fingerprint;
-        const author = message.role === "user" ? "你" : "學習助手";
-        return `**${author}${stale ? "（針對較舊版本）" : ""}：**\n\n${message.content}`;
+        const author = message.role === "user" ? m.you : m.assistant;
+        const heading = stale ? m.staleTurn({ author }) : m.turn({ author });
+        return `${heading}\n\n${message.content}`;
       });
       return [`### \`${filePath}\``, ...turns].join("\n\n");
     })
     .join("\n\n");
 }
 
-function efficiencySection(run: RunCore) {
+function efficiencySection(m: Messages, run: RunCore) {
   const usage = run.efficiency;
-  if (!usage) return "沒有用量紀錄。";
+  if (!usage) return m.noUsage;
   const lines = [
-    `- 呼叫次數：${usage.calls}（完成 ${usage.completedCalls}、失敗 ${usage.failedCalls}）`,
-    `- 用量回報：${usage.measuredCalls} / ${usage.calls} 次`,
-    `- 輸入 tokens：${usage.inputTokens}（含快取讀取 ${usage.cachedInputTokens}）`,
-    `- 輸出 tokens：${usage.outputTokens}`,
-    `- Agent 執行時間：${Math.round(usage.durationMs / 1000)} 秒`,
-    `- Ponytail 模式：${usage.mode}（${usage.policyVersion}）`,
+    m.calls({
+      calls: usage.calls,
+      completed: usage.completedCalls,
+      failed: usage.failedCalls,
+    }),
+    m.measured({ measured: usage.measuredCalls, calls: usage.calls }),
+    m.inputTokens({
+      input: usage.inputTokens,
+      cached: usage.cachedInputTokens,
+    }),
+    m.outputTokens({ output: usage.outputTokens }),
+    m.duration({ seconds: Math.round(usage.durationMs / 1000) }),
+    m.mode({ mode: usage.mode, policyVersion: usage.policyVersion }),
   ];
-  if (usage.measuredCalls < usage.calls)
-    lines.push(
-      "- 注意：有呼叫未回報用量，上述 tokens 只加總已回報部分；未回報的用量為未知，不是 0。",
-    );
+  if (usage.measuredCalls < usage.calls) lines.push(m.unmeasured);
   return lines.join("\n");
 }
