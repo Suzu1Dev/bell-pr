@@ -94,6 +94,7 @@ import {
   findDraftPlaceholders,
 } from "../shared/draft-checks.js";
 import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
+import { commitDetail, listCommits } from "./commits.js";
 import {
   addedLines,
   parseWalkthrough,
@@ -2450,6 +2451,16 @@ export class Workbench {
       if (temporary) await rm(temporary, { recursive: true, force: true });
       await this.store.save();
     }
+  }
+
+  /** The commits on a published contribution's branch, oldest first. */
+  async commits(id: string) {
+    return listCommits(this.run(id));
+  }
+
+  /** What one of those commits changed, with the review screen's protections. */
+  async commit(id: string, sha: string) {
+    return commitDetail(this.run(id), sha);
   }
 
   /**

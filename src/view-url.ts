@@ -8,7 +8,7 @@ export const pages = [
   "settings",
 ] as const;
 export type Page = (typeof pages)[number];
-export const tabs = ["overview", "changes", "activity", "draft"] as const;
+export const tabs = ["overview", "changes", "activity", "draft", "commits"] as const;
 export type Tab = (typeof tabs)[number];
 
 /** Where the person is, kept in the address bar so a reload returns there. */
