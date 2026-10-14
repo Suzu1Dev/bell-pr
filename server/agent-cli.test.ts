@@ -13,8 +13,13 @@ import {
   type AgentEvent,
 } from "./agent-cli.js";
 import type { ModelExecution } from "../shared/models.js";
+import { formatters } from "../shared/i18n/locale.js";
 import { agentEnvironment } from "./process.js";
 import { AppError } from "./types.js";
+import { withLocale } from "./i18n/index.js";
+
+/** Han characters and CJK punctuation; the Latin middle dot is not one. */
+const cjk = /(?!\u00B7)[\p{Script_Extensions=Han}\u3000-\u303F\uFF00-\uFFEF]/u;
 
 test("Codex arguments keep the existing sandbox, approval and schema flags", async () => {
   assert.deepEqual(
@@ -628,11 +633,12 @@ test("Claude Code retries, rate limits and denied tools are notices, never error
   const message = rejected[0].kind === "notice" ? rejected[0].message : "";
   assert.match(message, /^Claude 額度已達上限，等待重置中（5 小時滾動視窗/);
   assert.match(message, /已用 100%/);
-  assert.match(
-    message,
-    new RegExp(
-      `預計 ${new Date(1791439800 * 1000).toLocaleString("zh-TW", { hour12: false })} 重置）。$`,
+  // The reset time is formatted for the locale, never with a hard-coded tag.
+  assert.ok(
+    message.endsWith(
+      `預計 ${formatters("zh-TW").dateTime(1791439800 * 1000)} 重置）。`,
     ),
+    message,
   );
   assert.deepEqual(
     read({
@@ -872,4 +878,126 @@ test("retryTransientAuth reruns a retryable attempt up to twice with the product
   aborted.abort();
   await assert.rejects(pending, /工作已取消/);
   assert.equal(attempts, 1);
+});
+
+test("agent CLI notices, outcomes and failures follow the locale in effect", async () => {
+  const resetsAt = formatters("en").dateTime(1791439800 * 1000);
+  const events = withLocale("en", () => {
+    const read = agentEventReader("claude");
+    return [
+      ...read({
+        type: "system",
+        subtype: "api_retry",
+        attempt: 2,
+        max_retries: 10,
+        retry_delay_ms: 4000,
+        error: "rate_limit",
+      }),
+      ...read({ type: "system", subtype: "api_retry", retry_delay_ms: 1000 }),
+      ...read({
+        type: "rate_limit_event",
+        rate_limit_info: {
+          status: "rejected",
+          resetsAt: 1791439800,
+          rateLimitType: "five_hour",
+          utilization: 1,
+        },
+      }),
+      ...read({
+        type: "rate_limit_event",
+        rate_limit_info: { status: "allowed_warning", rateLimitType: "toString" },
+      }),
+      ...read({
+        type: "system",
+        subtype: "permission_denied",
+        tool_name: "Bash",
+        decision_reason: "Bash(git push:*) is in --disallowedTools",
+      }),
+      ...read({
+        type: "assistant",
+        message: {
+          content: [
+            { type: "tool_use", id: "b1", name: "Bash", input: { command: "npm test" } },
+            { type: "tool_use", id: "b2", name: "Bash", input: { command: "npm run lint" } },
+          ],
+        },
+      }),
+      ...read({
+        type: "user",
+        message: {
+          content: [
+            { type: "tool_result", tool_use_id: "b1", is_error: true },
+            { type: "tool_result", tool_use_id: "b2" },
+          ],
+        },
+      }),
+      ...read({ type: "result", subtype: "error_max_turns", is_error: true }),
+      ...read({
+        type: "result",
+        subtype: "error_during_execution",
+        is_error: true,
+        errors: ["first problem", "second problem"],
+      }),
+      ...agentEventReader("codex")({ type: "turn.failed" }),
+      ...agentEventReader("codex")({ type: "error" }),
+    ];
+  });
+  assert.deepEqual(
+    events.map((event) =>
+      event.kind === "command"
+        ? event.outcome
+        : event.kind === "notice" || event.kind === "error"
+          ? event.message
+          : event.kind,
+    ),
+    [
+      "Claude Code is retrying (attempt 2 of 10, reason: rate_limit, next try in 4 seconds).",
+      "Claude Code is retrying (next try in 1 second).",
+      `Claude usage limit reached; waiting for it to reset (5-hour rolling window: usage resets 5 hours after it started, 100% used, expected to reset at ${resetsAt}).`,
+      // An unknown window id is shown as given, even one named like an object method.
+      "Claude usage is close to its limit (toString).",
+      "The permission settings denied the Bash tool: Bash(git push:*) is in --disallowedTools",
+      "failed",
+      "succeeded",
+      "The Claude Code turn failed (error_max_turns).",
+      "first problem, second problem",
+      "The Codex turn failed.",
+      "Codex reported an error.",
+    ],
+  );
+  assert.doesNotMatch(JSON.stringify(events), cjk);
+  // The same events read under zh-TW keep their Traditional Chinese text.
+  const chinese = withLocale("zh-TW", () =>
+    agentEventReader("claude")({
+      type: "result",
+      subtype: "error_during_execution",
+      is_error: true,
+      errors: ["first problem", "second problem"],
+    }),
+  );
+  assert.deepEqual(chinese, [
+    { kind: "error", terminal: true, message: "first problem、second problem" },
+  ]);
+
+  const notices: string[] = [];
+  const controller = new AbortController();
+  let attempts = 0;
+  await assert.rejects(
+    withLocale("en", () =>
+      retryTransientAuth(async () => ({ retryable: true, attempt: ++attempts }), {
+        signal: controller.signal,
+        onRetry: (notice) => notices.push(notice),
+        sleep: async () => {
+          controller.abort();
+        },
+      }),
+    ),
+    (error: unknown) =>
+      error instanceof AppError &&
+      error.statusCode === 409 &&
+      error.message === "The operation was cancelled.",
+  );
+  assert.deepEqual(notices, [
+    "Claude Code is refreshing its sign-in while another process holds the refresh lock; next try in 15 seconds (attempt 2 of 3).",
+  ]);
 });

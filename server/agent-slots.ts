@@ -1,4 +1,5 @@
 import { AppError } from "./types.js";
+import { cancelled } from "./i18n/index.js";
 
 export const defaultAgentProcessLimit = 3;
 
@@ -26,7 +27,7 @@ export class AgentSlots {
   /** Resolves with an idempotent release function once a slot is free. */
   acquire(signal?: AbortSignal): Promise<() => void> {
     if (signal?.aborted)
-      return Promise.reject(new AppError("工作已取消。", 409));
+      return Promise.reject(new AppError(cancelled(), 409));
     if (this.activeCount < this.limit) {
       this.activeCount++;
       return Promise.resolve(this.releaser());
@@ -35,7 +36,7 @@ export class AgentSlots {
       const onAbort = () => {
         const index = this.waiters.indexOf(waiter);
         if (index >= 0) this.waiters.splice(index, 1);
-        reject(new AppError("工作已取消。", 409));
+        reject(new AppError(cancelled(), 409));
       };
       const waiter = {
         grant: () => {

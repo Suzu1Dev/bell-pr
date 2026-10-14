@@ -5,9 +5,11 @@ import {
   type AgentProvider,
   type ModelExecution,
 } from "../shared/models.js";
+import { formatters } from "../shared/i18n/locale.js";
 import { modelArguments, modelExecutionSchema, modelId } from "./models.js";
 import { AppError } from "./types.js";
 import { redact } from "./secrets.js";
+import { cancelled, currentLocale, sm } from "./i18n/index.js";
 
 /** none: answer from the prompt only; read: inspect files; write: edit the working directory and run commands. */
 export type AgentAccess = "none" | "read" | "write";
@@ -179,39 +181,30 @@ function webEvent(
   return text ? [{ kind: "web", action, detail: text.slice(0, 200) }] : [];
 }
 
-const rateLimitWindows: Record<string, string> = {
-  five_hour: "5 小時滾動視窗：用量每 5 小時依開始時間重置",
-  seven_day: "7 天滾動視窗：所有模型的每週總量",
-  seven_day_opus: "7 天滾動視窗：Opus 的每週用量",
-  seven_day_sonnet: "7 天滾動視窗：Sonnet 的每週用量",
-  seven_day_overage_included: "7 天滾動視窗：含額外用量的每週總量",
-  overage: "額外用量",
-};
-
 /** Explains a non-allowed rate_limit_event in one line; a plain "allowed" status is normal and stays silent. */
 function rateLimitNotice(info: unknown): string | undefined {
   if (!info || typeof info !== "object") return;
   const value = info as Json;
   if (typeof value.status !== "string" || value.status === "allowed") return;
-  const state =
-    value.status === "rejected"
-      ? "已達上限，等待重置中"
-      : value.status === "allowed_warning"
-        ? "接近上限"
-        : `狀態 ${value.status}`;
-  const parts = [
-    typeof value.rateLimitType === "string"
-      ? (rateLimitWindows[value.rateLimitType] ?? value.rateLimitType)
-      : undefined,
-    finite(value.utilization)
-      ? `已用 ${Math.round(value.utilization * 100)}%`
+  const messages = sm().run.agentCli;
+  const windows: Record<string, string> = messages.rateLimitWindows;
+  const type = value.rateLimitType;
+  return messages.rateLimit({
+    status: value.status,
+    window:
+      typeof type === "string"
+        ? Object.hasOwn(windows, type)
+          ? windows[type]
+          : type
+        : undefined,
+    used: finite(value.utilization)
+      ? Math.round(value.utilization * 100)
       : undefined,
     // resetsAt is Unix time in seconds (observed 1791439800 for a same-day reset).
-    finite(value.resetsAt)
-      ? `預計 ${new Date(value.resetsAt * 1000).toLocaleString("zh-TW", { hour12: false })} 重置`
+    resetsAt: finite(value.resetsAt)
+      ? formatters(currentLocale()).dateTime(value.resetsAt * 1000)
       : undefined,
-  ].filter((part): part is string => !!part);
-  return `Claude 額度${state}${parts.length ? `（${parts.join("；")}）` : ""}。`;
+  });
 }
 
 /** Tool denials from the permission settings; tool_input is never logged. */
@@ -227,27 +220,33 @@ function denialNotice(denial: unknown): AgentEvent | undefined {
         : "";
   return {
     kind: "notice",
-    message: `工具 ${value.tool_name} 被權限設定拒絕${reason ? `：${reason}` : "。"}`,
+    message: sm().run.agentCli.deniedTool({
+      tool: value.tool_name,
+      reason: reason || undefined,
+    }),
   };
 }
 
 function systemNotice(value: Json): AgentEvent[] {
   if (value.subtype === "api_retry") {
-    const parts = [
-      finite(value.attempt)
-        ? `第 ${value.attempt}${finite(value.max_retries) ? `/${value.max_retries}` : ""} 次`
-        : undefined,
-      typeof value.error === "string" && value.error
-        ? `原因 ${value.error}`
-        : undefined,
-      finite(value.retry_delay_ms)
-        ? `${Math.max(0, Math.round(value.retry_delay_ms / 1000))} 秒後重試`
-        : undefined,
-    ].filter((part): part is string => !!part);
+    const attempt = finite(value.attempt) ? value.attempt : undefined;
     return [
       {
         kind: "notice",
-        message: `Claude Code 重試中${parts.length ? `（${parts.join("，")}）` : ""}。`,
+        message: sm().run.agentCli.apiRetry({
+          attempt,
+          maxRetries:
+            attempt !== undefined && finite(value.max_retries)
+              ? value.max_retries
+              : undefined,
+          reason:
+            typeof value.error === "string" && value.error
+              ? value.error
+              : undefined,
+          delaySeconds: finite(value.retry_delay_ms)
+            ? Math.max(0, Math.round(value.retry_delay_ms / 1000))
+            : undefined,
+        }),
       },
     ];
   }
@@ -308,7 +307,9 @@ export function agentEventReader(provider: AgentProvider = "codex") {
             message: String(
               value.message ??
                 value.error?.message ??
-                (terminal ? "Codex 工作回合失敗。" : "Codex 回報執行錯誤。"),
+                (terminal
+                  ? sm().run.agentCli.codexTurnFailed
+                  : sm().run.agentCli.codexError),
             ),
           },
         ];
@@ -366,7 +367,9 @@ export function agentEventReader(provider: AgentProvider = "codex") {
         if (tool?.name === "Bash")
           events.push({
             kind: "command",
-            outcome: block.is_error ? "失敗" : "成功",
+            outcome: block.is_error
+              ? sm().run.agentCli.commandFailed
+              : sm().run.agentCli.commandSucceeded,
             ...withField("command", tool.summary),
           });
         else if (
@@ -390,7 +393,9 @@ export function agentEventReader(provider: AgentProvider = "codex") {
           typeof value.result === "string" && value.result
             ? value.result
             : Array.isArray(value.errors)
-              ? value.errors.join("；")
+              ? formatters(currentLocale()).list(value.errors.map(String), {
+                  type: "unit",
+                })
               : "";
         const retryable =
           (value.is_error === true || value.terminal_reason === "api_error") &&
@@ -400,7 +405,9 @@ export function agentEventReader(provider: AgentProvider = "codex") {
           terminal: true,
           message:
             detail ||
-            `Claude Code 工作回合失敗（${String(value.subtype ?? "unknown")}）。`,
+            sm().run.agentCli.claudeTurnFailed({
+              subtype: String(value.subtype ?? "unknown"),
+            }),
           ...(retryable ? { retryable: true } : {}),
         });
         return events;
@@ -454,7 +461,7 @@ export type TransientSleep = (ms: number, signal: AbortSignal) => Promise<void>;
 
 export interface TransientRetryOptions {
   signal: AbortSignal;
-  /** Receives the Traditional Chinese notice before each wait. */
+  /** Receives the notice, in the locale in effect, before each wait. */
   onRetry?: (notice: string) => void;
   /** Test seam; the default waits for real and rejects with the 409 cancellation on abort. */
   sleep?: TransientSleep;
@@ -464,7 +471,7 @@ const waitFor: TransientSleep = async (ms, signal) => {
   try {
     await delay(ms, undefined, { signal });
   } catch {
-    throw new AppError("工作已取消。", 409);
+    throw new AppError(cancelled(), 409);
   }
 };
 
@@ -487,9 +494,13 @@ export async function retryTransientAuth<T extends { retryable?: boolean }>(
     if (!result.retryable || ms === undefined || options.signal.aborted)
       return result;
     options.onRetry?.(
-      `Claude Code 正在更新登入憑證（其他行程持有更新鎖），${Math.round(ms / 1000)} 秒後重試（第 ${index + 2}/${total} 次）。`,
+      sm().run.agentCli.authRetry({
+        seconds: Math.round(ms / 1000),
+        attempt: index + 2,
+        total,
+      }),
     );
     await sleep(ms, options.signal);
-    if (options.signal.aborted) throw new AppError("工作已取消。", 409);
+    if (options.signal.aborted) throw new AppError(cancelled(), 409);
   }
 }
