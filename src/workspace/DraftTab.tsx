@@ -5,14 +5,17 @@ import {
   Circle,
   CircleCheck,
   ExternalLink,
-  Github,
   GitPullRequest,
   Loader2,
+  Lock,
   Play,
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
-import { useFormat, useT } from "../i18n";
+import { getDemo } from "../demo";
+import { useFormat, useLocale, useT } from "../i18n";
+import { ProBadge } from "../license/ProBadge";
+import { requestUpgrade } from "../license/useEntitlements";
 import type { DiffFile, Run } from "../types";
 import { groupPrFeedback, summarizeChecks } from "../../shared/pr-feedback";
 import {
@@ -80,6 +83,53 @@ interface DraftTabProps {
   >;
   actions: Pick<RunActions, "feedbackLoading" | "fetchPrFeedback">;
   rounds: RunRounds;
+  /**
+   * Reading maintainer feedback and starting a round from it need Pro and
+   * the plan is Free: those controls open the upgrade dialog instead. The
+   * round history, an open round's review and push, and syncing stay.
+   */
+  feedbackLocked?: boolean;
+}
+
+/**
+ * The sample's Draft PR once the demo "publishes" it: the demo's own card,
+ * which says that nothing was created on GitHub, with the branch and the
+ * title it would carry. While the playback pushes, it says so.
+ */
+export function SamplePublishedCard({ run }: { run: Run }) {
+  const t = useT("workspace").published;
+  const [locale] = useLocale();
+  const card = getDemo(locale).publishedCard;
+  if (run.publishing)
+    return (
+      <section className="sample-published is-pending" role="status">
+        <Loader2 className="spin" size={18} aria-hidden="true" />
+        <p>{t.publishing}</p>
+      </section>
+    );
+  if (run.status !== "published" || !card) return null;
+  return (
+    <section
+      className="sample-published"
+      role="status"
+      aria-labelledby="sample-published-title"
+    >
+      <span className="sample-published-icon">
+        <GitPullRequest size={20} aria-hidden="true" />
+      </span>
+      <div>
+        <h2 id="sample-published-title">{card.title}</h2>
+        <p>{card.note}</p>
+        <p className="sample-published-meta">
+          <strong>{run.draft.title}</strong>
+          <span>
+            <code>{run.publishedBranch ?? run.branch}</code> →{" "}
+            <code>{run.baseBranch}</code>
+          </span>
+        </p>
+      </div>
+    </section>
+  );
 }
 
 /**
@@ -100,6 +150,7 @@ export function DraftTab({
   draft,
   actions,
   rounds,
+  feedbackLocked = false,
 }: DraftTabProps) {
   const t = useT("workspace");
   const optional = useT("common").optional;
@@ -148,6 +199,7 @@ export function DraftTab({
   } = rounds;
   return (
     <div className="draft-workspace">
+      {demo && <SamplePublishedCard run={run} />}
       {/* A run has a base only once its checkout exists; a queued run has nothing to sync. */}
       {!demo && !!run.baseSha && (
         <SyncPanel
@@ -246,15 +298,17 @@ export function DraftTab({
             disabled={run.status === "published" || !!followUp}
           />
           <div className="editor-toolbar">
-            <div>
+            <div role="group" aria-label={t.draft.modeLabel}>
               <button
                 className={!draftPreview ? "selected" : ""}
+                aria-pressed={!draftPreview}
                 onClick={() => setDraftPreview(false)}
               >
                 {t.draft.edit}
               </button>
               <button
                 className={draftPreview ? "selected" : ""}
+                aria-pressed={draftPreview}
                 onClick={() => setDraftPreview(true)}
               >
                 {t.draft.preview}
@@ -534,27 +588,37 @@ export function DraftTab({
               <p>{t.feedback.intro}</p>
             </div>
             <div className="pr-feedback-actions">
-              <a
-                className="button secondary"
-                href={run.prUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Github size={15} />
-                {t.feedback.viewPullRequest}
-                <ExternalLink size={13} />
-              </a>
+              {/* The sample PR exists nowhere to link to. */}
+              {!demo && (
+                <a
+                  className="button secondary"
+                  href={run.prUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <GitPullRequest size={15} />
+                  {t.feedback.viewPullRequest}
+                  <ExternalLink size={13} />
+                </a>
+              )}
               <button
                 className="button primary"
                 disabled={feedbackLoading}
-                onClick={fetchPrFeedback}
+                onClick={
+                  feedbackLocked
+                    ? () => requestUpgrade("prFeedback")
+                    : fetchPrFeedback
+                }
               >
                 {feedbackLoading ? (
                   <Loader2 className="spin" size={15} />
+                ) : feedbackLocked ? (
+                  <Lock size={15} aria-hidden="true" />
                 ) : (
                   <RefreshCw size={15} />
                 )}
                 {run.prFeedback ? t.feedback.fetchAgain : t.feedback.fetch}
+                {(feedbackLocked || demo) && <ProBadge />}
               </button>
             </div>
           </div>
@@ -667,9 +731,12 @@ export function DraftTab({
                                 })}
                                 aria-describedby={`pr-feedback-body-${groupIndex}-${itemIndex}`}
                                 checked={followUpSelection.includes(item.url)}
-                                // At the limit only selected items stay changeable.
+                                // At the limit only selected items stay
+                                // changeable; the sample and Free start no round.
                                 disabled={
                                   busy ||
+                                  demo ||
+                                  feedbackLocked ||
                                   (!followUpSelection.includes(item.url) &&
                                     followUpSelection.length >=
                                       followUpFeedbackLimit)
@@ -695,13 +762,16 @@ export function DraftTab({
                             {item.isResolved && (
                               <span>{t.feedback.resolved}</span>
                             )}
-                            <a
-                              href={item.url}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              {t.feedback.openOnGitHub}
-                            </a>
+                            {/* Sample feedback links to nothing on GitHub. */}
+                            {!demo && (
+                              <a
+                                href={item.url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {t.feedback.openOnGitHub}
+                              </a>
+                            )}
                           </div>
                           <p
                             id={`pr-feedback-body-${groupIndex}-${itemIndex}`}
@@ -716,8 +786,12 @@ export function DraftTab({
               )}
               {!followUp && (
                 <div className="follow-up-start">
-                  <h3>{t.followUp.title}</h3>
+                  <h3>
+                    {t.followUp.title}
+                    {(feedbackLocked || demo) && <ProBadge />}
+                  </h3>
                   <p>{t.followUp.intro}</p>
+                  {demo && <p className="field-help">{t.followUp.demoNote}</p>}
                   <p
                     className="field-help"
                     id="follow-up-limit"
@@ -738,20 +812,30 @@ export function DraftTab({
                     maxLength={followUpNoteLimit}
                     placeholder={t.followUp.placeholder}
                     onChange={(event) => setFollowUpNote(event.target.value)}
-                    disabled={busy}
+                    disabled={busy || demo || feedbackLocked}
                   />
                   <button
                     className="button primary"
                     aria-describedby="follow-up-limit"
                     disabled={
                       busy ||
-                      feedbackLoading ||
-                      followUpSelection.length > followUpFeedbackLimit ||
-                      (!followUpSelection.length && !followUpNote.trim())
+                      demo ||
+                      (!feedbackLocked &&
+                        (feedbackLoading ||
+                          followUpSelection.length > followUpFeedbackLimit ||
+                          (!followUpSelection.length && !followUpNote.trim())))
                     }
-                    onClick={startFollowUp}
+                    onClick={
+                      feedbackLocked
+                        ? () => requestUpgrade("prFeedback")
+                        : startFollowUp
+                    }
                   >
-                    <Play size={15} />
+                    {feedbackLocked ? (
+                      <Lock size={15} aria-hidden="true" />
+                    ) : (
+                      <Play size={15} />
+                    )}
                     {followUpSelection.length
                       ? t.followUp.startSelected({
                           count: followUpSelection.length,

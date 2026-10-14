@@ -2,18 +2,107 @@ import { Suspense, type Dispatch, type SetStateAction } from "react";
 import {
   BookOpen,
   CircleCheck,
+  FolderGit2,
   GitBranch,
-  Github,
   GitPullRequest,
   Loader2,
+  UserRound,
 } from "lucide-react";
+import type { DoctorReport } from "../../shared/doctor";
 import { useT } from "../i18n";
 import type { DiffFile, Repo, Run } from "../types";
 import type { Tab } from "../app/AppShell";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
+import { usePresentation } from "../app/presentation";
 import { Modal } from "../modals/Modal";
+import {
+  ReadinessNotice,
+  readinessOf,
+  type Requirement,
+} from "../setup/ReadinessNotice";
+import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import { MarkdownContent } from "./DraftTab";
+
+/** Publishing commits with the Git identity and pushes with the GitHub CLI. */
+const publishRequirements: readonly Requirement[] = ["git-identity", "gh"];
+
+/**
+ * Who the publish acts as, from the environment check: the commit author
+ * Git uses ("Name <e-mail>", or the address Git guessed) and the GitHub
+ * login that pushes. Either is absent when the check has not found it.
+ */
+export function publishIdentity(report: DoctorReport | null): {
+  author?: string;
+  login?: string;
+} {
+  const identity = report?.checks.find((check) => check.id === "git-identity");
+  const guessed = identity?.params?.email;
+  const author =
+    identity?.status === "ok"
+      ? identity.detail
+      : identity?.status === "warn" && typeof guessed === "string"
+        ? guessed
+        : undefined;
+  const auth = report?.checks.find((check) => check.id === "gh-auth");
+  const login =
+    auth?.status === "ok" && typeof auth.params?.login === "string"
+      ? auth.params.login
+      : undefined;
+  return {
+    ...(author ? { author } : {}),
+    ...(login ? { login } : {}),
+  };
+}
+
+/** "Commit author: Name <e-mail> · Pushing as @login", masked while presenting. */
+export function PublishIdentity({
+  author,
+  login,
+  maskUser,
+}: {
+  author?: string;
+  login?: string;
+  maskUser: (value: string) => string;
+}) {
+  const t = useT("workspace").publish.identity;
+  if (!author && !login) return null;
+  const text =
+    author && login
+      ? t.both({ author: maskUser(author), login: maskUser(login) })
+      : author
+        ? t.author({ author: maskUser(author) })
+        : t.login({ login: maskUser(login!) });
+  return (
+    <p className="publish-identity">
+      <UserRound size={15} aria-hidden="true" />
+      <span>{text}</span>
+    </p>
+  );
+}
+
+const emailPattern = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+/** A path under a home folder, where the user name is. */
+const homePathPattern =
+  /(?:\/(?:home|Users)\/|[A-Za-z]:\\Users\\)[^\s"'`<>]+/g;
+
+/**
+ * `text` with e-mail addresses and home-folder paths masked, for the
+ * preflight results and errors shown while presenting.
+ */
+export function maskPersonalText(
+  text: string,
+  presentation: {
+    present: boolean;
+    maskUser: (value: string) => string;
+    maskPath: (value: string) => string;
+  },
+): string {
+  if (!presentation.present) return text;
+  return text
+    .replace(emailPattern, (email) => presentation.maskUser(email))
+    .replace(homePathPattern, (path) => presentation.maskPath(path));
+}
 
 interface PublishModalProps {
   run: Run;
@@ -36,6 +125,8 @@ interface PublishModalProps {
   publish: () => void;
   closeModal: () => void;
   setTab: Dispatch<SetStateAction<Tab>>;
+  /** A useDoctor() state to share; the dialog loads its own otherwise. */
+  doctor?: DoctorState;
 }
 
 /**
@@ -55,9 +146,17 @@ export function PublishModal({
   publish,
   closeModal,
   setTab,
+  doctor: shared,
 }: PublishModalProps) {
   const workspace = useT("workspace");
   const t = workspace.publish;
+  const presentation = usePresentation();
+  const mask = (text: string) => maskPersonalText(text, presentation);
+  // The sample publishes nothing, so it needs neither tool and asks for no
+  // check; a real publish waits until both are ready.
+  const own = useDoctor({ enabled: !demo && !shared });
+  const doctor = shared ?? own;
+  const ready = demo || readinessOf(doctor.report, publishRequirements).ready;
   const {
     draftChecks,
     publishBlocked,
@@ -90,7 +189,7 @@ export function PublishModal({
     >
       <div className="publish-summary">
         <span>
-          <Github size={16} />
+          <FolderGit2 size={16} />
           {currentRepo?.fullName}
         </span>
         <h3>{run.draft.title}</h3>
@@ -110,19 +209,30 @@ export function PublishModal({
           </b>
         </p>
       </div>
-      {demo && (
+      {demo ? (
         <div className="callout">
           <BookOpen size={18} />
           <p>{t.demoCallout}</p>
         </div>
+      ) : (
+        <PublishIdentity
+          {...publishIdentity(doctor.report)}
+          maskUser={presentation.maskUser}
+        />
       )}
+      <ReadinessNotice
+        requires={publishRequirements}
+        bypass={demo}
+        doctor={doctor}
+        maskUser={presentation.maskUser}
+      />
       {!demo && followUp && (
         <div className="publish-commit-preview">
           <strong>{t.commitPreview}</strong>
           <pre>{run.draft.commitMessage}</pre>
         </div>
       )}
-      {!demo && !followUp && (
+      {!followUp && (
         <details className="publish-body-preview" open>
           <summary>
             {draftChecks
@@ -131,7 +241,13 @@ export function PublishModal({
                 })
               : t.bodyPreview}
           </summary>
-          <div className="markdown-preview">
+          {/* It scrolls when long, so a keyboard can reach and scroll it. */}
+          <div
+            className="markdown-preview"
+            role="region"
+            aria-label={t.bodyPreview}
+            tabIndex={0}
+          >
             <ErrorBoundary>
               <Suspense fallback={<p>{workspace.loadingPreview}</p>}>
                 <MarkdownContent>{run.draft.body}</MarkdownContent>
@@ -142,7 +258,7 @@ export function PublishModal({
       )}
       {!demo && publishBlocked && (
         <p role="alert" className="inline-error">
-          {[publishBlocked.message, ...publishBlocked.details].join("\n")}
+          {mask([publishBlocked.message, ...publishBlocked.details].join("\n"))}
         </p>
       )}
       {!demo && publishConfirmations.length > 0 && (
@@ -162,9 +278,9 @@ export function PublishModal({
                 }
               />
               <span>
-                {check.message}
+                {mask(check.message)}
                 {check.details.map((detail) => (
-                  <small key={detail}>{detail}</small>
+                  <small key={detail}>{mask(detail)}</small>
                 ))}
               </span>
             </label>
@@ -174,7 +290,7 @@ export function PublishModal({
       )}
       {formError && (
         <p role="alert" className="inline-error">
-          {formError}
+          {mask(formError)}
         </p>
       )}
       <div className="modal-actions">
@@ -192,7 +308,8 @@ export function PublishModal({
           disabled={
             busy ||
             (!demo &&
-              (!draftChecks ||
+              (!ready ||
+                !draftChecks ||
                 !!publishBlocked ||
                 publishConfirmations.some(
                   (check) => !acknowledged.includes(check.id),

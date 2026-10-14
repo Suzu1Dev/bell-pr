@@ -29,6 +29,18 @@ const workspace = {
     activity: "Agent activity",
     draft: "PR draft",
   },
+  /** The badge of a run whose Claude Code agent ran without the OS sandbox. */
+  unsandboxed: {
+    label: "Ran without sandbox",
+    tooltip:
+      "You allowed Claude agents to run without the operating system's sandbox, so an agent of this run could read or change files outside its working folder. Check its changes with extra care. The safety settings turn this off for new runs.",
+  },
+  runNotices: {
+    queuedFree: "Queued: Free runs one contribution at a time",
+    queuedUpgrade: "Run several at once with Pro",
+    workspaceRemoved:
+      "Files for this run were cleaned up to free disk space. Reports and notes are kept.",
+  },
   sampleReview: "Sample review",
   humanReview: "Human review",
   footer: {
@@ -54,6 +66,9 @@ const workspace = {
     files: "Changed files",
     searchPlaceholder: "Search files…",
     searchLabel: "Search changed files",
+    /** The icon button that shows the file search on a phone. */
+    openSearch: "Search the changed files",
+    closeSearch: "Close the file search",
     onlyUnreviewed: "Only unreviewed",
     suggestedOrderTitle:
       "Sort by the reading order in the Lead's integration summary; files it does not mention follow in git order",
@@ -84,6 +99,7 @@ const workspace = {
     copyWorktree: "Copy the worktree path",
     preparing: "The agent team is preparing your changes",
     noChanges: "No code changes yet",
+    filesRemoved: "The changed files were cleaned up",
     noChangesHint:
       "Follow the run in Agent activity; once it finishes, you can review it here.",
     viewActivity: "View agent activity",
@@ -93,6 +109,8 @@ const workspace = {
     emptyText: "Select a changed file to ask about its design and trade-offs.",
   },
   activity: {
+    /** The disclosure that holds the model and agent usage cards. */
+    runDetails: "Run details",
     runTitle: "How it ran",
     runText:
       "The task board is above; the full log, error messages and the stop button stay here.",
@@ -137,6 +155,8 @@ const workspace = {
     emptyNotice:
       "There is no PR description yet. Generate and apply a suggested draft above, or write in your own words what changed, why, and which checks you actually ran. The agents' full reports are in the explanation panel next to the code.",
     titleLabel: "Pull request title",
+    /** The group of the Edit and Preview buttons. */
+    modeLabel: "Description view",
     edit: "Edit",
     preview: "Preview",
     bodyLabel: "PR description",
@@ -183,6 +203,10 @@ const workspace = {
     draftPr: "Submit as a Draft PR",
     draftPrHelp:
       "You can keep editing on GitHub afterwards; the project's automated checks run on Draft PRs too.",
+  },
+  /** The sample's Draft PR; its card's words come from the demo content. */
+  published: {
+    publishing: "Opening the sample Draft PR…",
   },
   feedback: {
     title: "Maintainer feedback",
@@ -254,6 +278,8 @@ const workspace = {
         ? `Fix the ${count} selected comment`
         : `Fix the ${count} selected comments`,
     startNote: "Fix from the note",
+    demoNote:
+      "The sample starts no round. Import your own project to fix a real PR from its feedback.",
   },
   publish: {
     titleDemo: "Your demo contribution is ready.",
@@ -272,7 +298,14 @@ const workspace = {
         ? `${count} file reviewed`
         : `${count} files reviewed`,
     demoCallout:
-      "This is an interactive demo: finishing it does not open a GitHub PR. Import your own project to make a real contribution.",
+      "This is an interactive demo: nothing is pushed and no PR opens on GitHub. Import your own project to make a real contribution.",
+    /** Who the publish acts as, from the environment check. */
+    identity: {
+      both: ({ author, login }: { author: string; login: string }) =>
+        `Commit author: ${author} · Pushing as @${login}`,
+      author: ({ author }: { author: string }) => `Commit author: ${author}`,
+      login: ({ login }: { login: string }) => `Pushing as @${login}`,
+    },
     commitPreview: "This round's commit message",
     bodyPreview: "PR description sent to GitHub",
     bodyPreviewWords: ({ count }: { count: number }) =>
@@ -282,7 +315,7 @@ const workspace = {
     confirmLegend: "Confirm each item before submitting",
     confirmNote: `Ticking only means you know these items are still open and want to submit the description as it is. ${product.name} never changes the description or ticks anything for you, and these confirmations are not written into the PR. To change something first, choose “Back to the draft”.`,
     back: "Back to the draft",
-    finishDemo: "Finish the demo review",
+    finishDemo: "Open the sample Draft PR",
     sending: "Submitting…",
     pushRound: "Push this round",
     submit: "Submit Draft PR",
@@ -316,16 +349,15 @@ const workspace = {
     rerunStarted:
       "Re-review started on the current diff. The report appears in the explanation panel when it is done.",
     imported: ({ name }: { name: string }) => `Imported ${name}`,
-    demoDirectionSaved:
-      "Demo direction saved. Import your own repository to start a real team.",
+    demoPlaybackStarted:
+      "The sample team is starting: a prewritten run plays here, with no agent and nothing sent to GitHub.",
+    demoStopped:
+      "The sample team stopped. Start it again from New contribution.",
     /** A chat turn that failed; `ChatMessage.failed` marks it. */
     chatFailed: ({ message }: { message: string }) =>
       `Could not get an answer this time: ${message}`,
-    demoPublished:
-      "Demo review complete! Import your repository to open a real PR.",
     roundPushed: "Pushed this round to the PR: the branch has one more commit.",
     prCreated: "GitHub Draft PR created",
-    demoFeedback: "The demo never contacts GitHub for feedback.",
     feedbackRead: ({ count }: { count: number }) =>
       plural(count) === "one"
         ? `Read ${count} maintainer comment.`

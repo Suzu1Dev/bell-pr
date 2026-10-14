@@ -9,16 +9,17 @@ import {
   Code2,
   ExternalLink,
   FileText,
+  FolderGit2,
   GitBranch,
-  Github,
   GitPullRequest,
   Globe2,
+  Lock,
   Plus,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { apiUrl } from "../api";
-import { useLocale, useT } from "../i18n";
+import { useT } from "../i18n";
+import { ProBadge } from "../license/ProBadge";
 import type { DiffFile, Repo, Run } from "../types";
 import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { ContributionRecommendation } from "../../shared/insights";
@@ -30,6 +31,9 @@ import { ActivityTab } from "./ActivityTab";
 import { ChangesTab } from "./ChangesTab";
 import { DraftTab } from "./DraftTab";
 import { OverviewTab } from "./OverviewTab";
+import { RunNotices, UnsandboxedBadge } from "./RunNotices";
+import { UpgradeFallback } from "./UpgradeFallback";
+import "./workspace.css";
 
 interface WorkspacePageProps {
   run: Run;
@@ -40,7 +44,10 @@ interface WorkspacePageProps {
   setSelectedPath: Dispatch<SetStateAction<string>>;
   currentRepo: Repo | undefined;
   demo: boolean;
-  /** The changes tab is open: the heading collapses to one row. */
+  /**
+   * The changes tab is open. The shell styles the compact heading from it
+   * (.is-reading); nothing here is clipped, so nothing else changes.
+   */
   reading: boolean;
   active: boolean;
   busy: boolean;
@@ -102,7 +109,6 @@ export function WorkspacePage({
   setSelectedPath,
   currentRepo,
   demo,
-  reading,
   active,
   busy,
   editable,
@@ -145,23 +151,33 @@ export function WorkspacePage({
 }: WorkspacePageProps) {
   const t = useT("workspace");
   const statusLabels = useT("common").runStatus;
-  const [locale] = useLocale();
   const { draftDirty, draftUnfinished, followUp, commitMessageUnfinished } =
     draft;
-  const { approve } = actions;
-  // In reading mode the one-row heading clips the repo/branch text, so the
-  // export link moves up next to "New contribution" where it stays visible
-  // and reachable. A plain link cannot send the locale header, so the URL
-  // carries it.
-  const exportLink = !demo && (
-    <a
-      className="export-link"
-      href={apiUrl(`/runs/${run.id}/export.md`, { locale })}
-      download={`bell-learning-${run.id}.md`}
+  const { approve, plan, exporting, exportLearning } = actions;
+  // The sample's playback queues for a moment behind nothing.
+  const queuedOnFree =
+    !demo &&
+    run.status === "queued" &&
+    plan.entitlements?.maxActiveRuns === 1;
+  // The learning record is Pro: on Free the button shows a lock and opens
+  // the upgrade dialog without a request; the sample builds its own record
+  // and shows the PRO chip.
+  const exportLocked = plan.locked("learningExport", { demo });
+  const exportButton = (
+    <button
+      type="button"
+      className="export-link export-button"
+      disabled={exporting}
+      onClick={() => void exportLearning()}
     >
-      <ArrowDownToLine size={13} />
+      {exportLocked ? (
+        <Lock size={13} aria-hidden="true" />
+      ) : (
+        <ArrowDownToLine size={13} aria-hidden="true" />
+      )}
       {t.exportLearning}
-    </a>
+      {(exportLocked || demo) && <ProBadge />}
+    </button>
   );
   const reviewedCount = files.filter((f) =>
     run.reviewedFiles.includes(f.path),
@@ -191,7 +207,6 @@ export function WorkspacePage({
             <span>{t.eyebrow}</span>
             {demo && <span className="demo-pill">{t.demoPill}</span>}
           </div>
-          {reading && exportLink}
           <button
             className="button secondary new-task-button"
             onClick={() => beginContribution()}
@@ -200,26 +215,18 @@ export function WorkspacePage({
           </button>
         </div>
         <div className="title-row">
-          <h1 tabIndex={-1} title={reading ? run.title : undefined}>
-            {run.title}
-          </h1>
+          <h1 tabIndex={-1}>{run.title}</h1>
           <span
             className={`status-badge ${run.status === "failed" ? "error" : ""}`}
           >
             <span />
             {statusLabels[run.status]}
           </span>
+          {run.unsandboxed === true && <UnsandboxedBadge />}
         </div>
-        <div
-          className="repo-meta"
-          title={
-            reading
-              ? `${currentRepo?.fullName || t.repositoryFallback} · ${run.branch} → ${run.baseBranch}`
-              : undefined
-          }
-        >
+        <div className="repo-meta">
           <span>
-            <Github size={15} />
+            <FolderGit2 size={15} />
             {currentRepo?.fullName || t.repositoryFallback}
           </span>
           <i />
@@ -229,13 +236,11 @@ export function WorkspacePage({
           </span>
           <span className="branch-direction">→</span>
           <span>{run.baseBranch}</span>
-          {demo ? (
-            <span className="meta-demo">{t.demoMeta}</span>
-          ) : (
-            !reading && exportLink
-          )}
+          {demo && <span className="meta-demo">{t.demoMeta}</span>}
+          {exportButton}
         </div>
       </section>
+      <RunNotices run={run} queuedOnFree={queuedOnFree} />
       <section className="workflow-strip" aria-label={t.progress}>
         {[
           { n: "01", ...t.steps.define, icon: FileText },
@@ -246,6 +251,7 @@ export function WorkspacePage({
           return (
             <div
               className={`workflow-step ${index === currentStep && !halted ? "current" : ""} ${index < currentStep ? "done" : ""}`}
+              aria-current={index === currentStep && !halted ? "step" : undefined}
               key={step.n}
             >
               <span className="step-icon">
@@ -436,6 +442,7 @@ export function WorkspacePage({
               draft={draft}
               actions={actions}
               rounds={rounds}
+              feedbackLocked={plan.locked("prFeedback", { demo })}
             />
           )}
         </div>
@@ -457,14 +464,15 @@ export function WorkspacePage({
                 total: files.length,
               })}
             </span>
-            {run.status === "published" && run.prUrl ? (
+            {/* The sample PR exists nowhere: its button just stays off. */}
+            {run.status === "published" && run.prUrl && !demo ? (
               <a
                 className="button primary"
                 href={run.prUrl}
                 target="_blank"
                 rel="noreferrer"
               >
-                <Github size={16} />
+                <GitPullRequest size={16} />
                 {t.footer.viewPullRequest}
                 <ExternalLink size={14} />
               </a>
@@ -475,6 +483,7 @@ export function WorkspacePage({
                   !allReviewed ||
                   active ||
                   busy ||
+                  !!run.publishing ||
                   draftDirty ||
                   (!demo &&
                     (followUp ? commitMessageUnfinished : !!draftUnfinished)) ||
@@ -503,6 +512,7 @@ export function WorkspacePage({
           </div>
         </footer>
       </section>
+      <UpgradeFallback demo={demo} summary={plan.summary} />
     </>
   );
 }

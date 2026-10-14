@@ -132,3 +132,48 @@ test("a language switch shows the demo in the new locale and keeps the reader's 
   const other = { ...before, id: "run-1" };
   assert.equal(demoRunInLocale(other, "en"), other);
 });
+
+test("an opened sample PR stays open after a reload and a language switch", () => {
+  const storage = memoryStorage();
+  installStorage(storage);
+  const en = loadDemo("en");
+  saveDemo("en", {
+    ...en,
+    status: "published",
+    prUrl: "#demo-pr",
+    draft: { ...en.draft, publishBranch: "retry-backoff" },
+  });
+  const kept = loadDemo("en");
+  assert.equal(kept.status, "published");
+  assert.equal(kept.prUrl, "#demo-pr");
+  assert.equal(kept.publishedBranch, "retry-backoff");
+
+  // Switching languages keeps the PR and shows the feedback read in the new one.
+  const zh = demoRunInLocale(
+    { ...kept, prFeedback: getDemo("en").prFeedback },
+    "zh-TW",
+  );
+  assert.equal(zh.status, "published");
+  assert.equal(zh.prUrl, "#demo-pr");
+  assert.equal(zh.prFeedback?.warnings?.[0], getDemo("zh-TW").prFeedback?.warnings?.[0]);
+  assert.equal(zh.title, getDemo("zh-TW").run.title);
+  // A sample PR still on its way is shown opened: no playback finishes it now.
+  const pushing = demoRunInLocale({ ...en, status: "approved", publishing: true }, "zh-TW");
+  assert.equal(pushing.status, "published");
+  assert.equal(pushing.prUrl, "#demo-pr");
+  assert.equal(pushing.publishing, undefined);
+  // Without a PR, nothing is invented.
+  const reviewing = demoRunInLocale({ ...en, status: "review" }, "zh-TW");
+  assert.equal(reviewing.prUrl, undefined);
+  assert.equal(reviewing.prFeedback, undefined);
+});
+
+test("a stopped sample shows the finished sample in the new language, as a reload does", () => {
+  const en = getDemo("en");
+  const stopped = demoRunInLocale(
+    { ...en.run, status: "cancelled", reviewedFiles: [] },
+    "zh-TW",
+  );
+  assert.equal(stopped.status, "review");
+  assert.deepEqual(stopped.team, getDemo("zh-TW").team);
+});

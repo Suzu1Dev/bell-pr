@@ -24,6 +24,16 @@ const m: Translation<typeof en> = {
     activity: "Agent 動態",
     draft: "PR 草稿",
   },
+  unsandboxed: {
+    label: "未使用沙箱執行",
+    tooltip:
+      "你允許 Claude agent 不經作業系統沙箱執行，因此這次任務的 agent 可能讀取或修改工作資料夾以外的檔案。請更仔細地檢查它的變更。可在安全設定中為之後的任務關閉這個選項。",
+  },
+  runNotices: {
+    queuedFree: "排隊中：Free 一次只執行一個貢獻任務",
+    queuedUpgrade: "升級 Pro 可同時執行多個",
+    workspaceRemoved: "為了釋出磁碟空間，這次任務的檔案已清除；報告與筆記仍會保留。",
+  },
   sampleReview: "範例審查",
   humanReview: "人工審查",
   footer: {
@@ -46,6 +56,8 @@ const m: Translation<typeof en> = {
     files: "變更的檔案",
     searchPlaceholder: "搜尋檔案…",
     searchLabel: "搜尋變更檔案",
+    openSearch: "搜尋變更的檔案",
+    closeSearch: "關閉檔案搜尋",
     onlyUnreviewed: "只看尚未審查",
     suggestedOrderTitle:
       "依 Lead 整合摘要建議的閱讀順序排列；未提到的檔案維持 git 順序排在後面",
@@ -76,6 +88,7 @@ const m: Translation<typeof en> = {
     copyWorktree: "複製工作目錄路徑",
     preparing: "Agent team 正在準備你的變更",
     noChanges: "尚無程式碼變更",
+    filesRemoved: "變更的檔案已清除",
     noChangesHint: "在 Agent 動態查看執行過程，完成後即可在這裡審查。",
     viewActivity: "查看 Agent 動態",
     resize: "調整解說面板寬度",
@@ -84,6 +97,7 @@ const m: Translation<typeof en> = {
     emptyText: "選取變更的檔案，就能詢問背後的設計與取捨。",
   },
   activity: {
+    runDetails: "執行細節",
     runTitle: "執行過程",
     runText: "任務板在上方；完整紀錄、錯誤訊息與停止操作保留在這裡。",
     teamTitle: "你的 Agent team",
@@ -122,6 +136,7 @@ const m: Translation<typeof en> = {
     emptyNotice:
       "還沒有 PR 說明。可以在上方產生並套用建議草稿，或用自己的話寫下改了什麼、為什麼，以及實際執行過哪些檢查。Agent 的完整報告在「審查者怎麼看」。",
     titleLabel: "Pull Request 標題",
+    modeLabel: "說明檢視方式",
     edit: "編輯",
     preview: "預覽",
     bodyLabel: "PR 說明",
@@ -163,6 +178,9 @@ const m: Translation<typeof en> = {
     draftPrHelp:
       "送出後仍可在 GitHub 繼續編輯；專案的自動檢查對 Draft PR 一樣會執行。",
   },
+  published: {
+    publishing: "正在開啟範例 Draft PR…",
+  },
   feedback: {
     title: "維護者回饋",
     intro: `按下按鈕才會讀取 PR 上的 review、留言與 CI 結果；${product.name} 只讀不回，回覆請到 GitHub。`,
@@ -201,6 +219,7 @@ const m: Translation<typeof en> = {
     placeholder: "例如：只處理命名的建議，測試的部分我會另外回覆",
     startSelected: ({ count }) => `依選取的 ${count} 則回饋修正`,
     startNote: "依補充說明修正",
+    demoNote: "範例不會真的開始修正；匯入自己的專案，才能依真實 PR 的回饋修正。",
   },
   publish: {
     titleDemo: "你的示範貢獻，準備好了。",
@@ -215,14 +234,19 @@ const m: Translation<typeof en> = {
     subtitle: "這會推送審查過的分支，並在目標 repository 建立 Draft PR。",
     filesReviewed: ({ count }) => `${count} 個檔案已審閱`,
     demoCallout:
-      "這是互動示範，按下完成不會建立 GitHub PR。匯入你自己的專案，就能開始真正的貢獻。",
+      "這是互動示範，不會推送任何內容，也不會在 GitHub 建立 PR。匯入你自己的專案，就能開始真正的貢獻。",
+    identity: {
+      both: ({ author, login }) => `Commit 作者：${author} · 以 @${login} 推送`,
+      author: ({ author }) => `Commit 作者：${author}`,
+      login: ({ login }) => `以 @${login} 推送`,
+    },
     commitPreview: "這輪的提交訊息",
     bodyPreview: "會送到 GitHub 的 PR 說明",
     bodyPreviewWords: ({ count }) => `會送到 GitHub 的 PR 說明（約 ${count} 字）`,
     confirmLegend: "送出前請逐項確認",
     confirmNote: `勾選只代表你知道這些項目還沒處理、願意照目前的說明送出。${product.name} 不會因此改動說明或替你勾選任何項目，這些確認也不會寫進 PR。想先修改，請按「返回編輯草稿」。`,
     back: "返回編輯草稿",
-    finishDemo: "完成示範審查",
+    finishDemo: "開啟範例 Draft PR",
     sending: "正在送出…",
     pushRound: "推送這輪修正",
     submit: "送出 Draft PR",
@@ -249,13 +273,12 @@ const m: Translation<typeof en> = {
     rerunStarted:
       "已開始依目前差異重新審查，報告完成後會出現在「審查者怎麼看」。",
     imported: ({ name }) => `已匯入 ${name}`,
-    demoDirectionSaved:
-      "示範方向設定已儲存。匯入自己的 repository 後即可啟動真實團隊。",
+    demoPlaybackStarted:
+      "範例團隊開始工作：這裡播放預先寫好的執行過程，不會啟動 agent，也不會送出任何內容到 GitHub。",
+    demoStopped: "範例團隊已停止。可從「新增貢獻」重新開始。",
     chatFailed: ({ message }) => `這次未能取得回答：${message}`,
-    demoPublished: "示範審查已完成！匯入你的 repository，即可建立真正的 PR。",
     roundPushed: "已把這輪修正推送到 PR，分支上多了一個 commit。",
     prCreated: "GitHub Draft PR 已建立",
-    demoFeedback: "示範模式不會連線 GitHub 讀取回饋。",
     feedbackRead: ({ count }) => `已讀取 ${count} 則維護者回饋。`,
     branchInvalid:
       "分支名稱只能用英數字與 . _ - /，不能有 ..，也不能以 . 或 .lock 結尾。",

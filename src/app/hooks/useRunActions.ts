@@ -7,22 +7,41 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
-import { api, ApiError, send } from "../../api";
+import { api, ApiError, ProRequiredError, send } from "../../api";
 import { demoAnswer, getDemo } from "../../demo";
+import { demoLearningExport } from "../../demo/export";
+import {
+  createDemoPlayback,
+  demoPrUrl,
+  type DemoPlayback,
+} from "../../demo/playback";
 import { useLocale, useT, type Messages } from "../../i18n";
+import {
+  requestUpgrade,
+  useEntitlements,
+} from "../../license/useEntitlements";
 import type { Repo, Run, RunSummary, DiffFile, ChatMessage } from "../../types";
 import type { Locale } from "../../../shared/i18n/locale";
+import type { ContributionSettings } from "../../../shared/insights";
 import { summarizeRun } from "../../../shared/runs";
 import { activeFollowUp } from "../../../shared/followups";
 import type { ModalName, Notify, Page, Tab } from "../AppShell";
+import { usePresentation } from "../presentation";
 import {
   demoRunInLocale,
   loadDemo,
   saveDemo,
   saveDemoSettings,
 } from "./demoStorage";
+import { saveTextFile } from "./saveTextFile";
 import type { DraftEditor } from "./useDraftEditor";
 import type { TaskSetup } from "./useTaskSetup";
+
+/**
+ * The API path of run `id`. An id can come from the address, so it is
+ * escaped: a crafted one cannot reach another route.
+ */
+export const runPath = (id: string) => `/runs/${encodeURIComponent(id)}`;
 
 /**
  * The run's changed files. A run whose working files were cleaned up
@@ -31,7 +50,7 @@ import type { TaskSetup } from "./useTaskSetup";
  */
 export async function readRunFiles(id: string): Promise<DiffFile[]> {
   try {
-    return (await api<{ files: DiffFile[] }>(`/runs/${id}/diff`)).files;
+    return (await api<{ files: DiffFile[] }>(`${runPath(id)}/diff`)).files;
   } catch (error) {
     if (error instanceof ApiError && error.code === "workspace_removed")
       return [];
@@ -50,6 +69,91 @@ function savedMessages(run: Run): Record<string, ChatMessage[]> {
 }
 
 type Notices = Messages["workspace"]["notices"];
+
+/** No status at hand: useEntitlements reads the plan from /api/license. */
+const noStatus = {};
+
+/**
+ * The open sample run after a playback step: the step brings the run's
+ * progress (status, team, logs, reports, the PR), while the review
+ * progress, the draft, the notes, the feedback read and the messages the
+ * reader typed to the team stay as the reader left them.
+ */
+export function mergePlaybackRun(previous: Run, step: Run): Run {
+  const typed =
+    previous.team?.messages.filter(
+      (message) =>
+        message.from === "user" &&
+        !step.team?.messages.some((shown) => shown.id === message.id),
+    ) ?? [];
+  return {
+    ...step,
+    reviewedFiles: previous.reviewedFiles,
+    draft: previous.draft,
+    ...(previous.notes ? { notes: previous.notes } : {}),
+    ...(previous.prFeedback ? { prFeedback: previous.prFeedback } : {}),
+    // The sample PR goes out under the branch name the reader chose.
+    ...(step.publishedBranch
+      ? { publishedBranch: previous.draft.publishBranch || step.publishedBranch }
+      : {}),
+    ...(step.team && typed.length
+      ? { team: { ...step.team, messages: [...step.team.messages, ...typed] } }
+      : {}),
+  };
+}
+
+/**
+ * The sample run once the reader stops its playing team: it stops where it
+ * was, as a stopped run does, and its unfinished work goes back to waiting.
+ * A sample whose team is done is left as it is.
+ */
+export function stopSampleRun(run: Run): Run {
+  if (!["queued", "running", "awaiting_plan"].includes(run.status)) return run;
+  return {
+    ...run,
+    status: "cancelled",
+    agents: run.agents.map((agent) =>
+      agent.status === "running" ? { ...agent, status: "waiting" } : agent,
+    ),
+    ...(run.team
+      ? {
+          team: {
+            ...run.team,
+            phase: "cancelled",
+            tasks: run.team.tasks.map((task) =>
+              task.status === "running" ? { ...task, status: "pending" } : task,
+            ),
+          },
+        }
+      : {}),
+  };
+}
+
+const wait = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * How a playback answer types out: a pause of 300-900 ms first, then the
+ * text in at most 40 growing slices about 1.2 s apart in total at speed 1
+ * (faster at a higher speed, never under 16 ms a slice).
+ */
+export function answerTyping(
+  answer: string,
+  speed: number,
+  random: () => number = Math.random,
+): { delay: number; pause: number; slices: string[] } {
+  const steps = Math.max(1, Math.min(40, Math.ceil(answer.length / 8)));
+  const size = Math.max(1, Math.ceil(answer.length / steps));
+  const slices: string[] = [];
+  for (let end = size; end < answer.length; end += size)
+    slices.push(answer.slice(0, end));
+  slices.push(answer);
+  return {
+    delay: 300 + Math.floor(random() * 600),
+    pause: Math.max(16, Math.round(1200 / speed / slices.length)),
+    slices,
+  };
+}
 
 /**
  * What stopping a run reports, from the run as it was when the person pressed
@@ -149,6 +253,9 @@ export function useRunActions({
   const t = useT("workspace").notices;
   const [locale] = useLocale();
   const demoContent = getDemo(locale);
+  // The plan, for the Pro controls of the workspace; the server still
+  // answers 402 to a gated request.
+  const plan = useEntitlements(noStatus);
   const {
     source,
     setSource,
@@ -163,6 +270,7 @@ export function useRunActions({
     settingsReady,
   } = setup;
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
   const [loadingChats, setLoadingChats] = useState<Set<string>>(new Set());
   const pendingChats = useRef(new Set<string>());
@@ -170,11 +278,31 @@ export function useRunActions({
   const rerunPending = useRef(new Set<string>());
   const [rerunRequests, setRerunRequests] = useState<Set<string>>(new Set());
   const chatLoading = loadingChats.has(`${run.id}:${file?.path}`);
+  const presentation = usePresentation();
+  // The scripted playback that drives the open sample run (see
+  // src/demo/playback.ts), with the settings it started from; null while
+  // the sample shows its finished run.
+  const playback = useRef<{
+    player: DemoPlayback;
+    settings?: ContributionSettings;
+    stop: () => void;
+  } | null>(null);
+  const [playing, setPlaying] = useState(false);
   // The locale the open demo run's text is in; its progress is kept under it.
   const demoLocale = useRef(locale);
   useEffect(() => {
-    if (demo) saveDemo(demoLocale.current, run);
-  }, [demo, run]);
+    if (!demo) return;
+    // A playing sample is kept once the team is done; a presentation
+    // (demo=play) keeps nothing, so it never replaces the reader's own
+    // progress.
+    if (
+      playing &&
+      (presentation.play ||
+        !["review", "approved", "published"].includes(run.status))
+    )
+      return;
+    saveDemo(demoLocale.current, run);
+  }, [demo, run, playing, presentation.play]);
   // After a language switch, show the open run again so the text the server
   // writes for a request follows the new locale. The demo takes the new
   // locale's fixtures and keeps the reader's progress.
@@ -183,6 +311,14 @@ export function useRunActions({
   showInLocale.current = (next: Locale) => {
     if (demo) {
       demoLocale.current = next;
+      const current = playback.current;
+      // A team still at work plays again from the start in the new
+      // language; a finished one shows the sample in it.
+      if (current && ["queued", "running", "awaiting_plan"].includes(run.status)) {
+        startPlayback(current.settings);
+        return;
+      }
+      stopPlayback();
       setRun((previous) => demoRunInLocale(previous, next));
       setFiles(getDemo(next).files);
       return;
@@ -194,12 +330,75 @@ export function useRunActions({
     shownLocale.current = locale;
     showInLocale.current(locale);
   }, [locale]);
+  /** Stops the playback; the sample keeps its run as it was shown. */
+  function stopPlayback() {
+    const current = playback.current;
+    if (!current) return;
+    playback.current = null;
+    current.stop();
+    setPlaying(false);
+  }
+  /**
+   * Plays the sample contribution from "queued" in the workspace, with
+   * `settings` (the sample team's own when absent): each step replaces the
+   * open run and its files, and nothing reaches the server or GitHub.
+   */
+  function startPlayback(settings?: ContributionSettings) {
+    stopPlayback();
+    const player = createDemoPlayback({
+      demo: getDemo(locale),
+      speed: presentation.speed,
+    });
+    let first = true;
+    const unsubscribe = player.subscribe((event) => {
+      if (event.kind !== "run") return;
+      if (first) {
+        // The sample run starts afresh, whichever run was open.
+        first = false;
+        setRun(event.run);
+      } else if (runIdRef.current === event.run.id)
+        setRun((previous) =>
+          previous.id === event.run.id
+            ? mergePlaybackRun(previous, event.run)
+            : previous,
+        );
+      else return;
+      setFiles(event.files);
+    });
+    playback.current = {
+      player,
+      ...(settings ? { settings } : {}),
+      stop() {
+        unsubscribe();
+        player.stop();
+      },
+    };
+    demoLocale.current = locale;
+    setMessages({});
+    setChatRequests({});
+    setPlaying(true);
+    player.start(settings);
+  }
+  // demo=play starts the playback once per page load when the sample is
+  // open; leaving the sample, or the app, stops it.
+  const latest = useRef({ startPlayback, stopPlayback });
+  latest.current = { startPlayback, stopPlayback };
+  const autoplayed = useRef(false);
+  useEffect(() => {
+    if (!demo || !presentation.play || autoplayed.current) return;
+    autoplayed.current = true;
+    latest.current.startPlayback();
+  }, [demo, presentation.play]);
+  useEffect(() => {
+    if (!demo) latest.current.stopPlayback();
+  }, [demo]);
+  useEffect(() => () => playback.current?.stop(), []);
   /** Reads the run and its diff again without a notice; errors stay quiet. */
   async function reloadRun(id: string) {
     const epoch = draft.draftMutationEpoch.current;
     try {
       const [current, files] = await Promise.all([
-        api<{ run: Run }>(`/runs/${id}`),
+        api<{ run: Run }>(runPath(id)),
         readRunFiles(id),
       ]);
       if (runIdRef.current !== id) return;
@@ -211,6 +410,10 @@ export function useRunActions({
     }
   }
   async function approveTeamPlan() {
+    if (demo) {
+      playback.current?.player.approvePlan();
+      return;
+    }
     setBusy(true);
     try {
       const result = await api<{ run: Run }>(
@@ -298,7 +501,7 @@ export function useRunActions({
         setSelectedPath(demoContent.files[0]?.path || "");
       } else {
         const [r, files] = await Promise.all([
-          api<{ run: Run }>(`/runs/${id}`),
+          api<{ run: Run }>(runPath(id)),
           readRunFiles(id),
         ]);
         if (sequence !== selectionSequence.current || intent !== navigationIntent.current) return false;
@@ -412,9 +615,22 @@ export function useRunActions({
     event.preventDefault();
     if (!settingsReady || settingsLoading) return;
     if (taskRepoId === demoContent.repo.id) {
+      // The sample plays its scripted team with these settings, here in
+      // the browser; no agent starts.
       saveDemoSettings(locale, contributionSettings);
+      if (
+        run.id !== demoContent.run.id &&
+        draftDirty &&
+        !window.confirm(t.discardDraftConfirm)
+      )
+        return;
+      selectionSequence.current++;
+      navigationIntent.current++;
       closeModal();
-      notify(t.demoDirectionSaved);
+      startPlayback(contributionSettings);
+      setTab("activity");
+      navigate("workspace");
+      notify(t.demoPlaybackStarted);
       return;
     }
     setBusy(true);
@@ -448,6 +664,10 @@ export function useRunActions({
     if (!file) return;
     const reviewed = !run.reviewedFiles.includes(file.path);
     if (demo) {
+      // As on the server, only a run in review takes review marks: the
+      // sample PR, once opened (or on its way), stays as it was approved.
+      if (!["review", "approved"].includes(run.status) || run.publishing)
+        return;
       setRun((previous) => ({
         ...previous,
         status: "review",
@@ -524,21 +744,24 @@ export function useRunActions({
         ? demoAnswer(targetFile, question, locale)
         : (
             await api<{ answer: string }>(
-              `/runs/${targetRun}/chat`,
+              `${runPath(targetRun)}/chat`,
               send("POST", { filePath: targetFile.path, question }),
             )
           ).answer;
-      setMessages((previous) => ({
-        ...previous,
-        [key]: [
-          ...(previous[key] || []),
-          {
-            role: "assistant",
-            content: answer,
-            fingerprint: targetFile.fingerprint,
-          },
-        ],
-      }));
+      if (demo && playback.current)
+        await typeAnswer(key, targetRun, answer, targetFile.fingerprint);
+      else
+        setMessages((previous) => ({
+          ...previous,
+          [key]: [
+            ...(previous[key] || []),
+            {
+              role: "assistant",
+              content: answer,
+              fingerprint: targetFile.fingerprint,
+            },
+          ],
+        }));
     } catch (error) {
       setMessages((previous) => ({
         ...previous,
@@ -560,11 +783,50 @@ export function useRunActions({
       });
     }
   }
+  /**
+   * The playback's answers read like a live one: after a pause of 300-900
+   * ms the prewritten text appears a few characters at a time (about 1.2 s
+   * at speed 1). A run switched meanwhile stops it.
+   */
+  async function typeAnswer(
+    key: string,
+    runId: string,
+    answer: string,
+    fingerprint?: string,
+  ) {
+    const { delay, pause, slices } = answerTyping(answer, presentation.speed);
+    await wait(delay);
+    let shown: ChatMessage | undefined;
+    for (const [index, content] of slices.entries()) {
+      if (index) await wait(pause);
+      if (runIdRef.current !== runId) return;
+      const previousTurn = shown;
+      const turn: ChatMessage = { role: "assistant", content, fingerprint };
+      shown = turn;
+      setMessages((previous) => {
+        const list = previous[key] || [];
+        if (!previousTurn) return { ...previous, [key]: [...list, turn] };
+        // The conversation was reset meanwhile: the answer is not shown.
+        if (!list.includes(previousTurn)) return previous;
+        return {
+          ...previous,
+          [key]: list.map((each) => (each === previousTurn ? turn : each)),
+        };
+      });
+    }
+  }
   async function approve() {
     setBusy(true);
     try {
-      if (demo) setRun((previous) => ({ ...previous, status: "approved" }));
-      else {
+      if (demo) {
+        // The playback approves its own run; the finished sample, here.
+        if (!playback.current?.player.approve())
+          setRun((previous) =>
+            previous.status === "review"
+              ? { ...previous, status: "approved" }
+              : previous,
+          );
+      } else {
         const { run: updated } = await api<{ run: Run }>(
           `/runs/${run.id}/approve`,
           send("POST", {
@@ -593,8 +855,21 @@ export function useRunActions({
   }
   async function publish() {
     if (demo) {
+      // The sample "opens" its Draft PR without a request: the draft tab
+      // shows it as published, with the sample card.
       closeModal();
-      notify(t.demoPublished);
+      setTab("draft");
+      if (!playback.current?.player.publish())
+        setRun((previous) =>
+          previous.status === "published"
+            ? previous
+            : {
+                ...previous,
+                status: "published",
+                prUrl: demoPrUrl,
+                publishedBranch: previous.draft.publishBranch || previous.branch,
+              },
+        );
       return;
     }
     setBusy(true);
@@ -621,10 +896,57 @@ export function useRunActions({
       setBusy(false);
     }
   }
+  /**
+   * Saves the run's learning record (Markdown) as a file. A real run's
+   * comes from GET /api/runs/:id/export.md in the UI language; it needs
+   * Pro, so on Free the upgrade dialog opens instead of a request, and a
+   * 402 opens it too. The sample builds its record here.
+   */
+  async function exportLearning() {
+    const name = `bell-learning-${run.id}.md`;
+    if (demo) {
+      saveTextFile(
+        name,
+        demoLearningExport(
+          run,
+          demoContent.repo,
+          demoContent.files,
+          messages,
+          locale,
+        ),
+      );
+      return;
+    }
+    if (plan.locked("learningExport")) {
+      requestUpgrade("learningExport");
+      return;
+    }
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const text = await api<string | undefined>(`${runPath(run.id)}/export.md`);
+      saveTextFile(name, text ?? "");
+    } catch (error) {
+      // A 402 already opened the upgrade dialog.
+      if (!(error instanceof ProRequiredError))
+        notify((error as Error).message, "error");
+    } finally {
+      setExporting(false);
+    }
+  }
   // Read-only and only on request: no timer refreshes maintainer feedback.
   async function fetchPrFeedback() {
+    // The sample shows its fictional feedback; nothing asks GitHub.
     if (demo) {
-      notify(t.demoFeedback);
+      if (demoContent.prFeedback)
+        setRun((previous) => ({
+          ...previous,
+          prFeedback: structuredClone(demoContent.prFeedback),
+        }));
+      return;
+    }
+    if (plan.locked("prFeedback")) {
+      requestUpgrade("prFeedback");
       return;
     }
     setFeedbackLoading(true);
@@ -638,12 +960,21 @@ export function useRunActions({
         t.feedbackRead({ count: updated.prFeedback?.items.length ?? 0 }),
       );
     } catch (error) {
-      notify((error as Error).message, "error");
+      // A 402 already opened the upgrade dialog.
+      if (!(error instanceof ProRequiredError))
+        notify((error as Error).message, "error");
     } finally {
       setFeedbackLoading(false);
     }
   }
   async function cancel() {
+    if (demo) {
+      // The sample's team plays in the browser: stopping it sends nothing.
+      stopPlayback();
+      setRun(stopSampleRun);
+      notify(t.demoStopped);
+      return;
+    }
     try {
       const { run: updated } = await api<{ run: Run }>(
         `/runs/${run.id}/cancel`,
@@ -665,6 +996,9 @@ export function useRunActions({
     }
   }
   return {
+    plan,
+    exporting,
+    exportLearning,
     feedbackLoading,
     messages,
     chatRequests,

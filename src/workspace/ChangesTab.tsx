@@ -1,7 +1,9 @@
 import {
   lazy,
   Suspense,
+  useEffect,
   useRef,
+  useState,
   type Dispatch,
   type SetStateAction,
 } from "react";
@@ -25,6 +27,7 @@ import {
   RefreshCw,
   Search,
   Sparkles,
+  X,
 } from "lucide-react";
 import { useT } from "../i18n";
 import type { DiffFile, Repo, Run } from "../types";
@@ -35,6 +38,7 @@ import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { Tab } from "../app/AppShell";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import { fileStatusLabel } from "../app/labels";
+import { usePresentation } from "../app/presentation";
 import type { RunActions } from "../app/hooks/useRunActions";
 
 const ExplanationPanel = lazy(() =>
@@ -138,7 +142,9 @@ export function ChangesTab({
   prepareExplanations,
   actions,
 }: ChangesTabProps) {
-  const t = useT("workspace").changes;
+  const workspace = useT("workspace");
+  const t = workspace.changes;
+  const notices = workspace.runNotices;
   const fileStatus = useT("common").fileStatus;
   const {
     messages,
@@ -153,7 +159,15 @@ export function ChangesTab({
     saveNote,
     ask,
   } = actions;
+  const { present, maskPath } = usePresentation();
   const reviewGridRef = useRef<HTMLDivElement>(null);
+  // On a phone the file search hides behind an icon button; a query keeps it open.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const searchShown = searchOpen || fileSearch !== "";
+  useEffect(() => {
+    if (searchOpen) searchInput.current?.focus();
+  }, [searchOpen]);
   function changeCodeFont(delta: number) {
     const next = Math.max(12, Math.min(20, codeFont + delta));
     setCodeFont(next);
@@ -199,45 +213,67 @@ export function ChangesTab({
       className={`review-grid ${!showFiles ? "files-hidden" : ""} ${!showExplanation ? "explanation-hidden" : ""}`}
     >
       {showFiles && (
-        <aside className="file-panel">
+        <aside
+          className={`file-panel ${searchShown ? "is-search-open" : ""}`}
+        >
           <div className="file-panel-heading">
             <strong>
               {t.files} <span>{files.length}</span>
             </strong>
             <ListTree size={16} />
+            <button
+              type="button"
+              className="icon-button file-search-toggle"
+              aria-label={searchShown ? t.closeSearch : t.openSearch}
+              title={searchShown ? t.closeSearch : t.openSearch}
+              aria-expanded={searchShown}
+              aria-controls="workspace-file-search"
+              onClick={() => {
+                // Closing also clears the query, so no hidden filter stays on.
+                if (searchShown) setFileSearch("");
+                setSearchOpen(!searchShown);
+              }}
+            >
+              {searchShown ? <X size={15} /> : <Search size={15} />}
+            </button>
           </div>
           <label className="file-search">
             <Search size={14} />
             <input
+              id="workspace-file-search"
+              ref={searchInput}
               placeholder={t.searchPlaceholder}
               aria-label={t.searchLabel}
               value={fileSearch}
               onChange={(e) => setFileSearch(e.target.value)}
             />
-            <kbd>⌕</kbd>
+            <kbd aria-hidden="true">⌕</kbd>
           </label>
-          <button
-            className={`filter-toggle ${onlyUnreviewed ? "is-on" : ""}`}
-            onClick={() => setOnlyUnreviewed(!onlyUnreviewed)}
-          >
-            <span className="toggle-track">
-              <span />
-            </span>
-            {t.onlyUnreviewed}
-          </button>
-          {reviewOrder.length > 0 && (
+          <div className="file-filters">
             <button
-              className={`filter-toggle ${suggestedOrder ? "is-on" : ""}`}
-              aria-pressed={suggestedOrder}
-              title={t.suggestedOrderTitle}
-              onClick={() => setSuggestedOrder(!suggestedOrder)}
+              className={`filter-toggle ${onlyUnreviewed ? "is-on" : ""}`}
+              aria-pressed={onlyUnreviewed}
+              onClick={() => setOnlyUnreviewed(!onlyUnreviewed)}
             >
               <span className="toggle-track">
                 <span />
               </span>
-              {t.suggestedOrder}
+              {t.onlyUnreviewed}
             </button>
-          )}
+            {reviewOrder.length > 0 && (
+              <button
+                className={`filter-toggle ${suggestedOrder ? "is-on" : ""}`}
+                aria-pressed={suggestedOrder}
+                title={t.suggestedOrderTitle}
+                onClick={() => setSuggestedOrder(!suggestedOrder)}
+              >
+                <span className="toggle-track">
+                  <span />
+                </span>
+                {t.suggestedOrder}
+              </button>
+            )}
+          </div>
           <div className="file-tree">
             <div className="tree-root">
               <ChevronDown size={13} />
@@ -382,10 +418,11 @@ export function ChangesTab({
             >
               <RefreshCw size={14} />
             </button>
-            <div className="view-toggle" aria-label={t.viewMode}>
+            <div className="view-toggle" role="group" aria-label={t.viewMode}>
               <button
                 aria-label={t.unified}
                 title={t.unified}
+                aria-pressed={diffView === "unified"}
                 className={diffView === "unified" ? "selected" : ""}
                 onClick={() => setDiffView("unified")}
               >
@@ -394,6 +431,7 @@ export function ChangesTab({
               <button
                 aria-label={t.split}
                 title={t.split}
+                aria-pressed={diffView === "split"}
                 className={diffView === "split" ? "selected" : ""}
                 onClick={() => setDiffView("split")}
               >
@@ -402,21 +440,13 @@ export function ChangesTab({
             </div>
           </div>
         </div>
-        {editable && run.worktreePath && (
-          <div className="worktree-hint">
-            <FolderGit2 size={14} />
-            <span>{t.worktreeHint}</span>
-            <code>{run.worktreePath}</code>
-            <button
-              type="button"
-              className="icon-button"
-              aria-label={t.copyWorktree}
-              title={t.copyWorktree}
-              onClick={copyWorktreePath}
-            >
-              <Copy size={13} />
-            </button>
-          </div>
+        {editable && run.worktreePath && !run.workspaceRemovedAt && (
+          <WorktreeHint
+            path={run.worktreePath}
+            presenting={present}
+            maskPath={maskPath}
+            onCopy={copyWorktreePath}
+          />
         )}
         {file ? (
           <DiffView
@@ -433,8 +463,19 @@ export function ChangesTab({
             <div className="empty-icon">
               {active ? <Loader2 className="spin" /> : <Code2 />}
             </div>
-            <h3>{active ? t.preparing : t.noChanges}</h3>
-            <p>{run.error || t.noChangesHint}</p>
+            <h3>
+              {active
+                ? t.preparing
+                : run.workspaceRemovedAt
+                  ? t.filesRemoved
+                  : t.noChanges}
+            </h3>
+            <p>
+              {run.error ||
+                (run.workspaceRemovedAt
+                  ? notices.workspaceRemoved
+                  : t.noChangesHint)}
+            </p>
             <button
               className="button secondary"
               onClick={() => setTab("activity")}
@@ -531,6 +572,42 @@ export function ChangesTab({
             )}
           </aside>
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Where the run's checkout is, for editing files by hand. While presenting
+ * the path loses its folders (maskPath) and cannot be copied.
+ */
+export function WorktreeHint({
+  path,
+  presenting,
+  maskPath,
+  onCopy,
+}: {
+  path: string;
+  presenting: boolean;
+  maskPath: (path: string) => string;
+  onCopy: () => void;
+}) {
+  const t = useT("workspace").changes;
+  return (
+    <div className="worktree-hint">
+      <FolderGit2 size={14} />
+      <span>{t.worktreeHint}</span>
+      <code>{maskPath(path)}</code>
+      {!presenting && (
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={t.copyWorktree}
+          title={t.copyWorktree}
+          onClick={onCopy}
+        >
+          <Copy size={13} />
+        </button>
       )}
     </div>
   );

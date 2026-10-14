@@ -3,7 +3,14 @@ import test from "node:test";
 import { assertNoHan } from "../../test-utils/render";
 import en from "../../i18n/en";
 import zhTW from "../../i18n/zh-TW";
-import { readRunFiles, stopNotice } from "./useRunActions";
+import {
+  answerTyping,
+  mergePlaybackRun,
+  readRunFiles,
+  runPath,
+  stopNotice,
+  stopSampleRun,
+} from "./useRunActions";
 import type { Run } from "../../types";
 
 const zh = zhTW.workspace.notices;
@@ -109,4 +116,154 @@ test("a run whose working files were cleaned up still opens, with no files to sh
   // Any other failure is still reported.
   answer = json(404, { error: "Run not found." });
   await assert.rejects(readRunFiles("r"), { status: 404, message: "Run not found." });
+});
+
+test("a run id is escaped in its API path, so it cannot name another route", async (t) => {
+  assert.equal(runPath("demo-run"), "/runs/demo-run");
+  assert.equal(runPath("../repos"), "/runs/..%2Frepos");
+  assert.equal(runPath("a?b#c"), "/runs/a%3Fb%23c");
+  const realFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = realFetch;
+  });
+  const asked: string[] = [];
+  globalThis.fetch = (async (url: string) => {
+    asked.push(url);
+    return new Response(JSON.stringify({ files: [] }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+  await readRunFiles("x/../../status");
+  assert.deepEqual(asked, ["/api/runs/x%2F..%2F..%2Fstatus/diff"]);
+});
+
+test("a playback step brings the run's progress and keeps what the reader did", () => {
+  const team = {
+    config: {
+      maxTeammates: 2 as const,
+      requirePlanApproval: true,
+      provider: "codex" as const,
+      protocol: "bell-shared-tasks" as const,
+      messageDelivery: "between-turns" as const,
+    },
+    phase: "developing" as const,
+    planSummary: "Plan",
+    tasks: [],
+    messages: [
+      {
+        id: "m1",
+        from: "lead",
+        to: "all",
+        content: "Brief",
+        createdAt: "2026-10-13T00:00:01Z",
+        status: "delivered" as const,
+        recipients: [],
+        deliveredTo: [],
+      },
+    ],
+  };
+  const typed = {
+    ...team.messages[0],
+    id: "u1",
+    from: "user",
+    content: "Keep the old option working",
+    status: "queued" as const,
+  };
+  const previous: Run = {
+    ...base,
+    id: "demo-run",
+    reviewedFiles: ["a.ts"],
+    draft: { title: "Mine", body: "My words", publishBranch: "my-branch" },
+    notes: { "a.ts": { text: "note", fingerprint: "f", updatedAt: "2026-10-13T00:00:00Z" } },
+    team: { ...team, messages: [...team.messages, typed] },
+  };
+  const step: Run = {
+    ...base,
+    id: "demo-run",
+    status: "published",
+    prUrl: "#demo-pr",
+    publishedBranch: "fix/abc",
+    reports: { reviewer: "Looks fine" },
+    team,
+  };
+  const merged = mergePlaybackRun(previous, step);
+  assert.equal(merged.status, "published");
+  assert.equal(merged.prUrl, "#demo-pr");
+  assert.deepEqual(merged.reports, { reviewer: "Looks fine" });
+  assert.deepEqual(merged.reviewedFiles, ["a.ts"]);
+  assert.equal(merged.draft.body, "My words");
+  assert.equal(merged.notes?.["a.ts"].text, "note");
+  // The sample PR goes out under the branch the reader chose.
+  assert.equal(merged.publishedBranch, "my-branch");
+  // The playback's messages first, then what the reader typed to the team.
+  assert.deepEqual(merged.team?.messages.map((message) => message.id), ["m1", "u1"]);
+  // A step that already lists a message does not list it twice.
+  assert.equal(
+    mergePlaybackRun(previous, { ...step, team: previous.team }).team?.messages.length,
+    2,
+  );
+});
+
+test("a playback answer waits 300-900 ms, then types out in growing slices", () => {
+  const answer = "Full jitter spreads the retries of many clients over time.".repeat(8);
+  const quick = answerTyping(answer, 1, () => 0);
+  const slow = answerTyping(answer, 1, () => 0.999);
+  assert.equal(quick.delay, 300);
+  assert.ok(slow.delay >= 300 && slow.delay < 900, String(slow.delay));
+  // Each slice starts the answer and grows it; the last one is the answer.
+  assert.ok(quick.slices.length > 1 && quick.slices.length <= 40);
+  quick.slices.forEach((slice, index) => {
+    assert.ok(answer.startsWith(slice));
+    if (index) assert.ok(slice.length > quick.slices[index - 1].length);
+  });
+  assert.equal(quick.slices.at(-1), answer);
+  // About 1.2 s in all at speed 1, a quarter of it at speed 4, never under 16 ms a slice.
+  const total = quick.pause * (quick.slices.length - 1);
+  assert.ok(total > 1000 && total <= 1300, String(total));
+  assert.ok(answerTyping(answer, 4, () => 0).pause < quick.pause);
+  assert.equal(answerTyping(answer, 400, () => 0).pause, 16);
+  // A short answer still arrives whole.
+  assert.deepEqual(answerTyping("Yes.", 1, () => 0).slices, ["Yes."]);
+});
+
+test("stopping the sample's team stops it where it was, and a finished sample stays", () => {
+  const playing: Run = {
+    ...base,
+    id: "demo-run",
+    status: "running",
+    agents: [
+      { id: "lead", name: "Lead", role: "Lead", status: "complete", detail: "" },
+      { id: "frontend", name: "Frontend", role: "Teammate", status: "running", detail: "" },
+    ],
+    team: {
+      config: {
+        maxTeammates: 2,
+        requirePlanApproval: true,
+        provider: "codex",
+        protocol: "bell-shared-tasks",
+        messageDelivery: "between-turns",
+      },
+      phase: "developing",
+      planSummary: "Plan",
+      tasks: [
+        { id: "t1", title: "One", description: "", owner: "frontend", files: [], dependsOn: [], status: "complete" },
+        { id: "t2", title: "Two", description: "", owner: "frontend", files: [], dependsOn: ["t1"], status: "running" },
+      ],
+      messages: [],
+    },
+  };
+  const stopped = stopSampleRun(playing);
+  assert.equal(stopped.status, "cancelled");
+  assert.equal(stopped.team?.phase, "cancelled");
+  assert.deepEqual(stopped.team?.tasks.map((task) => task.status), ["complete", "pending"]);
+  assert.deepEqual(stopped.agents.map((agent) => agent.status), ["complete", "waiting"]);
+  // The playing run itself is not changed.
+  assert.equal(playing.status, "running");
+  // A sample in review or published has no team at work to stop.
+  for (const status of ["review", "approved", "published"] as const) {
+    const done = { ...playing, status };
+    assert.equal(stopSampleRun(done), done);
+  }
+  assert.equal(zh.demoStopped, "範例團隊已停止。可從「新增貢獻」重新開始。");
+  assertNoHan(en.workspace.notices.demoStopped);
 });

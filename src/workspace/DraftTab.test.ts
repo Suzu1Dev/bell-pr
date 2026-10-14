@@ -4,9 +4,10 @@ import { createElement } from "react";
 import * as draftChecks from "../../shared/draft-checks";
 import type { FollowUpRound } from "../../shared/followups";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
+import { getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Run } from "../types";
-import { DraftTab } from "./DraftTab";
+import { DraftTab, SamplePublishedCard } from "./DraftTab";
 
 type Props = Parameters<typeof DraftTab>[0];
 
@@ -322,5 +323,98 @@ test("the feedback summary formats the time, the checks and the labels for the l
   assert.match(
     chinese,
     /讀取時間 [^<]*2026[^<]* · CI 2 項檢查：1 成功、0 進行中、1 失敗（整體 FAILURE） · 標籤：needs: tests、docs</,
+  );
+});
+
+test("the description's Edit and Preview buttons say which one is on", () => {
+  const html = renderEn(element({ run: { ...published, status: "review" } }));
+  assert.match(html, /<div role="group" aria-label="Description view">/);
+  assert.match(tag(html, /aria-pressed="true"/), /class="selected"/);
+  assert.match(html, /aria-pressed="true"[^>]*>Edit</);
+  assert.match(html, /aria-pressed="false"[^>]*>Preview</);
+  const previewing = renderEn(
+    element({ run: { ...published, status: "review" } }, { draftPreview: true }),
+  );
+  assert.match(previewing, /aria-pressed="false"[^>]*>Edit</);
+  assert.match(previewing, /aria-pressed="true"[^>]*>Preview</);
+  assertNoHan(html);
+});
+
+test("on Free, reading feedback and starting a round are locked with the PRO badge", () => {
+  const html = renderEn(element({ feedbackLocked: true }, {}, { followUpSelection: [items[0].url] }));
+  // The button stays enabled: it opens the upgrade dialog instead of asking GitHub.
+  const read = html.match(/<button class="button primary"[^>]*>(?:(?!<\/button>).)*Read feedback again(?:(?!<\/button>).)*<\/button>/)?.[0] ?? "";
+  assert.ok(read, "the read button is there");
+  assert.doesNotMatch(read, /disabled=""/);
+  assert.match(read, /lucide-lock/);
+  assert.match(read, /aria-label="Pro feature"/);
+  // Every feedback checkbox and the note are locked; the start button opens the dialog.
+  for (const box of html.match(/<input type="checkbox"[^>]*aria-label="Include[^>]*>/g) ?? [])
+    assert.match(box, /disabled=""/);
+  assert.match(tag(html, /id="follow-up-note"/), /disabled=""/);
+  const start = tag(html, /aria-describedby="follow-up-limit"/);
+  assert.doesNotMatch(start, /disabled=""/);
+  assert.match(html, /Keep fixing from feedback<span class="pro-badge"/);
+  // The round history, its push and the PR link stay on every plan.
+  assert.match(html, /View pull request/);
+  assertNoHan(html);
+});
+
+test("the sample shows its fictional feedback with a PRO chip and links to nothing", () => {
+  const demo = getDemo("en");
+  const html = renderEn(
+    element({
+      demo: true,
+      run: {
+        ...demo.run,
+        status: "published",
+        prUrl: "#demo-pr",
+        prFeedback: demo.prFeedback,
+      },
+    }),
+  );
+  assert.match(html, /Read feedback again/);
+  assert.match(html, /aria-label="Pro feature"/);
+  assert.match(html, /sample_maintainer/);
+  // No sample link looks like a page on GitHub.
+  assert.doesNotMatch(html, /View pull request/);
+  assert.doesNotMatch(html, /Open on GitHub/);
+  assert.doesNotMatch(html, /href="#demo-pr/);
+  // The sample starts no round: its controls are off, and it says why.
+  for (const box of html.match(/<input type="checkbox"[^>]*aria-label="Include[^>]*>/g) ?? [])
+    assert.match(box, /disabled=""/);
+  assert.match(tag(html, /aria-describedby="follow-up-limit"/), /disabled=""/);
+  assert.match(html, /The sample starts no round\./);
+  assertNoHan(html);
+});
+
+test("the published sample shows its own card, which says nothing reached GitHub", () => {
+  const demo = getDemo("en");
+  const published = {
+    ...demo.run,
+    status: "published" as const,
+    prUrl: "#demo-pr",
+    publishedBranch: "retry-backoff",
+  };
+  const html = renderEn(element({ demo: true, run: published }));
+  assert.match(html, /<section class="sample-published" role="status" aria-labelledby="sample-published-title">/);
+  assert.ok(html.includes(`<h2 id="sample-published-title">${demo.publishedCard!.title}</h2>`));
+  assert.ok(html.includes(demo.publishedCard!.note));
+  assert.match(html, /<code>retry-backoff<\/code> → <code>main<\/code>/);
+  assertNoHan(html);
+  // While the playback pushes, it says so instead.
+  const pushing = renderEn(
+    createElement(SamplePublishedCard, {
+      run: { ...demo.run, status: "approved", publishing: true },
+    }),
+  );
+  assert.match(pushing, /Opening the sample Draft PR…/);
+  assert.doesNotMatch(pushing, /sample-published-title/);
+  // Before it is published, and for a real run, there is no card.
+  assert.equal(renderEn(createElement(SamplePublishedCard, { run: demo.run })), "");
+  assert.doesNotMatch(renderEn(element()), /sample-published/);
+  assert.match(
+    renderZh(createElement(SamplePublishedCard, { run: { ...published, ...getDemo("zh-TW").run, status: "published" } })),
+    new RegExp(getDemo("zh-TW").publishedCard!.title),
   );
 });
