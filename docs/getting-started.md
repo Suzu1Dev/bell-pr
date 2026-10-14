@@ -105,7 +105,10 @@ On **Repositories**, import a project in any of these forms:
 
 - `owner/repo`, for a project on GitHub;
 - a GitHub link, such as `https://github.com/owner/repo`;
-- the path of a Git folder on your computer.
+- the path of a Git folder on your computer, such as
+  `~/projects/repository` (`~/` is your home directory). On Windows, use
+  the path inside WSL2, where BELL PR runs; a Windows folder is under
+  `/mnt/c/`, for example `/mnt/c/projects/repository`.
 
 BELL PR makes its own full clone in its data directory. Your own folder is
 never changed: runs never add branches or worktrees to it. A clone that

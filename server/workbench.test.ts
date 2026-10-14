@@ -144,6 +144,40 @@ test("GitHub sources are normalized and remote option-like inputs rejected", () 
   assert.equal(parseGitHubSource("https://example.com/openai/codex"), null);
 });
 
+test("a local project imports from the path the import dialog suggests, ~/projects/repository", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-pr-home-import-"));
+  const previousHome = process.env.HOME;
+  try {
+    // The home directory of the user BELL PR runs as.
+    const home = path.join(directory, "home");
+    const checkout = path.join(home, "projects", "repository");
+    await mkdir(checkout, { recursive: true });
+    await git(checkout, ["init", "-b", "main"]);
+    await git(checkout, ["config", "user.name", "BELL Test"]);
+    await git(checkout, ["config", "user.email", "test@example.invalid"]);
+    await writeFile(path.join(checkout, "README.md"), "# Repository\n");
+    await git(checkout, ["add", "--", "README.md"]);
+    await git(checkout, ["commit", "-m", "initial"]);
+    process.env.HOME = home;
+    assert.equal(os.homedir(), home);
+    const store = new Store(path.join(directory, "state"));
+    await store.initialize();
+    const repo = await new Workbench(store).importRepository("~/projects/repository");
+    assert.equal(repo.fullName, "local/repository");
+    assert.equal(repo.defaultBranch, "main");
+    // BELL PR works in its own clone; the person's folder stays as it is.
+    assert.ok(repo.path.startsWith(path.join(store.directory, "repositories") + path.sep), repo.path);
+    assert.equal(
+      (await git(repo.path, ["log", "-1", "--format=%s"])).stdout.trim(),
+      "initial",
+    );
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("GitHub issue URLs are parsed to owner, repository and number; anything else is rejected", () => {
   assert.deepEqual(
     parseGitHubIssueUrl("https://github.com/openai/codex/issues/1234/"),

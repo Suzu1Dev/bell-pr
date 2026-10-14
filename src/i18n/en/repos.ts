@@ -44,9 +44,11 @@ const repos = {
       "Paste a GitHub link or owner/repository, or the full path of a local Git project.",
     source: "Repository source",
     placeholder: "owner/repository or https://github.com/owner/repository",
-    /** `example` is a path in this computer's style. */
+    /** `example` is a path under the home directory, such as ~/projects/repository. */
     localPathHint: ({ example }: { example: string }) =>
-      `Local Git projects work too: paste the full path, such as ${example}`,
+      `Local Git projects work too: paste the path, such as ${example}`,
+    /** Shown to Windows browsers under localPathHint. */
+    wslPathHint: `On Windows, ${product.name} runs inside WSL2: use the path in your Linux distribution. A Windows folder is under /mnt/c/, for example /mnt/c/projects/repository.`,
     callout:
       "GitHub projects are downloaded to this computer; development then uses separate worktrees and leaves the original checkout as it is.",
     later: "Not now",

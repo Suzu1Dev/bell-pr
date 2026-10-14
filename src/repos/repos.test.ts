@@ -3,7 +3,7 @@ import test from "node:test";
 import { createElement } from "react";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Repo } from "../types";
-import { examplePath, ImportRepoModal, namesSample } from "./ImportRepoModal";
+import { ImportRepoModal, isWindowsPlatform, localPathExample, namesSample } from "./ImportRepoModal";
 import { ReposPage } from "./ReposPage";
 
 const repo: Repo = {
@@ -79,7 +79,7 @@ test("the import dialog reads in English with no Chinese left", () => {
   assert.match(html, /<h2 id="modal-title">Bring in your next contribution\.<\/h2>/);
   assert.match(html, /<label class="field-label" for="repo-source">Repository source<\/label>/);
   assert.match(html, /placeholder="owner\/repository or https:\/\/github\.com\/owner\/repository"/);
-  assert.match(html, /Local Git projects work too: paste the full path, such as /);
+  assert.match(html, /Local Git projects work too: paste the path, such as ~\/projects\/repository<\/p>/);
   assert.match(html, />Not now<\/button>/);
   assert.doesNotMatch(html, /lucide-github|Cloning/);
   assertNoHan(html);
@@ -92,10 +92,36 @@ test("the import dialog reads in English with no Chinese left", () => {
   assert.match(renderZh(createElement(ImportRepoModal, props)), />稍後再說<\/button>/);
 });
 
-test("the path example follows the computer's platform", () => {
-  assert.equal(examplePath("MacIntel"), "/Users/you/projects/repository");
-  assert.equal(examplePath("Win32"), "C:\\Users\\you\\projects\\repository");
-  assert.equal(examplePath("Linux x86_64"), "/home/you/projects/repository");
+test("one path example for every computer, and the WSL2 hint for Windows browsers", () => {
+  assert.equal(localPathExample, "~/projects/repository");
+  assert.equal(isWindowsPlatform("Win32"), true);
+  for (const platform of ["MacIntel", "Linux x86_64", "iPhone", ""])
+    assert.equal(isWindowsPlatform(platform), false, platform);
+  const props = {
+    source: "",
+    setSource() {},
+    busy: false,
+    formError: "",
+    importRepo() {},
+    closeModal() {},
+  };
+  for (const platform of ["MacIntel", "Linux x86_64"]) {
+    const html = renderEn(createElement(ImportRepoModal, { ...props, platform }));
+    assert.match(html, /such as ~\/projects\/repository</, platform);
+    assert.match(html, /aria-describedby="repo-source-hint"/, platform);
+    assert.doesNotMatch(html, /WSL2|C:\\|\/home\/|\/Users\//, platform);
+  }
+  const windows = renderEn(createElement(ImportRepoModal, { ...props, platform: "Win32" }));
+  assert.match(windows, /such as ~\/projects\/repository</);
+  assert.match(windows, /aria-describedby="repo-source-hint repo-source-wsl"/);
+  assert.match(
+    windows,
+    /<p class="field-help" id="repo-source-wsl">On Windows, BELL PR runs inside WSL2: use the path in your Linux distribution\. A Windows folder is under \/mnt\/c\/, for example \/mnt\/c\/projects\/repository\.<\/p>/,
+  );
+  assertNoHan(windows);
+  const zh = renderZh(createElement(ImportRepoModal, { ...props, platform: "Win32" }));
+  assert.match(zh, /也支援本機 Git 專案：貼上路徑，例如 ~\/projects\/repository/);
+  assert.match(zh, /在 Windows 上，BELL PR 在 WSL2 中執行/);
 });
 
 test("the sample is recognized by its name or its GitHub address", () => {
