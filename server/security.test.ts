@@ -1,7 +1,7 @@
 /**
- * Git hardening: repository configuration that could run programs,
- * teammate checkout pointers, diff path names, and syncing a checkout whose
- * attributes name drivers.
+ * Git hardening: repository configuration that could run programs, the
+ * clone made for a local import, teammate checkout pointers, diff path
+ * names, and syncing a checkout whose attributes name drivers.
  */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -19,6 +19,7 @@ import os from "node:os";
 import path from "node:path";
 import { git } from "./process.js";
 import { readDiff } from "./git.js";
+import { createRunWorktree } from "./repositories.js";
 import {
   checkoutTreeOnto,
   filesWithConflictMarkers,
@@ -202,6 +203,88 @@ test("a teammate checkout whose .git pointer was forged is not used", async (t) 
   await rm(pointerPath);
   await writeFile(pointerPath, genuine);
   await assertTeammateWorktree(run, taskPath);
+});
+
+/** The person's own repository, as `git worktree list` and the refs show it. */
+async function repositoryState(directory: string) {
+  const [worktrees, refs, config] = await Promise.all([
+    git(directory, ["worktree", "list", "--porcelain"]),
+    git(directory, ["for-each-ref", "--format=%(refname) %(objectname)"]),
+    readFile(path.join(directory, ".git", "config"), "utf8"),
+  ]);
+  return { worktrees: worktrees.stdout, refs: refs.stdout, config };
+}
+
+test("a local import is cloned, so runs never add worktrees or branches to the person's repository", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-security-import-"));
+  const own = path.join(directory, "own");
+  await repository(own, { "app.ts": "app\n" });
+  await git(own, ["branch", "feature"]);
+  await git(own, ["config", "user.name", "Owner"]);
+  const before = await repositoryState(own);
+  const branches = (await git(own, ["branch", "--list"])).stdout;
+
+  const store = new Store(path.join(directory, "state"));
+  await store.initialize();
+  const workbench = new Workbench(store);
+  t.after(async () => {
+    await workbench.shutdown();
+    await store.save();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const repo = await workbench.importRepository(own);
+  assert.ok(repo.path.startsWith(path.join(store.directory, "repositories") + path.sep));
+  assert.equal(repo.url, "");
+  assert.equal(repo.fullName, "local/own");
+  assert.equal(repo.defaultBranch, "main");
+  assert.equal(workbench.managedClone(repo), false);
+  // Every branch came along; the clone keeps no remote pointing at the checkout.
+  assert.match((await git(repo.path, ["branch", "--list"])).stdout, /feature/);
+  assert.equal((await git(repo.path, ["remote"])).stdout.trim(), "");
+  assert.equal((await git(repo.path, ["config", "--get", "user.name"], { allowedCodes: [0, 1] })).stdout, "");
+  // Importing the same checkout again finds the clone.
+  assert.equal((await workbench.importRepository(own)).id, repo.id);
+
+  const run = baseRun({
+    id: "import-run",
+    repoId: repo.id,
+    worktreePath: path.join(store.directory, "worktrees", "import-run"),
+    baseSha: "",
+    branch: "fix/importrn",
+  });
+  await createRunWorktree(run, repo, new AbortController().signal);
+  assert.match((await git(repo.path, ["branch", "--list"])).stdout, /fix\/importrn/);
+  assert.deepEqual(await repositoryState(own), before);
+  assert.equal((await git(own, ["branch", "--list"])).stdout, branches);
+
+  // A checkout of a GitHub project: BELL's clone points at GitHub and may be updated.
+  const github = path.join(directory, "github-checkout");
+  await repository(github, { "lib.ts": "lib\n" });
+  await git(github, ["remote", "add", "origin", "https://github.com/test-owner/example.git"]);
+  const githubBefore = await repositoryState(github);
+  const cloned = await workbench.importRepository(github);
+  assert.equal(cloned.url, "https://github.com/test-owner/example");
+  assert.equal(cloned.fullName, "test-owner/example");
+  assert.equal(workbench.managedClone(cloned), true);
+  assert.equal(
+    (await git(cloned.path, ["remote", "get-url", "origin"])).stdout.trim(),
+    "https://github.com/test-owner/example.git",
+  );
+  assert.deepEqual(await repositoryState(github), githubBefore);
+
+  // A checkout imported by an earlier build keeps working where it is, without migration.
+  const legacy = path.join(directory, "legacy");
+  await repository(legacy, { "old.ts": "old\n" });
+  store.data.repos.push({
+    id: "legacy",
+    name: "legacy",
+    owner: "local",
+    fullName: "local/legacy",
+    path: legacy,
+    defaultBranch: "main",
+    url: "",
+  });
+  assert.equal((await workbench.importRepository(legacy)).id, "legacy");
 });
 
 test("diff paths that would reach an object prototype are refused", async (t) => {

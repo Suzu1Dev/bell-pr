@@ -3,8 +3,8 @@
  * checkout, updating BELL's own clone, the latest commit of a branch, and
  * the Git worktree each run works in.
  */
-import { randomUUID } from "node:crypto";
-import { mkdir, realpath } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdir, realpath, rm } from "node:fs/promises";
 import path from "node:path";
 import { command, git, gitNetwork } from "./process.js";
 import { assertRefName, parseGitHubSource } from "./git.js";
@@ -14,6 +14,92 @@ import type { WorkbenchContext } from "./workbench.js";
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
 const json = <T>(value: string) => JSON.parse(value) as T;
+/**
+ * The folder name of BELL's clone of a local checkout. It starts with a
+ * digest of the checkout's path, so importing the same checkout again finds
+ * the clone made before.
+ */
+function localClonePrefix(sourcePath: string) {
+  const name = path.basename(sourcePath).replace(/[^A-Za-z0-9._-]/g, "_");
+  const digest = createHash("sha256").update(sourcePath).digest("hex");
+  return `local-${name.slice(0, 40)}-${digest.slice(0, 12)}-`;
+}
+
+/**
+ * Clones a local checkout into BELL's data directory, so runs never add
+ * worktrees or branches to the person's own repository. Only commits are
+ * copied (no hard links, no submodules, none of the checkout's hooks or
+ * configuration). Every local branch comes along, so a run can start from
+ * any of them. With a GitHub origin the clone's origin becomes that GitHub
+ * repository; without one the clone keeps no remote at all.
+ */
+async function cloneLocalCheckout(
+  sourcePath: string,
+  destination: string,
+  remoteUrl: string | undefined,
+) {
+  await git(
+    path.dirname(destination),
+    [
+      "clone",
+      "--no-hardlinks",
+      "--no-recurse-submodules",
+      "--quiet",
+      "--",
+      sourcePath,
+      destination,
+    ],
+    { timeoutMs: 180_000, maxBytes: 1_000_000 },
+  );
+  try {
+    const head = (
+      await git(destination, ["symbolic-ref", "-q", "--short", "HEAD"], {
+        allowedCodes: [0, 1],
+      })
+    ).stdout.trim();
+    // One update for every branch the checkout has besides the one cloned.
+    const updates = (
+      await git(destination, [
+        "for-each-ref",
+        "--format=%(objectname) %(refname:strip=3)",
+        "refs/remotes/origin/",
+      ])
+    ).stdout
+      .split("\n")
+      .map((line) => /^([0-9a-f]{40,64}) (.+)$/.exec(line.trim()))
+      .filter(
+        (match): match is RegExpExecArray =>
+          !!match && match[2] !== "HEAD" && match[2] !== head,
+      )
+      .map(([, commit, branch]) => `create refs/heads/${branch} ${commit}\n`);
+    if (updates.length)
+      await git(destination, ["update-ref", "--stdin"], {
+        input: updates.join(""),
+      });
+    if (remoteUrl)
+      await git(destination, ["remote", "set-url", "origin", `${remoteUrl}.git`]);
+    else await git(destination, ["remote", "remove", "origin"]);
+  } catch (error) {
+    await rm(destination, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+/** The branch origin's HEAD names, else the branch checked out. */
+async function defaultBranchOf(directory: string) {
+  try {
+    return (
+      await git(directory, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
+    ).stdout
+      .trim()
+      .replace(/^origin\//, "");
+  } catch {
+    return (
+      await git(directory, ["symbolic-ref", "--short", "HEAD"])
+    ).stdout.trim();
+  }
+}
+
 export async function importRepository(
   ctx: WorkbenchContext,
   source: string,
@@ -27,13 +113,17 @@ export async function importRepository(
           primaryLanguage?: { name: string };
         }
       | undefined;
+    let remote = github;
+    let defaultBranch: string | undefined;
+    /** A local-only project is named after the person's checkout, not BELL's clone. */
+    let localName: string | undefined;
+    const root = path.join(ctx.store.directory, "repositories");
     if (github) {
       const existing = ctx.store.data.repos.find(
         (repo) =>
           repo.fullName.toLowerCase() === github.fullName.toLowerCase(),
       );
       if (existing) return existing;
-      const root = path.join(ctx.store.directory, "repositories");
       await mkdir(root, { recursive: true, mode: 0o700 });
       repositoryPath = path.join(
         root,
@@ -69,60 +159,69 @@ export async function importRepository(
       } catch {
         /* Git works for public repositories without GitHub authentication. */
       }
+      defaultBranch = metadata?.defaultBranchRef?.name;
     } else {
       if (!path.isAbsolute(source))
         throw new AppError((m) => m.run.repos.importSource);
-      repositoryPath = await realpath(source);
-      const root = (
-        await git(repositoryPath, ["rev-parse", "--show-toplevel"])
+      const checkout = await realpath(
+        (
+          await git(await realpath(source), ["rev-parse", "--show-toplevel"])
+        ).stdout.trim(),
+      );
+      // Imported by an earlier build, which worked in the checkout itself.
+      const legacy = ctx.store.data.repos.find((repo) => repo.path === checkout);
+      if (legacy) return legacy;
+      const isBare = (
+        await git(checkout, ["rev-parse", "--is-bare-repository"])
       ).stdout.trim();
-      repositoryPath = await realpath(root);
-    }
-    const existing = ctx.store.data.repos.find(
-      (repo) => repo.path === repositoryPath,
-    );
-    if (existing) return existing;
-    const isBare = (
-      await git(repositoryPath, ["rev-parse", "--is-bare-repository"])
-    ).stdout.trim();
-    if (isBare === "true") throw new AppError((m) => m.run.repos.bare);
-    await git(repositoryPath, ["rev-parse", "--verify", "HEAD"]);
-    let remote = github;
-    if (!remote) {
+      if (isBare === "true") throw new AppError((m) => m.run.repos.bare);
+      await git(checkout, ["rev-parse", "--verify", "HEAD"]);
       try {
         remote = parseGitHubSource(
-          (
-            await git(repositoryPath, ["remote", "get-url", "origin"])
-          ).stdout.trim(),
+          (await git(checkout, ["remote", "get-url", "origin"])).stdout.trim(),
         );
       } catch {
         /* A local-only repository may have no origin. */
       }
+      const prefix = path.join(root, localClonePrefix(checkout));
+      const origin = remote;
+      // A checkout of a GitHub project is that project, however it was imported.
+      const existing = ctx.store.data.repos.find((repo) =>
+        origin
+          ? repo.fullName.toLowerCase() === origin.fullName.toLowerCase()
+          : repo.path.startsWith(prefix),
+      );
+      if (existing) return existing;
+      // The checkout's view of its origin, before the clone replaces it.
+      defaultBranch = await defaultBranchOf(checkout);
+      await mkdir(root, { recursive: true, mode: 0o700 });
+      localName = path.basename(checkout);
+      repositoryPath = `${prefix}${newId().slice(0, 8)}`;
+      await cloneLocalCheckout(checkout, repositoryPath, remote?.url);
+      // Like a GitHub import, the clone starts on the default branch.
+      const head = (
+        await git(repositoryPath, ["symbolic-ref", "-q", "--short", "HEAD"], {
+          allowedCodes: [0, 1],
+        })
+      ).stdout.trim();
+      const hasDefault =
+        (
+          await git(
+            repositoryPath,
+            ["rev-parse", "--verify", "-q", `refs/heads/${defaultBranch}`],
+            { allowedCodes: [0, 1] },
+          )
+        ).code === 0;
+      if (head !== defaultBranch && hasDefault)
+        await git(repositoryPath, ["checkout", "-q", defaultBranch, "--"]);
     }
-    let defaultBranch = metadata?.defaultBranchRef?.name;
-    if (!defaultBranch) {
-      try {
-        defaultBranch = (
-          await git(repositoryPath, [
-            "symbolic-ref",
-            "--short",
-            "refs/remotes/origin/HEAD",
-          ])
-        ).stdout
-          .trim()
-          .replace(/^origin\//, "");
-      } catch {
-        defaultBranch = (
-          await git(repositoryPath, ["symbolic-ref", "--short", "HEAD"])
-        ).stdout.trim();
-      }
-    }
+    defaultBranch ||= await defaultBranchOf(repositoryPath);
     await git(repositoryPath, [
       "check-ref-format",
       "--branch",
       defaultBranch,
     ]);
-    const name = remote?.name ?? path.basename(repositoryPath);
+    const name = remote?.name ?? localName ?? path.basename(repositoryPath);
     const repo: Repository = {
       id: newId(),
       name,
@@ -140,8 +239,10 @@ export async function importRepository(
 }
 
 /**
- * BELL's own clone of a GitHub repository, which it may update. A local
- * import is the person's checkout and is never changed.
+ * BELL's own clone of a GitHub repository, which it may update: a GitHub
+ * import, or a local checkout of a GitHub project, cloned at import. A
+ * local-only project has nothing to update from, and a checkout imported by
+ * an earlier build is the person's own and is never changed.
  */
 export function managedClone(directory: string, repo: Repository) {
   return (
