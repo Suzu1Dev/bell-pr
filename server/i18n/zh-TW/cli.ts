@@ -38,6 +38,12 @@ const m: Translation<typeof en> = {
     `沒有「${command}」這個指令。執行 \`${bin} help\` 查看可用指令。`,
   invalidArguments: ({ reason }) =>
     `${reason}\n執行 \`${bin} help\` 查看用法。`,
+  arguments: {
+    unknownOption: ({ option }) => `沒有 ${option} 這個選項。`,
+    missingValue: ({ option }) => `選項 ${option} 需要一個值。`,
+    noValue: ({ option }) => `選項 ${option} 不接受值。`,
+    unexpected: ({ value }) => `多了一個參數「${value}」。`,
+  },
   envFileFailed: ({ path, reason }) => `無法載入設定檔 ${path}：${reason}`,
   version: {
     app: ({ version, buildDate }) =>

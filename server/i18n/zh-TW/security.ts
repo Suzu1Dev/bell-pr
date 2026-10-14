@@ -25,6 +25,8 @@ const m: Translation<typeof en> = {
     codexFix: "或登入 Codex，並在「設定 → 模型」選用它",
     allowFix: `或在「設定 → Agent 安全」允許不使用沙箱的 Claude Agent，或用這個變數啟動 ${product.name}（Agent 會以你的完整使用者權限執行）`,
   },
+  invalidOrigins:
+    "BELLPR_ALLOWED_ORIGINS 必須是以逗號分隔的來源（origin），不可含帳號密碼、路徑、查詢字串、片段或萬用字元；只有本機回送位址可以使用純 HTTP。",
   gitConfigUnsafe: ({ keys }) =>
     `這個儲存庫的 Git 設定含有 ${list(keys)}，可能讓 Git 執行其他程式或把憑證送到別處。${product.name} 不會在其中執行 Git。請從它的 .git/config 移除這些設定，或重新匯入專案。`,
   worktreeForged:

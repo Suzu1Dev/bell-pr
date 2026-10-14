@@ -3,8 +3,7 @@ import type { Request, RequestHandler, Response } from "express";
 import { htmlLang } from "../shared/i18n/locale.js";
 import { currentLocale, sm } from "./i18n/index.js";
 
-const invalidOrigins =
-  "BELLPR_ALLOWED_ORIGINS must contain comma-separated origins without credentials, paths, queries, fragments, or wildcards; plain HTTP is accepted only for loopback addresses.";
+const invalidOrigins = () => sm().security.invalidOrigins;
 
 /** localhost, 127.0.0.0/8 and [::1]: addresses only this computer can reach. */
 function loopbackHost(hostname: string) {
@@ -41,7 +40,7 @@ export function parseAllowedOrigins(value = ""): string[] {
         throw new Error("Invalid origin");
       return url.origin;
     } catch {
-      throw new Error(invalidOrigins);
+      throw new Error(invalidOrigins());
     }
   });
 }
@@ -187,7 +186,7 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
   const allowedOrigins = new Set(
     opts.allowedOrigins.map((entry) => {
       const origins = parseAllowedOrigins(entry);
-      if (origins.length !== 1) throw new Error(invalidOrigins);
+      if (origins.length !== 1) throw new Error(invalidOrigins());
       return origins[0];
     }),
   );

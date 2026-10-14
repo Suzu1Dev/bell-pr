@@ -37,9 +37,20 @@ export default {
   /** A command that does not exist. */
   unknownCommand: ({ command }: { command: string }) =>
     `Unknown command "${command}". Run \`${bin} help\` for the list of commands.`,
-  /** Options the command does not accept; `reason` comes from the parser. */
+  /** Options the command does not accept; `reason` is one of `arguments`. */
   invalidArguments: ({ reason }: { reason: string }) =>
     `${reason}\nRun \`${bin} help\` for usage.`,
+  /** What is wrong with the command line. */
+  arguments: {
+    unknownOption: ({ option }: { option: string }) =>
+      `Unknown option ${option}.`,
+    missingValue: ({ option }: { option: string }) =>
+      `The option ${option} needs a value.`,
+    noValue: ({ option }: { option: string }) =>
+      `The option ${option} does not take a value.`,
+    unexpected: ({ value }: { value: string }) =>
+      `Unexpected argument "${value}".`,
+  },
   /** --env-file could not be loaded. */
   envFileFailed: ({ path, reason }: { path: string; reason: string }) =>
     `Could not load the settings file ${path}: ${reason}`,

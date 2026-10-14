@@ -216,6 +216,16 @@ test("resolveConfig refuses settings that cannot work, in the request locale", (
   });
 });
 
+test("an invalid BELLPR_ALLOWED_ORIGINS is reported in the CLI's language", () => {
+  withLocale("zh-TW", () =>
+    assert.throws(
+      () => resolveConfig({}, { BELLPR_ALLOWED_ORIGINS: "https://*.example.com" }),
+      (error: unknown) =>
+        error instanceof ConfigError && /^BELLPR_ALLOWED_ORIGINS 必須/.test(error.message),
+    ),
+  );
+});
+
 test("resolveConfig adds the public origin, trusts the dev port only in dev and never opens a browser in CI", () => {
   const config = resolveConfig(
     {},

@@ -264,6 +264,39 @@ test("bell-pr help lists every command, and mistakes exit 2", async () => {
   assert.match(badPort.stderr, /--port must be a whole number from 1024 to 65535/);
 });
 
+test("every command shows the help for --help, and argument mistakes read in the CLI's language", async () => {
+  for (const argv of [
+    ["start", "--help"],
+    ["open", "-h"],
+    ["version", "--help"],
+    ["--port", "4400", "--help"],
+  ]) {
+    const result = await cli(argv);
+    assert.equal(result.code, 0, argv.join(" "));
+    assert.match(result.stdout, /^Usage: bell-pr /m);
+    assert.equal(result.stderr, "");
+  }
+  for (const [argv, reason] of [
+    [["open", "--frob"], "Unknown option --frob."],
+    [["start", "--port"], "The option --port needs a value."],
+    [["open", "--print=yes"], "The option --print does not take a value."],
+    [["open", "extra"], 'Unexpected argument "extra".'],
+  ] as const) {
+    const result = await cli([...argv]);
+    assert.equal(result.code, 2, argv.join(" "));
+    assert.equal(result.stderr, `${reason}\nRun \`bell-pr help\` for usage.\n`);
+  }
+  let zhError = "";
+  const zh = await withLocale("zh-TW", () =>
+    main(["start", "--bogus"], {
+      env: { BELLPR_NO_OPEN: "1" },
+      stderr: { write: (text: string) => (zhError += text) },
+    }),
+  );
+  assert.equal(zh, 2);
+  assert.equal(zhError, "沒有 --bogus 這個選項。\n執行 `bell-pr help` 查看用法。\n");
+});
+
 test("bell-pr doctor and license get the data directory and their own arguments", async () => {
   await withDataDir(async (dataDir) => {
     for (const command of ["doctor", "license"]) {

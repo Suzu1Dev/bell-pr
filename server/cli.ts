@@ -62,16 +62,62 @@ const commonOptions = {
   "env-file": { type: "string" },
 } satisfies ParseArgsConfig["options"];
 
+/**
+ * What is wrong with `args` for a command taking `options`, in the CLI's
+ * own words; undefined when the parser's message has to do.
+ */
+function argumentProblem(
+  args: string[],
+  options: NonNullable<ParseArgsConfig["options"]>,
+): string | undefined {
+  const m = sm().cli.arguments;
+  const { tokens } = parseArgs({
+    args,
+    options,
+    strict: false,
+    allowPositionals: true,
+    tokens: true,
+  });
+  for (const token of tokens ?? []) {
+    if (token.kind === "positional")
+      return m.unexpected({ value: token.value });
+    if (token.kind !== "option") continue;
+    const option = Object.hasOwn(options, token.name)
+      ? options[token.name]
+      : undefined;
+    if (!option) return m.unknownOption({ option: token.rawName });
+    if (option.type === "string" && token.value === undefined)
+      return m.missingValue({ option: token.rawName });
+    if (option.type === "boolean" && token.inlineValue)
+      return m.noValue({ option: token.rawName });
+  }
+  return undefined;
+}
+
 function parse<T extends ParseArgsConfig["options"]>(args: string[], options: T) {
   try {
     return parseArgs({ args, options, strict: true, allowPositionals: false });
   } catch (error) {
+    let reason: string | undefined;
+    try {
+      reason = argumentProblem(args, options ?? {});
+    } catch {
+      // The parser's own message below.
+    }
     throw new UsageError(
       sm().cli.invalidArguments({
-        reason: error instanceof Error ? error.message : String(error),
+        reason: reason ?? (error instanceof Error ? error.message : String(error)),
       }),
     );
   }
+}
+
+/** -h or --help anywhere before a `--`: the command shows the help. */
+function wantsHelp(args: string[]) {
+  const end = args.indexOf("--");
+  return (end < 0 ? args : args.slice(0, end)).some(
+    (arg) => arg === "--help" || arg === "-h",
+  );
 }
 
 /** Splits the common options off arguments that another parser reads. */
@@ -306,7 +352,17 @@ export async function main(
     deps,
   };
   const [first, ...rest] = argv;
+  const help = () => {
+    ctx.stdout.write(`${sm().cli.help({ version })}\n`);
+    return 0;
+  };
   try {
+    // `bell-pr start --help` and the like show the help instead of failing.
+    if (
+      ["start", "open", "version", "--version", "-v"].includes(first) ||
+      first?.startsWith("-")
+    )
+      if (wantsHelp(argv)) return help();
     switch (first) {
       case undefined:
         return await start([], ctx);
@@ -324,8 +380,7 @@ export async function main(
       case "help":
       case "--help":
       case "-h":
-        ctx.stdout.write(`${sm().cli.help({ version })}\n`);
-        return 0;
+        return help();
       default:
         // `bell-pr --port 4400` starts with options.
         if (first.startsWith("-")) return await start(argv, ctx);

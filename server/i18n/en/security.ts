@@ -37,6 +37,9 @@ export default {
       "Or sign in to Codex and choose it as the provider under Settings → Models",
     allowFix: `Or allow unsandboxed Claude agents under Settings → Agent safety, or start ${product.name} with this variable (agents then run with your full user rights)`,
   },
+  /** BELLPR_ALLOWED_ORIGINS (or an origin given to the request guard) is not valid. */
+  invalidOrigins:
+    "BELLPR_ALLOWED_ORIGINS must contain comma-separated origins without credentials, paths, queries, fragments, or wildcards; plain HTTP is accepted only for loopback addresses.",
   /** A repository whose own Git configuration could run commands (409). */
   gitConfigUnsafe: ({ keys }: { keys: string[] }) =>
     `This repository's Git configuration sets ${list(keys)}, which can make Git run other programs or send credentials elsewhere. ${product.name} does not run Git in it. Remove these settings from its .git/config, or import the project again.`,
