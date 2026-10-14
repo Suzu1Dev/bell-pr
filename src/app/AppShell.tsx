@@ -33,7 +33,6 @@ import { useLocale, useT } from "../i18n";
 import { UpgradeDialog } from "../license/UpgradeDialog";
 import { useEntitlements } from "../license/useEntitlements";
 import type { Run, DiffFile, Repo } from "../types";
-import { CommandPalette } from "../navigation/CommandPalette";
 import {
   currentRoute,
   navigate as navigateTo,
@@ -45,15 +44,12 @@ import { useProjectInsights } from "../mission/useProjectInsights";
 import { HelpModal } from "../modals/HelpModal";
 import { needsEulaPrompt, startView, type StartView } from "../onboarding/startView";
 import type { WelcomeChoice } from "../onboarding/Welcome";
-import { NewTaskModal } from "../modals/NewTaskModal";
 import { RunsModal } from "../modals/RunsModal";
 import { DiscoveryPage } from "../pages/DiscoveryPage";
-import { LearningPage } from "../pages/LearningPage";
 import { TeamPage } from "../pages/TeamPage";
 import { ExplorePage } from "../repos/ExplorePage";
 import { ImportRepoModal } from "../repos/ImportRepoModal";
 import { ReposPage } from "../repos/ReposPage";
-import { ModelSettingsModal } from "../settings/ModelSettingsModal";
 import { CopyCommand } from "../setup/CopyCommand";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import { PublishModal } from "../workspace/PublishModal";
@@ -111,6 +107,25 @@ const EulaPrompt = lazy(() =>
 // Settings are a page most visits never open; it loads on its own too.
 const SettingsPage = lazy(() =>
   import("../settings/SettingsPage").then((module) => ({ default: module.SettingsPage })),
+);
+// Opened on request (Ctrl+K, the learning page), so each loads on its own.
+const CommandPalette = lazy(() =>
+  import("../navigation/CommandPalette").then((module) => ({
+    default: module.CommandPalette,
+  })),
+);
+const LearningPage = lazy(() =>
+  import("../pages/LearningPage").then((module) => ({ default: module.LearningPage })),
+);
+// The task and model dialogs carry the direction and model pickers, which
+// load with the dialog that needs them.
+const NewTaskModal = lazy(() =>
+  import("../modals/NewTaskModal").then((module) => ({ default: module.NewTaskModal })),
+);
+const ModelSettingsModal = lazy(() =>
+  import("../settings/ModelSettingsModal").then((module) => ({
+    default: module.ModelSettingsModal,
+  })),
 );
 
 export default function App() {
@@ -1133,12 +1148,16 @@ function AppShell({
         ) : page === "team" ? (
           <TeamPage beginContribution={beginContribution} />
         ) : page === "learning" ? (
-          <LearningPage
-            repos={repos}
-            chooseRun={chooseRun}
-            setSelectedPath={setSelectedPath}
-            setTab={setTab}
-          />
+          <ErrorBoundary>
+          <Suspense fallback={null}>
+            <LearningPage
+              repos={repos}
+              chooseRun={chooseRun}
+              setSelectedPath={setSelectedPath}
+              setTab={setTab}
+            />
+          </Suspense>
+          </ErrorBoundary>
         ) : (
           // A chunk that fails to load stops at this page, so the shell
           // and what the person typed elsewhere stay.
@@ -1158,18 +1177,22 @@ function AppShell({
         )}
       </main>
       {commandOpen && (
-        <CommandPalette
-          repos={[...repos, sample.repo]}
-          runs={[...runs, { ...sample.run, status: demo ? run.status : sample.run.status }]}
-          currentRepoId={insightRepo?.id}
-          currentRunId={run.id}
-          onClose={closeCommandPalette}
-          onSelectRun={openPaletteRun}
-          onSelectRepo={openPaletteRepo}
-          onOpenSample={() => navigateTo({ name: "demo" })}
-          onOpenSettings={() => navigate("settings")}
-          onOpenAbout={() => openModal("about")}
-        />
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <CommandPalette
+              repos={[...repos, sample.repo]}
+              runs={[...runs, { ...sample.run, status: demo ? run.status : sample.run.status }]}
+              currentRepoId={insightRepo?.id}
+              currentRunId={run.id}
+              onClose={closeCommandPalette}
+              onSelectRun={openPaletteRun}
+              onSelectRepo={openPaletteRepo}
+              onOpenSample={() => navigateTo({ name: "demo" })}
+              onOpenSettings={() => navigate("settings")}
+              onOpenAbout={() => openModal("about")}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
       <Toasts toast={toast} setToast={setToast} />
       {modal === "import" && (
@@ -1186,28 +1209,36 @@ function AppShell({
         />
       )}
       {modal === "models" && (
-        <ModelSettingsModal
-          setup={setup}
-          busy={busy}
-          formError={formError}
-          setFormError={setFormError}
-          closeModal={closeModal}
-        />
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <ModelSettingsModal
+              setup={setup}
+              busy={busy}
+              formError={formError}
+              setFormError={setFormError}
+              closeModal={closeModal}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
       {modal === "task" && (
-        <NewTaskModal
-          setup={setup}
-          repos={repos}
-          busy={busy}
-          formError={formError}
-          startTask={startTask}
-          closeModal={closeModal}
-          openModal={openModal}
-          navigate={navigate}
-          setExploreRepoId={setExploreRepoId}
-          doctor={doctor}
-          maskUser={presentation.maskUser}
-        />
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <NewTaskModal
+              setup={setup}
+              repos={repos}
+              busy={busy}
+              formError={formError}
+              startTask={startTask}
+              closeModal={closeModal}
+              openModal={openModal}
+              navigate={navigate}
+              setExploreRepoId={setExploreRepoId}
+              doctor={doctor}
+              maskUser={presentation.maskUser}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
       {modal === "publish" && (
         <PublishModal
