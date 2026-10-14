@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
+import { createElement } from "react";
+import type { Locale } from "../../shared/i18n/locale";
 import {
   maxProjectRecommendations,
   type ProjectInsights,
 } from "../../shared/insights";
 import { getDemo } from "../demo";
 import { setLocale } from "../i18n";
-import { assertNoHan } from "../test-utils/render";
-import { ProjectInsightsCache } from "./useProjectInsights";
+import { assertNoHan, renderWith } from "../test-utils/render";
+import { ProjectInsightsCache, useProjectInsights } from "./useProjectInsights";
 
 afterEach(async () => {
   await setLocale("en");
@@ -119,4 +121,21 @@ test("the cache words its own messages in the UI language", async () => {
     rejected: "未儲存顯示與排序設定，已還原：connection lost",
     silent: "未儲存顯示與排序設定，已還原。請再試一次。",
   });
+});
+
+function DemoAnalysis({ locale }: { locale: Locale }) {
+  const { insights } = useProjectInsights("demo-repo");
+  return createElement(
+    "output",
+    null,
+    String(insights === getDemo(locale).insights),
+  );
+}
+
+test("the sample project's prewritten analysis follows the UI language", () => {
+  for (const locale of ["en", "zh-TW"] as const)
+    assert.equal(
+      renderWith(locale, createElement(DemoAnalysis, { locale })),
+      "<output>true</output>",
+    );
 });

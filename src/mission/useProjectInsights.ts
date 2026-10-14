@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { locales } from "../../shared/i18n/locale";
 import {
   maxProjectRecommendations,
   type InsightsStaleDetail,
@@ -6,11 +7,16 @@ import {
   type RecommendationPreferences,
 } from "../../shared/insights";
 import { api, send } from "../api";
-import { getCurrentMessages } from "../i18n";
-import { demoInsights } from "./demo";
+import { getDemo } from "../demo";
+import { getCurrentLocale, getCurrentMessages, useLocale } from "../i18n";
 
 /** The cache's messages in the active UI language, read when one is shown. */
 const messages = () => getCurrentMessages().mission.insights;
+
+/** The prewritten sample analysis in the active UI language. */
+const demoInsights = () => getDemo(getCurrentLocale()).insights;
+// Every locale's sample analysis, to tell it apart from other analyses.
+const demoAnalyses = new Set(locales.map((locale) => getDemo(locale).insights));
 
 interface InsightsResult {
   insights: ProjectInsights | null;
@@ -51,7 +57,7 @@ const emptyState: InsightsState = {
 /** One cache belongs to the mounted workbench, so changing repositories keeps active work. */
 export class ProjectInsightsCache {
   private states = new Map<string, InsightsState>([
-    ["demo-repo", { ...emptyState, insights: demoInsights }],
+    ["demo-repo", { ...emptyState, insights: demoInsights() }],
   ]);
   private reads = new Map<string, Promise<void>>();
   private mutations = new Map<string, Promise<void>>();
@@ -141,7 +147,7 @@ export class ProjectInsightsCache {
   analyze(repoId: string): Promise<void> {
     if (repoId === "demo-repo") {
       this.update(repoId, {
-        insights: demoInsights,
+        insights: demoInsights(),
         error: messages().demoAnalysis,
       });
       return Promise.resolve();
@@ -259,6 +265,7 @@ export class ProjectInsightsCache {
 }
 
 export function useProjectInsights(repoId?: string) {
+  const [locale] = useLocale();
   const [cache] = useState(() => new ProjectInsightsCache());
   const getSnapshot = useCallback(
     () => cache.snapshot(repoId),
@@ -290,5 +297,12 @@ export function useProjectInsights(repoId?: string) {
     [cache, repoId],
   );
 
-  return { ...state, analyze, recommendMore, savePreferences, reload };
+  // The prewritten sample analysis follows the UI language; an AI analysis
+  // stays in the language it was written in.
+  const insights =
+    state.insights && demoAnalyses.has(state.insights)
+      ? getDemo(locale).insights
+      : state.insights;
+
+  return { ...state, insights, analyze, recommendMore, savePreferences, reload };
 }
