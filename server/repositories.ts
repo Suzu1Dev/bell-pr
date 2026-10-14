@@ -95,11 +95,13 @@ async function cloneLocalCheckout(
 }
 
 /**
- * Clones a GitHub repository without the file contents of past commits
- * (Git fetches one when it is needed), so a long history clones in a
- * fraction of the time. A clone that takes longer than `timeoutMs` stops
- * with 504 `clone_timeout`, whose advice is to clone it yourself and
- * import the path; a failed clone leaves nothing behind.
+ * Clones a GitHub repository in full. A partial clone (`--filter`) would
+ * fetch old file contents later through plain git, without gh's
+ * credentials (private repositories fail) and from sandboxed agents that
+ * have no network (`git log -p` and `git blame` fail). A clone that takes
+ * longer than `timeoutMs` stops with 504 `clone_timeout`, whose advice is
+ * to clone it yourself and import the path; a failed clone leaves nothing
+ * behind.
  */
 export async function cloneGitHubRepository(
   root: string,
@@ -112,7 +114,6 @@ export async function cloneGitHubRepository(
       root,
       [
         "clone",
-        "--filter=blob:none",
         "--no-recurse-submodules",
         "--",
         `${url}.git`,
