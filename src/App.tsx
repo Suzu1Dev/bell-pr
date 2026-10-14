@@ -1963,6 +1963,17 @@ export default function App() {
       f.path.toLowerCase().includes(fileSearch.toLowerCase()) &&
       (!onlyUnreviewed || !run.reviewedFiles.includes(f.path)),
   );
+  // A published PR's draft tab leads with its sync and review rounds (the draft
+  // itself is sent); before that it leads with the editor, the sync after it.
+  const draftSync = !demo && (
+    <SyncPanel
+      run={run}
+      busy={busy}
+      onSync={() => void syncToLatest()}
+      onResolve={() => void resolveSyncConflicts()}
+      onUndo={() => void undoSync()}
+    />
+  );
   return (
     <div
       className={`app-shell ${reading ? "is-reading" : ""} ${reading && focusMode ? "is-focused" : ""} ${sidebarCollapsed ? "is-sidebar-collapsed" : ""}`}
@@ -2288,30 +2299,22 @@ export default function App() {
                   icon: GitPullRequest,
                 },
               ].map((step, index) => {
+                const current = index === currentStep && !halted;
                 return (
                   <div
-                    className={`workflow-step ${index === currentStep && !halted ? "current" : ""} ${index < currentStep ? "done" : ""}`}
+                    className={`workflow-step ${current ? "current" : ""} ${index < currentStep ? "done" : ""}`}
                     key={step.n}
+                    title={`${step.n} ${step.title}：${step.description}`}
+                    aria-current={current ? "step" : undefined}
                   >
                     <span className="step-icon">
                       {index < currentStep ? (
-                        <Check size={17} />
+                        <Check size={13} />
                       ) : (
-                        <step.icon size={18} />
+                        <step.icon size={13} />
                       )}
                     </span>
-                    <div>
-                      <span className="step-number">{step.n}</span>
-                      <strong>{step.title}</strong>
-                      <small>
-                        {index === 1 && currentStep === 1
-                          ? statusLabels[run.status]
-                          : step.description}
-                      </small>
-                    </div>
-                    {index < 3 && (
-                      <ChevronRight className="step-chevron" size={16} />
-                    )}
+                    <strong>{step.title}</strong>
                   </div>
                 );
               })}
@@ -2470,6 +2473,10 @@ export default function App() {
                         : undefined
                     }
                     checkingPremise={checkingPremise}
+                    onExploreProject={() => {
+                      setExploreRepoId(currentRepo.id);
+                      navigate("explore");
+                    }}
                   />
                 )}
                 {tab === "changes" && (
@@ -3032,15 +3039,7 @@ export default function App() {
                 )}
                 {tab === "draft" && (
                   <div className="draft-workspace">
-                    {!demo && (
-                      <SyncPanel
-                        run={run}
-                        busy={busy}
-                        onSync={() => void syncToLatest()}
-                        onResolve={() => void resolveSyncConflicts()}
-                        onUndo={() => void undoSync()}
-                      />
-                    )}
+                    {run.prUrl && draftSync}
                     {!!run.followUps?.length && (
                       <FollowUpRounds
                         rounds={run.followUps}
@@ -3053,33 +3052,6 @@ export default function App() {
                             : undefined
                         }
                       />
-                    )}
-                    {!followUp && (
-                    <Suspense
-                      fallback={<p className="muted">正在載入草稿規範…</p>}
-                    >
-                      <DraftGuidancePanel
-                        preparation={run.draftPreparation}
-                        busy={draftRequests.has(run.id)}
-                        disabled={
-                          active ||
-                          busy ||
-                          !["review", "approved"].includes(run.status)
-                        }
-                        demo={demo}
-                        issueUrl={run.contributionSettings?.issueUrl}
-                        onGenerate={prepareDraft}
-                        onApply={applyDraftProposal}
-                        applied={
-                          !!run.draftPreparation?.proposal &&
-                          draftTitle === run.draftPreparation.proposal.title &&
-                          !!draftChecks?.sameDraftProse(
-                            draftBody,
-                            run.draftPreparation.proposal.body,
-                          )
-                        }
-                      />
-                    </Suspense>
                     )}
                     <div className="draft-layout">
                       <div className="draft-editor">
@@ -3106,7 +3078,7 @@ export default function App() {
                             <p>
                               下方說明是 BELL
                               依專案規範產生的建議原文，你還沒有修改。這段文字會原樣送到
-                              GitHub：送出前請用自己的話確認內容，待辦事項留在上方的核對清單，不要寫進說明。
+                              GitHub：送出前請用自己的話確認內容，待辦事項留在下方規範區的核對清單，不要寫進說明。
                             </p>
                           </div>
                         )}
@@ -3119,7 +3091,7 @@ export default function App() {
                               <AlertCircle size={16} />
                               <p>
                                 還沒有 PR
-                                說明。可以在上方產生並套用建議草稿，或用自己的話寫下改了什麼、為什麼，以及實際執行過哪些檢查。Agent
+                                說明。可以在下方產生並套用建議草稿，或用自己的話寫下改了什麼、為什麼，以及實際執行過哪些檢查。Agent
                                 的完整報告在「審查者怎麼看」。
                               </p>
                             </div>
@@ -3425,6 +3397,34 @@ export default function App() {
                         </div>
                       </aside>
                     </div>
+                    {!followUp && (
+                    <Suspense
+                      fallback={<p className="muted">正在載入草稿規範…</p>}
+                    >
+                      <DraftGuidancePanel
+                        preparation={run.draftPreparation}
+                        busy={draftRequests.has(run.id)}
+                        disabled={
+                          active ||
+                          busy ||
+                          !["review", "approved"].includes(run.status)
+                        }
+                        demo={demo}
+                        issueUrl={run.contributionSettings?.issueUrl}
+                        onGenerate={prepareDraft}
+                        onApply={applyDraftProposal}
+                        applied={
+                          !!run.draftPreparation?.proposal &&
+                          draftTitle === run.draftPreparation.proposal.title &&
+                          !!draftChecks?.sameDraftProse(
+                            draftBody,
+                            run.draftPreparation.proposal.body,
+                          )
+                        }
+                      />
+                    </Suspense>
+                    )}
+                    {!run.prUrl && draftSync}
                     {run.status === "published" && run.prUrl && (
                       <section
                         className="pr-feedback"

@@ -184,3 +184,37 @@ test("the contribution brief shows the premise verdict and labels what still sta
   assert.doesNotMatch(missing, /依你的假設/);
   assert.doesNotMatch(render({ run: { ...base, team }, brief }), /依審查結果查核前提/);
 });
+
+test("an open contribution leads with its brief, folds the project analysis and links to the other directions", () => {
+  const run = {
+    id: "r",
+    repoId: "demo-repo",
+    title: "確認呼叫端使用回傳的 id",
+    prompt: "讓呼叫端使用回傳的 id。",
+    status: "review",
+    branch: "fix/abc",
+    baseBranch: "main",
+    createdAt: "2026-10-14T00:00:00Z",
+    agents: [],
+    logs: [],
+    draft: { title: "t", body: "b" },
+    reviewedFiles: [],
+  } as unknown as NonNullable<ProjectOverviewProps["run"]>;
+  const html = render({ run, onExploreProject() {} });
+  const brief = html.indexOf("這次改動，會帶來什麼不同？");
+  const folded = html.indexOf('<details class="mission-background">');
+  assert.ok(brief >= 0 && folded > brief);
+  // The folded line says what the analysis found; the analysis itself is kept inside.
+  assert.ok(html.includes(`<span class="mission-background-status">${demoInsights.summary}</span>`));
+  assert.ok(html.indexOf("先看懂專案，再決定怎麼改。") > folded);
+  assert.doesNotMatch(html, /mission-ideas-title/);
+  assert.match(html, /看這個專案的其他貢獻方向/);
+  assert.match(render({ run, loading: true }), /mission-background-status">正在分析專案…/);
+  assert.match(render({ run, insights: null }), /mission-background-status">尚未分析這個專案/);
+
+  // The project page is the analysis: nothing folded, the directions listed.
+  const page = render();
+  assert.doesNotMatch(page, /mission-background/);
+  assert.match(page, /mission-ideas-title/);
+  assert.doesNotMatch(page, /看這個專案的其他貢獻方向/);
+});

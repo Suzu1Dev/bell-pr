@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -70,6 +76,8 @@ export interface ProjectOverviewProps {
   /** Checks the request's assumption for a finished run made before premise checks existed. */
   onCheckPremise?: () => void;
   checkingPremise?: boolean;
+  /** With a contribution open, its project's other directions live on the project page. */
+  onExploreProject?: () => void;
 }
 
 const effortLabels = { small: "小型", medium: "中型", large: "大型" };
@@ -168,6 +176,33 @@ function EvidencePaths({
   );
 }
 
+/**
+ * With a contribution open, the project analysis is background to it: folded
+ * under one line that says what it found. On the project page it is the page.
+ */
+function Background({
+  folded,
+  status,
+  children,
+}: {
+  folded: boolean;
+  status: string;
+  children: ReactNode;
+}) {
+  if (!folded) return <>{children}</>;
+  return (
+    <details className="mission-background">
+      <summary>
+        <BookOpen size={16} />
+        <span>專案背景</span>
+        <span className="mission-background-status">{status}</span>
+        <ChevronRight size={15} />
+      </summary>
+      <div className="mission-background-body">{children}</div>
+    </details>
+  );
+}
+
 function Brief({
   run,
   brief,
@@ -201,7 +236,6 @@ function Brief({
           <Target size={20} />
         </span>
       </div>
-      <h3 className="mission-contribution-name">{run.title}</h3>
       <PremiseNotice premise={premise} />
       {premise && onCheckPremise && (
         <div className="mission-premise-recheck">
@@ -355,6 +389,7 @@ export function ProjectOverview({
   updatingRepo = false,
   onCheckPremise,
   checkingPremise = false,
+  onExploreProject,
 }: ProjectOverviewProps) {
   const ideaRail = useRef<HTMLDivElement>(null);
   const hiddenSummary = useRef<HTMLElement>(null);
@@ -576,337 +611,6 @@ export function ProjectOverview({
         : "Agent 會沿用這個專案已儲存的模型設定，尋找不同的改善問題與使用者價值。既有建議會保留，由你決定何時開始開發。";
   return (
     <div className="mission-overview">
-      <div className="mission-overview-heading">
-        <div>
-          <span className="mission-kicker">
-            <BookOpen size={14} />
-            PROJECT CONTEXT
-          </span>
-          <h2>先看懂專案，再決定怎麼改。</h2>
-          <p>從使用者的角度，理解每一次貢獻的理由。</p>
-        </div>
-        <div className="mission-overview-actions">
-          {onUpdateRepo && (
-            <button
-              type="button"
-              className="mission-button mission-button-secondary"
-              onClick={onUpdateRepo}
-              disabled={updatingRepo || loading || recommending || savingPreferences}
-              aria-describedby="mission-update-help"
-            >
-              {updatingRepo ? (
-                <Loader2 className="mission-spin" size={15} />
-              ) : (
-                <Download size={15} />
-              )}
-              {updatingRepo ? "正在更新…" : "更新到最新版本"}
-            </button>
-          )}
-          <button
-            type="button"
-            className="mission-button mission-button-secondary"
-            onClick={onAnalyze}
-            disabled={loading || recommending || savingPreferences || updatingRepo}
-          >
-            {loading ? (
-              <Loader2 className="mission-spin" size={15} />
-            ) : (
-              <RefreshCw size={15} />
-            )}
-            {loading ? "正在分析專案…" : insights ? "重新分析" : "分析專案全貌"}
-          </button>
-          {onUpdateRepo && (
-            <p id="mission-update-help" className="mission-update-help">
-              從 GitHub 取得 {repo.defaultBranch} 的最新版本，專案全貌與分析會以它為準；新的貢獻本來就從最新版本開始。
-              {repo.updatedAt &&
-                ` 上次更新：${new Date(repo.updatedAt).toLocaleString("zh-TW")}`}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {error && (
-        <div className="mission-alert mission-alert-error" role="alert">
-          <span><FailureText text={error} /></span>
-          <button
-            type="button"
-            onClick={onAnalyze}
-            disabled={loading || recommending || savingPreferences || updatingRepo}
-          >
-            重試
-            <RefreshCw size={13} />
-          </button>
-        </div>
-      )}
-      {stale && insights && (
-        <div className="mission-alert" role="status">
-          <RefreshCw size={15} />
-          <span>{staleNotice(insights.baseSha, staleDetail)}</span>
-        </div>
-      )}
-
-      {!insights ? (
-        <section className="mission-overview-empty" aria-busy={loading}>
-          <span className="mission-empty-icon">
-            {loading ? (
-              <Loader2 className="mission-spin" size={27} />
-            ) : (
-              <FolderTree size={27} />
-            )}
-          </span>
-          <span className="mission-repository-label">{repo.fullName}</span>
-          <h3>
-            {loading
-              ? "正在把程式碼，整理成專案全貌。"
-              : "你的下一個貢獻，從理解開始。"}
-          </h3>
-          <p>
-            {loading
-              ? "Agent 會閱讀專案文件與主要模組，整理用途、使用流程，以及有依據的改善建議。"
-              : "讓 Agent 閱讀這個 repository，先回答三個問題，再決定值得投入的方向。"}
-          </p>
-          <div className="mission-discovery-points">
-            <span>
-              <Target size={18} />
-              <strong>它解決什麼問題？</strong>
-            </span>
-            <span>
-              <Users size={18} />
-              <strong>誰會使用它？</strong>
-            </span>
-            <span>
-              <Lightbulb size={18} />
-              <strong>哪裡值得改善？</strong>
-            </span>
-          </div>
-          {!loading && (
-            <button
-              type="button"
-              className="mission-button mission-button-primary"
-              onClick={onAnalyze}
-              disabled={updatingRepo}
-            >
-              <Sparkles size={16} />
-              開始專案分析
-              <ArrowRight size={15} />
-            </button>
-          )}
-          <small>分析完成前，不會推測這個專案的用途或推薦改動。</small>
-        </section>
-      ) : (
-        <>
-          <section
-            className="mission-project-card"
-            aria-labelledby="mission-purpose-title"
-          >
-            <div className="mission-project-meta">
-              <span className="mission-repository-label">
-                <GitBranch size={14} />
-                {repo.fullName}
-              </span>
-              <span
-                className={
-                  insights.source === "demo"
-                    ? "mission-source mission-source-demo"
-                    : "mission-source"
-                }
-              >
-                <Sparkles size={12} />
-                {insights.source === "demo" ? "示範分析" : "AI 專案分析"}
-              </span>
-            </div>
-            <h3 id="mission-purpose-title">{insights.summary}</h3>
-            <p className="mission-project-purpose">{insights.purpose}</p>
-            {insights.audience.length > 0 && (
-              <div className="mission-audience">
-                <span>
-                  <Users size={14} />
-                  主要使用者
-                </span>
-                {insights.audience.map((person, index) => (
-                  <strong key={`${person}-${index}`}>{person}</strong>
-                ))}
-              </div>
-            )}
-            <div className="mission-analysis-footer">
-              <span>
-                {dateLabel && <>更新於 {dateLabel}</>}
-                {insights.baseSha && (
-                  <>
-                    {" "}
-                    · 版本 <code>{insights.baseSha.slice(0, 7)}</code>
-                  </>
-                )}
-              </span>
-              <span>
-                {insights.source === "demo"
-                  ? "預寫範例，未呼叫 AI"
-                  : `${sampleCoverage(insights.sample)}，推論仍需確認`}
-              </span>
-            </div>
-            <ModelSummary
-              execution={insights.modelExecution}
-              demo={insights.source === "demo"}
-              analysis
-            />
-            <EfficiencySummary
-              title="這次專案分析用量"
-              metrics={insights.efficiency}
-              demo={insights.source === "demo"}
-            />
-          </section>
-
-          {insights.userJourney.length > 0 && (
-            <section
-              className="mission-journey"
-              aria-labelledby="mission-journey-title"
-            >
-              <div className="mission-section-heading">
-                <div>
-                  <span className="mission-kicker">THE USER JOURNEY</span>
-                  <h2 id="mission-journey-title">
-                    <Route size={18} />
-                    使用者如何用到這個專案？
-                  </h2>
-                </div>
-              </div>
-              <ol>
-                {insights.userJourney.map((step, index) => (
-                  <li key={index}>
-                    <span className="mission-journey-number">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <p>{step}</p>
-                    {index < insights.userJourney.length - 1 && (
-                      <ChevronRight size={16} aria-hidden="true" />
-                    )}
-                  </li>
-                ))}
-              </ol>
-            </section>
-          )}
-
-          {!!insights.readingPath?.length && (
-            <section
-              className="mission-reading-path"
-              aria-labelledby="mission-reading-title"
-            >
-              <div className="mission-section-heading">
-                <div>
-                  <span className="mission-kicker">WHERE TO START READING</span>
-                  <h2 id="mission-reading-title">
-                    <BookOpen size={18} />
-                    第一次讀這個專案，建議這樣讀
-                  </h2>
-                  <p>
-                    依 Agent 讀過的抽樣檔案排出順序；每一步說明為什麼先看它、看什麼。
-                  </p>
-                </div>
-              </div>
-              {insights.howItFitsTogether && (
-                <div className="mission-reading-flow">
-                  <span>模組怎麼串起來</span>
-                  <p>{insights.howItFitsTogether}</p>
-                </div>
-              )}
-              <ol className="mission-reading-steps">
-                {insights.readingPath.map((step, index) => {
-                  const module = insights.modules.find(
-                    (entry) => entry.path === step.path,
-                  );
-                  const evidence = insights.evidence.find(
-                    (entry) => entry.path === step.path,
-                  );
-                  return (
-                    <li key={`${step.path}-${index}`}>
-                      <span className="mission-journey-number">
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
-                      <code>{step.path}</code>
-                      {step.sampled === false && (
-                        <span className="mission-reading-unsampled">
-                          未抽樣，內容未讀
-                        </span>
-                      )}
-                      <p>{step.why}</p>
-                      <p>
-                        <strong>看什麼</strong>
-                        {step.lookFor}
-                      </p>
-                      {(module || evidence) && (
-                        <details className="mission-reading-context">
-                          <summary>
-                            這個檔案在分析中的其他說明
-                            <ChevronRight size={14} aria-hidden="true" />
-                          </summary>
-                          {module && (
-                            <p>
-                              <strong>模組分工</strong>
-                              {module.purpose}
-                            </p>
-                          )}
-                          {evidence && (
-                            <p>
-                              <strong>分析依據</strong>
-                              {evidence.note}
-                            </p>
-                          )}
-                        </details>
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
-            </section>
-          )}
-
-          {(insights.modules.length > 0 || insights.evidence.length > 0) && (
-            <div className="mission-project-details">
-              {insights.modules.length > 0 && (
-                <details className="mission-detail-block">
-                  <summary>
-                    <FolderTree size={16} />
-                    <span>主要模組怎麼分工？</span>
-                    <span className="mission-detail-count">
-                      {insights.modules.length} 個模組
-                    </span>
-                    <ChevronRight size={15} />
-                  </summary>
-                  <div className="mission-module-list">
-                    {insights.modules.map((module, index) => (
-                      <div key={`${module.path}-${index}`}>
-                        <code>{module.path}</code>
-                        <p>{module.purpose}</p>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              )}
-              {insights.evidence.length > 0 && (
-                <details className="mission-detail-block">
-                  <summary>
-                    <FileSearch size={16} />
-                    <span>分析的來源與依據</span>
-                    <span className="mission-detail-count">
-                      {insights.evidence.length} 份來源
-                    </span>
-                    <ChevronRight size={15} />
-                  </summary>
-                  <div className="mission-module-list">
-                    {insights.evidence.map((evidence, index) => (
-                      <div key={`${evidence.path}-${index}`}>
-                        <code>{evidence.path}</code>
-                        <p>{evidence.note}</p>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              )}
-            </div>
-          )}
-        </>
-      )}
-
       {run && (
         <Brief
           run={run}
@@ -915,8 +619,366 @@ export function ProjectOverview({
           checkingPremise={checkingPremise}
         />
       )}
+      <Background
+        folded={!!run}
+        status={
+          loading
+            ? "正在分析專案…"
+            : error
+              ? "專案分析未完成"
+              : !insights
+                ? "尚未分析這個專案"
+                : stale
+                  ? `分析可能已過時：${insights.summary}`
+                  : insights.summary
+        }
+      >
+        <div className="mission-overview-heading">
+          <div>
+            <span className="mission-kicker">
+              <BookOpen size={14} />
+              PROJECT CONTEXT
+            </span>
+            <h2>先看懂專案，再決定怎麼改。</h2>
+            <p>從使用者的角度，理解每一次貢獻的理由。</p>
+          </div>
+          <div className="mission-overview-actions">
+            {onUpdateRepo && (
+              <button
+                type="button"
+                className="mission-button mission-button-secondary"
+                onClick={onUpdateRepo}
+                disabled={updatingRepo || loading || recommending || savingPreferences}
+                aria-describedby="mission-update-help"
+              >
+                {updatingRepo ? (
+                  <Loader2 className="mission-spin" size={15} />
+                ) : (
+                  <Download size={15} />
+                )}
+                {updatingRepo ? "正在更新…" : "更新到最新版本"}
+              </button>
+            )}
+            <button
+              type="button"
+              className="mission-button mission-button-secondary"
+              onClick={onAnalyze}
+              disabled={loading || recommending || savingPreferences || updatingRepo}
+            >
+              {loading ? (
+                <Loader2 className="mission-spin" size={15} />
+              ) : (
+                <RefreshCw size={15} />
+              )}
+              {loading ? "正在分析專案…" : insights ? "重新分析" : "分析專案全貌"}
+            </button>
+            {onUpdateRepo && (
+              <p id="mission-update-help" className="mission-update-help">
+                從 GitHub 取得 {repo.defaultBranch} 的最新版本，專案全貌與分析會以它為準；新的貢獻本來就從最新版本開始。
+                {repo.updatedAt &&
+                  ` 上次更新：${new Date(repo.updatedAt).toLocaleString("zh-TW")}`}
+              </p>
+            )}
+          </div>
+        </div>
 
-      {insights && (
+        {error && (
+          <div className="mission-alert mission-alert-error" role="alert">
+            <span><FailureText text={error} /></span>
+            <button
+              type="button"
+              onClick={onAnalyze}
+              disabled={loading || recommending || savingPreferences || updatingRepo}
+            >
+              重試
+              <RefreshCw size={13} />
+            </button>
+          </div>
+        )}
+        {stale && insights && (
+          <div className="mission-alert" role="status">
+            <RefreshCw size={15} />
+            <span>{staleNotice(insights.baseSha, staleDetail)}</span>
+          </div>
+        )}
+
+        {!insights ? (
+          <section className="mission-overview-empty" aria-busy={loading}>
+            <span className="mission-empty-icon">
+              {loading ? (
+                <Loader2 className="mission-spin" size={27} />
+              ) : (
+                <FolderTree size={27} />
+              )}
+            </span>
+            <span className="mission-repository-label">{repo.fullName}</span>
+            <h3>
+              {loading
+                ? "正在把程式碼，整理成專案全貌。"
+                : "你的下一個貢獻，從理解開始。"}
+            </h3>
+            <p>
+              {loading
+                ? "Agent 會閱讀專案文件與主要模組，整理用途、使用流程，以及有依據的改善建議。"
+                : "讓 Agent 閱讀這個 repository，先回答三個問題，再決定值得投入的方向。"}
+            </p>
+            <div className="mission-discovery-points">
+              <span>
+                <Target size={18} />
+                <strong>它解決什麼問題？</strong>
+              </span>
+              <span>
+                <Users size={18} />
+                <strong>誰會使用它？</strong>
+              </span>
+              <span>
+                <Lightbulb size={18} />
+                <strong>哪裡值得改善？</strong>
+              </span>
+            </div>
+            {!loading && (
+              <button
+                type="button"
+                className="mission-button mission-button-primary"
+                onClick={onAnalyze}
+                disabled={updatingRepo}
+              >
+                <Sparkles size={16} />
+                開始專案分析
+                <ArrowRight size={15} />
+              </button>
+            )}
+            <small>分析完成前，不會推測這個專案的用途或推薦改動。</small>
+          </section>
+        ) : (
+          <>
+            <section
+              className="mission-project-card"
+              aria-labelledby="mission-purpose-title"
+            >
+              <div className="mission-project-meta">
+                <span className="mission-repository-label">
+                  <GitBranch size={14} />
+                  {repo.fullName}
+                </span>
+                <span
+                  className={
+                    insights.source === "demo"
+                      ? "mission-source mission-source-demo"
+                      : "mission-source"
+                  }
+                >
+                  <Sparkles size={12} />
+                  {insights.source === "demo" ? "示範分析" : "AI 專案分析"}
+                </span>
+              </div>
+              <h3 id="mission-purpose-title">{insights.summary}</h3>
+              <p className="mission-project-purpose">{insights.purpose}</p>
+              {insights.audience.length > 0 && (
+                <div className="mission-audience">
+                  <span>
+                    <Users size={14} />
+                    主要使用者
+                  </span>
+                  {insights.audience.map((person, index) => (
+                    <strong key={`${person}-${index}`}>{person}</strong>
+                  ))}
+                </div>
+              )}
+              <div className="mission-analysis-footer">
+                <span>
+                  {dateLabel && <>更新於 {dateLabel}</>}
+                  {insights.baseSha && (
+                    <>
+                      {" "}
+                      · 版本 <code>{insights.baseSha.slice(0, 7)}</code>
+                    </>
+                  )}
+                </span>
+                <span>
+                  {insights.source === "demo"
+                    ? "預寫範例，未呼叫 AI"
+                    : `${sampleCoverage(insights.sample)}，推論仍需確認`}
+                </span>
+              </div>
+              <ModelSummary
+                execution={insights.modelExecution}
+                demo={insights.source === "demo"}
+                analysis
+              />
+              <EfficiencySummary
+                title="這次專案分析用量"
+                metrics={insights.efficiency}
+                demo={insights.source === "demo"}
+              />
+            </section>
+
+            {insights.userJourney.length > 0 && (
+              <section
+                className="mission-journey"
+                aria-labelledby="mission-journey-title"
+              >
+                <div className="mission-section-heading">
+                  <div>
+                    <span className="mission-kicker">THE USER JOURNEY</span>
+                    <h2 id="mission-journey-title">
+                      <Route size={18} />
+                      使用者如何用到這個專案？
+                    </h2>
+                  </div>
+                </div>
+                <ol>
+                  {insights.userJourney.map((step, index) => (
+                    <li key={index}>
+                      <span className="mission-journey-number">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <p>{step}</p>
+                      {index < insights.userJourney.length - 1 && (
+                        <ChevronRight size={16} aria-hidden="true" />
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
+
+            {!!insights.readingPath?.length && (
+              <section
+                className="mission-reading-path"
+                aria-labelledby="mission-reading-title"
+              >
+                <div className="mission-section-heading">
+                  <div>
+                    <span className="mission-kicker">WHERE TO START READING</span>
+                    <h2 id="mission-reading-title">
+                      <BookOpen size={18} />
+                      第一次讀這個專案，建議這樣讀
+                    </h2>
+                    <p>
+                      依 Agent 讀過的抽樣檔案排出順序；每一步說明為什麼先看它、看什麼。
+                    </p>
+                  </div>
+                </div>
+                {insights.howItFitsTogether && (
+                  <div className="mission-reading-flow">
+                    <span>模組怎麼串起來</span>
+                    <p>{insights.howItFitsTogether}</p>
+                  </div>
+                )}
+                <ol className="mission-reading-steps">
+                  {insights.readingPath.map((step, index) => {
+                    const module = insights.modules.find(
+                      (entry) => entry.path === step.path,
+                    );
+                    const evidence = insights.evidence.find(
+                      (entry) => entry.path === step.path,
+                    );
+                    return (
+                      <li key={`${step.path}-${index}`}>
+                        <span className="mission-journey-number">
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <code>{step.path}</code>
+                        {step.sampled === false && (
+                          <span className="mission-reading-unsampled">
+                            未抽樣，內容未讀
+                          </span>
+                        )}
+                        <p>{step.why}</p>
+                        <p>
+                          <strong>看什麼</strong>
+                          {step.lookFor}
+                        </p>
+                        {(module || evidence) && (
+                          <details className="mission-reading-context">
+                            <summary>
+                              這個檔案在分析中的其他說明
+                              <ChevronRight size={14} aria-hidden="true" />
+                            </summary>
+                            {module && (
+                              <p>
+                                <strong>模組分工</strong>
+                                {module.purpose}
+                              </p>
+                            )}
+                            {evidence && (
+                              <p>
+                                <strong>分析依據</strong>
+                                {evidence.note}
+                              </p>
+                            )}
+                          </details>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              </section>
+            )}
+
+            {(insights.modules.length > 0 || insights.evidence.length > 0) && (
+              <div className="mission-project-details">
+                {insights.modules.length > 0 && (
+                  <details className="mission-detail-block">
+                    <summary>
+                      <FolderTree size={16} />
+                      <span>主要模組怎麼分工？</span>
+                      <span className="mission-detail-count">
+                        {insights.modules.length} 個模組
+                      </span>
+                      <ChevronRight size={15} />
+                    </summary>
+                    <div className="mission-module-list">
+                      {insights.modules.map((module, index) => (
+                        <div key={`${module.path}-${index}`}>
+                          <code>{module.path}</code>
+                          <p>{module.purpose}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+                {insights.evidence.length > 0 && (
+                  <details className="mission-detail-block">
+                    <summary>
+                      <FileSearch size={16} />
+                      <span>分析的來源與依據</span>
+                      <span className="mission-detail-count">
+                        {insights.evidence.length} 份來源
+                      </span>
+                      <ChevronRight size={15} />
+                    </summary>
+                    <div className="mission-module-list">
+                      {insights.evidence.map((evidence, index) => (
+                        <div key={`${evidence.path}-${index}`}>
+                          <code>{evidence.path}</code>
+                          <p>{evidence.note}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+      </Background>
+
+      {run && onExploreProject && (
+        <button
+          type="button"
+          className="mission-explore-link"
+          onClick={onExploreProject}
+        >
+          <Lightbulb size={16} />
+          看這個專案的其他貢獻方向
+          <ArrowRight size={15} />
+        </button>
+      )}
+
+      {insights && !run && (
         <section
           className="mission-recommendations"
           aria-labelledby="mission-ideas-title"
