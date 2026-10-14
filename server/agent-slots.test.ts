@@ -92,6 +92,46 @@ test("releasing twice frees only one slot", async () => {
   assert.equal(slots.active, 0);
 });
 
+test("raising the limit grants waiters at once; lowering it waits for running work", async () => {
+  const slots = new AgentSlots(1);
+  const first = await slots.acquire();
+  const order: string[] = [];
+  const waiting = ["second", "third", "fourth"].map((name) =>
+    slots.acquire().then((release) => {
+      order.push(name);
+      return release;
+    }),
+  );
+  await delay(10);
+  assert.equal(slots.waiting, 3);
+  slots.setLimit(3);
+  assert.equal(slots.limit, 3);
+  const second = await waiting[0];
+  const third = await waiting[1];
+  // FIFO order, and only as many as the new limit allows.
+  assert.deepEqual(order, ["second", "third"]);
+  assert.equal(slots.active, 3);
+  assert.equal(slots.waiting, 1);
+
+  // Lowering never stops running work: the waiter gets a slot only once
+  // fewer than the new limit are active.
+  slots.setLimit(1);
+  first();
+  second();
+  await delay(10);
+  assert.deepEqual(order, ["second", "third"]);
+  assert.equal(slots.active, 1);
+  third();
+  const fourth = await waiting[2];
+  assert.deepEqual(order, ["second", "third", "fourth"]);
+  assert.equal(slots.active, 1);
+  fourth();
+  assert.equal(slots.active, 0);
+  assert.throws(() => slots.setLimit(0), /positive integer/);
+  assert.throws(() => slots.setLimit(1.5), /positive integer/);
+  assert.equal(slots.limit, 1);
+});
+
 test("BELLPR_MAX_AGENT_PROCESSES defaults to 3 and rejects values outside 1-32", () => {
   assert.equal(parseAgentProcessLimit(undefined), 3);
   assert.equal(parseAgentProcessLimit("1"), 1);
