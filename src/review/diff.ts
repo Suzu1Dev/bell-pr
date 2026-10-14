@@ -1,3 +1,5 @@
+import type { Messages } from "../i18n";
+
 export type DiffLine = {
   id: number;
   kind: "context" | "added" | "removed" | "hunk" | "note";
@@ -101,23 +103,28 @@ export function languageBadge(language: string): string {
   return languageBadges[language] ?? language.trim().slice(0, 2).toUpperCase();
 }
 
-/** Keep context questions within the chat API's 8,000-character limit. */
-export function selectionQuestion(path: string, lines: DiffLine[]): string {
-  const header = `請用白話解釋 ${path} 中選取的 ${lines.length} 行程式碼，說明它們的用途、變更原因與需要注意的地方。\n\n`;
+/**
+ * The question about selected lines, in the language of `messages` (the UI's
+ * review dictionary). Keep context questions within the chat API's
+ * 8,000-character limit.
+ */
+export function selectionQuestion(
+  path: string,
+  lines: DiffLine[],
+  messages: Messages["review"]["selection"],
+): string {
+  const header = `${messages.question({ path, count: lines.length })}\n\n`;
   const context = lines
-    .map((line) => {
-      const location =
-        line.kind === "removed"
-          ? `刪除 舊 L${line.oldLine}`
-          : line.kind === "added"
-            ? `新增 新 L${line.newLine}`
-            : `原有 舊 L${line.oldLine}／新 L${line.newLine}`;
-      return `${location}: ${line.text}`;
-    })
+    .map((line) =>
+      line.kind === "removed"
+        ? messages.removedLine(line)
+        : line.kind === "added"
+          ? messages.addedLine(line)
+          : messages.contextLine(line),
+    )
     .join("\n");
   if (header.length + context.length <= 8000) return header + context;
-  const note =
-    "\n\n[內容已節錄] 選取範圍較長，下方僅附部分內容，請優先解釋這段節錄。\n";
+  const note = `\n\n${messages.truncated}\n`;
   return `${header}${note}${context.slice(0, Math.max(0, 8000 - header.length - note.length))}`;
 }
 

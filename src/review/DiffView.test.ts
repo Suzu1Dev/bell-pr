@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { demoFiles } from "../demo";
+import { getDemo } from "../demo";
+import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { DiffFile } from "../types";
-import { DiffView } from "./DiffView";
+import { DiffView, type DiffViewProps } from "./DiffView";
+
+// These tests pin zh-TW, the language their assertions were written in.
+const demoFiles = getDemo("zh-TW").files;
 
 const render = (file: DiffFile, view: "unified" | "split" = "unified") =>
-  renderToStaticMarkup(
+  renderZh(
     createElement(DiffView, {
       file,
       reviewed: false,
@@ -43,7 +46,7 @@ test("split view labels the before and after columns", () => {
 });
 
 test("the note hint appears only when a note is known to be missing and never disables the checkbox", () => {
-  const withHint = renderToStaticMarkup(
+  const withHint = renderZh(
     createElement(DiffView, {
       file: demoFiles[0],
       reviewed: false,
@@ -55,7 +58,7 @@ test("the note hint appears only when a note is known to be missing and never di
   );
   assert.match(withHint, /還沒寫下你的理解/);
   assert.doesNotMatch(withHint, /<input type="checkbox"[^>]*disabled/);
-  const withNote = renderToStaticMarkup(
+  const withNote = renderZh(
     createElement(DiffView, {
       file: demoFiles[0],
       reviewed: false,
@@ -75,4 +78,51 @@ test("a blocked file shows the reason and disables review", () => {
   assert.match(html, /<p>原因<\/p>/);
   assert.match(html, /<input type="checkbox"[^>]*disabled/);
   assert.doesNotMatch(html, /rv-line-added/);
+});
+
+test("an English render of the diff view has no Han in its own text", () => {
+  // The English demo's diffs hold only code, so its files serve as they are.
+  const files = getDemo("en").files;
+  const renderEnglish = (props: Partial<DiffViewProps> & { file: DiffFile }) =>
+    renderEn(
+      createElement(DiffView, {
+        reviewed: false,
+        onReview() {},
+        onAsk() {},
+        view: "unified",
+        ...props,
+      }),
+    );
+  for (const file of files) {
+    for (const view of ["unified", "split"] as const) {
+      const html = renderEnglish({ file, view, hasNote: false });
+      assertNoHan(html);
+      assert.ok(html.includes(`aria-label="Code changes in ${file.path}"`));
+      assert.match(html, /You haven&#x27;t noted your understanding yet/);
+      assert.match(html, /Click any line and the agent will explain it/);
+      assert.match(html, /<kbd>Shift<\/kbd> for several lines/);
+      assert.match(html, /aria-label="Added, line \d+: /);
+      if (view === "split") assert.match(html, />Before<\/span><span>After</);
+    }
+  }
+  const reviewed = renderEnglish({ file: files[0], reviewed: true });
+  assertNoHan(reviewed);
+  assert.match(reviewed, /Reviewed<\/label>/);
+  const blocked = renderEnglish({
+    file: { ...files[0], blocked: "The file is too large to review." },
+  });
+  assertNoHan(blocked);
+  assert.match(blocked, /This file can&#x27;t be reviewed right now/);
+  assert.match(blocked, /<p>The file is too large to review\.<\/p>/);
+  const binary = renderEnglish({
+    file: { ...files[0], patch: "Binary files differ\n" },
+  });
+  assertNoHan(binary);
+  assert.match(binary, /This file has no text changes to show/);
+  assert.match(binary, /can&#x27;t be shown line by line/);
+  // An empty added line still gets a readable name.
+  const blank = renderEnglish({
+    file: { ...files[0], patch: "@@ -1,0 +1,1 @@\n+\n" },
+  });
+  assert.match(blank, /aria-label="Added, line 1: blank line"/);
 });

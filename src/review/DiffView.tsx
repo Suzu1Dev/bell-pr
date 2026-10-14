@@ -9,6 +9,7 @@ import {
   MousePointer2,
   X,
 } from "lucide-react";
+import { useT } from "../i18n";
 import type { DiffFile } from "../types";
 import {
   languageBadges,
@@ -17,6 +18,7 @@ import {
   splitDiff,
   type DiffLine,
 } from "./diff";
+import { withNodes } from "./withNodes";
 import "./review.css";
 
 export interface DiffViewProps {
@@ -67,6 +69,7 @@ export function DiffView({
   view,
   hasNote,
 }: DiffViewProps) {
+  const t = useT("review");
   const lines = useMemo(
     () => (file.blocked ? [] : parseDiff(file.patch)),
     [file.patch, file.blocked],
@@ -103,7 +106,7 @@ export function DiffView({
 
   function askAboutSelection() {
     if (file.blocked || selectedLines.length === 0) return;
-    onAsk(selectionQuestion(file.path, selectedLines));
+    onAsk(selectionQuestion(file.path, selectedLines, t.selection));
   }
 
   function renderLine(line: DiffLine | undefined, side?: "old" | "new") {
@@ -118,6 +121,8 @@ export function DiffView({
     const isSelected = selectedIds.has(line.id);
     const sign =
       line.kind === "added" ? "+" : line.kind === "removed" ? "−" : " ";
+    const kind =
+      line.kind === "added" || line.kind === "removed" ? line.kind : "context";
     return (
       <div
         key={`${side ?? "unified"}-${line.id}`}
@@ -125,7 +130,10 @@ export function DiffView({
         role="button"
         tabIndex={0}
         aria-pressed={isSelected}
-        aria-label={`${line.kind === "removed" ? "刪除" : line.kind === "added" ? "新增" : "未變更"}，第 ${side === "old" ? line.oldLine : (line.newLine ?? line.oldLine)} 行：${line.text || "空白行"}`}
+        aria-label={t.diff.lineLabel[kind]({
+          line: side === "old" ? line.oldLine : (line.newLine ?? line.oldLine),
+          text: line.text || t.diff.blankLine,
+        })}
         onClick={(event) => select(line, event.shiftKey)}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -133,7 +141,7 @@ export function DiffView({
             select(line, event.shiftKey);
           }
         }}
-        title="點選行以追問，按住 Shift 可選取多行"
+        title={t.diff.lineTitle}
       >
         {side ? (
           <span className="rv-gutter">
@@ -159,7 +167,7 @@ export function DiffView({
   return (
     <section
       className={`rv-diff ${view === "split" ? "rv-diff-split" : ""}`}
-      aria-label={`${file.path} 的程式碼差異`}
+      aria-label={t.diff.regionLabel({ path: file.path })}
     >
       <div className="rv-file-header">
         <div className="rv-file-path">
@@ -183,7 +191,7 @@ export function DiffView({
           <span className="rv-additions">+{file.additions}</span>
           <span className="rv-deletions">−{file.deletions}</span>
           {hasNote === false && !reviewed && !file.blocked && (
-            <span className="rv-note-hint">還沒寫下你的理解</span>
+            <span className="rv-note-hint">{t.diff.noteHint}</span>
           )}
           <label className={`rv-reviewed ${reviewed ? "rv-reviewed-yes" : ""}`}>
             <input
@@ -195,7 +203,7 @@ export function DiffView({
             <span className="rv-review-check" aria-hidden="true">
               {reviewed && <Check size={11} strokeWidth={3} />}
             </span>
-            已審閱
+            {t.diff.reviewed}
           </label>
         </div>
       </div>
@@ -203,21 +211,17 @@ export function DiffView({
         <div className="rv-empty">
           <Code2 size={28} />
           <h3>
-            {file.blocked
-              ? "這個檔案目前無法審閱"
-              : "這個檔案沒有可顯示的文字差異"}
+            {file.blocked ? t.diff.blockedTitle : t.diff.noTextTitle}
           </h3>
-          <p>
-            {file.blocked || "二進位檔案或沒有文字變更的檔案，無法逐行呈現。"}
-          </p>
+          <p>{file.blocked || t.diff.noTextBody}</p>
         </div>
       ) : (
         <div className="rv-code-scroll">
           {view === "split" ? (
             <div className="rv-split-content">
               <div className="rv-split-labels">
-                <span>變更前</span>
-                <span>變更後</span>
+                <span>{t.diff.before}</span>
+                <span>{t.diff.after}</span>
               </div>
               {splitRows.map((row, index) =>
                 row.hunk ? (
@@ -256,13 +260,15 @@ export function DiffView({
           {selectedLines.length ? (
             <>
               <span className="rv-selection-dot" />
-              已選取 {selectedLines.length} 行
+              {t.diff.selectedLines({ count: selectedLines.length })}
             </>
           ) : (
             <>
-              <MousePointer2 size={13} /> 點選任何一行，讓 Agent 為你解說
+              <MousePointer2 size={13} /> {t.diff.idleHint}
               <span className="rv-shift-hint">
-                <kbd>Shift</kbd> 可多行選取
+                {withNodes(t.diff.shiftHint, {
+                  key: <kbd>{t.diff.shiftKey}</kbd>,
+                })}
               </span>
             </>
           )}
@@ -272,7 +278,7 @@ export function DiffView({
             <button
               type="button"
               className="rv-clear"
-              aria-label="清除選取"
+              aria-label={t.diff.clearSelection}
               onClick={() => setSelection(null)}
             >
               <X size={14} />
@@ -283,7 +289,7 @@ export function DiffView({
               onClick={askAboutSelection}
             >
               <MessageSquare size={13} />
-              解說這段程式碼
+              {t.diff.askSelection}
               <ChevronRight size={13} />
             </button>
           </div>
