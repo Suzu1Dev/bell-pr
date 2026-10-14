@@ -49,6 +49,28 @@ them. The run log records the queries and addresses, never the page
 contents. Project analysis and discovery never get web access. Leave it
 off for confidential code.
 
+### The AI CLIs' own usage data
+
+The Codex CLI and Claude Code may send their own usage data, such as
+telemetry and error reports, to their providers. BELL PR neither adds to it
+nor turns it off. It starts each agent with only the environment variables
+that CLI needs, plus these opt-outs when they are set in the environment
+BELL PR runs in:
+
+- `DO_NOT_TRACK`, passed to both CLIs;
+- for Claude Code, the variables it documents: `DISABLE_TELEMETRY`,
+  `DISABLE_ERROR_REPORTING`, `DISABLE_BUG_COMMAND`,
+  `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY`, and
+  `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, which turns off all of its
+  non-essential traffic.
+
+BELL PR starts the Codex CLI as `codex exec --ignore-user-config`, which does
+not load `$CODEX_HOME/config.toml` (sign-in still uses `CODEX_HOME`). This
+keeps your personal Codex settings out of the agents' work, but it also
+means that a setting you made only in that file, such as
+`[analytics] enabled = false`, does not apply to the agents BELL PR runs:
+Codex's built-in defaults apply instead.
+
 ## What BELL PR stores
 
 Everything lives in one data directory: `~/.bellpr` by default, or the

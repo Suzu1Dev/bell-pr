@@ -95,6 +95,11 @@ it supports (a Claude subscription login, `ANTHROPIC_API_KEY` or
 Microsoft Foundry); BELL PR never restricts or reads them. Codex receives
 `CODEX_HOME`, `OPENAI_API_KEY` and `CODEX_API_KEY`. Neither receives the
 other's keys, and no agent receives GitHub tokens or a BELL PR license key.
+Usage-data opt-outs that you set also pass through, unchanged: `DO_NOT_TRACK`
+to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
+`DISABLE_BUG_COMMAND`, `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY` and
+`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` to Claude Code (see
+[Privacy and your data](privacy-and-data.md#the-ai-clis-own-usage-data)).
 
 ### Instructions from the target repository
 

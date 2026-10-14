@@ -95,6 +95,33 @@ test("each agent CLI gets its own sign-in variables and never the other's", (t) 
   }
 });
 
+test("usage-data opt-outs the person set reach the agents, and BELL PR never sets one", (t) => {
+  const claudeOptOuts = {
+    DISABLE_TELEMETRY: "1",
+    DISABLE_ERROR_REPORTING: "1",
+    DISABLE_BUG_COMMAND: "1",
+    CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY: "1",
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "true",
+  };
+  withEnv(t, { ...claudeOptOuts, DO_NOT_TRACK: "1" });
+  const claude = agentEnvironment("claude");
+  for (const [key, value] of Object.entries({ ...claudeOptOuts, DO_NOT_TRACK: "1" }))
+    assert.equal(claude[key], value, key);
+  // Codex gets the cross-tool convention only, not Claude Code's variables.
+  const codex = agentEnvironment("codex");
+  assert.equal(codex.DO_NOT_TRACK, "1");
+  for (const key of Object.keys(claudeOptOuts)) assert.equal(key in codex, false, key);
+  const both = agentEnvironment();
+  for (const [key, value] of Object.entries({ ...claudeOptOuts, DO_NOT_TRACK: "1" }))
+    assert.equal(both[key], value, key);
+
+  // Unset, nothing is added on the person's behalf.
+  for (const key of ["DO_NOT_TRACK", ...Object.keys(claudeOptOuts)]) delete process.env[key];
+  for (const env of [agentEnvironment("claude"), agentEnvironment("codex"), agentEnvironment()])
+    for (const key of ["DO_NOT_TRACK", ...Object.keys(claudeOptOuts)])
+      assert.equal(key in env, false, key);
+});
+
 test("empty variables are left out", (t) => {
   withEnv(t, { ANTHROPIC_API_KEY: "", OPENAI_API_KEY: "" });
   assert.equal("ANTHROPIC_API_KEY" in agentEnvironment("claude"), false);
