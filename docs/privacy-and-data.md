@@ -71,8 +71,11 @@ with mode 0600.
 | `logs/` | Daily log files, at most 7 files and 50 MB, with secrets redacted. Prompts and page contents are never logged. |
 | `children.json`, `bellpr.lock`, `run/` | The agent processes that are running (so a crash leaves none behind), the running instance's process id and port, and a one-time sign-in link that is deleted as soon as `bell-pr open` reads it. |
 
-The session secret and the one-time sign-in tokens live only in the
-memory of the running server and are never written to disk.
+The session secret lives only in the memory of the running server and is
+never written to disk. A one-time sign-in link from `bell-pr open` does
+reach the disk briefly: the server writes it to a `0600` file under `run/`,
+the command deletes that file as soon as it has read it, and the link
+expires after two minutes.
 
 Your browser keeps, for this local site only: the language you chose,
 layout preferences such as the code font size and the collapsed sidebar,

@@ -218,8 +218,10 @@ other's keys, and no agent receives GitHub tokens or a BELL PR license key.
 ## Data at rest
 
 The data directory is created with mode `0700`, and `state.json` and the
-files that hold secrets with `0600`. The session secret and one-time tokens
-are never written to disk.
+files that hold secrets with `0600`. The session secret is never written
+to disk. A one-time sign-in link does reach the disk briefly: the server
+writes it to `run/open-link.json` (`0600`), `bell-pr open` deletes the file
+as soon as it has read it, and the link expires after 120 seconds.
 
 ## Docker
 
