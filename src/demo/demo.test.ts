@@ -8,28 +8,17 @@ import {
   type Locale,
 } from "../../shared/i18n/locale";
 import { parseReviewOrder } from "../../shared/review-order";
-import { demoDraftPreparation as panelDraftPreparation } from "../draft/DraftGuidancePanel";
-import {
-  demoContributionBrief as missionBrief,
-  demoInsights as missionInsights,
-} from "../mission/demo";
-import { demoTeam as boardTeam } from "../team/TeamBoard";
 import { assertNoHan } from "../test-utils/render";
 import type { DiffFile } from "../types";
 import { getSampleDiscoveryJob } from "./discovery";
 import {
   demoAnswer,
-  demoContributionBrief,
-  demoDraftPreparation,
-  demoFiles,
-  demoInsights,
-  demoRepo,
-  demoRun,
-  demoTeam,
   getDemo,
   type DemoAnswerTopic,
   type DemoContent,
 } from "./index";
+
+const demoFiles = getDemo("zh-TW").files;
 
 // String values under these keys are structure (ids, paths, times, enum
 // values, code), so every locale must carry the same value. Any other string
@@ -134,21 +123,6 @@ test("every locale has the same demo structure: ids, paths, times and array leng
   const reference = structure(getDemo("zh-TW"));
   for (const locale of locales)
     assert.deepEqual(structure(getDemo(locale)), reference, locale);
-});
-
-test("the legacy names and the component re-exports are the zh-TW fixtures", () => {
-  const zh = getDemo("zh-TW");
-  assert.equal(demoRepo, zh.repo);
-  assert.equal(demoFiles, zh.files);
-  assert.equal(demoRun, zh.run);
-  assert.equal(demoInsights, zh.insights);
-  assert.equal(demoContributionBrief, zh.contributionBrief);
-  assert.equal(demoTeam, zh.team);
-  assert.equal(demoDraftPreparation, zh.draftPreparation);
-  assert.equal(missionInsights, zh.insights);
-  assert.equal(missionBrief, zh.contributionBrief);
-  assert.equal(boardTeam, zh.team);
-  assert.equal(panelDraftPreparation, zh.draftPreparation);
 });
 
 test("demoAnswer gives the rationale answer to a why question, with or without the locale", () => {

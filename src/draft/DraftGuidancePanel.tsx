@@ -666,5 +666,3 @@ export function DraftGuidancePanel({
     </section>
   );
 }
-
-export { demoDraftPreparation } from "../demo";

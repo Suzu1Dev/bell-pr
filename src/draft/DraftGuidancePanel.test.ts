@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import { demoDraftPreparation, getDemo } from "../demo";
+import { getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { DraftGuidancePanel } from "./DraftGuidancePanel";
 import { draftPreflight, type DraftCheck } from "../../shared/draft-checks";
@@ -10,6 +10,8 @@ import {
   withAiDisclosure,
   type DraftPreparation,
 } from "../../shared/drafts";
+
+const demoDraftPreparation = getDemo("zh-TW").draftPreparation;
 
 type PanelOptions = {
   applied?: boolean;

@@ -8,13 +8,15 @@ import {
   type Entitlements,
 } from "../../shared/plans";
 import type { AgentTeam } from "../../shared/team";
-import { demoRun, demoTeam, getDemo } from "../demo";
+import { getDemo } from "../demo";
 import { createDemoPlayback, type PlaybackClock } from "../demo/playback";
 import { LocaleProvider } from "../i18n";
 import en from "../i18n/en";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Run } from "../types";
 import { TeamBoard } from "./TeamBoard";
+
+const { run: demoRun, team: demoTeam } = getDemo("zh-TW");
 
 const board = (
   run: Run,
