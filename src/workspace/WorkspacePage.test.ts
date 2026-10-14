@@ -111,7 +111,7 @@ test("on Free the learning export is a locked button with the PRO badge, never a
   assert.match(button, /lucide-lock/);
   assert.match(button, /Export learning record \(Markdown\)/);
   assert.match(button, /aria-label="Pro feature"/);
-  assert.doesNotMatch(html, /download=/);
+  assert.doesNotMatch(html, /<a [^>]*\bdownload\b/);
   assert.doesNotMatch(html, /export\.md/);
   assertNoHan(html);
 });
