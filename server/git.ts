@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
 import { git } from "./process.js";
-import { secretInPatch } from "./secrets.js";
+import { redact, secretInPatch } from "./secrets.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
 
 export { secretInPatch };
@@ -125,6 +125,43 @@ export function parseNumstat(
         binary: match[1] === "-",
       };
     });
+}
+
+/** The largest base version shown around a diff; the same bound as a new file. */
+export const contextFileLimit = 512_000;
+
+/**
+ * A changed file as it was at the run's base commit, split into lines. The
+ * lines a diff leaves out are unchanged, so they read the same here as in
+ * the checkout. Callers check the path against the current diff first.
+ */
+export async function baseFileLines(
+  run: Pick<Run, "worktreePath" | "baseSha">,
+  filePath: string,
+) {
+  const blob = `${run.baseSha}:${filePath}`;
+  // A submodule is a commit, not file content.
+  const type = (await git(run.worktreePath, ["cat-file", "-t", blob])).stdout.trim();
+  if (type !== "blob")
+    throw new AppError("子模組或特殊項目沒有可展開的程式碼。", 422);
+  const size = Number(
+    (await git(run.worktreePath, ["cat-file", "-s", blob])).stdout.trim(),
+  );
+  if (!(size <= contextFileLimit))
+    throw new AppError("檔案超過 512 KB，無法展開周圍的程式碼。", 422);
+  const content = (
+    await git(run.worktreePath, ["cat-file", "blob", blob], {
+      maxBytes: contextFileLimit + 1_000,
+    })
+  ).stdout;
+  if (content.includes("\0"))
+    throw new AppError("二進位檔案無法展開周圍的程式碼。", 422);
+  if (secretInPatch(content))
+    throw new AppError("檔案疑似包含憑證，周圍的程式碼不會顯示。", 422);
+  // Masked line by line, so password=… or URL credentials never leave and numbering holds.
+  const lines = content.split("\n").map(redact);
+  if (lines.at(-1) === "") lines.pop();
+  return lines;
 }
 
 export async function readDiff(

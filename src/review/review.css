@@ -1519,3 +1519,79 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* Unchanged code around the changes: expand arrows, whole-file toggle, read-error notice. */
+.rv-line-expanded .rv-gutter {
+  background: #f7f8f5;
+}
+.rv-gap {
+  height: auto;
+  min-height: 31px;
+}
+.rv-gap-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.rv-hunk > .rv-gap-actions {
+  flex: 0 0 auto;
+  min-width: 66px;
+  padding: 0 6px;
+  font-size: 10px;
+}
+.rv-gap-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: #6f8360;
+  cursor: pointer;
+}
+.rv-gap-actions button:hover:not(:disabled),
+.rv-gap-actions button:focus-visible {
+  border-color: #d6e1cd;
+  background: #fff;
+}
+.rv-gap-actions button:disabled {
+  opacity: 0.45;
+  cursor: progress;
+}
+.rv-gap-header {
+  margin-left: 12px;
+  color: #a2acac;
+}
+.rv-whole {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid #e1e7dc;
+  border-radius: 999px;
+  background: #fff;
+  color: #6f8360;
+  font: inherit;
+  cursor: pointer;
+}
+.rv-whole-on {
+  border-color: #b9cfa9;
+  background: #eef5e7;
+  color: #46603f;
+}
+.rv-whole:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.rv-context-error {
+  margin: 0;
+  padding: 7px 15px;
+  border-bottom: 1px solid #f0e2d6;
+  background: #fff8f2;
+  color: #985b3e;
+  font-size: 11px;
+}

@@ -1272,6 +1272,18 @@ export default function App() {
       notify("無法使用剪貼簿，請直接選取路徑複製。", "error");
     }
   }
+  /** The file at the run's base commit, for the code around its changes. */
+  async function loadBaseLines(runId: string, target: DiffFile) {
+    const query = new URLSearchParams({
+      path: target.path,
+      fingerprint: target.fingerprint ?? "",
+      base: run.baseSha ?? "",
+    });
+    const { lines } = await api<{ lines: string[] }>(
+      `/runs/${runId}/context?${query}`,
+    );
+    return lines;
+  }
   async function copySetupCommand(command: string) {
     try {
       await navigator.clipboard.writeText(command);
@@ -2585,13 +2597,18 @@ export default function App() {
                       )}
                       {file ? (
                         <DiffView
-                          key={`${run.id}:${file.path}`}
+                          key={`${run.id}:${file.path}:${run.baseSha ?? ""}`}
                           file={file}
                           reviewed={run.reviewedFiles.includes(file.path)}
                           onReview={reviewFile}
                           onAsk={ask}
                           view={diffView}
                           hasNote={Boolean(run.notes?.[file.path]?.text)}
+                          onLoadBase={
+                            !demo && file.fingerprint && run.baseSha
+                              ? () => loadBaseLines(run.id, file)
+                              : undefined
+                          }
                         />
                       ) : (
                         <div className="empty-state">

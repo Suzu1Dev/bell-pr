@@ -1,21 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   Code2,
   FileCode2,
   FileText,
+  FoldVertical,
   MessageSquare,
   MousePointer2,
+  UnfoldVertical,
   X,
 } from "lucide-react";
 import type { DiffFile } from "../types";
 import {
+  expandDiff,
   languageBadges,
   parseDiff,
   selectionQuestion,
   splitDiff,
   type DiffLine,
+  type Reveal,
 } from "./diff";
 import "./review.css";
 
@@ -27,7 +33,12 @@ export interface DiffViewProps {
   view: "unified" | "split";
   /** When given and false, a soft hint invites a learner note; it never blocks the checkbox. */
   hasNote?: boolean;
+  /** Reads the base version of a modified file, so the code around its changes can be shown. */
+  onLoadBase?: () => Promise<string[]>;
 }
+
+/** Lines one click on an expand arrow shows. */
+const expandStep = 20;
 
 function Syntax({ code }: { code: string }) {
   const tokens = code.split(
@@ -66,10 +77,33 @@ export function DiffView({
   onAsk,
   view,
   hasNote,
+  onLoadBase,
 }: DiffViewProps) {
-  const lines = useMemo(
+  const parsed = useMemo(
     () => (file.blocked ? [] : parseDiff(file.patch)),
     [file.patch, file.blocked],
+  );
+  // Added and deleted files are whole in the patch; only a modified one has
+  // code around it, and only with a hunk to place it (not a mode change)
+  // and as a regular file (a submodule, mode 160000, is a commit).
+  const readable =
+    !!onLoadBase &&
+    file.status === "modified" &&
+    !file.blocked &&
+    parsed.some((line) => line.kind === "hunk") &&
+    !/^index [0-9a-f]+\.\.[0-9a-f]+ 160000$/m.test(file.patch);
+  const [base, setBase] = useState<string[] | null>(null);
+  const [reveal, setReveal] = useState<Reveal>({});
+  const [whole, setWhole] = useState(false);
+  const [baseLoading, setBaseLoading] = useState(false);
+  const [baseError, setBaseError] = useState("");
+  const version = `${file.path}\0${file.patch}`;
+  const currentVersion = useRef(version);
+  currentVersion.current = version;
+  const pendingBase = useRef<Promise<string[] | null> | null>(null);
+  const lines = useMemo(
+    () => expandDiff(parsed, base, whole ? "all" : reveal, readable),
+    [parsed, base, whole, reveal, readable],
   );
   const splitRows = useMemo(() => splitDiff(lines), [lines]);
   const [selection, setSelection] = useState<{
@@ -77,7 +111,64 @@ export function DiffView({
     end: number;
   } | null>(null);
 
-  useEffect(() => setSelection(null), [file.path, file.patch, file.blocked]);
+  useEffect(() => {
+    setBase(null);
+    setReveal({});
+    setWhole(false);
+    setBaseError("");
+    setBaseLoading(false);
+    pendingBase.current = null;
+  }, [version]);
+  // Shown lines are renumbered whenever more code appears.
+  useEffect(() => setSelection(null), [file.blocked, lines]);
+
+  /** The base version, read once per diff version; null when it cannot be read. */
+  function readBase(): Promise<string[] | null> {
+    if (base) return Promise.resolve(base);
+    if (!onLoadBase || !readable) return Promise.resolve(null);
+    if (!pendingBase.current) {
+      const requested = version;
+      setBaseLoading(true);
+      setBaseError("");
+      pendingBase.current = onLoadBase().then(
+        (value) => {
+          if (currentVersion.current !== requested) return null;
+          setBase(value);
+          setBaseLoading(false);
+          return value;
+        },
+        (error: unknown) => {
+          if (currentVersion.current !== requested) return null;
+          pendingBase.current = null;
+          setBaseLoading(false);
+          setBaseError(
+            error instanceof Error ? error.message : "無法讀取周圍的程式碼。",
+          );
+          return null;
+        },
+      );
+    }
+    return pendingBase.current;
+  }
+
+  async function expand(index: number, side: "below" | "above" | "all") {
+    if (!(await readBase())) return;
+    setReveal((current) => {
+      const shown = current[index] ?? { below: 0, above: 0 };
+      return {
+        ...current,
+        [index]:
+          side === "all"
+            ? { below: Infinity, above: 0 }
+            : { ...shown, [side]: shown[side] + expandStep },
+      };
+    });
+  }
+
+  async function toggleWhole() {
+    if (whole) setWhole(false);
+    else if (await readBase()) setWhole(true);
+  }
 
   const selectedLines = selection
     ? lines.filter(
@@ -121,7 +212,7 @@ export function DiffView({
     return (
       <div
         key={`${side ?? "unified"}-${line.id}`}
-        className={`rv-line rv-line-${line.kind}${isSelected ? " rv-line-selected" : ""}`}
+        className={`rv-line rv-line-${line.kind}${line.expanded ? " rv-line-expanded" : ""}${isSelected ? " rv-line-selected" : ""}`}
         role="button"
         tabIndex={0}
         aria-pressed={isSelected}
@@ -156,6 +247,63 @@ export function DiffView({
     );
   }
 
+  function renderGap(line: DiffLine, className: string) {
+    const gap = line.gap!;
+    const count =
+      gap.hidden === null ? expandStep : Math.min(expandStep, gap.hidden);
+    return (
+      <div key={`gap-${line.id}`} className={`${className} rv-gap`}>
+        <span className="rv-gap-actions">
+          {gap.afterChange && (
+            <button
+              type="button"
+              onClick={() => void expand(gap.index, "below")}
+              disabled={baseLoading}
+              aria-label={`顯示上一段變更下方的 ${count} 行`}
+              title={`顯示上一段變更下方的 ${count} 行`}
+            >
+              <ChevronDown size={13} />
+            </button>
+          )}
+          {gap.beforeChange && (
+            <button
+              type="button"
+              onClick={() => void expand(gap.index, "above")}
+              disabled={baseLoading}
+              aria-label={`顯示這段變更上方的 ${count} 行`}
+              title={`顯示這段變更上方的 ${count} 行`}
+            >
+              <ChevronUp size={13} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => void expand(gap.index, "all")}
+            disabled={baseLoading}
+            aria-label={
+              gap.hidden === null
+                ? "顯示到檔案結尾"
+                : `顯示這裡全部 ${gap.hidden} 行`
+            }
+            title={
+              gap.hidden === null
+                ? "顯示到檔案結尾"
+                : `顯示這裡全部 ${gap.hidden} 行`
+            }
+          >
+            <UnfoldVertical size={13} />
+          </button>
+        </span>
+        <code>
+          {gap.hidden === null
+            ? "檔案後面還有未變更的程式碼"
+            : `${gap.hidden} 行未變更`}
+          {line.text && <span className="rv-gap-header">{line.text}</span>}
+        </code>
+      </div>
+    );
+  }
+
   return (
     <section
       className={`rv-diff ${view === "split" ? "rv-diff-split" : ""}`}
@@ -180,6 +328,23 @@ export function DiffView({
           <span className="rv-file-language">{languageLabel}</span>
         </div>
         <div className="rv-file-actions">
+          {readable && (
+            <button
+              type="button"
+              className={`rv-whole ${whole ? "rv-whole-on" : ""}`}
+              aria-pressed={whole}
+              onClick={() => void toggleWhole()}
+              disabled={baseLoading}
+              title="在變更之間顯示整個檔案"
+            >
+              {whole ? (
+                <FoldVertical size={13} />
+              ) : (
+                <UnfoldVertical size={13} />
+              )}
+              完整檔案
+            </button>
+          )}
           <span className="rv-additions">+{file.additions}</span>
           <span className="rv-deletions">−{file.deletions}</span>
           {hasNote === false && !reviewed && !file.blocked && (
@@ -199,6 +364,11 @@ export function DiffView({
           </label>
         </div>
       </div>
+      {baseError && (
+        <p className="rv-context-error" role="alert">
+          {baseError}
+        </p>
+      )}
       {file.blocked || lines.length === 0 ? (
         <div className="rv-empty">
           <Code2 size={28} />
@@ -220,7 +390,9 @@ export function DiffView({
                 <span>變更後</span>
               </div>
               {splitRows.map((row, index) =>
-                row.hunk ? (
+                row.hunk?.kind === "gap" ? (
+                  renderGap(row.hunk, "rv-hunk rv-split-hunk")
+                ) : row.hunk ? (
                   <div className="rv-hunk rv-split-hunk" key={index}>
                     <span>⋯</span>
                     <code>{row.hunk.text}</code>
@@ -236,7 +408,9 @@ export function DiffView({
           ) : (
             <div className="rv-unified-content">
               {lines.map((line) =>
-                line.kind === "hunk" || line.kind === "note" ? (
+                line.kind === "gap" ? (
+                  renderGap(line, "rv-hunk")
+                ) : line.kind === "hunk" || line.kind === "note" ? (
                   <div key={line.id} className="rv-hunk">
                     <span>⋯</span>
                     <code>{line.text}</code>
