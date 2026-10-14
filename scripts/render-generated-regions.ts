@@ -176,6 +176,9 @@ function markdownCode(text: string): [number, number][] {
     } else if (fenceMatch) {
       flushProse();
       fence = { char: fenceMatch[1][0], length: fenceMatch[1].length, start: offset };
+    } else if (line.trim() === "") {
+      // Code spans end with their paragraph.
+      flushProse();
     } else {
       if (prose === "") proseStart = offset;
       prose += `${line}\n`;
@@ -629,6 +632,9 @@ function selfTest(): number {
     plans: { ...context.plans, en: { ...en, features: { ...en.features, runs: { label: "A | B <c>", limit: "*x*" } } } },
   };
   assert.ok(renderText(md, "README.md", pipes).text.includes("| A \\| B \\<c\\> | Free | \\*x\\* |"));
+  // A backtick without a partner in its paragraph hides nothing.
+  const loose = "Use ` carefully.\n\n<!-- generated:product-link key=docsUrl text=Docs -->x<!-- /generated:product-link -->\n\nAnd ` here.\n";
+  assert.equal(renderText(loose, "x.md", context).regions, 1);
   const crlf = renderText(md.replace(/\n/g, "\r\n"), "README.md", context).text;
   assert.equal(crlf, markdown.replace(/\n/g, "\r\n"));
 
