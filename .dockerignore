@@ -7,6 +7,9 @@ build
 .git
 .env*
 tools
+# server/license.test.ts imports these and `npm run build` type-checks it;
+# the image itself copies only the build output.
+!tools/license/*.ts
 e2e
 marketing
 site
