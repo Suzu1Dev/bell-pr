@@ -220,6 +220,8 @@ test("configured proxy supports same-origin JSON API requests without weakening 
   const app = createApp(workbench, {
     allowedOrigins: remoteOrigin,
     staticDirectory: path.join(directory, "missing"),
+    // The UI dev server's origin below is trusted in development mode.
+    dev: true,
   });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
