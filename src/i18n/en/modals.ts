@@ -63,7 +63,7 @@ const modals = {
     importOther: "Import another project",
     recommendations: "See AI-recommended directions first",
     demoNote:
-      "Demo settings can be changed freely; no real agent starts. Import your repository to start building.",
+      "Demo settings can be changed freely; no real agent starts. The sample team plays its run again from the start. Import your repository to start building.",
     loadingSettings: "Loading this project's contribution settings…",
     reloadSettings: "Reload project settings",
     saveDefault: "Save as default settings",
@@ -80,7 +80,7 @@ const modals = {
     teamLimit: "Free: 2 teammates · Pro: up to 4",
     usage: ({ provider }: { provider: string }) =>
       `The task runs with the ${provider} CLI signed in on this computer and counts against that account's usage. When it finishes, it waits for your review.`,
-    saveDemo: "Save demo direction",
+    saveDemo: "Play the sample team",
     planFirst: "Generate the team plan",
     start: "Start the agent team",
   },

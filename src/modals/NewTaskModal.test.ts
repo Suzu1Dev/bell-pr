@@ -121,10 +121,10 @@ test("the start button names what happens next and waits for a long enough goal"
   assert.match(direct, /會使用本機 Claude Code 帳號執行任務/);
 });
 
-test("the demo repository only saves a direction", () => {
+test("the demo repository plays the sample team again instead of starting agents", () => {
   const html = render({ taskRepoId: "demo-repo" });
-  assert.match(html, /示範設定可以自由調整；不會啟動真實 agent。/);
-  assert.match(html, />儲存示範方向<\/button>/);
+  assert.match(html, /示範設定可以自由調整；不會啟動真實 agent。示範團隊會從頭重新播放它的工作。/);
+  assert.match(html, />播放示範團隊<\/button>/);
 });
 
 test("loading or failed settings keep the form locked and say why", () => {
@@ -151,7 +151,7 @@ test("the new-task dialog reads in English with no Chinese left", () => {
 
   const demo = renderEn(element({ taskRepoId: "demo-repo" }));
   assert.match(demo, /Demo settings can be changed freely; no real agent starts\./);
-  assert.match(demo, />Save demo direction<\/button>/);
+  assert.match(demo, />Play the sample team<\/button>/);
   assertNoHan(demo);
 
   const loading = renderEn(element({ settingsLoading: true, settingsReady: false }));

@@ -57,7 +57,7 @@ const m: Translation<typeof en> = {
     importOther: "匯入其他專案",
     recommendations: "先看 AI 推薦方向",
     demoNote:
-      "示範設定可以自由調整；不會啟動真實 agent。請匯入你的 repository 開始開發。",
+      "示範設定可以自由調整；不會啟動真實 agent。示範團隊會從頭重新播放它的工作。請匯入你的 repository 開始開發。",
     loadingSettings: "正在載入這個專案的貢獻設定…",
     reloadSettings: "重新載入專案設定",
     saveDefault: "儲存為預設設定",
@@ -71,7 +71,7 @@ const m: Translation<typeof en> = {
     teamLimit: "Free：2 位 Teammates · Pro：最多 4 位",
     usage: ({ provider }) =>
       `會使用本機 ${provider} 帳號執行任務，消耗對應用量。完成後等待你審查。`,
-    saveDemo: "儲存示範方向",
+    saveDemo: "播放示範團隊",
     planFirst: "產生團隊計畫",
     start: "啟動 Agent team",
   },
