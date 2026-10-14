@@ -29,7 +29,7 @@ import {
 } from "./discovery.js";
 import { lenientRead } from "./persisted-schema.js";
 import { Store } from "./store.js";
-import { withLocale } from "./i18n/index.js";
+import { currentLocale, withLocale } from "./i18n/index.js";
 import { respondIn } from "./prompt-language.js";
 import { assertNoHan } from "../src/test-utils/render.js";
 
@@ -607,7 +607,16 @@ test("restart marks interrupted work failed while retaining its prior result and
 
 test("a discovery job records the locale it started in and keeps using it for its messages and output", async () => {
   const prompts: string[] = [];
+  const collectedIn: string[] = [];
   const f = await fixture({
+    // The GitHub sources (issue facts, warnings) are collected in the job's locale.
+    collectCandidates: async () => {
+      collectedIn.push(currentLocale());
+      return {
+        candidates: [copy(candidate)],
+        warnings: ["Only a bounded source sample was read."],
+      };
+    },
     command: async (_executable, _args, commandOptions) => {
       prompts.push(commandOptions!.input!);
       commandOptions?.onLine?.(
@@ -652,6 +661,7 @@ test("a discovery job records the locale it started in and keeps using it for it
     await withLocale("zh-TW", () => f.service.start({}));
     const chinese = await finished(f.service);
     assert.equal(chinese.locale, "zh-TW");
+    assert.deepEqual(collectedIn, ["en", "zh-TW"]);
     assert.ok(prompts[1].includes(respondIn("zh-TW")));
     assert.match(chinese.message, /找到 1 項/);
   } finally {
