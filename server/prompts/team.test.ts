@@ -29,15 +29,15 @@ import type { ContributionSettings } from "../../shared/insights.js";
 import type { Locale } from "../../shared/i18n/locale.js";
 import { outputLanguage, respondIn } from "../prompt-language.js";
 import { withLocale } from "../i18n/index.js";
-
-/** Han characters and CJK punctuation; the Latin middle dot is not one. */
-const cjk = /(?!\u00B7)[\p{Script_Extensions=Han}\u3000-\u303F\uFF00-\uFFEF]/u;
 import { freeEntitlements, proEntitlements } from "../../shared/plans.js";
 import type {
   AgentTeam,
   TeamPlanRevision,
   TeamTask,
 } from "../../shared/team.js";
+
+/** Han characters and CJK punctuation; the Latin middle dot is not one. */
+const cjk = /(?!\u00B7)[\p{Script_Extensions=Han}\u3000-\u303F\uFF00-\uFFEF]/u;
 
 /**
  * Fixtures hold each prompt as its lines, so a wording change shows up as a
