@@ -20,11 +20,15 @@
  * never packed): a byte copy of README.md, and the other root README.*
  * files, moved there so the package holds README.md alone. It then
  * rewrites every relative image and link in README.md:
- *   - while `homepageUrl` in shared/product.ts is set, to the absolute
- *     `<homepageUrl>/<path>`, so the website must serve the repository's
- *     files at the same paths (docs/images/… above all);
- *   - while it is empty, an image becomes the text "Screenshot: <alt>" and
- *     a link keeps its text without the link.
+ *   - to the absolute `<homepageUrl>/<site path>` when `homepageUrl` in
+ *     shared/product.ts is set and the website serves the file. The website
+ *     is site/ deployed as site/README.md ("Hosting") says, media/ aside:
+ *     it serves each legal document as its page from site/build-legal.mjs
+ *     (LICENSE.md as legal/eula.html, …) and any other file of which site/
+ *     holds a byte-identical copy (the screenshots in assets/screenshots/);
+ *   - otherwise an image becomes the text "Screenshot: <alt>" and a link
+ *     keeps its text without the link, so npmjs.com never shows a broken
+ *     image or a dead link.
  * Links within the page (#…), absolute URLs and everything in code stay as
  * they are. --pre refuses to run while .README.md.orig exists: it holds the
  * originals from a pack that did not finish, so run --post first.
@@ -46,7 +50,9 @@
  *     (scripts/render-generated-regions.ts), which this check skips;
  *   - an ErrorCode of shared/errors.ts has no heading in
  *     docs/troubleshooting.md;
- *   - README.md, rewritten as --pre would, still has a relative path.
+ *   - README.md, rewritten as --pre would, still has a relative path, or,
+ *     rewritten with the current or a stand-in `homepageUrl`, links to a
+ *     path that site/ does not serve.
  *
  * Messages go to stderr and findings to stdout, so `npm pack --json` keeps
  * its report readable.
@@ -56,10 +62,12 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { documents as legalDocuments } from "../site/build-legal.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
@@ -305,14 +313,64 @@ const escapeHtml = (value) =>
 /** `text` written out in Markdown, without the characters that would make it a link or code. */
 const plainText = (value) => value.replace(/\s+/g, " ").trim();
 
+/** Files in site/ that the website does not serve (site/README.md, "Hosting"). */
+const notDeployed = new Set(["README.md", "check-site.mjs", "build-legal.mjs"]);
+
 /**
- * README.md for the npm package: every relative image and link made
- * absolute against `homepageUrl`, or, while it is empty, images as text
- * and links as their text. Returns the text and what changed.
+ * The paths the website serves, relative to site/ and sorted: every file
+ * there except the development files above and media/ (gitignored, and
+ * different on each machine).
  */
-export function npmReadme(text, { homepageUrl = "" } = {}) {
+export function siteFiles(root) {
+  const siteRoot = path.join(root, "site");
+  const files = [];
+  const walk = (folder) => {
+    for (const entry of fs.readdirSync(path.join(siteRoot, folder), { withFileTypes: true })) {
+      const name = folder ? `${folder}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        if (name !== "media") walk(name);
+      } else if (entry.isFile() && !notDeployed.has(name)) files.push(name);
+    }
+  };
+  if (fs.existsSync(siteRoot)) walk("");
+  return files.sort();
+}
+
+/**
+ * Where the website serves a file of the repository: a function from a
+ * repository path to a path in site/, or undefined when the site does not
+ * serve that file. Legal documents map to their pages; any other file to
+ * the first byte-identical copy in site/.
+ */
+export function siteServing(root) {
+  const files = siteFiles(root);
+  const deployed = new Set(files);
+  const digest = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+  const copies = new Map();
+  for (const file of files) {
+    const hash = digest(path.join(root, "site", file));
+    if (!copies.has(hash)) copies.set(hash, file);
+  }
+  const pages = new Map(legalDocuments.map((doc) => [doc.source, `legal/${doc.page}`]));
+  return (target) => {
+    if (pages.has(target)) return deployed.has(pages.get(target)) ? pages.get(target) : undefined;
+    const file = path.join(root, target);
+    if (!fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return undefined;
+    return copies.get(digest(file));
+  };
+}
+
+/**
+ * README.md for the npm package: every relative image and link that the
+ * website serves (`sitePath`, see siteServing) made absolute against
+ * `homepageUrl`; every other one, and all of them while `homepageUrl` is
+ * empty, images as text and links as their text. Returns the text, what
+ * changed, and the references that now point at the website.
+ */
+export function npmReadme(text, { homepageUrl = "", sitePath = () => undefined } = {}) {
   const base = homepageUrl.trim().replace(/\/+$/, "");
-  const changed = { images: 0, links: 0 };
+  const changed = { images: 0, links: 0, site: 0 };
+  const linked = [];
   let output = "";
   let cursor = 0;
   for (const reference of references(text)) {
@@ -324,13 +382,19 @@ export function npmReadme(text, { homepageUrl = "" } = {}) {
     const image = reference.kind === "image" || reference.kind === "html-image";
     if (image) changed.images += 1;
     else changed.links += 1;
+    const file = decodePart(target.replace(/[?#][^]*$/, ""));
+    const served = base ? sitePath(file) : undefined;
     let replacement;
-    if (base)
+    if (served !== undefined) {
+      changed.site += 1;
+      linked.push({ line: reference.line, target, sitePath: served });
+      // The anchor and query only fit the file itself, not another page.
+      const destination = served === file ? target : served;
       replacement =
         text.slice(reference.start, reference.destStart) +
-        `${base}/${target}` +
+        `${base}/${destination}` +
         text.slice(reference.destEnd, reference.end);
-    else if (reference.kind === "image")
+    } else if (reference.kind === "image")
       replacement = `*Screenshot: ${plainText(reference.text) || "untitled"}*`;
     else if (reference.kind === "html-image")
       replacement = `<em>Screenshot: ${escapeHtml(plainText(reference.text) || "untitled")}</em>`;
@@ -347,7 +411,7 @@ export function npmReadme(text, { homepageUrl = "" } = {}) {
     output += text.slice(cursor, reference.start) + replacement;
     cursor = reference.end;
   }
-  return { text: output + text.slice(cursor), changed };
+  return { text: output + text.slice(cursor), changed, linked };
 }
 
 function readProduct(root) {
@@ -387,7 +451,10 @@ function pre(root, log) {
   }
   const product = readProduct(root);
   const original = fs.readFileSync(readme);
-  const { text, changed } = npmReadme(original.toString("utf8"), product);
+  const { text, changed } = npmReadme(original.toString("utf8"), {
+    homepageUrl: product.homepageUrl,
+    sitePath: siteServing(root),
+  });
   const others = otherReadmes(root);
   // mkdir without `recursive` fails if the folder appeared since the check.
   fs.mkdirSync(backup);
@@ -395,8 +462,10 @@ function pre(root, log) {
   for (const name of others) fs.renameSync(path.join(root, name), path.join(backup, name));
   fs.writeFileSync(readme, text);
   log(
-    `npm-readme: README.md rewritten for the package (${changed.images} image(s), ${changed.links} link(s), ${
-      product.homepageUrl.trim() ? "made absolute" : "as text: homepageUrl is empty"
+    `npm-readme: README.md rewritten for the package (${changed.images} image(s), ${changed.links} link(s): ${
+      product.homepageUrl.trim()
+        ? `${changed.site} to the website, ${changed.images + changed.links - changed.site} as text where site/ does not serve the file`
+        : "as text: homepageUrl is empty"
     })${others.length ? `; ${others.join(", ")} set aside` : ""}. ${backupName} keeps the originals until postpack.`,
   );
   return 0;
@@ -552,19 +621,29 @@ export function checkDocs(root, env = process.env) {
       if (!headings.some((heading) => heading.includes(`\`${code}\``)))
         problems.push(`${troubleshootingName}: no heading names the error code \`${code}\`.`);
   }
-  // README.md as the package will carry it: no relative path left.
+  // README.md as the package will carry it, with the current homepageUrl
+  // and with a stand-in one: no relative path left, and every link to the
+  // website names a file that site/ serves.
   if (files.has(readmeName)) {
-    try {
-      const packed = npmReadme(read(readmeName), readProduct(root)).text;
-      for (const reference of references(packed))
-        if (isRelative(reference.dest))
-          problems.push(`README.md (npm): line ${reference.line} still links to "${reference.dest}".`);
-      if (/\]\((?:\.\/)?docs\//.test(packed))
-        problems.push("README.md (npm): still contains ](docs/.");
-    } catch (error) {
-      if (!(error instanceof ReadmeError)) throw error;
-      problems.push(`README.md (npm): ${error.message}`);
+    const sitePath = siteServing(root);
+    const deployed = new Set(siteFiles(root));
+    const found = new Set();
+    for (const homepageUrl of new Set([readProduct(root).homepageUrl, "https://homepage.invalid"])) {
+      try {
+        const { text: packed, linked } = npmReadme(read(readmeName), { homepageUrl, sitePath });
+        for (const reference of references(packed))
+          if (isRelative(reference.dest))
+            found.add(`README.md (npm): line ${reference.line} still links to "${reference.dest}".`);
+        if (/\]\((?:\.\/)?docs\//.test(packed)) found.add("README.md (npm): still contains ](docs/.");
+        for (const link of linked)
+          if (!deployed.has(link.sitePath))
+            found.add(`README.md (npm): line ${link.line} links "${link.target}" to ${link.sitePath}, which site/ does not serve.`);
+      } catch (error) {
+        if (!(error instanceof ReadmeError)) throw error;
+        found.add(`README.md (npm): ${error.message}`);
+      }
     }
+    problems.push(...found);
   }
   return problems;
 }
@@ -584,7 +663,15 @@ function checkDocsCommand(root, log, out) {
 // Self-test
 
 function selfTest() {
-  const site = { homepageUrl: "https://bell.example.test/" };
+  // What a website might serve: copies elsewhere, the same path, a legal page.
+  const served = {
+    "docs/images/en/run-changes-1280.png": "assets/screenshots/run-changes-1280.png",
+    "docs/images/en/team-390.png": "docs/images/en/team-390.png",
+    "docs/getting-started.md": "docs/getting-started.md",
+    "docs/faq.md": "docs/faq.md",
+    "PRIVACY.md": "legal/privacy.html",
+  };
+  const site = { homepageUrl: "https://bell.example.test/", sitePath: (file) => served[file] };
   const readme = [
     "# BELL PR",
     "",
@@ -613,23 +700,34 @@ function selfTest() {
     "",
   ].join("\n");
 
-  // With a homepage, every relative reference becomes absolute.
+  // With a homepage, what the website serves becomes absolute (an anchor
+  // only where the path stays the same), and the rest becomes text.
   const absolute = npmReadme(readme, site);
-  assert.deepEqual(absolute.changed, { images: 3, links: 5 });
+  assert.deepEqual(absolute.changed, { images: 3, links: 5, site: 5 });
+  assert.deepEqual(
+    absolute.linked.map((link) => `${link.line} ${link.target} ${link.sitePath}`),
+    [
+      "5 docs/images/en/run-changes-1280.png assets/screenshots/run-changes-1280.png",
+      "9 docs/getting-started.md#requirements docs/getting-started.md",
+      "10 PRIVACY.md legal/privacy.html",
+      "13 docs/images/en/team-390.png docs/images/en/team-390.png",
+      "13 docs/faq.md docs/faq.md",
+    ],
+  );
   const a = absolute.text;
-  assert.ok(a.includes("[繁體中文](https://bell.example.test/README.zh-TW.md) · [Features](#features)"));
-  assert.ok(a.includes("![The workbench: a diff with an explanation](https://bell.example.test/docs/images/en/run-changes-1280.png)"));
-  assert.ok(a.includes('![Titled](https://bell.example.test/docs/images/en/home-1280.png "Home")'));
-  assert.ok(a.includes("[Getting started](https://bell.example.test/docs/getting-started.md#requirements)"));
-  assert.ok(a.includes("[`.env.example`](https://bell.example.test/.env.example)"));
-  assert.ok(a.includes("[privacy\npolicy](https://bell.example.test/PRIVACY.md)"));
+  assert.ok(a.includes("繁體中文 · [Features](#features)"));
+  assert.ok(a.includes("![The workbench: a diff with an explanation](https://bell.example.test/assets/screenshots/run-changes-1280.png)"));
+  assert.ok(a.includes("\n*Screenshot: Titled*\n"));
+  assert.ok(a.includes("See [Getting started](https://bell.example.test/docs/getting-started.md#requirements) and `.env.example`."));
+  assert.ok(a.includes("[privacy\npolicy](https://bell.example.test/legal/privacy.html)"));
   assert.ok(a.includes('<img src="https://bell.example.test/docs/images/en/team-390.png" alt="Agent team" width="390">'));
   assert.ok(a.includes('<a href="https://bell.example.test/docs/faq.md" title="FAQ">FAQ</a>'));
   assert.ok(a.includes("<https://nodejs.org/en>, or https://cli.github.com/."));
 
-  // Without one, images become text and links their text.
-  const text = npmReadme(readme, { homepageUrl: "" });
-  assert.deepEqual(text.changed, absolute.changed);
+  // Without one, images become text and links their text, served or not.
+  const text = npmReadme(readme, { ...site, homepageUrl: "" });
+  assert.deepEqual(text.changed, { images: 3, links: 5, site: 0 });
+  assert.deepEqual(text.linked, []);
   const t = text.text;
   assert.ok(t.includes("繁體中文 · [Features](#features)"));
   assert.ok(t.includes("\n*Screenshot: The workbench: a diff with an explanation*\n"));
@@ -651,7 +749,10 @@ function selfTest() {
   assert.equal(npmReadme("# Plain\n\nNo links.", site).text, "# Plain\n\nNo links.");
   assert.throws(() => npmReadme("[x](../outside.md)\n", site), /leaves the repository root/);
   assert.throws(() => npmReadme("[x][ref]\n\n[ref]: docs/x.md\n", { homepageUrl: "" }), /inline link/);
-  assert.ok(npmReadme("[x][ref]\n\n[ref]: docs/x.md\n", site).text.includes("[ref]: https://bell.example.test/docs/x.md"));
+  assert.throws(() => npmReadme("[x][ref]\n\n[ref]: docs/x.md\n", site), /inline link/);
+  assert.ok(
+    npmReadme("[x][ref]\n\n[ref]: docs/faq.md\n", site).text.includes("[ref]: https://bell.example.test/docs/faq.md"),
+  );
 
   // Product values come from the source of shared/product.ts.
   const source = (homepage) =>
@@ -729,10 +830,29 @@ function selfTest() {
     assert.throws(() => pre(temp, quiet), /inline link/);
     assert.equal(fs.existsSync(at(backupName)), false);
     assert.ok(fs.existsSync(at("README.zh-TW.md")));
+    // The website: site/ without its development files and media/.
+    write("docs/images/a.png", "png");
+    write("docs/a.md", "# A\n");
+    write("site/shots/a.png", "png");
+    write("site/README.md", "# A\n");
+    write("site/media/a.md", "# A\n");
+    write("site/index.html", "<!doctype html>\n");
+    assert.deepEqual(siteFiles(temp), ["index.html", "shots/a.png"]);
+    const serves = siteServing(temp);
+    assert.equal(serves("docs/images/a.png"), "shots/a.png");
+    assert.equal(serves("docs/a.md"), undefined, "site/README.md and media/ are not deployed");
+    assert.equal(serves("docs/missing.png"), undefined);
+    assert.equal(serves("docs/images"), undefined);
+    assert.equal(serves("LICENSE.md"), undefined, "no legal page yet");
+    write("site/legal/eula.html", "<!doctype html>\n");
+    assert.equal(siteServing(temp)("LICENSE.md"), "legal/eula.html");
     write("README.md", original);
     write("shared/product.ts", source("https://bell.example.test"));
     assert.equal(pre(temp, quiet), 0);
-    assert.ok(fs.readFileSync(at("README.md"), "utf8").includes("](https://bell.example.test/docs/images/a.png)"));
+    assert.equal(
+      fs.readFileSync(at("README.md"), "utf8"),
+      "# Fixture\r\n\r\n![Shot](https://bell.example.test/shots/a.png)\r\nDocs",
+    );
     assert.equal(post(temp, quiet), 0);
     assert.deepEqual(fs.readFileSync(at("README.md")), original);
     for (const name of ["readme.txt", "README.md~", "docs/README.md"]) fs.rmSync(at(name));

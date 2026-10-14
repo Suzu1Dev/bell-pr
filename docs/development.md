@@ -117,8 +117,11 @@ npm pack
 
 `prepack` builds the product and runs `node scripts/npm-readme.mjs --pre`,
 which readies `README.md` for npmjs.com. The package does not contain
-`docs/`, so relative screenshots and links become absolute URLs under
-`homepageUrl` from `shared/product.ts`, or plain text while it is empty.
+`docs/`, so a relative screenshot or link becomes an absolute URL under
+`homepageUrl` from `shared/product.ts` when the website (`site/`) serves
+the file: a legal document as its `legal/*.html` page, any other file
+where `site/` holds a byte-identical copy. Everything else, and everything
+while `homepageUrl` is empty, becomes plain text.
 npm packs every `README.*` at the root and takes the first one it finds as
 the package's README, so `README.zh-TW.md` is set aside during the pack.
 The originals wait in the folder `.README.md.orig` (gitignored) and

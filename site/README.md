@@ -87,7 +87,14 @@ an HTML comment.
 8. **Seller name in the footer**: there is no copyright line until the
    legal entity is decided.
 9. **Domain and hosting**: set `homepageUrl` in `shared/product.ts`; the
-   absolute Open Graph URL and image tags then appear (see below).
+   absolute Open Graph URL and image tags then appear (see below). The npm
+   package's README then links to this site too, but only to what it
+   serves: the legal documents become links to `legal/*.html`, and an
+   image or file becomes a link only when `site/` holds a byte-identical
+   copy of it (`scripts/npm-readme.mjs`). Every other screenshot stays the
+   text "Screenshot: …" and every other link its text, so to show the
+   README's screenshots on npmjs.com, copy those files from `docs/images/en/`
+   into `site/assets/screenshots/`.
 
 ## Hidden while a product value is empty
 
