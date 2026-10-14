@@ -139,6 +139,7 @@ const page = (value: Status | null) =>
     configureContributionModels() {},
     setTab() {},
     navigate() {},
+    doctor: doctor(null),
   });
 
 /** The text a person reads: tags and attributes dropped. */

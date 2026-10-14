@@ -816,10 +816,13 @@ function AppShell({
     notify,
   });
 
-  // Home's environment summary and the new-task dialog follow the
-  // environment while the person fixes it; elsewhere the report stays.
+  // Home's environment summary, the new-task dialog and the environment
+  // settings follow the environment while the person fixes it; elsewhere
+  // the report stays.
   const doctorLive =
-    (page === "home" && !presentation.present) || modal === "task";
+    (page === "home" && !presentation.present) ||
+    modal === "task" ||
+    (route?.name === "settings" && route.section === "environment");
   useEffect(() => onDoctorLive?.(doctorLive), [doctorLive, onDoctorLive]);
 
   // The workbench remembers the run it showed last, for Home and the next visit.
@@ -1151,6 +1154,7 @@ function AppShell({
               configureContributionModels={configureContributionModels}
               setTab={setTab}
               navigate={navigate}
+              doctor={doctor}
               onAppSettingsSaved={(view) => setAppSettings(view.settings)}
             />
           </Suspense>

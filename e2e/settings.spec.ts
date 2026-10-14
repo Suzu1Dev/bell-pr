@@ -308,6 +308,39 @@ test("Re-check probes the environment again", async ({ page }) => {
   await expect(recheck).toBeEnabled();
 });
 
+test("only the environment section probes again, and its Re-check updates the readiness pill", async ({ page }) => {
+  await page.clock.install();
+  // No AI provider is ready until `fixed`; then every check passes.
+  let fixed = false;
+  let forced = 0;
+  await page.route("**/api/doctor**", (route) => {
+    if (new URL(route.request().url()).searchParams.get("refresh") === "1") forced++;
+    const report = stubbedReport();
+    if (!fixed)
+      report.checks = report.checks.map((value) =>
+        value.id === "provider-ready" ? { ...value, status: "fail" } : value,
+      );
+    return route.fulfill({ json: report });
+  });
+  /** Every request the page sent so far has been seen once this answers. */
+  const answered = () => page.evaluate(() => fetch("/api/health").then(() => undefined));
+
+  await page.goto("/#/settings/general");
+  await expect(page.locator(".readiness-not-ready")).toBeVisible();
+  await page.clock.runFor(16_000);
+  await answered();
+  expect(forced).toBe(0);
+
+  await page.locator('.settings-nav a[data-section="environment"]').click();
+  await expect(sectionTitle(page)).toHaveText(settings.sections.environment);
+  await page.clock.runFor(6_000);
+  await expect.poll(() => forced).toBeGreaterThan(0);
+  fixed = true;
+  await panel(page).getByRole("button", { name: setup.checklist.recheck }).click();
+  await expect(page.locator(".readiness-ready")).toBeVisible();
+  await expect(page.locator(".readiness-not-ready")).toHaveCount(0);
+});
+
 test("the privacy link opens the privacy policy that ships with the app", async ({ page }) => {
   await page.goto("/#/settings/data");
   const link = panel(page).getByRole("link", { name: settings.data.privacy.link });

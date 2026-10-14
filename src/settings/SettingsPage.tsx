@@ -19,7 +19,7 @@ import { usePresentation } from "../app/presentation";
 import { useT } from "../i18n";
 import { useEntitlements } from "../license/useEntitlements";
 import { serializeRoute, useHashRoute, type RouteFlags } from "../navigation/route";
-import { useDoctor } from "../setup/useDoctor";
+import type { DoctorState } from "../setup/useDoctor";
 import { AboutSection } from "./AboutSection";
 import { DataSection } from "./DataSection";
 import { EnvironmentSection } from "./EnvironmentSection";
@@ -42,6 +42,12 @@ interface SettingsPageProps {
   configureContributionModels?: () => void;
   setTab: Dispatch<SetStateAction<Tab>>;
   navigate: (value: Page) => void;
+  /**
+   * The shell's environment report, which the readiness pill also shows,
+   * so a re-check here updates both. The shell probes it again while the
+   * environment section shows.
+   */
+  doctor: DoctorState;
   /**
    * Receives the app settings after a section saved them, so a copy kept
    * elsewhere (the shell's, for the sample project) can follow.
@@ -71,7 +77,7 @@ export function sectionHref(section: SettingsSection, flags?: RouteFlags): strin
 /**
  * The Settings page: a list of sections, each at `#/settings/<section>`
  * (General when the address names none), and the section it shows. The
- * environment report and the app settings load once and are shared by the
+ * environment report (the shell's) and the app settings are shared by the
  * sections; while presenting (`present=1`), the GitHub login, account
  * details, the licensee and paths are masked.
  */
@@ -81,6 +87,7 @@ export function SettingsPage({
   setApiError,
   setTab,
   navigate,
+  doctor,
   onAppSettingsSaved,
 }: SettingsPageProps) {
   const t = useT("settings");
@@ -88,7 +95,6 @@ export function SettingsPage({
   const flags = route?.flags;
   const section = parseSection(route?.name === "settings" ? route.section : undefined);
   const { maskUser, maskPath } = usePresentation();
-  const doctor = useDoctor();
   const settings = useAppSettings(onAppSettingsSaved);
   const full = status as SettingsStatus | null;
   const { entitlements, locked } = useEntitlements(full);
