@@ -183,10 +183,103 @@ function EvidencePaths({
   );
 }
 
+/** The overview's sections that the section nav links to. */
+type OverviewSection =
+  | "purpose"
+  | "journey"
+  | "reading"
+  | "contribution"
+  | "directions";
+
+/** The element id of a section, such as `overview-directions`. */
+const sectionAnchor = (section: OverviewSection) => `overview-${section}`;
+
+/** Scrolls `target` to the top, below the sticky section nav, and focuses it. */
+function showSection(target: HTMLElement) {
+  target.scrollIntoView({
+    block: "start",
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? "auto"
+      : "smooth",
+  });
+  target.focus({ preventScroll: true });
+}
+
+/**
+ * The sticky in-page nav. A link scrolls to its section and keeps the
+ * route in the address; the section in view is marked as the current one.
+ */
+function SectionNav({ sections }: { sections: OverviewSection[] }) {
+  const t = useT("mission").sections;
+  const [current, setCurrent] = useState<OverviewSection>();
+  const sectionKey = sections.join(" ");
+  // A link to a section, such as #overview-directions, scrolls to it; the
+  // nav mounts with the sections, so a link followed while the analysis
+  // loaded works too. The router keeps the route for such an anchor.
+  useEffect(() => {
+    const follow = () => {
+      const anchor = window.location.hash.slice(1);
+      const target = anchor.startsWith("overview-")
+        ? document.getElementById(anchor)
+        : null;
+      if (target) showSection(target);
+    };
+    follow();
+    window.addEventListener("hashchange", follow);
+    return () => window.removeEventListener("hashchange", follow);
+  }, []);
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const shown = sectionKey.split(" ") as OverviewSection[];
+    const inView = new Set<string>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries)
+          if (entry.isIntersecting) inView.add(entry.target.id);
+          else inView.delete(entry.target.id);
+        const first = shown.find((section) => inView.has(sectionAnchor(section)));
+        if (first) setCurrent(first);
+      },
+      // The band below the nav where a section counts as the one being read.
+      { rootMargin: "-72px 0px -50% 0px" },
+    );
+    for (const section of shown) {
+      const element = document.getElementById(sectionAnchor(section));
+      if (element) observer.observe(element);
+    }
+    return () => observer.disconnect();
+  }, [sectionKey]);
+  return (
+    <nav className="mission-section-nav" aria-label={t.label}>
+      <ul>
+        {sections.map((section) => (
+          <li key={section}>
+            <a
+              href={`#${sectionAnchor(section)}`}
+              aria-current={current === section ? "location" : undefined}
+              onClick={(event) => {
+                const target = document.getElementById(sectionAnchor(section));
+                if (!target) return;
+                event.preventDefault();
+                setCurrent(section);
+                showSection(target);
+              }}
+            >
+              {t[section]}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
 function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
   const t = useT("mission").brief;
   return (
     <section
+      id={sectionAnchor("contribution")}
+      tabIndex={-1}
       className="mission-contribution"
       aria-labelledby="mission-contribution-title"
     >
@@ -546,11 +639,24 @@ export function ProjectOverview({
         : (insights?.recommendations.length ?? 0) >= maxProjectRecommendations
           ? t.ideas.moreLimit({ max: maxProjectRecommendations })
           : t.ideas.moreHint;
+  // Without a run (a project just imported), where to help comes right
+  // after the project card; a run's overview keeps it after the brief.
+  const sections: OverviewSection[] = insights
+    ? [
+        "purpose",
+        ...(run ? [] : (["directions"] as const)),
+        ...(insights.userJourney.length ? (["journey"] as const) : []),
+        ...(insights.readingPath?.length ? (["reading"] as const) : []),
+        ...(run ? (["contribution", "directions"] as const) : []),
+      ]
+    : [];
   // How people use the project, where to start reading and its parts.
   const projectContext = insights && (
     <>
       {insights.userJourney.length > 0 && (
         <section
+          id={sectionAnchor("journey")}
+          tabIndex={-1}
           className="mission-journey"
           aria-labelledby="mission-journey-title"
         >
@@ -581,6 +687,8 @@ export function ProjectOverview({
 
       {!!insights.readingPath?.length && (
         <section
+          id={sectionAnchor("reading")}
+          tabIndex={-1}
           className="mission-reading-path"
           aria-labelledby="mission-reading-title"
         >
@@ -759,6 +867,8 @@ export function ProjectOverview({
         </div>
       </div>
 
+      {sections.length > 0 && <SectionNav sections={sections} />}
+
       {error && (
         <div className="mission-alert mission-alert-error" role="alert">
           <span>{error}</span>
@@ -860,6 +970,8 @@ export function ProjectOverview({
       ) : (
         <>
           <section
+            id={sectionAnchor("purpose")}
+            tabIndex={-1}
             className="mission-project-card"
             aria-labelledby="mission-purpose-title"
           >
@@ -923,7 +1035,7 @@ export function ProjectOverview({
             />
           </section>
 
-          {projectContext}
+          {run && projectContext}
         </>
       )}
 
@@ -931,6 +1043,8 @@ export function ProjectOverview({
 
       {insights && (
         <section
+          id={sectionAnchor("directions")}
+          tabIndex={-1}
           className="mission-recommendations"
           aria-labelledby="mission-ideas-title"
         >
@@ -1342,6 +1456,8 @@ export function ProjectOverview({
           )}
         </section>
       )}
+
+      {!run && projectContext}
 
       {(run || onStartContribution) && (
         <div className="mission-next-step">

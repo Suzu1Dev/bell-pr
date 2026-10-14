@@ -503,3 +503,58 @@ test("while the sample's analysis plays, the loading state lists its lines so fa
   }
 });
 
+/** The section ids in the order the page shows them. */
+const sectionOrder = (html: string) =>
+  [...html.matchAll(/<section id="(overview-[a-z]+)"/g)].map((match) => match[1]);
+/** The section nav's links, as [anchor, label]. */
+const navLinks = (html: string) =>
+  [...(html.match(/<nav class="mission-section-nav"[^>]*>.*?<\/nav>/)?.[0] ?? "").matchAll(/<a href="#([^"]+)"[^>]*>([^<]+)<\/a>/g)].map(
+    (match) => [match[1], match[2]],
+  );
+
+test("a sticky nav links to every section, and a run's overview keeps the directions last", () => {
+  const html = renderEnglish({ run: englishRun });
+  assertNoHan(html);
+  assert.match(html, /<nav class="mission-section-nav" aria-label="On this page">/);
+  assert.deepEqual(navLinks(html), [
+    ["overview-purpose", "Purpose"],
+    ["overview-journey", "How people use it"],
+    ["overview-reading", "Where to start reading"],
+    ["overview-contribution", "This contribution"],
+    ["overview-directions", "Directions"],
+  ]);
+  assert.deepEqual(sectionOrder(html), [
+    "overview-purpose",
+    "overview-journey",
+    "overview-reading",
+    "overview-contribution",
+    "overview-directions",
+  ]);
+  // Each target can take focus when a link moves there.
+  assert.match(html, /<section id="overview-directions" tabindex="-1" class="mission-recommendations"/);
+});
+
+test("without a run the directions come right after the project card", () => {
+  const html = renderEnglish({ onStartContribution() {} });
+  assert.deepEqual(sectionOrder(html), [
+    "overview-purpose",
+    "overview-directions",
+    "overview-journey",
+    "overview-reading",
+  ]);
+  assert.deepEqual(
+    navLinks(html).map(([anchor]) => anchor),
+    ["overview-purpose", "overview-directions", "overview-journey", "overview-reading"],
+  );
+  // The details and the next step still follow the reading path.
+  assert.ok(html.indexOf("mission-project-details") > html.indexOf('id="overview-reading"'));
+  assert.ok(html.indexOf("mission-next-step") > html.indexOf("mission-project-details"));
+  // Sections without content get no link.
+  const short = renderEnglish({ insights: { ...englishInsights, userJourney: [], readingPath: undefined } });
+  assert.deepEqual(navLinks(short).map(([anchor]) => anchor), ["overview-purpose", "overview-directions"]);
+  // Before an analysis there is nothing to navigate.
+  assert.doesNotMatch(renderEnglish({ insights: null }), /mission-section-nav/);
+  assert.match(render(), /aria-label="本頁內容"/);
+  assert.match(render(), />貢獻方向<\/a>/);
+});
+

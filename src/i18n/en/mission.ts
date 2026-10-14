@@ -114,6 +114,15 @@ const mission = {
     }) =>
       `At least ${amount(changed, "file", "files")} changed ${since(sha)}, including ${capped ? `${n(cited)} or more files` : amount(cited, "file", "files")} that this analysis cites: ${files}. Re-analyze before you settle on a direction.`,
   },
+  /** The sticky nav that links to the overview's sections. */
+  sections: {
+    label: "On this page",
+    purpose: "Purpose",
+    journey: "How people use it",
+    reading: "Where to start reading",
+    contribution: "This contribution",
+    directions: "Directions",
+  },
   journey: {
     kicker: "THE USER JOURNEY",
     title: "How do people use this project?",

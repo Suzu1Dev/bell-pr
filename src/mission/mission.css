@@ -7,6 +7,62 @@
   background: var(--color-bg);
   min-width: 0;
 }
+/* The sticky in-page nav to the overview's sections. */
+.mission-section-nav {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  margin-bottom: -12px;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-1);
+}
+.mission-section-nav ul {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.mission-section-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 550;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.mission-section-nav a:hover {
+  background: var(--color-surface-sunken);
+  color: var(--color-text);
+}
+.mission-section-nav a[aria-current] {
+  background: var(--color-brand-50);
+  color: var(--color-brand-700);
+}
+.mission-overview [id^="overview-"] {
+  /* Below the sticky nav when a link scrolls to the section. */
+  scroll-margin-top: 72px;
+}
+.mission-overview [id^="overview-"]:focus:not(:focus-visible) {
+  outline: none;
+}
+/* The workspace card clips its corners with overflow: hidden, which would
+   make it the sticky nav's scroll container; clip keeps the corners and
+   lets the nav stick to the page. */
+.review-area:has(.mission-section-nav) {
+  overflow: clip;
+}
+
 .mission-overview-heading,
 .mission-section-heading,
 .mission-project-meta,

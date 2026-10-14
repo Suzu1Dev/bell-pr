@@ -60,6 +60,14 @@ const m: Translation<typeof en> = {
     cited: ({ changed, sha, cited, capped, files }) =>
       `自${version(sha)}後有至少 ${n(changed)} 個檔案變動，其中 ${n(cited)} 個${capped ? "以上" : ""}是本份分析引用的檔案：${files}。重新分析後再確認貢獻方向。`,
   },
+  sections: {
+    label: "本頁內容",
+    purpose: "用途",
+    journey: "使用方式",
+    reading: "從哪裡讀起",
+    contribution: "這次貢獻",
+    directions: "貢獻方向",
+  },
   journey: {
     kicker: "THE USER JOURNEY",
     title: "使用者如何用到這個專案？",
