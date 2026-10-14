@@ -18,6 +18,7 @@ function call(
   pathname: string,
   body?: unknown,
   contentType = "application/json",
+  extraHeaders: Record<string, string> = {},
 ) {
   return new Promise<{ status: number; json: Record<string, unknown> }>(
     (resolve, reject) => {
@@ -31,6 +32,7 @@ function call(
           headers: {
             host: "127.0.0.1:4311",
             ...(payload !== undefined ? { "content-type": contentType } : {}),
+            ...extraHeaders,
           },
         },
         (response) => {
@@ -113,6 +115,20 @@ test("sync, follow-up and clone update routes validate input and answer refusals
   const running = await call(port, "POST", "/api/runs/running/sync", {});
   assert.equal(running.status, 409);
   assert.match(String(running.json.error), /只有審閱中/);
+  // The same refusal for a request in English.
+  const english = await call(port, "POST", "/api/runs/running/sync", {}, "application/json", {
+    "x-bell-locale": "en",
+  });
+  assert.equal(english.status, 409);
+  assert.equal(
+    english.json.error,
+    "Only runs in review, approved or waiting for plan approval can sync to the latest target branch.",
+  );
+  const englishUpdate = await call(port, "POST", `/api/repos/${repository.id}/update`, {}, "application/json", {
+    "x-bell-locale": "en",
+  });
+  assert.equal(englishUpdate.status, 409);
+  assert.match(String(englishUpdate.json.error), /^This is your own local repository, and BELL never changes it; run git pull/);
   const undo = await call(port, "POST", "/api/runs/review/sync/undo", {});
   assert.equal(undo.status, 409);
   assert.match(String(undo.json.error), /沒有可以復原的同步/);
