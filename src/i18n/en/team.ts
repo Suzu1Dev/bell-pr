@@ -3,6 +3,7 @@
  * revision, the task lanes, retries of failed subtasks and the team mailbox.
  * Task statuses come from `common.teamTaskStatus`.
  */
+import type { Plan } from "../../../shared/plans";
 import { product } from "../../../shared/product";
 import type { AgentTeam } from "../../../shared/team";
 import type { TeamLaneId } from "../../team/lanes";
@@ -31,6 +32,17 @@ const team = {
       count === 1
         ? "Up to 1 member works at a time"
         : `Up to ${count} members work at the same time`,
+    /** The plan's limit for new runs, from the license (Free 2, Pro 4). */
+    planLimit: {
+      free: ({ count }: { count: number }) =>
+        `Free plan: up to ${count} members at once`,
+      trial: ({ count }: { count: number }) =>
+        `Pro trial: up to ${count} members at once`,
+      pro: ({ count }: { count: number }) =>
+        `Pro: up to ${count} members at once`,
+    } satisfies Record<Plan, (params: { count: number }) => string>,
+    /** A run started with more members than the plan now allows. */
+    keptSize: "This run keeps the team size it started with.",
   },
   flow: {
     plan: "Lead plans",
@@ -39,6 +51,8 @@ const team = {
     parallel: "Teammates work in parallel",
     integrate: "Integration and review",
   },
+  /** A run waiting in the queue; its team phase is still "planning". */
+  queued: "Waiting to start",
   phase: {
     planning: "The lead is planning",
     awaiting_approval: "Waiting for you to approve the plan",
@@ -52,6 +66,8 @@ const team = {
   progress: ({ done, total }: { done: number; total: number }) =>
     `${done} / ${total} subtasks done`,
   plan: {
+    queued:
+      "The run is in the queue. The lead starts planning as soon as it can run.",
     replanning: "The lead is re-planning with your feedback.",
     reading:
       "Reading the project and building a plan with clear scopes and dependencies.",
@@ -101,10 +117,16 @@ const team = {
     running: "In progress",
     done: "Done",
   } satisfies Record<TeamLaneId, string>,
+  /** An empty lane's message, chosen by lane id. */
   laneEmpty: {
+    todo: "No subtask is waiting",
     running: "No subtask is running right now",
-    other: "No tasks right now",
-  },
+    done: "No subtask has finished yet",
+  } satisfies Record<TeamLaneId, string>,
+  /** The to-do lane while the lead plans. */
+  laneEmptyPlanning: "Subtasks appear here once the lead's plan is ready.",
+  /** The running lane while the plan waits for approval. */
+  laneEmptyAwaiting: "Subtasks start once you approve the plan.",
   task: {
     worktree: "Isolated worktree",
     worktreeRemoved: "Isolated worktree cleaned up",
@@ -149,6 +171,13 @@ const team = {
     unavailable:
       "This task no longer receives messages. Choose the lead or another member.",
   },
+  /** The model and AI usage cards, folded together. */
+  runDetails: {
+    title: "Run details",
+    hint: "Model, reasoning effort and AI usage",
+  },
+  /** The disclosure holding the protocol note. */
+  howItWorks: "How it works",
   protocolNote: ({ provider }: { provider: string }) =>
     `${product.name} coordinates the team with shared tasks, separate working directories and messages between turns. This is ${product.name}'s own implementation, driven turn by turn by ${provider}; it is not Claude Code's native Agent Teams.`,
 };

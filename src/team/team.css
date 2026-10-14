@@ -36,6 +36,54 @@
   margin-top: 4px;
   color: var(--color-accent-600);
 }
+.team-runtime-badge .team-plan-limit {
+  color: var(--color-text-muted);
+}
+/* The model and AI usage cards, folded under one summary line. */
+.team-run-details {
+  margin: 22px 0 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 9px;
+  background: var(--color-surface);
+}
+.team-run-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--text-sm);
+  color: var(--color-accent-600);
+}
+.team-run-details > summary::-webkit-details-marker {
+  display: none;
+}
+.team-run-details > summary strong {
+  font-weight: 550;
+}
+.team-run-details > summary span {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.team-run-details > summary svg {
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+.team-run-details[open] > summary svg {
+  transform: rotate(180deg);
+}
+.team-run-details-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+.team-run-details-body > .model-summary,
+.team-run-details-body > .efficiency-summary {
+  margin: 0;
+}
 .team-flow {
   display: flex;
   align-items: center;
@@ -52,6 +100,14 @@
   gap: 8px;
   font-size: var(--text-sm);
   color: var(--color-accent-600);
+}
+.team-flow > span.is-current {
+  padding: 4px 10px;
+  margin: -4px -10px;
+  border-radius: 999px;
+  background: var(--color-accent-100);
+  color: var(--color-accent-700);
+  font-weight: 550;
 }
 .team-flow > i {
   flex: 1;
@@ -516,6 +572,25 @@
 .team-message-form .button {
   padding: 7px;
 }
+.team-how {
+  margin-top: 20px;
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
+}
+.team-how > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+  line-height: 1.8;
+}
+.team-how > summary::-webkit-details-marker {
+  display: none;
+}
+.team-how[open] > summary svg:last-child {
+  transform: rotate(180deg);
+}
 .team-protocol-note {
   display: flex;
   align-items: flex-start;
@@ -523,7 +598,7 @@
   font-size: var(--text-2xs);
   color: var(--color-accent-600);
   line-height: 1.8;
-  margin-top: 20px;
+  margin-top: 8px;
 }
 .team-legacy {
   display: flex;
@@ -557,8 +632,12 @@
   .team-flow > span {
     font-size: var(--text-xs);
   }
+  .team-board-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
   .team-runtime-badge {
-    display: none;
+    white-space: normal;
   }
 }
 @media (max-width: 760px) {
@@ -581,8 +660,12 @@
   .team-kanban {
     grid-template-columns: 1fr;
   }
-  .team-lane:has(.team-lane-empty) {
+  /* Once there are tasks, empty lanes give the space to the others. */
+  .team-kanban.has-tasks .team-lane.is-empty {
     display: none;
+  }
+  .team-run-details-body {
+    grid-template-columns: 1fr;
   }
   .team-plan-heading {
     align-items: flex-start;
