@@ -214,10 +214,11 @@ export function ChangesTab({
               value={fileSearch}
               onChange={(e) => setFileSearch(e.target.value)}
             />
-            <kbd>⌕</kbd>
+            <kbd aria-hidden="true">⌕</kbd>
           </label>
           <button
             className={`filter-toggle ${onlyUnreviewed ? "is-on" : ""}`}
+            aria-pressed={onlyUnreviewed}
             onClick={() => setOnlyUnreviewed(!onlyUnreviewed)}
           >
             <span className="toggle-track">
@@ -382,10 +383,11 @@ export function ChangesTab({
             >
               <RefreshCw size={14} />
             </button>
-            <div className="view-toggle" aria-label={t.viewMode}>
+            <div className="view-toggle" role="group" aria-label={t.viewMode}>
               <button
                 aria-label={t.unified}
                 title={t.unified}
+                aria-pressed={diffView === "unified"}
                 className={diffView === "unified" ? "selected" : ""}
                 onClick={() => setDiffView("unified")}
               >
@@ -394,6 +396,7 @@ export function ChangesTab({
               <button
                 aria-label={t.split}
                 title={t.split}
+                aria-pressed={diffView === "split"}
                 className={diffView === "split" ? "selected" : ""}
                 onClick={() => setDiffView("split")}
               >

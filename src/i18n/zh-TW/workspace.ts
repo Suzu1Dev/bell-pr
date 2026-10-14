@@ -122,6 +122,7 @@ const m: Translation<typeof en> = {
     emptyNotice:
       "還沒有 PR 說明。可以在上方產生並套用建議草稿，或用自己的話寫下改了什麼、為什麼，以及實際執行過哪些檢查。Agent 的完整報告在「審查者怎麼看」。",
     titleLabel: "Pull Request 標題",
+    modeLabel: "說明檢視方式",
     edit: "編輯",
     preview: "預覽",
     bodyLabel: "PR 說明",

@@ -137,6 +137,8 @@ const workspace = {
     emptyNotice:
       "There is no PR description yet. Generate and apply a suggested draft above, or write in your own words what changed, why, and which checks you actually ran. The agents' full reports are in the explanation panel next to the code.",
     titleLabel: "Pull request title",
+    /** The group of the Edit and Preview buttons. */
+    modeLabel: "Description view",
     edit: "Edit",
     preview: "Preview",
     bodyLabel: "PR description",

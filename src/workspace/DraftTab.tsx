@@ -246,15 +246,17 @@ export function DraftTab({
             disabled={run.status === "published" || !!followUp}
           />
           <div className="editor-toolbar">
-            <div>
+            <div role="group" aria-label={t.draft.modeLabel}>
               <button
                 className={!draftPreview ? "selected" : ""}
+                aria-pressed={!draftPreview}
                 onClick={() => setDraftPreview(false)}
               >
                 {t.draft.edit}
               </button>
               <button
                 className={draftPreview ? "selected" : ""}
+                aria-pressed={draftPreview}
                 onClick={() => setDraftPreview(true)}
               >
                 {t.draft.preview}

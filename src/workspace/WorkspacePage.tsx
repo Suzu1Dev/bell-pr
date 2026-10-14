@@ -246,6 +246,7 @@ export function WorkspacePage({
           return (
             <div
               className={`workflow-step ${index === currentStep && !halted ? "current" : ""} ${index < currentStep ? "done" : ""}`}
+              aria-current={index === currentStep && !halted ? "step" : undefined}
               key={step.n}
             >
               <span className="step-icon">

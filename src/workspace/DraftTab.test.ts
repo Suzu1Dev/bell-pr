@@ -324,3 +324,17 @@ test("the feedback summary formats the time, the checks and the labels for the l
     /讀取時間 [^<]*2026[^<]* · CI 2 項檢查：1 成功、0 進行中、1 失敗（整體 FAILURE） · 標籤：needs: tests、docs</,
   );
 });
+
+test("the description's Edit and Preview buttons say which one is on", () => {
+  const html = renderEn(element({ run: { ...published, status: "review" } }));
+  assert.match(html, /<div role="group" aria-label="Description view">/);
+  assert.match(tag(html, /aria-pressed="true"/), /class="selected"/);
+  assert.match(html, /aria-pressed="true"[^>]*>Edit</);
+  assert.match(html, /aria-pressed="false"[^>]*>Preview</);
+  const previewing = renderEn(
+    element({ run: { ...published, status: "review" } }, { draftPreview: true }),
+  );
+  assert.match(previewing, /aria-pressed="false"[^>]*>Edit</);
+  assert.match(previewing, /aria-pressed="true"[^>]*>Preview</);
+  assertNoHan(html);
+});
