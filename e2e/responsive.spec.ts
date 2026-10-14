@@ -10,10 +10,11 @@
 // The pages show the sample project in presentation mode (`present=1`,
 // `capture=1`) with the same ready setup as e2e/screenshots.spec.ts, so
 // these are the views the screenshots show, between and below the captured
-// widths. Each view is loaded at its own width, as a phone or a tablet
-// opens it. Home is also checked on the 14-day trial, whose plan chip in
-// the sidebar is the widest, and the run's tabs with the sidebar collapsed
-// to its rail, which gives their panes another layout from 761 px up.
+// widths, and the pages with the sample badge also at 320 px. Each view is
+// loaded at its own width, as a phone or a tablet opens it. Home is also
+// checked on the 14-day trial, whose plan chip in the sidebar is the
+// widest, and the run's tabs with the sidebar collapsed to its rail, which
+// gives their panes another layout from 761 px up.
 //
 //   BELLPR_E2E_PORT=<port> npx playwright test e2e/responsive.spec.ts
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -354,6 +355,24 @@ test.describe("every page", () => {
             collapsed: true,
           });
         });
+});
+
+// The narrowest common phone: the sample badge shares the top bar with the
+// page name, the quick switch and the profile button.
+test.describe("at 320 px with the sample badge", () => {
+  let server: LaunchedServer | undefined;
+  test.beforeAll(async () => {
+    server = await startServer();
+  });
+  test.afterAll(async () => {
+    await server?.stop();
+  });
+
+  for (const locale of locales)
+    for (const route of routes.filter((entry) => sampleRoutes.test(entry.name)))
+      test(`${route.name} in ${locale} fits at 320 px`, async ({ browser }) => {
+        await expectFits(browser, server!, locale, route.hash, { width: 320, height: 640 }, true);
+      });
 });
 
 // The trial's chip ("TRIAL · 14d") is the widest plan chip in the sidebar.
