@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import type { DoctorCheck, DoctorReport } from "../shared/doctor.js";
 import {
   claudeAuthDetail,
@@ -374,9 +375,13 @@ test("probes are cached for 10 seconds and shared; force probes again; the wordi
   const probes = (await f.calls()).length;
   assert.ok(probes > 0);
   assert.deepEqual(statuses(first), statuses(second));
+  await delay(20);
   const chinese = await withLocale("zh-TW", () => runDoctor({ dataDir }));
   assert.equal((await f.calls()).length, probes, "cached");
   assert.deepEqual(statuses(chinese), statuses(first));
+  // A report from cached results says when they were found.
+  assert.equal(second.checkedAt, first.checkedAt);
+  assert.equal(chinese.checkedAt, first.checkedAt);
   assert.notEqual(check(chinese, "gh").detail, check(first, "gh").detail);
   assert.ok(await knownDoctorReport(dataDir));
   await runDoctor({ dataDir, force: true });

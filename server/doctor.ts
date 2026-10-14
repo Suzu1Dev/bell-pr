@@ -88,6 +88,8 @@ interface AgentAuthFacts {
 
 /** Everything the probes found; the report is built from it per locale. */
 interface Facts {
+  /** When the probes answered (ISO time). */
+  checkedAt: string;
   git: ToolFacts;
   identity?: GitIdentityFacts;
   gh: ToolFacts;
@@ -421,6 +423,7 @@ async function probe(exec: DoctorExec, dataDir?: string): Promise<Facts> {
       : undefined,
   ]);
   return {
+    checkedAt: new Date().toISOString(),
     git,
     gh,
     codex,
@@ -812,7 +815,9 @@ function buildReport(
   return {
     checks,
     ready: !checks.some((check) => check.required && check.status === "fail"),
-    checkedAt: new Date().toISOString(),
+    // The probe's time: a report built from results up to 10 seconds old
+    // (or older, see knownDoctorReport) says when they were found.
+    checkedAt: facts.checkedAt,
     platform,
   };
 }
