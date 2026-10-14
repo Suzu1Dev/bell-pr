@@ -5,7 +5,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ProjectInsights } from "../../shared/insights";
 import type { AgentTeam } from "../../shared/team";
 import { demoInsights } from "./demo";
-import { ProjectOverview, type ProjectOverviewProps } from "./ProjectOverview";
+import { MarkdownContent } from "../review/MarkdownContent";
+import { briefMarkdown, ProjectOverview, type ProjectOverviewProps } from "./ProjectOverview";
 
 const repo = {
   id: "demo-repo",
@@ -217,4 +218,34 @@ test("an open contribution leads with its brief, folds the project analysis and 
   assert.doesNotMatch(page, /mission-background/);
   assert.match(page, /mission-ideas-title/);
   assert.doesNotMatch(page, /看這個專案的其他貢獻方向/);
+});
+
+test("a request written in labelled sections renders as Markdown with its labels in bold", () => {
+  const request = [
+    "問題：觀察：create_interview 會回傳既有列的 id。",
+    "使用者影響：若此假設成立，候選人重新整理後就無法開始面試。",
+    "建議做法：1) 用 `grep -rn 'create_interview(' src/` 找出呼叫端。",
+    "驗收：",
+    "- `./scripts/test.sh` 通過",
+    "原始碼依據（引文已核對；推論仍待確認）：",
+    "- src/accounts/interviews.rs：「The caller supplies the id」",
+  ].join("\n");
+  const marked = briefMarkdown(request);
+  for (const label of ["問題", "使用者影響", "建議做法", "驗收"])
+    assert.ok(marked.includes(`**${label}**：`), label);
+  // A parenthetical stays outside the bold; list items, sentences and later colons are untouched.
+  assert.ok(marked.includes("**原始碼依據**（引文已核對；推論仍待確認）："));
+  assert.ok(marked.includes("觀察：create_interview"));
+  assert.ok(marked.includes("- src/accounts/interviews.rs：「"));
+  assert.equal(briefMarkdown("若此假設成立，候選人：無法開始"), "若此假設成立，候選人：無法開始");
+  // An ordered list stays a list.
+  assert.equal(briefMarkdown("1) 步驟：先讀"), "1) 步驟：先讀");
+
+  const html = renderToStaticMarkup(createElement(MarkdownContent, { children: marked }));
+  // Each section is its own paragraph, so the one after a list is not absorbed into it.
+  assert.match(html, /<p><strong>問題<\/strong>：觀察：create_interview 會回傳既有列的 id。<\/p>/);
+  assert.match(html, /<p><strong>使用者影響<\/strong>：/);
+  assert.match(html, /<code>grep -rn &#x27;create_interview\(&#x27; src\/<\/code>/);
+  assert.match(html, /<p><strong>驗收<\/strong>：<\/p>\s*<ul>\s*<li><code>\.\/scripts\/test\.sh<\/code> 通過<\/li>\s*<\/ul>/);
+  assert.match(html, /<p><strong>原始碼依據<\/strong>（引文已核對；推論仍待確認）：<\/p>\s*<ul>/);
 });

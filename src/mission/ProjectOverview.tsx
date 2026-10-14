@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useEffect,
   useRef,
   useState,
@@ -176,6 +178,45 @@ function EvidencePaths({
   );
 }
 
+const MarkdownContent = lazy(() =>
+  import("../review/MarkdownContent").then((module) => ({
+    default: module.MarkdownContent,
+  })),
+);
+
+/** A short label opening a line, with an optional parenthetical: 「原始碼依據（…）：」. */
+const sectionLabel =
+  /^([^\s\d：:（(，。、,.*+#>`|\-][^\n：:（(，。、,.]{0,11})((?:（[^）\n]*）)?)：/;
+
+/**
+ * Bolds the label of each section in a request written as labelled lines
+ * (「問題：」, 「驗收：」), and starts each section as its own paragraph so it
+ * never reads as the continuation of a list item above it. List items,
+ * sentences and long phrases are left alone.
+ */
+export function briefMarkdown(text: string) {
+  return text
+    .split("\n")
+    .map((line, index) => {
+      const match = sectionLabel.exec(line);
+      if (!match) return line;
+      const section = `**${match[1]}**${match[2]}：${line.slice(match[0].length)}`;
+      return index > 0 ? `\n${section}` : section;
+    })
+    .join("\n");
+}
+
+/** Request and direction text as Markdown, its line breaks kept as written. */
+function BriefText({ text }: { text: string }) {
+  return (
+    <Suspense fallback={<p>{text}</p>}>
+      <div className="mission-brief-text">
+        <MarkdownContent>{briefMarkdown(text)}</MarkdownContent>
+      </div>
+    </Suspense>
+  );
+}
+
 /**
  * With a contribution open, the project analysis is background to it: folded
  * under one line that says what it found. On the project page it is the page.
@@ -278,17 +319,22 @@ function Brief({
       )}
       {brief ? (
         <>
-          <div className="mission-contribution-reason">
+          <div
+            className={`mission-contribution-reason${
+              // A request written in sections reads better across the full width.
+              brief.problem.length > 280 ? " is-stacked" : ""
+            }`}
+          >
             <div>
               <span>這次想解決的問題</span>
-              <p>{brief.problem}</p>
+              <BriefText text={brief.problem} />
             </div>
             <div>
               <span>
                 為什麼值得現在改善
                 {tag && <em className="mission-premise-tag">{tag}</em>}
               </span>
-              <p>{brief.motivation}</p>
+              <BriefText text={brief.motivation} />
             </div>
           </div>
           {brief.beneficiaries.length > 0 && (
@@ -305,7 +351,7 @@ function Brief({
               <span className="mission-change-label">
                 BEFORE <span>目前的體驗</span>
               </span>
-              <p>{brief.before}</p>
+              <BriefText text={brief.before} />
             </article>
             <div className="mission-change-arrow" aria-hidden="true">
               <ArrowRight size={20} />
@@ -315,7 +361,7 @@ function Brief({
                 AFTER <span>希望帶來的改善</span>
                 {tag && <em className="mission-premise-tag">{tag}</em>}
               </span>
-              <p>{brief.after}</p>
+              <BriefText text={brief.after} />
             </article>
           </div>
           <p className="mission-impact-note">
@@ -332,7 +378,9 @@ function Brief({
                 </h4>
                 <ul>
                   {brief.validation.map((item, index) => (
-                    <li key={index}>{item}</li>
+                    <li key={index}>
+                      <BriefText text={item} />
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -345,7 +393,9 @@ function Brief({
                 </h4>
                 <ul>
                   {brief.risks.map((item, index) => (
-                    <li key={index}>{item}</li>
+                    <li key={index}>
+                      <BriefText text={item} />
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -355,7 +405,7 @@ function Brief({
       ) : (
         <div className="mission-brief-pending">
           <span className="mission-field-caption">你提出的需求</span>
-          <p>{run.prompt}</p>
+          <BriefText text={run.prompt} />
           <small>
             尚未產生這次貢獻的使用者影響分析。先保留原始需求，完成分析後再連結到具體動機與驗收方式。
           </small>
