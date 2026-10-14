@@ -19,12 +19,15 @@ import "../mission/mission.css";
 import "../team/team.css";
 import { ApiError } from "../api";
 import { getDemo } from "../demo";
+import { HomePage } from "../home/HomePage";
 import { useLocale, useT } from "../i18n";
+import { useEntitlements } from "../license/useEntitlements";
 import type { Run, DiffFile } from "../types";
 import { CommandPalette } from "../navigation/CommandPalette";
 import {
   currentRoute,
   navigate as navigateTo,
+  titleFor,
   useHashRoute,
   type Route,
 } from "../navigation/route";
@@ -40,13 +43,15 @@ import { ImportRepoModal } from "../repos/ImportRepoModal";
 import { ReposPage } from "../repos/ReposPage";
 import { ModelSettingsModal } from "../settings/ModelSettingsModal";
 import { SettingsPage } from "../settings/SettingsPage";
+import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import { PublishModal } from "../workspace/PublishModal";
 import { WorkspacePage } from "../workspace/WorkspacePage";
 import { ErrorBoundary, listenForPreloadErrors } from "./ErrorBoundary";
 import { Sidebar } from "./Sidebar";
 import { Toasts, type Toast } from "./Toasts";
 import { Topbar } from "./Topbar";
-import { useAppData } from "./hooks/useAppData";
+import { usePresentation } from "./presentation";
+import { useAppData, type AppData } from "./hooks/useAppData";
 import { loadDemo } from "./hooks/demoStorage";
 import { useDraftEditor } from "./hooks/useDraftEditor";
 import { useExplanations } from "./hooks/useExplanations";
@@ -57,6 +62,7 @@ import { useRunRounds } from "./hooks/useRunRounds";
 import { useTaskSetup } from "./hooks/useTaskSetup";
 
 export type Page =
+  | "home"
   | "workspace"
   | "repos"
   | "explore"
@@ -81,18 +87,56 @@ listenForPreloadErrors();
 export default function App() {
   return (
     <ErrorBoundary>
-      <AppShell />
+      <AppRoot />
     </ErrorBoundary>
   );
 }
 
+/** localStorage key of the run the workbench showed last. */
+export const lastRunKey = "bellpr-last-run";
+
+/** The run the workbench showed last, if the browser kept it. */
+export function readLastRun(): string | undefined {
+  try {
+    return localStorage.getItem(lastRunKey) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function rememberLastRun(id: string) {
+  try {
+    localStorage.setItem(lastRunKey, id);
+  } catch {
+    // The current session still works if browser storage is unavailable.
+  }
+}
+
+/**
+ * Loads the app's data and the environment report once for every page, and
+ * sends an address that names no route (an empty hash, an unknown path) to
+ * Home, keeping its flags.
+ */
+function AppRoot() {
+  const data = useAppData();
+  const doctor = useDoctor();
+  const route = useHashRoute();
+  useEffect(() => {
+    if (!route) navigateTo({ name: "home" }, { replace: true });
+  }, [route]);
+  return <AppShell data={data} doctor={doctor} />;
+}
+
 // The address (src/navigation/route.ts) is the source of the page, the open
-// run, its tab and its file. An empty hash keeps the start view: the sample
-// workspace, which #/home, #/demo and #/about show as well for now.
+// run, its tab and its file. Home is the start view; #/demo shows the
+// sample workspace and #/about opens the About dialog over Home.
 
 /** The page a route shows; a repository that is not listed shows the list. */
 function pageFor(route: Route | null, knownRepo: boolean): Page {
   switch (route?.name) {
+    case "run":
+    case "demo":
+      return "workspace";
     case "repos":
       return "repos";
     case "repo":
@@ -106,12 +150,13 @@ function pageFor(route: Route | null, knownRepo: boolean): Page {
     case "settings":
       return "settings";
     default:
-      return "workspace";
+      return "home";
   }
 }
 
 /** The route of each page that takes no parameters. */
 const pageRoutes = {
+  home: "home",
   repos: "repos",
   discovery: "discover",
   team: "team",
@@ -125,7 +170,7 @@ const pageRoutes = {
 /** The run the address shows in the workspace; undefined on other pages. */
 function addressedRunId(route: Route | null, demoRunId: string) {
   if (route?.name === "run") return route.runId;
-  if (!route || ["home", "demo", "about"].includes(route.name)) return demoRunId;
+  if (route?.name === "demo") return demoRunId;
   return undefined;
 }
 
@@ -145,12 +190,14 @@ interface WorkspaceView {
   file?: string;
 }
 
-function AppShell() {
+function AppShell({ data, doctor }: { data: AppData; doctor: DoctorState }) {
   const t = useT("app");
+  const workspaceMessages = useT("workspace");
   const [locale] = useLocale();
   // The sample project in the UI language; its ids are the same in every locale.
   const sample = getDemo(locale);
   const route = useHashRoute();
+  const presentation = usePresentation();
   const {
     repos,
     setRepos,
@@ -158,9 +205,13 @@ function AppShell() {
     setRuns,
     status,
     setStatus,
+    appSettings,
     apiError,
     setApiError,
-  } = useAppData();
+  } = data;
+  const entitlements = useEntitlements(status);
+  const discoveryLocked = entitlements.locked("discovery");
+  const [lastRunId, setLastRunId] = useState(readLastRun);
   const [run, setRunState] = useState<Run>(() => loadDemo(locale));
   // The run the latest action opened, ahead of the next render; the setters
   // below write it into the address.
@@ -563,6 +614,58 @@ function AppShell() {
     notify,
   });
 
+  // The workbench remembers the run it showed last, for Home and the next visit.
+  useEffect(() => {
+    if (page !== "workspace" || addressRunId !== run.id) return;
+    rememberLastRun(run.id);
+    setLastRunId(run.id);
+  }, [page, addressRunId, run.id]);
+
+  /**
+   * The Workbench item: the run open now, or the run shown last when the
+   * workbench still holds the sample it starts with (after a reload).
+   */
+  function openWorkbench() {
+    const last = readLastRun();
+    if (
+      demo &&
+      last &&
+      last !== run.id &&
+      runs.some((item) => item.id === last)
+    ) {
+      navigationIntent.current++;
+      showWorkspace({ runId: last, tab: "overview" });
+      setSidebarOpen(false);
+    } else navigate("workspace");
+  }
+
+  // The tab title names the page and, on a run or a project, its repository.
+  const titleRepo =
+    page === "workspace" ? currentRepo : page === "explore" ? exploreRepo : undefined;
+  const documentTitle = titleFor(
+    route,
+    { app: t, workspace: workspaceMessages },
+    titleRepo ? { repoName: titleRepo.fullName } : {},
+  );
+  useEffect(() => {
+    // The i18n runtime writes the app's title when the language changes, in
+    // an effect that runs after this one; a microtask runs after both.
+    let current = true;
+    queueMicrotask(() => {
+      if (current) document.title = documentTitle;
+    });
+    return () => {
+      current = false;
+    };
+  }, [documentTitle]);
+
+  // The sample run is listed while it is all there is, while the workbench
+  // shows it, or when the app settings ask for it.
+  const showSample =
+    runs.length === 0 ||
+    appSettings?.showSampleProject === true ||
+    (page === "workspace" && demo);
+
   function focusDestination() {
     window.requestAnimationFrame(() => {
       const heading = mainContent.current?.querySelector<HTMLElement>("h1");
@@ -605,9 +708,15 @@ function AppShell() {
         runs={runs}
         run={run}
         status={status}
+        license={entitlements.summary}
+        discoveryLocked={discoveryLocked}
+        showSample={showSample}
+        presenting={presentation.present}
+        maskUser={presentation.maskUser}
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
         navigate={navigate}
+        openWorkbench={openWorkbench}
         openModal={openModal}
         beginContribution={beginContribution}
         chooseRun={chooseRun}
@@ -622,6 +731,10 @@ function AppShell() {
           setSidebarCollapsed={setSidebarCollapsed}
           toggleCommandPalette={toggleCommandPalette}
           navigate={navigate}
+          report={doctor.report}
+          presenting={presentation.present}
+          repoUrl={titleRepo && titleRepo !== sample.repo ? titleRepo.url : undefined}
+          githubUser={status?.githubUser ?? ""}
         />
         {apiError && (
           <div role="alert" className="connection-banner">
@@ -635,7 +748,23 @@ function AppShell() {
             </button>
           </div>
         )}
-        {page === "workspace" ? (
+        {page === "home" ? (
+          <HomePage
+            runs={runs}
+            repos={repos}
+            doctor={doctor}
+            license={entitlements.summary}
+            discoveryLocked={discoveryLocked}
+            presenting={presentation.present}
+            maskUser={presentation.maskUser}
+            maskPath={presentation.maskPath}
+            lastRunId={lastRunId}
+            openSample={() => navigateTo({ name: "demo" })}
+            openImport={() => openModal("import")}
+            openDiscovery={() => navigate("discovery")}
+            chooseRun={chooseRun}
+          />
+        ) : page === "workspace" ? (
           <WorkspacePage
             run={run}
             files={files}

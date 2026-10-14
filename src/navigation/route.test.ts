@@ -167,15 +167,16 @@ test("titles name the page, then what it shows, then the product", () => {
   );
   const pages: [Route, string][] = [
     [{ name: "repos" }, "Repositories"],
-    [{ name: "discover" }, "Discover"],
+    [{ name: "discover" }, "Explore contributions"],
     [{ name: "team" }, "Agent team"],
     [{ name: "learning" }, "Learning notes"],
     [{ name: "settings", section: "general" }, "Settings"],
   ];
   for (const [route, page] of pages)
     assert.equal(titleFor(route, en), `${page} — BELL PR`, route.name);
-  for (const route of [null, { name: "home" }, { name: "about" }] as const)
+  for (const route of [null, { name: "home" }] as const)
     assert.equal(titleFor(route, en), en.app.title);
+  assert.equal(titleFor({ name: "about" }, en), "About BELL PR");
   // zh-TW takes the same shape from its own dictionary.
   assert.equal(
     titleFor({ name: "run", runId: "demo-run", tab: "changes" }, zhTW, { repoName }),

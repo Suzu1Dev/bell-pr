@@ -161,8 +161,8 @@ export interface TitleContext {
 
 /**
  * The document title for a route, for example
- * "Code changes · openfetch-sample/open-fetch — BELL PR". A route without a
- * page of its own (null, home, about) gets the app's title.
+ * "Code changes · openfetch-sample/open-fetch — BELL PR". Home (and an
+ * address that is no route) gets the app's title, About its dialog's name.
  */
 export function titleFor(
   route: Route | null,
@@ -197,6 +197,8 @@ export function titleFor(
     case "settings":
       page = pages.settings;
       break;
+    case "about":
+      return t.app.sidebar.about;
     default:
       return t.app.title;
   }

@@ -18,10 +18,11 @@ const app = {
   dismissNotice: "Dismiss notification",
   /** Each page's name in the navigation and the breadcrumb. */
   pages: {
+    home: "Home",
     workspace: "Workbench",
     repos: "Repositories",
     explore: "Project overview",
-    discovery: "Discover",
+    discovery: "Explore contributions",
     team: "Agent team",
     learning: "Learning notes",
     settings: "Settings",
@@ -29,14 +30,12 @@ const app = {
   sidebar: {
     closeNavigation: "Close navigation",
     home: `${product.name} home`,
-    beta: "BETA",
-    workspaceName: "My workspace",
-    workspaceKind: "Personal workspace",
     navigationHeading: "WORKSPACE",
     mainNavigation: "Main navigation",
-    newBadge: "NEW",
     recent: "Recent contributions",
     newTask: "New task",
+    /** Heads the sample project's row below the person's own runs. */
+    sampleHeading: "Sample",
     /** The demo run's short name in the recent list. */
     demoRunTitle: "SDK smart retries",
     demoBadge: "Sample",
@@ -47,6 +46,7 @@ const app = {
       "Understand the thinking behind each change and build up your own experience.",
     learningAction: "Explore learning notes",
     help: "User guide",
+    about: `About ${product.name}`,
     /** Shown in place of the GitHub user while none is signed in. */
     profileFallback: "My workspace",
     localWorkspace: "Local workspace",
@@ -61,9 +61,31 @@ const app = {
     quickSwitchLabel: "Switch projects and contributions",
     quickSwitchTitle: ({ shortcut }: { shortcut: string }) =>
       `Switch projects and contributions (${shortcut})`,
-    localFirst: "Local-first",
-    openGitHub: "Open GitHub",
+    /** The environment readiness pill; it links to Settings → Environment. */
+    readiness: {
+      ready: "Ready",
+      steps: ({ count }: { count: number }) =>
+        plural(count) === "one" ? `${count} setup step` : `${count} setup steps`,
+      notReady: "Not ready",
+      /** The pill's full name for screen readers and its tooltip. */
+      label: ({ state }: { state: string }) =>
+        `Environment: ${state}. Open the environment settings.`,
+    },
+    /** A text link to the open project's repository on GitHub. */
+    openOnGitHub: "Open on GitHub",
     profile: "Profile settings",
+  },
+  /** Shown when the sign-in session ended (for example after a restart). */
+  sessionEnded: {
+    title: "Your session ended.",
+    text: "Run this command in a terminal to get a new sign-in link and open it. This page stays as it is until then, so you can copy anything you typed.",
+    /** The command that prints and opens a new sign-in link; never translated. */
+    command: `${product.binNames[0]} open`,
+  },
+  /** Presentation mode (present=1). */
+  presentation: {
+    /** The badge that stays on screen while the sample project is shown. */
+    sampleBadge: "Sample project",
   },
   errorBoundary: {
     title: "Something went wrong",
@@ -96,6 +118,13 @@ const app = {
         : `${name}, ${contributions}`;
     },
     noProjects: "No projects imported yet",
+    /** Commands below the projects: other places and the language. */
+    goTo: "Go to",
+    sample: "Sample project",
+    settings: "Settings",
+    about: `About ${product.name}`,
+    /** Switches to the other UI language, whose name follows in its own script. */
+    language: "Language",
     contributionList: "Contributions",
     search: "Search the selected project's contributions",
     searchPlaceholder: "Search contributions…",

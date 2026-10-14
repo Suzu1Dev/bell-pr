@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
+import type { LicenseSummary } from "../../shared/plans";
 import { demoRun } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { RunSummary } from "../types";
@@ -15,9 +16,14 @@ const element = (props: Partial<Props> = {}) =>
       runs: [],
       run: demoRun,
       status: null,
+      discoveryLocked: false,
+      showSample: true,
+      presenting: false,
+      maskUser: (value) => value,
       sidebarOpen: false,
       setSidebarOpen() {},
       navigate() {},
+      openWorkbench() {},
       openModal() {},
       beginContribution() {},
       async chooseRun() {
@@ -31,22 +37,32 @@ const render = (props: Partial<Props> = {}) => renderZh(element(props));
 const summary = (id: string, title: string, status: RunSummary["status"] = "review") =>
   ({ ...demoRun, id, title, status }) as RunSummary;
 
+const free: LicenseSummary = { plan: "free", source: "none", status: "none" };
+
 test("the sidebar lists every page and marks the open one", () => {
   const html = render();
-  for (const label of ["貢獻工作台", "Repositories", "探索貢獻", "Agent team", "學習筆記", "連線與設定", "使用指南"])
+  for (const label of ["首頁", "貢獻工作台", "Repositories", "探索貢獻", "Agent team", "學習筆記", "連線與設定", "使用指南"])
     assert.ok(html.includes(`<span>${label}</span>`), label);
   assert.match(html, /<nav aria-label="主要導覽">/);
-  assert.match(html, /class="nav-item active" title="貢獻工作台"/);
-  // The workspace count includes the demo run.
-  assert.match(html, /<span class="nav-count">1<\/span>/);
+  assert.match(html, /class="nav-item active" title="貢獻工作台" aria-current="page"/);
+  assert.equal(html.match(/aria-current="page"/g)?.length, 1);
   assert.match(html, /每一次貢獻，都有所收穫。/);
 
   const learning = render({ page: "learning" });
-  assert.match(learning, /class="nav-item active" title="學習筆記"/);
+  assert.match(learning, /class="nav-item active" title="學習筆記" aria-current="page"/);
   assert.doesNotMatch(learning, /class="nav-item active" title="貢獻工作台"/);
+  // A repository's overview belongs to the repository list.
+  assert.match(render({ page: "explore" }), /class="nav-item active" title="Repositories" aria-current="page"/);
+  assert.match(render({ page: "home" }), /class="nav-item active" title="首頁" aria-current="page"/);
 });
 
-test("recent contributions show the four newest runs and the demo", () => {
+test("the workbench count leaves the sample out", () => {
+  assert.doesNotMatch(render(), /nav-count/);
+  const html = render({ runs: [summary("run-1", "修正登入逾時")] });
+  assert.match(html, /<span>貢獻工作台<\/span><span class="nav-count">1<\/span>/);
+});
+
+test("recent contributions show the four newest runs, then the sample under its heading", () => {
   const runs = [
     summary("run-1", "修正登入逾時", "running"),
     summary("run-2", "補上重試測試"),
@@ -55,20 +71,52 @@ test("recent contributions show the four newest runs and the demo", () => {
     summary("run-5", "第五個任務"),
   ];
   const html = render({ runs, run: { ...demoRun, id: "run-2" } });
-  assert.match(html, /<span class="nav-count">6<\/span>/);
+  assert.match(html, /<span class="nav-count">5<\/span>/);
   for (const run of runs.slice(0, 4)) assert.ok(html.includes(run.title), run.title);
   assert.ok(!html.includes("第五個任務"));
-  assert.match(html, /<span>SDK 智慧重試機制<\/span><span class="demo-small">範例<\/span>/);
+  assert.match(
+    html,
+    /更新使用文件<\/span><\/button><div class="recent-sample-heading">範例<\/div><button class="recent-item "><span class="small-status "><\/span><span>SDK 智慧重試機制<\/span><\/button>/,
+  );
   assert.match(html, /class="recent-item selected"><span class="small-status "><\/span><span>補上重試測試/);
   assert.match(html, /<span class="small-status running"><\/span><span>修正登入逾時/);
   assert.match(html, /查看全部貢獻/);
+
+  const hidden = render({ runs, showSample: false });
+  assert.doesNotMatch(hidden, /recent-sample-heading|SDK 智慧重試機制/);
 });
 
-test("the profile names the signed-in GitHub user or the local workspace", () => {
+test("the brand is the logo with the plan chip, without placeholder chips", () => {
+  const html = renderEn(element({ license: free }));
+  assert.match(html, /<a href="#\/home" class="brand" aria-label="BELL PR home"><svg class="brand-wordmark"[^>]*aria-hidden="true"/);
+  assert.match(html, /<span class="sidebar-plan"><span class="plan-chips"><span class="plan-chip plan-chip-free" role="img" aria-label="Free plan"/);
+  assert.doesNotMatch(html, /workspace-switch|Personal workspace|tiny-new|>NEW<|brand-symbol/);
+  // Until the license is known only the build's BETA mark can show.
+  assert.doesNotMatch(renderEn(element()), /plan-chip-/);
+});
+
+test("discovery is marked PRO only while it is locked", () => {
+  assert.doesNotMatch(renderEn(element()), /pro-badge/);
+  assert.match(
+    renderEn(element({ discoveryLocked: true })),
+    /title="Explore contributions"><svg[^]*?<span>Explore contributions<\/span><span class="pro-badge" role="img" aria-label="Pro feature" title="Pro feature">PRO<\/span><\/button>/,
+  );
+});
+
+test("the profile shows the GitHub user's initials, and only an icon while presenting", () => {
+  assert.match(render(), /<span class="profile-avatar" aria-hidden="true"><svg/);
   assert.match(render(), /<strong>My workspace<\/strong>/);
-  const html = render({ status: { codex: true, github: true, githubUser: "octo" } });
-  assert.match(html, /<strong>octo<\/strong>/);
+  const status = { codex: true, github: true, githubUser: "octo-cat" };
+  const html = render({ status });
+  assert.match(html, /<span class="profile-avatar" aria-hidden="true">OC<\/span>/);
+  assert.match(html, /<strong>octo-cat<\/strong>/);
   assert.match(html, /本機工作空間/);
+  const presenting = renderEn(
+    element({ status, presenting: true, maskUser: (value) => (value ? "you" : value) }),
+  );
+  assert.match(presenting, /<span class="profile-avatar" aria-hidden="true"><svg/);
+  assert.match(presenting, /<strong>you<\/strong>/);
+  assert.doesNotMatch(presenting, /octo|OC</);
 });
 
 test("the narrow-screen drawer adds a scrim that closes it", () => {
@@ -83,13 +131,15 @@ test("the sidebar reads in English with no Chinese left", () => {
     element({
       runs: [summary("run-1", "Fix the login timeout", "running")],
       status: { codex: true, github: true },
+      license: free,
+      discoveryLocked: true,
       sidebarOpen: true,
     }),
   );
-  for (const label of ["Workbench", "Repositories", "Discover", "Agent team", "Learning notes", "Settings", "User guide"])
+  for (const label of ["Home", "Workbench", "Repositories", "Explore contributions", "Agent team", "Learning notes", "Settings", "User guide"])
     assert.ok(html.includes(`<span>${label}</span>`), label);
   assert.match(html, /<nav aria-label="Main navigation">/);
-  assert.match(html, /<span>SDK smart retries<\/span><span class="demo-small">Sample<\/span>/);
+  assert.match(html, /<div class="recent-sample-heading">Sample<\/div><button class="recent-item selected"><span class="small-status "><\/span><span>SDK smart retries<\/span>/);
   assert.match(html, /Every contribution teaches you something\./);
   assert.match(html, /<strong>My workspace<\/strong>/);
   assert.match(html, /aria-label="Close navigation"/);
