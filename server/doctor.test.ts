@@ -289,6 +289,8 @@ test("a missing Git identity fails with fixes that offer the GitHub no-reply add
       command: 'git config --global user.email "583231+octocat@users.noreply.github.com"',
     },
   ]);
+  // The address is a param too, so clients can mask it while presenting.
+  assert.deepEqual(identity.params, { noreply: "583231+octocat@users.noreply.github.com" });
   // Runs still work without it; approving and publishing check it again.
   assert.equal(report.ready, true);
 });
@@ -310,6 +312,10 @@ test("an e-mail address Git only guessed is a warning with the no-reply fix", as
   assert.deepEqual(identity.fixes?.map((fix) => fix.command), [
     'git config --global user.email "583231+octocat@users.noreply.github.com"',
   ]);
+  assert.deepEqual(identity.params, {
+    email: "me@host.example",
+    noreply: "583231+octocat@users.noreply.github.com",
+  });
 });
 
 test("token scopes: workflow missing warns, repo missing fails, fine-grained is unknown", async (t) => {

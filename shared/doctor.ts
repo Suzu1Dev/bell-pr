@@ -43,7 +43,8 @@ export interface DoctorCheck {
   reason?: string;
   /**
    * Values behind the detail that clients format or mask themselves, such
-   * as `login` (gh-auth), `path` and `freeBytes` (data-dir) or `email`.
+   * as `login` (gh-auth), `path` and `freeBytes` (data-dir) or `email`
+   * and `noreply` (git-identity: the guessed and the suggested address).
    */
   params?: Record<string, string | number>;
   fixes?: Fix[];

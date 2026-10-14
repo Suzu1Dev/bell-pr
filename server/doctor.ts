@@ -31,6 +31,7 @@ import {
   fixesFor,
   identityFixes,
   installFixes,
+  noreplyAddress,
   setupError,
   signInFixes,
 } from "./cli-errors.js";
@@ -583,6 +584,8 @@ function buildReport(
 
   const identity = facts.identity;
   const account = facts.github?.state === "ok" ? facts.github : undefined;
+  // The address the fixes offer: clients mask it while presenting.
+  const noreply = noreplyAddress(account);
   add({
     id: "git-identity",
     required: false,
@@ -595,7 +598,14 @@ function buildReport(
               status: "warn",
               reason: "autodetected",
               detail: m.identityAutodetected({ email: identity.email ?? "" }),
-              ...(identity.email ? { params: { email: identity.email } } : {}),
+              ...(identity.email || noreply
+                ? {
+                    params: {
+                      ...(identity.email ? { email: identity.email } : {}),
+                      ...(noreply ? { noreply } : {}),
+                    },
+                  }
+                : {}),
               ...fixes(identityFixes(account, { name: false })),
             }
           : identity.state === "missing"
@@ -603,6 +613,7 @@ function buildReport(
                 status: "fail",
                 reason: "missing",
                 detail: m.identityMissing,
+                ...(noreply ? { params: { noreply } } : {}),
                 ...fixes(identityFixes(account)),
               }
             : { status: "warn", reason: "unknown", detail: m.identityUnknown }),

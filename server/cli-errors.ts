@@ -142,6 +142,13 @@ export function signInFixes(tool: Exclude<Tool, "git">): Fix[] {
   }
 }
 
+/** The GitHub no-reply e-mail address of an account, when its id and login are known. */
+export function noreplyAddress(github?: { id?: string; login?: string }) {
+  return github?.id && github.login
+    ? `${github.id}+${github.login}@users.noreply.github.com`
+    : undefined;
+}
+
 /**
  * Setting the Git identity. With the GitHub account's id and login, the
  * e-mail fix offers GitHub's no-reply address, which keeps a personal
@@ -153,10 +160,7 @@ export function identityFixes(
 ): Fix[] {
   const f = sm().setup.fixes;
   const placeholders = sm().setup.placeholders;
-  const noreply =
-    github?.id && github.login
-      ? `${github.id}+${github.login}@users.noreply.github.com`
-      : undefined;
+  const noreply = noreplyAddress(github);
   return [
     ...(options.name === false
       ? []
