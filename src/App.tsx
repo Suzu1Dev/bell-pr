@@ -73,6 +73,9 @@ import {
 } from "../shared/followups";
 import { FollowUpRounds } from "./draft/FollowUpRounds";
 import { SyncPanel } from "./draft/SyncPanel";
+import { SetupChecklist } from "./team/SetupChecklist";
+import { mergeSetupNeeds } from "../shared/setup";
+import { parseViewSearch, viewSearch, type Page, type Tab } from "./view-url";
 
 /** The draft checks bring a Markdown parser, so they load beside the first screen. */
 type DraftChecks = typeof import("../shared/draft-checks");
@@ -117,15 +120,6 @@ import {
   type ContributionBrief,
 } from "../shared/insights";
 
-type Page =
-  | "workspace"
-  | "repos"
-  | "explore"
-  | "discovery"
-  | "team"
-  | "learning"
-  | "settings";
-type Tab = "overview" | "changes" | "activity" | "draft";
 type Status = {
   codex: boolean;
   codexAuthenticated?: boolean;
@@ -268,6 +262,8 @@ function Modal({
 export default function App() {
   const [page, setPage] = useState<Page>("workspace");
   const [tab, setTab] = useState<Tab>("overview");
+  // The address bar follows the view only after a reload's view is restored.
+  const [viewRestored, setViewRestored] = useState(false);
   const [repos, setRepos] = useState<Repo[]>([]);
   const [updatingRepo, setUpdatingRepo] = useState(false);
   const [runs, setRuns] = useState<RunSummary[]>([]);
@@ -643,6 +639,7 @@ export default function App() {
         setStatus(s);
         setRepos(r.repos);
         setRuns(jobs.runs);
+        void restoreView(r.repos);
       })
       .catch((error) => {
         if (!cancelled) setApiError(error.message);
@@ -651,6 +648,21 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+  useEffect(() => {
+    if (!viewRestored) return;
+    const search = viewSearch({
+      page,
+      tab,
+      runId: demo ? undefined : run.id,
+      repoId: exploreRepoId,
+    });
+    if (search !== window.location.search)
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${search}${window.location.hash}`,
+      );
+  }, [viewRestored, page, tab, demo, run.id, exploreRepoId]);
   useEffect(() => {
     let stopped = false;
     let fetching = false;
@@ -1262,6 +1274,26 @@ export default function App() {
     }
   }
 
+  /** Returns a reload to the contribution, tab, project or page in the address bar. */
+  async function restoreView(knownRepos: Repo[]) {
+    const view = parseViewSearch(window.location.search);
+    try {
+      if (view?.runId) {
+        if (await chooseRun(view.runId)) setTab(view.tab ?? "overview");
+      } else if (view?.repoId) {
+        if (
+          view.repoId === demoRepo.id ||
+          knownRepos.some((repo) => repo.id === view.repoId)
+        ) {
+          setExploreRepoId(view.repoId);
+          navigate("explore");
+        }
+      } else if (view) navigate(view.page);
+    } finally {
+      setViewRestored(true);
+    }
+  }
+
   function focusDestination() {
     window.requestAnimationFrame(() => {
       const heading = mainContent.current?.querySelector<HTMLElement>("h1");
@@ -1321,6 +1353,14 @@ export default function App() {
       `/runs/${runId}/context?${query}`,
     );
     return lines;
+  }
+  async function copySetupCommand(command: string) {
+    try {
+      await navigator.clipboard.writeText(command);
+      notify("已複製指令，執行前請先確認內容");
+    } catch {
+      notify("無法使用剪貼簿，請直接選取指令複製。", "error");
+    }
   }
   async function rerunReview() {
     if (demo) {
@@ -2347,6 +2387,23 @@ export default function App() {
                 id="workspace-panel"
                 aria-labelledby={`workspace-tab-${tab}`}
               >
+                {tab === "overview" && !demo && (
+                  <SetupChecklist
+                    needs={mergeSetupNeeds([
+                      ...(run.team?.tasks ?? []).map((task) => ({
+                        from:
+                          run.agents.find((agent) => agent.id === task.owner)
+                            ?.name ?? task.owner,
+                        needs: task.setup,
+                      })),
+                      ...(run.followUps ?? []).map((round, index) => ({
+                        from: `修正第 ${index + 1} 輪`,
+                        needs: round.setup,
+                      })),
+                    ])}
+                    onCopy={(command) => void copySetupCommand(command)}
+                  />
+                )}
                 {tab === "overview" && currentRepo && (
                   <ProjectOverview
                     repo={currentRepo}
