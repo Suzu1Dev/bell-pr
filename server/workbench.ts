@@ -26,7 +26,9 @@ import type { AgentProvider } from "../shared/models.js";
 import { proEntitlements, type Entitlements } from "../shared/plans.js";
 import { synchronizeExplanations } from "./explanations.js";
 import { currentLocale, sm } from "./i18n/index.js";
-import { log } from "./log.js";
+import { initLog, log } from "./log.js";
+import { logged, logRunQueued } from "./run-events.js";
+import { activeFollowUp } from "../shared/followups.js";
 import * as cleanup from "./cleanup.js";
 import { runJanitor } from "./janitor.js";
 
@@ -209,6 +211,8 @@ export class Workbench {
       explanations: (id) => this.explanations(id),
       prepareRunDraft: (id, options) => this.prepareRunDraft(id, options),
     };
+    // Server logs go to the data directory from here on (see log.ts).
+    initLog(store.directory);
     const startedAt = Date.now();
     this.maintenance = this.startMaintenance(startedAt);
     this.retentionTimer = setInterval(() => {
@@ -260,6 +264,7 @@ export class Workbench {
       withRunLocale(run, () =>
         this.log(run, "system", sm().storage.recovery.resumed),
       );
+      logRunQueued(run, "resumed");
       this.queue.push(run.id);
     }
     if (failed) void this.store.save().catch(() => undefined);
@@ -445,6 +450,7 @@ export class Workbench {
     };
     this.store.data.runs.unshift(run);
     await this.store.save();
+    logRunQueued(run, "created");
     this.queue.push(id);
     this.drain();
     return run;
@@ -476,14 +482,7 @@ export class Workbench {
         executor.executeRun(this.context, id),
       )
         .catch((error) => {
-          console.error(
-            `[BELL-PR] run ${id} could not persist final state:`,
-            redact(
-              error instanceof Error
-                ? (error.stack ?? error.message)
-                : String(error),
-            ),
-          );
+          log.error("run.persist_failed", { runId: id, error });
         })
         .finally(() => {
           this.active--;
@@ -540,6 +539,7 @@ export class Workbench {
       run.status = "queued";
       this.log(run, "user", sm().run.queue.planApproved);
       await this.store.save();
+      logRunQueued(run, "plan_approved");
       this.queue.push(id);
       this.drain();
       return run;
@@ -594,6 +594,7 @@ export class Workbench {
         }),
       );
       await this.store.save();
+      logRunQueued(run, "plan_revised");
       this.queue.push(id);
       this.drain();
       return run;
@@ -729,19 +730,28 @@ export class Workbench {
   }
 
   async discardFollowUp(id: string) {
-    return followUps.discardFollowUp(this.context, id);
+    return logged("round.discard", { runId: id }, () =>
+      followUps.discardFollowUp(this.context, id),
+    );
   }
 
+  /** Publishes the first commit and PR, or pushes an open round (publish.ts). */
   async publish(
     id: string,
     displayedFingerprint: string,
     acknowledged: string[] = [],
   ) {
-    return publishing.publish(
-      this.context,
-      id,
-      displayedFingerprint,
-      acknowledged,
+    const round = activeFollowUp(this.run(id).followUps);
+    return logged(
+      "publish",
+      { runId: id, ...(round ? { round: round.id } : {}) },
+      () =>
+        publishing.publish(
+          this.context,
+          id,
+          displayedFingerprint,
+          acknowledged,
+        ),
     );
   }
 

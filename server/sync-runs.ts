@@ -35,6 +35,7 @@ import { runAgent } from "./run-executor.js";
 import { contributionContext } from "./prompts/team.js";
 import { conflictPrompt } from "./prompts/sync.js";
 import { log } from "./log.js";
+import { logged, parseAgentOutput } from "./run-events.js";
 import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
 import type { WorkbenchContext } from "./workbench.js";
 
@@ -70,6 +71,10 @@ export function runBusy(ctx: WorkbenchContext, id: string) {
  */
 export async function syncRun(ctx: WorkbenchContext, id: string) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
+  return logged("sync", { runId: id }, () => syncRunLocked(ctx, id));
+}
+
+async function syncRunLocked(ctx: WorkbenchContext, id: string) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     if (run.prUrl) return syncPublishedRun(ctx, run);
@@ -267,6 +272,10 @@ async function syncPublishedRun(ctx: WorkbenchContext, run: Run) {
 
 /** Returns an unpublished run to the checkout and base it had before the last sync. */
 export async function undoSync(ctx: WorkbenchContext, id: string) {
+  return logged("sync.undo", { runId: id }, () => undoSyncLocked(ctx, id));
+}
+
+async function undoSyncLocked(ctx: WorkbenchContext, id: string) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     const sync = run.sync;
@@ -378,6 +387,8 @@ async function runConflictResolution(
 ) {
   let temporary: string | undefined;
   let resolved = false;
+  const started = Date.now();
+  log.info("sync.resolve.started", { runId: run.id, files: files.length });
   try {
     temporary = await mkdtemp(path.join(os.tmpdir(), "bell-conflicts-"));
     const outputSchema = path.join(temporary, "conflict-schema.json");
@@ -400,7 +411,9 @@ async function runConflictResolution(
       false,
       { outputSchema },
     );
-    const result = parseConflictResult(answer, files);
+    const result = parseAgentOutput(run, "conflict-resolution", () =>
+      parseConflictResult(answer, files),
+    );
     await ctx.lock(run.id, async () => {
       const moved = await restoreSyncHead(run, head);
       const open = await filesWithConflictMarkers(run.worktreePath, holder.conflicts);
@@ -451,6 +464,14 @@ async function runConflictResolution(
     if (ctx.controllers.get(run.id) === controller)
       ctx.controllers.delete(run.id);
     if (temporary) await rm(temporary, { recursive: true, force: true });
+    (resolved ? log.info : log.warn)(
+      resolved ? "sync.resolve.finished" : "sync.resolve.failed",
+      {
+        runId: run.id,
+        cancelled: controller.signal.aborted,
+        durationMs: Date.now() - started,
+      },
+    );
     await ctx.store.save();
   }
 }

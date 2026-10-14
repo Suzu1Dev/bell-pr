@@ -53,6 +53,12 @@ import { cancelled, currentLocale, sm } from "./i18n/index.js";
 import type { Locale } from "../shared/i18n/locale.js";
 import { createRunWorktree } from "./repositories.js";
 import {
+  agentSpawn,
+  enterPhase,
+  parseAgentOutput,
+  runLifecycle,
+} from "./run-events.js";
+import {
   coordinationPrompt,
   independentReviewContext,
   integrationPrompt,
@@ -215,6 +221,7 @@ export async function runAgent(
         ctx.log(run, role, sm().run.unsandboxedNotice, { kind: "notice" });
       }
       const read = agentEventReader(modelExecution.provider);
+      const spawned = agentSpawn(run, role, cli.executable, timeoutMs);
       await execute(cli.executable, cli.args, {
         input: fullPrompt,
         cwd,
@@ -324,7 +331,8 @@ export async function runAgent(
             /* Only documented JSONL events are used; never return raw tool output. */
           }
         },
-      }).catch((error: unknown) => {
+      }).then(spawned.exited, (error: unknown) => {
+        spawned.failed(error);
         // claude exits non-zero after losing the OAuth refresh race; its result event
         // (flushed before the rejection) already classified the attempt as retryable.
         if (!retryable)
@@ -517,7 +525,9 @@ async function executeTeamTask(
         },
       );
       if (checks.length) task.checks = checks;
-      const result = parseMemberResult(answer);
+      const result = parseAgentOutput(run, "member-report", () =>
+        parseMemberResult(answer),
+      );
       task.report = result.report;
       run.reports![task.id] = result.report;
       for (const message of result.messages) {
@@ -642,6 +652,7 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
   const controller = new AbortController();
   ctx.controllers.set(id, controller);
   const signal = controller.signal;
+  const finished = runLifecycle(run);
   // Output schemas live in a temporary directory, never in a task worktree
   // where they would become unassigned files and fail integration.
   let schemaDirectory: string | undefined;
@@ -669,7 +680,7 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
     const team = run.team;
     if (!team) throw new AppError((m) => m.run.team.legacyRun, 409);
     if (!team.tasks.length) {
-      team.phase = "planning";
+      enterPhase(run, team, "planning");
       const revisions = team.planRevisions ?? [];
       const plan = await runAgent(
         ctx,
@@ -685,7 +696,9 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
         true,
         { outputSchema: planSchema },
       );
-      const parsed = parseTeamPlan(plan, team.config.maxTeammates);
+      const parsed = parseAgentOutput(run, "team-plan", () =>
+        parseTeamPlan(plan, team.config.maxTeammates),
+      );
       team.planSummary = parsed.summary;
       team.tasks = parsed.tasks;
       if (revisions.length && parsed.revisionNotes)
@@ -711,19 +724,19 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
         }),
       );
       if (team.config.requirePlanApproval) {
-        team.phase = "awaiting_approval";
+        enterPhase(run, team, "awaiting_approval");
         run.status = "awaiting_plan";
         ctx.log(run, "lead", sm().run.team.awaitingApproval);
         return;
       }
       team.approvedAt = now();
     }
-    team.phase = "developing";
+    enterPhase(run, team, "developing");
     await ctx.store.save();
     await executeTeamTasks(ctx, run, locale, reportSchema, signal);
     const files = await readDiff(run);
     if (!files.length) throw new AppError((m) => m.run.team.noChanges, 422);
-    team.phase = "integrating";
+    enterPhase(run, team, "integrating");
     // Read-only roles may have no shell (Claude read access), so the diff
     // itself travels in the prompt instead of being fetched with git.
     const diffContext = reviewDiffContext(files);
@@ -735,7 +748,7 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
       signal,
     );
     run.reports!.implementer = implementation;
-    team.phase = "reviewing";
+    enterPhase(run, team, "reviewing");
     await runIndependentReview(ctx, run, files, implementation, signal);
     for (let turn = 0; turn < 3 && hasTeamInbox(team, "lead"); turn++) {
       implementation = await runAgent(
@@ -755,7 +768,7 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
       status: "generating",
       fingerprint: draftFingerprint(run, files),
     };
-    team.phase = "complete";
+    enterPhase(run, team, "complete");
     ctx.log(run, "system", sm().run.team.done({ files: files.length }));
     await ctx.store.save();
     // Development is complete; optional preparation failures cannot fail the run.
@@ -795,6 +808,7 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
       await rm(schemaDirectory, { recursive: true, force: true }).catch(
         () => undefined,
       );
+    finished();
     await ctx.store.save();
   }
 }

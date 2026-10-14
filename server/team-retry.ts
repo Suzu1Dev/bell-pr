@@ -9,6 +9,7 @@ import { AppError, type Run } from "./types.js";
 import { sm } from "./i18n/index.js";
 import { queueTeamMessage } from "./run-executor.js";
 import { assertWorkspacePresent } from "./cleanup.js";
+import { logRunQueued } from "./run-events.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 /**
@@ -97,6 +98,7 @@ export async function retryTeam(
           : sm().run.team.retryPending,
     );
     await ctx.store.save();
+    logRunQueued(run, "retry");
     ctx.enqueue(id);
     return run;
   });
@@ -129,6 +131,7 @@ async function retryPlanning(
   run.status = "queued";
   ctx.log(run, "user", sm().storage.recovery.retryPlanning);
   await ctx.store.save();
+  logRunQueued(run, "retry");
   ctx.enqueue(run.id);
   return run;
 }

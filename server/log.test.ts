@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { initLog, log, recentLogLines } from "./log.js";
+import { git, type command } from "./process.js";
+import { Store } from "./store.js";
+import { Workbench } from "./workbench.js";
 
 const token = `ghp_${"A1b2C3d4".repeat(4)}`;
 
@@ -197,4 +201,87 @@ test("recentLogLines returns the newest lines across daily files, oldest first",
     ["day1-2", "day1-3", "day1-4", "day2-0", "day2-1", "day2-2"],
   );
   assert.deepEqual(await recentLogLines(path.join(directory, "missing")), []);
+});
+
+test("a run's lifecycle, its agent processes and a rejected answer are logged as events without the prompt", async (t) => {
+  const { directory } = await logDirectory();
+  const repository = path.join(directory, "repo");
+  await mkdir(repository);
+  await git(repository, ["init", "-b", "main"]);
+  await git(repository, ["config", "user.name", "BELL Test"]);
+  await git(repository, ["config", "user.email", "test@example.invalid"]);
+  await writeFile(path.join(repository, "hello.ts"), "export const hello = 1;\n");
+  await git(repository, ["add", "hello.ts"]);
+  await git(repository, ["commit", "-m", "initial"]);
+  const calls: string[] = [];
+  // The lead's answer is not a plan: the "format incomplete" path.
+  const fakeCommand = (async (executable, _args, options) => {
+    calls.push(executable);
+    options?.onLine?.(
+      JSON.stringify({
+        type: "item.completed",
+        item: { type: "agent_message", text: "Here is my plan, in prose." },
+      }),
+      "stdout",
+    );
+    return { stdout: "", stderr: "", code: 0 };
+  }) as typeof command;
+  const store = new Store(path.join(directory, "state"));
+  await store.initialize();
+  const workbench = new Workbench(store, undefined, {
+    command: fakeCommand,
+    getModelCatalog: async () => ({ models: [], source: "codex" }),
+  });
+  workbench.status = async () => ({
+    codex: true,
+    codexAuthenticated: true,
+    claude: false,
+    claudeAuthenticated: false,
+    github: false,
+  });
+  t.after(async () => {
+    await workbench.shutdown();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const repo = await workbench.importRepository(repository);
+  const prompt = "Rename the greeting PROMPT-MARKER-1234 everywhere";
+  const run = await workbench.createRun(repo.id, prompt);
+  const end = Date.now() + 10_000;
+  while (run.status !== "failed") {
+    if (Date.now() > end) throw new Error(`run stayed ${run.status}`);
+    await delay(10);
+  }
+  await workbench.shutdown();
+  assert.deepEqual(calls, ["codex"]);
+  const files = await readdir(path.join(store.directory, "logs"));
+  assert.equal(files.length, 1);
+  const written = (await recentLogLines(store.directory)).map(
+    (line) => JSON.parse(line) as Record<string, unknown>,
+  );
+  const events = written
+    .filter((entry) => entry.runId === run.id)
+    .map((entry) => entry.msg);
+  assert.deepEqual(events, [
+    "run.queued",
+    "run.started",
+    "run.phase",
+    "agent.spawn",
+    "agent.exit",
+    "agent.output_retry",
+    "run.failed",
+  ]);
+  const byEvent = (msg: string) => written.find((entry) => entry.msg === msg)!;
+  assert.equal(byEvent("run.queued").reason, "created");
+  assert.equal(byEvent("run.phase").phase, "planning");
+  assert.equal(byEvent("agent.spawn").executable, "codex");
+  assert.equal(typeof byEvent("agent.spawn").timeoutMs, "number");
+  assert.equal(byEvent("agent.exit").exitCode, 0);
+  assert.equal(typeof byEvent("agent.exit").durationMs, "number");
+  assert.deepEqual(
+    { level: byEvent("agent.output_retry").level, schema: byEvent("agent.output_retry").schema },
+    { level: "warn", schema: "team-plan" },
+  );
+  assert.equal(typeof byEvent("run.failed").durationMs, "number");
+  const text = await readFile(path.join(store.directory, "logs", files[0]), "utf8");
+  assert.ok(!text.includes("PROMPT-MARKER-1234"), "the prompt must not be logged");
 });
