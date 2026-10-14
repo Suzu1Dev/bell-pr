@@ -1046,12 +1046,13 @@ button {
   background: var(--color-surface-sunken);
   border-color: var(--color-border);
 }
+/* A name too long for the column wraps instead of being cut off. */
 .file-name {
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   flex: 1;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
   color: var(--color-text-muted);
 }
 .file-name small {
