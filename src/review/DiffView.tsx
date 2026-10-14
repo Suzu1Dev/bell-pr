@@ -1,4 +1,5 @@
 import {
+  memo,
   useEffect,
   useId,
   useMemo,
@@ -46,7 +47,9 @@ export interface DiffViewProps {
   hasNote?: boolean;
 }
 
-function Syntax({ code }: { code: string }) {
+// Memoized: every arrow key in the list re-renders the diff, and a line's
+// tokens only change with its text.
+const Syntax = memo(function Syntax({ code }: { code: string }) {
   const tokens = code.split(
     /(\/\/.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b(?:import|from|export|async|await|function|return|const|let|for|try|catch|throw|if|new|type|interface|class|extends|public|readonly|true|false|void|number|string|unknown)\b|\b\d[\d_]*\b)/g,
   );
@@ -74,7 +77,7 @@ function Syntax({ code }: { code: string }) {
       })}
     </>
   );
-}
+});
 
 export function DiffView({
   file,
