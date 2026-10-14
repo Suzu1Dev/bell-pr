@@ -197,7 +197,11 @@ function parsePublicUrl(value: string): string {
     url.password ||
     url.pathname !== "/" ||
     url.search ||
-    url.hash
+    url.hash ||
+    // Sign-in links and the session cookie must not cross a network in
+    // the clear: plain http only for this computer.
+    (url.protocol === "http:" &&
+      !isLoopbackHost(url.hostname.replace(/^\[(.*)\]$/, "$1")))
   )
     throw invalid();
   // The guard checks the origin the same way as BELLPR_ALLOWED_ORIGINS.

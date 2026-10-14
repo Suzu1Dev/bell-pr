@@ -197,6 +197,9 @@ test("resolveConfig refuses settings that cannot work, in the request locale", (
       [{}, { BELLPR_PUBLIC_URL: "ftp://bell.example.com" }, /BELLPR_PUBLIC_URL/],
       [{}, { BELLPR_PUBLIC_URL: "https://user:pw@bell.example.com" }, /BELLPR_PUBLIC_URL/],
       [{}, { BELLPR_PUBLIC_URL: "not a url" }, /BELLPR_PUBLIC_URL/],
+      // Plain http only for this computer.
+      [{}, { BELLPR_PUBLIC_URL: "http://bell.example.com" }, /https for any address other than this computer/],
+      [{}, { BELLPR_PUBLIC_URL: "http://192.168.1.5:4311" }, /BELLPR_PUBLIC_URL/],
       [{}, { BELLPR_ALLOWED_ORIGINS: "https://*.example.com" }, /BELLPR_ALLOWED_ORIGINS/],
       [{}, { BELLPR_MAX_ACTIVE_RUNS: "0" }, /BELLPR_MAX_ACTIVE_RUNS/],
     ] as const) {
@@ -222,6 +225,9 @@ test("resolveConfig adds the public origin, trusts the dev port only in dev and 
     "https://proxy.example.com",
     "https://bell.example.com",
   ]);
+  // A published port on this computer, as in Docker, may use http.
+  for (const local of ["http://localhost:4311", "http://127.0.0.1:4535", "http://[::1]:8080"])
+    assert.equal(resolveConfig({}, { BELLPR_PUBLIC_URL: local }).publicUrl, local);
   const dev = resolveConfig({ dev: true }, { BELLPR_FRONTEND_PORT: "4400" });
   assert.equal(dev.dev, true);
   assert.equal(dev.frontendPort, 4400);
