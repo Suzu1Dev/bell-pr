@@ -154,10 +154,16 @@ export async function explanations(
       );
     });
     if (selected.length) {
-      const job = generateExplanations(ctx, run, selected).finally(() => {
-        ctx.explanationJobs.delete(id);
-        ctx.jobs.delete(job);
-      });
+      const job = generateExplanations(ctx, run, selected)
+        // Waited on by later requests and at shutdown; a failed save must
+        // not become an unhandled rejection that stops the server.
+        .catch((error) =>
+          log.error("explanations failed", { runId: id, error: String(error) }),
+        )
+        .finally(() => {
+          ctx.explanationJobs.delete(id);
+          ctx.jobs.delete(job);
+        });
       ctx.explanationJobs.set(id, job);
       ctx.jobs.add(job);
       await job;
