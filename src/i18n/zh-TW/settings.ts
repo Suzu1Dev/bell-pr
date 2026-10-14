@@ -153,7 +153,7 @@ const m: Translation<typeof en> = {
         BELLPR_MAX_AGENT_PROCESSES: "同時執行的 Agent CLI 行程數：1 到 32，預設 3。",
         BELLPR_AGENT_TIMEOUT_SCALE: "Agent 逾時倍數：0.5 到 10，預設 1。",
         BELLPR_ALLOW_UNSANDBOXED_AGENTS: "設為 1 允許 Claude Code Agent 在沙箱外執行。",
-        BELLPR_RETENTION_DAYS: "保留已取消與失敗工作檔案的天數：1 到 365，預設 14。",
+        BELLPR_RETENTION_DAYS: "保留已停止與失敗工作檔案的天數：1 到 365，預設 14。",
         BELLPR_LOG_LEVEL: "伺服器紀錄的詳細程度：debug、info（預設）、warn 或 error。",
         BELLPR_LICENSE_KEY: "Pro 授權金鑰，優先於在 App 中儲存的金鑰。",
       },
@@ -195,7 +195,7 @@ const m: Translation<typeof en> = {
     retention: {
       title: "自動清理",
       label: "保留已停止與失敗工作檔案的天數",
-      help: "1 到 365。已取消或失敗的工作在這麼多天沒有動靜後，工作檔案會被移除；紀錄、報告與筆記會保留。已發佈的工作會一直保留，直到你釋放它。",
+      help: "1 到 365。已停止或失敗的工作在這麼多天沒有動靜後，工作檔案會被移除；紀錄、報告與筆記會保留。已發佈的工作會一直保留，直到你釋放它。",
       save: "儲存",
     },
     erase: {

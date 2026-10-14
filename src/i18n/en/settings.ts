@@ -183,7 +183,7 @@ const settings = {
         BELLPR_ALLOW_UNSANDBOXED_AGENTS:
           "1 allows unsandboxed Claude Code agents.",
         BELLPR_RETENTION_DAYS:
-          "Days to keep the files of cancelled and failed runs: 1 to 365, default 14.",
+          "Days to keep the files of stopped and failed runs: 1 to 365, default 14.",
         BELLPR_LOG_LEVEL:
           "How much the server logs: debug, info (the default), warn or error.",
         BELLPR_LICENSE_KEY:
@@ -233,7 +233,7 @@ const settings = {
     retention: {
       title: "Automatic cleanup",
       label: "Days to keep the files of stopped and failed runs",
-      help: "1 to 365. After this many days without activity, a cancelled or failed run's working files are removed; its record, reports and notes stay. Published runs are kept until you free them.",
+      help: "1 to 365. After this many days without activity, a stopped or failed run's working files are removed; its record, reports and notes stay. Published runs are kept until you free them.",
       save: "Save",
     },
     erase: {

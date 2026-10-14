@@ -382,7 +382,7 @@ test("Environment shows the GitHub connection without the brand icon, the checkl
     "BELLPR_LOG_LEVEL",
   ])
     assert.match(advanced, new RegExp(`<code>${variable}</code>`));
-  assert.match(advanced, /<code>BELLPR_RETENTION_DAYS<\/code><\/dt><dd>Days to keep the files of cancelled and failed runs: 1 to 365, default 14\.<\/dd>/);
+  assert.match(advanced, /<code>BELLPR_RETENTION_DAYS<\/code><\/dt><dd>Days to keep the files of stopped and failed runs: 1 to 365, default 14\.<\/dd>/);
   // No documentation link, and no sentence pointing to one, while the
   // product has no docs URL.
   assert.doesNotMatch(advanced, /<a |documentation/);
