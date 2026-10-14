@@ -409,14 +409,18 @@ export function DiffView({
           )}
         </div>
       )}
-      <p className="rv-visually-hidden" id={hintId}>
-        {t.diff.keyboardHint}
-      </p>
-      <span className="rv-visually-hidden" role="status">
-        {selectedLines.length
-          ? t.diff.selectedLines({ count: selectedLines.length })
-          : ""}
-      </span>
+      {!file.blocked && codeLines.length > 0 && (
+        <>
+          <p className="rv-visually-hidden" id={hintId}>
+            {t.diff.keyboardHint}
+          </p>
+          <span className="rv-visually-hidden" role="status">
+            {selectedLines.length
+              ? t.diff.selectedLines({ count: selectedLines.length })
+              : ""}
+          </span>
+        </>
+      )}
       <div
         className={`rv-diff-footer ${selectedLines.length ? "rv-diff-footer-active" : ""}`}
       >

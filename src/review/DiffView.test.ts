@@ -239,7 +239,7 @@ test("the list of lines explains its keys and has a status for the selection", (
   assert.match(zh, /aria-label="export function first\(\) \{ 中，從舊版第 1 行、新版第 1 行起的變更"/);
 });
 
-test("a diff with only hunk headers and notes shows the no-text state instead of an empty list", () => {
+test("a diff without code lines shows its empty state instead of an empty list", () => {
   const html = renderEn(
     createElement(DiffView, {
       file: { ...longFile, patch: "@@ -1,0 +1,0 @@\n\\ No newline at end of file\n" },
@@ -251,4 +251,16 @@ test("a diff with only hunk headers and notes shows the no-text state instead of
   );
   assert.match(html, /This file has no text changes to show/);
   assert.doesNotMatch(html, /role="listbox"/);
+  // Without lines there are no keys to explain and nothing to select.
+  assert.doesNotMatch(html, /rv-visually-hidden/);
+  const blocked = renderEn(
+    createElement(DiffView, {
+      file: { ...longFile, blocked: "The file is too large to review." },
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "unified",
+    }),
+  );
+  assert.doesNotMatch(blocked, /role="listbox"|rv-visually-hidden/);
 });
