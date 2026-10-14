@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { git, redact } from "./process.js";
 import { readDiff } from "./git.js";
-import { AppError, type Run } from "./types.js";
+import { AppError, withRunLocale, type Run } from "./types.js";
 import type { TeamCheck } from "../shared/team.js";
 import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
 import { followUpJsonSchema, parseFollowUpResult } from "./followups.js";
@@ -24,9 +24,10 @@ import {
   worktreeDirty,
 } from "./pr-branch.js";
 import { runAgent } from "./run-executor.js";
-import { contributionContext, teamBoundaries } from "./prompts/team.js";
+import { contributionContext } from "./prompts/team.js";
 import { followUpPrompt } from "./prompts/followups.js";
 import { log } from "./log.js";
+import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 const now = () => new Date().toISOString();
@@ -43,15 +44,15 @@ export async function startFollowUp(
   id: string,
   input: { feedbackUrls: string[]; note?: string },
 ) {
-  if (ctx.stopping()) throw new AppError("服務正在關閉，請稍後重試。", 503);
+  if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     if (activeFollowUp(run.followUps))
-      throw new AppError("這個工作已有一輪修正在進行。", 409);
+      throw new AppError((m) => m.run.followUp.inProgress, 409);
     // A round that just ended may still be cleaning up outside the lock.
     await ctx.followUpJobs.get(id)?.catch(() => undefined);
     if (ctx.followUpJobs.has(id) || ctx.controllers.has(id))
-      throw new AppError("這個工作已有一輪修正或審查在進行。", 409);
+      throw new AppError((m) => m.run.followUp.busy, 409);
     if (
       run.status !== "published" ||
       !run.prUrl ||
@@ -59,26 +60,20 @@ export async function startFollowUp(
       !run.headRepository ||
       run.publishing
     )
-      throw new AppError("只有已送出 PR 的工作可以依 review 繼續修正。", 409);
+      throw new AppError((m) => m.run.followUp.notPublished, 409);
     const feedbackUrls = [...new Set(input.feedbackUrls)];
     const items = run.prFeedback?.items ?? [];
     if (feedbackUrls.some((url) => !items.some((item) => item.url === url)))
-      throw new AppError(
-        "選取的回饋不在最近一次讀取的結果中；請重新讀取回饋後再選。",
-        409,
-      );
+      throw new AppError((m) => m.run.followUp.feedbackNotInLatest, 409);
     const note = input.note?.trim();
     if (!feedbackUrls.length && !note)
-      throw new AppError("請至少選一則回饋，或寫下這輪要修正的內容。", 422);
+      throw new AppError((m) => m.run.followUp.inputRequired, 422);
     // The checkout must still be exactly the pushed PR head.
     const head = (
       await git(run.worktreePath, ["rev-parse", "HEAD"])
     ).stdout.trim();
     if (head !== run.publishCommit || (await worktreeDirty(run)))
-      throw new AppError(
-        "工作目錄和已推送的 PR 內容不一致；請先還原工作目錄裡的修改再開始修正。",
-        409,
-      );
+      throw new AppError((m) => m.run.followUp.checkoutDiffers, 409);
     // Rounds build on the PR head: take over commits added on GitHub, and
     // refuse rewritten history before the agent spends any time.
     await adoptRemoteCommits(ctx, run);
@@ -98,7 +93,7 @@ export async function startFollowUp(
         name: "Mend",
         role: "Review follow-up",
         status: "waiting",
-        detail: "依維護者回饋修正",
+        detail: sm().run.agents.followUp,
       });
     // Only this round's own message may be pushed: the agent's or the person's.
     const { commitMessage: _previous, ...draft } = run.draft;
@@ -109,11 +104,17 @@ export async function startFollowUp(
     ctx.log(
       run,
       "user",
-      `要求依 ${feedbackUrls.length} 則維護者回饋${note ? "與補充說明" : ""}進行第 ${run.followUps.length} 輪修正。`,
+      sm().run.followUp.requested({
+        feedback: feedbackUrls.length,
+        note: !!note,
+        round: run.followUps.length,
+      }),
     );
     const controller = new AbortController();
     ctx.controllers.set(id, controller);
-    const job = runFollowUp(ctx, run, round, controller)
+    const job = withRunLocale(run, () =>
+      runFollowUp(ctx, run, round, controller),
+    )
       // Nothing awaits this job until shutdown or cancel; a failed save
       // must not become an unhandled rejection that stops the server.
       .catch((error) =>
@@ -159,8 +160,6 @@ async function runFollowUp(
   let temporary: string | undefined;
   const checks: TeamCheck[] = [];
   const roundNumber = (run.followUps?.indexOf(round) ?? 0) + 1;
-  const committedNote =
-    "Agent 自行建立了 commit 或切換了分支；已還原到已推送的 PR，修改保留在工作目錄供你審閱。";
   let succeeded = false;
   try {
     const files = await readDiff(run);
@@ -182,7 +181,8 @@ async function runFollowUp(
       run,
       "followup",
       followUpPrompt({
-        boundaries: teamBoundaries,
+        // The run's locale: startFollowUp runs this job under withRunLocale.
+        locale: currentLocale(),
         contributionContext: contributionContext(run),
         pullRequest: {
           url: run.prUrl!,
@@ -210,14 +210,13 @@ async function runFollowUp(
       const moved = await restoreAgentHead(run, round.parentCommit);
       if (!(await worktreeDirty(run))) {
         round.status = "failed";
-        round.error =
-          "Agent 沒有修改任何檔案；請看下方的說明，必要時調整選取的回饋或補充說明再試一次。";
+        round.error = sm().run.followUp.noChanges;
         await restoreParentMessage(run, round);
         run.status = "published";
         ctx.log(run, "followup", round.error);
         return;
       }
-      if (moved) round.error = committedNote;
+      if (moved) round.error = sm().run.followUp.agentCommitted;
       // An empty message is stored as absent; the person then writes one.
       const { commitMessage: _empty, ...draft } = run.draft;
       run.draft = result.commitMessage
@@ -232,14 +231,18 @@ async function runFollowUp(
       ctx.log(
         run,
         "system",
-        `第 ${roundNumber} 輪修正完成，請逐檔審閱這輪改到的檔案，確認提交訊息後再推送。${moved ? committedNote : ""}`,
+        sm().run.followUp.done({ round: roundNumber, agentCommitted: moved }),
       );
     });
   } catch (error) {
     await ctx.lock(run.id, async () => {
       const reason = controller.signal.aborted
-        ? "這輪修正已停止"
-        : redact(error instanceof Error ? error.message : "這輪修正未完成");
+        ? sm().run.followUp.stoppedReason
+        : redact(
+            error instanceof Error
+              ? error.message
+              : sm().run.followUp.incompleteReason,
+          );
       // What BELL saw the agent run is evidence even when its answer is lost.
       if (checks.length) round.checks = checks;
       await restoreAgentHead(run, round.parentCommit).catch(() => undefined);
@@ -250,9 +253,7 @@ async function runFollowUp(
         : controller.signal.aborted
           ? "cancelled"
           : "failed";
-      round.error = dirty
-        ? `${reason}；工作目錄保留了部分修改，可以審閱、寫好提交訊息後推送，或放棄這輪修正。`
-        : reason;
+      round.error = dirty ? sm().run.followUp.keptEdits({ reason }) : reason;
       if (dirty) await ctx.diff(run.id).catch(() => undefined);
       else await restoreParentMessage(run, round).catch(() => undefined);
       run.status = dirty ? "review" : "published";
@@ -263,10 +264,10 @@ async function runFollowUp(
     if (agent) {
       agent.status = succeeded ? "complete" : "failed";
       agent.detail = succeeded
-        ? "修正完成，等待審閱"
+        ? sm().run.agents.followUpDone
         : round.status === "review"
-          ? "修正中斷，修改保留待審閱"
-          : "修正中斷或沒有修改";
+          ? sm().run.agents.followUpStoppedKept
+          : sm().run.agents.followUpStopped;
     }
     if (ctx.controllers.get(run.id) === controller)
       ctx.controllers.delete(run.id);
@@ -286,14 +287,11 @@ export async function discardFollowUp(ctx: WorkbenchContext, id: string) {
       run.publishing ||
       !["review", "approved"].includes(run.status)
     )
-      throw new AppError("目前沒有可以放棄的修正。", 409);
+      throw new AppError((m) => m.run.followUp.nothingToDiscard, 409);
     if (round.commit) {
       // A commit is only safe to drop when the PR on GitHub does not have it.
       if (await prHasCommit(ctx, run, round.commit))
-        throw new AppError(
-          "這輪修正已推送到 PR；請再按一次推送，讓 BELL 記錄完成。",
-          409,
-        );
+        throw new AppError((m) => m.run.followUp.alreadyPushed, 409);
       await git(run.worktreePath, [
         "update-ref",
         `refs/heads/${run.branch}`,
@@ -337,7 +335,7 @@ export async function discardFollowUp(ctx: WorkbenchContext, id: string) {
         .map((file) => [file.path, file.fingerprint]),
     );
     run.reviewedFiles = Object.keys(run.reviewedFingerprints);
-    ctx.log(run, "user", "已放棄這輪修正，工作目錄回到已推送的 PR 內容。");
+    ctx.log(run, "user", sm().run.followUp.discarded);
     await ctx.store.save();
     return run;
   });

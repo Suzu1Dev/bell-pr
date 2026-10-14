@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, readFile, rm, mkdir } from "node:fs/promises";
+import {
+  mkdtemp,
+  writeFile,
+  readFile,
+  rm,
+  mkdir,
+  symlink,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { once } from "node:events";
@@ -20,6 +27,8 @@ import { Workbench } from "./workbench.js";
 import { createApp } from "./index.js";
 import { AppError, type Run } from "./types.js";
 import { defaultContributionSettings } from "../shared/insights.js";
+import { draftFingerprint } from "./drafts.js";
+import { withLocale } from "./i18n/index.js";
 
 async function http(
   url: string,
@@ -401,6 +410,51 @@ test("sensitive files and credential-like diff content are blocked and hidden", 
   }
 });
 
+test("a held-back file's reason follows the run's locale, so reading the diff in another language changes no fingerprint", async () => {
+  const f = await fixture();
+  try {
+    await writeFile(path.join(f.repository, ".env"), "PASSWORD=private-value");
+    // An untracked symbolic link has no patch: its reason is its fingerprint.
+    await symlink("hello.ts", path.join(f.repository, "link.ts"));
+    f.run.locale = "zh-TW";
+    const chinese = await readDiff(f.run);
+    const english = await withLocale("en", () => readDiff(f.run));
+    assert.deepEqual(english, chinese);
+    assert.equal(
+      chinese.find((file) => file.path === ".env")?.blocked,
+      "敏感檔案或產物不會被加入 PR；請先從本次變更移除。",
+    );
+    assert.equal(
+      draftFingerprint(f.run, english),
+      draftFingerprint(f.run, chinese),
+    );
+    // An English run words them in English under any request locale.
+    f.run.locale = "en";
+    const held = await readDiff(f.run);
+    assert.deepEqual(
+      held.filter((file) => file.blocked).map(({ path, blocked, patch }) => ({ path, blocked, patch })),
+      [
+        {
+          path: ".env",
+          blocked:
+            "Sensitive files and build artifacts are never added to the PR; remove this file from the changes first.",
+          patch:
+            "Publishing this file is on hold: Sensitive files and build artifacts are never added to the PR; remove this file from the changes first.",
+        },
+        {
+          path: "link.ts",
+          blocked:
+            "A new file must be a regular file; symbolic links need manual handling.",
+          patch:
+            "Publishing this file is on hold: A new file must be a regular file; symbolic links need manual handling.",
+        },
+      ],
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test("store preserves state and marks interrupted work as failed on restart", async () => {
   const f = await fixture();
   try {
@@ -617,6 +671,142 @@ test("HTTP API restricts localhost origins, requires JSON mutations, and validat
       },
     );
     assert.equal(unknownExplanation.status, 404);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await f.cleanup();
+  }
+});
+
+/** Han characters and CJK punctuation; the Latin middle dot is not one. */
+const cjk = /(?!\u00B7)[\p{Script_Extensions=Han}\u3000-\u303F\uFF00-\uFFEF]/u;
+
+test("HTTP errors follow X-Bell-Locale: validation, the guard, the error handler and refusals", async () => {
+  const f = await fixture();
+  const app = createApp(f.workbench, {
+    staticDirectory: path.join(f.directory, "missing"),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing server port");
+  const url = `http://127.0.0.1:${address.port}`;
+  const headers = (locale: string, extra: Record<string, string> = {}) => ({
+    host: "127.0.0.1:4311",
+    "content-type": "application/json",
+    "x-bell-locale": locale,
+    ...extra,
+  });
+  const errorOf = async (
+    locale: string,
+    pathname: string,
+    options: { method?: string; body?: string; headers?: Record<string, string> } = {},
+  ) => {
+    const response = await http(`${url}${pathname}`, {
+      method: options.method ?? "POST",
+      headers: headers(locale, options.headers),
+      body: options.body,
+    });
+    return { status: response.status, error: String(response.json().error) };
+  };
+  try {
+    // A request that fails validation answers in English, joined the English way.
+    const invalidRun = JSON.stringify({ repoId: "not-a-uuid", prompt: "short" });
+    const english = await errorOf("en", "/api/runs", { body: invalidRun });
+    assert.equal(english.status, 400);
+    assert.match(english.error, /^repoId: Invalid uuid, prompt: String must contain at least 10/);
+    assert.doesNotMatch(english.error, cjk);
+    const chinese = await errorOf("zh-TW", "/api/runs", { body: invalidRun });
+    assert.match(chinese.error, /^repoId: Invalid uuid、prompt: /);
+    // The refinements the routes define are worded at request time.
+    const control = JSON.stringify({
+      title: "Improve greeting",
+      body: "A tested greeting improvement.",
+      commitMessage: "Fix x\u001b]8;;https://evil.example\u0007click",
+    });
+    assert.deepEqual(
+      await errorOf("en", `/api/runs/${f.run.id}/draft`, { method: "PATCH", body: control }),
+      { status: 400, error: "commitMessage: A commit message may only contain text and line breaks." },
+    );
+    assert.deepEqual(
+      await errorOf("zh-TW", `/api/runs/${f.run.id}/draft`, { method: "PATCH", body: control }),
+      { status: 400, error: "commitMessage: 提交訊息只能包含文字與換行。" },
+    );
+    const branch = JSON.stringify({
+      title: "Improve greeting",
+      body: "A tested greeting improvement.",
+      publishBranch: "fix..bad",
+    });
+    assert.deepEqual(
+      await errorOf("en", `/api/runs/${f.run.id}/draft`, { method: "PATCH", body: branch }),
+      {
+        status: 400,
+        error:
+          "publishBranch: A GitHub branch name may only use letters, digits and . _ - /, must not contain .., and must not end with . or .lock.",
+      },
+    );
+    // The error handler and the guard.
+    assert.deepEqual(await errorOf("en", "/api/repos", { body: "{" }), {
+      status: 400,
+      error: "The request body is not valid JSON.",
+    });
+    assert.deepEqual(
+      await errorOf("en", "/api/repos", {
+        body: JSON.stringify({ source: "x".repeat(200_000) }),
+      }),
+      { status: 413, error: "The request body is too large." },
+    );
+    assert.deepEqual(
+      await errorOf("en", "/api/repos", {
+        body: "text",
+        headers: { "content-type": "text/plain" },
+      }),
+      { status: 415, error: "Requests that change data must use application/json." },
+    );
+    assert.deepEqual(
+      await errorOf("en", "/api/repos", { headers: { host: "invalid.example:4311" } }),
+      { status: 403, error: "This service address is not allowed." },
+    );
+    assert.deepEqual(
+      await errorOf("en", "/api/repos", { headers: { origin: "https://invalid.example" } }),
+      { status: 403, error: "Cross-origin requests are not allowed." },
+    );
+    assert.deepEqual(
+      await errorOf("en", "/api/models?provider=unknown", { method: "GET" }),
+      { status: 400, error: "This agent type is not supported." },
+    );
+    // Refusals from the Workbench and its modules.
+    assert.deepEqual(await errorOf("en", "/api/runs/missing", { method: "GET" }), {
+      status: 404,
+      error: "Run not found.",
+    });
+    assert.deepEqual(await errorOf("en", `/api/runs/${f.run.id}/cancel`, { body: "{}" }), {
+      status: 409,
+      error: "Only runs that are queued, running or waiting for plan approval can be cancelled.",
+    });
+    assert.deepEqual(await errorOf("zh-TW", `/api/runs/${f.run.id}/cancel`, { body: "{}" }), {
+      status: 409,
+      error: "只有排隊、等待計畫核准或執行中的工作可取消。",
+    });
+    assert.deepEqual(await errorOf("en", `/api/runs/${f.run.id}/approve`, {
+      body: JSON.stringify({ draft: f.run.draft }),
+    }), {
+      status: 409,
+      error: "Review every latest change and remove the blocked files first.",
+    });
+    assert.deepEqual(await errorOf("en", `/api/runs/${f.run.id}/publish`, {
+      body: JSON.stringify({ fingerprint: "a".repeat(64) }),
+    }), {
+      status: 409,
+      error: "The approved version changed or expired; reload, review and approve again before you send the PR.",
+    });
+    assert.deepEqual(await errorOf("en", "/api/repos", {
+      body: JSON.stringify({ source: "relative/path" }),
+    }), {
+      status: 400,
+      error: "Enter a GitHub HTTPS URL or the absolute path of a local repository.",
+    });
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));

@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { parseFollowUpResult } from "./followups.js";
 import { followUpPrompt } from "./prompts/followups.js";
+import { outputLanguage, respondIn } from "./prompt-language.js";
 import { command, git } from "./process.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
@@ -97,7 +98,7 @@ test("the follow-up result keeps only selected feedback and never carries a pers
   assert.equal(withMessage("Fix x\n\n\tindented"), "");
   assert.equal(withMessage("Fix x\r\n\r\nBody line."), "Fix x\n\nBody line.");
   const prompt = followUpPrompt({
-    boundaries: "BOUNDARIES",
+    locale: "zh-TW",
     contributionContext: "CONTEXT",
     pullRequest: { url: prUrl, title: "fix: greet", body: "Body" },
     previousCommitMessage: "fix: greet",
@@ -109,6 +110,15 @@ test("the follow-up result keeps only selected feedback and never carries a pers
   assert.match(prompt, /Do not commit, stage or change \.git/);
   assert.match(prompt, /never mentions AI, tools or BELL/);
   assert.match(prompt, /"note":"Only the greeting\."/);
+  // The person reads the summary and notes in the run's language; the
+  // commit message stays English.
+  assert.ok(prompt.startsWith(respondIn("zh-TW")));
+  assert.ok(
+    prompt.includes(
+      `notAddressed [{url, reason}] in ${outputLanguage("zh-TW")}, using`,
+    ),
+  );
+  assert.match(prompt, /commitMessage: an English git commit message/);
 });
 
 /** A published run in a real repository, with stand-ins for every remote git and gh call. */
@@ -268,6 +278,41 @@ async function settled(run: Run) {
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
 }
+
+test("a follow-up round works in the run's locale, whatever the locale of the request that started it", async () => {
+  let prompt = "";
+  const f = await publishedFixture(async (input) => {
+    prompt = input.prompt;
+    await writeFile(path.join(input.cwd, "hello.ts"), 'export const hello = "world";\n');
+    return JSON.stringify({
+      summary: "Changed the greeting to world.",
+      addressed: [{ url: feedbackItem.url, change: "Changed the greeting." }],
+      notAddressed: [],
+      checks: [],
+      commitMessage: "Greet the world",
+    });
+  });
+  try {
+    f.run.locale = "en";
+    // Started under the zh-TW default; the round is background work of the run.
+    await f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackItem.url] });
+    await settled(f.run);
+    assert.match(prompt, /Please say hello to the world\./);
+    assert.ok(prompt.startsWith(respondIn("en")));
+    assert.ok(!prompt.includes(outputLanguage("zh-TW")));
+    assert.equal(f.run.followUps![0].status, "review");
+    assert.equal(
+      f.run.logs.at(-1)?.message,
+      "Follow-up round 1 is done; review the files this round changed one by one and check the commit message before you push.",
+    );
+    assert.equal(
+      f.run.agents.find((agent) => agent.id === "followup")?.detail,
+      "Revision done; waiting for review",
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
 
 test("a review follow-up round becomes one more commit on the same PR branch after the person reviews it", async () => {
   let edit: ((cwd: string) => Promise<void>) | undefined;

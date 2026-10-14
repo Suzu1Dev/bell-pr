@@ -14,6 +14,7 @@ import {
 import { defaultAgentTimeoutScale } from "./agent-timeouts.js";
 import {
   AppError,
+  withRunLocale,
   type DiffFile,
   type Repository,
   type Run,
@@ -24,11 +25,13 @@ import { agentLoginCheck, type TransientSleep } from "./agent-cli.js";
 import type { AgentProvider } from "../shared/models.js";
 import { proEntitlements, type Entitlements } from "../shared/plans.js";
 import { synchronizeExplanations } from "./explanations.js";
+import { currentLocale, sm } from "./i18n/index.js";
 
 import { collectDraftContext } from "./draft-sources.js";
 import { synchronizeDraftPreparation } from "./drafts.js";
 import * as repositories from "./repositories.js";
 import * as executor from "./run-executor.js";
+import { retryTeam } from "./team-retry.js";
 import * as publishing from "./publish.js";
 import * as learning from "./learning.js";
 import * as drafting from "./draft-jobs.js";
@@ -220,13 +223,13 @@ export class Workbench {
 
   repo(id: string) {
     const repo = this.store.data.repos.find((value) => value.id === id);
-    if (!repo) throw new AppError("找不到 Repository。", 404);
+    if (!repo) throw new AppError((m) => m.run.repos.notFound, 404);
     return repo;
   }
 
   run(id: string) {
     const run = this.store.data.runs.find((value) => value.id === id);
-    if (!run) throw new AppError("找不到工作。", 404);
+    if (!run) throw new AppError((m) => m.run.queue.runNotFound, 404);
     return run;
   }
 
@@ -296,26 +299,18 @@ export class Workbench {
     const capability = await this.status();
     if (modelExecution.provider === "claude") {
       if (!capability.claude)
-        throw new AppError(
-          "尚未安裝 Claude Code CLI。請先安裝並執行 claude auth login。",
-          503,
-        );
+        throw new AppError((m) => m.run.queue.claudeMissing, 503);
       if (!capability.claudeAuthenticated)
-        throw new AppError(
-          "Claude Code 尚未登入。請先在終端機執行 claude auth login。",
-          503,
-        );
+        throw new AppError((m) => m.run.queue.claudeSignedOut, 503);
     } else {
       if (!capability.codex)
-        throw new AppError(
-          "尚未安裝 Codex CLI。請先安裝並執行 codex login。",
-          503,
-        );
+        throw new AppError((m) => m.run.queue.codexMissing, 503);
       if (!capability.codexAuthenticated)
-        throw new AppError("Codex 尚未登入。請先在終端機執行 codex login。", 503);
+        throw new AppError((m) => m.run.queue.codexSignedOut, 503);
     }
     this.assertQueueCapacity();
     const id = newId();
+    const agents = sm().run.agents;
     const run: Run = {
       id,
       repoId,
@@ -328,27 +323,29 @@ export class Workbench {
       baseSha: "",
       worktreePath: path.join(this.store.directory, "worktrees", id),
       createdAt: now(),
+      // The request's locale; the run's background work and agents use it.
+      locale: currentLocale(),
       agents: [
         {
           id: "lead",
           name: "Atlas",
           role: "Team lead",
           status: "waiting",
-          detail: "分析專案與拆解需求",
+          detail: agents.lead,
         },
         {
           id: "reviewer",
           name: "Lens",
           role: "Reviewer",
           status: "waiting",
-          detail: "獨立審查正確性與維護性",
+          detail: agents.reviewer,
         },
         {
           id: "tester",
           name: "Scout",
           role: "Test analyst",
           status: "waiting",
-          detail: "檢查測試證據與回歸風險",
+          detail: agents.tester,
         },
       ],
       logs: [],
@@ -387,7 +384,7 @@ export class Workbench {
       ).length >= this.maxQueuedRuns
     )
       throw new AppError(
-        `最多可同時排入 ${this.maxQueuedRuns} 個工作；請等待現有工作完成。`,
+        (m) => m.run.queue.full({ max: this.maxQueuedRuns }),
         429,
       );
   }
@@ -396,10 +393,14 @@ export class Workbench {
     if (this.stopping) return;
     while (this.active < this.maxActiveRuns && this.queue.length) {
       const id = this.queue.shift()!;
-      if (this.run(id).status !== "queued") continue;
+      const run = this.run(id);
+      if (run.status !== "queued") continue;
       this.active++;
-      const job = executor
-        .executeRun(this.context, id)
+      // Whoever drains the queue (a request, another run finishing), the
+      // run executes in its own locale.
+      const job = withRunLocale(run, () =>
+        executor.executeRun(this.context, id),
+      )
         .catch((error) => {
           console.error(
             `[BELL-PR] run ${id} could not persist final state:`,
@@ -442,7 +443,7 @@ export class Workbench {
     return this.lock(`team-message:${id}`, async () => {
       const run = this.run(id);
       if (!["queued", "running", "awaiting_plan"].includes(run.status))
-        throw new AppError("團隊已停止工作，請使用程式碼追問功能。", 409);
+        throw new AppError((m) => m.run.queue.teamStopped, 409);
       executor.queueTeamMessage(
         this.context,
         run,
@@ -459,11 +460,11 @@ export class Workbench {
     return this.lock(id, async () => {
       const run = this.run(id);
       if (run.status !== "awaiting_plan" || !run.team?.tasks.length)
-        throw new AppError("目前沒有等待核准的團隊計畫。", 409);
+        throw new AppError((m) => m.run.queue.noPlanToApprove, 409);
       run.team.approvedAt = now();
       run.team.phase = "developing";
       run.status = "queued";
-      this.log(run, "user", "已核准任務分工與檔案範圍，團隊進入開發佇列。");
+      this.log(run, "user", sm().run.queue.planApproved);
       await this.store.save();
       this.queue.push(id);
       this.drain();
@@ -482,14 +483,14 @@ export class Workbench {
       const run = this.run(id);
       const team = run.team;
       if (run.status !== "awaiting_plan" || !team?.tasks.length)
-        throw new AppError("目前沒有等待核准的團隊計畫。", 409);
+        throw new AppError((m) => m.run.queue.noPlanToApprove, 409);
       const content = redact(feedback.trim());
       if (!content || content.length > 4000)
-        throw new AppError("退回意見必須介於 1 至 4000 字。", 400);
+        throw new AppError((m) => m.run.queue.feedbackLength, 400);
       const revisions = (team.planRevisions ??= []);
       if (revisions.length >= maxPlanRevisions)
         throw new AppError(
-          `已重擬 ${maxPlanRevisions} 次，請核准目前計畫，或取消後調整需求再建立新工作。`,
+          (m) => m.run.queue.revisionLimit({ max: maxPlanRevisions }),
           409,
         );
       revisions.push({
@@ -513,7 +514,10 @@ export class Workbench {
       this.log(
         run,
         "user",
-        `已退回計畫並補充意見（第 ${revisions.length}/${maxPlanRevisions} 次），Lead 將依意見重新規劃。`,
+        sm().run.queue.planSentBack({
+          revision: revisions.length,
+          max: maxPlanRevisions,
+        }),
       );
       await this.store.save();
       this.queue.push(id);
@@ -523,7 +527,7 @@ export class Workbench {
   }
 
   async retryTeam(id: string, message?: string) {
-    return executor.retryTeam(this.context, id, message);
+    return retryTeam(this.context, id, message);
   }
 
   async cancel(id: string) {
@@ -541,15 +545,11 @@ export class Workbench {
       return run;
     }
     if (!["queued", "running", "awaiting_plan"].includes(run.status))
-      throw new AppError("只有排隊、等待計畫核准或執行中的工作可取消。", 409);
+      throw new AppError((m) => m.run.queue.cancelNotAllowed, 409);
     this.controllers.get(id)?.abort();
     run.status = "cancelled";
     if (run.team) run.team.phase = "cancelled";
-    this.log(
-      run,
-      "system",
-      "已要求取消；失敗或取消任務的隔離工作目錄保留，已整合任務的目錄已自動移除。可用「重試失敗的子任務」接續。",
-    );
+    this.log(run, "system", sm().run.queue.cancelRequested);
     await this.store.save();
     // Do not hold a run/repository/integration lock here: workers must finish
     // their cleanup and persist final task states before the HTTP response.

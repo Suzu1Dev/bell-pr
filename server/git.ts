@@ -3,7 +3,8 @@ import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
 import { git } from "./process.js";
 import { secretInPatch } from "./secrets.js";
-import { AppError, type DiffFile, type Run } from "./types.js";
+import { AppError, withRunLocale, type DiffFile, type Run } from "./types.js";
+import { sm } from "./i18n/index.js";
 
 export { secretInPatch };
 
@@ -115,9 +116,9 @@ export function parseNumstat(
     .filter(Boolean)
     .map((entry) => {
       const match = /^([^\t]+)\t([^\t]+)\t([\s\S]+)$/.exec(entry);
-      if (!match) throw new AppError("無法解析 Git 差異。", 422);
+      if (!match) throw new AppError((m) => m.run.diff.unparsable, 422);
       if (!safeRelativePath(match[3]))
-        throw new AppError("檔案名稱包含不支援的字元，請先重新命名。", 422);
+        throw new AppError((m) => m.run.diff.renameFirst, 422);
       return {
         path: match[3],
         additions: Number(match[1]) || 0,
@@ -128,9 +129,14 @@ export function parseNumstat(
 }
 
 export async function readDiff(
-  run: Pick<Run, "worktreePath" | "baseSha">,
+  run: Pick<Run, "worktreePath" | "baseSha" | "locale">,
 ): Promise<DiffFile[]> {
   if (!run.baseSha || !run.worktreePath) return [];
+  // A held-back file's reason is part of its fingerprint and of the draft
+  // fingerprint, so it is worded in the run's locale: reading the diff in
+  // another language must not make a reviewed draft stale.
+  const messages = withRunLocale(run, () => sm().run.diff);
+  const held = messages.blocked;
   const common = ["--no-ext-diff", "--no-textconv", "--no-renames"];
   const stats = parseNumstat(
     (
@@ -157,7 +163,7 @@ export async function readDiff(
   const files: DiffFile[] = [];
   let total = 0;
   if (stats.length + untracked.length > 150)
-    throw new AppError("差異超過 150 個檔案，請縮小任務後重新執行。", 422);
+    throw new AppError((m) => m.run.diff.tooManyFiles, 422);
   for (const stat of [
     ...stats.map((value) => ({ ...value, untracked: false })),
     ...untracked.map((filePath) => ({
@@ -169,10 +175,8 @@ export async function readDiff(
     })),
   ]) {
     if (!safeRelativePath(stat.path))
-      throw new AppError("檔案名稱包含不支援的字元。", 422);
-    let blocked = sensitivePath(stat.path)
-      ? "敏感檔案或產物不會被加入 PR；請先從本次變更移除。"
-      : undefined;
+      throw new AppError((m) => m.run.diff.unsupportedName, 422);
+    let blocked = sensitivePath(stat.path) ? held.sensitive : undefined;
     let patch = "";
     let status: DiffFile["status"] = "modified";
     let fileMode = "";
@@ -182,14 +186,13 @@ export async function readDiff(
       const metadata = await lstat(fullPath);
       fileMode = String(metadata.mode);
       if (!metadata.isFile() || metadata.isSymbolicLink())
-        blocked = "新檔案必須是一般檔案；符號連結需要手動處理。";
-      if (metadata.size > 512_000)
-        blocked = "新檔案超過 512 KB，請手動檢視或拆分。";
+        blocked = held.notRegularFile;
+      if (metadata.size > 512_000) blocked = held.newFileTooLarge;
       if (!blocked) {
         const resolved = await realpath(fullPath);
         const root = await realpath(run.worktreePath);
         if (!resolved.startsWith(root + path.sep))
-          throw new AppError("檔案超出工作目錄。", 422);
+          throw new AppError((m) => m.run.diff.outsideWorktree, 422);
         patch = (
           await git(
             run.worktreePath,
@@ -229,16 +232,15 @@ export async function readDiff(
       patch.includes("Binary files ") ||
       patch.includes("GIT binary patch")
     )
-      blocked = "二進位檔案需要另外人工檢視，無法透過此工作流程發佈。";
-    if (secretInPatch(patch))
-      blocked = "差異疑似包含憑證，內容已隱藏；請移除後重新審閱。";
+      blocked = held.binary;
+    if (secretInPatch(patch)) blocked = held.credentials;
     const fingerprint = digest(
       stat.path + "\0" + (patch || fileMode + blocked),
     );
-    if (blocked) patch = `此檔案已暫停發佈：${blocked}`;
+    if (blocked) patch = messages.heldBack({ reason: blocked });
     total += Buffer.byteLength(patch);
     if (total > 2_000_000)
-      throw new AppError("差異超過 2 MB，請拆成較小的工作。", 422);
+      throw new AppError((m) => m.run.diff.tooLarge, 422);
     files.push({
       path: stat.path,
       language: languageFor(stat.path),

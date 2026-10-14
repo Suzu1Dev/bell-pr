@@ -27,6 +27,8 @@ import type { AgentTeam } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import { ProjectInsightsService } from "./insights.js";
 import { AgentSlots } from "./agent-slots.js";
+import { withLocale } from "./i18n/index.js";
+import { outputLanguage, respondIn } from "./prompt-language.js";
 
 const settings: ContributionSettings = {
   direction: "feature",
@@ -270,6 +272,95 @@ test("task ids are normalised before validation and format problems name the fie
   assert.throws(() => parseTeamPlan("invented prose", 2), /JSON/);
 });
 
+test("lead plan problems and member reports are worded in the locale in effect", () => {
+  const plan = JSON.parse(
+    makePlan([
+      { id: "a", files: ["a.ts"] },
+      { id: "b", files: ["b.ts"] },
+    ]),
+  );
+  const englishProblem = (value: unknown) =>
+    withLocale("en", () => {
+      try {
+        parseTeamPlan(JSON.stringify(value), 2);
+      } catch (error) {
+        return (error as AppError).message;
+      }
+      return "";
+    });
+  plan.tasks[1].description = "x".repeat(4001);
+  assert.equal(
+    englishProblem(plan),
+    "The lead's plan does not match the required format (tasks[1].description: more than 4,000 characters); adjust the request and try again.",
+  );
+  plan.tasks[1].description = "ok";
+  plan.tasks[1].files = Array.from({ length: 31 }, (_, index) => `f${index}.ts`);
+  assert.match(englishProblem(plan), /\(tasks\[1\]\.files: more than 30 items\)/);
+  plan.tasks[1].files = [];
+  assert.match(englishProblem(plan), /\(tasks\[1\]\.files: must not be empty\)/);
+  delete plan.summary;
+  assert.match(
+    englishProblem(plan),
+    /\(summary: expected string, received undefined\)/,
+  );
+  assert.equal(englishProblem({ tasks: "none" }).includes("(summary: "), true);
+  assert.match(englishProblem([]), /\(plan: expected object, received array\)/);
+  for (const [value, expected] of [
+    [
+      JSON.parse(makePlan([{ id: "a", files: ["a.ts"], dependsOn: ["a"] }])),
+      "The lead's plan has an invalid task dependency.",
+    ],
+    [
+      JSON.parse(makePlan([{ id: "lead", files: ["a.ts"] }])),
+      "The lead's plan has duplicate or reserved task IDs.",
+    ],
+    [
+      JSON.parse(makePlan([{ id: "a", files: ["src/*"] }])),
+      "The lead's plan has an invalid file scope: src/*",
+    ],
+    [
+      JSON.parse(
+        makePlan([
+          { id: "a", files: ["a.ts"], dependsOn: ["b"] },
+          { id: "b", files: ["b.ts"], dependsOn: ["a"] },
+        ]),
+      ),
+      "The lead's plan has a dependency cycle.",
+    ],
+  ] as const)
+    assert.equal(englishProblem(value), expected);
+  assert.throws(
+    () => withLocale("en", () => parseTeamPlan("invented prose", 2)),
+    {
+      message:
+        "The lead did not return a valid task plan in JSON; adjust the request and try again.",
+    },
+  );
+
+  const report = {
+    report: {
+      summary: "Aligned the output.",
+      checks: [{ command: "npm test", outcome: "exit 0" }],
+      tradeoffs: "",
+      limitations: "No integration test ran.",
+    },
+    messages: [],
+  };
+  assert.equal(
+    withLocale("en", () => parseMemberResult(JSON.stringify(report)).report),
+    "Aligned the output.\n\nValidation evidence (commands the member reports it ran):\n- npm test → exit 0\n\nLimitations and unmet acceptance criteria:\nNo integration test ran.\n\nDesign tradeoffs (approaches considered but not taken):\n(Not reported.)",
+  );
+  report.report.checks = [];
+  assert.match(
+    withLocale("en", () => parseMemberResult(JSON.stringify(report)).report),
+    /\(The member reported no checks that actually ran\.\)/,
+  );
+  assert.match(
+    withLocale("zh-TW", () => parseMemberResult(JSON.stringify(report)).report),
+    /（成員未回報任何實際執行的檢查）/,
+  );
+});
+
 test("team plans validate DAGs, concrete scopes, and preserve literal bracket filenames", () => {
   const parsed = parseTeamPlan(
     makePlan([
@@ -375,10 +466,12 @@ test("member results accept the structured report, the earlier string report and
   });
 
   // Intent text keeps only the five user-written fields and skips empty ones.
+  // Its labels are English like the prompt around them; the values are the
+  // person's own words.
   assert.equal(contributionIntentText(undefined), "");
   assert.equal(
     contributionIntentText({ ...settings, targetUser: "", outcome: " " }),
-    "需求：feature\n限制：保留 API\n驗收條件：既有測試通过",
+    "Direction: feature\nConstraints: 保留 API\nAcceptance criteria: 既有測試通过",
   );
 });
 
@@ -477,8 +570,8 @@ test("team execution waits for plan approval, runs isolated independent members 
       assert.match(input.prompt, /complete teaching explanation/);
       // The mentor gets the user's contribution settings and the named
       // reviewer/tester reports, labelled as untrusted static review.
-      assert.match(input.prompt, /限制：保留 API/);
-      assert.match(input.prompt, /驗收條件：既有測試通过/);
+      assert.match(input.prompt, /Constraints: 保留 API/);
+      assert.match(input.prompt, /Acceptance criteria: 既有測試通过/);
       assert.match(
         input.prompt,
         /UNTRUSTED DATA[^\n]*\n\{"reviewer":"獨立靜態審查：未發現問題；本輪未執行專案程式碼。","tester":"獨立靜態審查：未發現問題；本輪未執行專案程式碼。"\}/,
@@ -529,12 +622,17 @@ test("team execution waits for plan approval, runs isolated independent members 
       cwd: input.cwd,
     });
     // Members get the person's intent and their task, not runtime settings.
-    assert.match(input.prompt, /驗收條件：既有測試通过/);
+    assert.match(input.prompt, /Acceptance criteria: 既有測試通过/);
     assert.doesNotMatch(
       input.prompt,
       /worktreePath|reasoningEffort|requirePlanApproval|ponytailMode/,
     );
-    assert.match(input.prompt, /report\.tradeoffs \(設計取捨\)/);
+    assert.match(input.prompt, /report\.tradeoffs names the alternatives/);
+    assert.ok(
+      input.prompt.includes(
+        `Finish with the report object in ${outputLanguage("zh-TW")}:`,
+      ),
+    );
     running.add(taskId);
     peak = Math.max(peak, running.size);
     if (taskId === "alpha" || taskId === "beta") await barrier;
@@ -1954,6 +2052,228 @@ if (prompt.includes('You are the team lead with read-only access')) {
     assert.deepEqual(savedTask.integratedFiles, ["a.ts"]);
   } finally {
     process.env.PATH = previousPath;
+    await f.cleanup();
+  }
+});
+
+/** Han characters and CJK punctuation; the Latin middle dot is not one. */
+const cjk = /(?!\u00B7)[\p{Script_Extensions=Han}\u3000-\u303F\uFF00-\uFFEF]/u;
+
+/**
+ * An English team: a two-task plan, members that report and message the
+ * lead, and reviewers. Team prompts are collected in `options.prompts`.
+ */
+const englishTeam =
+  (options: { failBetaOnce?: boolean; prompts?: string[] } = {}): TeamAgentRunner =>
+  async (input) => {
+    options.prompts?.push(input.prompt);
+    if (input.role === "lead") {
+      if (input.prompt.includes("You are the team lead"))
+        return JSON.stringify({
+          summary: "Make both modules print the same value.",
+          revisionNotes: null,
+          tasks: [
+            {
+              id: "alpha",
+              title: "Update a.ts",
+              description: "Change the value in a.ts.",
+              files: ["a.ts"],
+              dependsOn: [],
+            },
+            {
+              id: "beta",
+              title: "Update b.ts",
+              description: "Change the value in b.ts.",
+              files: ["b.ts"],
+              dependsOn: ["alpha"],
+            },
+          ],
+        });
+      return "Integration report: both modules print the same value.\n\nSuggested review order:\n- a.ts — read first.\n- b.ts — follows a.ts.";
+    }
+    if (input.role === "reviewer" || input.role === "tester")
+      return `${input.role} report: no issues found.`;
+    if (input.taskId === "beta" && options.failBetaOnce) {
+      options.failBetaOnce = false;
+      throw new Error("The value check failed in b.ts.");
+    }
+    const file = input.taskId === "alpha" ? "a.ts" : "b.ts";
+    await writeFile(
+      path.join(input.cwd, file),
+      `export const value = "${input.taskId}";\n`,
+    );
+    return JSON.stringify({
+      report: {
+        summary: `${input.taskId} updated ${file}.`,
+        checks: [{ command: "npm test", outcome: "exit 0" }],
+        tradeoffs: "",
+        limitations: "",
+      },
+      messages: [{ to: "lead", content: `${file} is ready.` }],
+    });
+  };
+
+const englishSettings: ContributionSettings = {
+  direction: "feature",
+  targetUser: "Command-line users",
+  outcome: "Consistent output",
+  constraints: "Keep the API",
+  acceptance: "The existing tests pass",
+  maxTeammates: 2,
+  requirePlanApproval: true,
+};
+
+/** Waits until the run is in review and its draft suggestion and explanations are no longer being generated. */
+const settled = (run: Run) =>
+  run.status === "review" &&
+  !!run.draftPreparation &&
+  run.draftPreparation.status !== "generating" &&
+  Object.values(run.explanations ?? {}).every(
+    (entry) => entry.status !== "generating",
+  );
+
+test("a run created under en records its locale, and its log, agent details and errors stay in English", async () => {
+  const prompts: string[] = [];
+  const f = await fixture(englishTeam({ failBetaOnce: true, prompts }));
+  try {
+    const run = await withLocale("en", () =>
+      f.workbench.createRun(
+        f.repo.id,
+        "Make every module print the same value.",
+        "Consistent value",
+        englishSettings,
+      ),
+    );
+    assert.equal(run.locale, "en");
+    assert.deepEqual(
+      run.agents.map((agent) => agent.detail),
+      [
+        "Analysing the project and breaking down the request",
+        "Reviewing correctness and maintainability independently",
+        "Checking the test evidence and regression risk",
+      ],
+    );
+    await waitUntil(() => run.status === "awaiting_plan", "the plan");
+    await withLocale("en", () => f.workbench.approvePlan(run.id));
+    await waitUntil(() => run.status === "failed", "the failed beta task");
+    assert.equal(run.error, "The value check failed in b.ts.");
+    await withLocale("en", () => f.workbench.retryTeam(run.id));
+    await waitUntil(() => settled(run), "the review, explanations and draft");
+    assert.equal(run.error, undefined);
+    const messages = run.logs.map((entry) => entry.message);
+    for (const expected of [
+      "Created 2 tasks with dependencies and file scopes; up to 2 teammates work at once.",
+      "Waiting for you to approve the plan; no code has been changed yet.",
+      "Approved the task split and file scopes; the team is queued for development.",
+      "Claimed task Update a.ts; its own working directory and file scope are ready.",
+      "Queued a team message for lead; it is delivered at the start of the next turn.",
+      "Update a.ts is done; integrated 1 file that passed the scope check: a.ts.",
+      "The value check failed in b.ts.",
+      "Retrying failed subtasks: 1 completed task is kept, and 1 task starts again from a fresh snapshot.",
+      "Team development and the independent review are done: 2 changed files wait for your file-by-file review.",
+    ])
+      assert.ok(messages.includes(expected), `${expected}\n${messages.join("\n")}`);
+    assert.ok(
+      messages.some((message) =>
+        /^Atlas started\. Model: Codex CLI default \(not recorded\); reasoning effort: model default\./.test(
+          message,
+        ),
+      ),
+      messages.join("\n"),
+    );
+    assert.match(
+      run.team!.tasks[0].report!,
+      /^alpha updated a\.ts\.\n\nValidation evidence \(commands the member reports it ran\):\n- npm test → exit 0\n\nLimitations and unmet acceptance criteria:\n\(Not reported\.\)/,
+    );
+    // Acceptance: nothing the run wrote for the person is in Chinese.
+    assert.doesNotMatch(
+      JSON.stringify({
+        logs: run.logs,
+        details: run.agents.map((agent) => agent.detail),
+        error: run.error ?? null,
+        draftError: run.draftPreparation?.error ?? null,
+      }),
+      cjk,
+    );
+    // The default locale (zh-TW in these tests) does not leak into the run.
+    assert.doesNotMatch(JSON.stringify(run.logs), /開始工作|領取任務/);
+    // Every team agent was asked to answer in English: the plan, both
+    // members (beta twice), integration, reviewer and test analyst.
+    assert.equal(prompts.length, 7);
+    for (const prompt of prompts) {
+      // A retried task's first turn leads with why the last attempt failed.
+      assert.ok(prompt.includes(`${respondIn("en")} `), prompt.slice(0, 80));
+      assert.ok(!prompt.includes(outputLanguage("zh-TW")));
+    }
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a run's background work keeps the run's locale when a request in another locale resumes it", async () => {
+  const prompts: string[] = [];
+  const f = await fixture(englishTeam({ prompts }));
+  try {
+    // Created under the zh-TW default, then approved and re-reviewed from en requests.
+    const run = await f.workbench.createRun(
+      f.repo.id,
+      "Make every module print the same value.",
+      "Consistent value",
+      englishSettings,
+    );
+    assert.equal(run.locale, "zh-TW");
+    await waitUntil(() => run.status === "awaiting_plan", "the plan");
+    await withLocale("en", () => f.workbench.approvePlan(run.id));
+    await waitUntil(() => settled(run), "the review, explanations and draft");
+    const approval = run.logs.findIndex((entry) =>
+      entry.message.startsWith("Approved the task split"),
+    );
+    assert.ok(approval > 0, "the approving request logs in its own locale");
+    const background = run.logs.slice(approval + 1);
+    assert.ok(background.length > 5);
+    for (const entry of background)
+      if (entry.agent === "system" || entry.kind === "status")
+        assert.match(entry.message, cjk, entry.message);
+    assert.ok(
+      background.some((entry) =>
+        entry.message.startsWith("團隊開發與獨立審查完成"),
+      ),
+    );
+    assert.match(run.team!.tasks[0].report!, /驗證證據/);
+    // The agents answer in the run's language, not the approving request's.
+    assert.ok(prompts.length >= 6);
+    for (const prompt of prompts)
+      assert.ok(prompt.startsWith(respondIn("zh-TW")), prompt.slice(0, 80));
+    const before = prompts.length;
+    // The review rerun is background work of the run as well. It can start
+    // once the run's own job has let go of the run.
+    const deadline = Date.now() + 8000;
+    for (;;) {
+      try {
+        await withLocale("en", () => f.workbench.rerunReview(run.id));
+        break;
+      } catch (error) {
+        if ((error as AppError).statusCode !== 409 || Date.now() > deadline)
+          throw error;
+        await delay(10);
+      }
+    }
+    const requested = run.logs.length;
+    await waitUntil(
+      () => run.logs.slice(requested).some((entry) => entry.agent === "system"),
+      "the end of the review rerun",
+    );
+    assert.equal(
+      run.logs.at(-1)?.message,
+      "獨立審查已更新；報告是建議，審閱狀態與核准不變。",
+    );
+    assert.deepEqual(
+      prompts
+        .slice(before)
+        .map((prompt) => prompt.startsWith(respondIn("zh-TW"))),
+      [true, true],
+    );
+  } finally {
     await f.cleanup();
   }
 });

@@ -14,6 +14,7 @@ import { readDiff } from "./git.js";
 import { filesWithConflictMarkers, labelConflictMarkers } from "./sync.js";
 import { AppError, type Run } from "./types.js";
 import type { TeamAgentRunner } from "./team.js";
+import { outputLanguage, respondIn } from "./prompt-language.js";
 
 async function getJson(url: string) {
   return new Promise<any>((resolve, reject) => {
@@ -439,6 +440,47 @@ test("an agent resolves sync conflicts for review, leftover markers keep blockin
     assert.equal(saved.status, "review");
     assert.equal(saved.sync!.resolving, false);
     assert.match(saved.sync!.report!, /服務重新啟動/);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a conflict resolution works in the run's locale, whatever the locale of the request that started it", async () => {
+  let prompt = "";
+  const f = await unpublishedRun("review", async (input) => {
+    prompt = input.prompt;
+    await writeFile(
+      path.join(input.cwd, "hello.ts"),
+      "line one\nline two, theirs and mine\nline three\n",
+    );
+    return JSON.stringify({
+      summary: "Kept the target branch's line and added this change.",
+      files: [{ path: "hello.ts", resolution: "Merged both edits into one line." }],
+    });
+  });
+  try {
+    f.run.locale = "en";
+    await f.write("hello.ts", "line one\nline two, mine\nline three\n");
+    await f.github.upstreamCommit({ "hello.ts": "line one\nline two, theirs\nline three\n" });
+    await f.workbench.syncRun(f.run.id);
+    // Requested under the zh-TW default; the agent's turn belongs to the run.
+    await f.workbench.resolveConflicts(f.run.id);
+    await until(() => f.run.status === "review");
+    assert.match(prompt, /hello\.ts/);
+    assert.ok(prompt.startsWith(respondIn("en")));
+    assert.ok(!prompt.includes(outputLanguage("zh-TW")));
+    // The labels written into the files stay English.
+    assert.match(prompt, /labelled "latest main"/);
+    assert.equal(
+      f.run.logs.at(-1)?.message,
+      "The agent resolved the merge conflicts; review these files one by one.",
+    );
+    const agent = f.run.agents.find((entry) => entry.id === "sync");
+    assert.equal(agent?.detail, "Conflicts resolved; waiting for review");
+    assert.equal(
+      f.run.sync!.report,
+      "Kept the target branch's line and added this change.",
+    );
   } finally {
     await f.cleanup();
   }

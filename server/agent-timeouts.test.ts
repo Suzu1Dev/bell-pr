@@ -9,6 +9,8 @@ import {
   withAgentTimeoutHint,
 } from "./agent-timeouts.js";
 import { AppError } from "./types.js";
+import { withLocale } from "./i18n/index.js";
+import { command } from "./process.js";
 
 const codex = { provider: "codex" as const };
 const claude = { provider: "claude" as const };
@@ -86,6 +88,68 @@ test("only command()'s 504 is replaced with the actionable timeout message", () 
   assert.equal(withAgentTimeoutHint(failure, "codex", 240_000), failure);
   const plain = new Error("boom");
   assert.equal(withAgentTimeoutHint(plain, "codex", 240_000), plain);
+});
+
+test("time limits and command failures are worded in the locale in effect", async () => {
+  await withLocale("en", async () => {
+    assert.equal(describeAgentTimeout(900_000), "waits up to 15 minutes");
+    assert.equal(describeAgentTimeout(2_250_000), "waits up to 37.5 minutes");
+    const replaced = withAgentTimeoutHint(
+      new AppError("claude timed out.", 504),
+      "claude",
+      900_000,
+    );
+    assert.ok(replaced instanceof AppError);
+    assert.equal(
+      replaced.message,
+      "claude timed out after 15 minutes. A higher reasoning effort or a large project needs more time: lower the effort, choose a faster model, or raise BELLPR_AGENT_TIMEOUT_SCALE.",
+    );
+    // command() words its own failures in the caller's locale too.
+    await assert.rejects(
+      command(process.execPath, ["-e", "process.exit(3)"]),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 422 &&
+        error.message === `${process.execPath} failed: exit 3`,
+    );
+    await assert.rejects(
+      command(process.execPath, ["-e", 'process.stdout.write("x".repeat(4096))'], {
+        maxBytes: 64,
+      }),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.message ===
+          `${process.execPath} produced more output than the safety limit allows; make the task smaller.`,
+    );
+    await assert.rejects(
+      command(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+        timeoutMs: 50,
+      }),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 504 &&
+        error.message === `${process.execPath} timed out.`,
+    );
+    // A command aborted from another locale is cancelled in the caller's.
+    const controller = new AbortController();
+    const aborted = command(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+      signal: controller.signal,
+    });
+    setTimeout(() => withLocale("zh-TW", () => controller.abort()), 50);
+    await assert.rejects(aborted, {
+      statusCode: 409,
+      message: "The operation was cancelled.",
+    });
+    // A missing executable is one whole sentence, with the reason kept as the cause.
+    await assert.rejects(
+      command("bell-pr-missing-executable", []),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 503 &&
+        error.message.startsWith("bell-pr-missing-executable could not start: ") &&
+        (error.cause as NodeJS.ErrnoException | undefined)?.code === "ENOENT",
+    );
+  });
 });
 
 test("BELLPR_AGENT_TIMEOUT_SCALE defaults to 1 and accepts 0.5-10", () => {

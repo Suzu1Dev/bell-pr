@@ -1,4 +1,5 @@
 import type { RequestHandler } from "express";
+import { sm } from "./i18n/index.js";
 
 const invalidOrigins =
   "BELLPR_ALLOWED_ORIGINS must contain comma-separated HTTP(S) origins without credentials, paths, queries, fragments, or wildcards.";
@@ -68,7 +69,7 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
   return (req, res, next) => {
     const host = (req.headers.host ?? "").toLowerCase();
     if (!allowedHosts.has(host)) {
-      res.status(403).json({ error: "不允許此服務網址。" });
+      res.status(403).json({ error: sm().common.hostNotAllowed });
       return;
     }
     const origin = req.get("origin");
@@ -80,14 +81,14 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
         )) ||
       req.get("sec-fetch-site") === "cross-site"
     ) {
-      res.status(403).json({ error: "不允許跨來源請求。" });
+      res.status(403).json({ error: sm().common.crossOriginNotAllowed });
       return;
     }
     if (
       !["GET", "HEAD", "OPTIONS"].includes(req.method) &&
       !req.is("application/json")
     ) {
-      res.status(415).json({ error: "變更操作必須使用 application/json。" });
+      res.status(415).json({ error: sm().common.jsonRequired });
       return;
     }
     res.setHeader("X-Content-Type-Options", "nosniff");

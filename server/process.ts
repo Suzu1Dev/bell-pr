@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { log } from "./log.js";
 import { redact } from "./secrets.js";
 import { AppError } from "./types.js";
+import { cancelled, currentLocale, withLocale } from "./i18n/index.js";
 
 export { redact };
 
@@ -82,7 +83,7 @@ export async function command(
   args: string[],
   options: CommandOptions = {},
 ) {
-  if (options.signal?.aborted) throw new AppError("工作已取消。", 409);
+  if (options.signal?.aborted) throw new AppError(cancelled(), 409);
   return await new Promise<{ stdout: string; stderr: string; code: number }>(
     (resolve, reject) => {
       const child = spawn(executable, args, {
@@ -120,10 +121,17 @@ export async function command(
         killTimer = setTimeout(() => kill("SIGKILL"), 1500);
         killTimer.unref();
       };
-      const abort = () => stop(new AppError("工作已取消。", 409));
+      // An abort listener runs in the scope of whoever aborted, so the
+      // cancellation is worded in the locale of the work that ran this.
+      const locale = currentLocale();
+      const abort = () =>
+        stop(new AppError(withLocale(locale, cancelled), 409));
       options.signal?.addEventListener("abort", abort, { once: true });
       const timer = setTimeout(
-        () => stop(new AppError(`${executable} 執行逾時。`, 504)),
+        () =>
+          stop(
+            new AppError((m) => m.run.command.timedOut({ executable }), 504),
+          ),
         options.timeoutMs ?? 60_000,
       );
       const consume = (stream: "stdout" | "stderr", buffer: Buffer) => {
@@ -131,7 +139,7 @@ export async function command(
         if (byteCount > (options.maxBytes ?? 2_000_000)) {
           stop(
             new AppError(
-              `${executable} 輸出超過安全上限；請縮小工作範圍。`,
+              (m) => m.run.command.outputTooLarge({ executable }),
               422,
             ),
           );
@@ -155,9 +163,15 @@ export async function command(
         /* Process may exit before consuming input. */
       });
       child.on("error", (error) => {
+        // One whole sentence; callers that need the reason read cause.code.
         failure = new AppError(
-          `${executable} 無法啟動：${redact(error.message)}`,
+          (m) =>
+            m.run.command.spawnFailed({
+              executable,
+              reason: redact(error.message),
+            }),
           503,
+          { cause: error },
         );
       });
       child.on("close", (code) => {
@@ -171,7 +185,13 @@ export async function command(
         else if (!(options.allowedCodes ?? [0]).includes(code ?? -1)) {
           reject(
             new AppError(
-              `${executable} 執行失敗：${redact((stderr || stdout || `exit ${code}`).trim()).slice(-1800)}`,
+              (m) =>
+                m.run.command.failed({
+                  executable,
+                  output: redact(
+                    (stderr || stdout || `exit ${code}`).trim(),
+                  ).slice(-1800),
+                }),
               422,
             ),
           );

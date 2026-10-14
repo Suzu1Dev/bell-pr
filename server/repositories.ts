@@ -84,9 +84,7 @@ export async function importRepository(
       }
     } else {
       if (!path.isAbsolute(source))
-        throw new AppError(
-          "請輸入 GitHub HTTPS URL 或本機 Repository 的絕對路徑。",
-        );
+        throw new AppError((m) => m.run.repos.importSource);
       repositoryPath = await realpath(source);
       const root = (
         await git(repositoryPath, ["rev-parse", "--show-toplevel"])
@@ -100,8 +98,7 @@ export async function importRepository(
     const isBare = (
       await git(repositoryPath, ["rev-parse", "--is-bare-repository"])
     ).stdout.trim();
-    if (isBare === "true")
-      throw new AppError("請選擇有工作目錄的 Repository。");
+    if (isBare === "true") throw new AppError((m) => m.run.repos.bare);
     await git(repositoryPath, ["rev-parse", "--verify", "HEAD"]);
     let remote = github;
     if (!remote) {
@@ -211,10 +208,7 @@ export async function fetchBranchCommit(
 export async function updateRepository(ctx: WorkbenchContext, id: string) {
   const repo = ctx.repo(id);
   if (!managedClone(ctx.store.directory, repo))
-    throw new AppError(
-      "這是你本機的 repository，BELL 不會更動它；請在終端機自行 git pull 後再重新分析。",
-      409,
-    );
+    throw new AppError((m) => m.run.repos.localNotUpdated, 409);
   return ctx.lock(`repository:${repo.id}`, async () => {
     const from = (
       await git(repo.path, ["rev-parse", "--verify", "HEAD"])
@@ -229,10 +223,7 @@ export async function updateRepository(ctx: WorkbenchContext, id: string) {
         ])
       ).stdout.trim()
     )
-      throw new AppError(
-        "BELL 的專案副本有未預期的修改，已停止更新；請檢查後再試。",
-        409,
-      );
+      throw new AppError((m) => m.run.repos.cloneChanged, 409);
     if (from !== to)
       // An ignored local file in the way stops the update instead of being overwritten.
       await git(repo.path, [

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AppError, type DiffFile } from "./types.js";
+import { sm } from "./i18n/index.js";
 import { safeRelativePath, sensitivePath } from "./git.js";
 import type { AgentTeam, TeamTask } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
@@ -16,21 +17,25 @@ export function contributionIntent(settings: ContributionSettings | undefined) {
   return { direction, targetUser, outcome, constraints, acceptance };
 }
 
-/** Labelled lines for prompts; empty fields are skipped, no settings yields "". */
+/**
+ * Labelled lines for prompts; empty fields are skipped, no settings yields "".
+ * The labels are English in every locale, like the prompt around them; the
+ * values are the person's own words.
+ */
 export function contributionIntentText(
   settings: ContributionSettings | undefined,
 ) {
   const intent = contributionIntent(settings);
   const labels: [keyof typeof intent, string][] = [
-    ["direction", "需求"],
-    ["targetUser", "目標使用者"],
-    ["outcome", "預期結果"],
-    ["constraints", "限制"],
-    ["acceptance", "驗收條件"],
+    ["direction", "Direction"],
+    ["targetUser", "Target users"],
+    ["outcome", "Expected outcome"],
+    ["constraints", "Constraints"],
+    ["acceptance", "Acceptance criteria"],
   ];
   return labels
     .filter(([key]) => intent[key]?.trim())
-    .map(([key, label]) => `${label}：${intent[key]!.trim()}`)
+    .map(([key, label]) => `${label}: ${intent[key]!.trim()}`)
     .join("\n");
 }
 
@@ -208,38 +213,43 @@ function normalisePlanIds(raw: unknown) {
 }
 
 /**
- * One zod issue as a "tasks[2].description"-style path plus a Traditional
- * Chinese reason, so the 422 names the field instead of the whole plan.
+ * One zod issue as a "tasks[2].description"-style path plus the reason, in
+ * the locale in effect, so the 422 names the field instead of the whole plan.
  */
 function describePlanIssue(issue: z.ZodIssue) {
+  const m = sm().run.plan;
   const path =
     issue.path
       .map((part, index) =>
         typeof part === "number" ? `[${part}]` : index ? `.${part}` : part,
       )
-      .join("") || "計畫";
-  const unit = (type: string | undefined) => (type === "array" ? "項" : "字");
-  let reason: string;
+      .join("") || m.wholePlan;
   switch (issue.code) {
     case z.ZodIssueCode.too_big:
-      reason = `超過 ${issue.maximum} ${unit(issue.type)}`;
-      break;
+      return m.tooBig({
+        path,
+        maximum: Number(issue.maximum),
+        items: issue.type === "array",
+      });
     case z.ZodIssueCode.too_small:
-      reason =
-        issue.minimum === 1
-          ? "不可為空"
-          : `至少 ${issue.minimum} ${unit(issue.type)}`;
-      break;
+      return issue.minimum === 1
+        ? m.empty({ path })
+        : m.tooSmall({
+            path,
+            minimum: Number(issue.minimum),
+            items: issue.type === "array",
+          });
     case z.ZodIssueCode.invalid_type:
-      reason = `應為 ${issue.expected}，收到 ${issue.received}`;
-      break;
+      return m.wrongType({
+        path,
+        expected: issue.expected,
+        received: issue.received,
+      });
     case z.ZodIssueCode.invalid_string:
-      reason = "格式不正確";
-      break;
+      return m.badFormat({ path });
     default:
-      reason = issue.message;
+      return m.other({ path, reason: issue.message });
   }
-  return `${path}：${reason}`;
 }
 
 export function parseTeamPlan(answer: string, maxTeammates: number) {
@@ -247,15 +257,15 @@ export function parseTeamPlan(answer: string, maxTeammates: number) {
   try {
     raw = JSON.parse(jsonText(answer));
   } catch {
-    throw new AppError(
-      "Lead 未回傳有效的任務計畫 JSON，請調整需求後重試。",
-      422,
-    );
+    throw new AppError((m) => m.run.plan.notJson, 422);
   }
   const result = planSchema.safeParse(normalisePlanIds(raw));
   if (!result.success)
     throw new AppError(
-      `Lead 回傳的計畫不符合格式（${describePlanIssue(result.error.issues[0])}）；請調整需求後重試。`,
+      (m) =>
+        m.run.plan.invalid({
+          problem: describePlanIssue(result.error.issues[0]),
+        }),
       422,
     );
   const parsed = result.data;
@@ -274,10 +284,10 @@ export function parseTeamPlan(answer: string, maxTeammates: number) {
       (task) => reserved.has(task.id) || /^member-/.test(task.id),
     )
   )
-    throw new AppError("Lead 計畫包含重複或保留的任務 ID。", 422);
+    throw new AppError((m) => m.run.plan.duplicateIds, 422);
   for (const task of parsed.tasks) {
     if (task.dependsOn.some((id) => !ids.has(id) || id === task.id))
-      throw new AppError("Lead 計畫包含無效的任務依賴。", 422);
+      throw new AppError((m) => m.run.plan.invalidDependency, 422);
     for (const scope of task.files) {
       const cleaned = scope.replace(/\/$/, "");
       if (
@@ -287,14 +297,14 @@ export function parseTeamPlan(answer: string, maxTeammates: number) {
         /[*?{}]/.test(cleaned) ||
         sensitivePath(cleaned)
       )
-        throw new AppError(`Lead 計畫的檔案範圍無效：${scope}`, 422);
+        throw new AppError((m) => m.run.plan.invalidScope({ scope }), 422);
     }
   }
   const visited = new Set<string>();
   const visiting = new Set<string>();
   const visit = (id: string) => {
     if (visiting.has(id))
-      throw new AppError("Lead 計畫的任務依賴形成循環。", 422);
+      throw new AppError((m) => m.run.plan.cycle, 422);
     if (visited.has(id)) return;
     visiting.add(id);
     parsed.tasks.find((task) => task.id === id)!.dependsOn.forEach(visit);
@@ -466,24 +476,22 @@ const memberResultSchema = z.object({
 
 /**
  * Renders a structured report as the single report string the board, the
- * draft prompt and the lead already read. Checks and limitations come before
+ * draft prompt and the lead already read, with headings in the locale in
+ * effect (the run's, while it runs). Checks and limitations come before
  * the tradeoffs so a truncated excerpt still keeps the evidence.
  */
 export function formatMemberReport(
   report: z.infer<typeof structuredReportSchema>,
 ) {
-  const checks = report.checks.length
-    ? report.checks
-        .map((check) => `- ${check.command} → ${check.outcome}`)
-        .join("\n")
-    : "（成員未回報任何實際執行的檢查）";
-  return [
-    report.summary,
-    `驗證證據（成員自述的執行結果）：\n${checks}`,
-    `限制與未達成的驗收條件：\n${report.limitations || "（未回報）"}`,
-    `設計取捨（考慮過但未採用的做法）：\n${report.tradeoffs || "（未回報）"}`,
-  ]
-    .join("\n\n")
+  return sm()
+    .run.report.member({
+      summary: report.summary,
+      checks: report.checks.map(
+        (check) => `- ${check.command} → ${check.outcome}`,
+      ),
+      limitations: report.limitations,
+      tradeoffs: report.tradeoffs,
+    })
     .slice(0, memberReportLimit);
 }
 

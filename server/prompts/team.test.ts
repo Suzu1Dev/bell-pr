@@ -26,6 +26,9 @@ import {
 import type { TeamAgentInput, TeamAgentRunner } from "../team.js";
 import type { DiffFile, Run } from "../types.js";
 import type { ContributionSettings } from "../../shared/insights.js";
+import type { Locale } from "../../shared/i18n/locale.js";
+import { outputLanguage, respondIn } from "../prompt-language.js";
+import { withLocale } from "../i18n/index.js";
 import { freeEntitlements, proEntitlements } from "../../shared/plans.js";
 import type {
   AgentTeam,
@@ -33,10 +36,15 @@ import type {
   TeamTask,
 } from "../../shared/team.js";
 
+/** Han characters and CJK punctuation; the Latin middle dot is not one. */
+const cjk = /(?!\u00B7)[\p{Script_Extensions=Han}\u3000-\u303F\uFF00-\uFFEF]/u;
+
 /**
  * Fixtures hold each prompt as its lines, so a wording change shows up as a
  * readable line diff. They were recorded from the prompt code before it moved
- * out of workbench.ts; a test failure means the text the agents receive
+ * out of workbench.ts, and recorded again in English when the prompts started
+ * to follow the run's locale (the zh-TW prompts are checked against them by
+ * the language name); a test failure means the text the agents receive
  * changed.
  */
 async function fixture(name: string) {
@@ -217,11 +225,13 @@ async function recordPlanAndRetryPrompts() {
       return implement(input);
     },
     async (workbench, repoId) => {
-      const run = await workbench.createRun(
-        repoId,
-        "Make every module print the same greeting.",
-        "Align the greeting",
-        settings,
+      const run = await withLocale("en", () =>
+        workbench.createRun(
+          repoId,
+          "Make every module print the same greeting.",
+          "Align the greeting",
+          settings,
+        ),
       );
       await waitUntil(() => run.status === "awaiting_plan", "the first plan");
       await workbench.revisePlan(run.id, "Name the check each task runs.");
@@ -301,11 +311,13 @@ async function recordMessagePrompts() {
       return implement(input);
     },
     async (workbench, repoId) => {
-      const run = await workbench.createRun(
-        repoId,
-        "Make a.ts and b.ts print the same greeting.",
-        "Share the greeting",
-        { ...settings, requirePlanApproval: false },
+      const run = await withLocale("en", () =>
+        workbench.createRun(
+          repoId,
+          "Make a.ts and b.ts print the same greeting.",
+          "Share the greeting",
+          { ...settings, requirePlanApproval: false },
+        ),
       );
       await waitUntil(() => run.status === "review", "the review");
     },
@@ -313,8 +325,8 @@ async function recordMessagePrompts() {
   return prompts;
 }
 
-/** Small fixed inputs that reach every branch of the prompt builders. */
-function builderPrompts() {
+/** Small fixed inputs that reach every branch of the prompt builders, in `locale`. */
+function builderPrompts(locale: Locale = "en") {
   const run = {
     prompt: "Make the greeting consistent.",
     contributionSettings: settings,
@@ -431,7 +443,7 @@ function builderPrompts() {
   const reviewContext = "<review context>";
   const brief = "<member brief>";
   return {
-    teamBoundaries,
+    teamBoundaries: teamBoundaries(locale),
     webBoundaries,
     contributionContext: contributionContext(run),
     "contributionContext:no-intent": contributionContext({
@@ -449,13 +461,13 @@ function builderPrompts() {
       files,
       undefined,
     ),
-    reviewer: reviewerPrompt(reviewContext),
-    tester: testerPrompt(reviewContext, team),
-    "tester:no-team": testerPrompt(reviewContext, undefined),
-    leadPlan: leadPlanPrompt(teamBoundaries, run, 2, []),
-    "leadPlan:revised": leadPlanPrompt(teamBoundaries, run, 4, revisions),
-    "member:beta": memberPrompt(teamBoundaries, run, team, tasks[1]),
-    "member:gamma": memberPrompt(teamBoundaries, run, team, tasks[2]),
+    reviewer: reviewerPrompt(reviewContext, locale),
+    tester: testerPrompt(reviewContext, team, locale),
+    "tester:no-team": testerPrompt(reviewContext, undefined, locale),
+    leadPlan: leadPlanPrompt(locale, run, 2, []),
+    "leadPlan:revised": leadPlanPrompt(locale, run, 4, revisions),
+    "member:beta": memberPrompt(locale, run, team, tasks[1]),
+    "member:gamma": memberPrompt(locale, run, team, tasks[2]),
     "memberTurn:first": memberTurnPrompt(brief, 0, undefined, undefined),
     "memberTurn:after-failure": memberTurnPrompt(
       brief,
@@ -469,9 +481,9 @@ function builderPrompts() {
       undefined,
       "beta: b.ts updated.",
     ),
-    integration: integrationPrompt(teamBoundaries, run, team, diffContext),
+    integration: integrationPrompt(locale, run, team, diffContext),
     coordination: coordinationPrompt(
-      teamBoundaries,
+      locale,
       run,
       diffContext,
       "Lead: the greeting is aligned.",
@@ -481,6 +493,46 @@ function builderPrompts() {
 
 test("the prompt builders return exactly the recorded prompts", async () => {
   assert.deepEqual(builderPrompts(), await fixture("team-prompts.json"));
+});
+
+test("every team prompt builder answers in the locale it is given", () => {
+  // Builders that open with the shared team boundaries, which name the language.
+  const roles = [
+    "teamBoundaries",
+    "reviewer",
+    "tester",
+    "tester:no-team",
+    "leadPlan",
+    "leadPlan:revised",
+    "member:beta",
+    "member:gamma",
+    "integration",
+    "coordination",
+  ];
+  const english: Record<string, string> = builderPrompts("en");
+  const chinese: Record<string, string> = builderPrompts("zh-TW");
+  for (const role of roles) {
+    assert.ok(english[role].startsWith(respondIn("en")), role);
+    assert.ok(chinese[role].startsWith(respondIn("zh-TW")), role);
+  }
+  for (const [name, prompt] of Object.entries(english)) {
+    assert.ok(!prompt.includes(outputLanguage("zh-TW")), name);
+    // Prompts are English text in every locale: no Chinese labels or terms.
+    assert.doesNotMatch(prompt, cjk, name);
+    // The zh-TW prompt is the English one with the other language named.
+    assert.equal(
+      chinese[name],
+      prompt.replaceAll(outputLanguage("en"), outputLanguage("zh-TW")),
+      name,
+    );
+  }
+  assert.match(english.leadPlan, /summary states, in English, the project purpose/);
+  assert.match(english["leadPlan:revised"], /Explain in revisionNotes, in English, which adjustments/);
+  assert.match(english["member:beta"], /Finish with the report object in English: /);
+  assert.match(english["member:beta"], /report\.tradeoffs names the alternatives/);
+  // The intent labels are English for every locale.
+  assert.match(english.contributionContext, /\nDirection: feature\nTarget users: Command-line users\n/);
+  assert.equal(english.contributionContext, chinese.contributionContext);
 });
 
 test("a team run with a revised plan and a retried task sends exactly the recorded prompts", async () => {

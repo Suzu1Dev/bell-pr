@@ -1,7 +1,8 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { Database } from "./types.js";
+import { withRunLocale, type Database } from "./types.js";
 import { activeFollowUp } from "../shared/followups.js";
+import { sm } from "./i18n/index.js";
 
 export class Store {
   data: Database = { version: 1, repos: [], runs: [] };
@@ -24,20 +25,25 @@ export class Store {
       // A missing file is a first start; anything else names the file (no auto-repair).
       if ((error as NodeJS.ErrnoException).code !== "ENOENT")
         throw new Error(
-          `無法讀取 ${statePath}：${error instanceof Error ? error.message : String(error)}。請檢查檔案是否為有效 JSON（version 1）。`,
+          sm().run.recovery.unreadableState({
+            path: statePath,
+            reason: error instanceof Error ? error.message : String(error),
+          }),
           { cause: error },
         );
     }
     for (const run of this.data.runs) {
+      // Each run explains the interruption in its own language, whatever
+      // the server's default is now.
+      const recovery = withRunLocale(run, () => sm().run.recovery);
       if (run.draftPreparation?.status === "generating") {
         run.draftPreparation.status = "failed";
-        run.draftPreparation.error =
-          "服務重新啟動，PR 草稿建議已中斷；現有草稿保留，可重新產生。";
+        run.draftPreparation.error = recovery.draft;
       }
       for (const explanation of Object.values(run.explanations ?? {})) {
         if (explanation.status === "generating") {
           explanation.status = "failed";
-          explanation.error = "服務重新啟動，解說產生已中斷；可重試產生解說。";
+          explanation.error = recovery.explanation;
         }
       }
       // A re-review interrupted by a crash leaves reviewer/tester agents "running" on a finished run.
@@ -45,14 +51,13 @@ export class Store {
         for (const agent of run.agents)
           if (agent.status === "running") {
             agent.status = "failed";
-            agent.detail = "服務重新啟動，重新審查已中斷；原有報告保留";
+            agent.detail = recovery.review;
           }
       }
       // An interrupted conflict resolution keeps its edits for review.
       if (run.sync?.resolving && run.status === "running") {
         run.sync.resolving = false;
-        run.sync.report =
-          "服務重新啟動，解衝突已中斷；已改的檔案保留，可以自行完成，或再請 Agent 處理。";
+        run.sync.report = recovery.conflicts;
         run.status = "review";
         for (const agent of run.agents)
           if (agent.status === "running") agent.status = "failed";
@@ -63,14 +68,12 @@ export class Store {
       const round = activeFollowUp(run.followUps);
       if (round?.resolving) {
         round.resolving = false;
-        round.report =
-          "服務重新啟動，解衝突已中斷；已改的檔案保留，可以自行完成，或再請 Agent 處理。";
+        round.report = recovery.conflicts;
       }
       if (round && (run.status === "running" || run.publishing)) {
         if (round.status === "running") {
           round.status = "review";
-          round.error =
-            "服務重新啟動，這輪修正已中斷；工作目錄保留的修改可以審閱、寫好提交訊息後推送，或放棄這輪修正。";
+          round.error = recovery.round;
           // Rounds saved before startFollowUp cleared it still hold the last pushed message.
           delete run.draft.commitMessage;
         }
@@ -88,8 +91,7 @@ export class Store {
       ) {
         run.status = "failed";
         run.publishing = false;
-        run.error =
-          "服務重新啟動，先前工作已中斷。工作目錄仍保留，可檢視差異；團隊工作可在任務板重試失敗的子任務，已整合的子任務不會重跑。";
+        run.error = recovery.run;
         for (const agent of run.agents)
           if (agent.status === "running") agent.status = "failed";
         if (run.team) {
@@ -97,8 +99,7 @@ export class Store {
           for (const task of run.team.tasks)
             if (task.status === "running") {
               task.status = "failed";
-              task.error =
-                "服務重新啟動，任務已中斷；隔離工作目錄保留，重試時會以新快照重新開始。";
+              task.error = recovery.task;
             }
         }
       }

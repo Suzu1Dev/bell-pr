@@ -14,8 +14,9 @@ import {
   conversationMessageLimit,
   type ChatMessage,
 } from "../shared/chat.js";
-import { AppError, type Run } from "./types.js";
+import { AppError, withRunLocale, type Run } from "./types.js";
 import { log } from "./log.js";
+import { shuttingDown, sm } from "./i18n/index.js";
 import {
   explanationBatches,
   explanationJsonSchema,
@@ -45,21 +46,21 @@ const readableStatuses: Run["status"][] = [
  * is started; the reports arrive through the normal run polling.
  */
 export async function rerunReview(ctx: WorkbenchContext, id: string) {
-  if (ctx.stopping()) throw new AppError("服務正在關閉，請稍後重試。", 503);
+  if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   const run = ctx.run(id);
   if (!["review", "approved"].includes(run.status) || run.publishing)
-    throw new AppError("只有審閱中或已核准的工作可以重新執行審查。", 409);
+    throw new AppError((m) => m.run.review.rerunNotAllowed, 409);
   if (ctx.reviewJobs.has(id) || ctx.controllers.has(id))
-    throw new AppError("這個工作的審查正在重新執行，請等待完成或先停止。", 409);
+    throw new AppError((m) => m.run.review.rerunRunning, 409);
   // Registering the controller first makes a concurrent request a 409 and
-  // lets 停止 abort the reviewers through the usual run-level controller.
+  // lets Stop abort the reviewers through the usual run-level controller.
   const controller = new AbortController();
   ctx.controllers.set(id, controller);
   let files: Awaited<ReturnType<typeof readDiff>>;
   try {
     files = await ctx.lock(id, () => ctx.diff(id));
     if (!files.length)
-      throw new AppError("目前沒有程式碼差異可供審查。", 422);
+      throw new AppError((m) => m.run.review.nothingToReview, 422);
   } catch (error) {
     ctx.controllers.delete(id);
     throw error;
@@ -69,14 +70,15 @@ export async function rerunReview(ctx: WorkbenchContext, id: string) {
   );
   for (const agent of reviewers) {
     agent.status = "running";
-    agent.detail = "等待重新審查…";
+    agent.detail = sm().run.agents.rerunWaiting;
   }
   ctx.log(
     run,
     "user",
-    `要求依目前工作目錄的 ${files.length} 個變更檔案重新執行獨立審查。`,
+    sm().run.review.rerunRequested({ files: files.length }),
   );
-  const job = (async () => {
+  // The rerun is background work of the run: it uses the run's locale.
+  const job = withRunLocale(run, async () => {
     try {
       await runIndependentReview(
         ctx,
@@ -85,24 +87,22 @@ export async function rerunReview(ctx: WorkbenchContext, id: string) {
         run.reports?.implementer,
         controller.signal,
       );
-      ctx.log(
-        run,
-        "system",
-        "獨立審查已更新；報告是建議，審閱狀態與核准不變。",
-      );
+      ctx.log(run, "system", sm().run.review.rerunDone);
     } catch (error) {
       for (const agent of reviewers)
         if (agent.status === "running") {
           agent.status = "failed";
-          agent.detail = "執行中斷或失敗";
+          agent.detail = sm().run.agents.failed;
         }
       ctx.log(
         run,
         "system",
         controller.signal.aborted
-          ? "已停止重新審查；原有報告與審閱狀態保留。"
+          ? sm().run.review.rerunStopped
           : redact(
-              error instanceof Error ? error.message : "重新審查未完成。",
+              error instanceof Error
+                ? error.message
+                : sm().run.review.rerunIncomplete,
             ),
       );
     } finally {
@@ -111,7 +111,7 @@ export async function rerunReview(ctx: WorkbenchContext, id: string) {
       ctx.reviewJobs.delete(id);
       await ctx.store.save();
     }
-  })()
+  })
     // Nothing awaits this job until shutdown or cancel; a failed save above
     // must not become an unhandled rejection that stops the server.
     .catch((error) =>
@@ -131,17 +131,17 @@ export async function explanations(
   id: string,
   options: { retry?: boolean; filePath?: string } = {},
 ) {
-  if (ctx.stopping()) throw new AppError("服務正在關閉，請稍後重試。", 503);
+  if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   const run = ctx.run(id);
   if (!readableStatuses.includes(run.status) || run.publishing)
-    throw new AppError("請等待開發完成後再產生變更解說。", 409);
+    throw new AppError((m) => m.run.review.explanationsTooEarly, 409);
   const files = await ctx.lock(id, () => ctx.diff(id));
-  if (ctx.stopping()) throw new AppError("服務正在關閉，請稍後重試。", 503);
+  if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   if (
     options.filePath &&
     !files.some((file) => file.path === options.filePath)
   )
-    throw new AppError("找不到此差異檔案。", 404);
+    throw new AppError((m) => m.run.review.fileNotFound, 404);
   const existing = ctx.explanationJobs.get(id);
   if (existing) await existing;
   else {
@@ -175,11 +175,11 @@ async function generateExplanations(
   ctx.controllers.set(key, controller);
   const fail = (batch: typeof files, error: unknown) => {
     const message = controller.signal.aborted
-      ? "解說產生已中斷；已完成的程式碼變更仍保留，可重試解說。"
+      ? sm().run.review.explanationsStopped
       : redact(
           error instanceof Error
             ? error.message
-            : "變更解說產生失敗，請重試。",
+            : sm().run.review.explanationsFailed,
         );
     for (const file of batch) {
       const stored = run.explanations?.[file.path];
@@ -208,7 +208,7 @@ async function generateExplanations(
   try {
     await ctx.store.save();
     if (controller.signal.aborted)
-      throw new AppError("解說產生已取消。", 409);
+      throw new AppError((m) => m.run.review.explanationsCancelled, 409);
     temporary = await mkdtemp(path.join(os.tmpdir(), "bell-explanations-"));
     const outputSchema = path.join(temporary, "response-schema.json");
     await writeFile(outputSchema, JSON.stringify(explanationJsonSchema), {
@@ -216,7 +216,7 @@ async function generateExplanations(
     });
     for (const batch of explanationBatches(files)) {
       if (controller.signal.aborted)
-        throw new AppError("解說產生已取消。", 409);
+        throw new AppError((m) => m.run.review.explanationsCancelled, 409);
       try {
         const answer = await runAgent(
           ctx,
@@ -283,11 +283,11 @@ export async function saveNote(
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     if (!readableStatuses.includes(run.status))
-      throw new AppError("請等待開發完成後再寫下理解。", 409);
+      throw new AppError((m) => m.run.review.notesTooEarly, 409);
     const file = (await ctx.diff(id)).find(
       (value) => value.path === filePath,
     );
-    if (!file) throw new AppError("找不到此差異檔案。", 404);
+    if (!file) throw new AppError((m) => m.run.review.fileNotFound, 404);
     const notes = (run.notes ??= {});
     if (text.trim())
       notes[filePath] = {
@@ -301,6 +301,11 @@ export async function saveNote(
   });
 }
 
+/**
+ * Answers a question about one changed file. Unlike the run's background
+ * work, the mentor answers in the language of the person asking: the
+ * request's locale, not the run's.
+ */
 export async function chat(
   ctx: WorkbenchContext,
   id: string,
@@ -310,12 +315,12 @@ export async function chat(
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     if (!readableStatuses.includes(run.status))
-      throw new AppError("請等待開發完成後再追問。", 409);
+      throw new AppError((m) => m.run.review.chatTooEarly, 409);
     const file = (await ctx.diff(id)).find(
       (value) => value.path === filePath,
     );
     if (!file || file.blocked)
-      throw new AppError("此檔案目前無法用於追問。", 422);
+      throw new AppError((m) => m.run.review.chatUnavailable, 422);
     // The run record is the only copy of the conversation: turns about an
     // older version of the file stay readable but are not fed back.
     const stored = run.conversations?.[filePath]?.messages ?? [];
@@ -380,12 +385,12 @@ export async function fetchPrFeedback(ctx: WorkbenchContext, id: string) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     if (run.status !== "published" || !run.prUrl)
-      throw new AppError("PR 尚未送出，還沒有維護者回饋可以讀取。", 409);
+      throw new AppError((m) => m.run.review.feedbackUnpublished, 409);
     const repo = ctx.repo(run.repoId);
     const remote = parseGitHubSource(repo.url);
     const prNumber = remote && prNumberOf(run.prUrl, remote.url);
     if (!remote || !prNumber)
-      throw new AppError("PR 網址與此 Repository 不一致，無法讀取回饋。", 422);
+      throw new AppError((m) => m.run.review.feedbackMismatch, 422);
     const result = await command(
       "gh",
       [
@@ -408,7 +413,7 @@ export async function fetchPrFeedback(ctx: WorkbenchContext, id: string) {
     try {
       response = JSON.parse(result.stdout);
     } catch {
-      throw new AppError("GitHub 回應不是有效的 JSON。", 502);
+      throw new AppError((m) => m.run.review.githubInvalidJson, 502);
     }
     run.prFeedback = parsePrFeedback(response, {
       repositoryUrl: remote.url,
@@ -418,7 +423,10 @@ export async function fetchPrFeedback(ctx: WorkbenchContext, id: string) {
     ctx.log(
       run,
       "system",
-      `已讀取 PR #${prNumber} 的維護者回饋：${run.prFeedback.items.length} 則。`,
+      sm().run.review.feedbackRead({
+        number: prNumber,
+        items: run.prFeedback.items.length,
+      }),
     );
     await ctx.store.save();
     return run;

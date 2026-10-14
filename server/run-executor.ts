@@ -2,7 +2,7 @@
  * Runs a contribution for the Workbench queue: one agent CLI turn
  * (runAgent), the run log, team messages, and the team phases in order:
  * the lead's plan, the members in their own worktrees, integration, and the
- * independent reviewer and test analyst. retryTeam resumes a failed or
+ * independent reviewer and test analyst. team-retry.ts resumes a failed or
  * cancelled run from its task board.
  */
 import { randomUUID } from "node:crypto";
@@ -49,6 +49,8 @@ import {
   retryTransientAuth,
 } from "./agent-cli.js";
 import { draftFingerprint } from "./drafts.js";
+import { cancelled, currentLocale, sm } from "./i18n/index.js";
+import type { Locale } from "../shared/i18n/locale.js";
 import { createRunWorktree } from "./repositories.js";
 import {
   coordinationPrompt,
@@ -58,7 +60,6 @@ import {
   memberPrompt,
   memberTurnPrompt,
   reviewerPrompt,
-  teamBoundaries,
   testerPrompt,
   webBoundaries,
 } from "./prompts/team.js";
@@ -107,9 +108,10 @@ export async function runAgent(
   };
   const label = agentLabel(modelExecution.provider);
   const agent = run.agents.find((value) => value.id === role);
+  const running = sm().run.agents.running({ cli: label });
   if (agent) {
     agent.status = "running";
-    agent.detail = `正在執行 ${label}…`;
+    agent.detail = running;
   }
   const inbox =
     run.team && !context.isolated
@@ -135,7 +137,17 @@ export async function runAgent(
   ctx.log(
     run,
     role,
-    `${agent?.name ?? "Guide"} 開始工作。模型：${modelExecution.model ?? `${label} CLI 預設（未記錄模型）`}；推理：${modelExecution.reasoningEffort ?? "模型預設"}${web ? "；已允許上網" : ""}${hasExtendedAgentTimeout(modelExecution) ? `；${describeAgentTimeout(timeoutMs)}` : ""}。${inbox.length ? ` 已在回合起點收到 ${inbox.length} 則團隊訊息。` : ""}`,
+    sm().run.team.started({
+      name: agent?.name ?? "Guide",
+      cli: label,
+      model: modelExecution.model,
+      effort: modelExecution.reasoningEffort,
+      web,
+      timeout: hasExtendedAgentTimeout(modelExecution)
+        ? describeAgentTimeout(timeoutMs)
+        : undefined,
+      inbox: inbox.length,
+    }),
     { kind: "status" },
   );
   let efficiency: ReturnType<typeof trackEfficiency> | undefined;
@@ -163,13 +175,15 @@ export async function runAgent(
     terminalFailure = undefined;
     retryable = false;
     if (ctx.agentSlots.active >= ctx.agentSlots.limit) {
-      const waiting = `等待其他 Agent 完成（${ctx.agentSlots.waiting + 1} 個排隊中）`;
-      if (agent) agent.detail = waiting;
-      ctx.log(run, role, `${waiting}。`, { kind: "status" });
+      const queued = ctx.agentSlots.waiting + 1;
+      if (agent) agent.detail = sm().run.agents.waitingForSlot({ queued });
+      ctx.log(run, role, sm().run.team.waitingForSlot({ queued }), {
+        kind: "status",
+      });
     }
     const releaseSlot = await ctx.agentSlots.acquire(signal);
     try {
-      if (agent) agent.detail = `正在執行 ${label}…`;
+      if (agent) agent.detail = running;
       // Queue time is not agent time: measure from the moment the slot is held.
       const call = trackEfficiency(mode);
       efficiency = call;
@@ -194,6 +208,12 @@ export async function runAgent(
         skipGitRepoCheck: context.isolated,
         web,
       });
+      // Marks the run once when an agent runs without the OS sandbox
+      // because the person allowed it in Settings (agentCommand decides).
+      if (cli.unsandboxed && !run.unsandboxed) {
+        run.unsandboxed = true;
+        ctx.log(run, role, sm().run.unsandboxedNotice, { kind: "notice" });
+      }
       const read = agentEventReader(modelExecution.provider);
       await execute(cli.executable, cli.args, {
         input: fullPrompt,
@@ -210,7 +230,7 @@ export async function runAgent(
             for (const item of read(event)) {
               // A notice (retry, rate limit, denied tool) replaces the status line until the agent is seen working again.
               if (agent && item.kind !== "notice" && item.kind !== "session" && item.kind !== "usage-by-model")
-                agent.detail = `正在執行 ${label}…`;
+                agent.detail = running;
               if (item.kind === "message" || item.kind === "final") {
                 const text = redact(item.text).slice(0, answerLimit);
                 // Claude Code repeats its last message as the final result; log it once.
@@ -219,7 +239,7 @@ export async function runAgent(
                     run,
                     role,
                     context.isolated
-                      ? "結構化結果已回傳，正在驗證來源與內容。"
+                      ? sm().run.team.structuredResult
                       : text,
                   );
                 answer = text;
@@ -237,7 +257,8 @@ export async function runAgent(
                 ctx.log(
                   run,
                   role,
-                  item.command ?? `執行檢查完成（${item.outcome}）。`,
+                  item.command ??
+                    sm().run.team.checkFinished({ outcome: item.outcome }),
                   { kind: "command", detail: item.outcome },
                 );
               } else if (item.kind === "file-change") {
@@ -248,7 +269,9 @@ export async function runAgent(
                 ctx.log(
                   run,
                   role,
-                  edited ? `已更新 ${edited}。` : "已更新工作目錄中的檔案。",
+                  edited
+                    ? sm().run.team.fileUpdated({ path: edited })
+                    : sm().run.team.filesUpdated,
                   { kind: "file", detail: edited },
                 );
               } else if (item.kind === "web") {
@@ -256,7 +279,9 @@ export async function runAgent(
                 ctx.log(
                   run,
                   role,
-                  `${item.action === "search" ? "搜尋網路" : "讀取網頁"}：${item.detail}`,
+                  item.action === "search"
+                    ? sm().run.team.webSearch({ detail: item.detail })
+                    : sm().run.team.webFetch({ detail: item.detail }),
                   { kind: "status", detail: item.detail },
                 );
               } else if (item.kind === "notice") {
@@ -275,7 +300,12 @@ export async function runAgent(
                   ctx.log(
                     run,
                     role,
-                    `${label} 回報實際模型：${run.modelExecution.reported?.model}（${modelExecution.model ? `--model 傳入 ${modelExecution.model}` : "未傳入 --model"}${run.modelExecution.reported?.cliVersion ? `，CLI ${run.modelExecution.reported.cliVersion}` : ""}）。`,
+                    sm().run.team.reportedModel({
+                      cli: label,
+                      model: String(run.modelExecution.reported?.model),
+                      requested: modelExecution.model,
+                      version: run.modelExecution.reported?.cliVersion,
+                    }),
                     { kind: "status" },
                   );
               } else if (item.kind === "error") {
@@ -316,13 +346,13 @@ export async function runAgent(
         ctx.log(run, role, notice, { kind: "notice" });
       },
     });
-    if (signal.aborted) throw new AppError("工作已取消。", 409);
+    if (signal.aborted) throw new AppError(cancelled(), 409);
     if (terminalFailure) throw new AppError(terminalFailure, 422);
     if (!answer.trim())
-      throw new AppError(`${label} 沒有回傳工作報告。`, 422);
+      throw new AppError((m) => m.run.team.noReport({ cli: label }), 422);
     if (agent) {
       agent.status = "complete";
-      agent.detail = "已完成，報告可供審閱";
+      agent.detail = sm().run.agents.complete;
     }
     if (!context.isolated) {
       run.reports ??= {};
@@ -333,7 +363,7 @@ export async function runAgent(
   } catch (error) {
     if (agent) {
       agent.status = "failed";
-      agent.detail = "執行中斷或失敗";
+      agent.detail = sm().run.agents.failed;
     }
     throw error;
   } finally {
@@ -350,7 +380,7 @@ export function queueTeamMessage(
   content: string,
 ) {
   const team = run.team;
-  if (!team) throw new AppError("此工作沒有 Agent Team。", 409);
+  if (!team) throw new AppError((m) => m.run.team.noTeam, 409);
   const activeTasks = team.tasks.filter(
     (task) =>
       ["pending", "ready", "running"].includes(task.status) &&
@@ -366,14 +396,11 @@ export function queueTeamMessage(
         validTargets.add(id);
   }
   if (to !== "all" && !validTargets.has(to))
-    throw new AppError(
-      "此成員或任務已完成，無法再排入訊息；請傳給 Lead。",
-      409,
-    );
+    throw new AppError((m) => m.run.team.messageTargetClosed, 409);
   if (!content.trim() || content.length > 4000)
-    throw new AppError("團隊訊息必須介於 1 至 4000 字。", 400);
+    throw new AppError((m) => m.run.team.messageLength, 400);
   if (team.messages.length >= 200)
-    throw new AppError("此工作的團隊訊息已達 200 則上限。", 429);
+    throw new AppError((m) => m.run.team.messageLimit, 429);
   const recipients =
     to === "all"
       ? [...new Set(["lead", ...activeTasks.map((task) => task.owner)])]
@@ -389,7 +416,7 @@ export function queueTeamMessage(
     deliveredTo: [] as string[],
   };
   team.messages.push(message);
-  ctx.log(run, from, `已排入給 ${to} 的團隊訊息，將在下一回合起點送達。`);
+  ctx.log(run, from, sm().run.team.messageQueued({ to }));
   return message;
 }
 
@@ -406,32 +433,34 @@ export async function runIndependentReview(
   signal: AbortSignal,
 ) {
   const reviewContext = independentReviewContext(run, files, leadReport);
+  // Both callers run under the run's locale (withRunLocale).
+  const locale = currentLocale();
   const results = await Promise.allSettled([
     runAgent(
       ctx,
       run,
       "reviewer",
-      reviewerPrompt(reviewContext),
+      reviewerPrompt(reviewContext, locale),
       signal,
     ),
     runAgent(
       ctx,
       run,
       "tester",
-      testerPrompt(reviewContext, run.team),
+      testerPrompt(reviewContext, run.team, locale),
       signal,
     ),
   ]);
   const failure = results.find((result) => result.status === "rejected");
   if (failure?.status === "rejected") throw failure.reason;
-  if (signal.aborted) throw new AppError("工作已取消。", 409);
+  if (signal.aborted) throw new AppError(cancelled(), 409);
 }
 
 async function executeTeamTask(
   ctx: WorkbenchContext,
   run: Run,
   task: TeamTask,
-  boundaries: string,
+  locale: Locale,
   reportSchema: string,
   signal: AbortSignal,
 ) {
@@ -442,7 +471,7 @@ async function executeTeamTask(
   delete task.error;
   try {
     await ctx.lock(`integration:${run.id}`, async () => {
-      if (signal.aborted) throw new AppError("工作已取消。", 409);
+      if (signal.aborted) throw new AppError(cancelled(), 409);
       task.baseSha = await createTeamSnapshot(
         run,
         ctx.store.directory,
@@ -466,13 +495,9 @@ async function executeTeamTask(
         ),
       );
     });
-    ctx.log(
-      run,
-      task.owner,
-      `領取任務 ${task.title}；獨立工作目錄與檔案範圍已建立。`,
-    );
+    ctx.log(run, task.owner, sm().run.team.taskClaimed({ title: task.title }));
     await ctx.store.save();
-    const context = memberPrompt(boundaries, run, team, task);
+    const context = memberPrompt(locale, run, team, task);
     // Commands seen across all turns of this task; stored only when the CLI reported some.
     const checks: TeamCheck[] = task.checks ?? [];
     for (let turn = 0; turn < 3; turn++) {
@@ -502,32 +527,29 @@ async function executeTeamTask(
           ctx.log(
             run,
             task.owner,
-            `協調訊息未排入：${error instanceof Error ? error.message : String(error)}`,
+            sm().run.team.messageNotQueued({
+              reason: error instanceof Error ? error.message : String(error),
+            }),
           );
         }
       }
       await ctx.store.save();
       if (!hasTeamInbox(team, task.owner, task.id)) break;
-      if (turn === 2)
-        ctx.log(
-          run,
-          task.owner,
-          "已達每個任務 3 回合上限；尚未送達的訊息保留在團隊收件匣，交由 Lead 在整合時檢視。",
-        );
+      if (turn === 2) ctx.log(run, task.owner, sm().run.team.turnLimit);
     }
     task.acceptsMessages = false;
-    if (signal.aborted) throw new AppError("工作已取消。", 409);
+    if (signal.aborted) throw new AppError(cancelled(), 409);
     const integrated = await ctx.lock(`integration:${run.id}`, () =>
       integrateTeamTask(run, task, signal),
     );
-    if (signal.aborted) throw new AppError("工作已取消。", 409);
+    if (signal.aborted) throw new AppError(cancelled(), 409);
     task.status = "complete";
     task.completedAt = now();
     task.integratedFiles = integrated;
     ctx.log(
       run,
       task.owner,
-      `${task.title} 完成，${integrated.length} 個檔案通過範圍檢查並整合${integrated.length ? `：${integrated.join("、")}` : ""}。`,
+      sm().run.team.taskIntegrated({ title: task.title, files: integrated }),
       { kind: "file", detail: integrated.join("\n") },
     );
     // The integrated diff now lives in the run worktree; a leftover checkout
@@ -539,20 +561,23 @@ async function executeTeamTask(
       ctx.log(
         run,
         "system",
-        `整合後的差異已在本次工作的 worktree，${task.owner} 的獨立 checkout 已不需保留，已移除。`,
+        sm().run.team.checkoutRemoved({ owner: task.owner }),
       );
     } catch (error) {
       ctx.log(
         run,
         "system",
-        `無法移除 ${task.id} 的隔離工作目錄，可手動清理：${error instanceof Error ? error.message : String(error)}`,
+        sm().run.team.checkoutNotRemoved({
+          task: task.id,
+          reason: error instanceof Error ? error.message : String(error),
+        }),
       );
     }
   } catch (error) {
     task.status = "failed";
     task.acceptsMessages = false;
     task.error = redact(
-      error instanceof Error ? error.message : "任務失敗。",
+      error instanceof Error ? error.message : sm().run.team.taskFailed,
     );
     const member = run.agents.find((agent) => agent.id === task.owner);
     if (member) {
@@ -569,7 +594,7 @@ async function executeTeamTask(
 async function executeTeamTasks(
   ctx: WorkbenchContext,
   run: Run,
-  boundaries: string,
+  locale: Locale,
   reportSchema: string,
   signal: AbortSignal,
 ) {
@@ -586,7 +611,7 @@ async function executeTeamTasks(
           ctx,
           run,
           task,
-          boundaries,
+          locale,
           reportSchema,
           workerSignal,
         )
@@ -606,12 +631,9 @@ async function executeTeamTasks(
   }
   claimReadyTasks(team.tasks, 0); // Propagate failed dependencies without claiming new tasks.
   if (failure) throw failure;
-  if (signal.aborted) throw new AppError("工作已取消。", 409);
+  if (signal.aborted) throw new AppError(cancelled(), 409);
   if (team.tasks.some((task) => task.status !== "complete"))
-    throw new AppError(
-      "任務依賴或檔案分工阻止團隊繼續，請檢視共享任務清單。",
-      422,
-    );
+    throw new AppError((m) => m.run.team.stuck, 422);
 }
 
 export async function executeRun(ctx: WorkbenchContext, id: string) {
@@ -635,20 +657,17 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
       mode: 0o600,
     });
     if (!run.baseSha) {
-      ctx.log(run, "system", "建立獨立 Git worktree。");
+      ctx.log(run, "system", sm().run.team.creatingWorktree);
       await ctx.store.save();
       await ctx.lock(`repository:${repo.id}`, () =>
         createRunWorktree(run, repo, signal),
       );
       await ctx.store.save();
     }
-    const boundaries = teamBoundaries;
+    // The run's locale: the Workbench queue runs executeRun under withRunLocale.
+    const locale = currentLocale();
     const team = run.team;
-    if (!team)
-      throw new AppError(
-        "舊工作無法重新派工，請建立新的 Agent Team 工作。",
-        409,
-      );
+    if (!team) throw new AppError((m) => m.run.team.legacyRun, 409);
     if (!team.tasks.length) {
       team.phase = "planning";
       const revisions = team.planRevisions ?? [];
@@ -657,7 +676,7 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
         run,
         "lead",
         leadPlanPrompt(
-          boundaries,
+          locale,
           run,
           team.config.maxTeammates,
           revisions,
@@ -680,31 +699,30 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
           name: `Teammate ${index + 1}`,
           role: "Developer",
           status: "waiting" as const,
-          detail: "等待認領共享任務，使用獨立工作目錄",
+          detail: sm().run.agents.member,
         })),
       );
       ctx.log(
         run,
         "lead",
-        `已建立 ${team.tasks.length} 個有依賴與檔案範圍的任務，最多 ${team.config.maxTeammates} 位 teammate 同時工作。`,
+        sm().run.team.planCreated({
+          tasks: team.tasks.length,
+          max: team.config.maxTeammates,
+        }),
       );
       if (team.config.requirePlanApproval) {
         team.phase = "awaiting_approval";
         run.status = "awaiting_plan";
-        ctx.log(run, "lead", "等待你核准計畫；尚未開始修改程式碼。");
+        ctx.log(run, "lead", sm().run.team.awaitingApproval);
         return;
       }
       team.approvedAt = now();
     }
     team.phase = "developing";
     await ctx.store.save();
-    await executeTeamTasks(ctx, run, boundaries, reportSchema, signal);
+    await executeTeamTasks(ctx, run, locale, reportSchema, signal);
     const files = await readDiff(run);
-    if (!files.length)
-      throw new AppError(
-        "Agent Team 沒有產生程式碼差異。請檢查任務報告或調整方向。",
-        422,
-      );
+    if (!files.length) throw new AppError((m) => m.run.team.noChanges, 422);
     team.phase = "integrating";
     // Read-only roles may have no shell (Claude read access), so the diff
     // itself travels in the prompt instead of being fetched with git.
@@ -713,7 +731,7 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
       ctx,
       run,
       "lead",
-      integrationPrompt(boundaries, run, team, diffContext),
+      integrationPrompt(locale, run, team, diffContext),
       signal,
     );
     run.reports!.implementer = implementation;
@@ -724,7 +742,7 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
         ctx,
         run,
         "lead",
-        coordinationPrompt(boundaries, run, diffContext, implementation),
+        coordinationPrompt(locale, run, diffContext, implementation),
         signal,
       );
     }
@@ -738,11 +756,7 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
       fingerprint: draftFingerprint(run, files),
     };
     team.phase = "complete";
-    ctx.log(
-      run,
-      "system",
-      `團隊開發與獨立審查完成，共 ${files.length} 個變更檔案，等待逐檔審閱。`,
-    );
+    ctx.log(run, "system", sm().run.team.done({ files: files.length }));
     await ctx.store.save();
     // Development is complete; optional preparation failures cannot fail the run.
     await Promise.allSettled([
@@ -759,7 +773,7 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
           run.draftPreparation.error = redact(
             error instanceof Error
               ? error.message
-              : "PR 草稿建議未完成，請重試。",
+              : sm().run.team.draftIncomplete,
           );
           ctx.log(run, "draft", run.draftPreparation.error);
           await ctx.store.save();
@@ -769,7 +783,9 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
   } catch (error) {
     run.status = signal.aborted ? "cancelled" : "failed";
     if (run.team) run.team.phase = run.status;
-    run.error = redact(error instanceof Error ? error.message : "工作失敗。");
+    run.error = redact(
+      error instanceof Error ? error.message : sm().run.team.runFailed,
+    );
     ctx.log(run, "system", run.error);
     for (const agent of run.agents)
       if (agent.status === "running") agent.status = "failed";
@@ -781,95 +797,4 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
       );
     await ctx.store.save();
   }
-}
-
-/**
- * Resumes a failed or cancelled team run instead of starting over: completed
- * tasks keep their integrated patches, failed and blocked tasks start again
- * from a fresh snapshot, and a run whose tasks are all complete only re-runs
- * integration and review. An unapproved plan returns to the approval step so
- * cancelling during approval cannot be used to skip it.
- */
-export async function retryTeam(
-  ctx: WorkbenchContext,
-  id: string,
-  message?: string,
-) {
-  return ctx.lock(id, async () => {
-    const run = ctx.run(id);
-    const team = run.team;
-    if (
-      !["failed", "cancelled"].includes(run.status) ||
-      !run.baseSha ||
-      !team?.tasks.length
-    )
-      throw new AppError(
-        "只有已失敗或已取消、且 Lead 已建立計畫的團隊工作可以重試。",
-        409,
-      );
-    // A cancelled run keeps its controller until the worker has exited; the
-    // controller is dropped in the same tick as a failed status, so this is
-    // race-free where the job set (cleared later) is not.
-    if (ctx.controllers.has(id))
-      throw new AppError("此工作仍在收尾，請稍後再重試。", 409);
-    ctx.assertQueueCapacity();
-    const retried = team.tasks.filter(
-      (task) => task.status === "failed" || task.status === "blocked",
-    );
-    const kept = team.tasks.filter((task) => task.status === "complete");
-    // The same path is reused by the next attempt, so the old checkout has to
-    // go first; its unintegrated edits are discarded with it.
-    for (const task of retried)
-      await ctx.lock(`repository:${run.repoId}`, () =>
-        removeTaskWorktree(run, task),
-      );
-    for (const task of retried) {
-      task.status = "pending";
-      delete task.worktreePath;
-      delete task.worktreeRemoved;
-      delete task.baseSha;
-      delete task.report;
-      delete task.startedAt;
-      delete task.completedAt;
-      delete task.acceptsMessages;
-      delete run.reports?.[task.id];
-      const member = run.agents.find((agent) => agent.id === task.owner);
-      if (member) {
-        member.status = "waiting";
-        member.detail = "等待重新認領任務，使用新的獨立工作目錄";
-      }
-    }
-    claimReadyTasks(team.tasks, 0); // Recompute ready/pending without claiming.
-    delete run.error;
-    if (message) {
-      // sendTeamMessage stays closed for finished runs; the retry itself is
-      // the only way to brief the restarted tasks (or the lead when none).
-      // Queued before the approval check so a briefing is never dropped.
-      if (retried.length)
-        for (const task of retried)
-          queueTeamMessage(ctx, run, "user", task.id, message);
-      else queueTeamMessage(ctx, run, "user", "lead", message);
-    }
-    if (team.config.requirePlanApproval && !team.approvedAt) {
-      team.phase = "awaiting_approval";
-      run.status = "awaiting_plan";
-      ctx.log(run, "user", "要求重試；計畫尚未核准，先回到等待核准。");
-      await ctx.store.save();
-      return run;
-    }
-    team.phase = "developing";
-    run.status = "queued";
-    ctx.log(
-      run,
-      "user",
-      retried.length
-        ? `重試失敗的子任務：${kept.length} 個已完成任務不重跑，${retried.length} 個任務以新快照重新開始。`
-        : kept.length === team.tasks.length
-          ? "重試：所有子任務都已完成，直接重跑整合與獨立審查。"
-          : "重試：繼續執行尚未開始的子任務。",
-    );
-    await ctx.store.save();
-    ctx.enqueue(id);
-    return run;
-  });
 }

@@ -1,5 +1,6 @@
 import type { ModelExecution } from "../shared/models.js";
 import { AppError } from "./types.js";
+import { sm } from "./i18n/index.js";
 
 export type AgentTimeoutKind =
   | "analysis"
@@ -55,12 +56,13 @@ export function hasExtendedAgentTimeout(
 }
 
 /** Whole minutes when exact, otherwise one decimal (37.5). */
-function minutes(timeoutMs: number): string {
-  return String(Math.round(timeoutMs / 6000) / 10);
+function minutes(timeoutMs: number): number {
+  return Math.round(timeoutMs / 6000) / 10;
 }
 
+/** A clause such as "waits up to 15 minutes" for a line announcing a turn. */
 export function describeAgentTimeout(timeoutMs: number): string {
-  return `最多等待 ${minutes(timeoutMs)} 分鐘`;
+  return sm().run.agentCli.timeoutLimit({ minutes: minutes(timeoutMs) });
 }
 
 /**
@@ -74,7 +76,8 @@ export function withAgentTimeoutHint(
 ): unknown {
   if (!(error instanceof AppError) || error.statusCode !== 504) return error;
   return new AppError(
-    `${executable} 執行逾時（已等待 ${minutes(timeoutMs)} 分鐘）。較高的思考強度或大型專案需要更久；可降低思考強度、改用較快的模型，或提高 BELLPR_AGENT_TIMEOUT_SCALE。`,
+    (m) =>
+      m.run.agentCli.timedOut({ executable, minutes: minutes(timeoutMs) }),
     504,
   );
 }

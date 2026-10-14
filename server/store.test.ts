@@ -11,6 +11,7 @@ import { ProjectInsightsService } from "./insights.js";
 import { git } from "./process.js";
 import { Store } from "./store.js";
 import type { Database, Repository, Run } from "./types.js";
+import { withLocale } from "./i18n/index.js";
 
 async function dataDirectory() {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-store-test-"));
@@ -158,6 +159,179 @@ test("重新審查途中當機時，已完成工作的審查者會被標記失�
   assert.equal(loaded.agents[1].status, "failed");
   assert.match(loaded.agents[1].detail, /重新審查已中斷/);
   assert.equal(loaded.agents[2].status, "waiting");
+});
+
+/** Writes `runs` as state.json in a fresh data directory and returns it. */
+async function stateWith(runs: Run[]) {
+  const data = await dataDirectory();
+  const fixture: Database = { version: 1, repos: [repository], runs };
+  await writeFile(
+    path.join(data.directory, "state.json"),
+    JSON.stringify(fixture),
+  );
+  return data;
+}
+
+test("restart recovery explains each interrupted run in the run's own locale", async (t) => {
+  // The server default is en, as with BELLPR_LOCALE=en or the app settings.
+  const chinese = await stateWith([
+    { ...interruptedRun(), id: "run-zh", locale: "zh-TW" },
+    { ...interruptedRun(), id: "run-older" },
+  ]);
+  t.after(chinese.cleanup);
+  const first = new Store(chinese.directory);
+  await withLocale("en", () => first.initialize());
+  const [zh, older] = first.data.runs;
+  assert.equal(
+    zh.error,
+    "服務重新啟動，先前工作已中斷。工作目錄仍保留，可檢視差異；團隊工作可在任務板重試失敗的子任務，已整合的子任務不會重跑。",
+  );
+  assert.equal(
+    zh.team?.tasks[0].error,
+    "服務重新啟動，任務已中斷；隔離工作目錄保留，重試時會以新快照重新開始。",
+  );
+  assert.match(zh.draftPreparation?.error ?? "", /^服務重新啟動，PR 草稿建議已中斷/);
+  assert.match(zh.explanations?.["hello.ts"].error ?? "", /^服務重新啟動，解說產生已中斷/);
+  // A run saved before runs had a locale follows the server default.
+  assert.match(older.error ?? "", /^The service restarted, so the run stopped\./);
+  assert.equal(older.locale, undefined);
+
+  // The tests' default is zh-TW; an English run still recovers in English.
+  const reviewing: Run = { ...interruptedRun(), id: "run-review", locale: "en" };
+  reviewing.status = "review";
+  reviewing.agents[0].status = "complete";
+  reviewing.agents[1].status = "running";
+  const english = await stateWith([
+    { ...interruptedRun(), id: "run-en", locale: "en" },
+    reviewing,
+  ]);
+  t.after(english.cleanup);
+  const second = new Store(english.directory);
+  await second.initialize();
+  const [en, review] = second.data.runs;
+  assert.equal(
+    en.error,
+    "The service restarted, so the run stopped. Its working directory is kept and you can read the diff; for a team run, retry the failed subtasks on the task board, and integrated subtasks do not run again.",
+  );
+  assert.equal(
+    en.team?.tasks[0].error,
+    "The service restarted, so the task stopped; its isolated working directory is kept, and a retry starts again from a fresh snapshot.",
+  );
+  assert.equal(
+    en.draftPreparation?.error,
+    "The service restarted, so the PR draft suggestion stopped; your current draft is kept, and you can generate the suggestion again.",
+  );
+  assert.equal(
+    en.explanations?.["hello.ts"].error,
+    "The service restarted, so generating the explanation stopped; you can retry it.",
+  );
+  assert.equal(
+    review.agents[1].detail,
+    "The service restarted, so the review rerun stopped; the earlier reports are kept",
+  );
+  // Text saved before the restart is never translated.
+  assert.equal(en.logs[0].message, "開始分析");
+});
+
+test("an interrupted conflict resolution or follow-up round is explained in the run's own locale", async (t) => {
+  // An English run whose agent was resolving sync conflicts, under the
+  // tests' zh-TW default.
+  const resolving: Run = {
+    ...interruptedRun(),
+    id: "run-sync",
+    locale: "en",
+    sync: {
+      at: "2026-10-07T00:00:02.000Z",
+      from: "a".repeat(40),
+      to: "b".repeat(40),
+      snapshot: "c".repeat(40),
+      conflicts: ["hello.ts"],
+      resolving: true,
+    },
+  };
+  const english = await stateWith([resolving]);
+  t.after(english.cleanup);
+  const first = new Store(english.directory);
+  await first.initialize();
+  const [synced] = first.data.runs;
+  assert.equal(synced.status, "review");
+  assert.equal(synced.sync?.resolving, false);
+  assert.equal(
+    synced.sync?.report,
+    "The service restarted, so resolving the conflicts stopped; the edited files are kept, and you can finish yourself or ask the agent again.",
+  );
+
+  // A zh-TW run whose follow-up round was running, under an en default.
+  const revising: Run = {
+    ...interruptedRun(),
+    id: "run-round",
+    locale: "zh-TW",
+    prUrl: "https://github.com/test-owner/example/pull/1",
+    followUps: [
+      {
+        id: "round-1",
+        requestedAt: "2026-10-07T00:00:02.000Z",
+        feedbackUrls: [],
+        note: "Rename the greeting.",
+        status: "running",
+        parentCommit: "b".repeat(40),
+      },
+    ],
+  };
+  const chinese = await stateWith([revising]);
+  t.after(chinese.cleanup);
+  const second = new Store(chinese.directory);
+  await withLocale("en", () => second.initialize());
+  const [round] = second.data.runs;
+  assert.equal(round.status, "review");
+  assert.equal(round.followUps?.[0].status, "review");
+  assert.equal(
+    round.followUps?.[0].error,
+    "服務重新啟動，這輪修正已中斷；工作目錄保留的修改可以審閱、寫好提交訊息後推送，或放棄這輪修正。",
+  );
+});
+
+test("a run's locale, and fields a newer build adds, survive a load and save", async (t) => {
+  // state.json has no read schema: a build that predates `locale` reads the
+  // file as plain JSON and writes it back field for field, as this one does.
+  const run = {
+    ...interruptedRun(),
+    status: "review",
+    locale: "en",
+    unsandboxed: true,
+    fromNewerBuild: { kept: true },
+  } as Run;
+  delete run.draftPreparation;
+  delete run.explanations;
+  for (const agent of run.agents) agent.status = "complete";
+  run.team!.tasks[0].status = "complete";
+  const unknownLocale = {
+    ...interruptedRun(),
+    id: "run-unknown-locale",
+    locale: "fr",
+  } as unknown as Run;
+  const { directory, cleanup } = await stateWith([run, unknownLocale]);
+  t.after(cleanup);
+  const written = JSON.parse(
+    await readFile(path.join(directory, "state.json"), "utf8"),
+  ) as Database;
+  const store = new Store(directory);
+  await withLocale("en", () => store.initialize());
+  assert.deepEqual(store.data.runs[0], written.runs[0]);
+  assert.equal(store.data.runs[0].locale, "en");
+  // A locale this build does not know is kept as written, and recovery
+  // uses the locale in effect instead of failing.
+  const [, unknown] = store.data.runs;
+  assert.equal(unknown.locale, "fr");
+  assert.match(unknown.error ?? "", /^The service restarted/);
+  await store.save();
+  const reopened = new Store(directory);
+  await reopened.initialize();
+  assert.deepEqual(reopened.data.runs[0], written.runs[0]);
+  assert.deepEqual(
+    (reopened.data.runs[0] as unknown as Record<string, unknown>).fromNewerBuild,
+    { kept: true },
+  );
 });
 
 /**

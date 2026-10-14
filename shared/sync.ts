@@ -16,7 +16,7 @@ export interface BaseSync {
   unresolved?: string[];
   /** Review marks before the sync, restored on undo where the file is unchanged. */
   reviewedFingerprints?: Record<string, string>;
-  /** How the agent resolved the conflicts, in Traditional Chinese. */
+  /** How the agent resolved the conflicts, in the run's language. */
   report?: string;
   /** Per-file resolutions the agent described. */
   resolutions?: { path: string; resolution: string }[];
