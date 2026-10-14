@@ -16,7 +16,9 @@ import {
   runDoctorCli,
 } from "./doctor.js";
 import { currentLocale, withLocale } from "./i18n/index.js";
+import { command } from "./process.js";
 import { allowUnsandboxedAgents } from "./sandbox.js";
+import { AppError } from "./types.js";
 
 /**
  * Stand-in CLIs, the only directory on PATH, so no real git, gh, codex or
@@ -338,6 +340,50 @@ test("Git older than 2.40 works with a warning that syncing needs a newer one", 
   assert.equal(check(report, "git").reason, "too-old");
   assert.match(check(report, "git").detail!, /2\.40/);
   assert.equal(report.ready, true);
+});
+
+test("a CLI that fails tells its error, offers a reinstall and is told apart from one that times out", async (t) => {
+  const failing = `[ "$1" = --version ] && { echo 'error while loading shared libraries: libfoo.so' >&2; exit 1; }; exit 1`;
+  await fakes(t, { git: git(), gh: failing, codex: failing, claude: failing });
+  const report = await withLocale("en", () => runDoctor({ force: true, platform: "linux" }));
+  for (const [id, install] of [
+    ["gh", "sudo apt install gh"],
+    ["codex", "npm install -g @openai/codex"],
+    ["claude", "npm install -g @anthropic-ai/claude-code"],
+  ] as const) {
+    const row = check(report, id);
+    assert.deepEqual({ status: row.status, reason: row.reason }, { status: "warn", reason: "broken" }, id);
+    assert.equal(
+      row.detail,
+      `Installed, but \`${id} --version\` failed: error while loading shared libraries: libfoo.so`,
+    );
+    assert.deepEqual(row.fixes?.map((fix) => fix.command), [install]);
+  }
+  // Signing in cannot help a CLI that fails, so only reinstalling is offered.
+  assert.deepEqual(check(report, "provider-ready").fixes?.map((fix) => fix.command), [
+    "npm install -g @openai/codex",
+    "npm install -g @anthropic-ai/claude-code",
+  ]);
+  const zh = await withLocale("zh-TW", () => runDoctor({ platform: "linux" }));
+  assert.match(check(zh, "gh").detail!, /^已安裝，但執行 `gh --version` 失敗：/);
+
+  // Only a probe that ran out of time says so.
+  const slow = await withLocale("en", () =>
+    runDoctor({
+      force: true,
+      platform: "linux",
+      exec: async (executable, args, options) => {
+        if (executable === "git" && args[0] === "--version")
+          throw new AppError("git timed out", 504);
+        return command(executable, args, options);
+      },
+    }),
+  );
+  assert.deepEqual(
+    { status: check(slow, "git").status, reason: check(slow, "git").reason, fixes: check(slow, "git").fixes },
+    { status: "fail", reason: "not-responding", fixes: undefined },
+  );
+  assert.equal(check(slow, "git").detail, "Installed, but it did not answer within 5 seconds.");
 });
 
 test("Claude-only setups are ready and suggest Claude Code as the default provider", async (t) => {

@@ -52,11 +52,14 @@ const lowSpaceBytes = 1024 ** 3;
 /** Syncing a run onto the latest target branch needs `git merge-tree --write-tree --merge-base`. */
 const syncGitVersion = [2, 40] as const;
 
-type ToolState = "ok" | "missing" | "broken";
+/** broken: `--version` failed. timeout: it did not answer in time. */
+type ToolState = "ok" | "missing" | "broken" | "timeout";
 
 interface ToolFacts {
   state: ToolState;
   version?: string;
+  /** The first line the failed `--version` printed (redacted). */
+  error?: string;
 }
 
 /** What `git var` reports about the identity commits get. */
@@ -167,7 +170,16 @@ async function probeTool(
     const version = parseToolVersion(stdout) ?? parseToolVersion(stderr);
     return { state: "ok", ...(version ? { version } : {}) };
   } catch (error) {
-    return { state: missing(error) ? "missing" : "broken" };
+    if (missing(error)) return { state: "missing" };
+    // command() rejects with 504 when the probe ran out of time.
+    if (error instanceof AppError && error.statusCode === 504)
+      return { state: "timeout" };
+    // command() keeps the redacted stderr tail of a non-zero exit.
+    const output =
+      error instanceof AppError && typeof error.details?.stderr === "string"
+        ? firstLine(error.details.stderr).slice(0, 200)
+        : "";
+    return { state: "broken", ...(output ? { error: output } : {}) };
   }
 }
 
@@ -472,11 +484,13 @@ function readyProviders(facts: Facts): AgentProvider[] {
 }
 
 function providerFixes(provider: AgentProvider, facts: Facts): Fix[] {
-  const installed =
-    provider === "codex"
-      ? facts.codex.state !== "missing"
-      : facts.claude.state !== "missing";
-  return [...(installed ? [] : installFixes(provider)), ...signInFixes(provider)];
+  const state = facts[provider].state;
+  // Signing in cannot help while the CLI itself fails: install it again.
+  if (state === "broken") return installFixes(provider);
+  return [
+    ...(state === "missing" ? installFixes(provider) : []),
+    ...signInFixes(provider),
+  ];
 }
 
 function sandboxFixes(detection: SandboxDetection): Fix[] {
@@ -519,6 +533,17 @@ function buildReport(
   };
   const checks: DoctorCheck[] = [];
   const add = (check: DoctorCheck) => checks.push(check);
+  /** A tool that is installed but failed its `--version` probe. */
+  const notWorking = (tool: "git" | "gh" | AgentProvider, probed: ToolFacts) =>
+    probed.state === "timeout"
+      ? { reason: "not-responding", detail: m.notResponding }
+      : {
+          reason: "broken",
+          detail: probed.error
+            ? m.versionFailedWith({ command: `${tool} --version`, output: probed.error })
+            : m.versionFailed({ command: `${tool} --version` }),
+          ...fixes(installFixes(tool)),
+        };
 
   const nodeMajor = Number(process.versions.node.split(".")[0]);
   add({
@@ -542,8 +567,8 @@ function buildReport(
     ...(git.version ? { version: git.version } : {}),
     ...(git.state === "missing"
       ? { status: "fail", reason: "missing", detail: m.notInstalled, ...fixes(installFixes("git")) }
-      : git.state === "broken"
-        ? { status: "fail", reason: "not-responding", detail: m.notResponding }
+      : git.state !== "ok"
+        ? { status: "fail", ...notWorking("git", git) }
         : gitSupportsSync(git.version)
           ? { status: "ok" }
           : {
@@ -590,7 +615,7 @@ function buildReport(
       ? { status: "ok" }
       : gh.state === "missing"
         ? { status: "warn", reason: "missing", detail: m.notInstalled, ...fixes(installFixes("gh")) }
-        : { status: "warn", reason: "not-responding", detail: m.notResponding }),
+        : { status: "warn", ...notWorking("gh", gh) }),
   });
   add({
     id: "gh-auth",
@@ -664,7 +689,7 @@ function buildReport(
               detail: m.notInstalled,
               ...fixes(installFixes(provider)),
             }
-          : { status: "warn", reason: "not-responding", detail: m.notResponding }),
+          : { status: "warn", ...notWorking(provider, tool) }),
     });
     add({
       id: provider === "codex" ? "codex-auth" : "claude-auth",

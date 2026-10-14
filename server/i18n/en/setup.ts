@@ -112,6 +112,10 @@ export default {
       `Node.js ${version} is too old: ${product.name} needs version 22 or later.`,
     notInstalled: "Not installed.",
     notResponding: "Installed, but it did not answer within 5 seconds.",
+    versionFailed: ({ command }: { command: string }) =>
+      `Installed, but \`${command}\` failed.`,
+    versionFailedWith: ({ command, output }: { command: string; output: string }) =>
+      `Installed, but \`${command}\` failed: ${output}`,
     gitTooOld: ({ version }: { version: string }) =>
       `Git ${version} works, but moving a run onto the latest target branch needs Git 2.40 or later. Everything else works.`,
     identityMissing:

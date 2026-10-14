@@ -100,6 +100,9 @@ const m: Translation<typeof en> = {
       `Node.js ${version} 版本太舊：${product.name} 需要 22 以上版本。`,
     notInstalled: "尚未安裝。",
     notResponding: "已安裝，但 5 秒內沒有回應。",
+    versionFailed: ({ command }) => `已安裝，但執行 \`${command}\` 失敗。`,
+    versionFailedWith: ({ command, output }) =>
+      `已安裝，但執行 \`${command}\` 失敗：${output}`,
     gitTooOld: ({ version }) =>
       `Git ${version} 可以使用，但要把工作移到目標分支的最新版本，需要 Git 2.40 以上。其他功能都能正常使用。`,
     identityMissing:
