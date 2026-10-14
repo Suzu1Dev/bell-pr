@@ -559,6 +559,13 @@ test("GET /auth signs the browser in with the session secret and moves on with a
     assert.equal(wrong.status, 401);
     assert.equal(wrong.headers["set-cookie"], undefined);
     assert.match(wrong.body, /This sign-in link is no longer valid\./);
+    // Both one-time links: bell-pr open's and the one opened at start.
+    assert.match(
+      wrong.body,
+      /A link from <code>bell-pr open<\/code>, or the one BELL PR opens in your browser when it starts, works once/,
+    );
+    const wrongZh = await server.send("/auth?t=wrong", { headers: { "x-bell-locale": "zh-TW" } });
+    assert.match(wrongZh.body, /以及 BELL PR 啟動時在瀏覽器開啟的連結，都只能在兩分鐘內使用一次/);
     const bare = await server.send("/auth", { headers: { "x-bell-locale": "en" } });
     assert.equal(bare.status, 401);
     assert.doesNotMatch(bare.body, /no longer valid/);

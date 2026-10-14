@@ -20,7 +20,7 @@ export default {
     heading: `Sign in to ${product.name}`,
     howTo: `Open the sign-in link printed in your terminal, or run \`${bin} open\` in a terminal on this machine (Docker: \`docker exec <container> ${bin} open --print\`).`,
     /** Shown above howTo when the link in the address bar was not accepted. */
-    linkInvalid: `This sign-in link is no longer valid. A link from \`${bin} open\` works once, within two minutes; the link printed when ${product.name} starts works until it restarts.`,
+    linkInvalid: `This sign-in link is no longer valid. A link from \`${bin} open\`, or the one ${product.name} opens in your browser when it starts, works once, within two minutes; the link printed in your terminal works until ${product.name} restarts.`,
     signedInTitle: `Signed in to ${product.name}`,
     signedIn: "You are signed in on this browser.",
     continue: `Continue to ${product.name}`,

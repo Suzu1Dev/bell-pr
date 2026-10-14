@@ -12,7 +12,7 @@ const m: Translation<typeof en> = {
     title: `登入 ${product.name}`,
     heading: `登入 ${product.name}`,
     howTo: `請開啟終端機印出的登入連結，或在這台電腦的終端機執行 \`${bin} open\`（Docker：\`docker exec <container> ${bin} open --print\`）。`,
-    linkInvalid: `這個登入連結已失效。\`${bin} open\` 產生的連結只能在兩分鐘內使用一次；${product.name} 啟動時印出的連結在它重新啟動前都有效。`,
+    linkInvalid: `這個登入連結已失效。\`${bin} open\` 產生的連結，以及 ${product.name} 啟動時在瀏覽器開啟的連結，都只能在兩分鐘內使用一次；終端機印出的連結在 ${product.name} 重新啟動前都有效。`,
     signedInTitle: `已登入 ${product.name}`,
     signedIn: "這個瀏覽器已登入。",
     continue: `繼續前往 ${product.name}`,
