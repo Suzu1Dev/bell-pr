@@ -299,6 +299,10 @@ test("agents are denied credentials and BELL's data outside their own checkout",
     `${data}/**`,
   ])
     assert.ok(!rules.includes(rule(allowed)), allowed);
+  // A checkout without a worktree pointer keeps no clone readable.
+  const unlinked = path.join(data, "worktrees", "run-3");
+  await mkdir(unlinked);
+  assert.ok(agentReadDenials(unlinked).includes(rule(`${data}/repositories/**`)));
 
   // Work outside the data directory (explanations, the PR draft) is denied all of it.
   const outside = await mkdtemp(path.join(os.tmpdir(), "bell-sandbox-outside-"));

@@ -243,8 +243,8 @@ function dataDirectoryRules(dataDirectory: string, cwd: string): string[] {
     for (const entry of entries(directory)) {
       if (entry === part) continue;
       const target = path.join(directory, entry);
-      if (directory === root && entry === "repositories" && !clone) continue;
-      if (directory === root && entry === "repositories") {
+      // Without a worktree pointer there is no clone to keep readable.
+      if (directory === root && entry === "repositories" && clone) {
         for (const repository of entries(target)) {
           const candidate = path.join(target, repository);
           if (resolved(candidate) !== clone) deny(candidate);
