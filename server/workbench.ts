@@ -41,7 +41,7 @@ import { discoveryRunning, resetDiscovery } from "./discovery.js";
 import { synchronizeExplanations } from "./explanations.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
 import { parseLocale, type Locale } from "../shared/i18n/locale.js";
-import { initLog, log } from "./log.js";
+import { closeLog, initLog, log } from "./log.js";
 import { logged, logRunQueued } from "./run-events.js";
 import { activeFollowUp } from "../shared/followups.js";
 import * as cleanup from "./cleanup.js";
@@ -941,5 +941,7 @@ export class Workbench {
     for (const controller of this.controllers.values()) controller.abort();
     await Promise.allSettled([...this.jobs, this.maintenance]);
     await this.store.save();
+    // Later entries of this process go to stderr, not this data directory.
+    closeLog(this.store.directory);
   }
 }

@@ -312,6 +312,26 @@ export function initLog(dataDir: string, options: LogOptions = {}): void {
 }
 
 /**
+ * Stops writing log files for `dataDir` (any directory when omitted): the
+ * file is closed and entries go to stderr only, as before initLog, until
+ * initLog runs again. The Workbench calls it on shutdown, so a process that
+ * goes on (a test, the CLI) never writes into a data directory it left.
+ */
+export function closeLog(dataDir?: string): void {
+  if (!sink) return;
+  if (dataDir !== undefined && sink.directory !== path.join(path.resolve(dataDir), "logs"))
+    return;
+  if (sink.fd !== undefined) {
+    try {
+      closeSync(sink.fd);
+    } catch {
+      /* Already closed. */
+    }
+  }
+  sink = undefined;
+}
+
+/**
  * The newest `limit` lines of the log files in `<dataDir>/logs`, oldest
  * first, as they were written (already redacted). Reads only the end of
  * each file it needs.
