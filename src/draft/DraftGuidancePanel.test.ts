@@ -21,6 +21,7 @@ type PanelOptions = {
   issueUrl?: string;
   aiDisclosure?: boolean;
   alwaysDiscloseAi?: boolean;
+  draftBody?: string;
   onAiDisclosureChange?: (on: boolean) => void;
   checks?: DraftCheck[];
   readOnly?: boolean;
@@ -324,6 +325,48 @@ test("a project rule that asks for a disclosure turns it on and is quoted with i
   assert.doesNotMatch(switchOf(off), /checked/);
   assert.match(off, /This project asks for a disclosure/);
   assert.match(renderZh(panel(ruled)), /這個專案要求揭露：/);
+});
+
+test("without a saved choice the switch shows what the description holds, whatever the rules ask", () => {
+  const ruled: DraftPreparation = {
+    ...english,
+    context: {
+      ...english.context!,
+      sources: [
+        ...english.context!.sources,
+        {
+          id: "ai-policy",
+          kind: "contributing",
+          label: "AI_POLICY.md",
+          content: "# AI policy\n\nIf you use AI tools, you must disclose it in the pull request.",
+        },
+      ],
+    },
+  };
+  const body = english.proposal!.body;
+  // The rule asks for it, but the description lacks the line: Off, rule shown.
+  const lacking = renderEnglish(ruled, { onAiDisclosureChange() {}, draftBody: body });
+  assert.doesNotMatch(switchOf(lacking), /checked/);
+  assert.match(lacking, /The description does not mention AI\./);
+  assert.match(lacking, /This project asks for a disclosure/);
+  const holding = renderEnglish(ruled, {
+    onAiDisclosureChange() {},
+    draftBody: withAiDisclosure(body),
+  });
+  assert.match(switchOf(holding), /checked=""/);
+  // The setting only explains an On that the description shows.
+  const settingOff = renderEnglish(english, {
+    alwaysDiscloseAi: true,
+    onAiDisclosureChange() {},
+    draftBody: body,
+  });
+  assert.doesNotMatch(switchOf(settingOff), /checked/);
+  assert.doesNotMatch(settingOff, /On by default/);
+  // A saved choice still decides.
+  assert.match(
+    switchOf(renderEnglish(ruled, { aiDisclosure: true, onAiDisclosureChange() {}, draftBody: body })),
+    /checked=""/,
+  );
 });
 
 test("a saved choice is controlled by the draft PATCH callback; read-only panels lock it", () => {

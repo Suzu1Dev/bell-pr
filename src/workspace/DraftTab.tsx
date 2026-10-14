@@ -280,6 +280,7 @@ export function DraftTab({
             }
             aiDisclosure={run.draft.aiDisclosure}
             alwaysDiscloseAi={alwaysDiscloseAi}
+            draftBody={draftBody}
             onAiDisclosureChange={(on) => void setAiDisclosure(on)}
             checks={checkable && draftChecks ? publishChecks : undefined}
             readOnly={run.status === "published"}

@@ -54,6 +54,12 @@ interface Props {
   /** The app setting that turns the disclosure on for every new draft. */
   alwaysDiscloseAi?: boolean;
   /**
+   * The description in the editor. While no choice is saved, the switch
+   * then shows whether it holds the AI-assistance line, so it never reads
+   * On for a description without it.
+   */
+  draftBody?: string;
+  /**
    * Saves the choice through the draft PATCH (`aiDisclosure`); the server
    * then adds or removes the line in the saved description. Without it the
    * choice is local: it shapes the preview and what "Apply" puts in the
@@ -96,6 +102,7 @@ export function DraftGuidancePanel({
   applied = false,
   aiDisclosure,
   alwaysDiscloseAi,
+  draftBody,
   onAiDisclosureChange,
   checks,
   readOnly = false,
@@ -117,14 +124,19 @@ export function DraftGuidancePanel({
   // The server adds the line to new suggestions while the setting is on.
   const settingOn =
     alwaysDiscloseAi ?? !!proposal?.body.includes(aiDisclosureLine);
-  // Off unless the person's setting or the project's rules ask for it.
+  // Without a saved choice: what the description holds, or, with no
+  // description to show, off unless the person's setting or the project's
+  // rules ask for it.
   const savedDisclosure =
-    aiDisclosure ?? (settingOn || !!disclosureRequirement);
+    aiDisclosure ??
+    (draftBody !== undefined
+      ? draftBody.includes(aiDisclosureLine)
+      : settingOn || !!disclosureRequirement);
   const disclose = onAiDisclosureChange
     ? savedDisclosure
     : (localDisclosure ?? savedDisclosure);
   const disclosureReason =
-    aiDisclosure !== undefined || localDisclosure !== undefined
+    aiDisclosure !== undefined || localDisclosure !== undefined || !disclose
       ? undefined
       : settingOn
         ? t.disclosure.setting
