@@ -371,6 +371,22 @@ test("the AI-assistance switch saves the line into the draft, and an applied sug
     await page.getByRole("button", { name: workspace.draft.edit, exact: true }).click();
     await expect(description).toHaveValue(withLine);
     await expect(page.getByText(workspace.draft.proposalNotice)).toBeVisible();
+
+    // The sample keeps the choice in the browser, the same way. (A new
+    // page: leaving the unsaved draft above would ask for a confirmation.)
+    const sample = await page.context().newPage();
+    await sample.goto("/#/runs/demo-run/draft?locale=en");
+    await sample.getByRole("button", { name: guidance.generate.demo }).click();
+    await sample.getByRole("button", { name: guidance.apply.apply }).click();
+    const sampleSwitch = sample.getByRole("switch", { name: guidance.disclosure.label });
+    await sampleSwitch.click();
+    await expect(sampleSwitch).toBeChecked();
+    await sample.getByRole("button", { name: workspace.draft.edit, exact: true }).click();
+    const line = aiDisclosureLine.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    await expect(
+      sample.getByRole("textbox", { name: workspace.draft.bodyLabel }),
+    ).toHaveValue(new RegExp(`\\n\\n${line}$`));
+    await expect(sample.getByRole("button", { name: guidance.apply.applied })).toBeDisabled();
   } finally {
     await close();
     await server.stop();
