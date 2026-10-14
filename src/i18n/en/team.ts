@@ -122,7 +122,7 @@ const team = {
       planning:
         "The lead is planning. Once the plan is ready, you can send the members more instructions.",
       leadDuringApproval: ({ action }: { action: string }) =>
-        `To change the plan, use "${action}" above so the lead re-plans; messages here are only read in the integration turn.`,
+        `To change the plan, use “${action}” above so the lead re-plans; messages here are only read in the integration turn.`,
       lead: "The lead reads messages in the next integration turn and does not re-plan; send development instructions to everyone or to a specific teammate.",
       members:
         "Messages arrive at the next work turn; a turn in progress is not interrupted.",
