@@ -180,6 +180,12 @@ export class Workbench {
       sleep?: TransientSleep;
       /** The plan's limits; Pro with maxActiveRuns when absent (library and tests). */
       entitlements?: () => Entitlements;
+      /**
+       * The app settings of the store's data directory, when the caller
+       * activated them before the store loaded (startServer); read from the
+       * data directory when absent.
+       */
+      appSettings?: AppSettingsService;
     } = {},
   ) {
     this.agentSlots =
@@ -195,7 +201,8 @@ export class Workbench {
       this.base.maxActiveRuns < 1
     )
       throw new Error("Workbench maxActiveRuns must be a positive integer.");
-    this.appSettings = new AppSettingsService(store.directory);
+    this.appSettings =
+      dependencies.appSettings ?? new AppSettingsService(store.directory);
     // Work no request asked for (recovery, the resumed queue, retention)
     // follows the language chosen in the app.
     activateAppSettings(this.appSettings);

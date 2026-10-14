@@ -385,6 +385,57 @@ test("startServer serves the app with an in-memory session token, takes the lock
   }
 });
 
+test("startServer words the recovery notes in the language saved in the app, not BELLPR_LOCALE", async () => {
+  const box = await sandbox();
+  const port = await freePort();
+  const previousLocale = process.env.BELLPR_LOCALE;
+  try {
+    mkdirSync(box.data, { recursive: true });
+    writeFileSync(path.join(box.data, "app-settings.json"), JSON.stringify({ locale: "en" }));
+    // A run saved without a locale, interrupted while it ran.
+    const worktreePath = path.join(box.data, "worktrees", "interrupted");
+    mkdirSync(worktreePath, { recursive: true });
+    writeFileSync(
+      path.join(box.data, "state.json"),
+      JSON.stringify({
+        version: 1,
+        repos: [],
+        runs: [
+          {
+            id: "interrupted",
+            repoId: "missing",
+            title: "Interrupted",
+            prompt: "Do it",
+            status: "running",
+            branch: "fix/interrupted",
+            baseBranch: "main",
+            baseSha: "0".repeat(40),
+            worktreePath,
+            createdAt: "2026-10-12T00:00:00.000Z",
+            agents: [],
+            logs: [],
+            draft: { title: "", body: "" },
+            reviewedFiles: [],
+            reviewedFingerprints: {},
+          },
+        ],
+      }),
+    );
+    process.env.BELLPR_LOCALE = "zh-TW";
+    const config = resolveConfig({ port, dataDir: box.data }, box.env, box.directory);
+    // No request locale: the server-wide default decides.
+    const running = await startServer({ config, handleExit: false, print: () => {} });
+    await running.shutdown();
+    const [run] = JSON.parse(readFileSync(path.join(box.data, "state.json"), "utf8")).runs;
+    assert.equal(run.status, "failed");
+    assert.match(run.error, /^The service restarted, so the run stopped\./);
+  } finally {
+    if (previousLocale === undefined) delete process.env.BELLPR_LOCALE;
+    else process.env.BELLPR_LOCALE = previousLocale;
+    await box.cleanup();
+  }
+});
+
 test("startServer replaces a stale lock left by a process that is gone", async () => {
   const box = await sandbox();
   try {

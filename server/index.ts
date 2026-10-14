@@ -31,6 +31,11 @@ import { product } from "../shared/product.js";
 import { AgentRegistry, reapOrphanedAgents } from "./agent-registry.js";
 import { AgentSlots } from "./agent-slots.js";
 import { createApp } from "./app.js";
+import {
+  activateAppSettings,
+  AppSettingsService,
+  deactivateAppSettings,
+} from "./app-settings.js";
 import { bundled, version } from "./build-info.js";
 import { run } from "./cli.js";
 import {
@@ -489,6 +494,12 @@ export async function startServer(
     registry.start();
     cleanups.push(() => registry.stop());
 
+    // The saved settings apply before the store loads: the notes that
+    // recovery writes on interrupted runs follow the language chosen in the
+    // app, not BELLPR_LOCALE.
+    const appSettings = new AppSettingsService(config.dataDir);
+    activateAppSettings(appSettings);
+    cleanups.push(() => deactivateAppSettings(appSettings));
     const store = new Store(config.dataDir);
     await store.initialize();
     // Fails closed: without a valid key or an active trial the plan is Free.
@@ -500,6 +511,7 @@ export async function startServer(
     await license.initialize();
     const agentSlots = new AgentSlots(config.limits.maxAgentProcesses);
     workbench = new Workbench(store, undefined, {
+      appSettings,
       agentSlots,
       maxActiveRuns: config.limits.maxActiveRuns,
       agentTimeoutScale: config.limits.agentTimeoutScale,
