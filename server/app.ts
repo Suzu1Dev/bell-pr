@@ -11,7 +11,7 @@ import type { AgentSlots } from "./agent-slots.js";
 import { localhostGuard, parseAllowedOrigins } from "./http-guard.js";
 import type { LicenseService } from "./license.js";
 import type { ApiErrorBody } from "../shared/errors.js";
-import { parseLocale } from "../shared/i18n/locale.js";
+import { formatters, parseLocale } from "../shared/i18n/locale.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
 import { registerAppSettingsRoutes } from "./routes/app-settings.js";
 import { registerAuthRoutes } from "./routes/auth.js";
@@ -174,9 +174,12 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   const errors: ErrorRequestHandler = (error, req, res, _next) => {
     if (error instanceof z.ZodError) {
       res.status(400).json({
-        error: error.issues
-          .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
-          .join("；"),
+        error: formatters(currentLocale()).list(
+          error.issues.map(
+            (issue) => `${issue.path.join(".")}: ${issue.message}`,
+          ),
+          { type: "unit" },
+        ),
       });
       return;
     }
@@ -185,11 +188,11 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
       return;
     }
     if (error?.type === "entity.parse.failed") {
-      res.status(400).json({ error: "JSON 格式不正確。" });
+      res.status(400).json({ error: sm().common.invalidJson });
       return;
     }
     if (error?.type === "entity.too.large") {
-      res.status(413).json({ error: "請求內容過大。" });
+      res.status(413).json({ error: sm().common.payloadTooLarge });
       return;
     }
     // The stack only reaches the local journal; the client gets a generic message.
@@ -201,7 +204,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
         error instanceof Error ? (error.stack ?? error.message) : String(error),
       ),
     );
-    res.status(500).json({ error: "操作未完成；請檢查本機服務記錄。" });
+    res.status(500).json({ error: sm().common.internalError });
   };
   app.use(errors);
   return app;

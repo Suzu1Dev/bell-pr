@@ -3,6 +3,7 @@ import { z } from "zod";
 import { validBranchName } from "../../shared/drafts.js";
 import { commitMessageControl } from "../drafts.js";
 import { learningExport } from "../learning-export.js";
+import { sm } from "../i18n/index.js";
 import type { RouteDeps } from "./types.js";
 
 // The commit message is passed to git verbatim, so newline is the only control character allowed.
@@ -10,19 +11,19 @@ const commitMessageField = z
   .string()
   .trim()
   .max(4000)
-  .refine((value) => !commitMessageControl.test(value), {
-    message: "提交訊息只能包含文字與換行。",
-  });
+  // A message function, so the text follows the request's locale.
+  .refine((value) => !commitMessageControl.test(value), () => ({
+    message: sm().run.publish.commitMessageInvalid,
+  }));
 
 // The GitHub branch is pushed as a refspec; empty means the run's own branch.
 const publishBranchField = z
   .string()
   .trim()
   .max(100)
-  .refine((value) => !value || validBranchName(value), {
-    message:
-      "GitHub 分支名稱只能用英數字與 . _ - /，不能有 ..，也不能以 . 或 .lock 結尾。",
-  });
+  .refine((value) => !value || validBranchName(value), () => ({
+    message: sm().run.publish.invalidBranch,
+  }));
 
 /**
  * Reviewing a run's changes and publishing them: the learning export, the

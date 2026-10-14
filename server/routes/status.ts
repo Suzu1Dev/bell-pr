@@ -17,7 +17,7 @@ export function registerStatusRoutes(app: Express, { workbench }: RouteDeps) {
       .default("codex")
       .safeParse(req.query.provider);
     if (!provider.success)
-      throw new AppError("不支援這個 Agent 類型。", 400);
+      throw new AppError((m) => m.common.unsupportedProvider, 400);
     res.json(await workbench.models(provider.data));
   });
 }
