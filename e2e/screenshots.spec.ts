@@ -30,7 +30,11 @@ const outputRoot =
     ? path.join(root, "docs", "images")
     : path.join(root, "e2e", "output", "screenshots");
 
-/** Every page of the app, named after the file it is saved to. */
+/**
+ * Every page of the app, named after the file it is saved to.
+ * e2e/responsive.spec.ts checks the same pages at more widths and repeats
+ * this list (a spec cannot import another): keep the two in step.
+ */
 export const screenshotRoutes: { name: string; hash: string }[] = [
   { name: "home", hash: "#/home" },
   { name: "run-overview", hash: "#/runs/demo-run/overview" },
