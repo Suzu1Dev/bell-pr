@@ -12,7 +12,8 @@
 // these are the views the screenshots show, between and below the captured
 // widths. Each view is loaded at its own width, as a phone or a tablet
 // opens it. Home is also checked on the 14-day trial, whose plan chip in
-// the sidebar is the widest.
+// the sidebar is the widest, and the run's tabs with the sidebar collapsed
+// to its rail, which gives their panes another layout from 761 px up.
 //
 //   BELLPR_E2E_PORT=<port> npx playwright test e2e/responsive.spec.ts
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -60,6 +61,10 @@ const viewports = [
 ];
 /** The routes that show the sample project, so present=1 shows its badge. */
 const sampleRoutes = /^(run-.+|repo-overview)$/;
+/** The run's tabs, whose panes take another layout beside the rail. */
+const runRoutes = routes.filter((route) => route.name.startsWith("run-"));
+/** The widths at which the sidebar collapses to a rail (above 760 px). */
+const railViewports = viewports.filter((viewport) => viewport.width > 760);
 
 /** Relative times ("3 days ago") read the same on every run. */
 const frozenAt = new Date("2026-10-14T09:00:00Z");
@@ -290,7 +295,11 @@ async function startServer({ trial = false } = {}): Promise<LaunchedServer> {
   };
 }
 
-/** Opens `hash` at `viewport` and fails with every problem it finds. */
+/**
+ * Opens `hash` at `viewport` and fails with every problem it finds. With
+ * `collapsed` the sidebar is a rail, as the browser remembers it after
+ * the person collapsed it.
+ */
 async function expectFits(
   browser: Browser,
   server: LaunchedServer,
@@ -298,6 +307,7 @@ async function expectFits(
   hash: string,
   viewport: { width: number; height: number },
   sample: boolean,
+  { collapsed = false } = {},
 ) {
   const context = await browser.newContext({
     baseURL: server.baseURL,
@@ -307,10 +317,15 @@ async function expectFits(
     viewport,
   });
   try {
+    if (collapsed)
+      await context.addInitScript(() =>
+        localStorage.setItem("bellpr-sidebar-collapsed", "true"),
+      );
     const page = await context.newPage();
     await page.clock.setFixedTime(frozenAt);
     await page.goto(`/${hash}?present=1&capture=1&locale=${locale}`);
     await settled(page, locale);
+    if (collapsed) await expect(page.locator(".app-shell")).toHaveClass(/is-sidebar-collapsed/);
     if (sample) await expect(page.locator(".presentation-sample-badge")).toBeVisible();
     const problems = [
       ...(await findOverflow(page)).map(
@@ -351,6 +366,17 @@ test.describe("every page", () => {
             viewport,
             sampleRoutes.test(route.name),
           );
+        });
+
+  for (const locale of locales)
+    for (const route of runRoutes)
+      for (const viewport of railViewports)
+        test(`${route.name} in ${locale} fits at ${viewport.width} px with the sidebar collapsed`, async ({
+          browser,
+        }) => {
+          await expectFits(browser, server!, locale, route.hash, viewport, true, {
+            collapsed: true,
+          });
         });
 });
 
