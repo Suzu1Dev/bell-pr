@@ -506,5 +506,8 @@ test("the GitHub user answer and the Claude auth JSON are read defensively", () 
       checks: [report.checks[0], { id: "git-identity", status: "skip", required: false, detail: "D" }],
     }),
   );
-  assert.match(zh, /\n  ✗ Node\.js   v20\.0\.0  Too old\.\n      L：\n        c\n  - Git 身分  D\n/);
+  assert.ok(
+    zh.includes("\n  ✗ Node.js   v20.0.0  Too old.\n      L：\n        c\n  - Git 身分  D\n"),
+    zh,
+  );
 });
