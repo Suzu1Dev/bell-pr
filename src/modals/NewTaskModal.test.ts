@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { defaultContributionSettings } from "../../shared/insights";
+import { withoutElement } from "../app/test-markup";
+import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Repo } from "../types";
 import { NewTaskModal } from "./NewTaskModal";
 
@@ -18,12 +19,11 @@ const repo: Repo = {
   url: "https://github.com/octo/widgets",
 };
 
-const render = (
+const element = (
   setup: Partial<Props["setup"]> = {},
   props: Partial<Omit<Props, "setup">> = {},
 ) =>
-  renderToStaticMarkup(
-    createElement(NewTaskModal, {
+  createElement(NewTaskModal, {
       setup: {
         taskRepoId: repo.id,
         prompt: "",
@@ -47,8 +47,17 @@ const render = (
       navigate() {},
       setExploreRepoId() {},
       ...props,
-    }),
-  );
+    });
+
+const render = (
+  setup: Partial<Props["setup"]> = {},
+  props: Partial<Omit<Props, "setup">> = {},
+) => renderZh(element(setup, props));
+
+// The direction settings inside the dialog belong to the mission panel,
+// which is translated and tested in English on its own.
+const ownMarkup = (html: string) =>
+  withoutElement(html, 'class="direction-settings-container"');
 
 const submit = (html: string) =>
   html.match(/<button class="button primary" type="submit"[^>]*>/)?.[0] ?? "";
@@ -104,4 +113,42 @@ test("loading or failed settings keep the form locked and say why", () => {
   assert.match(failed, />重新載入專案設定<\/button>/);
   assert.match(failed, /<p role="alert" class="inline-error">讀取設定失敗<\/p>/);
   assert.match(submit(failed), /disabled=""/);
+});
+
+test("the new-task dialog reads in English with no Chinese left", () => {
+  const html = renderEn(element({ prompt: "Add timeout retries and tests to widgets" }));
+  assert.match(html, /<h2 id="modal-title">Hand your idea to your agent team\.<\/h2>/);
+  assert.match(html, /<option value="demo-repo">openfetch-sample\/open-fetch \(demo\)<\/option>/);
+  assert.match(html, /Task name <span>Optional<\/span>/);
+  assert.match(html, /<span>3 teammates<\/span>/);
+  assert.match(html, /The task runs with the Codex CLI signed in on this computer/);
+  assert.match(html, />Generate the team plan<\/button>/);
+  assert.match(html, />Cancel<\/button>/);
+  assertNoHan(ownMarkup(html));
+
+  const demo = renderEn(element({ taskRepoId: "demo-repo" }));
+  assert.match(demo, /Demo settings can be changed freely; no real agent starts\./);
+  assert.match(demo, />Save demo direction<\/button>/);
+  assertNoHan(ownMarkup(demo));
+
+  const loading = renderEn(element({ settingsLoading: true, settingsReady: false }));
+  assert.match(loading, /Loading this project&#x27;s contribution settings…/);
+  assertNoHan(ownMarkup(loading));
+  const failed = renderEn(element({ settingsReady: false }));
+  assert.match(failed, />Reload project settings<\/button>/);
+  assertNoHan(ownMarkup(failed));
+
+  const solo = renderEn(
+    element({
+      contributionSettings: {
+        ...defaultContributionSettings,
+        maxTeammates: 2,
+        requirePlanApproval: false,
+        provider: "claude",
+      },
+    }),
+  );
+  assert.match(solo, /<span>2 teammates<\/span>/);
+  assert.match(solo, /the Claude Code CLI signed in/);
+  assert.match(solo, />Start the agent team<\/button>/);
 });

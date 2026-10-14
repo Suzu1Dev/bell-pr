@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+import { Fragment, type Dispatch, type SetStateAction } from "react";
 import {
   ArrowUpRight,
   BookOpen,
@@ -6,6 +6,7 @@ import {
   ChevronRight,
   CircleHelp,
   FolderGit2,
+  Languages,
   LayoutDashboard,
   Plus,
   Search,
@@ -13,10 +14,13 @@ import {
   Sparkles,
   Workflow,
 } from "lucide-react";
-import { demoRun } from "../demo";
+import { getDemo } from "../demo";
+import { useLocale, useT } from "../i18n";
+import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
 import type { Run, RunSummary } from "../types";
 import type { ModalName, Page } from "./AppShell";
 import type { Status } from "./hooks/useAppData";
+import "./sidebar.css";
 
 interface SidebarProps {
   page: Page;
@@ -46,12 +50,15 @@ export function Sidebar({
   beginContribution,
   chooseRun,
 }: SidebarProps) {
+  const t = useT("app");
+  const [locale] = useLocale();
+  const demoRun = getDemo(locale).run;
   return (
     <>
       {sidebarOpen && (
         <button
           className="sidebar-scrim"
-          aria-label="關閉導覽"
+          aria-label={t.sidebar.closeNavigation}
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -62,7 +69,7 @@ export function Sidebar({
         <a
           href="#"
           className="brand"
-          aria-label="BELL PR 首頁"
+          aria-label={t.sidebar.home}
           onClick={(e) => {
             e.preventDefault();
             navigate("workspace");
@@ -74,64 +81,67 @@ export function Sidebar({
           <span>
             BELL<span className="brand-pr">PR</span>
           </span>
-          <span className="beta-label">BETA</span>
+          <span className="beta-label">{t.sidebar.beta}</span>
         </a>
         <button className="workspace-switch" onClick={() => navigate("repos")}>
           <span className="workspace-avatar">M</span>
           <span>
-            <strong>我的工作空間</strong>
-            <small>Personal workspace</small>
+            <strong>{t.sidebar.workspaceName}</strong>
+            <small>{t.sidebar.workspaceKind}</small>
           </span>
           <ChevronDown size={14} />
         </button>
-        <div className="nav-label">WORKSPACE</div>
-        <nav aria-label="主要導覽">
+        <div className="nav-label">{t.sidebar.navigationHeading}</div>
+        <nav aria-label={t.sidebar.mainNavigation}>
           <button
             className={page === "workspace" ? "nav-item active" : "nav-item"}
-            title="貢獻工作台"
+            title={t.pages.workspace}
             onClick={() => navigate("workspace")}
           >
             <LayoutDashboard size={18} />
-            <span>貢獻工作台</span>
+            <span>{t.pages.workspace}</span>
             <span className="nav-count">{runs.length + 1}</span>
           </button>
           <button
             className={page === "repos" ? "nav-item active" : "nav-item"}
-            title="Repositories"
+            title={t.pages.repos}
             onClick={() => navigate("repos")}
           >
             <FolderGit2 size={18} />
-            <span>Repositories</span>
+            <span>{t.pages.repos}</span>
           </button>
           <button
             className={page === "discovery" ? "nav-item active" : "nav-item"}
-            title="探索貢獻"
+            title={t.pages.discovery}
             onClick={() => navigate("discovery")}
           >
             <Search size={18} />
-            <span>探索貢獻</span>
+            <span>{t.pages.discovery}</span>
           </button>
           <button
             className={page === "team" ? "nav-item active" : "nav-item"}
-            title="Agent team"
+            title={t.pages.team}
             onClick={() => navigate("team")}
           >
             <Workflow size={18} />
-            <span>Agent team</span>
+            <span>{t.pages.team}</span>
           </button>
           <button
             className={page === "learning" ? "nav-item active" : "nav-item"}
-            title="學習筆記"
+            title={t.pages.learning}
             onClick={() => navigate("learning")}
           >
             <BookOpen size={18} />
-            <span>學習筆記</span>
-            <span className="tiny-new">NEW</span>
+            <span>{t.pages.learning}</span>
+            <span className="tiny-new">{t.sidebar.newBadge}</span>
           </button>
         </nav>
         <div className="nav-label recent-label">
-          最近的貢獻{" "}
-          <button aria-label="新增任務" onClick={() => beginContribution()}>
+          {t.sidebar.recent}{" "}
+          <button
+            aria-label={t.sidebar.newTask}
+            onClick={() => beginContribution()}
+          >
             <Plus size={14} />
           </button>
         </div>
@@ -145,12 +155,16 @@ export function Sidebar({
               <span
                 className={`small-status ${r.status === "running" ? "running" : ""}`}
               />
-              <span>{r.id === demoRun.id ? "SDK 智慧重試機制" : r.title}</span>
-              {r.id === demoRun.id && <span className="demo-small">範例</span>}
+              <span>
+                {r.id === demoRun.id ? t.sidebar.demoRunTitle : r.title}
+              </span>
+              {r.id === demoRun.id && (
+                <span className="demo-small">{t.sidebar.demoBadge}</span>
+              )}
             </button>
           ))}
           <button className="all-runs-link" onClick={() => openModal("runs")}>
-            查看全部貢獻 <ChevronRight size={12} />
+            {t.sidebar.allRuns} <ChevronRight size={12} />
           </button>
         </div>
         <div className="sidebar-bottom">
@@ -158,45 +172,52 @@ export function Sidebar({
             <div className="learning-card-icon">
               <Sparkles size={17} />
             </div>
-            <strong>每一次貢獻，都有所收穫。</strong>
+            <strong>{t.sidebar.learningTitle}</strong>
             <p>
-              理解改動背後的思考，
-              <br />
-              累積屬於你的開發經驗。
+              {t.sidebar.learningText.split("\n").map((line, index) => (
+                <Fragment key={index}>
+                  {index > 0 && <br />}
+                  {line}
+                </Fragment>
+              ))}
             </p>
             <button onClick={() => navigate("learning")}>
-              探索學習筆記 <ArrowUpRight size={14} />
+              {t.sidebar.learningAction} <ArrowUpRight size={14} />
             </button>
           </div>
           <button
             className="nav-item"
-            title="連線與設定"
+            title={t.pages.settings}
             onClick={() => navigate("settings")}
           >
             <Settings2 size={17} />
-            <span>連線與設定</span>
+            <span>{t.pages.settings}</span>
           </button>
           <button
             className="nav-item"
-            title="使用指南"
+            title={t.sidebar.help}
             aria-keyshortcuts="?"
             onClick={() => openModal("help")}
           >
             <CircleHelp size={17} />
-            <span>使用指南</span>
+            <span>{t.sidebar.help}</span>
             <span className="shortcut">?</span>
           </button>
+          <div className="sidebar-language">
+            <Languages size={16} aria-hidden="true" />
+            <LanguageSwitcher className="sidebar-language-select" />
+          </div>
           <div className="profile">
             <span className="profile-avatar">MC</span>
             <span>
-              <strong>{status?.githubUser || "My workspace"}</strong>
+              <strong>{status?.githubUser || t.sidebar.profileFallback}</strong>
               <small>
-                <span className="connection-dot" /> 本機工作空間
+                <span className="connection-dot" /> {t.sidebar.localWorkspace}
               </small>
             </span>
             <button
               className="icon-button"
-              aria-label="工作空間設定"
+              aria-label={t.sidebar.workspaceSettings}
               onClick={() => navigate("settings")}
             >
               <Settings2 size={15} />

@@ -161,8 +161,8 @@ test("setLocale switches the active locale, the document and remembers the choic
   assert.equal(getCurrentMessages().common.language.label, "語言");
   assert.equal(storage.items.get(localeStorageKey), "zh-TW");
   assert.equal(document.documentElement.lang, "zh-Hant-TW");
-  // The app namespace has no title yet, so the title stays as it was.
-  assert.equal(document.title, "BELL PR");
+  // The title comes from the app namespace.
+  assert.equal(document.title, zhTW.app.title);
   assert.deepEqual(events, [{ locale: "zh-TW" }]);
 
   // Choosing the active locale again changes nothing and announces nothing.

@@ -1,5 +1,6 @@
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { ArrowDownToLine, FolderGit2, Github, Loader2 } from "lucide-react";
+import { useT } from "../i18n";
 import { Modal } from "../modals/Modal";
 
 interface ImportRepoModalProps {
@@ -21,15 +22,16 @@ export function ImportRepoModal({
   importRepo,
   closeModal,
 }: ImportRepoModalProps) {
+  const t = useT("repos").import;
   return (
     <Modal
-      title="帶入你的下一個貢獻。"
-      subtitle="貼上 GitHub 連結，或選擇本機 Git 專案的完整路徑。"
+      title={t.title}
+      subtitle={t.subtitle}
       onClose={closeModal}
     >
       <form onSubmit={importRepo}>
         <label className="field-label" htmlFor="repo-source">
-          Repository 來源
+          {t.source}
         </label>
         <div className="input-with-icon">
           <Github size={18} />
@@ -43,15 +45,10 @@ export function ImportRepoModal({
             autoComplete="off"
           />
         </div>
-        <p className="field-help">
-          也支援 /Users/你的名稱/projects/repository
-        </p>
+        <p className="field-help">{t.localPathHint}</p>
         <div className="callout">
           <FolderGit2 size={18} />
-          <p>
-            GitHub 專案會下載至本機；後續開發使用獨立
-            worktree，保留原專案狀態。
-          </p>
+          <p>{t.callout}</p>
         </div>
         {formError && (
           <p role="alert" className="inline-error">
@@ -64,7 +61,7 @@ export function ImportRepoModal({
             className="button secondary"
             onClick={closeModal}
           >
-            稍後再說
+            {t.later}
           </button>
           <button
             type="submit"
@@ -76,7 +73,7 @@ export function ImportRepoModal({
             ) : (
               <ArrowDownToLine size={16} />
             )}{" "}
-            {busy ? "正在匯入…" : "匯入 Repository"}
+            {busy ? t.importing : t.import}
           </button>
         </div>
       </form>

@@ -1,6 +1,7 @@
 import { Component, useState, type ErrorInfo, type ReactNode } from "react";
 import { AlertCircle } from "lucide-react";
 import { product } from "../../shared/product";
+import { useT } from "../i18n";
 import { appVersion } from "../version";
 
 /**
@@ -24,6 +25,7 @@ export function ErrorFallback({
   error: Error;
   onReload?: () => void;
 }) {
+  const t = useT("app").errorBoundary;
   const [copy, setCopy] = useState<"idle" | "copied" | "failed">("idle");
   async function copyDiagnostics() {
     try {
@@ -38,27 +40,24 @@ export function ErrorFallback({
       <div className="empty-icon">
         <AlertCircle />
       </div>
-      <h3>Something went wrong</h3>
-      <p>
-        This part of {product.name} stopped working. Reload the page to try
-        again.
-      </p>
+      <h3>{t.title}</h3>
+      <p>{t.body}</p>
       <div>
         <button type="button" className="button primary" onClick={onReload}>
-          Reload
+          {t.reload}
         </button>{" "}
         <button
           type="button"
           className="button secondary"
           onClick={() => void copyDiagnostics()}
         >
-          Copy diagnostics
+          {t.copyDiagnostics}
         </button>
       </div>
-      {copy === "copied" && <p role="status">Diagnostics copied.</p>}
+      {copy === "copied" && <p role="status">{t.copied}</p>}
       {copy === "failed" && (
         <>
-          <p role="status">Could not copy. Select the text below instead.</p>
+          <p role="status">{t.copyFailed}</p>
           <pre>{diagnosticsText(error)}</pre>
         </>
       )}

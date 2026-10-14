@@ -16,7 +16,8 @@ import "../efficiency/efficiency.css";
 import "../models/models.css";
 import "../mission/mission.css";
 import "../team/team.css";
-import { demoRepo, demoRun, demoFiles } from "../demo";
+import { getDemo } from "../demo";
+import { useLocale, useT } from "../i18n";
 import type { Run, DiffFile } from "../types";
 import { CommandPalette } from "../navigation/CommandPalette";
 import { useProjectInsights } from "../mission/useProjectInsights";
@@ -34,15 +35,15 @@ import { SettingsPage } from "../settings/SettingsPage";
 import { PublishModal } from "../workspace/PublishModal";
 import { WorkspacePage } from "../workspace/WorkspacePage";
 import { ErrorBoundary, listenForPreloadErrors } from "./ErrorBoundary";
-import { statusLabels } from "./labels";
 import { Sidebar } from "./Sidebar";
 import { Toasts, type Toast } from "./Toasts";
 import { Topbar } from "./Topbar";
 import { useAppData } from "./hooks/useAppData";
+import { loadDemo } from "./hooks/demoStorage";
 import { useDraftEditor } from "./hooks/useDraftEditor";
 import { useExplanations } from "./hooks/useExplanations";
 import { useRepoUpdate } from "./hooks/useRepoUpdate";
-import { loadDemo, useRunActions } from "./hooks/useRunActions";
+import { useRunActions } from "./hooks/useRunActions";
 import { useRunPolling } from "./hooks/useRunPolling";
 import { useRunRounds } from "./hooks/useRunRounds";
 import { useTaskSetup } from "./hooks/useTaskSetup";
@@ -78,6 +79,10 @@ export default function App() {
 }
 
 function AppShell() {
+  const t = useT("app");
+  const [locale] = useLocale();
+  // The sample project in the UI language; its ids are the same in every locale.
+  const sample = getDemo(locale);
   const [page, setPage] = useState<Page>("workspace");
   const [tab, setTab] = useState<Tab>("overview");
   const {
@@ -90,21 +95,27 @@ function AppShell() {
     apiError,
     setApiError,
   } = useAppData();
-  const [run, setRun] = useState<Run>(loadDemo);
-  const [files, setFiles] = useState<DiffFile[]>(demoFiles);
-  const [selectedPath, setSelectedPath] = useState(demoFiles[0]?.path || "");
+  const [run, setRun] = useState<Run>(() => loadDemo(locale));
+  const [files, setFiles] = useState<DiffFile[]>(() => sample.files);
+  const [selectedPath, setSelectedPath] = useState(
+    () => sample.files[0]?.path || "",
+  );
   const [toast, setToast] = useState<Toast | null>(null);
   const [commandOpen, setCommandOpen] = useState(false);
   const mainContent = useRef<HTMLElement>(null);
   const [modal, setModal] = useState<ModalName>(null);
-  const [exploreRepoId, setExploreRepoId] = useState("demo-repo");
+  const [exploreRepoId, setExploreRepoId] = useState(sample.repo.id);
   const settingsRequest = useRef(0);
   const [showFiles, setShowFiles] = useState(true);
   const [showExplanation, setShowExplanation] = useState(true);
   const [focusMode, setFocusMode] = useState(false);
-  const [codeFont, setCodeFont] = useState(
-    () => Number(localStorage.getItem("bellpr-code-font")) || 14,
-  );
+  const [codeFont, setCodeFont] = useState(() => {
+    try {
+      return Number(localStorage.getItem("bellpr-code-font")) || 14;
+    } catch {
+      return 14;
+    }
+  });
   const [explanationWidth, setExplanationWidth] = useState(340);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
@@ -127,11 +138,13 @@ function AppShell() {
   runIdRef.current = run.id;
   const selectionSequence = useRef(0);
   const navigationIntent = useRef(0);
-  const demo = run.id === demoRun.id;
-  const currentRepo = demo ? demoRepo : repos.find((r) => r.id === run.repoId);
+  const demo = run.id === sample.run.id;
+  const currentRepo = demo
+    ? sample.repo
+    : repos.find((r) => r.id === run.repoId);
   const exploreRepo =
-    exploreRepoId === "demo-repo"
-      ? demoRepo
+    exploreRepoId === sample.repo.id
+      ? sample.repo
       : repos.find((repo) => repo.id === exploreRepoId);
   const insightRepo = page === "explore" ? exploreRepo : currentRepo;
   const intelligence = useProjectInsights(insightRepo?.id);
@@ -142,7 +155,7 @@ function AppShell() {
   const active = ["running", "queued", "awaiting_plan"].includes(run.status);
   const editable = !demo && ["review", "approved"].includes(run.status);
   // A learner-requested re-review keeps the run in review/approved; only the
-  // two reviewer agents report running, so poll and offer 停止 on that signal.
+  // two reviewer agents report running, so poll and offer to stop on that signal.
   const reviewRerunning =
     editable &&
     run.agents.some(
@@ -168,7 +181,7 @@ function AppShell() {
   }, []);
   const toggleCommandPalette = useCallback(() => {
     if (busy) {
-      notify("正在完成目前操作，稍後即可切換。");
+      notify(t.busySwitching);
       return;
     }
     if (commandOpen) closeCommandPalette();
@@ -177,7 +190,7 @@ function AppShell() {
       navigationIntent.current++;
       setCommandOpen(true);
     }
-  }, [busy, commandOpen, closeCommandPalette, notify]);
+  }, [busy, commandOpen, closeCommandPalette, notify, t]);
   const draft = useDraftEditor({
     run,
     setRun,
@@ -236,9 +249,6 @@ function AppShell() {
     const timer = setTimeout(() => setToast(null), 4500);
     return () => clearTimeout(timer);
   }, [toast]);
-  useEffect(() => {
-    if (demo) localStorage.setItem("bellpr-demo-run", JSON.stringify(run));
-  }, [demo, run]);
   useRunPolling({
     run,
     demo,
@@ -374,7 +384,7 @@ function AppShell() {
       <a className="skip-to-content" href="#main-content" onClick={(event) => {
         event.preventDefault();
         focusDestination();
-      }}>跳至主要內容</a>
+      }}>{t.skipToContent}</a>
       <Sidebar
         page={page}
         runs={runs}
@@ -402,7 +412,10 @@ function AppShell() {
           <div role="alert" className="connection-banner">
             <Terminal size={16} />
             <span>{apiError}</span>
-            <button onClick={() => setApiError("")} aria-label="關閉連線提示">
+            <button
+              onClick={() => setApiError("")}
+              aria-label={t.dismissConnectionNotice}
+            >
               <X size={15} />
             </button>
           </div>
@@ -509,11 +522,10 @@ function AppShell() {
       </main>
       {commandOpen && (
         <CommandPalette
-          repos={[...repos, demoRepo]}
-          runs={[...runs, { ...demoRun, status: demo ? run.status : demoRun.status }]}
+          repos={[...repos, sample.repo]}
+          runs={[...runs, { ...sample.run, status: demo ? run.status : sample.run.status }]}
           currentRepoId={insightRepo?.id}
           currentRunId={run.id}
-          statusLabels={statusLabels}
           onClose={closeCommandPalette}
           onSelectRun={openPaletteRun}
           onSelectRepo={openPaletteRepo}

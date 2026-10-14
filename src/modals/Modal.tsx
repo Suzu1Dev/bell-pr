@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { GitPullRequest, X } from "lucide-react";
+import { useT } from "../i18n";
 
 export function Modal({
   title,
@@ -14,6 +15,7 @@ export function Modal({
   onClose: () => void;
   wide?: boolean;
 }) {
+  const t = useT("modals");
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const before = document.activeElement as HTMLElement;
@@ -66,7 +68,7 @@ export function Modal({
       >
         <button
           className="icon-button modal-close"
-          aria-label="關閉視窗"
+          aria-label={t.close}
           onClick={onClose}
         >
           <X size={19} />

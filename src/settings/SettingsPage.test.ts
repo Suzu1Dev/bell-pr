@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import type { Status } from "../app/hooks/useAppData";
+import { withoutOtherLanguages } from "../app/test-markup";
+import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { SettingsPage } from "./SettingsPage";
 
-const render = (status: Status | null) =>
-  renderToStaticMarkup(
-    createElement(SettingsPage, {
+const element = (status: Status | null) =>
+  createElement(SettingsPage, {
       status,
       setStatus() {},
       setApiError() {},
@@ -15,8 +15,9 @@ const render = (status: Status | null) =>
       configureContributionModels() {},
       setTab() {},
       navigate() {},
-    }),
-  );
+    });
+
+const render = (status: Status | null) => renderZh(element(status));
 
 const serviceStatus = (html: string, name: string) =>
   html.match(
@@ -56,7 +57,77 @@ test("a reported status shows each CLI's state, the GitHub user and the limits",
   assert.equal(serviceStatus(html, "Claude Code CLI"), "尚未登入");
   assert.equal(serviceStatus(html, "GitHub CLI"), "已連線");
   assert.match(html, /以 octo 連線/);
-  assert.match(html, /BELLPR_MAX_ACTIVE_RUNS）<\/span><code>2<\/code>/);
-  assert.match(html, /BELLPR_MAX_AGENT_PROCESSES）<\/span><code>8<\/code>/);
+  // The limits show by name; the variables that set them are under Advanced.
+  assert.match(html, /同時執行的工作上限<\/span><code>2<\/code>/);
+  assert.match(html, /Agent CLI 行程上限<\/span><code>8<\/code>/);
   assert.match(html, /<code>20<\/code>/);
+});
+
+const status: Status = {
+  codex: true,
+  codexAuthenticated: true,
+  claude: true,
+  claudeAuthenticated: false,
+  github: true,
+  githubUser: "octo",
+  limits: { maxActiveRuns: 2, maxAgentProcesses: 8, maxQueued: 20 },
+};
+
+test("the settings page reads in English with no Chinese left", () => {
+  for (const value of [null, status]) {
+    const html = renderEn(element(value));
+    assert.match(html, /<h1 tabindex="-1">Get your workspace ready\.<\/h1>/);
+    assertNoHan(withoutOtherLanguages(html));
+  }
+  const html = renderEn(element(status));
+  assert.equal(serviceStatus(html, "Codex CLI"), "Ready");
+  assert.equal(serviceStatus(html, "Claude Code CLI"), "Not signed in");
+  assert.equal(serviceStatus(html, "GitHub CLI"), "Connected");
+  assert.match(html, /Connected as octo/);
+  assert.match(html, /Maximum runs at the same time<\/span><code>2<\/code>/);
+});
+
+test("the Claude Code copy is neutral about the person's plan and account", () => {
+  const html = renderEn(element(status));
+  assert.ok(
+    html.includes(
+      "Uses the Claude Code CLI you installed and signed in to (Claude plan or Anthropic API key). Usage counts against your own account.",
+    ),
+  );
+  assert.ok(
+    html.includes(
+      "Running many agents at once uses your provider account faster. Heavy parallel use of a personal plan may exceed its intended individual use.",
+    ),
+  );
+  // The retired plan and billing wording (in English and zh-TW) and the old
+  // service-manager path, spelled with escapes so that a search of the
+  // source for that wording comes back empty.
+  const retired = [
+    /sub\u0073cription|\u8a02\u95b1/i,
+    /API\u0020billing|API \u8a08\u8cbb/i,
+    /system\u0064|\.config\/bell-pr/,
+  ];
+  for (const locale of [html, render(status)])
+    for (const pattern of retired) assert.doesNotMatch(locale, pattern);
+  // The patterns do catch the old copy.
+  assert.match("Claude \u8a02\u95b1", retired[0]);
+  assert.match("Sub\u0073cription, not API\u0020billing", retired[1]);
+});
+
+test("the General card switches the language and the variables sit under Advanced", () => {
+  const html = renderEn(element(status));
+  assert.match(
+    html,
+    /<h3>General<\/h3>.*<label for="settings-language">Language<\/label><select id="settings-language" class="settings-language-select" aria-label="Language">/,
+  );
+  const advanced = html.match(/<details class="settings-advanced">.*?<\/details>/)?.[0] ?? "";
+  assert.match(advanced, /<summary>Advanced: environment variables<\/summary>/);
+  assert.match(advanced, /<p>Set environment variables and restart BELL PR\.<\/p>/);
+  assert.match(advanced, /<code>BELLPR_MAX_ACTIVE_RUNS<\/code><\/dt><dd>Maximum runs at the same time<\/dd>/);
+  assert.match(advanced, /<code>BELLPR_MAX_AGENT_PROCESSES<\/code><\/dt><dd>Maximum agent CLI processes<\/dd>/);
+  // The variable names appear nowhere else on the page.
+  assert.equal(html.match(/BELLPR_MAX_/g)?.length, 2);
+  // No documentation link, and no sentence pointing to one, while the
+  // product has no docs URL.
+  assert.doesNotMatch(advanced, /<a |documentation/);
 });

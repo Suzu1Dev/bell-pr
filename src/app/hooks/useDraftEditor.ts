@@ -7,6 +7,8 @@ import {
   type SetStateAction,
 } from "react";
 import { api, send } from "../../api";
+import { getDemo } from "../../demo";
+import { useLocale, useT } from "../../i18n";
 import type { Run } from "../../types";
 import { validBranchName, type DraftProposal } from "../../../shared/drafts";
 import type { DraftCheck, DraftTaskItem } from "../../../shared/draft-checks";
@@ -39,6 +41,9 @@ export function useDraftEditor({
   notify,
   setBusy,
 }: DraftEditorOptions) {
+  const t = useT("workspace").notices;
+  // The checks report in the UI language, like the server's for this request.
+  const [locale] = useLocale();
   const [draftTitle, setDraftTitle] = useState(run.draft.title);
   const [draftBody, setDraftBody] = useState(run.draft.body);
   // Empty means "use the PR title alone", matching the server fallback.
@@ -88,7 +93,7 @@ export function useDraftEditor({
   const draftSources = run.draftPreparation?.context?.sources;
   const proposalBody = run.draftPreparation?.proposal?.body;
   const draftUnfinished = draftChecks
-    ?.draftPreflight({ body: draftBody })
+    ?.draftPreflight({ body: draftBody }, locale)
     .find((check) => check.kind === "block");
   const draftTasks: DraftTaskItem[] = draftChecks?.draftTaskItems(draftBody) ?? [];
   const draftTaskGroups = [
@@ -107,9 +112,9 @@ export function useDraftEditor({
   const publishBranchError = !draftPublishBranch.trim()
     ? ""
     : !validBranchName(draftPublishBranch.trim())
-      ? "分支名稱只能用英數字與 . _ - /，不能有 ..，也不能以 . 或 .lock 結尾。"
+      ? t.branchInvalid
       : draftPublishBranch.trim().toLowerCase() === run.baseBranch.toLowerCase()
-        ? `不能用目標分支 ${run.baseBranch}，否則會直接推送到目標分支而不是建立 PR。`
+        ? t.branchIsTarget({ branch: run.baseBranch })
         : "";
   const publishBranchInvalid = !!publishBranchError;
   // A follow-up round pushes only a commit: the PR title and description stay.
@@ -120,11 +125,14 @@ export function useDraftEditor({
       !!draftChecks?.findDraftPlaceholders(draftCommitMessage).length);
   const publishChecks: DraftCheck[] = followUp
     ? []
-    : (draftChecks?.draftPreflight({
-        body: run.draft.body,
-        sources: draftSources,
-        proposalBody,
-      }) ?? []);
+    : (draftChecks?.draftPreflight(
+        {
+          body: run.draft.body,
+          sources: draftSources,
+          proposalBody,
+        },
+        locale,
+      ) ?? []);
   const publishBlocked = publishChecks.find((check) => check.kind === "block");
   const publishConfirmations = publishChecks.filter(
     (check) => check.kind === "confirm",
@@ -165,12 +173,11 @@ export function useDraftEditor({
     setDraftRequests((previous) => new Set(previous).add(id));
     try {
       if (demo) {
-        const { demoDraftPreparation } =
-          await import("../../draft/DraftGuidancePanel");
+        const { draftPreparation } = getDemo(locale);
         if (runIdRef.current === id)
           setRun((previous) => ({
             ...previous,
-            draftPreparation: structuredClone(demoDraftPreparation),
+            draftPreparation: structuredClone(draftPreparation),
           }));
       } else {
         const { run: updated } = await api<{ run: Run }>(
@@ -202,20 +209,20 @@ export function useDraftEditor({
     if (proposal.commitMessageSuggestion && !draftCommitMessage.trim())
       setDraftCommitMessage(proposal.commitMessageSuggestion.message);
     setDraftPreview(true);
-    notify("建議草稿已放入編輯區，確認後請儲存草稿。");
+    notify(t.proposalApplied);
   }
   function applyCommitMessageSuggestion() {
     if (!commitMessageSuggestion) return;
     setDraftCommitMessage(commitMessageSuggestion.message);
-    notify("建議的提交訊息已放入欄位，可自行補上簽署後儲存。");
+    notify(t.commitSuggestionApplied);
   }
   async function saveDraft() {
     if (!draftTitle.trim() || !draftBody.trim()) {
-      notify("請填寫 PR 標題與說明。", "error");
+      notify(t.draftRequired, "error");
       return;
     }
     if (publishBranchInvalid) {
-      notify(`GitHub 分支：${publishBranchError}`, "error");
+      notify(t.branchError({ error: publishBranchError }), "error");
       return;
     }
     const commitMessage = draftCommitMessage.trim();
@@ -246,7 +253,7 @@ export function useDraftEditor({
         );
         if (runIdRef.current === updated.id) setRun(updated);
       }
-      notify("PR 草稿已儲存");
+      notify(t.draftSaved);
     } catch (error) {
       notify((error as Error).message, "error");
     } finally {

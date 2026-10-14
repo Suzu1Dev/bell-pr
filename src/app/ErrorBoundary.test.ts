@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement, type ReactElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { appVersion } from "../version";
 import {
   ErrorBoundary,
@@ -9,8 +9,6 @@ import {
   diagnosticsText,
   reloadOnPreloadError,
 } from "./ErrorBoundary";
-
-const han = /\p{Script=Han}/u;
 
 test("getDerivedStateFromError keeps the thrown error as the boundary state", () => {
   const error = new Error("x");
@@ -21,16 +19,26 @@ test("getDerivedStateFromError keeps the thrown error as the boundary state", ()
 });
 
 test("the fallback offers Reload and Copy diagnostics in English", () => {
-  const html = renderToStaticMarkup(
+  const html = renderEn(
     createElement(ErrorFallback, { error: new Error("boom"), onReload() {} }),
   );
   assert.match(html, /role="alert"/);
+  assert.match(html, /<h3>Something went wrong<\/h3>/);
   assert.match(html, /<button type="button" class="button primary">Reload<\/button>/);
   assert.match(html, /<button type="button" class="button secondary">Copy diagnostics<\/button>/);
   assert.match(html, /This part of BELL PR stopped working/);
   // The message stays in the copied diagnostics, not on the page.
   assert.doesNotMatch(html, /boom/);
-  assert.doesNotMatch(html, han);
+  assertNoHan(html);
+});
+
+test("the fallback follows the UI language", () => {
+  const html = renderZh(
+    createElement(ErrorFallback, { error: new Error("boom"), onReload() {} }),
+  );
+  assert.match(html, /<button type="button" class="button primary">重新載入<\/button>/);
+  assert.match(html, /BELL PR 的這個部分無法正常運作/);
+  assert.doesNotMatch(html, /boom/);
 });
 
 test("diagnostics name the build, the browser and the message, without the stack", () => {
@@ -43,14 +51,14 @@ test("diagnostics name the build, the browser and the message, without the stack
 });
 
 test("the boundary renders its children until an error is caught", () => {
-  const html = renderToStaticMarkup(
+  const html = renderEn(
     createElement(ErrorBoundary, null, createElement("p", null, "panel")),
   );
   assert.equal(html, "<p>panel</p>");
 
   const boundary = new ErrorBoundary({ children: createElement("p", null, "panel") });
   boundary.state = { error: new Error("x") };
-  const fallback = renderToStaticMarkup(boundary.render() as ReactElement);
+  const fallback = renderEn(boundary.render() as ReactElement);
   assert.match(fallback, />Reload</);
   assert.doesNotMatch(fallback, /panel/);
 });

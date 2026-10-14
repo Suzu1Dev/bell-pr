@@ -1,8 +1,19 @@
 import type { Dispatch, SetStateAction } from "react";
-import { Bot, Github, Sparkles, Terminal, Workflow } from "lucide-react";
+import {
+  Bot,
+  Github,
+  Languages,
+  Sparkles,
+  Terminal,
+  Workflow,
+} from "lucide-react";
+import { productLink } from "../../shared/product";
 import { api } from "../api";
 import type { Notify, Page, Tab } from "../app/AppShell";
 import type { Status } from "../app/hooks/useAppData";
+import { useT } from "../i18n";
+import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
+import "./settings.css";
 
 interface SettingsPageProps {
   status: Status | null;
@@ -14,7 +25,7 @@ interface SettingsPageProps {
   navigate: (value: Page) => void;
 }
 
-/** The local CLI connections, model settings and run limits. */
+/** The language, the local CLI connections, model settings and run limits. */
 export function SettingsPage({
   status,
   setStatus,
@@ -24,13 +35,21 @@ export function SettingsPage({
   setTab,
   navigate,
 }: SettingsPageProps) {
+  const t = useT("settings");
+  const docsUrl = productLink("docsUrl");
+  const cliStatus = (installed?: boolean, authenticated?: boolean) =>
+    installed && authenticated
+      ? t.status.ready
+      : installed
+        ? t.status.signedOut
+        : t.status.missing;
   return (
     <section className="page-content settings-page">
       <div className="page-title">
         <div>
-          <span className="eyebrow">CONNECTIONS</span>
-          <h1 tabIndex={-1}>讓工作環境準備就緒。</h1>
-          <p>沿用本機 CLI 的登入狀態，憑證不會儲存在瀏覽器。</p>
+          <span className="eyebrow">{t.eyebrow}</span>
+          <h1 tabIndex={-1}>{t.title}</h1>
+          <p>{t.intro}</p>
         </div>
         <button
           className="button secondary"
@@ -39,13 +58,31 @@ export function SettingsPage({
               .then((s) => {
                 setStatus(s);
                 setApiError("");
-                notify("連線狀態已更新");
+                notify(t.rechecked);
               })
               .catch((e) => notify(e.message, "error"));
           }}
         >
-          重新檢查連線
+          {t.recheck}
         </button>
+      </div>
+      <div className="settings-card">
+        <div className="settings-service">
+          <div className="service-icon">
+            <Languages size={24} />
+          </div>
+          <div>
+            <h3>{t.general.title}</h3>
+            <p>{t.general.text}</p>
+          </div>
+        </div>
+        <div className="setup-command">
+          <label htmlFor="settings-language">{t.general.language}</label>
+          <LanguageSwitcher
+            id="settings-language"
+            className="settings-language-select"
+          />
+        </div>
       </div>
       <div className="settings-card">
         <div className="settings-service">
@@ -54,20 +91,16 @@ export function SettingsPage({
           </div>
           <div>
             <h3>Codex CLI</h3>
-            <p>執行 agent team、程式碼解說與追問</p>
+            <p>{t.codex.description}</p>
           </div>
           <span
             className={`service-status ${status?.codex && status?.codexAuthenticated ? "connected" : ""}`}
           >
-            {status?.codex && status?.codexAuthenticated
-              ? "已就緒"
-              : status?.codex
-                ? "尚未登入"
-                : "尚未安裝"}
+            {cliStatus(status?.codex, status?.codexAuthenticated)}
           </span>
         </div>
         <div className="setup-command">
-          <span>在終端機完成登入</span>
+          <span>{t.signInHint}</span>
           <code>codex login</code>
         </div>
       </div>
@@ -78,20 +111,16 @@ export function SettingsPage({
           </div>
           <div>
             <h3>Claude Code CLI</h3>
-            <p>可在模型設定改用 Claude，沿用你的 Claude 訂閱登入</p>
+            <p>{t.claude.description}</p>
           </div>
           <span
             className={`service-status ${status?.claude && status?.claudeAuthenticated ? "connected" : ""}`}
           >
-            {status?.claude && status?.claudeAuthenticated
-              ? "已就緒"
-              : status?.claude
-                ? "尚未登入"
-                : "尚未安裝"}
+            {cliStatus(status?.claude, status?.claudeAuthenticated)}
           </span>
         </div>
         <div className="setup-command">
-          <span>在終端機完成登入</span>
+          <span>{t.signInHint}</span>
           <code>claude auth login</code>
         </div>
       </div>
@@ -101,8 +130,8 @@ export function SettingsPage({
             <Sparkles size={24} />
           </div>
           <div>
-            <h3>模型與思考強度</h3>
-            <p>所有專案共用一組設定，既有任務保留當次設定。</p>
+            <h3>{t.models.title}</h3>
+            <p>{t.models.text}</p>
           </div>
         </div>
         <div className="setup-command">
@@ -110,7 +139,7 @@ export function SettingsPage({
             className="button secondary"
             onClick={configureContributionModels}
           >
-            設定貢獻模型
+            {t.models.configure}
           </button>
           <button
             className="button ghost"
@@ -119,7 +148,7 @@ export function SettingsPage({
               navigate("workspace");
             }}
           >
-            查看目前任務模型
+            {t.models.current}
           </button>
         </div>
       </div>
@@ -132,18 +161,18 @@ export function SettingsPage({
             <h3>GitHub CLI</h3>
             <p>
               {status?.githubUser
-                ? `以 ${status.githubUser} 連線`
-                : "匯入專案、推送分支與建立 Draft PR"}
+                ? t.github.connectedAs({ user: status.githubUser })
+                : t.github.description}
             </p>
           </div>
           <span
             className={`service-status ${status?.github ? "connected" : ""}`}
           >
-            {status?.github ? "已連線" : "尚未登入"}
+            {status?.github ? t.status.connected : t.status.signedOut}
           </span>
         </div>
         <div className="setup-command">
-          <span>在終端機完成授權</span>
+          <span>{t.authorizeHint}</span>
           <code>gh auth login</code>
         </div>
       </div>
@@ -153,10 +182,10 @@ export function SettingsPage({
             <Terminal size={24} />
           </div>
           <div>
-            <h3>本機工作空間</h3>
-            <p>Repository 與任務資料保存在執行本服務的電腦</p>
+            <h3>{t.local.title}</h3>
+            <p>{t.local.text}</p>
           </div>
-          <span className="service-status connected">Local-first</span>
+          <span className="service-status connected">{t.local.badge}</span>
         </div>
       </div>
       <div className="settings-card">
@@ -165,31 +194,52 @@ export function SettingsPage({
             <Workflow size={24} />
           </div>
           <div>
-            <h3>同時進行的工作數</h3>
-            <p>多個專案（或同一專案）的工作可以同時執行並各自發佈 PR</p>
+            <h3>{t.concurrency.title}</h3>
+            <p>{t.concurrency.text}</p>
           </div>
         </div>
         <div className="setup-command">
-          <span>同時執行的工作上限（BELLPR_MAX_ACTIVE_RUNS）</span>
+          <span>{t.concurrency.maxActiveRuns}</span>
           <code>{status?.limits?.maxActiveRuns ?? "—"}</code>
         </div>
         <div className="setup-command">
-          <span>Agent CLI 行程上限（BELLPR_MAX_AGENT_PROCESSES）</span>
+          <span>{t.concurrency.maxAgentProcesses}</span>
           <code>{status?.limits?.maxAgentProcesses ?? "—"}</code>
         </div>
         <div className="setup-command">
-          <span>排隊上限（執行中、等待執行與等待確認計畫合計）</span>
+          <span>{t.concurrency.maxQueued}</span>
           <code>{status?.limits?.maxQueued ?? "—"}</code>
         </div>
-        <p className="muted">
-          每個工作的 teammates、Reviewer 與 Test analyst 各需要一個 CLI
-          行程，因此 BELLPR_MAX_AGENT_PROCESSES
-          決定實際能同時進行多少；訂閱的使用額度才是真正的上限，BELL
-          只重試 OAuth 更新的競爭，不重試額度錯誤。同一個 repository
-          的多個工作彼此獨立，各自使用自己的 worktree
-          與分支。修改這些值需編輯環境檔並重新啟動服務（systemd 部署為
-          ~/.config/bell-pr/environment）。
-        </p>
+        <p className="muted">{t.concurrency.explanation}</p>
+        <p className="muted">{t.concurrency.usage}</p>
+        <details className="settings-advanced">
+          <summary>{t.concurrency.advanced}</summary>
+          <p>
+            {t.concurrency.advancedText}
+            {docsUrl && (
+              <>
+                {" "}
+                <a href={docsUrl} target="_blank" rel="noreferrer">
+                  {t.concurrency.documentation}
+                </a>
+              </>
+            )}
+          </p>
+          <dl>
+            <div>
+              <dt>
+                <code>BELLPR_MAX_ACTIVE_RUNS</code>
+              </dt>
+              <dd>{t.concurrency.maxActiveRuns}</dd>
+            </div>
+            <div>
+              <dt>
+                <code>BELLPR_MAX_AGENT_PROCESSES</code>
+              </dt>
+              <dd>{t.concurrency.maxAgentProcesses}</dd>
+            </div>
+          </dl>
+        </details>
       </div>
     </section>
   );

@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { assertNoHan } from "../../test-utils/render";
+import en from "../../i18n/en";
+import zhTW from "../../i18n/zh-TW";
 import { stopNotice } from "./useRunActions";
 import type { Run } from "../../types";
+
+const zh = zhTW.workspace.notices;
 
 const base: Run = {
   id: "r",
@@ -31,7 +36,7 @@ test("stopping the conflict agent says so instead of reporting a stopped re-revi
   // An unpublished run: the resolution is recorded on run.sync.
   const resolving = { ...base, sync: { ...sync, resolving: true } };
   assert.match(
-    stopNotice(resolving, { ...base, status: "review", sync }, false),
+    stopNotice(resolving, { ...base, status: "review", sync }, false, zh),
     stopped,
   );
   // A published PR: the resolution is recorded on its open sync round.
@@ -50,12 +55,37 @@ test("stopping the conflict agent says so instead of reporting a stopped re-revi
       { ...published, followUps: [{ ...round, resolving: true }] },
       { ...published, status: "review", followUps: [round] },
       false,
+      zh,
     ),
     stopped,
   );
   // A re-review stopped on a run in review keeps its own message.
   assert.equal(
-    stopNotice({ ...base, status: "review", sync }, { ...base, status: "review", sync }, true),
+    stopNotice({ ...base, status: "review", sync }, { ...base, status: "review", sync }, true, zh),
     "已停止重新審查；原有報告與審閱狀態保留。",
   );
+});
+
+test("each stop notice reads in the UI language", () => {
+  const notices = en.workspace.notices;
+  const round = {
+    id: "f",
+    requestedAt: "2026-10-13T00:00:00Z",
+    feedbackUrls: [],
+    status: "running" as const,
+    parentCommit: "d".repeat(40),
+  };
+  const cases: [Run, Run, boolean, string][] = [
+    [{ ...base, sync: { ...sync, resolving: true } }, { ...base, status: "review", sync }, false, notices.stopResolving],
+    [{ ...base, followUps: [round] }, { ...base, status: "review", followUps: [{ ...round, status: "review" }] }, false, notices.stopRoundKept],
+    [{ ...base, followUps: [round] }, { ...base, status: "published", followUps: [{ ...round, status: "discarded" }] }, false, notices.stopRoundEmpty],
+    [{ ...base, status: "review" }, { ...base, status: "review" }, true, notices.stopReview],
+    [base, { ...base, status: "cancelled", team: { tasks: [{}] } } as unknown as Run, false, notices.stopTeam],
+    [base, { ...base, status: "cancelled" }, false, notices.stopTask],
+  ];
+  for (const [before, updated, rerunning, expected] of cases) {
+    const notice = stopNotice(before, updated, rerunning, notices);
+    assert.equal(notice, expected);
+    assertNoHan(notice);
+  }
 });

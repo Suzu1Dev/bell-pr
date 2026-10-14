@@ -4,6 +4,7 @@ import type {
   DiscoveryCandidate,
 } from "../../shared/discovery";
 import { ErrorBoundary } from "../app/ErrorBoundary";
+import { useT } from "../i18n";
 
 const DiscoveryPanel = lazy(() => import("../discovery/DiscoveryPanel"));
 
@@ -16,11 +17,12 @@ interface DiscoveryPageProps {
 
 /** GitHub-wide discovery of projects and issues to contribute to. */
 export function DiscoveryPage({ chooseOpportunity }: DiscoveryPageProps) {
+  const t = useT("pages").discovery;
   return (
     <section className="page-content">
       <ErrorBoundary>
         <Suspense
-          fallback={<div className="empty-state">正在載入貢獻探索…</div>}
+          fallback={<div className="empty-state">{t.loading}</div>}
         >
           <DiscoveryPanel onChoose={chooseOpportunity} />
         </Suspense>

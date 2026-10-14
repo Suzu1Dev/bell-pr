@@ -17,11 +17,12 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import { apiUrl } from "../api";
+import { useLocale, useT } from "../i18n";
 import type { DiffFile, Repo, Run } from "../types";
 import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { ContributionRecommendation } from "../../shared/insights";
 import type { Tab } from "../app/AppShell";
-import { statusLabels } from "../app/labels";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
 import type { RunActions } from "../app/hooks/useRunActions";
 import type { RunRounds } from "../app/hooks/useRunRounds";
@@ -142,26 +143,31 @@ export function WorkspacePage({
   onUpdateRepo,
   updatingRepo,
 }: WorkspacePageProps) {
+  const t = useT("workspace");
+  const statusLabels = useT("common").runStatus;
+  const [locale] = useLocale();
   const { draftDirty, draftUnfinished, followUp, commitMessageUnfinished } =
     draft;
   const { approve } = actions;
   // In reading mode the one-row heading clips the repo/branch text, so the
-  // export link moves up next to 新增貢獻 where it stays visible and reachable.
+  // export link moves up next to "New contribution" where it stays visible
+  // and reachable. A plain link cannot send the locale header, so the URL
+  // carries it.
   const exportLink = !demo && (
     <a
       className="export-link"
-      href={`/api/runs/${run.id}/export.md`}
+      href={apiUrl(`/runs/${run.id}/export.md`, { locale })}
       download={`bell-learning-${run.id}.md`}
     >
       <ArrowDownToLine size={13} />
-      匯出學習紀錄（Markdown）
+      {t.exportLearning}
     </a>
   );
   const reviewedCount = files.filter((f) =>
     run.reviewedFiles.includes(f.path),
   ).length;
   const allReviewed = files.length > 0 && reviewedCount === files.length;
-  // Progress strip index: 0 定義任務, 1 Agent 開發, 2 理解與審查, 3 送出貢獻;
+  // Progress strip index: 0 define, 1 build, 2 review, 3 submit;
   // 4 marks every step done. Failed and cancelled runs stay on step 02.
   const currentStep: number = (
     {
@@ -182,15 +188,15 @@ export function WorkspacePage({
         <div className="heading-top">
           <div className="eyebrow">
             <GitPullRequest size={15} />
-            <span>CONTRIBUTION WORKSPACE</span>
-            {demo && <span className="demo-pill">互動示範</span>}
+            <span>{t.eyebrow}</span>
+            {demo && <span className="demo-pill">{t.demoPill}</span>}
           </div>
           {reading && exportLink}
           <button
             className="button secondary new-task-button"
             onClick={() => beginContribution()}
           >
-            <Plus size={15} /> 新增貢獻
+            <Plus size={15} /> {t.newContribution}
           </button>
         </div>
         <div className="title-row">
@@ -208,13 +214,13 @@ export function WorkspacePage({
           className="repo-meta"
           title={
             reading
-              ? `${currentRepo?.fullName || "Repository"} · ${run.branch} → ${run.baseBranch}`
+              ? `${currentRepo?.fullName || t.repositoryFallback} · ${run.branch} → ${run.baseBranch}`
               : undefined
           }
         >
           <span>
             <Github size={15} />
-            {currentRepo?.fullName || "Repository"}
+            {currentRepo?.fullName || t.repositoryFallback}
           </span>
           <i />
           <span className="branch">
@@ -224,40 +230,18 @@ export function WorkspacePage({
           <span className="branch-direction">→</span>
           <span>{run.baseBranch}</span>
           {demo ? (
-            <span className="meta-demo">
-              範例資料 · 不會送出至 GitHub
-            </span>
+            <span className="meta-demo">{t.demoMeta}</span>
           ) : (
             !reading && exportLink
           )}
         </div>
       </section>
-      <section className="workflow-strip" aria-label="貢獻進度">
+      <section className="workflow-strip" aria-label={t.progress}>
         {[
-          {
-            n: "01",
-            title: "定義任務",
-            description: "設定你的貢獻目標",
-            icon: FileText,
-          },
-          {
-            n: "02",
-            title: "協作開發",
-            description: "Agent team 分工完成",
-            icon: Bot,
-          },
-          {
-            n: "03",
-            title: "理解與審查",
-            description: "讀懂每一段程式碼",
-            icon: Code2,
-          },
-          {
-            n: "04",
-            title: "送出貢獻",
-            description: "你的下一個 Pull Request",
-            icon: GitPullRequest,
-          },
+          { n: "01", ...t.steps.define, icon: FileText },
+          { n: "02", ...t.steps.build, icon: Bot },
+          { n: "03", ...t.steps.review, icon: Code2 },
+          { n: "04", ...t.steps.submit, icon: GitPullRequest },
         ].map((step, index) => {
           return (
             <div
@@ -292,7 +276,7 @@ export function WorkspacePage({
           <div
             className="review-tabs"
             role="tablist"
-            aria-label="任務內容"
+            aria-label={t.tabsLabel}
             onKeyDown={(event) => {
               if (event.altKey || event.ctrlKey || event.metaKey || event.nativeEvent.isComposing) return;
               const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
@@ -320,7 +304,7 @@ export function WorkspacePage({
               }}
             >
               <Globe2 size={16} />
-              全貌與動機
+              {t.tabs.overview}
             </button>
             <button
               role="tab"
@@ -332,7 +316,7 @@ export function WorkspacePage({
               onClick={() => setTab("changes")}
             >
               <Code2 size={16} />
-              程式碼變更 <span>{files.length}</span>
+              {t.tabs.changes} <span>{files.length}</span>
             </button>
             <button
               role="tab"
@@ -344,7 +328,8 @@ export function WorkspacePage({
               onClick={() => setTab("activity")}
             >
               <Activity size={16} />
-              Agent 動態 {active && <span className="activity-pulse" />}
+              {t.tabs.activity}{" "}
+              {active && <span className="activity-pulse" />}
             </button>
             <button
               role="tab"
@@ -356,7 +341,8 @@ export function WorkspacePage({
               onClick={() => setTab("draft")}
             >
               <FileText size={16} />
-              PR 草稿{draftDirty && <span>•</span>}
+              {t.tabs.draft}
+              {draftDirty && <span>•</span>}
             </button>
           </div>
           <div className="review-totals">
@@ -364,7 +350,7 @@ export function WorkspacePage({
             <span className="deletions">−{deletions}</span>
             <span className="totals-divider" />
             <ShieldCheck size={15} />
-            <span>{demo ? "範例審查" : "人工審查"}</span>
+            <span>{demo ? t.sampleReview : t.humanReview}</span>
           </div>
         </div>
         <div
@@ -459,18 +445,17 @@ export function WorkspacePage({
               <Sparkles size={15} />
             </span>
             <span>
-              {allReviewed
-                ? "每一段改動，都經過你的理解。"
-                : "不只是 review，也是一次 code learning。"}
+              {allReviewed ? t.footer.allReviewed : t.footer.learning}
             </span>
-            <span className="footer-hint">
-              選取程式碼，就能向 agent 追問。
-            </span>
+            <span className="footer-hint">{t.footer.hint}</span>
           </div>
           <div>
             <span className="footer-reviewed">
               <CheckCheck size={15} />
-              {reviewedCount} / {files.length} 已審閱
+              {t.footer.reviewed({
+                reviewed: reviewedCount,
+                total: files.length,
+              })}
             </span>
             {run.status === "published" && run.prUrl ? (
               <a
@@ -480,7 +465,7 @@ export function WorkspacePage({
                 rel="noreferrer"
               >
                 <Github size={16} />
-                查看 Pull Request
+                {t.footer.viewPullRequest}
                 <ExternalLink size={14} />
               </a>
             ) : (
@@ -497,21 +482,21 @@ export function WorkspacePage({
                 }
                 title={
                   !allReviewed
-                    ? "請先逐一勾選所有檔案的「已審閱」"
+                    ? t.footer.needsReview
                     : draftDirty
-                      ? "請先儲存 PR 草稿"
+                      ? t.footer.needsSave
                       : followUp && commitMessageUnfinished
-                        ? "請先填好這輪修正的提交訊息"
+                        ? t.footer.needsCommitMessage
                         : !demo && draftUnfinished
-                          ? "PR 說明還有待填寫的內容，請先改成事實或刪除"
+                          ? t.footer.needsFacts
                           : followUp
-                            ? "確認這輪修正並預覽推送"
-                            : "確認變更並預覽送出"
+                            ? t.footer.previewPush
+                            : t.footer.previewSubmit
                 }
                 onClick={approve}
               >
                 <Check size={16} />
-                {followUp ? "確認並準備推送" : "確認並準備 PR"}
+                {followUp ? t.footer.approvePush : t.footer.approvePr}
                 <ChevronRight size={15} />
               </button>
             )}

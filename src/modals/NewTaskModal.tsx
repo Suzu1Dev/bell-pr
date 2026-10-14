@@ -8,7 +8,8 @@ import {
   Plus,
   Sparkles,
 } from "lucide-react";
-import { demoRepo } from "../demo";
+import { getDemo } from "../demo";
+import { useLocale, useT } from "../i18n";
 import type { Repo } from "../types";
 import { DirectionSettings } from "../mission";
 import { providerLabels } from "../../shared/models";
@@ -53,6 +54,10 @@ export function NewTaskModal({
   navigate,
   setExploreRepoId,
 }: NewTaskModalProps) {
+  const t = useT("modals").newTask;
+  const common = useT("common");
+  const [locale] = useLocale();
+  const demoRepo = getDemo(locale).repo;
   const {
     taskRepoId,
     prompt,
@@ -69,13 +74,13 @@ export function NewTaskModal({
   return (
     <Modal
       wide
-      title="把想法交給你的 Agent team。"
-      subtitle="描述你想改善什麼，以及完成後應該有的行為。"
+      title={t.title}
+      subtitle={t.subtitle}
       onClose={closeModal}
     >
       <form onSubmit={startTask}>
         <label className="field-label" htmlFor="task-repo">
-          目標 Repository
+          {t.repo}
         </label>
         <select
           id="task-repo"
@@ -86,19 +91,20 @@ export function NewTaskModal({
           required
         >
           <option value="" disabled>
-            選擇 Repository
+            {t.chooseRepo}
           </option>
           {[...repos, demoRepo].map((repo) => (
             <option value={repo.id} key={repo.id}>
-              {repo.fullName}
-              {repo.id === "demo-repo" ? "（示範）" : ""}
+              {repo.id === demoRepo.id
+                ? t.demoRepo({ name: repo.fullName })
+                : repo.fullName}
             </option>
           ))}
         </select>
         <div className="task-repo-actions">
           <button type="button" onClick={() => openModal("import")}>
             <Plus size={13} />
-            匯入其他專案
+            {t.importOther}
           </button>
           <button
             type="button"
@@ -109,18 +115,15 @@ export function NewTaskModal({
             }}
           >
             <Sparkles size={13} />
-            先看 AI 推薦方向
+            {t.recommendations}
           </button>
         </div>
-        {taskRepoId === "demo-repo" && (
-          <p className="task-demo-note">
-            示範設定可以自由調整；不會啟動真實 agent。請匯入你的 repository
-            開始開發。
-          </p>
+        {taskRepoId === demoRepo.id && (
+          <p className="task-demo-note">{t.demoNote}</p>
         )}
         {settingsLoading && (
           <p className="field-help" role="status">
-            正在載入這個專案的貢獻設定…
+            {t.loadingSettings}
           </p>
         )}
         {!settingsLoading && !settingsReady && (
@@ -129,7 +132,7 @@ export function NewTaskModal({
             className="save-direction-button"
             onClick={() => configureTaskRepo(taskRepoId)}
           >
-            重新載入專案設定
+            {t.reloadSettings}
           </button>
         )}
         <fieldset
@@ -151,25 +154,25 @@ export function NewTaskModal({
           onClick={saveDirection}
         >
           <Check size={14} />
-          儲存為預設設定
+          {t.saveDefault}
         </button>
         <label className="field-label" htmlFor="task-title">
-          任務名稱 <span>選填</span>
+          {t.taskName} <span>{common.optional}</span>
         </label>
         <input
           id="task-title"
           className="text-input"
-          placeholder="例如：為 API client 加入智慧重試"
+          placeholder={t.taskPlaceholder}
           value={taskTitle}
           onChange={(e) => setTaskTitle(e.target.value)}
         />
         <label className="field-label" htmlFor="task-prompt">
-          這次想完成什麼？
+          {t.goal}
         </label>
         <textarea
           id="task-prompt"
           className="text-input task-prompt"
-          placeholder="描述需求、相關檔案、預期行為與驗收方式…"
+          placeholder={t.goalPlaceholder}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           required
@@ -177,16 +180,18 @@ export function NewTaskModal({
         />
         <div className="task-team-preview">
           <Bot size={16} />
-          <span>Team lead</span>
+          <span>{t.lead}</span>
           <ChevronRight size={12} />
-          <span>{contributionSettings.maxTeammates} 位 Teammates</span>
+          <span>
+            {t.teammates({ count: contributionSettings.maxTeammates })}
+          </span>
           <ChevronRight size={12} />
-          <span>Reviewer + Test analyst</span>
+          <span>{t.reviewers}</span>
         </div>
         <p className="field-help">
-          會使用本機{" "}
-          {providerLabels[contributionSettings.provider ?? "codex"]}{" "}
-          帳號執行任務，消耗對應用量。完成後等待你審查。
+          {t.usage({
+            provider: providerLabels[contributionSettings.provider ?? "codex"],
+          })}
         </p>
         {formError && (
           <p role="alert" className="inline-error">
@@ -199,7 +204,7 @@ export function NewTaskModal({
             className="button secondary"
             onClick={closeModal}
           >
-            取消
+            {common.actions.cancel}
           </button>
           <button
             className="button primary"
@@ -217,11 +222,11 @@ export function NewTaskModal({
             ) : (
               <Play size={16} />
             )}
-            {taskRepoId === "demo-repo"
-              ? "儲存示範方向"
+            {taskRepoId === demoRepo.id
+              ? t.saveDemo
               : contributionSettings.requirePlanApproval
-                ? "產生團隊計畫"
-                : "啟動 Agent team"}
+                ? t.planFirst
+                : t.start}
           </button>
         </div>
       </form>

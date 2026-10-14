@@ -7,6 +7,7 @@ import {
   GitPullRequest,
   Loader2,
 } from "lucide-react";
+import { useT } from "../i18n";
 import type { DiffFile, Repo, Run } from "../types";
 import type { Tab } from "../app/AppShell";
 import { ErrorBoundary } from "../app/ErrorBoundary";
@@ -55,6 +56,8 @@ export function PublishModal({
   closeModal,
   setTab,
 }: PublishModalProps) {
+  const workspace = useT("workspace");
+  const t = workspace.publish;
   const {
     draftChecks,
     publishBlocked,
@@ -67,21 +70,21 @@ export function PublishModal({
     <Modal
       title={
         demo
-          ? "你的示範貢獻，準備好了。"
+          ? t.titleDemo
           : followUp?.kind === "sync"
-            ? "把同步結果推到 PR。"
+            ? t.titleSync
             : followUp
-              ? "把這輪修正推到 PR。"
-              : "將這次貢獻送上 GitHub。"
+              ? t.titleRound
+              : t.title
       }
       subtitle={
         demo
-          ? "你已完成所有檔案的審查。以下是 PR 的送出預覽。"
+          ? t.subtitleDemo
           : followUp?.kind === "sync"
-            ? "這會在 PR 分支加上一個合併 commit，把目標分支的最新版本帶進 PR；PR 標題與說明不變，也不會 force push。"
+            ? t.subtitleSync
             : followUp
-              ? "這會在 PR 分支加上一個新的 commit，PR 標題與說明不變，也不會覆蓋 GitHub 上的其他提交。"
-              : "這會推送審查過的分支，並在目標 repository 建立 Draft PR。"
+              ? t.subtitleRound
+              : t.subtitle
       }
       onClose={closeModal}
     >
@@ -101,7 +104,7 @@ export function PublishModal({
         </div>
         <p>
           <CircleCheck size={15} />
-          {files.length} 個檔案已審閱{" "}
+          {t.filesReviewed({ count: files.length })}{" "}
           <b>
             +{additions} −{deletions}
           </b>
@@ -110,28 +113,27 @@ export function PublishModal({
       {demo && (
         <div className="callout">
           <BookOpen size={18} />
-          <p>
-            這是互動示範，按下完成不會建立 GitHub
-            PR。匯入你自己的專案，就能開始真正的貢獻。
-          </p>
+          <p>{t.demoCallout}</p>
         </div>
       )}
       {!demo && followUp && (
         <div className="publish-commit-preview">
-          <strong>這輪的提交訊息</strong>
+          <strong>{t.commitPreview}</strong>
           <pre>{run.draft.commitMessage}</pre>
         </div>
       )}
       {!demo && !followUp && (
         <details className="publish-body-preview" open>
           <summary>
-            會送到 GitHub 的 PR 說明
-            {draftChecks &&
-              `（約 ${draftChecks.draftProseWords(run.draft.body)} 字）`}
+            {draftChecks
+              ? t.bodyPreviewWords({
+                  count: draftChecks.draftProseWords(run.draft.body),
+                })
+              : t.bodyPreview}
           </summary>
           <div className="markdown-preview">
             <ErrorBoundary>
-              <Suspense fallback={<p>正在載入預覽…</p>}>
+              <Suspense fallback={<p>{workspace.loadingPreview}</p>}>
                 <MarkdownContent>{run.draft.body}</MarkdownContent>
               </Suspense>
             </ErrorBoundary>
@@ -145,7 +147,7 @@ export function PublishModal({
       )}
       {!demo && publishConfirmations.length > 0 && (
         <fieldset className="publish-confirmations">
-          <legend>送出前請逐項確認</legend>
+          <legend>{t.confirmLegend}</legend>
           {publishConfirmations.map((check) => (
             <label key={check.id}>
               <input
@@ -167,11 +169,7 @@ export function PublishModal({
               </span>
             </label>
           ))}
-          <p>
-            勾選只代表你知道這些項目還沒處理、願意照目前的說明送出。BELL
-            不會因此改動說明或替你勾選任何項目，這些確認也不會寫進
-            PR。想先修改，請按「返回編輯草稿」。
-          </p>
+          <p>{t.confirmNote}</p>
         </fieldset>
       )}
       {formError && (
@@ -187,7 +185,7 @@ export function PublishModal({
             setTab("draft");
           }}
         >
-          返回編輯草稿
+          {t.back}
         </button>
         <button
           className="button primary"
@@ -208,12 +206,12 @@ export function PublishModal({
             <GitPullRequest size={16} />
           )}{" "}
           {demo
-            ? "完成示範審查"
+            ? t.finishDemo
             : busy
-              ? "正在送出…"
+              ? t.sending
               : followUp
-                ? "推送這輪修正"
-                : "送出 Draft PR"}
+                ? t.pushRound
+                : t.submit}
         </button>
       </div>
     </Modal>
