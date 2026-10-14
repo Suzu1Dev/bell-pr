@@ -118,6 +118,9 @@ export default function App() {
   );
 }
 
+/** A status without a license: useEntitlements then asks /api/license. */
+const statusPending = {};
+
 /** localStorage key of the run the workbench showed last. */
 export const lastRunKey = "bellpr-last-run";
 
@@ -384,7 +387,9 @@ function AppShell({
   } = data;
   // The app stays unusable until this build's license agreement is accepted.
   const blocked = needsEulaPrompt(appSettings, loaded.appSettings);
-  const entitlements = useEntitlements(status);
+  // Until the status answers (its environment probes take a moment), the
+  // plan comes from /api/license, so the plan chip and PRO marks show at once.
+  const entitlements = useEntitlements(status ?? statusPending);
   const discoveryLocked = entitlements.locked("discovery");
   const [lastRunId, setLastRunId] = useState(readLastRun);
   const [run, setRunState] = useState<Run>(() => loadDemo(locale));
