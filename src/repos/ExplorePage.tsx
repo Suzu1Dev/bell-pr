@@ -12,6 +12,9 @@ interface ExplorePageProps {
   beginContribution: (id?: string) => void;
   chooseRecommendation: (idea: ContributionRecommendation) => void;
   setTab: Dispatch<SetStateAction<Tab>>;
+  /** Updates BELL's clone to the latest default branch; absent for local imports and the demo. */
+  onUpdateRepo?: () => void;
+  updatingRepo: boolean;
 }
 
 /** One repository's users, problems and recommended contribution directions. */
@@ -21,6 +24,8 @@ export function ExplorePage({
   beginContribution,
   chooseRecommendation,
   setTab,
+  onUpdateRepo,
+  updatingRepo,
 }: ExplorePageProps) {
   return (
     <section className="page-content explore-page">
@@ -56,6 +61,8 @@ export function ExplorePage({
         onChooseRecommendation={chooseRecommendation}
         onReadCode={() => setTab("changes")}
         onStartContribution={() => beginContribution(exploreRepo.id)}
+        onUpdateRepo={onUpdateRepo}
+        updatingRepo={updatingRepo}
       />
     </section>
   );

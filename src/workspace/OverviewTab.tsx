@@ -33,6 +33,9 @@ interface OverviewTabProps {
   intelligence: ReturnType<typeof useProjectInsights>;
   chooseRecommendation: (idea: ContributionRecommendation) => void;
   setTab: Dispatch<SetStateAction<Tab>>;
+  /** Updates BELL's clone to the latest default branch; absent for local imports and the demo. */
+  onUpdateRepo?: () => void;
+  updatingRepo: boolean;
 }
 
 /** The workspace's first tab: the project overview and why this change. */
@@ -43,6 +46,8 @@ export function OverviewTab({
   intelligence,
   chooseRecommendation,
   setTab,
+  onUpdateRepo,
+  updatingRepo,
 }: OverviewTabProps) {
   return (
     <ProjectOverview
@@ -64,6 +69,8 @@ export function OverviewTab({
       onRecommendMore={intelligence.recommendMore}
       onChooseRecommendation={chooseRecommendation}
       onReadCode={() => setTab("changes")}
+      onUpdateRepo={onUpdateRepo}
+      updatingRepo={updatingRepo}
     />
   );
 }

@@ -36,6 +36,7 @@ const render = (props: Partial<Props> = {}, draft: Partial<Props["draft"]> = {})
         publishConfirmations: [],
         acknowledged: [],
         setAcknowledged() {},
+        followUp: undefined,
         ...draft,
       },
       publish() {},

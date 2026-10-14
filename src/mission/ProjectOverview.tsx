@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Code2,
+  Download,
   Eye,
   EyeOff,
   FileSearch,
@@ -61,6 +62,9 @@ export interface ProjectOverviewProps {
   onChooseRecommendation: (idea: ContributionRecommendation) => void;
   onReadCode: () => void;
   onStartContribution?: () => void;
+  /** Updates BELL's clone to the latest default branch; absent for local imports and the demo. */
+  onUpdateRepo?: () => void;
+  updatingRepo?: boolean;
 }
 
 const effortLabels = { small: "小型", medium: "中型", large: "大型" };
@@ -278,6 +282,8 @@ export function ProjectOverview({
   onChooseRecommendation,
   onReadCode,
   onStartContribution,
+  onUpdateRepo,
+  updatingRepo = false,
 }: ProjectOverviewProps) {
   const ideaRail = useRef<HTMLDivElement>(null);
   const hiddenSummary = useRef<HTMLElement>(null);
@@ -482,6 +488,7 @@ export function ProjectOverview({
     expansion?.requestedCount !== undefined &&
     addedIds.size < expansion.requestedCount;
   const moreDisabled =
+    updatingRepo ||
     loading ||
     recommending ||
     savingPreferences ||
@@ -507,19 +514,44 @@ export function ProjectOverview({
           <h2>先看懂專案，再決定怎麼改。</h2>
           <p>從使用者的角度，理解每一次貢獻的理由。</p>
         </div>
-        <button
-          type="button"
-          className="mission-button mission-button-secondary"
-          onClick={onAnalyze}
-          disabled={loading || recommending || savingPreferences}
-        >
-          {loading ? (
-            <Loader2 className="mission-spin" size={15} />
-          ) : (
-            <RefreshCw size={15} />
+        <div className="mission-overview-actions">
+          {onUpdateRepo && (
+            <button
+              type="button"
+              className="mission-button mission-button-secondary"
+              onClick={onUpdateRepo}
+              disabled={updatingRepo || loading || recommending || savingPreferences}
+              aria-describedby="mission-update-help"
+            >
+              {updatingRepo ? (
+                <Loader2 className="mission-spin" size={15} />
+              ) : (
+                <Download size={15} />
+              )}
+              {updatingRepo ? "正在更新…" : "更新到最新版本"}
+            </button>
           )}
-          {loading ? "正在分析專案…" : insights ? "重新分析" : "分析專案全貌"}
-        </button>
+          <button
+            type="button"
+            className="mission-button mission-button-secondary"
+            onClick={onAnalyze}
+            disabled={loading || recommending || savingPreferences || updatingRepo}
+          >
+            {loading ? (
+              <Loader2 className="mission-spin" size={15} />
+            ) : (
+              <RefreshCw size={15} />
+            )}
+            {loading ? "正在分析專案…" : insights ? "重新分析" : "分析專案全貌"}
+          </button>
+          {onUpdateRepo && (
+            <p id="mission-update-help" className="mission-update-help">
+              從 GitHub 取得 {repo.defaultBranch} 的最新版本，專案全貌與分析會以它為準；新的貢獻本來就從最新版本開始。
+              {repo.updatedAt &&
+                ` 上次更新：${new Date(repo.updatedAt).toLocaleString("zh-TW")}`}
+            </p>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -528,7 +560,7 @@ export function ProjectOverview({
           <button
             type="button"
             onClick={onAnalyze}
-            disabled={loading || recommending || savingPreferences}
+            disabled={loading || recommending || savingPreferences || updatingRepo}
           >
             重試
             <RefreshCw size={13} />
@@ -581,6 +613,7 @@ export function ProjectOverview({
               type="button"
               className="mission-button mission-button-primary"
               onClick={onAnalyze}
+              disabled={updatingRepo}
             >
               <Sparkles size={16} />
               開始專案分析

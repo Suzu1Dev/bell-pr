@@ -7,6 +7,7 @@ import {
 import { api } from "../../api";
 import type { DiffFile, Run, RunSummary } from "../../types";
 import { summarizeRun } from "../../../shared/runs";
+import { activeFollowUp } from "../../../shared/followups";
 import type { Tab } from "../AppShell";
 
 interface RunPollingOptions {
@@ -74,7 +75,12 @@ export function useRunPolling({
           if (!cancelled && epoch === draftMutationEpoch.current) {
             setFiles(changed);
             setSelectedPath(changed[0]?.path || "");
-            if (updated.status === "review") setTab("overview");
+            if (updated.status === "review")
+              setTab(
+                activeFollowUp(updated.followUps) || updated.sync
+                  ? "draft"
+                  : "overview",
+              );
           }
         }
         if (!cancelled && epoch === draftMutationEpoch.current) {

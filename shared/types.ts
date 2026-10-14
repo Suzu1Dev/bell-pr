@@ -7,6 +7,8 @@ import type { ModelExecution } from "./models.js";
 import type { FileConversation } from "./chat.js";
 import type { PrFeedback } from "./pr-feedback.js";
 import type { Locale } from "./i18n/locale.js";
+import type { FollowUpRound } from "./followups.js";
+import type { BaseSync } from "./sync.js";
 
 export type RunStatus =
   | "queued"
@@ -28,6 +30,8 @@ export interface Repository {
   defaultBranch: string;
   url: string;
   language?: string;
+  /** When the person last updated BELL's clone to the latest default branch. */
+  updatedAt?: string;
 }
 
 export interface Agent {
@@ -69,6 +73,8 @@ export interface RunCore {
   status: RunStatus;
   branch: string;
   baseBranch: string;
+  /** The target-branch commit the contribution is measured against; the server always records it, the demo run has none. */
+  baseSha?: string;
   /** Local checkout the learner may edit by hand; the server always records it, the demo run has none. */
   worktreePath?: string;
   createdAt: string;
@@ -98,6 +104,14 @@ export interface RunCore {
   error?: string;
   /** The GitHub branch the publish commit was pushed to; absent until a push succeeds. The branch field is locked once set. */
   publishedBranch?: string;
+  /** True while BELL pushes to GitHub. */
+  publishing?: boolean;
+  /** owner/name the PR branch was pushed to: the target repository or the person's fork. */
+  headRepository?: string;
+  /** Rounds of changes after maintainer review, oldest first; absent until the first one. */
+  followUps?: FollowUpRound[];
+  /** The last move of an unpublished run onto a newer target-branch commit. */
+  sync?: BaseSync;
   contributionSettings?: ContributionSettings;
   team?: AgentTeam;
   /** Follow-up Q&A per diff path; absent on runs saved before it was persisted. */

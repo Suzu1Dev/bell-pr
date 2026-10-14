@@ -68,7 +68,7 @@ const withAuxiliaryRoles =
     if (input.role === "draft")
       return JSON.stringify({
         title: "Improve consistent output",
-        body: "## Problem\n\nOutputs differ.\n\n## Changes\n\nAlign the output.\n\n## Validation\n\nStatic review only.\n\nDeveloped with AI assistance; human review is required.",
+        body: "## Problem\n\nOutputs differ.\n\n## Changes\n\nAlign the output.\n\n## Validation\n\nStatic review only.",
         policy: "linux",
         summary: "依 Linux 投稿寫作原則整理。",
         rules: [],

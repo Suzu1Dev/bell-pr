@@ -32,6 +32,8 @@ import * as executor from "./run-executor.js";
 import * as publishing from "./publish.js";
 import * as learning from "./learning.js";
 import * as drafting from "./draft-jobs.js";
+import * as syncing from "./sync-runs.js";
+import * as followUps from "./followup-runs.js";
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
@@ -60,6 +62,9 @@ export interface WorkbenchContext {
   draftJobs: Map<string, Promise<void>>;
   /** Learner-requested reviewer/tester reruns; one per run, aborted through controllers[run.id]. */
   reviewJobs: Map<string, Promise<void>>;
+  /** Review follow-up rounds and sync conflict resolutions, by run id; aborted through controllers[run.id]. */
+  followUpJobs: Map<string, Promise<void>>;
+  conflictJobs: Map<string, Promise<void>>;
   dependencies: {
     /** Agent CLI invocations only; Git and gh keep using the real command. */
     command?: typeof command;
@@ -110,6 +115,8 @@ export class Workbench {
   private draftJobs = new Map<string, Promise<void>>();
   /** Learner-requested reviewer/tester reruns; one per run, aborted through controllers[run.id]. */
   private reviewJobs = new Map<string, Promise<void>>();
+  private followUpJobs = new Map<string, Promise<void>>();
+  private conflictJobs = new Map<string, Promise<void>>();
   private statusCache?: {
     time: number;
     value: {
@@ -169,6 +176,8 @@ export class Workbench {
       explanationJobs: this.explanationJobs,
       draftJobs: this.draftJobs,
       reviewJobs: this.reviewJobs,
+      followUpJobs: this.followUpJobs,
+      conflictJobs: this.conflictJobs,
       dependencies: {
         command: dependencies.command,
         agentRunner,
@@ -262,6 +271,15 @@ export class Workbench {
 
   async importRepository(source: string) {
     return repositories.importRepository(this.context, source);
+  }
+
+  /** Whether BELL made this clone and may update it; a local import is never changed. */
+  managedClone(repo: Repository) {
+    return repositories.managedClone(this.store.directory, repo);
+  }
+
+  async updateRepository(id: string) {
+    return repositories.updateRepository(this.context, id);
   }
 
   async createRun(
@@ -510,11 +528,16 @@ export class Workbench {
 
   async cancel(id: string) {
     const run = this.run(id);
-    const rerun = this.reviewJobs.get(id);
-    if (rerun) {
-      // Stopping a re-review only aborts the reviewers; the run keeps its status.
+    // Stopping a re-review only aborts the reviewers; the run keeps its status.
+    // A conflict resolution or a follow-up round keeps the edits made so far
+    // for review, and a published PR stays published.
+    const side =
+      this.reviewJobs.get(id) ??
+      this.conflictJobs.get(id) ??
+      this.followUpJobs.get(id);
+    if (side) {
       this.controllers.get(id)?.abort();
-      await Promise.allSettled([rerun]);
+      await Promise.allSettled([side]);
       return run;
     }
     if (!["queued", "running", "awaiting_plan"].includes(run.status))
@@ -547,6 +570,7 @@ export class Workbench {
     if (run.status !== "published") {
       synchronizeReview(run, files);
     }
+    await syncing.refreshConflicts(run);
     await this.store.save();
     return files;
   }
@@ -606,6 +630,31 @@ export class Workbench {
 
   async fetchPrFeedback(id: string) {
     return learning.fetchPrFeedback(this.context, id);
+  }
+
+  /** Moves a run onto the latest commit of its target branch (see sync-runs.ts). */
+  async syncRun(id: string) {
+    return syncing.syncRun(this.context, id);
+  }
+
+  async undoSync(id: string) {
+    return syncing.undoSync(this.context, id);
+  }
+
+  async resolveConflicts(id: string) {
+    return syncing.resolveConflicts(this.context, id);
+  }
+
+  /** Starts a round of changes on a published PR from maintainer feedback. */
+  async startFollowUp(
+    id: string,
+    input: { feedbackUrls: string[]; note?: string },
+  ) {
+    return followUps.startFollowUp(this.context, id, input);
+  }
+
+  async discardFollowUp(id: string) {
+    return followUps.discardFollowUp(this.context, id);
   }
 
   async publish(

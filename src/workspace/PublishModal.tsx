@@ -30,13 +30,17 @@ interface PublishModalProps {
     | "publishConfirmations"
     | "acknowledged"
     | "setAcknowledged"
+    | "followUp"
   >;
   publish: () => void;
   closeModal: () => void;
   setTab: Dispatch<SetStateAction<Tab>>;
 }
 
-/** The last look before the approved branch is pushed as a Draft PR. */
+/**
+ * The last look before the approved branch is pushed as a Draft PR, or a
+ * follow-up round as one more commit on the PR's branch.
+ */
 export function PublishModal({
   run,
   files,
@@ -57,14 +61,27 @@ export function PublishModal({
     publishConfirmations,
     acknowledged,
     setAcknowledged,
+    followUp,
   } = draft;
   return (
     <Modal
-      title={demo ? "你的示範貢獻，準備好了。" : "將這次貢獻送上 GitHub。"}
+      title={
+        demo
+          ? "你的示範貢獻，準備好了。"
+          : followUp?.kind === "sync"
+            ? "把同步結果推到 PR。"
+            : followUp
+              ? "把這輪修正推到 PR。"
+              : "將這次貢獻送上 GitHub。"
+      }
       subtitle={
         demo
           ? "你已完成所有檔案的審查。以下是 PR 的送出預覽。"
-          : "這會推送審查過的分支，並在目標 repository 建立 Draft PR。"
+          : followUp?.kind === "sync"
+            ? "這會在 PR 分支加上一個合併 commit，把目標分支的最新版本帶進 PR；PR 標題與說明不變，也不會 force push。"
+            : followUp
+              ? "這會在 PR 分支加上一個新的 commit，PR 標題與說明不變，也不會覆蓋 GitHub 上的其他提交。"
+              : "這會推送審查過的分支，並在目標 repository 建立 Draft PR。"
       }
       onClose={closeModal}
     >
@@ -76,7 +93,9 @@ export function PublishModal({
         <h3>{run.draft.title}</h3>
         <div>
           <GitBranch size={14} />
-          {run.draft.publishBranch || run.branch}
+          {followUp
+            ? (run.publishedBranch ?? run.branch)
+            : run.draft.publishBranch || run.branch}
           <span>→</span>
           {run.baseBranch}
         </div>
@@ -97,7 +116,13 @@ export function PublishModal({
           </p>
         </div>
       )}
-      {!demo && (
+      {!demo && followUp && (
+        <div className="publish-commit-preview">
+          <strong>這輪的提交訊息</strong>
+          <pre>{run.draft.commitMessage}</pre>
+        </div>
+      )}
+      {!demo && !followUp && (
         <details className="publish-body-preview" open>
           <summary>
             會送到 GitHub 的 PR 說明
@@ -182,7 +207,13 @@ export function PublishModal({
           ) : (
             <GitPullRequest size={16} />
           )}{" "}
-          {demo ? "完成示範審查" : busy ? "正在送出…" : "送出 Draft PR"}
+          {demo
+            ? "完成示範審查"
+            : busy
+              ? "正在送出…"
+              : followUp
+                ? "推送這輪修正"
+                : "送出 Draft PR"}
         </button>
       </div>
     </Modal>

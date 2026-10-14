@@ -129,6 +129,13 @@ export class ProjectInsightsCache {
     return operation;
   }
 
+  /** Reads the analysis anew once nothing is in flight, for example after BELL's clone was updated. */
+  async refresh(repoId: string): Promise<void> {
+    const pending = this.mutations.get(repoId) ?? this.reads.get(repoId);
+    if (pending) await pending.catch(() => undefined);
+    return this.load(repoId);
+  }
+
   analyze(repoId: string): Promise<void> {
     if (repoId === "demo-repo") {
       this.update(repoId, {
@@ -277,5 +284,10 @@ export function useProjectInsights(repoId?: string) {
     [cache, repoId],
   );
 
-  return { ...state, analyze, recommendMore, savePreferences };
+  const reload = useCallback(
+    () => (repoId ? cache.refresh(repoId) : Promise.resolve()),
+    [cache, repoId],
+  );
+
+  return { ...state, analyze, recommendMore, savePreferences, reload };
 }

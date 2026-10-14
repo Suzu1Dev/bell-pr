@@ -41,8 +41,10 @@ import { Topbar } from "./Topbar";
 import { useAppData } from "./hooks/useAppData";
 import { useDraftEditor } from "./hooks/useDraftEditor";
 import { useExplanations } from "./hooks/useExplanations";
+import { useRepoUpdate } from "./hooks/useRepoUpdate";
 import { loadDemo, useRunActions } from "./hooks/useRunActions";
 import { useRunPolling } from "./hooks/useRunPolling";
+import { useRunRounds } from "./hooks/useRunRounds";
 import { useTaskSetup } from "./hooks/useTaskSetup";
 
 export type Page =
@@ -321,6 +323,20 @@ function AppShell() {
     setup,
   });
   const { chooseRun, importRepo, startTask, publish } = actions;
+  const rounds = useRunRounds({
+    run,
+    setRun,
+    runIdRef,
+    setFiles,
+    setBusy,
+    notify,
+    setTab,
+  });
+  const { updatingRepo, updateRepo } = useRepoUpdate({
+    setRepos,
+    reloadInsights: intelligence.reload,
+    notify,
+  });
 
   function focusDestination() {
     window.requestAnimationFrame(() => {
@@ -437,6 +453,13 @@ function AppShell() {
             chooseRecommendation={chooseRecommendation}
             draft={draft}
             actions={actions}
+            rounds={rounds}
+            onUpdateRepo={
+              !demo && currentRepo?.updatable
+                ? () => void updateRepo(currentRepo)
+                : undefined
+            }
+            updatingRepo={updatingRepo}
           />
         ) : page === "explore" && exploreRepo ? (
           <ExplorePage
@@ -445,6 +468,12 @@ function AppShell() {
             beginContribution={beginContribution}
             chooseRecommendation={chooseRecommendation}
             setTab={setTab}
+            onUpdateRepo={
+              exploreRepo.updatable
+                ? () => void updateRepo(exploreRepo)
+                : undefined
+            }
+            updatingRepo={updatingRepo}
           />
         ) : page === "discovery" ? (
           <DiscoveryPage chooseOpportunity={chooseOpportunity} />
