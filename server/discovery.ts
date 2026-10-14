@@ -358,6 +358,19 @@ export function discoveryPrompt(
   );
 }
 
+/** The discovery services of each data directory (see resetDiscovery). */
+const services = new WeakMap<Store, Set<DiscoveryService>>();
+
+/** Whether a discovery search runs in the data directory of `store`. */
+export function discoveryRunning(store: Store): boolean {
+  return [...(services.get(store) ?? [])].some((service) => service.running);
+}
+
+/** Makes every discovery service of `store` forget its job, after all data was erased. */
+export function resetDiscovery(store: Store): void {
+  for (const service of services.get(store) ?? []) service.reset();
+}
+
 /**
  * Refuses a search before it starts when the doctor already found that
  * the GitHub CLI or the agent CLI it needs is missing or signed out. When
@@ -430,9 +443,25 @@ export class DiscoveryService {
       dependencies.preflight ??
       ((preferences) =>
         assertDiscoveryReady(store.directory, preferences.provider ?? "codex"));
+    let registered = services.get(store);
+    if (!registered) services.set(store, (registered = new Set()));
+    registered.add(this);
   }
   private get timeoutScale() {
     return typeof this.scale === "function" ? this.scale() : this.scale;
+  }
+  /** Whether a search is running. */
+  get running() {
+    return this.active !== undefined;
+  }
+  /**
+   * Forgets the job after all data was erased, so neither the API nor a
+   * later save brings it back. A search started meanwhile is stopped.
+   */
+  reset() {
+    this.active?.controller.abort();
+    this.job = null;
+    this.initialization = undefined;
   }
   private initialize() {
     this.initialization ??= (async () => {
@@ -465,6 +494,8 @@ export class DiscoveryService {
     return this.initialization;
   }
   private save() {
+    // Nothing to keep after reset(); a stopped search must not write again.
+    if (!this.job) return this.writes;
     const value = JSON.stringify({ version: 1, job: this.job });
     this.writes = this.writes
       .catch(() => undefined)
@@ -781,5 +812,6 @@ export class DiscoveryService {
     await active?.finished;
     await this.initialization?.catch(() => undefined);
     await this.writes.catch(() => undefined);
+    services.get(this.store)?.delete(this);
   }
 }

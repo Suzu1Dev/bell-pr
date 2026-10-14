@@ -30,6 +30,10 @@ const m: Translation<typeof en> = {
     locked: ({ setting, variable }) =>
       `${setting} 這項設定來自環境變數 ${variable}。請修改或移除這個變數，再重新啟動 ${product.name}。`,
   },
+  busy: {
+    analysisRunning: "這個專案正在分析中。請等分析完成後再刪除專案。",
+    eraseAnalysisRunning: "仍有專案分析在執行。請等它完成後再刪除所有資料。",
+  },
   plan: {
     teamClamped: ({ max, pro }) =>
       `免費方案：最多 ${max} 位隊員同時工作。Pro 最多可有 ${pro} 位。`,

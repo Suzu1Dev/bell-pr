@@ -598,6 +598,20 @@ function novelRecommendations(
   return added;
 }
 
+/** The services analyzing each data directory's projects (see analysisRunning). */
+const services = new WeakMap<Store, Set<ProjectInsightsService>>();
+
+/**
+ * Whether a project analysis runs for `repoId` (any project when absent) in
+ * the data directory of `store`, so deleting the project or all data can
+ * wait for it instead of having the analysis write its cache afterwards.
+ */
+export function analysisRunning(store: Store, repoId?: string): boolean {
+  return [...(services.get(store) ?? [])].some((service) =>
+    service.analysisRunning(repoId),
+  );
+}
+
 /**
  * The run-events helpers name a run; an analysis has none, so its log
  * lines carry `analysis:<repoId>` in that field.
@@ -650,10 +664,18 @@ export class ProjectInsightsService {
     this.defaultProvider =
       dependencies.defaultProvider ??
       (async () => defaultProviderFrom(await knownDoctorReport(store.directory)));
+    let registered = services.get(store);
+    if (!registered) services.set(store, (registered = new Set()));
+    registered.add(this);
   }
 
   private get timeoutScale() {
     return typeof this.scale === "function" ? this.scale() : this.scale;
+  }
+
+  /** Whether an analysis of `repoId` (any project when absent) is running. */
+  analysisRunning(repoId?: string): boolean {
+    return repoId === undefined ? this.generating.size > 0 : this.generating.has(repoId);
   }
 
   private repository(id: string): Repository {
@@ -1373,6 +1395,8 @@ export class ProjectInsightsService {
       let recommendationPreferences!: RecommendationPreferences;
       await this.update(repoId, (cache) => {
         this.assertActive(signal);
+        // A project deleted meanwhile (or all data) gets no cache again.
+        this.repository(repoId);
         cache.insights = { ...insights, source: "ai" };
         cache.fingerprint = version.fingerprint;
         const ids = new Set(insights.recommendations.map((entry) => entry.id));
@@ -1400,5 +1424,6 @@ export class ProjectInsightsService {
     for (const controller of this.controllers.values()) controller.abort();
     await Promise.allSettled([...this.jobs]);
     await Promise.allSettled([...this.writes.values()]);
+    services.get(this.store)?.delete(this);
   }
 }

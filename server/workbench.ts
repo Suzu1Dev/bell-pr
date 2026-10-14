@@ -36,6 +36,8 @@ import {
 import { cliStatus, runDoctor, type DoctorAppInfo } from "./doctor.js";
 import { setupError } from "./cli-errors.js";
 import { enforceAgentSandbox } from "./sandbox.js";
+import { analysisRunning } from "./insights.js";
+import { discoveryRunning, resetDiscovery } from "./discovery.js";
 import { synchronizeExplanations } from "./explanations.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
 import { parseLocale, type Locale } from "../shared/i18n/locale.js";
@@ -895,12 +897,28 @@ export class Workbench {
     return cleanup.removeRun(this.context, id);
   }
 
+  /** Deletes a project; refused while its analysis runs, which would write its cache again. */
   async removeRepository(id: string) {
+    this.repo(id);
+    if (analysisRunning(this.store, id))
+      throw new AppError((m) => m.setup.busy.analysisRunning, 409);
     return cleanup.removeRepository(this.context, id);
   }
 
+  /**
+   * Deletes all data; refused while a project analysis or a discovery
+   * search runs. The discovery services then forget their job.
+   */
   async eraseAll(confirm: unknown) {
-    return cleanup.eraseAll(this.context, confirm);
+    if (confirm === "ERASE") {
+      if (analysisRunning(this.store))
+        throw new AppError((m) => m.setup.busy.eraseAnalysisRunning, 409);
+      if (discoveryRunning(this.store))
+        throw new AppError((m) => m.storage.erase.busy, 409);
+    }
+    const result = await cleanup.eraseAll(this.context, confirm);
+    resetDiscovery(this.store);
+    return result;
   }
 
   /** Disk use per project and run (cleanup.ts), cached for a minute. */

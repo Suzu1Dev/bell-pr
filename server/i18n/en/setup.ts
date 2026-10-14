@@ -46,6 +46,13 @@ export default {
     locked: ({ setting, variable }: { setting: string; variable: string }) =>
       `The ${setting} setting comes from the ${variable} environment variable. Change or remove the variable, then restart ${product.name}.`,
   },
+  /** Deleting while a project analysis runs. */
+  busy: {
+    analysisRunning:
+      "This project is being analyzed. Wait until the analysis finishes, then delete the project.",
+    eraseAnalysisRunning:
+      "A project analysis is still running. Wait until it finishes, then delete all data.",
+  },
   /** What the plan changes on a new run. */
   plan: {
     /** A run log notice when the plan lowered the team size of a new run. */
