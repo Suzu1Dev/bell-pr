@@ -80,6 +80,16 @@ test("an unknown run opens the sample instead", async ({ page }) => {
   await expect(heading(page)).toHaveText(demo.run.title);
 });
 
+test("a run id that is no plain name never reaches the API", async ({ page }) => {
+  const asked: string[] = [];
+  page.on("request", (request) => asked.push(new URL(request.url()).pathname));
+  await page.goto("/#/runs/..%2F..%2Fe2e-probe/changes");
+  await expect(page).toHaveURL(/#\/runs\/demo-run\/changes$/);
+  await expect(heading(page)).toHaveText(demo.run.title);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  expect(asked.filter((path) => path.includes("e2e-probe"))).toEqual([]);
+});
+
 test("a run of this server opens from a link, Back, Forward and a reload", async ({ browser }) => {
   const run = {
     id: "e2e-seeded-run",

@@ -129,6 +129,15 @@ function addressedRunId(route: Route | null, demoRunId: string) {
   return undefined;
 }
 
+/**
+ * Whether a run id from the address can name a run: ids are plain names
+ * (UUIDs, `demo-run`), so one that a URL path would have to escape, or a
+ * dot segment, is never sent to the API.
+ */
+function isRunId(id: string) {
+  return id === encodeURIComponent(id) && !/^\.+$/.test(id);
+}
+
 /** What the workspace shows of a run: its tab and, when chosen, its file. */
 interface WorkspaceView {
   runId: string;
@@ -513,6 +522,10 @@ function AppShell() {
     if (previous !== run.id && addressRunId === previous) {
       // An action opened another run without naming it in the address.
       showInstead(run.id);
+      return;
+    }
+    if (!isRunId(addressRunId)) {
+      showInstead(sample.run.id);
       return;
     }
     if (loadingRunId.current === addressRunId) return;
