@@ -57,7 +57,7 @@ export default {
     planSentBack: ({ revision, max }: { revision: number; max: number }) =>
       `Sent the plan back with feedback (revision ${revision} of ${max}); the lead will plan again.`,
     cancelNotAllowed:
-      "Only queued, running or plan-approval runs can be cancelled.",
+      "Only runs that are queued, running or waiting for plan approval can be cancelled.",
     cancelRequested:
       "Cancellation requested. The isolated working directories of failed or cancelled tasks are kept; those of integrated tasks were removed. Use “Retry failed subtasks” to continue.",
   },
@@ -372,7 +372,7 @@ export default {
   /** Explanations, notes, questions, maintainer feedback and review reruns on a finished run. */
   review: {
     rerunNotAllowed:
-      "Only runs in review or approved can have their review run again.",
+      "Only runs that are in review or approved can have their review run again.",
     rerunRunning:
       "The review of this run is already running again; wait for it to finish or stop it first.",
     nothingToReview: "There are no code changes to review.",
@@ -505,7 +505,8 @@ export default {
   followUp: {
     inProgress: "A follow-up round is already in progress on this run.",
     busy: "A follow-up round or a review is already in progress on this run.",
-    notPublished: "Only runs with a sent PR can be revised from a review.",
+    notPublished:
+      "Only a run whose PR has been sent can start a follow-up round from its review.",
     feedbackNotInLatest:
       "The selected feedback is not in the latest feedback read; read the feedback again, then choose.",
     inputRequired:

@@ -783,7 +783,7 @@ test("HTTP errors follow X-Bell-Locale: validation, the guard, the error handler
     });
     assert.deepEqual(await errorOf("en", `/api/runs/${f.run.id}/cancel`, { body: "{}" }), {
       status: 409,
-      error: "Only queued, running or plan-approval runs can be cancelled.",
+      error: "Only runs that are queued, running or waiting for plan approval can be cancelled.",
     });
     assert.deepEqual(await errorOf("zh-TW", `/api/runs/${f.run.id}/cancel`, { body: "{}" }), {
       status: 409,
