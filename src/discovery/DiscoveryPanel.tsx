@@ -29,44 +29,47 @@ import {
   type ReasoningEffort,
 } from "../../shared/models";
 import { api, send } from "../api";
-import { ModelSummary, reasoningLabels } from "../models/ModelSummary";
+import { useFormat, useT } from "../i18n";
+import { ModelSummary } from "../models/ModelSummary";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
 import { MarkdownContent } from "../review/MarkdownContent";
 import "../review/review.css";
 import "./discovery.css";
 
-const difficultyLabels = {
-  beginner: "初學者",
-  intermediate: "中等",
-  advanced: "進階",
-};
-const sortLabels: Record<DiscoveryPreferences["sort"], string> = {
-  updated: "最近更新",
-  relevance: "相關度",
-  stars: "星數",
-};
+/** Search orders in the order the form offers them. */
+const sortOptions: DiscoveryPreferences["sort"][] = [
+  "updated",
+  "relevance",
+  "stars",
+];
 const phaseSteps = ["searching", "screening", "analyzing"] as const;
-const date = (value: string) =>
-  value
-    ? new Date(value).toLocaleString("zh-TW", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
-    : "未提供";
+/** The four angles every opportunity is weighed from, in display order. */
+const angles = ["rules", "activity", "needs", "barrier"] as const;
 
 export default function DiscoveryPanel({
   onChoose,
+  initialJob,
 }: {
   onChoose: (
     opportunity: ContributionOpportunity,
     candidate: DiscoveryCandidate,
   ) => void | Promise<void>;
+  /**
+   * A job to show, with its preferences, before the saved one has loaded,
+   * such as a fixture in tests. The panel still loads the saved job when it
+   * mounts.
+   */
+  initialJob?: DiscoveryJob | null;
 }) {
+  const t = useT("discovery");
+  const effortLabels = useT("common").reasoningEffort;
+  const fmt = useFormat();
+  const date = (value: string) => (value ? fmt.dateTime(value) : undefined);
   const [preferences, setPreferences] = useState<DiscoveryPreferences>({
-    ...defaultDiscoveryPreferences,
+    ...(initialJob?.preferences ?? defaultDiscoveryPreferences),
   });
-  const [job, setJob] = useState<DiscoveryJob | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [job, setJob] = useState<DiscoveryJob | null>(initialJob ?? null);
+  const [loading, setLoading] = useState(initialJob === undefined);
   const [busy, setBusy] = useState(false);
   const [choosing, setChoosing] = useState("");
   const [error, setError] = useState("");
@@ -206,16 +209,16 @@ export default function DiscoveryPanel({
     <div className="discovery-page">
       <header className="discovery-hero">
         <div>
-          <span className="eyebrow">FIND YOUR NEXT CONTRIBUTION</span>
+          <span className="eyebrow">{t.eyebrow}</span>
           <h1>
-            找到值得投入的
+            {t.title.lead}
             <br />
-            <em>下一個貢獻。</em>
+            <em>{t.title.emphasis}</em>
           </h1>
           <p>
-            從真實的使用者需求出發，讓 AI 幫你讀懂規範、評估門檻，
+            {t.intro.lead}
             <br className="discovery-desktop-break" />
-            找到適合學習，也能帶來改變的開發機會。
+            {t.intro.rest}
           </p>
         </div>
         <div className="discovery-hero-art" aria-hidden="true">
@@ -223,7 +226,7 @@ export default function DiscoveryPanel({
             <Compass size={58} strokeWidth={1.2} />
           </span>
           <span className="discovery-orbit-label">
-            <Github size={15} /> GitHub → 你的下一步
+            <Github size={15} /> {t.heroCaption}
           </span>
           <span className="discovery-hero-dot" />
         </div>
@@ -237,27 +240,27 @@ export default function DiscoveryPanel({
       >
         <div className="discovery-section-label">
           <Search size={17} />
-          <h2>你想從哪裡開始？</h2>
-          <span>留白也可以，我們先幫你找方向</span>
+          <h2>{t.form.heading}</h2>
+          <span>{t.form.hint}</span>
         </div>
         <fieldset disabled={!!disabled} className="discovery-fields">
           <label className="discovery-interest">
-            感興趣的領域
+            {t.form.interests}
             <input
               value={preferences.interests}
               maxLength={300}
               onChange={(event) => update({ interests: event.target.value })}
-              placeholder="例如：accessibility、developer tools"
+              placeholder={t.form.interestsPlaceholder}
             />
-            <small>以 GitHub 關鍵字搜尋；多個詞會一起篩選。</small>
+            <small>{t.form.interestsHint}</small>
           </label>
           <label>
-            程式語言
+            {t.form.language}
             <input
               value={preferences.language}
               maxLength={40}
               onChange={(event) => update({ language: event.target.value })}
-              placeholder="不限，例如 TypeScript"
+              placeholder={t.form.languagePlaceholder}
               list="discovery-languages"
             />
             <datalist id="discovery-languages">
@@ -275,7 +278,7 @@ export default function DiscoveryPanel({
             </datalist>
           </label>
           <label>
-            可接受的難度
+            {t.form.difficulty}
             <select
               value={preferences.difficulty}
               onChange={(event) =>
@@ -285,13 +288,15 @@ export default function DiscoveryPanel({
                 })
               }
             >
-              <option value="beginner">適合初學者</option>
-              <option value="intermediate">中等以下</option>
-              <option value="any">不限難度</option>
+              <option value="beginner">{t.form.difficulties.beginner}</option>
+              <option value="intermediate">
+                {t.form.difficulties.intermediate}
+              </option>
+              <option value="any">{t.form.difficulties.any}</option>
             </select>
           </label>
           <label>
-            搜尋排序
+            {t.form.sort}
             <select
               value={preferences.sort}
               onChange={(event) =>
@@ -300,21 +305,16 @@ export default function DiscoveryPanel({
                 })
               }
             >
-              {(Object.keys(sortLabels) as DiscoveryPreferences["sort"][]).map(
-                (value) => (
-                  <option key={value} value={value}>
-                    {sortLabels[value]}
-                  </option>
-                ),
-              )}
+              {sortOptions.map((value) => (
+                <option key={value} value={value}>
+                  {t.sorts[value]}
+                </option>
+              ))}
             </select>
-            <small>
-              最近更新：反映近期活動，但結果隨專案更新而變動。相關度：GitHub best
-              match，可能含久未維護的專案，已排除封存專案並顯示最近推送時間。星數：知名度高，競爭與審查門檻也較高。
-            </small>
+            <small>{t.form.sortHint}</small>
           </label>
           <label>
-            最低星數
+            {t.form.minStars}
             <input
               type="number"
               min={0}
@@ -328,13 +328,13 @@ export default function DiscoveryPanel({
           </label>
         </fieldset>
         <details className="discovery-advanced">
-          <summary>模型與效率設定</summary>
+          <summary>{t.form.advanced}</summary>
           <fieldset
             disabled={!!disabled}
             className="discovery-fields discovery-model-fields"
           >
             <label>
-              Agent
+              {t.form.agent}
               <select
                 value={provider}
                 onChange={(event) =>
@@ -353,20 +353,22 @@ export default function DiscoveryPanel({
               </select>
             </label>
             <label>
-              分析模型
+              {t.form.model}
               <select
                 value={preferences.model || ""}
                 onChange={(event) =>
                   update({ model: event.target.value, reasoningEffort: "" })
                 }
               >
-                <option value="">使用 {providerLabel} 預設模型</option>
+                <option value="">
+                  {t.form.defaultModel({ provider: providerLabel })}
+                </option>
                 {preferences.model &&
                   !catalog.models.some(
                     (item) => item.id === preferences.model,
                   ) && (
                     <option value={preferences.model}>
-                      {preferences.model}（目錄未提供）
+                      {t.form.modelNotInCatalog({ model: preferences.model })}
                     </option>
                   )}
                 {catalog.models.map((value) => (
@@ -377,7 +379,7 @@ export default function DiscoveryPanel({
               </select>
             </label>
             <label>
-              思考強度
+              {t.form.reasoningEffort}
               <select
                 value={preferences.reasoningEffort || ""}
                 onChange={(event) =>
@@ -386,25 +388,26 @@ export default function DiscoveryPanel({
                   })
                 }
               >
-                <option value="">模型預設</option>
+                <option value="">{t.form.modelDefault}</option>
                 {preferences.reasoningEffort &&
                   !selectedModel?.reasoningEfforts.includes(
                     preferences.reasoningEffort,
                   ) && (
                     <option value={preferences.reasoningEffort}>
-                      {reasoningLabels[preferences.reasoningEffort]}
-                      （已儲存，目錄未提供）
+                      {t.form.effortNotInCatalog({
+                        effort: effortLabels[preferences.reasoningEffort],
+                      })}
                     </option>
                   )}
                 {selectedModel?.reasoningEfforts.map((value) => (
                   <option key={value} value={value}>
-                    {reasoningLabels[value]}
+                    {effortLabels[value]}
                   </option>
                 ))}
               </select>
             </label>
             <label>
-              Ponytail 模式
+              {t.form.ponytailMode}
               <select
                 value={preferences.ponytailMode}
                 onChange={(event) =>
@@ -414,20 +417,20 @@ export default function DiscoveryPanel({
                   })
                 }
               >
-                <option value="lite">輕量 · 預設</option>
-                <option value="full">完整</option>
-                <option value="off">關閉</option>
+                <option value="lite">{t.form.ponytailModes.lite}</option>
+                <option value="full">{t.form.ponytailModes.full}</option>
+                <option value="off">{t.form.ponytailModes.off}</option>
               </select>
             </label>
           </fieldset>
           <p className="discovery-hint">
             {catalog.error ||
-              `分析會沿用你的 ${providerLabel} 登入，使用模型用量。模型目錄不代表帳號具有所有模型的使用權限。`}
+              t.form.accountHint({ provider: providerLabel })}
           </p>
         </details>
         <div className="discovery-form-footer">
           <p>
-            <ShieldCheck size={15} /> 查閱公開資料，選定項目後再開始規劃。
+            <ShieldCheck size={15} /> {t.form.publicDataOnly}
           </p>
           <button
             type="submit"
@@ -439,7 +442,7 @@ export default function DiscoveryPanel({
             ) : (
               <Sparkles size={17} />
             )}
-            推薦貢獻項目
+            {t.form.submit}
           </button>
         </div>
       </form>
@@ -451,21 +454,21 @@ export default function DiscoveryPanel({
             onClick={() => void reload()}
             disabled={busy}
           >
-            重新讀取狀態
+            {t.reload}
           </button>
         </div>
       )}
       {loading && (
         <p className="discovery-status" role="status">
           <Loader2 size={18} className="spin" />
-          正在讀取探索紀錄…
+          {t.loading}
         </p>
       )}
       {running && (
-        <section className="discovery-progress" aria-label="探索進度">
+        <section className="discovery-progress" aria-label={t.progress.label}>
           <div className="discovery-progress-top">
             <div>
-              <span className="eyebrow">RESEARCH IN PROGRESS</span>
+              <span className="eyebrow">{t.progress.eyebrow}</span>
               <h2 role="status">{job.message}</h2>
             </div>
             <button
@@ -474,7 +477,7 @@ export default function DiscoveryPanel({
               disabled={busy}
             >
               <X size={15} />
-              停止探索
+              {t.progress.stop}
             </button>
           </div>
           <ol>
@@ -491,18 +494,8 @@ export default function DiscoveryPanel({
                     {index < current ? <Check size={15} /> : `0${index + 1}`}
                   </span>
                   <div>
-                    <strong>
-                      {["搜尋專案", "核對規範與需求", "AI 整理推薦"][index]}
-                    </strong>
-                    <small>
-                      {
-                        [
-                          "公開專案與活躍 issues",
-                          "貢獻文件、認領與維護者回應",
-                          "可行性、使用者價值與第一步",
-                        ][index]
-                      }
-                    </small>
+                    <strong>{t.progress.phases[phase].title}</strong>
+                    <small>{t.progress.phases[phase].detail}</small>
                   </div>
                 </li>
               );
@@ -516,12 +509,12 @@ export default function DiscoveryPanel({
           role="status"
         >
           <span>{job.error || job.message}</span>
-          <small>查詢時間 {date(job.createdAt)}</small>
+          <small>{t.searchedAt({ date: date(job.createdAt) })}</small>
         </div>
       )}
       {!!job?.warnings.length && (
         <details className="discovery-limitations">
-          <summary>這次搜尋的範圍與限制 · {job.warnings.length}</summary>
+          <summary>{t.limitations({ count: job.warnings.length })}</summary>
           <ul>
             {job.warnings.map((warning, index) => (
               <li key={index}>{warning}</li>
@@ -532,50 +525,37 @@ export default function DiscoveryPanel({
       {!loading && !running && !opportunities.length && (
         <section className="discovery-empty">
           <Compass size={34} strokeWidth={1.3} />
-          <h2>
-            {job ? "換個條件，找找下一個機會。" : "好的貢獻，從理解需求開始。"}
-          </h2>
-          <p>
-            {job
-              ? "目前沒有足夠證據支持適合的項目。試著減少關鍵字、放寬難度，或降低最低星數。"
-              : "按下推薦後，我們會查閱 GitHub 公開專案與 issues，再從這四個角度整理機會。"}
-          </p>
+          <h2>{job ? t.empty.retryTitle : t.empty.title}</h2>
+          <p>{job ? t.empty.retryBody : t.empty.body}</p>
           <div>
-            {[
-              ["01", "專案規範", "先理解怎麼參與"],
-              ["02", "熱度與活動", "看見持續維護的訊號"],
-              ["03", "使用者需求", "確認改動能幫助誰"],
-              ["04", "投入門檻", "找到做得到的第一步"],
-            ].map(([number, title, description]) => (
-              <div key={number}>
-                <span>{number}</span>
-                <strong>{title}</strong>
-                <small>{description}</small>
+            {angles.map((angle, index) => (
+              <div key={angle}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <strong>{t.empty.angles[angle].title}</strong>
+                <small>{t.empty.angles[angle].detail}</small>
               </div>
             ))}
           </div>
         </section>
       )}
       {!!opportunities.length && (
-        <section className="discovery-results" aria-label="推薦貢獻清單">
+        <section className="discovery-results" aria-label={t.results.label}>
           <div className="discovery-results-heading">
             <div>
               <span className="eyebrow">
-                {previous ? "PREVIOUS RESULTS" : "YOUR CONTRIBUTION SHORTLIST"}
+                {previous ? t.results.previousEyebrow : t.results.eyebrow}
               </span>
-              <h2>
-                {previous
-                  ? "上一份推薦，仍在這裡。"
-                  : "從這些機會，邁出第一步。"}
-              </h2>
+              <h2>{previous ? t.results.previousTitle : t.results.title}</h2>
               <p>
                 {previous
-                  ? `這是 ${date(previous.createdAt)} 的結果，未反映本次搜尋。`
-                  : `依你選的「${sortLabels[job?.preferences.sort ?? "updated"]}」排序取 12 個候選、驗證後最多 6 個；順序由分析整理，不是 GitHub 全站排名。實作前仍需確認 issue 最新狀態與維護者意願。`}
+                  ? t.results.previousNote({ date: date(previous.createdAt) })
+                  : t.results.note({
+                      sort: t.sorts[job?.preferences.sort ?? "updated"],
+                    })}
               </p>
             </div>
             <span className="discovery-count">
-              {opportunities.length} 個項目
+              {t.results.count({ count: opportunities.length })}
             </span>
           </div>
           {opportunities.map((item, index) => {
@@ -608,21 +588,23 @@ export default function DiscoveryPanel({
                     </p>
                   </div>
                   <span className="discovery-difficulty">
-                    {difficultyLabels[item.difficulty]}
+                    {t.difficulties[item.difficulty]}
                   </span>
                 </header>
                 <div className="discovery-repo-stats">
                   <span>
                     <Star size={14} />
-                    {candidate.stars.toLocaleString("zh-TW")}
+                    {fmt.number(candidate.stars)}
                   </span>
                   <span>
                     <GitFork size={14} />
-                    {candidate.forks.toLocaleString("zh-TW")}
+                    {fmt.number(candidate.forks)}
                   </span>
-                  <span>{candidate.language || "未標示語言"}</span>
+                  <span>{candidate.language || t.card.languageUnknown}</span>
                   <span>
-                    最近推送 {candidate.pushedAt?.slice(0, 10) || "未提供"}
+                    {t.card.lastPush({
+                      date: candidate.pushedAt?.slice(0, 10) || undefined,
+                    })}
                   </span>
                 </div>
                 <div className="discovery-opportunity-main">
@@ -631,31 +613,31 @@ export default function DiscoveryPanel({
                   <div className="discovery-need">
                     <Users size={20} />
                     <div>
-                      <h4>這次貢獻，可以幫助誰？</h4>
+                      <h4>{t.card.whoItHelps}</h4>
                       <MarkdownContent>{item.userNeed}</MarkdownContent>
                     </div>
                   </div>
                   <div className="discovery-assessment">
                     <div>
-                      <h4>為什麼適合投入</h4>
+                      <h4>{t.card.whyItFits}</h4>
                       <MarkdownContent>{item.feasibility}</MarkdownContent>
                     </div>
                     <div>
-                      <h4>預估投入</h4>
+                      <h4>{t.card.effort}</h4>
                       <MarkdownContent>{item.effort}</MarkdownContent>
-                      <small>AI 估計，尚未檢視完整程式碼。</small>
+                      <small>{t.card.effortNote}</small>
                     </div>
                   </div>
                 </div>
                 <details className="discovery-card-details">
                   <summary>
                     <ShieldCheck size={16} />
-                    貢獻規範與熱度判讀
+                    {t.card.rulesSummary}
                   </summary>
                   <div>
-                    <h4>參與前，先讀這些規定</h4>
+                    <h4>{t.card.rules}</h4>
                     <MarkdownContent>{item.contributionRules}</MarkdownContent>
-                    <h4>熱度快照</h4>
+                    <h4>{t.card.popularity}</h4>
                     <MarkdownContent>{item.popularity}</MarkdownContent>
                     {candidate.warnings.length > 0 && (
                       <ul className="discovery-source-warnings">
@@ -669,11 +651,11 @@ export default function DiscoveryPanel({
                 <details className="discovery-card-details">
                   <summary>
                     <Compass size={16} />
-                    第一步、驗收方式與待確認事項
+                    {t.card.planSummary}
                   </summary>
                   <div className="discovery-plan">
                     <div>
-                      <h4>建議從這裡開始</h4>
+                      <h4>{t.card.firstSteps}</h4>
                       <ol>
                         {item.firstSteps.map((value, i) => (
                           <li key={i}>
@@ -683,7 +665,7 @@ export default function DiscoveryPanel({
                       </ol>
                     </div>
                     <div>
-                      <h4>如何確認完成（尚未執行）</h4>
+                      <h4>{t.card.acceptanceChecks}</h4>
                       <ul>
                         {item.acceptanceChecks.map((value, i) => (
                           <li key={i}>
@@ -693,7 +675,7 @@ export default function DiscoveryPanel({
                       </ul>
                     </div>
                     <div className="discovery-plan-risks">
-                      <h4>投入之前，再確認</h4>
+                      <h4>{t.card.risks}</h4>
                       <ul>
                         {item.risks.map((value, i) => (
                           <li key={i}>
@@ -707,7 +689,7 @@ export default function DiscoveryPanel({
                 <details className="discovery-card-details">
                   <summary>
                     <ExternalLink size={16} />
-                    推薦依據與原文 · {item.evidence.length} 則
+                    {t.card.evidence({ count: item.evidence.length })}
                   </summary>
                   <div className="discovery-evidence">
                     {item.evidence.map((evidence, i) => {
@@ -738,7 +720,7 @@ export default function DiscoveryPanel({
                   </div>
                 </details>
                 <footer>
-                  <p>選擇後匯入專案，帶入可編輯的任務設定。</p>
+                  <p>{t.card.chooseHint}</p>
                   <button
                     className="button primary"
                     disabled={!!choosing || !!running || busy}
@@ -749,7 +731,7 @@ export default function DiscoveryPanel({
                     ) : (
                       <ArrowUpRight size={16} />
                     )}
-                    {choosing === item.id ? "正在匯入專案…" : "選擇此項目"}
+                    {choosing === item.id ? t.card.importing : t.card.choose}
                   </button>
                 </footer>
               </article>
@@ -759,12 +741,12 @@ export default function DiscoveryPanel({
       )}
       {job?.modelExecution && (
         <details className="discovery-runtime">
-          <summary>這次探索使用的模型與用量</summary>
+          <summary>{t.runtime.summary}</summary>
           <ModelSummary execution={job.modelExecution} analysis />
           <EfficiencySummary
             metrics={job.efficiency}
             mode={job.preferences.ponytailMode}
-            title="探索 AI 用量"
+            title={t.runtime.usageTitle}
           />
         </details>
       )}
