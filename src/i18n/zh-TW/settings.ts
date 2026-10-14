@@ -55,8 +55,8 @@ const m: Translation<typeof en> = {
     usage:
       "同時執行多個 Agent 會更快消耗你在服務提供者的帳戶用量。在個人方案上大量平行使用，可能超出該方案預期的個人使用範圍。",
     advanced: "進階：環境變數",
-    advancedText: `設定環境變數後重新啟動 ${product.name}。詳見說明文件。`,
-    documentation: "說明文件",
+    advancedText: `設定環境變數後重新啟動 ${product.name}。`,
+    documentation: "詳見說明文件。",
   },
   modelDialog: {
     title: "設定貢獻模型",

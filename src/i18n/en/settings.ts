@@ -50,16 +50,17 @@ const settings = {
   concurrency: {
     title: "Work running at the same time",
     text: "Work on several projects (or on the same one) can run at the same time, and each publishes its own PR.",
-    maxActiveRuns: "Runs at the same time",
-    maxAgentProcesses: "Agent CLI processes",
+    maxActiveRuns: "Maximum runs at the same time",
+    maxAgentProcesses: "Maximum agent CLI processes",
     maxQueued: "Queue limit (running, queued and awaiting plan approval combined)",
     explanation:
       "Each run's teammates, Reviewer and Test analyst need one CLI process each, so the agent CLI process limit decides how much really runs at once. Runs on the same repository are independent, each with its own worktree and branch.",
     usage:
       "Running many agents at once uses your provider account faster. Heavy parallel use of a personal plan may exceed its intended individual use.",
     advanced: "Advanced: environment variables",
-    advancedText: `Set environment variables and restart ${product.name}. See the documentation.`,
-    documentation: "Documentation",
+    advancedText: `Set environment variables and restart ${product.name}.`,
+    /** The documentation link; hidden while the product has no docs URL. */
+    documentation: "See the documentation.",
   },
   modelDialog: {
     title: "Set contribution models",

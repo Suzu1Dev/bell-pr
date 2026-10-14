@@ -84,7 +84,7 @@ test("the settings page reads in English with no Chinese left", () => {
   assert.equal(serviceStatus(html, "Claude Code CLI"), "Not signed in");
   assert.equal(serviceStatus(html, "GitHub CLI"), "Connected");
   assert.match(html, /Connected as octo/);
-  assert.match(html, /Runs at the same time<\/span><code>2<\/code>/);
+  assert.match(html, /Maximum runs at the same time<\/span><code>2<\/code>/);
 });
 
 test("the Claude Code copy is neutral about the person's plan and account", () => {
@@ -122,11 +122,12 @@ test("the General card switches the language and the variables sit under Advance
   );
   const advanced = html.match(/<details class="settings-advanced">.*?<\/details>/)?.[0] ?? "";
   assert.match(advanced, /<summary>Advanced: environment variables<\/summary>/);
-  assert.match(advanced, /Set environment variables and restart BELL PR\. See the documentation\./);
-  assert.match(advanced, /<code>BELLPR_MAX_ACTIVE_RUNS<\/code><\/dt><dd>Runs at the same time<\/dd>/);
-  assert.match(advanced, /<code>BELLPR_MAX_AGENT_PROCESSES<\/code><\/dt><dd>Agent CLI processes<\/dd>/);
+  assert.match(advanced, /<p>Set environment variables and restart BELL PR\.<\/p>/);
+  assert.match(advanced, /<code>BELLPR_MAX_ACTIVE_RUNS<\/code><\/dt><dd>Maximum runs at the same time<\/dd>/);
+  assert.match(advanced, /<code>BELLPR_MAX_AGENT_PROCESSES<\/code><\/dt><dd>Maximum agent CLI processes<\/dd>/);
   // The variable names appear nowhere else on the page.
   assert.equal(html.match(/BELLPR_MAX_/g)?.length, 2);
-  // No documentation link while the product has no docs URL.
-  assert.doesNotMatch(advanced, /<a /);
+  // No documentation link, and no sentence pointing to one, while the
+  // product has no docs URL.
+  assert.doesNotMatch(advanced, /<a |documentation/);
 });
