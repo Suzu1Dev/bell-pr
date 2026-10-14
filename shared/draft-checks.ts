@@ -284,8 +284,27 @@ export function ciConfigPath(filePath: string) {
   );
 }
 
-/** A home directory as it appears in a path on Linux or macOS. */
-const homePathPattern = /\/(?:home|Users)\/[A-Za-z0-9._-]+\//g;
+/**
+ * A home directory as it appears in a path on Linux or macOS (the second
+ * group). It must start a path, so a repository folder such as
+ * `src/home/components/` or a URL such as `https://example.com/home/docs/`
+ * is not taken for one.
+ */
+const homePathPattern =
+  /(^|[^A-Za-z0-9._~%+-])(\/(?:home|Users)\/[A-Za-z0-9._-]+\/)/g;
+
+/** Whether `text` names `directory` itself, not a longer name that starts like it. */
+function mentionsDirectory(text: string, directory: string) {
+  for (
+    let at = text.indexOf(directory);
+    at >= 0;
+    at = text.indexOf(directory, at + 1)
+  ) {
+    const next = text.charAt(at + directory.length);
+    if (!/[A-Za-z0-9._-]/.test(next)) return true;
+  }
+  return false;
+}
 
 /** An address GitHub hides behind: 12345+name@users.noreply.github.com. */
 export function noreplyEmail(email: string) {
@@ -412,9 +431,14 @@ export function draftPreflight(
     const trimmed = directory.replace(/\/+$/, "");
     // The root or a one-segment directory such as /tmp says nothing about the person.
     if (trimmed.split("/").filter(Boolean).length < 2) continue;
-    if (text.includes(trimmed)) found.add(trimmed);
+    if (mentionsDirectory(text, trimmed)) found.add(trimmed);
   }
-  for (const match of text.matchAll(homePathPattern)) found.add(match[0]);
+  for (const match of text.matchAll(homePathPattern)) {
+    // A home directory already reported above is not listed twice.
+    const home = match[2];
+    if (![...found].some((directory) => home.startsWith(`${directory}/`)))
+      found.add(home);
+  }
   if (found.size)
     checks.push({
       id: "local-paths",

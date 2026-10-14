@@ -1226,6 +1226,22 @@ test("preflight blocks a credential in the PR text and asks to confirm local pat
     draftPreflight({ body: "Reads files from /data.", localDirectories: ["/data"] }),
     [],
   );
+  // Repository folders and URLs that merely contain home or Users are not paths on this computer.
+  assert.deepEqual(
+    draftPreflight({
+      body: "Moves src/home/components/Card.tsx; see https://example.com/Users/guide/ and app/Users/list/.",
+      localDirectories: ["/home/alice"],
+    }),
+    [],
+  );
+  // A directory the server passed is reported once, and only as a whole name.
+  assert.deepEqual(
+    draftPreflight({
+      body: "Ran in /home/alice/project, not in /home/alicex/.",
+      localDirectories: ["/home/alice"],
+    })[0].details,
+    ["Found: /home/alice", "Found: /home/alicex/"],
+  );
 
   const ci = draftPreflight({
     body: "Updates the workflow.",
