@@ -337,12 +337,16 @@ export async function gitNetwork(
 
 /**
  * Repository settings that can make Git run a command or send credentials
- * or pushes somewhere else (`url.<base>.insteadOf` rewrites GitHub URLs).
- * `git config --get-regexp` matches lower-cased section and key names, so
- * the pattern is lower case; subsection names keep their case.
+ * or pushes somewhere else (`url.<base>.insteadOf` rewrites GitHub URLs),
+ * and that git() does not already override: its `-c` settings win over the
+ * repository's own hooks path, file monitor, pager, editor, password
+ * prompt and SSH command, so a checkout may set those (husky writes
+ * `core.hooksPath`). `git config --get-regexp` matches lower-cased section
+ * and key names, so the pattern is lower case; subsection names keep their
+ * case.
  */
 const unsafeConfigPattern =
-  "^(filter|diff|merge)\\.|^core\\.(sshcommand|pager|editor|askpass|fsmonitor|hookspath|alternaterefscommand)|^credential\\.|^protocol\\.|^include(if)?\\.|^url\\.";
+  "^(filter|diff|merge)\\.|^core\\.alternaterefscommand|^credential\\.|^protocol\\.|^include(if)?\\.|^url\\.";
 
 /**
  * Of the keys the pattern lists, the ones that really name a program or
@@ -352,7 +356,7 @@ const unsafeConfigPattern =
 function unsafeConfigKey(key: string) {
   if (/^(?:filter|credential|protocol|include|includeif|url)\./.test(key))
     return true;
-  if (/^core\./.test(key)) return true;
+  if (key === "core.alternaterefscommand") return true;
   if (key === "diff.external") return true;
   if (/^diff\..+\.(?:command|textconv)$/.test(key)) return true;
   return /^merge\..+\.driver$/.test(key);
@@ -361,12 +365,11 @@ function unsafeConfigKey(key: string) {
 /**
  * Refuses a repository whose own configuration (`.git/config`, and the
  * worktree's `config.worktree` when enabled) defines filters, diff or merge
- * drivers, a pager, editor, password prompt, SSH command, file monitor,
- * hooks path or alternate-refs command, credential helpers, protocol
- * rules, URL rewrites or includes. BELL's own clones never have them, so
- * finding one means the repository was changed by hand or by an agent;
- * nothing more runs in it. The person's global and system configuration
- * are theirs and are not checked.
+ * drivers, an alternate-refs command, credential helpers, protocol rules,
+ * URL rewrites or includes. BELL's own clones never have them, so finding
+ * one means the repository was changed by hand or by an agent; nothing
+ * more runs in it. The person's global and system configuration are theirs
+ * and are not checked.
  */
 export async function assertGitConfigSafe(directory: string) {
   const { stdout, code } = await git(

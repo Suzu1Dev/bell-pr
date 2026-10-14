@@ -146,6 +146,31 @@ test("a filter in .git/config stops the diff and the publish before Git runs it"
   assert.equal(existsSync(marker), false);
 });
 
+test("a checkout an earlier build worked in keeps its diff when its .git/config sets husky's hooks path", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-security-husky-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const checkout = path.join(directory, "checkout");
+  const baseSha = await repository(checkout, { "hello.ts": "before\n" });
+  const marker = path.join(directory, "hook-ran");
+  await mkdir(path.join(checkout, ".husky", "_"), { recursive: true });
+  await writeFile(
+    path.join(checkout, ".husky", "_", "pre-commit"),
+    `#!/bin/sh\ntouch ${marker}\n`,
+    { mode: 0o755 },
+  );
+  await git(checkout, ["config", "core.hooksPath", ".husky/_"]);
+  // Such a run's worktree shares the person's .git/config.
+  const worktreePath = path.join(directory, "worktrees", "husky-run");
+  await git(checkout, ["worktree", "add", "-q", "-b", "fix/husky", worktreePath, baseSha]);
+  await writeFile(path.join(worktreePath, "hello.ts"), "after\n");
+  const run = baseRun({ worktreePath, baseSha, branch: "fix/husky" });
+  assert.deepEqual(
+    (await readDiff(run)).map((file) => file.path),
+    ["hello.ts"],
+  );
+  assert.equal(existsSync(marker), false);
+});
+
 test("a teammate checkout whose .git pointer was forged is not used", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-security-team-"));
   t.after(() => rm(directory, { recursive: true, force: true }));

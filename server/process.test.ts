@@ -1,6 +1,6 @@
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -173,7 +173,9 @@ async function repository(t: TestContext) {
 
 test("a repository whose own Git configuration could run commands is refused", async (t) => {
   const directory = await repository(t);
-  // Ordinary settings, including harmless diff and merge preferences, pass.
+  // Ordinary settings, including harmless diff and merge preferences, pass,
+  // and so do the programs every git() call overrides with -c (a husky
+  // checkout sets core.hooksPath).
   for (const [key, value] of [
     ["user.name", "Someone"],
     ["diff.renames", "true"],
@@ -181,9 +183,24 @@ test("a repository whose own Git configuration could run commands is refused", a
     ["merge.conflictStyle", "diff3"],
     ["diff.custom.xfuncname", "^def"],
     ["merge.custom.name", "A custom driver"],
+    ["core.hooksPath", ".husky/_"],
+    ["core.fsmonitor", "touch pwned"],
+    ["core.sshCommand", "touch pwned"],
+    ["core.pager", "touch pwned"],
+    ["core.editor", "touch pwned"],
+    ["core.askPass", "touch pwned"],
   ])
     await git(directory, ["config", key, value]);
   await assertGitConfigSafe(directory);
+  for (const key of [
+    "core.hooksPath",
+    "core.fsmonitor",
+    "core.sshCommand",
+    "core.pager",
+    "core.editor",
+    "core.askPass",
+  ])
+    await git(directory, ["config", "--unset-all", key]);
 
   for (const [key, value] of [
     ["filter.lfs.clean", "touch pwned"],
@@ -192,12 +209,6 @@ test("a repository whose own Git configuration could run commands is refused", a
     ["diff.x.textconv", "touch pwned"],
     ["diff.x.command", "touch pwned"],
     ["merge.x.driver", "touch pwned"],
-    ["core.sshCommand", "touch pwned"],
-    ["core.pager", "touch pwned"],
-    ["core.editor", "touch pwned"],
-    ["core.askPass", "touch pwned"],
-    ["core.fsmonitor", "touch pwned"],
-    ["core.hooksPath", "/tmp"],
     ["credential.helper", "store"],
     ["credential.https://github.com.username", "x"],
     ["protocol.ext.allow", "always"],
@@ -238,4 +249,24 @@ test("a repository whose own Git configuration could run commands is refused", a
   );
   withEnv(t, { GIT_CONFIG_GLOBAL: global });
   await assertGitConfigSafe(directory);
+});
+
+test("a checkout's own hooks path and file monitor never run through git()", async (t) => {
+  const directory = await repository(t);
+  await git(directory, ["config", "user.name", "Someone"]);
+  await git(directory, ["config", "user.email", "someone@example.invalid"]);
+  const marker = path.join(directory, "ran");
+  const hooks = path.join(directory, ".husky", "_");
+  await mkdir(hooks, { recursive: true });
+  const script = `#!/bin/sh\necho "$0" >> ${JSON.stringify(marker)}\n`;
+  for (const name of ["pre-commit", "post-commit", "monitor"])
+    await writeFile(path.join(hooks, name), script, { mode: 0o755 });
+  await git(directory, ["config", "core.hooksPath", ".husky/_"]);
+  await git(directory, ["config", "core.fsmonitor", path.join(hooks, "monitor")]);
+  await assertGitConfigSafe(directory);
+  await writeFile(path.join(directory, "file.txt"), "content\n");
+  await git(directory, ["add", "file.txt"]);
+  await git(directory, ["commit", "-q", "-m", "Add a file"]);
+  await git(directory, ["status", "--porcelain"]);
+  assert.equal(await readFile(marker, "utf8").catch(() => ""), "");
 });
