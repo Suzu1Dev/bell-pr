@@ -43,12 +43,23 @@ export function changedSettings(
   return patch as AppSettingsPatch;
 }
 
-/** The app settings with the environment locks, and a way to change them. */
-export function useAppSettings(): AppSettingsState {
+/**
+ * The app settings with the environment locks, and a way to change them.
+ * `onSaved` receives the settings after each save, for the parts of the
+ * app that keep a copy of their own (the shell shows the sample project
+ * by `showSampleProject`).
+ */
+export function useAppSettings(
+  onSaved?: (view: AppSettingsView) => void,
+): AppSettingsState {
   const [view, setView] = useState<AppSettingsView | null>(null);
   const [error, setError] = useState("");
   // An answer to an older request never replaces a newer one.
   const latest = useRef(0);
+  const savedListener = useRef(onSaved);
+  useEffect(() => {
+    savedListener.current = onSaved;
+  });
 
   const reload = useCallback(async () => {
     const request = ++latest.current;
@@ -81,6 +92,7 @@ export function useAppSettings(): AppSettingsState {
       setView(next);
       setError("");
     }
+    savedListener.current?.(next);
     return next;
   }, []);
 

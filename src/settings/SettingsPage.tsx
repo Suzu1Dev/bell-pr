@@ -10,6 +10,7 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
+import type { AppSettingsView } from "../../shared/app-settings";
 import type { LicenseSummary } from "../../shared/plans";
 import { api } from "../api";
 import type { Notify, Page, Tab } from "../app/AppShell";
@@ -41,6 +42,11 @@ interface SettingsPageProps {
   configureContributionModels?: () => void;
   setTab: Dispatch<SetStateAction<Tab>>;
   navigate: (value: Page) => void;
+  /**
+   * Receives the app settings after a section saved them, so a copy kept
+   * elsewhere (the shell's, for the sample project) can follow.
+   */
+  onAppSettingsSaved?: (view: AppSettingsView) => void;
 }
 
 /** What GET /api/status also reports besides the `Status` fields. */
@@ -75,6 +81,7 @@ export function SettingsPage({
   setApiError,
   setTab,
   navigate,
+  onAppSettingsSaved,
 }: SettingsPageProps) {
   const t = useT("settings");
   const route = useHashRoute();
@@ -82,7 +89,7 @@ export function SettingsPage({
   const section = parseSection(route?.name === "settings" ? route.section : undefined);
   const { maskUser, maskPath } = usePresentation();
   const doctor = useDoctor();
-  const settings = useAppSettings();
+  const settings = useAppSettings(onAppSettingsSaved);
   const full = status as SettingsStatus | null;
   const { entitlements, locked } = useEntitlements(full);
   const { refresh } = doctor;

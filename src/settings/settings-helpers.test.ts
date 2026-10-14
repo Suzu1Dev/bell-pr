@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createElement } from "react";
+import type { AppSettingsView } from "../../shared/app-settings";
 import type { DoctorReport } from "../../shared/doctor";
 import { formatters } from "../../shared/i18n/locale";
 import { runsWithFiles, type StorageRun } from "./DataSection";
@@ -9,7 +11,8 @@ import { currentLimits, limitFields, parseLimit } from "./PerformanceSection";
 import { providerState } from "./ProviderSection";
 import { clearSampleProgress } from "./sampleProject";
 import { parseSection } from "./sections";
-import { changedSettings } from "./useAppSettings";
+import { renderEn } from "../test-utils/render";
+import { changedSettings, useAppSettings, type AppSettingsState } from "./useAppSettings";
 
 test("an address names a section; none or an unknown one is General", () => {
   assert.equal(parseSection("data"), "data");
@@ -194,4 +197,37 @@ test("a CLI's state follows its install and sign-in checks", () => {
     ),
     { state: "connected", login: "octo" },
   );
+});
+
+test("a save hands the saved settings to the listener, such as the shell's copy", async () => {
+  const saved: AppSettingsView = { settings: { showSampleProject: true }, lockedBy: {} };
+  const calls: { url: string; method: string; body?: string }[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    calls.push({
+      url: String(input),
+      method: init?.method ?? "GET",
+      body: typeof init?.body === "string" ? init.body : undefined,
+    });
+    return new Response(JSON.stringify(saved), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+  try {
+    const heard: AppSettingsView[] = [];
+    let state: AppSettingsState | undefined;
+    function Probe() {
+      state = useAppSettings((view) => heard.push(view));
+      return null;
+    }
+    renderEn(createElement(Probe));
+    assert.deepEqual(await state!.save({ showSampleProject: true }), saved);
+    assert.deepEqual(heard, [saved]);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].method, "PUT");
+    assert.match(calls[0].url, /\/api\/app-settings$/);
+    assert.deepEqual(JSON.parse(calls[0].body ?? ""), { showSampleProject: true });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
