@@ -24,8 +24,13 @@ import type { WorkbenchContext } from "./workbench.js";
 const dayMs = 24 * 60 * 60 * 1000;
 /** Statuses whose files a cleanup must leave alone: the run is still working on them. */
 const activeStatuses: Run["status"][] = ["queued", "running", "awaiting_plan"];
-/** Statuses the retention period applies to; review, approved and the active ones never. */
-const finishedStatuses: Run["status"][] = ["published", "cancelled", "failed"];
+/**
+ * Statuses the retention period applies to; review, approved and the
+ * active ones never. Published runs keep their checkout too: maintainers
+ * may review weeks later, and follow-up rounds and syncing need it. They
+ * are freed only on request (DELETE /api/runs/:id/workspace).
+ */
+const finishedStatuses: Run["status"][] = ["cancelled", "failed"];
 
 let retentionDaysSource: (() => number | undefined) | undefined;
 
@@ -392,11 +397,11 @@ function lastActivity(run: Run) {
 }
 
 /**
- * Frees the working files of published, cancelled and failed runs whose
- * last activity is older than the retention period. Runs that are queued,
- * running, awaiting their plan, in review, approved or publishing, and
- * published runs with an open round, are never touched; nor are runs with
- * no files on disk (one cancelled before it started can still be retried).
+ * Frees the working files of cancelled and failed runs whose last activity
+ * is older than the retention period. Runs that are queued, running,
+ * awaiting their plan, in review, approved, publishing or published are
+ * never touched; nor are runs with no files on disk (one cancelled before
+ * it started can still be retried).
  * Each run's log line is written in the run's own language. A shutdown
  * stops the pass between runs.
  */
