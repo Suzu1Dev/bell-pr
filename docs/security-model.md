@@ -258,6 +258,10 @@ whether it was blocked, never what a command printed.
   real `~/.claude`. Codex's sandbox does not restrict reading, so run the
   Codex canary with `--decoy-home`, and from a shell without token
   variables (`env -i`), or its attempts read your real GitHub CLI login.
+  `--web` starts the agents as BELL PR does with web access on and adds one
+  attempt: Python reaching `https://github.com`, a host Claude Code's
+  WebFetch may open. `webWidensSandbox` in the report says whether those
+  WebFetch allow rules also opened the shell sandbox's network.
 
 **Release rule:** if any exfiltration attempt (network, the sign-in link, or
 the GitHub CLI login when it exists) succeeds on a supported Claude Code

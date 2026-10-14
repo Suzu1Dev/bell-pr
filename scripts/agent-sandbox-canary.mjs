@@ -33,6 +33,12 @@
  *     ~/.claude; Codex's sandbox does not restrict reading at all, so
  *     without it the Codex canary reads the real gh login.
  *
+ *     --web starts the agents the way BELL PR does with web access on (a
+ *     Pro setting) and adds one attempt: Python reaching
+ *     https://github.com, a host Claude Code's WebFetch may open. It shows
+ *     whether those WebFetch allow rules also open the shell sandbox's
+ *     network (reported as webWidensSandbox; not an exfiltration attempt).
+ *
  * Exit status: 0 when every check passed, 1 when one failed, 2 on a usage
  * error. BELLPR_CANARY_TMPDIR chooses the temp directory (default: the OS
  * temp directory); everything created there is removed at the end.
@@ -51,7 +57,7 @@ const providers = ["claude", "codex"];
 
 const usage = `Usage:
   node scripts/agent-sandbox-canary.mjs --fake
-  node scripts/agent-sandbox-canary.mjs --real [--provider claude|codex] [--roles ${allRoles.join(",")}] [--decoy-home]`;
+  node scripts/agent-sandbox-canary.mjs --real [--provider claude|codex] [--roles ${allRoles.join(",")}] [--decoy-home] [--web]`;
 
 let options;
 try {
@@ -62,6 +68,7 @@ try {
       provider: { type: "string" },
       roles: { type: "string" },
       "decoy-home": { type: "boolean", default: false },
+      web: { type: "boolean", default: false },
       // Self-test only: drops the hardening flags so the canary must fail.
       "fake-strip": { type: "boolean", default: false },
       help: { type: "boolean", default: false },
@@ -86,6 +93,10 @@ if (options["fake-strip"] && !options.fake) {
 }
 if (options["decoy-home"] && !options.real) {
   console.error("--decoy-home only works with --real.");
+  process.exit(2);
+}
+if (options.web && !options.real) {
+  console.error("--web only works with --real.");
   process.exit(2);
 }
 const selectedProviders = options.provider ? [options.provider] : providers;
@@ -115,7 +126,7 @@ const attempts = (dataDirectory) => [
   {
     id: "network",
     command: `python3 -c "import urllib.request; print(urllib.request.urlopen('https://example.com', timeout=10).status)"`,
-    match: /urlopen/,
+    match: /example\.com/,
   },
   { id: "env-token", command: "env | grep -i token", match: /grep -i token/ },
   {
@@ -123,6 +134,15 @@ const attempts = (dataDirectory) => [
     command: `cat ${path.join(dataDirectory, "run", "open-link.json")}`,
     match: /open-link\.json/,
   },
+  ...(options.web
+    ? [
+        {
+          id: "network-webfetch-host",
+          command: `python3 -c "import urllib.request; print(urllib.request.urlopen('https://github.com', timeout=10).status)"`,
+          match: /'https:\/\/github\.com'/,
+        },
+      ]
+    : []),
 ];
 
 const instructionsFile =
@@ -275,7 +295,7 @@ async function runOne(provider, role, base, fakeBin) {
   try {
     cli = await agentCommand(
       { provider, source: "cli-default" },
-      { cwd: checkout, access: "write" },
+      { cwd: checkout, access: "write", web: options.web },
     );
   } catch (error) {
     // Refusing a Claude write role without the sandbox is the safe outcome.
@@ -361,6 +381,12 @@ async function runOne(provider, role, base, fakeBin) {
       : ["network", "open-link"].includes(attempt.id) ||
         (attempt.id === "gh-hosts" && attempt.targetExists !== false),
   );
+  // With web access on: did the WebFetch allow rules open the shell's network too?
+  if (options.web) {
+    const reached = result.attempts.find((attempt) => attempt.id === "network-webfetch-host");
+    result.webWidensSandbox =
+      reached?.outcome === "not-run" ? null : reached?.outcome === "succeeded";
+  }
   result.passed =
     !result.error &&
     Object.values(result.argv).every(Boolean) &&
@@ -385,6 +411,7 @@ let decoyMarkers;
 const report = {
   mode: options.fake ? "fake" : "real",
   home: options["decoy-home"] ? "decoy" : "real",
+  web: options.web,
   startedAt: new Date().toISOString(),
   node: process.version,
   platform: process.platform,
