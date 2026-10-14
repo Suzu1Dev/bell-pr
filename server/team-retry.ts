@@ -1,10 +1,11 @@
 /**
  * Retrying a team run from its task board: completed tasks are kept and the
- * failed ones start again in the Workbench queue (run-executor.ts).
+ * failed ones start again in the Workbench queue (run-executor.ts). A run
+ * that stopped before its plan existed plans again.
  */
 import { claimReadyTasks } from "./team.js";
 import { removeTaskWorktree } from "./team-workspace.js";
-import { AppError } from "./types.js";
+import { AppError, type Run } from "./types.js";
 import { sm } from "./i18n/index.js";
 import { queueTeamMessage } from "./run-executor.js";
 import type { WorkbenchContext } from "./workbench.js";
@@ -14,7 +15,8 @@ import type { WorkbenchContext } from "./workbench.js";
  * tasks keep their integrated patches, failed and blocked tasks start again
  * from a fresh snapshot, and a run whose tasks are all complete only re-runs
  * integration and review. An unapproved plan returns to the approval step so
- * cancelling during approval cannot be used to skip it.
+ * cancelling during approval cannot be used to skip it. A run without tasks
+ * (it stopped while queued or planning) goes back to the planning phase.
  */
 export async function retryTeam(
   ctx: WorkbenchContext,
@@ -24,12 +26,10 @@ export async function retryTeam(
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     const team = run.team;
-    if (
-      !["failed", "cancelled"].includes(run.status) ||
-      !run.baseSha ||
-      !team?.tasks.length
-    )
+    if (!["failed", "cancelled"].includes(run.status) || !team)
       throw new AppError((m) => m.run.team.retryNotAllowed, 409);
+    if (!team.tasks.length) return retryPlanning(ctx, run, team, message);
+    if (!run.baseSha) throw new AppError((m) => m.run.team.retryNotAllowed, 409);
     // A cancelled run keeps its controller until the worker has exited; the
     // controller is dropped in the same tick as a failed status, so this is
     // race-free where the job set (cleared later) is not.
@@ -98,4 +98,35 @@ export async function retryTeam(
     ctx.enqueue(id);
     return run;
   });
+}
+
+/**
+ * Sends a run that has no plan back to planning: the lead plans from the
+ * request again (and from the message, when there is one), and the plan
+ * waits for approval as configured. The caller holds the run lock.
+ */
+async function retryPlanning(
+  ctx: WorkbenchContext,
+  run: Run,
+  team: NonNullable<Run["team"]>,
+  message?: string,
+) {
+  if (ctx.controllers.has(run.id))
+    throw new AppError((m) => m.run.team.stillStopping, 409);
+  ctx.assertQueueCapacity();
+  delete run.error;
+  delete team.approvedAt;
+  team.phase = "planning";
+  run.agents = run.agents.filter((agent) => !/^member-/.test(agent.id));
+  // Nothing is done without a plan: every card waits again.
+  for (const agent of run.agents) {
+    agent.status = "waiting";
+    if (agent.id === "lead") agent.detail = sm().run.agents.lead;
+  }
+  if (message) queueTeamMessage(ctx, run, "user", "lead", message);
+  run.status = "queued";
+  ctx.log(run, "user", sm().storage.recovery.retryPlanning);
+  await ctx.store.save();
+  ctx.enqueue(run.id);
+  return run;
 }

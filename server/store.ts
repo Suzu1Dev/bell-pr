@@ -443,13 +443,24 @@ export class Store {
         if (agent.status === "running") agent.status = "failed";
       return;
     }
-    if (
-      run.status === "running" ||
-      run.status === "queued" ||
-      run.publishing
-    ) {
-      run.status = "failed";
+    // A first publish that stopped part way: what reached GitHub is checked
+    // again on the next publish, which reuses its commit and finds its PR.
+    if (run.publishing) {
       run.publishing = false;
+      if (run.status !== "published") {
+        run.status = run.approvedFingerprint ? "approved" : "review";
+        run.error = withRunLocale(
+          run,
+          () => sm().storage.recovery.publishingInterrupted,
+        );
+      }
+      return;
+    }
+    // A queued run that never started has nothing to repair; the Workbench
+    // queues it again (Workbench.resume).
+    if (run.status === "queued" && !run.baseSha) return;
+    if (run.status === "running" || run.status === "queued") {
+      run.status = "failed";
       run.error = recovery.run;
       for (const agent of run.agents)
         if (agent.status === "running") agent.status = "failed";

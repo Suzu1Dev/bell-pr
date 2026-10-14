@@ -26,6 +26,7 @@ import type { AgentProvider } from "../shared/models.js";
 import { proEntitlements, type Entitlements } from "../shared/plans.js";
 import { synchronizeExplanations } from "./explanations.js";
 import { currentLocale, sm } from "./i18n/index.js";
+import { log } from "./log.js";
 
 import { collectDraftContext } from "./draft-sources.js";
 import { synchronizeDraftPreparation } from "./drafts.js";
@@ -201,6 +202,42 @@ export class Workbench {
       explanations: (id) => this.explanations(id),
       prepareRunDraft: (id, options) => this.prepareRunDraft(id, options),
     };
+    this.resume();
+  }
+
+  /**
+   * Queues again, oldest first, the runs a restart left queued before they
+   * started (Store keeps them queued). Runs beyond the queue capacity fail
+   * with the queue-full message and can be retried.
+   */
+  resume() {
+    const queued = this.store.data.runs
+      .filter((run) => run.status === "queued" && !this.queue.includes(run.id))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    if (!queued.length) return;
+    let used = this.store.data.runs.filter((run) =>
+      ["running", "awaiting_plan"].includes(run.status),
+    ).length;
+    let failed = false;
+    for (const run of queued) {
+      if (used >= this.maxQueuedRuns) {
+        run.status = "failed";
+        run.error = withRunLocale(run, () =>
+          sm().run.queue.full({ max: this.maxQueuedRuns }),
+        );
+        if (run.team) run.team.phase = "failed";
+        failed = true;
+        log.warn("run.not_resumed", { runId: run.id, reason: "queue_full" });
+        continue;
+      }
+      used++;
+      withRunLocale(run, () =>
+        this.log(run, "system", sm().storage.recovery.resumed),
+      );
+      this.queue.push(run.id);
+    }
+    if (failed) void this.store.save().catch(() => undefined);
+    this.drain();
   }
 
   /** Queued, running and paused runs together; grows with the active limit. */
@@ -672,9 +709,11 @@ export class Workbench {
 
   async shutdown() {
     this.stopping = true;
+    // A run that never started stays queued and starts again on the next
+    // start (resume); one that already has a worktree is cancelled.
     for (const id of this.queue) {
       const run = this.run(id);
-      if (run.status === "queued") run.status = "cancelled";
+      if (run.status === "queued" && run.baseSha) run.status = "cancelled";
     }
     this.queue = [];
     for (const controller of this.controllers.values()) controller.abort();
