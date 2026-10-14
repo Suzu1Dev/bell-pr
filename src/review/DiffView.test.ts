@@ -98,7 +98,7 @@ test("an English render of the diff view has no Han in its own text", () => {
       const html = renderEnglish({ file, view, hasNote: false });
       assertNoHan(html);
       assert.ok(html.includes(`aria-label="Code changes in ${file.path}"`));
-      assert.match(html, /You haven&#x27;t noted your understanding yet/);
+      assert.match(html, /class="rv-note-hint">No note yet</);
       assert.match(html, /Click any line and the agent will explain it/);
       assert.match(html, /<kbd>Shift<\/kbd> for several lines/);
       assert.match(html, /aria-label="Added, line \d+: /);

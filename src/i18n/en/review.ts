@@ -31,7 +31,7 @@ const review = {
     /** Stands in for an empty line's text in its accessible name. */
     blankLine: "blank line",
     lineTitle: "Click a line to ask about it. Hold Shift to select several lines.",
-    noteHint: "You haven't noted your understanding yet",
+    noteHint: "No note yet",
     reviewed: "Reviewed",
     blockedTitle: "This file can't be reviewed right now",
     noTextTitle: "This file has no text changes to show",
@@ -77,14 +77,14 @@ const review = {
   panel: {
     label: "Code learning assistant",
     title: "Understand every change",
-    subtitle: "From what happened to why it was done this way",
+    subtitle: "What changed, and why",
     /** The mode badge and the badge on demo answers. */
     demoBadge: "Demo",
     liveBadge: "AI",
     tabsLabel: "Learning panel",
     tabs: {
       explain: "Explanation",
-      reports: "What reviewers say",
+      reports: "Reviews",
       chat: "Ask the agent",
     },
     /** `path` is shown as code; `purpose` is the project analysis's words. */
@@ -96,7 +96,7 @@ const review = {
   explain: {
     unavailableTitle: "This file can't be explained right now",
     unavailableBody: "This change has no text diff to explain right now.",
-    readyDemo: "Sample explanation · learning content prepared in advance",
+    readyDemo: "Sample explanation · prepared in advance",
     readyLive: "Prepared automatically from this diff",
     testFileHint:
       "Tests are behavior specs: read the it/test descriptions first, then check each expect to see which edge case it protects.",
@@ -227,7 +227,7 @@ const review = {
     stale: "About an earlier version",
     loading: "Reading the change…",
     inputLabel: "Question for the agent",
-    placeholder: "Which part would you like to understand better?",
+    placeholder: "Which part do you want to explore?",
     placeholderBlocked: "No explanation is available for this file right now",
     contextAttached: "File diff attached",
     contextBlocked: "File context can't be attached",

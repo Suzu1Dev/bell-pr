@@ -423,6 +423,11 @@ test("an English render of the explanation tab has no Han in its own text", () =
     for (const text of [
       'aria-label="Code learning assistant"',
       "Understand every change",
+      "What changed, and why",
+      'aria-label="Learning panel"',
+      "Explanation</button>",
+      "Reviews</button>",
+      "Ask the agent</button>",
       "A plain-language example",
       "Picture this",
       "What changed here?",
@@ -574,6 +579,7 @@ test("an English render of the chat tab has no Han in its own text", () => {
     assert.ok(welcome.includes(preset.replace(/'/g, "&#x27;")), preset);
   assert.match(welcome, /Take your understanding further/);
   assert.match(welcome, /aria-label="Question for the agent"/);
+  assert.match(welcome, /placeholder="Which part do you want to explore\?"/);
   assert.match(welcome, /Enter to send · Shift \+ Enter for a new line/);
   const file = { ...englishFile("src/utils/retry.ts"), fingerprint: "new" };
   const messages: ChatMessage[] = [
