@@ -3,14 +3,16 @@
 // Record the images on the commit before a refactor, then compare after it:
 //
 //   npm run build
-//   BELLPR_PORT=4511 BELLPR_DATA_DIR="$(mktemp -d)" npx tsx server/index.ts &
+//   BELLPR_DEV=1 BELLPR_PORT=4511 BELLPR_DATA_DIR="$(mktemp -d)" \
+//     npx tsx server/index.ts &
 //   UI_BASELINE_URL=http://127.0.0.1:4511 UI_BASELINE_DIR=/tmp/ui-baseline \
 //     npx playwright test -c scripts/ui-baseline/playwright.config.ts \
 //     [--update-snapshots]
 //
 // Start the server from the repository root (it serves dist/ from the
 // current directory) with an empty data directory, and keep UI_BASELINE_DIR
-// outside the repository. Set PLAYWRIGHT_CHROMIUM_EXECUTABLE to use an
+// outside the repository. BELLPR_DEV=1 turns sign-in off; without it every
+// page load gets the sign-in page instead of the app. Set PLAYWRIGHT_CHROMIUM_EXECUTABLE to use an
 // installed Chromium build. Requests to other hosts are aborted, the clock is
 // fixed and /api/status is answered here, so the images do not depend on the
 // network or on which CLIs the machine has signed in to.
