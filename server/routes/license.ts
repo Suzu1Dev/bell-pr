@@ -37,8 +37,8 @@ export function registerLicenseRoutes(
     if (!license.activate) throw fixed();
     res.json(changed(await license.activate(key)));
   });
-  // The client sends Content-Type: application/json, which the guard
-  // requires on every DELETE; the body is ignored.
+  // The client sends a JSON body ({}): the guard answers 415 to a DELETE
+  // without one. The body is ignored.
   app.delete("/api/license", async (_req, res) => {
     if (!license.deactivate) throw fixed();
     res.json(changed(await license.deactivate()));
