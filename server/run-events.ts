@@ -76,6 +76,11 @@ export function agentSpawn(
     },
     failed(error: unknown) {
       const status = error instanceof AppError ? error.statusCode : undefined;
+      // command() (process.ts) attaches the code when the process exited.
+      const exitCode =
+        error instanceof AppError && typeof error.details?.exitCode === "number"
+          ? error.details.exitCode
+          : undefined;
       log.warn("agent.exit", {
         ...fields,
         outcome:
@@ -87,6 +92,7 @@ export function agentSpawn(
                 ? "spawn_failed"
                 : "failed",
         status,
+        exitCode,
         durationMs: Date.now() - started,
       });
     },

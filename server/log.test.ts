@@ -5,8 +5,10 @@ import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { initLog, log, recentLogLines } from "./log.js";
-import { git, type command } from "./process.js";
+import { command, git } from "./process.js";
+import { agentSpawn } from "./run-events.js";
 import { Store } from "./store.js";
+import type { Run } from "./types.js";
 import { Workbench } from "./workbench.js";
 
 const token = `ghp_${"A1b2C3d4".repeat(4)}`;
@@ -301,4 +303,28 @@ test("a run's lifecycle, its agent processes and a rejected answer are logged as
   assert.equal(typeof byEvent("run.failed").durationMs, "number");
   const text = await readFile(path.join(store.directory, "logs", files[0]), "utf8");
   assert.ok(!text.includes("PROMPT-MARKER-1234"), "the prompt must not be logged");
+});
+
+test("agent.exit records the exit code of an agent process that failed", async (t) => {
+  const { directory, cleanup } = await logDirectory();
+  t.after(cleanup);
+  initLog(directory, { stderr: capture(false).stream });
+  const run = { id: "run-exit" } as Run;
+  const failed = await command(process.execPath, ["-e", "process.exit(3)"]).then(
+    () => assert.fail("the process exited 3"),
+    (error: unknown) => error,
+  );
+  agentSpawn(run, "lead", "codex", 1000).failed(failed);
+  // A process that never exited has no code to record.
+  agentSpawn(run, "lead", "codex", 1000).failed(new Error("spawn EACCES"));
+  const exits = (await recentLogLines(directory))
+    .map((line) => JSON.parse(line) as Record<string, unknown>)
+    .filter((entry) => entry.msg === "agent.exit");
+  assert.deepEqual(
+    exits.map(({ outcome, exitCode }) => ({ outcome, exitCode })),
+    [
+      { outcome: "failed", exitCode: 3 },
+      { outcome: "failed", exitCode: undefined },
+    ],
+  );
 });
