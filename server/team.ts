@@ -66,7 +66,7 @@ const planSchema = z.object({
 const premiseSchema = z.object({
   verdict: z.enum(["holds", "refuted", "unclear"]),
   statement: z.string().trim().min(1).max(1_000),
-  evidence: z.string().trim().max(3_000),
+  evidence: z.string().trim().min(1).max(3_000),
 });
 
 /** The lead's premise check, or undefined when there is none or it is malformed. */
