@@ -550,10 +550,10 @@ test("GET /auth signs the browser in with the session secret and moves on with a
     const wrong = await server.send("/auth?t=wrong", { headers: { "x-bell-locale": "en" } });
     assert.equal(wrong.status, 401);
     assert.equal(wrong.headers["set-cookie"], undefined);
-    assert.match(wrong.body, /expired or was already used/);
+    assert.match(wrong.body, /This sign-in link is no longer valid\./);
     const bare = await server.send("/auth", { headers: { "x-bell-locale": "en" } });
     assert.equal(bare.status, 401);
-    assert.doesNotMatch(bare.body, /expired or was already used/);
+    assert.doesNotMatch(bare.body, /no longer valid/);
     // Behind a TLS proxy BELL trusts (3A sets trust proxy to loopback), the cookie is Secure.
     server.app.set("trust proxy", "loopback");
     const secure = await server.send(`/auth?t=${sessionToken}`, {

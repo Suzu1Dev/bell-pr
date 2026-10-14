@@ -7,12 +7,12 @@ const list = (items: readonly string[]) =>
 const [bin] = product.binNames;
 
 const m: Translation<typeof en> = {
-  authRequired: `請先登入 ${product.name}：開啟終端機印出的登入連結，或在這台電腦上執行 \`${bin} open\`。`,
+  authRequired: `請先登入 ${product.name}：開啟終端機印出的登入連結，或在這台電腦上執行 ${bin} open。`,
   signIn: {
     title: `登入 ${product.name}`,
     heading: `登入 ${product.name}`,
     howTo: `請開啟終端機印出的登入連結，或在這台電腦的終端機執行 \`${bin} open\`（Docker：\`docker exec <container> ${bin} open --print\`）。`,
-    linkInvalid: "這個登入連結已過期或已使用過。每個連結只能在兩分鐘內使用一次。",
+    linkInvalid: `這個登入連結已失效。\`${bin} open\` 產生的連結只能在兩分鐘內使用一次；${product.name} 啟動時印出的連結在它重新啟動前都有效。`,
     signedInTitle: `已登入 ${product.name}`,
     signedIn: "這個瀏覽器已登入。",
     continue: `繼續前往 ${product.name}`,

@@ -8,19 +8,19 @@ const [bin] = product.binNames;
 
 /**
  * Sign-in, session and sandbox messages, and the outgoing-text checks on a
- * PR. Text between backticks is shown as code on the sign-in pages.
+ * PR. Text between backticks is shown as code on the sign-in pages; the
+ * JSON messages, shown as plain text, use none.
  */
 export default {
   /** The JSON error for an API request without a valid session (401). */
-  authRequired: `Sign in to ${product.name} first: open the sign-in link printed in your terminal, or run \`${bin} open\` on this machine.`,
+  authRequired: `Sign in to ${product.name} first: open the sign-in link printed in your terminal, or run ${bin} open on this machine.`,
   /** The pages shown around signing in; plain HTML without scripts. */
   signIn: {
     title: `Sign in to ${product.name}`,
     heading: `Sign in to ${product.name}`,
     howTo: `Open the sign-in link printed in your terminal, or run \`${bin} open\` in a terminal on this machine (Docker: \`docker exec <container> ${bin} open --print\`).`,
     /** Shown above howTo when the link in the address bar was not accepted. */
-    linkInvalid:
-      "This sign-in link has expired or was already used. Each link works once, within two minutes.",
+    linkInvalid: `This sign-in link is no longer valid. A link from \`${bin} open\` works once, within two minutes; the link printed when ${product.name} starts works until it restarts.`,
     signedInTitle: `Signed in to ${product.name}`,
     signedIn: "You are signed in on this browser.",
     continue: `Continue to ${product.name}`,

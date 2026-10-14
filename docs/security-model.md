@@ -41,7 +41,10 @@ what BELL PR trusts, what it does not, and the limits of each protection.
 - **Session.** At startup the server creates a random 32-byte session secret.
   It lives in memory only: it is never written to disk, an environment
   variable or a command line. The server prints a sign-in link once
-  (`/auth?t=…`). Opening it sets the cookie `bellpr_session`
+  (`/auth?t=…`). That link carries the session secret itself, so it works
+  until the server restarts: keep it, and any log that holds it (terminal
+  scrollback, `docker logs`, the journal), as private as a password.
+  Opening it sets the cookie `bellpr_session`
   (`HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000`, that is 30 days).
   Every API request except `/api/health` and the sign-in page itself needs
   the cookie; it is compared in constant time. Without it the API answers
