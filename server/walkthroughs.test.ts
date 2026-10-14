@@ -32,15 +32,43 @@ const file = (overrides: Partial<DiffFile>): DiffFile => ({
   ...overrides,
 });
 
-test("changed ranges come from the hunk headers, a deletion keeping the line it follows", () => {
-  assert.deepEqual(
-    changedRanges("@@ -4,3 +4,4 @@ fn a\n x\n@@ -20,2 +21,0 @@\n-y\n@@ -30 +30 @@\n-z\n+w\n"),
-    [
-      { startLine: 4, endLine: 7 },
-      { startLine: 21, endLine: 21 },
-      { startLine: 30, endLine: 30 },
-    ],
-  );
+test("changed ranges are the added lines and where lines were deleted, never the context around them", () => {
+  const patch = [
+    "diff --git a/a.ts b/a.ts",
+    "--- a/a.ts",
+    "+++ b/a.ts",
+    "@@ -2,7 +2,7 @@ fn a",
+    " a",
+    " b",
+    " c",
+    "-d",
+    "+D",
+    " e",
+    " f",
+    " g",
+    "@@ -18,7 +18,6 @@ fn b",
+    " r",
+    " s",
+    " t",
+    "-u",
+    " v",
+    " w",
+    " x",
+    "@@ -40,3 +39,5 @@ fn c",
+    " p",
+    "+q1",
+    "+q2",
+    " r",
+  ].join("\n");
+  assert.deepEqual(changedRanges(patch), [
+    // A replacement is located by its added line.
+    { startLine: 5, endLine: 5 },
+    // A pure deletion sits after the line before it.
+    { startLine: 20, endLine: 20 },
+    { startLine: 40, endLine: 41 },
+  ]);
+  // A deletion at the very end of a hunk is still placed.
+  assert.deepEqual(changedRanges("@@ -10,2 +10,1 @@\n a\n-b\n"), [{ startLine: 10, endLine: 10 }]);
 });
 
 test("only modified code files get a walkthrough, at most a fixed number per run, kept per diff version", () => {
@@ -154,7 +182,10 @@ test("the walkthrough schema is closed and fully required, and the prompt is rea
   const prompt = walkthroughPrompt({ contributionContext: "CONTEXT", file: file({}) });
   assert.match(prompt, /Work read-only/);
   assert.match(prompt, /do not modify files, execute code/);
-  assert.match(prompt, /\[\{"startLine":4,"endLine":6\}\]/);
+  assert.match(prompt, /\[\{"startLine":5,"endLine":5\}\]/);
+  // It explains the code beside the diff explanation and reports, not the diff again.
+  assert.match(prompt, /never restate the diff line by line/);
+  assert.match(prompt, /Skip code that only sits next to a range/);
   assert.match(prompt, /found by actually searching/);
   assert.match(prompt, /CONTEXT/);
 });

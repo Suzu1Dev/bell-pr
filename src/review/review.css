@@ -1755,3 +1755,18 @@
   color: #5d7350;
   font-weight: 600;
 }
+/* Grid items default to their content's width, so a long name or path
+   would push the walkthrough lists past the panel; keep them in its width. */
+.walkthrough-steps ol,
+.walkthrough-references ul {
+  grid-template-columns: minmax(0, 1fr);
+}
+.walkthrough-steps li,
+.walkthrough-references li {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.walkthrough-card pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
