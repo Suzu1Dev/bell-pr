@@ -774,19 +774,17 @@ function buildReport(
   });
 
   const app = options.app ?? {};
-  const appVersionValue = app.version ?? appVersion;
-  const runs = app.effectiveMaxActiveRuns ?? app.maxActiveRuns;
+  const appDetail = m.app({
+    port: app.port,
+    runs: app.effectiveMaxActiveRuns ?? app.maxActiveRuns,
+    processes: app.maxAgentProcesses,
+  });
   add({
     id: "app",
     required: false,
     status: "ok",
-    version: appVersionValue,
-    detail: m.app({
-      version: appVersionValue,
-      port: app.port,
-      runs,
-      processes: app.maxAgentProcesses,
-    }),
+    version: app.version ?? appVersion,
+    ...(appDetail ? { detail: appDetail } : {}),
     params: Object.fromEntries(
       Object.entries({
         port: app.port,
@@ -940,8 +938,10 @@ export function formatDoctorReport(report: DoctorReport, dataDir?: string): stri
     lines.push(
       `  ${symbols[check.status]} ${labels[check.id].padEnd(width)}  ${text}`.trimEnd(),
     );
-    for (const fix of check.fixes ?? [])
-      lines.push(`      ${fix.label}:`, `        ${fix.command}`);
+    // Fixes for what needs attention; a tool that is not used needs none.
+    if (check.status === "fail" || check.status === "warn")
+      for (const fix of check.fixes ?? [])
+        lines.push(`      ${fix.label}:`, `        ${fix.command}`);
   }
   lines.push("");
   if (dataDir) lines.push(m.cli.dataDir({ path: dataDir }));

@@ -134,15 +134,14 @@ const m: Translation<typeof en> = {
     dataDirLowSpace: ({ free }) =>
       `可以寫入，但只剩 ${size(free)}。每個工作都需要空間存放專案的複本。`,
     dataDirReadOnly: `無法寫入：${product.name} 無法在這裡儲存資料。`,
-    app: ({ version, port, runs, processes }) =>
-      [
-        `版本 ${version}`,
+    app: ({ port, runs, processes }) => {
+      const parts = [
         port === undefined ? undefined : `連接埠 ${port}`,
         runs === undefined ? undefined : `同時執行 ${runs} 個工作`,
         processes === undefined ? undefined : `${processes} 個 Agent 行程`,
-      ]
-        .filter(Boolean)
-        .join("，") + "。",
+      ].filter(Boolean);
+      return parts.length ? `${parts.join("，")}。` : "";
+    },
     windows: `Windows 透過 WSL2 執行 ${product.name}：請在 WSL2 發行版中安裝。`,
   },
   cli: {

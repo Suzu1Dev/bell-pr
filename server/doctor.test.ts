@@ -200,7 +200,7 @@ test("everything ready: versions, the GitHub account, scopes and the Claude plan
   assert.equal(check(report, "app").version, "9.9.9");
   assert.equal(
     check(report, "app").detail,
-    "Version 9.9.9, port 4541, 1 run at a time, 3 agent processes.",
+    "Port 4541, 1 run at a time, 3 agent processes.",
   );
   assert.deepEqual(check(report, "app").params, {
     port: 4541,
@@ -447,13 +447,16 @@ test("the GitHub user answer and the Claude auth JSON are read defensively", () 
   assert.equal(claudeAuthDetail({ loggedIn: true, authMethod: "api_key" }), "api_key");
   assert.equal(claudeAuthDetail("text"), undefined);
   const report: DoctorReport = {
-    checks: [{ id: "node", status: "ok", required: true, version: "v22.0.0", fixes: [{ label: "L", command: "c" }] }],
-    ready: true,
+    checks: [
+      { id: "node", status: "fail", required: true, version: "v20.0.0", detail: "Too old.", fixes: [{ label: "L", command: "c" }] },
+      { id: "codex", status: "skip", required: false, detail: "Not installed.", fixes: [{ label: "Install", command: "npm i" }] },
+    ],
+    ready: false,
     checkedAt: "2026-10-14T00:00:00.000Z",
     platform: "linux",
   };
   assert.equal(
     withLocale("en", () => formatDoctorReport(report)),
-    "BELL PR environment check\n\n  ✓ Node.js  v22.0.0\n      L:\n        c\n\nReady: every required check passed.\n",
+    "BELL PR environment check\n\n  ✗ Node.js    v20.0.0  Too old.\n      L:\n        c\n  - Codex CLI  Not installed.\n\nNot ready: fix the required checks marked ✗, then run the check again.\n",
   );
 });

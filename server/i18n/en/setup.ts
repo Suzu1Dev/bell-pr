@@ -150,20 +150,18 @@ export default {
     dataDirLowSpace: ({ free }: { free: number }) =>
       `Writable, but only ${size(free)} free. Runs need room for a copy of each project.`,
     dataDirReadOnly: `Not writable: ${product.name} cannot save its data here.`,
+    /** The app check's detail; the version is shown beside it. Empty when nothing is known. */
     app: ({
-      version,
       port,
       runs,
       processes,
     }: {
-      version: string;
       port?: number;
       runs?: number;
       processes?: number;
-    }) =>
-      [
-        `Version ${version}`,
-        port === undefined ? undefined : `port ${port}`,
+    }) => {
+      const parts = [
+        port === undefined ? undefined : `Port ${port}`,
         runs === undefined
           ? undefined
           : fmt.plural(runs) === "one"
@@ -174,9 +172,9 @@ export default {
           : fmt.plural(processes) === "one"
             ? `${processes} agent process`
             : `${processes} agent processes`,
-      ]
-        .filter(Boolean)
-        .join(", ") + ".",
+      ].filter(Boolean);
+      return parts.length ? `${parts.join(", ")}.` : "";
+    },
     windows: `Windows runs ${product.name} through WSL2: install it inside a WSL2 distribution.`,
   },
   /** `bell-pr doctor` on the command line. */
