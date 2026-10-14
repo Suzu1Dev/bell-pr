@@ -29,6 +29,18 @@ const workspace = {
     activity: "Agent activity",
     draft: "PR draft",
   },
+  /** The badge of a run whose Claude Code agent ran without the OS sandbox. */
+  unsandboxed: {
+    label: "Ran without sandbox",
+    tooltip:
+      "You allowed Claude agents to run without the operating system's sandbox, so an agent of this run could read or change files outside its working folder. Check its changes with extra care. The safety settings turn this off for new runs.",
+  },
+  runNotices: {
+    queuedFree: "Queued: Free runs one contribution at a time",
+    queuedUpgrade: "Run several at once with Pro",
+    workspaceRemoved:
+      "Files for this run were cleaned up to free disk space. Reports and notes are kept.",
+  },
   sampleReview: "Sample review",
   humanReview: "Human review",
   footer: {
@@ -87,6 +99,7 @@ const workspace = {
     copyWorktree: "Copy the worktree path",
     preparing: "The agent team is preparing your changes",
     noChanges: "No code changes yet",
+    filesRemoved: "The changed files were cleaned up",
     noChangesHint:
       "Follow the run in Agent activity; once it finishes, you can review it here.",
     viewActivity: "View agent activity",

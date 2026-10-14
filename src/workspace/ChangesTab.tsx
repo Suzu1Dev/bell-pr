@@ -142,7 +142,9 @@ export function ChangesTab({
   prepareExplanations,
   actions,
 }: ChangesTabProps) {
-  const t = useT("workspace").changes;
+  const workspace = useT("workspace");
+  const t = workspace.changes;
+  const notices = workspace.runNotices;
   const fileStatus = useT("common").fileStatus;
   const {
     messages,
@@ -438,7 +440,7 @@ export function ChangesTab({
             </div>
           </div>
         </div>
-        {editable && run.worktreePath && (
+        {editable && run.worktreePath && !run.workspaceRemovedAt && (
           <WorktreeHint
             path={run.worktreePath}
             presenting={present}
@@ -461,8 +463,19 @@ export function ChangesTab({
             <div className="empty-icon">
               {active ? <Loader2 className="spin" /> : <Code2 />}
             </div>
-            <h3>{active ? t.preparing : t.noChanges}</h3>
-            <p>{run.error || t.noChangesHint}</p>
+            <h3>
+              {active
+                ? t.preparing
+                : run.workspaceRemovedAt
+                  ? t.filesRemoved
+                  : t.noChanges}
+            </h3>
+            <p>
+              {run.error ||
+                (run.workspaceRemovedAt
+                  ? notices.workspaceRemoved
+                  : t.noChangesHint)}
+            </p>
             <button
               className="button secondary"
               onClick={() => setTab("activity")}

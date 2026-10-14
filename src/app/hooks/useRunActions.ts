@@ -10,6 +10,7 @@ import {
 import { api, ApiError, send } from "../../api";
 import { demoAnswer, getDemo } from "../../demo";
 import { useLocale, useT, type Messages } from "../../i18n";
+import { useEntitlements } from "../../license/useEntitlements";
 import type { Repo, Run, RunSummary, DiffFile, ChatMessage } from "../../types";
 import type { Locale } from "../../../shared/i18n/locale";
 import { summarizeRun } from "../../../shared/runs";
@@ -56,6 +57,9 @@ function savedMessages(run: Run): Record<string, ChatMessage[]> {
 }
 
 type Notices = Messages["workspace"]["notices"];
+
+/** No status at hand: useEntitlements reads the plan from /api/license. */
+const noStatus = {};
 
 /**
  * What stopping a run reports, from the run as it was when the person pressed
@@ -155,6 +159,9 @@ export function useRunActions({
   const t = useT("workspace").notices;
   const [locale] = useLocale();
   const demoContent = getDemo(locale);
+  // The plan, for the Pro controls of the workspace; the server still
+  // answers 402 to a gated request.
+  const plan = useEntitlements(noStatus);
   const {
     source,
     setSource,
@@ -671,6 +678,7 @@ export function useRunActions({
     }
   }
   return {
+    plan,
     feedbackLoading,
     messages,
     chatRequests,

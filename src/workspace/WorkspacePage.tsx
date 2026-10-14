@@ -30,6 +30,7 @@ import { ActivityTab } from "./ActivityTab";
 import { ChangesTab } from "./ChangesTab";
 import { DraftTab } from "./DraftTab";
 import { OverviewTab } from "./OverviewTab";
+import { RunNotices, UnsandboxedBadge } from "./RunNotices";
 import "./workspace.css";
 
 interface WorkspacePageProps {
@@ -149,7 +150,9 @@ export function WorkspacePage({
   const [locale] = useLocale();
   const { draftDirty, draftUnfinished, followUp, commitMessageUnfinished } =
     draft;
-  const { approve } = actions;
+  const { approve, plan } = actions;
+  const queuedOnFree =
+    run.status === "queued" && plan.entitlements?.maxActiveRuns === 1;
   // In reading mode the one-row heading clips the repo/branch text, so the
   // export link moves up next to "New contribution" where it stays visible
   // and reachable. A plain link cannot send the locale header, so the URL
@@ -210,6 +213,7 @@ export function WorkspacePage({
             <span />
             {statusLabels[run.status]}
           </span>
+          {run.unsandboxed === true && <UnsandboxedBadge />}
         </div>
         <div
           className="repo-meta"
@@ -237,6 +241,7 @@ export function WorkspacePage({
           )}
         </div>
       </section>
+      <RunNotices run={run} queuedOnFree={queuedOnFree} />
       <section className="workflow-strip" aria-label={t.progress}>
         {[
           { n: "01", ...t.steps.define, icon: FileText },

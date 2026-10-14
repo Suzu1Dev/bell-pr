@@ -161,3 +161,18 @@ test("the worktree path can be copied, except while presenting, when it loses it
   assert.doesNotMatch(presenting, /Copy the worktree path/);
   assertNoHan(presenting);
 });
+
+test("a run whose files were cleaned up says so instead of offering its folder", () => {
+  const html = renderEn(
+    element({
+      run: { ...run, workspaceRemovedAt: "2026-10-12T00:00:00Z" },
+      files: [],
+      file: undefined,
+      selectedPath: "",
+    }),
+  );
+  assert.match(html, /The changed files were cleaned up/);
+  assert.match(html, /Reports and notes are kept\./);
+  assert.doesNotMatch(html, /worktree-hint/);
+  assertNoHan(html);
+});
