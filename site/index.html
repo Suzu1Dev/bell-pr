@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; base-uri 'none'; form-action 'none'">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>BELL PR: a local-first AI workbench for open-source contributions</title>
+    <meta name="description" content="BELL PR runs an AI agent team on your own machine, explains every changed file in plain language, and drafts a pull request that follows the project's rules. Nothing is published until you approve it.">
+    <meta name="theme-color" content="#1f6d50">
+    <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="assets/brand/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="BELL PR">
+    <meta property="og:title" content="BELL PR: a local-first AI workbench for open-source contributions">
+    <meta property="og:description" content="An AI agent team on your own machine, a plain-language explanation of every changed file, and a pull request you approved line by line.">
+    <!-- generated:product-meta key=homepageUrl property="og:url" -->
+    <!-- /generated:product-meta -->
+    <!-- generated:product-meta key=homepageUrl property="og:image" path="assets/brand/og-image.png" -->
+    <!-- /generated:product-meta -->
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <script src="site.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="index.html"><img src="assets/brand/logo-wordmark.svg" alt="BELL PR" width="104" height="34"></a>
+        <nav class="site-nav" aria-label="Main">
+          <ul>
+            <li><a href="#how-it-works">How it works</a></li>
+            <li><a href="pricing.html">Pricing</a></li>
+            <li><a href="install.html">Install</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="wrap">
+          <p class="eyebrow">Local-first · No BELL cloud · No telemetry</p>
+          <!-- TODO [OWNER] tagline: pick one of the candidates in site/README.md. -->
+          <h1>Contribute to open source with an AI team, and understand every line you ship.</h1>
+          <p class="lead">BELL PR is a workbench that runs on your own machine. It analyses a project, proposes contribution directions, runs a small agent team in isolated git worktrees, explains every changed file in plain language, and drafts a pull request that follows the project's own rules. Nothing is published until you have reviewed and approved every file.</p>
+          <div class="hero-actions">
+            <div class="command"><code id="start-command">npx bell-pr</code><button class="copy-button" type="button" data-copy="start-command" hidden>Copy</button></div>
+            <a class="button" href="install.html">Install guide</a>
+          </div>
+          <p class="hero-note">Needs Node.js 22 or later, Git, the GitHub CLI, and the Codex CLI or Claude Code. Free to start, with no account.</p>
+        </div>
+      </section>
+
+      <section class="section" id="watch" aria-labelledby="watch-title">
+        <div class="wrap">
+          <div class="section-head">
+            <h2 id="watch-title">From an unfamiliar repository to a reviewed Draft PR</h2>
+            <p>A short tour of the sample project, from analysis to the published draft.</p>
+          </div>
+          <figure class="video">
+            <video controls preload="none" poster="media/poster.jpg" width="1920" height="1080">
+              <source src="media/bell-pr-promo.webm" type="video/webm">
+              <source src="media/bell-pr-promo.mp4" type="video/mp4">
+              <track kind="captions" src="media/captions.en.vtt" srclang="en" label="English">
+              <p>Your browser cannot play this video.</p>
+            </video>
+            <figcaption>The captions are part of the picture; the video has music and no voice-over.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="section section-tinted" id="how-it-works" aria-labelledby="how-title">
+        <div class="wrap">
+          <div class="section-head">
+            <p class="eyebrow">How it works</p>
+            <h2 id="how-title">Learn while you contribute</h2>
+            <p>The agents do the legwork. You stay in charge of every decision, and you finish knowing the code you changed.</p>
+          </div>
+          <ol class="steps">
+            <li>
+              <h3>Point it at a project</h3>
+              <p>BELL PR reads the repository and its contribution guidelines, then proposes contribution directions with verified recommendations.</p>
+            </li>
+            <li>
+              <h3>Approve the plan</h3>
+              <p>Pick a direction. The Lead plans the work and you approve or revise the plan before any code is written.</p>
+            </li>
+            <li>
+              <h3>Let the team work</h3>
+              <p>A Lead, teammates, a Reviewer and a Test analyst work in isolated git worktrees, with the AI coding CLI you already use.</p>
+            </li>
+            <li>
+              <h3>Review, understand, publish</h3>
+              <p>Read a plain-language explanation of every changed file and ask follow-up questions. Then publish a Draft PR that follows the project's rules.</p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="section" id="features" aria-labelledby="features-title">
+        <div class="wrap">
+          <div class="section-head">
+            <h2 id="features-title">Built for contributions you can stand behind</h2>
+          </div>
+          <ul class="grid">
+            <li class="card">
+              <h3>Plain-language explanations</h3>
+              <p>Each changed file comes with what changed and why, examples and trade-offs, and a suggested review order. Ask follow-up questions right next to the diff.</p>
+            </li>
+            <li class="card">
+              <h3>You approve every change</h3>
+              <p>Nothing is published until you have reviewed every file and approved the draft. Re-run the Reviewer and the Test analyst whenever you want a second look.</p>
+            </li>
+            <li class="card">
+              <h3>Rule-aware pull requests</h3>
+              <p>Drafts follow the target project's own contribution rules and pull request template, and preflight checks run before you publish a Draft PR.</p>
+            </li>
+            <li class="card">
+              <h3>Isolated agent team</h3>
+              <p>Agents work in separate git worktrees on your machine. You see the plan, the team inbox and every subtask as it happens.</p>
+            </li>
+            <li class="card">
+              <h3>Learning notes</h3>
+              <p>Keep what you learned from each contribution on a notes page. Pro exports a learning record as Markdown.</p>
+            </li>
+            <li class="card">
+              <h3>Your tools, your accounts</h3>
+              <p>Works with the OpenAI Codex CLI or the Claude Code CLI you installed and signed in to, and with the GitHub CLI. Usage counts against your own account.</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section section-tinted" id="plans" aria-labelledby="plans-title">
+        <div class="wrap">
+          <div class="section-head">
+            <h2 id="plans-title">Free covers the whole loop. Pro adds scale.</h2>
+            <p>Free runs one contribution at a time, from analysis to Draft PR. Pro adds bigger and parallel agent teams, GitHub-wide discovery and coaching on maintainer feedback. Every plan keeps the human review gate.</p>
+          </div>
+          <div class="table-frame">
+            <!-- generated:plan-table locale=en -->
+            <table class="plan-table" lang="en">
+              <thead>
+                <tr><th scope="col">Feature</th><th scope="col">Plan</th><th scope="col">Limits</th></tr>
+              </thead>
+              <tbody>
+                <tr class="tier-free"><th scope="row">Repositories and contribution runs</th><td data-label="Plan">Free</td><td data-label="Limits">Unlimited repositories and runs</td></tr>
+                <tr class="tier-free"><th scope="row">Project analysis with verified recommendations</th><td data-label="Plan">Free</td><td data-label="Limits">Up to 5 recommendations per analysis; re-analysis is allowed. Recommendations you already generated (up to 30) stay visible after a downgrade.</td></tr>
+                <tr class="tier-pro"><th scope="row">More recommendations (&quot;Generate 5 more&quot;, up to 30 per project)</th><td data-label="Plan">Pro</td><td data-label="Limits">Free: 5. Pro: up to 30 per project.</td></tr>
+                <tr class="tier-free-limited"><th scope="row">Agent team size</th><td data-label="Plan">Free (limited)</td><td data-label="Limits">Free: Lead, 2 teammates, Reviewer and Test analyst. Pro and trial: 3 or 4 teammates.</td></tr>
+                <tr class="tier-free-limited"><th scope="row">Concurrent runs</th><td data-label="Plan">Free (limited)</td><td data-label="Limits">Free: one contribution at a time; other runs wait in the queue. Pro: up to your configured limit (2 by default, at most 8).</td></tr>
+                <tr class="tier-free"><th scope="row">Plan approval and revision, team inbox, retry of failed subtasks</th><td data-label="Plan">Free</td><td data-label="Limits">Up to 3 plan revisions</td></tr>
+                <tr class="tier-free"><th scope="row">Diff review, explanations, follow-up chat, notes, suggested review order</th><td data-label="Plan">Free</td><td data-label="Limits">No limit</td></tr>
+                <tr class="tier-free"><th scope="row">Re-run Reviewer and Test analyst</th><td data-label="Plan">Free</td><td data-label="Limits">No limit (part of the human review safety gate)</td></tr>
+                <tr class="tier-free"><th scope="row">Rule-aware PR draft, preflight checks, publishing a Draft PR</th><td data-label="Plan">Free</td><td data-label="Limits">Human approval is required on every plan</td></tr>
+                <tr class="tier-free"><th scope="row">Learning notes page</th><td data-label="Plan">Free</td><td data-label="Limits">No limit</td></tr>
+                <tr class="tier-pro"><th scope="row">Learning record export (Markdown)</th><td data-label="Plan">Pro</td><td data-label="Limits">Free: not available (the notes page stays Free)</td></tr>
+                <tr class="tier-pro"><th scope="row">Maintainer feedback and CI coaching</th><td data-label="Plan">Pro</td><td data-label="Limits">Free: not available; the sample project shows example feedback labelled PRO</td></tr>
+                <tr class="tier-pro"><th scope="row">Discovery (GitHub-wide recommendations)</th><td data-label="Plan">Pro</td><td data-label="Limits">Free: labelled sample results only. Results you already have stay readable, and a running discovery can still be cancelled.</td></tr>
+                <tr class="tier-pro"><th scope="row">Web access for agents</th><td data-label="Plan">Pro</td><td data-label="Limits">Free: off. Pro: on, limited to an allowlist of domains</td></tr>
+                <tr class="tier-pro"><th scope="row">Deep reasoning efforts (xhigh, max, ultra)</th><td data-label="Plan">Pro</td><td data-label="Limits">Free: choose none to high. Leaving the effort on &quot;Default&quot; uses the model&#39;s own default effort on every plan.</td></tr>
+                <tr class="tier-free"><th scope="row">Providers, model choice, Efficiency modes</th><td data-label="Plan">Free</td><td data-label="Limits">Codex CLI and Claude Code, all models, all efficiency modes</td></tr>
+                <tr class="tier-free"><th scope="row">Sample project / demo (Pro features shown with sample data)</th><td data-label="Plan">Free</td><td data-label="Limits">Sample data in your browser only</td></tr>
+                <tr class="tier-free"><th scope="row">14-day Pro trial</th><td data-label="Plan">Free</td><td data-label="Limits">One per data directory, started only when you choose (in the app or with bell-pr license trial)</td></tr>
+                <tr class="tier-pro"><th scope="row">Pro license term and updates</th><td data-label="Plan">Pro</td><td data-label="Limits">Per named user; perpetual use of the builds released within 12 months of purchase</td></tr>
+              </tbody>
+            </table>
+            <!-- /generated:plan-table -->
+          </div>
+          <p class="hero-note"><a href="pricing.html">See pricing and the 14-day Pro trial</a></p>
+        </div>
+      </section>
+
+      <section class="section" id="privacy" aria-labelledby="privacy-title">
+        <div class="wrap">
+          <div class="section-head">
+            <p class="eyebrow">Privacy and trust</p>
+            <h2 id="privacy-title">Your machine, your accounts, your decision</h2>
+          </div>
+          <ul class="trust">
+            <li>
+              <h3>Local-first</h3>
+              <p>BELL PR runs on your computer and listens on 127.0.0.1 by default. Repositories, runs and notes stay in its data directory, and you can delete them from the app.</p>
+            </li>
+            <li>
+              <h3>No BELL cloud</h3>
+              <p>There is no BELL PR server and no account. Your code goes only where your own AI coding CLI and the GitHub CLI send it.</p>
+            </li>
+            <li>
+              <h3>No telemetry</h3>
+              <p>No analytics, usage data or crash reports, in the app or on this site. The app loads nothing from other sites.</p>
+            </li>
+            <li>
+              <h3>Offline license</h3>
+              <p>A Pro license key is checked on your machine. There is no license server, and activating a key sends nothing anywhere.</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section section-tinted" id="faq" aria-labelledby="faq-title">
+        <div class="wrap">
+          <div class="faq">
+            <h2 id="faq-title">Questions</h2>
+            <details>
+              <summary>What do I need to run BELL PR?</summary>
+              <p>macOS, Linux, or Windows through WSL2; Node.js 22 or later (or Docker); Git; the GitHub CLI, signed in; and one AI coding CLI, installed and signed in: the OpenAI Codex CLI or Claude Code. The <a href="install.html">install guide</a> has the details.</p>
+            </details>
+            <details>
+              <summary>Whose AI account does it use?</summary>
+              <p>Yours. BELL PR runs the AI coding CLI you installed and signed in to: the Codex CLI, or the Claude Code CLI with your Claude plan or Anthropic API key. Usage counts against your own account.</p>
+            </details>
+            <details>
+              <summary>Does it open pull requests on its own?</summary>
+              <p>No. BELL PR publishes a Draft PR only after you have reviewed every changed file and approved the draft, on every plan.</p>
+            </details>
+            <details>
+              <summary>Does my code go to BELL PR?</summary>
+              <p>No. There is no BELL PR cloud. Your code goes to the AI provider behind the coding CLI you chose and to GitHub, under your own accounts and their terms.</p>
+            </details>
+            <details>
+              <summary>What is free?</summary>
+              <p>The whole contribution loop, one contribution at a time, with a Lead, two teammates, a Reviewer and a Test analyst. A 14-day Pro trial starts only when you choose. See <a href="pricing.html">pricing</a> for the full comparison.</p>
+            </details>
+            <details>
+              <summary>Is BELL PR made by GitHub, OpenAI or Anthropic?</summary>
+              <p>No. BELL PR is an independent product. It works with tools from those companies that you install and sign in to yourself.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <div class="footer-grid">
+          <div class="footer-brand"><img src="assets/brand/logo-wordmark.svg" alt="BELL PR" width="92" height="30"></div>
+          <nav class="footer-col" aria-labelledby="footer-product">
+            <h2 id="footer-product">Product</h2>
+            <ul>
+              <li><a href="index.html#how-it-works">How it works</a></li>
+              <li><a href="pricing.html">Pricing</a></li>
+              <li><a href="install.html">Install</a></li>
+            </ul>
+          </nav>
+          <nav class="footer-col" aria-labelledby="footer-legal">
+            <h2 id="footer-legal">Legal</h2>
+            <ul>
+              <li><a href="legal/eula.html">License agreement</a></li>
+              <li><a href="legal/privacy.html">Privacy</a></li>
+              <li><a href="legal/terms.html">Terms</a></li>
+              <li><a href="legal/refund.html">Refunds</a></li>
+              <li><a href="legal/security.html">Security</a></li>
+            </ul>
+          </nav>
+          <div class="footer-col">
+            <h2>Contact</h2>
+            <ul>
+              <li><!-- generated:product-link key=supportEmail text="Support" --><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=securityEmail text="Report a vulnerability" --><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=publicRepoUrl path=issues text="Report an issue" --><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=docsUrl text="Documentation" --><!-- /generated:product-link --></li>
+            </ul>
+          </div>
+        </div>
+        <p class="disclaimer">BELL PR is an independent product and is not affiliated with, endorsed by, or sponsored by GitHub, Inc., OpenAI, or Anthropic PBC. GitHub, OpenAI, Codex, Anthropic, Claude and Claude Code are trademarks of their respective owners; BELL PR names them only to say which tools it works with.</p>
+      </div>
+    </footer>
+    <p class="visually-hidden" role="status" id="copy-status"></p>
+  </body>
+</html>
