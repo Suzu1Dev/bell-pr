@@ -8,7 +8,7 @@ import "../../../src/theme/tokens.css";
 import "@fontsource-variable/dm-sans/wght.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
-import { continueRender, delayRender } from "remotion";
+import { cancelRender, continueRender, delayRender } from "remotion";
 
 export const fonts = {
   sans: '"DM Sans Variable", "DM Sans", system-ui, sans-serif',
@@ -33,6 +33,6 @@ Promise.all([
   document.fonts.load(`500 32px ${fonts.mono}`),
 ])
   .then(() => continueRender(waiting))
-  .catch((error: Error) => {
-    throw new Error(`The brand fonts did not load: ${error.message}`);
-  });
+  // A throw here would only reject this promise and leave the render waiting
+  // for its timeout; cancelRender fails it at once with the reason.
+  .catch((error: Error) => cancelRender(new Error(`The brand fonts did not load: ${error.message}`)));
