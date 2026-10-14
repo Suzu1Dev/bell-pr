@@ -61,9 +61,10 @@ what BELL PR trusts, what it does not, and the limits of each protection.
 - **The same-user caveat.** Any process running as your OS user can send that
   signal and read the link, just as it could read your browser's cookies.
   Sign-in links protect against other users, other machines and web pages,
-  not against programs you run yourself. Sandboxed agents have no network
-  and are denied reading `<dataDir>/run`; agents you allowed to run without
-  the sandbox are fully trusted.
+  not against programs you run yourself. Sandboxed agents have no network;
+  Claude Code agents are also denied reading `<dataDir>/run`, while Codex's
+  sandbox does not restrict reading (see below). Agents you allowed to run
+  without the sandbox are fully trusted.
 - **Browser hardening.** Every response carries
   `Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`,
   `Cross-Origin-Resource-Policy: same-origin`, `X-Frame-Options: DENY`,
@@ -240,6 +241,9 @@ whether it was blocked, never what a command printed.
 **Release rule:** if any exfiltration attempt (network, the sign-in link, or
 the GitHub CLI login when it exists) succeeds on a supported Claude Code
 release, Claude write mode ships disabled by default for that release.
+Codex's sandbox restricts writes and the network but not reading, so a
+Codex result passes when its network attempt is blocked and the
+repository's instructions are ignored; its reads are still reported.
 
 ### Results
 
