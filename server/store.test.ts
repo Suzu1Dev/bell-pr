@@ -233,6 +233,64 @@ test("restart recovery explains each interrupted run in the run's own locale", a
   assert.equal(en.logs[0].message, "開始分析");
 });
 
+test("an interrupted conflict resolution or follow-up round is explained in the run's own locale", async (t) => {
+  // An English run whose agent was resolving sync conflicts, under the
+  // tests' zh-TW default.
+  const resolving: Run = {
+    ...interruptedRun(),
+    id: "run-sync",
+    locale: "en",
+    sync: {
+      at: "2026-10-07T00:00:02.000Z",
+      from: "a".repeat(40),
+      to: "b".repeat(40),
+      snapshot: "c".repeat(40),
+      conflicts: ["hello.ts"],
+      resolving: true,
+    },
+  };
+  const english = await stateWith([resolving]);
+  t.after(english.cleanup);
+  const first = new Store(english.directory);
+  await first.initialize();
+  const [synced] = first.data.runs;
+  assert.equal(synced.status, "review");
+  assert.equal(synced.sync?.resolving, false);
+  assert.equal(
+    synced.sync?.report,
+    "The service restarted, so resolving the conflicts stopped; the edited files are kept, and you can finish yourself or ask the agent again.",
+  );
+
+  // A zh-TW run whose follow-up round was running, under an en default.
+  const revising: Run = {
+    ...interruptedRun(),
+    id: "run-round",
+    locale: "zh-TW",
+    prUrl: "https://github.com/test-owner/example/pull/1",
+    followUps: [
+      {
+        id: "round-1",
+        requestedAt: "2026-10-07T00:00:02.000Z",
+        feedbackUrls: [],
+        note: "Rename the greeting.",
+        status: "running",
+        parentCommit: "b".repeat(40),
+      },
+    ],
+  };
+  const chinese = await stateWith([revising]);
+  t.after(chinese.cleanup);
+  const second = new Store(chinese.directory);
+  await withLocale("en", () => second.initialize());
+  const [round] = second.data.runs;
+  assert.equal(round.status, "review");
+  assert.equal(round.followUps?.[0].status, "review");
+  assert.equal(
+    round.followUps?.[0].error,
+    "服務重新啟動，這輪修正已中斷；工作目錄保留的修改可以審閱、寫好提交訊息後推送，或放棄這輪修正。",
+  );
+});
+
 test("a run's locale, and fields a newer build adds, survive a load and save", async (t) => {
   // state.json has no read schema: a build that predates `locale` reads the
   // file as plain JSON and writes it back field for field, as this one does.
