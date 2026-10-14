@@ -227,16 +227,19 @@ function AppRoot() {
         <div className="welcome-screen-logo">
           <Logo variant="wordmark" size={34} title="" />
         </div>
-        <Suspense fallback={starting}>
-          <Welcome
-            onFinish={finishWelcome}
-            settings={data.appSettings}
-            doctor={doctor}
-            status={data.status}
-            maskUser={presentation.maskUser}
-            maskPath={presentation.maskPath}
-          />
-        </Suspense>
+        {/* A chunk that fails to load stops here; the logo and notice stay. */}
+        <ErrorBoundary>
+          <Suspense fallback={starting}>
+            <Welcome
+              onFinish={finishWelcome}
+              settings={data.appSettings}
+              doctor={doctor}
+              status={data.status}
+              maskUser={presentation.maskUser}
+              maskPath={presentation.maskPath}
+            />
+          </Suspense>
+        </ErrorBoundary>
       </main>
     );
   return (
