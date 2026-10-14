@@ -90,6 +90,12 @@ export interface DiscoveryJob {
    * output use it. Absent on jobs saved before it was recorded.
    */
   locale?: Locale;
+  /**
+   * True for the built-in sample job the app shows without a Pro license;
+   * its candidates and sources have no links. The server never sets it, and
+   * real jobs leave it out.
+   */
+  sample?: boolean;
   previousResult?: {
     createdAt: string;
     candidates: DiscoveryCandidate[];

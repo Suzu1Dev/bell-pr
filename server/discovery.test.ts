@@ -718,6 +718,19 @@ test("a discovery job with a locale and a newer field still loads in a build tha
     const current = lenientRead(discoveryFileSchema).parse(written);
     assert.equal(current.job?.locale, "en");
     assert.equal("reviewedBy" in (current.job ?? {}), false);
+    // The sample flag is optional both ways: older builds drop it, this one keeps it.
+    const sample = { ...written, job: { ...written.job, sample: true } };
+    assert.equal(lenientRead(discoveryFileSchema).parse(sample).job?.sample, true);
+    assert.equal(
+      "sample" in
+        (lenientRead(
+          discoveryFileSchema.extend({
+            job: discoveryJobSchema.omit({ sample: true }).nullable(),
+          }),
+        ).parse(sample).job ?? {}),
+      false,
+    );
+    assert.equal("sample" in (current.job ?? {}), false);
     // A locale a later build may add reads as unknown instead of failing the job.
     const later = lenientRead(discoveryFileSchema).parse({
       ...written,

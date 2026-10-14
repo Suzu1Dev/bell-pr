@@ -196,6 +196,8 @@ export const discoveryJobSchema = z
     error: z.string().max(2400).optional(),
     // A locale this build does not know reads as unknown instead of failing the job.
     locale: z.enum(locales).optional().catch(undefined),
+    // Only the client's sample job sets it; kept so the type and schema agree.
+    sample: z.boolean().optional(),
     previousResult: previousSchema.optional(),
   })
   .strict();
