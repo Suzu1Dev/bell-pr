@@ -1,8 +1,16 @@
-import { GitMerge, LoaderCircle, Undo2, Wand2 } from "lucide-react";
+import {
+  CircleAlert,
+  CircleCheck,
+  GitMerge,
+  LoaderCircle,
+  Undo2,
+  Wand2,
+} from "lucide-react";
 import { activeFollowUp } from "../../shared/followups";
 import { useFormat, useT } from "../i18n";
 import type { Run } from "../types";
 import { rich } from "./rich";
+import "./rounds.css";
 
 interface Props {
   run: Run;
@@ -68,7 +76,10 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
     <section className="sync-panel" aria-labelledby="sync-panel-title">
       <div className="sync-panel-head">
         <div>
-          <h2 id="sync-panel-title">{t.title}</h2>
+          <h2 id="sync-panel-title">
+            <GitMerge size={16} aria-hidden="true" />
+            {t.title}
+          </h2>
           <p>
             {rich(published ? t.intro.published : t.intro.unpublished, {
               branch: <code>{run.baseBranch}</code>,
@@ -106,17 +117,35 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
         </div>
       </div>
       {conflicts.length > 0 && (
-        <div className="sync-conflicts" role="status">
+        <div className="sync-conflicts">
           <strong>{t.conflicts}</strong>
+          {/* Each file's state is written out; the colors only repeat it. */}
+          <p className="sync-conflict-count" role="status">
+            {open.length
+              ? t.openCount({ open: open.length, total: conflicts.length })
+              : t.allResolved}
+          </p>
           <ul>
-            {conflicts.map((file) => (
-              <li key={file}>
-                <code>{file}</code>
-                {!open.includes(file) && ` · ${t.resolved}`}
-              </li>
-            ))}
+            {conflicts.map((file) => {
+              const unresolved = open.includes(file);
+              return (
+                <li key={file}>
+                  <code>{file}</code>
+                  <span
+                    className={`sync-conflict-state ${unresolved ? "is-open" : "is-resolved"}`}
+                  >
+                    {unresolved ? (
+                      <CircleAlert size={12} aria-hidden="true" />
+                    ) : (
+                      <CircleCheck size={12} aria-hidden="true" />
+                    )}
+                    {unresolved ? t.unresolved : t.resolved}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
-          {open.length ? (
+          {open.length > 0 && (
             <p>
               {rich(
                 published
@@ -134,8 +163,6 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
                 },
               )}
             </p>
-          ) : (
-            <p>{t.allResolved}</p>
           )}
           {holder?.report && <p className="sync-report">{holder.report}</p>}
           {!!holder?.resolutions?.length && (

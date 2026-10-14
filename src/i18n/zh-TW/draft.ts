@@ -156,6 +156,13 @@ const m: Translation<typeof en> = {
     undo: "復原同步",
     conflicts: "合併衝突",
     resolved: "已解決",
+    unresolved: "仍有衝突標記",
+    openCount: ({ open, total }) =>
+      open === total
+        ? total === 1
+          ? "這個檔案仍有衝突標記。"
+          : `${total} 個檔案都仍有衝突標記。`
+        : `${total} 個檔案中有 ${open} 個仍有衝突標記。`,
     conflictHelp: {
       published: ({ latest, ours }) =>
         `檔案裡標示 ${latest} 的一邊是目標分支現在的內容，標示 ${ours} 的一邊是這個 PR。衝突標記全部移除前不能核准；可以在工作目錄自己改，改完到「程式碼變更」重新整理差異，或請 Agent 解決。改過的檔案仍要逐檔審閱。`,

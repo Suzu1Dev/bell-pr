@@ -84,8 +84,9 @@ test("resolved conflicts drop the agent action, and a run awaiting plan approval
     conflicts: ["src/a.ts", "src/b.ts"],
   };
   const partly = render({ ...base, sync: { ...sync, unresolved: ["src/b.ts"] } });
-  assert.match(partly, /src\/a\.ts<\/code> · 已解決/);
-  assert.doesNotMatch(partly, /src\/b\.ts<\/code> · 已解決/);
+  assert.match(partly, /src\/a\.ts<\/code><span class="sync-conflict-state is-resolved"><svg[\s\S]*?<\/svg>已解決<\/span>/);
+  assert.match(partly, /src\/b\.ts<\/code><span class="sync-conflict-state is-open"><svg[\s\S]*?<\/svg>仍有衝突標記<\/span>/);
+  assert.match(partly, /<p class="sync-conflict-count" role="status">2 個檔案中有 1 個仍有衝突標記。<\/p>/);
   assert.match(partly, /<code>this contribution<\/code>/);
   assert.equal(button(partly, "請 Agent 解決衝突"), "enabled");
   const done = render({ ...base, sync: { ...sync, unresolved: [] } });
@@ -159,7 +160,11 @@ test("the English panel explains the base, the conflicts and why it waits, witho
     /This contribution is based on <code>main<\/code> at <code>aaaaaaa<\/code>\. Syncing moves these changes/,
   );
   assert.match(html, /Last sync: <code>bbbbbbb<\/code> to <code>aaaaaaa<\/code>, /);
-  assert.match(html, /src\/a\.ts<\/code> · resolved/);
+  // Each file says its state in words; the count is announced politely.
+  assert.match(html, /src\/a\.ts<\/code><span class="sync-conflict-state is-resolved"><svg[^>]*aria-hidden="true"[\s\S]*?<\/svg>Resolved<\/span>/);
+  assert.match(html, /src\/b\.ts<\/code><span class="sync-conflict-state is-open"><svg[\s\S]*?<\/svg>Conflict markers left<\/span>/);
+  assert.match(html, /<p class="sync-conflict-count" role="status">Conflict markers remain in 1 of 2 files\.<\/p>/);
+  assert.doesNotMatch(html, /class="sync-conflicts" role=/);
   assert.match(html, /the side marked <code>latest main<\/code>/);
   assert.match(html, /the side marked <code>this contribution<\/code> is this contribution/);
   assert.equal(button(html, "Ask the agent to resolve the conflicts"), "enabled");
@@ -178,5 +183,25 @@ test("the English panel explains the base, the conflicts and why it waits, witho
   assert.match(
     renderEn(panel({ ...base, status: "failed" })),
     /Only runs in review, approved or waiting for plan approval can sync/,
+  );
+});
+
+test("the conflict count reads naturally for one file, all files and some files", () => {
+  const sync = {
+    at: "2026-10-13T01:00:00Z",
+    from: "b".repeat(40),
+    to: "a".repeat(40),
+    snapshot: "c".repeat(40),
+  };
+  const count = (conflicts: string[], unresolved?: string[]) =>
+    /class="sync-conflict-count" role="status">([^<]*)</.exec(
+      renderEn(panel({ ...base, sync: { ...sync, conflicts, unresolved } })),
+    )?.[1];
+  assert.equal(count(["a.ts"]), "Conflict markers remain in the file.");
+  assert.equal(count(["a.ts", "b.ts", "c.ts"]), "Conflict markers remain in all 3 files.");
+  assert.equal(count(["a.ts", "b.ts", "c.ts"], ["c.ts"]), "Conflict markers remain in 1 of 3 files.");
+  assert.equal(
+    count(["a.ts"], []),
+    "All conflict markers are removed; changed files still need a file-by-file review.",
   );
 });

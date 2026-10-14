@@ -196,7 +196,15 @@ const draft = {
     sync: "Sync to the latest target branch",
     undo: "Undo sync",
     conflicts: "Merge conflicts",
-    resolved: "resolved",
+    /** A conflicted file's state, written next to it. */
+    resolved: "Resolved",
+    unresolved: "Conflict markers left",
+    openCount: ({ open, total }: { open: number; total: number }) =>
+      open === total
+        ? total === 1
+          ? "Conflict markers remain in the file."
+          : `Conflict markers remain in all ${total} files.`
+        : `Conflict markers remain in ${open} of ${total} files.`,
     conflictHelp: {
       published: ({ latest, ours }: { latest: string; ours: string }) =>
         `In each file, the side marked ${latest} is the target branch's current content and the side marked ${ours} is this pull request. You cannot approve until every conflict marker is removed: edit the files in the working directory yourself and then refresh the diff on the Code changes tab, or ask the agent to resolve them. Changed files still need a file-by-file review.`,
