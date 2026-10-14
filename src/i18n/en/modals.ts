@@ -41,6 +41,8 @@ const modals = {
     freeSpace: "Free disk space",
     freeSpaceLabel: ({ title }: { title: string }) => `Free disk space: ${title}`,
     freeConfirm: `Remove this contribution's working files: its Git worktree, its teammates' checkouts and its branch in ${product.name}'s own copy of the project? The contribution, its notes and its explanations stay, but its changes can no longer be shown.`,
+    /** The same for a published run, whose checkout follow-ups and syncing need. */
+    freeConfirmPublished: `Remove this published contribution's working files: its Git worktree, its teammates' checkouts and its branch in ${product.name}'s own copy of the project? Follow-up rounds and syncing stop working for it. The contribution, its notes and its explanations stay.`,
     freeYes: "Free disk space",
     /** Marks a run whose working files were removed. */
     filesRemoved: "Files removed",

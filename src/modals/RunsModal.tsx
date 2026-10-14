@@ -127,7 +127,13 @@ export function RunsModal({
                           : t.deleteRunLabel({ title: job.title })
                       }
                     >
-                      <p>{asked.action === "free" ? t.freeConfirm : t.deleteConfirm}</p>
+                      <p>
+                        {asked.action === "delete"
+                          ? t.deleteConfirm
+                          : job.status === "published"
+                            ? t.freeConfirmPublished
+                            : t.freeConfirm}
+                      </p>
                       <div>
                         <button
                           type="button"

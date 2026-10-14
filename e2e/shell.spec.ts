@@ -10,6 +10,7 @@ import { getDemo } from "../src/demo";
 import { localeStorageKey } from "../src/i18n";
 import about from "../src/i18n/en/about";
 import app from "../src/i18n/en/app";
+import common from "../src/i18n/en/common";
 import home from "../src/i18n/en/home";
 import modals from "../src/i18n/en/modals";
 import onboarding from "../src/i18n/en/onboarding";
@@ -501,6 +502,46 @@ test("a run and a repository can be freed and deleted, and the workbench reopens
     await expect(page.locator(".repository-card", { hasText: "seeded" })).toHaveCount(0);
     expect((await (await page.request.get("/api/repos")).json()).repos).toEqual([]);
     expect((await (await page.request.get("/api/runs")).json()).runs).toEqual([]);
+  } finally {
+    await close();
+    await server.stop();
+  }
+});
+
+test("freeing a published run's disk space warns that follow-ups and syncing stop", async ({ browser }) => {
+  const server = await launchServer({
+    seed: async (dataDir) => {
+      const { repo, runs } = seededState(dataDir);
+      await writeFile(
+        path.join(dataDir, "state.json"),
+        JSON.stringify({
+          version: 1,
+          repos: [repo],
+          runs: [
+            {
+              ...runs[1],
+              status: "published",
+              prUrl: "https://github.com/e2e-sample/seeded/pull/1",
+              publishedBranch: runs[1].branch,
+            },
+          ],
+        }),
+      );
+    },
+  });
+  const { page, close } = await openOn(browser, server);
+  const [, published] = seededState(server.dataDir).runs;
+  try {
+    await page.goto(`/#/runs/${published.id}/overview`);
+    await expect(heading(page)).toHaveText(published.title);
+    await page.locator(".all-runs-link").click();
+    const list = page.getByRole("dialog", { name: modals.runs.title });
+    const label = modals.runs.freeSpaceLabel({ title: published.title });
+    await list.getByRole("button", { name: label }).click();
+    const freeing = list.getByRole("group", { name: label });
+    await expect(freeing).toContainText(modals.runs.freeConfirmPublished);
+    await freeing.getByRole("button", { name: common.actions.cancel }).click();
+    await expect(freeing).toHaveCount(0);
   } finally {
     await close();
     await server.stop();

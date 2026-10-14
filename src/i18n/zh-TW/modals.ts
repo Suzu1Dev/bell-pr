@@ -37,6 +37,7 @@ const m: Translation<typeof en> = {
     freeSpace: "釋放磁碟空間",
     freeSpaceLabel: ({ title }) => `釋放磁碟空間：${title}`,
     freeConfirm: `要移除這項貢獻的工作檔案嗎？包括它的 Git worktree、Teammates 的工作副本，以及它在 ${product.name} 專案副本中的分支。貢獻本身、筆記與說明都會保留，但無法再顯示它的程式碼改動。`,
+    freeConfirmPublished: `要移除這項已發佈貢獻的工作檔案嗎？包括它的 Git worktree、Teammates 的工作副本，以及它在 ${product.name} 專案副本中的分支。之後它就無法進行後續修改回合與同步。貢獻本身、筆記與說明都會保留。`,
     freeYes: "釋放磁碟空間",
     filesRemoved: "檔案已移除",
     deleteRun: "刪除貢獻",
