@@ -10,6 +10,7 @@ import { assertNoHan, renderEn, renderWith, renderZh } from "../test-utils/rende
 import { demoInsights } from "./demo";
 import { ProjectOverview, type ProjectOverviewProps } from "./ProjectOverview";
 import { playSampleAnalysis, stopSampleAnalysis } from "./sample-analysis";
+import { mount } from "./test-dom";
 
 const repo = {
   id: "demo-repo",
@@ -615,3 +616,26 @@ test("an analysis in another language than the UI offers to analyze again in the
   assert.match(zh, />改用繁體中文重新分析</);
 });
 
+test("the sample's overview reads no plan, also while its analysis plays", async () => {
+  const realFetch = globalThis.fetch;
+  const requests: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    requests.push(String(input));
+    return new Response(
+      JSON.stringify({ license: { plan: "free", source: "none", status: "none" } }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  }) as typeof fetch;
+  const loadingOverview = (id: string) =>
+    createElement(ProjectOverview, overviewProps({ repo: { ...repo, id }, insights: null, loading: true }));
+  const view = await mount(loadingOverview("demo-repo"));
+  try {
+    assert.deepEqual(requests, []);
+    // A real repository's overview reads the plan for "Generate 5 more".
+    await view.rerender(loadingOverview("repo-1"));
+    assert.deepEqual(requests, ["/api/license"]);
+  } finally {
+    await view.unmount();
+    globalThis.fetch = realFetch;
+  }
+});

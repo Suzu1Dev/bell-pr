@@ -423,16 +423,16 @@ export function ProjectOverview({
     insights?.locale && insights.locale !== locale && !demo
       ? insights.locale
       : undefined;
+  const sampleRepo = repo.id === getDemo(locale).repo.id;
   // The sample's analysis in playback mode: its loading lines so far.
   const sampleAnalysis = useSampleAnalysis();
   const analysisSteps =
-    !insights && loading && repo.id === getDemo(locale).repo.id
-      ? sampleAnalysis.steps
-      : [];
+    !insights && loading && sampleRepo ? sampleAnalysis.steps : [];
+  // The sample reads no plan, also while its analysis plays.
   const plan = usePlan({
     entitlements,
     demo,
-    read: canRecommendMore === undefined,
+    read: canRecommendMore === undefined && !sampleRepo,
   });
   // On Free, "Generate 5 more" is Pro; the sample shows it unlocked.
   const moreLocked =
