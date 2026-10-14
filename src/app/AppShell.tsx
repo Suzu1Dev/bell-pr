@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
   type SetStateAction,
 } from "react";
 import { createPortal } from "react-dom";
@@ -20,7 +21,8 @@ import "../mission/mission.css";
 import "../team/team.css";
 import type { AppSettingsView } from "../../shared/app-settings";
 import { eulaVersion } from "../../shared/product";
-import { api, ApiError } from "../api";
+import type { ApiErrorBody } from "../../shared/errors";
+import { api, ApiError, authRequiredEvent } from "../api";
 import { Logo } from "../brand/Logo";
 import { getDemo } from "../demo";
 import { HomePage } from "../home/HomePage";
@@ -50,6 +52,7 @@ import { ImportRepoModal } from "../repos/ImportRepoModal";
 import { ReposPage } from "../repos/ReposPage";
 import { ModelSettingsModal } from "../settings/ModelSettingsModal";
 import { SettingsPage } from "../settings/SettingsPage";
+import { CopyCommand } from "../setup/CopyCommand";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import { PublishModal } from "../workspace/PublishModal";
 import { WorkspacePage } from "../workspace/WorkspacePage";
@@ -125,6 +128,8 @@ function rememberLastRun(id: string) {
  * Home, keeping its flags, and shows the welcome flow on a first start.
  */
 function AppRoot() {
+  // First, so it listens before the first request is sent.
+  const [sessionEnded, setSessionEnded] = useSessionEnded();
   const data = useAppData();
   const doctor = useDoctor();
   const presentation = usePresentation();
@@ -163,9 +168,13 @@ function AppRoot() {
 
   if (view === "pending")
     return <div className="app-starting" aria-busy="true" />;
+  const sessionNotice = sessionEnded && (
+    <SessionEndedNotice onDismiss={() => setSessionEnded(false)} />
+  );
   if (view === "welcome")
     return (
       <main className="welcome-screen" id="main-content">
+        {sessionNotice}
         <div className="welcome-screen-logo">
           <Logo variant="wordmark" size={34} title="" />
         </div>
@@ -179,7 +188,55 @@ function AppRoot() {
         />
       </main>
     );
-  return <AppShell data={data} doctor={doctor} initialModal={initialModal} />;
+  return (
+    <AppShell
+      data={data}
+      doctor={doctor}
+      initialModal={initialModal}
+      sessionNotice={sessionNotice}
+    />
+  );
+}
+
+/**
+ * Whether the sign-in session ended (BELL PR restarted, or the cookie
+ * expired). The API client would reload into the sign-in page, which loses
+ * what the person typed; the app cancels that and says how to sign in
+ * again instead.
+ */
+function useSessionEnded() {
+  const [ended, setEnded] = useState(false);
+  useEffect(() => {
+    const handle = (event: CustomEvent<ApiErrorBody>) => {
+      event.preventDefault();
+      setEnded(true);
+    };
+    window.addEventListener(authRequiredEvent, handle);
+    return () => window.removeEventListener(authRequiredEvent, handle);
+  }, []);
+  return [ended, setEnded] as const;
+}
+
+/** The ended session: the command that prints a new sign-in link. */
+export function SessionEndedNotice({ onDismiss }: { onDismiss: () => void }) {
+  const t = useT("app");
+  return (
+    <div role="alert" className="session-banner">
+      <div className="session-banner-text">
+        <strong>{t.sessionEnded.title}</strong>
+        <span>{t.sessionEnded.text}</span>
+        <CopyCommand command={t.sessionEnded.command} />
+      </div>
+      <button
+        type="button"
+        className="icon-button"
+        onClick={onDismiss}
+        aria-label={t.dismissNotice}
+      >
+        <X size={15} aria-hidden="true" />
+      </button>
+    </div>
+  );
 }
 
 // The address (src/navigation/route.ts) is the source of the page, the open
@@ -249,11 +306,14 @@ function AppShell({
   data,
   doctor,
   initialModal = null,
+  sessionNotice,
 }: {
   data: AppData;
   doctor: DoctorState;
   /** A dialog to open at once, such as the import the welcome flow chose. */
   initialModal?: ModalName;
+  /** Shown above the page while the sign-in session has ended. */
+  sessionNotice?: ReactNode;
 }) {
   const t = useT("app");
   const workspaceMessages = useT("workspace");
@@ -805,7 +865,8 @@ function AppShell({
           repoUrl={titleRepo && titleRepo !== sample.repo ? titleRepo.url : undefined}
           githubUser={status?.githubUser ?? ""}
         />
-        {apiError && (
+        {sessionNotice}
+        {apiError && !sessionNotice && (
           <div role="alert" className="connection-banner">
             <Terminal size={16} />
             <span>{apiError}</span>
