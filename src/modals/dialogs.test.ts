@@ -28,6 +28,11 @@ test("the guide reads in English with no Chinese left", () => {
     renderZh(createElement(HelpModal, { closeModal() {} })),
     /<strong>理解每個改動<\/strong>/,
   );
+  assert.doesNotMatch(html, /About BELL PR/);
+  assert.match(
+    renderEn(createElement(HelpModal, { closeModal() {}, openAbout() {} })),
+    /<button class="button secondary full-width"><svg[^]*?About BELL PR<\/button>/,
+  );
 });
 
 test("the runs list reads in English with no Chinese left", () => {

@@ -1,5 +1,6 @@
 /** Dialogs (Traditional Chinese, Taiwan). */
 import type { Translation } from "../../../shared/i18n/locale";
+import { product } from "../../../shared/product";
 import type en from "../en/modals";
 
 const m: Translation<typeof en> = {
@@ -26,6 +27,7 @@ const m: Translation<typeof en> = {
       },
     },
     start: "開始探索",
+    about: `關於 ${product.name}`,
   },
   runs: {
     title: "每一個想法，都有進度。",

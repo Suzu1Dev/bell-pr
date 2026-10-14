@@ -23,10 +23,12 @@ import type { AppSettingsView } from "../../shared/app-settings";
 import { eulaVersion } from "../../shared/product";
 import type { ApiErrorBody } from "../../shared/errors";
 import { api, ApiError, authRequiredEvent } from "../api";
+import { AboutDialog } from "../about/AboutDialog";
 import { Logo } from "../brand/Logo";
 import { getDemo } from "../demo";
 import { HomePage } from "../home/HomePage";
 import { useLocale, useT } from "../i18n";
+import { UpgradeDialog } from "../license/UpgradeDialog";
 import { useEntitlements } from "../license/useEntitlements";
 import type { Run, DiffFile } from "../types";
 import { CommandPalette } from "../navigation/CommandPalette";
@@ -88,6 +90,7 @@ export type ModalName =
   | "publish"
   | "help"
   | "runs"
+  | "about"
   | null;
 export type Notify = (message: string, tone?: "success" | "error") => void;
 
@@ -810,6 +813,17 @@ function AppShell({
     return opened;
   }
 
+  // About opens from the app as a dialog over the page, and from #/about
+  // over Home; closing the latter leaves the address on Home.
+  const aboutOpen = modal === "about" || route?.name === "about";
+  const closeAbout = useCallback(() => {
+    if (currentRoute()?.name === "about")
+      navigateTo({ name: "home" }, { replace: true });
+    closeModal();
+  }, [closeModal]);
+  const dataDir = doctor.report?.checks.find((check) => check.id === "data-dir")
+    ?.params?.path;
+
   function openPaletteRepo(id: string) {
     setExploreRepoId(id);
     closeModal();
@@ -1003,6 +1017,9 @@ function AppShell({
           onClose={closeCommandPalette}
           onSelectRun={openPaletteRun}
           onSelectRepo={openPaletteRepo}
+          onOpenSample={() => navigateTo({ name: "demo" })}
+          onOpenSettings={() => navigate("settings")}
+          onOpenAbout={() => openModal("about")}
         />
       )}
       <Toasts toast={toast} setToast={setToast} />
@@ -1063,7 +1080,22 @@ function AppShell({
           closeModal={closeModal}
         />
       )}
-      {modal === "help" && <HelpModal closeModal={closeModal} />}
+      {modal === "help" && (
+        <HelpModal closeModal={closeModal} openAbout={() => openModal("about")} />
+      )}
+      {aboutOpen && (
+        <AboutDialog
+          onClose={closeAbout}
+          license={entitlements.summary}
+          dataDir={typeof dataDir === "string" ? dataDir : undefined}
+          presenting={presentation.present}
+          maskUser={presentation.maskUser}
+          maskPath={presentation.maskPath}
+          serverVersion={status?.version}
+        />
+      )}
+      {/* Mounted once: every 402 and locked control opens it. */}
+      <UpgradeDialog summary={entitlements.summary} demo={presentation.play} />
       {/* Outside the inert shell in the page, so it alone stays usable. */}
       {blocked &&
         createPortal(

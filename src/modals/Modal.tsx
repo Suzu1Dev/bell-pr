@@ -8,12 +8,15 @@ export function Modal({
   children,
   onClose,
   wide = false,
+  mark,
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  /** The picture above the title; a pull request icon by default. */
+  mark?: ReactNode;
 }) {
   const t = useT("modals");
   const panel = useRef<HTMLDivElement>(null);
@@ -78,7 +81,7 @@ export function Modal({
           <X size={19} />
         </button>
         <div className="modal-mark">
-          <GitPullRequest size={23} />
+          {mark ?? <GitPullRequest size={23} />}
         </div>
         <h2 id="modal-title">{title}</h2>
         {subtitle && <p className="modal-subtitle">{subtitle}</p>}

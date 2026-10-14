@@ -3,6 +3,7 @@
  * the new-task dialog.
  */
 import { formatters } from "../../../shared/i18n/locale";
+import { product } from "../../../shared/product";
 
 const { plural } = formatters("en");
 
@@ -30,6 +31,7 @@ const modals = {
       },
     },
     start: "Start exploring",
+    about: `About ${product.name}`,
   },
   runs: {
     title: "Every idea has its progress.",

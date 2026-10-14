@@ -11,6 +11,7 @@ import {
   CircleHelp,
   FolderGit2,
   House,
+  Info,
   Languages,
   LayoutDashboard,
   Plus,
@@ -212,6 +213,14 @@ export function Sidebar({
             <CircleHelp size={17} aria-hidden="true" />
             <span>{t.sidebar.help}</span>
             <span className="shortcut">?</span>
+          </button>
+          <button
+            className="nav-item"
+            title={t.sidebar.about}
+            onClick={() => openModal("about")}
+          >
+            <Info size={17} aria-hidden="true" />
+            <span>{t.sidebar.about}</span>
           </button>
           <div className="sidebar-language">
             <Languages size={16} aria-hidden="true" />

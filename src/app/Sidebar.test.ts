@@ -136,7 +136,7 @@ test("the sidebar reads in English with no Chinese left", () => {
       sidebarOpen: true,
     }),
   );
-  for (const label of ["Home", "Workbench", "Repositories", "Explore contributions", "Agent team", "Learning notes", "Settings", "User guide"])
+  for (const label of ["Home", "Workbench", "Repositories", "Explore contributions", "Agent team", "Learning notes", "Settings", "User guide", "About BELL PR"])
     assert.ok(html.includes(`<span>${label}</span>`), label);
   assert.match(html, /<nav aria-label="Main navigation">/);
   assert.match(html, /<div class="recent-sample-heading">Sample<\/div><button class="recent-item selected"><span class="small-status "><\/span><span>SDK smart retries<\/span>/);
