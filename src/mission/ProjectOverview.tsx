@@ -216,7 +216,18 @@ function showSection(target: HTMLElement) {
 function SectionNav({ sections }: { sections: OverviewSection[] }) {
   const t = useT("mission").sections;
   const [current, setCurrent] = useState<OverviewSection>();
+  const list = useRef<HTMLUListElement>(null);
   const sectionKey = sections.join(" ");
+  // On a narrow screen the links scroll sideways; keep the current one shown.
+  useEffect(() => {
+    const links = list.current;
+    const link = links?.querySelector("[aria-current]");
+    if (!links || !link) return;
+    const box = links.getBoundingClientRect();
+    const item = link.getBoundingClientRect();
+    if (item.left < box.left) links.scrollLeft -= box.left - item.left;
+    else if (item.right > box.right) links.scrollLeft += item.right - box.right;
+  }, [current]);
   // A link to a section, such as #overview-directions, scrolls to it; the
   // nav mounts with the sections, so a link followed while the analysis
   // loaded works too. The router keeps the route for such an anchor.
@@ -255,7 +266,7 @@ function SectionNav({ sections }: { sections: OverviewSection[] }) {
   }, [sectionKey]);
   return (
     <nav className="mission-section-nav" aria-label={t.label}>
-      <ul>
+      <ul ref={list}>
         {sections.map((section) => (
           <li key={section}>
             <a
