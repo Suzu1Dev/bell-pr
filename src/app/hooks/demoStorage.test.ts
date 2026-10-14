@@ -1,0 +1,98 @@
+import assert from "node:assert/strict";
+import test, { afterEach } from "node:test";
+import { defaultContributionSettings } from "../../../shared/insights";
+import { getDemo } from "../../demo";
+import {
+  demoRunKey,
+  demoSettingsKey,
+  loadDemo,
+  loadDemoSettings,
+  saveDemo,
+  saveDemoSettings,
+} from "./demoStorage";
+
+const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+
+function installStorage(value: unknown) {
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    get: () => value,
+  });
+}
+
+function memoryStorage() {
+  const items = new Map<string, string>();
+  return {
+    items,
+    getItem: (key: string) => items.get(key) ?? null,
+    setItem: (key: string, value: string) => void items.set(key, value),
+  };
+}
+
+afterEach(() => {
+  if (original) Object.defineProperty(globalThis, "localStorage", original);
+  else delete (globalThis as Record<string, unknown>).localStorage;
+});
+
+test("the demo keeps its progress per locale", () => {
+  const storage = memoryStorage();
+  installStorage(storage);
+  const zh = loadDemo("zh-TW");
+  assert.equal(zh.id, getDemo("zh-TW").run.id);
+  assert.deepEqual(zh.reviewedFiles, []);
+  assert.ok(zh.team, "the demo run carries its team");
+
+  const path = getDemo("zh-TW").files[0].path;
+  saveDemo("zh-TW", { ...zh, reviewedFiles: [path], status: "approved" });
+  assert.deepEqual([...storage.items.keys()], [demoRunKey("zh-TW")]);
+  assert.equal(demoRunKey("zh-TW"), "bellpr-demo-run:zh-TW");
+  const kept = loadDemo("zh-TW");
+  assert.deepEqual(kept.reviewedFiles, [path]);
+  assert.equal(kept.status, "approved");
+  // The other locale starts fresh from its own fixtures.
+  const en = loadDemo("en");
+  assert.deepEqual(en.reviewedFiles, []);
+  assert.equal(en.status, "review");
+  assert.equal(en.title, getDemo("en").run.title);
+});
+
+test("the demo direction settings are kept per locale over the defaults", () => {
+  const storage = memoryStorage();
+  installStorage(storage);
+  assert.deepEqual(loadDemoSettings("en"), defaultContributionSettings);
+  saveDemoSettings("en", { ...defaultContributionSettings, maxTeammates: 4 });
+  assert.equal(demoSettingsKey("en"), "bellpr-demo-settings:en");
+  assert.ok(storage.items.has("bellpr-demo-settings:en"));
+  assert.equal(loadDemoSettings("en").maxTeammates, 4);
+  assert.deepEqual(loadDemoSettings("zh-TW"), defaultContributionSettings);
+  // Garbage in storage falls back to the defaults.
+  storage.items.set(demoSettingsKey("zh-TW"), "[1,2]");
+  assert.deepEqual(loadDemoSettings("zh-TW"), defaultContributionSettings);
+  storage.items.set(demoRunKey("zh-TW"), "{not json");
+  assert.deepEqual(loadDemo("zh-TW").reviewedFiles, []);
+});
+
+test("blocked or missing storage never breaks the demo", () => {
+  const blocked = () => {
+    throw new Error("SecurityError: storage is disabled");
+  };
+  for (const storage of [
+    undefined,
+    { getItem: blocked, setItem: blocked },
+  ]) {
+    installStorage(storage);
+    assert.equal(loadDemo("en").id, getDemo("en").run.id);
+    assert.deepEqual(loadDemoSettings("en"), defaultContributionSettings);
+    assert.doesNotThrow(() => saveDemo("en", loadDemo("en")));
+    assert.doesNotThrow(() =>
+      saveDemoSettings("en", defaultContributionSettings),
+    );
+  }
+  // Reading the localStorage property itself throws in some browsers.
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    get: blocked,
+  });
+  assert.equal(loadDemo("zh-TW").id, getDemo("zh-TW").run.id);
+  assert.doesNotThrow(() => saveDemoSettings("zh-TW", defaultContributionSettings));
+});
