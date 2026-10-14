@@ -44,7 +44,10 @@ interface WorkspacePageProps {
   setSelectedPath: Dispatch<SetStateAction<string>>;
   currentRepo: Repo | undefined;
   demo: boolean;
-  /** The changes tab is open: the heading collapses to one row. */
+  /**
+   * The changes tab is open. The shell styles the compact heading from it
+   * (.is-reading); nothing here is clipped, so nothing else changes.
+   */
   reading: boolean;
   active: boolean;
   busy: boolean;
@@ -106,7 +109,6 @@ export function WorkspacePage({
   setSelectedPath,
   currentRepo,
   demo,
-  reading,
   active,
   busy,
   editable,
@@ -156,8 +158,7 @@ export function WorkspacePage({
     run.status === "queued" && plan.entitlements?.maxActiveRuns === 1;
   // The learning record is Pro: on Free the button shows a lock and opens
   // the upgrade dialog without a request; the sample builds its own record
-  // and shows the PRO chip. In reading mode the one-row heading clips the
-  // repo/branch text, so the button moves up next to "New contribution".
+  // and shows the PRO chip.
   const exportLocked = plan.locked("learningExport", { demo });
   const exportButton = (
     <button
@@ -203,7 +204,6 @@ export function WorkspacePage({
             <span>{t.eyebrow}</span>
             {demo && <span className="demo-pill">{t.demoPill}</span>}
           </div>
-          {reading && exportButton}
           <button
             className="button secondary new-task-button"
             onClick={() => beginContribution()}
@@ -212,9 +212,7 @@ export function WorkspacePage({
           </button>
         </div>
         <div className="title-row">
-          <h1 tabIndex={-1} title={reading ? run.title : undefined}>
-            {run.title}
-          </h1>
+          <h1 tabIndex={-1}>{run.title}</h1>
           <span
             className={`status-badge ${run.status === "failed" ? "error" : ""}`}
           >
@@ -223,14 +221,7 @@ export function WorkspacePage({
           </span>
           {run.unsandboxed === true && <UnsandboxedBadge />}
         </div>
-        <div
-          className="repo-meta"
-          title={
-            reading
-              ? `${currentRepo?.fullName || t.repositoryFallback} · ${run.branch} → ${run.baseBranch}`
-              : undefined
-          }
-        >
+        <div className="repo-meta">
           <span>
             <FolderGit2 size={15} />
             {currentRepo?.fullName || t.repositoryFallback}
@@ -243,7 +234,7 @@ export function WorkspacePage({
           <span className="branch-direction">→</span>
           <span>{run.baseBranch}</span>
           {demo && <span className="meta-demo">{t.demoMeta}</span>}
-          {!reading && exportButton}
+          {exportButton}
         </div>
       </section>
       <RunNotices run={run} queuedOnFree={queuedOnFree} />

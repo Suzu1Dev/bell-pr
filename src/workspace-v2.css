@@ -281,10 +281,13 @@
     height: 44px;
     flex-shrink: 0;
   }
+  /* The title and the actions share the first row; the repository and
+     branch line wraps below them, so no label ever cuts the title short. */
   .is-reading .workspace-heading {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 14px;
+    gap: 2px 14px;
     min-width: 0;
     padding: 6px 20px;
     flex-shrink: 0;
@@ -303,7 +306,7 @@
     margin-left: 0;
   }
   .is-reading .title-row {
-    flex: 0 1 auto;
+    flex: 1 1 0%;
     flex-wrap: nowrap;
     min-width: 0;
     gap: 10px;
@@ -312,26 +315,15 @@
     font-size: 18px;
     line-height: 1.4;
     min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
   }
   .is-reading .repo-meta {
-    display: block;
-    flex: 1 1 auto;
+    order: 4;
+    flex: 1 0 100%;
+    flex-wrap: wrap;
+    row-gap: 2px;
     min-width: 0;
     margin: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .is-reading .repo-meta > span,
-  .is-reading .repo-meta > a {
-    vertical-align: middle;
-  }
-  .is-reading .repo-meta i {
-    display: inline-block;
-    vertical-align: middle;
   }
   .is-reading .meta-demo {
     margin-left: 8px;
