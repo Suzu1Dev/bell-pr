@@ -314,7 +314,9 @@ export function LearningNotes({
     try {
       const page = await load.current(cursor, controller.signal);
       if (controller.signal.aborted) return;
-      focusFrom.current = visible.length;
+      // Counted now, not when the click came: the filters may have changed.
+      focusFrom.current =
+        grid.current?.querySelectorAll(".note-card h2").length ?? 0;
       setRecord((previous) => [
         ...previous,
         ...page.runs.filter(
