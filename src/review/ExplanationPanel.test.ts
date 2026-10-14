@@ -3,7 +3,7 @@ import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { demoFiles, demoRun } from "../demo";
-import type { DiffFile } from "../types";
+import type { ChatMessage, DiffFile } from "../types";
 import {
   ExplanationPanel,
   ReviewReports,
@@ -311,4 +311,34 @@ test("the reports tab offers a re-review button for real runs only and shows the
   assert.match(render({ onRerunReview() {}, reports: {} }), /還沒有審查報告[\s\S]*重新執行審查/);
   assert.doesNotMatch(render({}), /重新執行審查/);
   assert.doesNotMatch(render({ onRerunReview() {}, demo: true }), /重新執行審查/);
+});
+
+test("a failed chat turn is recognised by its flag, not by its text", () => {
+  const chat = (answer: ChatMessage) =>
+    renderToStaticMarkup(
+      createElement(ExplanationPanel, {
+        file: demoFiles[0],
+        messages: [{ role: "user", content: "為什麼要這樣改？" }, answer],
+        loading: false,
+        onAsk() {},
+        demo: false,
+        chatRequestId: 1,
+      }),
+    );
+  const flagged = chat({
+    role: "assistant",
+    content: "This turn failed: the agent timed out",
+    failed: true,
+  });
+  assert.match(flagged, /explain-message-assistant explain-message-error/);
+  assert.match(flagged, /role="alert"/);
+  assert.match(flagged, /<\/span>回答失敗<\/div>/);
+  // The text the failure turn used to start with no longer marks it.
+  const unflagged = chat({
+    role: "assistant",
+    content: "這次未能取得回答：Agent 逾時",
+  });
+  assert.doesNotMatch(unflagged, /explain-message-error|role="alert"|回答失敗/);
+  assert.match(unflagged, /<\/span>學習助手<\/div>/);
+  assert.match(unflagged, /這次未能取得回答：Agent 逾時/);
 });

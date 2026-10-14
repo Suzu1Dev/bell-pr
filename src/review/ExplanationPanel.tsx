@@ -777,9 +777,9 @@ export function ExplanationPanel({
               </div>
             )}
             {messages.map((message, index) => {
+              // The failure text follows the UI language; only the flag marks it.
               const failed =
-                message.role === "assistant" &&
-                message.content.startsWith("這次未能取得回答：");
+                message.role === "assistant" && message.failed === true;
               // Saved turns about an earlier diff stay readable but are marked.
               const stale =
                 message.fingerprint !== undefined &&
