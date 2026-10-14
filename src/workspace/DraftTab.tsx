@@ -248,6 +248,8 @@ export function DraftTab({
                 run.draftPreparation.proposal.body,
               )
             }
+            aiDisclosure={run.draft.aiDisclosure}
+            readOnly={run.status === "published"}
           />
         </Suspense>
       </ErrorBoundary>
