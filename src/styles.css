@@ -3110,6 +3110,23 @@ button {
     margin-top: 4px;
   }
 }
+/* On a phone "New contribution" in the run heading shows its icon only, so
+   the heading keeps to the screen; the label stays for screen readers. */
+@media (max-width: 600px) {
+  .new-task-button {
+    padding: 6px;
+  }
+  .new-task-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
