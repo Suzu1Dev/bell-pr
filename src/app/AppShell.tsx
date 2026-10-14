@@ -746,7 +746,7 @@ function AppShell() {
           onSelectRepo={openPaletteRepo}
         />
       )}
-      {toast && <Toasts toast={toast} setToast={setToast} />}
+      <Toasts toast={toast} setToast={setToast} />
       {modal === "import" && (
         <ImportRepoModal
           source={source}

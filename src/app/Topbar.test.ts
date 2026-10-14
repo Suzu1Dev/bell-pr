@@ -44,11 +44,34 @@ test("the top bar keeps its zh-TW page names", () => {
 test("a notice's close button reads in the UI language", () => {
   const toast = { message: "Saved", tone: "success" as const };
   const html = renderEn(createElement(Toasts, { toast, setToast() {} }));
-  assert.match(html, /role="status"/);
   assert.match(html, /aria-label="Dismiss notification"/);
   assertNoHan(html);
   assert.match(
     renderZh(createElement(Toasts, { toast, setToast() {} })),
     /aria-label="關閉通知"/,
   );
+});
+
+test("notices are read from live regions that stay in the page", () => {
+  const regions = (html: string) => [
+    html.match(/<div class="visually-hidden" aria-live="polite" aria-atomic="true">([^<]*)<\/div>/)?.[1],
+    html.match(/<div class="visually-hidden" aria-live="assertive" aria-atomic="true">([^<]*)<\/div>/)?.[1],
+  ];
+  const none = renderEn(createElement(Toasts, { toast: null, setToast() {} }));
+  assert.deepEqual(regions(none), ["", ""]);
+  assert.doesNotMatch(none, /class="toast/);
+
+  const saved = renderEn(
+    createElement(Toasts, { toast: { message: "Saved", tone: "success" }, setToast() {} }),
+  );
+  assert.deepEqual(regions(saved), ["Saved", ""]);
+  // The visible notice carries no role of its own, so it is read once.
+  assert.match(saved, /<div class="toast ">/);
+  assert.doesNotMatch(saved, /role="(status|alert)"/);
+
+  const failed = renderEn(
+    createElement(Toasts, { toast: { message: "Push failed", tone: "error" }, setToast() {} }),
+  );
+  assert.deepEqual(regions(failed), ["", "Push failed"]);
+  assert.match(failed, /<div class="toast toast-error">/);
 });
