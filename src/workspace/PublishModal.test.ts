@@ -361,3 +361,22 @@ test("an open round's publish dialog reads in English with no Chinese left", () 
   assertNoHan(sync);
   assert.match(renderEn(element({ busy: true })), /Submitting…/);
 });
+
+test("the server's local-path, workflow and author e-mail checks each need a tick", () => {
+  const checks: DraftCheck[] = [
+    { id: "local-paths", kind: "confirm", message: "The PR text contains a path on this computer.", details: ["Found: /home/ada/notes.md"] },
+    { id: "workflows", kind: "confirm", message: "This change edits CI configuration.", details: ["Changed: .github/workflows/ci.yml"] },
+    { id: "author-email", kind: "confirm", message: "The commit will carry ada@example.com.", details: [] },
+  ];
+  const html = renderEn(element({}, { publishConfirmations: checks }));
+  assert.equal(html.match(/<input type="checkbox"\/>/g)?.length, 3);
+  assert.match(html, /The PR text contains a path on this computer\.<small>Found: \/home\/ada\/notes\.md<\/small>/);
+  assert.match(html, /Changed: \.github\/workflows\/ci\.yml/);
+  assert.match(html, /The commit will carry ada@example\.com\./);
+  assert.match(html, /<button class="button primary" disabled="">.*Submit Draft PR<\/button>/);
+  const ticked = renderEn(
+    element({}, { publishConfirmations: checks, acknowledged: checks.map((check) => check.id) }),
+  );
+  assert.doesNotMatch(ticked, /<button class="button primary" disabled="">/);
+  assertNoHan(html);
+});
