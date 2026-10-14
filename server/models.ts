@@ -13,6 +13,7 @@ import {
   type ModelSettings,
   type ReasoningEffort,
 } from "../shared/models.js";
+import { sm } from "./i18n/index.js";
 import { agentEnvironment } from "./process.js";
 import { AppError } from "./types.js";
 
@@ -91,8 +92,10 @@ export function parseModelPage(value: unknown) {
   return { models, nextCursor: page.nextCursor || undefined };
 }
 
-const catalogError =
-  "暫時無法讀取 Codex 模型目錄。請確認 CLI 已安裝並登入，稍後再試。";
+/** The only error a Codex catalog read reports, in the locale in effect. */
+function catalogError() {
+  return sm().analysis.models.catalogUnavailable;
+}
 
 /** Read model metadata only: this connection never creates a thread or inference turn. */
 export async function readModelCatalog(
@@ -110,6 +113,8 @@ export async function readModelCatalog(
     ),
   timeoutMs = 10_000,
 ): Promise<ModelCatalog> {
+  // Read once here: the process callbacks below run outside the caller's turn.
+  const error = catalogError();
   let cwd: string | undefined;
   try {
     cwd = await mkdtemp(path.join(tmpdir(), "bell-models-"));
@@ -142,7 +147,7 @@ export async function readModelCatalog(
         killTimer.unref();
       };
       const fail = () =>
-        finish({ source: "codex", models: [], error: catalogError });
+        finish({ source: "codex", models: [], error });
       const timer = setTimeout(fail, timeoutMs);
       const send = (message: unknown) =>
         child.stdin.write(`${JSON.stringify(message)}\n`);
@@ -212,7 +217,7 @@ export async function readModelCatalog(
               finish({
                 source: "codex",
                 models,
-                ...(models.length ? {} : { error: catalogError }),
+                ...(models.length ? {} : { error }),
               });
             }
           } catch {
@@ -223,7 +228,7 @@ export async function readModelCatalog(
       child.on("close", () => {
         clearTimeout(timer);
         if (killTimer) clearTimeout(killTimer);
-        resolve(result ?? { source: "codex", models: [], error: catalogError });
+        resolve(result ?? { source: "codex", models: [], error });
       });
       send({
         method: "initialize",
@@ -234,7 +239,7 @@ export async function readModelCatalog(
       });
     });
   } catch {
-    return { source: "codex", models: [], error: catalogError };
+    return { source: "codex", models: [], error };
   } finally {
     if (cwd) await rm(cwd, { recursive: true, force: true }).catch(() => {});
   }
@@ -244,50 +249,59 @@ const claudeEfforts: ReasoningEffort[] = ["low", "medium", "high", "xhigh", "max
 /**
  * Claude Code has no model-list command, so BELL offers its documented aliases.
  * Each alias follows the latest model of that family; availability depends on the plan.
+ * The descriptions are in the locale in effect.
  */
-export const claudeModelCatalog: ModelCatalog = {
-  source: "claude",
-  models: [
-    {
-      id: "opus",
-      name: "Claude Opus",
-      description: "適合複雜的程式修改、審查與多步驟推理。",
-      isDefault: false,
-      reasoningEfforts: claudeEfforts,
-    },
-    {
-      id: "sonnet",
-      name: "Claude Sonnet",
-      description: "速度與能力較平衡，適合日常開發與分析。",
-      isDefault: false,
-      reasoningEfforts: claudeEfforts,
-    },
-    {
-      id: "fable",
-      name: "Claude Fable",
-      description: "能力最強，單次工作可能較久；需方案支援。",
-      isDefault: false,
-      reasoningEfforts: claudeEfforts,
-    },
-    {
-      id: "haiku",
-      name: "Claude Haiku",
-      description: "最快、用量最低；不支援思考強度設定。",
-      isDefault: false,
-      reasoningEfforts: [],
-    },
-  ],
-};
+export function claudeModelCatalog(): ModelCatalog {
+  const m = sm().analysis.models;
+  return {
+    source: "claude",
+    models: [
+      {
+        id: "opus",
+        name: "Claude Opus",
+        description: m.claudeOpus,
+        isDefault: false,
+        reasoningEfforts: claudeEfforts,
+      },
+      {
+        id: "sonnet",
+        name: "Claude Sonnet",
+        description: m.claudeSonnet,
+        isDefault: false,
+        reasoningEfforts: claudeEfforts,
+      },
+      {
+        id: "fable",
+        name: "Claude Fable",
+        description: m.claudeFable,
+        isDefault: false,
+        reasoningEfforts: claudeEfforts,
+      },
+      {
+        id: "haiku",
+        name: "Claude Haiku",
+        description: m.claudeHaiku,
+        isDefault: false,
+        reasoningEfforts: [],
+      },
+    ],
+  };
+}
+
+/** A cached catalog with its error in the locale of this read, not of the read that filled the cache. */
+function localized(catalog: ModelCatalog): ModelCatalog {
+  return catalog.error ? { ...catalog, error: catalogError() } : catalog;
+}
 
 let cached: { value: ModelCatalog; expires: number } | undefined;
 let pending: Promise<ModelCatalog> | undefined;
 export function getModelCatalog(
   provider: AgentProvider = "codex",
 ): Promise<ModelCatalog> {
-  if (provider === "claude") return Promise.resolve(claudeModelCatalog);
+  if (provider === "claude") return Promise.resolve(claudeModelCatalog());
   if (cached && cached.expires > Date.now())
-    return Promise.resolve(cached.value);
-  if (pending) return pending;
+    return Promise.resolve(localized(cached.value));
+  if (pending) return pending.then(localized);
   pending = readModelCatalog()
     .then((value) => {
       cached = { value, expires: Date.now() + (value.error ? 10_000 : 60_000) };
@@ -305,10 +319,10 @@ export function resolveModelExecution(
 ): ModelExecution {
   const parsed = z.object(modelSettingsSchema).safeParse(settings);
   if (!parsed.success)
-    throw new AppError("模型設定格式不正確，請重新選擇。", 400);
+    throw new AppError((m) => m.analysis.models.invalidSettings, 400);
   const selected = parsed.data;
   if ((selected.provider ?? "codex") !== catalog.source)
-    throw new AppError("模型目錄與所選 Agent 不一致，請重新載入後再選擇。", 400);
+    throw new AppError((m) => m.analysis.models.providerMismatch, 400);
   const recordedProvider = {
     ...(catalog.source === "codex" ? {} : { provider: catalog.source }),
     // Off is the default, so only an enabled flag is recorded on the run.
@@ -319,17 +333,14 @@ export function resolveModelExecution(
     : catalog.models.find((item) => item.isDefault);
   if (!model) {
     if (selected.model || selected.reasoningEffort) {
-      throw new AppError(
-        "無法確認這組模型設定，請重新載入模型目錄並選擇。",
-        400,
-      );
+      throw new AppError((m) => m.analysis.models.unknownModel, 400);
     }
     return { ...recordedProvider, source: "cli-default" };
   }
   const reasoningEffort =
     selected.reasoningEffort || model.defaultReasoningEffort;
   if (reasoningEffort && !model.reasoningEfforts.includes(reasoningEffort)) {
-    throw new AppError("所選模型不支援這個思考強度，請重新選擇。", 400);
+    throw new AppError((m) => m.analysis.models.unsupportedEffort, 400);
   }
   return {
     ...recordedProvider,

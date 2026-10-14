@@ -6,6 +6,8 @@ import {
   prNumberOf,
 } from "./pr-feedback.js";
 import { AppError } from "./types.js";
+import { withLocale } from "./i18n/index.js";
+import { assertNoHan } from "../src/test-utils/render.js";
 import {
   groupPrFeedback,
   summarizeChecks,
@@ -229,6 +231,57 @@ test("items are capped at 100, bodies at 4,000 characters, and partial pages are
   assert.equal(feedback.items[0].kind, "review");
   assert.ok(feedback.warnings?.some((warning) => /對話留言只讀取最近 120 則，共 400 則/.test(warning)));
   assert.ok(feedback.warnings?.some((warning) => /超過 100 則上限/.test(warning)));
+});
+
+test("in English, partial pages, dropped comments and GitHub errors are reported without Han", () => {
+  const pr = graphqlPayload().data.repository.pullRequest;
+  pr.reviewThreads.nodes[0].comments.totalCount = 12;
+  const payload = {
+    data: {
+      repository: {
+        pullRequest: {
+          ...pr,
+          comments: {
+            totalCount: 400,
+            nodes: Array.from({ length: 120 }, (_, index) => ({
+              author: { login: `user${index}` },
+              authorAssociation: "NONE",
+              body: "Thanks.",
+              url: `${prUrl}#issuecomment-${index + 100}`,
+              createdAt: "2026-10-07T00:00:00Z",
+            })),
+          },
+          labels: { totalCount: 101, nodes: [{ name: "bug" }] },
+        },
+      },
+    },
+  };
+  const feedback = withLocale("en", () => parsePrFeedback(payload, options));
+  const warnings = feedback.warnings ?? [];
+  assert.ok(
+    warnings.includes("Only the latest 120 of 400 conversation comments were read."),
+    warnings.join("\n"),
+  );
+  assert.ok(
+    warnings.some((warning) =>
+      /^Only the first \d+ of 12 replies on hello\.ts were read\.$/.test(warning),
+    ),
+    warnings.join("\n"),
+  );
+  assert.ok(
+    warnings.some((warning) =>
+      /^\d+ comments were left out: they are over the limit of 100/.test(warning),
+    ),
+  );
+  assert.ok(warnings.includes("Only 1 of 101 PR labels were read; the labels left out may include ones that start with needs:."));
+  for (const warning of warnings) assertNoHan(warning);
+  assert.throws(
+    () =>
+      withLocale("en", () =>
+        parsePrFeedback({ errors: [{ message: "Bad credentials" }] }, options),
+      ),
+    { message: "GitHub returned an error: Bad credentials" },
+  );
 });
 
 test("missing or mismatched PRs and GraphQL errors are reported as application errors", () => {

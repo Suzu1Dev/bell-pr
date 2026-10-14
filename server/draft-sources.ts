@@ -5,6 +5,8 @@ import {
   secretInPatch,
   sensitivePath,
 } from "./git.js";
+import { formatters } from "../shared/i18n/locale.js";
+import { currentLocale, sm } from "./i18n/index.js";
 import { command, redact } from "./process.js";
 import { AppError, type Repository, type Run } from "./types.js";
 
@@ -191,7 +193,8 @@ export async function collectDraftContext(
   options: { signal?: AbortSignal; execute?: typeof command } = {},
 ): Promise<DraftContext> {
   if (!shaPattern.test(run.baseSha))
-    throw new AppError("草稿規範需要有效的基準版本。", 422);
+    throw new AppError((m) => m.analysis.draftSources.invalidBase, 422);
+  const messages = sm().analysis.draftSources;
   const execute = options.execute ?? command;
   const context: DraftContext = {
     sources: [],
@@ -208,26 +211,26 @@ export async function collectDraftContext(
   };
   const active = () => {
     if (options.signal?.aborted)
-      throw new AppError("草稿規範讀取已取消。", 409);
+      throw new AppError((m) => m.analysis.draftSources.cancelled, 409);
   };
   const addSource = (source: DraftSource, limit = maximumFileBytes) => {
     active();
     if (!source.content.trim()) return;
     if (/[\x00-\x08\x0b\x0c\x0e-\x1f\ufffd]/.test(source.content)) {
-      warn(`${source.label} 不是可安全讀取的文字，已略過。`);
+      warn(messages.unreadableText({ label: source.label }));
       return;
     }
     if (
       secretInPatch(source.content) ||
       redact(source.content) !== source.content
     ) {
-      warn(`${source.label} 疑似包含敏感資訊，已略過。`);
+      warn(messages.sensitive({ label: source.label }));
       return;
     }
     const bytes = Buffer.from(source.content);
     const allowed = Math.min(limit, maximumTotalBytes - total);
     if (allowed <= 0) {
-      warn("規範來源達到 80 KB 上限；尚未完整檢查所有文件與討論。");
+      warn(messages.totalLimit);
       return;
     }
     const content = bytes
@@ -236,7 +239,10 @@ export async function collectDraftContext(
       .replace(/\ufffd$/, "");
     if (bytes.length > allowed)
       warn(
-        `${source.label} 僅讀取前 ${allowed.toLocaleString("en-US")} bytes；後續內容尚未檢查。`,
+        messages.truncated({
+          label: source.label,
+          bytes: formatters(currentLocale()).number(allowed),
+        }),
       );
     total += Buffer.byteLength(content);
     context.sources.push({ ...source, content });
@@ -282,9 +288,12 @@ export async function collectDraftContext(
     url?: string,
     kind: DraftSource["kind"] = documentKind(entry.path)!,
   ) => {
-    const label = source === "base" ? entry.path : `共用預設 · ${entry.path}`;
+    const label =
+      source === "base"
+        ? entry.path
+        : messages.accountDefault({ path: entry.path });
     if (entry.type !== "blob" || !["100644", "100755"].includes(entry.mode)) {
-      warn(`${label} 不是一般檔案，已略過符號連結或子模組。`);
+      warn(messages.notRegularFile({ label }));
       return;
     }
     if (
@@ -292,11 +301,11 @@ export async function collectDraftContext(
       entry.size > maximumReadBytes ||
       entry.size < 0
     ) {
-      warn(`${label} 超過單檔讀取上限或大小不明，尚未檢查其內容。`);
+      warn(messages.tooLarge({ label }));
       return;
     }
     if (documentCount >= maximumFiles || total >= maximumTotalBytes) {
-      warn("文件取樣達到 16 份或 80 KB 上限；尚未完整檢查所有規範。");
+      warn(messages.documentLimit);
       return;
     }
     documentCount++;
@@ -311,13 +320,11 @@ export async function collectDraftContext(
       });
     } catch {
       active();
-      warn(`${label} 讀取失敗，尚未確認其規範。`);
+      warn(messages.readFailed({ label }));
     }
   };
 
-  warn(
-    "本機規範搜尋範圍為基準版本的根目錄、.github、docs 與 documentation 內常見貢獻指南、README、維護者文件及 PR 模板，根目錄的 AGENTS.md／CLAUDE.md，以及 .github/workflows 中會自動檢查 PR 的流程；未追蹤文件中的外部連結。",
-  );
+  warn(messages.searchScope);
   const localKinds = new Set<DocumentKind>();
   let localChecked = false;
   // Set once the base tree is read; run after all written guidance.
@@ -371,13 +378,19 @@ export async function collectDraftContext(
       for (const [index, entry] of workflows.entries()) {
         if (automation >= maximumAutomationSources) {
           warn(
-            `自動檢查流程最多收錄 ${maximumAutomationSources} 份；其餘 ${workflows.length - index} 個 workflow 尚未檢查。`,
+            messages.automationLimit({
+              max: maximumAutomationSources,
+              remaining: workflows.length - index,
+            }),
           );
           break;
         }
         if (index >= maximumWorkflowScans) {
           warn(
-            `.github/workflows 有 ${workflows.length} 個檔案，只檢查了前 ${maximumWorkflowScans} 個是否會自動檢查 PR。`,
+            messages.workflowScanLimit({
+              total: workflows.length,
+              max: maximumWorkflowScans,
+            }),
           );
           break;
         }
@@ -387,7 +400,7 @@ export async function collectDraftContext(
           content = await show(entry.path);
         } catch {
           active();
-          warn(`${entry.path} 讀取失敗，尚未確認它是否會自動檢查 PR。`);
+          warn(messages.workflowReadFailed({ path: entry.path }));
           continue;
         }
         if (!pullRequestGate(content)) continue;
@@ -403,13 +416,11 @@ export async function collectDraftContext(
     };
   } catch {
     active();
-    warn("無法讀取任務基準版本的規範文件；不能據此判定專案沒有規範。");
+    warn(messages.baseUnreadable);
   }
   active();
   if (!remote) {
-    warn(
-      "未提供可驗證的 github.com 專案網址，尚未檢查 GitHub 維護者討論與帳號共用預設規範。",
-    );
+    warn(messages.noRemote);
     await scanWorkflows();
     return context;
   }
@@ -430,9 +441,7 @@ export async function collectDraftContext(
     metadata = response.data.repository;
   } catch {
     active();
-    warn(
-      "GitHub 維護者討論與帳號共用資訊讀取失敗（可能是權限、連線或 API 限制）；不能據此判定沒有額外規範。",
-    );
+    warn(messages.metadataFailed);
   }
 
   if (
@@ -473,7 +482,7 @@ export async function collectDraftContext(
         if (!shaPattern.test(tree.sha) || !Array.isArray(tree.tree))
           throw new Error("Invalid default tree");
         if (tree.truncated)
-          warn("帳號共用 .github 的檔案清單已截斷；尚未完整檢查預設規範。");
+          warn(messages.defaultsTruncated);
         const candidates: Entry[] = tree.tree
           .filter((entry: Entry) => {
             const kind =
@@ -515,9 +524,9 @@ export async function collectDraftContext(
           );
         }
       } else if (defaults.private !== false) {
-        warn("帳號共用 .github 未確認為公開 repository，未採用其預設規範。");
+        warn(messages.defaultsNotPublic);
       } else {
-        warn("帳號共用 .github 沒有可讀取的預設分支，尚未確認預設規範。");
+        warn(messages.defaultsNoBranch);
       }
     } catch (error) {
       active();
@@ -527,16 +536,14 @@ export async function collectDraftContext(
           error instanceof Error && /(?:HTTP\s+404|\(404\))/.test(error.message)
         )
       )
-        warn("帳號共用 .github 預設規範讀取失敗；尚未確認是否存在適用規範。");
+        warn(messages.defaultsFailed);
     }
   }
 
   await scanWorkflows();
 
   if (metadata) {
-    warn(
-      "維護者偏好僅取樣最近更新的 3 個已合併 PR，各最多 5 則留言及 5 則 review；已合併不等於規範認可，仍需人工確認適用性。",
-    );
+    warn(messages.maintainerSample);
     const prs = Array.isArray(metadata.pullRequests?.nodes)
       ? metadata.pullRequests.nodes.slice(0, 3)
       : [];
@@ -558,11 +565,18 @@ export async function collectDraftContext(
             !validPrUrl(comment.url, remote.url, pr.number, true)
           )
             continue;
+          const author = {
+            number: pr.number,
+            association: comment.authorAssociation,
+          };
           addSource(
             {
               id: `${type}:${pr.number}:${new URL(comment.url).hash.slice(1)}`,
               kind: "maintainer",
-              label: `PR #${pr.number} · ${comment.authorAssociation} ${type === "review" ? "審查" : "留言"}`,
+              label:
+                type === "review"
+                  ? messages.maintainerReview(author)
+                  : messages.maintainerComment(author),
               url: comment.url,
               content: comment.body,
             },
@@ -575,7 +589,7 @@ export async function collectDraftContext(
           {
             id: `pr:${pr.number}`,
             kind: "example",
-            label: `PR #${pr.number} · 已合併範例（非規範）`,
+            label: messages.mergedExample({ number: pr.number }),
             url: pr.url,
             content: `${pr.title}\n\n${pr.body}`,
           },

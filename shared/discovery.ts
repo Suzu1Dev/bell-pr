@@ -1,4 +1,5 @@
 import type { EfficiencyMetrics, PonytailMode } from "./efficiency.js";
+import type { Locale } from "./i18n/locale.js";
 import type { ModelExecution, ModelSettings } from "./models.js";
 
 /** GitHub search order: "relevance" is GitHub best match (no sort parameter). */
@@ -84,6 +85,17 @@ export interface DiscoveryJob {
   modelExecution?: ModelExecution;
   efficiency?: EfficiencyMetrics;
   error?: string;
+  /**
+   * The UI locale the job was started in; its messages and the agent's
+   * output use it. Absent on jobs saved before it was recorded.
+   */
+  locale?: Locale;
+  /**
+   * True for the built-in sample job the app shows without a Pro license;
+   * its candidates and sources have no links. The server never sets it, and
+   * real jobs leave it out.
+   */
+  sample?: boolean;
   previousResult?: {
     createdAt: string;
     candidates: DiscoveryCandidate[];

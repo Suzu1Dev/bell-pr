@@ -42,8 +42,16 @@ import {
   hasExtendedAgentTimeout,
   withAgentTimeoutHint,
 } from "./agent-timeouts.js";
+import {
+  currentLocale,
+  sm,
+  withLocale,
+  type ServerMessages,
+} from "./i18n/index.js";
+import { respondIn } from "./prompt-language.js";
 import { AppError, type Repository } from "./types.js";
 import { lenientRead } from "./persisted-schema.js";
+import { locales, type Locale } from "../shared/i18n/locale.js";
 import {
   defaultPonytailMode,
   ponytailModes,
@@ -86,10 +94,9 @@ export const contributionSettingsSchema = z
       .string()
       .trim()
       .max(400)
-      .refine((value) => !value || parseGitHubIssueUrl(value) !== null, {
-        message:
-          "相關 issue 連結需為 https://github.com/<owner>/<repo>/issues/<編號>",
-      })
+      .refine((value) => !value || parseGitHubIssueUrl(value) !== null, () => ({
+        message: sm().analysis.insights.issueUrlInvalid,
+      }))
       .optional(),
     ...modelSettingsSchema,
   })
@@ -246,7 +253,11 @@ const analysisJsonSchema = objectSchema({
   recommendations: arraySchema(recommendationJsonSchema),
 });
 
-const persistedInsightsSchema = analysisSchema.extend({
+/** A locale this build does not know reads as unknown instead of failing the whole cache. */
+const persistedLocale = z.enum(locales).optional().catch(undefined);
+
+/** The saved analysis (the cache entry); read leniently through `cacheSchema`. */
+export const persistedInsightsSchema = analysisSchema.extend({
   // Caches written before the reading path was requested keep loading.
   readingPath: readingPathSchema.optional(),
   howItFitsTogether: text.optional(),
@@ -275,6 +286,7 @@ const persistedInsightsSchema = analysisSchema.extend({
   generatedAt: z.string().datetime(),
   source: z.literal("ai"),
   baseSha: z.string().regex(/^[a-f0-9]{40,64}$/),
+  locale: persistedLocale,
   sample: z
     .object({
       trackedFiles: z.number().int().min(0),
@@ -289,11 +301,13 @@ const persistedInsightsSchema = analysisSchema.extend({
 const recommendationIdsSchema = z
   .array(recommendationSchema.shape.id)
   .max(maxProjectRecommendations)
-  .refine((ids) => new Set(ids).size === ids.length, "建議識別碼不可重複。");
+  .refine((ids) => new Set(ids).size === ids.length, () => ({
+    message: sm().analysis.insights.duplicateRecommendationIds,
+  }));
 const recommendationPreferencesSchema = z
   .object({ order: recommendationIdsSchema, hidden: recommendationIdsSchema })
   .strict();
-const cacheSchema = z.object({
+export const cacheSchema = z.object({
   version: z.literal(1),
   settings: contributionSettingsSchema,
   insights: persistedInsightsSchema.nullable(),
@@ -357,10 +371,17 @@ function classifyCitation(
   return tree.has(file) ? "known" : "unknown";
 }
 
-function citationReason(citation: Citation, file: string): string {
+/** The messages BELL saves with an analysis, in the analysis's locale. */
+type InsightsMessages = ServerMessages["analysis"]["insights"];
+
+function citationReason(
+  m: InsightsMessages,
+  citation: Citation,
+  file: string,
+): string {
   return citation === "known"
-    ? `引用了未抽樣的檔案 ${file}`
-    : `引用了未提供的檔案 ${file}`;
+    ? m.citesUnsampledFile({ path: file })
+    : m.citesUnsuppliedFile({ path: file });
 }
 
 /**
@@ -370,27 +391,31 @@ function citationReason(citation: Citation, file: string): string {
  * claimed without storing the unverified proposal.
  */
 function unverifiedReason(
+  m: InsightsMessages,
   recommendation: z.infer<typeof recommendationSchema>,
   source: Map<string, string>,
   cite: (file: string) => Citation,
 ): string | null {
   for (const file of recommendation.evidence) {
     const citation = cite(file);
-    if (citation !== "sampled") return citationReason(citation, file);
+    if (citation !== "sampled") return citationReason(m, citation, file);
   }
   const details = recommendation.evidenceDetails ?? [];
   const excerpt = (quote: string) =>
     quote.length > 120 ? `${quote.slice(0, 120)}…` : quote;
   for (const detail of details) {
     if (!recommendation.evidence.includes(detail.path))
-      return `引文路徑 ${detail.path} 不在這項建議的 evidence 清單：「${excerpt(detail.quote)}」`;
+      return m.quotePathNotInEvidence({
+        path: detail.path,
+        quote: excerpt(detail.quote),
+      });
     if (!quoteMatches(source.get(detail.path) ?? "", detail.quote))
-      return `引文在 ${detail.path} 找不到：「${excerpt(detail.quote)}」`;
+      return m.quoteNotFound({ path: detail.path, quote: excerpt(detail.quote) });
   }
   const uncited = recommendation.evidence.find(
     (file) => !details.some((detail) => detail.path === file),
   );
-  return uncited ? `evidence 路徑 ${uncited} 缺對應引文` : null;
+  return uncited ? m.evidenceWithoutQuote({ path: uncited }) : null;
 }
 
 /**
@@ -400,7 +425,9 @@ function unverifiedReason(
  * reading step may cite a tracked file (marked `sampled: false`); evidence
  * notes and recommendation quotes still need sampled content. Entries that
  * fail are dropped and recorded, and the answer is rejected only when a
- * required section has nothing left.
+ * required section has nothing left. The recorded reasons are saved with the
+ * analysis, so they are written in its `locale`; a rejection answers the
+ * request in the request's locale.
  */
 function validateAnalysis<
   S extends typeof analysisSchema | typeof recommendationsSchema,
@@ -409,17 +436,19 @@ function validateAnalysis<
   sourceFiles: { path: string; content: string }[],
   tree: string[],
   schema: S,
+  locale: Locale,
 ): { value: z.infer<S>; verification: RecommendationVerification } {
+  const reasons = withLocale(locale, () => sm().analysis.insights);
   let value: z.infer<S>;
   try {
     value = schema.parse(JSON.parse(raw)) as z.infer<S>;
   } catch {
-    throw new AppError("AI 分析格式不完整，請重新分析；原有結果已保留。", 422);
+    throw new AppError((m) => m.analysis.insights.incompleteAnswer, 422);
   }
   // Checked on the complete answer: a dropped recommendation is still model output that was seen.
   const serialized = JSON.stringify(value);
   if (secretInPatch(serialized) || redact(serialized) !== serialized)
-    throw new AppError("AI 回應疑似包含敏感內容，結果未儲存。", 422);
+    throw new AppError((m) => m.analysis.insights.sensitiveAnswer, 422);
   const source = new Map(sourceFiles.map((file) => [file.path, file.content]));
   const known = new Set(tree);
   const cite = (file: string) => classifyCitation(file, source, known);
@@ -435,7 +464,7 @@ function validateAnalysis<
       droppedPaths.push({
         field,
         path: entry.path,
-        reason: citationReason(citation, entry.path),
+        reason: citationReason(reasons, citation, entry.path),
       });
       return false;
     });
@@ -452,14 +481,14 @@ function validateAnalysis<
       const first = droppedPaths.find((entry) => entry.field === field);
       if (value[field].length || !first) continue;
       throw new AppError(
-        `AI 分析引用了未提供的檔案（${field}：${first.path}），請重新分析；原有結果已保留。`,
+        (m) => m.analysis.insights.unsuppliedCitation({ field, path: first.path }),
         422,
       );
     }
     // The prompt asks for 3–8 reading steps; tiny samples cannot provide three.
     if (value.readingPath.length < Math.min(3, sourceFiles.length))
       throw new AppError(
-        "AI 分析的建議閱讀順序過短，請重新分析；原有結果已保留。",
+        (m) => m.analysis.insights.readingPathTooShort,
         422,
       );
   }
@@ -468,13 +497,13 @@ function validateAnalysis<
     new Set(value.recommendations.map((entry) => entry.id)).size !==
       value.recommendations.length
   )
-    throw new AppError("AI 建議的識別碼重複，請重新分析。", 422);
+    throw new AppError((m) => m.analysis.insights.duplicateIds, 422);
   const verification: RecommendationVerification = {
     droppedRecommendations: [],
   };
   if (droppedPaths.length) verification.droppedPaths = droppedPaths;
   value.recommendations = value.recommendations.filter((recommendation) => {
-    const reason = unverifiedReason(recommendation, source, cite);
+    const reason = unverifiedReason(reasons, recommendation, source, cite);
     if (reason)
       verification.droppedRecommendations.push({
         id: recommendation.id,
@@ -608,7 +637,8 @@ export class ProjectInsightsService {
 
   private repository(id: string): Repository {
     const repo = this.store.data.repos.find((entry) => entry.id === id);
-    if (!repo) throw new AppError("找不到 Repository。", 404);
+    if (!repo)
+      throw new AppError((m) => m.analysis.insights.repositoryNotFound, 404);
     return repo;
   }
 
@@ -641,7 +671,7 @@ export class ProjectInsightsService {
           recommendationPreferences: { order: [], hidden: [] },
         };
       throw new AppError(
-        "專案分析資料無法讀取，請檢查本機 insights 資料檔。",
+        (m) => m.analysis.insights.cacheUnreadable,
         500,
       );
     }
@@ -677,7 +707,10 @@ export class ProjectInsightsService {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT")
         return sharedModelSettingsSchema.parse({});
-      throw new AppError("模型設定無法讀取，請檢查本機 model-settings.json。", 500);
+      throw new AppError(
+        (m) => m.analysis.insights.modelSettingsUnreadable,
+        500,
+      );
     }
   }
 
@@ -737,19 +770,23 @@ export class ProjectInsightsService {
     const preferences = recommendationPreferencesSchema.parse(input);
     await this.update(repoId, (cache) => {
       if (!cache.insights)
-        throw new AppError("請先分析專案，再調整貢獻建議。", 409);
+        throw new AppError((m) => m.analysis.insights.analyzeFirst, 409);
       const ids = new Set(
         cache.insights.recommendations.map((entry) => entry.id),
       );
       if ([...preferences.order, ...preferences.hidden].some((id) => !ids.has(id)))
-        throw new AppError("部分貢獻建議已更新，請重新整理後再調整。", 409);
+        throw new AppError(
+          (m) => m.analysis.insights.recommendationsChanged,
+          409,
+        );
       cache.recommendationPreferences = preferences;
     });
     return preferences;
   }
 
   private assertActive(signal?: AbortSignal) {
-    if (signal?.aborted) throw new AppError("專案分析已取消。", 409);
+    if (signal?.aborted)
+      throw new AppError((m) => m.analysis.insights.cancelled, 409);
   }
 
   private async version(repo: Repository, signal?: AbortSignal) {
@@ -779,7 +816,7 @@ export class ProjectInsightsService {
     ]);
     const baseSha = head.stdout.trim();
     if (!/^[a-f0-9]{40,64}$/.test(baseSha))
-      throw new AppError("Repository 沒有可分析的 Git 版本。", 422);
+      throw new AppError((m) => m.analysis.insights.noCommit, 422);
     const fingerprint = createHash("sha256")
       .update(baseSha)
       .update("\0")
@@ -916,10 +953,7 @@ export class ProjectInsightsService {
       }
     }
     if (!files.length)
-      throw new AppError(
-        "找不到可分析的已追蹤文字檔案；請先加入 README 或程式碼並提交。",
-        422,
-      );
+      throw new AppError((m) => m.analysis.insights.noTextFiles, 422);
     return {
       files,
       tree,
@@ -991,7 +1025,16 @@ export class ProjectInsightsService {
     return this.analyze(repoId, true);
   }
 
-  private async analyze(
+  /**
+   * Runs the analysis in the request's locale, held for its whole run: its
+   * errors answer the request in that locale, and a new analysis is written
+   * in it. The locale is not part of the fingerprint.
+   */
+  private async analyze(repoId: string, more: boolean) {
+    return withLocale(currentLocale(), () => this.analyzeInLocale(repoId, more));
+  }
+
+  private async analyzeInLocale(
     repoId: string,
     more: boolean,
   ): Promise<{
@@ -1001,11 +1044,11 @@ export class ProjectInsightsService {
   }> {
     const repo = this.repository(repoId);
     if (this.stopping)
-      throw new AppError("服務正在關閉，無法開始新的專案分析。", 503);
+      throw new AppError((m) => m.analysis.insights.shuttingDown, 503);
     if (this.generating.has(repoId))
-      throw new AppError("這個專案正在分析，請等待目前分析完成。", 409);
+      throw new AppError((m) => m.analysis.insights.alreadyRunning, 409);
     if (this.generating.size >= 2)
-      throw new AppError("同時最多分析兩個專案，請稍後再試。", 429);
+      throw new AppError((m) => m.analysis.insights.tooManyRunning, 429);
     this.generating.add(repoId);
     const controller = new AbortController();
     const signal = controller.signal;
@@ -1025,7 +1068,7 @@ export class ProjectInsightsService {
         (!previous.insights || previous.fingerprint !== version.fingerprint)
       )
         throw new AppError(
-          "請先重新分析專案全貌，再產出更多貢獻方向。",
+          (m) => m.analysis.insights.reanalyzeBeforeMore,
           409,
         );
       if (
@@ -1033,9 +1076,15 @@ export class ProjectInsightsService {
         previous.insights!.recommendations.length >= maxProjectRecommendations
       )
         throw new AppError(
-          `已累積 ${maxProjectRecommendations} 個貢獻方向；請先選擇想改善的項目，或重新分析專案。`,
+          (m) =>
+            m.analysis.insights.recommendationLimit({
+              max: maxProjectRecommendations,
+            }),
           409,
         );
+      // One analysis keeps one language: more recommendations are written in
+      // the saved analysis's locale, or the request's when the cache predates it.
+      const locale = (more && previous.insights?.locale) || currentLocale();
       const requestedCount = more
         ? Math.min(
             projectRecommendationBatchSize,
@@ -1054,7 +1103,14 @@ export class ProjectInsightsService {
       } catch {
         this.assertActive(signal);
         throw new AppError(
-          `無法使用 ${agentLabel(settings.provider)}：請確認已安裝 CLI 並執行 ${login.executable === "claude" ? "claude auth login" : "codex login"}。`,
+          (m) =>
+            m.analysis.insights.agentUnavailable({
+              agent: agentLabel(settings.provider),
+              login:
+                login.executable === "claude"
+                  ? "claude auth login"
+                  : "codex login",
+            }),
           503,
         );
       }
@@ -1079,7 +1135,7 @@ export class ProjectInsightsService {
       const mode = settings.ponytailMode ?? defaultPonytailMode;
       const input = applyPonytail(
         [
-          "You are BELL PR's read-only project analyst. Return a single JSON object matching the provided output schema, in Traditional Chinese.",
+          `You are BELL PR's read-only project analyst. Return a single JSON object matching the provided output schema. ${respondIn(locale)}`,
           more
             ? `Extend the existing contribution recommendations in this one response. Return exactly ${requestedCount} genuinely different, source-backed NEW recommendations. Consider all relevant contribution directions (${contributionDirections.join(", ")}) and materially different problems before selecting the strongest proposals. Do not repeat a previous title, problem or proposed change in different words, or split one idea to fill the batch. Return fewer only when the supplied evidence cannot support ${requestedCount} distinct useful new ideas; never invent facts to reach the target. An empty recommendations array is valid only when no additional useful idea is supported.`
             : "Explain the project's purpose, intended users, ordinary user journey and architecture before suggesting contributions. readingPath lists 3–8 supplied files in the order a newcomer should read them (fewer only when fewer files were supplied), each with why it comes at that point and what to look for in it. howItFitsTogether traces one main data flow in prose using the import and call relationships visible in the supplied excerpts; where the excerpts do not show a link, say so instead of guessing.",
@@ -1135,7 +1191,17 @@ export class ProjectInsightsService {
       // The analysis request has no progress channel, so the wait is only visible in the server log.
       if (hasExtendedAgentTimeout(modelExecution))
         console.log(
-          `專案分析 ${repo.fullName}（${agentLabel(modelExecution.provider)}${modelExecution.model ? ` ${modelExecution.model}` : ""}${modelExecution.reasoningEffort ? ` ${modelExecution.reasoningEffort}` : ""}）開始，${describeAgentTimeout(timeoutMs)}。`,
+          sm().analysis.insights.started({
+            repository: repo.fullName,
+            runner: [
+              agentLabel(modelExecution.provider),
+              modelExecution.model,
+              modelExecution.reasoningEffort,
+            ]
+              .filter(Boolean)
+              .join(" "),
+            wait: describeAgentTimeout(timeoutMs),
+          }),
         );
       await retryTransientAuth(
         async () => {
@@ -1195,18 +1261,15 @@ export class ProjectInsightsService {
       );
       this.assertActive(signal);
       if (failed || !answer || Buffer.byteLength(answer) > 120_000)
-        throw new AppError(
-          "AI 分析未完成或回應過大，請重試；原有結果已保留。",
-          422,
-        );
+        throw new AppError((m) => m.analysis.insights.unfinished, 422);
       const { value: analysis, verification } = more
-        ? validateAnalysis(answer, context.files, safePaths, recommendationsSchema)
-        : validateAnalysis(answer, context.files, safePaths, analysisSchema);
+        ? validateAnalysis(answer, context.files, safePaths, recommendationsSchema, locale)
+        : validateAnalysis(answer, context.files, safePaths, analysisSchema, locale);
       if (
         (await this.version(repo, signal)).fingerprint !== version.fingerprint
       )
         throw new AppError(
-          "分析期間 Repository 已改變，請重新分析最新版本。",
+          (m) => m.analysis.insights.repositoryChanged,
           409,
         );
       let insights: ProjectInsights;
@@ -1239,6 +1302,7 @@ export class ProjectInsightsService {
           generatedAt,
           source: "ai",
           baseSha: version.baseSha,
+          locale,
           // Recorded outside the strict analysis schema: the model never reports its own coverage.
           sample: {
             trackedFiles: context.trackedFileCount,

@@ -3,7 +3,9 @@ import test from "node:test";
 import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import { assertNoHan } from "../src/test-utils/render.js";
 import { collectDraftContext, pullRequestGate } from "./draft-sources.js";
+import { withLocale } from "./i18n/index.js";
 import { command, git } from "./process.js";
 
 const json = (value: unknown) => ({
@@ -225,6 +227,107 @@ test("maintainer statements require verified repository URLs and roles; merged P
       stub.calls
         .find((call) => call.executable === "gh")
         ?.args.some((arg) => arg.startsWith("query=query BellDraftContext")),
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("in English, source labels and warnings carry no Han", async () => {
+  const f = await fixture({ "README.md": "A test project." });
+  try {
+    const stub = stubGithub((args) => {
+      if (args.includes("graphql"))
+        return metadata("Organization", [
+          {
+            number: 42,
+            title: "fix: network retry",
+            body: "A merged example.",
+            url: "https://github.com/owner/project/pull/42",
+            comments: {
+              nodes: [
+                {
+                  body: "Please include a reproducer.",
+                  authorAssociation: "OWNER",
+                  url: "https://github.com/owner/project/pull/42#issuecomment-1",
+                },
+              ],
+            },
+            reviews: {
+              nodes: [
+                {
+                  body: "Explain the test coverage.",
+                  authorAssociation: "MEMBER",
+                  url: "https://github.com/owner/project/pull/42#pullrequestreview-5",
+                },
+              ],
+            },
+          },
+        ]);
+      const endpoint = args.at(-1)!;
+      if (endpoint === "repos/owner/.github")
+        return { private: false, default_branch: "main" };
+      if (endpoint.includes("/git/ref/"))
+        return { object: { type: "commit", sha: defaultSha } };
+      if (endpoint.includes("/git/trees/"))
+        return {
+          sha: treeSha,
+          truncated: true,
+          tree: [
+            {
+              path: "CONTRIBUTING.md",
+              type: "blob",
+              mode: "100644",
+              sha: blobSha,
+              size: 36,
+            },
+          ],
+        };
+      return {
+        encoding: "base64",
+        content: Buffer.from("Shared rule: describe the motivation.").toString(
+          "base64",
+        ),
+      };
+    });
+    const context = await withLocale("en", () =>
+      collectDraftContext(f.repo, f.run, { execute: stub.execute }),
+    );
+    assert.deepEqual(
+      context.sources.map((source) => source.label),
+      [
+        "README.md",
+        "Account default · CONTRIBUTING.md",
+        "PR #42 · OWNER comment",
+        "PR #42 · MEMBER review",
+        "PR #42 · merged example (not a rule)",
+      ],
+    );
+    assert.ok(
+      context.warnings.some((warning) =>
+        warning.startsWith("The local rule search covers"),
+      ),
+    );
+    assert.ok(
+      context.warnings.includes(
+        "The file list of the account-wide .github repository was truncated; its default rules were not fully checked.",
+      ),
+    );
+    assert.ok(
+      context.warnings.some((warning) =>
+        warning.includes("A merged PR is not an endorsed rule"),
+      ),
+    );
+    for (const text of [
+      ...context.warnings,
+      ...context.sources.map((source) => source.label),
+    ])
+      assertNoHan(text);
+    await assert.rejects(
+      withLocale("en", () =>
+        collectDraftContext(f.repo, { ...f.run, baseSha: "nope" }),
+      ),
+      { message: "Reading the draft rules needs a valid base commit." },
     );
   } finally {
     await f.cleanup();

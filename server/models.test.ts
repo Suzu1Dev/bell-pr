@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access } from "node:fs/promises";
+import { access, chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { z } from "zod";
 import type { ModelCatalog } from "../shared/models.js";
+import { assertNoHan } from "../src/test-utils/render.js";
+import { withLocale } from "./i18n/index.js";
 import { AppError } from "./types.js";
 import {
   claudeModelCatalog,
@@ -201,6 +205,59 @@ test("catalog timeout and provider errors return safe messages without raw detai
   assert.doesNotMatch(failed.error || "", /private/);
 });
 
+test("catalog errors, Claude descriptions and settings errors follow the locale of each read", async () => {
+  const failed = await withLocale("en", () =>
+    readModelCatalog(server("// Wait until the caller times out."), 100),
+  );
+  assert.equal(
+    failed.error,
+    "The Codex model list cannot be read right now. Check that the CLI is installed and signed in, then try again later.",
+  );
+  const english = withLocale("en", () => claudeModelCatalog());
+  for (const model of english.models) assertNoHan(model.description);
+  assert.deepEqual(
+    english.models.map((model) => model.id),
+    claudeModelCatalog().models.map((model) => model.id),
+  );
+  assert.notEqual(
+    english.models[0].description,
+    withLocale("zh-TW", () => claudeModelCatalog()).models[0].description,
+  );
+  assert.throws(
+    () =>
+      withLocale("en", () =>
+        resolveModelExecution(
+          { provider: "claude", model: "haiku", reasoningEffort: "low" },
+          english,
+        ),
+      ),
+    { message: "The selected model does not support this reasoning effort. Choose another one." },
+  );
+  // A failed Codex catalog is cached briefly; each read still gets its own locale.
+  const bin = await mkdtemp(path.join(os.tmpdir(), "bell-models-bin-"));
+  const previousPath = process.env.PATH;
+  try {
+    await writeFile(path.join(bin, "codex"), "#!/bin/sh\nexit 1\n");
+    await chmod(path.join(bin, "codex"), 0o755);
+    process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
+    const [zh, en] = await Promise.all([
+      withLocale("zh-TW", () => getModelCatalog("codex")),
+      withLocale("en", () => getModelCatalog("codex")),
+    ]);
+    assert.match(zh.error ?? "", /暫時無法讀取/);
+    assert.equal(en.error, failed.error);
+    const cachedEnglish = await withLocale("en", () => getModelCatalog("codex"));
+    assert.equal(cachedEnglish.error, failed.error);
+    assert.match(
+      (await withLocale("zh-TW", () => getModelCatalog("codex"))).error ?? "",
+      /暫時無法讀取/,
+    );
+  } finally {
+    process.env.PATH = previousPath;
+    await rm(bin, { recursive: true, force: true });
+  }
+});
+
 test("repeating pagination cursor fails without returning a partial catalog", async () => {
   const value = await readModelCatalog(
     server(`
@@ -213,15 +270,15 @@ test("repeating pagination cursor fails without returning a partial catalog", as
 });
 
 test("Claude Code settings resolve against its static aliases and record the provider", async () => {
-  assert.equal(await getModelCatalog("claude"), claudeModelCatalog);
+  assert.deepEqual(await getModelCatalog("claude"), claudeModelCatalog());
   assert.deepEqual(
-    resolveModelExecution({ provider: "claude" }, claudeModelCatalog),
+    resolveModelExecution({ provider: "claude" }, claudeModelCatalog()),
     { provider: "claude", source: "cli-default" },
   );
   assert.deepEqual(
     resolveModelExecution(
       { provider: "claude", model: "opus", reasoningEffort: "xhigh" },
-      claudeModelCatalog,
+      claudeModelCatalog(),
     ),
     {
       provider: "claude",
@@ -233,7 +290,7 @@ test("Claude Code settings resolve against its static aliases and record the pro
   assert.deepEqual(
     resolveModelExecution(
       { provider: "claude", model: "haiku" },
-      claudeModelCatalog,
+      claudeModelCatalog(),
     ),
     { provider: "claude", model: "haiku", source: "selected" },
   );
@@ -243,7 +300,7 @@ test("Claude Code settings resolve against its static aliases and record the pro
     { provider: "claude" as const, reasoningEffort: "ultra" as const },
   ]) {
     assert.throws(
-      () => resolveModelExecution(settings, claudeModelCatalog),
+      () => resolveModelExecution(settings, claudeModelCatalog()),
       (error) => error instanceof AppError && error.statusCode === 400,
     );
   }
@@ -252,7 +309,7 @@ test("Claude Code settings resolve against its static aliases and record the pro
     (error) => error instanceof AppError && error.statusCode === 400,
   );
   assert.throws(
-    () => resolveModelExecution({ model: "opus" }, claudeModelCatalog),
+    () => resolveModelExecution({ model: "opus" }, claudeModelCatalog()),
     AppError,
   );
   assert.throws(() =>
@@ -276,7 +333,7 @@ test("webAccess is optional in the shared settings and recorded on the execution
   assert.deepEqual(
     resolveModelExecution(
       { provider: "claude", model: "opus", webAccess: true },
-      claudeModelCatalog,
+      claudeModelCatalog(),
     ),
     { provider: "claude", webAccess: true, model: "opus", source: "selected" },
   );

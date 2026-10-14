@@ -1,4 +1,5 @@
 import type { EfficiencyMetrics, PonytailMode } from "./efficiency.js";
+import type { Locale } from "./i18n/locale.js";
 import type { ModelExecution, ModelSettings } from "./models.js";
 export const contributionDirections = [
   "bugfix",
@@ -114,6 +115,12 @@ export interface ProjectInsights {
   generatedAt: string;
   source: "ai" | "demo";
   baseSha: string;
+  /**
+   * The UI locale the analysis was written in; more recommendations for it
+   * are written in the same one. Absent on demo data and on caches written
+   * before it was recorded, whose language is unknown.
+   */
+  locale?: Locale;
   /** What the model actually read; missing on demo data and caches written before it was recorded. */
   sample?: {
     trackedFiles: number;

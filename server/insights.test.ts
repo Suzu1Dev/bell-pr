@@ -20,10 +20,19 @@ import {
   type ProjectInsights,
 } from "../shared/insights.js";
 import type { ModelCatalog } from "../shared/models.js";
-import { fileTree, ProjectInsightsService } from "./insights.js";
+import {
+  cacheSchema,
+  fileTree,
+  persistedInsightsSchema,
+  ProjectInsightsService,
+} from "./insights.js";
+import { lenientRead } from "./persisted-schema.js";
+import { assertNoHan } from "../src/test-utils/render.js";
 import { command, git } from "./process.js";
 import { AppError } from "./types.js";
 import { Store } from "./store.js";
+import { withLocale } from "./i18n/index.js";
+import { respondIn } from "./prompt-language.js";
 
 /** The JSON data object sent after the prompt sentences and before the Ponytail guidance. */
 function payload(input: string) {
@@ -327,6 +336,237 @@ test("analysis uses bounded read-only structured Codex context and excludes secr
       ),
       [],
     );
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("the analysis prompt asks for the request's language", async () => {
+  const f = await fixture();
+  try {
+    const stub = fakeCodex();
+    const service = new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: stub.execute,
+    });
+    const prompts = () =>
+      stub.calls
+        .filter((call) => call.args[0] === "exec")
+        .map((call) => call.options!.input!);
+    await withLocale("en", () => service.generate(f.repo.id));
+    const [english] = prompts();
+    assert.ok(
+      english.startsWith(
+        `You are BELL PR's read-only project analyst. Return a single JSON object matching the provided output schema. ${respondIn("en")}`,
+      ),
+    );
+    assert.doesNotMatch(english, /Traditional Chinese/);
+    await withLocale("zh-TW", () => service.generate(f.repo.id));
+    const chinese = prompts()[1];
+    assert.ok(chinese.includes(respondIn("zh-TW")));
+    assert.equal(
+      english.replace(respondIn("en"), ""),
+      chinese.replace(respondIn("zh-TW"), ""),
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("an analysis records its locale outside the fingerprint, and more recommendations keep that locale", async () => {
+  const f = await fixture();
+  try {
+    const proposal = validAnalysis().recommendations[0];
+    const english = new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: fakeCodex(() => ({
+        ...validAnalysis(),
+        recommendations: [
+          proposal,
+          {
+            ...proposal,
+            id: "unquoted",
+            evidenceDetails: [
+              { path: "hello.ts", quote: "a quote that is not there", reason: "Guess" },
+            ],
+          },
+        ],
+      })).execute,
+    });
+    const first = await withLocale("en", () => english.generate(f.repo.id));
+    assert.equal(first.insights.locale, "en");
+    // Persisted text BELL writes about the analysis is in the analysis's locale.
+    assert.deepEqual(first.insights.verification?.droppedRecommendations, [
+      {
+        id: "unquoted",
+        title: proposal.title,
+        reason: 'The quote was not found in hello.ts: "a quote that is not there"',
+      },
+    ]);
+    // Reading it in another locale is still current: the locale is not part of the fingerprint.
+    const read = await withLocale("zh-TW", () => english.get(f.repo.id));
+    assert.equal(read.stale, false);
+    assert.equal(read.insights?.locale, "en");
+    const cacheFile = (await readdir(path.join(f.store.directory, "insights"))).find(
+      (name) => name.endsWith(".json"),
+    )!;
+    const saved = JSON.parse(
+      await readFile(path.join(f.store.directory, "insights", cacheFile), "utf8"),
+    );
+    assert.equal(saved.insights.locale, "en");
+    // More recommendations requested from a zh-TW page are still written in English.
+    const more = fakeCodex(() => ({
+      recommendations: [
+        { ...proposal, id: "examples", title: "Add greeting examples", problem: "Examples may help." },
+      ],
+    }));
+    const expanding = new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: more.execute,
+    });
+    const expanded = await withLocale("zh-TW", () => expanding.generateMore(f.repo.id, {}));
+    const input = more.calls.find((call) => call.args[0] === "exec")!.options!.input!;
+    assert.ok(input.includes(respondIn("en")));
+    assert.doesNotMatch(input, /Traditional Chinese/);
+    assert.equal(expanded.insights.locale, "en");
+    assert.deepEqual(expanded.insights.recommendationExpansion?.addedIds, ["examples"]);
+    // A cache written before the locale was recorded expands in the request's locale and stays unlabelled.
+    delete saved.insights.locale;
+    await writeFile(path.join(f.store.directory, "insights", cacheFile), JSON.stringify(saved));
+    const legacy = fakeCodex(() => ({ recommendations: [] }));
+    const legacyResult = await withLocale("en", () =>
+      new ProjectInsightsService(f.store, {
+        getModelCatalog: async () => ({ models: [], source: "codex" }),
+        command: legacy.execute,
+      }).generateMore(f.repo.id, {}),
+    );
+    assert.ok(
+      legacy.calls.find((call) => call.args[0] === "exec")!.options!.input!.includes(respondIn("en")),
+    );
+    assert.equal(legacyResult.insights.locale, undefined);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("more recommendations answer the request in its locale and save their notes in the analysis's", async () => {
+  const f = await fixture();
+  const service = (answer: () => unknown) =>
+    new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: fakeCodex(answer).execute,
+    });
+  try {
+    await withLocale("en", () => service(validAnalysis).generate(f.repo.id));
+    const proposal = validAnalysis().recommendations[0];
+    const expanded = await withLocale("zh-TW", () =>
+      service(() => ({
+        recommendations: [
+          { ...proposal, id: "examples", title: "Add greeting examples", problem: "Examples may help." },
+          {
+            ...proposal,
+            id: "unquoted",
+            evidenceDetails: [
+              { path: "hello.ts", quote: "a quote that is not there", reason: "Guess" },
+            ],
+          },
+        ],
+      })).generateMore(f.repo.id, {}),
+    );
+    assert.equal(expanded.insights.locale, "en");
+    // Saved with the English analysis, so written in English.
+    assert.deepEqual(
+      expanded.insights.recommendationExpansion?.verification?.droppedRecommendations,
+      [
+        {
+          id: "unquoted",
+          title: proposal.title,
+          reason: 'The quote was not found in hello.ts: "a quote that is not there"',
+        },
+      ],
+    );
+    // A rejected answer is the zh-TW request's error, so it is worded in zh-TW.
+    await assert.rejects(
+      withLocale("zh-TW", () =>
+        service(() => ({ recommendations: [{ id: "BAD" }] })).generateMore(f.repo.id, {}),
+      ),
+      { message: "AI 分析格式不完整，請重新分析；原有結果已保留。" },
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("an insights cache with a locale and a newer field still loads in a build that predates the locale", async () => {
+  const f = await fixture();
+  try {
+    const service = new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: fakeCodex().execute,
+    });
+    await withLocale("en", () => service.generate(f.repo.id));
+    const directory = path.join(f.store.directory, "insights");
+    const file = path.join(directory, (await readdir(directory)).find((name) => name.endsWith(".json"))!);
+    const written = JSON.parse(await readFile(file, "utf8"));
+    assert.equal(written.insights.locale, "en");
+    written.insights.readingTime = "a field from a newer build";
+    // An older build: the same schemas without the locale field.
+    const older = lenientRead(
+      cacheSchema.extend({
+        insights: persistedInsightsSchema.omit({ locale: true }).nullable(),
+      }),
+    ).parse(written);
+    assert.ok(older.insights);
+    assert.equal("locale" in older.insights, false);
+    assert.equal("readingTime" in older.insights, false);
+    assert.equal(older.insights.recommendations.length, 1);
+    assert.equal(older.fingerprint, written.fingerprint);
+    // This build keeps the locale and drops only the unknown field.
+    const current = lenientRead(cacheSchema).parse(written);
+    assert.equal(current.insights?.locale, "en");
+    assert.equal("readingTime" in (current.insights ?? {}), false);
+    // A locale a later build may add reads as unknown instead of failing the cache.
+    const later = lenientRead(cacheSchema).parse({
+      ...written,
+      insights: { ...written.insights, locale: "ja" },
+    });
+    assert.equal(later.insights?.locale, undefined);
+    assert.equal(later.insights?.summary, written.insights.summary);
+    // The service itself reads the file as written.
+    await writeFile(file, JSON.stringify(written));
+    const reread = await service.get(f.repo.id);
+    assert.equal(reread.insights?.locale, "en");
+    assert.equal(reread.stale, false);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("in English, analysis errors and the server log line carry no Han", async () => {
+  const f = await fixture();
+  try {
+    const service = new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: fakeCodex(() => ({ ...validAnalysis(), recommendations: [{ id: "BAD" }] })).execute,
+    });
+    await assert.rejects(
+      withLocale("en", () => service.generate(f.repo.id)),
+      { message: "The AI analysis came back incomplete. Analyze again; the previous result is kept." },
+    );
+    await assert.rejects(
+      withLocale("en", () => service.generateMore(f.repo.id, {})),
+      { message: "Analyze the whole project again before you generate more contribution directions." },
+    );
+    await assert.rejects(
+      withLocale("en", () => service.setSettings(f.repo.id, { ...defaultContributionSettings, issueUrl: "https://example.com/1" })),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /The related issue link must look like https:\/\/github\.com\/<owner>\/<repo>\/issues\/<number>/);
+        assertNoHan(error.message);
+        return true;
+      },
+    );
+    await assert.rejects(withLocale("en", () => service.get("missing")), { message: "Repository not found." });
   } finally {
     await f.cleanup();
   }

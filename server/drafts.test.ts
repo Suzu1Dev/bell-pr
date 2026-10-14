@@ -37,6 +37,9 @@ import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
 import { createApp } from "./index.js";
 import { git } from "./process.js";
+import { assertNoHan } from "../src/test-utils/render.js";
+import { withLocale } from "./i18n/index.js";
+import { respondIn } from "./prompt-language.js";
 
 const context: DraftContext = {
   sources: [],
@@ -830,11 +833,14 @@ test("issue and brevity rules are quoted from contributing and template sources 
 });
 
 test("preflight blocks unfinished text and asks the person to confirm empty boxes, a missing issue and unrevised model text", () => {
-  const checks = draftPreflight({
-    body: leakedBody,
-    sources: opencodeSources,
-    proposalBody: leakedBody,
-  });
+  const checks = draftPreflight(
+    {
+      body: leakedBody,
+      sources: opencodeSources,
+      proposalBody: leakedBody,
+    },
+    "zh-TW",
+  );
   assert.deepEqual(
     checks.map((check) => [check.id, check.kind]),
     [
@@ -889,6 +895,64 @@ test("preflight blocks unfinished text and asks the person to confirm empty boxe
   );
 });
 
+test("preflight messages default to English, keep their ids and quote the rules without Han", () => {
+  const checks = draftPreflight({
+    body: leakedBody,
+    sources: opencodeSources,
+    proposalBody: leakedBody,
+  });
+  assert.deepEqual(
+    checks.map((check) => check.id),
+    ["placeholder", "unchecked", "issue", "brevity"],
+  );
+  for (const check of checks)
+    for (const text of [check.message, ...check.details]) assertNoHan(text);
+  assert.match(checks[0].message, /^The PR description still has 3 unfinished spots\./);
+  assert.equal(
+    checks[0].details[0],
+    'Line 3: "_TODO: No issue is linked yet. Open one and link it here before submitting._"',
+  );
+  assert.deepEqual(checks[1].details, [
+    "Type of change: all 2 items are unticked",
+    "Checklist: all 2 items are unticked",
+  ]);
+  assert.match(checks[2].message, /does not reference one\.$/);
+  assert.deepEqual(checks[2].details, [
+    'CONTRIBUTING.md: "All PRs must reference an existing issue. Before opening a PR, open an issue."',
+  ]);
+  assert.match(checks[3].message, /still BELL's suggested text, unrevised/);
+  assert.deepEqual(checks[3].details, [
+    'CONTRIBUTING.md: "No AI-Generated Walls of Text"',
+  ]);
+  // One unticked box under no heading, and a body over the word budget.
+  const long = draftPreflight({
+    body: `- [ ] Tested\n\n${"word ".repeat(200)}`,
+    sources: opencodeSources,
+  });
+  assert.deepEqual(long.find((check) => check.id === "unchecked")?.details, [
+    "(no heading): its 1 item is unticked",
+  ]);
+  assert.match(
+    long.find((check) => check.id === "brevity")?.message ?? "",
+    /^This description is about 200 words, more than the 150 BELL suggests/,
+  );
+  // The same checks in zh-TW differ only in their text.
+  const zh = draftPreflight(
+    { body: leakedBody, sources: opencodeSources, proposalBody: leakedBody },
+    "zh-TW",
+  );
+  assert.deepEqual(
+    zh.map(({ id, kind }) => [id, kind]),
+    checks.map(({ id, kind }) => [id, kind]),
+  );
+  assert.equal(zh[0].details[0], "第 3 行：「_TODO: No issue is linked yet. Open one and link it here before submitting._」");
+  assert.deepEqual(
+    draftPreflight({ body: "- [ ] Tested", sources: opencodeSources }, "zh-TW")
+      .find((check) => check.id === "unchecked")?.details,
+    ["（無標題）：1 項都未勾"],
+  );
+});
+
 test("GitHub branch names follow a conservative Git subset", () => {
   for (const name of ["readme-startup", "bellpr-c4bc3a23", "feat/smart-retry", "v1.2_fix"])
     assert.ok(validBranchName(name), name);
@@ -936,6 +1000,70 @@ test("draft proposals that put the person's to-dos into the published body are r
   const properties = draftJsonSchema.properties as Record<string, { maxItems?: number }>;
   assert.equal(properties.rules.maxItems, 24);
   assert.equal(properties.checklist.maxItems, 24);
+});
+
+test("in English, draft rejections and the provisional-policy note carry no Han", () => {
+  const withLines = (body: string) =>
+    withLocale("en", () =>
+      parseDraftProposal(JSON.stringify({ ...proposal, body }), context),
+    );
+  assert.throws(() => withLines(`${proposal.body}\n\n_TODO: add the output_`), {
+    message:
+      "The PR draft put to-dos or unfilled template fields into the description that is sent to GitHub (line 13). Generate it again.",
+  });
+  assert.throws(
+    () => withLines(`Closes #\n\n${proposal.body}\n\nResults go here.\n\nTBD: owner`),
+    /\(lines 1, 15, 17\)/,
+  );
+  assert.throws(
+    () => withLocale("en", () => parseDraftProposal("{}", context)),
+    { message: "The PR draft suggestion came back incomplete. Generate it again." },
+  );
+  const provisional = withLocale("en", () =>
+    parseDraftProposal(JSON.stringify(proposal), {
+      ...context,
+      warnings: ["Lookup was sampled."],
+    }),
+  );
+  assert.match(
+    provisional.summary,
+    /^Looking up the project's sources was limited or incomplete, so the Linux contribution writing principles are used for now\./,
+  );
+  assertNoHan(provisional.summary.split("\n")[0]);
+});
+
+test("draft prompt writes the person's fields in the locale's language and keeps the PR text English", () => {
+  const prompt = () =>
+    draftPrompt(
+      { title: "Update", prompt: "Update value", reports: {}, branch: "bellpr-abc12345" },
+      [diff],
+      context,
+    );
+  const english = withLocale("en", prompt);
+  const chinese = withLocale("zh-TW", prompt);
+  assert.ok(
+    english.includes(
+      `for those fields: ${respondIn("en")}`,
+    ),
+  );
+  assert.doesNotMatch(english, /Traditional Chinese/);
+  assert.ok(chinese.includes(`for those fields: ${respondIn("zh-TW")}`));
+  assert.match(chinese, /Traditional Chinese/);
+  for (const text of [english, chinese]) {
+    // The PR title and body follow the project, not the UI language.
+    assert.match(
+      text,
+      /Use English for PR title\/body unless explicit project instructions require another language\./,
+    );
+    assert.match(text, /summary, the rules text, checklist and the commit message rationale are read by the person/);
+    assert.match(text, /Do not mention AI assistance/);
+    assert.match(text, /requires disclosing AI assistance, add a checklist item/);
+  }
+  // Only the language directive differs.
+  assert.equal(
+    english.replace(respondIn("en"), ""),
+    chinese.replace(respondIn("zh-TW"), ""),
+  );
 });
 
 test("draft prompt routes the person's to-dos to the checklist and passes the branch and word budget", () => {
