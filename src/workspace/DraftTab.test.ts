@@ -118,6 +118,8 @@ const element = (
         applyDraftProposal() {},
         applyCommitMessageSuggestion() {},
         async saveDraft() {},
+        async setAiDisclosure() {},
+        alwaysDiscloseAi: undefined,
         ...draft,
       },
       actions: { feedbackLoading: false, async fetchPrFeedback() {} },

@@ -10,7 +10,12 @@ import { api, send } from "../../api";
 import { getDemo } from "../../demo";
 import { useLocale, useT } from "../../i18n";
 import type { Run } from "../../types";
-import { validBranchName, type DraftProposal } from "../../../shared/drafts";
+import {
+  validBranchName,
+  withAiDisclosure,
+  withoutAiDisclosure,
+  type DraftProposal,
+} from "../../../shared/drafts";
 import type { DraftCheck, DraftTaskItem } from "../../../shared/draft-checks";
 import { activeFollowUp } from "../../../shared/followups";
 import type { Notify } from "../AppShell";
@@ -43,6 +48,8 @@ interface DraftEditorOptions {
   runIdRef: RefObject<string>;
   notify: Notify;
   setBusy: Dispatch<SetStateAction<boolean>>;
+  /** The app setting that discloses AI assistance in every new draft. */
+  alwaysDiscloseAi?: boolean;
 }
 
 /**
@@ -57,6 +64,7 @@ export function useDraftEditor({
   runIdRef,
   notify,
   setBusy,
+  alwaysDiscloseAi,
 }: DraftEditorOptions) {
   const t = useT("workspace").notices;
   // The checks report in the UI language, like the server's for this request.
@@ -261,8 +269,19 @@ export function useDraftEditor({
     setDraftCommitMessage(commitMessageSuggestion.message);
     notify(t.commitSuggestionApplied);
   }
-  async function saveDraft() {
-    if (!draftTitle.trim() || !draftBody.trim()) {
+  /**
+   * Saves the editor's draft. With `aiDisclosure` it also saves the
+   * AI-assistance choice, adding BELL's line to the description or
+   * removing it (the server does the same).
+   */
+  async function persistDraft(aiDisclosure?: boolean) {
+    const body =
+      aiDisclosure === undefined
+        ? draftBody
+        : aiDisclosure
+          ? withAiDisclosure(draftBody)
+          : withoutAiDisclosure(draftBody);
+    if (!draftTitle.trim() || !body.trim()) {
       notify(t.draftRequired, "error");
       return;
     }
@@ -275,30 +294,39 @@ export function useDraftEditor({
     setBusy(true);
     draftMutationEpoch.current++;
     try {
+      let open = true;
       if (demo)
-        setRun((previous) => ({
-          ...previous,
-          draft: {
-            title: draftTitle,
-            body: draftBody,
-            ...(commitMessage ? { commitMessage } : {}),
-            ...(publishBranch ? { publishBranch } : {}),
-          },
-          status: "review",
-        }));
+        setRun((previous) => {
+          const chosen = aiDisclosure ?? previous.draft.aiDisclosure;
+          return {
+            ...previous,
+            draft: {
+              title: draftTitle,
+              body,
+              ...(commitMessage ? { commitMessage } : {}),
+              ...(publishBranch ? { publishBranch } : {}),
+              ...(chosen !== undefined ? { aiDisclosure: chosen } : {}),
+            },
+            status: "review",
+          };
+        });
       else {
         const { run: updated } = await api<{ run: Run }>(
           `/runs/${run.id}/draft`,
           send("PATCH", {
             title: draftTitle,
-            body: draftBody,
+            body,
             commitMessage,
             publishBranch,
+            ...(aiDisclosure !== undefined ? { aiDisclosure } : {}),
           }),
         );
-        if (runIdRef.current === updated.id) setRun(updated);
+        open = runIdRef.current === updated.id;
+        if (open) setRun(updated);
       }
-      notify(t.draftSaved);
+      // The editor shows the saved line, or no longer shows it.
+      if (open && body !== draftBody) setDraftBody(body);
+      if (aiDisclosure === undefined) notify(t.draftSaved);
     } catch (error) {
       notify((error as Error).message, "error");
     } finally {
@@ -307,6 +335,9 @@ export function useDraftEditor({
       setBusy(false);
     }
   }
+  const saveDraft = () => persistDraft();
+  /** Turns the PR's AI-assistance line on or off and saves the draft. */
+  const setAiDisclosure = (on: boolean) => persistDraft(on);
   return {
     draftTitle,
     setDraftTitle,
@@ -340,6 +371,8 @@ export function useDraftEditor({
     applyDraftProposal,
     applyCommitMessageSuggestion,
     saveDraft,
+    setAiDisclosure,
+    alwaysDiscloseAi,
   };
 }
 

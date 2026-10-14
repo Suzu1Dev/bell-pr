@@ -595,6 +595,7 @@ function AppShell({
     runIdRef,
     notify,
     setBusy,
+    alwaysDiscloseAi: appSettings?.alwaysDiscloseAi,
   });
   const { draftMutationEpoch } = draft;
 

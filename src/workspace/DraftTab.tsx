@@ -80,6 +80,8 @@ interface DraftTabProps {
     | "applyDraftProposal"
     | "applyCommitMessageSuggestion"
     | "saveDraft"
+    | "setAiDisclosure"
+    | "alwaysDiscloseAi"
   >;
   actions: Pick<RunActions, "feedbackLoading" | "fetchPrFeedback">;
   rounds: RunRounds;
@@ -184,6 +186,8 @@ export function DraftTab({
     applyDraftProposal,
     applyCommitMessageSuggestion,
     saveDraft,
+    setAiDisclosure,
+    alwaysDiscloseAi,
   } = draft;
   const { feedbackLoading, fetchPrFeedback } = actions;
   const {
@@ -243,12 +247,15 @@ export function DraftTab({
             applied={
               !!run.draftPreparation?.proposal &&
               draftTitle === run.draftPreparation.proposal.title &&
+              // BELL's AI-disclosure line is not a change to the suggestion.
               !!draftChecks?.sameDraftProse(
                 draftBody,
                 run.draftPreparation.proposal.body,
               )
             }
             aiDisclosure={run.draft.aiDisclosure}
+            alwaysDiscloseAi={alwaysDiscloseAi}
+            onAiDisclosureChange={(on) => void setAiDisclosure(on)}
             readOnly={run.status === "published"}
           />
         </Suspense>

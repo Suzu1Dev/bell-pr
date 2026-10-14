@@ -6,7 +6,9 @@ import { execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { aiDisclosureLine } from "../shared/drafts";
 import { getDemo } from "../src/demo";
+import draftEn from "../src/i18n/en/draft";
 import license from "../src/i18n/en/license";
 import review from "../src/i18n/en/review";
 import workspace from "../src/i18n/en/workspace";
@@ -284,6 +286,90 @@ test("an open follow-up round asks for its commit message and pushes through its
     // This server's GitHub CLI cannot push: the dialog says so and waits.
     await expect(dialog.locator(".readiness-notice")).toBeVisible();
     await expect(dialog.getByRole("button", { name: workspace.publish.pushRound })).toBeDisabled();
+  } finally {
+    await close();
+    await server.stop();
+  }
+});
+
+/** Two runs in review holding a ready draft suggestion that does not mention AI. */
+const suggestion = {
+  title: "Greet the whole world in the README",
+  body: "## Summary\n\nThe README example greets the whole world.",
+  policy: "repository",
+  summary: "The project keeps PR descriptions short.",
+  rules: [],
+  checklist: ["Say what changed"],
+  templateSourceId: "",
+};
+const suggested = (dataDir: string, id: string) => ({
+  ...seededRun,
+  id,
+  createdAt: now(),
+  worktreePath: path.join(dataDir, "worktrees", id),
+  draftPreparation: {
+    status: "ready",
+    fingerprint: "e2e",
+    proposal: suggestion,
+    generatedAt: now(),
+  },
+});
+
+test("the AI-assistance switch saves the line into the draft, and an applied suggestion stays applied", async ({ browser }) => {
+  const server = await launchServer({
+    seed: (dataDir) =>
+      seedState(dataDir, [
+        suggested(dataDir, "e2e-apply-first"),
+        suggested(dataDir, "e2e-switch-first"),
+      ]),
+  });
+  const { page, close } = await openOn(browser, server);
+  const guidance = draftEn.guidance;
+  const disclosure = page.getByRole("switch", { name: guidance.disclosure.label });
+  const description = page.getByRole("textbox", { name: workspace.draft.bodyLabel });
+  const savedDraft = async (id: string) =>
+    (await (await page.request.get(`/api/runs/${id}`)).json()).run.draft;
+  const withLine = `${suggestion.body}\n\n${aiDisclosureLine}`;
+  try {
+    // Apply, then turn the line on and off: the saved draft follows, and
+    // the suggestion still counts as applied.
+    await page.goto("/#/runs/e2e-apply-first/draft?locale=en");
+    await expect(disclosure).not.toBeChecked();
+    await page.getByRole("button", { name: guidance.apply.apply }).click();
+    const applied = page.getByRole("button", { name: guidance.apply.applied });
+    await expect(applied).toBeDisabled();
+    await disclosure.click();
+    await expect(disclosure).toBeChecked();
+    await page.getByRole("button", { name: workspace.draft.edit, exact: true }).click();
+    await expect(description).toHaveValue(withLine);
+    await expect(applied).toBeDisabled();
+    expect(await savedDraft("e2e-apply-first")).toMatchObject({
+      title: suggestion.title,
+      body: withLine,
+      aiDisclosure: true,
+    });
+    await disclosure.click();
+    await expect(disclosure).not.toBeChecked();
+    await expect(description).toHaveValue(suggestion.body);
+    expect(await savedDraft("e2e-apply-first")).toMatchObject({
+      body: suggestion.body,
+      aiDisclosure: false,
+    });
+
+    // Turn the line on, then apply: the suggestion with the line counts as
+    // applied, and as text nobody has revised yet.
+    await page.goto("/#/runs/e2e-switch-first/draft?locale=en");
+    await disclosure.click();
+    await expect(disclosure).toBeChecked();
+    expect(await savedDraft("e2e-switch-first")).toMatchObject({
+      body: `${seededRun.draft.body}\n\n${aiDisclosureLine}`,
+      aiDisclosure: true,
+    });
+    await page.getByRole("button", { name: guidance.apply.apply }).click();
+    await expect(page.getByRole("button", { name: guidance.apply.applied })).toBeDisabled();
+    await page.getByRole("button", { name: workspace.draft.edit, exact: true }).click();
+    await expect(description).toHaveValue(withLine);
+    await expect(page.getByText(workspace.draft.proposalNotice)).toBeVisible();
   } finally {
     await close();
     await server.stop();
