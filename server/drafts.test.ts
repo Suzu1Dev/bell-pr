@@ -1174,3 +1174,87 @@ test("ordered task items and ordered issue slots are handled like bulleted ones"
     "Every PR must reference an issue with `Fixes #123`.",
   );
 });
+
+test("preflight blocks a credential in the PR text and asks to confirm local paths, CI files and a public e-mail", () => {
+  const token = `ghp_${"a".repeat(36)}`;
+  const secret = draftPreflight({ body: `Debugged with ${token} set.` });
+  assert.deepEqual(
+    secret.map(({ id, kind }) => [id, kind]),
+    [["secret", "block"]],
+  );
+  assert.deepEqual(secret[0].details, ["In the description"]);
+  for (const text of [secret[0].message, ...secret[0].details]) assertNoHan(text);
+  assert.deepEqual(
+    draftPreflight({
+      title: `Fix ${token}`,
+      body: "A fix.",
+      commitMessage: `Fix\n\n-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----`,
+    })[0].details,
+    ["In the title", "In the commit message"],
+  );
+  // A BELL PR license key is a credential too.
+  assert.equal(
+    draftPreflight({ body: `Key: BELLPR1.${"p".repeat(48)}.${"s".repeat(86)}` })[0]?.id,
+    "secret",
+  );
+  // A secret blocks before the other checks are even confirmed.
+  assert.equal(
+    draftPreflight({ body: `TODO: remove ${token}` }).map((check) => check.id).join(),
+    "secret,placeholder",
+  );
+
+  const paths = draftPreflight({
+    body: "Ran it in /home/alice/project and /Users/bob/src; output in /srv/bell-data/logs.",
+    localDirectories: ["/srv/bell-data", "/data", "/"],
+  });
+  assert.deepEqual(paths.map(({ id, kind }) => [id, kind]), [["local-paths", "confirm"]]);
+  assert.deepEqual(paths[0].details, [
+    "Found: /srv/bell-data",
+    "Found: /home/alice/",
+    "Found: /Users/bob/",
+  ]);
+  // A one-segment directory such as /data says nothing about the person.
+  assert.deepEqual(
+    draftPreflight({ body: "Reads files from /data.", localDirectories: ["/data"] }),
+    [],
+  );
+
+  const ci = draftPreflight({
+    body: "Updates the workflow.",
+    changedPaths: ["src/a.ts", ".github/workflows/ci.yml", ".gitlab-ci.yml"],
+  });
+  assert.deepEqual(ci.map(({ id, kind }) => [id, kind]), [["workflows", "confirm"]]);
+  assert.deepEqual(ci[0].details, [
+    "Changed: .github/workflows/ci.yml",
+    "Changed: .gitlab-ci.yml",
+  ]);
+
+  const email = draftPreflight({
+    body: "A fix.",
+    commitEmails: ["me@company.dev", "12345+me@users.noreply.github.com"],
+  });
+  assert.deepEqual(email.map(({ id, kind }) => [id, kind]), [["author-email", "confirm"]]);
+  assert.match(email[0].message, /me@company\.dev/);
+  assert.doesNotMatch(email[0].message, /noreply/);
+  for (const address of [
+    "12345+me@users.noreply.github.com",
+    "me@users.noreply.github.com",
+    "bell@localhost.invalid",
+    "someone@example.com",
+    "ci@build.test",
+  ])
+    assert.deepEqual(draftPreflight({ body: "A fix.", commitEmails: [address] }), [], address);
+
+  // Same ids and kinds in zh-TW, in Traditional Chinese.
+  const zh = draftPreflight(
+    {
+      body: `${token} /home/alice/x`,
+      changedPaths: [".github/workflows/ci.yml"],
+      commitEmails: ["me@company.dev"],
+    },
+    "zh-TW",
+  );
+  assert.deepEqual(zh.map((check) => check.id), ["secret", "local-paths", "workflows", "author-email"]);
+  assert.match(zh[0].message, /憑證/);
+  assert.deepEqual(zh[0].details, ["位於說明"]);
+});

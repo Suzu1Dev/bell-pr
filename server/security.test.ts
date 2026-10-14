@@ -1,25 +1,32 @@
 /**
- * Git hardening: repository configuration that could run programs, the
- * clone made for a local import, teammate checkout pointers, diff path
- * names, and syncing a checkout whose attributes name drivers.
+ * Git hardening, the clone made for a local import, teammate checkout
+ * pointers, diff path names, syncing a checkout whose attributes name
+ * drivers, and the checks on what a first publish sends to GitHub.
  */
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
+import { once } from "node:events";
+import { request } from "node:http";
 import {
   lstat,
   mkdir,
   mkdtemp,
   readFile,
   rm,
+  stat,
   symlink,
   writeFile,
 } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { fakeGitHub } from "../test/fake-github.js";
+import { createApp } from "./index.js";
 import { git } from "./process.js";
-import { readDiff } from "./git.js";
+import { readDiff, reviewFingerprint } from "./git.js";
 import { createRunWorktree } from "./repositories.js";
+import { publishChecks } from "./publish.js";
 import {
   checkoutTreeOnto,
   filesWithConflictMarkers,
@@ -372,4 +379,174 @@ test("conflict paths outside the checkout, and symlinks, are never read or rewri
   assert.equal(await readFile(outside, "utf8"), conflicted);
   assert.ok((await lstat(path.join(checkout, "linked.ts"))).isSymbolicLink());
   assert.match(await readFile(path.join(checkout, "inside.ts"), "utf8"), /^<{7} your version$/m);
+});
+
+/** Commits made by BELL in these tests carry a test identity. */
+function useIdentity(t: TestContext, values: Record<string, string>) {
+  const previous = Object.fromEntries(
+    Object.keys(values).map((key) => [key, process.env[key]]),
+  );
+  Object.assign(process.env, values);
+  t.after(() => {
+    for (const [key, value] of Object.entries(previous))
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+  });
+}
+
+/** A fake GitHub project, BELL's clone of it, and one reviewed run ready to approve. */
+async function publishable(t: TestContext, changes: Record<string, string>) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-security-publish-"));
+  const github = await fakeGitHub(directory, {
+    files: { "hello.ts": "hello\n", ".github/workflows/ci.yml": "on: push\n" },
+  });
+  const store = new Store(path.join(directory, "state"));
+  await store.initialize();
+  const workbench = new Workbench(store);
+  t.after(async () => {
+    github.restore();
+    await workbench.shutdown();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const repo = await workbench.importRepository(github.url);
+  const baseSha = (await git(repo.path, ["rev-parse", "HEAD"])).stdout.trim();
+  const worktreePath = path.join(store.directory, "worktrees", "publish-run");
+  await git(repo.path, ["worktree", "add", "-q", "-b", "fix/publish1", worktreePath, baseSha]);
+  for (const [file, content] of Object.entries(changes))
+    await writeFile(path.join(worktreePath, file), content);
+  const run = baseRun({
+    id: "publish-run",
+    repoId: repo.id,
+    worktreePath,
+    baseSha,
+    branch: "fix/publish1",
+    draft: { title: "Update hello", body: "Updates the greeting." },
+  });
+  store.data.runs.push(run);
+  for (const file of await readDiff(run))
+    await workbench.review(run.id, file.path, true, file.fingerprint);
+  return { directory, store, workbench, run, repo };
+}
+
+test("publishing confirms CI changes, local paths and, once per address, a public commit e-mail", async (t) => {
+  useIdentity(t, {
+    ...identity,
+    GIT_AUTHOR_EMAIL: "someone@company.dev",
+    GIT_COMMITTER_EMAIL: "someone@company.dev",
+  });
+  const f = await publishable(t, {
+    "hello.ts": "hello, world\n",
+    ".github/workflows/ci.yml": "on: [push, pull_request]\n",
+  });
+  const ids = async () =>
+    (await publishChecks(f.run, await readDiff(f.run), f.store.directory, "en")).map(
+      (check) => [check.id, check.kind],
+    );
+  assert.deepEqual(await ids(), [
+    ["workflows", "confirm"],
+    ["author-email", "confirm"],
+  ]);
+  // A path from this computer in the PR text asks for confirmation as well.
+  await f.workbench.draft(f.run.id, {
+    title: "Update hello",
+    body: `Updates the greeting.\n\nTested in ${path.join(os.homedir(), "project")} and /home/alice/src.`,
+  });
+  assert.deepEqual(await ids(), [
+    ["local-paths", "confirm"],
+    ["workflows", "confirm"],
+    ["author-email", "confirm"],
+  ]);
+  await f.workbench.approve(f.run.id, { ...f.run.draft });
+
+  // The publish dialog reads the same list from the server.
+  const app = createApp(f.workbench, { staticDirectory: path.join(f.directory, "missing") });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(async () => {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await app.locals.insights.shutdown();
+    await app.locals.discovery.shutdown();
+  });
+  const preflight = await new Promise<{ checks: { id: string; message: string; details: string[] }[] }>(
+    (resolve, reject) => {
+      request(
+        `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/runs/${f.run.id}/preflight`,
+        { headers: { host: "127.0.0.1:4311", "x-bell-locale": "en" } },
+        (response) => {
+          let body = "";
+          response.setEncoding("utf8");
+          response.on("data", (chunk) => (body += chunk));
+          response.on("end", () => resolve(JSON.parse(body)));
+        },
+      )
+        .on("error", reject)
+        .end();
+    },
+  );
+  assert.deepEqual(
+    preflight.checks.map((check) => check.id),
+    ["local-paths", "workflows", "author-email"],
+  );
+  assert.match(preflight.checks[2].message, /someone@company\.dev/);
+  assert.ok(preflight.checks[0].details.some((detail) => detail.includes("/home/alice/")));
+  assert.deepEqual(preflight.checks[1].details, ["Changed: .github/workflows/ci.yml"]);
+
+  for (const acknowledged of [[], ["local-paths", "workflows"], ["author-email"]])
+    await assert.rejects(
+      f.workbench.publish(f.run.id, f.run.approvedFingerprint!, acknowledged),
+      (error: unknown) => error instanceof AppError && error.statusCode === 422,
+    );
+  assert.equal(existsSync(path.join(f.store.directory, "author-emails.json")), false);
+  await f.workbench.publish(f.run.id, f.run.approvedFingerprint!, [
+    "local-paths",
+    "workflows",
+    "author-email",
+  ]);
+  assert.equal(f.run.status, "published");
+  // The address is remembered as a digest, readable by the owner only.
+  const saved = path.join(f.store.directory, "author-emails.json");
+  const content = JSON.parse(await readFile(saved, "utf8"));
+  assert.equal(content.version, 1);
+  assert.equal(content.confirmed.length, 1);
+  assert.match(content.confirmed[0], /^[a-f0-9]{64}$/);
+  assert.doesNotMatch(await readFile(saved, "utf8"), /company/);
+  assert.equal((await stat(saved)).mode & 0o777, 0o600);
+  assert.ok(
+    !(await publishChecks(f.run, await readDiff(f.run), f.store.directory, "en")).some(
+      (check) => check.id === "author-email",
+    ),
+  );
+  // The temporary publish index is gone.
+  assert.equal(existsSync(path.join(f.store.directory, `publish-index-${f.run.id}`)), false);
+  assert.equal(existsSync(path.join(f.store.directory, `publish-index-${f.run.id}.lock`)), false);
+});
+
+test("a credential in the PR text blocks approval and publishing", async (t) => {
+  useIdentity(t, identity);
+  const f = await publishable(t, { "hello.ts": "hello, world\n" });
+  const token = `ghp_${"a".repeat(36)}`;
+  for (const draft of [
+    { title: "Update hello", body: `Uses ${token} for the test.` },
+    { title: `Update hello ${token}`, body: "Updates the greeting." },
+    { title: "Update hello", body: "Updates the greeting.", commitMessage: `Update hello\n\ntoken ${token}` },
+  ]) {
+    await f.workbench.draft(f.run.id, draft);
+    await assert.rejects(
+      withLocale("en", () => f.workbench.approve(f.run.id, { ...f.run.draft })),
+      (error: unknown) =>
+        error instanceof AppError && error.statusCode === 422 && /credential/.test(error.message),
+    );
+    // Approved before the check existed: still stopped before anything is pushed.
+    f.run.status = "approved";
+    f.run.approvedFingerprint = reviewFingerprint(await readDiff(f.run), f.run.draft);
+    await assert.rejects(
+      withLocale("en", () => f.workbench.publish(f.run.id, f.run.approvedFingerprint!)),
+      (error: unknown) =>
+        error instanceof AppError && error.statusCode === 422 && /credential/.test(error.message),
+    );
+    assert.equal(f.run.publishCommit, undefined);
+    f.run.status = "review";
+    delete f.run.approvedFingerprint;
+  }
 });

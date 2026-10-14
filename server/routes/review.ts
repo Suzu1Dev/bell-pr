@@ -3,7 +3,8 @@ import { z } from "zod";
 import { validBranchName } from "../../shared/drafts.js";
 import { commitMessageControl } from "../drafts.js";
 import { learningExport } from "../learning-export.js";
-import { sm } from "../i18n/index.js";
+import { publishChecks } from "../publish.js";
+import { currentLocale, sm } from "../i18n/index.js";
 import type { RouteDeps } from "./types.js";
 
 // The commit message is passed to git verbatim, so newline is the only control character allowed.
@@ -87,6 +88,23 @@ export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
       })
       .parse(req.body);
     res.json({ run: await workbench.draft(req.params.id, draft) });
+  });
+  // Every check publishing runs, with the facts only the server has (local
+  // paths, CI files among the changes, the commit e-mail), so the publish
+  // dialog can show and confirm the same list.
+  app.get("/api/runs/:id/preflight", async (req, res) => {
+    const run = workbench.run(req.params.id);
+    const files = await workbench.lock(req.params.id, () =>
+      workbench.diff(req.params.id),
+    );
+    res.json({
+      checks: await publishChecks(
+        run,
+        files,
+        workbench.store.directory,
+        currentLocale(),
+      ),
+    });
   });
   app.patch("/api/runs/:id/notes", async (req, res) => {
     const { filePath, text } = z

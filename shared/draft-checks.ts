@@ -11,8 +11,17 @@ import type { DraftSource } from "./drafts.js";
 import en from "./i18n/draft-checks.en.js";
 import zhTW from "./i18n/draft-checks.zh-TW.js";
 import type { Locale } from "./i18n/locale.js";
+// The secret shapes and the safety-check messages have one source each,
+// kept with the server; both modules are plain data and load in the browser.
+import { secretInPatch } from "../server/secrets.js";
+import securityEn from "../server/i18n/en/security.js";
+import securityZhTW from "../server/i18n/zh-TW/security.js";
 
 const dictionaries: Record<Locale, typeof en> = { en, "zh-TW": zhTW };
+const safetyDictionaries: Record<Locale, typeof securityEn> = {
+  en: securityEn,
+  "zh-TW": securityZhTW,
+};
 
 /**
  * Lines of a Markdown body with code (fenced, indented and inline) and HTML
@@ -244,7 +253,15 @@ export function draftWordBudget(sources: DraftSource[]) {
 }
 
 export interface DraftCheck {
-  id: "placeholder" | "unchecked" | "issue" | "brevity";
+  id:
+    | "placeholder"
+    | "unchecked"
+    | "issue"
+    | "brevity"
+    | "secret"
+    | "local-paths"
+    | "workflows"
+    | "author-email";
   /** block stops approval and publishing; confirm needs the person's acknowledgement before publishing. */
   kind: "block" | "confirm";
   message: string;
@@ -252,19 +269,90 @@ export interface DraftCheck {
 }
 
 /**
+ * Continuous-integration configuration: GitHub Actions workflows and
+ * actions, and the CI files of other services. A change to them is
+ * published only after the person confirms it (the `workflows` check); it
+ * is not held back like a sensitive file.
+ */
+export function ciConfigPath(filePath: string) {
+  return (
+    /^\.github\/(?:workflows|actions)\//.test(filePath) ||
+    /^(?:\.gitlab-ci\.ya?ml|\.travis\.ya?ml|azure-pipelines\.ya?ml|appveyor\.ya?ml|\.appveyor\.ya?ml|bitbucket-pipelines\.ya?ml|\.drone\.ya?ml|Jenkinsfile|\.cirrus\.ya?ml)$/.test(
+      filePath,
+    ) ||
+    /^(?:\.circleci|\.buildkite|\.woodpecker|\.gitlab\/ci)\//.test(filePath)
+  );
+}
+
+/** A home directory as it appears in a path on Linux or macOS. */
+const homePathPattern = /\/(?:home|Users)\/[A-Za-z0-9._-]+\//g;
+
+/** An address GitHub hides behind: 12345+name@users.noreply.github.com. */
+export function noreplyEmail(email: string) {
+  return /@users\.noreply\.github\.com$/i.test(email.trim());
+}
+
+/**
+ * Names that can never be a real mailbox (RFC 2606 and RFC 6761): test
+ * identities and BELL's own internal one publish nothing personal.
+ */
+function reservedEmail(email: string) {
+  return /\.(?:invalid|test|example|localhost)$|@(?:[^@]+\.)?example\.(?:com|net|org)$/i.test(
+    email.trim(),
+  );
+}
+
+export interface DraftPreflightInput {
+  /** The PR description. */
+  body: string;
+  /** The PR title, checked for credentials and local paths. */
+  title?: string;
+  /** The commit message, checked like the title. */
+  commitMessage?: string;
+  sources?: DraftSource[];
+  proposalBody?: string;
+  /**
+   * Directories of this computer that must not appear in the text, such as
+   * the home and data directories; the server passes them.
+   */
+  localDirectories?: string[];
+  /** The repository paths the PR changes. */
+  changedPaths?: string[];
+  /**
+   * The e-mail addresses the commit will carry (author and committer). The
+   * server leaves out an address the person already confirmed once.
+   */
+  commitEmails?: string[];
+}
+
+/**
  * Checks the text that will be sent to GitHub. Shared by the draft tab, the
  * publish dialog and the server so all three agree. It reports what is still
  * open; it never ticks a box or edits the text. `locale` chooses the language
- * of the messages; the ids and kinds are the same in every locale.
+ * of the messages; the ids and kinds are the same in every locale. Checks
+ * that need facts only the server has (local directories, changed paths,
+ * the commit e-mail) run when those facts are passed in.
  */
-export function draftPreflight(input: {
-  body: string;
-  sources?: DraftSource[];
-  proposalBody?: string;
-}, locale: Locale = "en"): DraftCheck[] {
+export function draftPreflight(
+  input: DraftPreflightInput,
+  locale: Locale = "en",
+): DraftCheck[] {
   const m = dictionaries[locale];
+  const safety = safetyDictionaries[locale].draftChecks;
   const sources = input.sources ?? [];
   const checks: DraftCheck[] = [];
+  const fields = (["title", "body", "commitMessage"] as const).filter(
+    (field) => !!input[field],
+  );
+  // Credentials block wherever they are; only the person can take them out.
+  const leaking = fields.filter((field) => secretInPatch(input[field]!));
+  if (leaking.length)
+    checks.push({
+      id: "secret",
+      kind: "block",
+      message: safety.secret,
+      details: leaking.map((field) => safety.secretIn({ field })),
+    });
   const placeholders = findDraftPlaceholders(input.body);
   if (placeholders.length)
     checks.push({
@@ -318,5 +406,47 @@ export function draftPreflight(input: {
         details: [m.ruleQuote(brevity)],
       });
   }
+  const text = fields.map((field) => input[field]!).join("\n");
+  const found = new Set<string>();
+  for (const directory of input.localDirectories ?? []) {
+    const trimmed = directory.replace(/\/+$/, "");
+    // The root or a one-segment directory such as /tmp says nothing about the person.
+    if (trimmed.split("/").filter(Boolean).length < 2) continue;
+    if (text.includes(trimmed)) found.add(trimmed);
+  }
+  for (const match of text.matchAll(homePathPattern)) found.add(match[0]);
+  if (found.size)
+    checks.push({
+      id: "local-paths",
+      kind: "confirm",
+      message: safety.localPaths,
+      details: [...found]
+        .slice(0, 5)
+        .map((value) => safety.localPath({ path: value.slice(0, 120) })),
+    });
+  const workflows = (input.changedPaths ?? []).filter(ciConfigPath);
+  if (workflows.length)
+    checks.push({
+      id: "workflows",
+      kind: "confirm",
+      message: safety.workflows,
+      details: workflows
+        .slice(0, 5)
+        .map((value) => safety.workflowFile({ path: value })),
+    });
+  const emails = [
+    ...new Set(
+      (input.commitEmails ?? [])
+        .map((email) => email.trim())
+        .filter((email) => email && !noreplyEmail(email) && !reservedEmail(email)),
+    ),
+  ];
+  if (emails.length)
+    checks.push({
+      id: "author-email",
+      kind: "confirm",
+      message: safety.authorEmail({ email: emails.join(", ") }),
+      details: [],
+    });
   return checks;
 }

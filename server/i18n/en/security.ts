@@ -7,8 +7,8 @@ const list = (items: readonly string[]) => fmt.list(items, { type: "unit" });
 const [bin] = product.binNames;
 
 /**
- * Sign-in, session and sandbox messages, and Git safety refusals. Text
- * between backticks is shown as code on the sign-in pages.
+ * Sign-in, session and sandbox messages, and the outgoing-text checks on a
+ * PR. Text between backticks is shown as code on the sign-in pages.
  */
 export default {
   /** The JSON error for an API request without a valid session (401). */
@@ -42,4 +42,24 @@ export default {
   /** A recorded GitHub repository or branch name that is not valid (409). */
   invalidRemote:
     "The GitHub repository or branch recorded for this run is not a valid name, so nothing was fetched or pushed.",
+  /** Checks on the text sent to GitHub, shown in the draft tab and publish dialog. */
+  draftChecks: {
+    secret:
+      "The PR title, description or commit message contains what looks like a credential, such as an access token or a private key. Remove it: everything you publish on GitHub is public.",
+    /** Which field holds it. */
+    secretIn: ({ field }: { field: "title" | "body" | "commitMessage" }) =>
+      ({
+        title: "In the title",
+        body: "In the description",
+        commitMessage: "In the commit message",
+      })[field],
+    localPaths:
+      "The PR text contains a path on this computer, which can show your user name and how your folders are organised. Confirm that you want to publish it, or remove it.",
+    localPath: ({ path }: { path: string }) => `Found: ${path}`,
+    workflows:
+      "This change edits GitHub Actions workflows or other CI configuration. Maintainers check such changes closely, and pushing a workflow file needs the GitHub CLI's workflow scope.",
+    workflowFile: ({ path }: { path: string }) => `Changed: ${path}`,
+    authorEmail: ({ email }: { email: string }) =>
+      `The commit will carry the e-mail address ${email}, which anyone can read on GitHub. To keep it private, set your GitHub no-reply address with git config user.email; this is asked only once.`,
+  },
 };

@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import {
   assertGitHubRepository,
   assertRefName,
+  ciConfigPath,
   safeRefName,
   safeRelativePath,
+  sensitivePath,
 } from "./git.js";
 import { AppError } from "./types.js";
 
@@ -31,6 +33,33 @@ test("diff paths that would reach an object prototype are rejected", () => {
   // The existing rules still hold.
   for (const filePath of ["", "/etc/passwd", "../x", "a/../b", ".git/config", "a\\b", "a\nb"])
     assert.equal(safeRelativePath(filePath), false, JSON.stringify(filePath));
+});
+
+test("CI configuration is confirmed at publishing, not held back as sensitive", () => {
+  for (const filePath of [
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yaml",
+    ".github/actions/setup/action.yml",
+    ".gitlab-ci.yml",
+    ".circleci/config.yml",
+    ".travis.yml",
+    "azure-pipelines.yml",
+    "Jenkinsfile",
+    ".buildkite/pipeline.yml",
+  ]) {
+    assert.equal(sensitivePath(filePath), false, filePath);
+    assert.equal(ciConfigPath(filePath), true, filePath);
+  }
+  for (const filePath of [
+    "docs/.github/workflows/example.yml",
+    "src/workflows/ci.ts",
+    ".github/CODEOWNERS",
+    "README.md",
+  ])
+    assert.equal(ciConfigPath(filePath), false, filePath);
+  // Credentials stay held back.
+  assert.equal(sensitivePath(".env"), true);
+  assert.equal(sensitivePath("deploy/id_ed25519"), true);
 });
 
 test("branch and repository names are checked before they reach a URL or refspec", () => {

@@ -6,8 +6,9 @@ import { secretInPatch } from "./secrets.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
 import { sm, withLocale } from "./i18n/index.js";
 import { parseLocale, type Locale } from "../shared/i18n/locale.js";
+import { ciConfigPath } from "../shared/draft-checks.js";
 
-export { secretInPatch };
+export { ciConfigPath, secretInPatch };
 
 /** The only language of the builds that saved runs without a locale. */
 const legacyRunLocale: Locale = "zh-TW";
@@ -101,6 +102,11 @@ export function assertGitHubRepository(fullName: string) {
     throw new AppError((m) => m.security.invalidRemote, 409);
 }
 
+/**
+ * Files held back from review and publishing. GitHub Actions workflows and
+ * other CI configuration are not among them: they are published after the
+ * person confirms them (the `workflows` publish check, ciConfigPath).
+ */
 export function sensitivePath(filePath: string): boolean {
   return (
     /(^|\/)(?:\.env(?:\.(?!example$|sample$|template$)[^/]+)?|\.npmrc|\.pypirc|id_rsa|id_ed25519|credentials(?:\.[^/]+)?|\.DS_Store)(?:$|\/)/i.test(
