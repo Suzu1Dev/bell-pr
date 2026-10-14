@@ -21,6 +21,7 @@ import {
   explanationBatches,
   explanationJsonSchema,
   explanationPrompt,
+  feedbackForAgent,
   guidePrompt,
   parseExplanations,
 } from "./explanations.js";
@@ -330,9 +331,11 @@ export async function chat(
         (message) =>
           `${message.role === "user" ? "User" : "Mentor"}: ${message.content}`,
       );
-    // Only thread comments attached to this file reach the mentor.
-    const feedback = (run.prFeedback?.items ?? []).filter(
-      (item) => item.path === file.path,
+    // Only thread comments attached to this file reach the mentor, and with
+    // web access on only those of the repository's own people.
+    const feedback = feedbackForAgent(
+      (run.prFeedback?.items ?? []).filter((item) => item.path === file.path),
+      run.modelExecution?.webAccess === true,
     );
     const controller = new AbortController();
     const controllerKey = `guide:${id}`;

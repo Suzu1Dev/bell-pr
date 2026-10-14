@@ -13,6 +13,7 @@ import path from "node:path";
 import {
   explanationBatches,
   explanationPrompt,
+  feedbackForAgent,
   guidePrompt,
   parseExplanations,
   synchronizeExplanations,
@@ -312,6 +313,52 @@ test("guide prompt carries contribution context, the ready explanation card and 
   );
   assert.match(ready, /answer the question directly first/);
   assert.match(ready, /English terms in parentheses/);
+});
+
+test("with web access on, the mentor sees PR feedback only from the repository's own people", () => {
+  const item = (author: string, authorAssociation: string) => ({
+    kind: "thread" as const,
+    author,
+    authorAssociation,
+    body: `Comment by ${author}.`,
+    path: "a.ts",
+    url: `https://github.com/o/r/pull/1#discussion_${author}`,
+    createdAt: "2026-10-07T00:00:00Z",
+  });
+  const feedback = [
+    item("owner", "OWNER"),
+    item("member", "MEMBER"),
+    item("collaborator", "COLLABORATOR"),
+    item("contributor", "CONTRIBUTOR"),
+    item("stranger", "NONE"),
+    item("first", "FIRST_TIME_CONTRIBUTOR"),
+  ];
+  const prompt = (webAccess: boolean) =>
+    guidePrompt({
+      contributionContext: "User request:\nImprove a",
+      run: {
+        prompt: "Improve a",
+        modelExecution: { source: "cli-default", webAccess },
+      } as unknown as Run,
+      file: diff("a.ts"),
+      messages: [],
+      question: "What should I change?",
+      feedback,
+    });
+  const online = prompt(true);
+  for (const author of ["owner", "member", "collaborator"])
+    assert.match(online, new RegExp(`Comment by ${author}\\.`));
+  for (const author of ["contributor", "stranger", "first"])
+    assert.doesNotMatch(online, new RegExp(`Comment by ${author}\\.`));
+  // Without web access a comment cannot send the agent anywhere: all are kept.
+  const offline = prompt(false);
+  for (const { author } of feedback)
+    assert.match(offline, new RegExp(`Comment by ${author}\\.`));
+  assert.deepEqual(
+    feedbackForAgent(feedback, true).map((entry) => entry.author),
+    ["owner", "member", "collaborator"],
+  );
+  assert.equal(feedbackForAgent(feedback, false).length, 6);
 });
 
 function response(prompt: string) {
