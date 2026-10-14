@@ -179,7 +179,12 @@ const mission = {
       `Generating ${n(count)} more…`,
     limitReached: "Recommendation limit reached",
     moreDemo:
-      "The sample uses prewritten recommendations. Import a real project to have the Agent generate more contribution directions.",
+      "In the sample this adds prewritten recommendations, without calling an AI. Import a real project to have the Agent generate more contribution directions.",
+    moreDemoShown:
+      "The sample's extra recommendations are all shown. Import a real project to have the Agent generate more contribution directions.",
+    moreLocked:
+      "Generating more recommendations is part of Pro. Free keeps the 5 recommendations of each analysis, and the ones you already have stay.",
+    seePro: "See what Pro adds",
     moreStale:
       "The project has a newer version. Re-analyze it before you generate more recommendations.",
     moreLimit: ({ max }: { max: number }) =>

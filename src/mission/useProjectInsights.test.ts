@@ -9,7 +9,11 @@ import {
 import { getDemo } from "../demo";
 import { setLocale } from "../i18n";
 import { assertNoHan, renderWith } from "../test-utils/render";
-import { ProjectInsightsCache, useProjectInsights } from "./useProjectInsights";
+import {
+  ProjectInsightsCache,
+  shownInsights,
+  useProjectInsights,
+} from "./useProjectInsights";
 
 afterEach(async () => {
   await setLocale("en");
@@ -61,6 +65,8 @@ async function cacheMessages() {
   );
   await cache.load("broken");
   await cache.analyze("demo-repo");
+  // The first click adds the sample's prewritten batch; the second has nothing left.
+  await cache.recommendMore("demo-repo");
   await cache.recommendMore("demo-repo");
   await cache.recommendMore("missing");
   for (const id of ["stale", "full", "fails", "rejected", "silent"])
@@ -138,4 +144,59 @@ test("the sample project's prewritten analysis follows the UI language", () => {
       renderWith(locale, createElement(DemoAnalysis, { locale })),
       "<output>true</output>",
     );
+});
+
+test("Generate 5 more adds the sample's prewritten batch once, without a request", async () => {
+  const requests: string[] = [];
+  const cache = new ProjectInsightsCache(async (repoId, operation) => {
+    requests.push(`${repoId}:${operation}`);
+    return { insights: null, stale: false };
+  });
+  const demo = getDemo("en");
+  const extras = (demo.extraRecommendations ?? []).map((idea) => idea.id);
+  assert.equal(extras.length, 5);
+  await cache.recommendMore("demo-repo");
+  const expanded = cache.snapshot("demo-repo");
+  assert.equal(expanded.recommendationError, "");
+  assert.deepEqual(
+    expanded.insights?.recommendations.map((idea) => idea.id),
+    [...demo.insights.recommendations.map((idea) => idea.id), ...extras],
+  );
+  assert.deepEqual(expanded.insights?.recommendationExpansion, {
+    generatedAt: demo.insights.generatedAt,
+    addedIds: extras,
+    requestedCount: 5,
+  });
+  assert.equal(expanded.insights?.source, "demo");
+  // A second click changes nothing and says why.
+  await cache.recommendMore("demo-repo");
+  assert.equal(cache.snapshot("demo-repo").insights, expanded.insights);
+  assert.equal(
+    cache.snapshot("demo-repo").recommendationError,
+    "Import a real project to generate more contribution recommendations.",
+  );
+  assert.deepEqual(requests, []);
+});
+
+test("the sample's extra batch follows the UI language too", async () => {
+  await setLocale("zh-TW");
+  const cache = new ProjectInsightsCache();
+  await cache.recommendMore("demo-repo");
+  const written = cache.snapshot("demo-repo").insights;
+  const zh = getDemo("zh-TW");
+  assert.equal(written?.recommendations.at(-1)?.title, zh.extraRecommendations?.at(-1)?.title);
+  // An English reader sees the English sample with the same batch added.
+  const en = getDemo("en");
+  const shown = shownInsights(written, "en");
+  assertNoHan(JSON.stringify(shown));
+  assert.deepEqual(
+    shown?.recommendations.map((idea) => idea.title),
+    [...en.insights.recommendations, ...(en.extraRecommendations ?? [])].map((idea) => idea.title),
+  );
+  assert.equal(shownInsights(shown, "en"), shown);
+  assert.equal(shownInsights(written, "zh-TW"), written);
+  // An AI analysis keeps its language.
+  const analysis = { ...en.insights, source: "ai" as const };
+  assert.equal(shownInsights(analysis, "zh-TW"), analysis);
+  assert.equal(shownInsights(null, "en"), null);
 });

@@ -564,6 +564,12 @@
   font-size: var(--text-sm);
   line-height: 1.8;
 }
+.mission-upgrade-button {
+  margin-top: 4px;
+}
+.mission-ideas-actions .pro-badge {
+  margin-left: 2px;
+}
 .mission-more-status:not(:empty) {
   margin-top: 8px;
   color: var(--color-brand-600);

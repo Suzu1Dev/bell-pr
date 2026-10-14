@@ -32,11 +32,15 @@ import {
   type RecommendationPreferences,
 } from "../../shared/insights";
 import type { Formatters } from "../../shared/i18n/locale";
+import type { Entitlements } from "../../shared/plans";
 import { useFormat, useT, type Messages } from "../i18n";
 import type { Repo, Run } from "../types";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
+import { ProBadge } from "../license/ProBadge";
+import { requestUpgrade } from "../license/useEntitlements";
 import { ModelSummary } from "../models/ModelSummary";
 import { directionOptions } from "./DirectionSettings";
+import { usePlan } from "./plan";
 import {
   moveRecommendation,
   orderedRecommendations,
@@ -67,6 +71,14 @@ export interface ProjectOverviewProps {
   /** Updates BELL's clone to the latest default branch; absent for local imports and the demo. */
   onUpdateRepo?: () => void;
   updatingRepo?: boolean;
+  /**
+   * Whether "Generate 5 more" may run (Pro and the trial). When absent it
+   * follows `entitlements`, or the plan read from the server. The sample
+   * project is never locked.
+   */
+  canRecommendMore?: boolean;
+  /** What the plan unlocks, when the parent knows it. */
+  entitlements?: Entitlements;
 }
 
 type MissionMessages = Messages["mission"];
@@ -287,10 +299,24 @@ export function ProjectOverview({
   onStartContribution,
   onUpdateRepo,
   updatingRepo = false,
+  canRecommendMore,
+  entitlements,
 }: ProjectOverviewProps) {
   const t = useT("mission");
   const common = useT("common");
   const fmt = useFormat();
+  const demo = insights?.source === "demo";
+  const plan = usePlan({
+    entitlements,
+    demo,
+    read: canRecommendMore === undefined,
+  });
+  // On Free, "Generate 5 more" is Pro; the sample shows it unlocked.
+  const moreLocked =
+    !demo &&
+    (canRecommendMore === undefined
+      ? plan.locked("moreRecommendations")
+      : !canRecommendMore);
   const ideaRail = useRef<HTMLDivElement>(null);
   const hiddenSummary = useRef<HTMLElement>(null);
   const pointerDrag = useRef<{
@@ -488,6 +514,8 @@ export function ProjectOverview({
   const shortfall =
     expansion?.requestedCount !== undefined &&
     addedIds.size < expansion.requestedCount;
+  // The sample has one prewritten batch to add.
+  const demoMoreShown = demo && !!expansion;
   const moreDisabled =
     updatingRepo ||
     loading ||
@@ -495,15 +523,20 @@ export function ProjectOverview({
     savingPreferences ||
     !insights ||
     stale ||
-    insights.source === "demo" ||
+    moreLocked ||
+    demoMoreShown ||
     insights.recommendations.length >= maxProjectRecommendations;
-  const moreDescription = insights?.source === "demo"
-    ? t.ideas.moreDemo
-    : stale
-      ? t.ideas.moreStale
-      : (insights?.recommendations.length ?? 0) >= maxProjectRecommendations
-        ? t.ideas.moreLimit({ max: maxProjectRecommendations })
-        : t.ideas.moreHint;
+  const moreDescription = demo
+    ? demoMoreShown
+      ? t.ideas.moreDemoShown
+      : t.ideas.moreDemo
+    : moreLocked
+      ? t.ideas.moreLocked
+      : stale
+        ? t.ideas.moreStale
+        : (insights?.recommendations.length ?? 0) >= maxProjectRecommendations
+          ? t.ideas.moreLimit({ max: maxProjectRecommendations })
+          : t.ideas.moreHint;
   return (
     <div className="mission-overview">
       <div className="mission-overview-heading">
@@ -884,11 +917,22 @@ export function ProjectOverview({
                   : requestedCount
                     ? t.ideas.more({ count: requestedCount })
                     : t.ideas.limitReached}
+                {(demo || moreLocked) && <ProBadge />}
               </button>
             </div>
           </div>
           <div className="mission-more-context">
             <p id="mission-more-description">{moreDescription}</p>
+            {moreLocked && (
+              <button
+                type="button"
+                className="mission-text-button mission-upgrade-button"
+                onClick={() => requestUpgrade("moreRecommendations")}
+              >
+                {t.ideas.seePro}
+                <ArrowRight size={14} aria-hidden="true" />
+              </button>
+            )}
             <div className="mission-more-status" role="status" aria-live="polite">
               {recommending ? (
                 <span>{t.ideas.generatingStatus}</span>
@@ -935,10 +979,15 @@ export function ProjectOverview({
                     date: analysisDate(fmt, expansion.generatedAt),
                   })}
                 </p>
-                <ModelSummary execution={expansion.modelExecution} analysis />
+                <ModelSummary
+                  execution={expansion.modelExecution}
+                  demo={demo}
+                  analysis
+                />
                 <EfficiencySummary
                   title={t.ideas.usageTitle}
                   metrics={expansion.efficiency}
+                  demo={demo}
                 />
               </details>
             )}

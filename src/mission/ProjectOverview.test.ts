@@ -3,6 +3,8 @@ import test from "node:test";
 import { createElement } from "react";
 import { formatters } from "../../shared/i18n/locale";
 import type { ProjectInsights } from "../../shared/insights";
+import { freeEntitlements, proEntitlements } from "../../shared/plans";
+import { getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { demoInsights } from "./demo";
 import { ProjectOverview, type ProjectOverviewProps } from "./ProjectOverview";
@@ -391,3 +393,71 @@ test("the English stale notices name the changed and cited files in one sentence
   });
   assert.match(capped, /At least 1,250 files changed .*, including 12 or more files that this analysis cites: f0\.ts, f1\.ts/);
 });
+
+/** The "Generate 5 more" button, as rendered. */
+function moreButton(html: string) {
+  const found = html.match(/<button[^>]*aria-describedby="mission-more-description"[^>]*>.*?<\/button>/)?.[0];
+  assert.ok(found, "no Generate more button");
+  return found;
+}
+const moreReason = (html: string) =>
+  html.match(/<p id="mission-more-description">([^<]*)<\/p>/)?.[1];
+
+test("Generate 5 more is locked on Free with its reason, and open on Pro", () => {
+  for (const props of [{ entitlements: freeEntitlements }, { canRecommendMore: false }]) {
+    const html = renderEnglish(props);
+    assertNoHan(html);
+    assert.match(moreButton(html), /disabled=""/);
+    assert.match(moreButton(html), /Generate 5 more<span class="pro-badge"[^>]*>PRO<\/span><\/button>/);
+    assert.equal(
+      moreReason(html),
+      "Generating more recommendations is part of Pro. Free keeps the 5 recommendations of each analysis, and the ones you already have stay.",
+    );
+    assert.match(html, /<button type="button" class="mission-text-button mission-upgrade-button">See what Pro adds/);
+  }
+  for (const props of [{ entitlements: proEntitlements(2) }, { canRecommendMore: true }, {}]) {
+    const html = renderEnglish(props);
+    assert.doesNotMatch(moreButton(html), /disabled|pro-badge/);
+    assert.match(moreReason(html) ?? "", /^The Agent uses the model settings saved for this project/);
+    assert.doesNotMatch(html, /See what Pro adds/);
+  }
+  // A stale analysis still says Pro first on Free.
+  assert.match(moreReason(renderEnglish({ entitlements: freeEntitlements, stale: true })) ?? "", /part of Pro/);
+  assert.match(
+    render({ insights: analyzed, entitlements: freeEntitlements }),
+    /產出更多建議是 Pro 功能。/,
+  );
+});
+
+test("the sample offers its extra batch unlocked, with a PRO chip, once", () => {
+  const sample = getDemo("en").insights;
+  const html = renderEnglish({ insights: sample, entitlements: freeEntitlements });
+  assertNoHan(html);
+  assert.doesNotMatch(moreButton(html), /disabled/);
+  assert.match(moreButton(html), /<span class="pro-badge"/);
+  assert.match(moreReason(html) ?? "", /^In the sample this adds prewritten recommendations, without calling an AI\./);
+  assert.doesNotMatch(html, /See what Pro adds/);
+
+  const extras = getDemo("en").extraRecommendations ?? [];
+  const expanded = renderEnglish({
+    insights: {
+      ...sample,
+      recommendations: [...sample.recommendations, ...extras],
+      recommendationExpansion: {
+        generatedAt: sample.generatedAt,
+        addedIds: extras.map((idea) => idea.id),
+        requestedCount: 5,
+      },
+    },
+    entitlements: freeEntitlements,
+  });
+  assertNoHan(expanded);
+  assert.match(moreButton(expanded), /disabled=""/);
+  assert.match(moreReason(expanded) ?? "", /^The sample&#x27;s extra recommendations are all shown\./);
+  assert.match(expanded, /View this batch&#x27;s new recommendations \(5 of 5\)/);
+  // Its provenance says it is a sample, not an unrecorded model call.
+  assert.match(expanded, /mission-more-provenance/);
+  assert.doesNotMatch(expanded, /did not record its model/);
+  assert.match(expanded, /No measurements yet\. The sample did not call AI\./);
+});
+

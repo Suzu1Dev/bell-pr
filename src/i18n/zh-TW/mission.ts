@@ -118,7 +118,12 @@ const m: Translation<typeof en> = {
     generating: ({ count }) => `正在產出 ${n(count)} 個新建議…`,
     limitReached: "建議數量已達上限",
     moreDemo:
-      "示範內容使用預寫建議。匯入真實專案後，即可請 Agent 產出更多貢獻方向。",
+      "示範內容會加入預寫的建議，不會呼叫 AI。匯入真實專案後，即可請 Agent 產出更多貢獻方向。",
+    moreDemoShown:
+      "示範內容的額外建議已全部顯示。匯入真實專案後，即可請 Agent 產出更多貢獻方向。",
+    moreLocked:
+      "產出更多建議是 Pro 功能。免費方案保留每次分析的 5 個建議，已產出的建議也會保留。",
+    seePro: "看看 Pro 提供哪些功能",
     moreStale: "專案版本已更新，請先重新分析專案，再產出更多建議。",
     moreLimit: ({ max }) =>
       `已累積 ${n(max)} 個建議，達到這份分析的上限。可先挑選方向，或重新分析專案。`,

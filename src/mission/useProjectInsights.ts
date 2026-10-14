@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { locales } from "../../shared/i18n/locale";
+import { locales, type Locale } from "../../shared/i18n/locale";
 import {
   maxProjectRecommendations,
+  projectRecommendationBatchSize,
   type InsightsStaleDetail,
   type ProjectInsights,
   type RecommendationPreferences,
@@ -13,10 +14,54 @@ import { getCurrentLocale, getCurrentMessages, useLocale } from "../i18n";
 /** The cache's messages in the active UI language, read when one is shown. */
 const messages = () => getCurrentMessages().mission.insights;
 
+/**
+ * The prewritten sample analysis in `locale`; `expanded` adds the sample
+ * recommendations that "Generate 5 more" shows, as one prewritten batch.
+ * The same object comes back for the same arguments.
+ */
+function sampleInsights(locale: Locale, expanded: boolean): ProjectInsights {
+  const key = `${locale}:${expanded}`;
+  let insights = sampleAnalyses.get(key);
+  if (!insights) {
+    const demo = getDemo(locale);
+    const extras = demo.extraRecommendations ?? [];
+    insights = expanded
+      ? {
+          ...demo.insights,
+          recommendations: [...demo.insights.recommendations, ...extras],
+          recommendationExpansion: {
+            generatedAt: demo.insights.generatedAt,
+            addedIds: extras.map((idea) => idea.id),
+            requestedCount: projectRecommendationBatchSize,
+          },
+        }
+      : demo.insights;
+    sampleAnalyses.set(key, insights);
+    sampleVariants.set(insights, expanded);
+  }
+  return insights;
+}
+const sampleAnalyses = new Map<string, ProjectInsights>();
+/** Every sample analysis made so far, and whether it has the extra batch. */
+const sampleVariants = new Map<ProjectInsights, boolean>();
+for (const locale of locales)
+  for (const expanded of [false, true]) sampleInsights(locale, expanded);
+
 /** The prewritten sample analysis in the active UI language. */
-const demoInsights = () => getDemo(getCurrentLocale()).insights;
-// Every locale's sample analysis, to tell it apart from other analyses.
-const demoAnalyses = new Set(locales.map((locale) => getDemo(locale).insights));
+const demoInsights = () => sampleInsights(getCurrentLocale(), false);
+
+/**
+ * The analysis to show in `locale`: the prewritten sample analysis follows
+ * the UI language, with its extra batch if it was added; an AI analysis
+ * stays in the language it was written in.
+ */
+export function shownInsights(
+  insights: ProjectInsights | null,
+  locale: Locale,
+): ProjectInsights | null {
+  const sample = insights && sampleVariants.get(insights);
+  return typeof sample === "boolean" ? sampleInsights(locale, sample) : insights;
+}
 
 interface InsightsResult {
   insights: ProjectInsights | null;
@@ -159,6 +204,15 @@ export class ProjectInsightsCache {
     const pending = this.mutations.get(repoId);
     if (pending) return pending;
     const state = this.snapshot(repoId);
+    // The sample adds its prewritten batch once, without a request.
+    const sample = state.insights && sampleVariants.get(state.insights);
+    if (repoId === "demo-repo" && sample === false) {
+      this.update(repoId, {
+        insights: sampleInsights(getCurrentLocale(), true),
+        recommendationError: "",
+      });
+      return Promise.resolve();
+    }
     const error =
       repoId === "demo-repo" || state.insights?.source === "demo"
         ? messages().demoMore
@@ -297,12 +351,7 @@ export function useProjectInsights(repoId?: string) {
     [cache, repoId],
   );
 
-  // The prewritten sample analysis follows the UI language; an AI analysis
-  // stays in the language it was written in.
-  const insights =
-    state.insights && demoAnalyses.has(state.insights)
-      ? getDemo(locale).insights
-      : state.insights;
+  const insights = shownInsights(state.insights, locale);
 
   return { ...state, insights, analyze, recommendMore, savePreferences, reload };
 }
