@@ -3,10 +3,14 @@ import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
 import { git } from "./process.js";
 import { secretInPatch } from "./secrets.js";
-import { AppError, withRunLocale, type DiffFile, type Run } from "./types.js";
-import { sm } from "./i18n/index.js";
+import { AppError, type DiffFile, type Run } from "./types.js";
+import { sm, withLocale } from "./i18n/index.js";
+import { parseLocale, type Locale } from "../shared/i18n/locale.js";
 
 export { secretInPatch };
+
+/** The only language of the builds that saved runs without a locale. */
+const legacyRunLocale: Locale = "zh-TW";
 
 export const digest = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -134,8 +138,13 @@ export async function readDiff(
   if (!run.baseSha || !run.worktreePath) return [];
   // A held-back file's reason is part of its fingerprint and of the draft
   // fingerprint, so it is worded in the run's locale: reading the diff in
-  // another language must not make a reviewed draft stale.
-  const messages = withRunLocale(run, () => sm().run.diff);
+  // another language must not make a reviewed draft stale. A run saved
+  // before runs recorded a locale was fingerprinted by a build that worded
+  // these reasons in zh-TW only, so it keeps that wording.
+  const messages = withLocale(
+    parseLocale(run.locale) ?? legacyRunLocale,
+    () => sm().run.diff,
+  );
   const held = messages.blocked;
   const common = ["--no-ext-diff", "--no-textconv", "--no-renames"];
   const stats = parseNumstat(

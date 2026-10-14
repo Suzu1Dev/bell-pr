@@ -455,6 +455,29 @@ test("a held-back file's reason follows the run's locale, so reading the diff in
   }
 });
 
+test("a run saved without a locale keeps its zh-TW held-back reasons, so its draft fingerprint holds in any request locale", async () => {
+  const f = await fixture();
+  try {
+    await writeFile(path.join(f.repository, ".env"), "PASSWORD=private-value");
+    await symlink("hello.ts", path.join(f.repository, "link.ts"));
+    assert.equal(f.run.locale, undefined);
+    const english = await withLocale("en", () => readDiff(f.run));
+    const chinese = await withLocale("zh-TW", () => readDiff(f.run));
+    assert.deepEqual(english, chinese);
+    // The wording every build before runs recorded a locale fingerprinted.
+    assert.equal(
+      english.find((file) => file.path === "link.ts")?.blocked,
+      "新檔案必須是一般檔案；符號連結需要手動處理。",
+    );
+    assert.equal(
+      draftFingerprint(f.run, english),
+      draftFingerprint(f.run, chinese),
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test("store preserves state and marks interrupted work as failed on restart", async () => {
   const f = await fixture();
   try {
