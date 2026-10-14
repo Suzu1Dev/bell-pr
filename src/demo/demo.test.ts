@@ -573,6 +573,9 @@ const titleBudget = 72;
 const summaryBudget = 180;
 // The review panel shows a module's purpose after its path on one 340 px line.
 const modulePurposeBudget = 25;
+// In the changes tab, the run title shares one line with the status badge and
+// the repository line; with the English labels, about 18 characters fit.
+const runTitleBudget = 18;
 
 type Strings = (string | undefined)[];
 const recommendationsOf = (demo: DemoContent) => [
@@ -584,7 +587,7 @@ const budgets: {
   budget: number;
   values: (demo: DemoContent, job: DiscoveryJob) => Strings;
 }[] = [
-  { field: "run title", budget: titleBudget, values: (d) => [d.run.title] },
+  { field: "run title", budget: runTitleBudget, values: (d) => [d.run.title] },
   {
     field: "agent role chips",
     budget: titleBudget,

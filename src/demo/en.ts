@@ -110,7 +110,7 @@ const en: DemoContent = buildDemoContent({
     },
   },
   run: {
-    title: "Give GET requests a second chance",
+    title: "Smart GET retries",
     prompt:
       "Add exponential backoff and jitter to the SDK's GET requests. Keep the retry count configurable, and add tests and usage docs.",
     agents: {
