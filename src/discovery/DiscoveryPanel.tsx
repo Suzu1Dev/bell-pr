@@ -48,21 +48,28 @@ const angles = ["rules", "activity", "needs", "barrier"] as const;
 
 export default function DiscoveryPanel({
   onChoose,
+  initialJob,
 }: {
   onChoose: (
     opportunity: ContributionOpportunity,
     candidate: DiscoveryCandidate,
   ) => void | Promise<void>;
+  /**
+   * A job to show, with its preferences, before the saved one has loaded,
+   * such as a fixture in tests. The panel still loads the saved job when it
+   * mounts.
+   */
+  initialJob?: DiscoveryJob | null;
 }) {
   const t = useT("discovery");
   const effortLabels = useT("common").reasoningEffort;
   const fmt = useFormat();
   const date = (value: string) => (value ? fmt.dateTime(value) : undefined);
   const [preferences, setPreferences] = useState<DiscoveryPreferences>({
-    ...defaultDiscoveryPreferences,
+    ...(initialJob?.preferences ?? defaultDiscoveryPreferences),
   });
-  const [job, setJob] = useState<DiscoveryJob | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [job, setJob] = useState<DiscoveryJob | null>(initialJob ?? null);
+  const [loading, setLoading] = useState(initialJob === undefined);
   const [busy, setBusy] = useState(false);
   const [choosing, setChoosing] = useState("");
   const [error, setError] = useState("");
