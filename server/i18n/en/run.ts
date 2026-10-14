@@ -584,7 +584,11 @@ export default {
     importSource:
       "Enter a GitHub HTTPS URL or the absolute path of a local repository.",
     bare: "Choose a repository that has a working directory.",
+    /** A local-only project: BELL cloned it at import, and it has no GitHub source. */
     localNotUpdated:
+      `This project has no GitHub source, so ${product.name} has nothing to update its copy from. To work on newer code, update your own checkout, then remove the project here and import it again.`,
+    /** A checkout an earlier build imported in place: the person's own. */
+    checkoutNotUpdated:
       `This is your own local repository, and ${product.name} never changes it; run git pull in a terminal yourself, then analyse the project again.`,
     cloneChanged:
       `${product.name}'s copy of the project has unexpected changes, so the update stopped; check it and try again.`,

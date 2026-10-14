@@ -345,6 +345,8 @@ const m: Translation<typeof en> = {
     importSource: "請輸入 GitHub HTTPS URL 或本機 Repository 的絕對路徑。",
     bare: "請選擇有工作目錄的 Repository。",
     localNotUpdated:
+      `這個專案沒有 GitHub 來源，${product.name} 無從更新它的副本。若要使用較新的程式碼，請先更新你自己的 repository，再在這裡移除專案並重新匯入。`,
+    checkoutNotUpdated:
       `這是你本機的 repository，${product.name} 不會更動它；請在終端機自行 git pull 後再重新分析。`,
     cloneChanged: `${product.name} 的專案副本有未預期的修改，已停止更新；請檢查後再試。`,
   },

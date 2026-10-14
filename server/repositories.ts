@@ -282,10 +282,12 @@ export async function importRepository(
  * an earlier build is the person's own and is never changed.
  */
 export function managedClone(directory: string, repo: Repository) {
-  return (
-    !!repo.url &&
-    repo.path.startsWith(path.join(directory, "repositories") + path.sep)
-  );
+  return !!repo.url && insideRepositories(directory, repo.path);
+}
+
+/** True for a clone BELL made under `<dataDir>/repositories`. */
+function insideRepositories(directory: string, repoPath: string) {
+  return repoPath.startsWith(path.join(directory, "repositories") + path.sep);
 }
 
 /**
@@ -335,7 +337,13 @@ export async function fetchBranchCommit(
 export async function updateRepository(ctx: WorkbenchContext, id: string) {
   const repo = ctx.repo(id);
   if (!managedClone(ctx.store.directory, repo))
-    throw new AppError((m) => m.run.repos.localNotUpdated, 409);
+    throw new AppError(
+      (m) =>
+        insideRepositories(ctx.store.directory, repo.path)
+          ? m.run.repos.localNotUpdated
+          : m.run.repos.checkoutNotUpdated,
+      409,
+    );
   return ctx.lock(`repository:${repo.id}`, async () => {
     const from = (
       await git(repo.path, ["rev-parse", "--verify", "HEAD"])
