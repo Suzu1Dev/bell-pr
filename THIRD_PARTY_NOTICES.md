@@ -270,9 +270,10 @@ under Anthropic's own terms.
 
 ### Written offer for source code
 
-git, socat and bubblewrap are licensed under the GNU General Public License
-or the GNU Lesser General Public License. The image contains them as
-unmodified Debian packages. Their complete corresponding source code is
+git, socat, bubblewrap and other Debian packages in the image, such as bash
+and coreutils from the base system, are licensed under the GNU General
+Public License or the GNU Lesser General Public License. The image contains
+them as unmodified Debian packages. Their complete corresponding source code is
 available from the Debian archive (https://sources.debian.org and
 https://snapshot.debian.org) under the package names and versions that
 `dpkg -l` lists in the image.
