@@ -21,7 +21,7 @@ const m: Translation<typeof en> = {
     addTitle: "加入你的 Repository",
     addText: "GitHub 連結或本機 Git 專案",
     delete: "刪除 Repository",
-    deleteLabel: ({ name }) => `刪除 ${name}`,
+    deleteLabel: ({ name }) => `刪除 Repository：${name}`,
     deleteConfirm: ({ name }) =>
       `要從 ${product.name} 刪除 ${name} 嗎？它的貢獻、筆記與專案分析也會一併刪除。${product.name} 下載的副本會被移除；從這台電腦匯入的資料夾則保留在原處。`,
     deleteYes: "刪除",

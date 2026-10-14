@@ -22,7 +22,8 @@ import "../team/team.css";
 import type { AppSettingsView } from "../../shared/app-settings";
 import { eulaVersion } from "../../shared/product";
 import type { ApiErrorBody } from "../../shared/errors";
-import { api, ApiError, authRequiredEvent } from "../api";
+import { summarizeRun } from "../../shared/runs";
+import { api, ApiError, authRequiredEvent, send } from "../api";
 import { AboutDialog } from "../about/AboutDialog";
 import { Logo } from "../brand/Logo";
 import { getDemo } from "../demo";
@@ -321,6 +322,7 @@ function AppShell({
   const t = useT("app");
   const workspaceMessages = useT("workspace");
   const repoMessages = useT("repos");
+  const runMessages = useT("modals").runs;
   const [locale] = useLocale();
   // The sample project in the UI language; its ids are the same in every locale.
   const sample = getDemo(locale);
@@ -800,6 +802,48 @@ function AppShell({
     sampleImported ||
     (page === "workspace" && demo);
 
+  // The open run's project, for a deletion that ends while it is open.
+  const runRepoId = useRef(run.repoId);
+  runRepoId.current = run.repoId;
+  /** Shows the sample in place of an open run that is gone. */
+  const dropOpenRun = () => {
+    setRun(loadDemo(locale));
+    setFiles(sample.files);
+  };
+
+  /** Frees a finished run's working files; the run and its notes stay. */
+  async function freeRunSpace(id: string) {
+    const { run: updated } = await api<{ run: Run }>(
+      `/runs/${encodeURIComponent(id)}/workspace`,
+      send("DELETE"),
+    );
+    setRuns((list) =>
+      list.map((item) => (item.id === id ? summarizeRun(updated) : item)),
+    );
+    if (runIdRef.current === id) {
+      setRun(updated);
+      setFiles([]);
+    }
+    notify(runMessages.freed);
+  }
+
+  async function deleteRun(id: string) {
+    await api(`/runs/${encodeURIComponent(id)}`, send("DELETE"));
+    setRuns((list) => list.filter((item) => item.id !== id));
+    if (runIdRef.current === id) dropOpenRun();
+    notify(runMessages.deleted);
+  }
+
+  /** Deletes a project with its runs (and BELL's own clone of it). */
+  async function deleteRepository(repo: Repo) {
+    await api(`/repos/${encodeURIComponent(repo.id)}`, send("DELETE"));
+    setRepos((list) => list.filter((item) => item.id !== repo.id));
+    setRuns((list) => list.filter((item) => item.repoId !== repo.id));
+    if (runRepoId.current === repo.id && runIdRef.current !== sample.run.id)
+      dropOpenRun();
+    notify(repoMessages.list.deleted({ name: repo.fullName }));
+  }
+
   /** The sample's import played in the browser: list it and open it. */
   function openImportedSample(repo: Repo) {
     closeModal();
@@ -998,6 +1042,9 @@ function AppShell({
             navigate={navigate}
             chooseRun={chooseRun}
             setExploreRepoId={setExploreRepoId}
+            discoveryLocked={discoveryLocked}
+            maskPath={presentation.maskPath}
+            deleteRepository={deleteRepository}
           />
         ) : page === "team" ? (
           <TeamPage beginContribution={beginContribution} />
@@ -1096,6 +1143,8 @@ function AppShell({
           chooseRun={chooseRun}
           beginContribution={beginContribution}
           closeModal={closeModal}
+          freeRunSpace={freeRunSpace}
+          deleteRun={deleteRun}
         />
       )}
       {modal === "help" && (

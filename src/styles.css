@@ -692,6 +692,12 @@ button {
   background: var(--color-accent-50);
   border-color: var(--color-accent-300);
 }
+.button.danger {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-text-inverse);
+  box-shadow: var(--shadow-1);
+}
 .new-task-button {
   font-size: var(--text-2xs);
   padding: 7px 11px;
@@ -1685,6 +1691,22 @@ button {
 .discovery-entry strong {
   display: block;
   font-size: 15px;
+}
+.discovery-entry .discovery-entry-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.repository-delete {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  margin-top: 10px;
+}
+.repository-card .repository-delete .button {
+  width: auto;
+  margin-top: 0;
 }
 .discovery-entry small {
   display: block;
@@ -3304,6 +3326,70 @@ button {
   font-size: var(--text-2xs);
   font-style: normal;
   white-space: nowrap;
+}
+/* A run with its storage actions and their confirmation below it. */
+.run-list-entry {
+  display: grid;
+  gap: 4px;
+}
+.run-list-entry > .run-list-row {
+  width: 100%;
+}
+.run-files-removed {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
+  font-size: var(--text-2xs);
+}
+.run-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 12px;
+  padding: 0 4px 4px;
+}
+.run-list-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+}
+.run-list-action:hover:not(:disabled) {
+  color: var(--color-brand-700);
+  text-decoration: underline;
+}
+.run-list-action-danger:hover:not(:disabled) {
+  color: var(--color-danger);
+}
+.run-list-hint {
+  margin-right: auto;
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
+}
+.run-list-confirm {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-warning-border);
+  border-radius: 7px;
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  font-size: var(--text-xs);
+  line-height: 1.7;
+}
+.run-list-confirm > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.run-list-actions .inline-error {
+  width: 100%;
 }
 .diff-toolbar-actions {
   display: flex;

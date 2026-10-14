@@ -61,3 +61,68 @@ test("the runs list reads in English with no Chinese left", () => {
   assertNoHan(html);
   assert.match(renderZh(element), /<small>octo\/widgets · fix\/retry<\/small><\/span><em>開發中<\/em>/);
 });
+
+test("a run of the person's own can free its disk space or be deleted; the sample cannot", () => {
+  const own = (status: RunSummary["status"], extra: Partial<RunSummary> = {}) =>
+    ({
+      ...getDemo("en").run,
+      id: "run-1",
+      repoId: repo.id,
+      title: "Retry timeouts",
+      status,
+      branch: "fix/retry",
+      ...extra,
+    }) as RunSummary;
+  const render = (runs: RunSummary[], handlers = true) =>
+    renderEn(
+      createElement(RunsModal, {
+        runs,
+        repos: [repo],
+        async chooseRun() {
+          return true;
+        },
+        beginContribution() {},
+        closeModal() {},
+        ...(handlers ? { async freeRunSpace() {}, async deleteRun() {} } : {}),
+      }),
+    );
+  const html = render([own("review")]);
+  assert.match(
+    html,
+    /<button type="button" class="run-list-action" aria-label="Free disk space: Retry timeouts"><svg[^]*?Free disk space<\/button>/,
+  );
+  assert.match(
+    html,
+    /<button type="button" class="run-list-action run-list-action-danger" aria-label="Delete run: Retry timeouts"><svg[^]*?Delete run<\/button>/,
+  );
+  // One pair of actions: the sample's row has none.
+  assert.equal(html.match(/run-list-actions/g)?.length, 1);
+  assertNoHan(html);
+
+  const running = render([own("running")]);
+  assert.match(running, /<span class="run-list-hint">Stop this contribution before you free its space or delete it\.<\/span>/);
+  assert.match(running, /class="run-list-action" disabled="" aria-label="Free disk space/);
+  assert.match(running, /class="run-list-action run-list-action-danger" disabled=""/);
+
+  const removed = render([own("published", { workspaceRemovedAt: "2026-10-02T08:00:00.000Z" })]);
+  assert.match(removed, /<span class="run-files-removed">Files removed<\/span>/);
+  assert.doesNotMatch(removed, /Free disk space/);
+  assert.match(removed, /Delete run/);
+
+  assert.doesNotMatch(render([own("review")], false), /run-list-actions/);
+  assert.match(
+    renderZh(
+      createElement(RunsModal, {
+        runs: [own("review")],
+        repos: [repo],
+        async chooseRun() {
+          return true;
+        },
+        beginContribution() {},
+        closeModal() {},
+        async deleteRun() {},
+      }),
+    ),
+    /aria-label="刪除貢獻：Retry timeouts"/,
+  );
+});

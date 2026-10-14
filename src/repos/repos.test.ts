@@ -36,6 +36,36 @@ test("the repository list reads in English with no Chinese left", () => {
   assert.match(renderZh(element), /<span class="demo-pill">示範專案<\/span>/);
 });
 
+test("an imported repository can be deleted, the sample cannot, and paths mask while presenting", () => {
+  const element = createElement(ReposPage, {
+    repos: [repo],
+    openModal() {},
+    navigate() {},
+    async chooseRun() {
+      return true;
+    },
+    setExploreRepoId() {},
+    discoveryLocked: true,
+    maskPath: (path: string) => `…/${path.split("/").pop()}`,
+    async deleteRepository() {},
+  });
+  const html = renderEn(element);
+  assert.match(
+    html,
+    /<button type="button" class="run-list-action run-list-action-danger" aria-label="Delete repository: octo\/widgets"><svg[^]*?Delete repository<\/button>/,
+  );
+  assert.equal(html.match(/repository-delete/g)?.length, 1);
+  assert.match(html, /<p>…\/widgets<\/p>/);
+  assert.doesNotMatch(html, /\/tmp\/widgets/);
+  // On Free the discovery entry says PRO.
+  assert.match(
+    html,
+    /<strong class="discovery-entry-title">Not sure which project to contribute to yet\?<span class="pro-badge" role="img" aria-label="Pro feature"/,
+  );
+  assertNoHan(html);
+  assert.match(renderZh(element), /aria-label="刪除 Repository：octo\/widgets"/);
+});
+
 test("the import dialog reads in English with no Chinese left", () => {
   const props = {
     source: "",

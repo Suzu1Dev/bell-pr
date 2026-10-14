@@ -24,7 +24,7 @@ const repos = {
     addTitle: "Add your repository",
     addText: "A GitHub link or a local Git project",
     delete: "Delete repository",
-    deleteLabel: ({ name }: { name: string }) => `Delete ${name}`,
+    deleteLabel: ({ name }: { name: string }) => `Delete repository: ${name}`,
     deleteConfirm: ({ name }: { name: string }) =>
       `Delete ${name} from ${product.name}? Its contributions, their notes and the project analysis are deleted too. A copy ${product.name} downloaded is removed; a folder you imported from this computer stays where it is.`,
     deleteYes: "Delete",
