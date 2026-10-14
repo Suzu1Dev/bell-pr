@@ -1,6 +1,6 @@
 {
   "name": "bell-pr",
-  "version": "1.0.0-beta.0",
+  "version": "1.0.0-rc.1",
   "description": "A self-hosted, local-first workbench for open-source contributions: an AI agent team works in isolated git worktrees, explains every change in plain language, and drafts a pull request that you review and approve.",
   "keywords": [
     "open-source",
@@ -57,6 +57,9 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "bellpr": {
+    "releaseDate": "2026-10-14"
   },
   "dependencies": {
     "express": "^5.1.0",
