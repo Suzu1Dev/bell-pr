@@ -34,7 +34,9 @@ async function quarantinedRuns(directory: string) {
  * - `*.tmp`, `team-index-*`, `publish-index-*` and `sync-index-*` files;
  * - `insights/analysis-*` directories and `insights/*.tmp` files;
  * - `worktrees/<id>` and `team-worktrees/<id>` directories no run
- *   references (quarantined runs count as references);
+ *   references (quarantined runs count as references), unless this start
+ *   restored state.json from a backup: runs newer than the backup may still
+ *   be recovered from the damaged file, so their files stay;
  * then runs `git worktree prune` in every repository, which drops Git's
  * records of worktrees whose directories are gone. Returns the removed
  * entries relative to the data directory.
@@ -67,7 +69,9 @@ export async function runJanitor(
       await removeStale(path.join(insights, name), "any");
 
   const quarantined = await quarantinedRuns(directory);
-  for (const folder of ["worktrees", "team-worktrees"]) {
+  const restored = !!ctx.store.recovery?.restoredFrom;
+  if (restored) log.info("janitor.kept_worktrees", { reason: "restored_from_backup" });
+  for (const folder of restored ? [] : ["worktrees", "team-worktrees"]) {
     const parent = path.join(directory, folder);
     for (const name of await names(parent)) {
       const entry = path.join(parent, name);

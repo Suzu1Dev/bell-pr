@@ -180,6 +180,20 @@ test("the janitor removes crash leftovers and unreferenced worktrees, and prunes
   ]);
 });
 
+test("after a restore from a backup, worktrees of runs the backup does not know are kept", async (t) => {
+  const p = await plantedDataDirectory();
+  t.after(p.cleanup);
+  p.store.recovery = { restoredFrom: "state.json.bak.1", quarantinedRuns: 0 };
+  const removed = await runJanitor(
+    { store: p.store, lock: (_id, task) => task() },
+    { startedAt: Date.now() + 1000 },
+  );
+  assert.equal(await exists(p.orphan), true);
+  assert.equal(await exists(p.orphanTeam), true);
+  // Temporary files still go.
+  assert.deepEqual(removed.sort(), [...p.leftovers].sort());
+});
+
 test("entries newer than the start are left alone", async (t) => {
   const p = await plantedDataDirectory();
   t.after(p.cleanup);
