@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { command, redact } from "./process.js";
-import { readDiff, synchronizeReview } from "./git.js";
+import { legacyRunLocale, readDiff, synchronizeReview } from "./git.js";
 import type { TeamAgentRunner } from "./team.js";
 import { maxPlanRevisions } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
@@ -40,7 +40,7 @@ import { analysisRunning } from "./insights.js";
 import { discoveryRunning, resetDiscovery } from "./discovery.js";
 import { synchronizeExplanations } from "./explanations.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
-import { parseLocale, type Locale } from "../shared/i18n/locale.js";
+import { parseLocale } from "../shared/i18n/locale.js";
 import { closeLog, initLog, log } from "./log.js";
 import { logged, logRunQueued } from "./run-events.js";
 import { activeFollowUp } from "../shared/followups.js";
@@ -60,8 +60,6 @@ import * as followUps from "./followup-runs.js";
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
-/** The only language of the builds that saved runs without a locale (as in git.ts readDiff). */
-const legacyRunLocale: Locale = "zh-TW";
 /** How often the retention period is applied while the server runs. */
 const retentionIntervalMs = 24 * 60 * 60 * 1000;
 
