@@ -126,3 +126,141 @@ test("an English render of the diff view has no Han in its own text", () => {
   });
   assert.match(blank, /aria-label="Added, line 1: blank line"/);
 });
+
+/** A 500-line diff in two hunks: 300 unchanged, 100 removed and 100 added lines. */
+function longPatch() {
+  const hunk = (start: number, context: number, changed: number, name?: string) => [
+    `@@ -${start},${context + changed} +${start},${context + changed} @@${name ? ` ${name}` : ""}`,
+    ...Array.from({ length: context }, (_, index) => ` const keep${start + index} = ${index};`),
+    ...Array.from({ length: changed }, (_, index) => `-const old${index} = ${index};`),
+    ...Array.from({ length: changed }, (_, index) => `+const next${index} = ${index};`),
+  ];
+  return [
+    "diff --git a/src/long.ts b/src/long.ts",
+    "--- a/src/long.ts",
+    "+++ b/src/long.ts",
+    ...hunk(1, 200, 50, "export function first() {"),
+    ...hunk(400, 100, 50),
+    "",
+  ].join("\n");
+}
+
+const longFile: DiffFile = {
+  ...getDemo("en").files[0],
+  path: "src/long.ts",
+  patch: longPatch(),
+  additions: 100,
+  deletions: 100,
+};
+
+const count = (html: string, pattern: RegExp) => html.match(pattern)?.length ?? 0;
+
+/** The markup of the list of lines: from the listbox to the hidden keyboard help after it. */
+function codeRegion(html: string) {
+  const start = html.indexOf('role="listbox"');
+  const end = html.indexOf('class="rv-visually-hidden"');
+  assert.ok(start > 0 && end > start, "the diff renders a listbox before its keyboard help");
+  return html.slice(start, end);
+}
+
+test("a 500-line diff is one tab stop: a listbox of lines with a roving tabindex", () => {
+  for (const view of ["unified", "split"] as const) {
+    const html = renderEn(
+      createElement(DiffView, {
+        file: longFile,
+        reviewed: false,
+        onReview() {},
+        onAsk() {},
+        view,
+      }),
+    );
+    const region = codeRegion(html);
+    assert.equal(count(region, /tabindex="0"/g), 1, view);
+    assert.equal(count(html, /tabindex="0"/g), 1, view);
+    assert.equal(count(region, /tabindex="-1"/g), 499, view);
+    // Every code line is one option, named by its own label.
+    assert.equal(count(region, /role="option"/g), 500, view);
+    assert.equal(count(region, /aria-selected="false"/g), 500, view);
+    assert.equal(count(region, /role="option"[^>]*aria-label="(Added|Removed|Unchanged), line \d+: /g), 500, view);
+    // The first line holds the tab stop.
+    assert.match(region, /tabindex="0" aria-selected="false" aria-label="Unchanged, line 1: const keep1 = 0;"/);
+    assert.match(region, /^role="listbox" aria-multiselectable="true" aria-label="Diff lines" aria-describedby="[^"]+"/);
+    // Each hunk is a group named after where it starts; the raw header is hidden.
+    assert.equal(count(region, /role="group"/g), 2, view);
+    assert.match(region, /role="group" aria-label="Changes from old line 1, new line 1, in export function first\(\) \{"/);
+    assert.match(region, /role="group" aria-label="Changes from old line 400, new line 400"/);
+    assert.equal(count(region, /class="rv-hunk[^"]*" aria-hidden="true"/g), 2, view);
+    assertNoHan(html);
+  }
+  // Split view shows each unchanged line twice; only its new side is in the list.
+  const split = renderEn(
+    createElement(DiffView, {
+      file: longFile,
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "split",
+    }),
+  );
+  assert.equal(
+    count(split, /<div class="rv-line rv-line-context" aria-hidden="true" title=/g),
+    300,
+  );
+});
+
+test("the list of lines explains its keys and has a status for the selection", () => {
+  const html = renderEn(
+    createElement(DiffView, {
+      file: longFile,
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "unified",
+    }),
+  );
+  const describedBy = /role="listbox"[^>]*aria-describedby="([^"]+)"/.exec(html)![1];
+  assert.match(
+    html,
+    new RegExp(`<p class="rv-visually-hidden" id="${describedBy}">Use the arrow keys to move between lines and Shift with an arrow key to select several\\. Press Enter to go to “Explain this code” for the selection, and Escape to clear it\\.</p>`),
+  );
+  // Empty until lines are selected, so a screen reader hears the count change.
+  assert.match(html, /<span class="rv-visually-hidden" role="status"><\/span>/);
+  const zh = renderZh(
+    createElement(DiffView, {
+      file: longFile,
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "unified",
+    }),
+  );
+  assert.match(zh, /aria-label="差異的各行"/);
+  assert.match(zh, /用方向鍵在各行之間移動.*按 Enter 前往選取範圍的「解說這段程式碼」/);
+  assert.match(zh, /aria-label="export function first\(\) \{ 中，從舊版第 1 行、新版第 1 行起的變更"/);
+});
+
+test("a diff without code lines shows its empty state instead of an empty list", () => {
+  const html = renderEn(
+    createElement(DiffView, {
+      file: { ...longFile, patch: "@@ -1,0 +1,0 @@\n\\ No newline at end of file\n" },
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "unified",
+    }),
+  );
+  assert.match(html, /This file has no text changes to show/);
+  assert.doesNotMatch(html, /role="listbox"/);
+  // Without lines there are no keys to explain and nothing to select.
+  assert.doesNotMatch(html, /rv-visually-hidden/);
+  const blocked = renderEn(
+    createElement(DiffView, {
+      file: { ...longFile, blocked: "The file is too large to review." },
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "unified",
+    }),
+  );
+  assert.doesNotMatch(blocked, /role="listbox"|rv-visually-hidden/);
+});

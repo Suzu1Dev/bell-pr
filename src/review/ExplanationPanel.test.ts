@@ -44,7 +44,8 @@ test("a demo file with an explanation renders every learning section", () => {
     assert.match(html, new RegExp(title));
   }
   assert.match(html, /指數退避（Exponential backoff）/);
-  assert.match(html, /示範解說 · 預先整理的學習內容/);
+  assert.match(html, /示範 · 預寫內容，未呼叫 AI/);
+  assert.doesNotMatch(html, /AI 生成/);
 });
 
 test("test files get a reading hint and extra presets while source files keep the fixed three", () => {
@@ -156,7 +157,7 @@ test("the reports tab renders demo reports with the static-review label and per-
       demo: true,
     }),
   );
-  assert.match(html, /示範報告 · 預先整理的內容/);
+  assert.match(html, /示範 · 預寫內容，未呼叫 AI/);
   assert.match(html, /Lead 整合摘要/);
   assert.match(html, /Lens · Reviewer/);
   assert.match(html, /Scout · Test analyst/);
@@ -350,10 +351,10 @@ test("a failed chat turn is recognised by its flag, not by its text", () => {
   assert.match(unflagged, /這次未能取得回答：Agent 逾時/);
 });
 
-// English renders. The English demo is a copy of the zh-TW one until its own
-// words land (2F), so these tests keep its files and diffs but put neutral
-// English text where the demo's explanations and reports would go: what they
-// check is the panel's own text.
+// English renders. These tests take the English demo's files and diffs but
+// give them an explanation and reports of their own, so what they check is
+// the panel's own text, whatever the demo's copy says. The demo itself is
+// checked at the end of this file.
 const englishDemo = getDemo("en");
 const englishExplanation: ChangeExplanation = {
   summary: "Failed requests now wait a little longer before each retry.",
@@ -443,7 +444,7 @@ test("an English render of the explanation tab has no Han in its own text", () =
     ])
       assert.ok(html.includes(text), text);
     assert.match(html, /Module <code>src\/utils<\/code>: Shared helpers/);
-    assert.match(html, demo ? /Sample explanation/ : /from this diff/);
+    assert.match(html, demo ? /Sample · prewritten, no AI call/ : /AI-generated · may be inaccurate/);
   }
   const saved = renderPanel({
     file: { ...englishFile("src/utils/retry.ts"), fingerprint: "a".repeat(64) },
@@ -463,6 +464,26 @@ test("an English render of the explanation tab has no Han in its own text", () =
   const testFile = renderPanel({ file: englishFile("tests/retry.test.ts") });
   assertNoHan(testFile);
   assert.match(testFile, /Tests are behavior specs/);
+});
+
+test("only the selected tab is a tab stop, and the tab panel is one too", () => {
+  const tabs = (html: string) =>
+    [
+      ...html.matchAll(
+        /<button type="button" role="tab" id="[^"]+-(\w+)" tabindex="(-?\d)" aria-selected="(\w+)"/g,
+      ),
+    ].map(([, name, tabIndex, selected]) => `${name} ${tabIndex} ${selected}`);
+  const explain = renderPanel();
+  assertNoHan(explain);
+  assert.deepEqual(tabs(explain), ["explain 0 true", "reports -1 false", "chat -1 false"]);
+  assert.deepEqual(tabs(renderPanel({ chatRequestId: 1 })), [
+    "explain -1 false",
+    "reports -1 false",
+    "chat 0 true",
+  ]);
+  // The panel's text comes before anything focusable, so it can be
+  // focused and scrolled from the keyboard.
+  assert.match(explain, /role="tabpanel" aria-labelledby="[^"]+-explain" tabindex="0"/);
 });
 
 test("every explanation state renders English text without Han", () => {
@@ -551,8 +572,10 @@ test("an English render of the reports tab has no Han in its own text", () => {
     // The Lead's order is found through the untranslated anchor.
     assert.match(html, /Reading order suggested by the Lead/);
     assert.match(html, /<li aria-current="true"><code>src\/utils\/retry\.ts<\/code>/);
-    assert.match(html, demo ? /Sample reports/ : /The team&#x27;s full reports/);
+    assert.match(html, demo ? /Sample · prewritten, no AI call/ : /AI-generated · may be inaccurate/);
     assert.equal(html.includes("Run the review again"), !demo);
+    // Re-running the review is Free: never locked or badged as Pro.
+    assert.doesNotMatch(html, /pro-badge|\bPRO\b|\bPro\b|disabled=""/);
   }
   const busy = renderEn(
     createElement(ReviewReports, {
@@ -607,6 +630,107 @@ test("an English render of the chat tab has no Han in its own text", () => {
   assert.match(blocked, /File context can&#x27;t be attached/);
 });
 
+test("explanations and reports say they are AI output, or a prewritten sample in the demo", () => {
+  const ai = "AI-generated · may be inaccurate";
+  const sample = "Sample · prewritten, no AI call";
+  const live = renderPanel({ demo: false });
+  assertNoHan(live);
+  assert.ok(live.includes(`<p class="explain-provenance">`), "live label");
+  assert.ok(live.includes(ai));
+  assert.ok(!live.includes(sample));
+  const demo = renderPanel({ demo: true });
+  assertNoHan(demo);
+  assert.ok(demo.includes(`<p class="explain-provenance explain-provenance-sample">`));
+  assert.ok(demo.includes(sample));
+  assert.ok(!demo.includes(ai));
+  // No label before there is an explanation to label.
+  const pending = renderPanel({
+    file: { ...englishFile("src/utils/retry.ts"), explanation: undefined, explanationStatus: "generating" },
+  });
+  assert.ok(!pending.includes(ai));
+  for (const [isDemo, label] of [[false, ai], [true, sample]] as const) {
+    const reports = renderEn(
+      createElement(ReviewReports, {
+        file: englishFile("src/utils/retry.ts"),
+        reports: englishReports,
+        demo: isDemo,
+      }),
+    );
+    assert.ok(reports.includes(label), label);
+  }
+});
+
+test("answers carry the AI label; failed turns, questions and demo answers do not", () => {
+  const messages: ChatMessage[] = [
+    { role: "user", content: "Why the jitter?" },
+    { role: "assistant", content: "It spreads retries." },
+    { role: "user", content: "And the cap?" },
+    { role: "assistant", content: "This turn failed: timeout", failed: true },
+    { role: "assistant", content: "The cap is maxDelay." },
+  ];
+  const live = renderPanel({ messages, chatRequestId: 1 });
+  assertNoHan(live);
+  assert.equal(
+    live.match(/<p class="explain-message-provenance">AI-generated · may be inaccurate<\/p>/g)?.length,
+    2,
+  );
+  // The label follows the answer it belongs to.
+  assert.match(
+    live,
+    /It spreads retries\.<\/p><\/div><\/div><p class="explain-message-provenance">/,
+  );
+  const demo = renderPanel({ messages, chatRequestId: 1, demo: true });
+  assert.doesNotMatch(demo, /explain-message-provenance/);
+  const zh = renderZh(
+    createElement(ExplanationPanel, {
+      file: demoFiles[0],
+      messages,
+      loading: false,
+      onAsk() {},
+      demo: false,
+      chatRequestId: 1,
+    }),
+  );
+  assert.equal(zh.match(/AI 生成 · 內容可能有誤/g)?.length, 2);
+});
+
+test("explanations written in another language than the UI say which", () => {
+  const notice = "These explanations were generated in Traditional Chinese.";
+  const zhRun = renderPanel({ runLocale: "zh-TW" });
+  assertNoHan(zhRun);
+  assert.ok(zhRun.includes(`<p class="explain-language-note" role="note">`));
+  assert.ok(zhRun.includes(notice));
+  assert.ok(!renderPanel({ runLocale: "en" }).includes("explain-language-note"));
+  // Runs without a recorded language, the demo (always in the UI language)
+  // and files without an explanation yet show no notice.
+  assert.ok(!renderPanel().includes("explain-language-note"));
+  assert.ok(!renderPanel({ runLocale: "zh-TW", demo: true }).includes("explain-language-note"));
+  assert.ok(
+    !renderPanel({
+      runLocale: "zh-TW",
+      file: { ...englishFile("src/utils/retry.ts"), explanation: undefined, explanationStatus: "pending" },
+    }).includes("explain-language-note"),
+  );
+  // A language this build does not know is not named.
+  assert.ok(
+    !renderPanel({ runLocale: "ja" as unknown as ExplanationPanelProps["runLocale"] }).includes(
+      "explain-language-note",
+    ),
+  );
+  const zhUi = renderZh(
+    createElement(ExplanationPanel, {
+      file: demoFiles[0],
+      messages: [],
+      loading: false,
+      onAsk() {},
+      demo: false,
+      runLocale: "en",
+    }),
+  );
+  assert.match(zhUi, /這些解說是以英文產生的。/);
+  assert.match(zhUi, /AI 生成 · 內容可能有誤/);
+});
+
 test("every English review message is free of Han for any count", () => {
   const texts: string[] = [];
   const visit = (value: unknown) => {
@@ -626,40 +750,35 @@ test("every English review message is free of Han for any count", () => {
   for (const text of texts) assertNoHan(text);
 });
 
-// The demo's own words are English once 2F replaces the placeholder; the
-// wave-2 merge runs this test with that demo.
-const englishDemoReady = englishDemo !== getDemo("zh-TW");
-
-test(
-  "an English render of the demo has no Han",
-  { skip: !englishDemoReady && "the English demo is still the zh-TW placeholder" },
-  () => {
-    for (const file of englishDemo.files) {
-      for (const chatRequestId of [0, 1])
-        assertNoHan(
-          renderEn(
-            createElement(ExplanationPanel, {
-              file,
-              messages: [],
-              loading: false,
-              onAsk() {},
-              demo: true,
-              chatRequestId,
-            }),
-          ),
-        );
-      assertNoHan(
-        renderEn(
-          createElement(ReviewReports, {
-            file,
-            reports: englishDemo.run.reports,
-            demo: true,
-            feedback: englishDemo.prFeedback?.items.filter(
-              (item) => item.path === file.path,
-            ),
-          }),
-        ),
+test("an English render of the demo has no Han and labels its text as a sample", () => {
+  for (const file of englishDemo.files) {
+    for (const chatRequestId of [0, 1]) {
+      const html = renderEn(
+        createElement(ExplanationPanel, {
+          file,
+          messages: [],
+          loading: false,
+          onAsk() {},
+          demo: true,
+          chatRequestId,
+        }),
       );
+      assertNoHan(html);
+      if (!chatRequestId && file.explanation)
+        assert.ok(html.includes("Sample · prewritten, no AI call"), file.path);
+      assert.ok(!html.includes("AI-generated"), file.path);
     }
-  },
-);
+    const reports = renderEn(
+      createElement(ReviewReports, {
+        file,
+        reports: englishDemo.run.reports,
+        demo: true,
+        feedback: englishDemo.prFeedback?.items.filter(
+          (item) => item.path === file.path,
+        ),
+      }),
+    );
+    assertNoHan(reports);
+    assert.ok(reports.includes("Sample · prewritten, no AI call"), file.path);
+  }
+});

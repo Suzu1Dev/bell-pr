@@ -5,12 +5,12 @@ import {
   ArrowUp,
   ArrowUpRight,
   BookOpen,
-  Check,
   Eye,
   FileCode2,
   FlaskConical,
   FolderTree,
   HelpCircle,
+  Languages,
   Lightbulb,
   ListOrdered,
   LoaderCircle,
@@ -21,9 +21,11 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { LearnerNote } from "../../shared/explanations";
+import { parseLocale, type Locale } from "../../shared/i18n/locale";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
 import { parseReviewOrder } from "../../shared/review-order";
-import { useFormat, useT } from "../i18n";
+import { useTablistKeys } from "../a11y/useTablistKeys";
+import { useFormat, useLocale, useT } from "../i18n";
 import type { ChatMessage, DiffFile, Run } from "../types";
 import { MarkdownContent } from "./MarkdownContent";
 import { withNodes } from "./withNodes";
@@ -51,6 +53,25 @@ export interface ExplanationPanelProps {
   /** Re-runs the reviewer and test analyst on the current diff; the button renders when given. */
   onRerunReview?: () => void;
   reviewBusy?: boolean;
+  /**
+   * The language the run's agents wrote in (`run.locale`). When it is not
+   * the UI language, the explanation tab says which language it is in.
+   */
+  runLocale?: Locale;
+}
+
+/**
+ * Says where agent-written text comes from: AI output that may be wrong, or
+ * the sample project's prewritten text.
+ */
+export function ProvenanceLabel({ demo }: { demo: boolean }) {
+  const t = useT("review");
+  return (
+    <p className={`explain-provenance${demo ? " explain-provenance-sample" : ""}`}>
+      {demo ? <BookOpen size={13} /> : <Sparkles size={13} />}
+      {demo ? t.provenance.sample : t.provenance.ai}
+    </p>
+  );
 }
 
 /** Longest module path that is the file itself or one of its parent directories. */
@@ -181,10 +202,7 @@ export function ReviewReports({
   return (
     <>
       <MaintainerFeedback items={feedback} />
-      <div className="explain-ready-label">
-        <Check size={13} />
-        {demo ? t.reports.readyDemo : t.reports.readyLive}
-      </div>
+      <ProvenanceLabel demo={demo} />
       <p className="explain-reports-intro">{t.reports.intro}</p>
       {reviewOrder.length > 0 && (
         <section className="explain-card explain-card-order">
@@ -256,9 +274,11 @@ export function ExplanationPanel({
   feedback = [],
   onRerunReview,
   reviewBusy,
+  runLocale,
 }: ExplanationPanelProps) {
   const t = useT("review");
   const fmt = useFormat();
+  const [locale] = useLocale();
   const [tab, setTab] = useState<"explain" | "reports" | "chat">(
     chatRequestId ? "chat" : "explain",
   );
@@ -269,6 +289,7 @@ export function ExplanationPanel({
   const chatEnd = useRef<HTMLDivElement>(null);
   const lastMessageCount = useRef(messages.length);
   const panelId = useId();
+  const tablistKeys = useTablistKeys();
 
   useEffect(() => {
     setQuestion("");
@@ -346,6 +367,15 @@ export function ExplanationPanel({
     note && file.fingerprint && note.fingerprint !== file.fingerprint,
   );
   const noteDirty = noteDraft !== (note?.text ?? "");
+  // Saved explanations keep the language they were written in; regenerating
+  // them in the UI language is not offered yet.
+  const otherLanguage = parseLocale(runLocale);
+  const languageNote =
+    !demo && otherLanguage && otherLanguage !== locale
+      ? t.provenance.otherLanguage({
+          language: t.provenance.languages[otherLanguage],
+        })
+      : undefined;
   const presets = [
     t.presets.why,
     t.presets.risks,
@@ -373,11 +403,13 @@ export function ExplanationPanel({
         className="explain-tabs"
         role="tablist"
         aria-label={t.panel.tabsLabel}
+        onKeyDown={tablistKeys}
       >
         <button
           type="button"
           role="tab"
           id={`${panelId}-explain`}
+          tabIndex={tab === "explain" ? 0 : -1}
           aria-selected={tab === "explain"}
           aria-controls={`${panelId}-content`}
           className={tab === "explain" ? "explain-tab-active" : ""}
@@ -390,6 +422,7 @@ export function ExplanationPanel({
           type="button"
           role="tab"
           id={`${panelId}-reports`}
+          tabIndex={tab === "reports" ? 0 : -1}
           aria-selected={tab === "reports"}
           aria-controls={`${panelId}-content`}
           className={tab === "reports" ? "explain-tab-active" : ""}
@@ -402,6 +435,7 @@ export function ExplanationPanel({
           type="button"
           role="tab"
           id={`${panelId}-chat`}
+          tabIndex={tab === "chat" ? 0 : -1}
           aria-selected={tab === "chat"}
           aria-controls={`${panelId}-content`}
           className={tab === "chat" ? "explain-tab-active" : ""}
@@ -437,6 +471,9 @@ export function ExplanationPanel({
         id={`${panelId}-content`}
         role="tabpanel"
         aria-labelledby={`${panelId}-${tab}`}
+        // Its text starts before anything focusable, so the panel itself is
+        // a stop: keyboard users can scroll a long explanation.
+        tabIndex={0}
       >
         {tab === "explain" ? (
           <>
@@ -452,10 +489,13 @@ export function ExplanationPanel({
               </div>
             ) : explanation ? (
               <>
-                <div className="explain-ready-label">
-                  <Check size={13} />
-                  {demo ? t.explain.readyDemo : t.explain.readyLive}
-                </div>
+                <ProvenanceLabel demo={demo} />
+                {languageNote && (
+                  <p className="explain-language-note" role="note">
+                    <Languages size={13} />
+                    {languageNote}
+                  </p>
+                )}
                 {isTestFile && (
                   <p className="explain-test-hint">
                     <FlaskConical size={13} />
@@ -806,6 +846,12 @@ export function ExplanationPanel({
                   <div className="explain-message-body">
                     <MarkdownContent>{message.content}</MarkdownContent>
                   </div>
+                  {/* Demo answers open with their own sample line. */}
+                  {message.role === "assistant" && !failed && !demo && (
+                    <p className="explain-message-provenance">
+                      {t.provenance.ai}
+                    </p>
+                  )}
                 </div>
               );
             })}

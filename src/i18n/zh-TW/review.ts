@@ -12,6 +12,13 @@ const m: Translation<typeof en> = {
       context: ({ line, text }) => `未變更，第 ${line} 行：${text}`,
     },
     blankLine: "空白行",
+    listLabel: "差異的各行",
+    keyboardHint: ({ button }) =>
+      `用方向鍵在各行之間移動，按住 Shift 再按方向鍵可選取多行；按 Enter 前往選取範圍的「${button}」，按 Esc 清除選取。`,
+    hunkLabel: ({ oldLine, newLine }) =>
+      `從舊版第 ${oldLine} 行、新版第 ${newLine} 行起的變更`,
+    hunkLabelIn: ({ oldLine, newLine, context }) =>
+      `${context} 中，從舊版第 ${oldLine} 行、新版第 ${newLine} 行起的變更`,
     lineTitle: "點選行以追問，按住 Shift 可選取多行",
     noteHint: "還沒寫下你的理解",
     reviewed: "已審閱",
@@ -37,6 +44,15 @@ const m: Translation<typeof en> = {
     truncated:
       "[內容已節錄] 選取範圍較長，下方僅附部分內容，請優先解釋這段節錄。",
   },
+  provenance: {
+    ai: "AI 生成 · 內容可能有誤",
+    sample: "示範 · 預寫內容，未呼叫 AI",
+    otherLanguage: ({ language }) => `這些解說是以${language}產生的。`,
+    languages: {
+      en: "英文",
+      "zh-TW": "繁體中文",
+    },
+  },
   markdown: {
     imageOmitted: "圖片已省略",
     imageOmittedWithAlt: ({ alt }) => `圖片已省略：${alt}`,
@@ -60,8 +76,6 @@ const m: Translation<typeof en> = {
   explain: {
     unavailableTitle: "目前無法解說此檔案",
     unavailableBody: "這份變更目前沒有可供解說的文字差異。",
-    readyDemo: "示範解說 · 預先整理的學習內容",
-    readyLive: "已依這份 diff 自動整理",
     testFileHint:
       "測試就是行為規格：先讀 it/test 描述，再對照 expect 看它保護哪個邊界。",
     cards: {
@@ -123,8 +137,6 @@ const m: Translation<typeof en> = {
     emptyTitle: "這次工作還沒有審查報告",
     emptyBody:
       "Lead 整合、Reviewer 與 Test analyst 完成後，報告全文會放在這裡。",
-    readyDemo: "示範報告 · 預先整理的內容",
-    readyLive: "團隊回報的完整內容",
     intro:
       "這些是獨立靜態審查，不是執行結果；每份報告保留全文，並標示提到目前檔案的段落數。",
     orderTitle: "Lead 建議的閱讀順序",

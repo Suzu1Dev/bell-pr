@@ -7,7 +7,7 @@
  * component renders it through src/review/withNodes.tsx: put that parameter
  * where the element belongs in the sentence.
  */
-import { formatters } from "../../../shared/i18n/locale";
+import { formatters, type Locale } from "../../../shared/i18n/locale";
 import { product } from "../../../shared/product";
 
 const { plural } = formatters("en");
@@ -30,6 +30,28 @@ const review = {
     },
     /** Stands in for an empty line's text in its accessible name. */
     blankLine: "blank line",
+    /** The accessible name of the list of diff lines, one tab stop. */
+    listLabel: "Diff lines",
+    /**
+     * Read out with the list of lines: how to use it from the keyboard.
+     * `button` is askSelection; Enter selects the line when nothing is
+     * selected yet and moves to that button, which then asks.
+     */
+    keyboardHint: ({ button }: { button: string }) =>
+      `Use the arrow keys to move between lines and Shift with an arrow key to select several. Press Enter to go to “${button}” for the selection, and Escape to clear it.`,
+    /** The accessible name of one hunk: where its lines start in each version. */
+    hunkLabel: ({ oldLine, newLine }: { oldLine: number; newLine: number }) =>
+      `Changes from old line ${oldLine}, new line ${newLine}`,
+    /** The same, when the hunk header names the code around it; `context` is code. */
+    hunkLabelIn: ({
+      oldLine,
+      newLine,
+      context,
+    }: {
+      oldLine: number;
+      newLine: number;
+      context: string;
+    }) => `Changes from old line ${oldLine}, new line ${newLine}, in ${context}`,
     lineTitle: "Click a line to ask about it. Hold Shift to select several lines.",
     noteHint: "No note yet",
     reviewed: "Reviewed",
@@ -67,6 +89,22 @@ const review = {
     truncated:
       "[Excerpt] The selection is long, so only part of it is included below. Please explain this excerpt first.",
   },
+  /**
+   * Where agent-written text comes from, shown on explanations, reports and
+   * answers: AI output, or the sample project's prewritten text.
+   */
+  provenance: {
+    ai: "AI-generated · may be inaccurate",
+    sample: "Sample · prewritten, no AI call",
+    /** `language` is one of `languages`, the run's own language. */
+    otherLanguage: ({ language }: { language: string }) =>
+      `These explanations were generated in ${language}.`,
+    /** Each language's name in this language. */
+    languages: {
+      en: "English",
+      "zh-TW": "Traditional Chinese",
+    } satisfies Record<Locale, string>,
+  },
   /** MarkdownContent: explanations, reports and other agent-written text. */
   markdown: {
     imageOmitted: "Image omitted",
@@ -96,8 +134,6 @@ const review = {
   explain: {
     unavailableTitle: "This file can't be explained right now",
     unavailableBody: "This change has no text diff to explain right now.",
-    readyDemo: "Sample explanation · prepared in advance",
-    readyLive: "Prepared automatically from this diff",
     testFileHint:
       "Tests are behavior specs: read the it/test descriptions first, then check each expect to see which edge case it protects.",
     /** Card titles; the loading skeleton shows them too. */
@@ -175,8 +211,6 @@ const review = {
     emptyTitle: "No review reports for this run yet",
     emptyBody:
       "Once the Lead's integration, the Reviewer and the Test analyst have finished, their full reports appear here.",
-    readyDemo: "Sample reports · prepared in advance",
-    readyLive: "The team's full reports",
     intro:
       "These are independent static reviews, not execution results. Each report is shown in full, with the number of paragraphs that mention the current file.",
     orderTitle: "Reading order suggested by the Lead",

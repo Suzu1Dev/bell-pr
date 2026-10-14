@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  groupHunks,
+  hunkStart,
+  isCodeLine,
   languageBadge,
   languageBadges,
   parseDiff,
@@ -141,4 +144,41 @@ test("selection questions are written in the UI language", () => {
   );
   assert.match(single, /^Explain the selected line of code in src\/example\.ts/);
   assert.doesNotMatch(single, /\[Excerpt\]/);
+});
+
+test("hunks group the lines under each header, notes included, and only code lines are selectable", () => {
+  const lines = parseDiff(
+    "@@ -1,2 +1,2 @@ first()\n same\n-old\n+new\n\\ No newline at end of file\n@@ -9 +9 @@\n+tail\n",
+  );
+  const hunks = groupHunks(lines);
+  assert.equal(hunks.length, 2);
+  assert.equal(hunks[0].header?.text, "@@ -1,2 +1,2 @@ first()");
+  assert.deepEqual(
+    hunks[0].lines.map((line) => line.kind),
+    ["context", "removed", "added", "note"],
+  );
+  assert.deepEqual(hunks[1].lines.map((line) => line.text), ["tail"]);
+  assert.deepEqual(
+    lines.filter(isCodeLine).map((line) => line.text),
+    ["same", "old", "new", "tail"],
+  );
+  // Grouping keeps every line once and in order.
+  assert.deepEqual(
+    hunks.flatMap((hunk) => [hunk.header!, ...hunk.lines]),
+    lines,
+  );
+  assert.deepEqual(groupHunks([]), []);
+  const headless = groupHunks([{ id: 0, kind: "added", text: "x", oldLine: null, newLine: 1 }]);
+  assert.equal(headless[0].header, undefined);
+  assert.equal(headless[0].lines.length, 1);
+});
+
+test("a hunk header gives where its lines start and the code it names", () => {
+  assert.deepEqual(hunkStart("@@ -10,3 +20,4 @@ function example()"), {
+    oldLine: 10,
+    newLine: 20,
+    context: "function example()",
+  });
+  assert.deepEqual(hunkStart("@@ -80 +91 @@"), { oldLine: 80, newLine: 91, context: "" });
+  assert.equal(hunkStart("not a header"), undefined);
 });

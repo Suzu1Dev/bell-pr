@@ -27,6 +27,19 @@
   border: 1px solid var(--color-border);
   border-radius: 8px;
 }
+/* Read by screen readers, not shown: the diff's keyboard help and status. */
+.rv-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 .rv-file-header {
   display: flex;
   align-items: center;
@@ -552,7 +565,7 @@
 }
 .explain-panel .explain-module {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   margin: 6px 18px 0;
   flex-shrink: 0;
@@ -562,11 +575,13 @@
 }
 .explain-module > svg {
   flex-shrink: 0;
+  margin-top: 4px;
 }
+/* The module's purpose is a sentence (longer in zh-TW): it wraps instead of
+   being cut off, and a long path breaks anywhere. */
 .explain-module > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .explain-module code {
   font-family: var(--font-mono);
@@ -582,14 +597,40 @@
   scrollbar-width: thin;
   scrollbar-color: var(--color-border-strong) transparent;
 }
-.explain-ready-label {
+/* The tab panel is a tab stop; the panel's own edges would clip an outer
+   ring, so it rings inside (after the shared rule in styles.css). */
+:root .explain-panel .explain-content:focus-visible {
+  box-shadow: var(--focus-ring-inset);
+}
+/* Where the text below comes from: AI output or the prewritten sample. */
+.explain-panel .explain-provenance {
   display: flex;
   align-items: center;
   gap: 6px;
+  margin: 0 0 14px;
   color: var(--color-accent-600);
   font-size: var(--text-2xs);
   line-height: 1.7;
-  margin-bottom: 14px;
+}
+.explain-provenance > svg {
+  flex-shrink: 0;
+}
+/* The run's text is in another language than the UI. */
+.explain-panel .explain-language-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: -6px 0 14px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: var(--color-info-bg);
+  color: var(--color-info);
+  font-size: var(--text-xs);
+  line-height: 1.7;
+}
+.explain-language-note > svg {
+  flex-shrink: 0;
+  margin-top: 4px;
 }
 .explain-card {
   background: var(--color-surface);
@@ -1141,6 +1182,12 @@
 .explain-panel .explain-message-body {
   white-space: normal;
   overflow-wrap: anywhere;
+}
+.explain-panel .explain-message-provenance {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+  line-height: 1.6;
 }
 .explain-message-error .explain-message-author {
   color: var(--color-danger);
