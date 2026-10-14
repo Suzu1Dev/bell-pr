@@ -618,6 +618,13 @@
   justify-content: flex-end;
   gap: 10px;
 }
+/* A label on one line keeps each action group at least as wide as its
+   widest button: a group squeezed narrower let the button spill over the
+   heading's text beside it. */
+.mission-ideas-actions > .mission-button,
+.mission-overview-actions > .mission-button {
+  white-space: nowrap;
+}
 .mission-more-context {
   padding: 14px 18px;
   margin-bottom: 16px;
