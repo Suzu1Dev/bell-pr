@@ -860,6 +860,7 @@ test("sending a plan back re-runs the lead with the feedback and previous plan, 
     );
     await waitUntil(() => run.status === "awaiting_plan", "first plan");
     assert.match(leadPrompts[0], /premise checks the assumption/);
+    assert.match(leadPrompts[0], /evidence is at most three short sentences of plain text/);
     assert.equal(run.team!.premise?.verdict, "refuted");
     assert.deepEqual(
       run.agents

@@ -1370,7 +1370,7 @@ export default function App() {
       setFiles(result.files);
       notify(
         result.premise
-          ? `前提查核完成：${{ holds: "假設成立", refuted: "假設不成立", unclear: "無法確認假設" }[result.premise.verdict]}。變更解說與程式碼解說會依結論重新產生。`
+          ? `前提查核完成：${{ holds: "假設成立", refuted: "假設不成立", unclear: "無法確認假設" }[result.premise.verdict]}。結論改變時，變更解說與程式碼解說會依結論重新產生。`
           : "需求裡沒有需要查核的假設。",
       );
     } catch (error) {
@@ -2460,11 +2460,10 @@ export default function App() {
                     onCheckPremise={
                       !demo &&
                       run.team &&
-                      !run.team.premise &&
                       !active &&
                       ["review", "approved", "published", "failed", "cancelled"].includes(run.status) &&
-                      // Only a request that states an assumption has one to check.
-                      /假設|未驗證|hypothes|assum/i.test(run.prompt)
+                      // A check can be made again; a first one only when the request states an assumption.
+                      (run.team.premise || /假設|未驗證|hypothes|assum/i.test(run.prompt))
                         ? () => void checkPremise()
                         : undefined
                     }

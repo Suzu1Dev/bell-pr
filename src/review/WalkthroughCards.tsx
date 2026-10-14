@@ -126,8 +126,27 @@ export function WalkthroughCards({
         </div>
       </div>
     );
+  const added = walkthrough.newUnits ?? [];
+  const addedNote = added.length > 0 && (
+    <p className="walkthrough-new-units">
+      這次新增的程式碼沒有原本的邏輯可以拆解：
+      {added.map((name, index) => (
+        <span key={`${name}:${index}`}>
+          {index > 0 && "、"}
+          <code>{name}</code>
+        </span>
+      ))}
+      ，請看「變更解說」。
+    </p>
+  );
   if (!walkthrough.functions.length)
-    return (
+    return added.length ? (
+      <div className="explain-empty">
+        <Workflow size={28} />
+        <h3>這個檔案的變更都是新增的程式碼</h3>
+        {addedNote}
+      </div>
+    ) : (
       <div className="explain-empty">
         <Workflow size={28} />
         <h3>沒有找到包住這些變更的函式</h3>
@@ -218,6 +237,7 @@ export function WalkthroughCards({
           )}
         </section>
       ))}
+      {addedNote}
     </>
   );
 }

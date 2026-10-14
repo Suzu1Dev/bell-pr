@@ -12,6 +12,7 @@ import { Workbench } from "./workbench.js";
 import type { TeamAgentInput } from "./team.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
 import {
+  addedLines,
   changedRanges,
   parseWalkthrough,
   synchronizeWalkthroughs,
@@ -315,4 +316,50 @@ test("a run's walkthrough is generated from the checkout, cached by fingerprint,
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("a function the diff adds whole is listed as new instead of explained", () => {
+  // Lines 10 to 14 are a new test; line 3 changes an existing function.
+  const patch = [
+    "@@ -1,4 +1,4 @@",
+    " fn old() {",
+    "-  let a = 1;",
+    "+  let a = 2;",
+    " }",
+    "@@ -8,1 +8,7 @@",
+    " ",
+    "+",
+    "+#[test]",
+    "+fn added() {",
+    "+  assert!(true);",
+    "+}",
+    "+",
+  ].join("\n");
+  assert.deepEqual([...addedLines(patch)], [2, 9, 10, 11, 12, 13, 14]);
+  const unit = (name: string, startLine: number, endLine: number) => ({
+    name,
+    kind: "函式",
+    startLine,
+    endLine,
+    summary: "s",
+    change: "c",
+    steps: [],
+    callers: [],
+    callees: [],
+    analogy: "",
+    selfCheck: { question: "", answer: "" },
+  });
+  const parsed = parseWalkthrough(
+    JSON.stringify({ functions: [unit("old", 1, 3), unit("added", 10, 13)], newUnits: ["helper"] }),
+    20,
+    addedLines(patch),
+  );
+  assert.deepEqual(parsed.functions.map((entry) => entry.name), ["old"]);
+  assert.deepEqual(parsed.newUnits, ["helper", "added"]);
+  // Without the diff's lines nothing is moved, as in walkthroughs parsed before this.
+  assert.deepEqual(
+    parseWalkthrough(JSON.stringify({ functions: [unit("added", 10, 13)] }), 20).functions.length,
+    1,
+  );
+  assert.match(walkthroughPrompt({ contributionContext: "", file: file({ patch }) }), /list its name in newUnits/);
 });
