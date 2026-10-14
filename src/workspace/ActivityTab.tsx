@@ -10,8 +10,6 @@ import {
 } from "lucide-react";
 import { useFormat, useT } from "../i18n";
 import type { Run } from "../types";
-import { EfficiencySummary } from "../efficiency/EfficiencySummary";
-import { ModelSummary } from "../models/ModelSummary";
 import { TeamBoard } from "../team/TeamBoard";
 import type { RunActions } from "../app/hooks/useRunActions";
 
@@ -61,10 +59,6 @@ export function ActivityTab({
     activeLogFilter === "all"
       ? run.logs
       : run.logs.filter((log) => log.agent === activeLogFilter);
-  // The model and usage cards wait in a closed disclosure until the run
-  // has something to report, so the board stays in the first screen.
-  const runDetails =
-    !demo && (!!run.modelExecution || !!run.efficiency?.calls);
   return (
     <>
       <TeamBoard
@@ -77,17 +71,6 @@ export function ActivityTab({
         onRetry={retryTeam}
         busy={busy}
       />
-      <details className="run-details" open={runDetails}>
-        <summary>{t.runDetails}</summary>
-        <div className="run-details-cards">
-          <ModelSummary execution={run.modelExecution} demo={demo} />
-          <EfficiencySummary
-            metrics={run.efficiency}
-            mode={run.contributionSettings?.ponytailMode}
-            demo={demo}
-          />
-        </div>
-      </details>
       <div className="activity-layout">
         <div className="activity-main">
           <div className="section-heading">

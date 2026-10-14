@@ -12,7 +12,7 @@ const demo = getDemo("en");
 
 const element = (props: Partial<Props> = {}) =>
   createElement(ActivityTab, {
-    run: demo.run,
+    run: { ...demo.run, team: demo.team },
     demo: true,
     busy: false,
     active: false,
@@ -29,35 +29,34 @@ const element = (props: Partial<Props> = {}) =>
     ...props,
   });
 
-/** The Run details disclosure, from its opening tag to its end. */
-const details = (html: string) =>
-  html.match(/<details class="run-details"[^>]*>.*?<\/details>/)?.[0] ?? "";
+const count = (html: string, pattern: RegExp) =>
+  html.match(new RegExp(pattern, "g"))?.length ?? 0;
 
-test("the model and usage cards wait in a closed Run details disclosure without data", () => {
+test("the model and usage cards show once, in the team board's folded Run details", () => {
   const html = renderEn(element());
-  const disclosure = details(html);
-  assert.match(disclosure, /^<details class="run-details"><summary>Run details<\/summary>/);
-  assert.match(disclosure, /class="model-summary"/);
-  assert.match(disclosure, /class="efficiency-summary"/);
-  // It follows the team board, before the run log.
-  assert.ok(html.indexOf("run-details") > html.indexOf("team-board"));
-  assert.ok(html.indexOf("run-details") < html.indexOf("activity-layout"));
+  // TeamBoard owns the disclosure; the Activity tab adds no second one.
+  assert.equal(count(html, /<details class="team-run-details">/), 1);
+  assert.equal(count(html, /<details class="run-details"/), 0);
+  assert.equal(count(html, /class="model-summary"/), 1);
+  assert.equal(count(html, /class="efficiency-summary[ "]/), 1);
+  const disclosure = html.slice(html.indexOf('<details class="team-run-details">'));
+  assert.ok(disclosure.indexOf('class="model-summary"') < disclosure.indexOf("</details>"));
+  assert.match(disclosure, /<strong>Run details<\/strong>/);
+  // It sits on the board, before the run log.
+  assert.ok(html.indexOf("team-run-details") > html.indexOf("team-board"));
+  assert.ok(html.indexOf("team-run-details") < html.indexOf("activity-layout"));
   assertNoHan(html);
-  assert.match(renderZh(element()), /<summary>執行細節<\/summary>/);
+  assert.match(renderZh(element()), /<strong>執行細節<\/strong>/);
 });
 
-test("a run that recorded its model or usage opens Run details", () => {
+test("a run that recorded its model names it on the folded Run details", () => {
   const run: Run = {
     ...demo.run,
+    team: demo.team,
     id: "run-1",
     modelExecution: { provider: "codex", model: "gpt-5" } as Run["modelExecution"],
   };
-  assert.match(
-    details(renderEn(element({ run, demo: false }))),
-    /^<details class="run-details" open="">/,
-  );
-  assert.match(
-    details(renderEn(element({ run: { ...run, modelExecution: undefined }, demo: false }))),
-    /^<details class="run-details">/,
-  );
+  const html = renderEn(element({ run, demo: false }));
+  assert.equal(count(html, /class="model-summary"/), 1);
+  assert.match(html, /<details class="team-run-details"><summary><strong>Run details<\/strong><span>[^<]*gpt-5/);
 });
