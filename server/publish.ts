@@ -34,6 +34,8 @@ import { AppError, type DiffFile, type Run } from "./types.js";
 import { assertRemoteHead, prHasCommit, remoteBranchHead } from "./pr-branch.js";
 import { assertConflictsResolved } from "./sync-runs.js";
 import { applyAiDisclosure } from "./drafts.js";
+import { assertGitIdentity, githubTokenScopes } from "./doctor.js";
+import { setupError } from "./cli-errors.js";
 import type { WorkbenchContext } from "./workbench.js";
 import { currentLocale, sm } from "./i18n/index.js";
 import { secretInPatch } from "./secrets.js";
@@ -134,6 +136,23 @@ export async function publishChecks(
     },
     locale,
   );
+}
+
+/** GitHub only lets a token with the `workflow` scope push changes to these files. */
+const workflowPath = /^\.github\/workflows\//;
+
+/**
+ * Refuses with 409 `gh_workflow_scope` when the files to push change a
+ * GitHub Actions workflow and the GitHub CLI's token reports scopes
+ * without `workflow`. A token that reports none (fine-grained) or no
+ * answer from GitHub is not refused here; GitHub's own answer to the push
+ * is hinted the same way.
+ */
+async function assertWorkflowScope(files: DiffFile[]) {
+  if (!files.some((file) => workflowPath.test(file.path))) return;
+  const scopes = await githubTokenScopes();
+  if (scopes && !scopes.includes("workflow"))
+    throw setupError("gh_workflow_scope", 409);
 }
 
 /** The draft, file reviews and approval change only in review or approved, never while publishing. */
@@ -279,6 +298,9 @@ export async function approve(
           422,
         );
     }
+    // Publishing commits in the checkout, so its Git identity (repository
+    // settings included) must be set before anything is approved.
+    await assertGitIdentity(run.worktreePath);
     run.approvedFingerprint = reviewFingerprint(files, run.draft);
     run.status = "approved";
     await ctx.store.save();
@@ -312,6 +334,8 @@ export async function publish(
       throw new AppError((m) => m.run.publish.noGithubOrigin, 422);
     // Nothing is committed or pushed from a checkout whose Git settings could run commands.
     await assertGitConfigSafe(run.worktreePath);
+    // Nor before Git knows who commits.
+    await assertGitIdentity(run.worktreePath);
     const files = await ctx.diff(id);
     if (
       run.status !== "approved" ||
@@ -372,6 +396,7 @@ export async function publish(
           }),
         422,
       );
+    await assertWorkflowScope(files);
     // The commit e-mail is asked about once per address.
     if (checks.some((check) => check.id === "author-email"))
       await confirmEmails(ctx.store.directory, await commitEmails(run));
@@ -637,6 +662,7 @@ async function publishFollowUp(
   assertGitHubRepository(run.headRepository);
   assertRefName(branch);
   await assertGitConfigSafe(run.worktreePath);
+  await assertWorkflowScope(files);
   const roundNumber = (run.followUps?.indexOf(round) ?? 0) + 1;
   const finish = (commit: string) => {
     round.status = "published";
