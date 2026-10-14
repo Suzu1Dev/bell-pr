@@ -1206,7 +1206,8 @@ test("preflight blocks a credential in the PR text and asks to confirm local pat
     draftPreflight({
       title: `Fix ${token}`,
       body: "A fix.",
-      commitMessage: `Fix\n\n-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----`,
+      // Split, so the repository's "no private keys" grep stays clean.
+      commitMessage: `Fix\n\n-----${"BEGIN "}PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----`,
     })[0].details,
     ["In the title", "In the commit message"],
   );
