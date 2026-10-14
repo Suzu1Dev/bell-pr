@@ -98,4 +98,17 @@ export interface AgentTeam {
   approvedAt?: string;
   /** Optional: runs created before plan revision existed have none. Oldest first. */
   planRevisions?: TeamPlanRevision[];
+  /** The lead's check of the request's assumption; absent when it stated none or before this existed. */
+  premise?: PremiseCheck;
+}
+
+/**
+ * An assumption in the request, checked by the lead against the repository
+ * before planning: holds (the code confirms it), refuted (the code
+ * contradicts it) or unclear. Text is Traditional Chinese with path:line.
+ */
+export interface PremiseCheck {
+  verdict: "holds" | "refuted" | "unclear";
+  statement: string;
+  evidence: string;
 }

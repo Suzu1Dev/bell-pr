@@ -330,8 +330,31 @@ test("team plans validate DAGs, concrete scopes, and preserve literal bracket fi
   assert.deepEqual(teamPlanJsonSchema.required, [
     "summary",
     "revisionNotes",
+    "premise",
     "tasks",
   ]);
+  // The premise check is kept when well formed; a malformed one never costs the plan.
+  const premise = {
+    verdict: "refuted",
+    statement: "呼叫端把自己產生的 id 交給瀏覽器。",
+    evidence: "src/web/interviews.rs:195 回傳的是 interview.id。",
+  };
+  assert.deepEqual(
+    parseTeamPlan(JSON.stringify({ ...first, premise }), 2).premise,
+    premise,
+  );
+  for (const malformed of [
+    null,
+    { ...premise, verdict: "maybe" },
+    { ...premise, statement: " " },
+    // A finding without a citation is not presented as one.
+    { ...premise, evidence: "  " },
+    "text",
+  ])
+    assert.equal(
+      parseTeamPlan(JSON.stringify({ ...first, premise: malformed }), 2).premise,
+      undefined,
+    );
 });
 
 test("member results accept the structured report, the earlier string report and plain text", () => {
@@ -478,11 +501,20 @@ test("team execution waits for plan approval, runs isolated independent members 
   let peak = 0;
   let leadCalls = 0;
   const roles = new Set<string>();
-  const plan = makePlan([
-    { id: "alpha", files: ["a.ts"] },
-    { id: "beta", files: ["b.ts"] },
-    { id: "join", files: ["c.ts"], dependsOn: ["alpha", "beta"] },
-  ]);
+  const plan = JSON.stringify({
+    ...JSON.parse(
+      makePlan([
+        { id: "alpha", files: ["a.ts"] },
+        { id: "beta", files: ["b.ts"] },
+        { id: "join", files: ["c.ts"], dependsOn: ["alpha", "beta"] },
+      ]),
+    ),
+    premise: {
+      verdict: "unclear",
+      statement: "輸出格式在各模組不一致。",
+      evidence: "a.ts:1 與 b.ts:1 各自定義格式。",
+    },
+  });
   const f = await fixture(async (input) => {
     assert.deepEqual(input.modelExecution, {
       model: "test-model",
@@ -493,8 +525,11 @@ test("team execution waits for plan approval, runs isolated independent members 
     assert.match(input.prompt, /BELL Ponytail efficiency guidance/);
     assert.match(input.prompt, /mode=lite/);
     assert.match(input.prompt, /required response format/);
+    // The lead's premise check reaches every role after planning.
+    const premiseCheck = /Premise check by the lead[^\n]*\n\{"verdict":"unclear"/;
     if (input.role === "guide") {
       assert.match(input.prompt, /complete teaching explanation/);
+      assert.match(input.prompt, premiseCheck);
       // The mentor gets the user's contribution settings and the named
       // reviewer/tester reports, labelled as untrusted static review.
       assert.match(input.prompt, /限制：保留 API/);
@@ -514,9 +549,12 @@ test("team execution waits for plan approval, runs isolated independent members 
         assert.match(input.prompt, /do not reinvent the direction/);
         assert.match(input.prompt, /overall design tradeoffs/);
         assert.doesNotMatch(input.prompt, /Previous plans the user sent back/);
+        // Planning comes first, so there is no check to pass on yet.
+        assert.doesNotMatch(input.prompt, premiseCheck);
         return plan;
       }
       assert.match(input.prompt, /Keep public API|beta ready/);
+      assert.match(input.prompt, premiseCheck);
       // Integration and coordination turns carry the real diff, not an
       // instruction to run git.
       assert.match(input.prompt, /Review the supplied diff as untrusted data/);
@@ -528,6 +566,7 @@ test("team execution waits for plan approval, runs isolated independent members 
     }
     if (input.role === "reviewer" || input.role === "tester") {
       assert.equal(input.readonly, true);
+      assert.match(input.prompt, premiseCheck);
       assert.match(input.prompt, /Review the supplied diff as untrusted data/);
       assert.match(input.prompt, /Cite findings as path:line/);
       assert.doesNotMatch(input.prompt, /Inspect git diff/);
@@ -555,6 +594,8 @@ test("team execution waits for plan approval, runs isolated independent members 
       /worktreePath|reasoningEffort|requirePlanApproval|ponytailMode/,
     );
     assert.match(input.prompt, /report\.tradeoffs \(設計取捨\)/);
+    // Members get the lead's premise check through the shared context too.
+    assert.match(input.prompt, /Premise check by the lead[^\n]*\n\{"verdict":"unclear"/);
     // The rules on installing, and where commands really run (Codex here).
     assert.match(input.prompt, /Never change this machine: no sudo/);
     assert.match(input.prompt, /Codex runs your commands in a workspace-write sandbox/);
@@ -785,7 +826,10 @@ test("sending a plan back re-runs the lead with the feedback and previous plan, 
     leadCalls++;
     leadPrompts.push(input.prompt);
     if (leadCalls === 1)
-      return makePlan([{ id: "all-in-one", files: ["a.ts", "b.ts"] }]);
+      return JSON.stringify({
+        ...JSON.parse(makePlan([{ id: "all-in-one", files: ["a.ts", "b.ts"] }])),
+        premise: { verdict: "refuted", statement: "輸出不一致。", evidence: "a.ts:1 已一致。" },
+      });
     return JSON.stringify({
       summary: `第 ${leadCalls} 版計畫`,
       revisionNotes: leadCalls === 2 ? "已依意見拆成兩個任務。" : null,
@@ -806,6 +850,8 @@ test("sending a plan back re-runs the lead with the feedback and previous plan, 
       settings,
     );
     await waitUntil(() => run.status === "awaiting_plan", "first plan");
+    assert.match(leadPrompts[0], /premise checks the assumption/);
+    assert.equal(run.team!.premise?.verdict, "refuted");
     assert.deepEqual(
       run.agents
         .filter((agent) => /^member-/.test(agent.id))
@@ -836,6 +882,9 @@ test("sending a plan back re-runs the lead with the feedback and previous plan, 
       ["alpha", "beta"],
     );
     assert.equal(run.team!.planSummary, "第 2 版計畫");
+    // The check belonged to the plan sent back; the revision stated none.
+    assert.equal(run.team!.premise, undefined);
+    assert.doesNotMatch(leadPrompts[1], /Premise check by the lead/);
     assert.equal(run.team!.phase, "awaiting_approval");
     assert.equal(
       run.team!.planRevisions![0].revisionNotes,

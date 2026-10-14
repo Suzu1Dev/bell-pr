@@ -73,6 +73,7 @@ import {
 } from "../shared/followups";
 import { FollowUpRounds } from "./draft/FollowUpRounds";
 import { SyncPanel } from "./draft/SyncPanel";
+import { PremiseNotice } from "./team/PremiseNotice";
 import { SetupChecklist } from "./team/SetupChecklist";
 import { mergeSetupNeeds } from "../shared/setup";
 import { parseViewSearch, viewSearch, type Page, type Tab } from "./view-url";
@@ -2388,21 +2389,26 @@ export default function App() {
                 aria-labelledby={`workspace-tab-${tab}`}
               >
                 {tab === "overview" && !demo && (
-                  <SetupChecklist
-                    needs={mergeSetupNeeds([
-                      ...(run.team?.tasks ?? []).map((task) => ({
-                        from:
-                          run.agents.find((agent) => agent.id === task.owner)
-                            ?.name ?? task.owner,
-                        needs: task.setup,
-                      })),
-                      ...(run.followUps ?? []).map((round, index) => ({
-                        from: `修正第 ${index + 1} 輪`,
-                        needs: round.setup,
-                      })),
-                    ])}
-                    onCopy={(command) => void copySetupCommand(command)}
-                  />
+                  <>
+                    <div className="premise-overview">
+                      <PremiseNotice premise={run.team?.premise} />
+                    </div>
+                    <SetupChecklist
+                      needs={mergeSetupNeeds([
+                        ...(run.team?.tasks ?? []).map((task) => ({
+                          from:
+                            run.agents.find((agent) => agent.id === task.owner)
+                              ?.name ?? task.owner,
+                          needs: task.setup,
+                        })),
+                        ...(run.followUps ?? []).map((round, index) => ({
+                          from: `修正第 ${index + 1} 輪`,
+                          needs: round.setup,
+                        })),
+                      ])}
+                      onCopy={(command) => void copySetupCommand(command)}
+                    />
+                  </>
                 )}
                 {tab === "overview" && currentRepo && (
                   <ProjectOverview
@@ -2647,6 +2653,9 @@ export default function App() {
                           </div>
                         </div>
                       </div>
+                      {!demo && (
+                        <PremiseNotice premise={run.team?.premise} compact />
+                      )}
                       {editable && run.worktreePath && (
                         <div className="worktree-hint">
                           <FolderGit2 size={14} />

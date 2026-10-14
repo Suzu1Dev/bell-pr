@@ -610,3 +610,80 @@
     font-size: 14px;
   }
 }
+
+/* The lead's check of the request's assumption. */
+.premise-notice {
+  margin-top: 12px;
+  padding: 11px 14px;
+  border: 1px solid #e4eadf;
+  border-radius: 9px;
+  background: #f7faf2;
+  font-size: 12px;
+  line-height: 1.75;
+  color: #4d5f47;
+  overflow-wrap: anywhere;
+}
+.premise-notice.premise-refuted {
+  border-color: #f0dcc6;
+  background: #fff8f0;
+}
+.premise-notice.premise-unclear {
+  border-color: #e3e5e0;
+  background: #f8f9f7;
+}
+.premise-notice h3,
+.premise-notice summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+}
+.premise-notice summary {
+  flex-wrap: wrap;
+  cursor: pointer;
+  font-size: 12px;
+}
+.premise-notice summary > span {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-weight: 400;
+}
+.premise-holds svg {
+  color: #5f8c4f;
+}
+.premise-refuted svg {
+  color: #b5683b;
+}
+.premise-unclear svg {
+  color: #8d9488;
+}
+.premise-notice p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+}
+.premise-notice .premise-statement {
+  font-weight: 550;
+}
+.premise-notice small {
+  display: block;
+  margin-top: 6px;
+  color: #66735c;
+  font-size: 11px;
+}
+.premise-compact {
+  margin: 0;
+  border-width: 0 0 1px;
+  border-radius: 0;
+}
+.premise-overview:empty {
+  display: none;
+}
+.premise-overview {
+  margin: 0 28px 4px;
+}
+@media (max-width: 760px) {
+  .premise-overview {
+    margin: 0 16px 4px;
+  }
+}
