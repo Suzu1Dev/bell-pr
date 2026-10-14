@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { SyncPanel } from "./SyncPanel";
 import type { Run } from "../types";
 
@@ -20,10 +20,9 @@ const base: Run = {
   draft: { title: "t", body: "b" },
   reviewedFiles: [],
 };
-const render = (run: Run, busy = false) =>
-  renderToStaticMarkup(
-    createElement(SyncPanel, { run, busy, onSync: () => {}, onResolve: () => {}, onUndo: () => {} }),
-  );
+const panel = (run: Run, busy = false) =>
+  createElement(SyncPanel, { run, busy, onSync: () => {}, onResolve: () => {}, onUndo: () => {} });
+const render = (run: Run, busy = false) => renderZh(panel(run, busy));
 /** Whether the button with this label is there and enabled. */
 const button = (html: string, label: string) => {
   const match = new RegExp(`<button([^>]*)>(?:(?!</button>).)*${label}`).exec(html);
@@ -112,4 +111,72 @@ test("an unpublished run that cannot sync says why", () => {
     assert.match(html, /只有審閱中、已核准或等待計畫核准的工作可以同步/, status);
   }
   assert.doesNotMatch(render(base), /只有審閱中/);
+});
+
+test("the English panel explains the base, the conflicts and why it waits, without Han", () => {
+  const sync = {
+    at: "2026-10-13T01:00:00Z",
+    from: "b".repeat(40),
+    to: "a".repeat(40),
+    snapshot: "c".repeat(40),
+    conflicts: ["src/a.ts", "src/b.ts"],
+    unresolved: ["src/b.ts"],
+    report: "Kept both changes in src/a.ts.",
+    resolutions: [{ path: "src/a.ts", resolution: "kept both sides" }],
+  };
+  const published: Run = { ...base, status: "published", prUrl: "https://github.com/o/r/pull/1" };
+  const round = {
+    id: "f",
+    requestedAt: "2026-10-13T00:00:00Z",
+    feedbackUrls: [],
+    status: "review" as const,
+    parentCommit: "d".repeat(40),
+  };
+  const runs: [string, Run][] = [
+    ["clean", base],
+    ["conflicts", { ...base, sync }],
+    ["resolved", { ...base, sync: { ...sync, unresolved: [] } }],
+    ["resolving", { ...base, sync: { ...sync, resolving: true } }],
+    ["running", { ...base, status: "running" }],
+    ["published", published],
+    ["round open", { ...published, status: "review", followUps: [round] }],
+    [
+      "published conflicts",
+      {
+        ...published,
+        status: "review",
+        followUps: [{ ...round, kind: "sync", conflicts: ["src/a.ts"], resolving: true }],
+      },
+    ],
+  ];
+  for (const [name, run] of runs) {
+    const html = renderEn(panel(run));
+    assert.doesNotThrow(() => assertNoHan(html), name);
+  }
+  const html = renderEn(panel({ ...base, sync }));
+  assert.match(
+    html,
+    /This contribution is based on <code>main<\/code> at <code>aaaaaaa<\/code>\. Syncing moves these changes/,
+  );
+  assert.match(html, /Last sync: <code>bbbbbbb<\/code> to <code>aaaaaaa<\/code>, /);
+  assert.match(html, /src\/a\.ts<\/code> · resolved/);
+  assert.match(html, /the side marked <code>latest main<\/code>/);
+  assert.match(html, /the side marked <code>this contribution<\/code> is this contribution/);
+  assert.equal(button(html, "Ask the agent to resolve the conflicts"), "enabled");
+  assert.equal(button(html, "Sync to the latest target branch"), "disabled");
+  assert.match(html, /Resolve the conflicts from the last sync before you sync again/);
+  assert.match(html, /Undo sync/);
+  const pr = renderEn(
+    panel({
+      ...published,
+      status: "review",
+      followUps: [{ ...round, kind: "sync", conflicts: ["src/a.ts"] }],
+    }),
+  );
+  assert.match(pr, /the side marked <code>this pull request<\/code> is this pull request/);
+  assert.match(renderEn(panel({ ...published, status: "review", followUps: [round] })), /A follow-up round is in progress/);
+  assert.match(
+    renderEn(panel({ ...base, status: "failed" })),
+    /Only runs in review, approved or waiting for plan approval can sync/,
+  );
 });
