@@ -14,7 +14,7 @@ const followUpAgentCommitted =
 export default {
   /** Logged once on a run whose Claude agent ran without the OS sandbox. */
   unsandboxedNotice:
-    "This Claude agent ran without the OS sandbox because unsandboxed agents are allowed in Settings.",
+    "This Claude agent ran without the OS sandbox because unsandboxed Claude agents are allowed (in Settings or with BELLPR_ALLOW_UNSANDBOXED_AGENTS=1).",
   /** What an agent card says the agent is doing (its `detail`). */
   agents: {
     lead: "Analysing the project and breaking down the request",

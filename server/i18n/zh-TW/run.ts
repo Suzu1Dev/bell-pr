@@ -9,7 +9,7 @@ const followUpAgentCommitted =
 
 const m: Translation<typeof en> = {
   unsandboxedNotice:
-    "這個 Claude Agent 未在作業系統沙箱中執行，因為設定中允許不使用沙箱的 Agent。",
+    "這個 Claude Agent 未在作業系統沙箱中執行，因為已允許不使用沙箱的 Claude Agent（在設定中，或以 BELLPR_ALLOW_UNSANDBOXED_AGENTS=1 啟動）。",
   agents: {
     lead: "分析專案與拆解需求",
     reviewer: "獨立審查正確性與維護性",
