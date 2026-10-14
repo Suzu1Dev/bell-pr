@@ -567,7 +567,11 @@ async function main() {
   await mkdir(footageRoot, { recursive: true });
 
   const port = Number(process.env.PROMO_CAPTURE_PORT || 4573);
-  const temp = await mkdtemp(path.join(os.tmpdir(), "bellpr-7C-"));
+  // The temporary HOME and data dir go under /tmp/claude-1000 unless TMPDIR
+  // names another place.
+  const tempRoot = process.env.TMPDIR ? os.tmpdir() : "/tmp/claude-1000";
+  await mkdir(tempRoot, { recursive: true });
+  const temp = await mkdtemp(path.join(tempRoot, "bellpr-7C-"));
   let server;
   let browser;
   try {
