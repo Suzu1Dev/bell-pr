@@ -52,7 +52,7 @@ import {
   hasExtendedAgentTimeout,
   withAgentTimeoutHint,
 } from "./agent-timeouts.js";
-import { AppError, type Run } from "./types.js";
+import { AppError } from "./types.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
 import { setupError } from "./cli-errors.js";
 import { knownDoctorReport } from "./doctor.js";
@@ -394,7 +394,7 @@ async function assertDiscoveryReady(dataDir: string, provider: AgentProvider) {
  * The run-events helpers name a run; a discovery search has none, so its
  * log lines carry `discovery:<jobId>` in that field.
  */
-const discoveryLogRun = (jobId: string) => ({ id: `discovery:${jobId}` }) as Run;
+const discoveryLogRun = (jobId: string) => ({ id: `discovery:${jobId}` });
 
 export class DiscoveryService {
   private job: DiscoveryJob | null = null;

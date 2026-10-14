@@ -58,7 +58,7 @@ export function enterPhase(run: Run, team: AgentTeam, phase: AgentTeam["phase"])
  * duration.
  */
 export function agentSpawn(
-  run: Run,
+  run: Pick<Run, "id">,
   role: string,
   executable: string,
   timeoutMs: number,
@@ -105,7 +105,11 @@ export function agentSpawn(
  * "format incomplete, retry" path the person then has to retry) and
  * rethrows.
  */
-export function parseAgentOutput<T>(run: Run, schema: string, parse: () => T): T {
+export function parseAgentOutput<T>(
+  run: Pick<Run, "id">,
+  schema: string,
+  parse: () => T,
+): T {
   try {
     return parse();
   } catch (error) {
