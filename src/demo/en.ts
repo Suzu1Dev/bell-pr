@@ -1,6 +1,8 @@
+import { formatters } from "../../shared/i18n/locale";
 import { buildDemoContent } from "./shared";
 import type { DemoContent } from "./types";
 
+const { plural } = formatters("en");
 const answerPrefix = "Sample · prewritten, no AI call.\n\n";
 
 const en: DemoContent = buildDemoContent({
@@ -387,7 +389,9 @@ const en: DemoContent = buildDemoContent({
   discovery: {
     interests: "Developer tools, documentation, accessibility",
     message: ({ count }) =>
-      `Sample: found ${count} source-backed ${count === 1 ? "opportunity" : "opportunities"} to contribute. Maintainer interest and scope still need confirming.`,
+      plural(count) === "one"
+        ? `Sample: found ${count} source-backed opportunity to contribute. Maintainer interest and scope still need confirming.`
+        : `Sample: found ${count} source-backed opportunities to contribute. Maintainer interest and scope still need confirming.`,
     warnings: [
       "This is a sample result: the projects, issues and quotes are fictional. GitHub was not searched and no AI model was called.",
     ],

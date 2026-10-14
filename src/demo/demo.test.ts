@@ -432,6 +432,12 @@ test("demoAnswer reads English questions with the English keyword tables", () =>
     );
 });
 
+test("the English discovery message agrees with its count", () => {
+  const { message } = getDemo("en").discovery;
+  assert.match(message({ count: 1 }), /found 1 source-backed opportunity to/);
+  assert.match(message({ count: 3 }), /found 3 source-backed opportunities to/);
+});
+
 test("every English answer is labelled as a prewritten sample", () => {
   const demo = getDemo("en");
   const files = [
