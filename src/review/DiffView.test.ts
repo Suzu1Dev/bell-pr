@@ -133,4 +133,46 @@ test("a highlighted range marks its lines in the changed version only", () => {
   // Lines 12 to 16 of the new file; the two removed lines in between are not marked.
   assert.equal(marked.length, 5);
   assert.doesNotMatch(html, /rv-line-removed rv-line-highlighted|rv-line-removed[^"]*rv-line-highlighted/);
+
+test("a submodule or a mode-only change offers no expansion", () => {
+  const withLoader = (file: DiffFile) =>
+    renderToStaticMarkup(
+      createElement(DiffView, {
+        file,
+        reviewed: false,
+        onReview() {},
+        onAsk() {},
+        view: "unified",
+        onLoadBase: async () => [],
+      }),
+    );
+  const base = {
+    language: "Text",
+    additions: 1,
+    deletions: 1,
+    status: "modified",
+    fingerprint: "f".repeat(64),
+  };
+  const submodule = withLoader({
+    ...base,
+    path: "vendor/lib",
+    patch: [
+      "diff --git a/vendor/lib b/vendor/lib",
+      "index 1111111..2222222 160000",
+      "--- a/vendor/lib",
+      "+++ b/vendor/lib",
+      "@@ -1 +1 @@",
+      "-Subproject commit 1111111111111111111111111111111111111111",
+      "+Subproject commit 2222222222222222222222222222222222222222",
+    ].join("\n"),
+  });
+  assert.doesNotMatch(submodule, /完整檔案|rv-gap/);
+  const modeOnly = withLoader({
+    ...base,
+    path: "run.sh",
+    additions: 0,
+    deletions: 0,
+    patch: "diff --git a/run.sh b/run.sh\nold mode 100644\nnew mode 100755\n",
+  });
+  assert.doesNotMatch(modeOnly, /完整檔案|rv-gap/);
 });

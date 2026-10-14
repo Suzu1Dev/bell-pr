@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { lstat, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { git } from "./process.js";
-import { secretInPatch } from "./secrets.js";
+import { redact, secretInPatch } from "./secrets.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
 
 export { secretInPatch };
@@ -140,6 +140,10 @@ export async function baseFileLines(
   filePath: string,
 ) {
   const blob = `${run.baseSha}:${filePath}`;
+  // A submodule is a commit, not file content.
+  const type = (await git(run.worktreePath, ["cat-file", "-t", blob])).stdout.trim();
+  if (type !== "blob")
+    throw new AppError("子模組或特殊項目沒有可展開的程式碼。", 422);
   const size = Number(
     (await git(run.worktreePath, ["cat-file", "-s", blob])).stdout.trim(),
   );
@@ -154,7 +158,8 @@ export async function baseFileLines(
     throw new AppError("二進位檔案無法展開周圍的程式碼。", 422);
   if (secretInPatch(content))
     throw new AppError("檔案疑似包含憑證，周圍的程式碼不會顯示。", 422);
-  const lines = content.split("\n");
+  // Masked line by line, so password=… or URL credentials never leave and numbering holds.
+  const lines = content.split("\n").map(redact);
   if (lines.at(-1) === "") lines.pop();
   return lines;
 }
