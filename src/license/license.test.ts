@@ -104,8 +104,10 @@ test("the upgrade dialog names the feature, lists Pro and offers the trial and a
   for (const label of ["Agent team size", "Concurrent runs", "Learning record export (Markdown)", "Web access for agents"])
     assert.ok(html.includes(label), label);
   assert.match(html, /class="upgrade-feature current"><span class="pro-badge"[^>]*>PRO<\/span><span>Discovery \(GitHub-wide recommendations\)<\/span><span class="upgrade-feature-tag">The feature you tried<\/span>/);
-  // Free rows are not in the Pro list.
+  // Free rows, and the license term, which is not a feature, are not in the Pro list.
   assert.doesNotMatch(html, /Learning notes page/);
+  assert.doesNotMatch(html, /Pro license term/);
+  assert.equal(html.match(/class="upgrade-feature( current)?"/g)?.length, 8);
   assert.match(html, />Start 14-day trial</);
   assert.match(html, />Enter license key</);
   assert.match(html, />Not now</);

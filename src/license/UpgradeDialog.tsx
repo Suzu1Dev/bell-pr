@@ -92,7 +92,8 @@ export function UpgradeDialog({
     (triggered
       ? t.upgrade.featureLocked({ feature: t.plans.features[triggered.id].label })
       : t.upgrade.general);
-  const proRows = planFeatureTable.filter((row) => row.tier !== "free");
+  // The rows a Pro feature gates; the license term row is not a feature.
+  const proRows = planFeatureTable.filter((row) => row.feature !== undefined);
   const purchaseUrl = productLink("purchaseUrl");
   const pricingUrl = productLink("pricingUrl");
   const canChange = !demo && summary?.envLocked !== true;
