@@ -116,6 +116,7 @@ const m: Translation<typeof en> = {
         `以 ${guide} 中的動機、變更與驗證原則作為備用依據，調整成 GitHub PR 格式。Signed-off-by 等簽署資訊需由本人確認，不會自動填入。`,
       guide: "Linux 官方提交指引",
     },
+    readOnly: "這個 PR 已發布，以下指引保留供參考。",
     disclosure: {
       title: "AI 協助揭露",
       label: "在 PR 說明加入 AI 協助聲明",
@@ -129,6 +130,13 @@ const m: Translation<typeof en> = {
       quote: ({ quote }) => `「${quote}」`,
       ruleSource: ({ source }) => `來源：${source}`,
       applyHint: "下方預覽會依這個選擇顯示，套用建議時也會一併放入編輯器；記得儲存草稿。",
+    },
+    preflight: {
+      title: "發布前檢查",
+      intro: "發布時會對已儲存的草稿執行相同檢查。阻擋項目修正前無法發布；其他項目需要你確認。",
+      block: "阻擋發布",
+      confirm: "發布前需確認",
+      clear: "已儲存的草稿沒有需要處理的檢查項目。",
     },
   },
   sync: {

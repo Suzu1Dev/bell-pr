@@ -138,6 +138,9 @@ const draft = {
         `The motivation, change and verification principles in the ${guide} serve as a fallback, adapted to the GitHub PR format. Sign-off lines such as Signed-off-by must be confirmed by you and are never filled in automatically.`,
       guide: "Linux kernel's patch submission guidelines",
     },
+    /** The run is published: the panel stays for reference, without actions. */
+    readOnly:
+      "This pull request is published. The guidance stays here for reference.",
     /**
      * The AI-assistance disclosure: off unless the person's setting or the
      * project's rules ask for it. The line itself is English PR text.
@@ -164,6 +167,14 @@ const draft = {
         "The preview below follows this choice, and applying the suggestion puts it in the editor. Save the draft to keep it.",
     },
     /** The publish preflight for the saved draft. */
+    preflight: {
+      title: "Checks before publishing",
+      intro:
+        "Publishing runs the same checks on the saved draft. A blocking check stops publishing until you fix it; the others ask you to confirm.",
+      block: "Blocks publishing",
+      confirm: "Confirm before publishing",
+      clear: "No check needs your attention in the saved draft.",
+    },
   },
   /** SyncPanel: where the contribution stands against its target branch. */
   sync: {
