@@ -201,7 +201,7 @@ export function LearningNotes({
           <BookOpen size={28} />
           <h2>還沒有屬於你的學習筆記</h2>
           <p>
-            先在「專案」頁匯入 repository 並建立任務；進入審查後，每個檔案的解說會自動彙整到這裡。
+            先在「Repositories」頁匯入 repository 並建立任務；進入審查後，每個檔案的解說會自動彙整到這裡。
           </p>
         </div>
       ) : visible.length === 0 ? (
