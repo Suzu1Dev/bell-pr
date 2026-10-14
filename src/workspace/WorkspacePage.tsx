@@ -13,12 +13,13 @@ import {
   GitBranch,
   GitPullRequest,
   Globe2,
+  Lock,
   Plus,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { apiUrl } from "../api";
-import { useLocale, useT } from "../i18n";
+import { useT } from "../i18n";
+import { ProBadge } from "../license/ProBadge";
 import type { DiffFile, Repo, Run } from "../types";
 import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { ContributionRecommendation } from "../../shared/insights";
@@ -31,6 +32,7 @@ import { ChangesTab } from "./ChangesTab";
 import { DraftTab } from "./DraftTab";
 import { OverviewTab } from "./OverviewTab";
 import { RunNotices, UnsandboxedBadge } from "./RunNotices";
+import { UpgradeFallback } from "./UpgradeFallback";
 import "./workspace.css";
 
 interface WorkspacePageProps {
@@ -147,25 +149,31 @@ export function WorkspacePage({
 }: WorkspacePageProps) {
   const t = useT("workspace");
   const statusLabels = useT("common").runStatus;
-  const [locale] = useLocale();
   const { draftDirty, draftUnfinished, followUp, commitMessageUnfinished } =
     draft;
-  const { approve, plan } = actions;
+  const { approve, plan, exporting, exportLearning } = actions;
   const queuedOnFree =
     run.status === "queued" && plan.entitlements?.maxActiveRuns === 1;
-  // In reading mode the one-row heading clips the repo/branch text, so the
-  // export link moves up next to "New contribution" where it stays visible
-  // and reachable. A plain link cannot send the locale header, so the URL
-  // carries it.
-  const exportLink = !demo && (
-    <a
-      className="export-link"
-      href={apiUrl(`/runs/${run.id}/export.md`, { locale })}
-      download={`bell-learning-${run.id}.md`}
+  // The learning record is Pro: on Free the button shows a lock and opens
+  // the upgrade dialog without a request; the sample builds its own record
+  // and shows the PRO chip. In reading mode the one-row heading clips the
+  // repo/branch text, so the button moves up next to "New contribution".
+  const exportLocked = plan.locked("learningExport", { demo });
+  const exportButton = (
+    <button
+      type="button"
+      className="export-link export-button"
+      disabled={exporting}
+      onClick={() => void exportLearning()}
     >
-      <ArrowDownToLine size={13} />
+      {exportLocked ? (
+        <Lock size={13} aria-hidden="true" />
+      ) : (
+        <ArrowDownToLine size={13} aria-hidden="true" />
+      )}
       {t.exportLearning}
-    </a>
+      {(exportLocked || demo) && <ProBadge />}
+    </button>
   );
   const reviewedCount = files.filter((f) =>
     run.reviewedFiles.includes(f.path),
@@ -195,7 +203,7 @@ export function WorkspacePage({
             <span>{t.eyebrow}</span>
             {demo && <span className="demo-pill">{t.demoPill}</span>}
           </div>
-          {reading && exportLink}
+          {reading && exportButton}
           <button
             className="button secondary new-task-button"
             onClick={() => beginContribution()}
@@ -234,11 +242,8 @@ export function WorkspacePage({
           </span>
           <span className="branch-direction">→</span>
           <span>{run.baseBranch}</span>
-          {demo ? (
-            <span className="meta-demo">{t.demoMeta}</span>
-          ) : (
-            !reading && exportLink
-          )}
+          {demo && <span className="meta-demo">{t.demoMeta}</span>}
+          {!reading && exportButton}
         </div>
       </section>
       <RunNotices run={run} queuedOnFree={queuedOnFree} />
@@ -510,6 +515,7 @@ export function WorkspacePage({
           </div>
         </footer>
       </section>
+      <UpgradeFallback demo={demo} summary={plan.summary} />
     </>
   );
 }

@@ -7,10 +7,14 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
-import { api, ApiError, send } from "../../api";
+import { api, ApiError, ProRequiredError, send } from "../../api";
 import { demoAnswer, getDemo } from "../../demo";
+import { demoLearningExport } from "../../demo/export";
 import { useLocale, useT, type Messages } from "../../i18n";
-import { useEntitlements } from "../../license/useEntitlements";
+import {
+  requestUpgrade,
+  useEntitlements,
+} from "../../license/useEntitlements";
 import type { Repo, Run, RunSummary, DiffFile, ChatMessage } from "../../types";
 import type { Locale } from "../../../shared/i18n/locale";
 import { summarizeRun } from "../../../shared/runs";
@@ -22,6 +26,7 @@ import {
   saveDemo,
   saveDemoSettings,
 } from "./demoStorage";
+import { saveTextFile } from "./saveTextFile";
 import type { DraftEditor } from "./useDraftEditor";
 import type { TaskSetup } from "./useTaskSetup";
 
@@ -176,6 +181,7 @@ export function useRunActions({
     settingsReady,
   } = setup;
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
   const [loadingChats, setLoadingChats] = useState<Set<string>>(new Set());
   const pendingChats = useRef(new Set<string>());
@@ -634,6 +640,44 @@ export function useRunActions({
       setBusy(false);
     }
   }
+  /**
+   * Saves the run's learning record (Markdown) as a file. A real run's
+   * comes from GET /api/runs/:id/export.md in the UI language; it needs
+   * Pro, so on Free the upgrade dialog opens instead of a request, and a
+   * 402 opens it too. The sample builds its record here.
+   */
+  async function exportLearning() {
+    const name = `bell-learning-${run.id}.md`;
+    if (demo) {
+      saveTextFile(
+        name,
+        demoLearningExport(
+          run,
+          demoContent.repo,
+          demoContent.files,
+          messages,
+          locale,
+        ),
+      );
+      return;
+    }
+    if (plan.locked("learningExport")) {
+      requestUpgrade("learningExport");
+      return;
+    }
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const text = await api<string | undefined>(`${runPath(run.id)}/export.md`);
+      saveTextFile(name, text ?? "");
+    } catch (error) {
+      // A 402 already opened the upgrade dialog.
+      if (!(error instanceof ProRequiredError))
+        notify((error as Error).message, "error");
+    } finally {
+      setExporting(false);
+    }
+  }
   // Read-only and only on request: no timer refreshes maintainer feedback.
   async function fetchPrFeedback() {
     if (demo) {
@@ -679,6 +723,8 @@ export function useRunActions({
   }
   return {
     plan,
+    exporting,
+    exportLearning,
     feedbackLoading,
     messages,
     chatRequests,

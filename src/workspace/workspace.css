@@ -123,3 +123,12 @@
 .is-reading .run-notices {
   margin: 0 18px var(--space-2);
 }
+
+/* The learning record export: a quiet text button in the heading. */
+.workspace-heading .export-button {
+  padding: 0;
+  white-space: nowrap;
+}
+.workspace-heading .meta-demo + .export-button {
+  margin-left: var(--space-3);
+}
