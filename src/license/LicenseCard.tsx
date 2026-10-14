@@ -38,6 +38,9 @@ export function LicenseCard({
   const fmt = useFormat();
   const titleId = useId();
   const { summary } = useEntitlements(status);
+  // Masked, the name and the e-mail address read the same: show it once.
+  const licenseeName = summary?.name ? maskUser(summary.name) : "";
+  const licenseeEmail = summary?.email ? maskUser(summary.email) : "";
   const [busy, setBusy] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [error, setError] = useState("");
@@ -93,9 +96,9 @@ export function LicenseCard({
                 <div>
                   <dt>{t.card.licensee}</dt>
                   <dd>
-                    {summary.name && <span>{maskUser(summary.name)}</span>}
-                    {summary.email && (
-                      <span className="license-email">{maskUser(summary.email)}</span>
+                    {licenseeName && <span>{licenseeName}</span>}
+                    {licenseeEmail && licenseeEmail !== licenseeName && (
+                      <span className="license-email">{licenseeEmail}</span>
                     )}
                   </dd>
                 </div>

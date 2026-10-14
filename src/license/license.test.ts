@@ -175,7 +175,9 @@ test("the license card shows a Pro license and masks the licensee when asked", (
 
   const masked = renderEn(card(pro, { maskUser: () => "•••", maskPath: () => "…" }));
   assert.doesNotMatch(masked, /Ada|ada@example/);
-  assert.match(masked, /<span>•••<\/span><span class="license-email">•••<\/span>/);
+  assert.match(masked, /<dt>Licensed to<\/dt><dd><span>•••<\/span><\/dd>/);
+  const emailOnly = renderEn(card({ ...pro, name: undefined }, { maskUser: () => "•••" }));
+  assert.match(emailOnly, /<dt>Licensed to<\/dt><dd><span class="license-email">•••<\/span><\/dd>/);
 
   // A key from a pool carries no name or e-mail, so there is no licensee row.
   const { name: _name, email: _email, ...pooled } = pro;
