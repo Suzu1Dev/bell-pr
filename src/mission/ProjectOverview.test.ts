@@ -5,9 +5,11 @@ import { formatters } from "../../shared/i18n/locale";
 import type { ProjectInsights } from "../../shared/insights";
 import { freeEntitlements, proEntitlements } from "../../shared/plans";
 import { getDemo } from "../demo";
-import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
+import type { PlaybackClock } from "../demo/playback";
+import { assertNoHan, renderEn, renderWith, renderZh } from "../test-utils/render";
 import { demoInsights } from "./demo";
 import { ProjectOverview, type ProjectOverviewProps } from "./ProjectOverview";
+import { playSampleAnalysis, stopSampleAnalysis } from "./sample-analysis";
 
 const repo = {
   id: "demo-repo",
@@ -236,27 +238,29 @@ const englishRun = {
   diff: [],
 } as unknown as NonNullable<ProjectOverviewProps["run"]>;
 
+const overviewProps = (
+  overrides: Partial<ProjectOverviewProps> = {},
+): ProjectOverviewProps => ({
+  repo,
+  insights: englishInsights,
+  loading: false,
+  error: "",
+  recommending: false,
+  recommendationError: "",
+  recommendationPreferences: { order: [], hidden: [] },
+  savingPreferences: false,
+  preferenceError: "",
+  stale: false,
+  onAnalyze() {},
+  onRecommendMore() {},
+  onSavePreferences() {},
+  onChooseRecommendation() {},
+  onReadCode() {},
+  ...overrides,
+});
+
 const renderEnglish = (overrides: Partial<ProjectOverviewProps> = {}) =>
-  renderEn(
-    createElement(ProjectOverview, {
-      repo,
-      insights: englishInsights,
-      loading: false,
-      error: "",
-      recommending: false,
-      recommendationError: "",
-      recommendationPreferences: { order: [], hidden: [] },
-      savingPreferences: false,
-      preferenceError: "",
-      stale: false,
-      onAnalyze() {},
-      onRecommendMore() {},
-      onSavePreferences() {},
-      onChooseRecommendation() {},
-      onReadCode() {},
-      ...overrides,
-    }),
-  );
+  renderEn(createElement(ProjectOverview, overviewProps(overrides)));
 
 const en = formatters("en");
 
@@ -459,5 +463,43 @@ test("the sample offers its extra batch unlocked, with a PRO chip, once", () => 
   assert.match(expanded, /mission-more-provenance/);
   assert.doesNotMatch(expanded, /did not record its model/);
   assert.match(expanded, /No measurements yet\. The sample did not call AI\./);
+});
+
+test("while the sample's analysis plays, the loading state lists its lines so far", async () => {
+  // A clock that never fires: the playback stays on its first line.
+  const timers: (() => void)[] = [];
+  const clock: PlaybackClock = {
+    now: () => 0,
+    setTimeout: (callback) => timers.push(callback),
+    clearTimeout() {},
+  };
+  const demo = getDemo("en");
+  const steps = demo.analysisSteps ?? [];
+  const played = playSampleAnalysis({ demo, clock });
+  try {
+    timers.shift()?.();
+    const html = renderEnglish({ insights: null, loading: true });
+    assertNoHan(html);
+    assert.match(html, /Turning the code into a project overview\./);
+    assert.ok(
+      html.includes('role="progressbar" aria-label="Analysis progress" aria-valuemin="0" aria-valuemax="5" aria-valuenow="2"'),
+    );
+    assert.match(html, /style="width:33%"/);
+    assert.ok(html.includes(`<li class="done">`));
+    assert.ok(html.includes(`<span>${steps[0]}</span>`));
+    const current = html.slice(html.indexOf('<li class="current">'));
+    assert.ok(current.startsWith('<li class="current">') && current.includes(`<span>${steps[1]}</span></li>`));
+    assert.ok(!html.includes(steps[2]));
+    // Another repository, or a real analysis, shows no sample lines.
+    assert.doesNotMatch(renderEnglish({ repo: { ...repo, id: "repo-1" }, insights: null, loading: true }), /mission-analysis-steps/);
+    assert.doesNotMatch(renderEnglish({ insights: null, loading: false }), /mission-analysis-steps/);
+    assert.match(
+      renderWith("zh-TW", createElement(ProjectOverview, overviewProps({ insights: null, loading: true }))),
+      /aria-label="分析進度"/,
+    );
+  } finally {
+    stopSampleAnalysis();
+    await played;
+  }
 });
 

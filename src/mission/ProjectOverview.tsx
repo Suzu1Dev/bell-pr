@@ -33,7 +33,8 @@ import {
 } from "../../shared/insights";
 import type { Formatters } from "../../shared/i18n/locale";
 import type { Entitlements } from "../../shared/plans";
-import { useFormat, useT, type Messages } from "../i18n";
+import { getDemo } from "../demo";
+import { useFormat, useLocale, useT, type Messages } from "../i18n";
 import type { Repo, Run } from "../types";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
 import { ProBadge } from "../license/ProBadge";
@@ -41,6 +42,7 @@ import { requestUpgrade } from "../license/useEntitlements";
 import { ModelSummary } from "../models/ModelSummary";
 import { directionOptions } from "./DirectionSettings";
 import { usePlan } from "./plan";
+import { useSampleAnalysis } from "./sample-analysis";
 import {
   moveRecommendation,
   orderedRecommendations,
@@ -305,7 +307,14 @@ export function ProjectOverview({
   const t = useT("mission");
   const common = useT("common");
   const fmt = useFormat();
+  const [locale] = useLocale();
   const demo = insights?.source === "demo";
+  // The sample's analysis in playback mode: its loading lines so far.
+  const sampleAnalysis = useSampleAnalysis();
+  const analysisSteps =
+    !insights && loading && repo.id === getDemo(locale).repo.id
+      ? sampleAnalysis.steps
+      : [];
   const plan = usePlan({
     entitlements,
     demo,
@@ -627,6 +636,44 @@ export function ProjectOverview({
           <span className="mission-repository-label">{repo.fullName}</span>
           <h3>{loading ? t.empty.loadingTitle : t.empty.title}</h3>
           <p>{loading ? t.empty.loadingLead : t.empty.lead}</p>
+          {analysisSteps.length > 0 && (
+            <div className="mission-analysis-steps">
+              <div
+                className="mission-analysis-progress"
+                role="progressbar"
+                aria-label={t.empty.progressLabel}
+                aria-valuemin={0}
+                aria-valuemax={sampleAnalysis.total}
+                aria-valuenow={analysisSteps.length}
+              >
+                <span
+                  style={{
+                    width: `${Math.round((100 * analysisSteps.length) / Math.max(1, sampleAnalysis.total + 1))}%`,
+                  }}
+                />
+              </div>
+              <ol>
+                {analysisSteps.map((step, index) => {
+                  const done =
+                    index < analysisSteps.length - 1 || !sampleAnalysis.playing;
+                  return (
+                    <li key={index} className={done ? "done" : "current"}>
+                      {done ? (
+                        <Check size={14} aria-hidden="true" />
+                      ) : (
+                        <Loader2
+                          className="mission-spin"
+                          size={14}
+                          aria-hidden="true"
+                        />
+                      )}
+                      <span>{step}</span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          )}
           <div className="mission-discovery-points">
             <span>
               <Target size={18} />

@@ -60,6 +60,7 @@ const mission = {
       improve: "What is worth improving?",
     },
     start: "Start the project analysis",
+    progressLabel: "Analysis progress",
     note: "Until the analysis is done, nothing is guessed about what this project does and no change is recommended.",
   },
   project: {

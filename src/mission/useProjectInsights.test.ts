@@ -7,6 +7,7 @@ import {
   type ProjectInsights,
 } from "../../shared/insights";
 import { getDemo } from "../demo";
+import { playbackTiming, type PlaybackClock } from "../demo/playback";
 import { setLocale } from "../i18n";
 import { assertNoHan, renderWith } from "../test-utils/render";
 import {
@@ -14,6 +15,7 @@ import {
   shownInsights,
   useProjectInsights,
 } from "./useProjectInsights";
+import { sampleAnalysisState } from "./sample-analysis";
 
 afterEach(async () => {
   await setLocale("en");
@@ -200,3 +202,107 @@ test("the sample's extra batch follows the UI language too", async () => {
   assert.equal(shownInsights(analysis, "zh-TW"), analysis);
   assert.equal(shownInsights(null, "en"), null);
 });
+
+/** A clock whose time only moves when the test says so. */
+function fakeClock() {
+  let now = 0;
+  let sequence = 0;
+  const timers = new Map<number, { at: number; callback: () => void }>();
+  const clock: PlaybackClock = {
+    now: () => now,
+    setTimeout(callback, ms) {
+      timers.set(++sequence, { at: now + ms, callback });
+      return sequence;
+    },
+    clearTimeout(handle) {
+      timers.delete(handle as number);
+    },
+  };
+  /** Fires the timers that fall due within `ms`, in time order. */
+  const advance = (ms = Infinity) => {
+    const end = now + ms;
+    for (;;) {
+      const next = [...timers].sort((a, b) => a[1].at - b[1].at)[0];
+      if (!next || next[1].at > end) break;
+      timers.delete(next[0]);
+      now = next[1].at;
+      next[1].callback();
+    }
+    if (Number.isFinite(end)) now = end;
+  };
+  return { clock, advance, pending: () => timers.size };
+}
+
+/** A cache whose server requests are recorded and must not happen. */
+function playbackCache(time: ReturnType<typeof fakeClock>) {
+  const requests: string[] = [];
+  const cache = new ProjectInsightsCache(
+    async (repoId, operation) => {
+      requests.push(`${repoId}:${operation}`);
+      return { insights: null, stale: false };
+    },
+    async (repoId) => {
+      requests.push(`${repoId}:preferences`);
+      return { recommendationPreferences: { order: [], hidden: [] } };
+    },
+    { playSample: true, clock: time.clock },
+  );
+  return { cache, requests };
+}
+
+test("in playback mode the sample's analysis plays its loading lines, then shows, without a request", async () => {
+  const time = fakeClock();
+  const { cache, requests } = playbackCache(time);
+  const demo = getDemo("en");
+  const steps = demo.analysisSteps ?? [];
+  assert.equal(steps.length, 5);
+  // It starts out loading, so the analysis never shows before it plays.
+  assert.equal(cache.snapshot("demo-repo").insights, null);
+  assert.equal(cache.snapshot("demo-repo").loading, true);
+
+  const played = cache.playSample("en", 4);
+  assert.deepEqual(sampleAnalysisState(), { playing: true, steps: steps.slice(0, 1), total: 5 });
+  time.advance(playbackTiming.analysisStep / 4);
+  assert.deepEqual(sampleAnalysisState().steps, steps.slice(0, 2));
+  assert.equal(cache.snapshot("demo-repo").insights, null);
+  // Starting again while it plays joins it.
+  assert.equal(cache.playSample("en", 4), played);
+  time.advance();
+  await played;
+  assert.equal(cache.snapshot("demo-repo").insights, demo.insights);
+  assert.equal(cache.snapshot("demo-repo").loading, false);
+  assert.deepEqual(sampleAnalysisState(), { playing: false, steps, total: 5 });
+
+  // It plays once: a later start or load keeps the analysis.
+  await cache.playSample("en", 4);
+  await cache.load("demo-repo");
+  assert.equal(cache.snapshot("demo-repo").insights, demo.insights);
+  assert.equal(time.pending(), 0);
+
+  // Re-analyze in playback mode plays it again, in the language asked for.
+  const again = cache.playSample("zh-TW", 4, true);
+  assert.equal(cache.snapshot("demo-repo").insights, null);
+  assert.deepEqual(sampleAnalysisState().steps, getDemo("zh-TW").analysisSteps?.slice(0, 1));
+  time.advance();
+  await again;
+  assert.equal(cache.snapshot("demo-repo").insights, getDemo("zh-TW").insights);
+  assert.deepEqual(requests, []);
+});
+
+test("a sample analysis stopped while it plays shows on the next load", async () => {
+  const time = fakeClock();
+  const { cache, requests } = playbackCache(time);
+  const played = cache.playSample("en", 1);
+  cache.dispose();
+  assert.equal(time.pending(), 0);
+  await played;
+  assert.equal(sampleAnalysisState().playing, false);
+  assert.equal(cache.snapshot("demo-repo").insights, null);
+  await cache.load("demo-repo");
+  assert.equal(cache.snapshot("demo-repo").insights, getDemo("en").insights);
+  assert.equal(cache.snapshot("demo-repo").loading, false);
+  // Outside playback mode the sample shows at once, as before.
+  assert.equal(new ProjectInsightsCache().snapshot("demo-repo").insights, getDemo("en").insights);
+  assert.deepEqual(requests, []);
+});
+

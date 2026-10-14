@@ -35,6 +35,7 @@ const m: Translation<typeof en> = {
       improve: "哪裡值得改善？",
     },
     start: "開始專案分析",
+    progressLabel: "分析進度",
     note: "分析完成前，不會推測這個專案的用途或推薦改動。",
   },
   project: {

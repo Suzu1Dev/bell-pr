@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { locales, type Locale } from "../../shared/i18n/locale";
 import {
   maxProjectRecommendations,
@@ -8,8 +14,11 @@ import {
   type RecommendationPreferences,
 } from "../../shared/insights";
 import { api, send } from "../api";
+import { usePresentation } from "../app/presentation";
 import { getDemo } from "../demo";
+import type { PlaybackClock } from "../demo/playback";
 import { getCurrentLocale, getCurrentMessages, useLocale } from "../i18n";
+import { playSampleAnalysis, stopSampleAnalysis } from "./sample-analysis";
 
 /** The cache's messages in the active UI language, read when one is shown. */
 const messages = () => getCurrentMessages().mission.insights;
@@ -99,6 +108,16 @@ const emptyState: InsightsState = {
   preferenceError: "",
 };
 
+export interface ProjectInsightsCacheOptions {
+  /**
+   * The sample's analysis plays (`demo=play`): it starts out loading, and
+   * playSample() reveals it, instead of showing it at once.
+   */
+  playSample?: boolean;
+  /** The clock of the sample's playback; tests pass a fake one. */
+  clock?: PlaybackClock;
+}
+
 /** One cache belongs to the mounted workbench, so changing repositories keeps active work. */
 export class ProjectInsightsCache {
   private states = new Map<string, InsightsState>([
@@ -108,6 +127,9 @@ export class ProjectInsightsCache {
   private mutations = new Map<string, Promise<void>>();
   private revisions = new Map<string, number>();
   private listeners = new Set<() => void>();
+  /** The sample's analysis while it plays, and whether it has played. */
+  private samplePlay?: Promise<void>;
+  private samplePlayed = false;
 
   constructor(
     private request: InsightsRequest = (repoId, operation) =>
@@ -123,7 +145,11 @@ export class ProjectInsightsCache {
         `/repos/${repoId}/insights/preferences`,
         send("PUT", preferences),
       ),
-  ) {}
+    private options: ProjectInsightsCacheOptions = {},
+  ) {
+    if (options.playSample)
+      this.states.set("demo-repo", { ...emptyState, loading: true });
+  }
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -148,7 +174,12 @@ export class ProjectInsightsCache {
   }
 
   load(repoId: string): Promise<void> {
-    if (repoId === "demo-repo") return Promise.resolve();
+    if (repoId === "demo-repo") {
+      // A sample analysis that waited for a playback that did not come shows now.
+      if (!this.samplePlay && !this.snapshot(repoId).insights)
+        this.update(repoId, { insights: demoInsights(), loading: false });
+      return Promise.resolve();
+    }
     // Re-entering an active repository joins its original analysis instead of reading old cache.
     const pending = this.mutations.get(repoId) ?? this.reads.get(repoId);
     if (pending) return pending;
@@ -189,8 +220,50 @@ export class ProjectInsightsCache {
     return this.load(repoId);
   }
 
+  /**
+   * Plays the sample's analysis (`demo=play`): the overview shows its
+   * loading lines, then the analysis, without a request. It plays once per
+   * cache; `restart` plays it again, as "Re-analyze" does in playback mode.
+   */
+  playSample(locale: Locale, speed?: number, restart = false): Promise<void> {
+    if (!restart && (this.samplePlay || this.samplePlayed))
+      return this.samplePlay ?? Promise.resolve();
+    const repoId = "demo-repo";
+    this.update(repoId, {
+      insights: null,
+      stale: false,
+      staleDetail: undefined,
+      loading: true,
+      error: "",
+      recommendationError: "",
+    });
+    const play = playSampleAnalysis({
+      demo: getDemo(locale),
+      speed,
+      clock: this.options.clock,
+    }).then(() => {
+      if (this.samplePlay !== play) return;
+      this.samplePlay = undefined;
+      this.samplePlayed = true;
+      this.update(repoId, {
+        insights: sampleInsights(locale, false),
+        loading: false,
+      });
+    });
+    this.samplePlay = play;
+    return play;
+  }
+
+  /** Stops the sample's analysis if it plays; the next load or playSample() picks it up. */
+  dispose() {
+    if (!this.samplePlay) return;
+    this.samplePlay = undefined;
+    stopSampleAnalysis();
+  }
+
   analyze(repoId: string): Promise<void> {
     if (repoId === "demo-repo") {
+      this.dispose();
       this.update(repoId, {
         insights: demoInsights(),
         error: messages().demoAnalysis,
@@ -320,21 +393,39 @@ export class ProjectInsightsCache {
 
 export function useProjectInsights(repoId?: string) {
   const [locale] = useLocale();
-  const [cache] = useState(() => new ProjectInsightsCache());
+  const { play, speed } = usePresentation();
+  const [cache] = useState(
+    () => new ProjectInsightsCache(undefined, undefined, { playSample: play }),
+  );
   const getSnapshot = useCallback(
     () => cache.snapshot(repoId),
     [cache, repoId],
   );
   const state = useSyncExternalStore(cache.subscribe, getSnapshot, getSnapshot);
+  // In playback mode the sample's analysis plays instead of showing at once.
+  const playing = repoId === "demo-repo" && play;
+  // Read when it starts; changing them later does not start it again.
+  const sample = useRef({ locale, speed });
+  sample.current = { locale, speed };
 
+  useEffect(() => () => cache.dispose(), [cache]);
   useEffect(() => {
-    if (repoId) void cache.load(repoId);
-  }, [cache, repoId]);
+    if (!repoId) return;
+    if (playing)
+      void cache.playSample(sample.current.locale, sample.current.speed);
+    else void cache.load(repoId);
+  }, [cache, repoId, playing]);
 
-  const analyze = useCallback(
-    () => (repoId ? cache.analyze(repoId) : Promise.resolve()),
-    [cache, repoId],
-  );
+  const analyze = useCallback(() => {
+    if (!repoId) return Promise.resolve();
+    if (playing)
+      return cache.playSample(
+        sample.current.locale,
+        sample.current.speed,
+        true,
+      );
+    return cache.analyze(repoId);
+  }, [cache, repoId, playing]);
   const recommendMore = useCallback(
     () => (repoId ? cache.recommendMore(repoId) : Promise.resolve()),
     [cache, repoId],
