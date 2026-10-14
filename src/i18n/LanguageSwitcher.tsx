@@ -5,6 +5,7 @@ import {
   type Locale,
 } from "../../shared/i18n/locale";
 import { api, send } from "../api";
+import { currentRoute, navigate } from "../navigation/route";
 import { useLocale, useT } from "./index";
 
 /**
@@ -20,11 +21,18 @@ export function saveLocale(locale: Locale) {
 
 /**
  * Switches the UI to `next` with `change` (the setter from useLocale), then
- * saves it in the app settings (see `saveLocale`).
+ * saves it in the app settings (see `saveLocale`). A `locale=` flag in the
+ * address (from a shared or presentation link) goes, so a reload keeps the
+ * language the person chose; the other flags stay.
  */
 export function chooseLocale(next: Locale, change: (locale: Locale) => void) {
   change(next);
   saveLocale(next);
+  const route = currentRoute();
+  if (route?.flags && "locale" in route.flags) {
+    const { locale: _flag, ...flags } = route.flags;
+    navigate({ ...route, flags }, { replace: true });
+  }
 }
 
 /**

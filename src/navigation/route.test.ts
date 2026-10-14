@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import en from "../i18n/en";
+import { chooseLocale } from "../i18n/LanguageSwitcher";
 import zhTW from "../i18n/zh-TW";
 import {
   currentRoute,
@@ -360,4 +361,24 @@ test("without a window the store reads no route and navigate does nothing", () =
   assert.equal(currentRoute(), null);
   const unsubscribe = subscribeToRoute(() => assert.fail("no change expected"));
   unsubscribe();
+});
+
+test("choosing a language drops the locale flag, so a reload keeps the choice", async (t) => {
+  const previous = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = previous;
+  });
+  // The app-settings save is not what this test is about.
+  globalThis.fetch = (async () => new Response("{}", { status: 200 })) as typeof fetch;
+  const win = fakeWindow("#/runs/demo-run/changes?file=src/a.ts&locale=en&present=1");
+  await withWindow(win, () => {
+    const chosen: string[] = [];
+    chooseLocale("zh-TW", (locale) => chosen.push(locale));
+    assert.deepEqual(chosen, ["zh-TW"]);
+    // Replaced, not pushed: Back does not bring the flag back.
+    assert.deepEqual(win.entries, ["#/runs/demo-run/changes?file=src/a.ts&present=1"]);
+    // Without the flag the address is left as it is.
+    chooseLocale("en", () => undefined);
+    assert.deepEqual(win.entries, ["#/runs/demo-run/changes?file=src/a.ts&present=1"]);
+  });
 });
