@@ -565,7 +565,7 @@
 }
 .explain-panel .explain-module {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   margin: 6px 18px 0;
   flex-shrink: 0;
@@ -575,11 +575,13 @@
 }
 .explain-module > svg {
   flex-shrink: 0;
+  margin-top: 4px;
 }
+/* The module's purpose is a sentence (longer in zh-TW): it wraps instead of
+   being cut off, and a long path breaks anywhere. */
 .explain-module > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .explain-module code {
   font-family: var(--font-mono);
