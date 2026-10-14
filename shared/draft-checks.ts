@@ -469,7 +469,7 @@ export function draftPreflight(
     checks.push({
       id: "author-email",
       kind: "confirm",
-      message: safety.authorEmail({ email: emails.join(", ") }),
+      message: safety.authorEmail({ emails }),
       details: [],
     });
   return checks;

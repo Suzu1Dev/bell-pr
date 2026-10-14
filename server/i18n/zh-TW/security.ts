@@ -44,8 +44,8 @@ const m: Translation<typeof en> = {
     workflows:
       "這次修改涉及 GitHub Actions 工作流程或其他 CI 設定。維護者會仔細檢查這類修改，而推送工作流程檔案需要 GitHub CLI 的 workflow 權限。",
     workflowFile: ({ path }) => `已修改：${path}`,
-    authorEmail: ({ email }) =>
-      `這個提交會帶有電子郵件地址 ${email}，任何人都能在 GitHub 上看到。若要保密，請用 git config user.email 設定你的 GitHub no-reply 地址；這項確認只會出現一次。`,
+    authorEmail: ({ emails }) =>
+      `這個提交會帶有電子郵件地址 ${formatters("zh-TW").list(emails)}，任何人都能在 GitHub 上看到。若要保密，請用 git config user.email 設定你的 GitHub no-reply 地址；這項確認只會出現一次。`,
   },
 };
 export default m;

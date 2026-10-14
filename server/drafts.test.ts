@@ -1260,6 +1260,11 @@ test("preflight blocks a credential in the PR text and asks to confirm local pat
   assert.deepEqual(email.map(({ id, kind }) => [id, kind]), [["author-email", "confirm"]]);
   assert.match(email[0].message, /me@company\.dev/);
   assert.doesNotMatch(email[0].message, /noreply/);
+  // Two addresses are listed the way the locale lists them.
+  assert.match(
+    draftPreflight({ body: "A fix.", commitEmails: ["a@company.dev", "b@company.dev"] })[0].message,
+    /addresses a@company\.dev and b@company\.dev,/,
+  );
   for (const address of [
     "12345+me@users.noreply.github.com",
     "me@users.noreply.github.com",

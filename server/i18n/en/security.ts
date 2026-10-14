@@ -59,7 +59,9 @@ export default {
     workflows:
       "This change edits GitHub Actions workflows or other CI configuration. Maintainers check such changes closely, and pushing a workflow file needs the GitHub CLI's workflow scope.",
     workflowFile: ({ path }: { path: string }) => `Changed: ${path}`,
-    authorEmail: ({ email }: { email: string }) =>
-      `The commit will carry the e-mail address ${email}, which anyone can read on GitHub. To keep it private, set your GitHub no-reply address with git config user.email; this is asked only once.`,
+    authorEmail: ({ emails }: { emails: string[] }) =>
+      fmt.plural(emails.length) === "one"
+        ? `The commit will carry the e-mail address ${fmt.list(emails)}, which anyone can read on GitHub. To keep it private, set your GitHub no-reply address with git config user.email; this is asked only once.`
+        : `The commit will carry the e-mail addresses ${fmt.list(emails)}, which anyone can read on GitHub. To keep them private, set your GitHub no-reply address with git config user.email; this is asked only once per address.`,
   },
 };
