@@ -2,10 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { splitConceptHeading } from "../../shared/explanations";
-import { demoFiles, demoRun, getDemo } from "../demo";
+import { demoFiles, getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
-import type { DiffFile, Repo, Run } from "../types";
-import { collectLearningNotes, LearningNotes } from "./LearningNotes";
+import type { DiffFile, Repo } from "../types";
+import {
+  collectLearningNotes,
+  fetchLearningPage,
+  LearningNotes,
+  type LearningRecordPage,
+  type LearningRun,
+} from "./LearningNotes";
 
 const repos: Repo[] = [
   {
@@ -26,27 +32,25 @@ const explanation = (concept: string, tip = "先補一個失敗路徑的測試�
   tip,
 });
 
-function run(id: string, title: string, explanations: Run["explanations"]): Run {
+function run(
+  id: string,
+  title: string,
+  explanations: LearningRun["explanations"],
+  notes: LearningRun["notes"] = {},
+): LearningRun {
   return {
-    ...demoRun,
     id,
-    title,
     repoId: "repo-1",
+    title,
+    status: "review",
+    createdAt: "2026-10-01T00:00:00.000Z",
     explanations,
+    notes,
   };
 }
 
-const runs: Run[] = [
-  run("run-old", "加入重試機制", {
-    "src/retry.ts": {
-      fingerprint: "a",
-      status: "ready",
-      generatedAt: "2026-10-01T08:00:00.000Z",
-      content: explanation("指數退避\n每次失敗後等待時間加倍，讓忙碌的服務有機會恢復。"),
-    },
-    "src/pending.ts": { fingerprint: "b", status: "generating" },
-    "src/broken.ts": { fingerprint: "c", status: "failed", error: "逾時" },
-  }),
+// As GET /api/learning sends them: the newest run first.
+const runs: LearningRun[] = [
   run("run-new", "修正 token 快取", {
     "src/cache.ts": {
       fingerprint: "d",
@@ -55,6 +59,17 @@ const runs: Run[] = [
       content: explanation("快取失效\n寫入成功後再清除舊快取，避免讀到過期資料。", "檢查並發寫入。"),
     },
   }),
+  run("run-old", "加入重試機制", {
+    "src/retry.ts": {
+      fingerprint: "a",
+      status: "ready",
+      generatedAt: "2026-10-01T08:00:00.000Z",
+      content: explanation("指數退避\n每次失敗後等待時間加倍，讓忙碌的服務有機會恢復。"),
+    },
+    // The server sends ready explanations only; the page still checks.
+    "src/pending.ts": { fingerprint: "b", status: "generating" },
+    "src/broken.ts": { fingerprint: "c", status: "failed", error: "逾時" },
+  }),
 ];
 
 type Props = Parameters<typeof LearningNotes>[0];
@@ -62,10 +77,10 @@ type Props = Parameters<typeof LearningNotes>[0];
 const render = (props: Partial<Props> = {}) =>
   renderZh(
     createElement(LearningNotes, {
-      runs,
       repos,
       demoFiles,
       onOpen() {},
+      initial: { runs },
       ...props,
     }),
   );
@@ -81,20 +96,61 @@ test("splitConceptHeading separates the title line from the body", () => {
   });
 });
 
-test("collectLearningNotes keeps only ready explanations, newest first", () => {
-  const notes = collectLearningNotes(runs, repos);
+test("collectLearningNotes keeps ready explanations and notes in the record's order", () => {
+  const notes = collectLearningNotes(
+    [
+      ...runs,
+      run(
+        "run-notes",
+        "Notes only",
+        {
+          "src/a.ts": {
+            fingerprint: "e",
+            status: "ready",
+            generatedAt: "2026-09-01T08:00:00.000Z",
+            content: explanation("A\nAlpha."),
+          },
+          "src/b.ts": {
+            fingerprint: "f",
+            status: "ready",
+            generatedAt: "2026-09-03T08:00:00.000Z",
+            content: explanation("B\nBeta."),
+          },
+        },
+        {
+          "src/a.ts": { text: "Remember the edge case.", fingerprint: "e", updatedAt: "2026-09-02T00:00:00.000Z" },
+          "src/c.ts": { text: "  Only my note.  ", fingerprint: "g", updatedAt: "2026-09-04T00:00:00.000Z" },
+          "src/blank.ts": { text: "   ", fingerprint: "h", updatedAt: "2026-09-05T00:00:00.000Z" },
+        },
+      ),
+    ],
+    repos,
+  );
   assert.deepEqual(
     notes.map((note) => note.path),
-    ["src/cache.ts", "src/retry.ts"],
+    // Pages stay in run order, so "Load more" appends; each run lists its newest first.
+    ["src/cache.ts", "src/retry.ts", "src/c.ts", "src/b.ts", "src/a.ts"],
   );
   assert.equal(notes[0].repoName, "openfetch-sample/open-fetch");
   assert.equal(notes[1].runTitle, "加入重試機制");
+  const a = notes.find((note) => note.path === "src/a.ts")!;
+  assert.equal(a.note, "Remember the edge case.");
+  assert.equal(a.generatedAt, "2026-09-01T08:00:00.000Z");
+  const c = notes.find((note) => note.path === "src/c.ts")!;
+  assert.equal(c.explanation, undefined);
+  assert.equal(c.note, "Only my note.");
+  assert.equal(c.generatedAt, "2026-09-04T00:00:00.000Z");
+  // An unknown repository falls back to its id.
+  assert.equal(
+    collectLearningNotes([{ ...runs[0], repoId: "gone" }], repos)[0].repoName,
+    "gone",
+  );
 });
 
-test("real notes render concept, tip, task, repo, path and a demo section", () => {
+test("real notes render concept, tip, task, repo, path, the AI label and a demo section", () => {
   const html = render();
   assert.match(html, /2 \/ 2 則筆記/);
-  assert.match(html, /<h2>指數退避<\/h2>/);
+  assert.match(html, /<h2 tabindex="-1">指數退避<\/h2>/);
   assert.match(html, /每次失敗後等待時間加倍/);
   assert.match(html, /先補一個失敗路徑的測試。/);
   assert.match(html, /<code>src\/retry\.ts<\/code>/);
@@ -102,41 +158,99 @@ test("real notes render concept, tip, task, repo, path and a demo section", () =
   assert.match(html, /<dd>修正 token 快取<\/dd>/);
   assert.doesNotMatch(html, /src\/pending\.ts/);
   assert.doesNotMatch(html, /src\/broken\.ts/);
+  assert.equal(html.match(/class="note-ai-label">AI 生成</g)?.length, 2);
   assert.match(html, /示範筆記/);
   assert.match(html, /class="learning-demo-label">示範</);
   assert.match(html, /指數退避（Exponential backoff）/);
   assert.match(html, /<option value="run-new">修正 token 快取<\/option>/);
   assert.ok(
-    html.indexOf("快取失效") < html.indexOf("<h2>指數退避</h2>"),
-    "newest note comes first",
+    html.indexOf("快取失效") < html.indexOf(">指數退避</h2>"),
+    "the newest run comes first",
   );
+  // Everything came in one page, so there is nothing more to load.
+  assert.doesNotMatch(html, /載入更多/);
 });
 
 test("keyword filter narrows real and demo notes", () => {
   const html = render({ defaultKeyword: "快取" });
   assert.match(html, /1 \/ 2 則筆記/);
   assert.match(html, /快取失效/);
-  assert.doesNotMatch(html, /<h2>指數退避<\/h2>/);
+  assert.doesNotMatch(html, />指數退避<\/h2>/);
   assert.doesNotMatch(html, /示範筆記/);
 });
 
 test("run filter shows one task and hides the demo section", () => {
   const html = render({ defaultRunId: "run-old" });
   assert.match(html, /1 \/ 2 則筆記/);
-  assert.match(html, /<h2>指數退避<\/h2>/);
+  assert.match(html, />指數退避<\/h2>/);
   assert.doesNotMatch(html, /快取失效/);
   assert.doesNotMatch(html, /示範筆記/);
 });
 
 test("without real explanations the page guides the user to import a project", () => {
-  const html = render({ runs: [run("empty", "尚未審查", undefined)] });
+  const html = render({ initial: { runs: [] } });
   assert.match(html, /還沒有屬於你的學習筆記/);
   assert.match(html, /匯入 repository/);
   assert.match(html, /尚無真實任務的筆記/);
   assert.match(html, /示範筆記/);
 });
 
-const englishRuns: Run[] = [
+test("before the first page arrives the page says it is loading, and the sample stays", () => {
+  const html = render({ initial: undefined, loadPage: () => new Promise(() => {}) });
+  assert.match(html, /role="status"[^>]*>[\s\S]*正在載入你的筆記/);
+  assert.doesNotMatch(html, /還沒有屬於你的學習筆記/);
+  assert.match(html, /示範筆記/);
+});
+
+test("fetchLearningPage reads /api/learning and passes the cursor encoded", async (t) => {
+  const realFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = realFetch;
+  });
+  const urls: string[] = [];
+  const page: LearningRecordPage = { runs, nextCursor: "abc" };
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    urls.push(String(input));
+    return new Response(JSON.stringify(page), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+  assert.deepEqual(await fetchLearningPage(), page);
+  await fetchLearningPage("a+b/c=");
+  assert.deepEqual(urls, ["/api/learning", "/api/learning?cursor=a%2Bb%2Fc%3D"]);
+});
+
+const englishRuns: LearningRun[] = [
+  run(
+    "run-new",
+    "Fix the token cache",
+    {
+      "src/cache.ts": {
+        fingerprint: "d",
+        status: "ready",
+        content: {
+          summary: "Summary",
+          reason: "Reason",
+          concept:
+            "Cache invalidation\nClear the old entry only after the write succeeds.",
+          tip: "Check concurrent writes.",
+        },
+      },
+    },
+    {
+      "src/cache.ts": {
+        text: "Ask why the lock is not needed.",
+        fingerprint: "d",
+        updatedAt: "2026-10-06T08:00:00.000Z",
+      },
+      "src/notes-only.ts": {
+        text: "Read the retry docs.",
+        fingerprint: "z",
+        updatedAt: "2026-10-06T09:00:00.000Z",
+      },
+    },
+  ),
   run("run-old", "Add retries with backoff", {
     "src/retry.ts": {
       fingerprint: "a",
@@ -151,29 +265,16 @@ const englishRuns: Run[] = [
       },
     },
   }),
-  run("run-new", "Fix the token cache", {
-    "src/cache.ts": {
-      fingerprint: "d",
-      status: "ready",
-      content: {
-        summary: "Summary",
-        reason: "Reason",
-        concept:
-          "Cache invalidation\nClear the old entry only after the write succeeds.",
-        tip: "Check concurrent writes.",
-      },
-    },
-  }),
 ];
 
 /** Renders in English and checks that no zh-TW text is left. */
 const renderEnglish = (props: Partial<Props> = {}) => {
   const html = renderEn(
     createElement(LearningNotes, {
-      runs: englishRuns,
       repos,
       demoFiles: [],
       onOpen() {},
+      initial: { runs: englishRuns },
       ...props,
     }),
   );
@@ -185,27 +286,34 @@ test("English notes render the page, the filters and each note in English", () =
   const html = renderEnglish();
   assert.match(html, /<span class="eyebrow">LEARN BY CONTRIBUTING<\/span>/);
   assert.match(html, /Turn the code you understood into experience\./);
+  assert.match(html, /The explanations are AI-generated by the agents that reviewed each change\./);
   assert.match(html, /placeholder="Search notes and files"/);
   assert.match(html, /<option value=""[^>]*>All contributions<\/option>/);
   assert.match(html, /<option value="run-new">Fix the token cache<\/option>/);
-  assert.match(html, /Showing 2 of 2 notes/);
-  assert.match(html, /<h2>Exponential backoff<\/h2>/);
+  assert.match(html, /Showing 3 of 3 notes/);
+  assert.match(html, /<h2 tabindex="-1">Exponential backoff<\/h2>/);
   assert.match(html, /<strong>Tip<\/strong>/);
+  assert.match(html, /<span class="note-tag">Fix the token cache<\/span><span class="note-ai-label">AI-generated<\/span>/);
   assert.match(html, /<dt>Contribution<\/dt><dd>Add retries with backoff<\/dd>/);
   // The note without a timestamp says so instead of showing a date.
   assert.match(html, /<dt>Generated<\/dt><dd>Not recorded<\/dd>/);
   assert.match(html, /<dt>Generated<\/dt><dd>[^<]*2026[^<]*<\/dd>/);
   assert.match(html, /Study it in the code/);
   assert.doesNotMatch(html, /Sample notes/);
+  // The person's own notes: beside an explanation, and on their own.
+  assert.match(html, /<strong>Your note<\/strong><p>Ask why the lock is not needed\.<\/p>/);
+  assert.match(html, /<h2 tabindex="-1">src\/notes-only\.ts<\/h2><div class="learning-own-note"><strong>Your note<\/strong><p>Read the retry docs\.<\/p>/);
+  assert.match(html, /<dt>Note saved<\/dt><dd>[^<]*2026[^<]*<\/dd>/);
+  // A note the person wrote is not labelled AI-generated.
+  assert.equal(html.match(/AI-generated<\/span>/g)?.length, 2);
 });
 
 test("English filters count the visible notes and say when nothing matches", () => {
+  assert.match(renderEnglish({ defaultKeyword: "invalidation" }), /Showing 1 of 3 notes/);
+  // The person's notes are searched too.
+  assert.match(renderEnglish({ defaultKeyword: "retry docs" }), /Showing 1 of 3 notes/);
   assert.match(
-    renderEnglish({ defaultKeyword: "cache" }),
-    /Showing 1 of 2 notes/,
-  );
-  assert.match(
-    renderEnglish({ runs: englishRuns.slice(0, 1) }),
+    renderEnglish({ initial: { runs: englishRuns.slice(1) } }),
     /Showing 1 of 1 note</,
   );
   assert.match(
@@ -214,11 +322,31 @@ test("English filters count the visible notes and say when nothing matches", () 
   );
 });
 
-test("the English empty page points to the Repositories page", () => {
-  const html = renderEnglish({ runs: [run("empty", "Not reviewed yet", undefined)] });
+test("a record with older pages offers Load more and says the count is so far", () => {
+  const html = renderEnglish({ initial: { runs: englishRuns, nextCursor: "next" } });
+  assert.match(html, /Showing 3 of the 3 notes loaded so far/);
+  assert.match(
+    html,
+    /<div class="learning-more"><button type="button" class="button secondary" aria-describedby="learning-count">Load more<\/button><\/div>/,
+  );
+  // Matching notes may be on a page not read yet, so it stays with no match.
+  assert.match(
+    renderEnglish({
+      initial: { runs: englishRuns, nextCursor: "next" },
+      defaultKeyword: "no such concept",
+    }),
+    /No notes match the filters\.[\s\S]*Load more/,
+  );
+});
+
+test("the English empty and loading pages point to the Repositories page", () => {
+  const html = renderEnglish({ initial: { runs: [] } });
   assert.match(html, /You have no learning notes yet/);
   assert.match(html, /Import a repository on the Repositories page/);
   assert.match(html, /No notes from your own contributions yet/);
+  const loading = renderEnglish({ initial: undefined, loadPage: () => new Promise(() => {}) });
+  assert.match(loading, /Loading your notes…/);
+  assert.doesNotMatch(loading, /You have no learning notes yet/);
 });
 
 test("the English sample section labels the sample notes", () => {
@@ -238,15 +366,18 @@ test("the English sample section labels the sample notes", () => {
   };
   const html = renderEn(
     createElement(LearningNotes, {
-      runs: englishRuns,
       repos,
       demoFiles: [file],
       onOpen() {},
+      initial: { runs: englishRuns },
     }),
   );
   assert.match(html, /Sample notes<span class="learning-demo-label">Sample<\/span>/);
   assert.match(html, /Explanations from the built-in sample contribution/);
-  assert.match(html, /<div class="note-tag">Sample<\/div><h2>Jitter<\/h2>/);
+  assert.match(
+    html,
+    /<div class="note-tags"><span class="note-tag">Sample<\/span><\/div><h2 tabindex="-1">Jitter<\/h2>/,
+  );
   assert.match(html, /<dt>Generated<\/dt><dd>Sample content<\/dd>/);
 });
 
