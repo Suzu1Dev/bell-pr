@@ -129,9 +129,12 @@ function parsePort(name: string, value: string | number): number {
   return port;
 }
 
-/** An IPv6 address may be written in brackets; listen() takes it without. */
+/**
+ * An IPv6 address may be written in brackets; listen() takes it without.
+ * Host names are compared in lower case, as browsers send them.
+ */
 function parseHost(value: string): string {
-  const host = value.trim().replace(/^\[(.*)\]$/, "$1");
+  const host = value.trim().replace(/^\[(.*)\]$/, "$1").toLowerCase();
   if (
     !(isIP(host) || /^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/.test(host))
   )
@@ -156,12 +159,22 @@ export function isLoopbackHost(host: string): boolean {
 
 /**
  * The address a browser on this computer uses for a server on `host`:
- * 127.0.0.1 for loopback and wildcard hosts, which the request guard trusts,
- * and the host itself otherwise (IPv6 in brackets).
+ * 127.0.0.1 for the wildcard hosts, and otherwise the host itself (IPv6 in
+ * brackets), since a server on ::1 or localhost may not listen on 127.0.0.1.
  */
 export function browserHost(host: string): string {
-  if (isWildcardHost(host) || isLoopbackHost(host)) return "127.0.0.1";
+  if (isWildcardHost(host)) return "127.0.0.1";
   return isIP(host) === 6 ? `[${host}]` : host;
+}
+
+/**
+ * The origin of a loopback address the request guard does not know by
+ * name (it trusts localhost, 127.0.0.1 and [::1]), such as 127.0.0.2.
+ */
+function otherLoopbackOrigin(host: string, port: number): string | undefined {
+  return isLoopbackHost(host) && !["localhost", "127.0.0.1", "::1"].includes(host)
+    ? `http://${host}:${port}`
+    : undefined;
 }
 
 /** The base URL BELL PR prints: BELLPR_PUBLIC_URL, or the local address. */
@@ -236,9 +249,13 @@ export function resolveConfig(
     ? parsePublicUrl(setting(env.BELLPR_PUBLIC_URL)!)
     : undefined;
   const configured = parsed(() => parseAllowedOrigins(env.BELLPR_ALLOWED_ORIGINS ?? ""));
-  // Only append the public origin when it is set: an empty entry throws.
+  // Only append an origin that is set: an empty entry throws.
   const allowedOrigins = [
-    ...new Set(publicUrl ? [...configured, publicUrl] : configured),
+    ...new Set(
+      [...configured, publicUrl, otherLoopbackOrigin(host, port)].filter(
+        (origin): origin is string => Boolean(origin),
+      ),
+    ),
   ];
   const limits: Limits = {
     maxAgentProcesses: parsed(() =>

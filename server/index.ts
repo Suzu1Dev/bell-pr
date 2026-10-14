@@ -22,7 +22,6 @@ import {
   writeSync,
 } from "node:fs";
 import http from "node:http";
-import { isIP } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,6 +34,7 @@ import { bundled, version } from "./build-info.js";
 import { run } from "./cli.js";
 import {
   baseUrl,
+  browserHost,
   dataPaths,
   isLoopbackHost,
   isWildcardHost,
@@ -228,12 +228,7 @@ function acquireLock(file: string, info: LockInfo, dataDir: string): () => void 
 
 /** GET /api/health on `host:port`: whether BELL PR answers there. */
 export function probeHealth(host: string, port: number, timeoutMs = 2000) {
-  const address =
-    isWildcardHost(host) || isLoopbackHost(host)
-      ? "127.0.0.1"
-      : isIP(host) === 6
-        ? `[${host}]`
-        : host;
+  const address = browserHost(host);
   return new Promise<{ name?: string; version?: string } | undefined>(
     (resolve) => {
       const request = http.get(

@@ -62,10 +62,11 @@ async function withDataDir<T>(fn: (dataDir: string, directory: string) => Promis
 async function inProcessServer(
   dataDir: string,
   mintOneTimeToken?: () => string | undefined,
+  host?: string,
 ): Promise<RunningServer> {
   return startServer({
     config: resolveConfig(
-      { port: await freePort(), dataDir },
+      { port: await freePort(), dataDir, host },
       { BELLPR_STATIC_DIR: path.join(path.dirname(dataDir), "ui") },
     ),
     handleExit: false,
@@ -130,6 +131,32 @@ test("bell-pr open prints a fresh one-time link from the running server and dele
       if (!existsSync("/.dockerenv"))
         assert.deepEqual(second.opened, [`${server.url}/auth?t=one-time-2`]);
       assert.deepEqual(minted, ["one-time-1", "one-time-2"]);
+    } finally {
+      await server.shutdown();
+    }
+  });
+});
+
+test("bell-pr open reaches a server that listens on ::1 only", async (t) => {
+  const probe = createServer();
+  try {
+    probe.listen(0, "::1");
+    await once(probe, "listening");
+  } catch {
+    t.skip("this machine has no IPv6 loopback");
+    return;
+  } finally {
+    probe.close();
+  }
+  await withDataDir(async (dataDir) => {
+    const server = await inProcessServer(dataDir, () => "one-time", "::1");
+    try {
+      // The printed links go to the address the server listens on.
+      assert.match(server.url, /^http:\/\/\[::1\]:\d+$/);
+      assert.match(server.signInUrl, /^http:\/\/\[::1\]:\d+\/auth\?t=/);
+      const result = await cli(["open", "--data-dir", dataDir, "--print"]);
+      assert.equal(result.code, 0, result.stderr);
+      assert.equal(result.stdout, `${server.url}/auth?t=one-time\n`);
     } finally {
       await server.shutdown();
     }

@@ -15,7 +15,7 @@ import { request } from "node:http";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { resolveConfig, ConfigError, defaultStaticDir } from "./config.js";
+import { baseUrl, resolveConfig, ConfigError, defaultStaticDir } from "./config.js";
 import { createApp } from "./app.js";
 import { startServer, StartupError } from "./index.js";
 import { withLocale } from "./i18n/index.js";
@@ -231,6 +231,24 @@ test("resolveConfig adds the public origin, trusts the dev port only in dev and 
   assert.equal(resolveConfig({}, { BELLPR_NO_OPEN: "1" }).open, false);
   assert.equal(resolveConfig({}, { CI: "true" }).open, false);
   assert.equal(resolveConfig({}, { CI: "false" }).open, true);
+});
+
+test("resolveConfig prints links for the address BELL PR listens on", () => {
+  const url = (host: string) => baseUrl(resolveConfig({ host, port: 5000 }, {}));
+  assert.equal(url("127.0.0.1"), "http://127.0.0.1:5000");
+  assert.equal(url("0.0.0.0"), "http://127.0.0.1:5000");
+  assert.equal(url("::"), "http://127.0.0.1:5000");
+  // A server on ::1 or localhost may not listen on 127.0.0.1.
+  assert.equal(url("::1"), "http://[::1]:5000");
+  assert.equal(url("[::1]"), "http://[::1]:5000");
+  assert.equal(url("LocalHost"), "http://localhost:5000");
+  assert.equal(url("192.168.1.5"), "http://192.168.1.5:5000");
+  // The guard trusts localhost, 127.0.0.1 and [::1] by name; another
+  // loopback address becomes an allowed origin.
+  assert.deepEqual(resolveConfig({ host: "::1", port: 5000 }, {}).allowedOrigins, []);
+  assert.deepEqual(resolveConfig({ host: "127.0.0.2", port: 5000 }, {}).allowedOrigins, [
+    "http://127.0.0.2:5000",
+  ]);
 });
 
 test("resolveConfig points at data in ./.bellpr without moving it", async () => {
