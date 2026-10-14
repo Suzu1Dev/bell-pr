@@ -25,13 +25,19 @@ import type { DraftEditor } from "./useDraftEditor";
 import type { TaskSetup } from "./useTaskSetup";
 
 /**
+ * The API path of run `id`. An id can come from the address, so it is
+ * escaped: a crafted one cannot reach another route.
+ */
+export const runPath = (id: string) => `/runs/${encodeURIComponent(id)}`;
+
+/**
  * The run's changed files. A run whose working files were cleaned up
  * (410 `workspace_removed`) has none to show, but its reports, notes and
  * explanations stay readable, so it still opens.
  */
 export async function readRunFiles(id: string): Promise<DiffFile[]> {
   try {
-    return (await api<{ files: DiffFile[] }>(`/runs/${id}/diff`)).files;
+    return (await api<{ files: DiffFile[] }>(`${runPath(id)}/diff`)).files;
   } catch (error) {
     if (error instanceof ApiError && error.code === "workspace_removed")
       return [];
@@ -199,7 +205,7 @@ export function useRunActions({
     const epoch = draft.draftMutationEpoch.current;
     try {
       const [current, files] = await Promise.all([
-        api<{ run: Run }>(`/runs/${id}`),
+        api<{ run: Run }>(runPath(id)),
         readRunFiles(id),
       ]);
       if (runIdRef.current !== id) return;
@@ -298,7 +304,7 @@ export function useRunActions({
         setSelectedPath(demoContent.files[0]?.path || "");
       } else {
         const [r, files] = await Promise.all([
-          api<{ run: Run }>(`/runs/${id}`),
+          api<{ run: Run }>(runPath(id)),
           readRunFiles(id),
         ]);
         if (sequence !== selectionSequence.current || intent !== navigationIntent.current) return false;

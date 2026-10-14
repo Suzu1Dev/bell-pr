@@ -3,7 +3,7 @@ import test from "node:test";
 import { assertNoHan } from "../../test-utils/render";
 import en from "../../i18n/en";
 import zhTW from "../../i18n/zh-TW";
-import { readRunFiles, stopNotice } from "./useRunActions";
+import { readRunFiles, runPath, stopNotice } from "./useRunActions";
 import type { Run } from "../../types";
 
 const zh = zhTW.workspace.notices;
@@ -109,4 +109,23 @@ test("a run whose working files were cleaned up still opens, with no files to sh
   // Any other failure is still reported.
   answer = json(404, { error: "Run not found." });
   await assert.rejects(readRunFiles("r"), { status: 404, message: "Run not found." });
+});
+
+test("a run id is escaped in its API path, so it cannot name another route", async (t) => {
+  assert.equal(runPath("demo-run"), "/runs/demo-run");
+  assert.equal(runPath("../repos"), "/runs/..%2Frepos");
+  assert.equal(runPath("a?b#c"), "/runs/a%3Fb%23c");
+  const realFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = realFetch;
+  });
+  const asked: string[] = [];
+  globalThis.fetch = (async (url: string) => {
+    asked.push(url);
+    return new Response(JSON.stringify({ files: [] }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+  await readRunFiles("x/../../status");
+  assert.deepEqual(asked, ["/api/runs/x%2F..%2F..%2Fstatus/diff"]);
 });
