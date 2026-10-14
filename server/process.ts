@@ -4,6 +4,7 @@ import { log } from "./log.js";
 import { redact } from "./secrets.js";
 import { AppError } from "./types.js";
 import { cancelled, currentLocale, withLocale } from "./i18n/index.js";
+import { withCliSetupHint } from "./cli-errors.js";
 
 export { redact };
 
@@ -128,7 +129,17 @@ interface CommandOptions {
   allowedCodes?: number[];
 }
 
-/** Arguments are always passed directly to the executable; a shell is never used. */
+/** How much of a failed command's stderr its error keeps in `details.stderr`. */
+const stderrTailLength = 4000;
+
+/**
+ * Arguments are always passed directly to the executable; a shell is never
+ * used. A failure rejects with an AppError: a process that could not start
+ * keeps the spawn error as `cause`, and one that exited with a code outside
+ * `allowedCodes` carries `details.stderr` (the redacted end of its raw
+ * stderr) and `details.exitCode`. Known failures of git, gh, codex and
+ * claude get a setup code and fixes (cli-errors.ts).
+ */
 export async function command(
   executable: string,
   args: string[],
@@ -215,15 +226,18 @@ export async function command(
       });
       child.on("error", (error) => {
         // One whole sentence; callers that need the reason read cause.code.
-        failure = new AppError(
-          (m) =>
-            m.run.command.spawnFailed({
-              executable,
-              reason: redact(error.message),
-            }),
-          503,
-          { cause: error },
-        );
+        failure = withCliSetupHint(
+          new AppError(
+            (m) =>
+              m.run.command.spawnFailed({
+                executable,
+                reason: redact(error.message),
+              }),
+            503,
+            { cause: error },
+          ),
+          executable,
+        ) as Error;
       });
       child.on("close", (code) => {
         clearTimeout(timer);
@@ -235,15 +249,24 @@ export async function command(
         if (failure) reject(failure);
         else if (!(options.allowedCodes ?? [0]).includes(code ?? -1)) {
           reject(
-            new AppError(
-              (m) =>
-                m.run.command.failed({
-                  executable,
-                  output: redact(
-                    (stderr || stdout || `exit ${code}`).trim(),
-                  ).slice(-1800),
-                }),
-              422,
+            withCliSetupHint(
+              new AppError(
+                (m) =>
+                  m.run.command.failed({
+                    executable,
+                    output: redact(
+                      (stderr || stdout || `exit ${code}`).trim(),
+                    ).slice(-1800),
+                  }),
+                422,
+                {
+                  details: {
+                    stderr: redact(stderr.trim()).slice(-stderrTailLength),
+                    ...(code === null ? {} : { exitCode: code }),
+                  },
+                },
+              ),
+              executable,
             ),
           );
         } else resolve({ stdout, stderr, code: code ?? -1 });
