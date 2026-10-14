@@ -312,6 +312,12 @@ const workspace = {
       plural(count) === "one"
         ? `PR description sent to GitHub (about ${count} word)`
         : `PR description sent to GitHub (about ${count} words)`,
+    /** The demo sends nothing to GitHub. */
+    bodyPreviewDemo: "PR description preview",
+    bodyPreviewDemoWords: ({ count }: { count: number }) =>
+      plural(count) === "one"
+        ? `PR description preview (about ${count} word)`
+        : `PR description preview (about ${count} words)`,
     confirmLegend: "Confirm each item before submitting",
     confirmNote: `Ticking only means you know these items are still open and want to submit the description as it is. ${product.name} never changes the description or ticks anything for you, and these confirmations are not written into the PR. To change something first, choose “Back to the draft”.`,
     back: "Back to the draft",

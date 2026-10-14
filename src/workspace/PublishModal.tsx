@@ -236,16 +236,18 @@ export function PublishModal({
         <details className="publish-body-preview" open>
           <summary>
             {draftChecks
-              ? t.bodyPreviewWords({
+              ? (demo ? t.bodyPreviewDemoWords : t.bodyPreviewWords)({
                   count: draftChecks.draftProseWords(run.draft.body),
                 })
-              : t.bodyPreview}
+              : demo
+                ? t.bodyPreviewDemo
+                : t.bodyPreview}
           </summary>
           {/* It scrolls when long, so a keyboard can reach and scroll it. */}
           <div
             className="markdown-preview"
             role="region"
-            aria-label={t.bodyPreview}
+            aria-label={demo ? t.bodyPreviewDemo : t.bodyPreview}
             tabIndex={0}
           >
             <ErrorBoundary>

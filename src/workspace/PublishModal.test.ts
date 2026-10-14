@@ -160,7 +160,8 @@ test("the demo previews its PR body and opens the sample PR without any check", 
   assert.match(html, /你已完成所有檔案的審查。以下是 PR 的送出預覽。/);
   assert.match(html, /這是互動示範，不會推送任何內容，也不會在 GitHub 建立 PR/);
   assert.match(html, /開啟範例 Draft PR/);
-  assert.match(html, /會送到 GitHub 的 PR 說明（約 \d+ 字）/);
+  assert.match(html, /PR 說明預覽（約 \d+ 字）/);
+  assert.doesNotMatch(html, /會送到 GitHub/);
   assert.doesNotMatch(html, /readiness-notice/);
   assert.doesNotMatch(html, /Commit 作者/);
   assert.doesNotMatch(html, /disabled=""/);
@@ -345,7 +346,10 @@ test("the publish dialog reads in English with no Chinese left", () => {
   const demo = renderEn(element({ demo: true }));
   assert.match(demo, /Your demo contribution is ready\./);
   assert.match(demo, /Open the sample Draft PR/);
-  assert.match(demo, /PR description sent to GitHub/);
+  // Nothing reaches GitHub from the demo, so the preview says only that.
+  assert.match(demo, /PR description preview \(about \d+ words?\)/);
+  assert.match(demo, /role="region" aria-label="PR description preview"/);
+  assert.doesNotMatch(demo, /sent to GitHub/);
   assertNoHan(demo);
 });
 

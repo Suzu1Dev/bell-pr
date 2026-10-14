@@ -243,6 +243,8 @@ const m: Translation<typeof en> = {
     commitPreview: "這輪的提交訊息",
     bodyPreview: "會送到 GitHub 的 PR 說明",
     bodyPreviewWords: ({ count }) => `會送到 GitHub 的 PR 說明（約 ${count} 字）`,
+    bodyPreviewDemo: "PR 說明預覽",
+    bodyPreviewDemoWords: ({ count }) => `PR 說明預覽（約 ${count} 字）`,
     confirmLegend: "送出前請逐項確認",
     confirmNote: `勾選只代表你知道這些項目還沒處理、願意照目前的說明送出。${product.name} 不會因此改動說明或替你勾選任何項目，這些確認也不會寫進 PR。想先修改，請按「返回編輯草稿」。`,
     back: "返回編輯草稿",
