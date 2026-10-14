@@ -57,4 +57,7 @@ export default {
     confirm: "Type ERASE to confirm that all data should be deleted.",
     busy: "Work is still running. Stop every run and the discovery search first, then delete all data.",
   },
+  learning: {
+    invalidCursor: "This page of learning notes is out of date; reload the list.",
+  },
 };

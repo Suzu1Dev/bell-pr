@@ -48,5 +48,8 @@ const m: Translation<typeof en> = {
     confirm: "請輸入 ERASE，確認要刪除所有資料。",
     busy: "仍有工作在進行中。請先停止所有工作與探索搜尋，再刪除所有資料。",
   },
+  learning: {
+    invalidCursor: "這一頁學習筆記已過期，請重新載入清單。",
+  },
 };
 export default m;

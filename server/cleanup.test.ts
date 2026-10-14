@@ -26,6 +26,7 @@ import {
   retentionDays,
   setRetentionDaysSource,
 } from "./cleanup.js";
+import { learningPageSize } from "./routes/learning.js";
 import type { Repository, Run } from "./types.js";
 
 const dayMs = 24 * 60 * 60 * 1000;
@@ -515,4 +516,78 @@ test("storage and diagnostics report sizes, versions and logs without tokens, th
   assert.equal(entry.data, `<data>/worktrees/${value.id}`);
   assert.equal(entry.user, "[github-user]");
   assertShareable(diagnostics.text, f, login);
+});
+
+test("the learning record pages runs with ready explanations and notes, newest first", async (t) => {
+  const f = await fixture();
+  t.after(f.cleanup);
+  const repo: Repository = {
+    id: "12121212-1212-4121-8121-121212121212",
+    name: "greeting",
+    owner: "local",
+    fullName: "local/greeting",
+    path: path.join(f.directory, "repo"),
+    defaultBranch: "main",
+    url: "",
+  };
+  f.store.data.repos.push(repo);
+  const content = {
+    summary: "Greets the world.",
+    reason: "Clearer output.",
+    concept: "Constants\nA named value.",
+    tip: "Name values.",
+    example: { scenario: "Run it", before: "hi", after: "hello" },
+  };
+  const at = (minute: number) => new Date(Date.UTC(2026, 9, 1, 0, minute)).toISOString();
+  for (let index = 0; index < 23; index++)
+    f.store.data.runs.push(
+      run(`learn-${String(index).padStart(2, "0")}`, repo, {
+        createdAt: at(index),
+        explanations: {
+          "hello.ts": { fingerprint: "a".repeat(64), status: "ready", content, generatedAt: at(index) },
+          "other.ts": { fingerprint: "b".repeat(64), status: "failed", error: "No answer" },
+        },
+      }),
+    );
+  f.store.data.runs.push(
+    run("note-only", repo, {
+      createdAt: at(30),
+      notes: { "hello.ts": { text: "Remember this.", fingerprint: "c".repeat(64), updatedAt: at(30) } },
+    }),
+    run("nothing", repo, { createdAt: at(31) }),
+    run("failed-only", repo, {
+      createdAt: at(32),
+      explanations: { "x.ts": { fingerprint: "d".repeat(64), status: "failed" } },
+      notes: { "x.ts": { text: "   ", fingerprint: "d".repeat(64), updatedAt: at(32) } },
+    }),
+  );
+  const first = await f.call("GET", "/api/learning");
+  assert.equal(first.status, 200);
+  assert.equal(first.body.runs.length, learningPageSize);
+  assert.equal(first.body.runs[0].id, "note-only");
+  assert.equal(first.body.runs[1].id, "learn-22");
+  assert.deepEqual(Object.keys(first.body.runs[1].explanations), ["hello.ts"]);
+  assert.deepEqual(first.body.runs[0].notes["hello.ts"].text, "Remember this.");
+  assert.ok(!("logs" in first.body.runs[1]));
+  assert.ok(first.body.nextCursor);
+  // A run created meanwhile neither repeats nor shifts the next page.
+  f.store.data.runs.unshift(
+    run("newest", repo, {
+      createdAt: at(40),
+      notes: { "a.ts": { text: "New.", fingerprint: "e".repeat(64), updatedAt: at(40) } },
+    }),
+  );
+  const second = await f.call(
+    "GET",
+    `/api/learning?cursor=${encodeURIComponent(first.body.nextCursor)}`,
+  );
+  assert.equal(second.status, 200);
+  assert.deepEqual(
+    second.body.runs.map((entry: { id: string }) => entry.id),
+    ["learn-03", "learn-02", "learn-01", "learn-00"],
+  );
+  assert.equal(second.body.nextCursor, undefined);
+  const invalid = await f.call("GET", "/api/learning?cursor=not-a-cursor");
+  assert.equal(invalid.status, 400);
+  assert.equal(invalid.body.error, "This page of learning notes is out of date; reload the list.");
 });
