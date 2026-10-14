@@ -193,8 +193,8 @@ test("bell-pr open reaches a server that listens on ::1 only", async (t) => {
 
 test("bell-pr open reports unavailable links while sign-in links do not exist", async () => {
   await withDataDir(async (dataDir) => {
-    // The routes/auth stub returns undefined.
-    const server = await inProcessServer(dataDir);
+    // A server that cannot mint a link, as with sign-in turned off.
+    const server = await inProcessServer(dataDir, () => undefined);
     try {
       const result = await cli(["open", "--data-dir", dataDir, "--print"]);
       assert.equal(result.code, 1);

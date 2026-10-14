@@ -330,7 +330,12 @@ test("startServer serves the app with an in-memory session token, takes the lock
       const health = await get(`http://127.0.0.1:${port}/api/health`);
       assert.equal(health.status, 200);
       assert.deepEqual(JSON.parse(health.body), { name: "bell-pr", version });
-      const page = await get(`http://127.0.0.1:${port}/`);
+      // Without a session the app answers the sign-in page; the printed link signs in.
+      assert.equal((await get(`http://127.0.0.1:${port}/`)).status, 401);
+      const signIn = await get(running.signInUrl);
+      assert.equal(signIn.status, 200);
+      const cookie = (signIn.headers["set-cookie"] as string[])[0].split(";")[0];
+      const page = await get(`http://127.0.0.1:${port}/`, { cookie });
       assert.equal(page.status, 200);
       assert.match(String(page.headers["content-type"]), /text\/html/);
 
