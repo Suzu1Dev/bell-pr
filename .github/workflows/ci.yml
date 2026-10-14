@@ -51,6 +51,10 @@ jobs:
       - run: node scripts/audit.mjs
       - run: npx tsx scripts/render-generated-regions.ts --check
       - run: node scripts/sync-package-meta.mjs --check
+      - run: node scripts/npm-readme.mjs --check-docs
+      - run: node scripts/npm-readme.mjs --self-test
+      - run: node site/check-site.mjs
+      - run: node site/build-legal.mjs --self-test
 
   package-smoke:
     name: Package smoke test

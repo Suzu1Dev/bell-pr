@@ -130,8 +130,10 @@ own. The legal texts already describe the shipped behavior.
 5. **REFUND.md is not in the app.** The About dialog offers the EULA,
    privacy policy, terms and security policy; the refund policy that the
    EULA and the terms refer to ships only on the site.
-6. **CI.** `.github/workflows/ci.yml` does not run `node site/check-site.mjs`,
-   so a stale legal page or claim table is caught only by the wave gate.
+6. **CI.** Fixed after the merge: the build-and-test job of
+   `.github/workflows/ci.yml` now runs `node site/check-site.mjs` and
+   `node site/build-legal.mjs --self-test`, so CI catches a stale legal
+   page or claim table.
 7. **Usage-data opt-outs.** `agentEnvironment()` (`server/process.ts:109`)
    passes only the listed variables, so an opt-out such as
    `DISABLE_TELEMETRY` or `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` set in

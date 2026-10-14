@@ -84,6 +84,7 @@ most of them on Linux and macOS with Node.js 22 and 24.
 | `node scripts/check-personal-info.mjs` (and `--pack`) | No personal infrastructure names in the repository or the package |
 | `npx tsx scripts/render-generated-regions.ts --check` | The generated Free/Pro tables and product links are current |
 | `node scripts/npm-readme.mjs --check-docs` | Every link in the READMEs and `docs/` resolves, and every error code is in the troubleshooting guide |
+| `node site/check-site.mjs` | The landing site's links and resources, its size, and that the legal pages and `LEGAL-REVIEW.md` match the legal documents |
 | `node scripts/sync-package-meta.mjs --check` | `package.json` links match `shared/product.ts` |
 | `node scripts/tokenize-css.mjs --check` | The CSS uses the design tokens |
 | `node scripts/generate-third-party-notices.mjs --check` | The third-party notices are current |
