@@ -44,7 +44,8 @@ test("a demo file with an explanation renders every learning section", () => {
     assert.match(html, new RegExp(title));
   }
   assert.match(html, /指數退避（Exponential backoff）/);
-  assert.match(html, /示範解說 · 預先整理的學習內容/);
+  assert.match(html, /示範內容 · 預先寫好，未呼叫 AI/);
+  assert.doesNotMatch(html, /AI 生成/);
 });
 
 test("test files get a reading hint and extra presets while source files keep the fixed three", () => {
@@ -156,7 +157,7 @@ test("the reports tab renders demo reports with the static-review label and per-
       demo: true,
     }),
   );
-  assert.match(html, /示範報告 · 預先整理的內容/);
+  assert.match(html, /示範內容 · 預先寫好，未呼叫 AI/);
   assert.match(html, /Lead 整合摘要/);
   assert.match(html, /Lens · Reviewer/);
   assert.match(html, /Scout · Test analyst/);
@@ -443,7 +444,7 @@ test("an English render of the explanation tab has no Han in its own text", () =
     ])
       assert.ok(html.includes(text), text);
     assert.match(html, /Module <code>src\/utils<\/code>: Shared helpers/);
-    assert.match(html, demo ? /Sample explanation/ : /from this diff/);
+    assert.match(html, demo ? /Sample · prewritten, no AI call/ : /AI-generated · may be inaccurate/);
   }
   const saved = renderPanel({
     file: { ...englishFile("src/utils/retry.ts"), fingerprint: "a".repeat(64) },
@@ -571,8 +572,10 @@ test("an English render of the reports tab has no Han in its own text", () => {
     // The Lead's order is found through the untranslated anchor.
     assert.match(html, /Reading order suggested by the Lead/);
     assert.match(html, /<li aria-current="true"><code>src\/utils\/retry\.ts<\/code>/);
-    assert.match(html, demo ? /Sample reports/ : /The team&#x27;s full reports/);
+    assert.match(html, demo ? /Sample · prewritten, no AI call/ : /AI-generated · may be inaccurate/);
     assert.equal(html.includes("Run the review again"), !demo);
+    // Re-running the review is Free: never locked or badged as Pro.
+    assert.doesNotMatch(html, /pro-badge|\bPRO\b|\bPro\b|disabled=""/);
   }
   const busy = renderEn(
     createElement(ReviewReports, {
@@ -625,6 +628,70 @@ test("an English render of the chat tab has no Han in its own text", () => {
   assertNoHan(blocked);
   assert.match(blocked, /No explanation is available for this file right now/);
   assert.match(blocked, /File context can&#x27;t be attached/);
+});
+
+test("explanations and reports say they are AI output, or a prewritten sample in the demo", () => {
+  const ai = "AI-generated · may be inaccurate";
+  const sample = "Sample · prewritten, no AI call";
+  const live = renderPanel({ demo: false });
+  assertNoHan(live);
+  assert.ok(live.includes(`<p class="explain-provenance">`), "live label");
+  assert.ok(live.includes(ai));
+  assert.ok(!live.includes(sample));
+  const demo = renderPanel({ demo: true });
+  assertNoHan(demo);
+  assert.ok(demo.includes(`<p class="explain-provenance explain-provenance-sample">`));
+  assert.ok(demo.includes(sample));
+  assert.ok(!demo.includes(ai));
+  // No label before there is an explanation to label.
+  const pending = renderPanel({
+    file: { ...englishFile("src/utils/retry.ts"), explanation: undefined, explanationStatus: "generating" },
+  });
+  assert.ok(!pending.includes(ai));
+  for (const [isDemo, label] of [[false, ai], [true, sample]] as const) {
+    const reports = renderEn(
+      createElement(ReviewReports, {
+        file: englishFile("src/utils/retry.ts"),
+        reports: englishReports,
+        demo: isDemo,
+      }),
+    );
+    assert.ok(reports.includes(label), label);
+  }
+});
+
+test("answers carry the AI label; failed turns, questions and demo answers do not", () => {
+  const messages: ChatMessage[] = [
+    { role: "user", content: "Why the jitter?" },
+    { role: "assistant", content: "It spreads retries." },
+    { role: "user", content: "And the cap?" },
+    { role: "assistant", content: "This turn failed: timeout", failed: true },
+    { role: "assistant", content: "The cap is maxDelay." },
+  ];
+  const live = renderPanel({ messages, chatRequestId: 1 });
+  assertNoHan(live);
+  assert.equal(
+    live.match(/<p class="explain-message-provenance">AI-generated · may be inaccurate<\/p>/g)?.length,
+    2,
+  );
+  // The label follows the answer it belongs to.
+  assert.match(
+    live,
+    /It spreads retries\.<\/p><\/div><\/div><p class="explain-message-provenance">/,
+  );
+  const demo = renderPanel({ messages, chatRequestId: 1, demo: true });
+  assert.doesNotMatch(demo, /explain-message-provenance/);
+  const zh = renderZh(
+    createElement(ExplanationPanel, {
+      file: demoFiles[0],
+      messages,
+      loading: false,
+      onAsk() {},
+      demo: false,
+      chatRequestId: 1,
+    }),
+  );
+  assert.equal(zh.match(/AI 生成 · 內容可能有誤/g)?.length, 2);
 });
 
 test("every English review message is free of Han for any count", () => {

@@ -5,7 +5,6 @@ import {
   ArrowUp,
   ArrowUpRight,
   BookOpen,
-  Check,
   Eye,
   FileCode2,
   FlaskConical,
@@ -52,6 +51,20 @@ export interface ExplanationPanelProps {
   /** Re-runs the reviewer and test analyst on the current diff; the button renders when given. */
   onRerunReview?: () => void;
   reviewBusy?: boolean;
+}
+
+/**
+ * Says where agent-written text comes from: AI output that may be wrong, or
+ * the sample project's prewritten text.
+ */
+export function ProvenanceLabel({ demo }: { demo: boolean }) {
+  const t = useT("review");
+  return (
+    <p className={`explain-provenance${demo ? " explain-provenance-sample" : ""}`}>
+      {demo ? <BookOpen size={13} /> : <Sparkles size={13} />}
+      {demo ? t.provenance.sample : t.provenance.ai}
+    </p>
+  );
 }
 
 /** Longest module path that is the file itself or one of its parent directories. */
@@ -182,10 +195,7 @@ export function ReviewReports({
   return (
     <>
       <MaintainerFeedback items={feedback} />
-      <div className="explain-ready-label">
-        <Check size={13} />
-        {demo ? t.reports.readyDemo : t.reports.readyLive}
-      </div>
+      <ProvenanceLabel demo={demo} />
       <p className="explain-reports-intro">{t.reports.intro}</p>
       {reviewOrder.length > 0 && (
         <section className="explain-card explain-card-order">
@@ -461,10 +471,7 @@ export function ExplanationPanel({
               </div>
             ) : explanation ? (
               <>
-                <div className="explain-ready-label">
-                  <Check size={13} />
-                  {demo ? t.explain.readyDemo : t.explain.readyLive}
-                </div>
+                <ProvenanceLabel demo={demo} />
                 {isTestFile && (
                   <p className="explain-test-hint">
                     <FlaskConical size={13} />
@@ -815,6 +822,12 @@ export function ExplanationPanel({
                   <div className="explain-message-body">
                     <MarkdownContent>{message.content}</MarkdownContent>
                   </div>
+                  {/* Demo answers open with their own sample line. */}
+                  {message.role === "assistant" && !failed && !demo && (
+                    <p className="explain-message-provenance">
+                      {t.provenance.ai}
+                    </p>
+                  )}
                 </div>
               );
             })}

@@ -600,14 +600,18 @@
 :root .explain-panel .explain-content:focus-visible {
   box-shadow: var(--focus-ring-inset);
 }
-.explain-ready-label {
+/* Where the text below comes from: AI output or the prewritten sample. */
+.explain-panel .explain-provenance {
   display: flex;
   align-items: center;
   gap: 6px;
+  margin: 0 0 14px;
   color: var(--color-accent-600);
   font-size: var(--text-2xs);
   line-height: 1.7;
-  margin-bottom: 14px;
+}
+.explain-provenance > svg {
+  flex-shrink: 0;
 }
 .explain-card {
   background: var(--color-surface);
@@ -1159,6 +1163,12 @@
 .explain-panel .explain-message-body {
   white-space: normal;
   overflow-wrap: anywhere;
+}
+.explain-panel .explain-message-provenance {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+  line-height: 1.6;
 }
 .explain-message-error .explain-message-author {
   color: var(--color-danger);

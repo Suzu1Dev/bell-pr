@@ -85,6 +85,14 @@ const review = {
     truncated:
       "[Excerpt] The selection is long, so only part of it is included below. Please explain this excerpt first.",
   },
+  /**
+   * Where agent-written text comes from, shown on explanations, reports and
+   * answers: AI output, or the sample project's prewritten text.
+   */
+  provenance: {
+    ai: "AI-generated · may be inaccurate",
+    sample: "Sample · prewritten, no AI call",
+  },
   /** MarkdownContent: explanations, reports and other agent-written text. */
   markdown: {
     imageOmitted: "Image omitted",
@@ -114,8 +122,6 @@ const review = {
   explain: {
     unavailableTitle: "This file can't be explained right now",
     unavailableBody: "This change has no text diff to explain right now.",
-    readyDemo: "Sample explanation · prepared in advance",
-    readyLive: "Prepared automatically from this diff",
     testFileHint:
       "Tests are behavior specs: read the it/test descriptions first, then check each expect to see which edge case it protects.",
     /** Card titles; the loading skeleton shows them too. */
@@ -193,8 +199,6 @@ const review = {
     emptyTitle: "No review reports for this run yet",
     emptyBody:
       "Once the Lead's integration, the Reviewer and the Test analyst have finished, their full reports appear here.",
-    readyDemo: "Sample reports · prepared in advance",
-    readyLive: "The team's full reports",
     intro:
       "These are independent static reviews, not execution results. Each report is shown in full, with the number of paragraphs that mention the current file.",
     orderTitle: "Reading order suggested by the Lead",

@@ -44,6 +44,10 @@ const m: Translation<typeof en> = {
     truncated:
       "[內容已節錄] 選取範圍較長，下方僅附部分內容，請優先解釋這段節錄。",
   },
+  provenance: {
+    ai: "AI 生成 · 內容可能有誤",
+    sample: "示範內容 · 預先寫好，未呼叫 AI",
+  },
   markdown: {
     imageOmitted: "圖片已省略",
     imageOmittedWithAlt: ({ alt }) => `圖片已省略：${alt}`,
@@ -67,8 +71,6 @@ const m: Translation<typeof en> = {
   explain: {
     unavailableTitle: "目前無法解說此檔案",
     unavailableBody: "這份變更目前沒有可供解說的文字差異。",
-    readyDemo: "示範解說 · 預先整理的學習內容",
-    readyLive: "已依這份 diff 自動整理",
     testFileHint:
       "測試就是行為規格：先讀 it/test 描述，再對照 expect 看它保護哪個邊界。",
     cards: {
@@ -130,8 +132,6 @@ const m: Translation<typeof en> = {
     emptyTitle: "這次工作還沒有審查報告",
     emptyBody:
       "Lead 整合、Reviewer 與 Test analyst 完成後，報告全文會放在這裡。",
-    readyDemo: "示範報告 · 預先整理的內容",
-    readyLive: "團隊回報的完整內容",
     intro:
       "這些是獨立靜態審查，不是執行結果；每份報告保留全文，並標示提到目前檔案的段落數。",
     orderTitle: "Lead 建議的閱讀順序",
