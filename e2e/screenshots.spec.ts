@@ -4,7 +4,9 @@
 // each view. Each worker starts its own server whose stand-in codex, claude
 // and gh answer the setup checks like signed-in CLIs (any other call fails,
 // so no agent can run) and whose Git has a name and e-mail address, so the
-// pages show a ready setup as a person who finished it sees them.
+// pages show a ready setup as a person who finished it sees them. The
+// sample badge is checked at those widths and at 768 and 1024 px, where the
+// top bar has the least room.
 //
 //   BELLPR_E2E_PORT=<port> BELLPR_SCREENSHOTS=docs npx playwright test e2e/screenshots.spec.ts
 //
@@ -48,11 +50,20 @@ export const screenshotRoutes: { name: string; hash: string }[] = [
 ];
 
 export const screenshotWidths = [1280, 1440, 390] as const;
-const heights: Record<(typeof screenshotWidths)[number], number> = {
+/**
+ * Not captured, only checked for the sample badge: a tablet and a small
+ * laptop, where the top bar has the least room beside the sidebar.
+ */
+const checkedWidths = [768, 1024] as const;
+const heights: Record<(typeof screenshotWidths | typeof checkedWidths)[number], number> = {
   1280: 800,
   1440: 900,
   390: 844,
+  768: 1024,
+  1024: 768,
 };
+/** The routes that show the sample project, so present=1 shows its badge. */
+const sampleRoutes = /^(run-.+|repo-overview)$/;
 
 /** Relative times ("3 days ago") read the same on every run. */
 const frozenAt = new Date("2026-10-14T09:00:00Z");
@@ -66,6 +77,40 @@ async function settled(page: Page, locale: Locale) {
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => document.fonts.ready);
+}
+
+/**
+ * Fails when the presentation badge covers any text, button or link in the
+ * top bar (the overflow check does not see one box drawn over another).
+ */
+async function expectBadgeClear(page: Page) {
+  const covered = await page.evaluate(() => {
+    const badge = document.querySelector(".presentation-sample-badge");
+    const bar = document.querySelector(".topbar");
+    if (!badge || !bar) return [];
+    const box = badge.getBoundingClientRect();
+    const overlaps = (rect: DOMRect) =>
+      rect.width > 0 &&
+      rect.height > 0 &&
+      rect.left < box.right &&
+      rect.right > box.left &&
+      rect.top < box.bottom &&
+      rect.bottom > box.top;
+    const result: string[] = [];
+    const range = document.createRange();
+    const texts = document.createTreeWalker(bar, NodeFilter.SHOW_TEXT);
+    for (let node = texts.nextNode(); node; node = texts.nextNode()) {
+      if (badge.contains(node) || !node.textContent?.trim()) continue;
+      range.selectNodeContents(node);
+      if (Array.from(range.getClientRects()).some(overlaps))
+        result.push(node.textContent.trim());
+    }
+    for (const control of bar.querySelectorAll("button, a"))
+      if (overlaps(control.getBoundingClientRect()))
+        result.push(control.getAttribute("aria-label") ?? control.textContent ?? "");
+    return result;
+  });
+  expect(covered, "The sample badge covers the top bar").toEqual([]);
 }
 
 /** Stand-ins that answer the doctor's probes; every other call fails. */
@@ -129,10 +174,15 @@ for (const locale of locales)
         await page.setViewportSize({ width: screenshotWidths[0], height: heights[screenshotWidths[0]] });
         await page.goto(`/${route.hash}?present=1&capture=1&locale=${locale}`);
         await settled(page, locale);
-        for (const width of screenshotWidths) {
+        for (const width of [...screenshotWidths, ...checkedWidths]) {
           await page.setViewportSize({ width, height: heights[width] });
           await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
-          await expectNoOverflow(page);
+          const captured = (screenshotWidths as readonly number[]).includes(width);
+          if (captured) await expectNoOverflow(page);
+          if (sampleRoutes.test(route.name))
+            await expect(page.locator(".presentation-sample-badge")).toBeVisible();
+          await expectBadgeClear(page);
+          if (!captured) continue;
           await page.screenshot({
             path: path.join(directory, `${route.name}-${width}.png`),
             animations: "disabled",
