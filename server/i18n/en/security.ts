@@ -4,9 +4,27 @@ import { product } from "../../../shared/product.js";
 const fmt = formatters("en");
 /** Keys, files and similar items, separated as the locale separates a plain list. */
 const list = (items: readonly string[]) => fmt.list(items, { type: "unit" });
+const [bin] = product.binNames;
 
-/** Sign-in, session and sandbox messages, and Git safety refusals. */
+/**
+ * Sign-in, session and sandbox messages, and Git safety refusals. Text
+ * between backticks is shown as code on the sign-in pages.
+ */
 export default {
+  /** The JSON error for an API request without a valid session (401). */
+  authRequired: `Sign in to ${product.name} first: open the sign-in link printed in your terminal, or run \`${bin} open\` on this machine.`,
+  /** The pages shown around signing in; plain HTML without scripts. */
+  signIn: {
+    title: `Sign in to ${product.name}`,
+    heading: `Sign in to ${product.name}`,
+    howTo: `Open the sign-in link printed in your terminal, or run \`${bin} open\` in a terminal on this machine (Docker: \`docker exec <container> ${bin} open --print\`).`,
+    /** Shown above howTo when the link in the address bar was not accepted. */
+    linkInvalid:
+      "This sign-in link has expired or was already used. Each link works once, within two minutes.",
+    signedInTitle: `Signed in to ${product.name}`,
+    signedIn: "You are signed in on this browser.",
+    continue: `Continue to ${product.name}`,
+  },
   /** A Claude Code write agent that cannot get the OS sandbox (503). */
   sandbox: {
     unavailable: `Claude Code agents that edit files and run commands need the operating system sandbox, which is not available on this computer. On Linux it needs bubblewrap (bwrap) and socat; on macOS, sandbox-exec. Install them, switch this project to Codex, or allow unsandboxed agents under Settings → Agent safety.`,
