@@ -196,7 +196,7 @@ const draft = {
     note: ({ note }: { note: string }) => `Your note: ${note}`,
     conflicts: "Merge conflicts",
     addressed: "Addressed",
-    notAddressed: "Not changed; needs your judgement",
+    notAddressed: "Not changed; needs your judgment",
     checks: "Commands that actually ran",
     pushed: ({ commit, date }: { commit: string; date: string }) =>
       `${commit} pushed ${date}`,

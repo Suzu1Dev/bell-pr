@@ -75,7 +75,7 @@ const team = {
   },
   revise: {
     action: "Send back with feedback",
-    hint: "If the split does not make sense, the scope is too large, a test task is missing or the dependencies look odd, write down why so the lead re-plans. It is a chance to practise how to split work into tasks.",
+    hint: "If the split does not make sense, the scope is too large, a test task is missing or the dependencies look odd, write down why so the lead re-plans. It is a chance to practice how to split work into tasks.",
     label: "Feedback on the plan",
     placeholder:
       "For example: split the API and the UI into two tasks, and add a task that only writes tests.",
