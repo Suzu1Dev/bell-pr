@@ -385,7 +385,7 @@ const m: Translation<typeof en> = {
     priorMessageDiffers:
       "先前發佈的提交已帶有不同的提交訊息，推送後無法更改。請還原提交訊息，或建立新工作。",
     notAFork: "同名 Repository 不是目標專案的 fork，請先處理 GitHub fork。",
-    noPrUrl: "GitHub 未回傳 PR URL，請先到 GitHub 確认，避免重複發佈。",
+    noPrUrl: "GitHub 未回傳 PR URL，請先到 GitHub 確認，避免重複發佈。",
     prCreated: "已建立 GitHub Draft PR。",
     failed: "發佈失敗。",
     failedAfterPush: ({ error }) =>
@@ -407,7 +407,7 @@ const m: Translation<typeof en> = {
     pushFailed: "推送失敗。",
     stagedFilesDiffer: "準備提交的檔案與已核准差異不同。",
     fileChangedWhileStaging: ({ path }) => `${path} 在準備提交時變更，請重新審閱。`,
-    filesChangedWhilePublishing: "檔案在發佈準備期间變更，請重新審閱。",
+    filesChangedWhilePublishing: "檔案在發佈準備期間變更，請重新審閱。",
   },
 };
 export default m;
