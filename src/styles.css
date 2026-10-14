@@ -3392,8 +3392,9 @@ button {
   font-size: var(--text-xs);
   line-height: 1.7;
 }
+/* Spaced like the draft guide below it, so the first panel clears the tab bar. */
 .follow-up-rounds {
-  margin: 0 28px 20px;
+  margin: 24px 28px 0;
   padding: 18px 20px;
   border: 1px solid var(--color-border);
   border-radius: 10px;
@@ -3533,9 +3534,6 @@ button {
   overflow-wrap: anywhere;
 }
 @media (max-width: 760px) {
-  .follow-up-rounds {
-    margin: 0 16px 16px;
-  }
   .follow-up-round-head time {
     margin-left: 0;
   }
@@ -3543,7 +3541,7 @@ button {
 
 /* Where the contribution stands against its target branch, and its conflicts. */
 .sync-panel {
-  margin: 0 28px 20px;
+  margin: 24px 28px 0;
   padding: 16px 20px;
   border: 1px solid var(--color-border);
   border-radius: 10px;
@@ -3601,10 +3599,13 @@ button {
 .sync-conflicts .button {
   margin-top: 10px;
 }
-@media (max-width: 760px) {
+@media (max-width: 700px) {
+  .follow-up-rounds,
   .sync-panel {
-    margin: 0 16px 16px;
+    margin: 14px 14px 0;
   }
+}
+@media (max-width: 760px) {
   .sync-panel-head {
     flex-direction: column;
   }
