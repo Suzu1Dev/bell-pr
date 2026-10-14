@@ -448,6 +448,7 @@ export function WorkspacePage({
               draft={draft}
               actions={actions}
               rounds={rounds}
+              feedbackLocked={plan.locked("prFeedback", { demo })}
             />
           )}
         </div>

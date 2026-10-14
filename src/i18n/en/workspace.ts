@@ -272,6 +272,8 @@ const workspace = {
         ? `Fix the ${count} selected comment`
         : `Fix the ${count} selected comments`,
     startNote: "Fix from the note",
+    demoNote:
+      "The sample starts no round. Import your own project to fix a real PR from its feedback.",
   },
   publish: {
     titleDemo: "Your demo contribution is ready.",
@@ -343,7 +345,6 @@ const workspace = {
       "Demo review complete! Import your repository to open a real PR.",
     roundPushed: "Pushed this round to the PR: the branch has one more commit.",
     prCreated: "GitHub Draft PR created",
-    demoFeedback: "The demo never contacts GitHub for feedback.",
     feedbackRead: ({ count }: { count: number }) =>
       plural(count) === "one"
         ? `Read ${count} maintainer comment.`

@@ -4,6 +4,7 @@ import { createElement } from "react";
 import * as draftChecks from "../../shared/draft-checks";
 import type { FollowUpRound } from "../../shared/followups";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
+import { getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Run } from "../types";
 import { DraftTab } from "./DraftTab";
@@ -336,5 +337,53 @@ test("the description's Edit and Preview buttons say which one is on", () => {
   );
   assert.match(previewing, /aria-pressed="false"[^>]*>Edit</);
   assert.match(previewing, /aria-pressed="true"[^>]*>Preview</);
+  assertNoHan(html);
+});
+
+test("on Free, reading feedback and starting a round are locked with the PRO badge", () => {
+  const html = renderEn(element({ feedbackLocked: true }, {}, { followUpSelection: [items[0].url] }));
+  // The button stays enabled: it opens the upgrade dialog instead of asking GitHub.
+  const read = html.match(/<button class="button primary"[^>]*>(?:(?!<\/button>).)*Read feedback again(?:(?!<\/button>).)*<\/button>/)?.[0] ?? "";
+  assert.ok(read, "the read button is there");
+  assert.doesNotMatch(read, /disabled=""/);
+  assert.match(read, /lucide-lock/);
+  assert.match(read, /aria-label="Pro feature"/);
+  // Every feedback checkbox and the note are locked; the start button opens the dialog.
+  for (const box of html.match(/<input type="checkbox"[^>]*aria-label="Include[^>]*>/g) ?? [])
+    assert.match(box, /disabled=""/);
+  assert.match(tag(html, /id="follow-up-note"/), /disabled=""/);
+  const start = tag(html, /aria-describedby="follow-up-limit"/);
+  assert.doesNotMatch(start, /disabled=""/);
+  assert.match(html, /Keep fixing from feedback<span class="pro-badge"/);
+  // The round history, its push and the PR link stay on every plan.
+  assert.match(html, /View pull request/);
+  assertNoHan(html);
+});
+
+test("the sample shows its fictional feedback with a PRO chip and links to nothing", () => {
+  const demo = getDemo("en");
+  const html = renderEn(
+    element({
+      demo: true,
+      run: {
+        ...demo.run,
+        status: "published",
+        prUrl: "#demo-pr",
+        prFeedback: demo.prFeedback,
+      },
+    }),
+  );
+  assert.match(html, /Read feedback again/);
+  assert.match(html, /aria-label="Pro feature"/);
+  assert.match(html, /sample_maintainer/);
+  // No sample link looks like a page on GitHub.
+  assert.doesNotMatch(html, /View pull request/);
+  assert.doesNotMatch(html, /Open on GitHub/);
+  assert.doesNotMatch(html, /href="#demo-pr/);
+  // The sample starts no round: its controls are off, and it says why.
+  for (const box of html.match(/<input type="checkbox"[^>]*aria-label="Include[^>]*>/g) ?? [])
+    assert.match(box, /disabled=""/);
+  assert.match(tag(html, /aria-describedby="follow-up-limit"/), /disabled=""/);
+  assert.match(html, /The sample starts no round\./);
   assertNoHan(html);
 });

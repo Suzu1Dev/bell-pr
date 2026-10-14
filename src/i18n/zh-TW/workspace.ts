@@ -215,6 +215,7 @@ const m: Translation<typeof en> = {
     placeholder: "例如：只處理命名的建議，測試的部分我會另外回覆",
     startSelected: ({ count }) => `依選取的 ${count} 則回饋修正`,
     startNote: "依補充說明修正",
+    demoNote: "範例不會真的開始修正；匯入自己的專案，才能依真實 PR 的回饋修正。",
   },
   publish: {
     titleDemo: "你的示範貢獻，準備好了。",
@@ -269,7 +270,6 @@ const m: Translation<typeof en> = {
     demoPublished: "示範審查已完成！匯入你的 repository，即可建立真正的 PR。",
     roundPushed: "已把這輪修正推送到 PR，分支上多了一個 commit。",
     prCreated: "GitHub Draft PR 已建立",
-    demoFeedback: "示範模式不會連線 GitHub 讀取回饋。",
     feedbackRead: ({ count }) => `已讀取 ${count} 則維護者回饋。`,
     branchInvalid:
       "分支名稱只能用英數字與 . _ - /，不能有 ..，也不能以 . 或 .lock 結尾。",

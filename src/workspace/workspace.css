@@ -132,3 +132,8 @@
 .workspace-heading .meta-demo + .export-button {
   margin-left: var(--space-3);
 }
+
+/* PRO marks next to a heading of a gated control. */
+.follow-up-start h3 .pro-badge {
+  margin-left: var(--space-2);
+}

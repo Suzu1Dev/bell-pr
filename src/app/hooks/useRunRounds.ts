@@ -5,7 +5,7 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
-import { api, send } from "../../api";
+import { api, ProRequiredError, send } from "../../api";
 import { useT } from "../../i18n";
 import type { DiffFile, Run } from "../../types";
 import type { Notify, Tab } from "../AppShell";
@@ -134,7 +134,9 @@ export function useRunRounds({
       setTab("activity");
       notify(t.followUpStarted);
     } catch (error) {
-      notify((error as Error).message, "error");
+      // Starting a round needs Pro: a 402 already opened the upgrade dialog.
+      if (!(error instanceof ProRequiredError))
+        notify((error as Error).message, "error");
     } finally {
       setBusy(false);
     }

@@ -680,8 +680,17 @@ export function useRunActions({
   }
   // Read-only and only on request: no timer refreshes maintainer feedback.
   async function fetchPrFeedback() {
+    // The sample shows its fictional feedback; nothing asks GitHub.
     if (demo) {
-      notify(t.demoFeedback);
+      if (demoContent.prFeedback)
+        setRun((previous) => ({
+          ...previous,
+          prFeedback: structuredClone(demoContent.prFeedback),
+        }));
+      return;
+    }
+    if (plan.locked("prFeedback")) {
+      requestUpgrade("prFeedback");
       return;
     }
     setFeedbackLoading(true);
@@ -695,7 +704,9 @@ export function useRunActions({
         t.feedbackRead({ count: updated.prFeedback?.items.length ?? 0 }),
       );
     } catch (error) {
-      notify((error as Error).message, "error");
+      // A 402 already opened the upgrade dialog.
+      if (!(error instanceof ProRequiredError))
+        notify((error as Error).message, "error");
     } finally {
       setFeedbackLoading(false);
     }
