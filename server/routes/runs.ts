@@ -2,15 +2,18 @@ import type { Express } from "express";
 import { z } from "zod";
 import { summarizeRun } from "../../shared/runs.js";
 import { contributionSettingsSchema } from "../insights.js";
+import { fixedLicense } from "../license.js";
 import type { RouteDeps } from "./types.js";
 
 /**
  * Contribution runs: the list, creation, one run and cancel, plus the
- * team plan (approve and revise), team messages and retries.
+ * team plan (approve and revise), team messages and retries. Only a new
+ * run checks the plan (web access and Pro-only efforts); an existing run
+ * always continues, whatever plan it was created under.
  */
 export function registerRunsRoutes(
   app: Express,
-  { workbench, insights }: RouteDeps,
+  { workbench, insights, license = fixedLicense("free") }: RouteDeps,
 ) {
   app.post("/api/runs/:id/plan/approve", async (req, res) =>
     res.json({ run: await workbench.approvePlan(req.params.id) }),
@@ -52,13 +55,10 @@ export function registerRunsRoutes(
         settings: contributionSettingsSchema.optional(),
       })
       .parse(req.body);
+    const selected = settings ?? (await insights.getSettings(repoId));
+    license.assertModelEntitlement(selected);
     res.status(202).json({
-      run: await workbench.createRun(
-        repoId,
-        prompt,
-        title,
-        settings ?? (await insights.getSettings(repoId)),
-      ),
+      run: await workbench.createRun(repoId, prompt, title, selected),
     });
   });
   app.get("/api/runs/:id", (req, res) => {

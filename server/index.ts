@@ -42,6 +42,8 @@ import {
   type StartFlags,
 } from "./config.js";
 import { sm } from "./i18n/index.js";
+import { OfflineLicenseService, startupPlanLine } from "./license.js";
+import { licensePublicKeys, revokedLicenseIds } from "./license-keys.js";
 import { log } from "./log.js";
 import { redact } from "./process.js";
 import { mintOneTimeToken, oneTimeTokenLifetimeMs } from "./routes/auth.js";
@@ -489,12 +491,24 @@ export async function startServer(
 
     const store = new Store(config.dataDir);
     await store.initialize();
+    // Fails closed: without a valid key or an active trial the plan is Free.
+    const license = new OfflineLicenseService(config.dataDir, {
+      envKey: (options.env ?? process.env).BELLPR_LICENSE_KEY,
+      publicKeys: licensePublicKeys,
+      revoked: revokedLicenseIds,
+    });
+    await license.initialize();
     const agentSlots = new AgentSlots(config.limits.maxAgentProcesses);
     workbench = new Workbench(store, undefined, {
       agentSlots,
       maxActiveRuns: config.limits.maxActiveRuns,
       agentTimeoutScale: config.limits.agentTimeoutScale,
+      entitlements: () => license.entitlements(),
     });
+    // `bell-pr license` in another process changes license.json; the new
+    // plan applies here within seconds, and queued runs start if it allows.
+    const running = workbench;
+    cleanups.push(license.watch(() => running.entitlementsChanged()));
     // The session secret lives in memory only: never in env, argv or a file.
     const sessionToken = config.dev
       ? undefined
@@ -510,11 +524,14 @@ export async function startServer(
       version,
       agentSlots,
       agentTimeoutScale: config.limits.agentTimeoutScale,
+      license,
     });
     handler = app;
     if (linkRequested) writeOpenLink();
 
     const signInUrl = sessionToken ? `${url}/auth?t=${sessionToken}` : url;
+    // The plan goes on its own line, before the line with the link.
+    print(startupPlanLine(license.summary()));
     print(messages.startup({ version, url: signInUrl }));
     if (config.open) options.openBrowser?.(signInUrl);
     return { server, app, url, signInUrl, shutdown };
