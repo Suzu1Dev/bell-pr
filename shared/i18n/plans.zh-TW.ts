@@ -49,6 +49,10 @@ const plans: Translation<typeof en> = {
       label: "依專案規範撰寫 PR 草稿、送出前檢查、發布 Draft PR",
       limit: "所有方案都必須經過人工核准",
     },
+    sync: {
+      label: "將工作同步到目標分支的最新版本、由 Agent 解決衝突、更新專案的本機 clone",
+      limit: "不限（未發布的工作與已發布的 PR 皆可）",
+    },
     learningNotes: {
       label: "學習筆記頁面",
       limit: "不限",
@@ -58,8 +62,9 @@ const plans: Translation<typeof en> = {
       limit: "免費：不提供（學習筆記頁面仍免費）",
     },
     prFeedback: {
-      label: "維護者回饋與 CI 指導",
-      limit: "免費：不提供；範例專案會顯示標示 PRO 的範例回饋",
+      label: "維護者回饋、CI 指導與 AI 後續修改回合",
+      limit:
+        "免費：不提供；範例專案會顯示標示 PRO 的範例回饋。降級後，工作上已有的後續修改回合仍可查看，進行中的回合仍可審查、推送、停止或捨棄。",
     },
     discovery: {
       label: "探索貢獻（全 GitHub 推薦）",
