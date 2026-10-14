@@ -220,6 +220,12 @@ export class Store {
   data: Database = { version: 1, repos: [], runs: [] };
   /** What the last initialize() repaired; absent when the state loaded cleanly. */
   recovery?: StoreRecovery;
+  /**
+   * The backups found when state.json was missing at the last initialize().
+   * None is restored on its own, so the janitor keeps the run files a
+   * restored backup would still need.
+   */
+  backupsWithoutState?: string[];
   /** The write in progress and the one queued behind it (see save()). */
   private writing?: Promise<void>;
   private queued?: Promise<void>;
@@ -235,6 +241,7 @@ export class Store {
     // Recovery below is logged to the data directory's files too.
     initLog(this.directory);
     this.recovery = undefined;
+    this.backupsWithoutState = undefined;
     this.data = await this.load();
     const before = new Map(
       this.data.runs.map((run) => [run, { status: run.status, publishing: !!run.publishing }]),
@@ -365,7 +372,10 @@ export class Store {
           (names) => names.filter((name) => name.startsWith(`${stateFile}.bak.`)),
           () => [] as string[],
         );
-        if (backups.length) log.warn("store.state_missing", { backups });
+        if (backups.length) {
+          this.backupsWithoutState = backups;
+          log.warn("store.state_missing", { backups });
+        }
         return { version: 1, repos: [], runs: [] };
       }
       throw this.unreadable(error);
@@ -515,12 +525,22 @@ export class Store {
     await writeDurable(this.statePath, snapshot);
   }
 
-  /** state.json becomes .bak.1, and older backups move up to .bak.3. */
+  /**
+   * state.json becomes .bak.1, and older backups move up to .bak.3. Without
+   * a state.json (a first start, a missing file or one replaced by a backup)
+   * the backups stay as they are, so none is dropped for nothing.
+   */
   private async rotateBackups() {
     const backup = (index: number) => `${this.statePath}.bak.${index}`;
     const ignoreMissing = (error: NodeJS.ErrnoException) => {
       if (error.code !== "ENOENT") throw error;
     };
+    try {
+      await stat(this.statePath);
+    } catch (error) {
+      ignoreMissing(error as NodeJS.ErrnoException);
+      return;
+    }
     for (let index = backupCount - 1; index >= 1; index--)
       await rename(backup(index), backup(index + 1)).catch(ignoreMissing);
     const temporary = `${backup(1)}.${process.pid}.tmp`;

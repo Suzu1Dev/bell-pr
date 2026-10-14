@@ -530,6 +530,43 @@ test("each Store rotates state.json into three backups on its first save and wri
   }
 });
 
+test("a missing state.json starts empty and keeps every backup in place", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const statePath = path.join(directory, "state.json");
+  for (let start = 0; start < 4; start++) {
+    const store = new Store(directory);
+    await store.initialize();
+    store.data.repos = [{ ...repository, name: `generation-${start}` }];
+    await store.save();
+  }
+  const backups = async () =>
+    Promise.all(
+      [1, 2, 3].map((index) => readFile(`${statePath}.bak.${index}`, "utf8")),
+    );
+  const before = await backups();
+  await rm(statePath);
+  const store = new Store(directory);
+  await store.initialize();
+  assert.deepEqual(store.data, { version: 1, repos: [], runs: [] });
+  assert.deepEqual(store.backupsWithoutState?.sort(), [
+    "state.json.bak.1",
+    "state.json.bak.2",
+    "state.json.bak.3",
+  ]);
+  // Nothing new to keep, so no backup moved or was dropped.
+  assert.deepEqual(await backups(), before);
+  // The next start backs up the new state.json as usual.
+  const next = new Store(directory);
+  await next.initialize();
+  assert.equal(next.backupsWithoutState, undefined);
+  assert.deepEqual(await backups(), [
+    await readFile(statePath, "utf8"),
+    before[0],
+    before[1],
+  ]);
+});
+
 test("save() coalesces writes and resolves once the state it was called after is on disk", async (t) => {
   const { directory, cleanup } = await dataDirectory();
   t.after(cleanup);

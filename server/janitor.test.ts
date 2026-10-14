@@ -4,6 +4,7 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  readFile,
   realpath,
   rm,
   utimes,
@@ -192,6 +193,24 @@ test("after a restore from a backup, worktrees of runs the backup does not know 
   assert.equal(await exists(p.orphanTeam), true);
   // Temporary files still go.
   assert.deepEqual(removed.sort(), [...p.leftovers].sort());
+});
+
+test("with state.json missing next to a backup, worktrees no run references are kept", async (t) => {
+  const p = await plantedDataDirectory();
+  t.after(p.cleanup);
+  await rm(path.join(p.dataDir, "state.json"));
+  const store = new Store(p.dataDir);
+  await store.initialize();
+  assert.deepEqual(store.data.runs, []);
+  assert.deepEqual(store.backupsWithoutState, ["state.json.bak.1"]);
+  await runJanitor(
+    { store, lock: (_id, task) => task() },
+    { startedAt: Date.now() + 1000 },
+  );
+  for (const target of [p.kept.worktreePath, p.keptTeam, p.orphan, p.orphanTeam])
+    assert.equal(await exists(target), true, target);
+  // The backup is still there to restore by hand.
+  assert.equal(await readFile(path.join(p.dataDir, "state.json.bak.1"), "utf8"), "{}");
 });
 
 test("entries newer than the start are left alone", async (t) => {
