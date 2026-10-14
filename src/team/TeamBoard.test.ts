@@ -122,3 +122,42 @@ test("a plan awaiting approval offers 退回並補充意見 with the revision hi
   // Messaging the lead is pointed at the revision action instead.
   assert.match(html, /讓 Lead 重擬|退回並補充意見/);
 });
+
+/** Each lane's markup, in display order. */
+const lanes = (html: string) =>
+  html.split('<section class="team-lane">').slice(1).map((lane) => lane.split("</section>")[0]);
+
+test("lanes keep their grouping and the empty running lane has its own message", () => {
+  const [first, second, third, fourth] = demoTeam.tasks;
+  const html = render(
+    {
+      ...demoRun,
+      team: {
+        ...demoTeam,
+        phase: "developing",
+        tasks: [
+          { ...first, status: "blocked" },
+          { ...second, status: "pending" },
+          { ...third, status: "failed" },
+          { ...fourth, status: "complete" },
+        ],
+      },
+    },
+    false,
+  );
+  const [todo, running, done] = lanes(html);
+  assert.match(todo, /^<h3>待處理<span>2<\/span><\/h3>/);
+  assert.ok(todo.includes(first.title) && todo.includes(second.title));
+  assert.match(running, /^<h3>進行中<span>0<\/span><\/h3>/);
+  assert.match(running, /目前沒有正在執行的子任務/);
+  // Failed tasks sit in the done lane.
+  assert.match(done, /^<h3>已完成<span>2<\/span><\/h3>/);
+  assert.ok(done.includes(third.title) && done.includes(fourth.title));
+  const empty = lanes(
+    render({ ...demoRun, team: { ...demoTeam, phase: "planning", tasks: [] } }, false),
+  );
+  assert.deepEqual(
+    empty.map((lane) => /team-lane-empty">([^<]*)</.exec(lane)?.[1]),
+    ["目前沒有任務", "目前沒有正在執行的子任務", "目前沒有任務"],
+  );
+});

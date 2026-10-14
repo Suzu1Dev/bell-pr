@@ -26,6 +26,7 @@ import type { Run } from "../types";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
 import { ModelSummary } from "../models/ModelSummary";
 import { providerLabels } from "../../shared/models";
+import { teamLanes, type TeamLaneId } from "./lanes";
 import "./team.css";
 
 const taskLabels = {
@@ -45,6 +46,11 @@ const phaseLabels = {
   complete: "團隊工作已完成",
   failed: "需要處理執行問題",
   cancelled: "團隊已停止",
+};
+const laneLabels: Record<TeamLaneId, string> = {
+  todo: "待處理",
+  running: "進行中",
+  done: "已完成",
 };
 export function TeamBoard({
   run,
@@ -115,11 +121,6 @@ export function TeamBoard({
   const retriedCount = team.tasks.filter((task) =>
     ["failed", "blocked"].includes(task.status),
   ).length;
-  const groups: { label: string; states: TeamTask["status"][] }[] = [
-    { label: "待處理", states: ["pending", "ready", "blocked"] },
-    { label: "進行中", states: ["running"] },
-    { label: "已完成", states: ["complete", "failed"] },
-  ];
   return (
     <section className="team-board" aria-label="共享任務與團隊訊息">
       <div className="team-board-header">
@@ -342,10 +343,10 @@ export function TeamBoard({
       </div>
       <div className="team-board-content">
         <div className="team-kanban">
-          {groups.map((group) => (
-            <section className="team-lane" key={group.label}>
+          {teamLanes.map((group) => (
+            <section className="team-lane" key={group.id}>
               <h3>
-                {group.label}
+                {laneLabels[group.id]}
                 <span>
                   {
                     team.tasks.filter((task) =>
@@ -444,7 +445,7 @@ export function TeamBoard({
                 group.states.includes(task.status),
               ) && (
                 <div className="team-lane-empty">
-                  {group.label === "進行中"
+                  {group.id === "running"
                     ? "目前沒有正在執行的子任務"
                     : "目前沒有任務"}
                 </div>
