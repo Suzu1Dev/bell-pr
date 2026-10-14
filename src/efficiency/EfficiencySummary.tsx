@@ -18,6 +18,8 @@ const roleLabels: Record<string, string> = {
   draft: "PR 草稿",
   explanations: "解說",
   guide: "追問",
+  followup: "Review 修正",
+  sync: "解衝突",
 };
 const roleGroup = (role: string) =>
   /^member-\d+$/.test(role) ? "member" : role;

@@ -1,16 +1,25 @@
 /**
  * The human review gate and publishing: the PR draft, per-file review,
  * approval, and publishing exactly the reviewed files as one commit in a
- * GitHub Draft PR. Nothing reaches GitHub without that approval.
+ * GitHub Draft PR, or a follow-up round as one more commit on the PR's
+ * branch. Nothing reaches GitHub without that approval.
  */
 import path from "node:path";
 import { command, git, redact } from "./process.js";
 import { parseGitHubSource, readDiff, reviewFingerprint } from "./git.js";
 import { validBranchName } from "../shared/drafts.js";
-import { draftPreflight } from "../shared/draft-checks.js";
-import { AppError, type Run } from "./types.js";
+import {
+  draftPreflight,
+  findDraftPlaceholders,
+} from "../shared/draft-checks.js";
+import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
+import { AppError, type DiffFile, type Run } from "./types.js";
 import { networkConfig } from "./repositories.js";
+import { assertRemoteHead, prHasCommit, remoteBranchHead } from "./pr-branch.js";
+import { assertConflictsResolved, partlyPublished } from "./sync-runs.js";
 import type { WorkbenchContext } from "./workbench.js";
+
+const now = () => new Date().toISOString();
 
 const json = <T>(value: string) => JSON.parse(value) as T;
 
@@ -28,6 +37,14 @@ export async function saveDraft(
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     editable(run);
+    if (
+      activeFollowUp(run.followUps) &&
+      (draft.title !== run.draft.title || draft.body !== run.draft.body)
+    )
+      throw new AppError(
+        "這輪修正只推送新的 commit，PR 標題與說明維持原樣，不能在這裡修改。",
+        409,
+      );
     // An empty message is stored as absent so the title-only fallback applies.
     const commitMessage = draft.commitMessage?.trim();
     // Likewise an empty GitHub branch falls back to the run's own branch.
@@ -127,14 +144,28 @@ export async function approve(
     }
     if (!run.draft.title.trim() || !run.draft.body.trim())
       throw new AppError("請先填寫 PR 標題與內容。", 422);
-    const unfinished = draftPreflight({ body: run.draft.body }).find(
-      (check) => check.kind === "block",
-    );
-    if (unfinished)
-      throw new AppError(
-        [unfinished.message, ...unfinished.details].join("\n"),
-        422,
+    await assertConflictsResolved(run);
+    // A follow-up round pushes only a commit, so its message is what goes out.
+    const round = activeFollowUp(run.followUps);
+    if (round) {
+      const message = run.draft.commitMessage?.trim();
+      if (!message || findDraftPlaceholders(message).length)
+        throw new AppError(
+          "請填好這輪修正的提交訊息，不要留下待填寫的內容。",
+          422,
+        );
+      const unreviewable = await unreviewableRoundPaths(run, round, files);
+      if (unreviewable.length) throw unreviewableError(unreviewable);
+    } else {
+      const unfinished = draftPreflight({ body: run.draft.body }).find(
+        (check) => check.kind === "block",
       );
+      if (unfinished)
+        throw new AppError(
+          [unfinished.message, ...unfinished.details].join("\n"),
+          422,
+        );
+    }
     run.approvedFingerprint = reviewFingerprint(files, run.draft);
     run.status = "approved";
     await ctx.store.save();
@@ -186,6 +217,14 @@ export async function publish(
       )
     )
       throw new AppError("最新差異尚未全部審閱。", 409);
+    const round = activeFollowUp(run.followUps);
+    if (round) return publishFollowUp(ctx, run, round, files);
+    if (run.prUrl)
+      throw new AppError(
+        "這個 PR 已經送出；要推送新的修改，請從維護者回饋開始一輪修正。",
+        409,
+      );
+    await assertConflictsResolved(run);
     const headBranch = run.draft.publishBranch || run.branch;
     if (
       run.draft.publishBranch &&
@@ -260,7 +299,9 @@ export async function publish(
       ).stdout.trim();
       if (remoteSha !== run.baseSha)
         throw new AppError(
-          "目標分支已有新提交，請從最新版本建立新工作再審閱。",
+          run.publishCommit
+            ? `目標分支已有新提交；${partlyPublished}`
+            : "目標分支已有新提交；請先在 PR 草稿頁按「同步到最新目標分支」，審閱後再送出。",
           409,
         );
       const head = (
@@ -278,85 +319,7 @@ export async function publish(
         previousHead,
       ]);
 
-      // Build a fresh index from the reviewed base, then stage only explicitly reviewed paths.
-      // commit-tree produces one clean commit, excluding any unreviewed intermediate agent history.
-      const indexPath = path.join(
-        ctx.store.directory,
-        `publish-index-${run.id}`,
-      );
-      const indexEnv = {
-        ...process.env,
-        GIT_INDEX_FILE: indexPath,
-        GIT_TERMINAL_PROMPT: "0",
-      };
-      await git(run.worktreePath, ["read-tree", run.baseSha], {
-        env: indexEnv,
-      });
-      await git(
-        run.worktreePath,
-        [
-          "--literal-pathspecs",
-          "add",
-          "--",
-          ...files.map((file) => file.path),
-        ],
-        { env: indexEnv },
-      );
-      const stagedFiles = (
-        await git(
-          run.worktreePath,
-          [
-            "diff",
-            "--cached",
-            "--no-ext-diff",
-            "--no-textconv",
-            "--no-renames",
-            "--name-only",
-            "-z",
-            run.baseSha,
-            "--",
-          ],
-          { env: indexEnv },
-        )
-      ).stdout
-        .split("\0")
-        .filter(Boolean)
-        .sort();
-      if (
-        JSON.stringify(stagedFiles) !==
-        JSON.stringify(files.map((file) => file.path).sort())
-      )
-        throw new AppError("準備提交的檔案與已核准差異不同。", 409);
-      for (const file of files) {
-        const stagedPatch = (
-          await git(
-            run.worktreePath,
-            [
-              "--literal-pathspecs",
-              "diff",
-              "--cached",
-              "--no-ext-diff",
-              "--no-textconv",
-              "--no-renames",
-              run.baseSha,
-              "--",
-              file.path,
-            ],
-            { env: indexEnv },
-          )
-        ).stdout;
-        if (stagedPatch !== file.patch)
-          throw new AppError(
-            `${file.path} 在準備提交時變更，請重新審閱。`,
-            409,
-          );
-      }
-      const latest = await readDiff(run);
-      if (reviewFingerprint(latest, run.draft) !== run.approvedFingerprint)
-        throw new AppError("檔案在發佈準備期间變更，請重新審閱。", 409);
-      const tree = (
-        await git(run.worktreePath, ["write-tree"], { env: indexEnv })
-      ).stdout.trim();
+      const tree = await reviewedTree(ctx, run, files);
       let commit = run.publishCommit;
       if (commit) {
         const priorTree = (
@@ -511,4 +474,281 @@ export async function publish(
     }
     return run;
   });
+}
+
+/**
+ * Paths whose pushed content a round changed but the review list cannot
+ * show: a file put back to its base version or deleted drops out of the
+ * diff against the base, yet it would change the pushed commit.
+ */
+async function unreviewableRoundPaths(
+  run: Run,
+  round: FollowUpRound,
+  files: DiffFile[],
+  tree?: string,
+) {
+  // A sync round's tree is the target branch plus the reviewed files.
+  const base = round.mergeParent ?? round.parentCommit;
+  const changed = (
+    await git(
+      run.worktreePath,
+      tree
+        ? ["diff-tree", "-r", "--no-renames", "--name-only", "-z", base, tree]
+        : ["diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", base, "--"],
+    )
+  ).stdout
+    .split("\0")
+    .filter(Boolean);
+  const listed = new Set(files.map((file) => file.path));
+  return changed.filter((filePath) => !listed.has(filePath));
+}
+
+function unreviewableError(paths: string[]) {
+  return new AppError(
+    `這輪修正把已推送的檔案改回原始版本或刪除：${paths.slice(0, 10).join("、")}。這類修改無法在 BELL 逐檔審閱，因此不會推送；請還原這些檔案或放棄這輪修正。`,
+    409,
+  );
+}
+
+/**
+ * Pushes an approved follow-up round as one commit on top of the PR head.
+ * The PR title and description are left alone, and nothing is force-pushed:
+ * GitHub's branch is checked before a commit is made, and the push itself
+ * is a plain fast-forward. The caller holds the run lock.
+ */
+async function publishFollowUp(
+  ctx: WorkbenchContext,
+  run: Run,
+  round: FollowUpRound,
+  files: DiffFile[],
+) {
+  const message = run.draft.commitMessage?.trim();
+  if (!message) throw new AppError("請填寫這輪修正的提交訊息。", 422);
+  await assertConflictsResolved(run);
+  if (findDraftPlaceholders(message).length)
+    throw new AppError("提交訊息還有待填寫的內容，請改好再推送。", 422);
+  if (!run.prUrl || !run.headRepository)
+    throw new AppError("找不到這個 PR 的推送位置，無法推送修正。", 409);
+  const branch = run.publishedBranch ?? run.branch;
+  const roundNumber = (run.followUps?.indexOf(round) ?? 0) + 1;
+  const finish = (commit: string) => {
+    round.status = "published";
+    round.publishedAt = now();
+    run.publishCommit = commit;
+    run.status = "published";
+    ctx.log(
+      run,
+      "system",
+      `已把第 ${roundNumber} 輪修正推送到 PR 分支 ${branch}（${commit.slice(0, 7)}）。`,
+    );
+  };
+  run.publishing = true;
+  delete run.error;
+  await ctx.store.save();
+  try {
+    const head = (
+      await git(run.worktreePath, ["symbolic-ref", "--short", "HEAD"])
+    ).stdout.trim();
+    if (head !== run.branch)
+      throw new AppError("工作分支已改變，已停止推送。", 409);
+    const previousHead = (
+      await git(run.worktreePath, ["rev-parse", "HEAD"])
+    ).stdout.trim();
+    if (previousHead !== round.parentCommit && previousHead !== round.commit)
+      throw new AppError("工作分支的提交已改變，已停止推送。", 409);
+    // A retry after the push landed but before BELL recorded it, also when
+    // the branch moved on or the PR was merged since.
+    if (round.commit && (await prHasCommit(ctx, run, round.commit))) {
+      finish(round.commit);
+      return run;
+    }
+    const remoteHead = await remoteBranchHead(run);
+    // Checked before anything local changes, so a refusal leaves the round discardable.
+    assertRemoteHead(run, remoteHead, round.parentCommit);
+    const state = (
+      await command("gh", [
+        "pr",
+        "view",
+        run.prUrl,
+        "--json",
+        "state",
+        "--jq",
+        ".state",
+      ])
+    ).stdout.trim();
+    if (state !== "OPEN")
+      throw new AppError(
+        `這個 PR 已${state === "MERGED" ? "合併" : "關閉"}，不能再推送修正。`,
+        409,
+      );
+    const tree = await reviewedTree(ctx, run, files);
+    const parentTree = (
+      await git(run.worktreePath, ["rev-parse", `${round.parentCommit}^{tree}`])
+    ).stdout.trim();
+    if (tree === parentTree)
+      throw new AppError(
+        "這輪沒有新的修改可以推送；可以放棄這輪修正。",
+        422,
+      );
+    const unreviewable = await unreviewableRoundPaths(run, round, files, tree);
+    if (unreviewable.length) throw unreviewableError(unreviewable);
+    let commit = round.commit;
+    if (commit) {
+      // A retry after the commit was made: it must be the same reviewed content.
+      const [priorTree, priorParents, priorMessage] = await Promise.all([
+        git(run.worktreePath, ["rev-parse", `${commit}^{tree}`]),
+        git(run.worktreePath, ["rev-list", "--parents", "-n", "1", commit]),
+        git(run.worktreePath, ["log", "-1", "--format=%B", commit]),
+      ]);
+      if (
+        priorTree.stdout.trim() !== tree ||
+        priorParents.stdout.trim().split(/\s+/).slice(1).join(" ") !==
+          [round.parentCommit, round.mergeParent].filter(Boolean).join(" ") ||
+        priorMessage.stdout.trim() !== message
+      )
+        throw new AppError(
+          "這輪修正先前已建立不同內容的 commit；請還原修改與提交訊息後再推送，或放棄這輪修正。",
+          409,
+        );
+    } else {
+      commit = (
+        await git(
+          run.worktreePath,
+          [
+            "commit-tree",
+            tree,
+            "-p",
+            round.parentCommit,
+            ...(round.mergeParent ? ["-p", round.mergeParent] : []),
+          ],
+          { input: `${message}\n` },
+        )
+      ).stdout.trim();
+    }
+    // Recorded before the branch moves, so an interruption from here on can
+    // be retried (HEAD may be the parent or this commit) or discarded.
+    round.commit = commit;
+    await ctx.store.save();
+    if (previousHead !== commit)
+      await git(run.worktreePath, [
+        "update-ref",
+        `refs/heads/${run.branch}`,
+        commit,
+        previousHead,
+      ]);
+    await git(run.worktreePath, ["read-tree", commit]);
+    // A plain push: GitHub rejects it if the branch moved since the check above.
+    await git(
+      run.worktreePath,
+      [
+        ...networkConfig,
+        "push",
+        "--",
+        `https://github.com/${run.headRepository}.git`,
+        `${commit}:refs/heads/${branch}`,
+      ],
+      { timeoutMs: 120_000 },
+    );
+    finish(commit);
+  } catch (error) {
+    run.error = redact(error instanceof Error ? error.message : "推送失敗。");
+    ctx.log(run, "system", run.error);
+    throw error;
+  } finally {
+    run.publishing = false;
+    await ctx.store.save();
+  }
+  return run;
+}
+
+/**
+ * Builds a fresh index from the reviewed base and stages only the reviewed
+ * paths, checking each staged patch against what the person approved.
+ * commit-tree then produces one clean commit, excluding any unreviewed
+ * intermediate agent history.
+ */
+async function reviewedTree(
+  ctx: WorkbenchContext,
+  run: Run,
+  files: DiffFile[],
+) {
+  // Build a fresh index from the reviewed base, then stage only explicitly reviewed paths.
+  // commit-tree produces one clean commit, excluding any unreviewed intermediate agent history.
+  const indexPath = path.join(
+    ctx.store.directory,
+    `publish-index-${run.id}`,
+  );
+  const indexEnv = {
+    ...process.env,
+    GIT_INDEX_FILE: indexPath,
+    GIT_TERMINAL_PROMPT: "0",
+  };
+  await git(run.worktreePath, ["read-tree", run.baseSha], {
+    env: indexEnv,
+  });
+  await git(
+    run.worktreePath,
+    [
+      "--literal-pathspecs",
+      "add",
+      "--",
+      ...files.map((file) => file.path),
+    ],
+    { env: indexEnv },
+  );
+  const stagedFiles = (
+    await git(
+      run.worktreePath,
+      [
+        "diff",
+        "--cached",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--no-renames",
+        "--name-only",
+        "-z",
+        run.baseSha,
+        "--",
+      ],
+      { env: indexEnv },
+    )
+  ).stdout
+    .split("\0")
+    .filter(Boolean)
+    .sort();
+  if (
+    JSON.stringify(stagedFiles) !==
+    JSON.stringify(files.map((file) => file.path).sort())
+  )
+    throw new AppError("準備提交的檔案與已核准差異不同。", 409);
+  for (const file of files) {
+    const stagedPatch = (
+      await git(
+        run.worktreePath,
+        [
+          "--literal-pathspecs",
+          "diff",
+          "--cached",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--no-renames",
+          run.baseSha,
+          "--",
+          file.path,
+        ],
+        { env: indexEnv },
+      )
+    ).stdout;
+    if (stagedPatch !== file.patch)
+      throw new AppError(
+        `${file.path} 在準備提交時變更，請重新審閱。`,
+        409,
+      );
+  }
+  const latest = await readDiff(run);
+  if (reviewFingerprint(latest, run.draft) !== run.approvedFingerprint)
+    throw new AppError("檔案在發佈準備期间變更，請重新審閱。", 409);
+  return (
+    await git(run.worktreePath, ["write-tree"], { env: indexEnv })
+  ).stdout.trim();
 }

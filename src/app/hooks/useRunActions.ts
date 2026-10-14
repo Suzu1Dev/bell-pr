@@ -10,6 +10,7 @@ import { api, send } from "../../api";
 import { demoRun, demoFiles, demoAnswer } from "../../demo";
 import type { Repo, Run, RunSummary, DiffFile, ChatMessage } from "../../types";
 import { summarizeRun } from "../../../shared/runs";
+import { activeFollowUp } from "../../../shared/followups";
 import { demoTeam } from "../../team/TeamBoard";
 import type { ModalName, Notify, Page, Tab } from "../AppShell";
 import type { DraftEditor } from "./useDraftEditor";
@@ -113,6 +114,7 @@ export function useRunActions({
     draftPublishBranch,
     acknowledged,
     setAcknowledged,
+    followUp,
   } = draft;
   const {
     source,
@@ -526,6 +528,7 @@ export function useRunActions({
     }
     setBusy(true);
     setFormError("");
+    const pushingRound = !!followUp;
     try {
       const result = await api<{ run: Run; url?: string }>(
         `/runs/${run.id}/publish`,
@@ -533,9 +536,20 @@ export function useRunActions({
       );
       setRun(result.run);
       closeModal();
-      notify("GitHub Draft PR 已建立");
+      notify(
+        pushingRound
+          ? "已把這輪修正推送到 PR，分支上多了一個 commit。"
+          : "GitHub Draft PR 已建立",
+      );
     } catch (error) {
       setFormError((error as Error).message);
+      // A refused push may have saved the round's state; show it next to the error.
+      if (pushingRound)
+        void api<{ run: Run }>(`/runs/${run.id}`)
+          .then(({ run: latest }) => {
+            if (runIdRef.current === latest.id) setRun(latest);
+          })
+          .catch(() => undefined);
     } finally {
       setBusy(false);
     }
@@ -563,6 +577,7 @@ export function useRunActions({
     }
   }
   async function cancel() {
+    const stoppingRound = followUp?.status === "running" && !reviewRerunning;
     try {
       const { run: updated } = await api<{ run: Run }>(
         `/runs/${run.id}/cancel`,
@@ -579,7 +594,11 @@ export function useRunActions({
         }
       }
       notify(
-        ["review", "approved"].includes(updated.status)
+        stoppingRound
+          ? activeFollowUp(updated.followUps)
+            ? "這輪修正已停止；工作目錄保留了部分修改，請審閱、寫好提交訊息後推送，或放棄這輪修正。"
+            : "這輪修正已停止，沒有修改任何檔案；PR 維持原狀。"
+          : ["review", "approved"].includes(updated.status)
           ? "已停止重新審查；原有報告與審閱狀態保留。"
           : updated.team?.tasks.length
             ? "任務已停止；本次工作的目錄與失敗任務的隔離目錄保留，可重試失敗的子任務。"

@@ -118,3 +118,22 @@ test("unsampled reading steps are marked and dropped citations are listed; old c
   assert.doesNotMatch(legacy, /未抽樣，內容未讀/);
   assert.doesNotMatch(legacy, /因引用未抽樣／不存在的檔案而略過/);
 });
+
+test("BELL's own clone offers an update to the latest default branch, which pauses analysis while it runs", () => {
+  // Local imports and the demo get no handler, so no button.
+  assert.doesNotMatch(render(), /更新到最新版本/);
+  const updatable = render({
+    repo: { ...repo, updatedAt: "2026-10-13T00:00:00.000Z" },
+    onUpdateRepo() {},
+  });
+  assert.match(updatable, /aria-describedby="mission-update-help">.*更新到最新版本<\/button>/);
+  assert.match(updatable, /從 GitHub 取得 main 的最新版本/);
+  assert.match(updatable, /上次更新：/);
+  const updating = render({ onUpdateRepo() {}, updatingRepo: true });
+  assert.match(updating, /disabled="" aria-describedby="mission-update-help">.*正在更新…<\/button>/);
+  assert.match(updating, /<button[^>]*disabled="">(?:(?!<\/button>).)*重新分析<\/button>/);
+  assert.doesNotMatch(
+    render({ onUpdateRepo() {} }),
+    /<button[^>]*disabled="">(?:(?!<\/button>).)*重新分析<\/button>/,
+  );
+});

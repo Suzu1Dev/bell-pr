@@ -17,6 +17,7 @@ import { registerAppSettingsRoutes } from "./routes/app-settings.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerDiscoveryRoutes } from "./routes/discovery.js";
 import { registerDoctorRoutes } from "./routes/doctor.js";
+import { registerFollowUpsRoutes } from "./routes/follow-ups.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerLearningRoutes } from "./routes/learning.js";
 import { registerLicenseRoutes } from "./routes/license.js";
@@ -26,6 +27,7 @@ import { registerReposRoutes } from "./routes/repos.js";
 import { registerReviewRoutes } from "./routes/review.js";
 import { registerRunsRoutes } from "./routes/runs.js";
 import { registerStatusRoutes } from "./routes/status.js";
+import { registerSyncRoutes } from "./routes/sync.js";
 import type { RouteDeps } from "./routes/types.js";
 
 /** Masks secrets in string values, which may quote command output. */
@@ -149,6 +151,8 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   registerModelSettingsRoutes(app, deps);
   registerRunsRoutes(app, deps);
   registerReviewRoutes(app, deps);
+  registerSyncRoutes(app, deps);
+  registerFollowUpsRoutes(app, deps);
   // Route modules that later work fills in, in a fixed order, so none of
   // them needs to edit this list.
   registerHealthRoutes(app, deps);

@@ -16,6 +16,7 @@ import {
   parseDraftProposal,
 } from "./drafts.js";
 import { AppError, type Run } from "./types.js";
+import { activeFollowUp } from "../shared/followups.js";
 import { editable } from "./publish.js";
 import { runAgent } from "./run-executor.js";
 import type { WorkbenchContext } from "./workbench.js";
@@ -42,6 +43,11 @@ export async function prepareRunDraft(
     if (ctx.stopping()) throw new AppError("服務正在關閉，請稍後重試。", 503);
     const run = ctx.run(id);
     editable(run);
+    if (activeFollowUp(run.followUps))
+      throw new AppError(
+        "這輪修正只推送新的 commit，不會更新 PR 說明，因此不需要產生草稿建議。",
+        409,
+      );
     const files = await ctx.diff(id);
     if (ctx.stopping()) throw new AppError("服務正在關閉，請稍後重試。", 503);
     pending = ctx.draftJobs.get(id);

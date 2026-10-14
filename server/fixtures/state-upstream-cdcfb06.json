@@ -1,0 +1,300 @@
+{
+  "version": 1,
+  "repos": [
+    {
+      "id": "ca809e1a-275b-4f4b-bf72-29c70f33ef2e",
+      "name": "example",
+      "owner": "test-owner",
+      "fullName": "test-owner/example",
+      "path": "/tmp/bell-upstream-state/state/repositories/test-owner-example-5b6a0bb4",
+      "defaultBranch": "main",
+      "url": "https://github.com/test-owner/example",
+      "updatedAt": "2026-10-14T01:34:08.285Z"
+    }
+  ],
+  "runs": [
+    {
+      "id": "upstream-published-run",
+      "repoId": "ca809e1a-275b-4f4b-bf72-29c70f33ef2e",
+      "title": "Update hello",
+      "prompt": "Update the second line of hello.",
+      "status": "review",
+      "branch": "fix/published1",
+      "baseBranch": "main",
+      "baseSha": "d9a066a9b47bf3bf012afb7e4e60b1544c2b1f52",
+      "worktreePath": "/tmp/bell-upstream-state/state/worktrees/upstream-published-run",
+      "createdAt": "2026-10-12T00:00:00.000Z",
+      "agents": [
+        {
+          "id": "followup",
+          "name": "Mend",
+          "role": "Review follow-up",
+          "status": "complete",
+          "detail": "修正完成，等待審閱"
+        }
+      ],
+      "logs": [
+        {
+          "time": "2026-10-14T01:34:10.739Z",
+          "agent": "system",
+          "message": "已建立 GitHub Draft PR。"
+        },
+        {
+          "time": "2026-10-14T01:34:11.995Z",
+          "agent": "system",
+          "message": "已接續 GitHub 上 PR 分支 fix/published1 的 1 個提交（例如在 GitHub 上套用建議或 Update branch）；這些改動會在下一輪一起審閱。"
+        },
+        {
+          "time": "2026-10-14T01:34:12.070Z",
+          "agent": "user",
+          "message": "要求依 1 則維護者回饋與補充說明進行第 2 輪修正。"
+        },
+        {
+          "time": "2026-10-14T01:34:12.430Z",
+          "agent": "followup",
+          "message": "Mend 開始工作。模型：Codex CLI 預設（未記錄模型）；推理：模型預設。",
+          "kind": "status"
+        },
+        {
+          "time": "2026-10-14T01:34:12.926Z",
+          "agent": "system",
+          "message": "第 2 輪修正完成，請逐檔審閱這輪改到的檔案，確認提交訊息後再推送。"
+        },
+        {
+          "time": "2026-10-14T01:34:15.860Z",
+          "agent": "system",
+          "message": "已把第 2 輪修正推送到 PR 分支 fix/published1（ea0939d）。"
+        },
+        {
+          "time": "2026-10-14T01:34:17.386Z",
+          "agent": "user",
+          "message": "已把 main 最新版本（d9a066a）合併進 PR，沒有衝突；審閱後會推送一個合併 commit。"
+        }
+      ],
+      "draft": {
+        "title": "fix: update hello",
+        "body": "Changes the second line of hello.",
+        "commitMessage": "Merge branch 'main' into fix/published1"
+      },
+      "reviewedFiles": [
+        "hello.ts",
+        "notes.md"
+      ],
+      "reviewedFingerprints": {
+        "hello.ts": "071f3a6f7c9d5e9ba73b170adc67585474e952859fc431f6a3228f6fe69b5f0e",
+        "notes.md": "1fc5234292803899eba1743e85b2a1827504c56b9d3fe323513befaec26887b5"
+      },
+      "explanations": {
+        "hello.ts": {
+          "fingerprint": "071f3a6f7c9d5e9ba73b170adc67585474e952859fc431f6a3228f6fe69b5f0e",
+          "status": "pending"
+        },
+        "notes.md": {
+          "fingerprint": "1fc5234292803899eba1743e85b2a1827504c56b9d3fe323513befaec26887b5",
+          "status": "pending"
+        }
+      },
+      "publishing": false,
+      "publishCommit": "ea0939dfd4ad02dccaf2b4cdc1ee474aef67d169",
+      "headRepository": "test-owner/example",
+      "publishedBranch": "fix/published1",
+      "prUrl": "https://github.com/test-owner/example/pull/1",
+      "prFeedback": {
+        "fetchedAt": "2026-10-12T01:00:00.000Z",
+        "prNumber": 1,
+        "items": [
+          {
+            "kind": "thread",
+            "author": "maintainer",
+            "authorAssociation": "MEMBER",
+            "body": "Polish line two.",
+            "path": "hello.ts",
+            "line": 2,
+            "url": "https://github.com/test-owner/example/pull/1#discussion_r1",
+            "createdAt": "2026-10-12T00:30:00.000Z"
+          }
+        ]
+      },
+      "followUps": [
+        {
+          "id": "e6d2847e",
+          "kind": "sync",
+          "requestedAt": "2026-10-14T01:34:11.995Z",
+          "feedbackUrls": [],
+          "status": "published",
+          "parentCommit": "30cd9fbcaf3561ee1a18e8dc7af0ed4ab44e35ba",
+          "commit": "baf68f12704df60721bdfba9090cbb7ad26d59cc",
+          "publishedAt": "2026-10-14T01:34:11.995Z",
+          "adopted": true,
+          "report": "接續了 GitHub 上 BELL 以外的 1 個提交；這些改動會在下一輪一起審閱。"
+        },
+        {
+          "id": "75d606f6",
+          "requestedAt": "2026-10-14T01:34:12.070Z",
+          "feedbackUrls": [
+            "https://github.com/test-owner/example/pull/1#discussion_r1"
+          ],
+          "note": "Only line two.",
+          "status": "published",
+          "parentCommit": "baf68f12704df60721bdfba9090cbb7ad26d59cc",
+          "report": "改了第二行。",
+          "addressed": [
+            {
+              "url": "https://github.com/test-owner/example/pull/1#discussion_r1",
+              "change": "照建議改寫第二行。"
+            }
+          ],
+          "notAddressed": [
+            {
+              "url": "",
+              "reason": "測試範圍需要維護者決定。"
+            }
+          ],
+          "commit": "ea0939dfd4ad02dccaf2b4cdc1ee474aef67d169",
+          "publishedAt": "2026-10-14T01:34:15.860Z"
+        },
+        {
+          "id": "4e46c8e3",
+          "kind": "sync",
+          "requestedAt": "2026-10-14T01:34:17.102Z",
+          "feedbackUrls": [],
+          "status": "review",
+          "parentCommit": "ea0939dfd4ad02dccaf2b4cdc1ee474aef67d169",
+          "mergeParent": "d9a066a9b47bf3bf012afb7e4e60b1544c2b1f52",
+          "previousBase": "b5e195293dde2dc1429c0f8c0b4e3b4208a023b8",
+          "conflicts": [],
+          "unresolved": []
+        }
+      ],
+      "reports": {
+        "followup": "{\"summary\":\"改了第二行。\",\"addressed\":[{\"url\":\"https://github.com/test-owner/example/pull/1#discussion_r1\",\"change\":\"照建議改寫第二行。\"}],\"notAddressed\":[{\"url\":\"\",\"reason\":\"測試範圍需要維護者決定。\"}],\"checks\":[{\"command\":\"npm test\",\"outcome\":\"exit 0\"}],\"commitMessage\":\"Polish line two\\n\\nAddress the review on hello.ts.\"}"
+      },
+      "efficiency": {
+        "policyVersion": "bell-ponytail-v1",
+        "mode": "lite",
+        "calls": 1,
+        "completedCalls": 1,
+        "failedCalls": 0,
+        "measuredCalls": 0,
+        "durationMs": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "byRole": {
+          "followup": {
+            "calls": 1,
+            "measuredCalls": 0,
+            "inputTokens": 0,
+            "cachedInputTokens": 0,
+            "outputTokens": 0,
+            "durationMs": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-unpublished-run",
+      "repoId": "ca809e1a-275b-4f4b-bf72-29c70f33ef2e",
+      "title": "Update hello",
+      "prompt": "Update the second line of hello.",
+      "status": "review",
+      "branch": "fix/unpublished1",
+      "baseBranch": "main",
+      "baseSha": "6a3738a8ef62184000b57a12fbb99a0b0f1cfa79",
+      "worktreePath": "/tmp/bell-upstream-state/state/worktrees/upstream-unpublished-run",
+      "createdAt": "2026-10-12T00:00:00.000Z",
+      "agents": [
+        {
+          "id": "sync",
+          "name": "Weave",
+          "role": "Merge conflicts",
+          "status": "failed",
+          "detail": "仍有衝突或已中斷"
+        }
+      ],
+      "logs": [
+        {
+          "time": "2026-10-14T01:34:19.746Z",
+          "agent": "user",
+          "message": "已同步到 main 最新版本（6a3738a），1 個檔案有衝突需要解決：hello.ts。"
+        },
+        {
+          "time": "2026-10-14T01:34:19.818Z",
+          "agent": "user",
+          "message": "要求 Agent 解決 1 個檔案的合併衝突：hello.ts。"
+        },
+        {
+          "time": "2026-10-14T01:34:19.818Z",
+          "agent": "sync",
+          "message": "Weave 開始工作。模型：Codex CLI 預設（未記錄模型）；推理：模型預設。",
+          "kind": "status"
+        },
+        {
+          "time": "2026-10-14T01:34:20.320Z",
+          "agent": "system",
+          "message": "Agent 處理後仍有衝突標記：hello.ts；可以自行修改，或再請 Agent 處理。"
+        }
+      ],
+      "draft": {
+        "title": "fix: update hello",
+        "body": "Changes the second line of hello."
+      },
+      "reviewedFiles": [],
+      "reviewedFingerprints": {},
+      "explanations": {
+        "hello.ts": {
+          "fingerprint": "2ac00f7c6a23ac9ec94f01f29c96f9cd03535c0958394329b046059c9171d00e",
+          "status": "pending"
+        }
+      },
+      "sync": {
+        "at": "2026-10-14T01:34:19.461Z",
+        "from": "b5e195293dde2dc1429c0f8c0b4e3b4208a023b8",
+        "to": "6a3738a8ef62184000b57a12fbb99a0b0f1cfa79",
+        "snapshot": "e758e091d9ad501554e92dc5bfc9c271be482d3f",
+        "conflicts": [
+          "hello.ts"
+        ],
+        "reviewedFingerprints": {
+          "hello.ts": "a9558c55ce0d5c1dca746d731124a30136586e11e7d39e388b58478522d19127"
+        },
+        "unresolved": [
+          "hello.ts"
+        ],
+        "resolving": false,
+        "report": "保留目標分支的文字，再加上這次的修改。\n仍有衝突標記：hello.ts。",
+        "resolutions": [
+          {
+            "path": "hello.ts",
+            "resolution": "兩邊的改動合併成一行。"
+          }
+        ]
+      },
+      "reports": {
+        "sync": "{\"summary\":\"保留目標分支的文字，再加上這次的修改。\",\"files\":[{\"path\":\"hello.ts\",\"resolution\":\"兩邊的改動合併成一行。\"}]}"
+      },
+      "efficiency": {
+        "policyVersion": "bell-ponytail-v1",
+        "mode": "lite",
+        "calls": 1,
+        "completedCalls": 1,
+        "failedCalls": 0,
+        "measuredCalls": 0,
+        "durationMs": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "byRole": {
+          "sync": {
+            "calls": 1,
+            "measuredCalls": 0,
+            "inputTokens": 0,
+            "cachedInputTokens": 0,
+            "outputTokens": 0,
+            "durationMs": 0
+          }
+        }
+      }
+    }
+  ]
+}

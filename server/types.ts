@@ -18,9 +18,7 @@ export interface Run extends RunCore {
   baseSha: string;
   worktreePath: string;
   reviewedFingerprints: Record<string, string>;
-  publishing?: boolean;
   publishCommit?: string;
-  headRepository?: string;
 }
 
 /** What GET /api/runs returns for each run (see shared/runs.ts). */

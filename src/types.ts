@@ -7,7 +7,12 @@ import type { Repository, RunCore } from "../shared/types";
 
 export type { ChatMessage } from "../shared/chat";
 export type { Agent, RunLogEntry, RunStatus } from "../shared/types";
-export type Repo = Repository;
+
+/** A repository as the API lists it. */
+export interface Repo extends Repository {
+  /** Whether BELL owns the clone and may update it; computed by the API, not stored. */
+  updatable?: boolean;
+}
 
 /** The client run; the demo run has no baseSha, worktreePath or reviewedFingerprints. */
 export interface Run extends RunCore {}

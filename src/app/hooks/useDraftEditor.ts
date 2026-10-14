@@ -10,6 +10,7 @@ import { api, send } from "../../api";
 import type { Run } from "../../types";
 import { validBranchName, type DraftProposal } from "../../../shared/drafts";
 import type { DraftCheck, DraftTaskItem } from "../../../shared/draft-checks";
+import { activeFollowUp } from "../../../shared/followups";
 import type { Notify } from "../AppShell";
 
 /** The draft checks bring a Markdown parser, so they load beside the first screen. */
@@ -111,12 +112,19 @@ export function useDraftEditor({
         ? `不能用目標分支 ${run.baseBranch}，否則會直接推送到目標分支而不是建立 PR。`
         : "";
   const publishBranchInvalid = !!publishBranchError;
-  const publishChecks: DraftCheck[] =
-    draftChecks?.draftPreflight({
-      body: run.draft.body,
-      sources: draftSources,
-      proposalBody,
-    }) ?? [];
+  // A follow-up round pushes only a commit: the PR title and description stay.
+  const followUp = activeFollowUp(run.followUps);
+  const commitMessageUnfinished =
+    !!followUp &&
+    (!draftCommitMessage.trim() ||
+      !!draftChecks?.findDraftPlaceholders(draftCommitMessage).length);
+  const publishChecks: DraftCheck[] = followUp
+    ? []
+    : (draftChecks?.draftPreflight({
+        body: run.draft.body,
+        sources: draftSources,
+        proposalBody,
+      }) ?? []);
   const publishBlocked = publishChecks.find((check) => check.kind === "block");
   const publishConfirmations = publishChecks.filter(
     (check) => check.kind === "confirm",
@@ -270,6 +278,8 @@ export function useDraftEditor({
     draftIsProposal,
     publishBranchError,
     publishBranchInvalid,
+    followUp,
+    commitMessageUnfinished,
     publishBlocked,
     publishConfirmations,
     commitMessageSuggestion,

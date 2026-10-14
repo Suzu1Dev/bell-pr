@@ -1,10 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { defaultContributionSettings } from "../shared/insights.js";
+import { activeFollowUp } from "../shared/followups.js";
+import { summarizeRun } from "../shared/runs.js";
 import { ProjectInsightsService } from "./insights.js";
 import { git } from "./process.js";
 import { Store } from "./store.js";
@@ -156,6 +158,91 @@ test("重新審查途中當機時，已完成工作的審查者會被標記失�
   assert.equal(loaded.agents[1].status, "failed");
   assert.match(loaded.agents[1].detail, /重新審查已中斷/);
   assert.equal(loaded.agents[2].status, "waiting");
+});
+
+/**
+ * A state.json written by the upstream repository at cdcfb06, by its own
+ * Workbench through a stand-in GitHub: an updated clone, an unpublished run
+ * synced with a conflict the agent left behind, and a published run with a
+ * taken-over GitHub commit, a pushed review round and an open sync round.
+ */
+const upstreamState = () =>
+  readFile(
+    path.join(import.meta.dirname, "fixtures", "state-upstream-cdcfb06.json"),
+    "utf8",
+  );
+
+test("a state.json written by upstream cdcfb06 with follow-up rounds and syncs loads and saves unchanged", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const written = await upstreamState();
+  await writeFile(path.join(directory, "state.json"), written);
+  const store = new Store(directory);
+  await store.initialize();
+  // Nothing was interrupted, so loading changes nothing.
+  assert.deepEqual(store.data, JSON.parse(written));
+  const [repo] = store.data.repos;
+  assert.ok(repo.updatedAt);
+  const [published, unpublished] = store.data.runs;
+  assert.deepEqual(
+    published.followUps?.map((round) => [
+      round.kind ?? "review",
+      round.status,
+      !!round.adopted,
+    ]),
+    [
+      ["sync", "published", true],
+      ["review", "published", false],
+      ["sync", "review", false],
+    ],
+  );
+  const round = activeFollowUp(published.followUps);
+  assert.equal(round?.mergeParent, published.baseSha);
+  assert.equal(round?.parentCommit, published.publishCommit);
+  assert.equal(unpublished.sync?.to, unpublished.baseSha);
+  assert.deepEqual(unpublished.sync?.unresolved, ["hello.ts"]);
+  // The run list leaves the round history and the sync to the open run.
+  for (const run of store.data.runs) {
+    const summary = summarizeRun(run) as Record<string, unknown>;
+    assert.equal("followUps" in summary, false);
+    assert.equal("sync" in summary, false);
+  }
+  // This build writes it back field for field.
+  await store.save();
+  const reopened = new Store(directory);
+  await reopened.initialize();
+  assert.deepEqual(reopened.data, JSON.parse(written));
+});
+
+test("an upstream state saved during a follow-up round or a conflict resolution reopens in review", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const data = JSON.parse(await upstreamState()) as Database;
+  const [published, unpublished] = data.runs;
+  // As upstream saves a run while its agent works: the open round becomes
+  // a review round whose agent is still editing.
+  published.status = "running";
+  published.agents[0].status = "running";
+  const round = published.followUps!.at(-1)!;
+  round.status = "running";
+  delete round.kind;
+  unpublished.status = "running";
+  unpublished.agents[0].status = "running";
+  unpublished.sync!.resolving = true;
+  await writeFile(path.join(directory, "state.json"), JSON.stringify(data));
+  const store = new Store(directory);
+  await store.initialize();
+  const [pullRequest, synced] = store.data.runs;
+  assert.equal(pullRequest.status, "review");
+  assert.equal(pullRequest.prUrl, published.prUrl);
+  assert.equal(pullRequest.followUps!.at(-1)!.status, "review");
+  assert.match(pullRequest.followUps!.at(-1)!.error!, /服務重新啟動/);
+  assert.equal(pullRequest.draft.commitMessage, undefined);
+  assert.equal(pullRequest.agents[0].status, "failed");
+  assert.equal(synced.status, "review");
+  assert.equal(synced.sync!.resolving, false);
+  assert.match(synced.sync!.report!, /服務重新啟動/);
+  assert.equal(synced.agents[0].status, "failed");
 });
 
 test("既有 insights 快取檔可由 ProjectInsightsService 讀取", async (t) => {

@@ -24,6 +24,7 @@ import type { Tab } from "../app/AppShell";
 import { statusLabels } from "../app/labels";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
 import type { RunActions } from "../app/hooks/useRunActions";
+import type { RunRounds } from "../app/hooks/useRunRounds";
 import { ActivityTab } from "./ActivityTab";
 import { ChangesTab } from "./ChangesTab";
 import { DraftTab } from "./DraftTab";
@@ -82,6 +83,10 @@ interface WorkspacePageProps {
   chooseRecommendation: (idea: ContributionRecommendation) => void;
   draft: DraftEditor;
   actions: RunActions;
+  rounds: RunRounds;
+  /** Updates BELL's clone to the latest default branch; absent for local imports and the demo. */
+  onUpdateRepo?: () => void;
+  updatingRepo: boolean;
 }
 
 /**
@@ -133,8 +138,12 @@ export function WorkspacePage({
   chooseRecommendation,
   draft,
   actions,
+  rounds,
+  onUpdateRepo,
+  updatingRepo,
 }: WorkspacePageProps) {
-  const { draftDirty, draftUnfinished } = draft;
+  const { draftDirty, draftUnfinished, followUp, commitMessageUnfinished } =
+    draft;
   const { approve } = actions;
   // In reading mode the one-row heading clips the repo/branch text, so the
   // export link moves up next to 新增貢獻 where it stays visible and reachable.
@@ -371,6 +380,8 @@ export function WorkspacePage({
               intelligence={intelligence}
               chooseRecommendation={chooseRecommendation}
               setTab={setTab}
+              onUpdateRepo={onUpdateRepo}
+              updatingRepo={updatingRepo}
             />
           )}
           {tab === "changes" && (
@@ -438,6 +449,7 @@ export function WorkspacePage({
               setTab={setTab}
               draft={draft}
               actions={actions}
+              rounds={rounds}
             />
           )}
         </div>
@@ -479,7 +491,8 @@ export function WorkspacePage({
                   active ||
                   busy ||
                   draftDirty ||
-                  (!demo && !!draftUnfinished) ||
+                  (!demo &&
+                    (followUp ? commitMessageUnfinished : !!draftUnfinished)) ||
                   !["review", "approved"].includes(run.status)
                 }
                 title={
@@ -487,14 +500,18 @@ export function WorkspacePage({
                     ? "請先逐一勾選所有檔案的「已審閱」"
                     : draftDirty
                       ? "請先儲存 PR 草稿"
-                      : !demo && draftUnfinished
-                        ? "PR 說明還有待填寫的內容，請先改成事實或刪除"
-                        : "確認變更並預覽送出"
+                      : followUp && commitMessageUnfinished
+                        ? "請先填好這輪修正的提交訊息"
+                        : !demo && draftUnfinished
+                          ? "PR 說明還有待填寫的內容，請先改成事實或刪除"
+                          : followUp
+                            ? "確認這輪修正並預覽推送"
+                            : "確認變更並預覽送出"
                 }
                 onClick={approve}
               >
                 <Check size={16} />
-                確認並準備 PR
+                {followUp ? "確認並準備推送" : "確認並準備 PR"}
                 <ChevronRight size={15} />
               </button>
             )}

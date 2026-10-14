@@ -1,6 +1,7 @@
 /**
  * The repositories BELL works on: importing a GitHub clone or a local
- * checkout, and the Git worktree each run works in.
+ * checkout, updating BELL's own clone, the latest commit of a branch, and
+ * the Git worktree each run works in.
  */
 import { randomUUID } from "node:crypto";
 import { mkdir, realpath } from "node:fs/promises";
@@ -10,6 +11,7 @@ import { parseGitHubSource } from "./git.js";
 import { AppError, type Repository, type Run } from "./types.js";
 import type { WorkbenchContext } from "./workbench.js";
 
+const now = () => new Date().toISOString();
 const newId = () => randomUUID();
 const json = <T>(value: string) => JSON.parse(value) as T;
 /** Git network options: credentials come from gh, and local file and ext transports are refused. */
@@ -154,6 +156,100 @@ export async function importRepository(
 }
 
 /**
+ * BELL's own clone of a GitHub repository, which it may update. A local
+ * import is the person's checkout and is never changed.
+ */
+export function managedClone(directory: string, repo: Repository) {
+  return (
+    !!repo.url &&
+    repo.path.startsWith(path.join(directory, "repositories") + path.sep)
+  );
+}
+
+/**
+ * The latest commit of `branch`: fetched from GitHub, or the local branch
+ * for a repository without one. FETCH_HEAD is shared by the clone, so
+ * callers hold the repository lock.
+ */
+export async function fetchBranchCommit(
+  repo: Repository,
+  branch: string,
+  signal?: AbortSignal,
+) {
+  if (!repo.url)
+    return (
+      await git(
+        repo.path,
+        ["rev-parse", "--verify", `refs/heads/${branch}^{commit}`],
+        { signal },
+      )
+    ).stdout.trim();
+  await git(
+    repo.path,
+    [
+      ...networkConfig,
+      "fetch",
+      "--no-tags",
+      "--no-recurse-submodules",
+      `${repo.url}.git`,
+      `refs/heads/${branch}`,
+    ],
+    { signal, timeoutMs: 120_000 },
+  );
+  return (
+    await git(repo.path, ["rev-parse", "--verify", "FETCH_HEAD^{commit}"], {
+      signal,
+    })
+  ).stdout.trim();
+}
+
+/**
+ * Moves BELL's clone to the latest default branch, so the project overview
+ * and analysis describe the current project. New runs fetch the latest
+ * base on their own; existing runs keep their worktrees.
+ */
+export async function updateRepository(ctx: WorkbenchContext, id: string) {
+  const repo = ctx.repo(id);
+  if (!managedClone(ctx.store.directory, repo))
+    throw new AppError(
+      "這是你本機的 repository，BELL 不會更動它；請在終端機自行 git pull 後再重新分析。",
+      409,
+    );
+  return ctx.lock(`repository:${repo.id}`, async () => {
+    const from = (
+      await git(repo.path, ["rev-parse", "--verify", "HEAD"])
+    ).stdout.trim();
+    const to = await fetchBranchCommit(repo, repo.defaultBranch);
+    if (
+      (
+        await git(repo.path, [
+          "status",
+          "--porcelain",
+          "--untracked-files=no",
+        ])
+      ).stdout.trim()
+    )
+      throw new AppError(
+        "BELL 的專案副本有未預期的修改，已停止更新；請檢查後再試。",
+        409,
+      );
+    if (from !== to)
+      // An ignored local file in the way stops the update instead of being overwritten.
+      await git(repo.path, [
+        "checkout",
+        "-q",
+        "--no-overwrite-ignore",
+        "-B",
+        repo.defaultBranch,
+        to,
+      ]);
+    repo.updatedAt = now();
+    await ctx.store.save();
+    return { repo, from, to, updated: from !== to };
+  });
+}
+
+/**
  * Pins the run's base commit, fetched from GitHub when the repository has a
  * remote, and adds the run's worktree on its own branch. The caller holds the
  * repository lock.
@@ -163,39 +259,7 @@ export async function createRunWorktree(
   repo: Repository,
   signal: AbortSignal,
 ) {
-  if (repo.url) {
-    await git(
-      repo.path,
-      [
-        ...networkConfig,
-        "fetch",
-        "--no-tags",
-        "--no-recurse-submodules",
-        `${repo.url}.git`,
-        `refs/heads/${run.baseBranch}`,
-      ],
-      { signal, timeoutMs: 120_000 },
-    );
-    run.baseSha = (
-      await git(
-        repo.path,
-        ["rev-parse", "--verify", "FETCH_HEAD^{commit}"],
-        { signal },
-      )
-    ).stdout.trim();
-  } else {
-    run.baseSha = (
-      await git(
-        repo.path,
-        [
-          "rev-parse",
-          "--verify",
-          `refs/heads/${run.baseBranch}^{commit}`,
-        ],
-        { signal },
-      )
-    ).stdout.trim();
-  }
+  run.baseSha = await fetchBranchCommit(repo, run.baseBranch, signal);
   await mkdir(path.dirname(run.worktreePath), {
     recursive: true,
     mode: 0o700,
