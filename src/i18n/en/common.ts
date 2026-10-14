@@ -51,6 +51,8 @@ const common = {
     retry: "Retry",
     learnMore: "Learn more",
   },
+  /** Marks an optional form field, next to its label. */
+  optional: "Optional",
   language: { label: "Language" },
   /** Each language in its own script (autonyms), the same in every locale. */
   languageNames: {

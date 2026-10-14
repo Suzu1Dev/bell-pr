@@ -1,1 +1,70 @@
-export default {};
+/**
+ * Dialogs (English): the dialog frame, the guide, the list of every run and
+ * the new-task dialog.
+ */
+import { formatters } from "../../../shared/i18n/locale";
+
+const { plural } = formatters("en");
+
+const modals = {
+  close: "Close dialog",
+  help: {
+    title: "From an idea to your next PR.",
+    subtitle: "Four steps that connect building, reviewing and learning.",
+    steps: {
+      import: {
+        title: "Bring in a repository",
+        text: "Import a GitHub link or a local path and pick the project to contribute to.",
+      },
+      team: {
+        title: "Direct the agent team",
+        text: "Describe what you need clearly, so the planning, building and review roles can split the work.",
+      },
+      understand: {
+        title: "Understand every change",
+        text: "Switch files to read the diff; click a line number, or hold Shift to select a block of code, and ask the agent. Mark the file as reviewed once you understand it.",
+      },
+      submit: {
+        title: "Edit and submit the PR",
+        text: "Adjust the title and description, save the draft, and confirm the submission once every file is reviewed.",
+      },
+    },
+    start: "Start exploring",
+  },
+  runs: {
+    title: "Every idea has its progress.",
+    subtitle: "Switch tasks to see their status, code changes and PR draft.",
+    demo: "Interactive demo",
+    newContribution: "New contribution",
+  },
+  newTask: {
+    title: "Hand your idea to your agent team.",
+    subtitle: "Describe what you want to improve and how it should behave when it is done.",
+    repo: "Target repository",
+    chooseRepo: "Choose a repository",
+    demoRepo: ({ name }: { name: string }) => `${name} (demo)`,
+    importOther: "Import another project",
+    recommendations: "See AI-recommended directions first",
+    demoNote:
+      "Demo settings can be changed freely; no real agent starts. Import your repository to start building.",
+    loadingSettings: "Loading this project's contribution settings…",
+    reloadSettings: "Reload project settings",
+    saveDefault: "Save as default settings",
+    taskName: "Task name",
+    taskPlaceholder: "For example: add smart retries to the API client",
+    goal: "What do you want to get done?",
+    goalPlaceholder:
+      "Describe the need, related files, expected behavior and how to verify it…",
+    lead: "Team lead",
+    teammates: ({ count }: { count: number }) =>
+      plural(count) === "one" ? `${count} teammate` : `${count} teammates`,
+    reviewers: "Reviewer + Test analyst",
+    usage: ({ provider }: { provider: string }) =>
+      `The task runs with the ${provider} CLI signed in on this computer and counts against that account's usage. When it finishes, it waits for your review.`,
+    saveDemo: "Save demo direction",
+    planFirst: "Generate the team plan",
+    start: "Start the agent team",
+  },
+};
+
+export default modals;

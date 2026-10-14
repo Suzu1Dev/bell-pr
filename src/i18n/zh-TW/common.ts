@@ -45,6 +45,7 @@ const m: Translation<typeof en> = {
     retry: "重試",
     learnMore: "了解更多",
   },
+  optional: "選填",
   language: { label: "語言" },
   languageNames: {
     en: "English",
