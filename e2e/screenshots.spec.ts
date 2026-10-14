@@ -20,8 +20,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
 import { htmlLang, locales, type Locale } from "../shared/i18n/locale";
-import { settingsSections } from "../src/settings/sections";
 import { expectNoOverflow } from "./helpers/overflow";
+import { routes, sampleRoutes } from "./helpers/routes";
 import { launchServer, type LaunchedServer } from "./start-server.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -29,29 +29,6 @@ const outputRoot =
   process.env.BELLPR_SCREENSHOTS === "docs"
     ? path.join(root, "docs", "images")
     : path.join(root, "e2e", "output", "screenshots");
-
-/**
- * Every page of the app, named after the file it is saved to.
- * e2e/responsive.spec.ts checks the same pages at more widths and repeats
- * this list (a spec cannot import another): keep the two in step.
- */
-export const screenshotRoutes: { name: string; hash: string }[] = [
-  { name: "home", hash: "#/home" },
-  { name: "run-overview", hash: "#/runs/demo-run/overview" },
-  { name: "run-changes", hash: "#/runs/demo-run/changes" },
-  { name: "run-activity", hash: "#/runs/demo-run/activity" },
-  { name: "run-draft", hash: "#/runs/demo-run/draft" },
-  { name: "repos", hash: "#/repos" },
-  { name: "repo-overview", hash: "#/repos/demo-repo" },
-  { name: "discover", hash: "#/discover" },
-  { name: "team", hash: "#/team" },
-  { name: "learning", hash: "#/learning" },
-  ...settingsSections.map((section) => ({
-    name: `settings-${section}`,
-    hash: `#/settings/${section}`,
-  })),
-  { name: "about", hash: "#/about" },
-];
 
 export const screenshotWidths = [1280, 1440, 390] as const;
 /**
@@ -66,8 +43,6 @@ const heights: Record<(typeof screenshotWidths | typeof checkedWidths)[number], 
   768: 1024,
   1024: 768,
 };
-/** The routes that show the sample project, so present=1 shows its badge. */
-const sampleRoutes = /^(run-.+|repo-overview)$/;
 
 /** Relative times ("3 days ago") read the same on every run. */
 const frozenAt = new Date("2026-10-14T09:00:00Z");
@@ -162,7 +137,7 @@ test.afterAll(async () => {
 test.describe.configure({ mode: "parallel" });
 
 for (const locale of locales)
-  for (const route of screenshotRoutes)
+  for (const route of routes)
     test(`${route.name} in ${locale} fits and is captured at every width`, async ({ browser }) => {
       const context = await browser.newContext({
         baseURL: server!.baseURL,

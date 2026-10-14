@@ -21,31 +21,9 @@ import os from "node:os";
 import path from "node:path";
 import { expect, request, test, type Browser, type Page } from "@playwright/test";
 import { htmlLang, locales, type Locale } from "../shared/i18n/locale";
-import { settingsSections } from "../src/settings/sections";
 import { findOverflow } from "./helpers/overflow";
+import { routes, sampleRoutes } from "./helpers/routes";
 import { launchServer, type LaunchedServer } from "./start-server.mjs";
-
-/**
- * The routes of e2e/screenshots.spec.ts. A spec cannot import another
- * spec, so the list is repeated here: keep the two in step.
- */
-const routes: { name: string; hash: string }[] = [
-  { name: "home", hash: "#/home" },
-  { name: "run-overview", hash: "#/runs/demo-run/overview" },
-  { name: "run-changes", hash: "#/runs/demo-run/changes" },
-  { name: "run-activity", hash: "#/runs/demo-run/activity" },
-  { name: "run-draft", hash: "#/runs/demo-run/draft" },
-  { name: "repos", hash: "#/repos" },
-  { name: "repo-overview", hash: "#/repos/demo-repo" },
-  { name: "discover", hash: "#/discover" },
-  { name: "team", hash: "#/team" },
-  { name: "learning", hash: "#/learning" },
-  ...settingsSections.map((section) => ({
-    name: `settings-${section}`,
-    hash: `#/settings/${section}`,
-  })),
-  { name: "about", hash: "#/about" },
-];
 
 /**
  * A small and a common phone, a tablet, a small laptop, the widest view
@@ -59,8 +37,6 @@ const viewports = [
   { width: 1100, height: 800 },
   { width: 1280, height: 800 },
 ];
-/** The routes that show the sample project, so present=1 shows its badge. */
-const sampleRoutes = /^(run-.+|repo-overview)$/;
 /** The run's tabs, whose panes take another layout beside the rail. */
 const runRoutes = routes.filter((route) => route.name.startsWith("run-"));
 /** The widths at which the sidebar collapses to a rail (above 760 px). */
