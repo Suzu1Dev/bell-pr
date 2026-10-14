@@ -347,17 +347,24 @@ async function tailLines(file: string, count: number): Promise<string[]> {
     const { size } = await handle.stat();
     const chunkSize = 64 * 1024;
     let position = size;
-    let text = "";
+    // Bytes, decoded once at the end: a chunk boundary may split a
+    // multi-byte character.
+    const chunks: Buffer[] = [];
+    let newlines = 0;
     while (position > 0) {
       const length = Math.min(chunkSize, position);
       position -= length;
       const buffer = Buffer.alloc(length);
       await handle.read(buffer, 0, length, position);
-      text = buffer.toString("utf8") + text;
+      chunks.unshift(buffer);
+      for (const byte of buffer) if (byte === 0x0a) newlines++;
       // One extra line: the first may be cut in the middle.
-      if (text.split("\n").length > count + 1) break;
+      if (newlines > count) break;
     }
-    const lines = text.split("\n").filter(Boolean);
+    const lines = Buffer.concat(chunks)
+      .toString("utf8")
+      .split("\n")
+      .filter(Boolean);
     if (position > 0) lines.shift();
     return lines.slice(-count);
   } finally {

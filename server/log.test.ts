@@ -203,6 +203,23 @@ test("recentLogLines returns the newest lines across daily files, oldest first",
   assert.deepEqual(await recentLogLines(path.join(directory, "missing")), []);
 });
 
+test("recentLogLines keeps characters whole where a read chunk ends inside one", async (t) => {
+  const { directory, logs, cleanup } = await logDirectory();
+  t.after(cleanup);
+  await mkdir(logs);
+  // Three-byte characters, so 64 KiB chunk boundaries fall inside some.
+  const lines = Array.from({ length: 400 }, (_, index) =>
+    JSON.stringify({ msg: `${index}-${"語".repeat(100)}` }),
+  );
+  await writeFile(
+    path.join(logs, "bell-pr-2026-10-14.log"),
+    `${lines.join("\n")}\n`,
+  );
+  const recent = await recentLogLines(directory, 300);
+  assert.equal(recent.length, 300);
+  assert.deepEqual(recent, lines.slice(-300));
+});
+
 test("a run's lifecycle, its agent processes and a rejected answer are logged as events without the prompt", async (t) => {
   const { directory } = await logDirectory();
   const repository = path.join(directory, "repo");
