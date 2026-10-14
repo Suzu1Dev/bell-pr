@@ -80,7 +80,7 @@ export function parseFollowUpResult(
   try {
     result = resultSchema.parse(JSON.parse(jsonText(answer)));
   } catch {
-    throw new AppError("Agent 回傳的修正結果格式不完整", 422);
+    throw new AppError((m) => m.run.followUp.answerIncomplete, 422);
   }
   const known = (url: string) => url === "" || selectedUrls.includes(url);
   const commitMessage = result.commitMessage

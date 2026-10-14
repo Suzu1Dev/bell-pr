@@ -35,15 +35,11 @@ import { runAgent } from "./run-executor.js";
 import { contributionContext, teamBoundaries } from "./prompts/team.js";
 import { conflictPrompt } from "./prompts/sync.js";
 import { log } from "./log.js";
+import { shuttingDown, sm } from "./i18n/index.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
-/** A first publish that stopped after making its commit, which may already be on GitHub. */
-export const partlyPublished =
-  "先前的發佈已建立提交，可能已推送到 GitHub，因此不能再同步或復原同步；請從最新版本建立新工作。";
-const unmarkedConflicts = (files: string[]) =>
-  `這些檔案的衝突無法用衝突標記表示（一邊刪除、另一邊修改，或兩邊都改了二進位檔），BELL 不會替你選邊：${files.join("、")}。`;
 /** What a sync records about its conflicts, on a run or on a PR's sync round. */
 type ConflictHolder = {
   conflicts: string[];
@@ -73,7 +69,7 @@ export function runBusy(ctx: WorkbenchContext, id: string) {
  * block approval until resolved, and the sync can be undone.
  */
 export async function syncRun(ctx: WorkbenchContext, id: string) {
-  if (ctx.stopping()) throw new AppError("服務正在關閉，請稍後重試。", 503);
+  if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     if (run.prUrl) return syncPublishedRun(ctx, run);
@@ -81,29 +77,24 @@ export async function syncRun(ctx: WorkbenchContext, id: string) {
       !["review", "approved", "awaiting_plan"].includes(run.status) ||
       run.publishing
     )
-      throw new AppError(
-        "只有審閱中、已核准或等待計畫核准的工作可以同步到最新目標分支。",
-        409,
-      );
-    if (runBusy(ctx, id))
-      throw new AppError(
-        "這個工作還有 Agent、審查或解說在進行；請等它完成再同步。",
-        409,
-      );
-    if (run.publishCommit) throw new AppError(partlyPublished, 409);
+      throw new AppError((m) => m.run.sync.notAllowed, 409);
+    if (runBusy(ctx, id)) throw new AppError((m) => m.run.sync.busy, 409);
+    // A first publish that stopped after its commit, which may be on GitHub.
+    if (run.publishCommit)
+      throw new AppError((m) => m.run.sync.partlyPublished, 409);
     const repo = ctx.repo(run.repoId);
     const head = (
       await git(run.worktreePath, ["rev-parse", "HEAD"])
     ).stdout.trim();
     if (head !== run.baseSha)
-      throw new AppError("工作分支的提交和記錄的基準不一致，已停止同步。", 409);
+      throw new AppError((m) => m.run.sync.baseMismatch, 409);
     // The last sync's conflicts are tracked only until the next one.
     await assertConflictsResolved(run);
     const target = await ctx.lock(`repository:${repo.id}`, () =>
       fetchBranchCommit(repo, run.baseBranch),
     );
     if (target === run.baseSha) {
-      ctx.log(run, "user", `已確認 ${run.baseBranch} 沒有新提交，工作已是最新。`);
+      ctx.log(run, "user", sm().run.sync.upToDate({ branch: run.baseBranch }));
       await ctx.store.save();
       return { run, updated: false, conflicts: [] as string[] };
     }
@@ -124,7 +115,7 @@ export async function syncRun(ctx: WorkbenchContext, id: string) {
     );
     if (unmarked.length)
       throw new AppError(
-        `${unmarkedConflicts(unmarked)}工作沒有變動；可以先把這次對它們的修改或刪除還原，同步後再重做。`,
+        (m) => m.run.sync.unmarkedRun({ files: unmarked }),
         409,
       );
     // Keeps the snapshot reachable for undo, outside every branch.
@@ -159,9 +150,11 @@ export async function syncRun(ctx: WorkbenchContext, id: string) {
     ctx.log(
       run,
       "user",
-      merged.conflicts.length
-        ? `已同步到 ${run.baseBranch} 最新版本（${target.slice(0, 7)}），${merged.conflicts.length} 個檔案有衝突需要解決：${merged.conflicts.join("、")}。`
-        : `已同步到 ${run.baseBranch} 最新版本（${target.slice(0, 7)}），沒有衝突；改到的檔案需要重新審閱。`,
+      sm().run.sync.synced({
+        branch: run.baseBranch,
+        commit: target.slice(0, 7),
+        conflicts: merged.conflicts,
+      }),
     );
     await ctx.store.save();
     return { run, updated: true, conflicts: merged.conflicts };
@@ -180,22 +173,15 @@ async function syncPublishedRun(ctx: WorkbenchContext, run: Run) {
     !run.publishCommit ||
     !run.headRepository
   )
-    throw new AppError("只有已送出的 PR 可以同步目標分支。", 409);
+    throw new AppError((m) => m.run.sync.prOnly, 409);
   if (activeFollowUp(run.followUps))
-    throw new AppError("這個 PR 已有一輪修正在進行；完成或放棄後再同步。", 409);
-  if (runBusy(ctx, run.id))
-    throw new AppError(
-      "這個工作還有 Agent、審查或解說在進行；請等它完成再同步。",
-      409,
-    );
+    throw new AppError((m) => m.run.sync.roundOpen, 409);
+  if (runBusy(ctx, run.id)) throw new AppError((m) => m.run.sync.busy, 409);
   const head = (
     await git(run.worktreePath, ["rev-parse", "HEAD"])
   ).stdout.trim();
   if (head !== run.publishCommit || (await worktreeDirty(run)))
-    throw new AppError(
-      "工作目錄和已推送的 PR 內容不一致；請先還原工作目錄裡的修改再同步。",
-      409,
-    );
+    throw new AppError((m) => m.run.sync.prCheckoutDiffers, 409);
   await adoptRemoteCommits(ctx, run);
   assertRemoteHead(run, await remoteBranchHead(run), run.publishCommit);
   const repo = ctx.repo(run.repoId);
@@ -211,7 +197,7 @@ async function syncPublishedRun(ctx: WorkbenchContext, run: Run) {
       )
     ).code === 0;
   if (contained) {
-    ctx.log(run, "user", `已確認 PR 已包含 ${run.baseBranch} 的最新版本。`);
+    ctx.log(run, "user", sm().run.sync.prUpToDate({ branch: run.baseBranch }));
     await ctx.store.save();
     return { run, updated: false, conflicts: [] as string[] };
   }
@@ -223,7 +209,8 @@ async function syncPublishedRun(ctx: WorkbenchContext, run: Run) {
   );
   if (unmarked.length)
     throw new AppError(
-      `${unmarkedConflicts(unmarked)}PR 沒有變動；請在本機用 git 把 ${run.baseBranch} 合併進 PR 分支並推送，BELL 之後會接續這些提交。`,
+      (m) =>
+        m.run.sync.unmarkedPr({ files: unmarked, branch: run.baseBranch }),
       409,
     );
   const targetTree = (
@@ -232,7 +219,7 @@ async function syncPublishedRun(ctx: WorkbenchContext, run: Run) {
   // An empty round could never be approved, and the PR would change nothing.
   if (merged.tree === targetTree)
     throw new AppError(
-      `${run.baseBranch} 已經包含這個 PR 的全部修改，合併後沒有差異，所以沒有同步；PR 沒有變動，可以考慮關閉它。`,
+      (m) => m.run.sync.nothingToMerge({ branch: run.baseBranch }),
       409,
     );
   // HEAD stays at the PR head, the parent of the merge commit. The index
@@ -268,9 +255,11 @@ async function syncPublishedRun(ctx: WorkbenchContext, run: Run) {
   ctx.log(
     run,
     "user",
-    merged.conflicts.length
-      ? `已把 ${run.baseBranch} 最新版本（${target.slice(0, 7)}）合併進 PR，${merged.conflicts.length} 個檔案有衝突需要解決：${merged.conflicts.join("、")}。`
-      : `已把 ${run.baseBranch} 最新版本（${target.slice(0, 7)}）合併進 PR，沒有衝突；審閱後會推送一個合併 commit。`,
+    sm().run.sync.prSynced({
+      branch: run.baseBranch,
+      commit: target.slice(0, 7),
+      conflicts: merged.conflicts,
+    }),
   );
   await ctx.store.save();
   return { run, updated: true, conflicts: merged.conflicts };
@@ -287,19 +276,16 @@ export async function undoSync(ctx: WorkbenchContext, id: string) {
       run.publishing ||
       !["review", "approved", "awaiting_plan"].includes(run.status)
     )
-      throw new AppError("目前沒有可以復原的同步。", 409);
-    if (runBusy(ctx, id))
-      throw new AppError(
-        "這個工作還有 Agent、審查或解說在進行；請等它完成再復原。",
-        409,
-      );
-    if (run.publishCommit) throw new AppError(partlyPublished, 409);
+      throw new AppError((m) => m.run.sync.nothingToUndo, 409);
+    if (runBusy(ctx, id)) throw new AppError((m) => m.run.sync.busyUndo, 409);
+    if (run.publishCommit)
+      throw new AppError((m) => m.run.sync.partlyPublished, 409);
     await git(run.worktreePath, ["rev-parse", "--verify", `${sync.snapshot}^{commit}`]);
     const head = (
       await git(run.worktreePath, ["rev-parse", "HEAD"])
     ).stdout.trim();
     if (head !== run.baseSha)
-      throw new AppError("工作分支的提交和記錄的基準不一致，已停止復原。", 409);
+      throw new AppError((m) => m.run.sync.baseMismatchUndo, 409);
     await git(run.worktreePath, [
       "update-ref",
       `refs/heads/${run.branch}`,
@@ -315,7 +301,7 @@ export async function undoSync(ctx: WorkbenchContext, id: string) {
     if (run.status === "approved") run.status = "review";
     delete run.approvedFingerprint;
     await ctx.diff(id);
-    ctx.log(run, "user", "已復原同步，工作回到同步前的內容與基準。");
+    ctx.log(run, "user", sm().run.sync.undone);
     await ctx.store.save();
     return run;
   });
@@ -327,7 +313,7 @@ export async function undoSync(ctx: WorkbenchContext, id: string) {
  * run returns to review either way, so the person reviews the result.
  */
 export async function resolveConflicts(ctx: WorkbenchContext, id: string) {
-  if (ctx.stopping()) throw new AppError("服務正在關閉，請稍後重試。", 503);
+  if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     const target = conflictHolder(run);
@@ -336,23 +322,20 @@ export async function resolveConflicts(ctx: WorkbenchContext, id: string) {
       run.publishing ||
       !["review", "approved"].includes(run.status)
     )
-      throw new AppError("目前沒有需要解決的同步衝突。", 409);
+      throw new AppError((m) => m.run.sync.noConflicts, 409);
     const sync = target.holder;
     if (runBusy(ctx, id))
-      throw new AppError(
-        "這個工作還有 Agent、審查或解說在進行；請等它完成再解衝突。",
-        409,
-      );
+      throw new AppError((m) => m.run.sync.busyResolve, 409);
     const open = await filesWithConflictMarkers(run.worktreePath, sync.conflicts);
     if (!open.length)
-      throw new AppError("衝突標記都已解決，不需要再請 Agent 處理。", 409);
+      throw new AppError((m) => m.run.sync.conflictsGone, 409);
     if (!run.agents.some((agent) => agent.id === "sync"))
       run.agents.push({
         id: "sync",
         name: "Weave",
         role: "Merge conflicts",
         status: "waiting",
-        detail: "解決同步後的合併衝突",
+        detail: sm().run.agents.sync,
       });
     sync.resolving = true;
     delete sync.report;
@@ -360,7 +343,7 @@ export async function resolveConflicts(ctx: WorkbenchContext, id: string) {
     run.status = "running";
     delete run.approvedFingerprint;
     delete run.error;
-    ctx.log(run, "user", `要求 Agent 解決 ${open.length} 個檔案的合併衝突：${open.join("、")}。`);
+    ctx.log(run, "user", sm().run.sync.resolveRequested({ files: open }));
     const controller = new AbortController();
     ctx.controllers.set(id, controller);
     const job = runConflictResolution(
@@ -400,8 +383,6 @@ async function runConflictResolution(
 ) {
   let temporary: string | undefined;
   let resolved = false;
-  const committedNote =
-    "Agent 自行建立了 commit 或切換了分支；已還原，修改保留在工作目錄供你審閱。";
   try {
     temporary = await mkdtemp(path.join(os.tmpdir(), "bell-conflicts-"));
     const outputSchema = path.join(temporary, "conflict-schema.json");
@@ -430,8 +411,8 @@ async function runConflictResolution(
       resolved = !open.length;
       holder.report = [
         result.summary,
-        moved ? committedNote : "",
-        open.length ? `仍有衝突標記：${open.join("、")}。` : "",
+        moved ? sm().run.sync.agentCommitted : "",
+        open.length ? sm().run.sync.markersLeft({ files: open }) : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -442,26 +423,34 @@ async function runConflictResolution(
         run,
         "system",
         resolved
-          ? "Agent 已解決合併衝突，請逐檔審閱這些檔案。"
-          : `Agent 處理後仍有衝突標記：${open.join("、")}；可以自行修改，或再請 Agent 處理。`,
+          ? sm().run.sync.resolved
+          : sm().run.sync.stillConflicted({ files: open }),
       );
     });
   } catch (error) {
     await ctx.lock(run.id, async () => {
       await restoreSyncHead(run, head).catch(() => undefined);
       holder.report = controller.signal.aborted
-        ? "已停止解衝突；已改的檔案保留，可以自行完成，或再請 Agent 處理。"
-        : `${redact(error instanceof Error ? error.message : "解衝突未完成")}；已改的檔案保留，可以自行完成，或再請 Agent 處理。`;
+        ? sm().run.sync.stopped
+        : sm().run.sync.failed({
+            reason: redact(
+              error instanceof Error
+                ? error.message
+                : sm().run.sync.incompleteReason,
+            ),
+          });
       await ctx.diff(run.id).catch(() => undefined);
       run.status = "review";
-      ctx.log(run, "system", holder.report ?? "解衝突未完成。");
+      ctx.log(run, "system", holder.report ?? sm().run.sync.incomplete);
     });
   } finally {
     holder.resolving = false;
     const agent = run.agents.find((value) => value.id === "sync");
     if (agent) {
       agent.status = resolved ? "complete" : "failed";
-      agent.detail = resolved ? "衝突已解決，等待審閱" : "仍有衝突或已中斷";
+      agent.detail = resolved
+        ? sm().run.agents.syncResolved
+        : sm().run.agents.syncUnresolved;
     }
     if (ctx.controllers.get(run.id) === controller)
       ctx.controllers.delete(run.id);
@@ -502,10 +491,7 @@ export async function assertConflictsResolved(run: Run) {
     ? await filesWithConflictMarkers(run.worktreePath, conflicts)
     : [];
   if (open.length)
-    throw new AppError(
-      `這些檔案還有合併衝突標記：${open.join("、")}。請先解決衝突（也可以請 Agent 解決）。`,
-      409,
-    );
+    throw new AppError((m) => m.run.sync.conflictsOpen({ files: open }), 409);
 }
 
 /** Lets the page show which conflicts are left after edits outside BELL. */

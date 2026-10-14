@@ -6,6 +6,8 @@ const count = (n: number, one: string, other: string) =>
   `${fmt.number(n)} ${fmt.plural(n) === "one" ? one : other}`;
 /** File names and similar items, separated as the locale separates a plain list. */
 const list = (items: readonly string[]) => fmt.list(items, { type: "unit" });
+const followUpAgentCommitted =
+  "The agent made its own commit or switched branches; the branch is back on the pushed PR, and the edits stay in the working directory for your review.";
 
 /** Run pipeline messages: run logs, agent details and run errors. */
 export default {
@@ -22,6 +24,13 @@ export default {
     complete: "Done; the report is ready to read",
     failed: "Stopped or failed",
     rerunWaiting: "Waiting to review again…",
+    sync: "Resolving the merge conflicts a sync left",
+    syncResolved: "Conflicts resolved; waiting for review",
+    syncUnresolved: "Conflicts remain, or the work stopped",
+    followUp: "Revising from maintainer feedback",
+    followUpDone: "Revision done; waiting for review",
+    followUpStoppedKept: "Revision stopped; its edits wait for review",
+    followUpStopped: "Revision stopped or changed nothing",
   },
   /** Starting, queueing, approving and cancelling runs. */
   queue: {
@@ -405,6 +414,164 @@ export default {
       "Generating the PR draft suggestion stopped; your current draft and the finished changes are kept, and you can generate it again.",
     failed: "Generating the PR draft suggestion failed; try again.",
     incomplete: "The PR draft suggestion did not finish.",
+  },
+  /** Syncing a run onto the latest target branch and resolving its conflicts. */
+  sync: {
+    partlyPublished:
+      "An earlier publish already made a commit that may be on GitHub, so this run can no longer be synced or have a sync undone; start a new run from the latest version.",
+    unmarkedRun: ({ files }: { files: string[] }) =>
+      `These files conflict in a way conflict markers cannot show (deleted on one side and changed on the other, or a binary file changed on both), and BELL does not pick a side for you: ${list(files)}. The run is unchanged; you can first undo this run's changes to them or deletions of them, sync, and then make those changes again.`,
+    unmarkedPr: ({ files, branch }: { files: string[]; branch: string }) =>
+      `These files conflict in a way conflict markers cannot show (deleted on one side and changed on the other, or a binary file changed on both), and BELL does not pick a side for you: ${list(files)}. The PR is unchanged; merge ${branch} into the PR branch with git on your machine and push, and BELL takes over those commits afterwards.`,
+    notAllowed:
+      "Only runs in review, approved or waiting for plan approval can sync to the latest target branch.",
+    busy: "Agents, a review or explanations are still working on this run; wait for them to finish before you sync.",
+    busyUndo:
+      "Agents, a review or explanations are still working on this run; wait for them to finish before you undo the sync.",
+    busyResolve:
+      "Agents, a review or explanations are still working on this run; wait for them to finish before you resolve the conflicts.",
+    baseMismatch:
+      "The run's branch commit does not match its recorded base, so the sync stopped.",
+    baseMismatchUndo:
+      "The run's branch commit does not match its recorded base, so the undo stopped.",
+    upToDate: ({ branch }: { branch: string }) =>
+      `Checked ${branch}: it has no new commits, so the run is up to date.`,
+    synced: ({
+      branch,
+      commit,
+      conflicts,
+    }: {
+      branch: string;
+      commit: string;
+      conflicts: string[];
+    }) =>
+      conflicts.length
+        ? `Synced onto the latest ${branch} (${commit}); ${count(conflicts.length, "file has", "files have")} conflicts to resolve: ${list(conflicts)}.`
+        : `Synced onto the latest ${branch} (${commit}) without conflicts; the changed files need another review.`,
+    prOnly: "Only a sent PR can take in its target branch.",
+    roundOpen:
+      "A follow-up round is in progress on this PR; finish or discard it before you sync.",
+    prCheckoutDiffers:
+      "The working directory differs from the pushed PR; undo the changes in it before you sync.",
+    prUpToDate: ({ branch }: { branch: string }) =>
+      `Checked: the PR already contains the latest ${branch}.`,
+    nothingToMerge: ({ branch }: { branch: string }) =>
+      `${branch} already contains every change of this PR, so merging would change nothing and no sync was made; the PR is unchanged, and you may want to close it.`,
+    prSynced: ({
+      branch,
+      commit,
+      conflicts,
+    }: {
+      branch: string;
+      commit: string;
+      conflicts: string[];
+    }) =>
+      conflicts.length
+        ? `Merged the latest ${branch} (${commit}) into the PR; ${count(conflicts.length, "file has", "files have")} conflicts to resolve: ${list(conflicts)}.`
+        : `Merged the latest ${branch} (${commit}) into the PR without conflicts; after your review, one merge commit is pushed.`,
+    nothingToUndo: "There is no sync to undo.",
+    undone:
+      "Undid the sync; the run is back to the content and base it had before.",
+    noConflicts: "There are no sync conflicts to resolve.",
+    conflictsGone:
+      "Every conflict marker is already resolved; the agent is not needed.",
+    resolveRequested: ({ files }: { files: string[] }) =>
+      `Asked the agent to resolve the merge conflicts in ${count(files.length, "file", "files")}: ${list(files)}.`,
+    agentCommitted:
+      "The agent made its own commit or switched branches; that was undone, and its edits stay in the working directory for your review.",
+    markersLeft: ({ files }: { files: string[] }) =>
+      `Conflict markers remain: ${list(files)}.`,
+    resolved:
+      "The agent resolved the merge conflicts; review these files one by one.",
+    stillConflicted: ({ files }: { files: string[] }) =>
+      `Conflict markers remain after the agent: ${list(files)}; edit them yourself or ask the agent again.`,
+    stopped:
+      "Stopped resolving the conflicts; the edited files are kept, and you can finish yourself or ask the agent again.",
+    /** `reason` is an error message without its final period. */
+    failed: ({ reason }: { reason: string }) =>
+      `${reason}; the edited files are kept, and you can finish yourself or ask the agent again.`,
+    incompleteReason: "Resolving the conflicts did not finish",
+    incomplete: "Resolving the conflicts did not finish.",
+    conflictsOpen: ({ files }: { files: string[] }) =>
+      `These files still have merge conflict markers: ${list(files)}. Resolve the conflicts first (the agent can do it for you).`,
+    mergeFailed: "Could not compute the merge result.",
+    answerIncomplete:
+      "The agent's answer about the conflict resolution is incomplete",
+  },
+  /** Follow-up rounds on a published PR, and its branch on GitHub. */
+  followUp: {
+    inProgress: "A follow-up round is already in progress on this run.",
+    busy: "A follow-up round or a review is already in progress on this run.",
+    notPublished: "Only runs with a sent PR can be revised from a review.",
+    feedbackNotInLatest:
+      "The selected feedback is not in the latest feedback read; read the feedback again, then choose.",
+    inputRequired:
+      "Choose at least one feedback item, or describe what this round should change.",
+    checkoutDiffers:
+      "The working directory differs from the pushed PR; undo the changes in it before you start a round.",
+    requested: ({
+      feedback,
+      note,
+      round,
+    }: {
+      feedback: number;
+      note: boolean;
+      round: number;
+    }) =>
+      note
+        ? `Requested follow-up round ${round} from ${count(feedback, "maintainer feedback item", "maintainer feedback items")} and your note.`
+        : `Requested follow-up round ${round} from ${count(feedback, "maintainer feedback item", "maintainer feedback items")}.`,
+    agentCommitted: followUpAgentCommitted,
+    noChanges:
+      "The agent changed no files; read its explanation below and, if needed, adjust the selected feedback or your note and try again.",
+    done: ({
+      round,
+      agentCommitted,
+    }: {
+      round: number;
+      agentCommitted: boolean;
+    }) =>
+      `Follow-up round ${round} is done; review the files this round changed one by one and check the commit message before you push.${agentCommitted ? ` ${followUpAgentCommitted}` : ""}`,
+    stoppedReason: "This round was stopped",
+    incompleteReason: "This round did not finish",
+    /** `reason` is one of the reasons above or an error message. */
+    keptEdits: ({ reason }: { reason: string }) =>
+      `${reason}; some edits are kept in the working directory, and you can review them, write a commit message and push, or discard the round.`,
+    nothingToDiscard: "There is no follow-up round to discard.",
+    alreadyPushed:
+      "This round is already on the PR; press Push again so BELL records it as done.",
+    discarded:
+      "Discarded the follow-up round; the working directory is back to the pushed PR.",
+    answerIncomplete: "The agent's answer about the round is incomplete",
+    pushUnknown: "Cannot confirm whether this round was pushed to the PR.",
+    remoteMoved: ({ branch }: { branch: string }) =>
+      `The PR branch ${branch} on GitHub has commits from outside BELL (for example a suggestion applied on GitHub, a maintainer's push or an updated branch). BELL does not overwrite them and cannot continue the round; handle it on GitHub or discard the round.`,
+    remoteMissing: ({ branch }: { branch: string }) =>
+      `The PR branch ${branch} is not on GitHub, so the round cannot be pushed.`,
+    historyRewritten: ({ branch }: { branch: string }) =>
+      `The PR branch ${branch} on GitHub rewrote history that BELL pushed (for example with a force push), so BELL cannot continue; handle it on GitHub.`,
+    adoptedReport: ({ commits }: { commits: number }) =>
+      `Took over ${count(commits, "commit", "commits")} made on GitHub outside BELL; their changes are reviewed with the next round.`,
+    adopted: ({ branch, commits }: { branch: string; commits: number }) =>
+      `Took over ${count(commits, "commit", "commits")} on the PR branch ${branch} on GitHub (for example an applied suggestion or Update branch); their changes are reviewed with the next round.`,
+  },
+  /** What a run says after the service restarted in the middle of its work. */
+  recovery: {
+    unreadableState: ({ path, reason }: { path: string; reason: string }) =>
+      `Cannot read ${path}: ${reason}. Check that the file is valid JSON (version 1).`,
+    draft:
+      "The service restarted, so the PR draft suggestion stopped; your current draft is kept, and you can generate the suggestion again.",
+    explanation:
+      "The service restarted, so generating the explanation stopped; you can retry it.",
+    /** An agent card's detail, without a final period. */
+    review:
+      "The service restarted, so the review rerun stopped; the earlier reports are kept",
+    conflicts:
+      "The service restarted, so resolving the conflicts stopped; the edited files are kept, and you can finish yourself or ask the agent again.",
+    round:
+      "The service restarted, so this follow-up round stopped; you can review the edits kept in the working directory, write a commit message and push, or discard the round.",
+    run: "The service restarted, so the run stopped. Its working directory is kept and you can read the diff; for a team run, retry the failed subtasks on the task board, and integrated subtasks do not run again.",
+    task: "The service restarted, so the task stopped; its isolated working directory is kept, and a retry starts again from a fresh snapshot.",
   },
   /** The projects BELL works on and its own clones of them. */
   repos: {

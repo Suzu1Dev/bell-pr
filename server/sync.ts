@@ -60,7 +60,7 @@ export async function mergeCommits(
   );
   const [tree = "", ...conflicts] = result.stdout.split("\0").filter(Boolean);
   if (!/^[0-9a-f]{40,64}$/.test(tree))
-    throw new AppError("無法計算合併結果。", 500);
+    throw new AppError((m) => m.run.sync.mergeFailed, 500);
   return {
     tree,
     conflicts: [...new Set(conflicts)].filter((file) => safeRelativePath(file)),
@@ -216,7 +216,7 @@ export function parseConflictResult(answer: string, conflicts: string[]) {
         .replace(/\n?```$/, ""),
     );
   } catch {
-    throw new AppError("Agent 回傳的解衝突結果格式不完整", 422);
+    throw new AppError((m) => m.run.sync.answerIncomplete, 422);
   }
   const record = (value ?? {}) as { summary?: unknown; files?: unknown };
   const text = (input: unknown, max: number) =>

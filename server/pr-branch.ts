@@ -11,6 +11,7 @@ import { parseGitHubSource } from "./git.js";
 import { prNumberOf } from "./pr-feedback.js";
 import { AppError, type Run } from "./types.js";
 import { fetchBranchCommit, networkConfig } from "./repositories.js";
+import { sm } from "./i18n/index.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 const now = () => new Date().toISOString();
@@ -60,7 +61,7 @@ export async function prHasCommit(
   const source = parseGitHubSource(ctx.repo(run.repoId).url);
   const number = source ? prNumberOf(run.prUrl, source.url) : undefined;
   if (!source || !number)
-    throw new AppError("無法確認這輪修正是否已推送到 PR。", 502);
+    throw new AppError((m) => m.run.followUp.pushUnknown, 502);
   const commits = (
     await command(
       "gh",
@@ -88,9 +89,10 @@ export function assertRemoteHead(
   if (remoteHead === expected) return;
   const branch = run.publishedBranch ?? run.branch;
   throw new AppError(
-    remoteHead
-      ? `GitHub 上的 PR 分支 ${branch} 已有 BELL 以外的提交（例如在 GitHub 上套用建議、維護者推送或更新分支），BELL 不會覆蓋，也無法接續修正；請在 GitHub 上處理，或放棄這輪修正。`
-      : `GitHub 上找不到 PR 分支 ${branch}，無法推送修正。`,
+    (m) =>
+      remoteHead
+        ? m.run.followUp.remoteMoved({ branch })
+        : m.run.followUp.remoteMissing({ branch }),
     409,
   );
 }
@@ -131,7 +133,7 @@ export async function adoptRemoteCommits(ctx: WorkbenchContext, run: Run) {
     ).code === 0;
   if (!builds)
     throw new AppError(
-      `GitHub 上的 PR 分支 ${branch} 改寫了 BELL 推送過的歷史（例如 force push），BELL 無法接續；請在 GitHub 上處理。`,
+      (m) => m.run.followUp.historyRewritten({ branch }),
       409,
     );
   const repo = ctx.repo(run.repoId);
@@ -162,14 +164,14 @@ export async function adoptRemoteCommits(ctx: WorkbenchContext, run: Run) {
     commit: fetched,
     publishedAt: now(),
     adopted: true,
-    report: `接續了 GitHub 上 BELL 以外的 ${count} 個提交；這些改動會在下一輪一起審閱。`,
+    report: sm().run.followUp.adoptedReport({ commits: count }),
   });
   run.publishCommit = fetched;
   run.baseSha = base;
   ctx.log(
     run,
     "system",
-    `已接續 GitHub 上 PR 分支 ${branch} 的 ${count} 個提交（例如在 GitHub 上套用建議或 Update branch）；這些改動會在下一輪一起審閱。`,
+    sm().run.followUp.adopted({ branch, commits: count }),
   );
   await ctx.store.save();
   return true;

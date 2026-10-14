@@ -3,6 +3,8 @@ import type en from "../en/run.js";
 
 const list = (items: readonly string[]) =>
   formatters("zh-TW").list(items, { type: "unit" });
+const followUpAgentCommitted =
+  "Agent 自行建立了 commit 或切換了分支；已還原到已推送的 PR，修改保留在工作目錄供你審閱。";
 
 const m: Translation<typeof en> = {
   agents: {
@@ -16,6 +18,13 @@ const m: Translation<typeof en> = {
     complete: "已完成，報告可供審閱",
     failed: "執行中斷或失敗",
     rerunWaiting: "等待重新審查…",
+    sync: "解決同步後的合併衝突",
+    syncResolved: "衝突已解決，等待審閱",
+    syncUnresolved: "仍有衝突或已中斷",
+    followUp: "依維護者回饋修正",
+    followUpDone: "修正完成，等待審閱",
+    followUpStoppedKept: "修正中斷，修改保留待審閱",
+    followUpStopped: "修正中斷或沒有修改",
   },
   queue: {
     runNotFound: "找不到工作。",
@@ -226,6 +235,107 @@ const m: Translation<typeof en> = {
       "PR 草稿建議產生已中斷；現有草稿與已完成變更仍保留，可重新產生。",
     failed: "PR 草稿建議產生失敗，請重試。",
     incomplete: "PR 草稿建議未完成。",
+  },
+  sync: {
+    partlyPublished:
+      "先前的發佈已建立提交，可能已推送到 GitHub，因此不能再同步或復原同步；請從最新版本建立新工作。",
+    unmarkedRun: ({ files }) =>
+      `這些檔案的衝突無法用衝突標記表示（一邊刪除、另一邊修改，或兩邊都改了二進位檔），BELL 不會替你選邊：${list(files)}。工作沒有變動；可以先把這次對它們的修改或刪除還原，同步後再重做。`,
+    unmarkedPr: ({ files, branch }) =>
+      `這些檔案的衝突無法用衝突標記表示（一邊刪除、另一邊修改，或兩邊都改了二進位檔），BELL 不會替你選邊：${list(files)}。PR 沒有變動；請在本機用 git 把 ${branch} 合併進 PR 分支並推送，BELL 之後會接續這些提交。`,
+    notAllowed:
+      "只有審閱中、已核准或等待計畫核准的工作可以同步到最新目標分支。",
+    busy: "這個工作還有 Agent、審查或解說在進行；請等它完成再同步。",
+    busyUndo: "這個工作還有 Agent、審查或解說在進行；請等它完成再復原。",
+    busyResolve: "這個工作還有 Agent、審查或解說在進行；請等它完成再解衝突。",
+    baseMismatch: "工作分支的提交和記錄的基準不一致，已停止同步。",
+    baseMismatchUndo: "工作分支的提交和記錄的基準不一致，已停止復原。",
+    upToDate: ({ branch }) => `已確認 ${branch} 沒有新提交，工作已是最新。`,
+    synced: ({ branch, commit, conflicts }) =>
+      conflicts.length
+        ? `已同步到 ${branch} 最新版本（${commit}），${conflicts.length} 個檔案有衝突需要解決：${list(conflicts)}。`
+        : `已同步到 ${branch} 最新版本（${commit}），沒有衝突；改到的檔案需要重新審閱。`,
+    prOnly: "只有已送出的 PR 可以同步目標分支。",
+    roundOpen: "這個 PR 已有一輪修正在進行；完成或放棄後再同步。",
+    prCheckoutDiffers:
+      "工作目錄和已推送的 PR 內容不一致；請先還原工作目錄裡的修改再同步。",
+    prUpToDate: ({ branch }) => `已確認 PR 已包含 ${branch} 的最新版本。`,
+    nothingToMerge: ({ branch }) =>
+      `${branch} 已經包含這個 PR 的全部修改，合併後沒有差異，所以沒有同步；PR 沒有變動，可以考慮關閉它。`,
+    prSynced: ({ branch, commit, conflicts }) =>
+      conflicts.length
+        ? `已把 ${branch} 最新版本（${commit}）合併進 PR，${conflicts.length} 個檔案有衝突需要解決：${list(conflicts)}。`
+        : `已把 ${branch} 最新版本（${commit}）合併進 PR，沒有衝突；審閱後會推送一個合併 commit。`,
+    nothingToUndo: "目前沒有可以復原的同步。",
+    undone: "已復原同步，工作回到同步前的內容與基準。",
+    noConflicts: "目前沒有需要解決的同步衝突。",
+    conflictsGone: "衝突標記都已解決，不需要再請 Agent 處理。",
+    resolveRequested: ({ files }) =>
+      `要求 Agent 解決 ${files.length} 個檔案的合併衝突：${list(files)}。`,
+    agentCommitted:
+      "Agent 自行建立了 commit 或切換了分支；已還原，修改保留在工作目錄供你審閱。",
+    markersLeft: ({ files }) => `仍有衝突標記：${list(files)}。`,
+    resolved: "Agent 已解決合併衝突，請逐檔審閱這些檔案。",
+    stillConflicted: ({ files }) =>
+      `Agent 處理後仍有衝突標記：${list(files)}；可以自行修改，或再請 Agent 處理。`,
+    stopped: "已停止解衝突；已改的檔案保留，可以自行完成，或再請 Agent 處理。",
+    failed: ({ reason }) =>
+      `${reason}；已改的檔案保留，可以自行完成，或再請 Agent 處理。`,
+    incompleteReason: "解衝突未完成",
+    incomplete: "解衝突未完成。",
+    conflictsOpen: ({ files }) =>
+      `這些檔案還有合併衝突標記：${list(files)}。請先解決衝突（也可以請 Agent 解決）。`,
+    mergeFailed: "無法計算合併結果。",
+    answerIncomplete: "Agent 回傳的解衝突結果格式不完整",
+  },
+  followUp: {
+    inProgress: "這個工作已有一輪修正在進行。",
+    busy: "這個工作已有一輪修正或審查在進行。",
+    notPublished: "只有已送出 PR 的工作可以依 review 繼續修正。",
+    feedbackNotInLatest:
+      "選取的回饋不在最近一次讀取的結果中；請重新讀取回饋後再選。",
+    inputRequired: "請至少選一則回饋，或寫下這輪要修正的內容。",
+    checkoutDiffers:
+      "工作目錄和已推送的 PR 內容不一致；請先還原工作目錄裡的修改再開始修正。",
+    requested: ({ feedback, note, round }) =>
+      `要求依 ${feedback} 則維護者回饋${note ? "與補充說明" : ""}進行第 ${round} 輪修正。`,
+    agentCommitted: followUpAgentCommitted,
+    noChanges:
+      "Agent 沒有修改任何檔案；請看下方的說明，必要時調整選取的回饋或補充說明再試一次。",
+    done: ({ round, agentCommitted }) =>
+      `第 ${round} 輪修正完成，請逐檔審閱這輪改到的檔案，確認提交訊息後再推送。${agentCommitted ? followUpAgentCommitted : ""}`,
+    stoppedReason: "這輪修正已停止",
+    incompleteReason: "這輪修正未完成",
+    keptEdits: ({ reason }) =>
+      `${reason}；工作目錄保留了部分修改，可以審閱、寫好提交訊息後推送，或放棄這輪修正。`,
+    nothingToDiscard: "目前沒有可以放棄的修正。",
+    alreadyPushed: "這輪修正已推送到 PR；請再按一次推送，讓 BELL 記錄完成。",
+    discarded: "已放棄這輪修正，工作目錄回到已推送的 PR 內容。",
+    answerIncomplete: "Agent 回傳的修正結果格式不完整",
+    pushUnknown: "無法確認這輪修正是否已推送到 PR。",
+    remoteMoved: ({ branch }) =>
+      `GitHub 上的 PR 分支 ${branch} 已有 BELL 以外的提交（例如在 GitHub 上套用建議、維護者推送或更新分支），BELL 不會覆蓋，也無法接續修正；請在 GitHub 上處理，或放棄這輪修正。`,
+    remoteMissing: ({ branch }) =>
+      `GitHub 上找不到 PR 分支 ${branch}，無法推送修正。`,
+    historyRewritten: ({ branch }) =>
+      `GitHub 上的 PR 分支 ${branch} 改寫了 BELL 推送過的歷史（例如 force push），BELL 無法接續；請在 GitHub 上處理。`,
+    adoptedReport: ({ commits }) =>
+      `接續了 GitHub 上 BELL 以外的 ${commits} 個提交；這些改動會在下一輪一起審閱。`,
+    adopted: ({ branch, commits }) =>
+      `已接續 GitHub 上 PR 分支 ${branch} 的 ${commits} 個提交（例如在 GitHub 上套用建議或 Update branch）；這些改動會在下一輪一起審閱。`,
+  },
+  recovery: {
+    unreadableState: ({ path, reason }) =>
+      `無法讀取 ${path}：${reason}。請檢查檔案是否為有效 JSON（version 1）。`,
+    draft: "服務重新啟動，PR 草稿建議已中斷；現有草稿保留，可重新產生。",
+    explanation: "服務重新啟動，解說產生已中斷；可重試產生解說。",
+    review: "服務重新啟動，重新審查已中斷；原有報告保留",
+    conflicts:
+      "服務重新啟動，解衝突已中斷；已改的檔案保留，可以自行完成，或再請 Agent 處理。",
+    round:
+      "服務重新啟動，這輪修正已中斷；工作目錄保留的修改可以審閱、寫好提交訊息後推送，或放棄這輪修正。",
+    run: "服務重新啟動，先前工作已中斷。工作目錄仍保留，可檢視差異；團隊工作可在任務板重試失敗的子任務，已整合的子任務不會重跑。",
+    task: "服務重新啟動，任務已中斷；隔離工作目錄保留，重試時會以新快照重新開始。",
   },
   repos: {
     notFound: "找不到 Repository。",
