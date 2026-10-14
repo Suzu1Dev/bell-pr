@@ -211,6 +211,12 @@ const listeners = new Set<() => void>();
 let seenHash: string | undefined;
 let routeHash = "";
 let route: Route | null = null;
+/**
+ * The route hash the listeners last heard about. A render can read a new
+ * address before its hashchange event arrives; the event must still reach
+ * every listener.
+ */
+let notifiedHash = "";
 /** True after a push in this task; later navigations in it replace. */
 let pushedThisTask = false;
 
@@ -224,19 +230,20 @@ function isAnchor(hash: string) {
   return text !== "" && !text.startsWith("/") && !text.startsWith("?");
 }
 
-/** Reads the address; returns whether the route hash changed. */
-function sync(): boolean {
+/** Reads the address into the route and its hash. */
+function sync() {
   const hash = browserWindow()?.location.hash ?? "";
-  if (hash === seenHash) return false;
+  if (hash === seenHash) return;
   seenHash = hash;
-  if (isAnchor(hash) || hash === routeHash) return false;
+  if (isAnchor(hash) || hash === routeHash) return;
   routeHash = hash;
   route = parseRoute(hash);
-  return true;
 }
 
 function notify() {
-  if (!sync()) return;
+  sync();
+  if (routeHash === notifiedHash) return;
+  notifiedHash = routeHash;
   for (const listener of [...listeners]) listener();
 }
 
@@ -246,9 +253,14 @@ function notify() {
  */
 export function subscribeToRoute(listener: () => void): () => void {
   const win = browserWindow();
-  if (!listeners.size && win) {
-    win.addEventListener("hashchange", notify);
-    win.addEventListener("popstate", notify);
+  if (!listeners.size) {
+    // The first listener starts from the address as it is now.
+    sync();
+    notifiedHash = routeHash;
+    if (win) {
+      win.addEventListener("hashchange", notify);
+      win.addEventListener("popstate", notify);
+    }
   }
   listeners.add(listener);
   return () => {

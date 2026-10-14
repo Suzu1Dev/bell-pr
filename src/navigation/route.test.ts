@@ -231,11 +231,19 @@ function fakeWindow(initialHash = "") {
     },
     /** A link to `hash` followed in the page. */
     follow(hash: string) {
+      win.change(hash);
+      fire("hashchange");
+    },
+    /**
+     * The address changes to `hash`; its hashchange event is still queued,
+     * as it is between a typed or followed link and the next task.
+     */
+    change(hash: string) {
       entries.splice(index + 1);
       entries.push(hash);
       index++;
-      fire("hashchange");
     },
+    fire,
     entries,
     listeners: () =>
       [...handlers.values()].reduce((sum, set) => sum + set.size, 0),
@@ -323,6 +331,25 @@ test("an in-page anchor keeps the route and its flags", async () => {
     win.follow("");
     assert.equal(currentRoute(), null);
     assert.equal(currentRouteHash(), "");
+    unsubscribe();
+  });
+});
+
+test("a read before the hashchange event still lets the event reach every listener", async () => {
+  const win = fakeWindow("#/runs/demo-run/overview");
+  await withWindow(win, () => {
+    let changes = 0;
+    const unsubscribe = subscribeToRoute(() => changes++);
+    win.change("#/repos");
+    // A render (or a click handler) reads the new address first.
+    assert.deepEqual(currentRoute(), { name: "repos" });
+    assert.equal(changes, 0);
+    win.fire("hashchange");
+    assert.equal(changes, 1);
+    // The same route again, and an anchor, are no change.
+    win.fire("hashchange");
+    win.follow("#main-content");
+    assert.equal(changes, 1);
     unsubscribe();
   });
 });
