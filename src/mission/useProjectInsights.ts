@@ -1,22 +1,76 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { locales } from "../../shared/i18n/locale";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { locales, type Locale } from "../../shared/i18n/locale";
 import {
   maxProjectRecommendations,
+  projectRecommendationBatchSize,
   type InsightsStaleDetail,
   type ProjectInsights,
   type RecommendationPreferences,
 } from "../../shared/insights";
 import { api, send } from "../api";
+import { usePresentation } from "../app/presentation";
 import { getDemo } from "../demo";
+import type { PlaybackClock } from "../demo/playback";
 import { getCurrentLocale, getCurrentMessages, useLocale } from "../i18n";
+import { playSampleAnalysis, stopSampleAnalysis } from "./sample-analysis";
 
 /** The cache's messages in the active UI language, read when one is shown. */
 const messages = () => getCurrentMessages().mission.insights;
 
+/**
+ * The prewritten sample analysis in `locale`; `expanded` adds the sample
+ * recommendations that "Generate 5 more" shows, as one prewritten batch.
+ * The same object comes back for the same arguments.
+ */
+function sampleInsights(locale: Locale, expanded: boolean): ProjectInsights {
+  const key = `${locale}:${expanded}`;
+  let insights = sampleAnalyses.get(key);
+  if (!insights) {
+    const demo = getDemo(locale);
+    const extras = demo.extraRecommendations ?? [];
+    insights = expanded
+      ? {
+          ...demo.insights,
+          recommendations: [...demo.insights.recommendations, ...extras],
+          recommendationExpansion: {
+            generatedAt: demo.insights.generatedAt,
+            addedIds: extras.map((idea) => idea.id),
+            requestedCount: projectRecommendationBatchSize,
+          },
+        }
+      : demo.insights;
+    sampleAnalyses.set(key, insights);
+    sampleVariants.set(insights, expanded);
+  }
+  return insights;
+}
+const sampleAnalyses = new Map<string, ProjectInsights>();
+/** Every sample analysis made so far, and whether it has the extra batch. */
+const sampleVariants = new Map<ProjectInsights, boolean>();
+for (const locale of locales)
+  for (const expanded of [false, true]) sampleInsights(locale, expanded);
+
 /** The prewritten sample analysis in the active UI language. */
-const demoInsights = () => getDemo(getCurrentLocale()).insights;
-// Every locale's sample analysis, to tell it apart from other analyses.
-const demoAnalyses = new Set(locales.map((locale) => getDemo(locale).insights));
+const demoInsights = () => sampleInsights(getCurrentLocale(), false);
+
+/**
+ * The analysis to show in `locale`: the prewritten sample analysis follows
+ * the UI language, with its extra batch if it was added; an AI analysis
+ * stays in the language it was written in.
+ */
+export function shownInsights(
+  insights: ProjectInsights | null,
+  locale: Locale,
+): ProjectInsights | null {
+  const sample = insights && sampleVariants.get(insights);
+  return typeof sample === "boolean" ? sampleInsights(locale, sample) : insights;
+}
 
 interface InsightsResult {
   insights: ProjectInsights | null;
@@ -54,6 +108,16 @@ const emptyState: InsightsState = {
   preferenceError: "",
 };
 
+export interface ProjectInsightsCacheOptions {
+  /**
+   * The sample's analysis plays (`demo=play`): it starts out loading, and
+   * playSample() reveals it, instead of showing it at once.
+   */
+  playSample?: boolean;
+  /** The clock of the sample's playback; tests pass a fake one. */
+  clock?: PlaybackClock;
+}
+
 /** One cache belongs to the mounted workbench, so changing repositories keeps active work. */
 export class ProjectInsightsCache {
   private states = new Map<string, InsightsState>([
@@ -63,6 +127,9 @@ export class ProjectInsightsCache {
   private mutations = new Map<string, Promise<void>>();
   private revisions = new Map<string, number>();
   private listeners = new Set<() => void>();
+  /** The sample's analysis while it plays, and whether it has played. */
+  private samplePlay?: Promise<void>;
+  private samplePlayed = false;
 
   constructor(
     private request: InsightsRequest = (repoId, operation) =>
@@ -78,7 +145,11 @@ export class ProjectInsightsCache {
         `/repos/${repoId}/insights/preferences`,
         send("PUT", preferences),
       ),
-  ) {}
+    private options: ProjectInsightsCacheOptions = {},
+  ) {
+    if (options.playSample)
+      this.states.set("demo-repo", { ...emptyState, loading: true });
+  }
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -103,7 +174,12 @@ export class ProjectInsightsCache {
   }
 
   load(repoId: string): Promise<void> {
-    if (repoId === "demo-repo") return Promise.resolve();
+    if (repoId === "demo-repo") {
+      // A sample analysis that waited for a playback that did not come shows now.
+      if (!this.samplePlay && !this.snapshot(repoId).insights)
+        this.update(repoId, { insights: demoInsights(), loading: false });
+      return Promise.resolve();
+    }
     // Re-entering an active repository joins its original analysis instead of reading old cache.
     const pending = this.mutations.get(repoId) ?? this.reads.get(repoId);
     if (pending) return pending;
@@ -144,8 +220,50 @@ export class ProjectInsightsCache {
     return this.load(repoId);
   }
 
+  /**
+   * Plays the sample's analysis (`demo=play`): the overview shows its
+   * loading lines, then the analysis, without a request. It plays once per
+   * cache; `restart` plays it again, as "Re-analyze" does in playback mode.
+   */
+  playSample(locale: Locale, speed?: number, restart = false): Promise<void> {
+    if (!restart && (this.samplePlay || this.samplePlayed))
+      return this.samplePlay ?? Promise.resolve();
+    const repoId = "demo-repo";
+    this.update(repoId, {
+      insights: null,
+      stale: false,
+      staleDetail: undefined,
+      loading: true,
+      error: "",
+      recommendationError: "",
+    });
+    const play = playSampleAnalysis({
+      demo: getDemo(locale),
+      speed,
+      clock: this.options.clock,
+    }).then(() => {
+      if (this.samplePlay !== play) return;
+      this.samplePlay = undefined;
+      this.samplePlayed = true;
+      this.update(repoId, {
+        insights: sampleInsights(locale, false),
+        loading: false,
+      });
+    });
+    this.samplePlay = play;
+    return play;
+  }
+
+  /** Stops the sample's analysis if it plays; the next load or playSample() picks it up. */
+  dispose() {
+    if (!this.samplePlay) return;
+    this.samplePlay = undefined;
+    stopSampleAnalysis();
+  }
+
   analyze(repoId: string): Promise<void> {
     if (repoId === "demo-repo") {
+      this.dispose();
       this.update(repoId, {
         insights: demoInsights(),
         error: messages().demoAnalysis,
@@ -155,6 +273,28 @@ export class ProjectInsightsCache {
     return this.generate(repoId, "analyze");
   }
 
+  /**
+   * "Generate 5 more" for the sample: its prewritten batch
+   * (`extraRecommendations`) joins the analysis once, as a
+   * recommendationExpansion, without a request.
+   */
+  addSampleBatch(): Promise<void> {
+    const repoId = "demo-repo";
+    const state = this.snapshot(repoId);
+    const sample = state.insights && sampleVariants.get(state.insights);
+    this.update(
+      repoId,
+      sample === false
+        ? {
+            insights: sampleInsights(getCurrentLocale(), true),
+            recommendationError: "",
+          }
+        : { recommendationError: messages().demoMore },
+    );
+    return Promise.resolve();
+  }
+
+  /** Asks the server for more recommendations; the sample has none to ask for. */
   recommendMore(repoId: string): Promise<void> {
     const pending = this.mutations.get(repoId);
     if (pending) return pending;
@@ -266,23 +406,46 @@ export class ProjectInsightsCache {
 
 export function useProjectInsights(repoId?: string) {
   const [locale] = useLocale();
-  const [cache] = useState(() => new ProjectInsightsCache());
+  const { play, speed } = usePresentation();
+  const [cache] = useState(
+    () => new ProjectInsightsCache(undefined, undefined, { playSample: play }),
+  );
   const getSnapshot = useCallback(
     () => cache.snapshot(repoId),
     [cache, repoId],
   );
   const state = useSyncExternalStore(cache.subscribe, getSnapshot, getSnapshot);
+  // In playback mode the sample's analysis plays instead of showing at once.
+  const playing = repoId === "demo-repo" && play;
+  // Read when it starts; changing them later does not start it again.
+  const sample = useRef({ locale, speed });
+  sample.current = { locale, speed };
 
+  useEffect(() => () => cache.dispose(), [cache]);
   useEffect(() => {
-    if (repoId) void cache.load(repoId);
-  }, [cache, repoId]);
+    if (!repoId) return;
+    if (playing)
+      void cache.playSample(sample.current.locale, sample.current.speed);
+    else void cache.load(repoId);
+  }, [cache, repoId, playing]);
 
-  const analyze = useCallback(
-    () => (repoId ? cache.analyze(repoId) : Promise.resolve()),
-    [cache, repoId],
-  );
+  const analyze = useCallback(() => {
+    if (!repoId) return Promise.resolve();
+    if (playing)
+      return cache.playSample(
+        sample.current.locale,
+        sample.current.speed,
+        true,
+      );
+    return cache.analyze(repoId);
+  }, [cache, repoId, playing]);
   const recommendMore = useCallback(
-    () => (repoId ? cache.recommendMore(repoId) : Promise.resolve()),
+    () =>
+      repoId === "demo-repo"
+        ? cache.addSampleBatch()
+        : repoId
+          ? cache.recommendMore(repoId)
+          : Promise.resolve(),
     [cache, repoId],
   );
 
@@ -297,12 +460,7 @@ export function useProjectInsights(repoId?: string) {
     [cache, repoId],
   );
 
-  // The prewritten sample analysis follows the UI language; an AI analysis
-  // stays in the language it was written in.
-  const insights =
-    state.insights && demoAnalyses.has(state.insights)
-      ? getDemo(locale).insights
-      : state.insights;
+  const insights = shownInsights(state.insights, locale);
 
   return { ...state, insights, analyze, recommendMore, savePreferences, reload };
 }

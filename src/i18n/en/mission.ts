@@ -6,7 +6,7 @@
  * they can pick the singular or plural noun.
  */
 import type { PonytailMode } from "../../../shared/efficiency";
-import { formatters } from "../../../shared/i18n/locale";
+import { formatters, type Locale } from "../../../shared/i18n/locale";
 import type {
   ContributionDirection,
   ContributionRecommendation,
@@ -14,6 +14,7 @@ import type {
 } from "../../../shared/insights";
 import type { AgentProvider } from "../../../shared/models";
 import { product } from "../../../shared/product";
+import type { ProviderState } from "../../mission/readiness";
 
 const fmt = formatters("en");
 const n = (value: number) => fmt.number(value);
@@ -59,11 +60,12 @@ const mission = {
       improve: "What is worth improving?",
     },
     start: "Start the project analysis",
+    progressLabel: "Analysis progress",
     note: "Until the analysis is done, nothing is guessed about what this project does and no change is recommended.",
   },
   project: {
     sourceDemo: "Sample analysis",
-    sourceAi: "AI project analysis",
+    sourceAi: "AI-generated analysis",
     audience: "Main users",
     /** `date` arrives formatted for the locale. */
     updatedAt: ({ date }: { date: string }) => `Updated ${date}`,
@@ -112,6 +114,25 @@ const mission = {
     }) =>
       `At least ${amount(changed, "file", "files")} changed ${since(sha)}, including ${capped ? `${n(cited)} or more files` : amount(cited, "file", "files")} that this analysis cites: ${files}. Re-analyze before you settle on a direction.`,
   },
+  /** The sticky nav that links to the overview's sections. */
+  sections: {
+    label: "On this page",
+    purpose: "Purpose",
+    journey: "How people use it",
+    reading: "Where to start reading",
+    contribution: "This contribution",
+    directions: "Directions",
+  },
+  /** Language names, in the UI language. */
+  languages: {
+    en: "English",
+    "zh-TW": "Traditional Chinese",
+  } satisfies Record<Locale, string>,
+  /** An analysis written in another language than the UI's. */
+  localeNotice: {
+    analyzedIn: ({ language }: { language: string }) => `Analyzed in ${language}.`,
+    reanalyze: ({ language }: { language: string }) => `Re-analyze in ${language}`,
+  },
   journey: {
     kicker: "THE USER JOURNEY",
     title: "How do people use this project?",
@@ -124,6 +145,9 @@ const mission = {
     unsampled: "Not sampled; content not read",
     lookFor: "Look for",
     context: "More about this file in the analysis",
+    showAll: ({ count }: { count: number }) => `Show all ${n(count)} steps`,
+    showFirst: ({ count }: { count: number }) =>
+      `Show only the first ${n(count)}`,
   },
   details: {
     modules: "What do the main modules do?",
@@ -169,6 +193,8 @@ const mission = {
     kicker: "WHERE YOU CAN HELP",
     title: "Contribution directions worth exploring",
     lead: "Look at the problem and its value to users first, then decide whether to hand it to the team.",
+    /** Marks the recommendations as written by AI. */
+    aiGenerated: "AI-generated",
     sampleCount: ({ count }: { count: number }) =>
       amount(count, "sample", "samples"),
     recommendationCount: ({ count }: { count: number }) =>
@@ -178,7 +204,12 @@ const mission = {
       `Generating ${n(count)} more…`,
     limitReached: "Recommendation limit reached",
     moreDemo:
-      "The sample uses prewritten recommendations. Import a real project to have the Agent generate more contribution directions.",
+      "In the sample this adds prewritten recommendations, without calling an AI. Import a real project to have the Agent generate more contribution directions.",
+    moreDemoShown:
+      "The sample's extra recommendations are all shown. Import a real project to have the Agent generate more contribution directions.",
+    moreLocked:
+      "Generating more recommendations is part of Pro. Free keeps the 5 recommendations of each analysis, and the ones you already have stay.",
+    seePro: "See what Pro adds",
     moreStale:
       "The project has a newer version. Re-analyze it before you generate more recommendations.",
     moreLimit: ({ max }: { max: number }) =>
@@ -335,6 +366,15 @@ const mission = {
         claude:
           "Uses the Claude Code CLI you installed and signed in to (Claude plan or Anthropic API key). Usage counts against your own account. Available models depend on your plan.",
       } satisfies Record<AgentProvider, string>,
+      /** A provider in the list with its state, for example "Codex — not signed in". */
+      providerOption: ({ provider, state }: { provider: string; state: string }) =>
+        `${provider} — ${state}`,
+      providerStates: {
+        ready: "ready",
+        missing: "not installed",
+        broken: "not working",
+        "signed-out": "not signed in",
+      } satisfies Record<ProviderState, string>,
       model: "Model",
       providerDefault: ({ provider, model }: { provider: string; model?: string }) =>
         `${provider} default${model ? ` · ${model}` : ""}`,
@@ -348,6 +388,9 @@ const mission = {
       defaultModelHelp: ({ provider }: { provider: string }) =>
         `Uses your local ${provider}'s default model.`,
       effort: "Reasoning effort",
+      /** An effort that needs Pro; `label` is the effort's own label. */
+      proOption: ({ label }: { label: string }) => `${label} · Pro`,
+      defaultEffortNote: "Default uses the model's own default effort.",
       /** `effort` is the model's default effort, already labelled. */
       modelDefault: ({ effort }: { effort?: string }) =>
         `Model default${effort ? ` · ${effort}` : ""}`,
@@ -365,7 +408,8 @@ const mission = {
       reload: "Reload",
     },
     ponytail: {
-      label: "Ponytail development mode",
+      label: "Efficiency mode",
+      credit: "Efficiency mode is based on Ponytail by DietrichGebert (MIT).",
       modes: {
         lite: "Lite · default",
         full: "Full",
@@ -378,6 +422,9 @@ const mission = {
       legend: "Team size",
       teammates: "teammates",
       note: "Sets the most teammates the team may use; the run's plan decides the actual split.",
+      /** The plan lowered a larger team size to `free`, the most Free runs. */
+      clampNotice: ({ free, pro }: { free: number; pro: number }) =>
+        `Free runs up to ${n(free)} teammates, so this project will use ${n(free)}. Pro runs up to ${n(pro)}.`,
     },
     planApproval: {
       label: "Let me approve the plan before development",

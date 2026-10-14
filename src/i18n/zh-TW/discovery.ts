@@ -40,7 +40,8 @@ const m: Translation<typeof en> = {
     reasoningEffort: "思考強度",
     modelDefault: "模型預設",
     effortNotInCatalog: ({ effort }) => `${effort}（已儲存，目錄未提供）`,
-    ponytailMode: "Ponytail 模式",
+    ponytailMode: "效率模式",
+    ponytailCredit: "效率模式以 DietrichGebert 的 Ponytail（MIT）為基礎。",
     ponytailModes: {
       lite: "輕量 · 預設",
       full: "完整",
@@ -55,6 +56,24 @@ const m: Translation<typeof en> = {
     updated: "最近更新",
     relevance: "相關度",
     stars: "星數",
+  },
+  locked: {
+    body: "即時探索會搜尋 GitHub，並請你的 AI 服務評估每個專案，屬於 Pro 功能；你已有的結果仍可閱讀。",
+    startTrial: ({ days }) => `開始 ${fmt.number(days)} 天試用`,
+    upgrade: "升級到 Pro",
+  },
+  sample: {
+    title: "示範結果，非即時資料",
+    body: "這些虛構專案用來示範探索會找到什麼；內容並非來自 GitHub 或 AI，也無法匯入。",
+  },
+  languages: {
+    en: "英文",
+    "zh-TW": "繁體中文",
+  },
+  localeNotice: {
+    writtenIn: ({ language }) => `這些結果以${language}撰寫。`,
+    searchAgain: ({ language, current }) =>
+      `這些結果以${language}撰寫。重新搜尋即可取得${current}的結果。`,
   },
   reload: "重新讀取狀態",
   loading: "正在讀取探索紀錄…",
@@ -100,6 +119,7 @@ const m: Translation<typeof en> = {
     previousTitle: "上一份推薦，仍在這裡。",
     note: ({ sort }) =>
       `依你選的「${sort}」排序取 12 個候選、驗證後最多 6 個；順序由分析整理，不是 GitHub 全站排名。實作前仍需確認 issue 最新狀態與維護者意願。`,
+    sampleNote: "即時搜尋會依你選的排序取 12 個候選，檢查後最多保留 6 個，結果就像這些示範。",
     previousNote: ({ date }) =>
       date
         ? `這是 ${date} 的結果，未反映本次搜尋。`
@@ -127,6 +147,7 @@ const m: Translation<typeof en> = {
     risks: "投入之前，再確認",
     evidence: ({ count }) => `推薦依據與原文 · ${fmt.number(count)} 則`,
     chooseHint: "選擇後匯入專案，帶入可編輯的任務設定。",
+    sampleHint: "示範專案無法選擇；即時探索會找到可匯入的真實專案。",
     choose: "選擇此項目",
     importing: "正在匯入專案…",
   },

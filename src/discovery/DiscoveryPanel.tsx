@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   ArrowUpRight,
   Check,
   Compass,
   ExternalLink,
+  FolderGit2,
   GitFork,
-  Github,
+  Languages,
   Loader2,
+  Lock,
   Search,
   ShieldCheck,
   Sparkles,
@@ -28,11 +30,24 @@ import {
   type ModelCatalog,
   type ReasoningEffort,
 } from "../../shared/models";
+import {
+  trialDays,
+  type Entitlements,
+  type LicenseSummary,
+} from "../../shared/plans";
 import { api, send } from "../api";
-import { useFormat, useT } from "../i18n";
+import { usePresentation } from "../app/presentation";
+import { getSampleDiscoveryJob } from "../demo/discovery";
+import { useFormat, useLocale, useT } from "../i18n";
+import { ProBadge } from "../license/ProBadge";
+import { requestUpgrade, startTrial } from "../license/useEntitlements";
+import { usePlan } from "../mission/plan";
+import { providerReadiness, withProvider } from "../mission/readiness";
 import { ModelSummary } from "../models/ModelSummary";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
 import { MarkdownContent } from "../review/MarkdownContent";
+import { ReadinessMessage, readinessOf } from "../setup/ReadinessNotice";
+import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import "../review/review.css";
 import "./discovery.css";
 
@@ -46,9 +61,23 @@ const phaseSteps = ["searching", "screening", "analyzing"] as const;
 /** The four angles every opportunity is weighed from, in display order. */
 const angles = ["rules", "activity", "needs", "barrier"] as const;
 
+/** Whether a saved job has results to read, or is still running. */
+function hasResults(job: DiscoveryJob | null) {
+  return (
+    !!job &&
+    (job.status === "running" ||
+      job.opportunities.length > 0 ||
+      !!job.previousResult?.opportunities.length)
+  );
+}
+
 export default function DiscoveryPanel({
   onChoose,
   initialJob,
+  entitlements,
+  license,
+  demo: demoProp,
+  doctor,
 }: {
   onChoose: (
     opportunity: ContributionOpportunity,
@@ -60,16 +89,37 @@ export default function DiscoveryPanel({
    * mounts.
    */
   initialJob?: DiscoveryJob | null;
+  /** What the plan unlocks, when the parent knows it; read otherwise. */
+  entitlements?: Entitlements;
+  /** The license summary (GET /api/status), for the trial button. */
+  license?: LicenseSummary;
+  /**
+   * The sample project: the sample results with a PRO chip, and nothing
+   * is sent to the server. Default: the `demo=play` flag.
+   */
+  demo?: boolean;
+  /** A useDoctor() state to share; the panel loads its own otherwise. */
+  doctor?: DoctorState;
 }) {
   const t = useT("discovery");
   const effortLabels = useT("common").reasoningEffort;
   const fmt = useFormat();
+  const [locale] = useLocale();
+  const presentation = usePresentation();
+  const demo = demoProp ?? presentation.play;
+  const plan = usePlan({ entitlements, license, demo });
+  // Discovery is Pro: Free sees sample results and never sends a search.
+  // While the plan is read nothing is sent either.
+  const locked = plan.locked("discovery");
+  const live = !demo && !locked && !plan.checking;
+  const sampleJob = useMemo(() => getSampleDiscoveryJob(locale), [locale]);
   const date = (value: string) => (value ? fmt.dateTime(value) : undefined);
-  const [preferences, setPreferences] = useState<DiscoveryPreferences>({
-    ...(initialJob?.preferences ?? defaultDiscoveryPreferences),
-  });
+  const [preferences, setPreferences] = useState<DiscoveryPreferences>(() => ({
+    ...(initialJob?.preferences ??
+      (demo ? sampleJob.preferences : defaultDiscoveryPreferences)),
+  }));
   const [job, setJob] = useState<DiscoveryJob | null>(initialJob ?? null);
-  const [loading, setLoading] = useState(initialJob === undefined);
+  const [loading, setLoading] = useState(initialJob === undefined && !demo);
   const [busy, setBusy] = useState(false);
   const [choosing, setChoosing] = useState("");
   const [error, setError] = useState("");
@@ -120,12 +170,13 @@ export default function DiscoveryPanel({
   const providerLabel = providerLabels[provider];
   useEffect(() => {
     mounted.current = true;
-    void reload(true);
+    // The demo shows the sample; results already saved stay readable on Free.
+    if (!demo) void reload(true);
     return () => {
       mounted.current = false;
       epoch.current++;
     };
-  }, []);
+  }, [demo]);
   useEffect(() => {
     const controller = new AbortController();
     setCatalog({ source: provider, models: [] });
@@ -159,6 +210,8 @@ export default function DiscoveryPanel({
 
   async function mutate(cancel = false) {
     if (mutating.current) return;
+    // Never POST /api/discovery without Pro; cancelling stays open.
+    if (!cancel && !live) return;
     mutating.current = true;
     epoch.current++;
     setBusy(true);
@@ -198,12 +251,53 @@ export default function DiscoveryPanel({
     (!preferences.model
       ? catalog.models.find((value) => value.isDefault)
       : undefined);
-  const previous = !job?.opportunities.length ? job?.previousResult : undefined;
+  // Free (and the demo) show the sample unless saved results are there to read.
+  const sampleShown = demo || (locked && !loading && !hasResults(job));
+  const shown = sampleShown ? sampleJob : job;
+  const sample = shown?.sample === true;
+  const previous = !shown?.opportunities.length
+    ? shown?.previousResult
+    : undefined;
   const opportunities = previous
     ? previous.opportunities
-    : (job?.opportunities ?? []);
-  const candidates = previous ? previous.candidates : (job?.candidates ?? []);
+    : (shown?.opportunities ?? []);
+  const candidates = previous
+    ? previous.candidates
+    : (shown?.candidates ?? []);
   const disabled = loading || busy || running || !!choosing;
+  // Until the plan is known it is not clear whether the sample shows.
+  const settling = loading || (!demo && plan.checking);
+  // Saved results in another language than the UI's say so.
+  const resultsLocale =
+    !sample && shown?.locale && shown.locale !== locale
+      ? shown.locale
+      : undefined;
+  // A live search needs the GitHub CLI and the chosen provider.
+  const ownDoctor = useDoctor({ enabled: live && !doctor });
+  const report = live ? (doctor ?? ownDoctor).report : null;
+  const readiness = report
+    ? withProvider(readinessOf(report, ["gh"]), providerReadiness(report, provider))
+    : undefined;
+  // The demo's button stays open: it shows the sample results.
+  const submitDisabled =
+    disabled ||
+    (!demo && (!live || (readiness !== undefined && !readiness.ready)));
+  const trialOffered =
+    plan.summary?.trialAvailable !== false && plan.summary?.envLocked !== true;
+  const [trialStarting, setTrialStarting] = useState(false);
+  const [trialError, setTrialError] = useState("");
+  async function beginTrial() {
+    setTrialStarting(true);
+    setTrialError("");
+    try {
+      // The license change unlocks the form through usePlan.
+      await startTrial();
+    } catch (cause) {
+      if (mounted.current) setTrialError((cause as Error).message);
+    } finally {
+      if (mounted.current) setTrialStarting(false);
+    }
+  }
 
   return (
     <div className="discovery-page">
@@ -226,7 +320,7 @@ export default function DiscoveryPanel({
             <Compass size={58} strokeWidth={1.2} />
           </span>
           <span className="discovery-orbit-label">
-            <Github size={15} /> {t.heroCaption}
+            <FolderGit2 size={15} /> {t.heroCaption}
           </span>
           <span className="discovery-hero-dot" />
         </div>
@@ -235,15 +329,21 @@ export default function DiscoveryPanel({
         className="discovery-form"
         onSubmit={(event: FormEvent) => {
           event.preventDefault();
-          void mutate();
+          // The demo searches nothing: its sample results are the answer.
+          if (demo)
+            document
+              .getElementById("discovery-results")
+              ?.scrollIntoView({ block: "start" });
+          else void mutate();
         }}
       >
         <div className="discovery-section-label">
           <Search size={17} />
           <h2>{t.form.heading}</h2>
+          {plan.marked("discovery") && <ProBadge />}
           <span>{t.form.hint}</span>
         </div>
-        <fieldset disabled={!!disabled} className="discovery-fields">
+        <fieldset disabled={!!disabled || locked} className="discovery-fields">
           <label className="discovery-interest">
             {t.form.interests}
             <input
@@ -330,7 +430,7 @@ export default function DiscoveryPanel({
         <details className="discovery-advanced">
           <summary>{t.form.advanced}</summary>
           <fieldset
-            disabled={!!disabled}
+            disabled={!!disabled || locked}
             className="discovery-fields discovery-model-fields"
           >
             <label>
@@ -406,7 +506,7 @@ export default function DiscoveryPanel({
                 ))}
               </select>
             </label>
-            <label>
+            <label title={t.form.ponytailCredit}>
               {t.form.ponytailMode}
               <select
                 value={preferences.ponytailMode}
@@ -435,7 +535,7 @@ export default function DiscoveryPanel({
           <button
             type="submit"
             className="button primary"
-            disabled={!!disabled}
+            disabled={submitDisabled}
           >
             {busy || running ? (
               <Loader2 size={17} className="spin" />
@@ -443,8 +543,48 @@ export default function DiscoveryPanel({
               <Sparkles size={17} />
             )}
             {t.form.submit}
+            {plan.marked("discovery") && <ProBadge />}
           </button>
         </div>
+        {readiness && (
+          <ReadinessMessage
+            readiness={readiness}
+            maskUser={presentation.maskUser}
+          />
+        )}
+        {locked && (
+          <div className="discovery-locked">
+            <p>
+              <Lock size={15} aria-hidden="true" />
+              <span>{t.locked.body}</span>
+            </p>
+            <div className="discovery-locked-actions">
+              {trialOffered && (
+                <button
+                  type="button"
+                  className="button primary"
+                  disabled={trialStarting}
+                  onClick={() => void beginTrial()}
+                >
+                  {trialStarting && <Loader2 size={16} className="spin" />}
+                  {t.locked.startTrial({ days: trialDays })}
+                </button>
+              )}
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => requestUpgrade("discovery")}
+              >
+                {t.locked.upgrade}
+              </button>
+            </div>
+            {trialError && (
+              <p className="discovery-locked-error" role="alert">
+                {trialError}
+              </p>
+            )}
+          </div>
+        )}
       </form>
       {error && (
         <div className="discovery-alert" role="alert">
@@ -458,7 +598,7 @@ export default function DiscoveryPanel({
           </button>
         </div>
       )}
-      {loading && (
+      {settling && (
         <p className="discovery-status" role="status">
           <Loader2 size={18} className="spin" />
           {t.loading}
@@ -503,30 +643,52 @@ export default function DiscoveryPanel({
           </ol>
         </section>
       )}
-      {job && !running && (
-        <div
-          className={`discovery-status ${job.status === "failed" ? "has-error" : ""}`}
-          role="status"
-        >
-          <span>{job.error || job.message}</span>
-          <small>{t.searchedAt({ date: date(job.createdAt) })}</small>
+      {sample && (
+        <div className="discovery-sample-banner" role="note">
+          <strong>{t.sample.title}</strong>
+          <ProBadge />
+          <span>{t.sample.body}</span>
         </div>
       )}
-      {!!job?.warnings.length && (
+      {shown && !running && (
+        <div
+          className={`discovery-status ${shown.status === "failed" ? "has-error" : ""}`}
+          role="status"
+        >
+          <span>{shown.error || shown.message}</span>
+          <small>{t.searchedAt({ date: date(shown.createdAt) })}</small>
+        </div>
+      )}
+      {resultsLocale && (
+        <p className="discovery-locale-notice" role="status">
+          <Languages size={15} aria-hidden="true" />
+          <span>
+            {live
+              ? t.localeNotice.searchAgain({
+                  language: t.languages[resultsLocale],
+                  current: t.languages[locale],
+                })
+              : t.localeNotice.writtenIn({
+                  language: t.languages[resultsLocale],
+                })}
+          </span>
+        </p>
+      )}
+      {!!shown?.warnings.length && (
         <details className="discovery-limitations">
-          <summary>{t.limitations({ count: job.warnings.length })}</summary>
+          <summary>{t.limitations({ count: shown.warnings.length })}</summary>
           <ul>
-            {job.warnings.map((warning, index) => (
+            {shown.warnings.map((warning, index) => (
               <li key={index}>{warning}</li>
             ))}
           </ul>
         </details>
       )}
-      {!loading && !running && !opportunities.length && (
+      {!settling && !running && !opportunities.length && (
         <section className="discovery-empty">
           <Compass size={34} strokeWidth={1.3} />
-          <h2>{job ? t.empty.retryTitle : t.empty.title}</h2>
-          <p>{job ? t.empty.retryBody : t.empty.body}</p>
+          <h2>{shown ? t.empty.retryTitle : t.empty.title}</h2>
+          <p>{shown ? t.empty.retryBody : t.empty.body}</p>
           <div>
             {angles.map((angle, index) => (
               <div key={angle}>
@@ -539,7 +701,11 @@ export default function DiscoveryPanel({
         </section>
       )}
       {!!opportunities.length && (
-        <section className="discovery-results" aria-label={t.results.label}>
+        <section
+          className="discovery-results"
+          id="discovery-results"
+          aria-label={t.results.label}
+        >
           <div className="discovery-results-heading">
             <div>
               <span className="eyebrow">
@@ -549,9 +715,11 @@ export default function DiscoveryPanel({
               <p>
                 {previous
                   ? t.results.previousNote({ date: date(previous.createdAt) })
-                  : t.results.note({
-                      sort: t.sorts[job?.preferences.sort ?? "updated"],
-                    })}
+                  : sample
+                    ? t.results.sampleNote
+                    : t.results.note({
+                        sort: t.sorts[shown?.preferences.sort ?? "updated"],
+                      })}
               </p>
             </div>
             <span className="discovery-count">
@@ -566,23 +734,31 @@ export default function DiscoveryPanel({
             return (
               <article
                 className="discovery-opportunity"
-                key={`${previous?.createdAt || job?.id}:${item.id}`}
+                key={`${previous?.createdAt || shown?.id}:${item.id}`}
               >
                 <header>
                   <span className="discovery-rank">
                     {String(index + 1).padStart(2, "0")}
                   </span>
                   <div>
-                    <a
-                      className="discovery-repo-link"
-                      href={candidate.url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <Github size={16} />
-                      {candidate.fullName}
-                      <ExternalLink size={12} />
-                    </a>
+                    {candidate.url ? (
+                      <a
+                        className="discovery-repo-link"
+                        href={candidate.url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <FolderGit2 size={16} />
+                        {candidate.fullName}
+                        <ExternalLink size={12} />
+                      </a>
+                    ) : (
+                      // Sample repositories are fictional: no link.
+                      <span className="discovery-repo-link">
+                        <FolderGit2 size={16} />
+                        {candidate.fullName}
+                      </span>
+                    )}
                     <p className="discovery-repo-description">
                       {candidate.description}
                     </p>
@@ -699,14 +875,20 @@ export default function DiscoveryPanel({
                       return (
                         source && (
                           <div key={i}>
-                            <a
-                              href={source.url}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              {source.title}
-                              <ArrowUpRight size={14} />
-                            </a>
+                            {source.url ? (
+                              <a
+                                href={source.url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {source.title}
+                                <ArrowUpRight size={14} />
+                              </a>
+                            ) : (
+                              <span className="discovery-source-title">
+                                {source.title}
+                              </span>
+                            )}
                             <blockquote>
                               <MarkdownContent>
                                 {evidence.quote}
@@ -720,10 +902,11 @@ export default function DiscoveryPanel({
                   </div>
                 </details>
                 <footer>
-                  <p>{t.card.chooseHint}</p>
+                  <p>{sample ? t.card.sampleHint : t.card.chooseHint}</p>
                   <button
                     className="button primary"
-                    disabled={!!choosing || !!running || busy}
+                    // A sample repository cannot be imported.
+                    disabled={sample || !!choosing || !!running || busy}
                     onClick={() => void choose(item, candidate)}
                   >
                     {choosing === item.id ? (
@@ -739,13 +922,13 @@ export default function DiscoveryPanel({
           })}
         </section>
       )}
-      {job?.modelExecution && (
+      {shown?.modelExecution && (
         <details className="discovery-runtime">
           <summary>{t.runtime.summary}</summary>
-          <ModelSummary execution={job.modelExecution} analysis />
+          <ModelSummary execution={shown.modelExecution} analysis />
           <EfficiencySummary
-            metrics={job.efficiency}
-            mode={job.preferences.ponytailMode}
+            metrics={shown.efficiency}
+            mode={shown.preferences.ponytailMode}
             title={t.runtime.usageTitle}
           />
         </details>

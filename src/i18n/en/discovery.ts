@@ -5,7 +5,7 @@ import type {
   DiscoveryPreferences,
 } from "../../../shared/discovery";
 import type { PonytailMode } from "../../../shared/efficiency";
-import { formatters } from "../../../shared/i18n/locale";
+import { formatters, type Locale } from "../../../shared/i18n/locale";
 
 const fmt = formatters("en");
 
@@ -57,7 +57,8 @@ const discovery = {
     /** A saved effort that the selected model's catalog entry does not list. */
     effortNotInCatalog: ({ effort }: { effort: string }) =>
       `${effort} (saved, not in the catalog)`,
-    ponytailMode: "Ponytail mode",
+    ponytailMode: "Efficiency mode",
+    ponytailCredit: "Efficiency mode is based on Ponytail by DietrichGebert (MIT).",
     ponytailModes: {
       lite: "Lite · default",
       full: "Full",
@@ -74,6 +75,30 @@ const discovery = {
     relevance: "Relevance",
     stars: "Stars",
   } satisfies Record<DiscoveryPreferences["sort"], string>,
+  /** On Free, where a live search would start. */
+  locked: {
+    body: "Live discovery searches GitHub and has your AI provider weigh each project. It is part of Pro; results you already have stay readable.",
+    startTrial: ({ days }: { days: number }) =>
+      `Start ${fmt.number(days)}-day trial`,
+    upgrade: "Upgrade to Pro",
+  },
+  /** The labelled sample results shown without Pro and in the demo. */
+  sample: {
+    title: "Sample results — not live",
+    body: "These fictional projects show what discovery finds. Nothing here comes from GitHub or an AI, and they cannot be imported.",
+  },
+  /** Language names, in the UI language. */
+  languages: {
+    en: "English",
+    "zh-TW": "Traditional Chinese",
+  } satisfies Record<Locale, string>,
+  /** Saved results written in another language than the UI's. */
+  localeNotice: {
+    writtenIn: ({ language }: { language: string }) =>
+      `These results were written in ${language}.`,
+    searchAgain: ({ language, current }: { language: string; current: string }) =>
+      `These results were written in ${language}. Search again to get them in ${current}.`,
+  },
   reload: "Reload status",
   loading: "Loading your discovery history…",
   progress: {
@@ -134,6 +159,9 @@ const discovery = {
     previousTitle: "Your previous recommendations are still here.",
     note: ({ sort }: { sort: string }) =>
       `We took 12 candidates in the "${sort}" order you chose and kept at most 6 after checking them. The order comes from the analysis, not from a GitHub-wide ranking. Before you start, check the issue's latest status and whether the maintainers want the change.`,
+    /** Above the sample results, which no search produced. */
+    sampleNote:
+      "A live search takes 12 candidates in the order you choose and keeps at most 6 after checking them, like these.",
     previousNote: ({ date }: { date?: string }) =>
       date
         ? `These results are from ${date} and do not reflect your latest search.`
@@ -165,6 +193,8 @@ const discovery = {
       `Evidence and quoted sources · ${fmt.number(count)}`,
     chooseHint:
       "Choosing it imports the project and fills in contribution settings you can edit.",
+    sampleHint:
+      "A sample cannot be chosen. Live discovery finds real projects you can import.",
     choose: "Choose this opportunity",
     importing: "Importing the project…",
   },

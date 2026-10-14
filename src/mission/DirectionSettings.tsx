@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   Bug,
   Cpu,
@@ -26,13 +26,31 @@ import {
   type ReasoningEffort,
 } from "../../shared/models";
 import {
+  clampContributionSettings,
+  freeEntitlements,
+  proEntitlements,
+  proOnlyEfforts,
+  type Entitlements,
+} from "../../shared/plans";
+import {
   defaultPonytailMode,
   ponytailSource,
   type PonytailMode,
 } from "../../shared/efficiency";
 import { api } from "../api";
+import { usePresentation } from "../app/presentation";
 import { useT } from "../i18n";
+import { ProBadge } from "../license/ProBadge";
+import { ReadinessMessage } from "../setup/ReadinessNotice";
+import { useDoctor, type DoctorState } from "../setup/useDoctor";
+import { usePlan } from "./plan";
+import { providerReadiness, withProvider } from "./readiness";
 import "./mission.css";
+
+/** The efforts only Pro offers; "Default" is on every plan. */
+const proEfforts: readonly string[] = proOnlyEfforts;
+/** The most teammates Pro runs, for the notice that Free runs fewer. */
+const proTeammates = proEntitlements(1).maxTeammates;
 
 /** The directions in display order; their labels are in the `mission` dictionary. */
 export const directionOptions = [
@@ -68,6 +86,20 @@ export interface DirectionSettingsProps {
   onChange: (next: ContributionSettings) => void;
   compact?: boolean;
   modelsOnly?: boolean;
+  /** What the plan unlocks, when the parent knows it; read otherwise. */
+  entitlements?: Entitlements;
+  /**
+   * The sample project: every Pro control is unlocked and marked PRO, and
+   * provider readiness is not checked. Default: the `demo=play` flag.
+   */
+  demo?: boolean;
+  /** A useDoctor() state to share; the form loads its own otherwise. */
+  doctor?: DoctorState;
+  /**
+   * The model catalog for a render that runs no effects, such as a static
+   * render in tests. A mounted form loads the catalog and shows that one.
+   */
+  initialCatalog?: ModelCatalog;
 }
 
 export function DirectionSettings({
@@ -75,14 +107,25 @@ export function DirectionSettings({
   onChange,
   compact = false,
   modelsOnly = false,
+  entitlements,
+  demo: demoProp,
+  doctor,
+  initialCatalog,
 }: DirectionSettingsProps) {
   const { directions, settings: t } = useT("mission");
   const { reasoningEffort: efforts, reasoningEffortWithId } = useT("common");
   const id = useId();
-  const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
+  const presentation = usePresentation();
+  const demo = demoProp ?? presentation.play;
+  const plan = usePlan({ entitlements, demo });
+  const ownDoctor = useDoctor({ enabled: !demo && !doctor });
+  const report = demo ? null : (doctor ?? ownDoctor).report;
+  const [catalog, setCatalog] = useState<ModelCatalog | null>(
+    initialCatalog ?? null,
+  );
   // The reason the catalog request failed; null while it has not failed.
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [loadingModels, setLoadingModels] = useState(true);
+  const [loadingModels, setLoadingModels] = useState(!initialCatalog);
   const [catalogAttempt, setCatalogAttempt] = useState(0);
   const provider = value.provider ?? "codex";
   const providerLabel = providerLabels[provider];
@@ -126,6 +169,43 @@ export function DirectionSettings({
   ) {
     onChange({ ...value, [key]: next });
   }
+  const readiness = (option: AgentProvider) =>
+    providerReadiness(report, option);
+  const selectedReadiness = withProvider(
+    { ready: true, checking: false, missing: [] },
+    readiness(provider),
+  );
+  const effortLocked = plan.locked("deepReasoning");
+  const effortMarked = plan.marked("deepReasoning");
+  const webLocked = plan.locked("webAccess");
+  const teamLocked = plan.locked("teamSize");
+  const teamMarked = plan.marked("teamSize");
+  const teamLimit = teamLocked
+    ? (plan.entitlements?.maxTeammates ?? freeEntitlements.maxTeammates)
+    : undefined;
+
+  // Free runs at most 2 teammates. A value above the plan's limit (the
+  // default asks for 3, and a project saved under Pro may ask for 4) is
+  // lowered as soon as it arrives, and the form says why. The server
+  // clamps a saved setting too (PUT /api/repos/:id/settings answers
+  // clamped: true), for clients that do not.
+  const overLimit =
+    !modelsOnly && teamLimit !== undefined && value.maxTeammates > teamLimit;
+  const [clampedOnLoad, setClampedOnLoad] = useState(false);
+  const latest = useRef({ value, onChange, entitlements: plan.entitlements });
+  latest.current = { value, onChange, entitlements: plan.entitlements };
+  useEffect(() => {
+    const { value: current, onChange: apply, entitlements: limits } =
+      latest.current;
+    if (!overLimit || !limits) return;
+    const clamp = clampContributionSettings(current, limits);
+    if (!clamp.clamped) return;
+    apply(clamp.settings);
+    setClampedOnLoad(true);
+  }, [overLimit, teamLimit]);
+  // The notice stays after the parent took the lower value, while Free lasts.
+  const clampNotice =
+    !modelsOnly && teamLimit !== undefined && (overLimit || clampedOnLoad);
 
   return (
     <div
@@ -273,15 +353,27 @@ export function DirectionSettings({
               })
             }
           >
-            {agentProviders.map((option) => (
-              <option key={option} value={option}>
-                {providerLabels[option]}
-              </option>
-            ))}
+            {agentProviders.map((option) => {
+              const state = readiness(option)?.state;
+              return (
+                <option key={option} value={option}>
+                  {state
+                    ? t.model.providerOption({
+                        provider: providerLabels[option],
+                        state: t.model.providerStates[state],
+                      })
+                    : providerLabels[option]}
+                </option>
+              );
+            })}
           </select>
           <p id={`${id}-provider-help`} className="mission-field-note">
             {t.model.providerHelp[provider]}
           </p>
+          <ReadinessMessage
+            readiness={selectedReadiness}
+            maskUser={presentation.maskUser}
+          />
         </div>
         <div className="mission-form-columns">
           <div className="mission-form-field">
@@ -339,7 +431,7 @@ export function DirectionSettings({
                 loadingModels ||
                 (!availableEfforts.length && !value.reasoningEffort)
               }
-              aria-describedby={`${id}-reasoning-help`}
+              aria-describedby={`${id}-reasoning-default ${id}-reasoning-help`}
               onChange={(event) =>
                 update(
                   "reasoningEffort",
@@ -359,12 +451,25 @@ export function DirectionSettings({
                   {t.model.unconfirmed({ value: value.reasoningEffort ?? "" })}
                 </option>
               )}
-              {availableEfforts.map((effort) => (
-                <option key={effort} value={effort}>
-                  {reasoningEffortWithId({ effort })}
-                </option>
-              ))}
+              {availableEfforts.map((effort) => {
+                const label = reasoningEffortWithId({ effort });
+                const proOnly = proEfforts.includes(effort);
+                return (
+                  <option
+                    key={effort}
+                    value={effort}
+                    disabled={proOnly && effortLocked}
+                  >
+                    {proOnly && effortMarked
+                      ? t.model.proOption({ label })
+                      : label}
+                  </option>
+                );
+              })}
             </select>
+            <p id={`${id}-reasoning-default`} className="mission-field-note">
+              {t.model.defaultEffortNote}
+            </p>
             <p id={`${id}-reasoning-help`} className="mission-field-note">
               {unknownEffort && !loadingModels
                 ? t.model.unknownEffort
@@ -372,10 +477,14 @@ export function DirectionSettings({
             </p>
           </div>
         </div>
-        <label className="mission-plan-option">
+        <label
+          className={`mission-plan-option${webLocked && value.webAccess !== true ? " mission-option-locked" : ""}`}
+        >
           <input
             type="checkbox"
             checked={value.webAccess === true}
+            // Saved under Pro, web access can still be turned off on Free.
+            disabled={webLocked && value.webAccess !== true}
             onChange={(event) => update("webAccess", event.target.checked)}
             aria-describedby={`${id}-web-help`}
           />
@@ -383,6 +492,7 @@ export function DirectionSettings({
             <strong>
               <Globe size={16} />
               {t.model.webAccess}
+              {plan.marked("webAccess") && <ProBadge />}
             </strong>
             <small id={`${id}-web-help`}>{t.model.webAccessHelp}</small>
           </span>
@@ -404,7 +514,9 @@ export function DirectionSettings({
       {!modelsOnly && (
         <>
           <div className="mission-form-field mission-ponytail-setting">
-            <label htmlFor={`${id}-ponytail`}>{t.ponytail.label}</label>
+            <label htmlFor={`${id}-ponytail`} title={t.ponytail.credit}>
+              {t.ponytail.label}
+            </label>
             <select
               id={`${id}-ponytail`}
               value={value.ponytailMode ?? defaultPonytailMode}
@@ -434,27 +546,34 @@ export function DirectionSettings({
                 {t.team.legend}
               </legend>
               <div className="mission-team-choices">
-                {([2, 3, 4] as const).map((count) => (
-                  <label
-                    className={
-                      value.maxTeammates === count
-                        ? "mission-team-choice selected"
-                        : "mission-team-choice"
-                    }
-                    key={count}
-                  >
-                    <input
-                      type="radio"
-                      name={`${id}-teammates`}
-                      checked={value.maxTeammates === count}
-                      onChange={() => update("maxTeammates", count)}
-                    />
-                    <strong>{count}</strong>
-                    <span>{t.team.teammates}</span>
-                  </label>
-                ))}
+                {([2, 3, 4] as const).map((count) => {
+                  const proOnly = count > freeEntitlements.maxTeammates;
+                  const locked = teamLimit !== undefined && count > teamLimit;
+                  return (
+                    <label
+                      className={`mission-team-choice${value.maxTeammates === count ? " selected" : ""}${locked ? " locked" : ""}`}
+                      key={count}
+                    >
+                      <input
+                        type="radio"
+                        name={`${id}-teammates`}
+                        checked={value.maxTeammates === count}
+                        disabled={locked}
+                        onChange={() => update("maxTeammates", count)}
+                      />
+                      <strong>{count}</strong>
+                      <span>{t.team.teammates}</span>
+                      {proOnly && teamMarked && <ProBadge />}
+                    </label>
+                  );
+                })}
               </div>
               <p className="mission-field-note">{t.team.note}</p>
+              {clampNotice && (
+                <p className="mission-clamp-notice" role="status">
+                  {t.team.clampNotice({ free: teamLimit, pro: proTeammates })}
+                </p>
+              )}
             </fieldset>
             <label className="mission-plan-option">
               <input

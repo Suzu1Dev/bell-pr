@@ -3,9 +3,14 @@ import test from "node:test";
 import { createElement } from "react";
 import { formatters } from "../../shared/i18n/locale";
 import type { ProjectInsights } from "../../shared/insights";
-import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
+import { freeEntitlements, proEntitlements } from "../../shared/plans";
+import { getDemo } from "../demo";
+import type { PlaybackClock } from "../demo/playback";
+import { assertNoHan, renderEn, renderWith, renderZh } from "../test-utils/render";
 import { demoInsights } from "./demo";
 import { ProjectOverview, type ProjectOverviewProps } from "./ProjectOverview";
+import { playSampleAnalysis, stopSampleAnalysis } from "./sample-analysis";
+import { mount } from "./test-dom";
 
 const repo = {
   id: "demo-repo",
@@ -234,27 +239,29 @@ const englishRun = {
   diff: [],
 } as unknown as NonNullable<ProjectOverviewProps["run"]>;
 
+const overviewProps = (
+  overrides: Partial<ProjectOverviewProps> = {},
+): ProjectOverviewProps => ({
+  repo,
+  insights: englishInsights,
+  loading: false,
+  error: "",
+  recommending: false,
+  recommendationError: "",
+  recommendationPreferences: { order: [], hidden: [] },
+  savingPreferences: false,
+  preferenceError: "",
+  stale: false,
+  onAnalyze() {},
+  onRecommendMore() {},
+  onSavePreferences() {},
+  onChooseRecommendation() {},
+  onReadCode() {},
+  ...overrides,
+});
+
 const renderEnglish = (overrides: Partial<ProjectOverviewProps> = {}) =>
-  renderEn(
-    createElement(ProjectOverview, {
-      repo,
-      insights: englishInsights,
-      loading: false,
-      error: "",
-      recommending: false,
-      recommendationError: "",
-      recommendationPreferences: { order: [], hidden: [] },
-      savingPreferences: false,
-      preferenceError: "",
-      stale: false,
-      onAnalyze() {},
-      onRecommendMore() {},
-      onSavePreferences() {},
-      onChooseRecommendation() {},
-      onReadCode() {},
-      ...overrides,
-    }),
-  );
+  renderEn(createElement(ProjectOverview, overviewProps(overrides)));
 
 const en = formatters("en");
 
@@ -390,4 +397,245 @@ test("the English stale notices name the changed and cited files in one sentence
     },
   });
   assert.match(capped, /At least 1,250 files changed .*, including 12 or more files that this analysis cites: f0\.ts, f1\.ts/);
+});
+
+/** The "Generate 5 more" button, as rendered. */
+function moreButton(html: string) {
+  const found = html.match(/<button[^>]*aria-describedby="mission-more-description"[^>]*>.*?<\/button>/)?.[0];
+  assert.ok(found, "no Generate more button");
+  return found;
+}
+const moreReason = (html: string) =>
+  html.match(/<p id="mission-more-description">([^<]*)<\/p>/)?.[1];
+
+test("Generate 5 more is locked on Free with its reason, and open on Pro", () => {
+  for (const props of [{ entitlements: freeEntitlements }, { canRecommendMore: false }]) {
+    const html = renderEnglish(props);
+    assertNoHan(html);
+    assert.match(moreButton(html), /disabled=""/);
+    assert.match(moreButton(html), /Generate 5 more<span class="pro-badge"[^>]*>PRO<\/span><\/button>/);
+    assert.equal(
+      moreReason(html),
+      "Generating more recommendations is part of Pro. Free keeps the 5 recommendations of each analysis, and the ones you already have stay.",
+    );
+    assert.match(html, /<button type="button" class="mission-text-button mission-upgrade-button">See what Pro adds/);
+  }
+  for (const props of [{ entitlements: proEntitlements(2) }, { canRecommendMore: true }, {}]) {
+    const html = renderEnglish(props);
+    assert.doesNotMatch(moreButton(html), /disabled|pro-badge/);
+    assert.match(moreReason(html) ?? "", /^The Agent uses the model settings saved for this project/);
+    assert.doesNotMatch(html, /See what Pro adds/);
+  }
+  // A stale analysis still says Pro first on Free.
+  assert.match(moreReason(renderEnglish({ entitlements: freeEntitlements, stale: true })) ?? "", /part of Pro/);
+  assert.match(
+    render({ insights: analyzed, entitlements: freeEntitlements }),
+    /產出更多建議是 Pro 功能。/,
+  );
+});
+
+test("the sample offers its extra batch unlocked, with a PRO chip, once", () => {
+  const sample = getDemo("en").insights;
+  const html = renderEnglish({ insights: sample, entitlements: freeEntitlements });
+  assertNoHan(html);
+  assert.doesNotMatch(moreButton(html), /disabled/);
+  assert.match(moreButton(html), /<span class="pro-badge"/);
+  assert.match(moreReason(html) ?? "", /^In the sample this adds prewritten recommendations, without calling an AI\./);
+  assert.doesNotMatch(html, /See what Pro adds/);
+
+  const extras = getDemo("en").extraRecommendations ?? [];
+  const expanded = renderEnglish({
+    insights: {
+      ...sample,
+      recommendations: [...sample.recommendations, ...extras],
+      recommendationExpansion: {
+        generatedAt: sample.generatedAt,
+        addedIds: extras.map((idea) => idea.id),
+        requestedCount: 5,
+      },
+    },
+    entitlements: freeEntitlements,
+  });
+  assertNoHan(expanded);
+  assert.match(moreButton(expanded), /disabled=""/);
+  assert.match(moreReason(expanded) ?? "", /^The sample&#x27;s extra recommendations are all shown\./);
+  assert.match(expanded, /View this batch&#x27;s new recommendations \(5 of 5\)/);
+  // Its provenance says it is a sample, not an unrecorded model call.
+  assert.match(expanded, /mission-more-provenance/);
+  assert.doesNotMatch(expanded, /did not record its model/);
+  assert.match(expanded, /No measurements yet\. The sample did not call AI\./);
+});
+
+test("while the sample's analysis plays, the loading state lists its lines so far", async () => {
+  // A clock that never fires: the playback stays on its first line.
+  const timers: (() => void)[] = [];
+  const clock: PlaybackClock = {
+    now: () => 0,
+    setTimeout: (callback) => timers.push(callback),
+    clearTimeout() {},
+  };
+  const demo = getDemo("en");
+  const steps = demo.analysisSteps ?? [];
+  const played = playSampleAnalysis({ demo, clock });
+  try {
+    timers.shift()?.();
+    const html = renderEnglish({ insights: null, loading: true });
+    assertNoHan(html);
+    assert.match(html, /Turning the code into a project overview\./);
+    assert.ok(
+      html.includes('role="progressbar" aria-label="Analysis progress" aria-valuemin="0" aria-valuemax="5" aria-valuenow="2"'),
+    );
+    assert.match(html, /style="width:33%"/);
+    assert.ok(html.includes(`<li class="done">`));
+    assert.ok(html.includes(`<span>${steps[0]}</span>`));
+    const current = html.slice(html.indexOf('<li class="current">'));
+    assert.ok(current.startsWith('<li class="current">') && current.includes(`<span>${steps[1]}</span></li>`));
+    assert.ok(!html.includes(steps[2]));
+    // Another repository, or a real analysis, shows no sample lines.
+    assert.doesNotMatch(renderEnglish({ repo: { ...repo, id: "repo-1" }, insights: null, loading: true }), /mission-analysis-steps/);
+    assert.doesNotMatch(renderEnglish({ insights: null, loading: false }), /mission-analysis-steps/);
+    assert.match(
+      renderWith("zh-TW", createElement(ProjectOverview, overviewProps({ insights: null, loading: true }))),
+      /aria-label="分析進度"/,
+    );
+  } finally {
+    stopSampleAnalysis();
+    await played;
+  }
+});
+
+/** The section ids in the order the page shows them. */
+const sectionOrder = (html: string) =>
+  [...html.matchAll(/<section id="(overview-[a-z]+)"/g)].map((match) => match[1]);
+/** The section nav's links, as [anchor, label]. */
+const navLinks = (html: string) =>
+  [...(html.match(/<nav class="mission-section-nav"[^>]*>.*?<\/nav>/)?.[0] ?? "").matchAll(/<a href="#([^"]+)"[^>]*>([^<]+)<\/a>/g)].map(
+    (match) => [match[1], match[2]],
+  );
+
+test("a sticky nav links to every section, and a run's overview keeps the directions last", () => {
+  const html = renderEnglish({ run: englishRun });
+  assertNoHan(html);
+  assert.match(html, /<nav class="mission-section-nav" aria-label="On this page">/);
+  assert.deepEqual(navLinks(html), [
+    ["overview-purpose", "Purpose"],
+    ["overview-journey", "How people use it"],
+    ["overview-reading", "Where to start reading"],
+    ["overview-contribution", "This contribution"],
+    ["overview-directions", "Directions"],
+  ]);
+  assert.deepEqual(sectionOrder(html), [
+    "overview-purpose",
+    "overview-journey",
+    "overview-reading",
+    "overview-contribution",
+    "overview-directions",
+  ]);
+  // Each target can take focus when a link moves there.
+  assert.match(html, /<section id="overview-directions" tabindex="-1" class="mission-recommendations"/);
+});
+
+test("without a run the directions come right after the project card", () => {
+  const html = renderEnglish({ onStartContribution() {} });
+  assert.deepEqual(sectionOrder(html), [
+    "overview-purpose",
+    "overview-directions",
+    "overview-journey",
+    "overview-reading",
+  ]);
+  assert.deepEqual(
+    navLinks(html).map(([anchor]) => anchor),
+    ["overview-purpose", "overview-directions", "overview-journey", "overview-reading"],
+  );
+  // The details and the next step still follow the reading path.
+  assert.ok(html.indexOf("mission-project-details") > html.indexOf('id="overview-reading"'));
+  assert.ok(html.indexOf("mission-next-step") > html.indexOf("mission-project-details"));
+  // Sections without content get no link.
+  const short = renderEnglish({ insights: { ...englishInsights, userJourney: [], readingPath: undefined } });
+  assert.deepEqual(navLinks(short).map(([anchor]) => anchor), ["overview-purpose", "overview-directions"]);
+  // Before an analysis there is nothing to navigate.
+  assert.doesNotMatch(renderEnglish({ insights: null }), /mission-section-nav/);
+  assert.match(render(), /aria-label="本頁內容"/);
+  assert.match(render(), />貢獻方向<\/a>/);
+});
+
+test("the reading path opens on its first two steps, with a button that shows the rest", () => {
+  const readingPath = ["a.ts", "b.ts", "c.ts", "d.ts"].map((path) => ({
+    path,
+    why: `Why ${path}`,
+    lookFor: `Look in ${path}`,
+  }));
+  const html = renderEnglish({ insights: { ...englishInsights, readingPath } });
+  assertNoHan(html);
+  const list = html.match(/<ol class="mission-reading-steps".*?<\/ol>/)?.[0] ?? "";
+  const steps = [...list.matchAll(/<li( hidden="")?><span class="mission-journey-number">(\d+)<\/span>/g)]
+    .map((match) => [match[2], !!match[1]]);
+  assert.deepEqual(steps, [["01", false], ["02", false], ["03", true], ["04", true]]);
+  // Hidden steps stay in the page, so "Show all" only reveals them.
+  assert.ok(html.includes("Look in d.ts"));
+  assert.match(
+    html,
+    /<button type="button" class="mission-text-button mission-reading-toggle" aria-expanded="false" aria-controls="mission-reading-steps">Show all 4 steps/,
+  );
+  assert.match(html, /<ol class="mission-reading-steps" id="mission-reading-steps">/);
+  // Two steps or fewer need no button.
+  assert.doesNotMatch(renderEnglish(), /mission-reading-toggle/);
+  assert.match(render({ insights: { ...demoInsights, readingPath } }), />顯示全部 4 步/);
+});
+
+test("an AI analysis and its recommendations are labelled AI-generated; the sample is not", () => {
+  const html = renderEnglish();
+  assert.match(html, /<span class="mission-source"><svg[^>]*>.*?<\/svg>AI-generated analysis<\/span>/);
+  assert.match(html, /<span class="mission-source"><svg[^>]*>.*?<\/svg>AI-generated<\/span><span class="mission-ideas-count">3 recommendations<\/span>/);
+  const sample = renderEnglish({ insights: getDemo("en").insights });
+  assert.doesNotMatch(sample, /AI-generated/);
+  assert.match(sample, /Sample analysis/);
+  assert.match(render({ insights: analyzed }), /AI 生成的專案分析/);
+});
+
+test("an analysis in another language than the UI offers to analyze again in the UI's", () => {
+  const html = renderEnglish({ insights: { ...englishInsights, locale: "zh-TW" } });
+  assertNoHan(html);
+  assert.match(
+    html,
+    /<div class="mission-alert mission-alert-info" role="status"><svg[^>]*>.*?<\/svg><span>Analyzed in Traditional Chinese\.<\/span><button type="button">Re-analyze in English<svg/,
+  );
+  assert.match(
+    renderEnglish({ insights: { ...englishInsights, locale: "zh-TW" }, loading: true }),
+    /<button type="button" disabled="">Re-analyze in English/,
+  );
+  // The same language, an unknown one (older caches) and the sample need nothing.
+  for (const insights of [
+    { ...englishInsights, locale: "en" as const },
+    englishInsights,
+    { ...getDemo("en").insights, locale: "zh-TW" as const },
+  ])
+    assert.doesNotMatch(renderEnglish({ insights }), /Analyzed in|Re-analyze in/);
+  const zh = render({ insights: { ...analyzed, locale: "en" } });
+  assert.match(zh, /這份分析以英文撰寫。/);
+  assert.match(zh, />改用繁體中文重新分析</);
+});
+
+test("the sample's overview reads no plan, also while its analysis plays", async () => {
+  const realFetch = globalThis.fetch;
+  const requests: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    requests.push(String(input));
+    return new Response(
+      JSON.stringify({ license: { plan: "free", source: "none", status: "none" } }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  }) as typeof fetch;
+  const loadingOverview = (id: string) =>
+    createElement(ProjectOverview, overviewProps({ repo: { ...repo, id }, insights: null, loading: true }));
+  const view = await mount(loadingOverview("demo-repo"));
+  try {
+    assert.deepEqual(requests, []);
+    // A real repository's overview reads the plan for "Generate 5 more".
+    await view.rerender(loadingOverview("repo-1"));
+    assert.deepEqual(requests, ["/api/license"]);
+  } finally {
+    await view.unmount();
+    globalThis.fetch = realFetch;
+  }
 });

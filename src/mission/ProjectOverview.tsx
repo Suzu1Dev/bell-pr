@@ -14,6 +14,7 @@ import {
   FolderTree,
   GitBranch,
   GripVertical,
+  Languages,
   Lightbulb,
   Loader2,
   RefreshCw,
@@ -32,11 +33,17 @@ import {
   type RecommendationPreferences,
 } from "../../shared/insights";
 import type { Formatters } from "../../shared/i18n/locale";
-import { useFormat, useT, type Messages } from "../i18n";
+import type { Entitlements } from "../../shared/plans";
+import { getDemo } from "../demo";
+import { useFormat, useLocale, useT, type Messages } from "../i18n";
 import type { Repo, Run } from "../types";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
+import { ProBadge } from "../license/ProBadge";
+import { requestUpgrade } from "../license/useEntitlements";
 import { ModelSummary } from "../models/ModelSummary";
 import { directionOptions } from "./DirectionSettings";
+import { usePlan } from "./plan";
+import { useSampleAnalysis } from "./sample-analysis";
 import {
   moveRecommendation,
   orderedRecommendations,
@@ -67,6 +74,14 @@ export interface ProjectOverviewProps {
   /** Updates BELL's clone to the latest default branch; absent for local imports and the demo. */
   onUpdateRepo?: () => void;
   updatingRepo?: boolean;
+  /**
+   * Whether "Generate 5 more" may run (Pro and the trial). When absent it
+   * follows `entitlements`, or the plan read from the server. The sample
+   * project is never locked.
+   */
+  canRecommendMore?: boolean;
+  /** What the plan unlocks, when the parent knows it. */
+  entitlements?: Entitlements;
 }
 
 type MissionMessages = Messages["mission"];
@@ -169,10 +184,117 @@ function EvidencePaths({
   );
 }
 
+/** The reading steps shown before "Show all". */
+const firstReadingSteps = 2;
+
+/** The overview's sections that the section nav links to. */
+type OverviewSection =
+  | "purpose"
+  | "journey"
+  | "reading"
+  | "contribution"
+  | "directions";
+
+/** The element id of a section, such as `overview-directions`. */
+const sectionAnchor = (section: OverviewSection) => `overview-${section}`;
+
+/** Scrolls `target` to the top, below the sticky section nav, and focuses it. */
+function showSection(target: HTMLElement) {
+  target.scrollIntoView({
+    block: "start",
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? "auto"
+      : "smooth",
+  });
+  target.focus({ preventScroll: true });
+}
+
+/**
+ * The sticky in-page nav. A link scrolls to its section and keeps the
+ * route in the address; the section in view is marked as the current one.
+ */
+function SectionNav({ sections }: { sections: OverviewSection[] }) {
+  const t = useT("mission").sections;
+  const [current, setCurrent] = useState<OverviewSection>();
+  const list = useRef<HTMLUListElement>(null);
+  const sectionKey = sections.join(" ");
+  // On a narrow screen the links scroll sideways; keep the current one shown.
+  useEffect(() => {
+    const links = list.current;
+    const link = links?.querySelector("[aria-current]");
+    if (!links || !link) return;
+    const box = links.getBoundingClientRect();
+    const item = link.getBoundingClientRect();
+    if (item.left < box.left) links.scrollLeft -= box.left - item.left;
+    else if (item.right > box.right) links.scrollLeft += item.right - box.right;
+  }, [current]);
+  // A link to a section, such as #overview-directions, scrolls to it; the
+  // nav mounts with the sections, so a link followed while the analysis
+  // loaded works too. The router keeps the route for such an anchor.
+  useEffect(() => {
+    const follow = () => {
+      const anchor = window.location.hash.slice(1);
+      const target = anchor.startsWith("overview-")
+        ? document.getElementById(anchor)
+        : null;
+      if (target) showSection(target);
+    };
+    follow();
+    window.addEventListener("hashchange", follow);
+    return () => window.removeEventListener("hashchange", follow);
+  }, []);
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const shown = sectionKey.split(" ") as OverviewSection[];
+    const inView = new Set<string>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries)
+          if (entry.isIntersecting) inView.add(entry.target.id);
+          else inView.delete(entry.target.id);
+        const first = shown.find((section) => inView.has(sectionAnchor(section)));
+        if (first) setCurrent(first);
+      },
+      // The band below the nav where a section counts as the one being read.
+      { rootMargin: "-72px 0px -50% 0px" },
+    );
+    for (const section of shown) {
+      const element = document.getElementById(sectionAnchor(section));
+      if (element) observer.observe(element);
+    }
+    return () => observer.disconnect();
+  }, [sectionKey]);
+  return (
+    <nav className="mission-section-nav" aria-label={t.label}>
+      <ul ref={list}>
+        {sections.map((section) => (
+          <li key={section}>
+            <a
+              href={`#${sectionAnchor(section)}`}
+              aria-current={current === section ? "location" : undefined}
+              onClick={(event) => {
+                const target = document.getElementById(sectionAnchor(section));
+                if (!target) return;
+                event.preventDefault();
+                setCurrent(section);
+                showSection(target);
+              }}
+            >
+              {t[section]}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
 function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
   const t = useT("mission").brief;
   return (
     <section
+      id={sectionAnchor("contribution")}
+      tabIndex={-1}
       className="mission-contribution"
       aria-labelledby="mission-contribution-title"
     >
@@ -287,10 +409,37 @@ export function ProjectOverview({
   onStartContribution,
   onUpdateRepo,
   updatingRepo = false,
+  canRecommendMore,
+  entitlements,
 }: ProjectOverviewProps) {
   const t = useT("mission");
   const common = useT("common");
   const fmt = useFormat();
+  const [locale] = useLocale();
+  const demo = insights?.source === "demo";
+  // An analysis written in another language than the UI's offers to be
+  // written again in the UI's; the sample follows the UI by itself.
+  const analysisLocale =
+    insights?.locale && insights.locale !== locale && !demo
+      ? insights.locale
+      : undefined;
+  const sampleRepo = repo.id === getDemo(locale).repo.id;
+  // The sample's analysis in playback mode: its loading lines so far.
+  const sampleAnalysis = useSampleAnalysis();
+  const analysisSteps =
+    !insights && loading && sampleRepo ? sampleAnalysis.steps : [];
+  // The sample reads no plan, also while its analysis plays.
+  const plan = usePlan({
+    entitlements,
+    demo,
+    read: canRecommendMore === undefined && !sampleRepo,
+  });
+  // On Free, "Generate 5 more" is Pro; the sample shows it unlocked.
+  const moreLocked =
+    !demo &&
+    (canRecommendMore === undefined
+      ? plan.locked("moreRecommendations")
+      : !canRecommendMore);
   const ideaRail = useRef<HTMLDivElement>(null);
   const hiddenSummary = useRef<HTMLElement>(null);
   const pointerDrag = useRef<{
@@ -488,6 +637,8 @@ export function ProjectOverview({
   const shortfall =
     expansion?.requestedCount !== undefined &&
     addedIds.size < expansion.requestedCount;
+  // The sample has one prewritten batch to add.
+  const demoMoreShown = demo && !!expansion;
   const moreDisabled =
     updatingRepo ||
     loading ||
@@ -495,15 +646,218 @@ export function ProjectOverview({
     savingPreferences ||
     !insights ||
     stale ||
-    insights.source === "demo" ||
+    moreLocked ||
+    demoMoreShown ||
     insights.recommendations.length >= maxProjectRecommendations;
-  const moreDescription = insights?.source === "demo"
-    ? t.ideas.moreDemo
-    : stale
-      ? t.ideas.moreStale
-      : (insights?.recommendations.length ?? 0) >= maxProjectRecommendations
-        ? t.ideas.moreLimit({ max: maxProjectRecommendations })
-        : t.ideas.moreHint;
+  const moreDescription = demo
+    ? demoMoreShown
+      ? t.ideas.moreDemoShown
+      : t.ideas.moreDemo
+    : moreLocked
+      ? t.ideas.moreLocked
+      : stale
+        ? t.ideas.moreStale
+        : (insights?.recommendations.length ?? 0) >= maxProjectRecommendations
+          ? t.ideas.moreLimit({ max: maxProjectRecommendations })
+          : t.ideas.moreHint;
+  // Without a run (a project just imported), where to help comes right
+  // after the project card; a run's overview keeps it after the brief.
+  const sections: OverviewSection[] = insights
+    ? [
+        "purpose",
+        ...(run ? [] : (["directions"] as const)),
+        ...(insights.userJourney.length ? (["journey"] as const) : []),
+        ...(insights.readingPath?.length ? (["reading"] as const) : []),
+        ...(run ? (["contribution", "directions"] as const) : []),
+      ]
+    : [];
+  // The reading path opens on its first steps; "Show all" lists the rest
+  // until another analysis or repository shows.
+  const [expandedReading, setExpandedReading] = useState<string>();
+  const readingKey = `${repo.id}:${insights?.generatedAt ?? ""}`;
+  const allReadingSteps = expandedReading === readingKey;
+  // How people use the project, where to start reading and its parts.
+  const projectContext = insights && (
+    <>
+      {insights.userJourney.length > 0 && (
+        <section
+          id={sectionAnchor("journey")}
+          tabIndex={-1}
+          className="mission-journey"
+          aria-labelledby="mission-journey-title"
+        >
+          <div className="mission-section-heading">
+            <div>
+              <span className="mission-kicker">{t.journey.kicker}</span>
+              <h2 id="mission-journey-title">
+                <Route size={18} />
+                {t.journey.title}
+              </h2>
+            </div>
+          </div>
+          <ol>
+            {insights.userJourney.map((step, index) => (
+              <li key={index}>
+                <span className="mission-journey-number">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <p>{step}</p>
+                {index < insights.userJourney.length - 1 && (
+                  <ChevronRight size={16} aria-hidden="true" />
+                )}
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {!!insights.readingPath?.length && (
+        <section
+          id={sectionAnchor("reading")}
+          tabIndex={-1}
+          className="mission-reading-path"
+          aria-labelledby="mission-reading-title"
+        >
+          <div className="mission-section-heading">
+            <div>
+              <span className="mission-kicker">{t.reading.kicker}</span>
+              <h2 id="mission-reading-title">
+                <BookOpen size={18} />
+                {t.reading.title}
+              </h2>
+              <p>{t.reading.lead}</p>
+            </div>
+          </div>
+          {insights.howItFitsTogether && (
+            <div className="mission-reading-flow">
+              <span>{t.reading.flow}</span>
+              <p>{insights.howItFitsTogether}</p>
+            </div>
+          )}
+          <ol className="mission-reading-steps" id="mission-reading-steps">
+            {insights.readingPath.map((step, index) => {
+              const module = insights.modules.find(
+                (entry) => entry.path === step.path,
+              );
+              const evidence = insights.evidence.find(
+                (entry) => entry.path === step.path,
+              );
+              return (
+                <li
+                  key={`${step.path}-${index}`}
+                  hidden={!allReadingSteps && index >= firstReadingSteps}
+                >
+                  <span className="mission-journey-number">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <code>{step.path}</code>
+                  {step.sampled === false && (
+                    <span className="mission-reading-unsampled">
+                      {t.reading.unsampled}
+                    </span>
+                  )}
+                  <p>{step.why}</p>
+                  <p>
+                    <strong>{t.reading.lookFor}</strong>
+                    {step.lookFor}
+                  </p>
+                  {(module || evidence) && (
+                    <details className="mission-reading-context">
+                      <summary>
+                        {t.reading.context}
+                        <ChevronRight size={14} aria-hidden="true" />
+                      </summary>
+                      {module && (
+                        <p>
+                          <strong>{t.fields.modules}</strong>
+                          {module.purpose}
+                        </p>
+                      )}
+                      {evidence && (
+                        <p>
+                          <strong>{t.fields.evidence}</strong>
+                          {evidence.note}
+                        </p>
+                      )}
+                    </details>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+          {insights.readingPath.length > firstReadingSteps && (
+            <button
+              type="button"
+              className="mission-text-button mission-reading-toggle"
+              aria-expanded={allReadingSteps}
+              aria-controls="mission-reading-steps"
+              onClick={() =>
+                setExpandedReading(allReadingSteps ? undefined : readingKey)
+              }
+            >
+              {allReadingSteps
+                ? t.reading.showFirst({ count: firstReadingSteps })
+                : t.reading.showAll({ count: insights.readingPath.length })}
+              <ChevronRight
+                size={14}
+                aria-hidden="true"
+                className={allReadingSteps ? "mission-chevron-up" : "mission-chevron-down"}
+              />
+            </button>
+          )}
+        </section>
+      )}
+
+      {(insights.modules.length > 0 || insights.evidence.length > 0) && (
+        <div className="mission-project-details">
+          {insights.modules.length > 0 && (
+            <details className="mission-detail-block">
+              <summary>
+                <FolderTree size={16} />
+                <span>{t.details.modules}</span>
+                <span className="mission-detail-count">
+                  {t.details.moduleCount({
+                    count: insights.modules.length,
+                  })}
+                </span>
+                <ChevronRight size={15} />
+              </summary>
+              <div className="mission-module-list">
+                {insights.modules.map((module, index) => (
+                  <div key={`${module.path}-${index}`}>
+                    <code>{module.path}</code>
+                    <p>{module.purpose}</p>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+          {insights.evidence.length > 0 && (
+            <details className="mission-detail-block">
+              <summary>
+                <FileSearch size={16} />
+                <span>{t.details.sources}</span>
+                <span className="mission-detail-count">
+                  {t.details.sourceCount({
+                    count: insights.evidence.length,
+                  })}
+                </span>
+                <ChevronRight size={15} />
+              </summary>
+              <div className="mission-module-list">
+                {insights.evidence.map((evidence, index) => (
+                  <div key={`${evidence.path}-${index}`}>
+                    <code>{evidence.path}</code>
+                    <p>{evidence.note}</p>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+    </>
+  );
   return (
     <div className="mission-overview">
       <div className="mission-overview-heading">
@@ -562,6 +916,8 @@ export function ProjectOverview({
         </div>
       </div>
 
+      {sections.length > 0 && <SectionNav sections={sections} />}
+
       {error && (
         <div className="mission-alert mission-alert-error" role="alert">
           <span>{error}</span>
@@ -581,6 +937,24 @@ export function ProjectOverview({
           <span>{staleNotice(t, fmt, insights.baseSha, staleDetail)}</span>
         </div>
       )}
+      {analysisLocale && (
+        <div className="mission-alert mission-alert-info" role="status">
+          <Languages size={15} aria-hidden="true" />
+          <span>
+            {t.localeNotice.analyzedIn({
+              language: t.languages[analysisLocale],
+            })}
+          </span>
+          <button
+            type="button"
+            onClick={onAnalyze}
+            disabled={loading || recommending || savingPreferences || updatingRepo}
+          >
+            {t.localeNotice.reanalyze({ language: t.languages[locale] })}
+            <RefreshCw size={13} aria-hidden="true" />
+          </button>
+        </div>
+      )}
 
       {!insights ? (
         <section className="mission-overview-empty" aria-busy={loading}>
@@ -594,6 +968,44 @@ export function ProjectOverview({
           <span className="mission-repository-label">{repo.fullName}</span>
           <h3>{loading ? t.empty.loadingTitle : t.empty.title}</h3>
           <p>{loading ? t.empty.loadingLead : t.empty.lead}</p>
+          {analysisSteps.length > 0 && (
+            <div className="mission-analysis-steps">
+              <div
+                className="mission-analysis-progress"
+                role="progressbar"
+                aria-label={t.empty.progressLabel}
+                aria-valuemin={0}
+                aria-valuemax={sampleAnalysis.total}
+                aria-valuenow={analysisSteps.length}
+              >
+                <span
+                  style={{
+                    width: `${Math.round((100 * analysisSteps.length) / Math.max(1, sampleAnalysis.total + 1))}%`,
+                  }}
+                />
+              </div>
+              <ol>
+                {analysisSteps.map((step, index) => {
+                  const done =
+                    index < analysisSteps.length - 1 || !sampleAnalysis.playing;
+                  return (
+                    <li key={index} className={done ? "done" : "current"}>
+                      {done ? (
+                        <Check size={14} aria-hidden="true" />
+                      ) : (
+                        <Loader2
+                          className="mission-spin"
+                          size={14}
+                          aria-hidden="true"
+                        />
+                      )}
+                      <span>{step}</span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          )}
           <div className="mission-discovery-points">
             <span>
               <Target size={18} />
@@ -625,6 +1037,8 @@ export function ProjectOverview({
       ) : (
         <>
           <section
+            id={sectionAnchor("purpose")}
+            tabIndex={-1}
             className="mission-project-card"
             aria-labelledby="mission-purpose-title"
           >
@@ -688,156 +1102,7 @@ export function ProjectOverview({
             />
           </section>
 
-          {insights.userJourney.length > 0 && (
-            <section
-              className="mission-journey"
-              aria-labelledby="mission-journey-title"
-            >
-              <div className="mission-section-heading">
-                <div>
-                  <span className="mission-kicker">{t.journey.kicker}</span>
-                  <h2 id="mission-journey-title">
-                    <Route size={18} />
-                    {t.journey.title}
-                  </h2>
-                </div>
-              </div>
-              <ol>
-                {insights.userJourney.map((step, index) => (
-                  <li key={index}>
-                    <span className="mission-journey-number">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <p>{step}</p>
-                    {index < insights.userJourney.length - 1 && (
-                      <ChevronRight size={16} aria-hidden="true" />
-                    )}
-                  </li>
-                ))}
-              </ol>
-            </section>
-          )}
-
-          {!!insights.readingPath?.length && (
-            <section
-              className="mission-reading-path"
-              aria-labelledby="mission-reading-title"
-            >
-              <div className="mission-section-heading">
-                <div>
-                  <span className="mission-kicker">{t.reading.kicker}</span>
-                  <h2 id="mission-reading-title">
-                    <BookOpen size={18} />
-                    {t.reading.title}
-                  </h2>
-                  <p>{t.reading.lead}</p>
-                </div>
-              </div>
-              {insights.howItFitsTogether && (
-                <div className="mission-reading-flow">
-                  <span>{t.reading.flow}</span>
-                  <p>{insights.howItFitsTogether}</p>
-                </div>
-              )}
-              <ol className="mission-reading-steps">
-                {insights.readingPath.map((step, index) => {
-                  const module = insights.modules.find(
-                    (entry) => entry.path === step.path,
-                  );
-                  const evidence = insights.evidence.find(
-                    (entry) => entry.path === step.path,
-                  );
-                  return (
-                    <li key={`${step.path}-${index}`}>
-                      <span className="mission-journey-number">
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
-                      <code>{step.path}</code>
-                      {step.sampled === false && (
-                        <span className="mission-reading-unsampled">
-                          {t.reading.unsampled}
-                        </span>
-                      )}
-                      <p>{step.why}</p>
-                      <p>
-                        <strong>{t.reading.lookFor}</strong>
-                        {step.lookFor}
-                      </p>
-                      {(module || evidence) && (
-                        <details className="mission-reading-context">
-                          <summary>
-                            {t.reading.context}
-                            <ChevronRight size={14} aria-hidden="true" />
-                          </summary>
-                          {module && (
-                            <p>
-                              <strong>{t.fields.modules}</strong>
-                              {module.purpose}
-                            </p>
-                          )}
-                          {evidence && (
-                            <p>
-                              <strong>{t.fields.evidence}</strong>
-                              {evidence.note}
-                            </p>
-                          )}
-                        </details>
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
-            </section>
-          )}
-
-          {(insights.modules.length > 0 || insights.evidence.length > 0) && (
-            <div className="mission-project-details">
-              {insights.modules.length > 0 && (
-                <details className="mission-detail-block">
-                  <summary>
-                    <FolderTree size={16} />
-                    <span>{t.details.modules}</span>
-                    <span className="mission-detail-count">
-                      {t.details.moduleCount({
-                        count: insights.modules.length,
-                      })}
-                    </span>
-                    <ChevronRight size={15} />
-                  </summary>
-                  <div className="mission-module-list">
-                    {insights.modules.map((module, index) => (
-                      <div key={`${module.path}-${index}`}>
-                        <code>{module.path}</code>
-                        <p>{module.purpose}</p>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              )}
-              {insights.evidence.length > 0 && (
-                <details className="mission-detail-block">
-                  <summary>
-                    <FileSearch size={16} />
-                    <span>{t.details.sources}</span>
-                    <span className="mission-detail-count">
-                      {t.details.sourceCount({
-                        count: insights.evidence.length,
-                      })}
-                    </span>
-                    <ChevronRight size={15} />
-                  </summary>
-                  <div className="mission-module-list">
-                    {insights.evidence.map((evidence, index) => (
-                      <div key={`${evidence.path}-${index}`}>
-                        <code>{evidence.path}</code>
-                        <p>{evidence.note}</p>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              )}
-            </div>
-          )}
+          {run && projectContext}
         </>
       )}
 
@@ -845,6 +1110,8 @@ export function ProjectOverview({
 
       {insights && (
         <section
+          id={sectionAnchor("directions")}
+          tabIndex={-1}
           className="mission-recommendations"
           aria-labelledby="mission-ideas-title"
         >
@@ -858,6 +1125,12 @@ export function ProjectOverview({
               <p>{t.ideas.lead}</p>
             </div>
             <div className="mission-ideas-actions">
+              {insights.source === "ai" && (
+                <span className="mission-source">
+                  <Sparkles size={12} aria-hidden="true" />
+                  {t.ideas.aiGenerated}
+                </span>
+              )}
               <span className="mission-ideas-count">
                 {insights.source === "demo"
                   ? t.ideas.sampleCount({
@@ -884,11 +1157,22 @@ export function ProjectOverview({
                   : requestedCount
                     ? t.ideas.more({ count: requestedCount })
                     : t.ideas.limitReached}
+                {(demo || moreLocked) && <ProBadge />}
               </button>
             </div>
           </div>
           <div className="mission-more-context">
             <p id="mission-more-description">{moreDescription}</p>
+            {moreLocked && (
+              <button
+                type="button"
+                className="mission-text-button mission-upgrade-button"
+                onClick={() => requestUpgrade("moreRecommendations")}
+              >
+                {t.ideas.seePro}
+                <ArrowRight size={14} aria-hidden="true" />
+              </button>
+            )}
             <div className="mission-more-status" role="status" aria-live="polite">
               {recommending ? (
                 <span>{t.ideas.generatingStatus}</span>
@@ -935,10 +1219,15 @@ export function ProjectOverview({
                     date: analysisDate(fmt, expansion.generatedAt),
                   })}
                 </p>
-                <ModelSummary execution={expansion.modelExecution} analysis />
+                <ModelSummary
+                  execution={expansion.modelExecution}
+                  demo={demo}
+                  analysis
+                />
                 <EfficiencySummary
                   title={t.ideas.usageTitle}
                   metrics={expansion.efficiency}
+                  demo={demo}
                 />
               </details>
             )}
@@ -1240,6 +1529,8 @@ export function ProjectOverview({
           )}
         </section>
       )}
+
+      {!run && projectContext}
 
       {(run || onStartContribution) && (
         <div className="mission-next-step">
