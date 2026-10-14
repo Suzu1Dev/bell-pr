@@ -2,6 +2,7 @@ import {
   chmod,
   copyFile,
   mkdir,
+  readdir,
   readFile,
   rename,
   rm,
@@ -262,9 +263,17 @@ export class Store {
     try {
       content = await readFile(this.statePath, "utf8");
     } catch (error) {
-      // A missing file is a first start.
-      if ((error as NodeJS.ErrnoException).code === "ENOENT")
+      // A missing file is a first start, or data the person removed on
+      // purpose; backups are never restored without a damaged state.json,
+      // but the log says they exist.
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        const backups = await readdir(this.directory).then(
+          (names) => names.filter((name) => name.startsWith(`${stateFile}.bak.`)),
+          () => [] as string[],
+        );
+        if (backups.length) log.warn("store.state_missing", { backups });
         return { version: 1, repos: [], runs: [] };
+      }
       throw this.unreadable(error);
     }
     const parsed = parseState(content);
