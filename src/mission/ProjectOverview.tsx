@@ -31,6 +31,8 @@ import {
   type ProjectInsights,
   type RecommendationPreferences,
 } from "../../shared/insights";
+import type { Formatters } from "../../shared/i18n/locale";
+import { useFormat, useT, type Messages } from "../i18n";
 import type { Repo, Run } from "../types";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
 import { ModelSummary } from "../models/ModelSummary";
@@ -67,32 +69,32 @@ export interface ProjectOverviewProps {
   updatingRepo?: boolean;
 }
 
-const effortLabels = { small: "小型", medium: "中型", large: "大型" };
-const confidenceLabels = {
-  high: "依據較充分",
-  medium: "需進一步確認",
-  low: "初步構想",
-};
+type MissionMessages = Messages["mission"];
 
-function analysisDate(value?: string) {
+function analysisDate(fmt: Formatters, value?: string) {
   const date = value ? new Date(value) : null;
   return date && !Number.isNaN(date.valueOf())
-    ? date.toLocaleString("zh-TW", {
+    ? fmt.dateTime(date, {
         month: "numeric",
         day: "numeric",
-        hour: "2-digit",
+        hour: "numeric",
         minute: "2-digit",
       })
     : "";
 }
 
 /** Caches written before coverage was recorded say so instead of showing zeros. */
-function sampleCoverage(sample: ProjectInsights["sample"]) {
-  if (!sample) return "抽樣範圍未記錄，重新分析後顯示";
-  const count = (value: number) => value.toLocaleString("zh-TW");
-  const truncated =
-    sample.truncatedFiles > 0 ? `，${count(sample.truncatedFiles)} 檔節錄` : "";
-  return `讀取 ${count(sample.sampledFiles)} / ${count(sample.trackedFiles)} 個追蹤檔（約 ${count(Math.max(1, Math.round(sample.bytes / 1024)))} KB${truncated}）`;
+function sampleCoverage(
+  t: MissionMessages,
+  sample: ProjectInsights["sample"],
+) {
+  if (!sample) return t.project.coverageUnknown;
+  return t.project.coverage({
+    sampled: sample.sampledFiles,
+    tracked: sample.trackedFiles,
+    kilobytes: Math.max(1, Math.round(sample.bytes / 1024)),
+    truncated: sample.truncatedFiles,
+  });
 }
 
 /**
@@ -100,18 +102,25 @@ function sampleCoverage(sample: ProjectInsights["sample"]) {
  * variant still asks for a re-analysis: an unchanged cited file does not make
  * the rest of the overview current.
  */
-function staleNotice(baseSha: string, detail?: InsightsStaleDetail) {
-  const version = baseSha ? `分析版本 ${baseSha.slice(0, 7)}` : "分析版本";
-  if (!detail)
-    return `專案內容已更新。這份分析來自先前版本，無法列出變更明細；重新分析後再確認貢獻方向。`;
-  if (detail.changedFiles === 0)
-    return `版本已變更，但分析引用的檔案內容相同；全貌仍可能受其他變更影響，重新分析後再確認貢獻方向。`;
-  const changed = `自${version}後有至少 ${detail.changedFiles.toLocaleString("zh-TW")} 個檔案變動`;
+function staleNotice(
+  t: MissionMessages,
+  fmt: Formatters,
+  baseSha: string,
+  detail?: InsightsStaleDetail,
+) {
+  const sha = baseSha ? baseSha.slice(0, 7) : undefined;
+  if (!detail) return t.stale.unknown;
+  if (detail.changedFiles === 0) return t.stale.sameContent;
   if (!detail.citedChanged.length)
-    return `${changed}。分析引用的檔案未變動，但全貌仍可能受其他變更影響，重新分析後再確認貢獻方向。`;
-  // The server lists at most 12 cited files.
-  const cited = `${detail.citedChanged.length}${detail.citedChanged.length >= 12 ? " 個以上" : " 個"}`;
-  return `${changed}，其中 ${cited}是本份分析引用的檔案：${detail.citedChanged.join("、")}。重新分析後再確認貢獻方向。`;
+    return t.stale.uncited({ changed: detail.changedFiles, sha });
+  return t.stale.cited({
+    changed: detail.changedFiles,
+    sha,
+    cited: detail.citedChanged.length,
+    // The server lists at most 12 cited files.
+    capped: detail.citedChanged.length >= 12,
+    files: fmt.list(detail.citedChanged, { type: "unit" }),
+  });
 }
 
 function EvidencePaths({
@@ -121,13 +130,12 @@ function EvidencePaths({
   paths: string[];
   details?: ContributionRecommendation["evidenceDetails"];
 }) {
+  const t = useT("mission").evidence;
   if (!paths.length)
-    return (
-      <span className="mission-no-evidence">尚無檔案依據，開始前需確認。</span>
-    );
+    return <span className="mission-no-evidence">{t.none}</span>;
   return (
     <div className="mission-source-evidence">
-      <div className="mission-evidence-paths" aria-label="參考檔案">
+      <div className="mission-evidence-paths" aria-label={t.filesLabel}>
         {paths.map((file, index) => (
           <code key={`${file}-${index}`} title={file}>
             <FileSearch size={12} aria-hidden="true" />
@@ -139,12 +147,10 @@ function EvidencePaths({
         <details className="mission-source-quotes">
           <summary>
             <FileSearch size={13} />
-            查看原文依據 <span>{details.length}</span>
+            {t.quotes} <span>{details.length}</span>
             <ChevronRight size={14} />
           </summary>
-          <p className="mission-quote-note">
-            原文支持觀察；建議做法與使用者影響仍需確認。
-          </p>
+          <p className="mission-quote-note">{t.quotesNote}</p>
           {details.map((item, index) => (
             <figure key={`${item.path}-${index}`}>
               <figcaption>
@@ -152,7 +158,7 @@ function EvidencePaths({
               </figcaption>
               <blockquote>{item.quote}</blockquote>
               <p>
-                <strong>為什麼引用這段</strong>
+                <strong>{t.why}</strong>
                 {item.reason}
               </p>
             </figure>
@@ -164,6 +170,7 @@ function EvidencePaths({
 }
 
 function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
+  const t = useT("mission").brief;
   return (
     <section
       className="mission-contribution"
@@ -171,8 +178,8 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
     >
       <div className="mission-section-heading">
         <div>
-          <span className="mission-kicker">THIS CONTRIBUTION</span>
-          <h2 id="mission-contribution-title">這次改動，會帶來什麼不同？</h2>
+          <span className="mission-kicker">{t.kicker}</span>
+          <h2 id="mission-contribution-title">{t.title}</h2>
         </div>
         <span className="mission-section-icon">
           <Target size={20} />
@@ -183,18 +190,18 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
         <>
           <div className="mission-contribution-reason">
             <div>
-              <span>這次想解決的問題</span>
+              <span>{t.problem}</span>
               <p>{brief.problem}</p>
             </div>
             <div>
-              <span>為什麼值得現在改善</span>
+              <span>{t.motivation}</span>
               <p>{brief.motivation}</p>
             </div>
           </div>
           {brief.beneficiaries.length > 0 && (
             <div className="mission-beneficiaries">
               <Users size={15} />
-              <span>受益對象</span>
+              <span>{t.beneficiaries}</span>
               {brief.beneficiaries.map((person, index) => (
                 <strong key={`${person}-${index}`}>{person}</strong>
               ))}
@@ -203,7 +210,7 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
           <div className="mission-before-after">
             <article className="mission-before">
               <span className="mission-change-label">
-                BEFORE <span>目前的體驗</span>
+                {t.before} <span>{t.beforeCaption}</span>
               </span>
               <p>{brief.before}</p>
             </article>
@@ -212,20 +219,18 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
             </div>
             <article className="mission-after">
               <span className="mission-change-label">
-                AFTER <span>希望帶來的改善</span>
+                {t.after} <span>{t.afterCaption}</span>
               </span>
               <p>{brief.after}</p>
             </article>
           </div>
-          <p className="mission-impact-note">
-            以上是這次貢獻的目標；是否達成，仍需根據實作與驗證結果確認。
-          </p>
+          <p className="mission-impact-note">{t.impactNote}</p>
           <div className="mission-validation-grid">
             {brief.validation.length > 0 && (
               <div>
                 <h4>
                   <Check size={15} />
-                  如何知道改動有用？
+                  {t.validation}
                 </h4>
                 <ul>
                   {brief.validation.map((item, index) => (
@@ -238,7 +243,7 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
               <div>
                 <h4>
                   <Lightbulb size={15} />
-                  一起留意的取捨
+                  {t.risks}
                 </h4>
                 <ul>
                   {brief.risks.map((item, index) => (
@@ -251,11 +256,9 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
         </>
       ) : (
         <div className="mission-brief-pending">
-          <span className="mission-field-caption">你提出的需求</span>
+          <span className="mission-field-caption">{t.request}</span>
           <p>{run.prompt}</p>
-          <small>
-            尚未產生這次貢獻的使用者影響分析。先保留原始需求，完成分析後再連結到具體動機與驗收方式。
-          </small>
+          <small>{t.pending}</small>
         </div>
       )}
     </section>
@@ -285,6 +288,9 @@ export function ProjectOverview({
   onUpdateRepo,
   updatingRepo = false,
 }: ProjectOverviewProps) {
+  const t = useT("mission");
+  const common = useT("common");
+  const fmt = useFormat();
   const ideaRail = useRef<HTMLDivElement>(null);
   const hiddenSummary = useRef<HTMLElement>(null);
   const pointerDrag = useRef<{
@@ -400,26 +406,21 @@ export function ProjectOverview({
         : "smooth",
     });
   };
-  const dateLabel = analysisDate(insights?.generatedAt);
+  const dateLabel = analysisDate(fmt, insights?.generatedAt);
   const expansion = insights?.recommendationExpansion;
   // Proposals whose quotes failed the server check: only their title and reason are known.
   const droppedIdeas = [
     ...(insights?.verification?.droppedRecommendations ?? []).map((entry) => ({
       ...entry,
-      round: "專案分析",
+      round: "analysis" as const,
     })),
     ...(expansion?.verification?.droppedRecommendations ?? []).map((entry) => ({
       ...entry,
-      round: "最近一次追加",
+      round: "expansion" as const,
     })),
   ];
   // Modules, reading steps and evidence notes the server removed for citing files outside the sample.
   const droppedPaths = insights?.verification?.droppedPaths ?? [];
-  const droppedPathField = {
-    modules: "模組分工",
-    readingPath: "閱讀順序",
-    evidence: "分析依據",
-  } as const;
   const addedIds = new Set(
     recommending || recommendationError ? [] : (expansion?.addedIds ?? []),
   );
@@ -497,22 +498,22 @@ export function ProjectOverview({
     insights.source === "demo" ||
     insights.recommendations.length >= maxProjectRecommendations;
   const moreDescription = insights?.source === "demo"
-    ? "示範內容使用預寫建議。匯入真實專案後，即可請 Agent 產出更多貢獻方向。"
+    ? t.ideas.moreDemo
     : stale
-      ? "專案版本已更新，請先重新分析專案，再產出更多建議。"
+      ? t.ideas.moreStale
       : (insights?.recommendations.length ?? 0) >= maxProjectRecommendations
-        ? `已累積 ${maxProjectRecommendations} 個建議，達到這份分析的上限。可先挑選方向，或重新分析專案。`
-        : "Agent 會沿用這個專案已儲存的模型設定，尋找不同的改善問題與使用者價值。既有建議會保留，由你決定何時開始開發。";
+        ? t.ideas.moreLimit({ max: maxProjectRecommendations })
+        : t.ideas.moreHint;
   return (
     <div className="mission-overview">
       <div className="mission-overview-heading">
         <div>
           <span className="mission-kicker">
             <BookOpen size={14} />
-            PROJECT CONTEXT
+            {t.overview.kicker}
           </span>
-          <h2>先看懂專案，再決定怎麼改。</h2>
-          <p>從使用者的角度，理解每一次貢獻的理由。</p>
+          <h2>{t.overview.title}</h2>
+          <p>{t.overview.lead}</p>
         </div>
         <div className="mission-overview-actions">
           {onUpdateRepo && (
@@ -528,7 +529,7 @@ export function ProjectOverview({
               ) : (
                 <Download size={15} />
               )}
-              {updatingRepo ? "正在更新…" : "更新到最新版本"}
+              {updatingRepo ? t.overview.updating : t.overview.update}
             </button>
           )}
           <button
@@ -542,13 +543,20 @@ export function ProjectOverview({
             ) : (
               <RefreshCw size={15} />
             )}
-            {loading ? "正在分析專案…" : insights ? "重新分析" : "分析專案全貌"}
+            {loading
+              ? t.overview.analyzing
+              : insights
+                ? t.overview.reanalyze
+                : t.overview.analyze}
           </button>
           {onUpdateRepo && (
             <p id="mission-update-help" className="mission-update-help">
-              從 GitHub 取得 {repo.defaultBranch} 的最新版本，專案全貌與分析會以它為準；新的貢獻本來就從最新版本開始。
-              {repo.updatedAt &&
-                ` 上次更新：${new Date(repo.updatedAt).toLocaleString("zh-TW")}`}
+              {t.overview.updateHelp({
+                branch: repo.defaultBranch,
+                updatedAt: repo.updatedAt
+                  ? fmt.dateTime(repo.updatedAt)
+                  : undefined,
+              })}
             </p>
           )}
         </div>
@@ -562,7 +570,7 @@ export function ProjectOverview({
             onClick={onAnalyze}
             disabled={loading || recommending || savingPreferences || updatingRepo}
           >
-            重試
+            {common.actions.retry}
             <RefreshCw size={13} />
           </button>
         </div>
@@ -570,7 +578,7 @@ export function ProjectOverview({
       {stale && insights && (
         <div className="mission-alert" role="status">
           <RefreshCw size={15} />
-          <span>{staleNotice(insights.baseSha, staleDetail)}</span>
+          <span>{staleNotice(t, fmt, insights.baseSha, staleDetail)}</span>
         </div>
       )}
 
@@ -584,28 +592,20 @@ export function ProjectOverview({
             )}
           </span>
           <span className="mission-repository-label">{repo.fullName}</span>
-          <h3>
-            {loading
-              ? "正在把程式碼，整理成專案全貌。"
-              : "你的下一個貢獻，從理解開始。"}
-          </h3>
-          <p>
-            {loading
-              ? "Agent 會閱讀專案文件與主要模組，整理用途、使用流程，以及有依據的改善建議。"
-              : "讓 Agent 閱讀這個 repository，先回答三個問題，再決定值得投入的方向。"}
-          </p>
+          <h3>{loading ? t.empty.loadingTitle : t.empty.title}</h3>
+          <p>{loading ? t.empty.loadingLead : t.empty.lead}</p>
           <div className="mission-discovery-points">
             <span>
               <Target size={18} />
-              <strong>它解決什麼問題？</strong>
+              <strong>{t.empty.questions.problem}</strong>
             </span>
             <span>
               <Users size={18} />
-              <strong>誰會使用它？</strong>
+              <strong>{t.empty.questions.users}</strong>
             </span>
             <span>
               <Lightbulb size={18} />
-              <strong>哪裡值得改善？</strong>
+              <strong>{t.empty.questions.improve}</strong>
             </span>
           </div>
           {!loading && (
@@ -616,11 +616,11 @@ export function ProjectOverview({
               disabled={updatingRepo}
             >
               <Sparkles size={16} />
-              開始專案分析
+              {t.empty.start}
               <ArrowRight size={15} />
             </button>
           )}
-          <small>分析完成前，不會推測這個專案的用途或推薦改動。</small>
+          <small>{t.empty.note}</small>
         </section>
       ) : (
         <>
@@ -641,7 +641,9 @@ export function ProjectOverview({
                 }
               >
                 <Sparkles size={12} />
-                {insights.source === "demo" ? "示範分析" : "AI 專案分析"}
+                {insights.source === "demo"
+                  ? t.project.sourceDemo
+                  : t.project.sourceAi}
               </span>
             </div>
             <h3 id="mission-purpose-title">{insights.summary}</h3>
@@ -650,7 +652,7 @@ export function ProjectOverview({
               <div className="mission-audience">
                 <span>
                   <Users size={14} />
-                  主要使用者
+                  {t.project.audience}
                 </span>
                 {insights.audience.map((person, index) => (
                   <strong key={`${person}-${index}`}>{person}</strong>
@@ -659,18 +661,19 @@ export function ProjectOverview({
             )}
             <div className="mission-analysis-footer">
               <span>
-                {dateLabel && <>更新於 {dateLabel}</>}
+                {dateLabel && t.project.updatedAt({ date: dateLabel })}
                 {insights.baseSha && (
                   <>
                     {" "}
-                    · 版本 <code>{insights.baseSha.slice(0, 7)}</code>
+                    · {t.project.version}{" "}
+                    <code>{insights.baseSha.slice(0, 7)}</code>
                   </>
                 )}
               </span>
               <span>
                 {insights.source === "demo"
-                  ? "預寫範例，未呼叫 AI"
-                  : `${sampleCoverage(insights.sample)}，推論仍需確認`}
+                  ? t.project.demoNote
+                  : sampleCoverage(t, insights.sample)}
               </span>
             </div>
             <ModelSummary
@@ -679,7 +682,7 @@ export function ProjectOverview({
               analysis
             />
             <EfficiencySummary
-              title="這次專案分析用量"
+              title={t.project.usageTitle}
               metrics={insights.efficiency}
               demo={insights.source === "demo"}
             />
@@ -692,10 +695,10 @@ export function ProjectOverview({
             >
               <div className="mission-section-heading">
                 <div>
-                  <span className="mission-kicker">THE USER JOURNEY</span>
+                  <span className="mission-kicker">{t.journey.kicker}</span>
                   <h2 id="mission-journey-title">
                     <Route size={18} />
-                    使用者如何用到這個專案？
+                    {t.journey.title}
                   </h2>
                 </div>
               </div>
@@ -722,19 +725,17 @@ export function ProjectOverview({
             >
               <div className="mission-section-heading">
                 <div>
-                  <span className="mission-kicker">WHERE TO START READING</span>
+                  <span className="mission-kicker">{t.reading.kicker}</span>
                   <h2 id="mission-reading-title">
                     <BookOpen size={18} />
-                    第一次讀這個專案，建議這樣讀
+                    {t.reading.title}
                   </h2>
-                  <p>
-                    依 Agent 讀過的抽樣檔案排出順序；每一步說明為什麼先看它、看什麼。
-                  </p>
+                  <p>{t.reading.lead}</p>
                 </div>
               </div>
               {insights.howItFitsTogether && (
                 <div className="mission-reading-flow">
-                  <span>模組怎麼串起來</span>
+                  <span>{t.reading.flow}</span>
                   <p>{insights.howItFitsTogether}</p>
                 </div>
               )}
@@ -754,29 +755,29 @@ export function ProjectOverview({
                       <code>{step.path}</code>
                       {step.sampled === false && (
                         <span className="mission-reading-unsampled">
-                          未抽樣，內容未讀
+                          {t.reading.unsampled}
                         </span>
                       )}
                       <p>{step.why}</p>
                       <p>
-                        <strong>看什麼</strong>
+                        <strong>{t.reading.lookFor}</strong>
                         {step.lookFor}
                       </p>
                       {(module || evidence) && (
                         <details className="mission-reading-context">
                           <summary>
-                            這個檔案在分析中的其他說明
+                            {t.reading.context}
                             <ChevronRight size={14} aria-hidden="true" />
                           </summary>
                           {module && (
                             <p>
-                              <strong>模組分工</strong>
+                              <strong>{t.fields.modules}</strong>
                               {module.purpose}
                             </p>
                           )}
                           {evidence && (
                             <p>
-                              <strong>分析依據</strong>
+                              <strong>{t.fields.evidence}</strong>
                               {evidence.note}
                             </p>
                           )}
@@ -795,9 +796,11 @@ export function ProjectOverview({
                 <details className="mission-detail-block">
                   <summary>
                     <FolderTree size={16} />
-                    <span>主要模組怎麼分工？</span>
+                    <span>{t.details.modules}</span>
                     <span className="mission-detail-count">
-                      {insights.modules.length} 個模組
+                      {t.details.moduleCount({
+                        count: insights.modules.length,
+                      })}
                     </span>
                     <ChevronRight size={15} />
                   </summary>
@@ -815,9 +818,11 @@ export function ProjectOverview({
                 <details className="mission-detail-block">
                   <summary>
                     <FileSearch size={16} />
-                    <span>分析的來源與依據</span>
+                    <span>{t.details.sources}</span>
                     <span className="mission-detail-count">
-                      {insights.evidence.length} 份來源
+                      {t.details.sourceCount({
+                        count: insights.evidence.length,
+                      })}
                     </span>
                     <ChevronRight size={15} />
                   </summary>
@@ -845,17 +850,22 @@ export function ProjectOverview({
         >
           <div className="mission-section-heading">
             <div>
-              <span className="mission-kicker">WHERE YOU CAN HELP</span>
+              <span className="mission-kicker">{t.ideas.kicker}</span>
               <h2 id="mission-ideas-title">
                 <Lightbulb size={18} />
-                值得探索的貢獻方向
+                {t.ideas.title}
               </h2>
-              <p>先看問題與使用者價值，再決定要不要交給團隊。</p>
+              <p>{t.ideas.lead}</p>
             </div>
             <div className="mission-ideas-actions">
               <span className="mission-ideas-count">
-                {insights.recommendations.length} 個
-                {insights.source === "demo" ? "示範" : "建議"}
+                {insights.source === "demo"
+                  ? t.ideas.sampleCount({
+                      count: insights.recommendations.length,
+                    })
+                  : t.ideas.recommendationCount({
+                      count: insights.recommendations.length,
+                    })}
               </span>
               <button
                 type="button"
@@ -870,10 +880,10 @@ export function ProjectOverview({
                   <Sparkles size={15} />
                 )}
                 {recommending
-                  ? `正在產出 ${requestedCount} 個新建議…`
+                  ? t.ideas.generating({ count: requestedCount })
                   : requestedCount
-                    ? `產出 ${requestedCount} 個新建議`
-                    : "建議數量已達上限"}
+                    ? t.ideas.more({ count: requestedCount })
+                    : t.ideas.limitReached}
               </button>
             </div>
           </div>
@@ -881,29 +891,35 @@ export function ProjectOverview({
             <p id="mission-more-description">{moreDescription}</p>
             <div className="mission-more-status" role="status" aria-live="polite">
               {recommending ? (
-                <span>正在閱讀專案、避開既有方向，你可以繼續閱讀下方建議。</span>
+                <span>{t.ideas.generatingStatus}</span>
               ) : expansion && !recommendationError ? (
                 <>
                   {firstAddedIdea ? (
                     <a
                       href={`#${encodeURIComponent(ideaAnchor(firstAddedIdea.id))}`}
                     >
-                      查看本輪新增 {addedIds.size}
-                      {expansion.requestedCount !== undefined &&
-                        ` / ${expansion.requestedCount}`} 個建議
+                      {t.ideas.viewAdded({
+                        added: addedIds.size,
+                        requested: expansion.requestedCount,
+                      })}
                       <ArrowRight size={14} aria-hidden="true" />
                     </a>
                   ) : (
                     <span>
                       {addedIds.size
-                        ? `本輪新增 ${addedIds.size}${expansion.requestedCount !== undefined ? ` / ${expansion.requestedCount}` : ""} 個建議，目前皆已隱藏。`
+                        ? t.ideas.addedHidden({
+                            added: addedIds.size,
+                            requested: expansion.requestedCount,
+                          })
                         : expansion.requestedCount !== undefined
-                        ? `本輪新增 0 / ${expansion.requestedCount} 個建議。`
-                        : "本輪沒有新增不同且有足夠依據的建議，既有清單保持不變。"}
+                        ? t.ideas.addedNone({
+                            requested: expansion.requestedCount,
+                          })
+                        : t.ideas.noneAdded}
                     </span>
                   )}
                   {shortfall && (
-                    <p>未補足本輪目標數量；既有清單保留。</p>
+                    <p>{t.ideas.shortfall}</p>
                   )}
                 </>
               ) : null}
@@ -911,13 +927,17 @@ export function ProjectOverview({
             {expansion && (
               <details className="mission-more-provenance">
                 <summary>
-                  最近一次追加分析的模型與用量
+                  {t.ideas.provenance}
                   <ChevronRight size={14} aria-hidden="true" />
                 </summary>
-                <p>產生於 {analysisDate(expansion.generatedAt)}</p>
+                <p>
+                  {t.ideas.generatedAt({
+                    date: analysisDate(fmt, expansion.generatedAt),
+                  })}
+                </p>
                 <ModelSummary execution={expansion.modelExecution} analysis />
                 <EfficiencySummary
-                  title="這次追加建議用量"
+                  title={t.ideas.usageTitle}
                   metrics={expansion.efficiency}
                 />
               </details>
@@ -934,7 +954,7 @@ export function ProjectOverview({
                 onClick={onRecommendMore}
                 disabled={moreDisabled}
               >
-                重試產出
+                {t.ideas.retry}
                 <RefreshCw size={13} />
               </button>
             </div>
@@ -944,13 +964,13 @@ export function ProjectOverview({
             hidden={!savingPreferences && hiddenIdeas.length === 0}
           >
             <p role="status" aria-live="polite" hidden={!savingPreferences}>
-              {savingPreferences ? "正在儲存排列與顯示設定…" : ""}
+              {savingPreferences ? t.ideas.savingPreferences : ""}
             </p>
             {hiddenIdeas.length > 0 && (
               <details key={repo.id} className="mission-hidden-ideas">
                 <summary ref={hiddenSummary}>
                   <EyeOff size={14} aria-hidden="true" />
-                  已隱藏 {hiddenIdeas.length} 個建議
+                  {t.ideas.hiddenCount({ count: hiddenIdeas.length })}
                   <ChevronRight size={14} aria-hidden="true" />
                 </summary>
                 <ul>
@@ -961,9 +981,10 @@ export function ProjectOverview({
                         type="button"
                         disabled={preferencesDisabled}
                         onClick={() => setHidden(idea.id, false)}
-                        aria-label={`恢復顯示：${idea.title}`}
+                        aria-label={t.ideas.restoreLabel({ title: idea.title })}
                       >
-                        <Eye size={14} aria-hidden="true" />恢復顯示
+                        <Eye size={14} aria-hidden="true" />
+                        {t.ideas.restore}
                       </button>
                     </li>
                   ))}
@@ -979,17 +1000,15 @@ export function ProjectOverview({
           {droppedIdeas.length > 0 && (
             <details className="mission-dropped-ideas">
               <summary>
-                引文核對未通過，已略過 {droppedIdeas.length} 個建議
+                {t.ideas.droppedIdeas({ count: droppedIdeas.length })}
                 <ChevronRight size={14} aria-hidden="true" />
               </summary>
-              <p>
-                這些建議引用的原文不在送進模型的節錄中，因此只保留標題與原因；其餘分析結果照常儲存，可再「產出新建議」補足。
-              </p>
+              <p>{t.ideas.droppedIdeasNote}</p>
               <ul>
                 {droppedIdeas.map((entry) => (
                   <li key={`${entry.round}-${entry.id}`}>
                     <strong>{entry.title}</strong>
-                    <span>{entry.round}</span>
+                    <span>{t.ideas.rounds[entry.round]}</span>
                     <p>{entry.reason}</p>
                   </li>
                 ))}
@@ -999,16 +1018,14 @@ export function ProjectOverview({
           {droppedPaths.length > 0 && (
             <details className="mission-dropped-ideas">
               <summary>
-                因引用未抽樣／不存在的檔案而略過 {droppedPaths.length} 項說明
+                {t.ideas.droppedPaths({ count: droppedPaths.length })}
                 <ChevronRight size={14} aria-hidden="true" />
               </summary>
-              <p>
-                模型只讀過抽樣檔案的內容，其餘路徑只知道存在；依據必須來自讀過的檔案，不在清單中的路徑則無法核對。其餘分析結果照常儲存。
-              </p>
+              <p>{t.ideas.droppedPathsNote}</p>
               <ul>
                 {droppedPaths.map((entry, index) => (
                   <li key={`${entry.field}-${entry.path}-${index}`}>
-                    <strong>{droppedPathField[entry.field]}</strong>
+                    <strong>{t.fields[entry.field]}</strong>
                     <span>{entry.path}</span>
                     <p>{entry.reason}</p>
                   </li>
@@ -1020,18 +1037,19 @@ export function ProjectOverview({
             <>
               <div className="mission-idea-navigation">
                 <p id="mission-ideas-navigation">
-                  左右滑動，或聚焦清單後按方向鍵
+                  {t.ideas.navigationHint}
                   <span>
-                    顯示 {visibleIdeas.first}
-                    {visibleIdeas.last > visibleIdeas.first &&
-                      `–${visibleIdeas.last}`}
-                    {` / ${shownIdeas.length} 個顯示中的建議`}
+                    {t.ideas.showing({
+                      first: visibleIdeas.first,
+                      last: visibleIdeas.last,
+                      total: shownIdeas.length,
+                    })}
                   </span>
                 </p>
                 <div>
                   <button
                     type="button"
-                    aria-label="上一個建議"
+                    aria-label={t.ideas.previous}
                     aria-controls={`mission-idea-rail-${repo.id}`}
                     disabled={!visibleIdeas.previous}
                     onClick={() => scrollIdeas(-1)}
@@ -1040,7 +1058,7 @@ export function ProjectOverview({
                   </button>
                   <button
                     type="button"
-                    aria-label="下一個建議"
+                    aria-label={t.ideas.next}
                     aria-controls={`mission-idea-rail-${repo.id}`}
                     disabled={!visibleIdeas.next}
                     onClick={() => scrollIdeas(1)}
@@ -1055,7 +1073,7 @@ export function ProjectOverview({
                 id={`mission-idea-rail-${repo.id}`}
                 ref={ideaRail}
                 role="region"
-                aria-label="貢獻建議橫向清單"
+                aria-label={t.ideas.railLabel}
                 aria-describedby="mission-ideas-navigation"
                 tabIndex={0}
                 onKeyDown={(event) => {
@@ -1080,13 +1098,13 @@ export function ProjectOverview({
                       tabIndex={-1}
                       aria-labelledby={`${ideaAnchor(idea.id)}-title`}
                     >
-                      <div className="mission-idea-utilities" aria-label={`管理建議：${idea.title}`}>
+                      <div className="mission-idea-utilities" aria-label={t.ideas.manageLabel({ title: idea.title })}>
                         <button
                           type="button"
                           className="mission-idea-drag-handle"
                           disabled={preferencesDisabled}
-                          aria-label={`拖曳排序：${idea.title}；也可使用向左或向右移動按鈕`}
-                          title="拖曳排序，或使用旁邊的左右按鈕"
+                          aria-label={t.ideas.dragLabel({ title: idea.title })}
+                          title={t.ideas.dragTitle}
                           onPointerDown={(event) => {
                             if (preferencesDisabled || event.button !== 0 || !event.isPrimary) return;
                             event.currentTarget.setPointerCapture(event.pointerId);
@@ -1119,8 +1137,8 @@ export function ProjectOverview({
                         <button
                           type="button"
                           disabled={preferencesDisabled || index === 0}
-                          title="向左移動"
-                          aria-label={`向左移動：${idea.title}`}
+                          title={t.ideas.moveLeft}
+                          aria-label={t.ideas.moveLeftLabel({ title: idea.title })}
                           onClick={() => saveOrder(idea.id, shownIdeas[index - 1].id, "before")}
                         >
                           <ChevronLeft size={16} aria-hidden="true" />
@@ -1128,8 +1146,8 @@ export function ProjectOverview({
                         <button
                           type="button"
                           disabled={preferencesDisabled || index === shownIdeas.length - 1}
-                          title="向右移動"
-                          aria-label={`向右移動：${idea.title}`}
+                          title={t.ideas.moveRight}
+                          aria-label={t.ideas.moveRightLabel({ title: idea.title })}
                           onClick={() => saveOrder(idea.id, shownIdeas[index + 1].id, "after")}
                         >
                           <ChevronRight size={16} aria-hidden="true" />
@@ -1138,11 +1156,12 @@ export function ProjectOverview({
                           type="button"
                           className="mission-idea-hide"
                           disabled={preferencesDisabled}
-                          aria-label={`隱藏：${idea.title}`}
-                          title="隱藏此建議，可稍後恢復"
+                          aria-label={t.ideas.hideLabel({ title: idea.title })}
+                          title={t.ideas.hideTitle}
                           onClick={() => setHidden(idea.id, true)}
                         >
-                          <EyeOff size={14} aria-hidden="true" />隱藏
+                          <EyeOff size={14} aria-hidden="true" />
+                          {t.ideas.hide}
                         </button>
                       </div>
                       <div className="mission-idea-top">
@@ -1151,13 +1170,15 @@ export function ProjectOverview({
                         </span>
                         <span className="mission-idea-direction">
                           <Icon size={13} />
-                          {direction?.label ?? idea.direction}
+                          {t.directions[idea.direction]?.label ?? idea.direction}
                         </span>
                         <span className="mission-idea-effort">
-                          {effortLabels[idea.effort]}範圍
+                          {t.effort[idea.effort]}
                         </span>
                         {addedIds.has(idea.id) && (
-                          <span className="mission-idea-new-badge">本輪新增</span>
+                          <span className="mission-idea-new-badge">
+                            {t.ideas.newBadge}
+                          </span>
                         )}
                       </div>
                       <h3 id={`${ideaAnchor(idea.id)}-title`}>{idea.title}</h3>
@@ -1165,13 +1186,13 @@ export function ProjectOverview({
                       <div className="mission-idea-impact">
                         <Users size={15} />
                         <p>
-                          <strong>對使用者的幫助</strong>
+                          <strong>{t.ideas.userImpact}</strong>
                           {idea.userImpact}
                         </p>
                       </div>
                       <details className="mission-idea-approach">
                         <summary>
-                          看建議做法與驗收方式
+                          {t.ideas.approach}
                           <ChevronRight size={14} />
                         </summary>
                         <p>{idea.approach}</p>
@@ -1192,14 +1213,14 @@ export function ProjectOverview({
                           className={`mission-confidence mission-confidence-${idea.confidence}`}
                         >
                           <span />
-                          {confidenceLabels[idea.confidence]}
+                          {t.confidence[idea.confidence]}
                         </span>
                         <button
                           type="button"
                           className="mission-text-button"
                           onClick={() => onChooseRecommendation(idea)}
                         >
-                          以此方向開始
+                          {t.ideas.choose}
                           <ArrowUpRight size={15} />
                         </button>
                       </div>
@@ -1212,8 +1233,8 @@ export function ProjectOverview({
             <div className="mission-no-ideas">
               <p>
                 {hiddenIdeas.length
-                  ? `你已隱藏全部 ${hiddenIdeas.length} 個建議。展開上方「已隱藏」清單，就能選擇恢復顯示。`
-                  : "這次分析尚未提出有足夠依據的建議。你可以指定想改善的方向，再讓團隊確認範圍。"}
+                  ? t.ideas.allHidden({ count: hiddenIdeas.length })
+                  : t.ideas.none}
               </p>
             </div>
           )}
@@ -1228,15 +1249,9 @@ export function ProjectOverview({
             </span>
             <div>
               <strong>
-                {run
-                  ? "帶著理解，回到程式碼。"
-                  : "有自己的想法，也可以從這裡開始。"}
+                {run ? t.nextStep.codeTitle : t.nextStep.ideaTitle}
               </strong>
-              <p>
-                {run
-                  ? "把預期的使用者改善，和每一段實際變更對照。"
-                  : "指定受益對象、期待的結果與開發界線。"}
-              </p>
+              <p>{run ? t.nextStep.codeLead : t.nextStep.ideaLead}</p>
             </div>
           </div>
           <button
@@ -1244,7 +1259,7 @@ export function ProjectOverview({
             className="mission-button mission-button-primary"
             onClick={run ? onReadCode : onStartContribution}
           >
-            {run ? "檢閱程式碼變更" : "指定貢獻方向"}
+            {run ? t.nextStep.codeAction : t.nextStep.ideaAction}
             <ArrowRight size={15} />
           </button>
         </div>
