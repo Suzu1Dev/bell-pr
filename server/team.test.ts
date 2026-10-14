@@ -342,11 +342,29 @@ test("member results accept the structured report, the earlier string report and
         checks: [{ command: "npm test", outcome: "exit 0" }],
         tradeoffs: "也可以集中成常數；未採用，因為模組獨立。",
         limitations: "未執行整合測試。",
+        setup: [
+          {
+            need: "GLib 開發標頭",
+            command: "sudo apt install libglib2.0-dev",
+            reason: "README 的 Build time 列出 GLib；缺少時 cargo test 編譯失敗。",
+          },
+          // A download piped into a shell never reaches the person's checklist.
+          { need: "rustup", command: "curl -sSf https://sh.rustup.rs | sh", reason: "x" },
+        ],
       },
       messages: [{ to: "lead", content: "完成" }],
     }),
   );
   assert.deepEqual(structured.messages, [{ to: "lead", content: "完成" }]);
+  assert.deepEqual(structured.setup, [
+    {
+      need: "GLib 開發標頭",
+      command: "sudo apt install libglib2.0-dev",
+      reason: "README 的 Build time 列出 GLib；缺少時 cargo test 編譯失敗。",
+    },
+  ]);
+  // The setup list stays out of the report text the lead and the PR draft read.
+  assert.doesNotMatch(structured.report, /libglib/);
   assert.match(
     structured.report,
     /^已調整輸出。\n\n驗證證據[^\n]*\n- npm test → exit 0\n\n限制[^\n]*\n未執行整合測試。\n\n設計取捨[^\n]*\n也可以集中成常數/,
@@ -359,6 +377,7 @@ test("member results accept the structured report, the earlier string report and
     "checks",
     "tradeoffs",
     "limitations",
+    "setup",
   ]);
 
   const legacy = parseMemberResult(
@@ -366,12 +385,13 @@ test("member results accept the structured report, the earlier string report and
       JSON.stringify({ report: "舊格式報告", messages: [] }) +
       "\n```",
   );
-  assert.deepEqual(legacy, { report: "舊格式報告", messages: [] });
+  assert.deepEqual(legacy, { report: "舊格式報告", messages: [], setup: [] });
 
   const plain = parseMemberResult("Completed; no checks executed.");
   assert.deepEqual(plain, {
     report: "Completed; no checks executed.",
     messages: [],
+    setup: [],
   });
 
   // Intent text keeps only the five user-written fields and skips empty ones.
@@ -535,6 +555,11 @@ test("team execution waits for plan approval, runs isolated independent members 
       /worktreePath|reasoningEffort|requirePlanApproval|ponytailMode/,
     );
     assert.match(input.prompt, /report\.tradeoffs \(設計取捨\)/);
+    // The rules on installing, and where commands really run (Codex here).
+    assert.match(input.prompt, /Never change this machine: no sudo/);
+    assert.match(input.prompt, /Codex runs your commands in a workspace-write sandbox/);
+    assert.doesNotMatch(input.prompt, /within the sandbox|Do not install software globally/);
+    assert.match(input.prompt, /report\.setup lists what this machine lacks/);
     running.add(taskId);
     peak = Math.max(peak, running.size);
     if (taskId === "alpha" || taskId === "beta") await barrier;
@@ -576,8 +601,29 @@ test("team execution waits for plan approval, runs isolated independent members 
               ],
               tradeoffs: "也可以共用常數；未採用，因為模組獨立。",
               limitations: "未執行真實專案測試。",
+              setup: [
+                {
+                  need: "rustfmt",
+                  command: "rustup component add rustfmt",
+                  reason: "cargo fmt --check 需要它。",
+                },
+              ],
             }
-          : `${taskId} complete; fake runner only.`,
+          : taskId === "alpha" && !input.prompt.includes("Use alpha-final")
+            ? {
+                summary: "alpha first turn; fake runner only.",
+                checks: [],
+                tradeoffs: "",
+                limitations: "",
+                setup: [
+                  {
+                    need: "GLib 開發標頭",
+                    command: "sudo apt install libglib2.0-dev",
+                    reason: "cargo test 需要它。",
+                  },
+                ],
+              }
+            : `${taskId} complete; fake runner only.`,
       messages:
         taskId === "beta" ? [{ to: "lead", content: "beta ready" }] : [],
     });
@@ -670,6 +716,15 @@ test("team execution waits for plan approval, runs isolated independent members 
       run.team!.tasks.find((task) => task.id === "alpha")!.report,
       "alpha complete; fake runner only.",
     );
+    // Missing setup is kept on the task for the person's checklist.
+    assert.deepEqual(run.team!.tasks.find((task) => task.id === "beta")!.setup, [
+      { need: "rustfmt", command: "rustup component add rustfmt", reason: "cargo fmt --check 需要它。" },
+    ]);
+    // alpha's second turn reported no setup; what its first turn could not run stays.
+    assert.deepEqual(run.team!.tasks.find((task) => task.id === "alpha")!.setup, [
+      { need: "GLib 開發標頭", command: "sudo apt install libglib2.0-dev", reason: "cargo test 需要它。" },
+    ]);
+    assert.equal(run.team!.tasks.find((task) => task.id === "join")!.setup, undefined);
     // Integrated tasks no longer need their checkout; the path stays as a record.
     const registered = (await git(run.worktreePath, ["worktree", "list"]))
       .stdout;

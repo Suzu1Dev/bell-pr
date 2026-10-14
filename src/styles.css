@@ -3596,3 +3596,83 @@ button {
     justify-content: flex-start;
   }
 }
+
+/* Setup the machine lacks for checks agents could not run: the person installs it. */
+.setup-checklist {
+  margin: 0 28px 20px;
+  padding: 16px 20px;
+  border: 1px solid #eee7d1;
+  border-radius: 10px;
+  background: #fffcf3;
+}
+.setup-checklist h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 550;
+  color: #6f5c2e;
+}
+.setup-checklist > p {
+  margin: 6px 0 12px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #7d6b45;
+}
+.setup-checklist ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.setup-checklist li {
+  padding: 10px 12px;
+  border: 1px solid #efe6cc;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.setup-checklist li strong {
+  font-weight: 550;
+}
+.setup-checklist li p {
+  margin: 2px 0 0;
+  color: #6f8360;
+}
+.setup-checklist li small {
+  color: #68785b;
+  font-size: 11px;
+}
+.setup-checklist-command {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 2px;
+}
+.setup-checklist-command code {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid #e4eadf;
+  border-radius: 4px;
+  background: #f7faf2;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: #46603f;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.setup-checklist-command .icon-button {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+}
+@media (max-width: 760px) {
+  .setup-checklist {
+    margin: 0 16px 16px;
+  }
+}
