@@ -4,7 +4,9 @@ import {
   defaultDiscoveryPreferences,
   type DiscoveryPreferences,
 } from "../shared/discovery.js";
+import { assertNoHan } from "../src/test-utils/render.js";
 import { collectDiscoveryCandidates } from "./discovery-sources.js";
+import { withLocale } from "./i18n/index.js";
 import { command } from "./process.js";
 
 const sha = "a".repeat(40);
@@ -241,6 +243,72 @@ test("the chosen sort decides the GitHub search order and the sampling warning",
     /排序/,
   );
   assert.equal(invalid.calls.length, 0);
+});
+
+test("in English, the issue facts, source titles, warnings and errors carry no Han", async () => {
+  const stub = fakeGithub((endpoint) =>
+    endpoint === "graphql"
+      ? metadata("one", {
+          issues: {
+            nodes: [
+              {
+                ...issue(),
+                labels: { nodes: [] },
+                updatedAt: "not a date",
+                reactions: {},
+                assignees: { totalCount: 2 },
+                locked: true,
+              },
+            ],
+          },
+        })
+      : undefined,
+  );
+  const progress: string[] = [];
+  const result = await withLocale("en", () =>
+    collectDiscoveryCandidates(
+      { ...preferences, sort: "stars" },
+      {
+        command: stub.execute,
+        onProgress: (_phase, message) => progress.push(message),
+      },
+    ),
+  );
+  const [candidate] = result.candidates;
+  const issueSource = candidate.sources.find((source) => source.kind === "issue");
+  assert.equal(
+    issueSource?.content,
+    "Explain a confusing error\n\nGitHub status: OPEN; labels: none; updated: unconfirmed; assignees: 2; discussion locked: yes; total reactions: unconfirmed (not votes of support).\n\nUsers do not know which setting caused this error.",
+  );
+  assert.equal(
+    candidate.sources.find((source) => source.kind === "comment")?.title,
+    "#1 · OWNER comment",
+  );
+  assert.ok(
+    result.warnings.some((warning) =>
+      warning.startsWith("At most 6 projects were sampled (most stars first)"),
+    ),
+  );
+  assert.deepEqual(progress, [
+    "Searching for public, unarchived GitHub projects that match your criteria.",
+    "Checking the issues, contribution documents and maintainer replies of owner/one.",
+  ]);
+  for (const text of [
+    ...result.warnings,
+    ...candidate.warnings,
+    ...progress,
+    ...candidate.sources.map((source) => `${source.title}\n${source.content}`),
+  ])
+    assertNoHan(text);
+  await assert.rejects(
+    withLocale("en", () =>
+      collectDiscoveryCandidates(
+        { ...preferences, sort: "forks" as DiscoveryPreferences["sort"] },
+        { command: fakeGithub().execute },
+      ),
+    ),
+    { message: "Invalid discovery sort order." },
+  );
 });
 
 test("keywords cannot inject search qualifiers or shell commands and invalid filters make no request", async () => {

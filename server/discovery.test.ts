@@ -26,6 +26,8 @@ import {
   parseDiscoveryResult,
 } from "./discovery.js";
 import { Store } from "./store.js";
+import { withLocale } from "./i18n/index.js";
+import { assertNoHan } from "../src/test-utils/render.js";
 
 const candidate: DiscoveryCandidate = {
   fullName: "owner/project",
@@ -304,6 +306,47 @@ async function finished(service: DiscoveryService) {
   }
   throw new Error("Discovery did not finish");
 }
+
+test("in English, the actual popularity and the skipped opportunities are reported without Han", () => {
+  const english = { ...opportunity, title: "Clarify the keyboard instructions" };
+  const parsed = withLocale("en", () =>
+    parseDiscoveryResult(
+      answer([
+        english,
+        { ...english, id: "no-rules", evidence: [english.evidence[0]] },
+        { ...english, id: "no-issue", evidence: [english.evidence[1]] },
+        { ...english, id: "harder", difficulty: "advanced" },
+      ]),
+      [candidate],
+      defaultDiscoveryPreferences,
+    ),
+  );
+  assert.equal(
+    parsed.opportunities[0].popularity,
+    "GitHub snapshot: 1,250 stars, 70 forks, last pushed 2026-10-03. Popularity does not guarantee that a proposal will be accepted.",
+  );
+  assert.deepEqual(parsed.warnings, [
+    'Skipped owner/project "Clarify the keyboard instructions": it does not cite the CONTRIBUTING rules that were found.',
+    'Skipped owner/project "Clarify the keyboard instructions": it has no issue quote that can be checked.',
+    "Skipped 1 suggestion above the chosen difficulty.",
+  ]);
+  const unpushed = withLocale("en", () =>
+    parseDiscoveryResult(
+      answer([english]),
+      [{ ...candidate, pushedAt: "" }],
+      defaultDiscoveryPreferences,
+    ),
+  );
+  assert.match(unpushed.opportunities[0].popularity, /no last push date provided/);
+  assertNoHan(unpushed.opportunities[0].popularity);
+  assert.throws(
+    () =>
+      withLocale("en", () =>
+        parseDiscoveryResult("not json", [candidate], defaultDiscoveryPreferences),
+      ),
+    { message: "The discovery analysis came back incomplete. Try again; the previous result is kept." },
+  );
+});
 
 test("discovery returns a running job, uses one isolated model-pinned inference, persists evidence and measured usage", async () => {
   let release!: () => void;

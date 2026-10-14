@@ -5,7 +5,9 @@ import {
   type DiscoverySort,
   type DiscoverySource,
 } from "../shared/discovery.js";
+import { formatters } from "../shared/i18n/locale.js";
 import { parseGitHubSource, safeRelativePath, sensitivePath } from "./git.js";
+import { currentLocale, sm } from "./i18n/index.js";
 import { command, redact } from "./process.js";
 import { AppError } from "./types.js";
 
@@ -21,24 +23,30 @@ function searchQuery(preferences: DiscoveryPreferences) {
     preferences.interests.length > 300 ||
     /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(preferences.interests)
   )
-    throw new AppError("興趣關鍵字最多 300 字，且不能包含控制字元。", 422);
+    throw new AppError(
+      (m) => m.analysis.discoverySources.invalidInterests,
+      422,
+    );
   if (
     typeof preferences.language !== "string" ||
     preferences.language.length > 40 ||
     (preferences.language &&
       !/^[\p{L}\p{N}][\p{L}\p{N} +#._-]*$/u.test(preferences.language))
   )
-    throw new AppError("請填寫單一程式語言名稱，最多 40 字。", 422);
+    throw new AppError((m) => m.analysis.discoverySources.invalidLanguage, 422);
   if (
     !Number.isSafeInteger(preferences.minStars) ||
     preferences.minStars < 0 ||
     preferences.minStars > 1_000_000
   )
-    throw new AppError("最低 stars 必須介於 0 到 1,000,000。", 422);
+    throw new AppError((m) => m.analysis.discoverySources.invalidMinStars, 422);
   if (!["any", "beginner", "intermediate"].includes(preferences.difficulty))
-    throw new AppError("無效的探索難度。", 422);
+    throw new AppError(
+      (m) => m.analysis.discoverySources.invalidDifficulty,
+      422,
+    );
   if (!discoverySorts.includes(preferences.sort))
-    throw new AppError("無效的探索排序。", 422);
+    throw new AppError((m) => m.analysis.discoverySources.invalidSort, 422);
   // User text is reduced to quoted literal words; qualifiers come only from this code.
   const words =
     preferences.interests.match(/[\p{L}\p{N}][\p{L}\p{N}+#._-]*/gu) ?? [];
@@ -64,12 +72,6 @@ function searchQuery(preferences: DiscoveryPreferences) {
 function sortArguments(sort: DiscoverySort) {
   return sort === "relevance" ? [] : ["-f", `sort=${sort}`, "-f", "order=desc"];
 }
-
-const sortDescriptions: Record<DiscoverySort, string> = {
-  relevance: "GitHub 相關度（best match）最高",
-  updated: "最近更新",
-  stars: "星數最多",
-};
 
 function repositoryQuery(difficulty: DiscoveryPreferences["difficulty"]) {
   const label =
@@ -162,6 +164,8 @@ export async function collectDiscoveryCandidates(
   } = {},
 ): Promise<{ candidates: DiscoveryCandidate[]; warnings: string[] }> {
   const query = searchQuery(preferences);
+  const messages = sm().analysis.discoverySources;
+  const number = formatters(currentLocale()).number;
   const execute = options.command ?? command;
   const candidates: DiscoveryCandidate[] = [];
   const warnings: string[] = [];
@@ -171,12 +175,14 @@ export async function collectDiscoveryCandidates(
     : deadline;
   let requests = 0;
   const active = () => {
-    if (options.signal?.aborted) throw new AppError("貢獻探索已取消。", 409);
+    if (options.signal?.aborted)
+      throw new AppError((m) => m.analysis.discoverySources.cancelled, 409);
   };
   const limited = () => deadline.aborted || requests >= maximumRequests;
   const api = async (args: string[], maxBytes = 500_000) => {
     active();
-    if (limited()) throw new AppError("探索達到請求或時間上限。", 422);
+    if (limited())
+      throw new AppError((m) => m.analysis.discoverySources.limitReached, 422);
     requests++;
     const result = await execute(
       "gh",
@@ -192,12 +198,12 @@ export async function collectDiscoveryCandidates(
   ) => {
     if (!source.content.trim() || candidate.sources.length >= 15) return;
     if (/[\x00-\x08\x0b\x0c\x0e-\x1f\ufffd]/.test(source.content)) {
-      candidate.warnings.push(`${source.title} 不是可安全讀取的文字，已略過。`);
+      candidate.warnings.push(messages.unreadableText({ title: source.title }));
       return;
     }
     const cleaned = redact(source.content);
     if (cleaned !== source.content)
-      candidate.warnings.push(`${source.title} 已遮蔽疑似憑證。`);
+      candidate.warnings.push(messages.maskedCredentials({ title: source.title }));
     const used = candidate.sources.reduce(
       (total, item) => total + Buffer.byteLength(item.content),
       0,
@@ -207,7 +213,10 @@ export async function collectDiscoveryCandidates(
     const bytes = Buffer.from(cleaned);
     if (bytes.length > available)
       candidate.warnings.push(
-        `${source.title} 僅保留前 ${available.toLocaleString("en-US")} bytes，尚未讀取完整內容。`,
+        messages.truncatedSource({
+          title: source.title,
+          bytes: number(available),
+        }),
       );
     candidate.sources.push({
       ...source,
@@ -220,10 +229,7 @@ export async function collectDiscoveryCandidates(
   };
 
   active();
-  options.onProgress?.(
-    "searching",
-    "正在搜尋公開、未封存且符合條件的 GitHub 專案。",
-  );
+  options.onProgress?.("searching", messages.searching);
   let search: any;
   try {
     search = await api(
@@ -245,13 +251,11 @@ export async function collectDiscoveryCandidates(
     active();
     return {
       candidates,
-      warnings: [
-        "GitHub 搜尋未成功完成，可能受到權限、連線或 API 限制影響；尚不能判定沒有符合條件的專案。",
-      ],
+      warnings: [messages.searchFailed],
     };
   }
   if (search.incomplete_results)
-    warnings.push("GitHub 回傳部分搜尋結果，這次探索不是完整清單。");
+    warnings.push(messages.partialResults);
   const repositories = search.items
     .slice(0, 12)
     .filter((repo: any) => {
@@ -284,21 +288,16 @@ export async function collectDiscoveryCandidates(
   if (!repositories.length)
     return {
       candidates,
-      warnings: [
-        ...warnings,
-        "這次有界搜尋未找到符合條件的公開專案；可減少關鍵字、降低 stars 門檻或調整難度。",
-      ],
+      warnings: [...warnings, messages.noRepositories],
     };
-  warnings.push(
-    `最多取樣 6 個${sortDescriptions[preferences.sort]}的專案，每個最多 3 個開啟中的 issue 與每則最後 3 則留言；標籤不保證實際難度或仍可認領。文件僅讀取 GitHub community profile 識別的根目錄、.github、docs 內 README、CONTRIBUTING 與 PR 模板，未讀取帳號共用規範、多模板目錄及外部連結。`,
-  );
+  warnings.push(messages.samplingScope({ sort: preferences.sort }));
   for (const found of repositories) {
     active();
     if (limited()) break;
     const remote = parseGitHubSource(`https://github.com/${found.full_name}`)!;
     options.onProgress?.(
       "screening",
-      `正在檢查 ${remote.fullName} 的 issue、貢獻文件與維護者回應。`,
+      messages.screening({ repository: remote.fullName }),
     );
     let data: any;
     try {
@@ -337,7 +336,7 @@ export async function collectDiscoveryCandidates(
     } catch {
       active();
       warnings.push(
-        `${remote.fullName} 的公開狀態與 issue 資料未能完整確認，已略過；不代表沒有貢獻機會。`,
+        messages.repositoryUnconfirmed({ repository: remote.fullName }),
       );
       continue;
     }
@@ -372,7 +371,7 @@ export async function collectDiscoveryCandidates(
       );
     } catch {
       active();
-      candidate.warnings.push("貢獻文件索引讀取失敗，不能據此判定沒有規範。");
+      candidate.warnings.push(messages.profileFailed);
     }
     for (const [kind, key] of [
       ["readme", "readme"],
@@ -383,13 +382,11 @@ export async function collectDiscoveryCandidates(
       const indexed = profile?.files?.[key];
       const file = documentPath(indexed?.url, remote.fullName, kind);
       if (!shaPattern.test(baseSha ?? "")) {
-        candidate.warnings.push("未取得可驗證的預設分支版本，未讀取文件。");
+        candidate.warnings.push(messages.noBaseCommit);
         break;
       }
       if (!file && (kind !== "readme" || indexed)) {
-        candidate.warnings.push(
-          `${kind === "contributing" ? "CONTRIBUTING" : kind === "template" ? "PR 模板" : "README"} 未在本次允許的索引範圍找到，其他位置仍可能有規範。`,
-        );
+        candidate.warnings.push(messages.documentNotIndexed({ document: kind }));
         continue;
       }
       try {
@@ -434,7 +431,7 @@ export async function collectDiscoveryCandidates(
       } catch {
         active();
         candidate.warnings.push(
-          `${file ?? "README"} 讀取失敗或超出文字大小限制，尚未確認其完整內容。`,
+          messages.documentFailed({ path: file ?? "README" }),
         );
       }
     }
@@ -458,17 +455,22 @@ export async function collectDiscoveryCandidates(
             .filter(Boolean)
             .join(", ")
         : "";
-      const assigned = Number.isSafeInteger(issue.assignees?.totalCount)
-        ? String(issue.assignees.totalCount)
-        : "未確認";
+      // Undefined when GitHub did not confirm the value.
+      const assignees: number | undefined = Number.isSafeInteger(
+        issue.assignees?.totalCount,
+      )
+        ? issue.assignees.totalCount
+        : undefined;
       const updatedAt =
         typeof issue.updatedAt === "string" &&
         Number.isFinite(Date.parse(issue.updatedAt))
           ? issue.updatedAt
-          : "未確認";
-      const reactions = Number.isSafeInteger(issue.reactions?.totalCount)
-        ? String(issue.reactions.totalCount)
-        : "未確認";
+          : undefined;
+      const reactions: number | undefined = Number.isSafeInteger(
+        issue.reactions?.totalCount,
+      )
+        ? issue.reactions.totalCount
+        : undefined;
       addSource(
         candidate,
         {
@@ -476,7 +478,13 @@ export async function collectDiscoveryCandidates(
           kind: "issue",
           title: `#${issue.number} ${issue.title}`,
           url: issue.url,
-          content: `${issue.title}\n\nGitHub 狀態：OPEN；標籤：${labels || "無"}；更新時間：${updatedAt}；受指派人數：${assigned}；討論鎖定：${issue.locked === true ? "是" : "否"}；表情回應總數：${reactions}（不代表支持票）。\n\n${issue.body}`,
+          content: `${issue.title}\n\n${messages.issueHeader({
+            labels,
+            updatedAt,
+            assignees,
+            locked: issue.locked === true,
+            reactions,
+          })}\n\n${issue.body}`,
         },
         3_000,
       );
@@ -492,7 +500,10 @@ export async function collectDiscoveryCandidates(
         maintainerComments.push({
           id: `${remote.fullName}:comment:${new URL(comment.url).hash.slice(1)}`,
           kind: "comment",
-          title: `#${issue.number} · ${comment.authorAssociation} 留言`,
+          title: messages.commentTitle({
+            number: issue.number,
+            association: comment.authorAssociation,
+          }),
           url: comment.url,
           content: comment.body,
         });
@@ -501,27 +512,19 @@ export async function collectDiscoveryCandidates(
     for (const source of maintainerComments)
       addSource(candidate, source, 1_500);
     if (!candidate.sources.some((source) => source.kind === "issue"))
-      candidate.warnings.push(
-        "本次取樣未取得符合難度標籤的開啟中 issue，尚不能確認具體需求或可認領性。",
-      );
-    if (!candidate.pushedAt)
-      candidate.warnings.push("GitHub 未提供可驗證的最後推送時間。");
+      candidate.warnings.push(messages.noMatchingIssue);
+    if (!candidate.pushedAt) candidate.warnings.push(messages.noPushTime);
     if (
       candidate.sources.reduce(
         (bytes, source) => bytes + Buffer.byteLength(source.content),
         0,
       ) >= maximumCandidateBytes
     )
-      candidate.warnings.push("來源已達每個專案 30 KB 上限，部分內容未讀取。");
+      candidate.warnings.push(messages.candidateBytesLimit);
   }
   active();
   if (limited())
-    warnings.push(
-      "探索達到 36 次請求或 90 秒上限，已保留取得的結果；尚未完整讀取其餘候選來源。",
-    );
-  if (!candidates.length)
-    warnings.push(
-      "候選資料未能通過公開狀態與來源驗證，這次沒有可分析的專案；可稍後重試或調整條件。",
-    );
+    warnings.push(messages.requestLimit);
+  if (!candidates.length) warnings.push(messages.noCandidates);
   return { candidates, warnings };
 }

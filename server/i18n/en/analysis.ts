@@ -1,4 +1,9 @@
 /** Project analysis, discovery, draft and explanation messages. */
+import type { DiscoverySort } from "../../../shared/discovery.js";
+
+/** README, CONTRIBUTING or PR template: the documents discovery reads. */
+type DiscoveryDocument = "readme" | "contributing" | "template";
+
 export default {
   /** Project analysis (server/insights.ts). */
   insights: {
@@ -65,5 +70,186 @@ export default {
       "The AI analysis did not finish or its response was too large. Try again; the previous result is kept.",
     repositoryChanged:
       "The repository changed during the analysis. Analyze the latest version again.",
+  },
+  /** GitHub-wide discovery jobs (server/discovery.ts). */
+  discovery: {
+    incompleteAnswer:
+      "The discovery analysis came back incomplete. Try again; the previous result is kept.",
+    duplicateIds:
+      "The discovery analysis returned duplicate opportunity ids. Try again.",
+    unverifiedRepository:
+      "A discovery suggestion cited a repository that was not verified. Try again.",
+    skippedUnmatchedQuote: ({
+      repository,
+      title,
+      sourceId,
+    }: {
+      repository: string;
+      title: string;
+      sourceId: string;
+    }) =>
+      `Skipped ${repository} "${title}": a quote does not match its source ${sourceId}.`,
+    skippedNoIssueQuote: ({
+      repository,
+      title,
+    }: {
+      repository: string;
+      title: string;
+    }) =>
+      `Skipped ${repository} "${title}": it has no issue quote that can be checked.`,
+    skippedNoContributingQuote: ({
+      repository,
+      title,
+    }: {
+      repository: string;
+      title: string;
+    }) =>
+      `Skipped ${repository} "${title}": it does not cite the CONTRIBUTING rules that were found.`,
+    /** Replaces the model's popularity text with the fetched numbers. */
+    popularity: ({
+      stars,
+      forks,
+      pushedAt,
+    }: {
+      stars: string;
+      forks: string;
+      pushedAt: string;
+    }) =>
+      `GitHub snapshot: ${stars} stars, ${forks} forks, last pushed ${pushedAt}. Popularity does not guarantee that a proposal will be accepted.`,
+    popularityWithoutPush: ({ stars, forks }: { stars: string; forks: string }) =>
+      `GitHub snapshot: ${stars} stars, ${forks} forks, no last push date provided. Popularity does not guarantee that a proposal will be accepted.`,
+    skippedDifficulty: ({ count }: { count: number }) =>
+      count === 1
+        ? "Skipped 1 suggestion above the chosen difficulty."
+        : `Skipped ${count} suggestions above the chosen difficulty.`,
+    fileTooLarge: "The saved discovery results file is too large to load safely.",
+    /** A discovery job that was running when the server stopped. */
+    interruptedError:
+      "The server restarted and interrupted the discovery. The sources collected so far and the previous result are kept; you can run discovery again.",
+    interrupted: "The last discovery was interrupted",
+    shuttingDown: "The server is shutting down. Try discovery again later.",
+    alreadyRunning:
+      "A discovery is already running. Wait for it to finish or cancel it first.",
+    searching: "Looking for GitHub projects that match your criteria",
+    startFailed: "Discovery could not start",
+    startSaveFailed:
+      "The discovery job could not be saved. Check the local storage space and try again; the previous result is kept.",
+    cancelled: "Discovery was cancelled.",
+    duplicateRepository: "The discovery sources contain a duplicate repository.",
+    skippedFilter: ({ repository }: { repository: string }) =>
+      `Skipped ${repository}: it does not match the language or the minimum stars.`,
+    duplicateSourceIds:
+      "Discovery sources have duplicate ids, so quotes cannot be checked reliably.",
+    skippedSensitiveSource:
+      "Skipped a source that appears to contain sensitive information.",
+    sourcesTruncated:
+      "The sources are over the 30 KB limit, so whole sections were left out.",
+    noEvidence:
+      "No opportunity this time both matched your criteria and had issue evidence that can be checked.",
+    analyzing:
+      "Found real GitHub sources; analyzing which contribution opportunities fit",
+    analyzingWithWait: ({ wait }: { wait: string }) =>
+      `Found real GitHub sources; analyzing which contribution opportunities fit (${wait})`,
+    unusableAnswer:
+      "The AI discovery analysis did not finish, or its response cannot be used safely. Try again; the previous result is kept.",
+    found: ({ count }: { count: number }) =>
+      count === 1
+        ? "Found 1 contribution opportunity backed by sources. Check the maintainers' interest and the scope of the work before you start."
+        : `Found ${count} contribution opportunities backed by sources. Check the maintainers' interest and the scope of the work before you start.`,
+    noneFound:
+      "No contribution opportunity fits your criteria, the project rules and the available evidence this time. Adjust the criteria and run discovery again.",
+    cancelledKept: "Discovery was cancelled; the previous result is kept.",
+    failed: "Discovery failed. Try again later.",
+    cancelledStatus: "Discovery cancelled",
+    unfinishedStatus: "Discovery did not finish",
+    saveFailed:
+      "The discovery results could not be saved. Check the local storage space and try again.",
+  },
+  /** Public GitHub sources read for discovery (server/discovery-sources.ts). */
+  discoverySources: {
+    invalidInterests:
+      "Interest keywords can be at most 300 characters and cannot contain control characters.",
+    invalidLanguage:
+      "Enter a single programming language name of at most 40 characters.",
+    invalidMinStars: "Minimum stars must be between 0 and 1,000,000.",
+    invalidDifficulty: "Invalid discovery difficulty.",
+    invalidSort: "Invalid discovery sort order.",
+    cancelled: "Contribution discovery was cancelled.",
+    limitReached: "Discovery reached its request or time limit.",
+    unreadableText: ({ title }: { title: string }) =>
+      `Skipped ${title}: it is not text that can be read safely.`,
+    maskedCredentials: ({ title }: { title: string }) =>
+      `Masked what looks like a credential in ${title}.`,
+    truncatedSource: ({ title, bytes }: { title: string; bytes: string }) =>
+      `Kept only the first ${bytes} bytes of ${title}; the rest was not read.`,
+    searching:
+      "Searching for public, unarchived GitHub projects that match your criteria.",
+    searchFailed:
+      "The GitHub search did not finish, possibly because of permissions, the connection or API limits. This does not mean that no project matches.",
+    partialResults:
+      "GitHub returned partial search results, so this discovery is not a complete list.",
+    noRepositories:
+      "This bounded search found no public project that matches. Try fewer keywords, a lower stars threshold or another difficulty.",
+    /** What discovery sampled, in the GitHub search order the person chose. */
+    samplingScope: ({ sort }: { sort: DiscoverySort }) =>
+      `At most 6 projects were sampled (${
+        {
+          relevance: "GitHub's best matches first",
+          updated: "most recently updated first",
+          stars: "most stars first",
+        }[sort]
+      }), with up to 3 open issues each and the last 3 comments on each issue. Labels do not guarantee the actual difficulty or that the work is still available. Only the README, CONTRIBUTING and PR template that GitHub's community profile finds in the root, .github or docs were read; account-wide defaults, folders of several templates and external links were not.`,
+    screening: ({ repository }: { repository: string }) =>
+      `Checking the issues, contribution documents and maintainer replies of ${repository}.`,
+    repositoryUnconfirmed: ({ repository }: { repository: string }) =>
+      `Skipped ${repository}: its public status and issue data could not be fully confirmed. This does not mean it has no contribution opportunities.`,
+    profileFailed:
+      "The contribution document index could not be read; this does not mean the project has no rules.",
+    noBaseCommit:
+      "No verifiable default-branch commit was found, so no documents were read.",
+    documentNotIndexed: ({ document }: { document: DiscoveryDocument }) =>
+      `No ${
+        {
+          readme: "README",
+          contributing: "CONTRIBUTING",
+          template: "PR template",
+        }[document]
+      } was found in the locations BELL reads; the project may still keep rules elsewhere.`,
+    documentFailed: ({ path }: { path: string }) =>
+      `${path} could not be read or is over the text size limit; its full content was not checked.`,
+    /**
+     * The facts BELL adds above an issue's text for the model. A missing
+     * value was not confirmed by GitHub.
+     */
+    issueHeader: ({
+      labels,
+      updatedAt,
+      assignees,
+      locked,
+      reactions,
+    }: {
+      labels: string;
+      updatedAt?: string;
+      assignees?: number;
+      locked: boolean;
+      reactions?: number;
+    }) =>
+      `GitHub status: OPEN; labels: ${labels || "none"}; updated: ${updatedAt ?? "unconfirmed"}; assignees: ${assignees ?? "unconfirmed"}; discussion locked: ${locked ? "yes" : "no"}; total reactions: ${reactions ?? "unconfirmed"} (not votes of support).`,
+    commentTitle: ({
+      number,
+      association,
+    }: {
+      number: number;
+      association: string;
+    }) => `#${number} · ${association} comment`,
+    noMatchingIssue:
+      "This sample found no open issue with the difficulty label, so the concrete need and whether the work is still available are not confirmed.",
+    noPushTime: "GitHub did not provide a verifiable last push time.",
+    candidateBytesLimit:
+      "The sources reached the 30 KB limit for each project; some content was not read.",
+    requestLimit:
+      "Discovery reached its limit of 36 requests or 90 seconds. The results so far are kept; the sources of the remaining candidates were not fully read.",
+    noCandidates:
+      "No candidate passed the public status and source checks, so there is no project to analyze this time. Try again later or adjust the criteria.",
   },
 };
