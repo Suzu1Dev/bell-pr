@@ -82,8 +82,8 @@ Software on several of their own computers. <!-- claim:EULA-08 -->
 released within the Update Period. The Update Period ends on the "updates
 until" date that your License Key carries, which the Software shows in the
 License section of its settings and with `bell-pr license status`. <!-- claim:EULA-09 -->
-Unless your order states otherwise, that date is 12 months after your
-purchase
+Unless your order states otherwise, that date is 12 months after the date
+your License Key is issued
 [OWNER: confirm a perpetual license with 12 months of updates, or change it to a subscription term]. <!-- claim:EULA-10 -->
 After the Update Period ends, you may keep using the Pro Feature Set in the
 Builds released within it. Builds released later run with the Free Feature

@@ -196,7 +196,7 @@ also shows the Pro features with sample data.
 | Providers, model choice, Efficiency modes | Free | Codex CLI and Claude Code, all models, all efficiency modes |
 | Sample project / demo (Pro features shown with sample data) | Free | Sample data in your browser only |
 | 14-day Pro trial | Free | One per data directory, started only when you choose (in the app or with bell-pr license trial) |
-| Pro license term and updates | Pro | Per named user; perpetual use of the builds released within 12 months of purchase |
+| Pro license term and updates | Pro | Per named user; perpetual, with 12 months of updates from the date your key is issued |
 
 <!-- /generated:plan-table -->
 
@@ -344,10 +344,10 @@ in any of three ways:
 - **With the environment:** `BELLPR_LICENSE_KEY=<key>`; it wins over a
   saved key.
 
-A key covers the builds released within its update period (12 months from
-purchase by default) and keeps working with them forever. In this release
-candidate no license key can unlock Pro yet; the trial works. See
-[Licensing](docs/licensing.md).
+A key covers the builds released within its update period (12 months of
+updates from the date your key is issued, by default) and keeps working
+with them forever. In this release candidate no license key can unlock Pro
+yet; the trial works. See [Licensing](docs/licensing.md).
 
 ## Documentation
 

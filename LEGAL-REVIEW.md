@@ -111,13 +111,16 @@ own. The legal texts already describe the shipped behavior.
    link (`mintOneTimeToken`, `server/index.ts:555`) instead,
    `server/cli.test.ts` checks the opener's arguments, and SECURITY.md
    (SEC-14, SEC-16) and `docs/security-model.md` say so.
-2. **Update period of pool keys.** `tools/license/issue.ts:154` sets `upd`
-   12 months from the day a key is issued, which for a pre-signed pool is
-   the day the pool was made. The plan copy ("perpetual use of the builds
-   released within 12 months of purchase", `shared/i18n/plans.en.ts`, in the
-   generated tables of the site, the READMEs and TERMS.md) promises 12
-   months from purchase. The owner should issue pools close to the sale, use
-   a longer `--updates-months`, or change the copy.
+2. **Update period of pool keys.** Copy fixed after the merge:
+   `tools/license/issue.ts:154` sets `upd` 12 months from the day a key is
+   issued, which for a pre-signed pool is the day the pool was made, while
+   the plan copy promised 12 months from purchase. The copy now says "12
+   months of updates from the date your key is issued"
+   (`shared/i18n/plans.{en,zh-TW}.ts`, the generated tables of the site,
+   the READMEs and TERMS.md, the docs, and section 4.2 of the EULA, whose
+   `eulaVersion` stays the draft's). The code is unchanged: keys sold by
+   hand are issued at purchase, and the owner should still issue pools
+   close to the sale or with a longer `--updates-months`.
 3. **Web access copy.** Fixed after the merge: the plan copy said "Pro: on,
    limited to an allowlist of domains", but web access is off until the
    person turns it on, only Claude Code's WebFetch has a domain allowlist
@@ -182,7 +185,7 @@ Commands run on the tree of this review, test files excluded:
 | EULA-07 | Free allows commercial use [OWNER] | Owner decision: commercial terms |
 | EULA-08 | Pro grant per seat for one Named User, on several of their computers | Owner decision: counsel review (G4); keys carry `seats` and no device binding, `server/license.ts:100` |
 | EULA-09 | The Update Period ends on the key's "updates until" date, shown in Settings and `bell-pr license status` | `server/license.ts:114`, `server/license.ts:245`, `src/license/LicenseCard.tsx:110`, `server/license.ts:855` |
-| EULA-10 | That date is 12 months after purchase unless the order says otherwise [OWNER] | Owner decision: license term; `tools/license/issue.ts:154` (12 months from issue by default; finding 2) |
+| EULA-10 | That date is 12 months after the key is issued unless the order says otherwise [OWNER] | Owner decision: license term; `tools/license/issue.ts:154` (12 months from issue by default; finding 2) |
 | EULA-11 | After the Update Period, earlier builds keep Pro and later builds run Free | `server/license.ts:245`, `server/license.ts:729`, `server/license.ts:754` |
 | EULA-12 | A key with an expiry date keeps Pro for a 7-day grace period | `server/license.ts:241`, `shared/plans.ts:69` |
 | EULA-13 | A seat belongs to one Named User; reassignment allowed, sharing not | Owner decision: counsel review (G4); not enforced in code |
