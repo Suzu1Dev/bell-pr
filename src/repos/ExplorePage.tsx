@@ -1,11 +1,17 @@
-import type { Dispatch, SetStateAction } from "react";
+import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
 import { Target } from "lucide-react";
 import { useT } from "../i18n";
 import type { Repo } from "../types";
-import { ProjectOverview } from "../mission";
 import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { ContributionRecommendation } from "../../shared/insights";
 import type { Tab } from "../app/AppShell";
+
+// The overview is the largest view in the app; it loads with its first visit.
+const ProjectOverview = lazy(() =>
+  import("../mission/ProjectOverview").then((module) => ({
+    default: module.ProjectOverview,
+  })),
+);
 
 interface ExplorePageProps {
   exploreRepo: Repo;
@@ -45,6 +51,7 @@ export function ExplorePage({
           {t.chooseDirection}
         </button>
       </div>
+      <Suspense fallback={null}>
       <ProjectOverview
         repo={exploreRepo}
         insights={intelligence.insights}
@@ -66,6 +73,7 @@ export function ExplorePage({
         onUpdateRepo={onUpdateRepo}
         updatingRepo={updatingRepo}
       />
+      </Suspense>
     </section>
   );
 }

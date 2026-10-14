@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import { Check, CircleCheck, Loader2 } from "lucide-react";
-import { DirectionSettings } from "../mission";
+import { DirectionSettings } from "../mission/DirectionSettings";
 import { defaultContributionSettings } from "../../shared/insights";
 import type { TaskSetup } from "../app/hooks/useTaskSetup";
 import { useT } from "../i18n";

@@ -11,7 +11,7 @@ import {
 import { getDemo } from "../demo";
 import { useLocale, useT } from "../i18n";
 import type { Repo } from "../types";
-import { DirectionSettings } from "../mission";
+import { DirectionSettings } from "../mission/DirectionSettings";
 import { providerReadiness } from "../mission/readiness";
 import { providerLabels } from "../../shared/models";
 import type { ModalName, Page } from "../app/AppShell";

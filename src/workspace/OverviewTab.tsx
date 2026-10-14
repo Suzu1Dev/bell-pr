@@ -1,14 +1,20 @@
-import type { Dispatch, SetStateAction } from "react";
+import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
 import { getDemo } from "../demo";
 import { useLocale, useT, type Messages } from "../i18n";
 import type { Repo, Run } from "../types";
-import { ProjectOverview } from "../mission";
 import type { useProjectInsights } from "../mission/useProjectInsights";
 import type {
   ContributionBrief,
   ContributionRecommendation,
 } from "../../shared/insights";
 import type { Tab } from "../app/AppShell";
+
+// The overview is the largest view in the app; it loads with its first visit.
+const ProjectOverview = lazy(() =>
+  import("../mission/ProjectOverview").then((module) => ({
+    default: module.ProjectOverview,
+  })),
+);
 
 /**
  * The run's contribution brief, built from the settings it started with;
@@ -57,6 +63,7 @@ export function OverviewTab({
   const t = useT("workspace");
   const [locale] = useLocale();
   return (
+    <Suspense fallback={null}>
     <ProjectOverview
       repo={currentRepo}
       run={run}
@@ -83,5 +90,6 @@ export function OverviewTab({
       onUpdateRepo={onUpdateRepo}
       updatingRepo={updatingRepo}
     />
+    </Suspense>
   );
 }
