@@ -119,6 +119,7 @@ const m: Translation<typeof en> = {
     previousTitle: "上一份推薦，仍在這裡。",
     note: ({ sort }) =>
       `依你選的「${sort}」排序取 12 個候選、驗證後最多 6 個；順序由分析整理，不是 GitHub 全站排名。實作前仍需確認 issue 最新狀態與維護者意願。`,
+    sampleNote: "即時搜尋會依你選的排序取 12 個候選，檢查後最多保留 6 個，結果就像這些示範。",
     previousNote: ({ date }) =>
       date
         ? `這是 ${date} 的結果，未反映本次搜尋。`

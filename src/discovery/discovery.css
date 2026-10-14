@@ -167,6 +167,7 @@
   font-size: var(--text-2xs);
 }
 .discovery-section-label > .pro-badge {
+  flex-basis: auto;
   margin-left: 0;
   color: var(--color-violet);
   font-size: var(--text-2xs);

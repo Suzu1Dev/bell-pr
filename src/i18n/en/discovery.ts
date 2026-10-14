@@ -159,6 +159,9 @@ const discovery = {
     previousTitle: "Your previous recommendations are still here.",
     note: ({ sort }: { sort: string }) =>
       `We took 12 candidates in the "${sort}" order you chose and kept at most 6 after checking them. The order comes from the analysis, not from a GitHub-wide ranking. Before you start, check the issue's latest status and whether the maintainers want the change.`,
+    /** Above the sample results, which no search produced. */
+    sampleNote:
+      "A live search takes 12 candidates in the order you choose and keeps at most 6 after checking them, like these.",
     previousNote: ({ date }: { date?: string }) =>
       date
         ? `These results are from ${date} and do not reflect your latest search.`

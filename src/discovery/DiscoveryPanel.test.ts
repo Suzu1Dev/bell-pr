@@ -273,6 +273,9 @@ test("on Free the panel shows labelled sample results, a locked form and the way
     sample.opportunities.length,
   );
   assert.match(html, /A sample cannot be chosen\. Live discovery finds real projects you can import\./);
+  // The heading's note describes a live search, not one the reader ran.
+  assert.match(html, /A live search takes 12 candidates in the order you choose/);
+  assert.doesNotMatch(html, /order you chose/);
   // Once the trial was used, only the upgrade remains.
   const used = panel(null, { license: { ...free, trialAvailable: false }, demo: false });
   assert.doesNotMatch(used, /Start 14-day trial/);

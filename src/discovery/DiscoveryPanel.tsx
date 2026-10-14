@@ -715,9 +715,11 @@ export default function DiscoveryPanel({
               <p>
                 {previous
                   ? t.results.previousNote({ date: date(previous.createdAt) })
-                  : t.results.note({
-                      sort: t.sorts[shown?.preferences.sort ?? "updated"],
-                    })}
+                  : sample
+                    ? t.results.sampleNote
+                    : t.results.note({
+                        sort: t.sorts[shown?.preferences.sort ?? "updated"],
+                      })}
               </p>
             </div>
             <span className="discovery-count">
