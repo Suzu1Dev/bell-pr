@@ -7,6 +7,7 @@
  * unsandboxed agents; such a run is marked `run.unsandboxed`. Read-only
  * roles have no Bash, and Codex brings its own sandbox, so neither needs it.
  */
+import { execFile } from "node:child_process";
 import { constants, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { access } from "node:fs/promises";
 import os from "node:os";
@@ -22,7 +23,9 @@ export interface SandboxDetection {
   /**
    * Why the sandbox is unavailable, as a stable id rather than prose:
    * `missing:bwrap`, `missing:socat`, `missing:bwrap,socat`,
-   * `missing:sandbox-exec` or `platform:<name>`. Absent when available.
+   * `missing:sandbox-exec`, `unusable:bwrap` (installed, but it cannot
+   * create namespaces here, as in a Docker container with default security
+   * options) or `platform:<name>`. Absent when available.
    */
   reason?: string;
 }
@@ -47,13 +50,38 @@ async function onPath(executable: string, searchPath: string) {
   return false;
 }
 
+/**
+ * Whether bubblewrap can start a sandbox like the one Claude Code asks
+ * for (new namespaces, its own /proc and /dev). Docker's default seccomp
+ * and AppArmor profiles and masked /proc paths stop it even when the
+ * executables are installed (docs/docker.md).
+ */
+function bwrapWorks(): Promise<boolean> {
+  return new Promise((resolve) => {
+    execFile(
+      "bwrap",
+      [
+        "--ro-bind", "/", "/",
+        "--dev", "/dev",
+        "--proc", "/proc",
+        "--unshare-all",
+        "--die-with-parent",
+        "true",
+      ],
+      { timeout: 10_000, windowsHide: true },
+      (error) => resolve(!error),
+    );
+  });
+}
+
 /** Keyed by platform and PATH, so a changed PATH is looked at again. */
 const detections = new Map<string, Promise<SandboxDetection>>();
 
 /**
- * Whether Claude Code's sandbox can start here: bwrap and socat on PATH on
- * Linux, sandbox-exec on macOS; other platforms have none. The answer is
- * cached for the PATH it was computed with.
+ * Whether Claude Code's sandbox can start here: on Linux bwrap and socat
+ * on PATH, and bwrap able to create a sandbox; sandbox-exec on macOS;
+ * other platforms have none. The answer is cached for the PATH it was
+ * computed with.
  */
 export function detectClaudeSandbox(): Promise<SandboxDetection> {
   const platform = process.platform;
@@ -67,9 +95,11 @@ export function detectClaudeSandbox(): Promise<SandboxDetection> {
       const missing: string[] = [];
       for (const executable of needed)
         if (!(await onPath(executable, searchPath))) missing.push(executable);
-      return missing.length
-        ? { available: false, reason: `missing:${missing.join(",")}` }
-        : { available: true };
+      if (missing.length)
+        return { available: false, reason: `missing:${missing.join(",")}` };
+      if (platform === "linux" && !(await bwrapWorks()))
+        return { available: false, reason: "unusable:bwrap" };
+      return { available: true };
     })();
     detections.set(key, detection);
   }
@@ -117,10 +147,29 @@ export async function enforceAgentSandbox(
 ): Promise<{ sandbox: boolean; unsandboxed: boolean }> {
   if (provider !== "claude" || access !== "write")
     return { sandbox: false, unsandboxed: false };
-  if ((await detectClaudeSandbox()).available)
-    return { sandbox: true, unsandboxed: false };
+  const detection = await detectClaudeSandbox();
+  if (detection.available) return { sandbox: true, unsandboxed: false };
   if (allowUnsandboxedAgents()) return { sandbox: false, unsandboxed: true };
   const messages = sm().security.sandbox;
+  const allowFix = {
+    label: messages.allowFix,
+    command: `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1 ${product.binNames[0]}`,
+  };
+  // Installed but blocked, as in a container: installing it again or
+  // switching to Codex, whose sandbox is blocked the same way, cannot help.
+  if (detection.reason === "unusable:bwrap")
+    throw new AppError(messages.blocked, 503, {
+      code: "claude_sandbox_unavailable",
+      fixes: [
+        {
+          label: messages.dockerFix,
+          command:
+            "docker run --security-opt seccomp=unconfined --security-opt apparmor=unconfined --security-opt systempaths=unconfined …",
+          platform: "linux",
+        },
+        allowFix,
+      ],
+    });
   throw new AppError(messages.unavailable, 503, {
     code: "claude_sandbox_unavailable",
     fixes: [
@@ -130,10 +179,7 @@ export async function enforceAgentSandbox(
         platform: "linux",
       },
       { label: messages.codexFix, command: "codex login" },
-      {
-        label: messages.allowFix,
-        command: `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1 ${product.binNames[0]}`,
-      },
+      allowFix,
     ],
   });
 }

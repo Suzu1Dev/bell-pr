@@ -220,10 +220,13 @@ are never written to disk.
   `-p 127.0.0.1:4311:4311`; inside the container BELL PR listens on all
   interfaces so the port mapping can reach it.
 - Get a sign-in link with `docker exec <container> bell-pr open --print`.
-- Claude Code's sandbox needs bubblewrap to create namespaces. In a container
-  without that permission a writable Claude role stops with a sandbox error;
-  use Codex, or allow unsandboxed agents if you accept the container as the
-  only boundary.
+- Both agent sandboxes need bubblewrap to create namespaces, which Docker's
+  default security options forbid: every command a Codex agent runs fails,
+  and a writable Claude role stops with `claude_sandbox_unavailable` (BELL PR
+  checks that bubblewrap can really start a sandbox, not only that it is
+  installed). Start the container with the three `--security-opt` options
+  in [docker.md](docker.md), or, for Claude Code only, allow unsandboxed
+  agents if you accept the container as the only boundary.
 
 ## Agent sandbox canary
 

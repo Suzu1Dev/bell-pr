@@ -78,6 +78,38 @@ test("Linux needs both bwrap and socat on PATH for Claude Code's sandbox", { ski
   assert.equal(await detectClaudeSandbox(), await detectClaudeSandbox());
 });
 
+test("an installed bwrap that cannot create a sandbox, as in Docker, does not count", { skip: !linux }, async (t) => {
+  const directory = await stubPath(t, ["socat"]);
+  // What Docker's default profile answers to a namespace request.
+  await writeFile(
+    path.join(directory, "bwrap"),
+    "#!/bin/sh\necho 'bwrap: No permissions to create a new namespace' >&2\nexit 1\n",
+    { mode: 0o755 },
+  );
+  assert.deepEqual(await detectClaudeSandbox(), {
+    available: false,
+    reason: "unusable:bwrap",
+  });
+  optIn(t, false);
+  await assert.rejects(
+    withLocale("en", () => enforceAgentSandbox("claude", "write")),
+    (error: unknown) =>
+      error instanceof AppError &&
+      error.statusCode === 503 &&
+      error.code === "claude_sandbox_unavailable" &&
+      /installed but cannot create a sandbox/.test(error.message) &&
+      error.fixes?.length === 2 &&
+      error.fixes[0].command.includes("--security-opt systempaths=unconfined") &&
+      error.fixes[1].command === "BELLPR_ALLOW_UNSANDBOXED_AGENTS=1 bell-pr",
+  );
+  // The person's opt-in now applies, as it does without bwrap.
+  optIn(t, true);
+  assert.deepEqual(await enforceAgentSandbox("claude", "write"), {
+    sandbox: false,
+    unsandboxed: true,
+  });
+});
+
 test("a write-role Claude agent without the sandbox is refused with the ways to fix it", { skip: !linux }, async (t) => {
   await stubPath(t, []);
   optIn(t, undefined);
