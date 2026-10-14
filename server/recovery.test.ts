@@ -476,13 +476,14 @@ test("a run interrupted while publishing is approved again after a restart and t
   const store = new Store(f.dataDir);
   await store.initialize();
   const workbench = new Workbench(store);
-  const repo = await workbench.importRepository(f.repository);
-  Object.assign(repo, {
+  // Imported in place by an earlier build: the run works in the checkout.
+  const repo = Object.assign(repository(f.repository), {
     url: "https://github.com/test-owner/example",
     fullName: "test-owner/example",
     owner: "test-owner",
     name: "example",
   });
+  store.data.repos.push(repo);
   const run = reviewRun("run-publish", repo, f.repository, f.baseSha);
   run.draft.commitMessage = "Improve the greeting";
   store.data.runs.push(run);
@@ -699,13 +700,14 @@ test("a restart during a round's push reopens the round for review with the PR i
   const store = new Store(f.dataDir);
   await store.initialize();
   const workbench = new Workbench(store, runner);
-  const repo = await workbench.importRepository(f.repository);
-  Object.assign(repo, {
+  // Imported in place by an earlier build: the run works in the checkout.
+  const repo = Object.assign(repository(f.repository), {
     url: "https://github.com/test-owner/example",
     fullName: "test-owner/example",
     owner: "test-owner",
     name: "example",
   });
+  store.data.repos.push(repo);
   const run = reviewRun("run-round", repo, f.repository, f.baseSha);
   run.draft.commitMessage = "Improve the greeting";
   store.data.runs.push(run);

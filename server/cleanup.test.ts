@@ -11,6 +11,7 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { request } from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -126,6 +127,27 @@ async function gitRepository(repoPath: string, origin?: string) {
   return (await git(repoPath, ["rev-parse", "HEAD"])).stdout.trim();
 }
 
+/**
+ * The project record for `repoPath` itself. An import clones a local
+ * checkout, so a test that needs the record to point at a given folder
+ * (BELL's clone, or a checkout an earlier build worked in) adds it directly.
+ */
+function addRepository(f: Fixture, repoPath: string, url = ""): Repository {
+  const github = /^https:\/\/github\.com\/([^/]+)\/([^/]+)$/.exec(url);
+  const name = github?.[2] ?? path.basename(repoPath);
+  const repo: Repository = {
+    id: randomUUID(),
+    name,
+    owner: github?.[1] ?? "local",
+    fullName: github ? `${github[1]}/${name}` : `local/${name}`,
+    path: repoPath,
+    defaultBranch: "main",
+    url,
+  };
+  f.store.data.repos.unshift(repo);
+  return repo;
+}
+
 function run(id: string, repo: Repository, fields: Partial<Run> = {}): Run {
   return {
     id,
@@ -184,7 +206,7 @@ test("freeing a run's workspace removes its directories, Git records, branch and
   // BELL's own clone of a GitHub project, under <data>/repositories.
   const clonePath = path.join(f.dataDir, "repositories", "test-owner-example-1a2b3c4d");
   const baseSha = await gitRepository(clonePath, "https://github.com/test-owner/example.git");
-  const repo = await f.workbench.importRepository(clonePath);
+  const repo = addRepository(f, clonePath, "https://github.com/test-owner/example");
   assert.equal(f.workbench.managedClone(repo), true);
   const value = await runWithWorkspace(f, repo, baseSha, "aaaaaaaa-1111-4111-8111-111111111111", {
     prUrl: "https://github.com/test-owner/example/pull/1",
@@ -243,7 +265,8 @@ test("a repository on the person's disk keeps the run's branch, and active or ou
   t.after(f.cleanup);
   const userRepo = path.join(f.directory, "my-project");
   const baseSha = await gitRepository(userRepo, "https://github.com/test-owner/example.git");
-  const repo = await f.workbench.importRepository(userRepo);
+  // Imported in place by an earlier build.
+  const repo = addRepository(f, userRepo, "https://github.com/test-owner/example");
   assert.equal(f.workbench.managedClone(repo), false);
   const value = await runWithWorkspace(f, repo, baseSha, "bbbbbbbb-2222-4222-8222-222222222222");
   const busy = await runWithWorkspace(f, repo, baseSha, "cccccccc-3333-4333-8333-333333333333", {
@@ -375,7 +398,7 @@ test("deleting a project is refused while a run works, then removes its clone, r
   t.after(f.cleanup);
   const clonePath = path.join(f.dataDir, "repositories", "test-owner-example-5e6f7a8b");
   const baseSha = await gitRepository(clonePath, "https://github.com/test-owner/example.git");
-  const repo = await f.workbench.importRepository(clonePath);
+  const repo = addRepository(f, clonePath, "https://github.com/test-owner/example");
   const working = await runWithWorkspace(f, repo, baseSha, "eeeeeeee-5555-4555-8555-555555555555", {
     status: "running",
   });
