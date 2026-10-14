@@ -27,6 +27,7 @@ import type { AgentTeam } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import { ProjectInsightsService } from "./insights.js";
 import { AgentSlots } from "./agent-slots.js";
+import { withLocale } from "./i18n/index.js";
 
 const settings: ContributionSettings = {
   direction: "feature",
@@ -268,6 +269,95 @@ test("task ids are normalised before validation and format problems name the fie
     /（summary：應為 string，收到 undefined）/,
   );
   assert.throws(() => parseTeamPlan("invented prose", 2), /JSON/);
+});
+
+test("lead plan problems and member reports are worded in the locale in effect", () => {
+  const plan = JSON.parse(
+    makePlan([
+      { id: "a", files: ["a.ts"] },
+      { id: "b", files: ["b.ts"] },
+    ]),
+  );
+  const englishProblem = (value: unknown) =>
+    withLocale("en", () => {
+      try {
+        parseTeamPlan(JSON.stringify(value), 2);
+      } catch (error) {
+        return (error as AppError).message;
+      }
+      return "";
+    });
+  plan.tasks[1].description = "x".repeat(4001);
+  assert.equal(
+    englishProblem(plan),
+    "The lead's plan does not match the required format (tasks[1].description: more than 4,000 characters); adjust the request and try again.",
+  );
+  plan.tasks[1].description = "ok";
+  plan.tasks[1].files = Array.from({ length: 31 }, (_, index) => `f${index}.ts`);
+  assert.match(englishProblem(plan), /\(tasks\[1\]\.files: more than 30 items\)/);
+  plan.tasks[1].files = [];
+  assert.match(englishProblem(plan), /\(tasks\[1\]\.files: must not be empty\)/);
+  delete plan.summary;
+  assert.match(
+    englishProblem(plan),
+    /\(summary: expected string, received undefined\)/,
+  );
+  assert.equal(englishProblem({ tasks: "none" }).includes("(summary: "), true);
+  assert.match(englishProblem([]), /\(plan: expected object, received array\)/);
+  for (const [value, expected] of [
+    [
+      JSON.parse(makePlan([{ id: "a", files: ["a.ts"], dependsOn: ["a"] }])),
+      "The lead's plan has an invalid task dependency.",
+    ],
+    [
+      JSON.parse(makePlan([{ id: "lead", files: ["a.ts"] }])),
+      "The lead's plan has duplicate or reserved task IDs.",
+    ],
+    [
+      JSON.parse(makePlan([{ id: "a", files: ["src/*"] }])),
+      "The lead's plan has an invalid file scope: src/*",
+    ],
+    [
+      JSON.parse(
+        makePlan([
+          { id: "a", files: ["a.ts"], dependsOn: ["b"] },
+          { id: "b", files: ["b.ts"], dependsOn: ["a"] },
+        ]),
+      ),
+      "The lead's plan has a dependency cycle.",
+    ],
+  ] as const)
+    assert.equal(englishProblem(value), expected);
+  assert.throws(
+    () => withLocale("en", () => parseTeamPlan("invented prose", 2)),
+    {
+      message:
+        "The lead did not return a valid task plan in JSON; adjust the request and try again.",
+    },
+  );
+
+  const report = {
+    report: {
+      summary: "Aligned the output.",
+      checks: [{ command: "npm test", outcome: "exit 0" }],
+      tradeoffs: "",
+      limitations: "No integration test ran.",
+    },
+    messages: [],
+  };
+  assert.equal(
+    withLocale("en", () => parseMemberResult(JSON.stringify(report)).report),
+    "Aligned the output.\n\nValidation evidence (commands the member reports it ran):\n- npm test → exit 0\n\nLimitations and unmet acceptance criteria:\nNo integration test ran.\n\nDesign tradeoffs (approaches considered but not taken):\n(Not reported.)",
+  );
+  report.report.checks = [];
+  assert.match(
+    withLocale("en", () => parseMemberResult(JSON.stringify(report)).report),
+    /\(The member reported no checks that actually ran\.\)/,
+  );
+  assert.match(
+    withLocale("zh-TW", () => parseMemberResult(JSON.stringify(report)).report),
+    /（成員未回報任何實際執行的檢查）/,
+  );
 });
 
 test("team plans validate DAGs, concrete scopes, and preserve literal bracket filenames", () => {

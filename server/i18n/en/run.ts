@@ -113,6 +113,115 @@ export default {
     failed: ({ executable, output }: { executable: string; output: string }) =>
       `${executable} failed: ${output}`,
   },
+  /** Reading a run's changes: limits, and why a file is held back from the PR. */
+  diff: {
+    unparsable: "Could not parse the Git diff.",
+    renameFirst:
+      "A file name contains unsupported characters; rename the file first.",
+    unsupportedName: "A file name contains unsupported characters.",
+    tooManyFiles:
+      "The changes cover more than 150 files; make the task smaller and run it again.",
+    outsideWorktree: "A file is outside the working directory.",
+    tooLarge:
+      "The changes are larger than 2 MB; split the work into smaller runs.",
+    /** Why a file is held back from the PR (a diff file's `blocked`). */
+    blocked: {
+      sensitive:
+        "Sensitive files and build artifacts are never added to the PR; remove this file from the changes first.",
+      notRegularFile:
+        "A new file must be a regular file; symbolic links need manual handling.",
+      newFileTooLarge:
+        "This new file is larger than 512 KB; review it by hand or split it.",
+      binary:
+        "Binary files need a separate manual review and cannot be published through this workflow.",
+      credentials:
+        "The change looks like it contains credentials, so its content is hidden; remove them and review it again.",
+    },
+    /** Shown in place of a held-back file's patch. */
+    heldBack: ({ reason }: { reason: string }) =>
+      `Publishing this file is on hold: ${reason}`,
+  },
+  /** Taking a teammate's finished task into the run's worktree. */
+  integration: {
+    snapshotBlocked:
+      "The integration snapshot contains files that cannot be reviewed, so no more tasks are assigned.",
+    noWorktree: "The task has no isolated working directory.",
+    gitStateChanged:
+      "A teammate changed the Git commit state, so integration stopped.",
+    outOfScope: ({ path }: { path: string }) =>
+      `A teammate changed ${path}, which its task does not own; the change stays in its isolated working directory and was not integrated.`,
+    needsManualHandling: ({ path }: { path: string }) =>
+      `A teammate's ${path} needs manual handling and was not integrated.`,
+  },
+  /** Checking the lead's task plan. A problem names its field, as in "tasks[1].title". */
+  plan: {
+    /** Names the whole plan in a problem without a field path. */
+    wholePlan: "plan",
+    tooBig: ({
+      path,
+      maximum,
+      items,
+    }: {
+      path: string;
+      maximum: number;
+      items: boolean;
+    }) =>
+      `${path}: more than ${items ? count(maximum, "item", "items") : count(maximum, "character", "characters")}`,
+    empty: ({ path }: { path: string }) => `${path}: must not be empty`,
+    tooSmall: ({
+      path,
+      minimum,
+      items,
+    }: {
+      path: string;
+      minimum: number;
+      items: boolean;
+    }) =>
+      `${path}: at least ${items ? count(minimum, "item", "items") : count(minimum, "character", "characters")}`,
+    wrongType: ({
+      path,
+      expected,
+      received,
+    }: {
+      path: string;
+      expected: string;
+      received: string;
+    }) => `${path}: expected ${expected}, received ${received}`,
+    badFormat: ({ path }: { path: string }) => `${path}: invalid format`,
+    /** Any other problem, with zod's own reason. */
+    other: ({ path, reason }: { path: string; reason: string }) =>
+      `${path}: ${reason}`,
+    notJson:
+      "The lead did not return a valid task plan in JSON; adjust the request and try again.",
+    invalid: ({ problem }: { problem: string }) =>
+      `The lead's plan does not match the required format (${problem}); adjust the request and try again.`,
+    duplicateIds: "The lead's plan has duplicate or reserved task IDs.",
+    invalidDependency: "The lead's plan has an invalid task dependency.",
+    invalidScope: ({ scope }: { scope: string }) =>
+      `The lead's plan has an invalid file scope: ${scope}`,
+    cycle: "The lead's plan has a dependency cycle.",
+  },
+  /** A teammate's structured report as the one text the board and the lead read. */
+  report: {
+    /** `checks` are lines such as "- npm test → exit 0". */
+    member: ({
+      summary,
+      checks,
+      limitations,
+      tradeoffs,
+    }: {
+      summary: string;
+      checks: string[];
+      limitations: string;
+      tradeoffs: string;
+    }) =>
+      [
+        summary,
+        `Validation evidence (commands the member reports it ran):\n${checks.length ? checks.join("\n") : "(The member reported no checks that actually ran.)"}`,
+        `Limitations and unmet acceptance criteria:\n${limitations || "(Not reported.)"}`,
+        `Design tradeoffs (approaches considered but not taken):\n${tradeoffs || "(Not reported.)"}`,
+      ].join("\n\n"),
+  },
   /** Publishing a run's reviewed changes as a pull request. */
   publish: {
     commitMessageInvalid: "A commit message may only contain text and line breaks.",

@@ -4,6 +4,7 @@ import path from "node:path";
 import { readDiff } from "./git.js";
 import { git } from "./process.js";
 import { AppError, type Run } from "./types.js";
+import { cancelled } from "./i18n/index.js";
 import { scopeContains } from "./team.js";
 import type { TeamTask } from "../shared/team.js";
 
@@ -13,12 +14,12 @@ export async function createTeamSnapshot(
   directory: string,
   signal?: AbortSignal,
 ) {
-  if (signal?.aborted) throw new AppError("工作已取消。", 409);
+  if (signal?.aborted) throw new AppError(cancelled(), 409);
   const files = await readDiff(run);
-  if (signal?.aborted) throw new AppError("工作已取消。", 409);
+  if (signal?.aborted) throw new AppError(cancelled(), 409);
   if (!files.length) return run.baseSha;
   if (files.some((file) => file.blocked))
-    throw new AppError("整合快照含有無法審閱的檔案，已停止派工。", 422);
+    throw new AppError((m) => m.run.integration.snapshotBlocked, 422);
   const indexPath = path.join(directory, `team-index-${randomUUID()}`);
   const env = {
     ...process.env,
@@ -94,23 +95,23 @@ export async function integrateTeamTask(
   task: TeamTask,
   signal?: AbortSignal,
 ): Promise<string[]> {
-  if (signal?.aborted) throw new AppError("工作已取消。", 409);
+  if (signal?.aborted) throw new AppError(cancelled(), 409);
   if (!task.worktreePath || !task.baseSha)
-    throw new AppError("任務缺少隔離工作目錄。", 422);
+    throw new AppError((m) => m.run.integration.noWorktree, 422);
   const head = (
     await git(task.worktreePath, ["rev-parse", "HEAD"], { signal })
   ).stdout.trim();
   if (head !== task.baseSha)
-    throw new AppError("Teammate 改動 Git 提交狀態，已停止整合。", 422);
+    throw new AppError((m) => m.run.integration.gitStateChanged, 422);
   const files = await readDiff({
     worktreePath: task.worktreePath,
     baseSha: task.baseSha,
   });
-  if (signal?.aborted) throw new AppError("工作已取消。", 409);
+  if (signal?.aborted) throw new AppError(cancelled(), 409);
   for (const file of files) {
     if (!task.files.some((scope) => scopeContains(scope, file.path)))
       throw new AppError(
-        `Teammate 修改了未分配的檔案 ${file.path}；差異保留在其隔離工作目錄，未整合。`,
+        (m) => m.run.integration.outOfScope({ path: file.path }),
         422,
       );
     if (
@@ -118,7 +119,7 @@ export async function integrateTeamTask(
       /^(?:old|new|new file|deleted file) mode 120000$/m.test(file.patch)
     )
       throw new AppError(
-        `Teammate 的 ${file.path} 需要人工處理，未整合。`,
+        (m) => m.run.integration.needsManualHandling({ path: file.path }),
         422,
       );
   }
