@@ -28,6 +28,13 @@ interface ReposPageProps {
   deleteRepository?: (repo: Repo) => Promise<void>;
 }
 
+/** Moves the focus once the next render is on screen. */
+function focusSoon(selector: string) {
+  requestAnimationFrame(() =>
+    document.querySelector<HTMLElement>(selector)?.focus(),
+  );
+}
+
 /** The imported repositories and the demo project. */
 export function ReposPage({
   repos,
@@ -53,6 +60,8 @@ export function ReposPage({
     try {
       await deleteRepository(repo);
       setAsked("");
+      // The card is gone; the page's heading takes the focus.
+      focusSoon(".page-content h1");
     } catch (cause) {
       setError({
         id: repo.id,
@@ -155,9 +164,11 @@ export function ReposPage({
                           type="button"
                           className="button secondary"
                           disabled={deleting}
+                          autoFocus
                           onClick={() => {
                             setAsked("");
                             setError(null);
+                            focusSoon(`[data-repo-delete="${CSS.escape(repo.id)}"]`);
                           }}
                         >
                           {t.deleteNo}
@@ -176,6 +187,7 @@ export function ReposPage({
                     <button
                       type="button"
                       className="run-list-action run-list-action-danger"
+                      data-repo-delete={repo.id}
                       disabled={deleting}
                       aria-label={t.deleteLabel({ name: repo.fullName })}
                       onClick={() => {

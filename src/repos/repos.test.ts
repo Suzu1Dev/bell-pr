@@ -52,7 +52,7 @@ test("an imported repository can be deleted, the sample cannot, and paths mask w
   const html = renderEn(element);
   assert.match(
     html,
-    /<button type="button" class="run-list-action run-list-action-danger" aria-label="Delete repository: octo\/widgets"><svg[^]*?Delete repository<\/button>/,
+    /<button type="button" class="run-list-action run-list-action-danger" data-repo-delete="repo-1" aria-label="Delete repository: octo\/widgets"><svg[^]*?Delete repository<\/button>/,
   );
   assert.equal(html.match(/repository-delete/g)?.length, 1);
   assert.match(html, /<p>…\/widgets<\/p>/);

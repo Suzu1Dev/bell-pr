@@ -24,6 +24,17 @@ interface RunsModalProps {
 
 type Pending = { id: string; action: "free" | "delete" };
 
+/** Moves the focus once the next render is on screen. */
+function focusSoon(selector: string) {
+  requestAnimationFrame(() =>
+    document.querySelector<HTMLElement>(selector)?.focus(),
+  );
+}
+
+/** The selector of a run's action button. */
+const actionButton = (id: string, action: Pending["action"]) =>
+  `[data-run-action="${CSS.escape(`${id}:${action}`)}"]`;
+
 /**
  * Every contribution run, plus the demo, to switch between. A run of the
  * person's own can free its disk space or be deleted, each after a
@@ -55,6 +66,8 @@ export function RunsModal({
     try {
       await act(id);
       setPending(null);
+      // A freed run keeps its row and its Delete button; a deleted one is gone.
+      focusSoon(action === "free" ? actionButton(id, "delete") : ".all-runs .run-list-row");
     } catch (cause) {
       setError({
         id,
@@ -120,9 +133,11 @@ export function RunsModal({
                           type="button"
                           className="button secondary"
                           disabled={working}
+                          autoFocus
                           onClick={() => {
                             setPending(null);
                             setError(null);
+                            focusSoon(actionButton(asked.id, asked.action));
                           }}
                         >
                           {common.actions.cancel}
@@ -148,6 +163,7 @@ export function RunsModal({
                         <button
                           type="button"
                           className="run-list-action"
+                          data-run-action={`${job.id}:free`}
                           disabled={active || working}
                           aria-label={t.freeSpaceLabel({ title: job.title })}
                           onClick={() => {
@@ -163,6 +179,7 @@ export function RunsModal({
                         <button
                           type="button"
                           className="run-list-action run-list-action-danger"
+                          data-run-action={`${job.id}:delete`}
                           disabled={active || working}
                           aria-label={t.deleteRunLabel({ title: job.title })}
                           onClick={() => {

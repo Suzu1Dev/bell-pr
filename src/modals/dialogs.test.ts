@@ -89,11 +89,11 @@ test("a run of the person's own can free its disk space or be deleted; the sampl
   const html = render([own("review")]);
   assert.match(
     html,
-    /<button type="button" class="run-list-action" aria-label="Free disk space: Retry timeouts"><svg[^]*?Free disk space<\/button>/,
+    /<button type="button" class="run-list-action" data-run-action="run-1:free" aria-label="Free disk space: Retry timeouts"><svg[^]*?Free disk space<\/button>/,
   );
   assert.match(
     html,
-    /<button type="button" class="run-list-action run-list-action-danger" aria-label="Delete run: Retry timeouts"><svg[^]*?Delete run<\/button>/,
+    /<button type="button" class="run-list-action run-list-action-danger" data-run-action="run-1:delete" aria-label="Delete run: Retry timeouts"><svg[^]*?Delete run<\/button>/,
   );
   // One pair of actions: the sample's row has none.
   assert.equal(html.match(/run-list-actions/g)?.length, 1);
@@ -101,8 +101,8 @@ test("a run of the person's own can free its disk space or be deleted; the sampl
 
   const running = render([own("running")]);
   assert.match(running, /<span class="run-list-hint">Stop this contribution before you free its space or delete it\.<\/span>/);
-  assert.match(running, /class="run-list-action" disabled="" aria-label="Free disk space/);
-  assert.match(running, /class="run-list-action run-list-action-danger" disabled=""/);
+  assert.match(running, /class="run-list-action" data-run-action="run-1:free" disabled="" aria-label="Free disk space/);
+  assert.match(running, /class="run-list-action run-list-action-danger" data-run-action="run-1:delete" disabled=""/);
 
   const removed = render([own("published", { workspaceRemovedAt: "2026-10-02T08:00:00.000Z" })]);
   assert.match(removed, /<span class="run-files-removed">Files removed<\/span>/);

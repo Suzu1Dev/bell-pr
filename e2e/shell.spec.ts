@@ -441,6 +441,8 @@ test("a run and a repository can be freed and deleted, and the workbench reopens
 
     await list.getByRole("button", { name: modals.runs.deleteRunLabel({ title: opened.title }) }).click();
     const deleting = list.getByRole("group", { name: modals.runs.deleteRunLabel({ title: opened.title }) });
+    // The confirmation takes the focus on its safe choice.
+    await expect(deleting.getByRole("button", { name: "Cancel" })).toBeFocused();
     await deleting.getByRole("button", { name: modals.runs.deleteYes }).click();
     await expect(list.locator(".run-list-entry", { hasText: opened.title })).toHaveCount(0);
     await expect(page.locator(".toast")).toContainText(modals.runs.deleted);
@@ -454,8 +456,13 @@ test("a run and a repository can be freed and deleted, and the workbench reopens
 
     await page.goto("/#/repos");
     const name = "e2e-sample/seeded";
-    await page.getByRole("button", { name: repos.list.deleteLabel({ name }) }).click();
+    const remove = page.getByRole("button", { name: repos.list.deleteLabel({ name }) });
     const confirm = page.getByRole("group", { name: repos.list.deleteLabel({ name }) });
+    // Keeping it returns the focus to the Delete button.
+    await remove.click();
+    await confirm.getByRole("button", { name: repos.list.deleteNo }).click();
+    await expect(remove).toBeFocused();
+    await remove.click();
     await expect(confirm).toContainText(repos.list.deleteConfirm({ name }));
     await confirm.getByRole("button", { name: repos.list.deleteYes }).click();
     await expect(page.locator(".toast")).toContainText(repos.list.deleted({ name }));
