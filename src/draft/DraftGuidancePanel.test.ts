@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import { demoDraftPreparation } from "../demo";
+import { demoDraftPreparation, getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { DraftGuidancePanel } from "./DraftGuidancePanel";
 import type { DraftPreparation } from "../../shared/drafts";
@@ -199,3 +199,17 @@ test("the English panel renders every state, label and source kind without Han",
     /The draft suggestion could not be prepared this time\.[\s\S]*Try again/,
   );
 });
+
+test(
+  "the English demo draft suggestion renders without Han",
+  {
+    skip:
+      getDemo("en") === getDemo("zh-TW") &&
+      "the English demo content is not filled in yet",
+  },
+  () => {
+    const { draftPreparation } = getDemo("en");
+    for (const demo of [true, false])
+      assertNoHan(renderEn(panel(draftPreparation, { demo })));
+  },
+);
