@@ -9,8 +9,8 @@ import {
   Code2,
   ExternalLink,
   FileText,
+  FolderGit2,
   GitBranch,
-  Github,
   GitPullRequest,
   Globe2,
   Plus,
@@ -219,7 +219,7 @@ export function WorkspacePage({
           }
         >
           <span>
-            <Github size={15} />
+            <FolderGit2 size={15} />
             {currentRepo?.fullName || t.repositoryFallback}
           </span>
           <i />
@@ -465,7 +465,7 @@ export function WorkspacePage({
                 target="_blank"
                 rel="noreferrer"
               >
-                <Github size={16} />
+                <GitPullRequest size={16} />
                 {t.footer.viewPullRequest}
                 <ExternalLink size={14} />
               </a>

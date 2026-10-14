@@ -2,8 +2,8 @@ import { Suspense, type Dispatch, type SetStateAction } from "react";
 import {
   BookOpen,
   CircleCheck,
+  FolderGit2,
   GitBranch,
-  Github,
   GitPullRequest,
   Loader2,
 } from "lucide-react";
@@ -90,7 +90,7 @@ export function PublishModal({
     >
       <div className="publish-summary">
         <span>
-          <Github size={16} />
+          <FolderGit2 size={16} />
           {currentRepo?.fullName}
         </span>
         <h3>{run.draft.title}</h3>

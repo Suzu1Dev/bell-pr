@@ -5,7 +5,6 @@ import {
   Circle,
   CircleCheck,
   ExternalLink,
-  Github,
   GitPullRequest,
   Loader2,
   Play,
@@ -542,7 +541,7 @@ export function DraftTab({
                 target="_blank"
                 rel="noreferrer"
               >
-                <Github size={15} />
+                <GitPullRequest size={15} />
                 {t.feedback.viewPullRequest}
                 <ExternalLink size={13} />
               </a>
