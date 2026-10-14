@@ -8,6 +8,7 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfm } from "micromark-extension-gfm";
 import type { DraftSource } from "./drafts.js";
+import type { Locale } from "./i18n/locale.js";
 
 /**
  * Lines of a Markdown body with code (fenced, indented and inline) and HTML
@@ -249,13 +250,14 @@ export interface DraftCheck {
 /**
  * Checks the text that will be sent to GitHub. Shared by the draft tab, the
  * publish dialog and the server so all three agree. It reports what is still
- * open; it never ticks a box or edits the text.
+ * open; it never ticks a box or edits the text. `_locale` will choose the
+ * language of the messages; it has no effect yet.
  */
 export function draftPreflight(input: {
   body: string;
   sources?: DraftSource[];
   proposalBody?: string;
-}): DraftCheck[] {
+}, _locale?: Locale): DraftCheck[] {
   const sources = input.sources ?? [];
   const checks: DraftCheck[] = [];
   const placeholders = findDraftPlaceholders(input.body);

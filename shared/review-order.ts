@@ -16,7 +16,7 @@ const listPrefix = /^\s*(?:[-*+]|\d{1,3}[.)])\s+/;
 // A repo-relative path leads the line: either contains "/" or has an extension.
 const leadingPath =
   /^[`*_"']*((?:[\w.@-]+\/)+[\w.@-]+\/?|[\w@-]+(?:\.[\w-]+)+)[`*_"']*/;
-const reasonSeparator = /^[\s:：—–\-,，、.。]+/;
+const reasonSeparator = /^[\s:：—–\-,，、.。]+/; // i18n-allow: parser
 
 /** Tolerates bullets, numbering, Markdown emphasis and backticks; dedupes by path. */
 export function parseReviewOrder(report: string): ReviewOrderEntry[] {
