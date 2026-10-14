@@ -54,7 +54,6 @@ import { ExplorePage } from "../repos/ExplorePage";
 import { ImportRepoModal } from "../repos/ImportRepoModal";
 import { ReposPage } from "../repos/ReposPage";
 import { ModelSettingsModal } from "../settings/ModelSettingsModal";
-import { SettingsPage } from "../settings/SettingsPage";
 import { CopyCommand } from "../setup/CopyCommand";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import { PublishModal } from "../workspace/PublishModal";
@@ -108,6 +107,10 @@ const AboutDialog = lazy(() =>
 );
 const EulaPrompt = lazy(() =>
   import("../onboarding/EulaPrompt").then((module) => ({ default: module.EulaPrompt })),
+);
+// Settings are a page most visits never open; it loads on its own too.
+const SettingsPage = lazy(() =>
+  import("../settings/SettingsPage").then((module) => ({ default: module.SettingsPage })),
 );
 
 export default function App() {
@@ -1135,16 +1138,18 @@ function AppShell({
             setTab={setTab}
           />
         ) : (
-          <SettingsPage
-            status={status}
-            setStatus={setStatus}
-            setApiError={setApiError}
-            notify={notify}
-            configureContributionModels={configureContributionModels}
-            setTab={setTab}
-            navigate={navigate}
-            onAppSettingsSaved={(view) => setAppSettings(view.settings)}
-          />
+          <Suspense fallback={null}>
+            <SettingsPage
+              status={status}
+              setStatus={setStatus}
+              setApiError={setApiError}
+              notify={notify}
+              configureContributionModels={configureContributionModels}
+              setTab={setTab}
+              navigate={navigate}
+              onAppSettingsSaved={(view) => setAppSettings(view.settings)}
+            />
+          </Suspense>
         )}
       </main>
       {commandOpen && (
