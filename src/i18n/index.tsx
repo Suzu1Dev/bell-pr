@@ -141,12 +141,13 @@ export function initialLocale(): Locale {
   return browser === "zh-TW" ? "zh-TW" : defaultLocale;
 }
 
-/** `<html lang>` and, once the app namespace has one, the document title. */
-function applyToDocument({ locale, messages }: LocaleState) {
+/**
+ * `<html lang>`. The document title is the app shell's: it names the page
+ * in the active language (AppShell, `titleFor`).
+ */
+function applyToDocument({ locale }: LocaleState) {
   if (typeof document === "undefined") return;
   document.documentElement.lang = htmlLang(locale);
-  const title = (messages.app as { title?: unknown }).title;
-  if (typeof title === "string" && title) document.title = title;
 }
 
 async function changeLocale(locale: Locale, remember: boolean) {

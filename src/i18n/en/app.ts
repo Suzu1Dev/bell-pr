@@ -8,7 +8,7 @@ import { product } from "../../../shared/product";
 const { plural } = formatters("en");
 
 const app = {
-  /** The document title; `setLocale` applies it. */
+  /** The document title outside a named page (navigation/route.ts titleFor). */
   title: `${product.name} — AI contribution workbench`,
   skipToContent: "Skip to main content",
   /** What a GitHub login, an account or an e-mail address reads while presenting (`present=1`). */
