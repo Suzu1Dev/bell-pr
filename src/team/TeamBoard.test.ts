@@ -544,6 +544,14 @@ test("the protocol note sits in a How it works disclosure", () => {
   assert.match(renderZh(board(demoRunZh, true)), /<summary>[\s\S]*?運作方式[\s\S]*?並非 Claude Code 原生 Agent Teams/);
 });
 
+test("the message list can take focus and is named for screen readers", () => {
+  const html = english(englishRun);
+  assert.match(
+    html,
+    /<div class="team-messages" role="log" aria-live="polite" aria-label="Team messages" tabindex="0">/,
+  );
+});
+
 test("the model and usage cards fold into Run details, open only when the run recorded them", () => {
   const sample = renderEn(board(englishRun, true));
   assert.match(sample, /<details class="team-run-details"><summary><strong>Run details<\/strong><span>Model, reasoning effort and AI usage<\/span>/);

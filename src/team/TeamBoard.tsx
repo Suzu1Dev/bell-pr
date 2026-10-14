@@ -541,7 +541,14 @@ export function TeamBoard({
                   : t.mailbox.delivery.lead
                 : t.mailbox.delivery.members}
           </p>
-          <div className="team-messages" aria-live="polite">
+          {/* Scrolls on small screens, so it takes focus for keyboard scrolling. */}
+          <div
+            className="team-messages"
+            role="log"
+            aria-live="polite"
+            aria-label={t.mailbox.messagesLabel}
+            tabIndex={0}
+          >
             {team.messages.map((item) => (
               <article
                 key={item.id}

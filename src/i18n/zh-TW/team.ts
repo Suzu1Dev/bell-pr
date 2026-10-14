@@ -123,6 +123,7 @@ const m: Translation<typeof en> = {
     teamLead: "Team lead",
     closedRecipient: ({ name }) => `${name}（已停止收件）`,
     messageLabel: "團隊訊息",
+    messagesLabel: "團隊訊息列表",
     finishedPlaceholder: "此團隊已結束，可在程式碼閱讀區追問。",
     placeholder: "例如：請保留目前的 API 相容性…",
     demoHint: "示範訊息僅保留在畫面",

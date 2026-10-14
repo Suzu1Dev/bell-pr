@@ -162,6 +162,8 @@ const team = {
     closedRecipient: ({ name }: { name: string }) =>
       `${name} (no longer receiving)`,
     messageLabel: "Team message",
+    /** Accessible name of the scrollable message list. */
+    messagesLabel: "Team messages",
     finishedPlaceholder:
       "This team has finished. Ask follow-up questions on the Code changes tab.",
     placeholder: "For example: keep the current API compatible…",
