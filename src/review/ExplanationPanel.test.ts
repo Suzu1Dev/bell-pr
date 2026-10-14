@@ -44,7 +44,7 @@ test("a demo file with an explanation renders every learning section", () => {
     assert.match(html, new RegExp(title));
   }
   assert.match(html, /指數退避（Exponential backoff）/);
-  assert.match(html, /示範內容 · 預先寫好，未呼叫 AI/);
+  assert.match(html, /示範 · 預寫內容，未呼叫 AI/);
   assert.doesNotMatch(html, /AI 生成/);
 });
 
@@ -157,7 +157,7 @@ test("the reports tab renders demo reports with the static-review label and per-
       demo: true,
     }),
   );
-  assert.match(html, /示範內容 · 預先寫好，未呼叫 AI/);
+  assert.match(html, /示範 · 預寫內容，未呼叫 AI/);
   assert.match(html, /Lead 整合摘要/);
   assert.match(html, /Lens · Reviewer/);
   assert.match(html, /Scout · Test analyst/);
