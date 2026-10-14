@@ -36,6 +36,47 @@
   margin-top: 4px;
   color: #8ca17a;
 }
+/* The model and usage cards fold under one line of what ran and what it used. */
+.team-run-details {
+  margin-top: 22px;
+  border: 1px solid #e1e8d8;
+  border-radius: 8px;
+  background: #fff;
+}
+.team-run-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 15px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+  color: #4d5f47;
+}
+.team-run-details > summary::-webkit-details-marker {
+  display: none;
+}
+.team-run-details > summary > svg {
+  flex-shrink: 0;
+  color: #7b9276;
+}
+.team-run-details > summary > span {
+  flex: 1;
+  min-width: 0;
+  color: #768969;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.team-run-details > summary > svg:last-child {
+  transition: transform 0.15s;
+}
+.team-run-details[open] > summary > svg:last-child {
+  transform: rotate(180deg);
+}
+.team-run-details > section {
+  margin: 0 12px 12px;
+}
 .team-flow {
   display: flex;
   align-items: center;
@@ -93,6 +134,28 @@
   color: #768969;
   margin: 12px 0 0;
   white-space: pre-wrap;
+}
+.team-plan > p.team-plan-folded {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  overflow: hidden;
+}
+.team-task > p.team-task-folded {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+}
+.team-more-toggle {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #3f7651;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .team-plan-action {
   display: flex;
@@ -675,4 +738,10 @@
   margin: 0;
   border-width: 0 0 1px;
   border-radius: 0;
+}
+/* Folded, the assumption is one line; opened, it reads in full. */
+.premise-compact details:not([open]) summary > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

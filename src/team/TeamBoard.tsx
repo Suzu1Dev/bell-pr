@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Circle,
   Clock3,
+  Cpu,
   GitBranch,
   GitMerge,
   Layers3,
@@ -77,6 +78,10 @@ export function TeamBoard({
   const [retryError, setRetryError] = useState("");
   // Explicit toggles win; otherwise a failed task shows its reason right away.
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
+  const [planOpen, setPlanOpen] = useState(false);
+  const [openDescriptions, setOpenDescriptions] = useState<
+    Record<string, boolean>
+  >({});
   const isExpanded = (task: TeamTask) =>
     toggled[task.id] ?? (task.status === "failed" && !!task.error);
   const team = run.team;
@@ -122,6 +127,27 @@ export function TeamBoard({
     { label: "進行中", states: ["running"] },
     { label: "已完成", states: ["complete", "failed"] },
   ];
+  // A long task description opens to its first lines in the narrow lanes.
+  const longDescription = 180;
+  // A long plan opens to its first lines, except while it waits for approval.
+  const foldPlan =
+    team.phase !== "awaiting_approval" &&
+    (team.planSummary.length > 600 || team.planSummary.split("\n").length > 8);
+  // Missing usage is unknown, not zero; partial reports say so.
+  const usage = run.efficiency;
+  const runInfo = demo
+    ? "示範內容"
+    : [
+        providerLabels[run.modelExecution?.provider ?? team.config.provider],
+        run.modelExecution?.reported?.model ?? run.modelExecution?.model,
+        usage?.measuredCalls
+          ? `輸入 ${usage.inputTokens.toLocaleString("zh-TW")} · 輸出 ${usage.outputTokens.toLocaleString("zh-TW")} tokens${usage.measuredCalls < usage.calls ? "（部分回報）" : ""}`
+          : usage?.calls
+            ? "用量未回報"
+            : undefined,
+      ]
+        .filter(Boolean)
+        .join(" · ");
   return (
     <section className="team-board" aria-label="共享任務與團隊訊息">
       <div className="team-board-header">
@@ -140,12 +166,20 @@ export function TeamBoard({
           </span>
         </div>
       </div>
-      <ModelSummary execution={run.modelExecution} demo={demo} />
-      <EfficiencySummary
-        metrics={run.efficiency}
-        mode={run.contributionSettings?.ponytailMode}
-        demo={demo}
-      />
+      <details className="team-run-details">
+        <summary>
+          <Cpu size={15} aria-hidden="true" />
+          <strong>執行模型與 AI 用量</strong>
+          <span>{runInfo}</span>
+          <ChevronDown size={15} aria-hidden="true" />
+        </summary>
+        <ModelSummary execution={run.modelExecution} demo={demo} />
+        <EfficiencySummary
+          metrics={run.efficiency}
+          mode={run.contributionSettings?.ponytailMode}
+          demo={demo}
+        />
+      </details>
       <div className="team-flow">
         <span>
           <ListChecks size={18} />
@@ -179,12 +213,22 @@ export function TeamBoard({
             {done} / {team.tasks.length} 子任務完成
           </span>
         </div>
-        <p>
+        <p className={foldPlan && !planOpen ? "team-plan-folded" : undefined}>
           {team.planSummary ||
             (revisions.length
               ? "Lead 正依你的意見重新規劃。"
               : "正在閱讀專案並建立有明確範圍與相依關係的計畫。")}
         </p>
+        {foldPlan && (
+          <button
+            type="button"
+            className="team-more-toggle"
+            aria-expanded={planOpen}
+            onClick={() => setPlanOpen(!planOpen)}
+          >
+            {planOpen ? "收起計畫" : "顯示完整計畫"}
+          </button>
+        )}
         <PremiseNotice premise={team.premise} />
         {revisions.length > 0 && (
           <ol className="team-plan-revisions" aria-label="計畫重擬紀錄">
@@ -378,7 +422,31 @@ export function TeamBoard({
                       </span>
                     </div>
                     <h4>{task.title}</h4>
-                    <p>{task.description}</p>
+                    <p
+                      className={
+                        task.description.length > longDescription &&
+                        !openDescriptions[task.id]
+                          ? "team-task-folded"
+                          : undefined
+                      }
+                    >
+                      {task.description}
+                    </p>
+                    {task.description.length > longDescription && (
+                      <button
+                        type="button"
+                        className="team-more-toggle"
+                        aria-expanded={!!openDescriptions[task.id]}
+                        onClick={() =>
+                          setOpenDescriptions((open) => ({
+                            ...open,
+                            [task.id]: !open[task.id],
+                          }))
+                        }
+                      >
+                        {openDescriptions[task.id] ? "收起說明" : "顯示完整說明"}
+                      </button>
+                    )}
                     <div className="team-task-owner">
                       <Bot size={13} />
                       {task.owner}

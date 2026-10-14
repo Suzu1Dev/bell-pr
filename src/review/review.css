@@ -534,6 +534,26 @@
   border-bottom-color: #4f8060;
   font-weight: 600;
 }
+/* A narrow panel keeps its four tabs on one row: icons go first, then size.
+   Wrapping stays as the last resort. */
+@container (max-width: 440px) {
+  .explain-tabs {
+    gap: 0 12px;
+    padding: 0 14px;
+  }
+  .explain-panel .explain-tabs button > svg {
+    display: none;
+  }
+}
+@container (max-width: 330px) {
+  .explain-tabs {
+    gap: 0 9px;
+    padding: 0 11px;
+  }
+  .explain-panel .explain-tabs button {
+    font-size: 11px;
+  }
+}
 .explain-message-count {
   padding: 1px 5px;
   border-radius: 4px;
