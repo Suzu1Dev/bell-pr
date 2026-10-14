@@ -32,6 +32,9 @@ function savedMessages(run: Run): Record<string, ChatMessage[]> {
  */
 export function stopNotice(before: Run, updated: Run, reviewRerunning: boolean) {
   const round = activeFollowUp(before.followUps);
+  // The conflict agent of a sync, on the run itself or on a PR's sync round.
+  if (before.sync?.resolving || round?.resolving)
+    return "已停止解衝突；已改的檔案保留，可以自行完成，或再請 Agent 處理。";
   if (round?.status === "running" && !reviewRerunning)
     return activeFollowUp(updated.followUps)
       ? "這輪修正已停止；工作目錄保留了部分修改，請審閱、寫好提交訊息後推送，或放棄這輪修正。"
