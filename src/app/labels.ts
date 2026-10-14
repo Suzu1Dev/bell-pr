@@ -13,3 +13,17 @@ export function fileStatusLabel(labels: FileStatusLabels, status: string) {
     ? labels[status as keyof FileStatusLabels]
     : labels.modified;
 }
+
+/**
+ * Up to two capital letters for an avatar: the first letters of the first
+ * two words of a login such as `octo-cat` ("OC"), or the first letter of a
+ * single word ("O" for `octocat`). Empty when the name has no letter or digit.
+ */
+export function initialsOf(name: string): string {
+  const words = name.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  return words
+    .slice(0, 2)
+    .map((word) => Array.from(word)[0])
+    .join("")
+    .toLocaleUpperCase();
+}

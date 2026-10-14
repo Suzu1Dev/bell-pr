@@ -1,5 +1,5 @@
-// Accessibility gate: axe on Home and the four workspace tabs, in both
-// languages, on a desktop and a phone screen. Serious and critical issues
+// Accessibility gate: axe on Home, the repository list, About and the four
+// workspace tabs, in both languages, on a desktop and a phone screen. Serious and critical issues
 // fail, color contrast included. Known issues are excluded only through
 // the per-workstream allowlists in e2e/a11y/allowlist.<5A..5F>.json: each
 // entry {rule, selector, view, reason} sits in the file of the workstream
@@ -11,6 +11,8 @@ import { locales } from "../shared/i18n/locale";
 
 const views = {
   home: "#/home",
+  repos: "#/repos",
+  about: "#/about",
   "workspace-overview": "#/runs/demo-run/overview",
   "workspace-changes": "#/runs/demo-run/changes",
   "workspace-activity": "#/runs/demo-run/activity",

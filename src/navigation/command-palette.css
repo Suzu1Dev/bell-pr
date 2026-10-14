@@ -136,6 +136,38 @@
   font: var(--text-2xs) var(--font-mono);
   color: var(--color-text-muted);
 }
+/* "Go to" commands below the projects. */
+.command-palette-commands-label {
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.command-palette-commands {
+  display: grid;
+  gap: 2px;
+}
+.command-palette-commands > button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  text-align: left;
+}
+.command-palette-commands > button:hover:not(:disabled) {
+  background: var(--color-accent-50);
+  color: var(--color-accent-700);
+}
+.command-palette-commands > button > span {
+  flex: 1;
+  min-width: 0;
+}
+.command-palette-commands small {
+  font-size: var(--text-2xs);
+}
 .command-palette-no-projects {
   padding: 6px 10px;
   font-size: var(--text-xs);
@@ -392,6 +424,16 @@
     display: flex;
     gap: 6px;
     overflow-x: auto;
+  }
+  .command-palette-commands {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .command-palette-commands > button {
+    width: auto;
+    padding: 6px 9px;
   }
   .command-palette-project-list > button {
     width: auto;

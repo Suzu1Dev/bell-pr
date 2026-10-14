@@ -3,6 +3,7 @@
  * the new-task dialog.
  */
 import { formatters } from "../../../shared/i18n/locale";
+import { product } from "../../../shared/product";
 
 const { plural } = formatters("en");
 
@@ -30,12 +31,28 @@ const modals = {
       },
     },
     start: "Start exploring",
+    about: `About ${product.name}`,
   },
   runs: {
     title: "Every idea has its progress.",
     subtitle: "Switch tasks to see their status, code changes and PR draft.",
     demo: "Interactive demo",
     newContribution: "New contribution",
+    freeSpace: "Free disk space",
+    freeSpaceLabel: ({ title }: { title: string }) => `Free disk space: ${title}`,
+    freeConfirm: `Remove this contribution's working files: its Git worktree, its teammates' checkouts and its branch in ${product.name}'s own copy of the project? The contribution, its notes and its explanations stay, but its changes can no longer be shown.`,
+    freeYes: "Free disk space",
+    /** Marks a run whose working files were removed. */
+    filesRemoved: "Files removed",
+    deleteRun: "Delete run",
+    deleteRunLabel: ({ title }: { title: string }) => `Delete run: ${title}`,
+    deleteConfirm:
+      "Delete this contribution with its notes and working files? This cannot be undone.",
+    deleteYes: "Delete run",
+    working: "Working…",
+    activeHint: "Stop this contribution before you free its space or delete it.",
+    freed: "Disk space freed. The contribution and its notes stay.",
+    deleted: "Contribution deleted.",
   },
   newTask: {
     title: "Hand your idea to your agent team.",
@@ -59,6 +76,8 @@ const modals = {
     teammates: ({ count }: { count: number }) =>
       plural(count) === "one" ? `${count} teammate` : `${count} teammates`,
     reviewers: "Reviewer + Test analyst",
+    /** The team size each plan allows. */
+    teamLimit: "Free: 2 teammates · Pro: up to 4",
     usage: ({ provider }: { provider: string }) =>
       `The task runs with the ${provider} CLI signed in on this computer and counts against that account's usage. When it finishes, it waits for your review.`,
     saveDemo: "Save demo direction",

@@ -1,11 +1,15 @@
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
   type SetStateAction,
 } from "react";
+import { createPortal } from "react-dom";
 import { Terminal, X } from "lucide-react";
 // Stylesheets enter the bundle in import order and later rules win ties.
 // These keep the order the single App component produced, before the
@@ -17,19 +21,30 @@ import "../efficiency/efficiency.css";
 import "../models/models.css";
 import "../mission/mission.css";
 import "../team/team.css";
-import { ApiError } from "../api";
+import type { AppSettingsView } from "../../shared/app-settings";
+import { eulaVersion } from "../../shared/product";
+import type { ApiErrorBody } from "../../shared/errors";
+import { summarizeRun } from "../../shared/runs";
+import { api, ApiError, authRequiredEvent, send } from "../api";
+import { Logo } from "../brand/Logo";
 import { getDemo } from "../demo";
+import { HomePage } from "../home/HomePage";
 import { useLocale, useT } from "../i18n";
-import type { Run, DiffFile } from "../types";
+import { UpgradeDialog } from "../license/UpgradeDialog";
+import { useEntitlements } from "../license/useEntitlements";
+import type { Run, DiffFile, Repo } from "../types";
 import { CommandPalette } from "../navigation/CommandPalette";
 import {
   currentRoute,
   navigate as navigateTo,
+  titleFor,
   useHashRoute,
   type Route,
 } from "../navigation/route";
 import { useProjectInsights } from "../mission/useProjectInsights";
 import { HelpModal } from "../modals/HelpModal";
+import { needsEulaPrompt, startView, type StartView } from "../onboarding/startView";
+import type { WelcomeChoice } from "../onboarding/Welcome";
 import { NewTaskModal } from "../modals/NewTaskModal";
 import { RunsModal } from "../modals/RunsModal";
 import { DiscoveryPage } from "../pages/DiscoveryPage";
@@ -40,13 +55,16 @@ import { ImportRepoModal } from "../repos/ImportRepoModal";
 import { ReposPage } from "../repos/ReposPage";
 import { ModelSettingsModal } from "../settings/ModelSettingsModal";
 import { SettingsPage } from "../settings/SettingsPage";
+import { CopyCommand } from "../setup/CopyCommand";
+import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import { PublishModal } from "../workspace/PublishModal";
 import { WorkspacePage } from "../workspace/WorkspacePage";
 import { ErrorBoundary, listenForPreloadErrors } from "./ErrorBoundary";
 import { Sidebar } from "./Sidebar";
 import { Toasts, type Toast } from "./Toasts";
 import { Topbar } from "./Topbar";
-import { useAppData } from "./hooks/useAppData";
+import { usePresentation } from "./presentation";
+import { useAppData, type AppData } from "./hooks/useAppData";
 import { loadDemo } from "./hooks/demoStorage";
 import { useDraftEditor } from "./hooks/useDraftEditor";
 import { useExplanations } from "./hooks/useExplanations";
@@ -57,6 +75,7 @@ import { useRunRounds } from "./hooks/useRunRounds";
 import { useTaskSetup } from "./hooks/useTaskSetup";
 
 export type Page =
+  | "home"
   | "workspace"
   | "repos"
   | "explore"
@@ -72,27 +91,225 @@ export type ModalName =
   | "publish"
   | "help"
   | "runs"
+  | "about"
   | null;
 export type Notify = (message: string, tone?: "success" | "error") => void;
 
 // Registered on load, before the first render can request a lazy chunk.
 listenForPreloadErrors();
 
+// Shown once (the first start), on request (About) or rarely (a new
+// license agreement), so they load on their own instead of with the app.
+const Welcome = lazy(() =>
+  import("../onboarding/Welcome").then((module) => ({ default: module.Welcome })),
+);
+const AboutDialog = lazy(() =>
+  import("../about/AboutDialog").then((module) => ({ default: module.AboutDialog })),
+);
+const EulaPrompt = lazy(() =>
+  import("../onboarding/EulaPrompt").then((module) => ({ default: module.EulaPrompt })),
+);
+
 export default function App() {
   return (
     <ErrorBoundary>
-      <AppShell />
+      <AppRoot />
     </ErrorBoundary>
   );
 }
 
+/** A status without a license: useEntitlements then asks /api/license. */
+const statusPending = {};
+
+/** localStorage key of the run the workbench showed last. */
+export const lastRunKey = "bellpr-last-run";
+
+/** The run the workbench showed last, if the browser kept it. */
+export function readLastRun(): string | undefined {
+  try {
+    return localStorage.getItem(lastRunKey) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function rememberLastRun(id: string) {
+  try {
+    localStorage.setItem(lastRunKey, id);
+  } catch {
+    // The current session still works if browser storage is unavailable.
+  }
+}
+
+/**
+ * Loads the app's data and the environment report once for every page,
+ * sends an address that names no route (an empty hash, an unknown path) to
+ * Home, keeping its flags, and shows the welcome flow on a first start.
+ */
+function AppRoot() {
+  // First, so it listens before the first request is sent.
+  const [sessionEnded, setSessionEnded] = useSessionEnded();
+  const data = useAppData();
+  // Decided once: settings that change later never bring Welcome back.
+  const [view, setView] = useState<StartView>("pending");
+  // Every page uses the environment report (the readiness pill, About's
+  // data directory). useDoctor probes again every 5 s while a required
+  // check fails, which runs the CLI probes (`gh api user` among them), so
+  // that only goes on while a view that helps fix the environment shows:
+  // Welcome, and Home's summary or the new-task dialog (see AppShell).
+  const [doctorLive, setDoctorLive] = useState(false);
+  const [doctorSettled, setDoctorSettled] = useState(false);
+  const doctor = useDoctor({
+    enabled: !doctorSettled || doctorLive || view === "welcome",
+  });
+  useEffect(() => {
+    if (doctor.report || doctor.error) setDoctorSettled(true);
+  }, [doctor.report, doctor.error]);
+  const presentation = usePresentation();
+  const route = useHashRoute();
+  useEffect(() => {
+    if (!route) navigateTo({ name: "home" }, { replace: true });
+  }, [route]);
+  const next = startView(data);
+  if (view === "pending" && next !== "pending") setView(next);
+  const [initialModal, setInitialModal] = useState<ModalName>(null);
+  const { setAppSettings } = data;
+
+  const finishWelcome = (choice: WelcomeChoice) => {
+    // Welcome saved both; the settings are read again to be sure.
+    setAppSettings((settings) => ({
+      ...settings,
+      eulaAcceptedVersion: eulaVersion,
+      onboardingCompletedAt: new Date().toISOString(),
+    }));
+    api<AppSettingsView>("/app-settings").then(
+      (saved) => setAppSettings(saved.settings),
+      () => {
+        // The values set above stand.
+      },
+    );
+    if (choice === "tour") navigateTo({ name: "demo" });
+    else if (choice === "discover") navigateTo({ name: "discover" });
+    else {
+      navigateTo({ name: "home" });
+      setInitialModal("import");
+    }
+    setView("shell");
+  };
+
+  const starting = <div className="app-starting" aria-busy="true" />;
+  if (view === "pending") return starting;
+  const sessionNotice = sessionEnded && (
+    <SessionEndedNotice onDismiss={() => setSessionEnded(false)} />
+  );
+  if (view === "welcome")
+    return (
+      <main className="welcome-screen" id="main-content">
+        {sessionNotice}
+        <div className="welcome-screen-logo">
+          <Logo variant="wordmark" size={34} title="" />
+        </div>
+        <Suspense fallback={starting}>
+          <Welcome
+            onFinish={finishWelcome}
+            settings={data.appSettings}
+            doctor={doctor}
+            status={data.status}
+            maskUser={presentation.maskUser}
+            maskPath={presentation.maskPath}
+          />
+        </Suspense>
+      </main>
+    );
+  return (
+    <AppShell
+      data={data}
+      doctor={doctor}
+      onDoctorLive={setDoctorLive}
+      initialModal={initialModal}
+      sessionNotice={sessionNotice}
+    />
+  );
+}
+
+/**
+ * Whether the sign-in session ended (BELL PR restarted, or the cookie
+ * expired). The API client would reload into the sign-in page, which loses
+ * what the person typed; the app cancels that and says how to sign in
+ * again instead.
+ */
+function useSessionEnded() {
+  const [ended, setEnded] = useState(false);
+  useEffect(() => {
+    const handle = (event: CustomEvent<ApiErrorBody>) => {
+      event.preventDefault();
+      setEnded(true);
+    };
+    window.addEventListener(authRequiredEvent, handle);
+    return () => window.removeEventListener(authRequiredEvent, handle);
+  }, []);
+  return [ended, setEnded] as const;
+}
+
+/**
+ * cursor=1: a ring that follows the mouse, so a recording or a screen share
+ * shows where the presenter points. It never takes a click.
+ */
+export function PresentationCursor() {
+  const ring = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const move = (event: PointerEvent) => {
+      const node = ring.current;
+      if (!node) return;
+      node.style.transform = `translate(${event.clientX}px, ${event.clientY}px)`;
+      node.classList.add("is-visible");
+    };
+    const press = () => ring.current?.classList.add("is-pressed");
+    const release = () => ring.current?.classList.remove("is-pressed");
+    window.addEventListener("pointermove", move, { passive: true });
+    window.addEventListener("pointerdown", press);
+    window.addEventListener("pointerup", release);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerdown", press);
+      window.removeEventListener("pointerup", release);
+    };
+  }, []);
+  return <div ref={ring} className="presentation-cursor" aria-hidden="true" />;
+}
+
+/** The ended session: the command that prints a new sign-in link. */
+export function SessionEndedNotice({ onDismiss }: { onDismiss: () => void }) {
+  const t = useT("app");
+  return (
+    <div role="alert" className="session-banner">
+      <div className="session-banner-text">
+        <strong>{t.sessionEnded.title}</strong>
+        <span>{t.sessionEnded.text}</span>
+        <CopyCommand command={t.sessionEnded.command} />
+      </div>
+      <button
+        type="button"
+        className="icon-button"
+        onClick={onDismiss}
+        aria-label={t.dismissNotice}
+      >
+        <X size={15} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
 // The address (src/navigation/route.ts) is the source of the page, the open
-// run, its tab and its file. An empty hash keeps the start view: the sample
-// workspace, which #/home, #/demo and #/about show as well for now.
+// run, its tab and its file. Home is the start view; #/demo shows the
+// sample workspace and #/about opens the About dialog over Home.
 
 /** The page a route shows; a repository that is not listed shows the list. */
 function pageFor(route: Route | null, knownRepo: boolean): Page {
   switch (route?.name) {
+    case "run":
+    case "demo":
+      return "workspace";
     case "repos":
       return "repos";
     case "repo":
@@ -106,12 +323,13 @@ function pageFor(route: Route | null, knownRepo: boolean): Page {
     case "settings":
       return "settings";
     default:
-      return "workspace";
+      return "home";
   }
 }
 
 /** The route of each page that takes no parameters. */
 const pageRoutes = {
+  home: "home",
   repos: "repos",
   discovery: "discover",
   team: "team",
@@ -125,7 +343,7 @@ const pageRoutes = {
 /** The run the address shows in the workspace; undefined on other pages. */
 function addressedRunId(route: Route | null, demoRunId: string) {
   if (route?.name === "run") return route.runId;
-  if (!route || ["home", "demo", "about"].includes(route.name)) return demoRunId;
+  if (route?.name === "demo") return demoRunId;
   return undefined;
 }
 
@@ -145,12 +363,31 @@ interface WorkspaceView {
   file?: string;
 }
 
-function AppShell() {
+function AppShell({
+  data,
+  doctor,
+  onDoctorLive,
+  initialModal = null,
+  sessionNotice,
+}: {
+  data: AppData;
+  doctor: DoctorState;
+  /** Told whether a view that helps fix the environment shows (see AppRoot). */
+  onDoctorLive?: (live: boolean) => void;
+  /** A dialog to open at once, such as the import the welcome flow chose. */
+  initialModal?: ModalName;
+  /** Shown above the page while the sign-in session has ended. */
+  sessionNotice?: ReactNode;
+}) {
   const t = useT("app");
+  const workspaceMessages = useT("workspace");
+  const repoMessages = useT("repos");
+  const runMessages = useT("modals").runs;
   const [locale] = useLocale();
   // The sample project in the UI language; its ids are the same in every locale.
   const sample = getDemo(locale);
   const route = useHashRoute();
+  const presentation = usePresentation();
   const {
     repos,
     setRepos,
@@ -158,9 +395,19 @@ function AppShell() {
     setRuns,
     status,
     setStatus,
+    appSettings,
+    setAppSettings,
+    loaded,
     apiError,
     setApiError,
-  } = useAppData();
+  } = data;
+  // The app stays unusable until this build's license agreement is accepted.
+  const blocked = needsEulaPrompt(appSettings, loaded.appSettings);
+  // Until the status answers (its environment probes take a moment), the
+  // plan comes from /api/license, so the plan chip and PRO marks show at once.
+  const entitlements = useEntitlements(status ?? statusPending);
+  const discoveryLocked = entitlements.locked("discovery");
+  const [lastRunId, setLastRunId] = useState(readLastRun);
   const [run, setRunState] = useState<Run>(() => loadDemo(locale));
   // The run the latest action opened, ahead of the next render; the setters
   // below write it into the address.
@@ -242,7 +489,7 @@ function AppShell() {
   const [toast, setToast] = useState<Toast | null>(null);
   const [commandOpen, setCommandOpen] = useState(false);
   const mainContent = useRef<HTMLElement>(null);
-  const [modal, setModal] = useState<ModalName>(null);
+  const [modal, setModal] = useState<ModalName>(initialModal);
   const exploreRepoId = route?.name === "repo" ? route.repoId : undefined;
   const settingsRequest = useRef(0);
   const [showFiles, setShowFiles] = useState(true);
@@ -350,7 +597,7 @@ function AppShell() {
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.isComposing || event.repeat) return;
+      if (event.defaultPrevented || event.isComposing || event.repeat || blocked) return;
       if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k") {
         event.preventDefault();
         toggleCommandPalette();
@@ -358,7 +605,7 @@ function AppShell() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [toggleCommandPalette]);
+  }, [toggleCommandPalette, blocked]);
 
   useEffect(() => {
     if (reading) window.scrollTo({ top: 0, behavior: "instant" });
@@ -375,7 +622,9 @@ function AppShell() {
   }, [sidebarCollapsed]);
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.isComposing || modal || commandOpen) return;
+      if (event.defaultPrevented || event.isComposing || modal || commandOpen || blocked) return;
+      // #/about shows its dialog without setting `modal`; it is open all the same.
+      if (currentRoute()?.name === "about") return;
       if (event.key === "Escape") setFocusMode(false);
       // "?" opens the guide unless the reader is typing in a field.
       const typing = (event.target as Element | null)?.closest(
@@ -389,7 +638,7 @@ function AppShell() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [modal, commandOpen]);
+  }, [modal, commandOpen, blocked]);
   useEffect(() => {
     // Errors stay until the reader closes them; success notices fade out.
     if (!toast || toast.tone === "error") return;
@@ -563,6 +812,126 @@ function AppShell() {
     notify,
   });
 
+  // Home's environment summary and the new-task dialog follow the
+  // environment while the person fixes it; elsewhere the report stays.
+  const doctorLive =
+    (page === "home" && !presentation.present) || modal === "task";
+  useEffect(() => onDoctorLive?.(doctorLive), [doctorLive, onDoctorLive]);
+
+  // The workbench remembers the run it showed last, for Home and the next visit.
+  useEffect(() => {
+    if (page !== "workspace" || addressRunId !== run.id) return;
+    rememberLastRun(run.id);
+    setLastRunId(run.id);
+  }, [page, addressRunId, run.id]);
+
+  /**
+   * The Workbench item: the run open now, or the run shown last when the
+   * workbench still holds the sample it starts with (after a reload).
+   */
+  function openWorkbench() {
+    const last = readLastRun();
+    if (
+      demo &&
+      last &&
+      last !== run.id &&
+      runs.some((item) => item.id === last)
+    ) {
+      navigationIntent.current++;
+      showWorkspace({ runId: last, tab: "overview" });
+      setSidebarOpen(false);
+    } else navigate("workspace");
+  }
+
+  // The tab title names the page and, on a run or a project, its repository.
+  const titleRepo =
+    page === "workspace" ? currentRepo : page === "explore" ? exploreRepo : undefined;
+  const documentTitle = titleFor(
+    route,
+    { app: t, workspace: workspaceMessages },
+    titleRepo ? { repoName: titleRepo.fullName } : {},
+  );
+  useEffect(() => {
+    // The i18n runtime writes the app's title when the language changes, in
+    // an effect that runs after this one; a microtask runs after both. The
+    // locale is a dependency because a page's name can read the same in
+    // both languages.
+    let current = true;
+    queueMicrotask(() => {
+      if (current) document.title = documentTitle;
+    });
+    return () => {
+      current = false;
+    };
+  }, [documentTitle, locale]);
+
+  // The sample run is listed while it is all there is, while the workbench
+  // shows it, after the person imported it, or when the settings ask for it.
+  const [sampleImported, setSampleImported] = useState(false);
+  const showSample =
+    runs.length === 0 ||
+    appSettings?.showSampleProject === true ||
+    sampleImported ||
+    (page === "workspace" && demo);
+
+  // The open run's project, for a deletion that ends while it is open.
+  const runRepoId = useRef(run.repoId);
+  runRepoId.current = run.repoId;
+  /** Shows the sample in place of an open run that is gone. */
+  const dropOpenRun = () => {
+    setRun(loadDemo(locale));
+    setFiles(sample.files);
+  };
+
+  /** Frees a finished run's working files; the run and its notes stay. */
+  async function freeRunSpace(id: string) {
+    const { run: updated } = await api<{ run: Run }>(
+      `/runs/${encodeURIComponent(id)}/workspace`,
+      send("DELETE"),
+    );
+    setRuns((list) =>
+      list.map((item) => (item.id === id ? summarizeRun(updated) : item)),
+    );
+    if (runIdRef.current === id) {
+      setRun(updated);
+      setFiles([]);
+    }
+    notify(runMessages.freed);
+  }
+
+  async function deleteRun(id: string) {
+    await api(`/runs/${encodeURIComponent(id)}`, send("DELETE"));
+    setRuns((list) => list.filter((item) => item.id !== id));
+    if (runIdRef.current === id) dropOpenRun();
+    notify(runMessages.deleted);
+  }
+
+  /** Deletes a project with its runs (and BELL's own clone of it). */
+  async function deleteRepository(repo: Repo) {
+    await api(`/repos/${encodeURIComponent(repo.id)}`, send("DELETE"));
+    setRepos((list) => list.filter((item) => item.id !== repo.id));
+    setRuns((list) => list.filter((item) => item.repoId !== repo.id));
+    if (runRepoId.current === repo.id && runIdRef.current !== sample.run.id)
+      dropOpenRun();
+    notify(repoMessages.list.deleted({ name: repo.fullName }));
+  }
+
+  // Presenting the sample (or its playback): a badge says it is sample data.
+  const showingSample =
+    presentation.play ||
+    (page === "workspace" && demo) ||
+    (page === "explore" && exploreRepo === sample.repo);
+
+  /** The sample's import played in the browser: list it and open it. */
+  function openImportedSample(repo: Repo) {
+    closeModal();
+    setSource("");
+    setSampleImported(true);
+    setExploreRepoId(repo.id);
+    navigate("explore");
+    notify(repoMessages.import.sampleImported({ name: repo.fullName }));
+  }
+
   function focusDestination() {
     window.requestAnimationFrame(() => {
       const heading = mainContent.current?.querySelector<HTMLElement>("h1");
@@ -578,6 +947,17 @@ function AppShell() {
     }
     return opened;
   }
+
+  // About opens from the app as a dialog over the page, and from #/about
+  // over Home; closing the latter leaves the address on Home.
+  const aboutOpen = modal === "about" || route?.name === "about";
+  const closeAbout = useCallback(() => {
+    if (currentRoute()?.name === "about")
+      navigateTo({ name: "home" }, { replace: true });
+    closeModal();
+  }, [closeModal]);
+  const dataDir = doctor.report?.checks.find((check) => check.id === "data-dir")
+    ?.params?.path;
 
   function openPaletteRepo(id: string) {
     setExploreRepoId(id);
@@ -595,6 +975,7 @@ function AppShell() {
           "--explanation-width": `${explanationWidth}px`,
         } as CSSProperties
       }
+      inert={blocked}
     >
       <a className="skip-to-content" href="#main-content" onClick={(event) => {
         event.preventDefault();
@@ -605,9 +986,15 @@ function AppShell() {
         runs={runs}
         run={run}
         status={status}
+        license={entitlements.summary}
+        discoveryLocked={discoveryLocked}
+        showSample={showSample}
+        presenting={presentation.present}
+        maskUser={presentation.maskUser}
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
         navigate={navigate}
+        openWorkbench={openWorkbench}
         openModal={openModal}
         beginContribution={beginContribution}
         chooseRun={chooseRun}
@@ -622,8 +1009,13 @@ function AppShell() {
           setSidebarCollapsed={setSidebarCollapsed}
           toggleCommandPalette={toggleCommandPalette}
           navigate={navigate}
+          report={doctor.report}
+          presenting={presentation.present}
+          repoUrl={titleRepo && titleRepo !== sample.repo ? titleRepo.url : undefined}
+          githubUser={status?.githubUser ?? ""}
         />
-        {apiError && (
+        {sessionNotice}
+        {apiError && !sessionNotice && (
           <div role="alert" className="connection-banner">
             <Terminal size={16} />
             <span>{apiError}</span>
@@ -635,7 +1027,23 @@ function AppShell() {
             </button>
           </div>
         )}
-        {page === "workspace" ? (
+        {page === "home" ? (
+          <HomePage
+            runs={runs}
+            repos={repos}
+            doctor={doctor}
+            license={entitlements.summary}
+            discoveryLocked={discoveryLocked}
+            presenting={presentation.present}
+            maskUser={presentation.maskUser}
+            maskPath={presentation.maskPath}
+            lastRunId={lastRunId}
+            openSample={() => navigateTo({ name: "demo" })}
+            openImport={() => openModal("import")}
+            openDiscovery={() => navigate("discovery")}
+            chooseRun={chooseRun}
+          />
+        ) : page === "workspace" ? (
           <WorkspacePage
             run={run}
             files={files}
@@ -712,6 +1120,9 @@ function AppShell() {
             navigate={navigate}
             chooseRun={chooseRun}
             setExploreRepoId={setExploreRepoId}
+            discoveryLocked={discoveryLocked}
+            maskPath={presentation.maskPath}
+            deleteRepository={deleteRepository}
           />
         ) : page === "team" ? (
           <TeamPage beginContribution={beginContribution} />
@@ -744,9 +1155,12 @@ function AppShell() {
           onClose={closeCommandPalette}
           onSelectRun={openPaletteRun}
           onSelectRepo={openPaletteRepo}
+          onOpenSample={() => navigateTo({ name: "demo" })}
+          onOpenSettings={() => navigate("settings")}
+          onOpenAbout={() => openModal("about")}
         />
       )}
-      {toast && <Toasts toast={toast} setToast={setToast} />}
+      <Toasts toast={toast} setToast={setToast} />
       {modal === "import" && (
         <ImportRepoModal
           source={source}
@@ -755,6 +1169,9 @@ function AppShell() {
           formError={formError}
           importRepo={importRepo}
           closeModal={closeModal}
+          playDemo={presentation.play}
+          speed={presentation.speed}
+          onSampleImported={openImportedSample}
         />
       )}
       {modal === "models" && (
@@ -777,6 +1194,8 @@ function AppShell() {
           openModal={openModal}
           navigate={navigate}
           setExploreRepoId={setExploreRepoId}
+          doctor={doctor}
+          maskUser={presentation.maskUser}
         />
       )}
       {modal === "publish" && (
@@ -802,9 +1221,44 @@ function AppShell() {
           chooseRun={chooseRun}
           beginContribution={beginContribution}
           closeModal={closeModal}
+          freeRunSpace={freeRunSpace}
+          deleteRun={deleteRun}
         />
       )}
-      {modal === "help" && <HelpModal closeModal={closeModal} />}
+      {modal === "help" && (
+        <HelpModal closeModal={closeModal} openAbout={() => openModal("about")} />
+      )}
+      {aboutOpen && (
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <AboutDialog
+              onClose={closeAbout}
+              license={entitlements.summary}
+              dataDir={typeof dataDir === "string" ? dataDir : undefined}
+              presenting={presentation.present}
+              maskUser={presentation.maskUser}
+              maskPath={presentation.maskPath}
+              serverVersion={status?.version}
+            />
+          </Suspense>
+        </ErrorBoundary>
+      )}
+      {/* Mounted once: every 402 and locked control opens it. */}
+      <UpgradeDialog summary={entitlements.summary} demo={presentation.play} />
+      {presentation.present && showingSample && (
+        <p className="presentation-sample-badge">{t.presentation.sampleBadge}</p>
+      )}
+      {presentation.cursor && <PresentationCursor />}
+      {/* Outside the inert shell in the page, so it alone stays usable. */}
+      {blocked &&
+        createPortal(
+          <ErrorBoundary>
+            <Suspense fallback={null}>
+              <EulaPrompt onAccepted={(saved) => setAppSettings(saved.settings)} />
+            </Suspense>
+          </ErrorBoundary>,
+          document.body,
+        )}
     </div>
   );
 }

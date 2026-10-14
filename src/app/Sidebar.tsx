@@ -1,41 +1,69 @@
-import { Fragment, type Dispatch, type SetStateAction } from "react";
+import {
+  Fragment,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import {
   ArrowUpRight,
   BookOpen,
-  ChevronDown,
   ChevronRight,
   CircleHelp,
   FolderGit2,
+  House,
+  Info,
   Languages,
   LayoutDashboard,
   Plus,
   Search,
   Settings2,
   Sparkles,
+  UserRound,
   Workflow,
+  type LucideIcon,
 } from "lucide-react";
+import type { LicenseSummary } from "../../shared/plans";
+import { Logo } from "../brand/Logo";
 import { getDemo } from "../demo";
 import { useLocale, useT } from "../i18n";
 import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
+import { PlanChip } from "../license/PlanChip";
+import { ProBadge } from "../license/ProBadge";
 import type { Run, RunSummary } from "../types";
 import type { ModalName, Page } from "./AppShell";
 import type { Status } from "./hooks/useAppData";
+import { initialsOf } from "./labels";
 import "./sidebar.css";
 
 interface SidebarProps {
   page: Page;
+  /** The person's runs; the sample run is not one of them. */
   runs: RunSummary[];
   /** The open run, highlighted in the recent list. */
   run: Run;
   status: Status | null;
+  /** The license for the plan chip; nothing shows while it is unknown. */
+  license?: LicenseSummary;
+  /** Free: searching GitHub needs Pro, so the discovery item says PRO. */
+  discoveryLocked: boolean;
+  /** Whether the sample run is listed, below its own heading. */
+  showSample: boolean;
+  /** present=1: the GitHub login reads "you" and no initials show. */
+  presenting: boolean;
+  maskUser: (value: string) => string;
   /** The narrow-screen drawer is open. */
   sidebarOpen: boolean;
   setSidebarOpen: Dispatch<SetStateAction<boolean>>;
   navigate: (value: Page) => void;
+  /** Opens the workbench: the run opened last, or the one open now. */
+  openWorkbench: () => void;
   openModal: (value: ModalName) => void;
   beginContribution: () => void;
   chooseRun: (id: string) => Promise<boolean>;
 }
+
+/** How many of the person's runs the recent list shows. */
+const recentLimit = 4;
 
 /** The left navigation: pages, recent contributions, settings and help. */
 export function Sidebar({
@@ -43,9 +71,15 @@ export function Sidebar({
   runs,
   run,
   status,
+  license,
+  discoveryLocked,
+  showSample,
+  presenting,
+  maskUser,
   sidebarOpen,
   setSidebarOpen,
   navigate,
+  openWorkbench,
   openModal,
   beginContribution,
   chooseRun,
@@ -53,6 +87,39 @@ export function Sidebar({
   const t = useT("app");
   const [locale] = useLocale();
   const demoRun = getDemo(locale).run;
+  const login = status?.githubUser ?? "";
+  // A repository's overview belongs to the Repositories section.
+  const section: Page = page === "explore" ? "repos" : page;
+  const navItem = (
+    value: Page,
+    Icon: LucideIcon,
+    extra?: ReactNode,
+    onClick = () => navigate(value),
+  ) => (
+    <button
+      key={value}
+      className={section === value ? "nav-item active" : "nav-item"}
+      title={t.pages[value]}
+      aria-current={section === value ? "page" : undefined}
+      onClick={onClick}
+    >
+      <Icon size={18} aria-hidden="true" />
+      <span>{t.pages[value]}</span>
+      {extra}
+    </button>
+  );
+  const recentItem = (item: RunSummary | Run, sample: boolean) => (
+    <button
+      key={item.id}
+      className={`recent-item ${run.id === item.id ? "selected" : ""}`}
+      onClick={() => chooseRun(item.id)}
+    >
+      <span
+        className={`small-status ${item.status === "running" ? "running" : ""}`}
+      />
+      <span>{sample ? t.sidebar.demoRunTitle : item.title}</span>
+    </button>
+  );
   return (
     <>
       {sidebarOpen && (
@@ -66,75 +133,36 @@ export function Sidebar({
         id="workspace-sidebar"
         className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}
       >
-        <a
-          href="#"
-          className="brand"
-          aria-label={t.sidebar.home}
-          onClick={(e) => {
-            e.preventDefault();
-            navigate("workspace");
-          }}
-        >
-          <span className="brand-symbol">
-            b<span />
+        <div className="brand-row">
+          <a
+            href="#/home"
+            className="brand"
+            aria-label={t.sidebar.home}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate("home");
+            }}
+          >
+            <Logo variant="wordmark" size={30} title="" className="brand-wordmark" />
+            <Logo variant="mark" size={30} title="" className="brand-mark" />
+          </a>
+          <span className="sidebar-plan">
+            <PlanChip summary={license} />
           </span>
-          <span>
-            BELL<span className="brand-pr">PR</span>
-          </span>
-          <span className="beta-label">{t.sidebar.beta}</span>
-        </a>
-        <button className="workspace-switch" onClick={() => navigate("repos")}>
-          <span className="workspace-avatar">M</span>
-          <span>
-            <strong>{t.sidebar.workspaceName}</strong>
-            <small>{t.sidebar.workspaceKind}</small>
-          </span>
-          <ChevronDown size={14} />
-        </button>
+        </div>
         <div className="nav-label">{t.sidebar.navigationHeading}</div>
         <nav aria-label={t.sidebar.mainNavigation}>
-          <button
-            className={page === "workspace" ? "nav-item active" : "nav-item"}
-            title={t.pages.workspace}
-            onClick={() => navigate("workspace")}
-          >
-            <LayoutDashboard size={18} />
-            <span>{t.pages.workspace}</span>
-            <span className="nav-count">{runs.length + 1}</span>
-          </button>
-          <button
-            className={page === "repos" ? "nav-item active" : "nav-item"}
-            title={t.pages.repos}
-            onClick={() => navigate("repos")}
-          >
-            <FolderGit2 size={18} />
-            <span>{t.pages.repos}</span>
-          </button>
-          <button
-            className={page === "discovery" ? "nav-item active" : "nav-item"}
-            title={t.pages.discovery}
-            onClick={() => navigate("discovery")}
-          >
-            <Search size={18} />
-            <span>{t.pages.discovery}</span>
-          </button>
-          <button
-            className={page === "team" ? "nav-item active" : "nav-item"}
-            title={t.pages.team}
-            onClick={() => navigate("team")}
-          >
-            <Workflow size={18} />
-            <span>{t.pages.team}</span>
-          </button>
-          <button
-            className={page === "learning" ? "nav-item active" : "nav-item"}
-            title={t.pages.learning}
-            onClick={() => navigate("learning")}
-          >
-            <BookOpen size={18} />
-            <span>{t.pages.learning}</span>
-            <span className="tiny-new">{t.sidebar.newBadge}</span>
-          </button>
+          {navItem("home", House)}
+          {navItem(
+            "workspace",
+            LayoutDashboard,
+            runs.length > 0 && <span className="nav-count">{runs.length}</span>,
+            openWorkbench,
+          )}
+          {navItem("repos", FolderGit2)}
+          {navItem("discovery", Search, discoveryLocked && <ProBadge />)}
+          {navItem("team", Workflow)}
+          {navItem("learning", BookOpen)}
         </nav>
         <div className="nav-label recent-label">
           {t.sidebar.recent}{" "}
@@ -146,23 +174,13 @@ export function Sidebar({
           </button>
         </div>
         <div className="recent-list">
-          {[...runs.slice(0, 4), demoRun].map((r) => (
-            <button
-              key={r.id}
-              className={`recent-item ${run.id === r.id ? "selected" : ""}`}
-              onClick={() => chooseRun(r.id)}
-            >
-              <span
-                className={`small-status ${r.status === "running" ? "running" : ""}`}
-              />
-              <span>
-                {r.id === demoRun.id ? t.sidebar.demoRunTitle : r.title}
-              </span>
-              {r.id === demoRun.id && (
-                <span className="demo-small">{t.sidebar.demoBadge}</span>
-              )}
-            </button>
-          ))}
+          {runs.slice(0, recentLimit).map((item) => recentItem(item, false))}
+          {showSample && (
+            <>
+              <div className="recent-sample-heading">{t.sidebar.sampleHeading}</div>
+              {recentItem(demoRun, true)}
+            </>
+          )}
           <button className="all-runs-link" onClick={() => openModal("runs")}>
             {t.sidebar.allRuns} <ChevronRight size={12} />
           </button>
@@ -185,32 +203,35 @@ export function Sidebar({
               {t.sidebar.learningAction} <ArrowUpRight size={14} />
             </button>
           </div>
-          <button
-            className="nav-item"
-            title={t.pages.settings}
-            onClick={() => navigate("settings")}
-          >
-            <Settings2 size={17} />
-            <span>{t.pages.settings}</span>
-          </button>
+          {navItem("settings", Settings2)}
           <button
             className="nav-item"
             title={t.sidebar.help}
             aria-keyshortcuts="?"
             onClick={() => openModal("help")}
           >
-            <CircleHelp size={17} />
+            <CircleHelp size={17} aria-hidden="true" />
             <span>{t.sidebar.help}</span>
             <span className="shortcut">?</span>
+          </button>
+          <button
+            className="nav-item"
+            title={t.sidebar.about}
+            onClick={() => openModal("about")}
+          >
+            <Info size={17} aria-hidden="true" />
+            <span>{t.sidebar.about}</span>
           </button>
           <div className="sidebar-language">
             <Languages size={16} aria-hidden="true" />
             <LanguageSwitcher className="sidebar-language-select" />
           </div>
           <div className="profile">
-            <span className="profile-avatar">MC</span>
+            <span className="profile-avatar" aria-hidden="true">
+              {login && !presenting ? initialsOf(login) : <UserRound size={16} />}
+            </span>
             <span>
-              <strong>{status?.githubUser || t.sidebar.profileFallback}</strong>
+              <strong>{maskUser(login) || t.sidebar.profileFallback}</strong>
               <small>
                 <span className="connection-dot" /> {t.sidebar.localWorkspace}
               </small>

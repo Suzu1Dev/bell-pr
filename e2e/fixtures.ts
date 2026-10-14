@@ -43,10 +43,6 @@ function planOf(body: unknown): Plan | undefined {
 
 async function readPlan(page: Page): Promise<Plan> {
   const response = await page.request.get("/api/license");
-  if (response.status() === 404)
-    throw new Error(
-      "setPlan: this server has no /api/license route, so its plan cannot be read or changed.",
-    );
   if (!response.ok())
     throw new Error(`setPlan: GET /api/license answered ${response.status()}.`);
   const plan = planOf(await response.json());

@@ -132,12 +132,6 @@ async function completeOnboarding(context) {
       eulaAcceptedVersion: eulaVersion,
     },
   });
-  if (response.status() === 404) {
-    console.warn(
-      "[e2e] PUT /api/app-settings answered 404: this server has no app settings yet, so onboarding was not marked done.",
-    );
-    return;
-  }
   if (!response.ok())
     throw new Error(
       `PUT /api/app-settings answered ${response.status()}: ${await response.text()}`,

@@ -43,6 +43,18 @@ export default {
     saveFailed: ({ message }: { message: string }) =>
       `Your acceptance could not be saved: ${message}`,
   },
+  /**
+   * The blocking prompt when onboarding is done but this build's agreement
+   * version was not accepted yet. It reuses `license.summary`.
+   */
+  eulaPrompt: {
+    title: "Accept the license agreement to continue",
+    text: ({ version }: { version: string }) =>
+      `Version ${version} of the ${product.name} End User License Agreement applies to this build. Read it and accept it to keep using ${product.name}. In short:`,
+    accept: "Accept and continue",
+    accepting: "Saving…",
+    docs: "Read the documentation",
+  },
   environment: {
     title: "Check your environment",
     text: `${product.name} needs Git and at least one AI provider. The GitHub CLI is needed to publish pull requests and to find projects.`,
