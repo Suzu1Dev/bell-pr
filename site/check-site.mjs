@@ -7,10 +7,13 @@
  *
  * Static checks, on every .html file (media/ excluded):
  * - every <a href> resolves to an existing file (and #fragment id), sits
- *   inside a generated product-link region, or is listed in site/README.md;
+ *   inside a generated product-link region, or is an open item in
+ *   site/README.md: in backticks on a line that says TODO or [OWNER]. A
+ *   link to another site must be named in site/README.md;
  * - every resource (stylesheet, script, image, video, poster, track, CSS
  *   url()) is a relative path to an existing file, or a gitignored media/
- *   file listed in site/README.md. Nothing may come from another origin;
+ *   file that is an open item in site/README.md. Nothing may come from
+ *   another origin;
  * - no inline <script>, style="" or on*="" attribute, so a strict Content
  *   Security Policy can apply, and every page declares one.
  *
@@ -64,6 +67,10 @@ function generatedRanges(html) {
 
 const ids = (html) => new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]));
 const listedInReadme = (value) => readme.includes(value);
+// Only an open item excuses a missing file: a page the README merely
+// mentions, such as `install.html`, must exist.
+const openItems = readme.split("\n").filter((line) => /\bTODO\b|\[OWNER/.test(line));
+const isOpenItem = (value) => openItems.some((line) => line.includes(`\`${value}\``));
 
 function checkStatic() {
   const problems = [];
@@ -108,7 +115,7 @@ function checkStatic() {
         continue;
       }
       if (!fs.existsSync(path.join(siteDir, resolved))) {
-        if (!listedInReadme(resolved)) problems.push(`${where(match.index)}: ${value} does not exist and is not listed in site/README.md`);
+        if (!isOpenItem(resolved)) problems.push(`${where(match.index)}: ${value} does not exist and is not an open item in site/README.md`);
         continue;
       }
       if (fragment && resolved.endsWith(".html") && !idsOf(resolved).has(fragment))
@@ -139,7 +146,7 @@ function checkStatic() {
     if (error) problems.push(`${where}: ${value} ${error}`);
     else if (!fs.existsSync(path.join(siteDir, resolved))) {
       // The video files are gitignored; 7C copies them in before deploying.
-      if (!(resolved.startsWith("media/") && listedInReadme(resolved)))
+      if (!(resolved.startsWith("media/") && isOpenItem(resolved)))
         problems.push(`${where}: ${value} does not exist`);
     }
   }
