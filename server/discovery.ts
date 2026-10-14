@@ -53,10 +53,10 @@ import {
   withAgentTimeoutHint,
 } from "./agent-timeouts.js";
 import { AppError } from "./types.js";
-import { currentLocale, sm } from "./i18n/index.js";
+import { currentLocale, sm, withLocale } from "./i18n/index.js";
 import { lenientRead } from "./persisted-schema.js";
 import { respondIn } from "./prompt-language.js";
-import { formatters } from "../shared/i18n/locale.js";
+import { formatters, locales } from "../shared/i18n/locale.js";
 
 export const discoveryPreferencesSchema = z
   .object({
@@ -178,7 +178,8 @@ const previousSchema = z
     opportunities: z.array(opportunitySchema).max(6),
   })
   .strict();
-const jobSchema = z
+/** The saved discovery job; read leniently through `discoveryFileSchema`. */
+export const discoveryJobSchema = z
   .object({
     id: z.string().uuid(),
     status: z.enum(["running", "ready", "failed", "cancelled"]),
@@ -193,9 +194,16 @@ const jobSchema = z
     modelExecution: modelExecutionSchema.optional(),
     efficiency: efficiencyMetricsSchema.optional(),
     error: z.string().max(2400).optional(),
+    // A locale this build does not know reads as unknown instead of failing the job.
+    locale: z.enum(locales).optional().catch(undefined),
     previousResult: previousSchema.optional(),
   })
   .strict();
+/** discovery.json: the latest job, or null before the first one. */
+export const discoveryFileSchema = z.object({
+  version: z.literal(1),
+  job: discoveryJobSchema.nullable(),
+});
 const stringSchema = { type: "string" };
 const arraySchema = (items: unknown) => ({ type: "array", items });
 const objectSchema = (properties: Record<string, unknown>) => ({
@@ -387,15 +395,20 @@ export class DiscoveryService {
         if ((await stat(this.file)).size > 2_000_000)
           throw new AppError((m) => m.analysis.discovery.fileTooLarge, 422);
         // The file may come from a newer build: read it leniently.
-        const cached = lenientRead(
-          z.object({ version: z.literal(1), job: jobSchema.nullable() }),
-        ).parse(JSON.parse(await readFile(this.file, "utf8")));
+        const cached = lenientRead(discoveryFileSchema).parse(
+          JSON.parse(await readFile(this.file, "utf8")),
+        );
         this.job = cached.job;
         if (this.job?.status === "running") {
+          // Worded in the job's own locale, like the rest of its messages.
+          const messages = withLocale(
+            this.job.locale ?? currentLocale(),
+            () => sm().analysis.discovery,
+          );
           this.job.status = "failed";
           this.job.phase = "complete";
-          this.job.error = sm().analysis.discovery.interruptedError;
-          this.job.message = sm().analysis.discovery.interrupted;
+          this.job.error = messages.interruptedError;
+          this.job.message = messages.interrupted;
           this.job.completedAt = new Date().toISOString();
           await this.save();
         }
@@ -456,6 +469,7 @@ export class DiscoveryService {
       candidates: [],
       opportunities: [],
       warnings: [],
+      locale: currentLocale(),
       ...(prior ? { previousResult: prior } : {}),
     };
     this.job = job;
@@ -471,7 +485,11 @@ export class DiscoveryService {
       finish();
       throw new AppError(job.error, 500);
     }
-    void this.perform(job, controller.signal).finally(() => {
+    // The job keeps its locale for its messages and the agent's output,
+    // whatever the requests that read it later ask for.
+    void withLocale(job.locale ?? currentLocale(), () =>
+      this.perform(job, controller.signal),
+    ).finally(() => {
       if (this.active === active) this.active = undefined;
       finish();
     });

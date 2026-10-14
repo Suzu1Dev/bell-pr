@@ -42,10 +42,11 @@ import {
   hasExtendedAgentTimeout,
   withAgentTimeoutHint,
 } from "./agent-timeouts.js";
-import { currentLocale, sm } from "./i18n/index.js";
+import { currentLocale, sm, withLocale } from "./i18n/index.js";
 import { respondIn } from "./prompt-language.js";
 import { AppError, type Repository } from "./types.js";
 import { lenientRead } from "./persisted-schema.js";
+import { locales } from "../shared/i18n/locale.js";
 import {
   defaultPonytailMode,
   ponytailModes,
@@ -247,7 +248,11 @@ const analysisJsonSchema = objectSchema({
   recommendations: arraySchema(recommendationJsonSchema),
 });
 
-const persistedInsightsSchema = analysisSchema.extend({
+/** A locale this build does not know reads as unknown instead of failing the whole cache. */
+const persistedLocale = z.enum(locales).optional().catch(undefined);
+
+/** The saved analysis (the cache entry); read leniently through `cacheSchema`. */
+export const persistedInsightsSchema = analysisSchema.extend({
   // Caches written before the reading path was requested keep loading.
   readingPath: readingPathSchema.optional(),
   howItFitsTogether: text.optional(),
@@ -276,6 +281,7 @@ const persistedInsightsSchema = analysisSchema.extend({
   generatedAt: z.string().datetime(),
   source: z.literal("ai"),
   baseSha: z.string().regex(/^[a-f0-9]{40,64}$/),
+  locale: persistedLocale,
   sample: z
     .object({
       trackedFiles: z.number().int().min(0),
@@ -296,7 +302,7 @@ const recommendationIdsSchema = z
 const recommendationPreferencesSchema = z
   .object({ order: recommendationIdsSchema, hidden: recommendationIdsSchema })
   .strict();
-const cacheSchema = z.object({
+export const cacheSchema = z.object({
   version: z.literal(1),
   settings: contributionSettingsSchema,
   insights: persistedInsightsSchema.nullable(),
@@ -1004,7 +1010,22 @@ export class ProjectInsightsService {
     return this.analyze(repoId, true);
   }
 
-  private async analyze(
+  /**
+   * Runs the analysis in the locale it is written in: the request's for a
+   * new analysis; for more recommendations, the saved analysis's own locale
+   * (the request's when the cache predates it), so one analysis keeps one
+   * language. The locale is not part of the fingerprint.
+   */
+  private async analyze(repoId: string, more: boolean) {
+    let locale = currentLocale();
+    if (more) {
+      await this.writes.get(repoId);
+      locale = (await this.read(repoId)).insights?.locale ?? locale;
+    }
+    return withLocale(locale, () => this.analyzeInLocale(repoId, more));
+  }
+
+  private async analyzeInLocale(
     repoId: string,
     more: boolean,
   ): Promise<{
@@ -1269,6 +1290,7 @@ export class ProjectInsightsService {
           generatedAt,
           source: "ai",
           baseSha: version.baseSha,
+          locale: currentLocale(),
           // Recorded outside the strict analysis schema: the model never reports its own coverage.
           sample: {
             trackedFiles: context.trackedFileCount,

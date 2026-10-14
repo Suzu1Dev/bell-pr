@@ -1,4 +1,5 @@
 import type { EfficiencyMetrics, PonytailMode } from "./efficiency.js";
+import type { Locale } from "./i18n/locale.js";
 import type { ModelExecution, ModelSettings } from "./models.js";
 
 /** GitHub search order: "relevance" is GitHub best match (no sort parameter). */
@@ -84,6 +85,11 @@ export interface DiscoveryJob {
   modelExecution?: ModelExecution;
   efficiency?: EfficiencyMetrics;
   error?: string;
+  /**
+   * The UI locale the job was started in; its messages and the agent's
+   * output use it. Absent on jobs saved before it was recorded.
+   */
+  locale?: Locale;
   previousResult?: {
     createdAt: string;
     candidates: DiscoveryCandidate[];

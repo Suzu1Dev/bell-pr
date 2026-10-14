@@ -21,10 +21,13 @@ import {
 } from "../shared/discovery.js";
 import {
   DiscoveryService,
+  discoveryFileSchema,
+  discoveryJobSchema,
   discoveryPreferencesSchema,
   discoveryPrompt,
   parseDiscoveryResult,
 } from "./discovery.js";
+import { lenientRead } from "./persisted-schema.js";
 import { Store } from "./store.js";
 import { withLocale } from "./i18n/index.js";
 import { respondIn } from "./prompt-language.js";
@@ -597,6 +600,138 @@ test("restart marks interrupted work failed while retaining its prior result and
     );
     assert.deepEqual(job?.previousResult?.opportunities, ready.opportunities);
     await restarted.shutdown();
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a discovery job records the locale it started in and keeps using it for its messages and output", async () => {
+  const prompts: string[] = [];
+  const f = await fixture({
+    command: async (_executable, _args, commandOptions) => {
+      prompts.push(commandOptions!.input!);
+      commandOptions?.onLine?.(
+        JSON.stringify({
+          type: "item.completed",
+          item: {
+            type: "agent_message",
+            text: answer([
+              opportunity,
+              { ...opportunity, id: "harder", difficulty: "advanced" },
+            ]),
+          },
+        }),
+        "stdout",
+      );
+      return { stdout: "", stderr: "", code: 0 };
+    },
+  });
+  try {
+    const { job: started } = await withLocale("en", () => f.service.start({}));
+    assert.equal(started.locale, "en");
+    assert.equal(started.message, "Looking for GitHub projects that match your criteria");
+    // Later requests in another locale neither change nor re-word the job.
+    const job = await withLocale("zh-TW", () => finished(f.service));
+    assert.equal(job.status, "ready");
+    assert.equal(job.locale, "en");
+    assert.ok(prompts[0].includes(respondIn("en")));
+    assert.doesNotMatch(prompts[0], /Traditional Chinese/);
+    assert.equal(
+      job.message,
+      "Found 1 contribution opportunity backed by sources. Check the maintainers' interest and the scope of the work before you start.",
+    );
+    assert.match(job.opportunities[0].popularity, /^GitHub snapshot: 1,250 stars, 70 forks/);
+    assert.ok(job.warnings.includes("Skipped 1 suggestion above the chosen difficulty."));
+    for (const text of [job.message, job.opportunities[0].popularity, ...job.warnings])
+      assertNoHan(text);
+    const saved = JSON.parse(
+      await readFile(path.join(f.directory, "discovery.json"), "utf8"),
+    ) as { job: DiscoveryJob };
+    assert.equal(saved.job.locale, "en");
+    // A zh-TW job started afterwards uses zh-TW, prompt included.
+    await withLocale("zh-TW", () => f.service.start({}));
+    const chinese = await finished(f.service);
+    assert.equal(chinese.locale, "zh-TW");
+    assert.ok(prompts[1].includes(respondIn("zh-TW")));
+    assert.match(chinese.message, /找到 1 項/);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("restart words the interruption in the job's locale, or the current one for jobs saved without it", async () => {
+  const f = await fixture();
+  try {
+    await withLocale("en", () => f.service.start({}));
+    await finished(f.service);
+    await f.service.shutdown();
+    const file = path.join(f.directory, "discovery.json");
+    const saved = JSON.parse(await readFile(file, "utf8")) as {
+      version: number;
+      job: DiscoveryJob;
+    };
+    saved.job.status = "running";
+    await writeFile(file, JSON.stringify(saved));
+    const english = new DiscoveryService(f.store);
+    const { job } = await withLocale("zh-TW", () => english.get());
+    assert.equal(job?.status, "failed");
+    assert.equal(job?.message, "The last discovery was interrupted");
+    assert.match(job?.error ?? "", /^The server restarted and interrupted the discovery\./);
+    await english.shutdown();
+    delete saved.job.locale;
+    await writeFile(file, JSON.stringify(saved));
+    const legacy = new DiscoveryService(f.store);
+    const { job: legacyJob } = await withLocale("en", () => legacy.get());
+    assert.equal(legacyJob?.locale, undefined);
+    assert.equal(legacyJob?.message, "The last discovery was interrupted");
+    await legacy.shutdown();
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a discovery job with a locale and a newer field still loads in a build that predates the locale", async () => {
+  const f = await fixture();
+  try {
+    await withLocale("en", () => f.service.start({}));
+    await finished(f.service);
+    await f.service.shutdown();
+    const file = path.join(f.directory, "discovery.json");
+    const written = JSON.parse(await readFile(file, "utf8")) as {
+      version: number;
+      job: DiscoveryJob & Record<string, unknown>;
+    };
+    assert.equal(written.job.locale, "en");
+    written.job.reviewedBy = "a field from a newer build";
+    // An older build: the same schema without the locale field.
+    const older = lenientRead(
+      discoveryFileSchema.extend({
+        job: discoveryJobSchema.omit({ locale: true }).nullable(),
+      }),
+    ).parse(written);
+    assert.ok(older.job);
+    assert.equal("locale" in older.job, false);
+    assert.equal("reviewedBy" in older.job, false);
+    assert.equal(older.job.status, "ready");
+    assert.equal(older.job.opportunities.length, 1);
+    // This build keeps the locale and drops only the unknown field.
+    const current = lenientRead(discoveryFileSchema).parse(written);
+    assert.equal(current.job?.locale, "en");
+    assert.equal("reviewedBy" in (current.job ?? {}), false);
+    // A locale a later build may add reads as unknown instead of failing the job.
+    const later = lenientRead(discoveryFileSchema).parse({
+      ...written,
+      job: { ...written.job, locale: "ja" },
+    });
+    assert.equal(later.job?.locale, undefined);
+    assert.equal(later.job?.status, "ready");
+    // The service itself loads the file as written.
+    await writeFile(file, JSON.stringify(written));
+    const reloaded = new DiscoveryService(f.store);
+    const { job } = await reloaded.get();
+    assert.equal(job?.locale, "en");
+    assert.equal(job?.status, "ready");
+    await reloaded.shutdown();
   } finally {
     await f.cleanup();
   }
