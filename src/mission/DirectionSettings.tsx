@@ -314,8 +314,8 @@ export function DirectionSettings({
           </select>
           <p id={`${id}-provider-help`} className="mission-field-note">
             {provider === "claude"
-              ? "沿用本機 Claude Code 的訂閱登入，不使用 API 金鑰；可用模型依方案而定。"
-              : "沿用本機 Codex CLI 的登入。"}
+              ? "使用你已安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰皆可）。用量計入你自己的帳號，可用模型依你的方案而定。"
+              : "使用你已安裝並登入的 Codex CLI。"}
           </p>
         </div>
         <div className="mission-form-columns">
