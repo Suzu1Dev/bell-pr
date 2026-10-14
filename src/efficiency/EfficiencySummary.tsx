@@ -6,21 +6,24 @@ import {
   type PonytailMode,
   type RoleEfficiency,
 } from "../../shared/efficiency";
+import { useFormat, useT, type Messages } from "../i18n";
 import "./efficiency.css";
 
-const modeLabels = { lite: "輕量", full: "完整", off: "關閉" };
-/** Display order and zh-TW labels for the raw role keys; member-N teammates collapse into one row. */
-const roleLabels: Record<string, string> = {
-  lead: "Lead（規劃與整合）",
-  member: "Teammates",
-  reviewer: "Reviewer",
-  tester: "Tester",
-  draft: "PR 草稿",
-  explanations: "解說",
-  guide: "追問",
-  followup: "Review 修正",
-  sync: "解衝突",
-};
+type RoleGroup = keyof Messages["efficiency"]["roles"];
+/** Display order of the role groups; member-N teammates collapse into one row. */
+const roleOrder: readonly RoleGroup[] = [
+  "lead",
+  "member",
+  "reviewer",
+  "tester",
+  "draft",
+  "explanations",
+  "guide",
+  "followup",
+  "sync",
+];
+const isRoleGroup = (key: string): key is RoleGroup =>
+  (roleOrder as readonly string[]).includes(key);
 const roleGroup = (role: string) =>
   /^member-\d+$/.test(role) ? "member" : role;
 
@@ -45,52 +48,55 @@ export function groupByRole(byRole: Record<string, RoleEfficiency>) {
         : { ...entry },
     );
   }
-  const known = Object.keys(roleLabels);
   return [...groups.entries()]
     .sort(([a], [b]) => {
       const rank = (key: string) =>
-        known.includes(key) ? known.indexOf(key) : known.length;
+        isRoleGroup(key) ? roleOrder.indexOf(key) : roleOrder.length;
       return rank(a) - rank(b) || a.localeCompare(b);
     })
-    .map(([key, entry]) => ({ key, label: roleLabels[key] ?? key, ...entry }));
+    .map(([key, entry]) => ({ key, ...entry }));
 }
 
 export function EfficiencySummary({
   metrics,
   mode,
   demo = false,
-  title = "團隊 AI 用量",
+  title,
 }: {
   metrics?: EfficiencyMetrics;
   mode?: PonytailMode;
   demo?: boolean;
+  /** Heading and accessible name; the team usage title by default. */
   title?: string;
 }) {
+  const t = useT("efficiency");
+  const fmt = useFormat();
+  const heading = title ?? t.title;
   const data = demo ? undefined : metrics;
   const recordedMode = data?.mode ?? mode;
   const measured = !!data?.measuredCalls;
   const tokens = (value: number | undefined) =>
-    measured && value !== undefined ? value.toLocaleString("zh-TW") : "未回報";
-  const seconds = (ms: number) =>
-    `${(ms / 1000).toLocaleString("zh-TW", { maximumFractionDigits: 1 })} 秒`;
+    measured && value !== undefined ? fmt.number(value) : t.notReported;
+  const seconds = (ms: number) => t.seconds({ seconds: ms / 1000 });
+  const roleLabel = (key: string) => (isRoleGroup(key) ? t.roles[key] : key);
   const rows = data?.byRole ? groupByRole(data.byRole) : [];
   return (
-    <section className="efficiency-summary" aria-label={title}>
+    <section className="efficiency-summary" aria-label={heading}>
       <div className="efficiency-heading">
         <span>
           <Gauge size={15} aria-hidden="true" />
-          <strong>{title}</strong>
+          <strong>{heading}</strong>
         </span>
         {recordedMode && (
           <span className="efficiency-mode">
-            Ponytail · {modeLabels[recordedMode]}
+            Ponytail · {t.modes[recordedMode]}
           </span>
         )}
         <a
           href={ponytailSource}
           target="_blank"
           rel="noreferrer"
-          title={`Ponytail ${ponytailVersion} 原始專案`}
+          title={t.sourceTitle({ version: ponytailVersion })}
         >
           Ponytail {ponytailVersion}
           <ArrowUpRight size={13} aria-hidden="true" />
@@ -100,60 +106,58 @@ export function EfficiencySummary({
         <>
           <dl className="efficiency-metrics">
             <div>
-              <dt>輸入 tokens</dt>
+              <dt>{t.inputTokens}</dt>
               <dd>{tokens(data.inputTokens)}</dd>
             </div>
             <div>
-              <dt>其中快取命中</dt>
+              <dt>{t.cachedInputTokens}</dt>
               <dd>{tokens(data.cachedInputTokens)}</dd>
             </div>
             <div>
-              <dt>輸出 tokens</dt>
+              <dt>{t.outputTokens}</dt>
               <dd>{tokens(data.outputTokens)}</dd>
             </div>
             <div>
-              <dt>累計 Agent 時間</dt>
+              <dt>{t.agentTime}</dt>
               <dd>
                 {data.completedCalls + data.failedCalls > 0
                   ? seconds(data.durationMs)
-                  : "執行中"}
+                  : t.running}
               </dd>
             </div>
           </dl>
           <p className="efficiency-note">
-            {data.calls} 次呼叫 · 用量回報 {data.measuredCalls} / {data.calls}{" "}
-            次{data.measuredCalls < data.calls ? "，僅加總已回報部分。" : "。"}
-            快取已包含於輸入；時間為各次執行加總，並非等待時間。
+            {t.usageNote({ calls: data.calls, measured: data.measuredCalls })}
           </p>
           {rows.length > 0 && (
             <details className="efficiency-roles">
-              <summary>依角色分項（{rows.length} 類）</summary>
+              <summary>{t.byRole({ count: rows.length })}</summary>
               <div className="efficiency-roles-scroll">
                 <table>
                   <thead>
                     <tr>
-                      <th scope="col">角色</th>
-                      <th scope="col">呼叫</th>
-                      <th scope="col">輸入 tokens</th>
-                      <th scope="col">其中快取</th>
-                      <th scope="col">輸出 tokens</th>
-                      <th scope="col">時間</th>
+                      <th scope="col">{t.columns.role}</th>
+                      <th scope="col">{t.columns.calls}</th>
+                      <th scope="col">{t.columns.inputTokens}</th>
+                      <th scope="col">{t.columns.cachedInputTokens}</th>
+                      <th scope="col">{t.columns.outputTokens}</th>
+                      <th scope="col">{t.columns.time}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((row) => {
                       const value = (count: number) =>
-                        row.measuredCalls
-                          ? count.toLocaleString("zh-TW")
-                          : "未回報";
+                        row.measuredCalls ? fmt.number(count) : t.notReported;
                       return (
                         <tr key={row.key}>
-                          <th scope="row">{row.label}</th>
+                          <th scope="row">{roleLabel(row.key)}</th>
                           <td>
-                            {row.calls}
                             {row.measuredCalls < row.calls
-                              ? `（回報 ${row.measuredCalls}）`
-                              : ""}
+                              ? t.partialCalls({
+                                  calls: row.calls,
+                                  measured: row.measuredCalls,
+                                })
+                              : fmt.number(row.calls)}
                           </td>
                           <td>{value(row.inputTokens)}</td>
                           <td>{value(row.cachedInputTokens)}</td>
@@ -165,19 +169,13 @@ export function EfficiencySummary({
                   </tbody>
                 </table>
               </div>
-              <p className="efficiency-note">
-                同樣只列 CLI 回報的 tokens 與呼叫次數；Teammates
-                為所有成員合計。
-              </p>
+              <p className="efficiency-note">{t.byRoleNote}</p>
             </details>
           )}
         </>
       ) : (
         <p className="efficiency-note">
-          尚無實測
-          {demo
-            ? "；示範內容未呼叫 AI。"
-            : "；執行後會顯示已回報的用量與時間。"}
+          {demo ? t.noMeasurementSample : t.noMeasurement}
         </p>
       )}
     </section>

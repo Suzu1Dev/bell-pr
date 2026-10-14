@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import type { EfficiencyMetrics } from "../../shared/efficiency";
-import { EfficiencySummary } from "./EfficiencySummary";
+import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
+import { EfficiencySummary, groupByRole } from "./EfficiencySummary";
 
 const metrics: EfficiencyMetrics = {
   policyVersion: "bell-ponytail-v1",
@@ -18,8 +18,52 @@ const metrics: EfficiencyMetrics = {
   outputTokens: 1_234,
 };
 
-const render = (props: Parameters<typeof EfficiencySummary>[0]) =>
-  renderToStaticMarkup(createElement(EfficiencySummary, props));
+type Props = Parameters<typeof EfficiencySummary>[0];
+
+const render = (props: Props) =>
+  renderZh(createElement(EfficiencySummary, props));
+
+/** Renders in English and checks that no zh-TW text is left. */
+const renderEnglish = (props: Props) => {
+  const html = renderEn(createElement(EfficiencySummary, props));
+  assertNoHan(html);
+  return html;
+};
+
+const byRole: EfficiencyMetrics["byRole"] = {
+  "member-2": {
+    calls: 1,
+    measuredCalls: 1,
+    inputTokens: 2_000,
+    cachedInputTokens: 500,
+    outputTokens: 100,
+    durationMs: 1_000,
+  },
+  "member-1": {
+    calls: 2,
+    measuredCalls: 1,
+    inputTokens: 1_000,
+    cachedInputTokens: 0,
+    outputTokens: 50,
+    durationMs: 500,
+  },
+  lead: {
+    calls: 1,
+    measuredCalls: 0,
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    durationMs: 2_000,
+  },
+  custom: {
+    calls: 1,
+    measuredCalls: 1,
+    inputTokens: 7,
+    cachedInputTokens: 0,
+    outputTokens: 1,
+    durationMs: 10,
+  },
+};
 
 test("measured calls render zh-TW formatted tokens and summed time", () => {
   const html = render({ metrics });
@@ -41,45 +85,7 @@ test("calls without reported usage show 未回報 instead of zero", () => {
 });
 
 test("byRole renders a collapsible table with teammates merged and unreported roles marked", () => {
-  const html = render({
-    metrics: {
-      ...metrics,
-      byRole: {
-        "member-2": {
-          calls: 1,
-          measuredCalls: 1,
-          inputTokens: 2_000,
-          cachedInputTokens: 500,
-          outputTokens: 100,
-          durationMs: 1_000,
-        },
-        "member-1": {
-          calls: 2,
-          measuredCalls: 1,
-          inputTokens: 1_000,
-          cachedInputTokens: 0,
-          outputTokens: 50,
-          durationMs: 500,
-        },
-        lead: {
-          calls: 1,
-          measuredCalls: 0,
-          inputTokens: 0,
-          cachedInputTokens: 0,
-          outputTokens: 0,
-          durationMs: 2_000,
-        },
-        custom: {
-          calls: 1,
-          measuredCalls: 1,
-          inputTokens: 7,
-          cachedInputTokens: 0,
-          outputTokens: 1,
-          durationMs: 10,
-        },
-      },
-    },
-  });
+  const html = render({ metrics: { ...metrics, byRole } });
   assert.match(html, /<details class="efficiency-roles"><summary>依角色分項（3 類）/);
   const rows = [...html.matchAll(/<tr><th scope="row">([^<]+)<\/th>/g)].map(
     (match) => match[1],
@@ -93,4 +99,73 @@ test("byRole renders a collapsible table with teammates merged and unreported ro
 test("demo and unmeasured runs report no measurement", () => {
   assert.match(render({ metrics, demo: true }), /尚無實測；示範內容未呼叫 AI/);
   assert.match(render({ mode: "off" }), /尚無實測；執行後會顯示/);
+});
+
+test("English renders format tokens, seconds and the usage note", () => {
+  const html = renderEnglish({ metrics });
+  assert.match(html, /aria-label="Team AI usage"/);
+  assert.match(html, /<strong>Team AI usage<\/strong>/);
+  assert.match(html, /Ponytail · Lite/);
+  assert.match(html, /title="Ponytail \d+\.\d+\.\d+ upstream project"/);
+  assert.match(html, /<dt>Input tokens<\/dt><dd>123,456<\/dd>/);
+  assert.match(html, /<dt>Of which cached<\/dt><dd>7,890<\/dd>/);
+  assert.match(html, /<dt>Output tokens<\/dt><dd>1,234<\/dd>/);
+  assert.match(html, /<dt>Total agent time<\/dt><dd>12\.3 s<\/dd>/);
+  assert.match(html, /2 calls · usage reported for 2 of 2\. Cached input/);
+
+  const partial = renderEnglish({
+    metrics: { ...metrics, calls: 1, measuredCalls: 0, completedCalls: 0 },
+    title: "Discovery AI usage",
+  });
+  assert.match(partial, /<strong>Discovery AI usage<\/strong>/);
+  assert.match(partial, /<dd>Not reported<\/dd>/);
+  assert.match(partial, /<dd>Running<\/dd>/);
+  assert.match(partial, /1 call · usage reported for 0 of 1, so the totals/);
+});
+
+test("English role table keeps the order, merges teammates and marks partial reports", () => {
+  const html = renderEnglish({ metrics: { ...metrics, byRole } });
+  assert.match(html, /<summary>By role \(3 groups\)<\/summary>/);
+  const rows = [...html.matchAll(/<tr><th scope="row">([^<]+)<\/th>/g)].map(
+    (match) => match[1],
+  );
+  assert.deepEqual(rows, ["Lead (planning and integration)", "Teammates", "custom"]);
+  assert.match(
+    html,
+    /Lead \(planning and integration\)<\/th><td>1 \(0 reported\)<\/td><td>Not reported<\/td>/,
+  );
+  assert.match(
+    html,
+    /Teammates<\/th><td>3 \(2 reported\)<\/td><td>3,000<\/td><td>500<\/td><td>150<\/td><td>1\.5 s<\/td>/,
+  );
+  assert.match(html, /<th scope="col">Of which cached<\/th>/);
+  const one = renderEnglish({
+    metrics: { ...metrics, byRole: { reviewer: byRole.custom } },
+  });
+  assert.match(one, /<summary>By role \(1 group\)<\/summary>/);
+  assert.match(one, /<th scope="row">Reviewer<\/th><td>1<\/td>/);
+});
+
+test("English sample and unmeasured runs report no measurement", () => {
+  assert.match(
+    renderEnglish({ metrics, demo: true }),
+    /No measurements yet\. The sample did not call AI\./,
+  );
+  const off = renderEnglish({ mode: "off" });
+  assert.match(off, /Ponytail · Off/);
+  assert.match(off, /No measurements yet\. Reported usage and time appear/);
+});
+
+test("groupByRole orders the known roles by id and puts unknown keys last", () => {
+  const rows = groupByRole({
+    zeta: byRole.custom,
+    sync: byRole.custom,
+    alpha: byRole.custom,
+    tester: byRole.custom,
+    "member-3": byRole.custom,
+  });
+  assert.deepEqual(
+    rows.map((row) => row.key),
+    ["member", "tester", "sync", "alpha", "zeta"],
+  );
 });
