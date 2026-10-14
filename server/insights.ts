@@ -598,6 +598,9 @@ function novelRecommendations(
   return added;
 }
 
+/** The only language of the builds that saved analyses without a locale. */
+const legacyAnalysisLocale: Locale = "zh-TW";
+
 /** The services analyzing each data directory's projects (see analysisRunning). */
 const services = new WeakMap<Store, Set<ProjectInsightsService>>();
 
@@ -1133,8 +1136,11 @@ export class ProjectInsightsService {
           409,
         );
       // One analysis keeps one language: more recommendations are written in
-      // the saved analysis's locale, or the request's when the cache predates it.
-      const locale = (more && previous.insights?.locale) || currentLocale();
+      // the saved analysis's locale; an analysis saved without one was
+      // written in zh-TW, the only language of the builds that saved it.
+      const locale = more
+        ? (previous.insights?.locale ?? legacyAnalysisLocale)
+        : currentLocale();
       const requestedCount = more
         ? Math.min(
             projectRecommendationBatchSize,
