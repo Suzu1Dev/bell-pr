@@ -457,6 +457,112 @@ const zhTW: DemoContent = buildDemoContent({
       },
     },
   },
+  prFeedback: {
+    bodies: {
+      review:
+        "謝謝，這個改動很清楚，測試也好讀。合併前還有兩件事：\n\n1. 把 `retry.delay` 改名會讓既有設定失效。請讓 `delay` 再支援一個 minor 版本，並在使用時輸出棄用警告。\n2. 希望補一個重試用盡的測試：超過 `maxRetries` 後，應拋出最後一次的錯誤。",
+      "retry-after":
+        "429 和 503 常會附上 `Retry-After` 標頭。有這個標頭時，等待時間能不能參考它？想另開 issue 後續處理也可以。",
+    },
+    warnings: [
+      "示範回饋：維護者、review 與 CI 檢查都是虛構的，未讀取 GitHub。",
+    ],
+  },
+  extraRecommendations: {
+    "demo-retry-after": {
+      title: "遵守 Retry-After，等伺服器準備好再重試",
+      problem:
+        "遇到 429 或 503 時，伺服器常會送出 Retry-After。client 目前忽略它，重試可能在伺服器準備好之前就送達。",
+      userImpact:
+        "被限流的頁面能在時機正確的那次重試就恢復，不浪費重試次數；伺服器也得到它要求的緩衝時間。",
+      approach:
+        "從 HttpError 的回應讀取 Retry-After，作為最短等待時間，並仍以 maxDelay 封頂。",
+      acceptance: [
+        "帶有 Retry-After: 2 的 503 至少等待 2 秒。",
+        "即使標頭要求更久，等待也不超過 maxDelay。",
+        "沒有這個標頭的回應，維持現有的退避方式。",
+      ],
+    },
+    "demo-retry-cancel": {
+      title: "使用者離開頁面時，停止重試",
+      problem:
+        "withRetry 無法取消。需要資料的頁面關閉後，請求仍會繼續等待與重試。",
+      userImpact:
+        "離開頁面就停止背景請求，過期的資料不會再出現，也不浪費網路流量。",
+      approach:
+        "接受 AbortSignal 並傳給 fetch；訊號中止時，立即結束兩次嘗試之間的等待。",
+      acceptance: [
+        "在等待期間中止，會立即停止後續嘗試。",
+        "呼叫端收到 AbortError，而不是最後一次的 HTTP 錯誤。",
+        "沒有傳入訊號的請求，行為維持不變。",
+      ],
+    },
+    "demo-validate-options": {
+      title: "拒絕不合理的重試設定",
+      problem:
+        "withRetry 接受任何數字。負數的 maxRetries 會默默停用重試；NaN 永遠到不了上限，會一直重試下去。",
+      userImpact:
+        "設定打錯時會立刻以清楚的訊息失敗，而不是在正式環境卡住，或丟出難以理解的錯誤。",
+      approach:
+        "在第一次嘗試前檢查 maxRetries、baseDelay 與 maxDelay，並丟出指出錯誤選項的 RangeError。",
+      acceptance: [
+        "maxRetries 必須是 0 以上的整數。",
+        "baseDelay 與 maxDelay 必須是有限且非負的數字。",
+        "錯誤訊息指出選項名稱與它的值。",
+      ],
+    },
+    "demo-delay-deprecation": {
+      title: "讓舊的 delay 設定再支援一個版本",
+      problem:
+        "把 delay 改名為 baseDelay，會默默丟掉既有設定；升級的人會在沒有任何提示下改用預設等待時間。",
+      userImpact:
+        "團隊可以依自己的時程升級：舊設定照常運作，警告會告訴他們要改什麼。",
+      approach:
+        "把 retry.delay 當作 baseDelay 的棄用別名，只輸出一次警告，並在 README 註明預計移除的版本。",
+      acceptance: [
+        "retry.delay 仍會設定第一次的等待上限。",
+        "每個 client 只輸出一次棄用警告。",
+        "型別把 delay 標記為 @deprecated。",
+      ],
+    },
+    "demo-client-status-tests": {
+      title: "測試 client 會重試哪些 HTTP 狀態碼",
+      problem:
+        "目前的測試只涵蓋 withRetry 本身，沒有檢查 client 會重試 503、遇到 404 則立即停止。",
+      userImpact:
+        "日後修改狀態碼清單時，不會默默開始重試使用者造成的錯誤，也不會不再重試服務中斷。",
+      approach:
+        "用一連串預先安排的回應取代 fetch，針對每一類狀態碼檢查呼叫次數。",
+      acceptance: [
+        "503 之後回傳 200，第二次呼叫就拿到資料。",
+        "404 在一次呼叫後拋出 HttpError。",
+        "網路錯誤造成的 TypeError 會重試。",
+      ],
+    },
+  },
+  rerunReport: {
+    reviewer:
+      "示範 · 重新審查（預寫內容）\n\n重新閱讀目前的差異：仍是同樣 5 個檔案，第一次審查後沒有新的修改。\n\n**仍待處理**：`retry.delay` 依然會被靜默忽略，`maxRetries` 也仍未驗證；這兩項應優先處理。\n\n**已確認**：每次等待都不會超過 `maxDelay`，`HttpError` 也為呼叫端保留完整的 `Response`。\n\n**本次新發現**：`src/client.ts` 把 `shouldRetry` 放在 `...options.retry` 之後，呼叫端無法覆寫狀態碼判斷；這與 `ClientOptions` 的 `retry` 排除 `shouldRetry` 一致。\n\n本審查為靜態閱讀 diff，未執行程式碼。",
+    tester:
+      "示範 · 重新測試分析（預寫內容）\n\n仍是先前的兩個案例；第一次分析之後沒有新增測試。\n\n最值得先補的測試：讓 operation 每次都失敗，檢查它執行 `maxRetries + 1` 次並拋出最後一次的錯誤。這也能及早發現永遠停不下來的 `maxRetries` 設定。\n\n仍缺少：固定 `Math.random` 後檢查 `maxDelay` 上限，以及 client 會重試 503、遇到 404 只呼叫一次的測試。\n\n本分析未執行測試，以上皆為靜態閱讀。",
+  },
+  importSteps: [
+    "正在複製 openfetch-sample/open-fetch…",
+    "正在切換到 main 分支…",
+    "正在讀取 repository…",
+    "正在列出追蹤中的檔案…",
+  ],
+  analysisSteps: [
+    "正在閱讀 README 與主要模組…",
+    "正在了解大家怎麼使用它…",
+    "正在追蹤一次請求經過 client 的路徑…",
+    "正在尋找你能幫上忙的地方…",
+    "正在對照程式碼核對每個建議…",
+  ],
+  publishedCard: {
+    title: "已開啟 Draft PR",
+    note: "示範：未在 GitHub 上建立",
+  },
 });
 
 export default zhTW;

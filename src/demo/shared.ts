@@ -5,8 +5,13 @@
  * as a DemoCopy, and buildDemoContent() joins the two, so every locale shares
  * the same ids, paths and times.
  */
+import type { ContributionRecommendation } from "../../shared/insights";
 import type { DiffFile, Repo } from "../types";
-import type { DemoContent, DemoCopy } from "./types";
+import type {
+  DemoContent,
+  DemoCopy,
+  DemoRecommendationCopy,
+} from "./types";
 
 export const repo: Repo = {
   id: "demo-repo",
@@ -295,6 +300,47 @@ export type DemoEvidencePath = (typeof insights.evidence)[number];
 export type DemoRecommendationId =
   (typeof insights.recommendations)[number]["id"];
 
+/** The five recommendations that "Generate 5 more" adds in the demo. */
+export const extraRecommendations = [
+  {
+    id: "demo-retry-after",
+    direction: "feature",
+    effort: "medium",
+    confidence: "high",
+    evidence: ["src/client.ts", "src/utils/retry.ts"],
+  },
+  {
+    id: "demo-retry-cancel",
+    direction: "ux",
+    effort: "medium",
+    confidence: "medium",
+    evidence: ["src/utils/retry.ts", "src/client.ts"],
+  },
+  {
+    id: "demo-validate-options",
+    direction: "bugfix",
+    effort: "small",
+    confidence: "high",
+    evidence: ["src/utils/retry.ts", "src/types.ts"],
+  },
+  {
+    id: "demo-delay-deprecation",
+    direction: "maintenance",
+    effort: "small",
+    confidence: "medium",
+    evidence: ["src/types.ts", "src/client.ts", "README.md"],
+  },
+  {
+    id: "demo-client-status-tests",
+    direction: "testing",
+    effort: "small",
+    confidence: "high",
+    evidence: ["src/client.ts", "tests/retry.test.ts"],
+  },
+] as const;
+export type DemoExtraRecommendationId =
+  (typeof extraRecommendations)[number]["id"];
+
 export const team = {
   config: {
     maxTeammates: 3,
@@ -385,6 +431,44 @@ export const draftPreparation = {
 } as const;
 export type DemoDraftSourceId =
   (typeof draftPreparation.sources)[number]["id"];
+
+/**
+ * Sample maintainer feedback on the demo's published Draft PR (prUrl
+ * '#demo-pr'): one review that asks for changes, one comment on a diff line
+ * and one CI check. The maintainer is fictional: the login has an underscore,
+ * which personal GitHub accounts cannot use. Each url is a fragment that names
+ * its item, unique as the feedback list's keys need, and never a link to
+ * GitHub. `line` counts lines of the new file, as GitHub does.
+ */
+export const prFeedback = {
+  prNumber: 128,
+  fetchedAt: "2026-10-05T02:15:00.000Z",
+  checksState: "SUCCESS",
+  checks: [{ name: "ci / test (node 22)", state: "SUCCESS" }],
+  items: [
+    {
+      id: "review",
+      kind: "review",
+      author: "sample_maintainer",
+      authorAssociation: "MEMBER",
+      state: "CHANGES_REQUESTED",
+      url: "#demo-pr-review-1",
+      createdAt: "2026-10-04T08:20:00.000Z",
+    },
+    {
+      id: "retry-after",
+      kind: "thread",
+      author: "sample_maintainer",
+      authorAssociation: "MEMBER",
+      path: "src/client.ts",
+      line: 20,
+      isResolved: false,
+      url: "#demo-pr-thread-1",
+      createdAt: "2026-10-04T08:20:00.000Z",
+    },
+  ],
+} as const;
+export type DemoFeedbackItemId = (typeof prFeedback.items)[number]["id"];
 
 /**
  * The sample discovery job: fictional repositories, issues and quotes that
@@ -562,6 +646,28 @@ export const sampleDiscovery = {
 export type DemoOpportunityId =
   (typeof sampleDiscovery.opportunities)[number]["id"];
 
+/** One recommendation: its structure from this file, its copy from a locale. */
+function recommendation(
+  structure: (
+    | typeof insights.recommendations
+    | typeof extraRecommendations
+  )[number],
+  text: DemoRecommendationCopy,
+): ContributionRecommendation {
+  return {
+    id: structure.id,
+    title: text.title,
+    direction: structure.direction,
+    problem: text.problem,
+    userImpact: text.userImpact,
+    approach: text.approach,
+    acceptance: text.acceptance,
+    effort: structure.effort,
+    confidence: structure.confidence,
+    evidence: [...structure.evidence],
+  };
+}
+
 /** Joins the shared structure with one locale's copy. */
 export function buildDemoContent(copy: DemoCopy): DemoContent {
   return {
@@ -614,21 +720,9 @@ export function buildDemoContent(copy: DemoCopy): DemoContent {
         path,
         note: copy.insights.evidence[path],
       })),
-      recommendations: insights.recommendations.map((recommendation) => {
-        const text = copy.insights.recommendations[recommendation.id];
-        return {
-          id: recommendation.id,
-          title: text.title,
-          direction: recommendation.direction,
-          problem: text.problem,
-          userImpact: text.userImpact,
-          approach: text.approach,
-          acceptance: text.acceptance,
-          effort: recommendation.effort,
-          confidence: recommendation.confidence,
-          evidence: [...recommendation.evidence],
-        };
-      }),
+      recommendations: insights.recommendations.map((structure) =>
+        recommendation(structure, copy.insights.recommendations[structure.id]),
+      ),
       generatedAt: insights.generatedAt,
       source: insights.source,
       baseSha: insights.baseSha,
@@ -701,5 +795,23 @@ export function buildDemoContent(copy: DemoCopy): DemoContent {
     },
     answers: copy.answers,
     discovery: copy.discovery,
+    prFeedback: {
+      fetchedAt: prFeedback.fetchedAt,
+      prNumber: prFeedback.prNumber,
+      items: prFeedback.items.map(({ id, ...item }) => ({
+        ...item,
+        body: copy.prFeedback.bodies[id],
+      })),
+      checksState: prFeedback.checksState,
+      checks: prFeedback.checks.map((check) => ({ ...check })),
+      warnings: [...copy.prFeedback.warnings],
+    },
+    extraRecommendations: extraRecommendations.map((structure) =>
+      recommendation(structure, copy.extraRecommendations[structure.id]),
+    ),
+    rerunReport: { ...copy.rerunReport },
+    importSteps: [...copy.importSteps],
+    analysisSteps: [...copy.analysisSteps],
+    publishedCard: { ...copy.publishedCard },
   };
 }

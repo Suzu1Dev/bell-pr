@@ -12,6 +12,8 @@ import type {
   DemoAgentId,
   DemoDraftSourceId,
   DemoEvidencePath,
+  DemoExtraRecommendationId,
+  DemoFeedbackItemId,
   DemoFilePath,
   DemoLogKey,
   DemoMessageId,
@@ -65,6 +67,19 @@ export interface DemoDiscoveryCopy {
   opportunities: Record<DemoOpportunityId, DemoOpportunityCopy>;
 }
 
+/** The copy of one recommendation; its structure is in shared.ts. */
+export type DemoRecommendationCopy = Pick<
+  ContributionRecommendation,
+  "title" | "problem" | "userImpact" | "approach" | "acceptance"
+>;
+
+/** The card the demo shows once its sample Draft PR is "published". */
+export interface DemoPublishedCard {
+  title: string;
+  /** Says that nothing was created on GitHub. */
+  note: string;
+}
+
 /** Everything the demo shows, in one locale. */
 export interface DemoContent {
   repo: Repo;
@@ -78,13 +93,23 @@ export interface DemoContent {
   answers: DemoAnswer[];
   /** The copy of the sample discovery job; see discovery.ts. */
   discovery: DemoDiscoveryCopy;
-  // The samples below are optional until they are written.
-  /** Sample maintainer feedback and CI checks on the demo's published PR. */
+  // The samples below are optional in the type; every locale fills them.
+  /**
+   * Sample maintainer feedback and one CI check on the demo's published PR.
+   * The maintainer is fictional and each item's url is a fragment, unique per
+   * item, never a GitHub link.
+   */
   prFeedback?: PrFeedback;
   /** The sample recommendations that "Generate 5 more" adds in the demo. */
   extraRecommendations?: ContributionRecommendation[];
   /** The review reports after a demo re-run, keyed as in Run.reports. */
   rerunReport?: Record<string, string>;
+  /** Clone progress lines for the sample import, in order. */
+  importSteps?: string[];
+  /** Loading lines for the sample analysis, in order. */
+  analysisSteps?: string[];
+  /** The card shown once the sample Draft PR is published. */
+  publishedCard?: DemoPublishedCard;
 }
 
 /**
@@ -111,13 +136,7 @@ export interface DemoCopy {
     readingPath: Record<DemoReadingPath, { why: string; lookFor: string }>;
     howItFitsTogether: string;
     evidence: Record<DemoEvidencePath, string>;
-    recommendations: Record<
-      DemoRecommendationId,
-      Pick<
-        ContributionRecommendation,
-        "title" | "problem" | "userImpact" | "approach" | "acceptance"
-      >
-    >;
+    recommendations: Record<DemoRecommendationId, DemoRecommendationCopy>;
   };
   contributionBrief: ContributionBrief;
   team: {
@@ -143,4 +162,20 @@ export interface DemoCopy {
   };
   answers: DemoAnswer[];
   discovery: DemoDiscoveryCopy;
+  prFeedback: {
+    /** The text of each feedback item, keyed by its id in shared.ts. */
+    bodies: Record<DemoFeedbackItemId, string>;
+    /** Shown above the feedback; says that it is a fictional sample. */
+    warnings: string[];
+  };
+  extraRecommendations: Record<
+    DemoExtraRecommendationId,
+    DemoRecommendationCopy
+  >;
+  /** The reports a review re-run replaces, keyed as in Run.reports. */
+  rerunReport: Record<"reviewer" | "tester", string>;
+  // Fixed lengths, so every locale plays the same number of steps.
+  importSteps: [string, string, string, string];
+  analysisSteps: [string, string, string, string, string];
+  publishedCard: DemoPublishedCard;
 }

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatters, intlLocale, locales } from "../../shared/i18n/locale";
+import {
+  formatters,
+  intlLocale,
+  locales,
+  type Locale,
+} from "../../shared/i18n/locale";
+import { parseReviewOrder } from "../../shared/review-order";
 import { demoDraftPreparation as panelDraftPreparation } from "../draft/DraftGuidancePanel";
 import {
   demoContributionBrief as missionBrief,
@@ -28,10 +34,13 @@ import {
 // only: getSampleDiscoveryJob() takes its structure from shared.ts.
 const structuralKeys = new Set([
   "agent",
+  "author",
+  "authorAssociation",
   "baseBranch",
   "baseSha",
   "branch",
   "checkedAt",
+  "checksState",
   "command",
   "confidence",
   "createdAt",
@@ -41,6 +50,7 @@ const structuralKeys = new Set([
   "direction",
   "effort",
   "evidence",
+  "fetchedAt",
   "files",
   "fingerprint",
   "from",
@@ -66,6 +76,7 @@ const structuralKeys = new Set([
   "source",
   "sourceId",
   "sources",
+  "state",
   "status",
   "templateSourceId",
   "time",
@@ -104,12 +115,18 @@ function timestamps(value: unknown, where = ""): [string, unknown][] {
   );
 }
 
-const answerText = (topic: DemoAnswerTopic, file: DiffFile) => {
-  const answer = getDemo("zh-TW").answers.find((item) => item.topic === topic);
-  assert.ok(answer, `zh-TW has a ${topic} answer`);
+const answerText = (
+  topic: DemoAnswerTopic,
+  file: DiffFile,
+  locale: Locale = "zh-TW",
+) => {
+  const answer = getDemo(locale).answers.find((item) => item.topic === topic);
+  assert.ok(answer, `${locale} has a ${topic} answer`);
   return answer.text({ file });
 };
 
+// Every field, the Pro and video samples included: the structure test below
+// would also pass if both locales left an optional sample out.
 test("every locale has the same demo structure: ids, paths, times and array lengths", () => {
   const reference = structure(getDemo("zh-TW"));
   for (const locale of locales)
@@ -181,8 +198,9 @@ test("no fixture timestamp parses to an invalid Date", () => {
       ...timestamps(getSampleDiscoveryJob(locale), "discovery"),
     ];
     // run.createdAt, three log times, generatedAt, two messages, checkedAt,
-    // and the discovery job's two times and three pushedAt dates.
-    assert.ok(found.length >= 13, `${locale}: ${found.length} timestamps`);
+    // the PR feedback's fetchedAt and two items, and the discovery job's two
+    // times and three pushedAt dates.
+    assert.ok(found.length >= 16, `${locale}: ${found.length} timestamps`);
     for (const [where, value] of found) {
       assert.equal(typeof value, "string", `${locale} ${where}`);
       assert.ok(
@@ -331,4 +349,122 @@ test("the sample repositories are fictional and link nowhere", () => {
   const again = getSampleDiscoveryJob("zh-TW");
   assert.ok(again.candidates[0].sources.length > 0);
   assert.ok(!again.opportunities[0].firstSteps.includes("changed"));
+});
+
+test("every locale fills the Pro and video samples with the same ids and lengths", () => {
+  const [reference, ...others] = locales.map((locale) => {
+    const demo = getDemo(locale);
+    const { prFeedback, extraRecommendations, rerunReport } = demo;
+    const { importSteps, analysisSteps, publishedCard } = demo;
+    assert.ok(prFeedback, `${locale} prFeedback`);
+    assert.ok(extraRecommendations, `${locale} extraRecommendations`);
+    assert.ok(rerunReport, `${locale} rerunReport`);
+    assert.ok(importSteps && analysisSteps, `${locale} playback steps`);
+    assert.ok(publishedCard, `${locale} publishedCard`);
+    const filled = (text: string | undefined) => Boolean(text?.trim());
+    assert.ok(prFeedback.items.every((item) => filled(item.body)), locale);
+    assert.ok(prFeedback.items.some((item) => item.kind === "review"), locale);
+    assert.equal(prFeedback.checks?.length, 1, `${locale} one CI check`);
+    assert.ok(prFeedback.warnings?.every(filled), locale);
+    assert.equal(extraRecommendations.length, 5, locale);
+    const ids = [...demo.insights.recommendations, ...extraRecommendations].map(
+      (recommendation) => recommendation.id,
+    );
+    assert.equal(new Set(ids).size, ids.length, `${locale} unique ids`);
+    assert.deepEqual(Object.keys(rerunReport).sort(), ["reviewer", "tester"]);
+    assert.ok(Object.values(rerunReport).every(filled), locale);
+    assert.ok([...importSteps, ...analysisSteps].every(filled), locale);
+    assert.ok(filled(publishedCard.title) && filled(publishedCard.note), locale);
+    return {
+      feedback: prFeedback.items.map((item) => item.url),
+      checks: prFeedback.checks?.map((check) => check.name),
+      warnings: prFeedback.warnings?.length,
+      extra: extraRecommendations.map((item) => [item.id, item.acceptance.length]),
+      rerun: Object.keys(rerunReport),
+      importSteps: importSteps.length,
+      analysisSteps: analysisSteps.length,
+    };
+  });
+  for (const other of others) assert.deepEqual(other, reference);
+});
+
+test("the Lead's report keeps the machine-read review order in every locale", () => {
+  for (const locale of locales) {
+    const { run, files } = getDemo(locale);
+    const order = parseReviewOrder(run.reports?.implementer ?? "");
+    assert.deepEqual(
+      order.map((entry) => entry.path),
+      ["src/types.ts", "src/utils/retry.ts", "src/client.ts", "tests/retry.test.ts", "README.md"],
+      locale,
+    );
+    assert.deepEqual(
+      order.map((entry) => entry.path).sort(),
+      files.map((file) => file.path).sort(),
+    );
+    assert.ok(order.every((entry) => entry.reason), locale);
+  }
+});
+
+test("every recommendation cites files from the demo diff", () => {
+  for (const locale of locales) {
+    const demo = getDemo(locale);
+    const paths = demo.files.map((file) => file.path);
+    for (const recommendation of [
+      ...demo.insights.recommendations,
+      ...(demo.extraRecommendations ?? []),
+    ]) {
+      assert.ok(recommendation.evidence.length, recommendation.id);
+      for (const path of recommendation.evidence)
+        assert.ok(paths.includes(path), `${recommendation.id}: ${path}`);
+      assert.ok(recommendation.acceptance.length, recommendation.id);
+    }
+  }
+});
+
+test("every draft rule quotes its sample source word for word", () => {
+  for (const locale of locales) {
+    const { context, proposal } = getDemo(locale).draftPreparation;
+    assert.ok(context && proposal, locale);
+    for (const rule of proposal.rules) {
+      const source = context.sources.find((item) => item.id === rule.sourceId);
+      assert.ok(source, rule.sourceId);
+      assert.ok(source.content.includes(rule.quote), `${locale}: ${rule.quote}`);
+    }
+  }
+});
+
+/** The text of each new-file line of a demo patch, by line number. */
+function newFileLines(file: DiffFile) {
+  const lines = (file.patch ?? "").split("\n");
+  const body = lines.slice(lines.findIndex((line) => line.startsWith("@@")) + 1);
+  return body
+    .filter((line) => line !== "" && !line.startsWith("-"))
+    .map((line) => line.slice(1));
+}
+
+test("the sample PR feedback is fictional and points at the demo diff", () => {
+  for (const locale of locales) {
+    const { prFeedback, files, draftPreparation } = getDemo(locale);
+    assert.ok(prFeedback, locale);
+    const urls = prFeedback.items.map((item) => item.url);
+    assert.equal(new Set(urls).size, urls.length, "urls identify the items");
+    for (const item of prFeedback.items) {
+      // Never a link to GitHub, and never a login that could exist there.
+      assert.match(item.url, /^#demo-pr-/);
+      assert.match(item.author, /_/);
+      if (item.kind !== "thread") continue;
+      const file = files.find((entry) => entry.path === item.path);
+      assert.ok(file && item.line, `${item.path}:${item.line}`);
+      // The comment is about Retry-After on 429 and 503, so it sits on the
+      // line that lists the retryable status codes.
+      assert.match(newFileLines(file)[item.line - 1] ?? "", /429.*503/);
+    }
+    for (const check of prFeedback.checks ?? []) assert.equal(check.url, undefined);
+    const drafted = Date.parse(draftPreparation.context?.checkedAt ?? "");
+    const fetched = Date.parse(prFeedback.fetchedAt);
+    for (const item of prFeedback.items) {
+      const created = Date.parse(item.createdAt);
+      assert.ok(drafted < created && created <= fetched, item.createdAt);
+    }
+  }
 });
