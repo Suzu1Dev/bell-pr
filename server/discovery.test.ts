@@ -764,7 +764,10 @@ test("an initial persistence failure leaves a failed job rather than a permanent
   const f = await fixture();
   try {
     await f.service.get();
-    await mkdir(path.join(f.directory, "discovery.json.tmp"));
+    // A directory in place of the job file makes the durable write fail.
+    await mkdir(path.join(f.directory, "discovery.json", "blocked"), {
+      recursive: true,
+    });
     await assert.rejects(f.service.start({}), /無法儲存/);
     const { job } = await f.service.get();
     assert.equal(job?.status, "failed");

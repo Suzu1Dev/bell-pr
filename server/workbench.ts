@@ -25,7 +25,13 @@ import { agentLoginCheck, type TransientSleep } from "./agent-cli.js";
 import type { AgentProvider } from "../shared/models.js";
 import { proEntitlements, type Entitlements } from "../shared/plans.js";
 import { synchronizeExplanations } from "./explanations.js";
-import { currentLocale, sm } from "./i18n/index.js";
+import { currentLocale, sm, withLocale } from "./i18n/index.js";
+import { parseLocale, type Locale } from "../shared/i18n/locale.js";
+import { initLog, log } from "./log.js";
+import { logged, logRunQueued } from "./run-events.js";
+import { activeFollowUp } from "../shared/followups.js";
+import * as cleanup from "./cleanup.js";
+import { runJanitor } from "./janitor.js";
 
 import { collectDraftContext } from "./draft-sources.js";
 import { synchronizeDraftPreparation } from "./drafts.js";
@@ -40,6 +46,10 @@ import * as followUps from "./followup-runs.js";
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
+/** The only language of the builds that saved runs without a locale (as in git.ts readDiff). */
+const legacyRunLocale: Locale = "zh-TW";
+/** How often the retention period is applied while the server runs. */
+const retentionIntervalMs = 24 * 60 * 60 * 1000;
 
 /**
  * What the modules that do the Workbench's work receive instead of the
@@ -143,6 +153,9 @@ export class Workbench {
    */
   readonly entitlements: () => Entitlements;
   private readonly context: WorkbenchContext;
+  /** The startup janitor, then the first retention pass; never rejects. */
+  readonly maintenance: Promise<void>;
+  private retentionTimer?: NodeJS.Timeout;
   constructor(
     public store: Store,
     agentRunner?: TeamAgentRunner,
@@ -201,6 +214,82 @@ export class Workbench {
       explanations: (id) => this.explanations(id),
       prepareRunDraft: (id, options) => this.prepareRunDraft(id, options),
     };
+    // Server logs go to the data directory from here on (see log.ts).
+    initLog(store.directory);
+    const startedAt = Date.now();
+    this.maintenance = this.startMaintenance(startedAt);
+    this.retentionTimer = setInterval(() => {
+      void this.applyRetention();
+    }, retentionIntervalMs);
+    this.retentionTimer.unref();
+    this.resume();
+  }
+
+  /**
+   * Removes crash leftovers (janitor.ts), then frees the files of runs
+   * past the retention period. Entries newer than `startedAt` are kept.
+   */
+  private async startMaintenance(startedAt: number) {
+    try {
+      await runJanitor(this.context, { startedAt });
+      await this.applyRetention();
+    } catch (error) {
+      log.warn("maintenance.failed", { error });
+    }
+  }
+
+  /**
+   * Queues again, oldest first, the runs a restart left queued before they
+   * started (Store keeps them queued). Runs beyond the queue capacity, or
+   * whose project is gone, fail with the reason and can be retried.
+   */
+  resume() {
+    const queued = this.store.data.runs
+      .filter((run) => run.status === "queued" && !this.queue.includes(run.id))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    if (!queued.length) return;
+    let used = this.store.data.runs.filter((run) =>
+      ["running", "awaiting_plan"].includes(run.status),
+    ).length;
+    let failed = false;
+    for (const run of queued) {
+      const full = used >= this.maxQueuedRuns;
+      const orphaned = !this.store.data.repos.some((repo) => repo.id === run.repoId);
+      if (full || orphaned) {
+        run.status = "failed";
+        run.error = withRunLocale(run, () =>
+          orphaned
+            ? sm().run.repos.notFound
+            : sm().run.queue.full({ max: this.maxQueuedRuns }),
+        );
+        if (run.team) run.team.phase = "failed";
+        failed = true;
+        log.warn("run.not_resumed", {
+          runId: run.id,
+          reason: orphaned ? "repository_missing" : "queue_full",
+        });
+        continue;
+      }
+      used++;
+      withRunLocale(run, () =>
+        this.log(run, "system", sm().storage.recovery.resumed),
+      );
+      logRunQueued(run, "resumed");
+      this.queue.push(run.id);
+    }
+    if (failed) void this.store.save().catch(() => undefined);
+    this.drain();
+  }
+
+  /** Frees the files of finished runs past the retention period (cleanup.ts). */
+  async applyRetention() {
+    if (this.stopping) return [];
+    try {
+      return await cleanup.applyRetention(this.context);
+    } catch (error) {
+      log.warn("retention.failed", { error });
+      return [];
+    }
   }
 
   /** Queued, running and paused runs together; grows with the active limit. */
@@ -371,6 +460,7 @@ export class Workbench {
     };
     this.store.data.runs.unshift(run);
     await this.store.save();
+    logRunQueued(run, "created");
     this.queue.push(id);
     this.drain();
     return run;
@@ -402,14 +492,7 @@ export class Workbench {
         executor.executeRun(this.context, id),
       )
         .catch((error) => {
-          console.error(
-            `[BELL-PR] run ${id} could not persist final state:`,
-            redact(
-              error instanceof Error
-                ? (error.stack ?? error.message)
-                : String(error),
-            ),
-          );
+          log.error("run.persist_failed", { runId: id, error });
         })
         .finally(() => {
           this.active--;
@@ -466,6 +549,7 @@ export class Workbench {
       run.status = "queued";
       this.log(run, "user", sm().run.queue.planApproved);
       await this.store.save();
+      logRunQueued(run, "plan_approved");
       this.queue.push(id);
       this.drain();
       return run;
@@ -520,6 +604,7 @@ export class Workbench {
         }),
       );
       await this.store.save();
+      logRunQueued(run, "plan_revised");
       this.queue.push(id);
       this.drain();
       return run;
@@ -564,9 +649,14 @@ export class Workbench {
 
   async diff(id: string) {
     const run = this.run(id);
+    cleanup.assertWorkspacePresent(run);
     const files = await readDiff(run);
-    synchronizeExplanations(run, files);
-    synchronizeDraftPreparation(run, files);
+    // Text saved on the run is worded in the run's language, never the
+    // viewer's; runs saved without a locale were written in zh-TW.
+    withLocale(parseLocale(run.locale) ?? legacyRunLocale, () => {
+      synchronizeExplanations(run, files);
+      synchronizeDraftPreparation(run, files);
+    });
     if (run.status !== "published") {
       synchronizeReview(run, files);
     }
@@ -634,14 +724,17 @@ export class Workbench {
 
   /** Moves a run onto the latest commit of its target branch (see sync-runs.ts). */
   async syncRun(id: string) {
+    cleanup.assertWorkspacePresent(this.run(id));
     return syncing.syncRun(this.context, id);
   }
 
   async undoSync(id: string) {
+    cleanup.assertWorkspacePresent(this.run(id));
     return syncing.undoSync(this.context, id);
   }
 
   async resolveConflicts(id: string) {
+    cleanup.assertWorkspacePresent(this.run(id));
     return syncing.resolveConflicts(this.context, id);
   }
 
@@ -650,35 +743,70 @@ export class Workbench {
     id: string,
     input: { feedbackUrls: string[]; note?: string },
   ) {
+    cleanup.assertWorkspacePresent(this.run(id));
     return followUps.startFollowUp(this.context, id, input);
   }
 
   async discardFollowUp(id: string) {
-    return followUps.discardFollowUp(this.context, id);
+    return logged("round.discard", { runId: id }, () =>
+      followUps.discardFollowUp(this.context, id),
+    );
   }
 
+  /** Publishes the first commit and PR, or pushes an open round (publish.ts). */
   async publish(
     id: string,
     displayedFingerprint: string,
     acknowledged: string[] = [],
   ) {
-    return publishing.publish(
-      this.context,
-      id,
-      displayedFingerprint,
-      acknowledged,
+    const round = activeFollowUp(this.run(id).followUps);
+    return logged(
+      "publish",
+      { runId: id, ...(round ? { round: round.id } : {}) },
+      () =>
+        publishing.publish(
+          this.context,
+          id,
+          displayedFingerprint,
+          acknowledged,
+        ),
     );
+  }
+
+  /** Frees a finished run's working files; the run and its notes stay. */
+  async removeWorkspace(id: string) {
+    return cleanup.archiveRunWorkspace(this.context, this.run(id));
+  }
+
+  async removeRun(id: string) {
+    return cleanup.removeRun(this.context, id);
+  }
+
+  async removeRepository(id: string) {
+    return cleanup.removeRepository(this.context, id);
+  }
+
+  async eraseAll(confirm: unknown) {
+    return cleanup.eraseAll(this.context, confirm);
+  }
+
+  /** Disk use per project and run (cleanup.ts), cached for a minute. */
+  async storage() {
+    return cleanup.storageReport(this.context);
   }
 
   async shutdown() {
     this.stopping = true;
+    clearInterval(this.retentionTimer);
+    // A run that never started stays queued and starts again on the next
+    // start (resume); one that already has a worktree is cancelled.
     for (const id of this.queue) {
       const run = this.run(id);
-      if (run.status === "queued") run.status = "cancelled";
+      if (run.status === "queued" && run.baseSha) run.status = "cancelled";
     }
     this.queue = [];
     for (const controller of this.controllers.values()) controller.abort();
-    await Promise.allSettled([...this.jobs]);
+    await Promise.allSettled([...this.jobs, this.maintenance]);
     await this.store.save();
   }
 }

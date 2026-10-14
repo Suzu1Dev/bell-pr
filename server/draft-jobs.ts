@@ -19,6 +19,7 @@ import { AppError, type Run } from "./types.js";
 import { activeFollowUp } from "../shared/followups.js";
 import { editable } from "./publish.js";
 import { runAgent } from "./run-executor.js";
+import { parseAgentOutput } from "./run-events.js";
 import type { WorkbenchContext } from "./workbench.js";
 import { shuttingDown, sm } from "./i18n/index.js";
 
@@ -126,7 +127,10 @@ async function generateDraft(
       true,
       { cwd: temporary, outputSchema, isolated: true, timeout: "draft" },
     );
-    const proposal = parseDraftProposal(answer, preparation.context);
+    const context = preparation.context;
+    const proposal = parseAgentOutput(run, "draft", () =>
+      parseDraftProposal(answer, context),
+    );
     await ctx.lock(run.id, async () => {
       const currentFiles = await readDiff(run);
       if (fingerprint !== draftFingerprint(run, currentFiles)) {

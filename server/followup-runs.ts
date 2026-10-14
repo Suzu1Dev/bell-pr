@@ -27,6 +27,7 @@ import { runAgent } from "./run-executor.js";
 import { contributionContext } from "./prompts/team.js";
 import { followUpPrompt } from "./prompts/followups.js";
 import { log } from "./log.js";
+import { parseAgentOutput } from "./run-events.js";
 import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
 import type { WorkbenchContext } from "./workbench.js";
 
@@ -161,6 +162,8 @@ async function runFollowUp(
   const checks: TeamCheck[] = [];
   const roundNumber = (run.followUps?.indexOf(round) ?? 0) + 1;
   let succeeded = false;
+  const started = Date.now();
+  log.info("round.started", { runId: run.id, round: round.id });
   try {
     const files = await readDiff(run);
     temporary = await mkdtemp(path.join(os.tmpdir(), "bell-followup-"));
@@ -200,7 +203,9 @@ async function runFollowUp(
       false,
       { outputSchema, checks },
     );
-    const result = parseFollowUpResult(answer, round.feedbackUrls);
+    const result = parseAgentOutput(run, "follow-up", () =>
+      parseFollowUpResult(answer, round.feedbackUrls),
+    );
     await ctx.lock(run.id, async () => {
       round.report = result.summary;
       round.addressed = result.addressed;
@@ -272,6 +277,15 @@ async function runFollowUp(
     if (ctx.controllers.get(run.id) === controller)
       ctx.controllers.delete(run.id);
     if (temporary) await rm(temporary, { recursive: true, force: true });
+    (succeeded ? log.info : log.warn)(
+      succeeded ? "round.finished" : "round.failed",
+      {
+        runId: run.id,
+        round: round.id,
+        status: round.status,
+        durationMs: Date.now() - started,
+      },
+    );
     await ctx.store.save();
   }
 }

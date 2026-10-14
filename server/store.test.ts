@@ -1,7 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { defaultContributionSettings } from "../shared/insights.js";
@@ -292,8 +300,9 @@ test("an interrupted conflict resolution or follow-up round is explained in the 
 });
 
 test("a run's locale, and fields a newer build adds, survive a load and save", async (t) => {
-  // state.json has no read schema: a build that predates `locale` reads the
-  // file as plain JSON and writes it back field for field, as this one does.
+  // state.json is read through a passthrough schema: a build that predates
+  // `locale` keeps the field (and any other it does not know) and writes it
+  // back field for field, as this one does.
   const run = {
     ...interruptedRun(),
     status: "review",
@@ -489,4 +498,151 @@ test("既有 insights 快取檔可由 ProjectInsightsService 讀取", async (t) 
     order: ["greeting-tests"],
     hidden: [],
   });
+});
+
+test("each Store rotates state.json into three backups on its first save and writes compact JSON", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const statePath = path.join(directory, "state.json");
+  const generations: string[] = [];
+  for (let start = 0; start < 5; start++) {
+    const store = new Store(directory);
+    await store.initialize();
+    store.data.repos = [{ ...repository, name: `generation-${start}` }];
+    await store.save();
+    // Later saves of the same Store do not rotate again.
+    await store.save();
+    generations.push(await readFile(statePath, "utf8"));
+  }
+  const names = (await readdir(directory)).sort();
+  assert.deepEqual(
+    names.filter((name) => name.startsWith("state.json")),
+    ["state.json", "state.json.bak.1", "state.json.bak.2", "state.json.bak.3"],
+  );
+  // bak.1 is the state the newest Store found when it started.
+  assert.equal(await readFile(`${statePath}.bak.1`, "utf8"), generations[3]);
+  assert.equal(await readFile(`${statePath}.bak.2`, "utf8"), generations[2]);
+  assert.equal(await readFile(`${statePath}.bak.3`, "utf8"), generations[1]);
+  assert.ok(!generations[4].includes("\n"), "state.json is compact");
+  if (process.platform !== "win32") {
+    assert.equal((await stat(statePath)).mode & 0o777, 0o600);
+    assert.equal((await stat(`${statePath}.bak.1`)).mode & 0o777, 0o600);
+  }
+});
+
+test("a missing state.json starts empty and keeps every backup in place", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const statePath = path.join(directory, "state.json");
+  for (let start = 0; start < 4; start++) {
+    const store = new Store(directory);
+    await store.initialize();
+    store.data.repos = [{ ...repository, name: `generation-${start}` }];
+    await store.save();
+  }
+  const backups = async () =>
+    Promise.all(
+      [1, 2, 3].map((index) => readFile(`${statePath}.bak.${index}`, "utf8")),
+    );
+  const before = await backups();
+  await rm(statePath);
+  const store = new Store(directory);
+  await store.initialize();
+  assert.deepEqual(store.data, { version: 1, repos: [], runs: [] });
+  assert.deepEqual(store.backupsWithoutState?.sort(), [
+    "state.json.bak.1",
+    "state.json.bak.2",
+    "state.json.bak.3",
+  ]);
+  // Nothing new to keep, so no backup moved or was dropped.
+  assert.deepEqual(await backups(), before);
+  // The next start backs up the new state.json as usual.
+  const next = new Store(directory);
+  await next.initialize();
+  assert.equal(next.backupsWithoutState, undefined);
+  assert.deepEqual(await backups(), [
+    await readFile(statePath, "utf8"),
+    before[0],
+    before[1],
+  ]);
+});
+
+test("save() coalesces writes and resolves once the state it was called after is on disk", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const store = new Store(directory);
+  await store.initialize();
+  const statePath = path.join(directory, "state.json");
+  const saves: Promise<void>[] = [];
+  const returned = new Set<Promise<void>>();
+  for (let index = 0; index < 50; index++) {
+    store.data.repos = [{ ...repository, name: `name-${index}` }];
+    const saved = store.save();
+    returned.add(saved);
+    saves.push(
+      saved.then(async () => {
+        // Whatever was written includes this change or a later one.
+        const written = JSON.parse(await readFile(statePath, "utf8")) as Database;
+        assert.ok(Number(written.repos[0].name.slice(5)) >= index);
+      }),
+    );
+  }
+  // One write in flight plus one waiting: fifty calls, two writes.
+  assert.equal(returned.size, 2);
+  await Promise.all(saves);
+  const written = JSON.parse(await readFile(statePath, "utf8")) as Database;
+  assert.equal(written.repos[0].name, "name-49");
+  assert.deepEqual(
+    (await readdir(directory)).filter((name) => name.endsWith(".tmp")),
+    [],
+  );
+});
+
+test("save() shares one pending write between the calls made while another write runs", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const store = new Store(directory);
+  await store.initialize();
+  const first = store.save();
+  const second = store.save();
+  const third = store.save();
+  assert.notEqual(first, second);
+  assert.equal(second, third);
+  await Promise.all([first, second, third]);
+  // Once idle, a call starts a write of its own.
+  assert.notEqual(store.save(), second);
+});
+
+test("the data directory is made private, and one owned by another user is refused", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  if (process.platform === "win32" || typeof process.getuid !== "function")
+    return t.skip("POSIX permissions only");
+  const dataDir = path.join(directory, "data");
+  await mkdir(dataDir, { mode: 0o755 });
+  await new Store(dataDir).initialize();
+  assert.equal((await stat(dataDir)).mode & 0o777, 0o700);
+  const getuid = process.getuid;
+  t.after(() => {
+    process.getuid = getuid;
+  });
+  process.getuid = () => getuid() + 1;
+  await assert.rejects(
+    withLocale("en", () => new Store(dataDir).initialize()),
+    (error: Error) =>
+      error.message ===
+      `The data directory ${dataDir} belongs to another user. Start BELL PR as that user, or choose a data directory you own with --data-dir.`,
+  );
+});
+
+test("a state.json from a newer format is never replaced by a backup", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const statePath = path.join(directory, "state.json");
+  await writeFile(statePath, JSON.stringify({ version: 1, repos: [], runs: [] }));
+  await new Store(directory).initialize();
+  const newer = JSON.stringify({ version: 2, repos: [], runs: [] });
+  await writeFile(statePath, newer);
+  await assert.rejects(new Store(directory).initialize(), /version 1/);
+  assert.equal(await readFile(statePath, "utf8"), newer);
 });
