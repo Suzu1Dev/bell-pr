@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
+import { withoutOtherLanguages } from "../app/test-markup";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Repo, RunSummary } from "../types";
 import { CommandPalette } from "./CommandPalette";
@@ -68,14 +69,14 @@ test("the quick switch reads in English with no Chinese left", () => {
   assert.match(html, /<span class="command-palette-current">.*Current<\/span>/);
   assert.match(html, /<span>Open project overview<\/span>/);
   assert.match(html, /aria-label="Keyboard shortcuts"/);
-  assertNoHan(html);
+  assertNoHan(withoutOtherLanguages(html));
 });
 
 test("an empty project and no projects read in English with no Chinese left", () => {
   const empty = renderEn(element({ currentRepoId: "repo-2", currentRunId: "" }));
   assert.match(empty, /This project has no contributions yet/);
   assert.match(empty, /<span>0 items<\/span>/);
-  assertNoHan(empty);
+  assertNoHan(withoutOtherLanguages(empty));
   const one = renderEn(
     element({ runs: [runs[0]], currentRunId: "run-1" }),
   );
@@ -83,7 +84,27 @@ test("an empty project and no projects read in English with no Chinese left", ()
   assert.match(one, /<span>1 item<\/span>/);
   const none = renderEn(element({ repos: [], runs: [], currentRepoId: undefined }));
   assert.match(none, /No projects imported yet/);
-  assertNoHan(none);
+  assertNoHan(withoutOtherLanguages(none));
+});
+
+test("the quick switch goes to the sample, Settings, the other language and About", () => {
+  const commands = element({
+    onOpenSample() {},
+    onOpenSettings() {},
+    onOpenAbout() {},
+  });
+  const html = renderEn(commands);
+  assert.match(html, /<div class="command-palette-section-label command-palette-commands-label">Go to<\/div>/);
+  for (const label of ["Sample project", "Settings", "Language", "About BELL PR"])
+    assert.ok(html.includes(`<span>${label}</span>`), label);
+  // The language command names the other language in its own script.
+  assert.match(html, /<span>Language<\/span><small lang="zh-Hant-TW">/);
+  assertNoHan(withoutOtherLanguages(html));
+  assert.match(renderZh(commands), /<span>語言<\/span><small lang="en">English<\/small>/);
+  // Commands without a handler are left out; the language one always shows.
+  const bare = renderEn(element());
+  assert.doesNotMatch(bare, /Sample project|About BELL PR/);
+  assert.match(bare, /<span>Language<\/span>/);
 });
 
 test("the quick switch keeps its zh-TW labels", () => {

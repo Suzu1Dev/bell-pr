@@ -2,13 +2,19 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
   Check,
+  CirclePlay,
   FolderGit2,
   GitPullRequest,
+  Info,
+  Languages,
   Loader2,
   Search,
+  Settings2,
   X,
 } from "lucide-react";
-import { useT } from "../i18n";
+import { htmlLang, locales } from "../../shared/i18n/locale";
+import { useLocale, useT } from "../i18n";
+import { chooseLocale } from "../i18n/LanguageSwitcher";
 import type { Repo, RunSummary } from "../types";
 import "./command-palette.css";
 
@@ -20,6 +26,10 @@ export interface CommandPaletteProps {
   onClose: () => void;
   onSelectRun: (id: string) => Promise<boolean>;
   onSelectRepo: (id: string) => void;
+  /** The "Go to" commands; each closes the palette first. */
+  onOpenSample?: () => void;
+  onOpenSettings?: () => void;
+  onOpenAbout?: () => void;
 }
 
 export function CommandPalette({
@@ -30,9 +40,16 @@ export function CommandPalette({
   onClose,
   onSelectRun,
   onSelectRepo,
+  onOpenSample,
+  onOpenSettings,
+  onOpenAbout,
 }: CommandPaletteProps) {
   const t = useT("app").commandPalette;
-  const statusLabels = useT("common").runStatus;
+  const common = useT("common");
+  const statusLabels = common.runStatus;
+  const [locale, setLocale] = useLocale();
+  // With two languages, the command switches to the other one.
+  const otherLocale = locales.find((item) => item !== locale) ?? locale;
   const dialog = useRef<HTMLDialogElement>(null);
   const search = useRef<HTMLInputElement>(null);
   const projectList = useRef<HTMLDivElement>(null);
@@ -98,6 +115,15 @@ export function CommandPalette({
       document.getElementById(optionId(highlightedRun.id))?.scrollIntoView({ block: "nearest" });
     }
   }, [highlightedRun?.id]);
+
+  /** Closes the palette, then runs a "Go to" command. */
+  const runCommand = (command: () => void) => {
+    if (activating.current) return;
+    restoreFocus.current = false;
+    dialog.current?.close();
+    onClose();
+    command();
+  };
 
   const selectProject = (id: string) => {
     if (activating.current) return;
@@ -207,6 +233,33 @@ export function CommandPalette({
               );
             })}
             {!repos.length && <p className="command-palette-no-projects">{t.noProjects}</p>}
+          </div>
+          <div className="command-palette-section-label command-palette-commands-label">{t.goTo}</div>
+          <div className="command-palette-commands">
+            {onOpenSample && (
+              <button type="button" disabled={!!loadingId} onClick={() => runCommand(onOpenSample)}>
+                <CirclePlay size={16} aria-hidden="true" /><span>{t.sample}</span>
+              </button>
+            )}
+            {onOpenSettings && (
+              <button type="button" disabled={!!loadingId} onClick={() => runCommand(onOpenSettings)}>
+                <Settings2 size={16} aria-hidden="true" /><span>{t.settings}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={!!loadingId}
+              onClick={() => runCommand(() => chooseLocale(otherLocale, setLocale))}
+            >
+              <Languages size={16} aria-hidden="true" />
+              <span>{t.language}</span>
+              <small lang={htmlLang(otherLocale)}>{common.languageNames[otherLocale]}</small>
+            </button>
+            {onOpenAbout && (
+              <button type="button" disabled={!!loadingId} onClick={() => runCommand(onOpenAbout)}>
+                <Info size={16} aria-hidden="true" /><span>{t.about}</span>
+              </button>
+            )}
           </div>
         </nav>
         <section className="command-palette-contributions" aria-label={t.contributionList}>
