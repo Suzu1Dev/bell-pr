@@ -384,6 +384,25 @@ const mission = {
       help: "Review the split, scope and acceptance checks first; implementation starts once you approve.",
     },
   },
+  /** Project analysis loading and saving, shown where the action failed. */
+  insights: {
+    loadFailed: "Could not load the project analysis. Try again.",
+    demoAnalysis:
+      "The sample project uses a prewritten analysis. Import your repository to have AI read real source code.",
+    demoMore: "Import a real project to generate more contribution recommendations.",
+    reanalyzeFirst:
+      "Re-analyze the project before you generate more recommendations.",
+    limit: ({ max }: { max: number }) =>
+      `This analysis already has ${n(max)} recommendations.`,
+    /** `reason` is the error message of the failed save. */
+    preferencesReverted: ({ reason }: { reason: string }) =>
+      `The order and visibility were not saved and have been restored: ${reason}`,
+    preferencesRevertedRetry:
+      "The order and visibility were not saved and have been restored. Try again.",
+    moreFailed:
+      "No more recommendations were generated; the existing list is kept. Try again.",
+    analysisFailed: "The project analysis did not finish. Try again.",
+  },
 };
 
 export default mission;

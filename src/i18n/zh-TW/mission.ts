@@ -280,6 +280,19 @@ const m: Translation<typeof en> = {
       help: "先看分工、範圍與驗收方式，確認後再進入實作。",
     },
   },
+  insights: {
+    loadFailed: "無法讀取專案分析，請重試。",
+    demoAnalysis:
+      "示範專案使用預寫分析。匯入你的 repository 後，即可請 AI 閱讀真實原始碼。",
+    demoMore: "匯入真實專案後，即可產出更多貢獻建議。",
+    reanalyzeFirst: "請先重新分析專案，再產出更多建議。",
+    limit: ({ max }) => `這份分析已累積 ${n(max)} 個建議。`,
+    preferencesReverted: ({ reason }) =>
+      `未儲存顯示與排序設定，已還原：${reason}`,
+    preferencesRevertedRetry: "未儲存顯示與排序設定，已還原。請再試一次。",
+    moreFailed: "尚未產出更多建議，原有清單已保留。請重試。",
+    analysisFailed: "專案分析未完成，請重試。",
+  },
 };
 
 export default m;
