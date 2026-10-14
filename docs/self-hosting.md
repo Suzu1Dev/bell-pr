@@ -32,8 +32,9 @@ BELL PR 1.0.0 → http://127.0.0.1:4311/auth?t=...
 
 Open that link to sign in; BELL PR opens it for you when it runs in a
 terminal. `bell-pr help` lists the commands and options, and
-[.env.example](../.env.example) lists every `BELLPR_*` setting. Load a
-settings file with `bell-pr start --env-file <file>`.
+[Configuration](configuration.md) and [.env.example](../.env.example)
+describe every `BELLPR_*` setting. Load a settings file with
+`bell-pr start --env-file <file>`.
 
 Data lives in `~/.bellpr` unless you pass `--data-dir` or set
 `BELLPR_DATA_DIR`. BELL PR never moves data by itself: if an older version
@@ -140,3 +141,6 @@ session, for monitoring and container health checks.
 2. Back up the data directory.
 3. `npm install -g bell-pr@latest`
 4. Start BELL PR again and sign in with `bell-pr open`.
+
+[Upgrading](upgrading.md) covers backups, data from older versions and
+going back to an older version.

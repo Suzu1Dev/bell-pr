@@ -7,9 +7,10 @@ can install it into your container yourself (see below).
 **Docker support is beta.** With Docker's default security settings, the
 operating-system sandbox that the agent CLIs run commands in cannot start
 inside a container. See [Agent sandbox in
-Docker](#agent-sandbox-in-docker) for the probe result and the workaround.
-Running BELL PR directly on your computer (`npm install -g bell-pr`) does
-not have this limitation.
+Docker](#agent-sandbox-in-docker) for the probe result and the workaround,
+and [Beta status](#beta-status) for what has been verified. Running BELL PR
+directly on your computer (`npm install -g bell-pr`) does not have this
+limitation.
 
 ## Build the image
 
@@ -63,8 +64,11 @@ docker run -d --name bell-pr \
   `user.email`) once.
 
 Every `BELLPR_*` setting in [.env.example](../.env.example) works with
-`-e`. The image sets `BELLPR_HOST=0.0.0.0`, `BELLPR_DATA_DIR=/data` and
-`BELLPR_NO_OPEN=1`.
+`-e`; [Configuration](configuration.md) describes them. The image sets
+`BELLPR_HOST=0.0.0.0`, `BELLPR_DATA_DIR=/data` and `BELLPR_NO_OPEN=1`. For a
+Pro license, pass `-e BELLPR_LICENSE_KEY`, or activate a key once with
+`docker exec -i bell-pr bell-pr license activate - < key.txt`; it is then
+saved in the data volume.
 
 ## Sign in
 
@@ -75,21 +79,28 @@ docker logs bell-pr
 ```
 
 or ask the running server for a new one-time link (it works once, within
-two minutes):
+two minutes), with your container's name in place of `bell-pr`:
 
 ```sh
-docker exec bell-pr bell-pr open --print
+docker exec <container> bell-pr open --print
 ```
 
-The session lives in memory: after a restart or an update, sign in again
-with a new link. The health check (`GET /api/health`) is built into the
-image, so `docker ps` shows when BELL PR is ready.
+The browser never opens by itself from a container, so `--print` is the
+way to go: open the printed link in your browser. The session lives in
+memory: after a restart or an update, sign in again with a new link. The
+health check (`GET /api/health`) is built into the image, so `docker ps`
+shows when BELL PR is ready.
+
+To check the tools inside the container, run
+`docker exec bell-pr bell-pr doctor`.
 
 ## Use Claude Code
 
 Claude Code is not part of the image. To use it, install it into your
-container under the `node` user, whose npm prefix
-(`/home/node/.npm-global`) is writable and on `PATH`, then sign in:
+container yourself. The container runs as the `node` user, whose global npm
+prefix is `/home/node/.npm-global` (`NPM_CONFIG_PREFIX`): it is writable,
+on `PATH`, and inside the `bellpr-home` volume, so `npm install -g` works
+without root and survives container updates. Install it, then sign in:
 
 ```sh
 docker exec -it bell-pr npm install -g @anthropic-ai/claude-code
@@ -145,6 +156,25 @@ than the container would. Use them only on a machine you control. Without
 them, BELL PR still runs, but every command a Codex agent runs fails (so
 analysis, reviews and code changes stall), and Claude Code agents that write
 code cannot start their sandbox.
+
+## Beta status
+
+Docker stays **beta** in 1.0.0-rc.1 because the agent sandbox needs the
+three `--security-opt` options above. What the release candidate verified
+on Linux (Docker Engine 29.7):
+
+- the image builds, reports healthy within seconds and prints its sign-in
+  link;
+- `docker exec <container> bell-pr open --print` gives a one-time link that
+  signs in once; after `docker restart`, the old session is refused and a
+  new link signs in;
+- git, the GitHub CLI, the Codex CLI, bubblewrap and socat are in the
+  image, and `bell-pr doctor` runs in it;
+- the sandbox probe in the table above: it fails with the default options
+  and works with the three options.
+
+Still to be verified: a full agent run in Docker with a real Codex sign-in,
+and the multi-architecture (arm64) image.
 
 ## Files and user IDs
 
