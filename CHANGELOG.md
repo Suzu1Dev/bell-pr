@@ -7,6 +7,38 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+
+- The browser that BELL PR opens at start gets a one-time sign-in link.
+  The session link, which other users of the computer could read on the
+  command line of `open` or `xdg-open`, is only printed.
+
+### Changed
+
+- Usage-data opt-outs set in BELL PR's environment reach the agent CLIs:
+  `DO_NOT_TRACK` for both, and Claude Code's `DISABLE_TELEMETRY`,
+  `DISABLE_ERROR_REPORTING`, `DISABLE_BUG_COMMAND`,
+  `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY` and
+  `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` for Claude Code.
+- The refund and delivery policy ships with the app, and About lists it
+  with the other legal documents.
+- The import dialog suggests `~/projects/repository` as a local path on
+  every computer, and tells Windows browsers to use the path inside WSL2.
+- The plan copy says what a key carries: 12 months of updates from the
+  date the key is issued.
+
+### Fixed
+
+- A question about selected lines quotes them as a diff block with the
+  file and its line numbers, which the chat shows as code instead of one
+  paragraph.
+- `bell-pr doctor` reports the port of the BELL PR running with the data
+  directory, also one started with `--port`.
+- A second analysis of the same project, or a second discovery, answers
+  with the error code `already_running`.
+- At 320 px, the sample badge of presentation mode no longer pushes the
+  top bar's buttons off the screen.
+
 ## [1.0.0-rc.1] - 2026-10-14
 
 The first release candidate of BELL PR 1.0.0: a self-hosted, local-first
