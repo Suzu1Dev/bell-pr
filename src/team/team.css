@@ -162,8 +162,11 @@
   padding: 9px;
   font-size: var(--text-sm);
   line-height: 1.8;
-  color: var(--color-accent-600);
+  color: var(--color-text);
   background: var(--color-surface);
+}
+.team-plan-revise textarea::placeholder {
+  color: var(--color-text-muted);
 }
 .team-plan-revise textarea:disabled {
   background: var(--color-surface-sunken);
@@ -494,7 +497,7 @@
   padding: 9px;
   font-size: var(--text-xs);
   line-height: 1.8;
-  color: var(--color-accent-600);
+  color: var(--color-text);
   min-height: 90px;
 }
 .team-message-form textarea::placeholder {

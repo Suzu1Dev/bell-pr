@@ -155,8 +155,16 @@ export const overrides = [
   { selector: /^\.file-type\.markdown$/, property: "color", token: "text-muted" },
   { selector: /^\.file-type\.markdown$/, property: "background", token: "surface-sunken" },
   { selector: /^\.file-type\.markdown$/, property: "border", token: "border" },
-  // What is typed in the file search stays darker than its placeholder.
-  { selector: /^\.file-search input$/, property: "color", token: "text-secondary" },
+  // What is typed in a field stays darker than its placeholder
+  // (--color-text-muted), so a filled field never looks empty.
+  { selector: /^\.file-search input$/, property: "color", token: "text" },
+  { selector: /^\.text-input$/, property: "color", token: "text" },
+  { selector: /^\.draft-textarea$/, property: "color", token: "text" },
+  { selector: /^\.mission-form-field > (input|select|textarea)$/, property: "color", token: "text" },
+  { selector: /^\.team-message-form textarea$/, property: "color", token: "text" },
+  { selector: /^\.team-plan-revise textarea$/, property: "color", token: "text" },
+  { selector: /^\.explain-note-input$/, property: "color", token: "text" },
+  { selector: /^\.explain-panel \.explain-input-box textarea$/, property: "color", token: "text" },
   // Text selection has its own token.
   { selector: /^::selection$/, property: "background", token: "selection" },
 ];

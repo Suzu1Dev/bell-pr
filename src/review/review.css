@@ -799,11 +799,14 @@
   border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   background: var(--color-surface);
-  color: var(--color-text-muted);
+  color: var(--color-text);
   font: inherit;
   font-size: 12.5px;
   line-height: 1.7;
   resize: vertical;
+}
+.explain-note-input::placeholder {
+  color: var(--color-text-muted);
 }
 .explain-note-actions {
   display: flex;
@@ -962,7 +965,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--color-accent-700);
+  color: var(--color-text);
   font-size: var(--text-sm);
   line-height: 1.7;
 }

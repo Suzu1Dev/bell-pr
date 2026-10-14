@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -216,6 +216,54 @@ test("text tokens meet WCAG AA on every light background token", () => {
   const muted = (bg: string) =>
     pairs.find((pair) => pair.fg === "text-muted" && pair.bg === bg)!.ratio;
   assert.ok(muted("bg") >= 4.5 && muted("surface") >= 4.5);
+});
+
+test("typed text stays clearly darker than the placeholder in every field", () => {
+  // A placeholder as dark as the typed text makes an empty field look filled.
+  const minimum = 2;
+  const color = (value: string) => {
+    const name = /^var\((--color-[\w-]+)\)$/.exec(value)?.[1];
+    return name ? tokens.get(name)?.rgb : undefined;
+  };
+  const checked: string[] = [];
+  const files = readdirSync(path.join(root, "src"), { recursive: true })
+    .map((entry) => path.join("src", String(entry)))
+    .filter(
+      (file) =>
+        file.endsWith(".css") &&
+        !file.startsWith(path.join("src", "theme") + path.sep),
+    );
+  for (const file of files) {
+    const rules: { selector: string; value: string }[] = tokenizer
+      .declarations(readFileSync(path.join(root, file), "utf8"))
+      .filter((rule: { property: string }) => rule.property === "color");
+    for (const placeholder of rules) {
+      for (const entry of placeholder.selector.split(/\s*,\s*/)) {
+        if (!entry.endsWith("::placeholder")) continue;
+        const field = entry.slice(0, -"::placeholder".length);
+        const texts = rules.filter((rule) =>
+          rule.selector
+            .split(/\s*,\s*/)
+            .some((other) => other === field || other.endsWith(` ${field}`)),
+        );
+        assert.ok(texts.length, `${file}: ${field} sets no text color`);
+        const hint = color(placeholder.value);
+        assert.ok(hint, `${file}: ${entry} ${placeholder.value}`);
+        for (const text of texts) {
+          const typed = color(text.value);
+          assert.ok(typed, `${file}: ${field} ${text.value}`);
+          assert.ok(
+            tokenizer.luminance(typed) < tokenizer.luminance(hint) &&
+              tokenizer.contrastRatio(typed, hint) >= minimum,
+            `${file}: ${field} ${text.value} against ${placeholder.value}`,
+          );
+        }
+        checked.push(field);
+      }
+    }
+  }
+  for (const field of [".text-input", ".file-search input", ".mission-form-field > textarea", ".team-message-form textarea"])
+    assert.ok(checked.includes(field), field);
 });
 
 test("fonts.css self-hosts woff2 files of the latin subsets only", () => {
