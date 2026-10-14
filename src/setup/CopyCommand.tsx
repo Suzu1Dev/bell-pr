@@ -12,10 +12,13 @@ import "./setup.css";
 export function CopyCommand({
   command,
   label,
+  copyLabel,
 }: {
   command: string;
   /** What the command does, shown above it. */
   label?: string;
+  /** The copy button's name for screen readers; "Copy the command: …" by default. */
+  copyLabel?: string;
 }) {
   const t = useT("setup").copy;
   const code = useRef<HTMLElement>(null);
@@ -55,7 +58,7 @@ export function CopyCommand({
         <button
           type="button"
           className="button secondary copy-command-button"
-          aria-label={t.copyCommand({ command })}
+          aria-label={copyLabel ?? t.copyCommand({ command })}
           onClick={() => void copy()}
         >
           {state === "copied" ? (
