@@ -33,7 +33,7 @@ const discovery = {
     interestsHint:
       "Searched as GitHub keywords. With several words, a project must match all of them.",
     language: "Programming language",
-    languagePlaceholder: "Any, for example TypeScript",
+    languagePlaceholder: "Any, e.g. TypeScript",
     difficulty: "Difficulty you'll take on",
     difficulties: {
       beginner: "Beginner-friendly",

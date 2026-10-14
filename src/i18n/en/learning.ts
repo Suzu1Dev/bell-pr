@@ -9,7 +9,7 @@ const learning = {
   intro:
     "Every explanation generated while you review a contribution stays here, so you can revisit a concept across contributions.",
   keyword: "Keyword",
-  keywordPlaceholder: "Search concepts, tips, files or contributions",
+  keywordPlaceholder: "Search notes and files",
   run: "Contribution",
   allRuns: "All contributions",
   /** How many of the person's own notes the filters show. */

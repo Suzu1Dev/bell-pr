@@ -185,7 +185,7 @@ test("English notes render the page, the filters and each note in English", () =
   const html = renderEnglish();
   assert.match(html, /<span class="eyebrow">LEARN BY CONTRIBUTING<\/span>/);
   assert.match(html, /Turn the code you understood into experience\./);
-  assert.match(html, /placeholder="Search concepts, tips, files or contributions"/);
+  assert.match(html, /placeholder="Search notes and files"/);
   assert.match(html, /<option value=""[^>]*>All contributions<\/option>/);
   assert.match(html, /<option value="run-new">Fix the token cache<\/option>/);
   assert.match(html, /Showing 2 of 2 notes/);
