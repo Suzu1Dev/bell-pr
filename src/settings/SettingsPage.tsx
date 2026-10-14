@@ -1,48 +1,164 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useCallback, type Dispatch, type SetStateAction } from "react";
 import {
-  Bot,
-  Github,
+  Cpu,
+  Gauge,
+  HardDrive,
+  Info,
+  KeyRound,
   Languages,
-  Sparkles,
-  Terminal,
-  Workflow,
+  ShieldCheck,
+  Wrench,
+  type LucideIcon,
 } from "lucide-react";
-import { productLink } from "../../shared/product";
+import type { LicenseSummary } from "../../shared/plans";
 import { api } from "../api";
 import type { Notify, Page, Tab } from "../app/AppShell";
 import type { Status } from "../app/hooks/useAppData";
+import { usePresentation } from "../app/presentation";
 import { useT } from "../i18n";
-import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
+import { useEntitlements } from "../license/useEntitlements";
+import { serializeRoute, useHashRoute, type RouteFlags } from "../navigation/route";
+import { useDoctor } from "../setup/useDoctor";
+import { AboutSection } from "./AboutSection";
+import { DataSection } from "./DataSection";
+import { EnvironmentSection } from "./EnvironmentSection";
+import { GeneralSection } from "./GeneralSection";
+import { LicenseSection } from "./LicenseSection";
+import { PerformanceSection, type StatusLimits } from "./PerformanceSection";
+import { ProviderSection } from "./ProviderSection";
+import { SafetySection } from "./SafetySection";
+import { parseSection, settingsSections, type SettingsSection } from "./sections";
+import { useAppSettings } from "./useAppSettings";
 import "./settings.css";
 
 interface SettingsPageProps {
   status: Status | null;
   setStatus: Dispatch<SetStateAction<Status | null>>;
   setApiError: Dispatch<SetStateAction<string>>;
-  notify: Notify;
-  configureContributionModels: () => void;
+  /** Unused: each section reports its results in place. */
+  notify?: Notify;
+  /** Unused: the AI provider section edits the shared models in place. */
+  configureContributionModels?: () => void;
   setTab: Dispatch<SetStateAction<Tab>>;
   navigate: (value: Page) => void;
 }
 
-/** The language, the local CLI connections, model settings and run limits. */
+/** What GET /api/status also reports besides the `Status` fields. */
+type SettingsStatus = Status & { license?: LicenseSummary; limits?: StatusLimits };
+
+const icons: Record<SettingsSection, LucideIcon> = {
+  general: Languages,
+  provider: Cpu,
+  safety: ShieldCheck,
+  performance: Gauge,
+  environment: Wrench,
+  data: HardDrive,
+  license: KeyRound,
+  about: Info,
+};
+
+/** The address of a settings section, keeping the presentation flags. */
+export function sectionHref(section: SettingsSection, flags?: RouteFlags): string {
+  return serializeRoute({ name: "settings", section, ...(flags ? { flags } : {}) });
+}
+
+/**
+ * The Settings page: a list of sections, each at `#/settings/<section>`
+ * (General when the address names none), and the section it shows. The
+ * environment report and the app settings load once and are shared by the
+ * sections; while presenting (`present=1`), the GitHub login, account
+ * details, the licensee and paths are masked.
+ */
 export function SettingsPage({
   status,
   setStatus,
   setApiError,
-  notify,
-  configureContributionModels,
   setTab,
   navigate,
 }: SettingsPageProps) {
   const t = useT("settings");
-  const docsUrl = productLink("docsUrl");
-  const cliStatus = (installed?: boolean, authenticated?: boolean) =>
-    installed && authenticated
-      ? t.status.ready
-      : installed
-        ? t.status.signedOut
-        : t.status.missing;
+  const route = useHashRoute();
+  const flags = route?.flags;
+  const section = parseSection(route?.name === "settings" ? route.section : undefined);
+  const { maskUser, maskPath } = usePresentation();
+  const doctor = useDoctor();
+  const settings = useAppSettings();
+  const full = status as SettingsStatus | null;
+  const { entitlements, locked } = useEntitlements(full);
+  const { refresh } = doctor;
+
+  // The sidebar and the run limits read GET /api/status, which shares the
+  // doctor's latest probe.
+  const reloadStatus = useCallback(async () => {
+    try {
+      setStatus(await api<Status>("/status"));
+      setApiError("");
+    } catch {
+      // The connection banner and the checklist report failures already.
+    }
+  }, [setStatus, setApiError]);
+  const recheck = useCallback(async () => {
+    await refresh();
+    await reloadStatus();
+  }, [refresh, reloadStatus]);
+  const showCurrentRun = useCallback(() => {
+    setTab("activity");
+    navigate("workspace");
+  }, [setTab, navigate]);
+
+  let content;
+  switch (section) {
+    case "provider":
+      content = (
+        <ProviderSection doctor={doctor} maskUser={maskUser} showCurrentRun={showCurrentRun} />
+      );
+      break;
+    case "safety":
+      content = (
+        <SafetySection
+          doctor={doctor}
+          settings={settings}
+          maskUser={maskUser}
+          webAccessLocked={locked("webAccess")}
+          providerHref={sectionHref("provider", flags)}
+        />
+      );
+      break;
+    case "performance":
+      content = (
+        <PerformanceSection
+          settings={settings}
+          limits={full?.limits}
+          entitlements={entitlements}
+          onSaved={() => void reloadStatus()}
+        />
+      );
+      break;
+    case "environment":
+      content = (
+        <EnvironmentSection
+          doctor={doctor}
+          refresh={recheck}
+          maskUser={maskUser}
+          maskPath={maskPath}
+        />
+      );
+      break;
+    case "data":
+      content = <DataSection doctor={doctor} settings={settings} maskPath={maskPath} />;
+      break;
+    case "license":
+      content = <LicenseSection status={full} maskUser={maskUser} maskPath={maskPath} />;
+      break;
+    case "about":
+      content = (
+        <AboutSection aboutHref={serializeRoute({ name: "about", ...(flags ? { flags } : {}) })} />
+      );
+      break;
+    default:
+      content = <GeneralSection settings={settings} />;
+  }
+
   return (
     <section className="page-content settings-page">
       <div className="page-title">
@@ -51,195 +167,42 @@ export function SettingsPage({
           <h1 tabIndex={-1}>{t.title}</h1>
           <p>{t.intro}</p>
         </div>
-        <button
-          className="button secondary"
-          onClick={() => {
-            api<Status>("/status")
-              .then((s) => {
-                setStatus(s);
-                setApiError("");
-                notify(t.rechecked);
-              })
-              .catch((e) => notify(e.message, "error"));
-          }}
-        >
-          {t.recheck}
-        </button>
       </div>
-      <div className="settings-card">
-        <div className="settings-service">
-          <div className="service-icon">
-            <Languages size={24} />
-          </div>
-          <div>
-            <h3>{t.general.title}</h3>
-            <p>{t.general.text}</p>
-          </div>
-        </div>
-        <div className="setup-command">
-          <label htmlFor="settings-language">{t.general.language}</label>
-          <LanguageSwitcher
-            id="settings-language"
-            className="settings-language-select"
-          />
-        </div>
-      </div>
-      <div className="settings-card">
-        <div className="settings-service">
-          <div className="service-icon">
-            <Bot size={24} />
-          </div>
-          <div>
-            <h3>Codex CLI</h3>
-            <p>{t.codex.description}</p>
-          </div>
-          <span
-            className={`service-status ${status?.codex && status?.codexAuthenticated ? "connected" : ""}`}
-          >
-            {cliStatus(status?.codex, status?.codexAuthenticated)}
-          </span>
-        </div>
-        <div className="setup-command">
-          <span>{t.signInHint}</span>
-          <code>codex login</code>
-        </div>
-      </div>
-      <div className="settings-card">
-        <div className="settings-service">
-          <div className="service-icon">
-            <Bot size={24} />
-          </div>
-          <div>
-            <h3>Claude Code CLI</h3>
-            <p>{t.claude.description}</p>
-          </div>
-          <span
-            className={`service-status ${status?.claude && status?.claudeAuthenticated ? "connected" : ""}`}
-          >
-            {cliStatus(status?.claude, status?.claudeAuthenticated)}
-          </span>
-        </div>
-        <div className="setup-command">
-          <span>{t.signInHint}</span>
-          <code>claude auth login</code>
-        </div>
-      </div>
-      <div className="settings-card">
-        <div className="settings-service">
-          <div className="service-icon">
-            <Sparkles size={24} />
-          </div>
-          <div>
-            <h3>{t.models.title}</h3>
-            <p>{t.models.text}</p>
-          </div>
-        </div>
-        <div className="setup-command">
-          <button
-            className="button secondary"
-            onClick={configureContributionModels}
-          >
-            {t.models.configure}
-          </button>
-          <button
-            className="button ghost"
-            onClick={() => {
-              setTab("activity");
-              navigate("workspace");
-            }}
-          >
-            {t.models.current}
-          </button>
-        </div>
-      </div>
-      <div className="settings-card">
-        <div className="settings-service">
-          <div className="service-icon">
-            <Github size={24} />
-          </div>
-          <div>
-            <h3>GitHub CLI</h3>
-            <p>
-              {status?.githubUser
-                ? t.github.connectedAs({ user: status.githubUser })
-                : t.github.description}
-            </p>
-          </div>
-          <span
-            className={`service-status ${status?.github ? "connected" : ""}`}
-          >
-            {status?.github ? t.status.connected : t.status.signedOut}
-          </span>
-        </div>
-        <div className="setup-command">
-          <span>{t.authorizeHint}</span>
-          <code>gh auth login</code>
-        </div>
-      </div>
-      <div className="settings-card">
-        <div className="settings-service">
-          <div className="service-icon">
-            <Terminal size={24} />
-          </div>
-          <div>
-            <h3>{t.local.title}</h3>
-            <p>{t.local.text}</p>
-          </div>
-          <span className="service-status connected">{t.local.badge}</span>
-        </div>
-      </div>
-      <div className="settings-card">
-        <div className="settings-service">
-          <div className="service-icon">
-            <Workflow size={24} />
-          </div>
-          <div>
-            <h3>{t.concurrency.title}</h3>
-            <p>{t.concurrency.text}</p>
-          </div>
-        </div>
-        <div className="setup-command">
-          <span>{t.concurrency.maxActiveRuns}</span>
-          <code>{status?.limits?.maxActiveRuns ?? "—"}</code>
-        </div>
-        <div className="setup-command">
-          <span>{t.concurrency.maxAgentProcesses}</span>
-          <code>{status?.limits?.maxAgentProcesses ?? "—"}</code>
-        </div>
-        <div className="setup-command">
-          <span>{t.concurrency.maxQueued}</span>
-          <code>{status?.limits?.maxQueued ?? "—"}</code>
-        </div>
-        <p className="muted">{t.concurrency.explanation}</p>
-        <p className="muted">{t.concurrency.usage}</p>
-        <details className="settings-advanced">
-          <summary>{t.concurrency.advanced}</summary>
-          <p>
-            {t.concurrency.advancedText}
-            {docsUrl && (
-              <>
-                {" "}
-                <a href={docsUrl} target="_blank" rel="noreferrer">
-                  {t.concurrency.documentation}
-                </a>
-              </>
-            )}
-          </p>
-          <dl>
-            <div>
-              <dt>
-                <code>BELLPR_MAX_ACTIVE_RUNS</code>
-              </dt>
-              <dd>{t.concurrency.maxActiveRuns}</dd>
+      <div className="settings-layout">
+        <nav className="settings-nav" aria-label={t.nav.label}>
+          <ul>
+            {settingsSections.map((id) => {
+              const Icon = icons[id];
+              return (
+                <li key={id}>
+                  <a
+                    href={sectionHref(id, flags)}
+                    aria-current={id === section ? "page" : undefined}
+                    data-section={id}
+                  >
+                    <Icon size={16} aria-hidden="true" />
+                    <span>{t.sections[id]}</span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+        <div className="settings-panel">
+          {settings.error && !settings.view && (
+            <div className="settings-load-error" role="alert">
+              <p>{t.state.loadFailed({ message: settings.error })}</p>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => void settings.reload()}
+              >
+                {t.state.retry}
+              </button>
             </div>
-            <div>
-              <dt>
-                <code>BELLPR_MAX_AGENT_PROCESSES</code>
-              </dt>
-              <dd>{t.concurrency.maxAgentProcesses}</dd>
-            </div>
-          </dl>
-        </details>
+          )}
+          {content}
+        </div>
       </div>
     </section>
   );
