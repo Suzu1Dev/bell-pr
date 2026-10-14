@@ -392,6 +392,16 @@ const shots = {
     await playToReview(page, baseURL, flags);
     await openChanges(page, baseURL, flags, "src/utils/retry.ts");
     await sleep(800);
+    const line = (label) => page.locator(`[role=option][aria-label^="${label}"]`).first();
+    // The changed lines sit low in the diff: scroll it up by five lines, so
+    // the selection stays clear of the captions in the lower third.
+    const fifth = line(t.review.diff.lineLabel.context({ line: 5, text: "" }));
+    const diff = await scrollerOf(fifth);
+    await diff.evaluate(
+      (element, top) => element.scrollTo({ top, behavior: "instant" }),
+      await scrollerTop(diff, fifth, 0),
+    );
+    await sleep(300);
     const example = page.getByText(t.review.explain.cards.example).first();
     const panel = await scrollerOf(example);
     await rec.park(1250, 690);
@@ -399,7 +409,6 @@ const shots = {
     await rec.check("explanation");
     await rec.at(1.0);
     await rec.scrollTo(await scrollerTop(panel, page.getByText(t.review.explain.exampleScenario).first(), 8), { scroller: panel });
-    const line = (label) => page.locator(`[role=option][aria-label^="${label}"]`).first();
     const first = line(t.review.diff.lineLabel.removed({ line: 10, text: "" }));
     const last = line(t.review.diff.lineLabel.added({ line: 15, text: "" }));
     await rec.at(3.4);

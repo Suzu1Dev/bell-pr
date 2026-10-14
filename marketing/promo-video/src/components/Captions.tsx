@@ -1,8 +1,9 @@
 /**
  * The burned-in captions: each cue of timeline.json (other than the title
  * cues, which their scenes draw) on a semi-opaque brand-dark pill. The pill
- * sits in the lower third inside the 90% title-safe area, or near the top
- * when the cue asks for it. scripts/export-captions.mjs writes the same cues
+ * sits centred in the lower third inside the 90% title-safe area, or near
+ * the top or on the left when the cue asks for it, so it never covers what
+ * the shot is about. scripts/export-captions.mjs writes the same cues
  * to captions.en.vtt and .srt, so both carry identical timings.
  */
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
@@ -18,7 +19,7 @@ export function captionAt(captions: readonly Caption[], frame: number): Caption 
 
 export const Captions: React.FC = () => {
   const frame = useCurrentFrame();
-  const { height } = useVideoConfig();
+  const { width, height } = useVideoConfig();
   const cue = captionAt(timeline.captions, frame);
   if (!cue) return null;
   const opacity = Math.min(
@@ -32,9 +33,9 @@ export const Captions: React.FC = () => {
   return (
     <AbsoluteFill
       style={{
-        alignItems: "center",
+        alignItems: cue.align === "left" ? "flex-start" : "center",
         justifyContent: top ? "flex-start" : "flex-end",
-        padding: `${Math.round(height * 0.065)}px ${Math.round(height * 0.1)}px`,
+        padding: `${Math.round(height * 0.065)}px ${Math.round(width * 0.05)}px`,
         pointerEvents: "none",
       }}
     >

@@ -57,6 +57,8 @@ export interface Caption {
   style?: "title";
   /** Lower third by default; "top" when the shot's subject is low. */
   position?: "top";
+  /** Centred by default; "left" keeps it clear of a panel on the right. */
+  align?: "left";
 }
 
 export interface Timeline {

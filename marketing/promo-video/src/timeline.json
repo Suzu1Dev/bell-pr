@@ -270,7 +270,8 @@
               "ease": "linear",
               "dialog": true
             }
-          ]
+          ],
+          "crossfade": 8
         }
       ],
       "cursor": [
@@ -410,15 +411,15 @@
           "ease": "linear"
         },
         {
-          "f": 112,
+          "f": 114,
           "x": 938,
-          "y": 490,
+          "y": 500,
           "zoom": 1.44
         },
         {
           "f": 176,
           "x": 938,
-          "y": 490,
+          "y": 500,
           "zoom": 1.45,
           "ease": "linear"
         },
@@ -526,13 +527,13 @@
             {
               "f": 0,
               "x": 834,
-              "y": 520,
+              "y": 532,
               "zoom": 1.27
             },
             {
               "f": 90,
               "x": 846,
-              "y": 525,
+              "y": 535,
               "zoom": 1.33,
               "ease": "linear"
             }
@@ -595,22 +596,16 @@
         },
         {
           "f": 74,
-          "x": 720,
-          "y": 405,
-          "zoom": 1.0,
+          "x": 836,
+          "y": 300,
+          "zoom": 1.2,
           "ease": "linear"
         },
         {
-          "f": 110,
-          "x": 850,
-          "y": 380,
-          "zoom": 1.22
-        },
-        {
           "f": 180,
-          "x": 852,
-          "y": 378,
-          "zoom": 1.25,
+          "x": 836,
+          "y": 300,
+          "zoom": 1.23,
           "ease": "linear"
         }
       ]
@@ -644,7 +639,7 @@
     },
     {
       "from": 252,
-      "to": 330,
+      "to": 318,
       "text": "Bring a GitHub project."
     },
     {
@@ -655,7 +650,8 @@
     {
       "from": 579,
       "to": 714,
-      "text": "and suggests where to start."
+      "text": "and suggests where to start.",
+      "position": "top"
     },
     {
       "from": 770,
@@ -675,17 +671,20 @@
     {
       "from": 1212,
       "to": 1335,
-      "text": "Every change, in plain language."
+      "text": "Every change, in plain language.",
+      "align": "left"
     },
     {
       "from": 1376,
       "to": 1467,
-      "text": "Ask about any line."
+      "text": "Ask about any line.",
+      "align": "left"
     },
     {
       "from": 1473,
       "to": 1614,
-      "text": "See what reviewers will look for."
+      "text": "See what reviewers will look for.",
+      "align": "left"
     },
     {
       "from": 1632,
