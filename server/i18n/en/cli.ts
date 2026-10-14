@@ -13,7 +13,7 @@ export default {
       `Usage: ${bin} [command] [options]`,
       "",
       "Commands:",
-      "  start      Start BELL PR (the default command)",
+      `  start      Start ${name} (the default command)`,
       "  open       Print a new one-time sign-in link and open it in the browser",
       "  doctor     Check git, gh and the agent CLIs (--json for machine output)",
       "  license    Show or change the license: status, activate <key>, deactivate, trial",
@@ -30,9 +30,9 @@ export default {
       "Options for open:",
       "  --print             Only print the link",
       "  --no-open           Do not open the browser",
-      "  --data-dir <dir>    Data directory of the running BELL PR",
+      `  --data-dir <dir>    Data directory of the running ${name}`,
       "",
-      `BELL PR signs browsers in with a link. Run \`${bin} open\` on this computer for a new one; in Docker, run \`docker exec <container> ${bin} open --print\`.`,
+      `${name} signs browsers in with a link. Run \`${bin} open\` on this computer for a new one; in Docker, run \`docker exec <container> ${bin} open --print\`.`,
     ].join("\n"),
   /** A command that does not exist. */
   unknownCommand: ({ command }: { command: string }) =>
@@ -65,7 +65,7 @@ export default {
     hostInvalid: ({ value }: { value: string }) =>
       `--host and BELLPR_HOST take a host name or an IP address, not "${value}".`,
     publicUrlInvalid: ({ value }: { value: string }) =>
-      `BELLPR_PUBLIC_URL must be the address browsers use for BELL PR, such as https://bell.example.com: http or https, with no path, query or user name, and https for any address other than this computer. "${value}" is not.`,
+      `BELLPR_PUBLIC_URL must be the address browsers use for ${name}, such as https://bell.example.com: http or https, with no path, query or user name, and https for any address other than this computer. "${value}" is not.`,
     devNeedsLoopback: ({ host }: { host: string }) =>
       `Development mode turns sign-in off, so it only listens on this computer. Use --host 127.0.0.1 instead of ${host}.`,
   },
@@ -76,37 +76,37 @@ export default {
       `${name} ${version} → ${url}`,
     /** Data left by an older version in the current folder; nothing moves. */
     legacyDataDir: ({ dataDir }: { dataDir: string }) =>
-      `Found BELL PR data in ./.bellpr. BELL PR now uses ${dataDir} and moved nothing. To keep using the old folder, start it with: ${bin} start --data-dir ./.bellpr`,
+      `Found ${name} data in ./.bellpr. ${name} now uses ${dataDir} and moved nothing. To keep using the old folder, start it with: ${bin} start --data-dir ./.bellpr`,
     alreadyRunning: ({ url }: { url: string }) =>
-      `BELL PR is already running at ${url}. Run \`${bin} open\` to get a sign-in link.`,
+      `${name} is already running at ${url}. Run \`${bin} open\` to get a sign-in link.`,
     portInUse: ({ port }: { port: number }) =>
-      `Port ${port} is already in use by another program. Start BELL PR on a free port with \`${bin} start --port <port>\`.`,
+      `Port ${port} is already in use by another program. Start ${name} on a free port with \`${bin} start --port <port>\`.`,
     dataDirInUse: ({ dataDir, pid }: { dataDir: string; pid: number }) =>
-      `BELL PR is already running with the data directory ${dataDir} (process ${pid}). Run \`${bin} open\` to get a sign-in link, or stop that process first.`,
+      `${name} is already running with the data directory ${dataDir} (process ${pid}). Run \`${bin} open\` to get a sign-in link, or stop that process first.`,
     listenFailed: ({ address, reason }: { address: string; reason: string }) =>
-      `BELL PR could not listen on ${address}: ${reason}`,
+      `${name} could not listen on ${address}: ${reason}`,
     failed: ({ reason }: { reason: string }) =>
-      `BELL PR did not start: ${reason}`,
+      `${name} did not start: ${reason}`,
     uiMissing: ({ path }: { path: string }) =>
-      `The web interface is not built: ${path} has no index.html. Run \`npm run build\` in the BELL PR source folder and start BELL PR again; until then only the API answers.`,
+      `The web interface is not built: ${path} has no index.html. Run \`npm run build\` in the ${name} source folder and start ${name} again; until then only the API answers.`,
     /** Title and text of the page served while the web interface is missing. */
-    uiMissingTitle: "BELL PR: web interface not built",
+    uiMissingTitle: `${name}: web interface not built`,
     uiMissingPage:
-      "The BELL PR web interface is not built. Run npm run build in the BELL PR source folder, then start BELL PR again.",
+      `The ${name} web interface is not built. Run npm run build in the ${name} source folder, then start ${name} again.`,
     /** A host other than this computer or all addresses, without BELLPR_PUBLIC_URL. */
     publicUrlNeeded: ({ host }: { host: string }) =>
-      `BELL PR listens on ${host}. Browsers must reach it through the HTTPS address set in BELLPR_PUBLIC_URL; requests to other addresses are refused.`,
+      `${name} listens on ${host}. Browsers must reach it through the HTTPS address set in BELLPR_PUBLIC_URL; requests to other addresses are refused.`,
   },
   /** `bell-pr open`. */
   open: {
-    notRunning: `BELL PR is not running. Start it with \`${bin}\`.`,
+    notRunning: `${name} is not running. Start it with \`${bin}\`.`,
     noAnswer:
-      "BELL PR did not answer within 5 seconds. Check that it is still running, or restart it and use the sign-in link it prints.",
+      `${name} did not answer within 5 seconds. Check that it is still running, or restart it and use the sign-in link it prints.`,
     unavailable:
-      "Sign-in links are unavailable in this version of BELL PR. Restart BELL PR and use the sign-in link it prints.",
+      `Sign-in links are unavailable in this version of ${name}. Restart ${name} and use the sign-in link it prints.`,
     signalFailed: ({ reason }: { reason: string }) =>
-      `Could not reach the running BELL PR process: ${reason}`,
-    windows: `\`${bin} open\` does not work on Windows. Run BELL PR in WSL2 and use \`${bin} open\` there.`,
+      `Could not reach the running ${name} process: ${reason}`,
+    windows: `\`${bin} open\` does not work on Windows. Run ${name} in WSL2 and use \`${bin} open\` there.`,
     /** After the link: how long it lasts. */
     linkHint: "This link signs in one browser. It works once, within 2 minutes.",
   },
