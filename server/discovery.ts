@@ -3,7 +3,6 @@ import {
   mkdir,
   mkdtemp,
   readFile,
-  rename,
   rm,
   stat,
   writeFile,
@@ -44,6 +43,7 @@ import {
 import { agentEnvironment, command, redact } from "./process.js";
 import { collectDiscoveryCandidates } from "./discovery-sources.js";
 import { Store } from "./store.js";
+import { writeDurable } from "./fs-atomic.js";
 import { AgentSlots, defaultAgentProcessLimit } from "./agent-slots.js";
 import {
   agentTimeoutMs,
@@ -424,11 +424,7 @@ export class DiscoveryService {
     const value = JSON.stringify({ version: 1, job: this.job });
     this.writes = this.writes
       .catch(() => undefined)
-      .then(async () => {
-        const temporary = `${this.file}.tmp`;
-        await writeFile(temporary, value, { mode: 0o600 });
-        await rename(temporary, this.file);
-      });
+      .then(() => writeDurable(this.file, value));
     return this.writes;
   }
   async get(): Promise<{ job: DiscoveryJob | null }> {

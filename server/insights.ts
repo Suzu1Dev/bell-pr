@@ -1,11 +1,10 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import {
   lstat,
   mkdir,
   mkdtemp,
   readFile,
   realpath,
-  rename,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -34,6 +33,7 @@ import {
 } from "./git.js";
 import { agentEnvironment, command, git, redact } from "./process.js";
 import { Store } from "./store.js";
+import { writeDurable } from "./fs-atomic.js";
 import { AgentSlots, defaultAgentProcessLimit } from "./agent-slots.js";
 import {
   agentTimeoutMs,
@@ -338,13 +338,7 @@ function withoutModel(settings: ContributionSettings) {
 
 async function writeJsonAtomically(file: string, value: unknown) {
   await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
-  const temporary = `${file}.${randomUUID()}.tmp`;
-  try {
-    await writeFile(temporary, JSON.stringify(value, null, 2), { mode: 0o600 });
-    await rename(temporary, file);
-  } finally {
-    await rm(temporary, { force: true });
-  }
+  await writeDurable(file, JSON.stringify(value, null, 2));
 }
 
 /**
