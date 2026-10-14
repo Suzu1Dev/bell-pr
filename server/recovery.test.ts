@@ -541,13 +541,23 @@ test("a queued run resumes after a restart, oldest first, while a started one fa
     ...queuedRun("cccccccc-0000-4000-8000-000000000003", repo, f.dataDir, "2026-10-12T00:00:00.000Z"),
     baseSha: f.baseSha,
   };
-  await writeState(f.dataDir, { version: 1, repos: [repo], runs: [newer, older, started] });
+  // Its project is gone, so it cannot start.
+  const orphaned = {
+    ...queuedRun("eeeeeeee-0000-4000-8000-000000000005", repo, f.dataDir, "2026-10-12T00:00:03.000Z"),
+    repoId: "missing-repository",
+  };
+  await writeState(f.dataDir, {
+    version: 1,
+    repos: [repo],
+    runs: [newer, older, started, orphaned],
+  });
   const store = new Store(f.dataDir);
   await store.initialize();
   const byId = (id: string) => store.data.runs.find((run) => run.id === id)!;
   assert.equal(byId(newer.id).status, "queued");
   assert.equal(byId(older.id).status, "queued");
   assert.equal(byId(started.id).status, "failed");
+  assert.equal(byId(orphaned.id).status, "queued");
 
   const order: string[] = [];
   const plan = JSON.stringify({
@@ -575,10 +585,12 @@ test("a queued run resumes after a restart, oldest first, while a started one fa
     "both queued runs to reach their plans",
   );
   assert.deepEqual(order, [older.id, newer.id]);
+  assert.equal(byId(orphaned.id).status, "failed");
+  assert.equal(byId(orphaned.id).error, "Repository not found.");
   const resumed = byId(older.id);
   assert.equal(resumed.baseSha, f.baseSha);
   assert.equal(resumed.team?.tasks.length, 1);
-  assert.equal(resumed.logs[0].message, "The service restarted; this queued run starts again.");
+  assert.equal(resumed.logs[0].message, "The service restarted; this run is queued again.");
   // The worktree was created by the resumed run.
   assert.equal(
     (await git(resumed.worktreePath, ["rev-parse", "--abbrev-ref", "HEAD"])).stdout.trim(),

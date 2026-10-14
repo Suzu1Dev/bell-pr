@@ -240,8 +240,8 @@ export class Workbench {
 
   /**
    * Queues again, oldest first, the runs a restart left queued before they
-   * started (Store keeps them queued). Runs beyond the queue capacity fail
-   * with the queue-full message and can be retried.
+   * started (Store keeps them queued). Runs beyond the queue capacity, or
+   * whose project is gone, fail with the reason and can be retried.
    */
   resume() {
     const queued = this.store.data.runs
@@ -253,14 +253,21 @@ export class Workbench {
     ).length;
     let failed = false;
     for (const run of queued) {
-      if (used >= this.maxQueuedRuns) {
+      const full = used >= this.maxQueuedRuns;
+      const orphaned = !this.store.data.repos.some((repo) => repo.id === run.repoId);
+      if (full || orphaned) {
         run.status = "failed";
         run.error = withRunLocale(run, () =>
-          sm().run.queue.full({ max: this.maxQueuedRuns }),
+          orphaned
+            ? sm().run.repos.notFound
+            : sm().run.queue.full({ max: this.maxQueuedRuns }),
         );
         if (run.team) run.team.phase = "failed";
         failed = true;
-        log.warn("run.not_resumed", { runId: run.id, reason: "queue_full" });
+        log.warn("run.not_resumed", {
+          runId: run.id,
+          reason: orphaned ? "repository_missing" : "queue_full",
+        });
         continue;
       }
       used++;

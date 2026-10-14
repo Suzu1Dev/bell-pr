@@ -32,7 +32,7 @@ export default {
     publishingInterrupted:
       "Publishing was interrupted. Check GitHub, then publish again.",
     /** A run log line when a queued run starts again after a restart. */
-    resumed: "The service restarted; this queued run starts again.",
+    resumed: "The service restarted; this run is queued again.",
     /** A retry of a run that has no plan yet. */
     retryPlanning: "Retrying the run: the lead plans the task again.",
   },

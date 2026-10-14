@@ -29,7 +29,7 @@ const m: Translation<typeof en> = {
   },
   recovery: {
     publishingInterrupted: "發布中斷了。請先到 GitHub 確認狀態，再重新發布。",
-    resumed: "服務重新啟動；這個排隊中的工作重新開始。",
+    resumed: "服務重新啟動；這個工作已重新排隊。",
     retryPlanning: "重試這個工作：Lead 會重新規劃任務。",
   },
   workspace: {
