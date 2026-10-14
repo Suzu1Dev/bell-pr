@@ -468,7 +468,7 @@ test("bell-pr doctor prints the checklist with fix commands and exits by readine
   assert.match(text, /✗ AI provider +Install and sign in to the Codex CLI or Claude Code/);
   assert.match(text, /\n {8}npm install -g @openai\/codex\n/);
   assert.match(text, /\n {8}gh auth login\n/);
-  assert.match(text, /Not ready: fix the required checks marked ✗/);
+  assert.match(text, /Not ready: fix the required check marked ✗ \(AI provider\), then run the check again\./);
   let json = "";
   assert.equal(
     await runDoctorCli(["--json"], { stdout: { write: (chunk: string) => (json += chunk) } }),
@@ -587,7 +587,7 @@ test("the GitHub user answer and the Claude auth JSON are read defensively", () 
   };
   assert.equal(
     withLocale("en", () => formatDoctorReport(report)),
-    "BELL PR environment check\n\n  ✗ Node.js    v20.0.0  Too old.\n      L:\n        c\n  - Codex CLI  Not installed.\n\nNot ready: fix the required checks marked ✗, then run the check again.\n",
+    "BELL PR environment check\n\n  ✗ Node.js    v20.0.0  Too old.\n      L:\n        c\n  - Codex CLI  Not installed.\n\nNot ready: fix the required check marked ✗ (Node.js), then run the check again.\n",
   );
   // Chinese labels take two columns per character, and the punctuation
   // comes from the dictionary.
@@ -600,5 +600,22 @@ test("the GitHub user answer and the Claude auth JSON are read defensively", () 
   assert.ok(
     zh.includes("\n  ✗ Node.js   v20.0.0  Too old.\n      L：\n        c\n  - Git 身分  D\n"),
     zh,
+  );
+  // Ready to start, but a ✗ that is not required is named: publishing needs it.
+  const identity: DoctorReport = {
+    ...report,
+    ready: true,
+    checks: [
+      { id: "node", status: "ok", required: true },
+      { id: "git-identity", status: "fail", required: false, detail: "Not set." },
+    ],
+  };
+  assert.match(
+    withLocale("en", () => formatDoctorReport(identity)),
+    /\nReady: every required check passed\. Some steps need the check marked ✗ fixed first \(Git identity\)\.\n$/,
+  );
+  assert.match(
+    withLocale("zh-TW", () => formatDoctorReport(identity)),
+    /\n已就緒：所有必要的檢查都通過了。有些步驟要先修正標示 ✗ 的檢查（Git 身分）才能進行。\n$/,
   );
 });

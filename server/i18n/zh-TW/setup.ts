@@ -157,7 +157,10 @@ const m: Translation<typeof en> = {
   cli: {
     title: `${product.name} 環境檢查`,
     ready: "已就緒：所有必要的檢查都通過了。",
-    notReady: "尚未就緒：請修正標示 ✗ 的必要檢查，再重新檢查一次。",
+    readyExcept: ({ checks }) =>
+      `已就緒：所有必要的檢查都通過了。有些步驟要先修正標示 ✗ 的檢查（${fmt.list(checks)}）才能進行。`,
+    notReady: ({ checks }) =>
+      `尚未就緒：請修正標示 ✗ 的必要檢查（${fmt.list(checks)}），再重新檢查一次。`,
     dataDir: ({ path }) => `資料目錄：${path}`,
     fix: ({ label }) => `${label}：`,
     usage: `用法：${product.binNames[0]} doctor [--json] [--data-dir <目錄>]`,

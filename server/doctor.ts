@@ -1005,7 +1005,20 @@ export function formatDoctorReport(report: DoctorReport, dataDir?: string): stri
   }
   lines.push("");
   if (dataDir) lines.push(m.cli.dataDir({ path: dataDir }));
-  lines.push(report.ready ? m.cli.ready : m.cli.notReady);
+  // Name the ✗ rows, since a failed check that is not required does not
+  // stop the start but does stop a step (such as publishing).
+  const failed = (required: boolean) =>
+    report.checks
+      .filter((check) => check.status === "fail" && check.required === required)
+      .map((check) => labels[check.id]);
+  const blocked = failed(false);
+  lines.push(
+    !report.ready
+      ? m.cli.notReady({ checks: failed(true) })
+      : blocked.length
+        ? m.cli.readyExcept({ checks: blocked })
+        : m.cli.ready,
+  );
   return `${lines.join("\n")}\n`;
 }
 

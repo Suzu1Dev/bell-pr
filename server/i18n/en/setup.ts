@@ -193,8 +193,15 @@ export default {
   cli: {
     title: `${product.name} environment check`,
     ready: "Ready: every required check passed.",
-    notReady:
-      "Not ready: fix the required checks marked ✗, then run the check again.",
+    /** Ready, but checks that are not required failed: the steps that need them will not work. */
+    readyExcept: ({ checks }: { checks: string[] }) =>
+      fmt.plural(checks.length) === "one"
+        ? `Ready: every required check passed. Some steps need the check marked ✗ fixed first (${checks[0]}).`
+        : `Ready: every required check passed. Some steps need the checks marked ✗ fixed first (${fmt.list(checks)}).`,
+    notReady: ({ checks }: { checks: string[] }) =>
+      fmt.plural(checks.length) === "one"
+        ? `Not ready: fix the required check marked ✗ (${checks[0]}), then run the check again.`
+        : `Not ready: fix the required checks marked ✗ (${fmt.list(checks)}), then run the check again.`,
     dataDir: ({ path }: { path: string }) => `Data directory: ${path}`,
     /** The line above a fix command. */
     fix: ({ label }: { label: string }) => `${label}:`,
