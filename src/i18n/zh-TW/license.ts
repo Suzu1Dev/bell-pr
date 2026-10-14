@@ -60,7 +60,7 @@ const m: Translation<typeof en> = {
     activating: "啟用中…",
   },
   card: {
-    title: "授權",
+    title: "你的方案",
     checking: "正在確認授權…",
     status: {
       pro: "Pro 已生效。",

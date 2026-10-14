@@ -80,7 +80,7 @@ export default {
     activating: "Activating…",
   },
   card: {
-    title: "License",
+    title: "Your plan",
     checking: "Checking the license…",
     /** One line about the plan in effect. */
     status: {
