@@ -42,7 +42,7 @@ export function providerState(
   const tool = find(checkIds[provider].tool);
   const auth = find(checkIds[provider].auth);
   const state: CliState =
-    !tool || tool.status === "skip"
+    !tool || tool.status === "skip" || tool.reason === "missing"
       ? "missing"
       : tool.status !== "ok"
         ? "notWorking"

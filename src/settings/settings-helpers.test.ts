@@ -147,6 +147,13 @@ test("a CLI's state follows its install and sign-in checks", () => {
   );
   assert.equal(
     providerState(
+      report([{ id: "codex", status: "skip", reason: "missing", required: false }]),
+      "codex",
+    ).state,
+    "missing",
+  );
+  assert.equal(
+    providerState(
       report([
         { id: "claude", status: "ok", required: false },
         { id: "claude-auth", status: "warn", required: false },
@@ -169,6 +176,15 @@ test("a CLI's state follows its install and sign-in checks", () => {
   assert.deepEqual(githubState(report([{ id: "gh", status: "skip", required: false }])), {
     state: "missing",
   });
+  // The doctor words a missing GitHub CLI as a warning with the reason.
+  assert.deepEqual(
+    githubState(report([{ id: "gh", status: "warn", reason: "missing", required: false }])),
+    { state: "missing" },
+  );
+  assert.deepEqual(
+    githubState(report([{ id: "gh", status: "warn", reason: "broken", required: false }])),
+    { state: "notWorking" },
+  );
   assert.deepEqual(
     githubState(
       report([

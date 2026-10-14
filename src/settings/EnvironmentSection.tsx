@@ -15,7 +15,9 @@ export function githubState(report: DoctorReport | null): {
   if (!report) return { state: "checking" };
   const gh = report.checks.find((check) => check.id === "gh");
   const auth = report.checks.find((check) => check.id === "gh-auth");
-  if (!gh || gh.status === "skip") return { state: "missing" };
+  // The doctor reports a missing GitHub CLI as a warning, not a skip.
+  if (!gh || gh.status === "skip" || gh.reason === "missing")
+    return { state: "missing" };
   if (gh.status !== "ok") return { state: "notWorking" };
   if (auth?.status !== "ok") return { state: "signedOut" };
   const login = auth.params?.login ?? auth.detail;
