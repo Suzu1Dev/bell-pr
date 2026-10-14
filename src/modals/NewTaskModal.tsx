@@ -12,6 +12,7 @@ import { getDemo } from "../demo";
 import { useLocale, useT } from "../i18n";
 import type { Repo } from "../types";
 import { DirectionSettings } from "../mission";
+import { providerReadiness } from "../mission/readiness";
 import { providerLabels } from "../../shared/models";
 import type { ModalName, Page } from "../app/AppShell";
 import type { TaskSetup } from "../app/hooks/useTaskSetup";
@@ -85,6 +86,12 @@ export function NewTaskModal({
   const readiness = readinessOf(doctor.report, ["provider"]);
   const unready =
     !demo && !readiness.ready && !(readiness.checking && doctor.error);
+  // DirectionSettings names the selected provider's problem next to its
+  // picker; the notice by the Start button covers the other cases.
+  const providerShown =
+    !demo &&
+    (providerReadiness(doctor.report, contributionSettings.provider ?? "codex")
+      ?.state ?? "ready") !== "ready";
   return (
     <Modal
       wide
@@ -155,6 +162,8 @@ export function NewTaskModal({
             value={contributionSettings}
             onChange={changeContributionSettings}
             compact
+            demo={demo}
+            doctor={doctor}
           />
         </fieldset>
         <button
@@ -206,12 +215,14 @@ export function NewTaskModal({
             provider: providerLabels[contributionSettings.provider ?? "codex"],
           })}
         </p>
-        <ReadinessNotice
-          requires={["provider"]}
-          bypass={demo}
-          doctor={doctor}
-          maskUser={maskUser}
-        />
+        {!providerShown && (
+          <ReadinessNotice
+            requires={["provider"]}
+            bypass={demo}
+            doctor={doctor}
+            maskUser={maskUser}
+          />
+        )}
         {formError && (
           <p role="alert" className="inline-error">
             {formError}

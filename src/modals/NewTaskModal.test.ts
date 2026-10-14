@@ -205,6 +205,36 @@ test("a run waits for a ready AI provider and shows the fix; the sample does not
   assert.doesNotMatch(submit(failed), /disabled=""/);
 });
 
+test("a provider that is not ready is explained once, next to its picker", () => {
+  const prompt = "Add timeout retries and tests to widgets";
+  const base = report("fail");
+  const codexFails: DoctorReport = {
+    ...base,
+    checks: [
+      ...base.checks,
+      {
+        id: "codex",
+        status: "fail",
+        required: false,
+        detail: "The Codex CLI exited with code 1.",
+        fixes: [{ label: "Install the Codex CLI", command: "npm install -g @openai/codex" }],
+      },
+    ],
+  };
+  const html = renderEn(element({ prompt }, { doctor: doctor(codexFails) }));
+  // DirectionSettings shares the shell's report and says what is wrong with
+  // the chosen provider; the dialog adds no second notice, and still waits.
+  assert.equal(html.match(/class="readiness-notice"/g)?.length, 1);
+  assert.match(html, /The Codex CLI exited with code 1\./);
+  assert.match(submit(html), /disabled=""/);
+  assertNoHan(html);
+  // The sample checks nothing, in the dialog or in the form.
+  const sample = renderEn(
+    element({ prompt, taskRepoId: "demo-repo" }, { doctor: doctor(codexFails) }),
+  );
+  assert.doesNotMatch(sample, /readiness-notice/);
+});
+
 test("the dialog states the team size each plan allows", () => {
   assert.match(
     renderEn(element()),
