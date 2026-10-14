@@ -345,6 +345,19 @@ test("on the Free plan a second run stays queued and a 3-teammate request runs w
   assert.equal(pro.logs.some((entry) => entry.kind === "notice"), false);
 });
 
+test("analysis and discovery follow a changed agent timeout scale", async (t) => {
+  const f = await temporary(t);
+  const { workbench } = await workbenchWithProject(f);
+  const { app, call } = await serve(f, workbench);
+  const before = workbench.agentTimeoutScale;
+  assert.notEqual(before, 3);
+  assert.equal(app.locals.insights.timeoutScale, before);
+  assert.equal(app.locals.discovery.timeoutScale, before);
+  assert.equal((await call("PUT", "/api/app-settings", { agentTimeoutScale: 3 })).status, 200);
+  assert.equal(app.locals.insights.timeoutScale, 3);
+  assert.equal(app.locals.discovery.timeoutScale, 3);
+});
+
 /** Stand-ins for a machine where only Claude Code is installed and signed in. */
 const claudeOnly = {
   git: `case "$1" in

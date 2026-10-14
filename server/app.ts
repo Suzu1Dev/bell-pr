@@ -81,7 +81,10 @@ export interface AppOptions {
   frontendPort?: number;
   /** CLI slots for analysis and discovery; the Workbench's by default. */
   agentSlots?: AgentSlots;
-  /** Scales analysis and discovery timeouts; the Workbench's by default. */
+  /**
+   * Scales analysis and discovery timeouts. By default the Workbench's,
+   * read for each agent call so a changed app setting applies.
+   */
   agentTimeoutScale?: number;
   /** The session secret for sign-in; passed to the guard. */
   sessionToken?: string;
@@ -110,7 +113,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
     staticDirectory = defaultStaticDir(),
     allowedOrigins = "",
     agentSlots = workbench.agentSlots,
-    agentTimeoutScale = workbench.agentTimeoutScale,
+    agentTimeoutScale = () => workbench.agentTimeoutScale,
     license = fixedLicense("pro"),
   } = options;
   const insights = new ProjectInsightsService(workbench.store, {

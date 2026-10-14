@@ -523,7 +523,6 @@ export async function startServer(
       staticDirectory: config.staticDir,
       version,
       agentSlots,
-      agentTimeoutScale: config.limits.agentTimeoutScale,
       license,
     });
     handler = app;
