@@ -3,6 +3,7 @@ import test, { afterEach } from "node:test";
 import { defaultContributionSettings } from "../../../shared/insights";
 import { getDemo } from "../../demo";
 import {
+  demoRunInLocale,
   demoRunKey,
   demoSettingsKey,
   loadDemo,
@@ -95,4 +96,39 @@ test("blocked or missing storage never breaks the demo", () => {
   });
   assert.equal(loadDemo("zh-TW").id, getDemo("zh-TW").run.id);
   assert.doesNotThrow(() => saveDemoSettings("zh-TW", defaultContributionSettings));
+});
+
+test("a language switch shows the demo in the new locale and keeps the reader's progress", () => {
+  const zh = getDemo("zh-TW");
+  const path = zh.files[0].path;
+  const before = {
+    ...zh.run,
+    team: structuredClone(zh.team),
+    reviewedFiles: [path],
+    status: "approved" as const,
+    draft: { title: "My title", body: "My body" },
+    notes: {
+      [path]: { text: "a note", fingerprint: "f", updatedAt: "2026-10-14T00:00:00Z" },
+    },
+  };
+  const after = demoRunInLocale(before, "en");
+  const en = getDemo("en");
+  assert.equal(after.title, en.run.title);
+  assert.deepEqual(after.team, en.team);
+  assert.notEqual(after.team, en.team, "the fixture team is copied");
+  assert.deepEqual(after.reviewedFiles, [path]);
+  assert.equal(after.status, "approved");
+  assert.deepEqual(after.draft, before.draft);
+  assert.deepEqual(after.notes, before.notes);
+  // Guidance appears only once the reader prepared it, then in the new locale.
+  assert.equal(after.draftPreparation, undefined);
+  const prepared = demoRunInLocale(
+    { ...before, draftPreparation: structuredClone(zh.draftPreparation) },
+    "en",
+  );
+  assert.deepEqual(prepared.draftPreparation, en.draftPreparation);
+  assert.notEqual(prepared.draftPreparation, en.draftPreparation);
+  // Any other run is left as it is.
+  const other = { ...before, id: "run-1" };
+  assert.equal(demoRunInLocale(other, "en"), other);
 });

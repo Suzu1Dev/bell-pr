@@ -47,6 +47,26 @@ export function loadDemo(locale: Locale): Run {
   };
 }
 
+/**
+ * The open demo run in `locale`'s fixtures, keeping the reader's review
+ * progress, draft and notes. Draft guidance the reader already prepared is
+ * shown in the new locale.
+ */
+export function demoRunInLocale(previous: Run, locale: Locale): Run {
+  const { run, team, draftPreparation } = getDemo(locale);
+  if (previous.id !== run.id) return previous;
+  return {
+    ...run,
+    team: structuredClone(team),
+    reviewedFiles: previous.reviewedFiles,
+    draft: previous.draft,
+    status: previous.status,
+    notes: previous.notes,
+    draftPreparation:
+      previous.draftPreparation && structuredClone(draftPreparation),
+  };
+}
+
 /** Remembers the demo run's progress for `locale`. */
 export function saveDemo(locale: Locale, run: Run) {
   write(demoRunKey(locale), run);

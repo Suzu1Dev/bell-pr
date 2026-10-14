@@ -15,7 +15,12 @@ import type { Locale } from "../../../shared/i18n/locale";
 import { summarizeRun } from "../../../shared/runs";
 import { activeFollowUp } from "../../../shared/followups";
 import type { ModalName, Notify, Page, Tab } from "../AppShell";
-import { loadDemo, saveDemo, saveDemoSettings } from "./demoStorage";
+import {
+  demoRunInLocale,
+  loadDemo,
+  saveDemo,
+  saveDemoSettings,
+} from "./demoStorage";
 import type { DraftEditor } from "./useDraftEditor";
 import type { TaskSetup } from "./useTaskSetup";
 
@@ -161,21 +166,9 @@ export function useRunActions({
   const showInLocale = useRef((next: Locale) => void next);
   showInLocale.current = (next: Locale) => {
     if (demo) {
-      const content = getDemo(next);
       demoLocale.current = next;
-      setRun((previous) =>
-        previous.id === content.run.id
-          ? {
-              ...content.run,
-              team: structuredClone(content.team),
-              reviewedFiles: previous.reviewedFiles,
-              draft: previous.draft,
-              status: previous.status,
-              notes: previous.notes,
-            }
-          : previous,
-      );
-      setFiles(content.files);
+      setRun((previous) => demoRunInLocale(previous, next));
+      setFiles(getDemo(next).files);
       return;
     }
     void reloadRun(run.id);
