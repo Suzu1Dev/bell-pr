@@ -137,6 +137,18 @@ test("command() keeps the spawn error as cause and the raw stderr and exit code 
       return true;
     },
   );
+  // A working directory that is gone fails the spawn with ENOENT too, but
+  // the tool is there: no setup code, the spawn error stays the cause.
+  await assert.rejects(
+    command("git", ["--version"], { cwd: path.join(directory, "gone") }),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.code, undefined);
+      assert.equal(error.statusCode, 503);
+      assert.equal((error.cause as NodeJS.ErrnoException).code, "ENOENT");
+      return true;
+    },
+  );
   const script = path.join(directory, "gh");
   await writeFile(
     script,

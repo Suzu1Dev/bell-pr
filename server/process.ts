@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
 import type { AgentProvider } from "../shared/models.js";
 import { log } from "./log.js";
 import { redact } from "./secrets.js";
@@ -226,18 +227,21 @@ export async function command(
       });
       child.on("error", (error) => {
         // One whole sentence; callers that need the reason read cause.code.
-        failure = withCliSetupHint(
-          new AppError(
-            (m) =>
-              m.run.command.spawnFailed({
-                executable,
-                reason: redact(error.message),
-              }),
-            503,
-            { cause: error },
-          ),
-          executable,
-        ) as Error;
+        const spawnFailure = new AppError(
+          (m) =>
+            m.run.command.spawnFailed({
+              executable,
+              reason: redact(error.message),
+            }),
+          503,
+          { cause: error },
+        );
+        // A working directory that is gone fails the spawn with ENOENT as
+        // well; only an executable that cannot be found is a setup problem.
+        failure =
+          options.cwd && !existsSync(options.cwd)
+            ? spawnFailure
+            : (withCliSetupHint(spawnFailure, executable) as Error);
       });
       child.on("close", (code) => {
         clearTimeout(timer);
