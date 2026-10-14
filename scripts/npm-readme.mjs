@@ -3,29 +3,38 @@
  * The README that the npm package carries, and the checks of the READMEs
  * and docs/.
  *
- *   node scripts/npm-readme.mjs --pre          prepack: rewrite README.md for npm
- *   node scripts/npm-readme.mjs --post         postpack: restore README.md
+ *   node scripts/npm-readme.mjs --pre          prepack: ready README.md for npm
+ *   node scripts/npm-readme.mjs --post         postpack: restore the READMEs
  *   node scripts/npm-readme.mjs --check-docs   links, anchors and error codes
  *   node scripts/npm-readme.mjs --self-test    this script, on fixtures
  *
- * npmjs.com shows the package's README.md but cannot resolve a relative
- * path in it: the package leaves docs/ and the translated README out (the
- * `files` list in package.json), and it names no repository while the
- * source repository is private. Screenshots would show as broken images.
+ * npmjs.com shows the package's README but cannot resolve a relative path
+ * in it: the package leaves docs/ out (the `files` list in package.json),
+ * and it names no repository while the source repository is private.
+ * Screenshots would show as broken images. And npm packs every README.* at
+ * the root, whatever `files` says, then takes the first Markdown README its
+ * file search returns as the package's README, which can be
+ * README.zh-TW.md.
  *
- * --pre copies README.md byte for byte to .README.md.orig (gitignored and
- * never packed), then rewrites every relative image and link in README.md:
+ * --pre keeps the originals in the folder .README.md.orig (gitignored, and
+ * never packed): a byte copy of README.md, and the other root README.*
+ * files, moved there so the package holds README.md alone. It then
+ * rewrites every relative image and link in README.md:
  *   - while `homepageUrl` in shared/product.ts is set, to the absolute
  *     `<homepageUrl>/<path>`, so the website must serve the repository's
  *     files at the same paths (docs/images/… above all);
  *   - while it is empty, an image becomes the text "Screenshot: <alt>" and
  *     a link keeps its text without the link.
  * Links within the page (#…), absolute URLs and everything in code stay as
- * they are. --pre refuses to run while .README.md.orig exists: that file is
- * the original from a pack that did not finish, so run --post first.
+ * they are. --pre refuses to run while .README.md.orig exists: it holds the
+ * originals from a pack that did not finish, so run --post first.
  *
- * --post moves .README.md.orig back over README.md, so the working tree is
+ * --post moves everything in .README.md.orig back, so the working tree is
  * byte for byte what it was before the pack.
+ *
+ * npm reads the README for `npm publish` again after postpack, so publish
+ * the packed tarball (`npm publish bell-pr-<version>.tgz`, as the release
+ * workflow does), never the folder.
  *
  * --check-docs reads README.md, README.zh-TW.md and every Markdown file in
  * docs/, and fails when
@@ -352,25 +361,43 @@ function readProduct(root) {
   return productValues(source);
 }
 
+/**
+ * The root files besides README.md that npm would pack as READMEs, as
+ * npm-packlist's `/readme{,.*[^~$]}` rule matches them.
+ */
+function otherReadmes(root) {
+  return fs
+    .readdirSync(root, { withFileTypes: true })
+    .filter(
+      (entry) =>
+        entry.isFile() && entry.name !== readmeName && /^readme(?:\..*[^~$])?$/i.test(entry.name),
+    )
+    .map((entry) => entry.name)
+    .sort();
+}
+
 function pre(root, log) {
   const readme = path.join(root, readmeName);
   const backup = path.join(root, backupName);
   if (fs.existsSync(backup)) {
     log(
-      `npm-readme: ${backupName} holds README.md from a pack that did not finish. Run ${command} --post to restore README.md, then pack again.`,
+      `npm-readme: ${backupName} holds the READMEs from a pack that did not finish. Run ${command} --post to restore them, then pack again.`,
     );
     return 1;
   }
   const product = readProduct(root);
   const original = fs.readFileSync(readme);
   const { text, changed } = npmReadme(original.toString("utf8"), product);
-  // "wx": never overwrite a backup, whatever happened since the check.
-  fs.writeFileSync(backup, original, { flag: "wx" });
+  const others = otherReadmes(root);
+  // mkdir without `recursive` fails if the folder appeared since the check.
+  fs.mkdirSync(backup);
+  fs.writeFileSync(path.join(backup, readmeName), original, { flag: "wx" });
+  for (const name of others) fs.renameSync(path.join(root, name), path.join(backup, name));
   fs.writeFileSync(readme, text);
   log(
     `npm-readme: README.md rewritten for the package (${changed.images} image(s), ${changed.links} link(s), ${
       product.homepageUrl.trim() ? "made absolute" : "as text: homepageUrl is empty"
-    }); ${backupName} keeps the original until postpack.`,
+    })${others.length ? `; ${others.join(", ")} set aside` : ""}. ${backupName} keeps the originals until postpack.`,
   );
   return 0;
 }
@@ -379,13 +406,26 @@ function post(root, log) {
   const readme = path.join(root, readmeName);
   const backup = path.join(root, backupName);
   if (!fs.existsSync(backup)) {
-    log(`npm-readme: no ${backupName}, so README.md was not rewritten; nothing to restore.`);
+    log(`npm-readme: no ${backupName}, so no README was changed; nothing to restore.`);
     return 0;
   }
-  // Writing over README.md keeps its file mode; the bytes are the original's.
-  fs.writeFileSync(readme, fs.readFileSync(backup));
-  fs.rmSync(backup);
-  log("npm-readme: README.md restored.");
+  const saved = fs.readdirSync(backup);
+  const taken = saved.filter((name) => name !== readmeName && fs.existsSync(path.join(root, name)));
+  if (taken.length) {
+    log(
+      `npm-readme: ${taken.join(", ")} exist again at the root, so nothing was restored. Compare them with the copies in ${backupName}, keep one of each, then run ${command} --post again.`,
+    );
+    return 1;
+  }
+  for (const name of saved)
+    if (name !== readmeName) fs.renameSync(path.join(backup, name), path.join(root, name));
+  if (saved.includes(readmeName)) {
+    // Writing over README.md keeps its file mode; the bytes are the original's.
+    fs.writeFileSync(readme, fs.readFileSync(path.join(backup, readmeName)));
+    fs.rmSync(path.join(backup, readmeName));
+  }
+  fs.rmdirSync(backup);
+  log("npm-readme: the READMEs are restored.");
   return 0;
 }
 
@@ -643,25 +683,55 @@ function selfTest() {
     };
     const quiet = () => {};
 
-    // --pre and --post: the original comes back byte for byte.
+    // --pre and --post: the originals come back byte for byte.
     const original = Buffer.from("# Fixture\r\n\r\n![Shot](docs/images/a.png)\r\n[Docs](docs/a.md)", "utf8");
+    const translated = Buffer.from("# 範例\n\n![圖](docs/images/b.png)\n", "utf8");
+    const at = (...parts) => path.join(temp, ...parts);
     write("README.md", original);
+    write("README.zh-TW.md", translated);
+    write("readme.txt", "plain");
+    write("README.md~", "an editor backup npm does not pack");
+    write("docs/README.md", "# Docs index stays\n");
     write("shared/product.ts", source(""));
+    assert.deepEqual(otherReadmes(temp), ["README.zh-TW.md", "readme.txt"]);
     assert.equal(pre(temp, quiet), 0);
-    assert.deepEqual(fs.readFileSync(path.join(temp, backupName)), original);
-    assert.equal(fs.readFileSync(path.join(temp, "README.md"), "utf8"), "# Fixture\r\n\r\n*Screenshot: Shot*\r\nDocs");
+    assert.deepEqual(fs.readFileSync(at(backupName, "README.md")), original);
+    assert.deepEqual(fs.readFileSync(at(backupName, "README.zh-TW.md")), translated);
+    assert.deepEqual(fs.readdirSync(at(backupName)).sort(), ["README.md", "README.zh-TW.md", "readme.txt"]);
+    assert.equal(fs.existsSync(at("README.zh-TW.md")), false, "the package holds README.md alone");
+    assert.equal(fs.existsSync(at("readme.txt")), false);
+    assert.ok(fs.existsSync(at("README.md~")) && fs.existsSync(at("docs", "README.md")));
+    assert.equal(fs.readFileSync(at("README.md"), "utf8"), "# Fixture\r\n\r\n*Screenshot: Shot*\r\nDocs");
     assert.equal(pre(temp, quiet), 1, "a backup from an unfinished pack blocks --pre");
-    assert.deepEqual(fs.readFileSync(path.join(temp, backupName)), original, "and stays untouched");
+    assert.deepEqual(fs.readFileSync(at(backupName, "README.md")), original, "and stays untouched");
     assert.equal(post(temp, quiet), 0);
-    assert.deepEqual(fs.readFileSync(path.join(temp, "README.md")), original);
-    assert.equal(fs.existsSync(path.join(temp, backupName)), false);
+    assert.deepEqual(fs.readFileSync(at("README.md")), original);
+    assert.deepEqual(fs.readFileSync(at("README.zh-TW.md")), translated);
+    assert.equal(fs.readFileSync(at("readme.txt"), "utf8"), "plain");
+    assert.equal(fs.existsSync(at(backupName)), false);
     assert.equal(post(temp, quiet), 0, "--post without a backup does nothing");
-    assert.deepEqual(fs.readFileSync(path.join(temp, "README.md")), original);
+    assert.deepEqual(fs.readFileSync(at("README.md")), original);
+    // A translated README that reappeared meanwhile is never overwritten.
+    assert.equal(pre(temp, quiet), 0);
+    write("README.zh-TW.md", "new text");
+    assert.equal(post(temp, quiet), 1);
+    assert.equal(fs.readFileSync(at("README.zh-TW.md"), "utf8"), "new text");
+    assert.deepEqual(fs.readFileSync(at(backupName, "README.zh-TW.md")), translated);
+    fs.rmSync(at("README.zh-TW.md"));
+    assert.equal(post(temp, quiet), 0);
+    assert.deepEqual(fs.readFileSync(at("README.zh-TW.md")), translated);
+    // A README that cannot become text stops --pre before anything moves.
+    write("README.md", "[x][r]\n\n[r]: docs/a.md\n");
+    assert.throws(() => pre(temp, quiet), /inline link/);
+    assert.equal(fs.existsSync(at(backupName)), false);
+    assert.ok(fs.existsSync(at("README.zh-TW.md")));
+    write("README.md", original);
     write("shared/product.ts", source("https://bell.example.test"));
     assert.equal(pre(temp, quiet), 0);
-    assert.ok(fs.readFileSync(path.join(temp, "README.md"), "utf8").includes("](https://bell.example.test/docs/images/a.png)"));
+    assert.ok(fs.readFileSync(at("README.md"), "utf8").includes("](https://bell.example.test/docs/images/a.png)"));
     assert.equal(post(temp, quiet), 0);
-    assert.deepEqual(fs.readFileSync(path.join(temp, "README.md")), original);
+    assert.deepEqual(fs.readFileSync(at("README.md")), original);
+    for (const name of ["readme.txt", "README.md~", "docs/README.md"]) fs.rmSync(at(name));
 
     // --check-docs on a small repository.
     write("shared/product.ts", source(""));
