@@ -1135,7 +1135,6 @@ function AppShell({
           <TeamPage beginContribution={beginContribution} />
         ) : page === "learning" ? (
           <LearningPage
-            runs={runs}
             repos={repos}
             chooseRun={chooseRun}
             setSelectedPath={setSelectedPath}
