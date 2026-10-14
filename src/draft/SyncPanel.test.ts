@@ -48,7 +48,9 @@ test("an unpublished run shows its base, its conflicts with the agent action, an
   assert.match(html, /仍有衝突標記/);
   assert.equal(button(html, "請 Agent 解決衝突"), "enabled");
   assert.match(html, /復原同步/);
-  assert.equal(button(html, "同步到最新目標分支"), "enabled");
+  // The server refuses another sync until these conflicts are resolved.
+  assert.equal(button(html, "同步到最新目標分支"), "disabled");
+  assert.match(html, /上一次同步的衝突解決前不能再同步/);
 });
 
 test("a published PR syncs only when no round is open, and has no undo", () => {
@@ -90,9 +92,13 @@ test("resolved conflicts drop the agent action, and a run awaiting plan approval
   const done = render({ ...base, sync: { ...sync, unresolved: [] } });
   assert.match(done, /衝突標記都已移除/);
   assert.doesNotMatch(done, /請 Agent 解決衝突/);
+  assert.equal(button(done, "同步到最新目標分支"), "enabled");
+  assert.doesNotMatch(done, /衝突解決前不能再同步/);
   const planning = render({ ...base, status: "awaiting_plan", sync });
-  assert.equal(button(planning, "同步到最新目標分支"), "enabled");
+  assert.equal(button(planning, "同步到最新目標分支"), "disabled");
   assert.equal(button(planning, "請 Agent 解決衝突"), "disabled");
+  const planned = render({ ...base, status: "awaiting_plan", sync: { ...sync, unresolved: [] } });
+  assert.equal(button(planned, "同步到最新目標分支"), "enabled");
   // Once the plan is approved the team runs; that is not the conflict agent.
   const team = render({ ...base, status: "running", sync });
   assert.doesNotMatch(team, /正在解衝突/);

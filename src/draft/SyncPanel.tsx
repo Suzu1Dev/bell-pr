@@ -35,12 +35,17 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
     !run.publishing &&
     (published
       ? run.status === "published" && !round
-      : syncable);
+      : // The server refuses a new sync while the last one's conflicts are open.
+        syncable && !open.length);
   // Why an unpublished run cannot sync, unless the conflict agent is at work.
   const waitNote =
-    published || running || syncable
+    published || running
       ? ""
-      : "只有審閱中、已核准或等待計畫核准的工作可以同步到最新目標分支。";
+      : open.length
+        ? "上一次同步的衝突解決前不能再同步。"
+        : syncable
+          ? ""
+          : "只有審閱中、已核准或等待計畫核准的工作可以同步到最新目標分支。";
   const canUndo =
     !published &&
     !!run.sync &&
