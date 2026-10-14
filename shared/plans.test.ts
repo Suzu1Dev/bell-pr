@@ -78,8 +78,8 @@ test("re-running the review is Free and Pro-only efforts are real efforts", () =
   for (const effort of proOnlyEfforts) assert.ok(reasoningEfforts.includes(effort));
 });
 
-test("the plan table has the 19 rows in order, and every Pro feature gates one row", () => {
-  assert.equal(planFeatureIds.length, 19);
+test("the plan table has the 20 rows in order, and every Pro feature gates one row", () => {
+  assert.equal(planFeatureIds.length, 20);
   assert.deepEqual(planFeatureTable.map((row) => row.id), [...planFeatureIds]);
   for (const feature of proFeatures) {
     const rows = planFeatureTable.filter((row) => row.feature === feature);
@@ -92,6 +92,9 @@ test("the plan table has the 19 rows in order, and every Pro feature gates one r
   assert.equal(tier("parallelRuns"), "free-limited");
   assert.equal(tier("discovery"), "pro");
   assert.equal(tier("licenseTerm"), "pro");
+  // Syncing, conflict resolution and updating the clone are Free (README §10 row 20).
+  assert.equal(tier("sync"), "free");
+  assert.equal(planFeatureIds.indexOf("sync"), planFeatureIds.indexOf("publish") + 1);
 });
 
 test("the purchase link is not part of the plans module", () => {
@@ -117,4 +120,7 @@ test("the English copy uses the amended Free/Pro wording", () => {
   assert.doesNotMatch(all, /one analysis per project/i);
   assert.doesNotMatch(all, /\p{Script_Extensions=Han}/u);
   assert.match(zh.features.parallelRuns.limit, /一次進行一項貢獻/);
+  // AI follow-up rounds are Pro under prFeedback (1U).
+  assert.match(en.features.prFeedback.label, /follow-up rounds/);
+  assert.match(zh.features.prFeedback.label, /後續修改回合/);
 });

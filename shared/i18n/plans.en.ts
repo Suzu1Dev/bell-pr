@@ -53,6 +53,11 @@ const plans = {
       label: "Rule-aware PR draft, preflight checks, publishing a Draft PR",
       limit: "Human approval is required on every plan",
     },
+    sync: {
+      label:
+        "Syncing a run onto the latest target branch, agent conflict resolution, updating a project's local clone",
+      limit: "No limit (unpublished runs and published PRs)",
+    },
     learningNotes: {
       label: "Learning notes page",
       limit: "No limit",
@@ -62,9 +67,9 @@ const plans = {
       limit: "Free: not available (the notes page stays Free)",
     },
     prFeedback: {
-      label: "Maintainer feedback and CI coaching",
+      label: "Maintainer feedback, CI coaching and AI follow-up rounds",
       limit:
-        "Free: not available; the sample project shows example feedback labelled PRO",
+        "Free: not available; the sample project shows example feedback labelled PRO. Follow-up rounds already on a run stay readable after a downgrade, and an open round can still be reviewed, pushed, stopped or discarded.",
     },
     discovery: {
       label: "Discovery (GitHub-wide recommendations)",

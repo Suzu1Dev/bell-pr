@@ -57,6 +57,18 @@ export const freeEntitlements: Entitlements = Object.freeze({
 });
 
 /**
+ * The most runs Pro and the trial execute at once; the configured limit
+ * (1-8: BELLPR_MAX_ACTIVE_RUNS or the app settings) applies below it.
+ */
+export const proMaxActiveRuns = 8;
+
+/** How long the Pro trial lasts; each data directory gets one. */
+export const trialDays = 14;
+
+/** Pro stays on this many days after a license's expiry date. */
+export const licenseGraceDays = 7;
+
+/**
  * Pro unlocks every feature; `maxActiveRuns` is the configured concurrency.
  * The trial grants the same with `plan: "trial"`.
  */
@@ -92,8 +104,16 @@ export interface LicenseSummary {
   /** ISO date until which new builds are covered. */
   updatesUntil?: string;
   trialDaysLeft?: number;
-  /** True while this data directory has not used its trial. */
+  /**
+   * True while this data directory has not used its trial and no Pro
+   * license is active, so the trial can start.
+   */
   trialAvailable?: boolean;
+  /**
+   * True while BELLPR_LICENSE_KEY is set: the key can only change there,
+   * so the app shows the license read-only.
+   */
+  envLocked?: boolean;
 }
 
 /**
@@ -123,6 +143,7 @@ export const planFeatureIds = [
   "review",
   "reviewRerun",
   "publish",
+  "sync",
   "learningNotes",
   "learningExport",
   "prFeedback",
@@ -160,6 +181,7 @@ export const planFeatureTable: readonly PlanFeatureRow[] = [
   { id: "review", tier: "free" },
   { id: "reviewRerun", tier: "free" },
   { id: "publish", tier: "free" },
+  { id: "sync", tier: "free" },
   { id: "learningNotes", tier: "free" },
   { id: "learningExport", tier: "pro", feature: "learningExport" },
   { id: "prFeedback", tier: "pro", feature: "prFeedback" },

@@ -9,7 +9,7 @@ import { redact } from "./process.js";
 import { DiscoveryService } from "./discovery.js";
 import type { AgentSlots } from "./agent-slots.js";
 import { localhostGuard, parseAllowedOrigins } from "./http-guard.js";
-import type { LicenseService } from "./license.js";
+import { fixedLicense, type LicenseService } from "./license.js";
 import type { ApiErrorBody } from "../shared/errors.js";
 import { formatters, htmlLang, parseLocale } from "../shared/i18n/locale.js";
 import { defaultStaticDir } from "./config.js";
@@ -85,7 +85,11 @@ export interface AppOptions {
   agentTimeoutScale?: number;
   /** The session secret for sign-in; passed to the guard. */
   sessionToken?: string;
-  /** The plan in effect, for Pro gating; route modules get it too. */
+  /**
+   * The plan in effect, for Pro gating; route modules get it too. Pro
+   * (`fixedLicense('pro')`) by default, for library use and tests;
+   * `startServer` passes the offline license service, which fails closed.
+   */
   license?: LicenseService;
   /** The app version the API reports. */
   version?: string;
@@ -107,6 +111,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
     allowedOrigins = "",
     agentSlots = workbench.agentSlots,
     agentTimeoutScale = workbench.agentTimeoutScale,
+    license = fixedLicense("pro"),
   } = options;
   const insights = new ProjectInsightsService(workbench.store, {
     getModelCatalog: (provider) => workbench.models(provider),
@@ -162,7 +167,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
     discovery,
     agentSlots,
     options,
-    license: options.license,
+    license,
   };
   // No two of these routes match the same request, so the order of the
   // modules cannot change which handler answers.

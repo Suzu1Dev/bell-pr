@@ -4,18 +4,21 @@ import {
   followUpFeedbackLimit,
   followUpNoteLimit,
 } from "../../shared/followups.js";
+import { fixedLicense, requirePro } from "../license.js";
 import type { RouteDeps } from "./types.js";
 
 /**
  * Review follow-up rounds on a published PR: starting one from the selected
  * maintainer feedback and discarding the one waiting for review. Pushing a
  * round goes through POST /api/runs/:id/publish like a first publish.
+ * Starting a round is Pro (prFeedback); a round that is already open can
+ * still be discarded, reviewed and pushed on every plan.
  */
 export function registerFollowUpsRoutes(
   app: Express,
-  { workbench }: RouteDeps,
+  { workbench, license = fixedLicense("free") }: RouteDeps,
 ) {
-  app.post("/api/runs/:id/follow-ups", async (req, res) => {
+  app.post("/api/runs/:id/follow-ups", requirePro(license, "prFeedback"), async (req, res) => {
     const input = z
       .object({
         feedbackUrls: z

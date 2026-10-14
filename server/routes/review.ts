@@ -4,6 +4,7 @@ import { runDraftSchema } from "../drafts.js";
 import { learningExport } from "../learning-export.js";
 import { publishChecks } from "../publish.js";
 import { currentLocale } from "../i18n/index.js";
+import { fixedLicense, requirePro } from "../license.js";
 import type { RouteDeps } from "./types.js";
 
 // The commit message is passed to git verbatim, so newline is the only control character allowed.
@@ -12,10 +13,17 @@ const commitMessageField = runDraftSchema.shape.commitMessage;
 /**
  * Reviewing a run's changes and publishing them: the learning export, the
  * diff, chat and explanations, the PR draft, notes, per-file review and the
- * review rerun, approval, maintainer feedback and publishing.
+ * review rerun, approval, maintainer feedback and publishing. Only the
+ * learning export and reading maintainer feedback are Pro; reviewing,
+ * re-running the review, approving and publishing stay open on every plan.
  */
-export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
-  app.get("/api/runs/:id/export.md", (req, res) => {
+export function registerReviewRoutes(
+  app: Express,
+  { workbench, license = fixedLicense("free") }: RouteDeps,
+) {
+  // The one explicit exception to "never gate reads of existing data": the
+  // export generates a new document rather than reading a stored one.
+  app.get("/api/runs/:id/export.md", requirePro(license, "learningExport"), (req, res) => {
     const run = workbench.run(req.params.id);
     const repo = workbench.store.data.repos.find(
       (value) => value.id === run.repoId,
@@ -128,7 +136,7 @@ export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
   });
   // Button-triggered read of the published PR's reviews, comments and CI;
   // nothing polls it and nothing is ever posted back to GitHub.
-  app.post("/api/runs/:id/pr/feedback", async (req, res) => {
+  app.post("/api/runs/:id/pr/feedback", requirePro(license, "prFeedback"), async (req, res) => {
     res.json({ run: await workbench.fetchPrFeedback(req.params.id) });
   });
   app.post("/api/runs/:id/publish", async (req, res) => {
