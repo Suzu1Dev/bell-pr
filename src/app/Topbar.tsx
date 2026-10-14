@@ -7,6 +7,7 @@ import {
   PanelLeftOpen,
   Search,
 } from "lucide-react";
+import { useT } from "../i18n";
 import type { Page } from "./AppShell";
 
 interface TopbarProps {
@@ -32,13 +33,14 @@ export function Topbar({
   toggleCommandPalette,
   navigate,
 }: TopbarProps) {
+  const t = useT("app");
   const commandShortcut = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? "⌘ K" : "Ctrl K";
   return (
     <header className="topbar">
       <div className="breadcrumb">
         <button
           className="icon-button mobile-menu"
-          aria-label="開啟導覽"
+          aria-label={t.topbar.openNavigation}
           aria-controls="workspace-sidebar"
           aria-expanded={sidebarOpen}
           onClick={() => setSidebarOpen(true)}
@@ -47,8 +49,16 @@ export function Topbar({
         </button>
         <button
           className="icon-button sidebar-toggle"
-          aria-label={sidebarCollapsed ? "展開左側選單" : "收合左側選單"}
-          title={sidebarCollapsed ? "展開左側選單" : "收合左側選單"}
+          aria-label={
+            sidebarCollapsed
+              ? t.topbar.expandSidebar
+              : t.topbar.collapseSidebar
+          }
+          title={
+            sidebarCollapsed
+              ? t.topbar.expandSidebar
+              : t.topbar.collapseSidebar
+          }
           aria-controls="workspace-sidebar"
           aria-expanded={!sidebarCollapsed}
           onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
@@ -59,52 +69,40 @@ export function Topbar({
             <PanelLeftClose size={18} />
           )}
         </button>
-        <span className="breadcrumb-root">工作空間</span>
+        <span className="breadcrumb-root">{t.topbar.root}</span>
         <ChevronRight size={13} />
-        <span>
-          {
-            {
-              workspace: "貢獻工作台",
-              repos: "Repositories",
-              explore: "專案全貌",
-              discovery: "探索貢獻",
-              team: "Agent team",
-              learning: "學習筆記",
-              settings: "連線與設定",
-            }[page]
-          }
-        </span>
+        <span>{t.pages[page]}</span>
       </div>
       <div className="topbar-right">
         <button
           className="workspace-command"
           onClick={toggleCommandPalette}
           disabled={busy}
-          aria-label="快速切換專案與貢獻"
+          aria-label={t.topbar.quickSwitchLabel}
           aria-keyshortcuts="Meta+K Control+K"
           aria-haspopup="dialog"
-          title={`快速切換專案與貢獻 (${commandShortcut})`}
+          title={t.topbar.quickSwitchTitle({ shortcut: commandShortcut })}
         >
           <Search size={15} aria-hidden="true" />
-          <span>快速切換</span>
+          <span>{t.topbar.quickSwitch}</span>
           <kbd>{commandShortcut}</kbd>
         </button>
         <span className="local-badge">
-          <span className="connection-dot" /> Local-first
+          <span className="connection-dot" /> {t.topbar.localFirst}
         </span>
         <a
           href="https://github.com"
           target="_blank"
           rel="noreferrer"
           className="icon-button"
-          aria-label="開啟 GitHub"
+          aria-label={t.topbar.openGitHub}
         >
           <Github size={18} />
         </a>
         <button
           className="top-avatar"
           onClick={() => navigate("settings")}
-          aria-label="個人設定"
+          aria-label={t.topbar.profile}
         >
           M
         </button>

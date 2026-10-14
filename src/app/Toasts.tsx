@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import { AlertCircle, CircleCheck, X } from "lucide-react";
+import { useT } from "../i18n";
 
 export type Toast = {
   message: string;
@@ -14,6 +15,7 @@ export function Toasts({
   toast: Toast;
   setToast: Dispatch<SetStateAction<Toast | null>>;
 }) {
+  const t = useT("app");
   return (
     // role="alert" is announced immediately (assertive); role="status"
     // waits for the screen reader to finish what it is saying (polite).
@@ -27,7 +29,7 @@ export function Toasts({
         <CircleCheck size={18} />
       )}
       {toast.message}
-      <button aria-label="關閉通知" onClick={() => setToast(null)}>
+      <button aria-label={t.dismissNotice} onClick={() => setToast(null)}>
         <X size={14} />
       </button>
     </div>

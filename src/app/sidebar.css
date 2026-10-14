@@ -1,0 +1,32 @@
+/* The language switcher in the sidebar footer, laid out like a nav item. */
+.sidebar-language {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 3px 0;
+  padding: 6px 13px;
+  color: var(--color-text-muted);
+}
+.sidebar-language > svg {
+  flex-shrink: 0;
+  stroke-width: 1.7;
+}
+.sidebar-language-select {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+}
+.sidebar-language-select:hover {
+  border-color: var(--color-accent-300);
+}
+@media (min-width: 761px) {
+  /* The collapsed rail keeps icons only; the settings page has the switcher. */
+  .is-sidebar-collapsed .sidebar-language {
+    display: none;
+  }
+}

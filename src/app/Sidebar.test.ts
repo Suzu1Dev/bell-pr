@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { demoRun } from "../demo";
+import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { RunSummary } from "../types";
 import { Sidebar } from "./Sidebar";
+import { withoutOtherLanguages } from "./test-markup";
 
 type Props = Parameters<typeof Sidebar>[0];
 
-const render = (props: Partial<Props> = {}) =>
-  renderToStaticMarkup(
-    createElement(Sidebar, {
+const element = (props: Partial<Props> = {}) =>
+  createElement(Sidebar, {
       page: "workspace",
       runs: [],
       run: demoRun,
@@ -24,8 +24,9 @@ const render = (props: Partial<Props> = {}) =>
         return true;
       },
       ...props,
-    }),
-  );
+    });
+
+const render = (props: Partial<Props> = {}) => renderZh(element(props));
 
 const summary = (id: string, title: string, status: RunSummary["status"] = "review") =>
   ({ ...demoRun, id, title, status }) as RunSummary;
@@ -75,4 +76,35 @@ test("the narrow-screen drawer adds a scrim that closes it", () => {
   const html = render({ sidebarOpen: true });
   assert.match(html, /<button class="sidebar-scrim" aria-label="關閉導覽"><\/button>/);
   assert.match(html, /class="sidebar sidebar-open"/);
+});
+
+test("the sidebar reads in English with no Chinese left", () => {
+  const html = renderEn(
+    element({
+      runs: [summary("run-1", "Fix the login timeout", "running")],
+      status: { codex: true, github: true },
+      sidebarOpen: true,
+    }),
+  );
+  for (const label of ["Workbench", "Repositories", "Discover", "Agent team", "Learning notes", "Settings", "User guide"])
+    assert.ok(html.includes(`<span>${label}</span>`), label);
+  assert.match(html, /<nav aria-label="Main navigation">/);
+  assert.match(html, /<span>SDK smart retries<\/span><span class="demo-small">Sample<\/span>/);
+  assert.match(html, /Every contribution teaches you something\./);
+  assert.match(html, /<strong>My workspace<\/strong>/);
+  assert.match(html, /aria-label="Close navigation"/);
+  assertNoHan(withoutOtherLanguages(html));
+});
+
+test("the sidebar footer offers the language switcher", () => {
+  const html = renderEn(element());
+  assert.match(
+    html,
+    /<div class="sidebar-language">.*<select class="sidebar-language-select" aria-label="Language">/,
+  );
+  assert.match(html, /<option value="en" lang="en" selected="">English<\/option>/);
+  assert.match(html, /<option value="zh-TW" lang="zh-Hant-TW">/);
+  const chinese = renderZh(element());
+  assert.match(chinese, /<select class="sidebar-language-select" aria-label="語言">/);
+  assert.match(chinese, /<option value="zh-TW" lang="zh-Hant-TW" selected="">/);
 });
