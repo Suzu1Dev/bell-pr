@@ -32,7 +32,6 @@ import { ChangesTab } from "./ChangesTab";
 import { DraftTab } from "./DraftTab";
 import { OverviewTab } from "./OverviewTab";
 import { RunNotices, UnsandboxedBadge } from "./RunNotices";
-import { UpgradeFallback } from "./UpgradeFallback";
 import "./workspace.css";
 
 interface WorkspacePageProps {
@@ -512,7 +511,6 @@ export function WorkspacePage({
           </div>
         </footer>
       </section>
-      <UpgradeFallback demo={demo} summary={plan.summary} />
     </>
   );
 }
