@@ -23,7 +23,8 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The refund and delivery policy ships with the app, and About lists it
   with the other legal documents.
 - The import dialog suggests `~/projects/repository` as a local path on
-  every computer, and tells Windows browsers to use the path inside WSL2.
+  every computer, and tells Windows browsers which path to use when BELL PR
+  runs inside WSL2.
 - The plan copy says what a key carries: 12 months of updates from the
   date the key is issued.
 
@@ -38,6 +39,8 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   with the error code `already_running`.
 - At 320 px, the sample badge of presentation mode no longer pushes the
   top bar's buttons off the screen.
+- Importing a local path that does not exist, or a folder outside Git,
+  says so instead of failing with "Check the local service log".
 
 ## [1.0.0-rc.1] - 2026-10-14
 
