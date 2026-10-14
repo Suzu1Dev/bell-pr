@@ -27,6 +27,7 @@ import {
   ponytailSource,
   type PonytailMode,
 } from "../../shared/efficiency";
+import { api } from "../api";
 import "./mission.css";
 
 export const directionOptions = [
@@ -74,6 +75,21 @@ export const directionOptions = [
   },
 ] as const;
 
+/**
+ * Reads a provider's model catalog through the API client, so the request
+ * carries the UI locale and a failure arrives as an `ApiError` with the
+ * server's message. Aborting `signal` rejects with the abort error unchanged.
+ */
+export function loadModelCatalog(
+  provider: AgentProvider,
+  signal?: AbortSignal,
+): Promise<ModelCatalog> {
+  return api<ModelCatalog>(
+    `/models?provider=${encodeURIComponent(provider)}`,
+    { signal },
+  );
+}
+
 export interface DirectionSettingsProps {
   value: ContributionSettings;
   onChange: (next: ContributionSettings) => void;
@@ -89,7 +105,8 @@ export function DirectionSettings({
 }: DirectionSettingsProps) {
   const id = useId();
   const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
-  const [modelError, setModelError] = useState("");
+  // The reason the catalog request failed; null while it has not failed.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingModels, setLoadingModels] = useState(true);
   const [catalogAttempt, setCatalogAttempt] = useState(0);
   const provider = value.provider ?? "codex";
@@ -98,28 +115,26 @@ export function DirectionSettings({
     const controller = new AbortController();
     setCatalog(null);
     setLoadingModels(true);
-    setModelError("");
-    fetch(`/api/models?provider=${provider}`, { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok)
-          throw new Error(`暫時無法讀取 ${providerLabel} 模型清單。`);
-        const result: ModelCatalog = await response.json();
-        if (!controller.signal.aborted) {
-          setCatalog(result);
-          setModelError(result.error || "");
-        }
+    setLoadError(null);
+    loadModelCatalog(provider, controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) setCatalog(result);
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted)
-          setModelError(
-            error instanceof Error ? error.message : "模型清單載入失敗。",
-          );
+          setLoadError(error instanceof Error ? error.message : "");
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoadingModels(false);
       });
     return () => controller.abort();
-  }, [catalogAttempt, provider, providerLabel]);
+  }, [catalogAttempt, provider]);
+  // A catalog can arrive with an error of its own, such as a CLI that is not
+  // signed in; the server words it in the UI language.
+  const modelError =
+    loadError === null
+      ? catalog?.error || ""
+      : loadError || `暫時無法讀取 ${providerLabel} 模型清單。`;
   const models = catalog?.models ?? [];
   const defaultModel = models.find((model) => model.isDefault);
   const selectedModel = value.model
