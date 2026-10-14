@@ -12,8 +12,12 @@ import {
   Users,
   WandSparkles,
   Wrench,
+  type LucideIcon,
 } from "lucide-react";
-import type { ContributionSettings } from "../../shared/insights";
+import type {
+  ContributionDirection,
+  ContributionSettings,
+} from "../../shared/insights";
 import {
   agentProviders,
   providerLabels,
@@ -21,58 +25,43 @@ import {
   type ModelCatalog,
   type ReasoningEffort,
 } from "../../shared/models";
-import { reasoningLabels } from "../models/ModelSummary";
 import {
   defaultPonytailMode,
   ponytailSource,
   type PonytailMode,
 } from "../../shared/efficiency";
+import { api } from "../api";
+import { useT } from "../i18n";
 import "./mission.css";
 
+/** The directions in display order; their labels are in the `mission` dictionary. */
 export const directionOptions = [
-  {
-    value: "bugfix",
-    label: "修復問題",
-    hint: "讓原本的行為正常運作",
-    icon: Bug,
-  },
-  {
-    value: "feature",
-    label: "新增功能",
-    hint: "讓使用者能完成新任務",
-    icon: Lightbulb,
-  },
-  {
-    value: "performance",
-    label: "改善效能",
-    hint: "減少等待與資源耗用",
-    icon: Gauge,
-  },
-  {
-    value: "ux",
-    label: "使用體驗",
-    hint: "讓操作更直覺、更順暢",
-    icon: WandSparkles,
-  },
-  {
-    value: "testing",
-    label: "補足測試",
-    hint: "保護重要行為與邊界",
-    icon: ShieldCheck,
-  },
-  {
-    value: "docs",
-    label: "完善文件",
-    hint: "讓理解與上手更容易",
-    icon: FileText,
-  },
-  {
-    value: "maintenance",
-    label: "維護整理",
-    hint: "降低後續修改的負擔",
-    icon: Wrench,
-  },
-] as const;
+  { value: "bugfix", icon: Bug },
+  { value: "feature", icon: Lightbulb },
+  { value: "performance", icon: Gauge },
+  { value: "ux", icon: WandSparkles },
+  { value: "testing", icon: ShieldCheck },
+  { value: "docs", icon: FileText },
+  { value: "maintenance", icon: Wrench },
+] as const satisfies readonly {
+  value: ContributionDirection;
+  icon: LucideIcon;
+}[];
+
+/**
+ * Reads a provider's model catalog through the API client, so the request
+ * carries the UI locale and a failure arrives as an `ApiError` with the
+ * server's message. Aborting `signal` rejects with the abort error unchanged.
+ */
+export function loadModelCatalog(
+  provider: AgentProvider,
+  signal?: AbortSignal,
+): Promise<ModelCatalog> {
+  return api<ModelCatalog>(
+    `/models?provider=${encodeURIComponent(provider)}`,
+    { signal },
+  );
+}
 
 export interface DirectionSettingsProps {
   value: ContributionSettings;
@@ -87,9 +76,12 @@ export function DirectionSettings({
   compact = false,
   modelsOnly = false,
 }: DirectionSettingsProps) {
+  const { directions, settings: t } = useT("mission");
+  const efforts = useT("common").reasoningEffort;
   const id = useId();
   const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
-  const [modelError, setModelError] = useState("");
+  // The reason the catalog request failed; null while it has not failed.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingModels, setLoadingModels] = useState(true);
   const [catalogAttempt, setCatalogAttempt] = useState(0);
   const provider = value.provider ?? "codex";
@@ -98,28 +90,26 @@ export function DirectionSettings({
     const controller = new AbortController();
     setCatalog(null);
     setLoadingModels(true);
-    setModelError("");
-    fetch(`/api/models?provider=${provider}`, { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok)
-          throw new Error(`暫時無法讀取 ${providerLabel} 模型清單。`);
-        const result: ModelCatalog = await response.json();
-        if (!controller.signal.aborted) {
-          setCatalog(result);
-          setModelError(result.error || "");
-        }
+    setLoadError(null);
+    loadModelCatalog(provider, controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) setCatalog(result);
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted)
-          setModelError(
-            error instanceof Error ? error.message : "模型清單載入失敗。",
-          );
+          setLoadError(error instanceof Error ? error.message : "");
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoadingModels(false);
       });
     return () => controller.abort();
-  }, [catalogAttempt, provider, providerLabel]);
+  }, [catalogAttempt, provider]);
+  // A catalog can arrive with an error of its own, such as a CLI that is not
+  // signed in; the server words it in the UI language.
+  const modelError =
+    loadError === null
+      ? catalog?.error || ""
+      : loadError || t.model.loadFailed({ provider: providerLabel });
   const models = catalog?.models ?? [];
   const defaultModel = models.find((model) => model.isDefault);
   const selectedModel = value.model
@@ -148,14 +138,12 @@ export function DirectionSettings({
               <span className="mission-legend-icon">
                 <Sparkles size={16} />
               </span>
-              這次想從哪個方向貢獻？
+              {t.directionLegend}
             </legend>
-            <p className="mission-field-note">
-              選一個主要方向，讓團隊圍繞同一個目標工作。
-            </p>
+            <p className="mission-field-note">{t.directionNote}</p>
             <div className="mission-direction-grid">
               {directionOptions.map(
-                ({ value: direction, label, hint, icon: Icon }) => (
+                ({ value: direction, icon: Icon }) => (
                   <label
                     className={`mission-direction${value.direction === direction ? " mission-direction-selected" : ""}`}
                     key={direction}
@@ -169,8 +157,8 @@ export function DirectionSettings({
                     />
                     <Icon size={17} aria-hidden="true" />
                     <span>
-                      <strong>{label}</strong>
-                      {!compact && <small>{hint}</small>}
+                      <strong>{directions[direction].label}</strong>
+                      {!compact && <small>{directions[direction].hint}</small>}
                     </span>
                   </label>
                 ),
@@ -180,30 +168,30 @@ export function DirectionSettings({
 
           <div className="mission-settings-fields">
             <div className="mission-form-field">
-              <label htmlFor={`${id}-target`}>誰會因此受益？</label>
+              <label htmlFor={`${id}-target`}>{t.targetUser.label}</label>
               <input
                 id={`${id}-target`}
                 maxLength={2000}
                 value={value.targetUser}
                 onChange={(event) => update("targetUser", event.target.value)}
-                placeholder="例如：用這個 SDK 建立儀表板的前端開發者"
+                placeholder={t.targetUser.placeholder}
               />
             </div>
             <div className="mission-form-field">
-              <label htmlFor={`${id}-outcome`}>完成後，使用者會有什麼不同？</label>
+              <label htmlFor={`${id}-outcome`}>{t.outcome.label}</label>
               <textarea
                 id={`${id}-outcome`}
                 maxLength={4000}
                 value={value.outcome}
                 onChange={(event) => update("outcome", event.target.value)}
                 rows={compact ? 2 : 3}
-                placeholder="例如：短暫網路中斷時，列表能自動重試載入，不需要手動重新整理。"
+                placeholder={t.outcome.placeholder}
               />
             </div>
             <div className="mission-form-columns">
               <div className="mission-form-field">
                 <label htmlFor={`${id}-constraints`}>
-                  開發界線 <span>選填</span>
+                  {t.constraints.label} <span>{t.optional}</span>
                 </label>
                 <textarea
                   id={`${id}-constraints`}
@@ -211,16 +199,16 @@ export function DirectionSettings({
                   value={value.constraints}
                   onChange={(event) => update("constraints", event.target.value)}
                   rows={3}
-                  placeholder="例如：維持既有 API 相容；只處理 GET；不新增套件。"
+                  placeholder={t.constraints.placeholder}
                   aria-describedby={`${id}-constraints-help`}
                 />
                 <p id={`${id}-constraints-help`} className="mission-field-note">
-                  寫下不能改動的行為、相容性或範圍限制。
+                  {t.constraints.help}
                 </p>
               </div>
               <div className="mission-form-field">
                 <label htmlFor={`${id}-acceptance`}>
-                  怎樣算完成？ <span>選填</span>
+                  {t.acceptance.label} <span>{t.optional}</span>
                 </label>
                 <textarea
                   id={`${id}-acceptance`}
@@ -228,19 +216,17 @@ export function DirectionSettings({
                   value={value.acceptance}
                   onChange={(event) => update("acceptance", event.target.value)}
                   rows={3}
-                  placeholder={
-                    "例如：\n暫時性失敗可重試成功\n401 不重試\n既有測試全部通過"
-                  }
+                  placeholder={t.acceptance.placeholder}
                   aria-describedby={`${id}-acceptance-help`}
                 />
                 <p id={`${id}-acceptance-help`} className="mission-field-note">
-                  以可觀察的結果或測試描述，一行一項。
+                  {t.acceptance.help}
                 </p>
               </div>
             </div>
             <div className="mission-form-field">
               <label htmlFor={`${id}-issue`}>
-                相關 issue 連結 <span>選填</span>
+                {t.issue.label} <span>{t.optional}</span>
               </label>
               <input
                 id={`${id}-issue`}
@@ -253,8 +239,7 @@ export function DirectionSettings({
                 aria-describedby={`${id}-issue-help`}
               />
               <p id={`${id}-issue-help`} className="mission-field-note">
-                只接受 GitHub issue 頁面網址。填了之後，PR 草稿才可以寫 Fixes／Refs
-                #編號並連回這個 issue；送出前請先在 issue 留言表明要處理。
+                {t.issue.help}
               </p>
             </div>
           </div>
@@ -269,15 +254,12 @@ export function DirectionSettings({
         <div className="mission-model-header">
           <h3 id={`${id}-model-heading`} className="mission-model-heading">
             <Cpu size={16} aria-hidden="true" />
-            模型與思考方式
+            {t.model.heading}
           </h3>
-          <p className="mission-field-note">
-            所有專案與 Agents
-            共用此設定。新任務會記錄自己的設定，後續修改不會影響已建立的任務。
-          </p>
+          <p className="mission-field-note">{t.model.note}</p>
         </div>
         <div className="mission-form-field">
-          <label htmlFor={`${id}-provider`}>Agent</label>
+          <label htmlFor={`${id}-provider`}>{t.model.agent}</label>
           <select
             id={`${id}-provider`}
             value={provider}
@@ -298,14 +280,12 @@ export function DirectionSettings({
             ))}
           </select>
           <p id={`${id}-provider-help`} className="mission-field-note">
-            {provider === "claude"
-              ? "沿用本機 Claude Code 的訂閱登入，不使用 API 金鑰；可用模型依方案而定。"
-              : "沿用本機 Codex CLI 的登入。"}
+            {t.model.providerHelp[provider]}
           </p>
         </div>
         <div className="mission-form-columns">
           <div className="mission-form-field">
-            <label htmlFor={`${id}-model`}>執行模型</label>
+            <label htmlFor={`${id}-model`}>{t.model.model}</label>
             <select
               id={`${id}-model`}
               value={value.model ?? ""}
@@ -325,12 +305,14 @@ export function DirectionSettings({
               }}
             >
               <option value="">
-                {providerLabel} 預設
-                {defaultModel ? ` · ${defaultModel.name}` : ""}
+                {t.model.providerDefault({
+                  provider: providerLabel,
+                  model: defaultModel?.name,
+                })}
               </option>
               {unknownModel && (
                 <option value={value.model}>
-                  {value.model} · 已儲存，待確認
+                  {t.model.unconfirmed({ value: value.model ?? "" })}
                 </option>
               )}
               {models.map((model) => (
@@ -341,15 +323,15 @@ export function DirectionSettings({
             </select>
             <p id={`${id}-model-help`} className="mission-field-note">
               {loadingModels
-                ? `正在讀取本機 ${providerLabel} 可用模型…`
+                ? t.model.loading({ provider: providerLabel })
                 : unknownModel
-                  ? "目前無法驗證這個已儲存的模型，請重新選擇或載入清單。"
+                  ? t.model.unknownModel
                   : selectedModel?.description ||
-                    `沿用本機 ${providerLabel} 的預設模型。`}
+                    t.model.defaultModelHelp({ provider: providerLabel })}
             </p>
           </div>
           <div className="mission-form-field">
-            <label htmlFor={`${id}-reasoning`}>思考強度</label>
+            <label htmlFor={`${id}-reasoning`}>{t.model.effort}</label>
             <select
               id={`${id}-reasoning`}
               value={value.reasoningEffort ?? ""}
@@ -366,26 +348,27 @@ export function DirectionSettings({
               }
             >
               <option value="">
-                模型預設
-                {selectedModel?.defaultReasoningEffort
-                  ? ` · ${reasoningLabels[selectedModel.defaultReasoningEffort]}`
-                  : ""}
+                {t.model.modelDefault({
+                  effort: selectedModel?.defaultReasoningEffort
+                    ? efforts[selectedModel.defaultReasoningEffort]
+                    : undefined,
+                })}
               </option>
               {unknownEffort && (
                 <option value={value.reasoningEffort}>
-                  {value.reasoningEffort} · 已儲存，待確認
+                  {t.model.unconfirmed({ value: value.reasoningEffort ?? "" })}
                 </option>
               )}
               {availableEfforts.map((effort) => (
                 <option key={effort} value={effort}>
-                  {reasoningLabels[effort]} · {effort}
+                  {efforts[effort]} · {effort}
                 </option>
               ))}
             </select>
             <p id={`${id}-reasoning-help`} className="mission-field-note">
               {unknownEffort && !loadingModels
-                ? "已儲存的強度未在此模型的清單中，請重新選擇。"
-                : "只列出所選模型支援的強度；較高的強度每回合需要更久、用量也較多，BELL 會為 Claude Code 以及 xhigh、max 強度延長等待時間。"}
+                ? t.model.unknownEffort
+                : t.model.effortHelp}
             </p>
           </div>
         </div>
@@ -399,23 +382,20 @@ export function DirectionSettings({
           <span className="mission-plan-copy">
             <strong>
               <Globe size={16} />
-              允許 Agent 上網搜尋與讀取網頁
+              {t.model.webAccess}
             </strong>
-            <small id={`${id}-web-help`}>
-              套用到 Lead、Teammates、Reviewer、Test analyst
-              與追問導師；專案分析與探索貢獻維持離線。網頁內容視為不可信資料；Claude Code 的 curl、wget 仍被拒絕。
-            </small>
+            <small id={`${id}-web-help`}>{t.model.webAccessHelp}</small>
           </span>
         </label>
         {modelError && (
           <div className="mission-model-error" role="status">
-            <span>{modelError} 已儲存的選擇會保留。</span>
+            <span>{t.model.error({ message: modelError })}</span>
             <button
               type="button"
               onClick={() => setCatalogAttempt((attempt) => attempt + 1)}
               disabled={loadingModels}
             >
-              重新載入
+              {t.model.reload}
             </button>
           </div>
         )}
@@ -424,7 +404,7 @@ export function DirectionSettings({
       {!modelsOnly && (
         <>
           <div className="mission-form-field mission-ponytail-setting">
-            <label htmlFor={`${id}-ponytail`}>Ponytail 開發方式</label>
+            <label htmlFor={`${id}-ponytail`}>{t.ponytail.label}</label>
             <select
               id={`${id}-ponytail`}
               value={value.ponytailMode ?? defaultPonytailMode}
@@ -433,14 +413,14 @@ export function DirectionSettings({
               }
               aria-describedby={`${id}-ponytail-help`}
             >
-              <option value="lite">輕量 · 預設</option>
-              <option value="full">完整</option>
-              <option value="off">關閉</option>
+              <option value="lite">{t.ponytail.modes.lite}</option>
+              <option value="full">{t.ponytail.modes.full}</option>
+              <option value="off">{t.ponytail.modes.off}</option>
             </select>
             <p id={`${id}-ponytail-help`} className="mission-field-note">
-              輕量：以精簡規則減少過度開發。完整：套用更多規則，優先重用現有程式與原生功能。關閉：方便比較不同方式的成果與用量。{" "}
+              {t.ponytail.help}{" "}
               <a href={ponytailSource} target="_blank" rel="noreferrer">
-                查看 Ponytail
+                {t.ponytail.link}
               </a>
             </p>
           </div>
@@ -451,7 +431,7 @@ export function DirectionSettings({
                 <span className="mission-legend-icon">
                   <Users size={16} />
                 </span>
-                協作規模
+                {t.team.legend}
               </legend>
               <div className="mission-team-choices">
                 {([2, 3, 4] as const).map((count) => (
@@ -470,13 +450,11 @@ export function DirectionSettings({
                       onChange={() => update("maxTeammates", count)}
                     />
                     <strong>{count}</strong>
-                    <span>位隊友</span>
+                    <span>{t.team.teammates}</span>
                   </label>
                 ))}
               </div>
-              <p className="mission-field-note">
-                設定團隊上限，實際分工由任務計畫決定。
-              </p>
+              <p className="mission-field-note">{t.team.note}</p>
             </fieldset>
             <label className="mission-plan-option">
               <input
@@ -489,9 +467,9 @@ export function DirectionSettings({
               <span className="mission-plan-copy">
                 <strong>
                   <Settings2 size={16} />
-                  開發前，先讓我確認計畫
+                  {t.planApproval.label}
                 </strong>
-                <small>先看分工、範圍與驗收方式，確認後再進入實作。</small>
+                <small>{t.planApproval.help}</small>
               </span>
             </label>
           </div>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { locales } from "../../shared/i18n/locale";
 import {
   maxProjectRecommendations,
   type InsightsStaleDetail,
@@ -6,7 +7,16 @@ import {
   type RecommendationPreferences,
 } from "../../shared/insights";
 import { api, send } from "../api";
-import { demoInsights } from "./demo";
+import { getDemo } from "../demo";
+import { getCurrentLocale, getCurrentMessages, useLocale } from "../i18n";
+
+/** The cache's messages in the active UI language, read when one is shown. */
+const messages = () => getCurrentMessages().mission.insights;
+
+/** The prewritten sample analysis in the active UI language. */
+const demoInsights = () => getDemo(getCurrentLocale()).insights;
+// Every locale's sample analysis, to tell it apart from other analyses.
+const demoAnalyses = new Set(locales.map((locale) => getDemo(locale).insights));
 
 interface InsightsResult {
   insights: ProjectInsights | null;
@@ -47,7 +57,7 @@ const emptyState: InsightsState = {
 /** One cache belongs to the mounted workbench, so changing repositories keeps active work. */
 export class ProjectInsightsCache {
   private states = new Map<string, InsightsState>([
-    ["demo-repo", { ...emptyState, insights: demoInsights }],
+    ["demo-repo", { ...emptyState, insights: demoInsights() }],
   ]);
   private reads = new Map<string, Promise<void>>();
   private mutations = new Map<string, Promise<void>>();
@@ -117,9 +127,7 @@ export class ProjectInsightsCache {
         if (this.revisions.get(repoId) === revision)
           this.update(repoId, {
             error:
-              error instanceof Error
-                ? error.message
-                : "無法讀取專案分析，請重試。",
+              error instanceof Error ? error.message : messages().loadFailed,
           });
       })
       .finally(() => {
@@ -139,9 +147,8 @@ export class ProjectInsightsCache {
   analyze(repoId: string): Promise<void> {
     if (repoId === "demo-repo") {
       this.update(repoId, {
-        insights: demoInsights,
-        error:
-          "示範專案使用預寫分析。匯入你的 repository 後，即可請 AI 閱讀真實原始碼。",
+        insights: demoInsights(),
+        error: messages().demoAnalysis,
       });
       return Promise.resolve();
     }
@@ -154,11 +161,11 @@ export class ProjectInsightsCache {
     const state = this.snapshot(repoId);
     const error =
       repoId === "demo-repo" || state.insights?.source === "demo"
-        ? "匯入真實專案後，即可產出更多貢獻建議。"
+        ? messages().demoMore
         : !state.insights || state.stale
-          ? "請先重新分析專案，再產出更多建議。"
+          ? messages().reanalyzeFirst
           : state.insights.recommendations.length >= maxProjectRecommendations
-            ? `這份分析已累積 ${maxProjectRecommendations} 個建議。`
+            ? messages().limit({ max: maxProjectRecommendations })
             : "";
     if (error) {
       this.update(repoId, { recommendationError: error });
@@ -193,8 +200,8 @@ export class ProjectInsightsCache {
           this.update(repoId, {
             recommendationPreferences: state.recommendationPreferences,
             preferenceError: error instanceof Error
-              ? `未儲存顯示與排序設定，已還原：${error.message}`
-              : "未儲存顯示與排序設定，已還原。請再試一次。",
+              ? messages().preferencesReverted({ reason: error.message })
+              : messages().preferencesRevertedRetry,
           });
       })
       .finally(() => {
@@ -242,8 +249,8 @@ export class ProjectInsightsCache {
               error instanceof Error
                 ? error.message
                 : recommending
-                  ? "尚未產出更多建議，原有清單已保留。請重試。"
-                  : "專案分析未完成，請重試。",
+                  ? messages().moreFailed
+                  : messages().analysisFailed,
           });
       })
       .finally(() => {
@@ -258,6 +265,7 @@ export class ProjectInsightsCache {
 }
 
 export function useProjectInsights(repoId?: string) {
+  const [locale] = useLocale();
   const [cache] = useState(() => new ProjectInsightsCache());
   const getSnapshot = useCallback(
     () => cache.snapshot(repoId),
@@ -289,5 +297,12 @@ export function useProjectInsights(repoId?: string) {
     [cache, repoId],
   );
 
-  return { ...state, analyze, recommendMore, savePreferences, reload };
+  // The prewritten sample analysis follows the UI language; an AI analysis
+  // stays in the language it was written in.
+  const insights =
+    state.insights && demoAnalyses.has(state.insights)
+      ? getDemo(locale).insights
+      : state.insights;
+
+  return { ...state, insights, analyze, recommendMore, savePreferences, reload };
 }

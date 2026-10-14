@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { before } from "node:test";
 import {
   maxProjectRecommendations,
   type ProjectInsights,
 } from "../shared/insights.js";
+import { setLocale } from "../src/i18n/index.js";
 import { ProjectInsightsCache } from "../src/mission/useProjectInsights.js";
+
+// The cache words its messages in the active client locale; these
+// assertions check the zh-TW wording.
+before(() => setLocale("zh-TW"));
 
 function insights(name: string): ProjectInsights {
   return {
