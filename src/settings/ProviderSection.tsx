@@ -116,8 +116,11 @@ function ProviderCard({
 /** The shared model settings, edited in place: provider, model, effort, web access. */
 function ModelSettingsForm({
   showCurrentRun,
+  onSaved,
 }: {
   showCurrentRun: () => void;
+  /** Called after a save; the readiness line depends on the chosen provider. */
+  onSaved: () => void;
 }) {
   const t = useT("settings").provider.models;
   const [settings, setSettings] = useState<ModelSettings | null>(null);
@@ -174,6 +177,7 @@ function ModelSettingsForm({
       );
       setSettings(saved);
       setMessage(t.saved);
+      onSaved();
     } catch (failure) {
       setError(messageOf(failure));
     } finally {
@@ -249,6 +253,10 @@ export function ProviderSection({
 }) {
   const t = useT("settings");
   const report = doctor.report;
+  const { refresh } = doctor;
+  // The environment check reads the saved provider: a provider chosen but
+  // not ready fails it, so check again after the models are saved.
+  const modelsSaved = useCallback(() => void refresh(), [refresh]);
   const ready = report
     ? agentProviders.filter(
         (provider) => providerState(report, provider).state === "ready",
@@ -293,7 +301,7 @@ export function ProviderSection({
           />
         ))}
       </div>
-      <ModelSettingsForm showCurrentRun={showCurrentRun} />
+      <ModelSettingsForm showCurrentRun={showCurrentRun} onSaved={modelsSaved} />
     </SettingsSectionFrame>
   );
 }

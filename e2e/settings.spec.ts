@@ -7,6 +7,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import type { DoctorCheck, DoctorReport } from "../shared/doctor";
 import { htmlLang, locales } from "../shared/i18n/locale";
+import { providerLabels } from "../shared/models";
 import type { LicenseSummary } from "../shared/plans";
 import license from "../src/i18n/en/license";
 import mission from "../src/i18n/en/mission";
@@ -253,7 +254,29 @@ test("the retention period saves and survives a reload", async ({ browser }) => 
 
 test("the shared models are edited in place in the AI provider section", async ({ browser }) => {
   await onServer(browser, {}, async (page) => {
+    // Only the Codex CLI works; the environment check reads the saved
+    // provider, as the server's does.
+    let chosen = "codex";
+    const notReady = "Claude Code is chosen in the model settings but is not ready.";
+    page.on("request", (request) => {
+      if (request.method() === "PUT" && new URL(request.url()).pathname === "/api/model-settings")
+        chosen = (request.postDataJSON() as { provider: string }).provider;
+    });
+    await page.route("**/api/doctor**", (route) => {
+      const report = stubbedReport();
+      report.checks = report.checks.map((value) =>
+        value.id === "claude"
+          ? { id: "claude", status: "skip", reason: "missing", required: false }
+          : value.id === "claude-auth"
+            ? { id: "claude-auth", status: "skip", required: false }
+            : value.id === "provider-ready" && chosen === "claude"
+              ? { ...value, status: "fail", reason: "chosen-not-ready", detail: notReady }
+              : value,
+      );
+      return route.fulfill({ json: report });
+    });
     await page.goto("/#/settings/provider");
+    await expect(panel(page)).toContainText(settings.provider.readyWith({ providers: [providerLabels.codex] }));
     const agent = panel(page).getByLabel(mission.settings.model.agent, { exact: true });
     await expect(agent).toHaveValue("codex");
     await agent.selectOption("claude");
@@ -261,6 +284,8 @@ test("the shared models are edited in place in the AI provider section", async (
     await expect(
       panel(page).getByRole("status").filter({ hasText: settings.provider.models.saved }),
     ).toBeVisible();
+    // The readiness line follows the saved provider at once.
+    await expect(panel(page).locator(".settings-readiness")).toHaveText(notReady);
     await page.reload();
     await expect(agent).toHaveValue("claude");
     const saved = await (await page.request.get("/api/model-settings")).json();
