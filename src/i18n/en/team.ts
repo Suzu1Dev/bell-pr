@@ -141,7 +141,7 @@ const team = {
       `${name} (no longer receiving)`,
     messageLabel: "Team message",
     finishedPlaceholder:
-      "This team has finished. Ask follow-up questions in the code review.",
+      "This team has finished. Ask follow-up questions on the Code changes tab.",
     placeholder: "For example: keep the current API compatible…",
     demoHint: "Sample messages stay on this screen only",
     hint: "Sent messages are kept in the run record",
