@@ -365,7 +365,7 @@ export class DiscoveryService {
   private collect: typeof collectDiscoveryCandidates;
   private slots: AgentSlots;
   private sleep?: TransientSleep;
-  private timeoutScale: number;
+  private scale: number | (() => number);
   private file: string;
   constructor(
     private store: Store,
@@ -374,8 +374,11 @@ export class DiscoveryService {
       getModelCatalog?: typeof getModelCatalog;
       collectCandidates?: typeof collectDiscoveryCandidates;
       agentSlots?: AgentSlots;
-      /** BELLPR_AGENT_TIMEOUT_SCALE; multiplies every agent turn timeout. */
-      agentTimeoutScale?: number;
+      /**
+       * Multiplies every agent turn timeout; a function is read for each
+       * search, so a changed app setting applies.
+       */
+      agentTimeoutScale?: number | (() => number);
       /** Wait between retries of an analysis that lost the OAuth refresh race. */
       sleep?: TransientSleep;
     } = {},
@@ -387,8 +390,10 @@ export class DiscoveryService {
     this.collect = dependencies.collectCandidates ?? collectDiscoveryCandidates;
     this.slots =
       dependencies.agentSlots ?? new AgentSlots(defaultAgentProcessLimit);
-    this.timeoutScale =
-      dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
+    this.scale = dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
+  }
+  private get timeoutScale() {
+    return typeof this.scale === "function" ? this.scale() : this.scale;
   }
   private initialize() {
     this.initialization ??= (async () => {

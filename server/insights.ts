@@ -607,7 +607,7 @@ export class ProjectInsightsService {
   private modelCatalog: typeof getModelCatalog;
   private slots: AgentSlots;
   private sleep?: TransientSleep;
-  private timeoutScale: number;
+  private scale: number | (() => number);
 
   constructor(
     public store: Store,
@@ -615,8 +615,11 @@ export class ProjectInsightsService {
       command?: typeof command;
       getModelCatalog?: typeof getModelCatalog;
       agentSlots?: AgentSlots;
-      /** BELLPR_AGENT_TIMEOUT_SCALE; multiplies every agent turn timeout. */
-      agentTimeoutScale?: number;
+      /**
+       * Multiplies every agent turn timeout; a function is read for each
+       * analysis, so a changed app setting applies.
+       */
+      agentTimeoutScale?: number | (() => number);
       /** Wait between retries of an analysis that lost the OAuth refresh race. */
       sleep?: TransientSleep;
     } = {},
@@ -626,8 +629,11 @@ export class ProjectInsightsService {
     this.modelCatalog = dependencies.getModelCatalog ?? getModelCatalog;
     this.slots =
       dependencies.agentSlots ?? new AgentSlots(defaultAgentProcessLimit);
-    this.timeoutScale =
-      dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
+    this.scale = dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
+  }
+
+  private get timeoutScale() {
+    return typeof this.scale === "function" ? this.scale() : this.scale;
   }
 
   private repository(id: string): Repository {

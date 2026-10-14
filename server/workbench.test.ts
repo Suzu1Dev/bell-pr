@@ -544,11 +544,13 @@ test("GET /api/status reports the configured run, process and queue limits", asy
     assert.equal(body.codex, false);
     assert.deepEqual(body.limits, {
       maxActiveRuns: 3,
+      effectiveMaxActiveRuns: 3,
       maxAgentProcesses: 5,
       maxQueued: 8,
     });
     assert.deepEqual(new Workbench(f.store).limits, {
       maxActiveRuns: 2,
+      effectiveMaxActiveRuns: 2,
       maxAgentProcesses: 3,
       maxQueued: 8,
     });

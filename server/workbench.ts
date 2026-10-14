@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { command, agentEnvironment, redact } from "./process.js";
+import { command, redact } from "./process.js";
 import { readDiff, synchronizeReview } from "./git.js";
 import type { TeamAgentRunner } from "./team.js";
 import { maxPlanRevisions } from "../shared/team.js";
@@ -21,9 +21,21 @@ import {
   type RunLogEntry,
 } from "./types.js";
 import { getModelCatalog, resolveModelExecution } from "./models.js";
-import { agentLoginCheck, type TransientSleep } from "./agent-cli.js";
+import type { TransientSleep } from "./agent-cli.js";
 import type { AgentProvider } from "../shared/models.js";
-import { proEntitlements, type Entitlements } from "../shared/plans.js";
+import {
+  clampContributionSettings,
+  proEntitlements,
+  type Entitlements,
+} from "../shared/plans.js";
+import {
+  activateAppSettings,
+  AppSettingsService,
+  deactivateAppSettings,
+} from "./app-settings.js";
+import { cliStatus, runDoctor, type DoctorAppInfo } from "./doctor.js";
+import { setupError } from "./cli-errors.js";
+import { enforceAgentSandbox } from "./sandbox.js";
 import { synchronizeExplanations } from "./explanations.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
 import { parseLocale, type Locale } from "../shared/i18n/locale.js";
@@ -60,8 +72,8 @@ export interface WorkbenchContext {
   store: Store;
   /** Shared by every agent CLI call, including project analysis and discovery. */
   agentSlots: AgentSlots;
-  /** BELLPR_AGENT_TIMEOUT_SCALE; multiplies every agent turn timeout. */
-  agentTimeoutScale: number;
+  /** Multiplies every agent turn timeout (app settings, then BELLPR_AGENT_TIMEOUT_SCALE). */
+  readonly agentTimeoutScale: number;
   /**
    * Aborts work in flight: a run or its review rerun by run id; explanations,
    * the PR draft and chat by "explanations:", "draft:" or "guide:" + run id.
@@ -130,26 +142,23 @@ export class Workbench {
   private reviewJobs = new Map<string, Promise<void>>();
   private followUpJobs = new Map<string, Promise<void>>();
   private conflictJobs = new Map<string, Promise<void>>();
-  private statusCache?: {
-    time: number;
-    value: {
-      codex: boolean;
-      github: boolean;
-      githubUser?: string;
-      codexAuthenticated: boolean;
-      claude: boolean;
-      claudeAuthenticated: boolean;
-    };
-  };
   /** Shared by every agent CLI call, including project analysis and discovery. */
   readonly agentSlots: AgentSlots;
-  /** How many runs drain() executes at once; each run still takes CLI slots per agent. */
-  readonly maxActiveRuns: number;
-  /** BELLPR_AGENT_TIMEOUT_SCALE; multiplies every agent turn timeout. */
-  readonly agentTimeoutScale: number;
   /**
-   * What the current plan allows. Nothing reads it yet: the queue and the
-   * team size apply it once licensing lands, so runs behave as before.
+   * The app settings in `<dataDir>/app-settings.json`. Saved limits apply
+   * over the values the Workbench was created with, and environment
+   * variables over both (see app-settings.ts).
+   */
+  readonly appSettings: AppSettingsService;
+  /** The limits the Workbench was created with, used while no setting changes them. */
+  private readonly base: {
+    maxActiveRuns: number;
+    maxAgentProcesses: number;
+    agentTimeoutScale: number;
+  };
+  /**
+   * What the current plan allows: how many runs execute at once
+   * (effectiveMaxActiveRuns) and how many teammates a new run gets.
    */
   readonly entitlements: () => Entitlements;
   private readonly context: WorkbenchContext;
@@ -175,18 +184,31 @@ export class Workbench {
   ) {
     this.agentSlots =
       dependencies.agentSlots ?? new AgentSlots(defaultAgentProcessLimit);
-    this.maxActiveRuns = dependencies.maxActiveRuns ?? defaultActiveRunLimit;
-    this.agentTimeoutScale =
-      dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
-    if (!Number.isInteger(this.maxActiveRuns) || this.maxActiveRuns < 1)
+    this.base = {
+      maxActiveRuns: dependencies.maxActiveRuns ?? defaultActiveRunLimit,
+      maxAgentProcesses: this.agentSlots.limit,
+      agentTimeoutScale:
+        dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale,
+    };
+    if (
+      !Number.isInteger(this.base.maxActiveRuns) ||
+      this.base.maxActiveRuns < 1
+    )
       throw new Error("Workbench maxActiveRuns must be a positive integer.");
+    this.appSettings = new AppSettingsService(store.directory);
+    // Work no request asked for (recovery, the resumed queue, retention)
+    // follows the language chosen in the app.
+    activateAppSettings(this.appSettings);
     this.entitlements =
       dependencies.entitlements ?? (() => proEntitlements(this.maxActiveRuns));
     // Callbacks go through `this` so a replaced method (as tests do) applies.
+    const workbench = this;
     this.context = {
       store: this.store,
       agentSlots: this.agentSlots,
-      agentTimeoutScale: this.agentTimeoutScale,
+      get agentTimeoutScale() {
+        return workbench.agentTimeoutScale;
+      },
       controllers: this.controllers,
       jobs: this.jobs,
       explanationJobs: this.explanationJobs,
@@ -214,6 +236,7 @@ export class Workbench {
       explanations: (id) => this.explanations(id),
       prepareRunDraft: (id, options) => this.prepareRunDraft(id, options),
     };
+    this.applySettings();
     // Server logs go to the data directory from here on (see log.ts).
     initLog(store.directory);
     const startedAt = Date.now();
@@ -292,6 +315,23 @@ export class Workbench {
     }
   }
 
+  /** How many runs may execute at once as configured (before the plan's limit). */
+  get maxActiveRuns() {
+    return this.appSettings.get().maxActiveRuns ?? this.base.maxActiveRuns;
+  }
+
+  /** How many runs drain() executes at once: the configured value within the plan's. */
+  get effectiveMaxActiveRuns() {
+    return Math.min(this.maxActiveRuns, this.entitlements().maxActiveRuns);
+  }
+
+  /** Multiplies every agent turn timeout. */
+  get agentTimeoutScale() {
+    return (
+      this.appSettings.get().agentTimeoutScale ?? this.base.agentTimeoutScale
+    );
+  }
+
   /** Queued, running and paused runs together; grows with the active limit. */
   get maxQueuedRuns() {
     return Math.max(8, this.maxActiveRuns * 2);
@@ -301,9 +341,33 @@ export class Workbench {
   get limits() {
     return {
       maxActiveRuns: this.maxActiveRuns,
+      effectiveMaxActiveRuns: this.effectiveMaxActiveRuns,
       maxAgentProcesses: this.agentSlots.limit,
       maxQueued: this.maxQueuedRuns,
     };
+  }
+
+  /** Applies saved limits: the agent process limit, then the run queue. */
+  private applySettings() {
+    this.agentSlots.setLimit(
+      this.appSettings.get().maxAgentProcesses ?? this.base.maxAgentProcesses,
+    );
+    this.drain();
+  }
+
+  /**
+   * Saves app settings (PUT /api/app-settings) and applies new limits at
+   * once: a higher run or process limit starts queued work.
+   */
+  async updateAppSettings(input: unknown) {
+    const view = await this.appSettings.update(input);
+    this.applySettings();
+    return view;
+  }
+
+  /** Saves how many runs may execute at once and starts queued runs it allows. */
+  async setMaxActiveRuns(maxActiveRuns: number) {
+    return this.updateAppSettings({ maxActiveRuns });
   }
 
   models(provider?: AgentProvider) {
@@ -333,32 +397,62 @@ export class Workbench {
     }
   }
 
+  /**
+   * The environment report (doctor.ts) for this data directory, with the
+   * run and process limits in its app check. Probes are shared for 10
+   * seconds; `force` probes again.
+   */
+  async doctor(options: { force?: boolean; app?: DoctorAppInfo } = {}) {
+    return runDoctor({
+      force: options.force,
+      dataDir: this.store.directory,
+      app: {
+        maxActiveRuns: this.maxActiveRuns,
+        effectiveMaxActiveRuns: this.effectiveMaxActiveRuns,
+        maxAgentProcesses: this.agentSlots.limit,
+        ...options.app,
+      },
+    });
+  }
+
+  /** Which agent CLIs are installed and signed in, and the GitHub account (from the doctor). */
   async status() {
-    if (this.statusCache && Date.now() - this.statusCache.time < 10_000)
-      return this.statusCache.value;
-    const claudeLogin = agentLoginCheck("claude");
-    const [codex, auth, github, claude, claudeAuth] = await Promise.allSettled([
-      command("codex", ["--version"], { timeoutMs: 5000 }),
-      command("codex", ["login", "status"], { timeoutMs: 5000 }),
-      command("gh", ["api", "user", "--jq", ".login"], { timeoutMs: 10_000 }),
-      command("claude", ["--version"], { timeoutMs: 5000 }),
-      command(claudeLogin.executable, claudeLogin.args, {
-        timeoutMs: 10_000,
-        env: agentEnvironment(),
-      }),
-    ]);
-    const value = {
-      codex: codex.status === "fulfilled",
-      codexAuthenticated: auth.status === "fulfilled",
-      claude: claude.status === "fulfilled",
-      claudeAuthenticated: claudeAuth.status === "fulfilled",
-      github: github.status === "fulfilled",
-      ...(github.status === "fulfilled"
-        ? { githubUser: github.value.stdout.trim() }
-        : {}),
-    };
-    this.statusCache = { value, time: Date.now() };
-    return value;
+    return cliStatus(await this.doctor());
+  }
+
+  /**
+   * Refuses a new run before it is queued when its provider is not
+   * installed or not signed in, or when it is Claude Code and its sandbox
+   * cannot start (unless unsandboxed agents are allowed). Each refusal has
+   * a code and the commands that fix it.
+   */
+  private async assertProviderReady(provider: AgentProvider) {
+    const capability = await this.status();
+    if (provider === "claude") {
+      if (!capability.claude)
+        throw new AppError((m) => m.run.queue.claudeMissing, 503, {
+          code: "claude_missing",
+          fixes: setupError("claude_missing").fixes,
+        });
+      if (!capability.claudeAuthenticated)
+        throw new AppError((m) => m.run.queue.claudeSignedOut, 503, {
+          code: "claude_unauthenticated",
+          fixes: setupError("claude_unauthenticated").fixes,
+        });
+      // Every contribution run has agents that edit files.
+      await enforceAgentSandbox("claude", "write");
+    } else {
+      if (!capability.codex)
+        throw new AppError((m) => m.run.queue.codexMissing, 503, {
+          code: "codex_missing",
+          fixes: setupError("codex_missing").fixes,
+        });
+      if (!capability.codexAuthenticated)
+        throw new AppError((m) => m.run.queue.codexSignedOut, 503, {
+          code: "codex_unauthenticated",
+          fixes: setupError("codex_unauthenticated").fixes,
+        });
+    }
   }
 
   async importRepository(source: string) {
@@ -385,19 +479,18 @@ export class Workbench {
       settings ?? {},
       await this.models(settings?.provider),
     );
-    const capability = await this.status();
-    if (modelExecution.provider === "claude") {
-      if (!capability.claude)
-        throw new AppError((m) => m.run.queue.claudeMissing, 503);
-      if (!capability.claudeAuthenticated)
-        throw new AppError((m) => m.run.queue.claudeSignedOut, 503);
-    } else {
-      if (!capability.codex)
-        throw new AppError((m) => m.run.queue.codexMissing, 503);
-      if (!capability.codexAuthenticated)
-        throw new AppError((m) => m.run.queue.codexSignedOut, 503);
-    }
+    await this.assertProviderReady(modelExecution.provider ?? "codex");
     this.assertQueueCapacity();
+    // The plan decides how many teammates a new run gets; runs created
+    // before keep their recorded team.
+    const requested = {
+      ...settings,
+      maxTeammates: settings?.maxTeammates ?? (3 as const),
+    };
+    const { settings: allowed, clamped } = clampContributionSettings(
+      requested,
+      this.entitlements(),
+    );
     const id = newId();
     const agents = sm().run.agents;
     const run: Run = {
@@ -442,11 +535,13 @@ export class Workbench {
       reviewedFiles: [],
       reviewedFingerprints: {},
       reports: {},
-      contributionSettings: settings ? { ...settings } : undefined,
+      contributionSettings: settings
+        ? { ...settings, maxTeammates: allowed.maxTeammates }
+        : undefined,
       modelExecution,
       team: {
         config: {
-          maxTeammates: settings?.maxTeammates ?? 3,
+          maxTeammates: allowed.maxTeammates,
           requirePlanApproval: settings?.requirePlanApproval ?? true,
           provider: modelExecution.provider ?? "codex",
           protocol: "bell-shared-tasks",
@@ -458,6 +553,18 @@ export class Workbench {
         messages: [],
       },
     };
+    if (clamped)
+      withRunLocale(run, () =>
+        this.log(
+          run,
+          "system",
+          sm().setup.plan.teamClamped({
+            max: allowed.maxTeammates,
+            pro: proEntitlements(1).maxTeammates,
+          }),
+          { kind: "notice" },
+        ),
+      );
     this.store.data.runs.unshift(run);
     await this.store.save();
     logRunQueued(run, "created");
@@ -481,7 +588,7 @@ export class Workbench {
 
   private drain() {
     if (this.stopping) return;
-    while (this.active < this.maxActiveRuns && this.queue.length) {
+    while (this.active < this.effectiveMaxActiveRuns && this.queue.length) {
       const id = this.queue.shift()!;
       const run = this.run(id);
       if (run.status !== "queued") continue;
@@ -509,8 +616,14 @@ export class Workbench {
     }
   }
 
-  /** 4A: drain the queue when entitlements change. */
-  entitlementsChanged(): void {}
+  /**
+   * Called after the plan changed (a license or trial started or ended):
+   * starts queued runs the new plan allows. Running runs are never stopped,
+   * and existing runs keep their team size.
+   */
+  entitlementsChanged(): void {
+    this.drain();
+  }
 
   /** Appends to the run's own log through the context (see appendRunLog). */
   private log(
@@ -798,6 +911,7 @@ export class Workbench {
   async shutdown() {
     this.stopping = true;
     clearInterval(this.retentionTimer);
+    deactivateAppSettings(this.appSettings);
     // A run that never started stays queued and starts again on the next
     // start (resume); one that already has a worktree is cancelled.
     for (const id of this.queue) {

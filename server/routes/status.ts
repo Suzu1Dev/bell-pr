@@ -1,21 +1,32 @@
 import type { Express } from "express";
 import { z } from "zod";
 import { agentProviders } from "../../shared/models.js";
+import { version } from "../build-info.js";
 import { AppError } from "../types.js";
 import type { RouteDeps } from "./types.js";
 
 /**
- * CLI readiness with the configured limits and, after a start that had to
- * repair state.json, what was repaired; and the model catalogs.
+ * CLI readiness, the doctor report seen the way /api/status always
+ * answered (which agent CLIs are installed and signed in, the GitHub
+ * account, and whether every required check passed), with the run limits
+ * (configured and effective under the plan), the license summary, what a
+ * start had to repair in state.json, and the version; and the model
+ * catalogs.
  */
-export function registerStatusRoutes(app: Express, { workbench }: RouteDeps) {
+export function registerStatusRoutes(
+  app: Express,
+  { workbench, license, options }: RouteDeps,
+) {
   app.get("/api/status", async (_req, res) => {
-    // CLI checks stay behind the 10-second cache; the limits are static config.
+    // The CLI checks share the doctor's 10-second probe results.
     const recovery = workbench.store.recovery;
+    const summary = license?.summary();
     res.json({
       ...(await workbench.status()),
       limits: workbench.limits,
+      ...(summary ? { license: summary } : {}),
       ...(recovery ? { recovery } : {}),
+      version: options.version ?? version,
     });
   });
   app.get("/api/models", async (req, res) => {
