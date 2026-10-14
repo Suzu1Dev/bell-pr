@@ -164,7 +164,7 @@ export async function enforceAgentSandbox(
         {
           label: messages.dockerFix,
           command:
-            "docker run --security-opt seccomp=unconfined --security-opt apparmor=unconfined --security-opt systempaths=unconfined …",
+            "--security-opt seccomp=unconfined --security-opt apparmor=unconfined --security-opt systempaths=unconfined",
           platform: "linux",
         },
         allowFix,

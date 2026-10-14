@@ -32,7 +32,7 @@ export default {
     blocked: `Claude Code agents that edit files and run commands need the operating system sandbox. bubblewrap is installed but cannot create a sandbox here, as in a Docker container started without the security options listed in docs/docker.md. Start the container with those options, or allow unsandboxed agents if you accept the container as the only boundary.`,
     installFix: "Install bubblewrap and socat (Debian, Ubuntu)",
     dockerFix:
-      "In Docker, start the container with these options (see docs/docker.md)",
+      "In Docker, add these options to docker run (see docs/docker.md)",
     codexFix:
       "Or sign in to Codex and choose it as the provider under Settings → Models",
     allowFix: `Or allow unsandboxed Claude agents under Settings → Agent safety, or start ${product.name} with this variable (agents then run with your full user rights)`,
