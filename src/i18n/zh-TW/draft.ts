@@ -3,6 +3,120 @@ import type { Translation } from "../../../shared/i18n/locale";
 import type en from "../en/draft";
 
 const m: Translation<typeof en> = {
+  guidance: {
+    eyebrow: "CONTRIBUTION GUIDE",
+    title: "寫出維護者容易理解的 PR",
+    intro: "先看投稿規範與範本，再把這次貢獻整理成清楚的草稿。",
+    status: {
+      generating:
+        "正在閱讀貢獻規範與 PR 範本，並對照本次變更整理建議。你可以繼續編輯下方草稿。",
+      failed: "這次未能整理草稿，請稍後重試。下方編輯內容已保留。",
+      stale:
+        "變更內容已更新，這份建議需要重新整理。請產生新版建議後再套用。",
+    },
+    generate: {
+      generating: "正在整理…",
+      retry: "重新嘗試",
+      refresh: "重新整理建議",
+      demo: "查看草稿建議示範",
+      first: "依專案規範產生建議草稿",
+    },
+    demoBadge: "示範資料",
+    policy: {
+      repository: "依專案規範",
+      linux: "Linux 原則 · PR 調整版",
+    },
+    empty: {
+      rules: "核對規範與範本",
+      sources: "每個建議附上依據",
+      choice: "由你選擇套用",
+      demo: "使用示範文件體驗完整流程，不會讀取或修改遠端專案。",
+      real: "適用於已完成變更的任務；舊任務也可以在這裡補上草稿建議。",
+    },
+    warnings: "閱讀範圍與待確認事項",
+    rules: {
+      title: "這份草稿的撰寫依據",
+      defaultTitle: "預設寫作原則",
+      noSource: "未附可核對的來源",
+      quote: "查看原文依據",
+      linuxPrinciples: [
+        "具體簡潔的標題，直接說明變更。",
+        "交代問題與對使用者的影響。",
+        "說明修改理由、設計取捨與限制。",
+        "如實記錄驗證結果與未完成事項。",
+      ],
+      template: ({ template }) =>
+        `依照「${template}」整理段落。此範本未附額外寫作規範，請核對每個段落是否符合本次變更。`,
+      noRules: "未附額外寫作規範，請對照來源文件確認草稿段落。",
+    },
+    checks: {
+      title: "送出前由你確認",
+      intro: "以下是核對提醒，尚未代表完成檢查。",
+    },
+    preview: "預覽建議草稿",
+    apply: {
+      appliedNote:
+        "下方編輯區就是這份建議的原文。說明會原樣送到 GitHub，請用自己的話確認後再送出。",
+      note: "套用後仍可編輯，儲存後才更新草稿。",
+      applied: "已套用",
+      apply: "套用建議草稿",
+    },
+    commit: {
+      title: "提交訊息建議",
+      sources: "依據：",
+      code: {
+        typeScope: "type(scope)",
+        subject: "type(scope): 說明",
+        signOff: "Signed-off-by: 姓名 <email>",
+      },
+      why: ({ typeScope, subject, signOff }) =>
+        `為什麼專案會要求 ${typeScope} 或 sign-off？採用 Conventional Commits 的專案靠主旨的 ${subject} 自動產生變更日誌並決定版本號，commitlint 會在 CI 擋下不符格式的提交；採用 DCO 的專案要求每個 commit 附上 ${signOff}，表示你有權以該授權貢獻這段程式碼，DCO bot 檢查的是 commit trailer，不是 PR 說明。這份建議只整理規範要求的格式；簽署是你本人的聲明，請在「提交訊息」欄位自行輸入，模型不會代填。`,
+    },
+    meta: {
+      base: ({ commit }) => `基準版本 ${commit}`,
+      checked: ({ time }) => `查閱 ${time}`,
+    },
+    sources: {
+      title: "查閱來源文件",
+      count: ({ count }) => `${count} 份`,
+      kinds: {
+        contributing: "貢獻規範",
+        template: "PR 範本",
+        documentation: "專案文件",
+        maintainer: "維護者指引",
+        example: "參考案例",
+        automation: "自動檢查",
+      },
+      usedTemplate: "本次採用範本",
+      open: "開啟來源文件",
+      textLabel: ({ label }) => `${label}原文`,
+    },
+    etiquette: {
+      title: "送出前，先和社群打個招呼",
+      intro:
+        "開源社群重視這兩件事，是因為 maintainer 的時間有限：事先留言能避免兩個人改同一個問題，也讓對方在你投入前就能說「這個方向可以」或「我們不收這類變更」。這裡的勾選只是給自己的提醒，不會儲存，也不會阻擋送出。",
+      reminders: {
+        claimed: {
+          text: "是否已在 issue 留言表明要處理？",
+          why: "避免和別人做重複的工作，也讓 maintainer 知道有人接手。",
+        },
+        discussed: {
+          text: "專案是否要求先開 issue 討論？",
+          why: "有些專案希望先確認方向與 AI 協作是否可接受，再收 PR；先問一句，可以省下雙方審閱一份不會被接受的 PR 的時間。",
+        },
+      },
+      rule: "這個專案的規範：",
+      quote: ({ quote }) => `「${quote}」`,
+      ruleSource: ({ source }) =>
+        `來源：${source}。沒有連結 issue 時，送出前會請你再確認一次。`,
+      openIssue: "開啟你填寫的 issue",
+    },
+    linux: {
+      note: ({ guide }) =>
+        `以 ${guide} 中的動機、變更與驗證原則作為備用依據，調整成 GitHub PR 格式。Signed-off-by 等簽署資訊需由本人確認，不會自動填入。`,
+      guide: "Linux 官方提交指引",
+    },
+  },
   sync: {
     title: "目標分支",
     intro: {

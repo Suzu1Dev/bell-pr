@@ -20,9 +20,10 @@ import {
   linuxContributionUrl,
   type DraftPreparation,
   type DraftProposal,
-  type DraftSource,
 } from "../../shared/drafts";
+import { useFormat, useT } from "../i18n";
 import { MarkdownContent } from "../review/MarkdownContent";
+import { rich } from "./rich";
 import "./drafts.css";
 
 interface Props {
@@ -39,30 +40,11 @@ interface Props {
 }
 
 /**
- * Community etiquette the person confirms for themselves. The checkboxes
- * are local UI state only: nothing is saved and publishing is never blocked.
+ * Community etiquette the person confirms for themselves, in display order;
+ * the text is in `draft.guidance.etiquette.reminders`. The checkboxes are
+ * local UI state only: nothing is saved and publishing is never blocked.
  */
-const etiquetteReminders = [
-  {
-    id: "claimed",
-    text: "是否已在 issue 留言表明要處理？",
-    why: "避免和別人做重複的工作，也讓 maintainer 知道有人接手。",
-  },
-  {
-    id: "discussed",
-    text: "專案是否要求先開 issue 討論？",
-    why: "有些專案希望先確認方向與 AI 協作是否可接受，再收 PR；先問一句，可以省下雙方審閱一份不會被接受的 PR 的時間。",
-  },
-] as const;
-
-const sourceKinds: Record<DraftSource["kind"], string> = {
-  contributing: "貢獻規範",
-  template: "PR 範本",
-  documentation: "專案文件",
-  maintainer: "維護者指引",
-  example: "參考案例",
-  automation: "自動檢查",
-};
+const etiquetteReminders = ["claimed", "discussed"] as const;
 
 function webLink(value?: string) {
   try {
@@ -83,6 +65,8 @@ export function DraftGuidancePanel({
   onApply,
   applied = false,
 }: Props) {
+  const t = useT("draft").guidance;
+  const fmt = useFormat();
   const prefix = useId().replaceAll(":", "");
   const [confirmed, setConfirmed] = useState<string[]>([]);
   const issueLink = webLink(issueUrl);
@@ -98,22 +82,21 @@ export function DraftGuidancePanel({
   const ready = preparation?.status === "ready" && !!proposal;
   const sourceAnchor = (index: number) => `draft-source-${prefix}-${index}`;
   const statusMessage = generating
-    ? "正在閱讀貢獻規範與 PR 範本，並對照本次變更整理建議。你可以繼續編輯下方草稿。"
+    ? t.status.generating
     : preparation?.status === "failed"
-      ? preparation.error ||
-        "這次未能整理草稿，請稍後重試。下方編輯內容已保留。"
+      ? preparation.error || t.status.failed
       : preparation?.status === "stale"
-        ? "變更內容已更新，這份建議需要重新整理。請產生新版建議後再套用。"
+        ? t.status.stale
         : undefined;
   const generateLabel = generating
-    ? "正在整理…"
+    ? t.generate.generating
     : preparation?.status === "failed"
-      ? "重新嘗試"
+      ? t.generate.retry
       : preparation
-        ? "重新整理建議"
+        ? t.generate.refresh
         : demo
-          ? "查看草稿建議示範"
-          : "依專案規範產生建議草稿";
+          ? t.generate.demo
+          : t.generate.first;
 
   return (
     <section
@@ -125,21 +108,21 @@ export function DraftGuidancePanel({
           <BookOpen size={21} />
         </span>
         <div className="draft-guidance-heading">
-          <div className="draft-guidance-eyebrow">CONTRIBUTION GUIDE</div>
-          <h2 id={`draft-guidance-${prefix}`}>寫出維護者容易理解的 PR</h2>
-          <p>先看投稿規範與範本，再把這次貢獻整理成清楚的草稿。</p>
+          <div className="draft-guidance-eyebrow">{t.eyebrow}</div>
+          <h2 id={`draft-guidance-${prefix}`}>{t.title}</h2>
+          <p>{t.intro}</p>
         </div>
         <div className="draft-guidance-actions">
           {demo && (
-            <span className="draft-guidance-badge is-demo">示範資料</span>
+            <span className="draft-guidance-badge is-demo">{t.demoBadge}</span>
           )}
           {proposal && (
             <span
               className={`draft-guidance-badge ${proposal.policy === "linux" ? "is-fallback" : ""}`}
             >
               {proposal.policy === "repository"
-                ? "依專案規範"
-                : "Linux 原則 · PR 調整版"}
+                ? t.policy.repository
+                : t.policy.linux}
             </span>
           )}
           <button
@@ -178,19 +161,15 @@ export function DraftGuidancePanel({
       {!preparation && (
         <div className="draft-guidance-empty">
           <span>
-            <FileText size={16} /> 核對規範與範本
+            <FileText size={16} /> {t.empty.rules}
           </span>
           <span>
-            <Quote size={16} /> 每個建議附上依據
+            <Quote size={16} /> {t.empty.sources}
           </span>
           <span>
-            <ArrowDownToLine size={16} /> 由你選擇套用
+            <ArrowDownToLine size={16} /> {t.empty.choice}
           </span>
-          <p>
-            {demo
-              ? "使用示範文件體驗完整流程，不會讀取或修改遠端專案。"
-              : "適用於已完成變更的任務；舊任務也可以在這裡補上草稿建議。"}
-          </p>
+          <p>{demo ? t.empty.demo : t.empty.real}</p>
         </div>
       )}
 
@@ -198,7 +177,7 @@ export function DraftGuidancePanel({
         <div className="draft-guidance-warnings">
           <div>
             <Info size={16} />
-            <strong>閱讀範圍與待確認事項</strong>
+            <strong>{t.warnings}</strong>
           </div>
           <ul>
             {preparation.context.warnings.map((warning, index) => (
@@ -216,8 +195,8 @@ export function DraftGuidancePanel({
               <h3>
                 <Quote size={16} />{" "}
                 {proposal.policy === "linux" && !proposal.rules.length
-                  ? "預設寫作原則"
-                  : "這份草稿的撰寫依據"}
+                  ? t.rules.defaultTitle
+                  : t.rules.title}
               </h3>
               {proposal.rules.length ? (
                 <ol>
@@ -254,12 +233,12 @@ export function DraftGuidancePanel({
                             </a>
                           ) : (
                             <span className="draft-guidance-source-missing">
-                              未附可核對的來源
+                              {t.rules.noSource}
                             </span>
                           )}
                           <details className="draft-guidance-quote">
                             <summary>
-                              <ChevronDown size={13} /> 查看原文依據
+                              <ChevronDown size={13} /> {t.rules.quote}
                             </summary>
                             <blockquote>{rule.quote}</blockquote>
                           </details>
@@ -270,12 +249,7 @@ export function DraftGuidancePanel({
                 </ol>
               ) : proposal.policy === "linux" ? (
                 <ol>
-                  {[
-                    "具體簡潔的標題，直接說明變更。",
-                    "交代問題與對使用者的影響。",
-                    "說明修改理由、設計取捨與限制。",
-                    "如實記錄驗證結果與未完成事項。",
-                  ].map((principle, index) => (
+                  {t.rules.linuxPrinciples.map((principle, index) => (
                     <li key={principle}>
                       <span
                         className="draft-guidance-number"
@@ -289,22 +263,19 @@ export function DraftGuidancePanel({
                 </ol>
               ) : (
                 <p className="draft-guidance-template-note">
-                  {template ? (
-                    <>
-                      依照「<strong>{template.label}</strong>
-                      」整理段落。此範本未附額外寫作規範，請核對每個段落是否符合本次變更。
-                    </>
-                  ) : (
-                    "未附額外寫作規範，請對照來源文件確認草稿段落。"
-                  )}
+                  {template
+                    ? rich(t.rules.template, {
+                        template: <strong>{template.label}</strong>,
+                      })
+                    : t.rules.noRules}
                 </p>
               )}
             </div>
             <div className="draft-guidance-checks">
               <h3>
-                <ClipboardList size={16} /> 送出前由你確認
+                <ClipboardList size={16} /> {t.checks.title}
               </h3>
-              <p>以下是核對提醒，尚未代表完成檢查。</p>
+              <p>{t.checks.intro}</p>
               <ul>
                 {proposal.checklist.map((item, index) => (
                   <li key={index}>
@@ -321,7 +292,7 @@ export function DraftGuidancePanel({
               <span className="draft-guidance-proposal-label">
                 <FileText size={17} />
                 <span>
-                  <strong>預覽建議草稿</strong>
+                  <strong>{t.preview}</strong>
                   <small>{proposal.title}</small>
                 </span>
               </span>
@@ -334,9 +305,7 @@ export function DraftGuidancePanel({
           </details>
           <div className="draft-guidance-apply">
             <p>
-              {applied
-                ? "下方編輯區就是這份建議的原文。說明會原樣送到 GitHub，請用自己的話確認後再送出。"
-                : "套用後仍可編輯，儲存後才更新草稿。"}
+              {applied ? t.apply.appliedNote : t.apply.note}
             </p>
             <button
               type="button"
@@ -344,20 +313,20 @@ export function DraftGuidancePanel({
               onClick={() => onApply(proposal)}
               disabled={disabled || generating || !ready || applied}
             >
-              <ArrowDownToLine size={15} /> {applied ? "已套用" : "套用建議草稿"}
+              <ArrowDownToLine size={15} /> {applied ? t.apply.applied : t.apply.apply}
             </button>
           </div>
 
           {proposal.commitMessageSuggestion && (
             <div className="draft-guidance-commit">
               <h3>
-                <GitCommitHorizontal size={16} /> 提交訊息建議
+                <GitCommitHorizontal size={16} /> {t.commit.title}
               </h3>
               <pre>{proposal.commitMessageSuggestion.message}</pre>
               <p>{proposal.commitMessageSuggestion.rationale}</p>
               {proposal.commitMessageSuggestion.sources.length > 0 && (
                 <p className="draft-guidance-commit-sources">
-                  依據：
+                  {t.commit.sources}
                   {proposal.commitMessageSuggestion.sources.map((id) => {
                     const sourceIndex = sources.findIndex(
                       (source) => source.id === id,
@@ -379,22 +348,18 @@ export function DraftGuidancePanel({
                       </a>
                     ) : (
                       <span key={id} className="draft-guidance-source-missing">
-                        未附可核對的來源
+                        {t.rules.noSource}
                       </span>
                     );
                   })}
                 </p>
               )}
               <p className="draft-guidance-commit-why">
-                為什麼專案會要求 <code>type(scope)</code> 或
-                sign-off？採用 Conventional Commits 的專案靠主旨的{" "}
-                <code>type(scope): 說明</code>{" "}
-                自動產生變更日誌並決定版本號，commitlint 會在 CI
-                擋下不符格式的提交；採用 DCO 的專案要求每個 commit 附上{" "}
-                <code>Signed-off-by: 姓名 &lt;email&gt;</code>
-                ，表示你有權以該授權貢獻這段程式碼，DCO bot 檢查的是 commit
-                trailer，不是 PR
-                說明。這份建議只整理規範要求的格式；簽署是你本人的聲明，請在「提交訊息」欄位自行輸入，模型不會代填。
+                {rich(t.commit.why, {
+                  typeScope: <code>{t.commit.code.typeScope}</code>,
+                  subject: <code>{t.commit.code.subject}</code>,
+                  signOff: <code>{t.commit.code.signOff}</code>,
+                })}
               </p>
             </div>
           )}
@@ -404,22 +369,17 @@ export function DraftGuidancePanel({
       {!demo && preparation?.context && (
         <div className="draft-guidance-source-meta">
           <span>
-            基準版本 <code>{preparation.context.baseSha.slice(0, 7)}</code>
+            {rich(t.meta.base, {
+              commit: <code>{preparation.context.baseSha.slice(0, 7)}</code>,
+            })}
           </span>
           {checkedDate && !Number.isNaN(checkedDate.getTime()) && (
             <span>
-              查閱{" "}
-              <time dateTime={checkedAt} title="台北時間">
-                {checkedDate.toLocaleString("zh-TW", {
-                  timeZone: "Asia/Taipei",
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: false,
-                })}
-              </time>
+              {rich(t.meta.checked, {
+                time: (
+                  <time dateTime={checkedAt}>{fmt.dateTime(checkedDate)}</time>
+                ),
+              })}
             </span>
           )}
         </div>
@@ -430,7 +390,8 @@ export function DraftGuidancePanel({
           <summary>
             <FileText size={15} />
             <span>
-              查閱來源文件 <small>{sources.length} 份</small>
+              {t.sources.title}{" "}
+              <small>{t.sources.count({ count: sources.length })}</small>
             </span>
             <ChevronDown size={15} />
           </summary>
@@ -442,22 +403,25 @@ export function DraftGuidancePanel({
                   <summary>
                     <span>
                       {source.label}
-                      <small>{source.path ?? sourceKinds[source.kind]}</small>
+                      <small>{source.path ?? t.sources.kinds[source.kind]}</small>
                     </span>
                     <span className="draft-guidance-source-kind">
                       {source.id === proposal?.templateSourceId
-                        ? "本次採用範本"
-                        : sourceKinds[source.kind]}
+                        ? t.sources.usedTemplate
+                        : t.sources.kinds[source.kind]}
                     </span>
                     <ChevronDown size={14} />
                   </summary>
                   <div className="draft-guidance-source-content">
                     {url && (
                       <a href={url} target="_blank" rel="noopener noreferrer">
-                        開啟來源文件 <ArrowUpRight size={13} />
+                        {t.sources.open} <ArrowUpRight size={13} />
                       </a>
                     )}
-                    <pre tabIndex={0} aria-label={`${source.label}原文`}>
+                    <pre
+                      tabIndex={0}
+                      aria-label={t.sources.textLabel({ label: source.label })}
+                    >
                       {source.content}
                     </pre>
                   </div>
@@ -473,26 +437,24 @@ export function DraftGuidancePanel({
         aria-labelledby={`draft-etiquette-${prefix}`}
       >
         <h3 id={`draft-etiquette-${prefix}`}>
-          <MessagesSquare size={16} /> 送出前，先和社群打個招呼
+          <MessagesSquare size={16} /> {t.etiquette.title}
         </h3>
-        <p>
-          開源社群重視這兩件事，是因為 maintainer
-          的時間有限：事先留言能避免兩個人改同一個問題，也讓對方在你投入前就能說「這個方向可以」或「我們不收這類變更」。這裡的勾選只是給自己的提醒，不會儲存，也不會阻擋送出。
-        </p>
+        <p>{t.etiquette.intro}</p>
         <ul>
-          {etiquetteReminders.map((reminder) => {
-            const inputId = `draft-etiquette-${prefix}-${reminder.id}`;
+          {etiquetteReminders.map((id) => {
+            const inputId = `draft-etiquette-${prefix}-${id}`;
+            const reminder = t.etiquette.reminders[id];
             return (
-              <li key={reminder.id}>
+              <li key={id}>
                 <input
                   id={inputId}
                   type="checkbox"
-                  checked={confirmed.includes(reminder.id)}
+                  checked={confirmed.includes(id)}
                   onChange={(event) =>
                     setConfirmed((previous) =>
                       event.target.checked
-                        ? [...previous, reminder.id]
-                        : previous.filter((entry) => entry !== reminder.id),
+                        ? [...previous, id]
+                        : previous.filter((entry) => entry !== id),
                     )
                   }
                 />
@@ -506,32 +468,33 @@ export function DraftGuidancePanel({
         </ul>
         {issueRequirement && (
           <p className="draft-guidance-issue-rule" role="note">
-            <strong>這個專案的規範：</strong>「{issueRequirement.quote}」
+            <strong>{t.etiquette.rule}</strong>
+            {t.etiquette.quote({ quote: issueRequirement.quote })}
             <small>
-              來源：{issueRequirement.label}。沒有連結 issue
-              時，送出前會請你再確認一次。
+              {t.etiquette.ruleSource({ source: issueRequirement.label })}
             </small>
           </p>
         )}
         {issueLink && (
           <a href={issueLink} target="_blank" rel="noopener noreferrer">
-            開啟你填寫的 issue <ArrowUpRight size={12} />
+            {t.etiquette.openIssue} <ArrowUpRight size={12} />
           </a>
         )}
       </section>
 
       {proposal?.policy === "linux" && (
         <p className="draft-guidance-linux">
-          以{" "}
-          <a
-            href={linuxContributionUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Linux 官方提交指引 <ArrowUpRight size={12} />
-          </a>{" "}
-          中的動機、變更與驗證原則作為備用依據，調整成 GitHub PR
-          格式。Signed-off-by 等簽署資訊需由本人確認，不會自動填入。
+          {rich(t.linux.note, {
+            guide: (
+              <a
+                href={linuxContributionUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t.linux.guide} <ArrowUpRight size={12} />
+              </a>
+            ),
+          })}
         </p>
       )}
     </section>
