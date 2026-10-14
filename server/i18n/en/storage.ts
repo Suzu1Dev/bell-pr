@@ -1,4 +1,22 @@
+import { intlLocale } from "../../../shared/i18n/locale.js";
 import { product } from "../../../shared/product.js";
+
+/** A disk size such as "12.3 MB"; anything under 1 kB still shows as kB. */
+const size = (bytes: number) => {
+  const units = ["kilobyte", "megabyte", "gigabyte", "terabyte"] as const;
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return new Intl.NumberFormat(intlLocale("en"), {
+    style: "unit",
+    unit: units[unit],
+    unitDisplay: "short",
+    maximumFractionDigits: 1,
+  }).format(value);
+};
 
 /** Storage, cleanup and recovery messages. */
 export default {
@@ -15,5 +33,23 @@ export default {
     resumed: "The service restarted; this queued run starts again.",
     /** A retry of a run that has no plan yet. */
     retryPlanning: "Retrying the run: the lead plans the task again.",
+  },
+  /** A run's working files on disk. */
+  workspace: {
+    removed:
+      "Files for this run were cleaned up to free disk space. Reports and notes are kept.",
+    /** A run log line after the person freed the space. */
+    removedLog: ({ bytes }: { bytes: number }) =>
+      `Removed this run's working files and freed ${size(bytes)}; reports, notes and explanations are kept.`,
+    busy: "This run is still working. Stop it or wait until it finishes, then try again.",
+    outsideData:
+      `This run's working directory is outside ${product.name}'s data directory, so it is left as it is.`,
+  },
+  repos: {
+    busy: "A run of this project is still working. Stop it or wait until it finishes, then delete the project.",
+  },
+  erase: {
+    confirm: "Type ERASE to confirm that all data should be deleted.",
+    busy: "Work is still running. Stop every run and the discovery search first, then delete all data.",
   },
 };

@@ -27,6 +27,7 @@ import { proEntitlements, type Entitlements } from "../shared/plans.js";
 import { synchronizeExplanations } from "./explanations.js";
 import { currentLocale, sm } from "./i18n/index.js";
 import { log } from "./log.js";
+import * as cleanup from "./cleanup.js";
 
 import { collectDraftContext } from "./draft-sources.js";
 import { synchronizeDraftPreparation } from "./drafts.js";
@@ -601,6 +602,7 @@ export class Workbench {
 
   async diff(id: string) {
     const run = this.run(id);
+    cleanup.assertWorkspacePresent(run);
     const files = await readDiff(run);
     synchronizeExplanations(run, files);
     synchronizeDraftPreparation(run, files);
@@ -705,6 +707,23 @@ export class Workbench {
       displayedFingerprint,
       acknowledged,
     );
+  }
+
+  /** Frees a finished run's working files; the run and its notes stay. */
+  async removeWorkspace(id: string) {
+    return cleanup.archiveRunWorkspace(this.context, this.run(id));
+  }
+
+  async removeRun(id: string) {
+    return cleanup.removeRun(this.context, id);
+  }
+
+  async removeRepository(id: string) {
+    return cleanup.removeRepository(this.context, id);
+  }
+
+  async eraseAll(confirm: unknown) {
+    return cleanup.eraseAll(this.context, confirm);
   }
 
   async shutdown() {

@@ -8,6 +8,7 @@ import { removeTaskWorktree } from "./team-workspace.js";
 import { AppError, type Run } from "./types.js";
 import { sm } from "./i18n/index.js";
 import { queueTeamMessage } from "./run-executor.js";
+import { assertWorkspacePresent } from "./cleanup.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 /**
@@ -28,6 +29,7 @@ export async function retryTeam(
     const team = run.team;
     if (!["failed", "cancelled"].includes(run.status) || !team)
       throw new AppError((m) => m.run.team.retryNotAllowed, 409);
+    assertWorkspacePresent(run);
     if (!team.tasks.length) return retryPlanning(ctx, run, team, message);
     if (!run.baseSha) throw new AppError((m) => m.run.team.retryNotAllowed, 409);
     // A cancelled run keeps its controller until the worker has exited; the
