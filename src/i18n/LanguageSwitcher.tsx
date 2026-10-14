@@ -1,10 +1,30 @@
-import { htmlLang, locales, parseLocale } from "../../shared/i18n/locale";
+import {
+  htmlLang,
+  locales,
+  parseLocale,
+  type Locale,
+} from "../../shared/i18n/locale";
+import { api, send } from "../api";
 import { useLocale, useT } from "./index";
+
+/**
+ * Switches the UI to `next` with `change` (the setter from useLocale), then
+ * saves it in the app settings, so work the server does on its own
+ * (recovery, queued runs, cleanup, the command line) uses it too. Saving is
+ * best effort: a failure (the demo, before sign-in) changes nothing.
+ */
+export function chooseLocale(next: Locale, change: (locale: Locale) => void) {
+  change(next);
+  api("/app-settings", send("PUT", { locale: next })).catch(() => {
+    // The UI language already changed.
+  });
+}
 
 /**
  * Chooses the UI language. Each option shows the language's own name and is
  * tagged with that language for screen readers. Switching takes effect
- * without a reload and is remembered (see `setLocale`).
+ * without a reload, is remembered (see `setLocale`) and is saved in the app
+ * settings (see `chooseLocale`).
  */
 export function LanguageSwitcher({
   id,
@@ -23,7 +43,7 @@ export function LanguageSwitcher({
       value={locale}
       onChange={(event) => {
         const next = parseLocale(event.target.value);
-        if (next && next !== locale) setLocale(next);
+        if (next && next !== locale) chooseLocale(next, setLocale);
       }}
     >
       {locales.map((option) => (

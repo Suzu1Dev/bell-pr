@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import type { DoctorCheck, DoctorReport } from "../../shared/doctor";
+import { chooseLocale } from "../i18n/LanguageSwitcher";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { CopyCommand } from "./CopyCommand";
 import { ReadinessNotice, readinessOf } from "./ReadinessNotice";
@@ -257,4 +258,33 @@ test("the readiness notice explains the requirement with fixes, and renders noth
   }) }));
   assert.match(zh, /這需要你的 Git 名字與電子郵件地址/);
   assert.match(zh, /Git 名字與電子郵件：尚未設定。/);
+});
+
+test("choosing a language also saves it in the app settings, and a failure is ignored", async (t) => {
+  const previous = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = previous;
+  });
+  const requests: { url: string; method?: string; body?: unknown }[] = [];
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    requests.push({ url, method: init?.method, body: init?.body });
+    return new Response(JSON.stringify({ settings: { locale: "zh-TW" }, lockedBy: {} }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+  const changed: string[] = [];
+  chooseLocale("zh-TW", (locale) => changed.push(locale));
+  assert.deepEqual(changed, ["zh-TW"]);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(requests, [
+    { url: "/api/app-settings", method: "PUT", body: JSON.stringify({ locale: "zh-TW" }) },
+  ]);
+  // In the demo or before sign-in the request fails; nothing else happens.
+  globalThis.fetch = (async () => {
+    throw new TypeError("fetch failed");
+  }) as typeof fetch;
+  chooseLocale("en", (locale) => changed.push(locale));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(changed, ["zh-TW", "en"]);
 });
