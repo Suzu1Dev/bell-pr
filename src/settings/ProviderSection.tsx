@@ -119,10 +119,13 @@ function ProviderCard({
 function ModelSettingsForm({
   showCurrentRun,
   onSaved,
+  doctor,
 }: {
   showCurrentRun: () => void;
   /** Called after a save; the readiness line depends on the chosen provider. */
   onSaved: () => void;
+  /** The page's environment report, shared with the provider picker. */
+  doctor: DoctorState;
 }) {
   const t = useT("settings").provider.models;
   const [settings, setSettings] = useState<ModelSettings | null>(null);
@@ -216,6 +219,7 @@ function ModelSettingsForm({
               }}
               modelsOnly
               compact
+              doctor={doctor}
             />
           </fieldset>
           <Feedback message={message} error={error} />
@@ -307,7 +311,11 @@ export function ProviderSection({
           />
         ))}
       </div>
-      <ModelSettingsForm showCurrentRun={showCurrentRun} onSaved={modelsSaved} />
+      <ModelSettingsForm
+        showCurrentRun={showCurrentRun}
+        onSaved={modelsSaved}
+        doctor={doctor}
+      />
     </SettingsSectionFrame>
   );
 }
