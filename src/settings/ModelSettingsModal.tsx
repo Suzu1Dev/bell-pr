@@ -3,6 +3,7 @@ import { Check, CircleCheck, Loader2 } from "lucide-react";
 import { DirectionSettings } from "../mission";
 import { defaultContributionSettings } from "../../shared/insights";
 import type { TaskSetup } from "../app/hooks/useTaskSetup";
+import { useT } from "../i18n";
 import { Modal } from "../modals/Modal";
 
 interface ModelSettingsModalProps {
@@ -32,6 +33,7 @@ export function ModelSettingsModal({
   setFormError,
   closeModal,
 }: ModelSettingsModalProps) {
+  const t = useT("settings").modelDialog;
   const {
     modelSettings,
     setModelSettings,
@@ -46,8 +48,8 @@ export function ModelSettingsModal({
   return (
     <Modal
       wide
-      title="設定貢獻模型"
-      subtitle="所有專案共用的 Agent、模型與思考強度，套用到之後建立的任務與專案分析。"
+      title={t.title}
+      subtitle={t.subtitle}
       onClose={closeModal}
     >
       <form onSubmit={(event) => {
@@ -55,7 +57,7 @@ export function ModelSettingsModal({
         void saveModelSettings();
       }}>
         {settingsLoading && (
-          <p className="field-help" role="status">正在載入模型設定…</p>
+          <p className="field-help" role="status">{t.loading}</p>
         )}
         {!settingsLoading && !settingsReady && (
           <button
@@ -63,7 +65,7 @@ export function ModelSettingsModal({
             className="save-direction-button"
             onClick={() => void configureContributionModels()}
           >
-            重新載入模型設定
+            {t.reload}
           </button>
         )}
         <fieldset
@@ -91,7 +93,7 @@ export function ModelSettingsModal({
         )}
         <div className="modal-actions">
           <button type="button" className="button secondary" onClick={closeModal}>
-            關閉
+            {t.close}
           </button>
           <button
             ref={settingsSaveButton}
@@ -100,7 +102,7 @@ export function ModelSettingsModal({
             disabled={busy || settingsLoading || !settingsReady}
           >
             {busy ? <Loader2 size={16} className="spin" /> : <Check size={16} />}
-            {busy ? "正在儲存…" : "儲存設定"}
+            {busy ? t.saving : t.save}
           </button>
         </div>
       </form>

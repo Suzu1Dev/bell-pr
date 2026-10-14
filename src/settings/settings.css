@@ -1,0 +1,51 @@
+/* The language row of the General card and the environment variable notes. */
+.setup-command label {
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
+}
+.settings-language-select {
+  min-width: 180px;
+  padding: 7px 10px;
+  border: 1px solid var(--color-accent-200);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+.settings-advanced {
+  margin-top: 4px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 5px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.settings-advanced summary {
+  padding: 10px 14px;
+  color: var(--color-accent-600);
+  cursor: pointer;
+}
+.settings-advanced p,
+.settings-advanced dl {
+  margin: 0;
+  padding: 0 14px 12px;
+}
+.settings-advanced dl > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.settings-advanced dt code {
+  font-family: var(--font-mono);
+  color: var(--color-accent-600);
+}
+.settings-advanced dd {
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .settings-language-select {
+    min-width: 0;
+    max-width: 60%;
+  }
+}
