@@ -102,6 +102,33 @@ export function mergePlaybackRun(previous: Run, step: Run): Run {
   };
 }
 
+/**
+ * The sample run once the reader stops its playing team: it stops where it
+ * was, as a stopped run does, and its unfinished work goes back to waiting.
+ * A sample whose team is done is left as it is.
+ */
+export function stopSampleRun(run: Run): Run {
+  if (!["queued", "running", "awaiting_plan"].includes(run.status)) return run;
+  return {
+    ...run,
+    status: "cancelled",
+    agents: run.agents.map((agent) =>
+      agent.status === "running" ? { ...agent, status: "waiting" } : agent,
+    ),
+    ...(run.team
+      ? {
+          team: {
+            ...run.team,
+            phase: "cancelled",
+            tasks: run.team.tasks.map((task) =>
+              task.status === "running" ? { ...task, status: "pending" } : task,
+            ),
+          },
+        }
+      : {}),
+  };
+}
+
 const wait = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -937,6 +964,13 @@ export function useRunActions({
     }
   }
   async function cancel() {
+    if (demo) {
+      // The sample's team plays in the browser: stopping it sends nothing.
+      stopPlayback();
+      setRun(stopSampleRun);
+      notify(t.demoStopped);
+      return;
+    }
     try {
       const { run: updated } = await api<{ run: Run }>(
         `/runs/${run.id}/cancel`,

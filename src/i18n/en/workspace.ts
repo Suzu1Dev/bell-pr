@@ -351,6 +351,8 @@ const workspace = {
     imported: ({ name }: { name: string }) => `Imported ${name}`,
     demoPlaybackStarted:
       "The sample team is starting: a prewritten run plays here, with no agent and nothing sent to GitHub.",
+    demoStopped:
+      "The sample team stopped. Start it again from New contribution.",
     /** A chat turn that failed; `ChatMessage.failed` marks it. */
     chatFailed: ({ message }: { message: string }) =>
       `Could not get an answer this time: ${message}`,

@@ -9,6 +9,7 @@ import {
   readRunFiles,
   runPath,
   stopNotice,
+  stopSampleRun,
 } from "./useRunActions";
 import type { Run } from "../../types";
 
@@ -223,4 +224,46 @@ test("a playback answer waits 300-900 ms, then types out in growing slices", () 
   assert.equal(answerTyping(answer, 400, () => 0).pause, 16);
   // A short answer still arrives whole.
   assert.deepEqual(answerTyping("Yes.", 1, () => 0).slices, ["Yes."]);
+});
+
+test("stopping the sample's team stops it where it was, and a finished sample stays", () => {
+  const playing: Run = {
+    ...base,
+    id: "demo-run",
+    status: "running",
+    agents: [
+      { id: "lead", name: "Lead", role: "Lead", status: "complete", detail: "" },
+      { id: "frontend", name: "Frontend", role: "Teammate", status: "running", detail: "" },
+    ],
+    team: {
+      config: {
+        maxTeammates: 2,
+        requirePlanApproval: true,
+        provider: "codex",
+        protocol: "bell-shared-tasks",
+        messageDelivery: "between-turns",
+      },
+      phase: "developing",
+      planSummary: "Plan",
+      tasks: [
+        { id: "t1", title: "One", description: "", owner: "frontend", files: [], dependsOn: [], status: "complete" },
+        { id: "t2", title: "Two", description: "", owner: "frontend", files: [], dependsOn: ["t1"], status: "running" },
+      ],
+      messages: [],
+    },
+  };
+  const stopped = stopSampleRun(playing);
+  assert.equal(stopped.status, "cancelled");
+  assert.equal(stopped.team?.phase, "cancelled");
+  assert.deepEqual(stopped.team?.tasks.map((task) => task.status), ["complete", "pending"]);
+  assert.deepEqual(stopped.agents.map((agent) => agent.status), ["complete", "waiting"]);
+  // The playing run itself is not changed.
+  assert.equal(playing.status, "running");
+  // A sample in review or published has no team at work to stop.
+  for (const status of ["review", "approved", "published"] as const) {
+    const done = { ...playing, status };
+    assert.equal(stopSampleRun(done), done);
+  }
+  assert.equal(zh.demoStopped, "範例團隊已停止。可從「新增貢獻」重新開始。");
+  assertNoHan(en.workspace.notices.demoStopped);
 });

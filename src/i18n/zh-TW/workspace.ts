@@ -275,6 +275,7 @@ const m: Translation<typeof en> = {
     imported: ({ name }) => `已匯入 ${name}`,
     demoPlaybackStarted:
       "範例團隊開始工作：這裡播放預先寫好的執行過程，不會啟動 agent，也不會送出任何內容到 GitHub。",
+    demoStopped: "範例團隊已停止。可從「新增貢獻」重新開始。",
     chatFailed: ({ message }) => `這次未能取得回答：${message}`,
     roundPushed: "已把這輪修正推送到 PR，分支上多了一個 commit。",
     prCreated: "GitHub Draft PR 已建立",

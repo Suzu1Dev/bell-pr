@@ -167,3 +167,35 @@ test("demo=play plays the sample from queued to a published sample PR, with no t
     await context.close();
   }
 });
+
+test("stopping the sample's team sends nothing and leaves it stopped", async ({ browser }) => {
+  const context = await browser.newContext({
+    baseURL: server.baseURL,
+    storageState: server.storageState,
+    viewport: { width: 1440, height: 900 },
+    locale: "en-US",
+    timezoneId: "UTC",
+  });
+  try {
+    const page = await context.newPage();
+    const writes: string[] = [];
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (request.method() !== "GET" && url.pathname.startsWith("/api/runs"))
+        writes.push(`${request.method()} ${url.pathname}`);
+    });
+    await page.goto("/#/runs/demo-run/activity?demo=play&speed=4&locale=en");
+    const badge = page.locator(".workspace-heading .status-badge");
+    await expect(badge).toHaveText(status.awaiting_plan, { timeout: 20_000 });
+    await page.getByRole("button", { name: workspace.activity.stopTask }).click();
+    await expect(badge).toHaveText(status.cancelled);
+    await expect(page.getByText(workspace.notices.demoStopped)).toBeVisible();
+    await expect(page.getByRole("button", { name: workspace.activity.stopTask })).toHaveCount(0);
+    // Nothing plays on after the stop.
+    await page.waitForTimeout(1_500);
+    await expect(badge).toHaveText(status.cancelled);
+    expect(writes).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
