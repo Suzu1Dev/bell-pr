@@ -69,8 +69,8 @@ start BELL PR (`bell-pr`) and use the link it prints.
 
 The errors below carry a stable code (`code` in the API's JSON body;
 `server_unreachable` comes from the app itself), and many come with the
-commands that fix them, which the app shows with a copy button. Text in quotes is the English message; the app shows it in
-your language.
+commands that fix them, which the app shows with a copy button. Text in
+quotes is the English message; the app shows it in your language.
 
 ### `pro_required`
 
