@@ -388,6 +388,16 @@ test("stop cancels every timer and settles what was pending", async () => {
   playback.start();
   time.runAll();
   assert.equal(playback.current()!.run.status, "awaiting_plan");
+
+  // A publish cut short by stop() can be tried again.
+  playback.approvePlan();
+  time.runAll();
+  assert.equal(playback.publish(), true);
+  playback.stop();
+  assert.equal(time.pending(), 0);
+  assert.equal(playback.publish(), true);
+  time.runAll();
+  assert.equal(playback.current()!.run.status, "published");
 });
 
 test("a restart, an unsubscribe or a failing subscriber leaves the rest playing", () => {

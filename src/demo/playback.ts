@@ -158,7 +158,8 @@ export interface DemoPlayback {
   current(): PlaybackRunEvent | undefined;
   /**
    * Cancels every timer. Pending import and analysis promises resolve with
-   * undefined; later calls start afresh.
+   * undefined, and a publish cut short can be retried; later calls start
+   * afresh.
    */
   stop(): void;
 }
@@ -603,6 +604,8 @@ export function createDemoPlayback({
     current: () => lastRun,
     stop() {
       for (const each of lanes) each.cancel();
+      // A publish cut short can be tried again.
+      if (run) delete run.publishing;
       settleImport?.(undefined);
       settleAnalysis?.(undefined);
       settleImport = undefined;
