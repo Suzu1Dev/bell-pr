@@ -472,6 +472,15 @@ function documents(root, files) {
     .sort();
 }
 
+/** A percent-encoded part of a link, decoded; as written when it is malformed. */
+function decodePart(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 /** Every problem with the documents under `root`, as "file:line: message". */
 export function checkDocs(root, env = process.env) {
   const { files, folders } = repositoryFiles(root, env);
@@ -494,7 +503,7 @@ export function checkDocs(root, env = process.env) {
       if (destination === "") {
         problems.push(`${where}: a link without a destination.`);
       } else if (destination.startsWith("#")) {
-        const anchor = decodeURIComponent(destination.slice(1));
+        const anchor = decodePart(destination.slice(1));
         if (!anchorsOf(name).has(anchor))
           problems.push(`${where}: no heading in ${name} has the anchor "${destination}".`);
       } else if (/^mailto:/i.test(destination)) {
@@ -510,12 +519,7 @@ export function checkDocs(root, env = process.env) {
         problems.push(`${where}: unsupported link "${destination}".`);
       } else {
         const [pathPart, anchor] = destination.split("#", 2);
-        let decoded;
-        try {
-          decoded = decodeURIComponent(pathPart.split("?")[0]);
-        } catch {
-          decoded = pathPart;
-        }
+        const decoded = decodePart(pathPart.split("?")[0]);
         const target = path.posix.normalize(
           decoded.startsWith("/")
             ? decoded.replace(/^\/+/, "")
@@ -528,7 +532,7 @@ export function checkDocs(root, env = process.env) {
         } else if (anchor !== undefined && files.has(target)) {
           if (!target.endsWith(".md"))
             problems.push(`${where}: "${destination}" has an anchor, but ${target} is not Markdown.`);
-          else if (!anchorsOf(target).has(decodeURIComponent(anchor)))
+          else if (!anchorsOf(target).has(decodePart(anchor)))
             problems.push(`${where}: no heading in ${target} has the anchor "#${anchor}".`);
         }
       }
@@ -753,7 +757,10 @@ function selfTest() {
       ].join("\n"),
     );
     write("README.zh-TW.md", "# 範例\n\n[English](README.md) [Ignored](ignored.md)\n");
-    write("docs/start.md", "# Start\n\n## Install\n\n[Back](../README.md#fixture) [Up](../../x.md)\n");
+    write(
+      "docs/start.md",
+      "# Start\n\n## Install\n\n[Back](../README.md#fixture) [Up](../../x.md)\n[Bad escape](#100%) [Bad file](../README.md#%zz)\n",
+    );
     write("docs/images/a.png", "png");
     write("docs/troubleshooting.md", "# Troubleshooting\n\n## `auth_required`\n\nText about `git_missing` outside a heading.\n");
     write(".gitignore", "ignored.md\n");
@@ -771,12 +778,16 @@ function selfTest() {
       "README.md:6: https://bell.example.test/ is neither a file of the repository nor on the list of public URLs in scripts/npm-readme.mjs; product URLs belong in generated product-link regions.",
       'README.zh-TW.md:3: "ignored.md" names no file or folder of the repository.',
       'docs/start.md:5: "../../x.md" leaves the repository.',
+      'docs/start.md:6: no heading in docs/start.md has the anchor "#100%".',
+      'docs/start.md:6: no heading in README.md has the anchor "#%zz".',
       "docs/troubleshooting.md: no heading names the error code `git_missing`.",
     ]);
     write("README.md", "# Fixture\n\n[Ref][r]\n\n[r]: docs/start.md\n");
     write("README.zh-TW.md", "# 範例\n\n[English](README.md)\n");
     assert.deepEqual(checkDocs(temp, env), [
       'docs/start.md:5: "../../x.md" leaves the repository.',
+      'docs/start.md:6: no heading in docs/start.md has the anchor "#100%".',
+      'docs/start.md:6: no heading in README.md has the anchor "#%zz".',
       "docs/troubleshooting.md: no heading names the error code `git_missing`.",
       'README.md (npm): README.md:5: write "docs/start.md" as an inline link; a reference definition cannot become text.',
     ]);
