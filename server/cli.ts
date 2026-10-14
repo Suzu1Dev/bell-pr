@@ -14,6 +14,7 @@ import {
   envFlag,
   resolveConfig,
   resolveDataDir,
+  resolvePort,
 } from "./config.js";
 import { runDoctorCli } from "./doctor.js";
 import { sm } from "./i18n/index.js";
@@ -318,6 +319,27 @@ function printVersion(args: string[], ctx: Context): number {
   return 0;
 }
 
+/**
+ * The port `bell-pr doctor` reports: that of the BELL PR running on
+ * `dataDir`, which may have been started with --port, else the one a start
+ * would take from the environment (BELLPR_PORT, else 4311).
+ */
+async function doctorPort(dataDir: string, env: NodeJS.ProcessEnv) {
+  const lock = readLock(dataDir);
+  if (
+    lock &&
+    lockHolderRunning(dataDir, lock) &&
+    (await probeHealth(lock.host ?? "127.0.0.1", lock.port))
+  )
+    return lock.port;
+  try {
+    return resolvePort(undefined, env);
+  } catch {
+    // An invalid BELLPR_PORT: the doctor reports no port.
+    return undefined;
+  }
+}
+
 /** doctor and license read their own arguments; --data-dir is shared. */
 async function delegate(
   command: "doctor" | "license",
@@ -330,9 +352,8 @@ async function delegate(
     dataDir: resolveDataDir({ dataDir: values["data-dir"] }, ctx.env),
     stdout: ctx.stdout,
   };
-  return command === "doctor"
-    ? runDoctorCli(rest, deps)
-    : runLicenseCli(rest, deps);
+  if (command === "license") return runLicenseCli(rest, deps);
+  return runDoctorCli(rest, { ...deps, port: await doctorPort(deps.dataDir, ctx.env) });
 }
 
 /**

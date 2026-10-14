@@ -66,7 +66,7 @@ or incomplete against the shipped code and are corrected in the documents:
   command line. It was never on BELL PR's own, but the startup link that
   holds it was passed to `open`/`xdg-open` when BELL PR opened the browser.
   Since finding 1 was fixed, the browser gets a one-time link instead
-  (`server/index.ts:555`, `server/cli.ts:173`), so the token is on no
+  (`server/index.ts:555`, `server/cli.ts:174`), so the token is on no
   command line, and SEC-14 and SEC-16 say so.
 - **Web access (PRIV-28, PRIV-29, SEC-32).** Named which agents get it
   (`server/run-executor.ts:134`), the Claude Code WebFetch domain list
@@ -106,7 +106,7 @@ own. The legal texts already describe the shipped behavior.
 
 1. **Startup sign-in link on a command line.** Fixed after the merge: BELL
    PR opened the startup link, which carries the session secret itself,
-   through `open`/`xdg-open` (`server/cli.ts:173`), so it could appear in a
+   through `open`/`xdg-open` (`server/cli.ts:174`), so it could appear in a
    process list that other local users can read. It now opens a one-time
    link (`mintOneTimeToken`, `server/index.ts:555`) instead,
    `server/cli.test.ts` checks the opener's arguments, and SECURITY.md
@@ -277,7 +277,7 @@ Commands run on the tree of this review, test files excluded:
 | PRIV-31 | Agents are told not to put contents or secrets in queries | `server/prompts/team.ts:28` |
 | PRIV-32 | One data directory: `~/.bellpr`, `--data-dir` or `BELLPR_DATA_DIR` | `server/config.ts:97`, `server/config.ts:105` |
 | PRIV-33 | The data directory is 0700 and BELL PR's files are private to the user | `server/store.ts:346`, `server/store.ts:351`, `server/index.ts:330` |
-| PRIV-34 | The data inventory table | `server/store.ts:36`, `server/store.ts:37`, `server/store.ts:393`, `server/store.ts:534`, `server/repositories.ts:253`, `server/workbench.ts:514`, `server/run-executor.ts:497`, `server/insights.ts:695`, `server/insights.ts:747`, `server/discovery.ts:434`, `server/license.ts:348`, `server/app-settings.ts:134`, `server/publish.ts:53`, `server/config.ts:114`, `server/config.ts:116`, `server/config.ts:120`, `server/log.ts:15`, `server/log.ts:305`, `server/log.ts:306`, `server/cli.ts:241` |
+| PRIV-34 | The data inventory table | `server/store.ts:36`, `server/store.ts:37`, `server/store.ts:393`, `server/store.ts:534`, `server/repositories.ts:253`, `server/workbench.ts:514`, `server/run-executor.ts:497`, `server/insights.ts:695`, `server/insights.ts:747`, `server/discovery.ts:434`, `server/license.ts:348`, `server/app-settings.ts:134`, `server/publish.ts:53`, `server/config.ts:114`, `server/config.ts:116`, `server/config.ts:120`, `server/log.ts:15`, `server/log.ts:305`, `server/log.ts:306`, `server/cli.ts:242` |
 | PRIV-35 | Temporary index files are deleted when done or at the next start | `server/sync.ts:40`, `server/cleanup.ts:153`, `server/janitor.ts:13` |
 | PRIV-36 | What the browser keeps, and the 30-day cookie | `src/i18n/index.tsx:35`, `src/app/AppShell.tsx:143`, `src/app/AppShell.tsx:527`, `src/app/AppShell.tsx:545`, `src/app/hooks/demoStorage.ts:15`, `src/app/ErrorBoundary.tsx:118`, `server/http-guard.ts:80` |
 | PRIV-37 | `BELLPR_LICENSE_KEY` holds the key wherever it is set | `server/index.ts:512` |
@@ -379,16 +379,16 @@ Commands run on the tree of this review, test files excluded:
 | SEC-08 | 90-day disclosure window | Owner decision: support policy |
 | SEC-09 | No legal action against good-faith research | Owner decision: counsel review (G4) |
 | SEC-10 | Listens on 127.0.0.1 by default | `server/config.ts:72` |
-| SEC-11 | Another address needs `--host`/`BELLPR_HOST` and, unless it is loopback or all interfaces, `BELLPR_PUBLIC_URL`; non-local origins need HTTPS | `server/config.ts:242`, `server/config.ts:258`, `server/config.ts:203`, `server/http-guard.ts:38` |
+| SEC-11 | Another address needs `--host`/`BELLPR_HOST` and, unless it is loopback or all interfaces, `BELLPR_PUBLIC_URL`; non-local origins need HTTPS | `server/config.ts:250`, `server/config.ts:266`, `server/config.ts:217`, `server/http-guard.ts:38` |
 | SEC-12 | Only its own hosts and allowed origins, no cross-site requests, JSON for changes, a strict CSP | `server/http-guard.ts:221`, `server/http-guard.ts:232`, `server/http-guard.ts:247`, `server/http-guard.ts:216` |
-| SEC-13 | Listening on all interfaces exposes the sign-in page; publish on 127.0.0.1 | `Dockerfile:80`, `server/config.ts:258`, `server/http-guard.ts:237` |
+| SEC-13 | Listening on all interfaces exposes the sign-in page; publish on 127.0.0.1 | `Dockerfile:80`, `server/config.ts:266`, `server/http-guard.ts:237` |
 | SEC-14 | A random 32-byte token in memory, never in a file, environment or command line; a restart signs out | `server/index.ts:529`, `server/index.ts:532`, `server/index.ts:556` |
 | SEC-15 | The printed link holds the token and works until restart | `server/index.ts:548` |
-| SEC-16 | The browser opened at start gets a one-time link, which goes to `open`/`xdg-open`; the token never does | `server/index.ts:556`, `server/routes/auth.ts:128`, `server/cli.ts:173`, `server/cli.ts:179`; `server/cli.test.ts` checks the opener's arguments; finding 1 |
+| SEC-16 | The browser opened at start gets a one-time link, which goes to `open`/`xdg-open`; the token never does | `server/index.ts:556`, `server/routes/auth.ts:128`, `server/cli.ts:174`, `server/cli.ts:180`; `server/cli.test.ts` checks the opener's arguments; finding 1 |
 | SEC-17 | HttpOnly, SameSite=Strict cookie for 30 days; all but the health check and sign-in page need it | `server/routes/auth.ts:65`, `server/routes/auth.ts:66`, `server/http-guard.ts:80`, `server/app.ts:163`, `server/http-guard.ts:237` |
 | SEC-18 | One-time links: once, 120 seconds, at most 5, digests only | `server/routes/auth.ts:27`, `server/routes/auth.ts:28`, `server/routes/auth.ts:138` |
-| SEC-19 | The link file is private and deleted once read | `server/index.ts:358`, `server/index.ts:359`, `server/cli.ts:241` |
-| SEC-20 | Any program of the same user can ask for a link | `server/cli.ts:278`; owner decision for the trust statement |
+| SEC-19 | The link file is private and deleted once read | `server/index.ts:358`, `server/index.ts:359`, `server/cli.ts:242` |
+| SEC-20 | Any program of the same user can ask for a link | `server/cli.ts:279`; owner decision for the trust statement |
 | SEC-21 | A local repository is cloned into the data directory | `server/repositories.ts:38`, `server/repositories.ts:54` |
 | SEC-22 | Git runs with overrides and refuses unsafe local configuration | `server/process.ts:310`, `server/process.ts:392`, `server/process.ts:438` |
 | SEC-23 | Project instruction files and settings are not loaded as instructions | `server/agent-cli.ts:169`, `server/agent-cli.ts:171`, `server/agent-cli.ts:195`, `server/agent-cli.ts:197` |

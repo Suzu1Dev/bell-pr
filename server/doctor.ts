@@ -35,7 +35,7 @@ import {
   setupError,
   signInFixes,
 } from "./cli-errors.js";
-import { defaultPort } from "./config.js";
+import { resolvePort } from "./config.js";
 import { sm } from "./i18n/index.js";
 import { OfflineLicenseService } from "./license.js";
 import { licensePublicKeys, revokedLicenseIds } from "./license-keys.js";
@@ -970,6 +970,13 @@ export function cliStatus(report: DoctorReport): CliStatus {
 export interface DoctorCliDeps {
   /** The resolved data directory, for the data-dir check. */
   dataDir?: string;
+  /**
+   * The port to report, as `bell-pr doctor` found it: that of the BELL PR
+   * running on the data directory, else the one a start would take
+   * (undefined: none valid). Left out, the port a start would take from
+   * this process's environment (BELLPR_PORT, else 4311).
+   */
+  port?: number;
   /** Where output goes; process.stdout by default. */
   stdout?: { write(text: string): unknown };
   /** Runs the probes' commands; tests may replace it. */
@@ -1068,6 +1075,15 @@ async function planEntitlements(dataDir: string): Promise<Entitlements | undefin
   }
 }
 
+/** The port a start would take from the environment; undefined when it is invalid. */
+function configuredPort(): number | undefined {
+  try {
+    return resolvePort(undefined);
+  } catch {
+    return undefined;
+  }
+}
+
 async function doctorCli(
   argv: string[],
   deps: DoctorCliDeps,
@@ -1089,7 +1105,7 @@ async function doctorCli(
   // The limits the server would start with: the environment, the saved
   // settings, then the defaults, capped by the plan of this data directory.
   const settings = saved?.get() ?? {};
-  const port = Number(process.env.BELLPR_PORT?.trim() || defaultPort);
+  const port = "port" in deps ? deps.port : configuredPort();
   const maxActiveRuns = settings.maxActiveRuns ?? defaultActiveRunLimit;
   const plan = deps.dataDir ? await planEntitlements(deps.dataDir) : undefined;
   const report = await runDoctor({
@@ -1098,7 +1114,7 @@ async function doctorCli(
     ...(deps.dataDir ? { dataDir: deps.dataDir } : {}),
     app: {
       version: appVersion,
-      ...(Number.isInteger(port) ? { port } : {}),
+      ...(port !== undefined ? { port } : {}),
       maxActiveRuns,
       ...(plan
         ? {

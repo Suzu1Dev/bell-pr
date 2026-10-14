@@ -130,6 +130,20 @@ function parsePort(name: string, value: string | number): number {
 }
 
 /**
+ * The port `bell-pr start` listens on: --port, then BELLPR_PORT, then 4311.
+ * Throws a ConfigError for a port outside 1024-65535.
+ */
+export function resolvePort(
+  flag: StartFlags["port"],
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  if (flag !== undefined) return parsePort("--port", flag);
+  return setting(env.BELLPR_PORT) !== undefined
+    ? parsePort("BELLPR_PORT", env.BELLPR_PORT!)
+    : defaultPort;
+}
+
+/**
  * An IPv6 address may be written in brackets; listen() takes it without.
  * Host names are compared in lower case, as browsers send them.
  */
@@ -232,13 +246,7 @@ export function resolveConfig(
   env: NodeJS.ProcessEnv = process.env,
   cwd = process.cwd(),
 ): Config {
-  const portFlag = flags.port === undefined ? undefined : String(flags.port);
-  const port =
-    portFlag !== undefined
-      ? parsePort("--port", portFlag)
-      : setting(env.BELLPR_PORT) !== undefined
-        ? parsePort("BELLPR_PORT", env.BELLPR_PORT!)
-        : defaultPort;
+  const port = resolvePort(flags.port, env);
   const host = parseHost(setting(flags.host) ?? setting(env.BELLPR_HOST) ?? defaultHost);
   const dev = flags.dev === true || envFlag(env.BELLPR_DEV);
   // Without a session there is no sign-in, so dev mode stays on this computer.

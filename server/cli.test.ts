@@ -452,6 +452,38 @@ esac`;
   });
 });
 
+test("bell-pr doctor reports the port of the BELL PR running on the data directory, else the configured one", async () => {
+  await withStandInClis({ git: standInGit }, async (directory) => {
+    const dataDir = path.join(directory, "data");
+    const appCheck = async (env: NodeJS.ProcessEnv = {}, json = true) => {
+      const result = await cli(["doctor", ...(json ? ["--json"] : []), "--data-dir", dataDir], {
+        env: { BELLPR_NO_OPEN: "1", ...env },
+      });
+      return json
+        ? (JSON.parse(result.stdout) as DoctorReport).checks.find((check) => check.id === "app")
+        : result.stdout;
+    };
+    const port = async (env?: NodeJS.ProcessEnv) =>
+      ((await appCheck(env)) as DoctorReport["checks"][number]).params?.port;
+    // Nothing runs: the port a start would take.
+    assert.equal(await port(), 4311);
+    assert.equal(await port({ BELLPR_PORT: "4400" }), 4400);
+    assert.equal(await port({ BELLPR_PORT: "80" }), undefined);
+    // Started with --port, which neither BELLPR_PORT nor the default names.
+    const server = await inProcessServer(dataDir);
+    try {
+      const running = Number(new URL(server.url).port);
+      assert.notEqual(running, 4311);
+      assert.equal(await port(), running);
+      assert.equal(await port({ BELLPR_PORT: "4400" }), running);
+      assert.match((await appCheck({}, false)) as string, new RegExp(`Port ${running}, `));
+    } finally {
+      await server.shutdown();
+    }
+    assert.equal(await port(), 4311);
+  });
+});
+
 test("bell-pr start runs the server with the flags and --env-file settings", async () => {
   await withDataDir(async (dataDir, directory) => {
     const port = await freePort();
