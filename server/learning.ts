@@ -21,6 +21,7 @@ import {
   explanationBatches,
   explanationJsonSchema,
   explanationPrompt,
+  feedbackForAgent,
   guidePrompt,
   parseExplanations,
 } from "./explanations.js";
@@ -153,10 +154,16 @@ export async function explanations(
       );
     });
     if (selected.length) {
-      const job = generateExplanations(ctx, run, selected).finally(() => {
-        ctx.explanationJobs.delete(id);
-        ctx.jobs.delete(job);
-      });
+      const job = generateExplanations(ctx, run, selected)
+        // Waited on by later requests and at shutdown; a failed save must
+        // not become an unhandled rejection that stops the server.
+        .catch((error) =>
+          log.error("explanations failed", { runId: id, error: String(error) }),
+        )
+        .finally(() => {
+          ctx.explanationJobs.delete(id);
+          ctx.jobs.delete(job);
+        });
       ctx.explanationJobs.set(id, job);
       ctx.jobs.add(job);
       await job;
@@ -330,9 +337,11 @@ export async function chat(
         (message) =>
           `${message.role === "user" ? "User" : "Mentor"}: ${message.content}`,
       );
-    // Only thread comments attached to this file reach the mentor.
-    const feedback = (run.prFeedback?.items ?? []).filter(
-      (item) => item.path === file.path,
+    // Only thread comments attached to this file reach the mentor, and with
+    // web access on only those of the repository's own people.
+    const feedback = feedbackForAgent(
+      (run.prFeedback?.items ?? []).filter((item) => item.path === file.path),
+      run.modelExecution?.webAccess === true,
     );
     const controller = new AbortController();
     const controllerKey = `guide:${id}`;

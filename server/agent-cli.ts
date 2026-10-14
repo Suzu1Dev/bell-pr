@@ -9,6 +9,7 @@ import { formatters } from "../shared/i18n/locale.js";
 import { modelArguments, modelExecutionSchema, modelId } from "./models.js";
 import { AppError } from "./types.js";
 import { redact } from "./secrets.js";
+import { agentReadDenials, enforceAgentSandbox } from "./sandbox.js";
 import { cancelled, currentLocale, sm } from "./i18n/index.js";
 
 /** none: answer from the prompt only; read: inspect files; write: edit the working directory and run commands. */
@@ -29,26 +30,50 @@ export interface AgentCommandOptions {
 export const agentLabel = (provider: AgentProvider = "codex") =>
   providerLabels[provider];
 
-/** Claude Code's built-in web tools; WebFetch is the sanctioned way to read a page, curl/wget stay denied. */
-const claudeWebTools = ["WebSearch", "WebFetch"];
+/**
+ * The pages WebFetch may open when web access is on: GitHub itself, its
+ * documentation and raw file contents. Anything else is not pre-approved,
+ * so the CLI refuses it (nobody answers a prompt in -p mode).
+ */
+export const claudeWebFetchDomains = [
+  "github.com",
+  "docs.github.com",
+  "raw.githubusercontent.com",
+];
 
+/**
+ * Tool flags per access level. Verified against Claude Code 2.1.292 (the
+ * settings schema and rule validator in the CLI, without a model call):
+ * - `Read(./**)` scopes reading to the working directory. Claude Code checks
+ *   Grep and Glob against Read rules ("Read rules cover all file-reading
+ *   tools"); `Glob(path)` is reported as never matched, so no Grep or Glob
+ *   path rule is added and neither gets an unscoped allow rule.
+ * - `WebFetch(domain:…)` allows one host per rule; WebSearch takes no
+ *   argument.
+ */
 function claudeAccess(access: AgentAccess, web: boolean): string[] {
   if (access === "none") return ["--tools", "", "--permission-mode", "dontAsk"];
   const tools =
     access === "read"
       ? ["Read", "Grep", "Glob"]
       : ["Read", "Grep", "Glob", "Edit", "Write", "Bash"];
-  const allowed =
-    access === "read" ? ["Read", "Grep", "Glob"] : ["Read", "Grep", "Glob", "Bash"];
-  const extra = web ? claudeWebTools : [];
+  const allowed = access === "read" ? ["Read(./**)"] : ["Read(./**)", "Bash"];
   return [
     "--tools",
-    [...tools, ...extra].join(","),
+    [...tools, ...(web ? ["WebSearch", "WebFetch"] : [])].join(","),
     "--allowedTools",
-    [...allowed, ...extra].join(" "),
+    [
+      ...allowed,
+      ...(web
+        ? [
+            "WebSearch",
+            ...claudeWebFetchDomains.map((domain) => `WebFetch(domain:${domain})`),
+          ]
+        : []),
+    ].join(" "),
     "--permission-mode",
     access === "read" ? "dontAsk" : "acceptEdits",
-    // acceptEdits approves file edits inside the working directory only; Bash is not sandboxed.
+    // acceptEdits approves file edits inside the working directory only.
     // Deny rules win over allow rules: pushing, GitHub CLI and raw downloads stay with BELL's own flow.
     ...(access === "write"
       ? [
@@ -62,19 +87,65 @@ function claudeAccess(access: AgentAccess, web: boolean): string[] {
   ];
 }
 
+/**
+ * The `--settings` value for one Claude Code turn. Every turn denies
+ * reading credential files and BELL's data outside its checkout. Read-only
+ * turns also refuse file reads outside the working directory. A write turn
+ * with the sandbox runs every Bash command inside it: writes only in the
+ * working directory, no network, and no way to step outside
+ * (`allowUnsandboxedCommands: false`); `failIfUnavailable` stops the turn
+ * instead of running unsandboxed if the sandbox cannot start after all.
+ *
+ * Keys verified against the settings schema bundled in Claude Code 2.1.292
+ * (`permissions` and `sandbox` are passthrough objects there, so a key a
+ * release does not know is ignored rather than rejected). Supported range:
+ * Claude Code >= 2.1.292 and < 2.2; scripts/agent-sandbox-canary.mjs must
+ * pass on a release before the range is widened.
+ */
+export function claudeSettings(options: {
+  cwd: string;
+  access: AgentAccess;
+  sandbox: boolean;
+}) {
+  return {
+    permissions: {
+      deny: agentReadDenials(options.cwd),
+      ...(options.access === "write"
+        ? {}
+        : { blockReadsOutsideWorkingDirectories: true }),
+    },
+    ...(options.sandbox
+      ? {
+          sandbox: {
+            enabled: true,
+            failIfUnavailable: true,
+            autoAllowBashIfSandboxed: true,
+            allowUnsandboxedCommands: false,
+            network: { allowedDomains: [], strictAllowlist: true },
+          },
+        }
+      : {}),
+  };
+}
+
 /** How to start one agent CLI turn. */
 export interface AgentCommand {
   executable: string;
   args: string[];
   /**
-   * 3B: true when a write-role Claude agent runs without the OS sandbox
-   * because the user opted in. Nothing sets it yet; runAgent records it on
-   * the run (run.unsandboxed) with one notice line.
+   * True when a write-role Claude agent runs without the OS sandbox because
+   * the person allowed it; runAgent records it on the run (run.unsandboxed)
+   * with one notice line.
    */
   unsandboxed?: boolean;
 }
 
-/** The prompt is always written to stdin; a shell is never used. */
+/**
+ * The prompt is always written to stdin; a shell is never used. A
+ * write-role Claude agent needs the OS sandbox (see sandbox.ts): without it
+ * this throws 503 `claude_sandbox_unavailable`, unless the person allowed
+ * unsandboxed agents, which the result reports as `unsandboxed: true`.
+ */
 export async function agentCommand(
   execution: ModelExecution,
   options: AgentCommandOptions,
@@ -82,6 +153,10 @@ export async function agentCommand(
   const web = options.web === true && options.access !== "none";
   if (execution.provider === "claude") {
     const value = modelExecutionSchema.parse(execution);
+    const { sandbox, unsandboxed } = await enforceAgentSandbox(
+      "claude",
+      options.access,
+    );
     return {
       executable: "claude",
       args: [
@@ -95,6 +170,10 @@ export async function agentCommand(
         // -p shows no trust dialog, so the imported repository's .claude settings, hooks and memory must not load.
         "--setting-sources",
         "user",
+        "--settings",
+        JSON.stringify(
+          claudeSettings({ cwd: options.cwd, access: options.access, sandbox }),
+        ),
         ...(value.model ? ["--model", value.model] : []),
         ...(value.reasoningEffort ? ["--effort", value.reasoningEffort] : []),
         ...claudeAccess(options.access, web),
@@ -102,6 +181,7 @@ export async function agentCommand(
           ? ["--json-schema", await readFile(options.outputSchema, "utf8")]
           : []),
       ],
+      ...(unsandboxed ? { unsandboxed: true } : {}),
     };
   }
   return {
@@ -109,6 +189,12 @@ export async function agentCommand(
     args: [
       "exec",
       "--ignore-user-config",
+      // The target repository's execpolicy .rules files and its AGENTS.md
+      // (project docs) are never loaded as instructions; verified with
+      // `codex exec --help` and the config keys of codex-cli 0.159.
+      "--ignore-rules",
+      "-c",
+      "project_doc_max_bytes=0",
       "--ephemeral",
       ...modelArguments(execution),
       "--sandbox",

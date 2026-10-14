@@ -76,7 +76,7 @@ const mapped = [];
 for (let index = 0; index < args.length; index++) {
   const arg = args[index];
   // BELL's network options: the local stand-in needs the file transport.
-  if (arg === '-c' && /^(protocol\\.file\\.allow|credential\\.helper)=/.test(args[index + 1] ?? '')) { index++; continue; }
+  if (arg === '-c' && /^(protocol\\.(?:[a-z]+\\.)?allow|credential\\.helper)=/.test(args[index + 1] ?? '')) { index++; continue; }
   mapped.push(arg.replace(/^https:\\/\\/github\\.com\\/([^/]+)\\/([^/]+?)(\\.git)?$/, (_, o, n) => ${JSON.stringify(root)} + '/' + o + '/' + n + '.git'));
 }
 if (mapped.some((arg) => ['fetch', 'push', 'ls-remote', 'clone'].includes(arg)))

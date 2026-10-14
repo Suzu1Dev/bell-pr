@@ -46,6 +46,19 @@ const rows: Row[] = [
     masked: "aws_access_key_id = [REDACTED]",
     blocks: true,
   },
+  // BELL PR license keys: version tag, payload and signature, masked and blocking.
+  {
+    name: "BELL PR license key",
+    input: `BELLPR_LICENSE_KEY=BELLPR1.${"e".repeat(40)}.${"s".repeat(60)} in .env`,
+    masked: "BELLPR_LICENSE_KEY=[REDACTED] in .env",
+    blocks: true,
+  },
+  {
+    name: "BELL PR license key with base64url payload and signature",
+    input: `key BELLPR1.eyJ2IjoxLCJwbGFuIjoicHJvIiwiaWQiOiJhYmMtMTIzIn0_-Q.${"Ab9-_".repeat(18)}`,
+    masked: "key [REDACTED]",
+    blocks: true,
+  },
   // PEM private keys.
   {
     name: "RSA private key block",
@@ -127,6 +140,12 @@ const rows: Row[] = [
     name: "certificate block is not a private key",
     input: "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----",
     masked: "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----",
+    blocks: false,
+  },
+  {
+    name: "BELL PR license key prefix with too short parts",
+    input: `BELLPR1.${"e".repeat(39)}.${"s".repeat(60)} and BELLPR1.${"e".repeat(40)}.${"s".repeat(59)}`,
+    masked: `BELLPR1.${"e".repeat(39)}.${"s".repeat(60)} and BELLPR1.${"e".repeat(40)}.${"s".repeat(59)}`,
     blocks: false,
   },
   {

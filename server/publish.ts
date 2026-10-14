@@ -4,25 +4,137 @@
  * GitHub Draft PR, or a follow-up round as one more commit on the PR's
  * branch. Nothing reaches GitHub without that approval.
  */
+import { createHash, randomUUID } from "node:crypto";
+import { readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
-import { command, git, redact } from "./process.js";
-import { parseGitHubSource, readDiff, reviewFingerprint } from "./git.js";
-import { validBranchName } from "../shared/drafts.js";
+import {
+  assertGitConfigSafe,
+  command,
+  git,
+  gitNetwork,
+  redact,
+} from "./process.js";
+import {
+  assertGitHubRepository,
+  assertRefName,
+  parseGitHubSource,
+  readDiff,
+  reviewFingerprint,
+} from "./git.js";
+import { validBranchName, type RunDraft } from "../shared/drafts.js";
 import {
   draftPreflight,
   findDraftPlaceholders,
+  type DraftCheck,
 } from "../shared/draft-checks.js";
+import type { Locale } from "../shared/i18n/locale.js";
 import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
-import { networkConfig } from "./repositories.js";
 import { assertRemoteHead, prHasCommit, remoteBranchHead } from "./pr-branch.js";
 import { assertConflictsResolved } from "./sync-runs.js";
+import { applyAiDisclosure } from "./drafts.js";
 import type { WorkbenchContext } from "./workbench.js";
 import { currentLocale, sm } from "./i18n/index.js";
+import { secretInPatch } from "./secrets.js";
 
 const now = () => new Date().toISOString();
 
 const json = <T>(value: string) => JSON.parse(value) as T;
+
+/**
+ * Commit e-mail addresses the person already confirmed publishing with
+ * (the one-time `author-email` check), stored as SHA-256 digests of the
+ * lower-cased address in `<data>/author-emails.json`.
+ */
+const confirmedEmailsFile = (directory: string) =>
+  path.join(directory, "author-emails.json");
+const emailDigest = (email: string) =>
+  createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
+
+async function confirmedEmails(directory: string): Promise<Set<string>> {
+  try {
+    const value = JSON.parse(
+      await readFile(confirmedEmailsFile(directory), "utf8"),
+    ) as { confirmed?: unknown };
+    return new Set(
+      Array.isArray(value.confirmed)
+        ? value.confirmed.filter(
+            (entry): entry is string =>
+              typeof entry === "string" && /^[a-f0-9]{64}$/.test(entry),
+          )
+        : [],
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+async function confirmEmails(directory: string, emails: string[]) {
+  const confirmed = await confirmedEmails(directory);
+  for (const email of emails) confirmed.add(emailDigest(email));
+  const file = confirmedEmailsFile(directory);
+  const temporary = `${file}.${randomUUID()}.tmp`;
+  await writeFile(
+    temporary,
+    JSON.stringify({ version: 1, confirmed: [...confirmed].sort() }, null, 2),
+    { mode: 0o600 },
+  );
+  await rename(temporary, file);
+}
+
+/** The author and committer addresses a commit made in the checkout would carry. */
+async function commitEmails(run: Run) {
+  const emails: string[] = [];
+  for (const ident of ["GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT"]) {
+    try {
+      const value = (await git(run.worktreePath, ["var", ident])).stdout;
+      const email = /<([^<>]*)>/.exec(value)?.[1]?.trim();
+      if (email && !emails.includes(email)) emails.push(email);
+    } catch {
+      /* No identity yet: the commit itself reports that. */
+    }
+  }
+  return emails;
+}
+
+/**
+ * Every check on what a first publish sends to GitHub: the PR text checks,
+ * credentials and local paths in the title, description and commit
+ * message, CI configuration among the changed files, and, once per
+ * address, a commit e-mail that is not GitHub's no-reply one. The publish
+ * dialog shows the same list (GET /api/runs/:id/preflight).
+ */
+export async function publishChecks(
+  run: Run,
+  files: DiffFile[],
+  dataDirectory: string,
+  locale: Locale = currentLocale(),
+): Promise<DraftCheck[]> {
+  const confirmed = await confirmedEmails(dataDirectory);
+  const emails = (await commitEmails(run)).filter(
+    (email) => !confirmed.has(emailDigest(email)),
+  );
+  const directories = [os.homedir(), dataDirectory];
+  try {
+    directories.push(await realpath(dataDirectory));
+  } catch {
+    /* Not created yet. */
+  }
+  return draftPreflight(
+    {
+      title: run.draft.title,
+      body: run.draft.body,
+      commitMessage: run.draft.commitMessage,
+      sources: run.draftPreparation?.context?.sources,
+      proposalBody: run.draftPreparation?.proposal?.body,
+      localDirectories: directories,
+      changedPaths: files.map((file) => file.path),
+      commitEmails: emails,
+    },
+    locale,
+  );
+}
 
 /** The draft, file reviews and approval change only in review or approved, never while publishing. */
 export function editable(run: Run) {
@@ -33,11 +145,13 @@ export function editable(run: Run) {
 export async function saveDraft(
   ctx: WorkbenchContext,
   id: string,
-  draft: Run["draft"],
+  edited: RunDraft,
 ) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     editable(run);
+    // Turning the AI disclosure on or off adds or removes BELL's line.
+    const draft = applyAiDisclosure(run.draft, edited);
     if (
       activeFollowUp(run.followUps) &&
       (draft.title !== run.draft.title || draft.body !== run.draft.body)
@@ -64,12 +178,16 @@ export async function saveDraft(
         (m) => m.run.publish.branchLocked({ branch: run.publishedBranch! }),
         409,
       );
-    run.draft = {
+    const saved: RunDraft = {
       title: draft.title,
       body: draft.body,
       ...(commitMessage ? { commitMessage } : {}),
       ...(publishBranch ? { publishBranch } : {}),
+      ...(draft.aiDisclosure !== undefined
+        ? { aiDisclosure: draft.aiDisclosure }
+        : {}),
     };
+    run.draft = saved;
     run.status = "review";
     delete run.approvedFingerprint;
     await ctx.store.save();
@@ -140,13 +258,19 @@ export async function approve(
       const message = run.draft.commitMessage?.trim();
       if (!message || findDraftPlaceholders(message).length)
         throw new AppError((m) => m.run.publish.roundMessageRequired, 422);
+      if (secretInPatch(message))
+        throw new AppError((m) => m.security.draftChecks.secret, 422);
       const unreviewable = await unreviewableRoundPaths(run, round, files);
       if (unreviewable.length) throw unreviewableError(unreviewable);
     } else {
       // The checks explain themselves in the request's locale; the
       // acknowledgements below match their ids, never their text.
       const unfinished = draftPreflight(
-        { body: run.draft.body },
+        {
+          title: run.draft.title,
+          body: run.draft.body,
+          commitMessage: run.draft.commitMessage,
+        },
         currentLocale(),
       ).find((check) => check.kind === "block");
       if (unfinished)
@@ -186,6 +310,8 @@ export async function publish(
       throw new AppError((m) => m.run.publish.approveFirst, 409);
     if (!repo.url || !parseGitHubSource(repo.url))
       throw new AppError((m) => m.run.publish.noGithubOrigin, 422);
+    // Nothing is committed or pushed from a checkout whose Git settings could run commands.
+    await assertGitConfigSafe(run.worktreePath);
     const files = await ctx.diff(id);
     if (
       run.status !== "approved" ||
@@ -221,13 +347,12 @@ export async function publish(
           m.run.publish.branchLockedPublish({ branch: run.publishedBranch! }),
         409,
       );
+    assertRefName(headBranch);
     // Runs approved before these checks existed are held to them as well.
-    const checks = draftPreflight(
-      {
-        body: run.draft.body,
-        sources: run.draftPreparation?.context?.sources,
-        proposalBody: run.draftPreparation?.proposal?.body,
-      },
+    const checks = await publishChecks(
+      run,
+      files,
+      ctx.store.directory,
       currentLocale(),
     );
     const blocking = checks.find((check) => check.kind === "block");
@@ -247,6 +372,9 @@ export async function publish(
           }),
         422,
       );
+    // The commit e-mail is asked about once per address.
+    if (checks.some((check) => check.id === "author-email"))
+      await confirmEmails(ctx.store.directory, await commitEmails(run));
     run.publishing = true;
     delete run.error;
     await ctx.store.save();
@@ -371,12 +499,12 @@ export async function publish(
           throw new AppError((m) => m.run.publish.notAFork, 409);
         headOwner = githubUser;
       }
+      assertGitHubRepository(headRepository);
       run.headRepository = headRepository;
       await ctx.store.save();
-      await git(
+      await gitNetwork(
         run.worktreePath,
         [
-          ...networkConfig,
           "push",
           "--",
           `https://github.com/${headRepository}.git`,
@@ -501,9 +629,14 @@ async function publishFollowUp(
   await assertConflictsResolved(run);
   if (findDraftPlaceholders(message).length)
     throw new AppError((m) => m.run.publish.roundMessagePlaceholders, 422);
+  if (secretInPatch(message))
+    throw new AppError((m) => m.security.draftChecks.secret, 422);
   if (!run.prUrl || !run.headRepository)
     throw new AppError((m) => m.run.publish.roundNoPushTarget, 409);
   const branch = run.publishedBranch ?? run.branch;
+  assertGitHubRepository(run.headRepository);
+  assertRefName(branch);
+  await assertGitConfigSafe(run.worktreePath);
   const roundNumber = (run.followUps?.indexOf(round) ?? 0) + 1;
   const finish = (commit: string) => {
     round.status = "published";
@@ -611,10 +744,9 @@ async function publishFollowUp(
       ]);
     await git(run.worktreePath, ["read-tree", commit]);
     // A plain push: GitHub rejects it if the branch moved since the check above.
-    await git(
+    await gitNetwork(
       run.worktreePath,
       [
-        ...networkConfig,
         "push",
         "--",
         `https://github.com/${run.headRepository}.git`,
@@ -658,6 +790,20 @@ async function reviewedTree(
     GIT_INDEX_FILE: indexPath,
     GIT_TERMINAL_PROMPT: "0",
   };
+  // The temporary index never outlives the publish, whatever happens.
+  try {
+    return await stageReviewedTree(run, files, indexEnv);
+  } finally {
+    await rm(indexPath, { force: true });
+    await rm(`${indexPath}.lock`, { force: true });
+  }
+}
+
+async function stageReviewedTree(
+  run: Run,
+  files: DiffFile[],
+  indexEnv: NodeJS.ProcessEnv,
+) {
   await git(run.worktreePath, ["read-tree", run.baseSha], {
     env: indexEnv,
   });

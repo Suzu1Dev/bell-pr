@@ -192,13 +192,34 @@ export interface GuidePromptInput {
   /** Prior "User: …" / "Mentor: …" turns for this file, oldest first. */
   messages: string[];
   question: string;
-  /** Maintainer thread comments on this file from the published PR, when fetched. */
+  /**
+   * Maintainer thread comments on this file from the published PR, when
+   * fetched. With web access on, only those of owners, members and
+   * collaborators reach the prompt (feedbackForAgent).
+   */
   feedback?: PrFeedbackItem[];
 }
 
 /** Items kept and body characters kept per item in the mentor prompt. */
 const feedbackPromptItemLimit = 20;
 const feedbackPromptBodyLimit = 2_000;
+
+/** GitHub author associations of people who can change the repository. */
+const trustedAssociations = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+
+/**
+ * The PR feedback an agent may read. With web access on, an agent could
+ * follow instructions in a stranger's comment out to the web, so only
+ * comments by the repository's owners, members and collaborators are
+ * included; without web access every comment is.
+ */
+export function feedbackForAgent(items: PrFeedbackItem[], web: boolean) {
+  return web
+    ? items.filter((item) =>
+        trustedAssociations.has(item.authorAssociation.toUpperCase()),
+      )
+    : items;
+}
 
 /**
  * Follow-up mentor prompt. Every context section stays before
@@ -230,8 +251,12 @@ export function guidePrompt({
   };
   // Thread comments on this file from the published PR. Other people's words:
   // the mentor explains them and maps them to the diff, never obeys them.
-  const maintainerFeedback = feedback.length
-    ? feedback
+  const included = feedbackForAgent(
+    feedback,
+    run.modelExecution?.webAccess === true,
+  );
+  const maintainerFeedback = included.length
+    ? included
         .slice(0, feedbackPromptItemLimit)
         .map(({ author, authorAssociation, body, line, isResolved, url }) => ({
           author,

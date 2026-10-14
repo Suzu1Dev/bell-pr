@@ -11,6 +11,7 @@ import path from "node:path";
 import express from "express";
 import { localhostGuard, parseAllowedOrigins } from "./http-guard.js";
 import { createApp } from "./index.js";
+import { mintOneTimeToken } from "./routes/auth.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
 
@@ -31,11 +32,22 @@ test("origin configuration accepts precise HTTP(S) origins and rejects ambiguous
   assert.deepEqual(parseAllowedOrigins(), []);
   assert.deepEqual(
     parseAllowedOrigins(
-      ` ${remoteOrigin}, https://EXAMPLE.COM:443,http://example.com:80 `,
+      ` ${remoteOrigin}, https://EXAMPLE.COM:443,http://localhost:5173,http://127.0.0.1:80,http://[::1]:8080 `,
     ),
-    [remoteOrigin, "https://example.com", "http://example.com"],
+    [
+      remoteOrigin,
+      "https://example.com",
+      "http://localhost:5173",
+      "http://127.0.0.1",
+      "http://[::1]:8080",
+    ],
   );
   for (const value of [
+    // Plain HTTP only for this computer: a session cookie must not cross the network in clear.
+    "http://example.com",
+    "http://example.com:80",
+    "http://192.168.1.10:4311",
+    "http://bell.example.internal:8443",
     "*",
     "https://*.example.com",
     "https://%2a.example.com",
@@ -208,6 +220,8 @@ test("configured proxy supports same-origin JSON API requests without weakening 
   const app = createApp(workbench, {
     allowedOrigins: remoteOrigin,
     staticDirectory: path.join(directory, "missing"),
+    // The UI dev server's origin below is trusted in development mode.
+    dev: true,
   });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -373,4 +387,222 @@ test("invalid origin configuration fails startup before creating application dat
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+/** A BELL server that requires sign-in, and a request helper that keeps headers and body. */
+async function signInServer(options: { sessionToken?: string } = {}) {
+  const directory = await mkdtemp(path.join(tmpdir(), "bell-pr-auth-"));
+  const workbench = new Workbench(new Store(directory));
+  workbench.importRepository = async () => ({
+    id: "test",
+    name: "test",
+    owner: "local",
+    fullName: "local/test",
+    path: directory,
+    defaultBranch: "main",
+    url: "",
+  });
+  const app = createApp(workbench, {
+    staticDirectory: path.join(directory, "missing"),
+    sessionToken: options.sessionToken,
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const { port } = server.address() as AddressInfo;
+  const send = (
+    requestPath: string,
+    {
+      method = "GET",
+      headers = {},
+      body,
+    }: { method?: string; headers?: Record<string, string>; body?: string } = {},
+  ) =>
+    new Promise<{ status: number; headers: IncomingHttpHeaders; body: string }>(
+      (resolve, reject) => {
+        const req = request(
+          `http://127.0.0.1:${port}${requestPath}`,
+          {
+            method,
+            headers: {
+              host: "127.0.0.1:4311",
+              ...(body ? { "content-type": "application/json" } : {}),
+              ...headers,
+            },
+          },
+          (res) => {
+            let text = "";
+            res.setEncoding("utf8");
+            res.on("data", (chunk) => (text += chunk));
+            res.on("end", () =>
+              resolve({ status: res.statusCode!, headers: res.headers, body: text }),
+            );
+          },
+        );
+        req.on("error", reject);
+        req.end(body);
+      },
+    );
+  return {
+    app,
+    send,
+    close: async () => {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await workbench.shutdown();
+      await app.locals.insights.shutdown();
+      await app.locals.discovery.shutdown();
+      await rm(directory, { recursive: true, force: true });
+    },
+  };
+}
+
+const sessionToken = "S".repeat(43);
+const cspHeader =
+  "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+
+test("with sign-in on, the API needs the session cookie and pages show how to sign in", async () => {
+  const server = await signInServer({ sessionToken });
+  const cookie = { cookie: `bellpr_session=${sessionToken}` };
+  try {
+    // An origin-less POST, as a local script would send it.
+    const anonymous = await server.send("/api/repos", { method: "POST", body: '{"source":"x"}' });
+    assert.equal(anonymous.status, 401);
+    const error = JSON.parse(anonymous.body);
+    assert.equal(error.code, "auth_required");
+    assert.match(error.error, /\S/);
+    const wrongCredentials: Record<string, string>[] = [
+      { cookie: "bellpr_session=wrong" },
+      { cookie: `bellpr_session=${sessionToken}x` },
+      { cookie: `other=${sessionToken}` },
+      { authorization: `Bearer ${sessionToken}` },
+    ];
+    for (const headers of wrongCredentials)
+      assert.equal(
+        (await server.send("/api/repos", { method: "POST", body: '{"source":"x"}', headers })).status,
+        401,
+        JSON.stringify(headers),
+      );
+    // A text body without a session is still refused as unauthenticated.
+    assert.equal(
+      (await server.send("/api/repos", {
+        method: "POST",
+        headers: { "content-type": "text/plain" },
+        body: "x",
+      })).status,
+      401,
+    );
+    const signedIn = await server.send("/api/repos", {
+      method: "POST",
+      body: '{"source":"x"}',
+      headers: { cookie: `theme=dark; bellpr_session=${sessionToken}; other=1` },
+    });
+    assert.equal(signedIn.status, 201);
+    assert.equal((await server.send("/api/repos", { headers: cookie })).status, 200);
+    // The health check stays open (3A answers it; until then it is the API's 404).
+    const health = await server.send("/api/health");
+    assert.notEqual(health.status, 401);
+    // Every response carries the content and resource policies.
+    for (const response of [anonymous, signedIn, health]) {
+      assert.equal(response.headers["content-security-policy"], cspHeader);
+      assert.equal(response.headers["cross-origin-resource-policy"], "same-origin");
+      assert.equal(response.headers["x-frame-options"], "DENY");
+    }
+    // A page load without the cookie gets the sign-in page in the request's language.
+    const page = await server.send("/", { headers: { "x-bell-locale": "en" } });
+    assert.equal(page.status, 401);
+    assert.match(String(page.headers["content-type"]), /^text\/html/);
+    assert.equal(page.headers["content-security-policy"], cspHeader);
+    assert.match(page.body, /<html lang="en">/);
+    assert.match(page.body, /<code>bell-pr open<\/code>/);
+    assert.match(page.body, /docker exec &lt;container&gt; bell-pr open --print/);
+    assert.doesNotMatch(page.body, /<script/i);
+    const zh = await server.send("/runs/x?locale=zh-TW");
+    assert.equal(zh.status, 401);
+    assert.match(zh.body, /<code>bell-pr open<\/code>/);
+    assert.match(zh.body, /登入/);
+    assert.equal((await server.send("/assets/index.js")).status, 401);
+  } finally {
+    await server.close();
+  }
+});
+
+test("GET /auth signs the browser in with the session secret and moves on with a page, not a redirect", async () => {
+  const server = await signInServer({ sessionToken });
+  try {
+    const signIn = await server.send(`/auth?t=${sessionToken}`, { headers: { "x-bell-locale": "en" } });
+    assert.equal(signIn.status, 200);
+    assert.equal(signIn.headers.location, undefined);
+    assert.equal(signIn.headers["cache-control"], "no-store");
+    assert.match(signIn.body, /<meta http-equiv="refresh" content="0;url=\/">/);
+    assert.match(signIn.body, /<a href="\/">Continue to BELL PR<\/a>/);
+    assert.doesNotMatch(signIn.body, /<script/i);
+    assert.doesNotMatch(signIn.body, new RegExp(sessionToken));
+    assert.deepEqual(signIn.headers["set-cookie"], [
+      `bellpr_session=${sessionToken}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000`,
+    ]);
+    const cookie = signIn.headers["set-cookie"]![0].split(";")[0];
+    assert.equal((await server.send("/api/repos", { headers: { cookie } })).status, 200);
+    // Signed in already: the page again, without a new cookie.
+    const again = await server.send("/auth", { headers: { cookie } });
+    assert.equal(again.status, 200);
+    assert.equal(again.headers["set-cookie"], undefined);
+    // A wrong link says so; no link at all just shows how to sign in.
+    const wrong = await server.send("/auth?t=wrong", { headers: { "x-bell-locale": "en" } });
+    assert.equal(wrong.status, 401);
+    assert.equal(wrong.headers["set-cookie"], undefined);
+    assert.match(wrong.body, /expired or was already used/);
+    const bare = await server.send("/auth", { headers: { "x-bell-locale": "en" } });
+    assert.equal(bare.status, 401);
+    assert.doesNotMatch(bare.body, /expired or was already used/);
+    // Behind a TLS proxy BELL trusts (3A sets trust proxy to loopback), the cookie is Secure.
+    server.app.set("trust proxy", "loopback");
+    const secure = await server.send(`/auth?t=${sessionToken}`, {
+      headers: { "x-forwarded-proto": "https" },
+    });
+    assert.match(secure.headers["set-cookie"]![0], /; Secure$/);
+  } finally {
+    await server.close();
+  }
+});
+
+test("a one-time sign-in link works once, for two minutes, with at most five open", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
+  const server = await signInServer({ sessionToken });
+  try {
+    const signInWith = (token: string) =>
+      server.send(`/auth?t=${encodeURIComponent(token)}`);
+    const token = mintOneTimeToken(server.app)!;
+    assert.match(token, /^[A-Za-z0-9_-]{43}$/);
+    assert.notEqual(token, sessionToken);
+    const first = await signInWith(token);
+    assert.equal(first.status, 200);
+    // The cookie holds the session secret, never the one-time token.
+    assert.equal(first.headers["set-cookie"]![0].split(";")[0], `bellpr_session=${sessionToken}`);
+    assert.equal((await signInWith(token)).status, 401);
+
+    const expiring = mintOneTimeToken(server.app)!;
+    t.mock.timers.tick(120_000);
+    assert.equal((await signInWith(expiring)).status, 401);
+    const inTime = mintOneTimeToken(server.app)!;
+    t.mock.timers.tick(119_999);
+    assert.equal((await signInWith(inTime)).status, 200);
+
+    const tokens = Array.from({ length: 6 }, () => mintOneTimeToken(server.app)!);
+    assert.equal(new Set(tokens).size, 6);
+    // The sixth replaced the oldest.
+    assert.equal((await signInWith(tokens[0])).status, 401);
+    for (const open of tokens.slice(1)) assert.equal((await signInWith(open)).status, 200);
+  } finally {
+    await server.close();
+  }
+  // Without a session secret there is nothing to sign in to, and no links.
+  const open = await signInServer();
+  try {
+    assert.equal(mintOneTimeToken(open.app), undefined);
+    assert.equal((await open.send("/api/repos")).status, 200);
+    assert.equal((await open.send("/auth?t=anything")).status, 200);
+  } finally {
+    await open.close();
+  }
+  assert.equal(mintOneTimeToken(express()), undefined);
 });

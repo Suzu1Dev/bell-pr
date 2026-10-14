@@ -6,17 +6,25 @@ import path from "node:path";
 import { once } from "node:events";
 import { request } from "node:http";
 import {
+  applyAiDisclosure,
   draftFingerprint,
   draftJsonSchema,
   draftPrompt,
   parseDraftProposal,
+  runDraftSchema,
+  setAlwaysDiscloseAiSource,
 } from "./drafts.js";
 import {
+  aiDisclosureLine,
   validBranchName,
+  withAiDisclosure,
+  withoutAiDisclosure,
   type DraftContext,
   type DraftProposal,
   type DraftSource,
+  type RunDraft,
 } from "../shared/drafts.js";
+import { lenientRead } from "./persisted-schema.js";
 import {
   brevityRule,
   draftPreflight,
@@ -1173,4 +1181,271 @@ test("ordered task items and ordered issue slots are handled like bulleted ones"
     ])?.quote,
     "Every PR must reference an issue with `Fixes #123`.",
   );
+});
+
+test("preflight blocks a credential in the PR text and asks to confirm local paths, CI files and a public e-mail", () => {
+  const token = `ghp_${"a".repeat(36)}`;
+  const secret = draftPreflight({ body: `Debugged with ${token} set.` });
+  assert.deepEqual(
+    secret.map(({ id, kind }) => [id, kind]),
+    [["secret", "block"]],
+  );
+  assert.deepEqual(secret[0].details, ["In the description"]);
+  for (const text of [secret[0].message, ...secret[0].details]) assertNoHan(text);
+  assert.deepEqual(
+    draftPreflight({
+      title: `Fix ${token}`,
+      body: "A fix.",
+      commitMessage: `Fix\n\n-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----`,
+    })[0].details,
+    ["In the title", "In the commit message"],
+  );
+  // A BELL PR license key is a credential too.
+  assert.equal(
+    draftPreflight({ body: `Key: BELLPR1.${"p".repeat(48)}.${"s".repeat(86)}` })[0]?.id,
+    "secret",
+  );
+  // A secret blocks before the other checks are even confirmed.
+  assert.equal(
+    draftPreflight({ body: `TODO: remove ${token}` }).map((check) => check.id).join(),
+    "secret,placeholder",
+  );
+
+  const paths = draftPreflight({
+    body: "Ran it in /home/alice/project and /Users/bob/src; output in /srv/bell-data/logs.",
+    localDirectories: ["/srv/bell-data", "/data", "/"],
+  });
+  assert.deepEqual(paths.map(({ id, kind }) => [id, kind]), [["local-paths", "confirm"]]);
+  assert.deepEqual(paths[0].details, [
+    "Found: /srv/bell-data",
+    "Found: /home/alice/",
+    "Found: /Users/bob/",
+  ]);
+  // A one-segment directory such as /data says nothing about the person.
+  assert.deepEqual(
+    draftPreflight({ body: "Reads files from /data.", localDirectories: ["/data"] }),
+    [],
+  );
+  // Repository folders and URLs that merely contain home or Users are not paths on this computer.
+  assert.deepEqual(
+    draftPreflight({
+      body: "Moves src/home/components/Card.tsx; see https://example.com/Users/guide/ and app/Users/list/.",
+      localDirectories: ["/home/alice"],
+    }),
+    [],
+  );
+  // A directory the server passed is reported once, and only as a whole name.
+  assert.deepEqual(
+    draftPreflight({
+      body: "Ran in /home/alice/project, not in /home/alicex/.",
+      localDirectories: ["/home/alice"],
+    })[0].details,
+    ["Found: /home/alice", "Found: /home/alicex/"],
+  );
+
+  const ci = draftPreflight({
+    body: "Updates the workflow.",
+    changedPaths: ["src/a.ts", ".github/workflows/ci.yml", ".gitlab-ci.yml"],
+  });
+  assert.deepEqual(ci.map(({ id, kind }) => [id, kind]), [["workflows", "confirm"]]);
+  assert.deepEqual(ci[0].details, [
+    "Changed: .github/workflows/ci.yml",
+    "Changed: .gitlab-ci.yml",
+  ]);
+
+  const email = draftPreflight({
+    body: "A fix.",
+    commitEmails: ["me@company.dev", "12345+me@users.noreply.github.com"],
+  });
+  assert.deepEqual(email.map(({ id, kind }) => [id, kind]), [["author-email", "confirm"]]);
+  assert.match(email[0].message, /me@company\.dev/);
+  assert.doesNotMatch(email[0].message, /noreply/);
+  // Two addresses are listed the way the locale lists them.
+  assert.match(
+    draftPreflight({ body: "A fix.", commitEmails: ["a@company.dev", "b@company.dev"] })[0].message,
+    /addresses a@company\.dev and b@company\.dev,/,
+  );
+  for (const address of [
+    "12345+me@users.noreply.github.com",
+    "me@users.noreply.github.com",
+    "bell@localhost.invalid",
+    "someone@example.com",
+    "ci@build.test",
+  ])
+    assert.deepEqual(draftPreflight({ body: "A fix.", commitEmails: [address] }), [], address);
+
+  // Same ids and kinds in zh-TW, in Traditional Chinese.
+  const zh = draftPreflight(
+    {
+      body: `${token} /home/alice/x`,
+      changedPaths: [".github/workflows/ci.yml"],
+      commitEmails: ["me@company.dev"],
+    },
+    "zh-TW",
+  );
+  assert.deepEqual(zh.map((check) => check.id), ["secret", "local-paths", "workflows", "author-email"]);
+  assert.match(zh[0].message, /憑證/);
+  assert.deepEqual(zh[0].details, ["位於說明"]);
+});
+
+const disclosureSource: DraftSource = {
+  id: "base:CONTRIBUTING.md",
+  kind: "contributing",
+  label: "CONTRIBUTING.md",
+  content: "## AI use\n\nIf you used AI tools, disclose it in the pull request description.",
+};
+
+test("AI disclosure is off by default: BELL never mentions AI unless the person or the project asks", () => {
+  const prompt = draftPrompt(
+    { title: "Update", prompt: "Update value", reports: {}, branch: "fix/abc" },
+    [diff],
+    context,
+  );
+  assert.match(prompt, /Do not mention AI assistance, AI tools, BELL or agents in title, body or commitMessageSuggestion/);
+  assert.doesNotMatch(prompt, new RegExp(aiDisclosureLine));
+  const parsed = parseDraftProposal(JSON.stringify(proposal), context);
+  assert.equal(parsed.body, proposal.body);
+  assert.doesNotMatch(parsed.body, /\bAI\b/);
+
+  // A project rule that requires a disclosure reaches the model and becomes a
+  // checklist item; BELL itself still adds nothing to the body.
+  const ruled = { ...context, sources: [disclosureSource] };
+  const ruledPrompt = draftPrompt(
+    { title: "Update", prompt: "Update value", reports: {}, branch: "fix/abc" },
+    [diff],
+    ruled,
+  );
+  assert.match(ruledPrompt, /disclose it in the pull request description/);
+  assert.match(ruledPrompt, /When a supplied source requires disclosing AI assistance, add a checklist item quoting that rule/);
+  const followed = parseDraftProposal(
+    JSON.stringify({
+      ...proposal,
+      policy: "repository",
+      rules: [
+        {
+          text: "The project asks for an AI-use disclosure.",
+          sourceId: disclosureSource.id,
+          quote: "If you used AI tools, disclose it in the pull request description.",
+        },
+      ],
+      checklist: ["Add your AI-use disclosure: \"If you used AI tools, disclose it in the pull request description.\""],
+    }),
+    ruled,
+  );
+  assert.equal(followed.body, proposal.body);
+  assert.doesNotMatch(followed.body, new RegExp(aiDisclosureLine));
+});
+
+test("turning the AI disclosure on adds BELL's editable line, which the person can reword or remove", () => {
+  const draft = { title: "Update", body: "Changes the value." };
+  const on = applyAiDisclosure(draft, { ...draft, aiDisclosure: true });
+  assert.equal(on.aiDisclosure, true);
+  assert.equal(on.body, `Changes the value.\n\n${aiDisclosureLine}`);
+  // Saving again with the line deleted keeps it deleted: the person's text wins.
+  const removed = applyAiDisclosure(on, { ...on, body: "Changes the value." });
+  assert.equal(removed.body, "Changes the value.");
+  assert.equal(removed.aiDisclosure, true);
+  const reworded = "Prepared with help from coding agents; I reviewed every line.";
+  assert.equal(
+    applyAiDisclosure(on, { ...on, body: `Changes the value.\n\n${reworded}` }).body,
+    `Changes the value.\n\n${reworded}`,
+  );
+  // Turning it off removes BELL's own line and leaves the rest as written.
+  const off = applyAiDisclosure(on, {
+    ...on,
+    body: `Changes the value.\n\n${aiDisclosureLine}\n\nMore notes.`,
+    aiDisclosure: false,
+  });
+  assert.equal(off.aiDisclosure, false);
+  assert.equal(off.body, "Changes the value.\n\nMore notes.");
+  assert.equal(
+    applyAiDisclosure(on, { ...on, body: `Changes the value.\n\n${reworded}`, aiDisclosure: false }).body,
+    `Changes the value.\n\n${reworded}`,
+  );
+  // A client that does not know the field keeps the saved choice and text.
+  const older = applyAiDisclosure(on, { title: "Update", body: on.body });
+  assert.equal(older.aiDisclosure, true);
+  assert.equal(older.body, on.body);
+  // The line is added once.
+  assert.equal(withAiDisclosure(withAiDisclosure("Body")), `Body\n\n${aiDisclosureLine}`);
+  assert.equal(withAiDisclosure(""), aiDisclosureLine);
+  assert.equal(withoutAiDisclosure(aiDisclosureLine), "");
+  assert.equal(withoutAiDisclosure("No line here."), "No line here.");
+});
+
+test("the always-disclose setting adds the line to suggestions until the person turns it off for a draft", (t) => {
+  setAlwaysDiscloseAiSource(() => true);
+  t.after(() => setAlwaysDiscloseAiSource());
+  const suggested = parseDraftProposal(JSON.stringify(proposal), context);
+  assert.equal(suggested.body, `${proposal.body}\n\n${aiDisclosureLine}`);
+  const draft = { title: "Update", body: suggested.body };
+  // Saved without a choice: the setting stands, the text is kept.
+  assert.deepEqual(applyAiDisclosure(draft, draft), draft);
+  const off = applyAiDisclosure(draft, { ...draft, aiDisclosure: false });
+  assert.equal(off.body, proposal.body);
+  assert.equal(off.aiDisclosure, false);
+  // A source that fails counts as off.
+  setAlwaysDiscloseAiSource(() => {
+    throw new Error("unreadable settings");
+  });
+  assert.equal(parseDraftProposal(JSON.stringify(proposal), context).body, proposal.body);
+});
+
+test("aiDisclosure round-trips through the draft API and state.json, and an older schema still parses it", async () => {
+  const f = await fixture(async () => JSON.stringify(proposal));
+  const app = createApp(f.workbench, { staticDirectory: path.join(f.directory, "missing") });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Missing port");
+  const patch = (body: unknown) =>
+    new Promise<{ status: number; json: { run: { draft: RunDraft } } }>((resolve, reject) => {
+      const req = request(
+        `http://127.0.0.1:${address.port}/api/runs/${f.run.id}/draft`,
+        {
+          method: "PATCH",
+          headers: { host: "127.0.0.1:4311", "content-type": "application/json" },
+        },
+        (response) => {
+          let text = "";
+          response.setEncoding("utf8");
+          response.on("data", (chunk) => (text += chunk));
+          response.on("end", () => resolve({ status: response.statusCode!, json: JSON.parse(text) }));
+        },
+      );
+      req.on("error", reject);
+      req.end(JSON.stringify(body));
+    });
+  try {
+    const on = await patch({ title: "Update value", body: "Changes the value.", aiDisclosure: true });
+    assert.equal(on.status, 200);
+    assert.equal(on.json.run.draft.aiDisclosure, true);
+    assert.equal(on.json.run.draft.body, `Changes the value.\n\n${aiDisclosureLine}`);
+    // An older client leaves the field out: the choice stays.
+    const kept = await patch({ title: "Update value", body: on.json.run.draft.body });
+    assert.equal(kept.json.run.draft.aiDisclosure, true);
+    assert.equal((await patch({ title: "Update value", body: "x", aiDisclosure: "yes" })).status, 400);
+    await f.store.save();
+    const reopened = new Store(f.store.directory);
+    await reopened.initialize();
+    const saved: RunDraft = reopened.data.runs[0].draft;
+    assert.equal(saved.aiDisclosure, true);
+    const off = await patch({ title: "Update value", body: saved.body, aiDisclosure: false });
+    assert.equal(off.json.run.draft.aiDisclosure, false);
+    assert.equal(off.json.run.draft.body, "Changes the value.");
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await app.locals.insights.shutdown();
+    await app.locals.discovery.shutdown();
+    await f.cleanup();
+  }
+  // A build from before the field reads a draft that has it, and drops it.
+  const written = { title: "Update value", body: "Changes the value.", aiDisclosure: true };
+  const older = lenientRead(runDraftSchema.omit({ aiDisclosure: true })).parse(written);
+  assert.deepEqual(older, { title: "Update value", body: "Changes the value." });
+  // This build reads a draft written before the field existed: the choice is off.
+  const current = lenientRead(runDraftSchema).parse({ title: "Update value", body: "b" });
+  assert.equal(current.aiDisclosure, undefined);
+  assert.equal(lenientRead(runDraftSchema).parse(written).aiDisclosure, true);
 });

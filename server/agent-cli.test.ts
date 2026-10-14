@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -21,6 +21,46 @@ import { withLocale } from "./i18n/index.js";
 /** Han characters and CJK punctuation; the Latin middle dot is not one. */
 const cjk = /(?!\u00B7)[\p{Script_Extensions=Han}\u3000-\u303F\uFF00-\uFFEF]/u;
 
+/**
+ * Puts stand-ins for bwrap, socat and sandbox-exec first on PATH, so Claude
+ * Code's sandbox counts as available on any machine running the tests.
+ */
+async function withSandboxTools(t: TestContext) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-sandbox-tools-"));
+  for (const name of ["bwrap", "socat", "sandbox-exec"])
+    await writeFile(path.join(directory, name), "#!/bin/sh\nexit 0\n", {
+      mode: 0o755,
+    });
+  const previous = process.env.PATH;
+  process.env.PATH = `${directory}${path.delimiter}${previous ?? ""}`;
+  t.after(async () => {
+    process.env.PATH = previous;
+    await rm(directory, { recursive: true, force: true });
+  });
+}
+
+/** The parsed --settings value of a Claude Code command. */
+const settingsOf = (args: string[]) =>
+  JSON.parse(args[args.indexOf("--settings") + 1]) as {
+    permissions: { deny: string[]; blockReadsOutsideWorkingDirectories?: boolean };
+    sandbox?: {
+      enabled: boolean;
+      failIfUnavailable: boolean;
+      allowUnsandboxedCommands: boolean;
+      network: { allowedDomains: string[]; strictAllowlist: boolean };
+    };
+  };
+
+const credentialDenials = [
+  "Read(~/.ssh/**)",
+  "Read(~/.config/gh/**)",
+  "Read(~/.aws/**)",
+  "Read(~/.npmrc)",
+  "Read(~/.netrc)",
+  "Read(~/.claude/.credentials.json)",
+  "Read(~/.codex/auth.json)",
+];
+
 test("Codex arguments keep the existing sandbox, approval and schema flags", async () => {
   assert.deepEqual(
     (
@@ -32,6 +72,10 @@ test("Codex arguments keep the existing sandbox, approval and schema flags", asy
     [
       "exec",
       "--ignore-user-config",
+      // The target repository's .rules files and AGENTS.md are never loaded.
+      "--ignore-rules",
+      "-c",
+      "project_doc_max_bytes=0",
       "--ephemeral",
       "--model",
       "codex-example",
@@ -73,6 +117,7 @@ test("Codex arguments keep the existing sandbox, approval and schema flags", asy
 });
 
 test("Claude Code arguments map access levels, inline the schema and keep MCP connectors out", async (t) => {
+  await withSandboxTools(t);
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-agent-cli-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const schemaPath = path.join(directory, "schema.json");
@@ -114,18 +159,23 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
   assert.ok(!read.args.includes("--model"));
   assert.ok(!read.args.includes("--effort"));
   assert.equal(value(read.args, "--tools"), "Read,Grep,Glob");
+  // Reading is scoped to the working directory: Read(./**) is the only read
+  // allow rule, and Claude Code applies Read rules to Grep and Glob too.
+  assert.equal(value(read.args, "--allowedTools"), "Read(./**)");
   assert.equal(value(read.args, "--permission-mode"), "dontAsk");
   assert.equal(value(read.args, "--setting-sources"), "user");
   assert.ok(!read.args.includes("--disallowedTools"));
+  assert.equal(read.unsandboxed, undefined);
 
   const write = await agentCommand(
     { provider: "claude", source: "cli-default" },
     { cwd: directory, access: "write" },
   );
   assert.equal(value(write.args, "--tools"), "Read,Grep,Glob,Edit,Write,Bash");
-  assert.equal(value(write.args, "--allowedTools"), "Read Grep Glob Bash");
+  assert.equal(value(write.args, "--allowedTools"), "Read(./**) Bash");
   assert.equal(value(write.args, "--permission-mode"), "acceptEdits");
   assert.equal(value(write.args, "--setting-sources"), "user");
+  assert.equal(write.unsandboxed, undefined);
   const denied = write.args.indexOf("--disallowedTools");
   assert.deepEqual(write.args.slice(denied + 1, denied + 5), [
     "Bash(git push:*)",
@@ -133,6 +183,30 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
     "Bash(curl:*)",
     "Bash(wget:*)",
   ]);
+
+  // --settings: the sandbox for write roles, the read denials for every role.
+  for (const command of [none, read, write]) {
+    const settings = settingsOf(command.args);
+    for (const rule of credentialDenials)
+      assert.ok(settings.permissions.deny.includes(rule), rule);
+  }
+  assert.equal(settingsOf(none.args).sandbox, undefined);
+  assert.equal(settingsOf(read.args).sandbox, undefined);
+  assert.equal(
+    settingsOf(read.args).permissions.blockReadsOutsideWorkingDirectories,
+    true,
+  );
+  assert.deepEqual(settingsOf(write.args).sandbox, {
+    enabled: true,
+    failIfUnavailable: true,
+    autoAllowBashIfSandboxed: true,
+    allowUnsandboxedCommands: false,
+    network: { allowedDomains: [], strictAllowlist: true },
+  });
+  assert.equal(
+    settingsOf(write.args).permissions.blockReadsOutsideWorkingDirectories,
+    undefined,
+  );
 
   await assert.rejects(
     agentCommand(
@@ -147,6 +221,7 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
 });
 
 test("teammates combine write access with an output schema on both providers", async (t) => {
+  await withSandboxTools(t);
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-agent-cli-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const schemaPath = path.join(directory, "report-schema.json");
@@ -171,7 +246,8 @@ test("teammates combine write access with an output schema on both providers", a
   assert.ok(claude.args.includes("--disallowedTools"));
 });
 
-test("web access adds Claude Code's WebSearch/WebFetch and Codex live search for read and write access only", async () => {
+test("web access adds Claude Code's WebSearch/WebFetch and Codex live search for read and write access only", async (t) => {
+  await withSandboxTools(t);
   const value = (args: string[], flag: string) => args[args.indexOf(flag) + 1];
   const claude = { provider: "claude" as const, source: "cli-default" as const };
   const codex = { source: "cli-default" as const };
@@ -180,9 +256,14 @@ test("web access adds Claude Code's WebSearch/WebFetch and Codex live search for
     const on = await agentCommand(claude, { cwd: "/work/tree", access, web: true });
     const tools =
       access === "read" ? "Read,Grep,Glob" : "Read,Grep,Glob,Edit,Write,Bash";
-    const allowed = access === "read" ? "Read Grep Glob" : "Read Grep Glob Bash";
+    const allowed = access === "read" ? "Read(./**)" : "Read(./**) Bash";
     assert.equal(value(on.args, "--tools"), `${tools},WebSearch,WebFetch`);
-    assert.equal(value(on.args, "--allowedTools"), `${allowed} WebSearch WebFetch`);
+    // WebFetch is pre-approved only for GitHub, its docs and raw file contents.
+    assert.equal(
+      value(on.args, "--allowedTools"),
+      `${allowed} WebSearch WebFetch(domain:github.com) WebFetch(domain:docs.github.com) WebFetch(domain:raw.githubusercontent.com)`,
+    );
+    assert.doesNotMatch(value(on.args, "--allowedTools"), /WebFetch(?!\()/);
     assert.ok(on.args.includes("--strict-mcp-config"));
     assert.equal(value(on.args, "--setting-sources"), "user");
     const off = await agentCommand(claude, { cwd: "/work/tree", access, web: false });
@@ -329,14 +410,16 @@ test("web tool use becomes a web event with the query or URL only, on both provi
   );
 });
 
-test("agent environment never forwards an Anthropic API key", (t) => {
+test("agent environment passes an Anthropic API key to Claude Code only", (t) => {
   const previous = process.env.ANTHROPIC_API_KEY;
   process.env.ANTHROPIC_API_KEY = "sk-ant-test";
   t.after(() => {
     if (previous === undefined) delete process.env.ANTHROPIC_API_KEY;
     else process.env.ANTHROPIC_API_KEY = previous;
   });
-  assert.equal(agentEnvironment().ANTHROPIC_API_KEY, undefined);
+  // Claude Code's built-in auth methods are never restricted (Anthropic's terms).
+  assert.equal(agentEnvironment("claude").ANTHROPIC_API_KEY, "sk-ant-test");
+  assert.equal(agentEnvironment("codex").ANTHROPIC_API_KEY, undefined);
 });
 
 test("Codex events keep their existing meaning", () => {

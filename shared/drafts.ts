@@ -59,6 +59,58 @@ export interface DraftPreparation {
   generatedAt?: string;
 }
 
+/**
+ * The PR text the person edits, reviews and publishes (`run.draft`). It is
+ * `RunCore["draft"]` plus the fields added since, all optional, so a draft
+ * saved by an older build reads as one with every new choice off.
+ */
+export interface RunDraft {
+  title: string;
+  body: string;
+  commitMessage?: string;
+  publishBranch?: string;
+  /**
+   * The person chose to say in the PR description that AI coding agents
+   * prepared the change. Absent means off: BELL then never mentions AI
+   * unless the target project's rules require a disclosure, which the
+   * draft's checklist quotes so the person writes it in their own words.
+   */
+  aiDisclosure?: boolean;
+}
+
+/**
+ * The editable English line BELL adds to the PR description when the
+ * person turns the disclosure on. PR text stays English unless the
+ * project's rules say otherwise, so it is not translated.
+ */
+export const aiDisclosureLine =
+  "This change was prepared with AI coding agents and reviewed by me.";
+
+/** The body with the disclosure line appended once, after a blank line. */
+export function withAiDisclosure(body: string) {
+  if (body.includes(aiDisclosureLine)) return body;
+  const trimmed = body.replace(/\s+$/, "");
+  return trimmed ? `${trimmed}\n\n${aiDisclosureLine}` : aiDisclosureLine;
+}
+
+/**
+ * The body without BELL's disclosure line. A line the person reworded is
+ * theirs and stays.
+ */
+export function withoutAiDisclosure(body: string) {
+  if (!body.includes(aiDisclosureLine)) return body;
+  const kept: string[] = [];
+  for (const line of body.split("\n")) {
+    if (line.trim() !== aiDisclosureLine) {
+      kept.push(line);
+      continue;
+    }
+    // Also drop the blank line withAiDisclosure put before it.
+    if (kept.length && !kept[kept.length - 1].trim()) kept.pop();
+  }
+  return kept.join("\n");
+}
+
 export const linuxContributionUrl =
   "https://docs.kernel.org/process/submitting-patches.html";
 
