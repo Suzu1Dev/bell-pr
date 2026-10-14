@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; base-uri 'none'; form-action 'none'">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>Install: BELL PR</title>
+    <meta name="description" content="Install BELL PR with npm or Docker on macOS, Linux, or Windows through WSL2, and connect the AI coding CLI and GitHub CLI you already use.">
+    <meta name="theme-color" content="#1f6d50">
+    <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="assets/brand/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="BELL PR">
+    <meta property="og:title" content="Install: BELL PR">
+    <meta property="og:description" content="Start BELL PR with npx bell-pr or Docker, on your own machine.">
+    <!-- generated:product-meta key=homepageUrl property="og:url" path="install.html" -->
+    <!-- /generated:product-meta -->
+    <!-- generated:product-meta key=homepageUrl property="og:image" path="assets/brand/og-image.png" -->
+    <!-- /generated:product-meta -->
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <script src="site.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="index.html"><img src="assets/brand/logo-wordmark.svg" alt="BELL PR" width="104" height="34"></a>
+        <nav class="site-nav" aria-label="Main">
+          <ul>
+            <li><a href="index.html#how-it-works">How it works</a></li>
+            <li><a href="pricing.html">Pricing</a></li>
+            <li><a href="install.html" aria-current="page">Install</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-head">
+        <div class="wrap">
+          <h1>Install BELL PR</h1>
+          <p class="lead">BELL PR runs on your own computer. Start it with one npm command or run the Docker image, then sign in through the one-time link it prints.</p>
+          <div class="hero-actions">
+            <div class="command"><code id="start-command">npx bell-pr</code><button class="copy-button" type="button" data-copy="start-command" hidden>Copy</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section-tinted">
+        <div class="wrap">
+          <div class="prose">
+            <h2 id="requirements">Requirements</h2>
+            <ul>
+              <li><strong>Platforms:</strong> macOS, Linux, or Windows through WSL2.</li>
+              <li><strong>Node.js 22 or later</strong> for npm, or Docker instead.</li>
+              <li><strong>Git 2.40 or later.</strong></li>
+              <li><strong>The GitHub CLI</strong> (<code>gh</code>), signed in with <code>gh auth login</code>. BELL PR uses it to publish Draft PRs and to find projects.</li>
+              <li><strong>One AI coding CLI</strong>, installed and signed in: the OpenAI Codex CLI, or Claude Code with your Claude plan or Anthropic API key. Usage counts against your own account.</li>
+            </ul>
+
+            <h2 id="npm">Start with npm</h2>
+            <pre><code>npx bell-pr</code></pre>
+            <p>BELL PR starts on <code>http://127.0.0.1:4311</code> and opens a one-time sign-in link in your browser. Keep the terminal open while you work; <kbd>Ctrl</kbd>+<kbd>C</kbd> stops BELL PR.</p>
+            <p>To install the <code>bell-pr</code> command instead:</p>
+            <pre><code>npm install -g bell-pr
+bell-pr</code></pre>
+            <h3 id="commands">Useful commands</h3>
+            <ul>
+              <li><code>bell-pr open</code> opens a new sign-in link when you closed the tab or lost the link.</li>
+              <li><code>bell-pr doctor</code> checks Git, the GitHub CLI and the AI coding CLIs, and says how to fix what is missing.</li>
+              <li><code>bell-pr start --port 4400</code> uses another port.</li>
+              <li><code>bell-pr start --data-dir ./bellpr-data</code> keeps the data somewhere other than the default <code>~/.bellpr</code>.</li>
+              <li><code>bell-pr license trial</code> starts the 14-day Pro trial.</li>
+            </ul>
+
+            <h2 id="docker">Run with Docker</h2>
+            <pre><code>docker run -d --name bell-pr \
+  -p 127.0.0.1:4311:4311 \
+  -v bellpr-data:/data \
+  -v bellpr-home:/home/node \
+  -e GH_TOKEN \
+  -e BELLPR_PUBLIC_URL=http://localhost:4311 \
+  IMAGE</code></pre>
+            <p>Replace <code>IMAGE</code> with the published image name: <span class="owner">[OWNER: Docker image name]</span></p>
+            <ul>
+              <li><code>-p 127.0.0.1:4311:4311</code> publishes the port on this computer's loopback interface only, so nothing else on your network can reach BELL PR.</li>
+              <li>The <code>bellpr-data</code> volume keeps your repositories, runs and notes; <code>bellpr-home</code> keeps the sign-ins of the tools inside the container.</li>
+              <li>Get a sign-in link with <code>docker exec bell-pr bell-pr open --print</code>.</li>
+              <li>The image includes Git, the GitHub CLI and the Codex CLI. For the Codex CLI, add <code>-e OPENAI_API_KEY</code>. Set the Git identity for commits with <code>-e GIT_AUTHOR_NAME</code>, <code>-e GIT_AUTHOR_EMAIL</code>, <code>-e GIT_COMMITTER_NAME</code> and <code>-e GIT_COMMITTER_EMAIL</code>.</li>
+              <li>Claude Code is not preinstalled. To use it, run <code>docker exec -it bell-pr npm install -g @anthropic-ai/claude-code</code> and then <code>docker exec -it bell-pr claude auth login</code>.</li>
+            </ul>
+
+            <h2 id="windows">Windows</h2>
+            <p>Install WSL2 and a Linux distribution, then follow the npm steps inside it. BELL PR does not run on Windows outside WSL2.</p>
+
+            <h2 id="next">Next steps</h2>
+            <p>Open the sample project to see a finished contribution, then import a repository you want to contribute to. Everything stays on your computer until you publish a Draft PR.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <div class="footer-grid">
+          <div class="footer-brand"><img src="assets/brand/logo-wordmark.svg" alt="BELL PR" width="92" height="30"></div>
+          <nav class="footer-col" aria-labelledby="footer-product">
+            <h2 id="footer-product">Product</h2>
+            <ul>
+              <li><a href="index.html#how-it-works">How it works</a></li>
+              <li><a href="pricing.html">Pricing</a></li>
+              <li><a href="install.html">Install</a></li>
+            </ul>
+          </nav>
+          <nav class="footer-col" aria-labelledby="footer-legal">
+            <h2 id="footer-legal">Legal</h2>
+            <ul>
+              <li><a href="legal/eula.html">License agreement</a></li>
+              <li><a href="legal/privacy.html">Privacy</a></li>
+              <li><a href="legal/terms.html">Terms</a></li>
+              <li><a href="legal/refund.html">Refunds</a></li>
+              <li><a href="legal/security.html">Security</a></li>
+            </ul>
+          </nav>
+          <div class="footer-col">
+            <h2>Contact</h2>
+            <ul>
+              <li><!-- generated:product-link key=supportEmail text="Support" --><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=securityEmail text="Report a vulnerability" --><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=publicRepoUrl path=issues text="Report an issue" --><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=docsUrl text="Documentation" --><!-- /generated:product-link --></li>
+            </ul>
+          </div>
+        </div>
+        <p class="disclaimer">BELL PR is an independent product and is not affiliated with, endorsed by, or sponsored by GitHub, Inc., OpenAI, or Anthropic PBC. GitHub, OpenAI, Codex, Anthropic, Claude and Claude Code are trademarks of their respective owners; BELL PR names them only to say which tools it works with.</p>
+      </div>
+    </footer>
+    <p class="visually-hidden" role="status" id="copy-status"></p>
+  </body>
+</html>
