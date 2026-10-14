@@ -88,7 +88,7 @@ WORKDIR /home/node
 VOLUME /data
 EXPOSE 4311
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --start-interval=2s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.BELLPR_PORT || 4311) + '/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 
 LABEL org.opencontainers.image.title="BELL PR" \
