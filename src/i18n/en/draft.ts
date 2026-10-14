@@ -138,6 +138,32 @@ const draft = {
         `The motivation, change and verification principles in the ${guide} serve as a fallback, adapted to the GitHub PR format. Sign-off lines such as Signed-off-by must be confirmed by you and are never filled in automatically.`,
       guide: "Linux kernel's patch submission guidelines",
     },
+    /**
+     * The AI-assistance disclosure: off unless the person's setting or the
+     * project's rules ask for it. The line itself is English PR text.
+     */
+    disclosure: {
+      title: "AI-assistance disclosure",
+      /** The switch's label. */
+      label: "Add an AI-assistance line to the description",
+      on: "On",
+      off: "Off",
+      lineOn: ({ line }: { line: string }) =>
+        `The description ends with this line: “${line}” You can reword it in the description like any other text.`,
+      lineOff:
+        "The description does not mention AI. Whether to disclose AI help is your decision.",
+      /** Why the toggle started on. */
+      setting:
+        "On by default because of your setting “Always add an AI-assistance note to my pull requests”.",
+      /** Bold label in front of the quoted rule; it ends with its own separator. */
+      rule: "This project asks for a disclosure: ",
+      quote: ({ quote }: { quote: string }) => `“${quote}”`,
+      ruleSource: ({ source }: { source: string }) => `Source: ${source}`,
+      /** Shown when the choice only shapes what "Apply" puts in the editor. */
+      applyHint:
+        "The preview below follows this choice, and applying the suggestion puts it in the editor. Save the draft to keep it.",
+    },
+    /** The publish preflight for the saved draft. */
   },
   /** SyncPanel: where the contribution stands against its target branch. */
   sync: {

@@ -116,6 +116,20 @@ const m: Translation<typeof en> = {
         `以 ${guide} 中的動機、變更與驗證原則作為備用依據，調整成 GitHub PR 格式。Signed-off-by 等簽署資訊需由本人確認，不會自動填入。`,
       guide: "Linux 官方提交指引",
     },
+    disclosure: {
+      title: "AI 協助揭露",
+      label: "在 PR 說明加入 AI 協助聲明",
+      on: "開",
+      off: "關",
+      lineOn: ({ line }) =>
+        `PR 說明最後會加上這一行：「${line}」你可以在說明中像其他文字一樣改寫它。`,
+      lineOff: "PR 說明不會提到 AI。要不要揭露 AI 協助，由你決定。",
+      setting: "因為你開啟了「我的 PR 一律加入 AI 協助聲明」設定，預設為開。",
+      rule: "這個專案要求揭露：",
+      quote: ({ quote }) => `「${quote}」`,
+      ruleSource: ({ source }) => `來源：${source}`,
+      applyHint: "下方預覽會依這個選擇顯示，套用建議時也會一併放入編輯器；記得儲存草稿。",
+    },
   },
   sync: {
     title: "目標分支",
