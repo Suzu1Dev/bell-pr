@@ -111,8 +111,8 @@ and shows only the player controls.
 ## Hosting
 
 The owner hosts the site (for example Cloudflare Pages or GitHub Pages) and
-never needs a build step: deploy `site/` as it is, plus `media/`. Recommended
-HTTP headers:
+never needs a build step: deploy `site/` as it is, plus `media/`, but
+without `README.md` and `check-site.mjs`. Recommended HTTP headers:
 
 ```text
 Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
