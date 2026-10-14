@@ -1,8 +1,46 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
+import { log } from "./log.js";
 import { redact } from "./secrets.js";
 import { AppError } from "./types.js";
 
 export { redact };
+
+/**
+ * Told about every child process BELL PR starts, for example to record
+ * agent process groups and reap leftovers after a crash.
+ */
+export interface SpawnObserver {
+  onSpawn(pid: number, executable: string): void;
+  onExit(pid: number): void;
+}
+
+let spawnObserver: SpawnObserver | undefined;
+
+/** Observes child processes started from now on; no argument removes it. */
+export function setSpawnObserver(observer?: SpawnObserver): void {
+  spawnObserver = observer;
+}
+
+/**
+ * Reports `child` to the spawn observer: onSpawn now if it has a pid, and
+ * onExit to the same observer when it closes. A child that failed to start
+ * has no pid and is not reported. Observer errors are logged, never thrown,
+ * so they cannot break the command.
+ */
+export function observeChild(child: ChildProcess, executable: string): void {
+  const observer = spawnObserver;
+  const pid = child.pid;
+  if (!observer || pid === undefined) return;
+  const notify = (event: string, call: () => void) => {
+    try {
+      call();
+    } catch (error) {
+      log.warn("Spawn observer failed", { event, executable, pid, error });
+    }
+  };
+  notify("spawn", () => observer.onSpawn(pid, executable));
+  child.once("close", () => notify("exit", () => observer.onExit(pid)));
+}
 
 /** ANTHROPIC_API_KEY is deliberately excluded so Claude Code uses the signed-in subscription, not API billing. */
 export function agentEnvironment(): NodeJS.ProcessEnv {
@@ -59,6 +97,7 @@ export async function command(
         detached: process.platform !== "win32",
         stdio: ["pipe", "pipe", "pipe"],
       });
+      observeChild(child, executable);
       let stdout = "";
       let stderr = "";
       let byteCount = 0;

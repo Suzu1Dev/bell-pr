@@ -1,3 +1,8 @@
+// Legacy server tests assert zh-TW text. currentLocale() falls back to
+// BELLPR_LOCALE when no request or job sets a locale, so pin it here; new
+// English tests use withLocale("en", ...) or the X-Bell-Locale header.
+process.env.BELLPR_LOCALE ??= "zh-TW";
+
 // Node test loader: components import their stylesheets at module level.
 // Vite handles those imports in the app; under node they would fail with
 // ERR_UNKNOWN_FILE_EXTENSION, so every *.css import resolves to an empty module.

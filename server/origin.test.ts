@@ -5,14 +5,27 @@ import { request, type IncomingHttpHeaders } from "node:http";
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
+import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createApp, localhostGuard, parseAllowedOrigins } from "./index.js";
+import express from "express";
+import { localhostGuard, parseAllowedOrigins } from "./http-guard.js";
+import { createApp } from "./index.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
 
-const remoteOrigin = "https://your-host.your-tailnet.ts.net:8443";
+const remoteOrigin = "https://bell.example.internal:8443";
 const remoteHost = new URL(remoteOrigin).host;
+
+/** A port the OS reports free on 127.0.0.1, released before it is returned. */
+async function freePort() {
+  const probe = createServer();
+  probe.listen(0, "127.0.0.1");
+  await once(probe, "listening");
+  const { port } = probe.address() as AddressInfo;
+  await new Promise<void>((resolve) => probe.close(() => resolve()));
+  return port;
+}
 
 test("origin configuration accepts precise HTTP(S) origins and rejects ambiguous values", () => {
   assert.deepEqual(parseAllowedOrigins(), []);
@@ -42,10 +55,137 @@ test("origin configuration accepts precise HTTP(S) origins and rejects ambiguous
     `${remoteOrigin},`,
   ]) {
     assert.throws(
-      () => localhostGuard([4311], value),
+      () =>
+        localhostGuard({
+          ports: [4311],
+          allowedOrigins: [value],
+          publicPaths: [],
+        }),
       /BELLPR_ALLOWED_ORIGINS/,
       value,
     );
+  }
+  // A list entry is exactly one origin; an empty entry or two origins in one
+  // entry fail the same way.
+  for (const allowedOrigins of [
+    [""],
+    [" "],
+    [remoteOrigin, ""],
+    [`${remoteOrigin},https://example.com`],
+  ]) {
+    assert.throws(
+      () => localhostGuard({ ports: [4311], allowedOrigins, publicPaths: [] }),
+      /BELLPR_ALLOWED_ORIGINS/,
+      JSON.stringify(allowedOrigins),
+    );
+  }
+});
+
+test("localhost guard allows only local hosts and origins and JSON mutations", async () => {
+  const app = express();
+  app.use(
+    localhostGuard({ ports: [4311], allowedOrigins: [], publicPaths: [] }),
+  );
+  app.use((_req, res) => {
+    res.json({ passed: true });
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Missing port");
+  const send = (
+    headers: Record<string, string>,
+    { method = "GET", path = "/api/repos", body = "" } = {},
+  ) =>
+    new Promise<{ status: number; headers: IncomingHttpHeaders; body: string }>(
+      (resolve, reject) => {
+        // DELETE and OPTIONS bodies are not chunked by default; send a length.
+        const length = body ? { "content-length": String(body.length) } : {};
+        const req = request(
+          `http://127.0.0.1:${address.port}${path}`,
+          { method, headers: { ...headers, ...length } },
+          (res) => {
+            let text = "";
+            res.setEncoding("utf8");
+            res.on("data", (chunk) => (text += chunk));
+            res.on("end", () =>
+              resolve({ status: res.statusCode!, headers: res.headers, body: text }),
+            );
+          },
+        );
+        req.on("error", reject);
+        req.end(body);
+      },
+    );
+  const local = { host: "127.0.0.1:4311" };
+  const json = { ...local, "content-type": "application/json" };
+  try {
+    const passed = await send(local);
+    assert.equal(passed.status, 200);
+    assert.deepEqual(JSON.parse(passed.body), { passed: true });
+    assert.equal(passed.headers["x-content-type-options"], "nosniff");
+    assert.equal(passed.headers["referrer-policy"], "no-referrer");
+    assert.equal(passed.headers["x-frame-options"], "DENY");
+    assert.equal(passed.headers["cache-control"], "no-store");
+    const page = await send(local, { path: "/" });
+    assert.equal(page.status, 200);
+    assert.equal(page.headers["x-frame-options"], "DENY");
+    assert.equal(page.headers["cache-control"], undefined);
+    for (const headers of [
+      { host: "localhost:4311" },
+      { host: "LOCALHOST:4311" },
+      { host: "[::1]:4311" },
+      { ...local, origin: "http://localhost:4311" },
+      { host: "localhost:4311", origin: "http://127.0.0.1:4311" },
+      { host: "[::1]:4311", origin: "http://[::1]:4311" },
+      { ...local, "sec-fetch-site": "same-origin" },
+    ]) {
+      assert.equal((await send(headers)).status, 200, JSON.stringify(headers));
+    }
+    for (const headers of [
+      { host: "localhost:4310" },
+      { host: "localhost" },
+      { host: "evil.example:4311" },
+      { host: "bell.example.internal:8443" },
+      { ...local, origin: "http://localhost:4310" },
+      { ...local, origin: "https://localhost:4311" },
+      { ...local, origin: "http://localhost:4311/" },
+      { ...local, origin: "https://evil.example" },
+      { ...local, origin: "null" },
+      { ...local, "sec-fetch-site": "cross-site" },
+    ]) {
+      const response = await send(headers);
+      assert.equal(response.status, 403, JSON.stringify(headers));
+      assert.match(JSON.parse(response.body).error, /\S/);
+    }
+    for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
+      assert.equal(
+        (await send(json, { method, body: "{}" })).status,
+        200,
+        method,
+      );
+      assert.equal(
+        (await send(local, { method, body: "text" })).status,
+        415,
+        method,
+      );
+      assert.equal(
+        (
+          await send(
+            { ...local, "content-type": "text/plain" },
+            { method, body: "{}" },
+          )
+        ).status,
+        415,
+        method,
+      );
+    }
+    for (const method of ["HEAD", "OPTIONS"]) {
+      assert.equal((await send(local, { method })).status, 200, method);
+    }
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
 
@@ -153,6 +293,58 @@ test("configured proxy supports same-origin JSON API requests without weakening 
   }
 });
 
+test("createApp also takes the allowed origins as a list", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "bell-pr-origin-list-"));
+  const workbench = new Workbench(new Store(directory));
+  const staticDirectory = path.join(directory, "missing");
+  assert.throws(
+    () => createApp(workbench, { allowedOrigins: ["*"], staticDirectory }),
+    /BELLPR_ALLOWED_ORIGINS/,
+  );
+  const app = createApp(workbench, {
+    allowedOrigins: [remoteOrigin, "https://second.example"],
+    staticDirectory,
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Missing port");
+  const get = (headers: Record<string, string>) =>
+    new Promise<number>((resolve, reject) => {
+      const req = request(
+        `http://127.0.0.1:${address.port}/api/repos`,
+        { headers },
+        (res) => {
+          res.resume();
+          res.on("end", () => resolve(res.statusCode!));
+        },
+      );
+      req.on("error", reject);
+      req.end();
+    });
+  try {
+    assert.equal(await get({ host: remoteHost, origin: remoteOrigin }), 200);
+    assert.equal(
+      await get({
+        host: "second.example",
+        origin: "https://second.example",
+      }),
+      200,
+    );
+    assert.equal(
+      await get({ host: remoteHost, origin: "https://second.example" }),
+      403,
+    );
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await workbench.shutdown();
+    await app.locals.insights.shutdown();
+    await app.locals.discovery.shutdown();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("invalid origin configuration fails startup before creating application data", async () => {
   const directory = await mkdtemp(
     path.join(tmpdir(), "bell-pr-origin-startup-"),
@@ -166,7 +358,7 @@ test("invalid origin configuration fails startup before creating application dat
         cwd: path.resolve(import.meta.dirname, ".."),
         env: {
           ...process.env,
-          BELLPR_PORT: "8443",
+          BELLPR_PORT: String(await freePort()),
           BELLPR_FRONTEND_PORT: "4310",
           BELLPR_ALLOWED_ORIGINS: "https://*.example.com",
           BELLPR_DATA_DIR: dataDirectory,
