@@ -6,6 +6,7 @@ import {
   type SetStateAction,
 } from "react";
 import { api, send } from "../../api";
+import { useT } from "../../i18n";
 import type { DiffFile, Run } from "../../types";
 import type { Notify, Tab } from "../AppShell";
 
@@ -35,6 +36,7 @@ export function useRunRounds({
   notify,
   setTab,
 }: RunRoundsOptions) {
+  const t = useT("workspace").notices;
   // Feedback picked for the next review follow-up round, and the person's note.
   const [followUpSelection, setFollowUpSelection] = useState<string[]>([]);
   const [followUpNote, setFollowUpNote] = useState("");
@@ -66,12 +68,12 @@ export function useRunRounds({
       await refreshFiles(result.run.id);
       notify(
         !result.updated
-          ? `已是 ${run.baseBranch} 的最新版本，不需要同步。`
+          ? t.syncCurrent({ branch: run.baseBranch })
           : result.conflicts.length
-            ? `已同步，但 ${result.conflicts.length} 個檔案有衝突；解決後才能核准。`
+            ? t.syncConflicts({ count: result.conflicts.length })
             : result.run.prUrl
-              ? "已把最新目標分支合併進 PR，審閱後推送一個合併 commit。"
-              : "已同步到最新目標分支；改到的檔案請重新審閱。",
+              ? t.syncedPr
+              : t.synced,
         result.conflicts.length ? "error" : "success",
       );
     } catch (error) {
@@ -90,7 +92,7 @@ export function useRunRounds({
       if (runIdRef.current !== updated.id) return;
       setRun(updated);
       setTab("activity");
-      notify("Agent 正在解決衝突，完成後請逐檔審閱。");
+      notify(t.resolvingConflicts);
     } catch (error) {
       notify((error as Error).message, "error");
     } finally {
@@ -98,12 +100,7 @@ export function useRunRounds({
     }
   }
   async function undoSync() {
-    if (
-      !window.confirm(
-        "復原同步？工作會回到同步前的內容與基準，同步後在工作目錄做的修改會被移除。",
-      )
-    )
-      return;
+    if (!window.confirm(t.undoSyncConfirm)) return;
     setBusy(true);
     try {
       const { run: updated } = await api<{ run: Run }>(
@@ -113,7 +110,7 @@ export function useRunRounds({
       if (runIdRef.current !== updated.id) return;
       setRun(updated);
       await refreshFiles(updated.id);
-      notify("已復原同步。");
+      notify(t.syncUndone);
     } catch (error) {
       notify((error as Error).message, "error");
     } finally {
@@ -135,7 +132,7 @@ export function useRunRounds({
       setFollowUpSelection([]);
       setFollowUpNote("");
       setTab("activity");
-      notify("已開始依回饋修正，完成後會請你審閱這輪的修改。");
+      notify(t.followUpStarted);
     } catch (error) {
       notify((error as Error).message, "error");
     } finally {
@@ -143,12 +140,7 @@ export function useRunRounds({
     }
   }
   async function discardFollowUp() {
-    if (
-      !window.confirm(
-        "放棄這輪修正？工作目錄裡這輪的修改會被移除，回到已推送的 PR 內容。",
-      )
-    )
-      return;
+    if (!window.confirm(t.discardRoundConfirm)) return;
     setBusy(true);
     try {
       const { run: updated } = await api<{ run: Run }>(
@@ -158,7 +150,7 @@ export function useRunRounds({
       if (runIdRef.current !== updated.id) return;
       setRun(updated);
       await refreshFiles(updated.id);
-      notify("已放棄這輪修正。");
+      notify(t.roundDiscarded);
     } catch (error) {
       notify((error as Error).message, "error");
     } finally {

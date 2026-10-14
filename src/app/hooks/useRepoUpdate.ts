@@ -1,5 +1,6 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { api, send } from "../../api";
+import { useT } from "../../i18n";
 import type { Repo } from "../../types";
 import type { Notify } from "../AppShell";
 
@@ -20,6 +21,7 @@ export function useRepoUpdate({
   reloadInsights,
   notify,
 }: RepoUpdateOptions) {
+  const t = useT("workspace").notices;
   const [updatingRepo, setUpdatingRepo] = useState(false);
   async function updateRepo(target: Repo) {
     setUpdatingRepo(true);
@@ -36,8 +38,8 @@ export function useRepoUpdate({
       await reloadInsights();
       notify(
         result.updated
-          ? `已更新到最新版本（${result.to.slice(0, 7)}）。專案分析若標示過期，請重新分析；新的貢獻會從最新版本開始。`
-          : "已是最新版本。",
+          ? t.repoUpdated({ commit: result.to.slice(0, 7) })
+          : t.repoCurrent,
       );
     } catch (error) {
       notify((error as Error).message, "error");
