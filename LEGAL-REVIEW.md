@@ -120,10 +120,12 @@ own. The legal texts already describe the shipped behavior.
    (`server/agent-cli.ts:38`); Codex's live web search has none
    (`server/agent-cli.ts:205`). The copy in `shared/i18n/plans.{en,zh-TW}.ts`
    should say so.
-4. **Claim markers in the app.** `scripts/generate-third-party-notices.mjs:47`
-   copies the Markdown verbatim to `dist/legal/*.txt` for the About dialog,
-   so readers there see the `claim:` comments and the owner lists. Stripping
-   HTML comments in that copy would hide them.
+4. **Claim markers in the app.** Fixed after the merge:
+   `scripts/generate-third-party-notices.mjs` now leaves HTML comments (the
+   `claim:` and generated-region markers) out of the `dist/legal/*.txt`
+   copies that the app shows, and `scripts/check-pack.mjs` fails when one
+   remains. The owner placeholder lists stay visible there while the texts
+   are drafts.
 5. **REFUND.md is not in the app.** The About dialog offers the EULA,
    privacy policy, terms and security policy; the refund policy that the
    EULA and the terms refer to ships only on the site.

@@ -414,6 +414,8 @@ test("About shows the versions and the local documents, and no link for an empty
     const document = await page.request.get(href);
     expect(document.ok(), href).toBe(true);
     expect(document.headers()["content-type"]).toMatch(/^text\/plain/);
+    // Claim and generated-region markers are for maintainers, not readers.
+    expect(await document.text(), href).not.toContain("<!--");
   }
   await expect(dialog).toContainText("Ponytail by DietrichGebert (MIT)");
   await expect(dialog).toContainText("not affiliated with");

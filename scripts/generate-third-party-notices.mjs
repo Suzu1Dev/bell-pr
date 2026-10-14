@@ -11,7 +11,11 @@
 //
 // Writes THIRD_PARTY_NOTICES.md (committed) and dist/THIRD_PARTY_NOTICES.txt,
 // and copies LICENSE.md, PRIVACY.md, TERMS.md and SECURITY.md to
-// dist/legal/{EULA,PRIVACY,TERMS,SECURITY}.txt for the About dialog.
+// dist/legal/{EULA,PRIVACY,TERMS,SECURITY}.txt for the app (the license
+// step of Welcome, the agreement prompt, About and Settings). The copies
+// leave out HTML comments: the claim markers that LEGAL-REVIEW.md maps and
+// the generated-region markers are for maintainers, not for the person
+// who reads and accepts the text.
 //
 // --check writes nothing. It fails when THIRD_PARTY_NOTICES.md as staged in
 // git (or on disk outside a git checkout) differs from what this script
@@ -21,7 +25,6 @@
 // Exit status: 0 when fine, 1 when a check failed, 2 on a setup error.
 import { spawnSync } from "node:child_process";
 import {
-  copyFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -65,6 +68,16 @@ function readJson(file) {
   } catch (error) {
     throw new SetupError(`could not read ${file}: ${error.message}`);
   }
+}
+
+/**
+ * A legal document as the app shows it: without HTML comments, the spaces
+ * before them, and the blank lines a comment on its own line leaves.
+ */
+function legalText(markdown) {
+  return markdown
+    .replace(/[ \t]*<!--[^]*?-->/g, "")
+    .replace(/(\r?\n){3,}/g, "$1$1");
 }
 
 /** Text with LF line ends, no trailing spaces and no outer blank lines. */
@@ -396,7 +409,7 @@ function main(args) {
   mkdirSync(path.join(root, "dist", "legal"), { recursive: true });
   writeFileSync(path.join(root, "dist", "THIRD_PARTY_NOTICES.txt"), markdown);
   for (const [source, target] of legalCopies)
-    copyFileSync(path.join(root, source), path.join(root, "dist", "legal", target));
+    writeFileSync(path.join(root, "dist", "legal", target), legalText(read(source)));
   if (disallowed.length) {
     console.warn(
       "generate-third-party-notices: warning: licenses outside the allowlist (the --check step fails on these):",

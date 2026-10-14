@@ -11,6 +11,8 @@
 //   - contains any .woff file, or more than 12 .woff2 files;
 //   - lacks a required file, or contains a dev-only one (tests, fixtures,
 //     tooling, keys, the Vite build manifest);
+//   - ships a legal text for the app (dist/legal/) that still has an HTML
+//     comment, such as a claim marker;
 //   - ships web bundles over the gzip budgets below.
 //
 // Raising a budget needs a reason in the commit message body.
@@ -145,6 +147,9 @@ function main() {
   for (const file of files)
     for (const { pattern, reason } of forbidden)
       if (pattern.test(file)) problems.push(`${file} must not be in the package (${reason}).`);
+  for (const file of files.filter((name) => name.startsWith("dist/legal/")))
+    if (readFileSync(path.join(root, file), "utf8").includes("<!--"))
+      problems.push(`${file} contains an HTML comment; the app shows it as plain text (scripts/generate-third-party-notices.mjs removes them).`);
 
   if (problems.length) {
     for (const problem of problems) console.error(`check-pack: ${problem}`);
