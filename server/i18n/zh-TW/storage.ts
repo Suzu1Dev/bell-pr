@@ -35,7 +35,7 @@ const m: Translation<typeof en> = {
   workspace: {
     removed: "為了釋出磁碟空間，這個工作的檔案已清除。報告與筆記仍保留。",
     removedPublished:
-      "為了釋出磁碟空間，這個工作的檔案已清除，因此無法再在這裡同步它的 Pull Request 或進行後續修改回合。報告與筆記仍保留。請直接在 GitHub 上更新 Pull Request 的分支；若要讓檔案保留更久，請調高 BELLPR_RETENTION_DAYS。",
+      "為了釋出磁碟空間，這個工作的檔案已移除，因此無法再在這裡同步它的 Pull Request 或進行後續修改回合。報告與筆記仍保留。請直接在 GitHub 上更新 Pull Request 的分支。",
     removedLog: ({ bytes }) =>
       `已移除這個工作的工作檔案，釋出 ${size(bytes)}；報告、筆記與解說仍保留。`,
     retentionLog: ({ bytes, days }) =>
