@@ -42,6 +42,7 @@ import {
   hasExtendedAgentTimeout,
   withAgentTimeoutHint,
 } from "./agent-timeouts.js";
+import { sm } from "./i18n/index.js";
 import { AppError, type Repository } from "./types.js";
 import { lenientRead } from "./persisted-schema.js";
 import {
@@ -86,10 +87,9 @@ export const contributionSettingsSchema = z
       .string()
       .trim()
       .max(400)
-      .refine((value) => !value || parseGitHubIssueUrl(value) !== null, {
-        message:
-          "相關 issue 連結需為 https://github.com/<owner>/<repo>/issues/<編號>",
-      })
+      .refine((value) => !value || parseGitHubIssueUrl(value) !== null, () => ({
+        message: sm().analysis.insights.issueUrlInvalid,
+      }))
       .optional(),
     ...modelSettingsSchema,
   })
@@ -289,7 +289,9 @@ const persistedInsightsSchema = analysisSchema.extend({
 const recommendationIdsSchema = z
   .array(recommendationSchema.shape.id)
   .max(maxProjectRecommendations)
-  .refine((ids) => new Set(ids).size === ids.length, "建議識別碼不可重複。");
+  .refine((ids) => new Set(ids).size === ids.length, () => ({
+    message: sm().analysis.insights.duplicateRecommendationIds,
+  }));
 const recommendationPreferencesSchema = z
   .object({ order: recommendationIdsSchema, hidden: recommendationIdsSchema })
   .strict();
@@ -358,9 +360,10 @@ function classifyCitation(
 }
 
 function citationReason(citation: Citation, file: string): string {
+  const m = sm().analysis.insights;
   return citation === "known"
-    ? `引用了未抽樣的檔案 ${file}`
-    : `引用了未提供的檔案 ${file}`;
+    ? m.citesUnsampledFile({ path: file })
+    : m.citesUnsuppliedFile({ path: file });
 }
 
 /**
@@ -381,16 +384,20 @@ function unverifiedReason(
   const details = recommendation.evidenceDetails ?? [];
   const excerpt = (quote: string) =>
     quote.length > 120 ? `${quote.slice(0, 120)}…` : quote;
+  const m = sm().analysis.insights;
   for (const detail of details) {
     if (!recommendation.evidence.includes(detail.path))
-      return `引文路徑 ${detail.path} 不在這項建議的 evidence 清單：「${excerpt(detail.quote)}」`;
+      return m.quotePathNotInEvidence({
+        path: detail.path,
+        quote: excerpt(detail.quote),
+      });
     if (!quoteMatches(source.get(detail.path) ?? "", detail.quote))
-      return `引文在 ${detail.path} 找不到：「${excerpt(detail.quote)}」`;
+      return m.quoteNotFound({ path: detail.path, quote: excerpt(detail.quote) });
   }
   const uncited = recommendation.evidence.find(
     (file) => !details.some((detail) => detail.path === file),
   );
-  return uncited ? `evidence 路徑 ${uncited} 缺對應引文` : null;
+  return uncited ? m.evidenceWithoutQuote({ path: uncited }) : null;
 }
 
 /**
@@ -414,12 +421,12 @@ function validateAnalysis<
   try {
     value = schema.parse(JSON.parse(raw)) as z.infer<S>;
   } catch {
-    throw new AppError("AI 分析格式不完整，請重新分析；原有結果已保留。", 422);
+    throw new AppError((m) => m.analysis.insights.incompleteAnswer, 422);
   }
   // Checked on the complete answer: a dropped recommendation is still model output that was seen.
   const serialized = JSON.stringify(value);
   if (secretInPatch(serialized) || redact(serialized) !== serialized)
-    throw new AppError("AI 回應疑似包含敏感內容，結果未儲存。", 422);
+    throw new AppError((m) => m.analysis.insights.sensitiveAnswer, 422);
   const source = new Map(sourceFiles.map((file) => [file.path, file.content]));
   const known = new Set(tree);
   const cite = (file: string) => classifyCitation(file, source, known);
@@ -452,14 +459,14 @@ function validateAnalysis<
       const first = droppedPaths.find((entry) => entry.field === field);
       if (value[field].length || !first) continue;
       throw new AppError(
-        `AI 分析引用了未提供的檔案（${field}：${first.path}），請重新分析；原有結果已保留。`,
+        (m) => m.analysis.insights.unsuppliedCitation({ field, path: first.path }),
         422,
       );
     }
     // The prompt asks for 3–8 reading steps; tiny samples cannot provide three.
     if (value.readingPath.length < Math.min(3, sourceFiles.length))
       throw new AppError(
-        "AI 分析的建議閱讀順序過短，請重新分析；原有結果已保留。",
+        (m) => m.analysis.insights.readingPathTooShort,
         422,
       );
   }
@@ -468,7 +475,7 @@ function validateAnalysis<
     new Set(value.recommendations.map((entry) => entry.id)).size !==
       value.recommendations.length
   )
-    throw new AppError("AI 建議的識別碼重複，請重新分析。", 422);
+    throw new AppError((m) => m.analysis.insights.duplicateIds, 422);
   const verification: RecommendationVerification = {
     droppedRecommendations: [],
   };
@@ -608,7 +615,8 @@ export class ProjectInsightsService {
 
   private repository(id: string): Repository {
     const repo = this.store.data.repos.find((entry) => entry.id === id);
-    if (!repo) throw new AppError("找不到 Repository。", 404);
+    if (!repo)
+      throw new AppError((m) => m.analysis.insights.repositoryNotFound, 404);
     return repo;
   }
 
@@ -641,7 +649,7 @@ export class ProjectInsightsService {
           recommendationPreferences: { order: [], hidden: [] },
         };
       throw new AppError(
-        "專案分析資料無法讀取，請檢查本機 insights 資料檔。",
+        (m) => m.analysis.insights.cacheUnreadable,
         500,
       );
     }
@@ -677,7 +685,10 @@ export class ProjectInsightsService {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT")
         return sharedModelSettingsSchema.parse({});
-      throw new AppError("模型設定無法讀取，請檢查本機 model-settings.json。", 500);
+      throw new AppError(
+        (m) => m.analysis.insights.modelSettingsUnreadable,
+        500,
+      );
     }
   }
 
@@ -737,19 +748,23 @@ export class ProjectInsightsService {
     const preferences = recommendationPreferencesSchema.parse(input);
     await this.update(repoId, (cache) => {
       if (!cache.insights)
-        throw new AppError("請先分析專案，再調整貢獻建議。", 409);
+        throw new AppError((m) => m.analysis.insights.analyzeFirst, 409);
       const ids = new Set(
         cache.insights.recommendations.map((entry) => entry.id),
       );
       if ([...preferences.order, ...preferences.hidden].some((id) => !ids.has(id)))
-        throw new AppError("部分貢獻建議已更新，請重新整理後再調整。", 409);
+        throw new AppError(
+          (m) => m.analysis.insights.recommendationsChanged,
+          409,
+        );
       cache.recommendationPreferences = preferences;
     });
     return preferences;
   }
 
   private assertActive(signal?: AbortSignal) {
-    if (signal?.aborted) throw new AppError("專案分析已取消。", 409);
+    if (signal?.aborted)
+      throw new AppError((m) => m.analysis.insights.cancelled, 409);
   }
 
   private async version(repo: Repository, signal?: AbortSignal) {
@@ -779,7 +794,7 @@ export class ProjectInsightsService {
     ]);
     const baseSha = head.stdout.trim();
     if (!/^[a-f0-9]{40,64}$/.test(baseSha))
-      throw new AppError("Repository 沒有可分析的 Git 版本。", 422);
+      throw new AppError((m) => m.analysis.insights.noCommit, 422);
     const fingerprint = createHash("sha256")
       .update(baseSha)
       .update("\0")
@@ -916,10 +931,7 @@ export class ProjectInsightsService {
       }
     }
     if (!files.length)
-      throw new AppError(
-        "找不到可分析的已追蹤文字檔案；請先加入 README 或程式碼並提交。",
-        422,
-      );
+      throw new AppError((m) => m.analysis.insights.noTextFiles, 422);
     return {
       files,
       tree,
@@ -1001,11 +1013,11 @@ export class ProjectInsightsService {
   }> {
     const repo = this.repository(repoId);
     if (this.stopping)
-      throw new AppError("服務正在關閉，無法開始新的專案分析。", 503);
+      throw new AppError((m) => m.analysis.insights.shuttingDown, 503);
     if (this.generating.has(repoId))
-      throw new AppError("這個專案正在分析，請等待目前分析完成。", 409);
+      throw new AppError((m) => m.analysis.insights.alreadyRunning, 409);
     if (this.generating.size >= 2)
-      throw new AppError("同時最多分析兩個專案，請稍後再試。", 429);
+      throw new AppError((m) => m.analysis.insights.tooManyRunning, 429);
     this.generating.add(repoId);
     const controller = new AbortController();
     const signal = controller.signal;
@@ -1025,7 +1037,7 @@ export class ProjectInsightsService {
         (!previous.insights || previous.fingerprint !== version.fingerprint)
       )
         throw new AppError(
-          "請先重新分析專案全貌，再產出更多貢獻方向。",
+          (m) => m.analysis.insights.reanalyzeBeforeMore,
           409,
         );
       if (
@@ -1033,7 +1045,10 @@ export class ProjectInsightsService {
         previous.insights!.recommendations.length >= maxProjectRecommendations
       )
         throw new AppError(
-          `已累積 ${maxProjectRecommendations} 個貢獻方向；請先選擇想改善的項目，或重新分析專案。`,
+          (m) =>
+            m.analysis.insights.recommendationLimit({
+              max: maxProjectRecommendations,
+            }),
           409,
         );
       const requestedCount = more
@@ -1054,7 +1069,14 @@ export class ProjectInsightsService {
       } catch {
         this.assertActive(signal);
         throw new AppError(
-          `無法使用 ${agentLabel(settings.provider)}：請確認已安裝 CLI 並執行 ${login.executable === "claude" ? "claude auth login" : "codex login"}。`,
+          (m) =>
+            m.analysis.insights.agentUnavailable({
+              agent: agentLabel(settings.provider),
+              login:
+                login.executable === "claude"
+                  ? "claude auth login"
+                  : "codex login",
+            }),
           503,
         );
       }
@@ -1135,7 +1157,17 @@ export class ProjectInsightsService {
       // The analysis request has no progress channel, so the wait is only visible in the server log.
       if (hasExtendedAgentTimeout(modelExecution))
         console.log(
-          `專案分析 ${repo.fullName}（${agentLabel(modelExecution.provider)}${modelExecution.model ? ` ${modelExecution.model}` : ""}${modelExecution.reasoningEffort ? ` ${modelExecution.reasoningEffort}` : ""}）開始，${describeAgentTimeout(timeoutMs)}。`,
+          sm().analysis.insights.started({
+            repository: repo.fullName,
+            runner: [
+              agentLabel(modelExecution.provider),
+              modelExecution.model,
+              modelExecution.reasoningEffort,
+            ]
+              .filter(Boolean)
+              .join(" "),
+            wait: describeAgentTimeout(timeoutMs),
+          }),
         );
       await retryTransientAuth(
         async () => {
@@ -1195,10 +1227,7 @@ export class ProjectInsightsService {
       );
       this.assertActive(signal);
       if (failed || !answer || Buffer.byteLength(answer) > 120_000)
-        throw new AppError(
-          "AI 分析未完成或回應過大，請重試；原有結果已保留。",
-          422,
-        );
+        throw new AppError((m) => m.analysis.insights.unfinished, 422);
       const { value: analysis, verification } = more
         ? validateAnalysis(answer, context.files, safePaths, recommendationsSchema)
         : validateAnalysis(answer, context.files, safePaths, analysisSchema);
@@ -1206,7 +1235,7 @@ export class ProjectInsightsService {
         (await this.version(repo, signal)).fingerprint !== version.fingerprint
       )
         throw new AppError(
-          "分析期間 Repository 已改變，請重新分析最新版本。",
+          (m) => m.analysis.insights.repositoryChanged,
           409,
         );
       let insights: ProjectInsights;
