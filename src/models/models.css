@@ -1,16 +1,16 @@
 .model-summary {
   padding: 15px 18px;
-  border: 1px solid #dde6dc;
+  border: 1px solid var(--color-border-strong);
   border-radius: 9px;
-  background: #f8faf5;
-  color: #35533e;
+  background: var(--color-surface-sunken);
+  color: var(--color-accent-700);
   min-width: 0;
 }
 .model-summary-heading {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .model-summary dl {
   display: flex;
@@ -22,19 +22,19 @@
   min-width: 0;
 }
 .model-summary dt {
-  color: #6f7c68;
-  font-size: 11px;
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
   margin-bottom: 4px;
 }
 .model-summary dd {
   margin: 0;
   overflow-wrap: anywhere;
-  font-size: 14px;
+  font-size: var(--text-md);
   font-weight: 550;
 }
 .model-summary p {
-  color: #718067;
-  font-size: 12px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
   line-height: 1.7;
   margin: 8px 0 0;
 }

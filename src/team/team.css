@@ -1,6 +1,6 @@
 .team-board {
   padding: 28px;
-  background: #fbfcf9;
+  background: var(--color-bg);
 }
 .team-board-header {
   display: flex;
@@ -14,27 +14,27 @@
   font-weight: 600;
 }
 .team-board-header p {
-  font-size: 14px;
-  color: #7b8871;
+  font-size: var(--text-md);
+  color: var(--color-text-muted);
   line-height: 1.8;
 }
 .team-runtime-badge {
   display: flex;
   gap: 10px;
   align-items: center;
-  border: 1px solid #dfe8d7;
-  background: #f0f6e9;
+  border: 1px solid var(--color-accent-200);
+  background: var(--color-accent-50);
   padding: 12px;
   border-radius: 8px;
-  color: #6a8655;
-  font-size: 12px;
+  color: var(--color-accent-600);
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 .team-runtime-badge small {
   display: block;
-  font-size: 11px;
+  font-size: var(--text-2xs);
   margin-top: 4px;
-  color: #8ca17a;
+  color: var(--color-accent-600);
 }
 .team-flow {
   display: flex;
@@ -42,31 +42,31 @@
   gap: 16px;
   margin: 25px 0;
   padding: 18px 22px;
-  border: 1px solid #e2e8d9;
+  border: 1px solid var(--color-border-strong);
   border-radius: 7px;
-  background: white;
+  background: var(--color-surface);
 }
 .team-flow > span {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  color: #829572;
+  font-size: var(--text-sm);
+  color: var(--color-accent-600);
 }
 .team-flow > i {
   flex: 1;
-  border-top: 1px dashed #d6e0ca;
+  border-top: 1px dashed var(--color-accent-200);
 }
 .team-plan {
   padding: 20px;
-  border: 1px solid #e1e8d8;
+  border: 1px solid var(--color-border-strong);
   border-radius: 8px;
-  background: white;
+  background: var(--color-surface);
   margin-bottom: 24px;
 }
 .team-plan.needs-approval {
-  border-color: #abc295;
-  background: #f7faee;
+  border-color: var(--color-accent-300);
+  background: var(--color-accent-50);
 }
 .team-plan-heading {
   display: flex;
@@ -80,17 +80,17 @@
   align-items: center;
   font-size: 15px;
   font-weight: 550;
-  color: #567843;
+  color: var(--color-accent-600);
 }
 .team-plan-heading > span {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: #96a687;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
 }
 .team-plan > p {
-  font-size: 14px;
+  font-size: var(--text-md);
   line-height: 1.9;
-  color: #768969;
+  color: var(--color-text-muted);
   margin: 12px 0 0;
   white-space: pre-wrap;
 }
@@ -100,12 +100,12 @@
   gap: 15px;
   align-items: center;
   margin-top: 20px;
-  border-top: 1px solid #e4ebd8;
+  border-top: 1px solid var(--color-accent-200);
   padding-top: 16px;
 }
 .team-plan-action > span {
-  font-size: 12px;
-  color: #8c9c7c;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
 }
 .team-plan-revisions {
   margin: 14px 0 0;
@@ -114,16 +114,16 @@
   gap: 10px;
 }
 .team-plan-revisions li {
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.8;
-  color: #768969;
+  color: var(--color-text-muted);
 }
 .team-plan-revisions strong {
-  color: #567843;
+  color: var(--color-accent-600);
   margin-right: 8px;
 }
 .team-plan-revisions li > span {
-  color: #96a687;
+  color: var(--color-text-muted);
 }
 .team-plan-revisions p {
   margin: 2px 0 0;
@@ -131,43 +131,43 @@
 }
 .team-plan-revisions b {
   font-weight: 550;
-  color: #6d8459;
+  color: var(--color-accent-600);
 }
 .team-plan-revise {
   margin-top: 16px;
-  border-top: 1px dashed #e4ebd8;
+  border-top: 1px dashed var(--color-accent-200);
   padding-top: 14px;
 }
 .team-plan-revise > label {
   display: block;
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 550;
-  color: #567843;
+  color: var(--color-accent-600);
 }
 .team-plan-revise > label small {
   display: block;
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 400;
   line-height: 1.8;
-  color: #8c9c7c;
+  color: var(--color-text-muted);
 }
 .team-plan-revise textarea {
   display: block;
   width: 100%;
   resize: vertical;
-  border: 1px solid #dfe9d3;
+  border: 1px solid var(--color-accent-200);
   border-radius: 5px;
   margin-top: 10px;
   padding: 9px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.8;
-  color: #5f7a4c;
-  background: white;
+  color: var(--color-accent-600);
+  background: var(--color-surface);
 }
 .team-plan-revise textarea:disabled {
-  background: #f6f8f1;
-  color: #a4b58f;
+  background: var(--color-surface-sunken);
+  color: var(--color-accent-600);
 }
 .team-plan-revise > div {
   display: flex;
@@ -177,8 +177,8 @@
   margin-top: 10px;
 }
 .team-plan-revise > div small {
-  font-size: 11px;
-  color: #96a687;
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
 }
 .team-plan-retry {
   display: flex;
@@ -187,21 +187,21 @@
   gap: 10px;
   margin-top: 14px;
   padding-top: 14px;
-  border-top: 1px dashed #dfe7d3;
+  border-top: 1px dashed var(--color-accent-200);
 }
 .team-plan-retry > span {
   flex-basis: 100%;
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.8;
-  color: #7c8f6c;
+  color: var(--color-accent-600);
 }
 .team-plan-retry > input {
   flex: 1 1 240px;
   min-width: 0;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--text-sm);
   padding: 8px 10px;
-  border: 1px solid #dfe7d3;
+  border: 1px solid var(--color-accent-200);
   border-radius: 6px;
 }
 .team-plan-retry > .inline-error {
@@ -219,42 +219,42 @@
 }
 .team-lane {
   min-width: 0;
-  background: #f0f3eb;
+  background: var(--color-surface-muted);
   padding: 12px;
   border-radius: 8px;
 }
 .team-lane > h3 {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 550;
-  color: #7b8f69;
+  color: var(--color-accent-600);
   padding: 4px 3px 14px;
 }
 .team-lane > h3 > span {
-  font-family: var(--mono);
-  color: #a3b293;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
 }
 .team-task {
   padding: 15px 13px;
-  border: 1px solid #dee7d3;
-  background: #fff;
+  border: 1px solid var(--color-accent-200);
+  background: var(--color-surface);
   border-radius: 7px;
   margin-bottom: 10px;
   min-width: 0;
 }
 .team-task.task-running {
-  border-color: #8eb378;
-  box-shadow: 0 0 0 2px #e5efdb;
+  border-color: var(--color-accent-500);
+  box-shadow: 0 0 0 2px var(--color-accent-100);
 }
 .team-task-label {
   display: flex;
   justify-content: space-between;
   gap: 5px;
-  font-size: 10px;
-  color: #8fa27c;
-  font-family: var(--mono);
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
+  font-family: var(--font-mono);
 }
 .team-task-label > span:last-child {
   display: flex;
@@ -263,39 +263,39 @@
   font-family: inherit;
 }
 .team-task h4 {
-  font-size: 14px;
+  font-size: var(--text-md);
   font-weight: 550;
   line-height: 1.7;
   margin: 13px 0 9px;
-  color: #53713f;
+  color: var(--color-accent-600);
 }
 .team-task > p {
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.9;
-  color: #8a9b7a;
+  color: var(--color-text-muted);
 }
 .team-task-owner {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 10px;
-  color: #95a882;
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
   margin-top: 16px;
   flex-wrap: wrap;
 }
 .team-task-owner > span {
   margin-left: auto;
-  font-size: 9px;
-  background: #f4f8ee;
+  font-size: var(--text-2xs);
+  background: var(--color-accent-50);
   padding: 2px 4px;
   border-radius: 3px;
 }
 .team-task-files {
   display: flex;
   gap: 6px;
-  font-family: var(--mono);
-  font-size: 10px;
-  color: #8ea578;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
   line-height: 1.8;
   margin-top: 10px;
 }
@@ -303,32 +303,32 @@
   overflow-wrap: anywhere;
 }
 .team-task-deps {
-  font-size: 10px;
-  color: #a2ad93;
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
   margin-top: 8px;
 }
 .team-lane-empty {
-  font-size: 12px;
-  color: #a4b395;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
   text-align: center;
   padding: 28px 6px;
 }
 .team-report-toggle {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   display: flex;
   align-items: center;
   gap: 5px;
-  color: #779c58;
+  color: var(--color-accent-600);
   margin-top: 14px;
   padding: 0;
 }
 .team-task-integrated {
-  color: #779c58;
+  color: var(--color-accent-600);
 }
 .team-task-checks {
   margin-top: 12px;
-  font-size: 11px;
-  color: #8ea578;
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
 }
 .team-task-checks > summary {
   cursor: pointer;
@@ -343,37 +343,35 @@
   display: flex;
   gap: 8px;
   align-items: baseline;
-  font-family: var(--mono);
-  font-size: 10px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
   line-height: 1.8;
   overflow-wrap: anywhere;
 }
 .team-task-checks code {
-  color: #4f6342;
-  background: #f2f6ec;
+  color: var(--color-accent-700);
+  background: var(--color-accent-50);
   border-radius: 4px;
   padding: 1px 5px;
 }
 .team-task-checks li > span {
-  color: #a1aa94;
+  color: var(--color-text-muted);
   white-space: nowrap;
 }
 .team-task-report {
-  font:
-    12px/1.9 "Noto Sans TC",
-    sans-serif;
+  font: var(--text-xs)/1.9 var(--font-sans);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 250px;
   overflow: auto;
-  color: #7c8f6c;
-  border-top: 1px solid #edf1e4;
+  color: var(--color-accent-600);
+  border-top: 1px solid var(--color-border-subtle);
   padding-top: 12px;
 }
 .team-mailbox {
-  border: 1px solid #e0e8d6;
+  border: 1px solid var(--color-accent-200);
   border-radius: 8px;
-  background: white;
+  background: var(--color-surface);
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -389,20 +387,20 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: var(--text-md);
   font-weight: 550;
-  color: #70885c;
+  color: var(--color-accent-600);
 }
 .team-mailbox-heading > span {
-  font: 11px var(--mono);
-  color: #a5b697;
+  font: var(--text-2xs) var(--font-mono);
+  color: var(--color-text-muted);
 }
 .team-delivery-note {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   line-height: 1.8;
-  color: #9eae8d;
+  color: var(--color-text-muted);
   padding: 0 17px 16px;
-  border-bottom: 1px solid #e9efdf;
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 .team-messages {
   padding: 18px 15px;
@@ -418,30 +416,30 @@
   display: flex;
   gap: 6px;
   align-items: center;
-  font-size: 10px;
-  color: #a0b18f;
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
   flex-wrap: wrap;
 }
 .team-message strong {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: #6c8d54;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
   font-weight: 500;
 }
 .team-message time {
   margin-left: auto;
-  font-family: var(--mono);
-  font-size: 9px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
 }
 .team-message p {
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.9;
   padding: 10px 11px;
-  background: #f5f8ef;
-  border: 1px solid #eaf0df;
+  background: var(--color-accent-50);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 6px;
   margin-top: 8px;
-  color: #7e946c;
+  color: var(--color-accent-600);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -449,58 +447,58 @@
   display: flex;
   align-items: center;
   gap: 3px;
-  font-size: 9px;
-  color: #acb99c;
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
   margin-top: 5px;
 }
 .team-message.from-user p {
-  background: #ecf4e5;
-  border-color: #dce9d1;
+  background: var(--color-accent-100);
+  border-color: var(--color-accent-200);
 }
 .team-messages-empty {
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.9;
-  color: #a4b396;
+  color: var(--color-text-muted);
   text-align: center;
   padding: 25px 5px;
 }
 .team-message-form {
-  border-top: 1px solid #e8eedf;
+  border-top: 1px solid var(--color-border-subtle);
   padding: 14px;
 }
 .team-message-form > label {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
-  color: #94a67d;
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
 }
 .team-message-form select {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   max-width: 200px;
   flex: 1;
   min-width: 0;
   padding: 5px;
-  border: 1px solid #e0ead5;
+  border: 1px solid var(--color-accent-200);
   border-radius: 4px;
-  color: #7c9666;
-  background: #f8fbf4;
+  color: var(--color-accent-600);
+  background: var(--color-surface-sunken);
 }
 .team-message-form textarea {
   display: block;
   width: 100%;
   resize: vertical;
-  border: 1px solid #dfe9d3;
+  border: 1px solid var(--color-accent-200);
   border-radius: 5px;
   margin-top: 10px;
   padding: 9px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.8;
-  color: #7c9467;
+  color: var(--color-accent-600);
   min-height: 90px;
 }
 .team-message-form textarea::placeholder {
-  color: #a9b996;
+  color: var(--color-text-muted);
 }
 .team-message-form > div {
   display: flex;
@@ -509,8 +507,8 @@
   margin-top: 8px;
 }
 .team-message-form small {
-  font-size: 9px;
-  color: #a4b58f;
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
 }
 .team-message-form .button {
   padding: 7px;
@@ -519,8 +517,8 @@
   display: flex;
   align-items: flex-start;
   gap: 7px;
-  font-size: 11px;
-  color: #9bae8a;
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
   line-height: 1.8;
   margin-top: 20px;
 }
@@ -529,9 +527,9 @@
   align-items: center;
   gap: 15px;
   padding: 25px;
-  color: #8a9e78;
-  background: #f6f9f0;
-  border-bottom: 1px solid #e7eedd;
+  color: var(--color-accent-600);
+  background: var(--color-accent-50);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 .team-legacy h3 {
   font-size: 15px;
@@ -539,7 +537,7 @@
   margin-bottom: 8px;
 }
 .team-legacy p {
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.9;
 }
 @media (max-width: 1250px) {
@@ -554,7 +552,7 @@
     padding: 17px 14px;
   }
   .team-flow > span {
-    font-size: 12px;
+    font-size: var(--text-xs);
   }
   .team-runtime-badge {
     display: none;
@@ -598,15 +596,15 @@
   .team-task-label,
   .team-task-owner,
   .team-task-files {
-    font-size: 12px;
+    font-size: var(--text-xs);
   }
   .team-plan > p {
-    font-size: 13px;
+    font-size: var(--text-sm);
   }
   .team-board-header p {
-    font-size: 13px;
+    font-size: var(--text-sm);
   }
   .team-message p {
-    font-size: 14px;
+    font-size: var(--text-md);
   }
 }
