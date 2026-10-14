@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useRef,
@@ -24,7 +26,6 @@ import { eulaVersion } from "../../shared/product";
 import type { ApiErrorBody } from "../../shared/errors";
 import { summarizeRun } from "../../shared/runs";
 import { api, ApiError, authRequiredEvent, send } from "../api";
-import { AboutDialog } from "../about/AboutDialog";
 import { Logo } from "../brand/Logo";
 import { getDemo } from "../demo";
 import { HomePage } from "../home/HomePage";
@@ -42,9 +43,8 @@ import {
 } from "../navigation/route";
 import { useProjectInsights } from "../mission/useProjectInsights";
 import { HelpModal } from "../modals/HelpModal";
-import { EulaPrompt } from "../onboarding/EulaPrompt";
 import { needsEulaPrompt, startView, type StartView } from "../onboarding/startView";
-import { Welcome, type WelcomeChoice } from "../onboarding/Welcome";
+import type { WelcomeChoice } from "../onboarding/Welcome";
 import { NewTaskModal } from "../modals/NewTaskModal";
 import { RunsModal } from "../modals/RunsModal";
 import { DiscoveryPage } from "../pages/DiscoveryPage";
@@ -97,6 +97,18 @@ export type Notify = (message: string, tone?: "success" | "error") => void;
 
 // Registered on load, before the first render can request a lazy chunk.
 listenForPreloadErrors();
+
+// Shown once (the first start), on request (About) or rarely (a new
+// license agreement), so they load on their own instead of with the app.
+const Welcome = lazy(() =>
+  import("../onboarding/Welcome").then((module) => ({ default: module.Welcome })),
+);
+const AboutDialog = lazy(() =>
+  import("../about/AboutDialog").then((module) => ({ default: module.AboutDialog })),
+);
+const EulaPrompt = lazy(() =>
+  import("../onboarding/EulaPrompt").then((module) => ({ default: module.EulaPrompt })),
+);
 
 export default function App() {
   return (
@@ -170,8 +182,8 @@ function AppRoot() {
     setView("shell");
   };
 
-  if (view === "pending")
-    return <div className="app-starting" aria-busy="true" />;
+  const starting = <div className="app-starting" aria-busy="true" />;
+  if (view === "pending") return starting;
   const sessionNotice = sessionEnded && (
     <SessionEndedNotice onDismiss={() => setSessionEnded(false)} />
   );
@@ -182,14 +194,16 @@ function AppRoot() {
         <div className="welcome-screen-logo">
           <Logo variant="wordmark" size={34} title="" />
         </div>
-        <Welcome
-          onFinish={finishWelcome}
-          settings={data.appSettings}
-          doctor={doctor}
-          status={data.status}
-          maskUser={presentation.maskUser}
-          maskPath={presentation.maskPath}
-        />
+        <Suspense fallback={starting}>
+          <Welcome
+            onFinish={finishWelcome}
+            settings={data.appSettings}
+            doctor={doctor}
+            status={data.status}
+            maskUser={presentation.maskUser}
+            maskPath={presentation.maskPath}
+          />
+        </Suspense>
       </main>
     );
   return (
@@ -1186,15 +1200,19 @@ function AppShell({
         <HelpModal closeModal={closeModal} openAbout={() => openModal("about")} />
       )}
       {aboutOpen && (
-        <AboutDialog
-          onClose={closeAbout}
-          license={entitlements.summary}
-          dataDir={typeof dataDir === "string" ? dataDir : undefined}
-          presenting={presentation.present}
-          maskUser={presentation.maskUser}
-          maskPath={presentation.maskPath}
-          serverVersion={status?.version}
-        />
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <AboutDialog
+              onClose={closeAbout}
+              license={entitlements.summary}
+              dataDir={typeof dataDir === "string" ? dataDir : undefined}
+              presenting={presentation.present}
+              maskUser={presentation.maskUser}
+              maskPath={presentation.maskPath}
+              serverVersion={status?.version}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
       {/* Mounted once: every 402 and locked control opens it. */}
       <UpgradeDialog summary={entitlements.summary} demo={presentation.play} />
@@ -1205,7 +1223,11 @@ function AppShell({
       {/* Outside the inert shell in the page, so it alone stays usable. */}
       {blocked &&
         createPortal(
-          <EulaPrompt onAccepted={(saved) => setAppSettings(saved.settings)} />,
+          <ErrorBoundary>
+            <Suspense fallback={null}>
+              <EulaPrompt onAccepted={(saved) => setAppSettings(saved.settings)} />
+            </Suspense>
+          </ErrorBoundary>,
           document.body,
         )}
     </div>

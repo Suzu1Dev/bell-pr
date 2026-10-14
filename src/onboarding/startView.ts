@@ -1,5 +1,5 @@
 import type { AppSettings } from "../../shared/app-settings";
-import { needsEulaAcceptance } from "./Welcome";
+import { needsEulaAcceptance } from "./eula";
 
 /** What the app shows first: nothing yet, the welcome flow or the app. */
 export type StartView = "pending" | "welcome" | "shell";

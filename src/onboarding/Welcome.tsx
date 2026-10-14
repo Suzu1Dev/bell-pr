@@ -31,15 +31,8 @@ import { SetupChecklist } from "../setup/SetupChecklist";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import "./onboarding.css";
 
-/**
- * Whether the person still has to accept the current license agreement:
- * never accepted, or accepted an older version (`eulaVersion` changed).
- */
-export function needsEulaAcceptance(
-  settings: Pick<AppSettings, "eulaAcceptedVersion"> | null | undefined,
-): boolean {
-  return settings?.eulaAcceptedVersion !== eulaVersion;
-}
+// In a module of its own, so the app can check it without loading Welcome.
+export { needsEulaAcceptance } from "./eula";
 
 /** Where the person chose to start; the app shell opens it. */
 export type WelcomeChoice = "tour" | "import" | "discover";
