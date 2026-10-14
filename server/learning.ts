@@ -301,6 +301,11 @@ export async function saveNote(
   });
 }
 
+/**
+ * Answers a question about one changed file. Unlike the run's background
+ * work, the mentor answers in the language of the person asking: the
+ * request's locale, not the run's.
+ */
 export async function chat(
   ctx: WorkbenchContext,
   id: string,

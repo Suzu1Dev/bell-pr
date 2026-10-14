@@ -33,6 +33,11 @@ export interface DraftOptions {
   startingDraft?: Run["draft"];
 }
 
+/**
+ * Starts the PR draft suggestion, or waits for the one running. A draft the
+ * person asks for follows the request's locale; the automatic one after the
+ * review runs in the run's locale, like the rest of executeRun.
+ */
 export async function prepareRunDraft(
   ctx: WorkbenchContext,
   id: string,
