@@ -273,19 +273,32 @@ export class ProjectInsightsCache {
     return this.generate(repoId, "analyze");
   }
 
+  /**
+   * "Generate 5 more" for the sample: its prewritten batch
+   * (`extraRecommendations`) joins the analysis once, as a
+   * recommendationExpansion, without a request.
+   */
+  addSampleBatch(): Promise<void> {
+    const repoId = "demo-repo";
+    const state = this.snapshot(repoId);
+    const sample = state.insights && sampleVariants.get(state.insights);
+    this.update(
+      repoId,
+      sample === false
+        ? {
+            insights: sampleInsights(getCurrentLocale(), true),
+            recommendationError: "",
+          }
+        : { recommendationError: messages().demoMore },
+    );
+    return Promise.resolve();
+  }
+
+  /** Asks the server for more recommendations; the sample has none to ask for. */
   recommendMore(repoId: string): Promise<void> {
     const pending = this.mutations.get(repoId);
     if (pending) return pending;
     const state = this.snapshot(repoId);
-    // The sample adds its prewritten batch once, without a request.
-    const sample = state.insights && sampleVariants.get(state.insights);
-    if (repoId === "demo-repo" && sample === false) {
-      this.update(repoId, {
-        insights: sampleInsights(getCurrentLocale(), true),
-        recommendationError: "",
-      });
-      return Promise.resolve();
-    }
     const error =
       repoId === "demo-repo" || state.insights?.source === "demo"
         ? messages().demoMore
@@ -427,7 +440,12 @@ export function useProjectInsights(repoId?: string) {
     return cache.analyze(repoId);
   }, [cache, repoId, playing]);
   const recommendMore = useCallback(
-    () => (repoId ? cache.recommendMore(repoId) : Promise.resolve()),
+    () =>
+      repoId === "demo-repo"
+        ? cache.addSampleBatch()
+        : repoId
+          ? cache.recommendMore(repoId)
+          : Promise.resolve(),
     [cache, repoId],
   );
 

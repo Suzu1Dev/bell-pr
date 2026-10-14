@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
-import { createElement } from "react";
+import { act, createElement } from "react";
 import type { Locale } from "../../shared/i18n/locale";
 import {
   maxProjectRecommendations,
@@ -16,6 +16,9 @@ import {
   useProjectInsights,
 } from "./useProjectInsights";
 import { sampleAnalysisState } from "./sample-analysis";
+import { mount } from "./test-dom";
+
+const realFetch = globalThis.fetch;
 
 afterEach(async () => {
   await setLocale("en");
@@ -67,8 +70,6 @@ async function cacheMessages() {
   );
   await cache.load("broken");
   await cache.analyze("demo-repo");
-  // The first click adds the sample's prewritten batch; the second has nothing left.
-  await cache.recommendMore("demo-repo");
   await cache.recommendMore("demo-repo");
   await cache.recommendMore("missing");
   for (const id of ["stale", "full", "fails", "rejected", "silent"])
@@ -157,7 +158,13 @@ test("Generate 5 more adds the sample's prewritten batch once, without a request
   const demo = getDemo("en");
   const extras = (demo.extraRecommendations ?? []).map((idea) => idea.id);
   assert.equal(extras.length, 5);
+  // The server path still refuses the sample, and asks nothing.
   await cache.recommendMore("demo-repo");
+  assert.equal(
+    cache.snapshot("demo-repo").recommendationError,
+    "Import a real project to generate more contribution recommendations.",
+  );
+  await cache.addSampleBatch();
   const expanded = cache.snapshot("demo-repo");
   assert.equal(expanded.recommendationError, "");
   assert.deepEqual(
@@ -171,7 +178,7 @@ test("Generate 5 more adds the sample's prewritten batch once, without a request
   });
   assert.equal(expanded.insights?.source, "demo");
   // A second click changes nothing and says why.
-  await cache.recommendMore("demo-repo");
+  await cache.addSampleBatch();
   assert.equal(cache.snapshot("demo-repo").insights, expanded.insights);
   assert.equal(
     cache.snapshot("demo-repo").recommendationError,
@@ -183,7 +190,7 @@ test("Generate 5 more adds the sample's prewritten batch once, without a request
 test("the sample's extra batch follows the UI language too", async () => {
   await setLocale("zh-TW");
   const cache = new ProjectInsightsCache();
-  await cache.recommendMore("demo-repo");
+  await cache.addSampleBatch();
   const written = cache.snapshot("demo-repo").insights;
   const zh = getDemo("zh-TW");
   assert.equal(written?.recommendations.at(-1)?.title, zh.extraRecommendations?.at(-1)?.title);
@@ -304,5 +311,30 @@ test("a sample analysis stopped while it plays shows on the next load", async ()
   // Outside playback mode the sample shows at once, as before.
   assert.equal(new ProjectInsightsCache().snapshot("demo-repo").insights, getDemo("en").insights);
   assert.deepEqual(requests, []);
+});
+
+test("the hook's Generate 5 more adds the sample's batch for the sample project", async () => {
+  const requests: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    requests.push(String(input));
+    return new Response("{}", { status: 500 });
+  }) as typeof fetch;
+  let latest: ReturnType<typeof useProjectInsights> | undefined;
+  function Probe() {
+    latest = useProjectInsights("demo-repo");
+    return createElement("output", null, latest.insights?.recommendations.length);
+  }
+  const view = await mount(createElement(Probe));
+  try {
+    const base = getDemo("en").insights.recommendations.length;
+    assert.equal(view.text(), String(base));
+    await act(() => latest!.recommendMore());
+    assert.equal(view.text(), String(base + 5));
+    assert.deepEqual(latest!.insights?.recommendationExpansion?.requestedCount, 5);
+    assert.deepEqual(requests, []);
+  } finally {
+    await view.unmount();
+    globalThis.fetch = realFetch;
+  }
 });
 
