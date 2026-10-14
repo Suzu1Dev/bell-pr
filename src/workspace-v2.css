@@ -264,6 +264,10 @@
     clip-path: inset(50%);
     width: 1px;
     height: 1px;
+    /* A padded badge (PRO) would keep a box larger than 1 px, and the
+       overflow check would read its hidden text as cut off. */
+    padding: 0;
+    border: 0;
     overflow: hidden;
     white-space: nowrap;
   }
