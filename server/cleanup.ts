@@ -18,6 +18,7 @@ import { activeFollowUp } from "../shared/followups.js";
 import { managedClone } from "./repositories.js";
 import { runBusy } from "./sync-runs.js";
 import { log } from "./log.js";
+import { redact } from "./secrets.js";
 import { sm } from "./i18n/index.js";
 import type { WorkbenchContext } from "./workbench.js";
 
@@ -476,7 +477,8 @@ function invalidateStorageReport(ctx: WorkbenchContext) {
 
 /**
  * Disk use per project and per run, from one asynchronous walk of the data
- * directory, cached for 60 seconds. Paths are not included.
+ * directory, cached for 60 seconds. Paths are not included, and secrets in
+ * run titles are masked.
  */
 export function storageReport(ctx: WorkbenchContext): Promise<StorageReport> {
   const cached = reports.get(ctx.store.directory);
@@ -497,7 +499,7 @@ async function buildStorageReport(ctx: WorkbenchContext): Promise<StorageReport>
       return {
         id: run.id,
         repoId: run.repoId,
-        title: run.title,
+        title: redact(run.title),
         status: run.status,
         createdAt: run.createdAt,
         bytes: run.workspaceRemovedAt

@@ -472,7 +472,10 @@ test("storage and diagnostics report sizes, versions and logs without tokens, th
   const clonePath = path.join(f.dataDir, "repositories", "octo-person-example-0a1b2c3d");
   const baseSha = await gitRepository(clonePath, "https://github.com/octo-person/example.git");
   const repo = await f.workbench.importRepository(clonePath);
-  const value = await runWithWorkspace(f, repo, baseSha, "abababab-7777-4777-8777-777777777777");
+  // A title is the person's text and may hold a pasted secret.
+  const value = await runWithWorkspace(f, repo, baseSha, "abababab-7777-4777-8777-777777777777", {
+    title: `Rotate ${token} in the example`,
+  });
   // Log lines that carry everything diagnostics must not leak.
   log.warn("probe.leaky", {
     token,
@@ -496,6 +499,7 @@ test("storage and diagnostics report sizes, versions and logs without tokens, th
   assert.equal(measured.id, value.id);
   assert.ok(measured.bytes > 0);
   assert.equal(measured.removable, true);
+  assert.ok(measured.title.startsWith("Rotate ") && !measured.title.includes(token));
   // The repository's full name is the project's, not a path or a secret.
   assertShareable(storage.text.replaceAll(repo.fullName, "owner/name"), f, login);
   // Cached for a minute, measured again after a cleanup.
