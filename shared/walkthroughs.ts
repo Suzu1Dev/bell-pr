@@ -39,6 +39,11 @@ export interface FunctionWalkthrough {
 
 export interface FileWalkthrough {
   functions: FunctionWalkthrough[];
+  /**
+   * Units the diff adds whole: they have no earlier logic to read, so the
+   * change explanation covers them. Absent on walkthroughs made before this.
+   */
+  newUnits?: string[];
 }
 
 /** Cached per diff version, like change explanations; regenerated when the fingerprint changes. */

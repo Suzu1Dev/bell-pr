@@ -167,6 +167,15 @@ test("the contribution brief shows the premise verdict and labels what still sta
   assert.equal(refuted.match(/依你的假設，查證後不成立/g)?.length, 2);
   assert.match(refuted, /若此假設成立，候選人重新整理後就無法開始面試。/);
   assert.match(refuted, /上面依假設描述的問題與影響實際上不會發生/);
+  // A check can be made again; the button appears only with the action.
+  assert.doesNotMatch(refuted, /重新查核前提/);
+  const recheck = render({
+    run: { ...base, team: { ...team, premise: { verdict: "refuted", statement: "s", evidence: "e:1" } } },
+    brief,
+    onCheckPremise() {},
+  });
+  assert.match(recheck, /重新查核前提/);
+  assert.doesNotMatch(recheck, /依審查結果查核前提/);
 
   // A run made before premise checks offers one; without the action, nothing is offered.
   const missing = render({ run: { ...base, team }, brief, onCheckPremise() {} });

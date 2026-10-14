@@ -1725,3 +1725,14 @@
   line-height: 1.75;
   color: #5d6e55;
 }
+.mission-premise-recheck {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin: -8px 0 18px;
+}
+.mission-premise-recheck small {
+  color: #66735c;
+  font-size: 11px;
+}

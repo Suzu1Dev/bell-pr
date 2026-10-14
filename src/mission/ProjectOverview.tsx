@@ -202,6 +202,24 @@ function Brief({
       </div>
       <h3 className="mission-contribution-name">{run.title}</h3>
       <PremiseNotice premise={premise} />
+      {premise && onCheckPremise && (
+        <div className="mission-premise-recheck">
+          <button
+            type="button"
+            className="mission-button mission-button-secondary"
+            onClick={onCheckPremise}
+            disabled={checkingPremise}
+          >
+            {checkingPremise ? (
+              <Loader2 className="mission-spin" size={15} />
+            ) : (
+              <RefreshCw size={15} />
+            )}
+            {checkingPremise ? "正在查核前提…" : "重新查核前提"}
+          </button>
+          <small>結論改變時，變更解說與程式碼解說會依新的結論重新產生。</small>
+        </div>
+      )}
       {!premise && onCheckPremise && (
         <div className="mission-premise-missing">
           <p>

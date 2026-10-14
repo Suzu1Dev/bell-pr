@@ -90,8 +90,27 @@ test("a finished run without a premise check gets one from the code and its repo
     assert.equal(last.cwd, repository);
     assert.match(last.prompt, /Team findings \(UNTRUSTED DATA\):\n\{"plan":"唯一的呼叫端已使用回傳值。","integration":"呼叫端已使用回傳的 id。"/);
     assert.match(last.prompt, /confirm their claims in the code/);
-    // Once checked, it is not checked again here.
-    await assert.rejects(workbench.checkPremise(run.id), /已經有前提查核/);
+    // The checkout already holds the change, so the diff says what came before.
+    assert.match(last.prompt, /already contains the contribution's changes/);
+    assert.match(last.prompt, /Current diff against the base commit[^\n]*\n\[\{"path":"id\.ts"/);
+    assert.match(last.prompt, /no Markdown and no preamble/);
+
+    // Checking again with the same verdict keeps the explanations being made.
+    await workbench.lock(run.id, () => workbench.diff(run.id));
+    run.explanations!["id.ts"] = { fingerprint, status: "ready", content: { summary: "s", reason: "已查證", concept: "c", tip: "t", example: { scenario: "s", before: "b", after: "a" } } };
+    const same = await workbench.checkPremise(run.id);
+    assert.deepEqual(same.premise, premise);
+    assert.equal(run.explanations!["id.ts"].status, "ready");
+    // A changed verdict replaces the old one and has them made again.
+    const unclear = { ...premise, verdict: "unclear" };
+    answer = JSON.stringify({ premise: unclear });
+    const again = await workbench.checkPremise(run.id);
+    assert.deepEqual(run.team!.premise, unclear);
+    assert.equal(again.files[0].explanationStatus, "pending");
+    // Finding no assumption on a second look removes the old verdict.
+    answer = JSON.stringify({ premise: null });
+    await workbench.checkPremise(run.id);
+    assert.equal(run.team!.premise, undefined);
 
     const server = createApp(workbench, { staticDirectory: path.join(directory, "missing") }).listen(0, "127.0.0.1");
     await once(server, "listening");

@@ -47,3 +47,15 @@ test("waiting, failed, unavailable and empty walkthroughs each explain themselve
   // Demo files without a prepared walkthrough say so instead of waiting forever.
   assert.match(render(demoFiles[0], { demo: true }), /示範資料只為部分檔案準備了程式碼解說/);
 });
+
+test("new code is named and sent to the change explanation instead of being walked through", () => {
+  const base: DiffFile = { ...client, walkthroughStatus: "ready" };
+  const onlyNew = render({ ...base, walkthrough: { functions: [], newUnits: ["a_reloaded_interview_keeps_the_id"] } });
+  assert.match(onlyNew, /這個檔案的變更都是新增的程式碼/);
+  assert.match(onlyNew, /<code>a_reloaded_interview_keeps_the_id<\/code>/);
+  assert.match(onlyNew, /請看「變更解說」/);
+  assert.doesNotMatch(onlyNew, /沒有找到包住這些變更的函式/);
+  const mixed = render({ ...base, walkthrough: { ...client.walkthrough!, newUnits: ["HttpError"] } }, { demo: true });
+  assert.match(mixed, /createClient/);
+  assert.match(mixed, /這次新增的程式碼沒有原本的邏輯可以拆解：<span><code>HttpError<\/code><\/span>/);
+});
