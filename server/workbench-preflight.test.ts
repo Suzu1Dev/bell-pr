@@ -72,7 +72,7 @@ async function standIns(
     (await readFile(calls, "utf8").catch(() => "")).split("\n").filter(Boolean);
 }
 
-test("an import accepts owner/repo and clones GitHub without past file contents", async (t) => {
+test("an import accepts owner/repo and clones GitHub in full", async (t) => {
   const f = await temporary(t);
   const calls = await standIns(f, {
     // No network: every clone fails after it is recorded.
