@@ -710,7 +710,6 @@ function AppShell({
     source,
     setSource,
     beginContribution,
-    configureContributionModels,
     chooseRecommendation,
     chooseOpportunity,
   } = setup;
@@ -1149,8 +1148,6 @@ function AppShell({
               status={status}
               setStatus={setStatus}
               setApiError={setApiError}
-              notify={notify}
-              configureContributionModels={configureContributionModels}
               setTab={setTab}
               navigate={navigate}
               doctor={doctor}
