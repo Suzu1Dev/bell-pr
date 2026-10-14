@@ -666,7 +666,11 @@ export class ProjectInsightsService {
     this.scale = dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
     this.defaultProvider =
       dependencies.defaultProvider ??
-      (async () => defaultProviderFrom(await knownDoctorReport(store.directory)));
+      (async () =>
+        // The last results as they are: reading settings never waits for a probe.
+        defaultProviderFrom(
+          await knownDoctorReport(store.directory, { stale: true }),
+        ));
     let registered = services.get(store);
     if (!registered) services.set(store, (registered = new Set()));
     registered.add(this);

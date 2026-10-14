@@ -380,6 +380,9 @@ test("probes are cached for 10 seconds and shared; force probes again; the wordi
   assert.ok(await knownDoctorReport(dataDir));
   await runDoctor({ dataDir, force: true });
   assert.equal((await f.calls()).length, probes * 2, "force probes again");
+  // The last results as they are, without a probe.
+  assert.deepEqual(statuses((await knownDoctorReport(dataDir, { stale: true }))!), statuses(first));
+  assert.equal((await f.calls()).length, probes * 2);
 });
 
 test("a data directory that cannot be written fails the required check", { skip: process.getuid?.() === 0 }, async (t) => {

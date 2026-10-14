@@ -848,7 +848,10 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
     entry = { time: Date.now(), facts: probe(exec, opts.dataDir) };
     cache.set(key, entry);
   }
-  const facts = await entry.facts;
+  return reportFrom(await entry.facts, opts);
+}
+
+async function reportFrom(facts: Facts, opts: DoctorOptions) {
   const provider =
     opts.provider ?? (opts.dataDir ? await savedProvider(opts.dataDir) : undefined);
   return buildReport(facts, {
@@ -860,15 +863,18 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
 
 /**
  * The doctor's report for `dataDir`, but only when the doctor already ran
- * for it in this process (the UI asks for the status as it loads); results
- * older than 10 seconds are probed again. Undefined otherwise, so services
- * can refuse work early without starting CLI probes of their own.
+ * for it in this process (the UI asks for the status as it loads).
+ * Undefined otherwise, so services can refuse work early without starting
+ * CLI probes of their own. Results older than 10 seconds are probed again,
+ * unless `stale` accepts the last ones as they are.
  */
 export async function knownDoctorReport(
   dataDir?: string,
+  options: { stale?: boolean } = {},
 ): Promise<DoctorReport | undefined> {
-  if (!cacheFor(command).has(cacheKey(dataDir))) return undefined;
-  return runDoctor({ dataDir });
+  const entry = cacheFor(command).get(cacheKey(dataDir));
+  if (!entry) return undefined;
+  return options.stale ? reportFrom(await entry.facts, { dataDir }) : runDoctor({ dataDir });
 }
 
 /** The default provider the report suggests: Claude Code when it is the only one ready. */
