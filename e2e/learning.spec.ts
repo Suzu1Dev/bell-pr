@@ -2,7 +2,8 @@
 // page by page from GET /api/learning.
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
-import { expect, test, type Request } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test, type Page, type Request } from "@playwright/test";
 import { splitConceptHeading } from "../shared/explanations";
 import { getDemo } from "../src/demo";
 import learning from "../src/i18n/en/learning";
@@ -62,6 +63,18 @@ function seededRun(index: number, dataDir: string) {
   };
 }
 
+/** Serious and critical axe issues on the page, color contrast included. */
+async function axeProblems(page: Page) {
+  const { violations } = await new AxeBuilder({ page })
+    .options({ rules: { "color-contrast": { enabled: true } } })
+    .analyze();
+  return violations
+    .filter((violation) => violation.impact === "serious" || violation.impact === "critical")
+    .flatMap((violation) =>
+      violation.nodes.map((node) => `${violation.id} at ${node.target.join(" ")}`),
+    );
+}
+
 test("the learning page shows the sample notes", async ({ page }) => {
   await page.goto("/#/learning?locale=en");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(learning.title);
@@ -75,6 +88,7 @@ test("the learning page shows the sample notes", async ({ page }) => {
     await expect(sample.getByRole("heading", { name: heading || file.path })).toBeVisible();
   }
   await expect(page.getByText(learning.aiNote)).toBeVisible();
+  expect(await axeProblems(page)).toEqual([]);
 });
 
 test("seeded notes load from /api/learning, 20 contributions at a time", async ({ browser }) => {
@@ -158,6 +172,8 @@ test("seeded notes load from /api/learning, 20 contributions at a time", async (
     await expect(oldest.locator(".learning-own-note")).toContainText(
       "My own note on the oldest run.",
     );
+
+    expect(await axeProblems(page)).toEqual([]);
 
     // The filters work on every page read so far.
     await page.getByPlaceholder(learning.keywordPlaceholder).fill("Seeded concept 1");
