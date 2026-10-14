@@ -40,7 +40,7 @@ const m: Translation<typeof en> = {
   },
   project: {
     sourceDemo: "示範分析",
-    sourceAi: "AI 專案分析",
+    sourceAi: "AI 生成的專案分析",
     audience: "主要使用者",
     updatedAt: ({ date }) => `更新於 ${date}`,
     version: "版本",
@@ -67,6 +67,14 @@ const m: Translation<typeof en> = {
     reading: "從哪裡讀起",
     contribution: "這次貢獻",
     directions: "貢獻方向",
+  },
+  languages: {
+    en: "英文",
+    "zh-TW": "繁體中文",
+  },
+  localeNotice: {
+    analyzedIn: ({ language }) => `這份分析以${language}撰寫。`,
+    reanalyze: ({ language }) => `改用${language}重新分析`,
   },
   journey: {
     kicker: "THE USER JOURNEY",
@@ -123,6 +131,7 @@ const m: Translation<typeof en> = {
     kicker: "WHERE YOU CAN HELP",
     title: "值得探索的貢獻方向",
     lead: "先看問題與使用者價值，再決定要不要交給團隊。",
+    aiGenerated: "AI 生成",
     sampleCount: ({ count }) => `${n(count)} 個示範`,
     recommendationCount: ({ count }) => `${n(count)} 個建議`,
     more: ({ count }) => `產出 ${n(count)} 個新建議`,

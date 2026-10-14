@@ -6,7 +6,7 @@
  * they can pick the singular or plural noun.
  */
 import type { PonytailMode } from "../../../shared/efficiency";
-import { formatters } from "../../../shared/i18n/locale";
+import { formatters, type Locale } from "../../../shared/i18n/locale";
 import type {
   ContributionDirection,
   ContributionRecommendation,
@@ -65,7 +65,7 @@ const mission = {
   },
   project: {
     sourceDemo: "Sample analysis",
-    sourceAi: "AI project analysis",
+    sourceAi: "AI-generated analysis",
     audience: "Main users",
     /** `date` arrives formatted for the locale. */
     updatedAt: ({ date }: { date: string }) => `Updated ${date}`,
@@ -122,6 +122,16 @@ const mission = {
     reading: "Where to start reading",
     contribution: "This contribution",
     directions: "Directions",
+  },
+  /** Language names, in the UI language. */
+  languages: {
+    en: "English",
+    "zh-TW": "Traditional Chinese",
+  } satisfies Record<Locale, string>,
+  /** An analysis written in another language than the UI's. */
+  localeNotice: {
+    analyzedIn: ({ language }: { language: string }) => `Analyzed in ${language}.`,
+    reanalyze: ({ language }: { language: string }) => `Re-analyze in ${language}`,
   },
   journey: {
     kicker: "THE USER JOURNEY",
@@ -183,6 +193,8 @@ const mission = {
     kicker: "WHERE YOU CAN HELP",
     title: "Contribution directions worth exploring",
     lead: "Look at the problem and its value to users first, then decide whether to hand it to the team.",
+    /** Marks the recommendations as written by AI. */
+    aiGenerated: "AI-generated",
     sampleCount: ({ count }: { count: number }) =>
       amount(count, "sample", "samples"),
     recommendationCount: ({ count }: { count: number }) =>

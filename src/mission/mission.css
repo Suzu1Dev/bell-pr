@@ -143,6 +143,11 @@
   background: var(--color-danger-bg);
   border-color: var(--color-danger-border);
 }
+.mission-alert-info {
+  color: var(--color-info);
+  background: var(--color-info-bg);
+  border-color: var(--color-info-border);
+}
 .mission-alert > span {
   flex: 1;
 }

@@ -582,3 +582,36 @@ test("the reading path opens on its first two steps, with a button that shows th
   assert.match(render({ insights: { ...demoInsights, readingPath } }), />顯示全部 4 步/);
 });
 
+test("an AI analysis and its recommendations are labelled AI-generated; the sample is not", () => {
+  const html = renderEnglish();
+  assert.match(html, /<span class="mission-source"><svg[^>]*>.*?<\/svg>AI-generated analysis<\/span>/);
+  assert.match(html, /<span class="mission-source"><svg[^>]*>.*?<\/svg>AI-generated<\/span><span class="mission-ideas-count">3 recommendations<\/span>/);
+  const sample = renderEnglish({ insights: getDemo("en").insights });
+  assert.doesNotMatch(sample, /AI-generated/);
+  assert.match(sample, /Sample analysis/);
+  assert.match(render({ insights: analyzed }), /AI 生成的專案分析/);
+});
+
+test("an analysis in another language than the UI offers to analyze again in the UI's", () => {
+  const html = renderEnglish({ insights: { ...englishInsights, locale: "zh-TW" } });
+  assertNoHan(html);
+  assert.match(
+    html,
+    /<div class="mission-alert mission-alert-info" role="status"><svg[^>]*>.*?<\/svg><span>Analyzed in Traditional Chinese\.<\/span><button type="button">Re-analyze in English<svg/,
+  );
+  assert.match(
+    renderEnglish({ insights: { ...englishInsights, locale: "zh-TW" }, loading: true }),
+    /<button type="button" disabled="">Re-analyze in English/,
+  );
+  // The same language, an unknown one (older caches) and the sample need nothing.
+  for (const insights of [
+    { ...englishInsights, locale: "en" as const },
+    englishInsights,
+    { ...getDemo("en").insights, locale: "zh-TW" as const },
+  ])
+    assert.doesNotMatch(renderEnglish({ insights }), /Analyzed in|Re-analyze in/);
+  const zh = render({ insights: { ...analyzed, locale: "en" } });
+  assert.match(zh, /這份分析以英文撰寫。/);
+  assert.match(zh, />改用繁體中文重新分析</);
+});
+

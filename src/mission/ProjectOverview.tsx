@@ -14,6 +14,7 @@ import {
   FolderTree,
   GitBranch,
   GripVertical,
+  Languages,
   Lightbulb,
   Loader2,
   RefreshCw,
@@ -405,6 +406,12 @@ export function ProjectOverview({
   const fmt = useFormat();
   const [locale] = useLocale();
   const demo = insights?.source === "demo";
+  // An analysis written in another language than the UI's offers to be
+  // written again in the UI's; the sample follows the UI by itself.
+  const analysisLocale =
+    insights?.locale && insights.locale !== locale && !demo
+      ? insights.locale
+      : undefined;
   // The sample's analysis in playback mode: its loading lines so far.
   const sampleAnalysis = useSampleAnalysis();
   const analysisSteps =
@@ -919,6 +926,24 @@ export function ProjectOverview({
           <span>{staleNotice(t, fmt, insights.baseSha, staleDetail)}</span>
         </div>
       )}
+      {analysisLocale && (
+        <div className="mission-alert mission-alert-info" role="status">
+          <Languages size={15} aria-hidden="true" />
+          <span>
+            {t.localeNotice.analyzedIn({
+              language: t.languages[analysisLocale],
+            })}
+          </span>
+          <button
+            type="button"
+            onClick={onAnalyze}
+            disabled={loading || recommending || savingPreferences || updatingRepo}
+          >
+            {t.localeNotice.reanalyze({ language: t.languages[locale] })}
+            <RefreshCw size={13} aria-hidden="true" />
+          </button>
+        </div>
+      )}
 
       {!insights ? (
         <section className="mission-overview-empty" aria-busy={loading}>
@@ -1089,6 +1114,12 @@ export function ProjectOverview({
               <p>{t.ideas.lead}</p>
             </div>
             <div className="mission-ideas-actions">
+              {insights.source === "ai" && (
+                <span className="mission-source">
+                  <Sparkles size={12} aria-hidden="true" />
+                  {t.ideas.aiGenerated}
+                </span>
+              )}
               <span className="mission-ideas-count">
                 {insights.source === "demo"
                   ? t.ideas.sampleCount({
