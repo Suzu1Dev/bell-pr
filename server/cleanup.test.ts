@@ -555,8 +555,12 @@ test("storage and diagnostics report sizes, versions and logs without tokens, th
   assert.ok(measured.title.startsWith("Rotate ") && !measured.title.includes(token));
   // The repository's full name is the project's, not a path or a secret.
   assertShareable(storage.text.replaceAll(repo.fullName, "owner/name"), f, login);
-  // Cached for a minute, measured again after a cleanup.
+  // Cached for a minute, measured again on request and after a cleanup.
   assert.deepEqual((await f.call("GET", "/api/storage")).body, storage.body);
+  await writeFile(path.join(f.dataDir, "measure-again.bin"), Buffer.alloc(64 * 1024));
+  assert.deepEqual((await f.call("GET", "/api/storage")).body, storage.body);
+  const remeasured = (await f.call("GET", "/api/storage?refresh=1")).body;
+  assert.ok(remeasured.totalBytes >= storage.body.totalBytes + 64 * 1024);
   await f.call("DELETE", `/api/runs/${value.id}/workspace`, {});
   const after = (await f.call("GET", "/api/storage")).body;
   assert.equal(after.runs[0].bytes, 0);

@@ -927,9 +927,9 @@ export class Workbench {
     return result;
   }
 
-  /** Disk use per project and run (cleanup.ts), cached for a minute. */
-  async storage() {
-    return cleanup.storageReport(this.context);
+  /** Disk use per project and run (cleanup.ts), cached for a minute unless `refresh`. */
+  async storage(options: { refresh?: boolean } = {}) {
+    return cleanup.storageReport(this.context, options);
   }
 
   async shutdown() {

@@ -341,6 +341,19 @@ test("only the environment section probes again, and its Re-check updates the re
   await expect(page.locator(".readiness-not-ready")).toHaveCount(0);
 });
 
+test("Measure again walks the data directory again instead of reading the cached report", async ({ page }) => {
+  await page.goto("/#/settings/data");
+  const again = panel(page).getByRole("button", { name: settings.data.storage.refresh });
+  await expect(again).toBeEnabled();
+  const measured = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return url.pathname === "/api/storage" && url.searchParams.get("refresh") === "1";
+  });
+  await again.click();
+  expect((await measured).ok()).toBe(true);
+  await expect(again).toBeEnabled();
+});
+
 test("the privacy link opens the privacy policy that ships with the app", async ({ page }) => {
   await page.goto("/#/settings/data");
   const link = panel(page).getByRole("link", { name: settings.data.privacy.link });

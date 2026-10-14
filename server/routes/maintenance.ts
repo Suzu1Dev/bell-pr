@@ -150,8 +150,12 @@ export function registerMaintenanceRoutes(app: Express, deps: RouteDeps) {
       throw new AppError((m) => m.storage.erase.busy, 409);
     res.json(await workbench.eraseAll(confirm));
   });
-  app.get("/api/storage", async (_req, res) => {
-    res.json(await workbench.storage());
+  // ?refresh=1 measures again instead of answering the minute-old report.
+  app.get("/api/storage", async (req, res) => {
+    const refresh = String(req.query.refresh ?? "");
+    res.json(
+      await workbench.storage({ refresh: refresh === "1" || refresh === "true" }),
+    );
   });
   app.get("/api/diagnostics", async (_req, res) => {
     res.json(await diagnostics(deps));

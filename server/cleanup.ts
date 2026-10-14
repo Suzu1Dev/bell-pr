@@ -501,12 +501,16 @@ function invalidateStorageReport(ctx: WorkbenchContext) {
 
 /**
  * Disk use per project and per run, from one asynchronous walk of the data
- * directory, cached for 60 seconds. Paths are not included, and secrets in
- * run titles are masked.
+ * directory, cached for 60 seconds unless `refresh` asks for a new walk
+ * (Settings, "Measure again"). Paths are not included, and secrets in run
+ * titles are masked.
  */
-export function storageReport(ctx: WorkbenchContext): Promise<StorageReport> {
+export function storageReport(
+  ctx: WorkbenchContext,
+  { refresh = false }: { refresh?: boolean } = {},
+): Promise<StorageReport> {
   const cached = reports.get(ctx.store.directory);
-  if (cached && Date.now() - cached.time < 60_000) return cached.report;
+  if (!refresh && cached && Date.now() - cached.time < 60_000) return cached.report;
   const report = buildStorageReport(ctx);
   reports.set(ctx.store.directory, { time: Date.now(), report });
   report.catch(() => invalidateStorageReport(ctx));

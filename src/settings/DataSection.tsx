@@ -481,11 +481,13 @@ export function DataSection({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const loads = useRef(0);
-  const load = useCallback(async () => {
+  // The first load may take the server's minute-old report; "Measure
+  // again" and a freed run ask for a new walk.
+  const load = useCallback(async (refresh = false) => {
     const request = ++loads.current;
     setLoading(true);
     try {
-      const next = await api<StorageReport>("/storage");
+      const next = await api<StorageReport>(refresh ? "/storage?refresh=1" : "/storage");
       if (request !== loads.current) return;
       setReport(next);
       setError("");
@@ -513,7 +515,7 @@ export function DataSection({
         report={report}
         error={error}
         loading={loading}
-        reload={() => void load()}
+        reload={() => void load(true)}
       />
       <SettingsGroup title={t.data.retention.title} className="settings-retention-group">
         {view ? (
