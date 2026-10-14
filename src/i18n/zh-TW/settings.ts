@@ -19,7 +19,7 @@ const m: Translation<typeof en> = {
   authorizeHint: "在終端機完成授權",
   general: {
     title: "一般",
-    text: "介面的語言，也是之後新產生內容使用的語言；已經產生的內容不會翻譯。",
+    text: "介面的語言，也是之後新的貢獻、專案分析與問答使用的語言；已開始的貢獻沿用開始時的語言，已經產生的內容不會翻譯。",
     language: "語言",
   },
   codex: {

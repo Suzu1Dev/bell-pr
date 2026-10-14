@@ -22,7 +22,7 @@ const settings = {
   authorizeHint: "Authorize from a terminal",
   general: {
     title: "General",
-    text: "The language of the interface and of text generated from now on. Text that already exists is not translated.",
+    text: "The language of the interface, and of new contributions, analyses and answers to your questions. A contribution that already started keeps working in the language it started in, and existing text is not translated.",
     language: "Language",
   },
   codex: {
