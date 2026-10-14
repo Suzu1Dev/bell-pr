@@ -4,7 +4,8 @@ import {
   splitConceptHeading,
   type ChangeExplanation,
 } from "../../shared/explanations";
-import { demoRepo, demoRun } from "../demo";
+import { getDemo } from "../demo";
+import { useFormat, useLocale, useT } from "../i18n";
 import type { DiffFile, Repo, RunSummary } from "../types";
 import "./learning.css";
 
@@ -35,14 +36,6 @@ export interface LearningNotesProps {
   defaultKeyword?: string;
   defaultRunId?: string;
 }
-
-const formatDate = (value?: string) =>
-  value
-    ? new Date(value).toLocaleString("zh-TW", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
-    : "未記錄";
 
 /** Flattens every stored explanation that is ready, newest first. */
 export function collectLearningNotes(runs: RunSummary[], repos: Repo[]): LearningNote[] {
@@ -90,30 +83,38 @@ function NoteCard({
   demo: boolean;
   onOpen: LearningNotesProps["onOpen"];
 }) {
+  const t = useT("learning");
+  const fmt = useFormat();
   const { heading, body } = splitConceptHeading(note.explanation.concept);
   return (
     <article className="note-card">
       <span className="note-number">{note.repoName}</span>
-      <div className="note-tag">{demo ? "示範" : note.runTitle}</div>
+      <div className="note-tag">{demo ? t.demoTag : note.runTitle}</div>
       <h2>{heading || note.path}</h2>
       <Suspense fallback={<p>{body}</p>}>
         <MarkdownContent>{body}</MarkdownContent>
       </Suspense>
       <div className="learning-note-tip">
-        <strong>提示</strong>
+        <strong>{t.tip}</strong>
         <Suspense fallback={<p>{note.explanation.tip}</p>}>
           <MarkdownContent>{note.explanation.tip}</MarkdownContent>
         </Suspense>
       </div>
       <code>{note.path}</code>
       <dl className="learning-note-meta">
-        <dt>任務</dt>
+        <dt>{t.noteRun}</dt>
         <dd>{note.runTitle}</dd>
-        <dt>產生時間</dt>
-        <dd>{demo ? "示範內容" : formatDate(note.generatedAt)}</dd>
+        <dt>{t.generatedAt}</dt>
+        <dd>
+          {demo
+            ? t.sampleContent
+            : note.generatedAt
+              ? fmt.dateTime(note.generatedAt)
+              : t.notRecorded}
+        </dd>
       </dl>
       <button type="button" onClick={() => onOpen(note.runId, note.path)}>
-        回到程式碼理解它 <ArrowUpRight size={15} />
+        {t.openInCode} <ArrowUpRight size={15} />
       </button>
     </article>
   );
@@ -127,9 +128,12 @@ export function LearningNotes({
   defaultKeyword = "",
   defaultRunId = "",
 }: LearningNotesProps) {
+  const t = useT("learning");
+  const [locale] = useLocale();
   const [keyword, setKeyword] = useState(defaultKeyword);
   const [runId, setRunId] = useState(defaultRunId);
   const notes = useMemo(() => collectLearningNotes(runs, repos), [runs, repos]);
+  const { run: demoRun, repo: demoRepo } = getDemo(locale);
   const demoNotes = useMemo<LearningNote[]>(
     () =>
       demoFiles
@@ -141,7 +145,7 @@ export function LearningNotes({
           path: file.path,
           explanation: file.explanation!,
         })),
-    [demoFiles],
+    [demoFiles, demoRun, demoRepo],
   );
   const needle = keyword.trim().toLowerCase();
   const visible = notes.filter(
@@ -159,30 +163,28 @@ export function LearningNotes({
     <>
       <div className="page-title">
         <div>
-          <span className="eyebrow">LEARN BY CONTRIBUTING</span>
-          <h1 tabIndex={-1}>讓看懂的程式碼，成為你的經驗。</h1>
-          <p>
-            每個任務審查時產生的解說都會留在這裡，可以跨任務回顧同一個觀念。
-          </p>
+          <span className="eyebrow">{t.eyebrow}</span>
+          <h1 tabIndex={-1}>{t.title}</h1>
+          <p>{t.intro}</p>
         </div>
       </div>
       <div className="learning-filters">
         <label>
-          <span>關鍵字</span>
+          <span>{t.keyword}</span>
           <input
             type="search"
             value={keyword}
-            placeholder="搜尋觀念、提示、檔案或任務"
+            placeholder={t.keywordPlaceholder}
             onChange={(event) => setKeyword(event.target.value)}
           />
         </label>
         <label>
-          <span>任務</span>
+          <span>{t.run}</span>
           <select
             value={runId}
             onChange={(event) => setRunId(event.target.value)}
           >
-            <option value="">全部任務</option>
+            <option value="">{t.allRuns}</option>
             {runOptions.map((run) => (
               <option key={run.id} value={run.id}>
                 {run.title}
@@ -192,21 +194,19 @@ export function LearningNotes({
         </label>
         <span className="learning-count" aria-live="polite">
           {notes.length
-            ? `${visible.length} / ${notes.length} 則筆記`
-            : "尚無真實任務的筆記"}
+            ? t.noteCount({ visible: visible.length, total: notes.length })
+            : t.noRealNotes}
         </span>
       </div>
       {notes.length === 0 ? (
         <div className="learning-empty">
           <BookOpen size={28} />
-          <h2>還沒有屬於你的學習筆記</h2>
-          <p>
-            先在「Repositories」頁匯入 repository 並建立任務；進入審查後，每個檔案的解說會自動彙整到這裡。
-          </p>
+          <h2>{t.emptyTitle}</h2>
+          <p>{t.emptyBody}</p>
         </div>
       ) : visible.length === 0 ? (
         <div className="learning-empty">
-          <p>沒有符合篩選條件的筆記。</p>
+          <p>{t.noMatches}</p>
         </div>
       ) : (
         <div className="learning-grid">
@@ -223,10 +223,10 @@ export function LearningNotes({
       {visibleDemo.length > 0 && (
         <section className="learning-demo" aria-labelledby="learning-demo-title">
           <h2 id="learning-demo-title">
-            示範筆記
-            <span className="learning-demo-label">示範</span>
+            {t.demoTitle}
+            <span className="learning-demo-label">{t.demoTag}</span>
           </h2>
-          <p>來自內建示範任務的解說，用來預覽真實筆記的樣子。</p>
+          <p>{t.demoIntro}</p>
           <div className="learning-grid">
             {visibleDemo.map((note) => (
               <NoteCard key={note.path} note={note} demo onOpen={onOpen} />
