@@ -65,5 +65,6 @@ export function getSampleDiscoveryJob(locale: Locale): DiscoveryJob {
       };
     }),
     warnings: [...copy.warnings],
+    sample: true,
   };
 }

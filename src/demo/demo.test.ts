@@ -288,6 +288,8 @@ test("the demo timeline runs forward from the analysis to the draft check", () =
 test("the sample discovery job holds together like a live result", () => {
   for (const locale of locales) {
     const job = getSampleDiscoveryJob(locale);
+    // Marks the built-in sample, whose candidates and sources have no links.
+    assert.equal(job.sample, true);
     assert.equal(job.status, "ready");
     assert.equal(job.phase, "complete");
     assert.ok(job.message && job.preferences.interests && job.warnings.length);
