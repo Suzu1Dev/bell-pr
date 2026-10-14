@@ -4,7 +4,8 @@
  * Git "Name <e-mail>"), so it is masked whole. A row with a problem keeps
  * its explanation, and only the e-mail addresses the check names (the
  * address Git guessed, the suggested no-reply address) are masked, in the
- * detail and in the fix commands.
+ * detail and in the fix commands, and so are the absolute paths in it
+ * (a broken CLI's error can name a file in the home folder).
  */
 import type { DoctorCheck, DoctorCheckId } from "../../shared/doctor";
 
@@ -36,13 +37,23 @@ export function maskCheckValues(
   return masked;
 }
 
-/** The detail to show for `check`, masked by `maskUser`. */
+/**
+ * Absolute paths inside a sentence: POSIX, home-relative and Windows
+ * drive paths, but not URLs or words such as "and/or".
+ */
+const absolutePaths = /(?<![\w.~:/\\-])(?:~?\/|[A-Za-z]:\\)[^\s"'`<>|;,()[\]{}]+/g;
+
+/** The detail to show for `check`, masked by `maskUser` and `maskPath`. */
 export function maskedDetail(
   check: DoctorCheck,
   maskUser: (value: string) => string,
+  maskPath: (value: string) => string = (value) => value,
 ): string | undefined {
   if (!check.detail) return check.detail;
   if (check.status === "ok" && userDetails.includes(check.id))
     return maskUser(check.detail);
-  return maskCheckValues(check.detail, [check], maskUser);
+  return maskCheckValues(check.detail, [check], maskUser).replace(
+    absolutePaths,
+    (path) => maskPath(path),
+  );
 }

@@ -57,17 +57,19 @@ function ProviderCard({
   provider,
   report,
   maskUser,
+  maskPath,
 }: {
   provider: AgentProvider;
   report: DoctorReport | null;
   maskUser: (value: string) => string;
+  maskPath: (value: string) => string;
 }) {
   const t = useT("settings");
   const labels = useT("setup").checklist.labels;
   const { state, tool, auth } = providerState(report, provider);
   // The account when it works; why it does not when the CLI fails.
   const shown = state === "ready" ? auth : state === "notWorking" ? tool : undefined;
-  const detail = shown ? maskedDetail(shown, maskUser) : undefined;
+  const detail = shown ? maskedDetail(shown, maskUser, maskPath) : undefined;
   const fixing: DoctorCheck[] =
     state === "missing" || state === "notWorking"
       ? [tool, auth].filter((check): check is DoctorCheck => !!check)
@@ -244,10 +246,13 @@ function ModelSettingsForm({
 export function ProviderSection({
   doctor,
   maskUser,
+  maskPath,
   showCurrentRun,
 }: {
   doctor: DoctorState;
   maskUser: (value: string) => string;
+  /** Masks the paths a broken CLI's error may name. */
+  maskPath: (value: string) => string;
   /** Opens the workspace's activity tab, which lists the open run's models. */
   showCurrentRun: () => void;
 }) {
@@ -298,6 +303,7 @@ export function ProviderSection({
             provider={provider}
             report={report}
             maskUser={maskUser}
+            maskPath={maskPath}
           />
         ))}
       </div>

@@ -42,7 +42,7 @@ export interface SetupChecklistProps {
    * and their fix commands.
    */
   maskUser?: (value: string) => string;
-  /** Masks the data directory's path. */
+  /** Masks the data directory's path and the paths in check details. */
   maskPath?: (value: string) => string;
   /**
    * "full" lists every check; "summary" says whether everything is ready
@@ -96,7 +96,7 @@ export function SetupChecklist({
 
   const row = (check: DoctorCheck) => {
     const label = t.labels[check.id];
-    const detail = maskedDetail(check, maskUser);
+    const detail = maskedDetail(check, maskUser, maskPath);
     const folder =
       check.id === "data-dir" && typeof check.params?.path === "string"
         ? maskPath(check.params.path)

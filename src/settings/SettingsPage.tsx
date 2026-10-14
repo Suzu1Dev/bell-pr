@@ -117,7 +117,12 @@ export function SettingsPage({
   switch (section) {
     case "provider":
       content = (
-        <ProviderSection doctor={doctor} maskUser={maskUser} showCurrentRun={showCurrentRun} />
+        <ProviderSection
+          doctor={doctor}
+          maskUser={maskUser}
+          maskPath={maskPath}
+          showCurrentRun={showCurrentRun}
+        />
       );
       break;
     case "safety":

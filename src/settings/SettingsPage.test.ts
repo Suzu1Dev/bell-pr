@@ -450,6 +450,25 @@ test("while presenting, no section shows the login, the account, the licensee or
     renderEn(createElement(EnvironmentSection, { doctor: doctor(report), refresh() {}, ...plain })),
     /Connected as real-user/,
   );
+  // A broken CLI's error loses the folders of the paths it names.
+  const broken = {
+    ...report,
+    checks: report.checks.map((value) =>
+      value.id === "codex"
+        ? check({
+            id: "codex",
+            status: "warn",
+            reason: "broken",
+            detail: "Installed, but `codex --version` failed: Cannot find module '/home/real-user/.nvm/codex.js'",
+          })
+        : value,
+    ),
+  };
+  const provider = renderEn(
+    createElement(ProviderSection, { doctor: doctor(broken), ...presenting, showCurrentRun() {} }),
+  );
+  assert.doesNotMatch(provider, /\/home\/|real-user/);
+  assert.match(provider, /Cannot find module &#x27;…\/codex\.js&#x27;/);
 });
 
 test("Data & privacy has the data directory, storage, retention, erasing and the privacy summary", () => {

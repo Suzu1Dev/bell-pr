@@ -5,6 +5,7 @@ import type { DoctorCheck, DoctorReport } from "../../shared/doctor";
 import { chooseLocale, saveLocale } from "../i18n/LanguageSwitcher";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { CopyCommand } from "./CopyCommand";
+import { maskedDetail } from "./mask";
 import { ReadinessNotice, readinessOf } from "./ReadinessNotice";
 import { SetupChecklist } from "./SetupChecklist";
 import { requiredCheckFails, type DoctorState } from "./useDoctor";
@@ -174,6 +175,51 @@ test("a Git identity problem keeps its words, and only the e-mail addresses are 
   // Outside presentations the command is the real one.
   const plain = renderEn(createElement(SetupChecklist, { report: identity(missing) }));
   assert.match(plain, /583231\+octocat@users\.noreply\.github\.com/);
+});
+
+test("a problem's detail keeps its words, and its absolute paths are masked in presentations", () => {
+  const broken = check({
+    id: "codex",
+    status: "warn",
+    reason: "broken",
+    detail:
+      "Installed, but `codex --version` failed: Error: Cannot find module '/home/octo/.nvm/versions/node/v22/lib/codex.js' (see ~/.codex/log or C:\\Users\\octo\\codex.log).",
+  });
+  const hide = (value: string) => `…/${value.split(/[\\/]/).pop()}`;
+  assert.equal(
+    maskedDetail(broken, mask.maskUser, hide),
+    "Installed, but `codex --version` failed: Error: Cannot find module '…/codex.js' (see …/log or …/codex.log).",
+  );
+  // Without a path masker, and for words, URLs and fractions, nothing changes.
+  assert.equal(maskedDetail(broken, mask.maskUser), broken.detail);
+  const words = check({
+    id: "gh",
+    status: "warn",
+    reason: "broken",
+    detail: "Read https://cli.github.com/manual and/or retry 1/2 times.",
+  });
+  assert.equal(maskedDetail(words, mask.maskUser, hide), words.detail);
+  // The checklist and the readiness notice mask the same way.
+  const report: DoctorReport = {
+    ...notReady,
+    checks: notReady.checks.map((entry) => (entry.id === "codex" ? broken : entry)),
+  };
+  const html = renderEn(createElement(SetupChecklist, { report, maskUser: mask.maskUser, maskPath: hide }));
+  assert.doesNotMatch(html, /\/home\/octo|~\/\.codex|Users/);
+  assert.match(html, /Cannot find module &#x27;…\/codex\.js&#x27;/);
+  const brokenGh = { ...broken, id: "gh" as const, detail: broken.detail!.replaceAll("codex", "gh") };
+  const notice = renderEn(
+    createElement(ReadinessNotice, {
+      requires: ["gh"],
+      doctor: doctor({
+        ...notReady,
+        checks: notReady.checks.map((entry) => (entry.id === "gh" ? brokenGh : entry)),
+      }),
+      maskPath: hide,
+    }),
+  );
+  assert.match(notice, /GitHub CLI: Installed, but `gh --version` failed: Error: Cannot find module &#x27;…\/gh\.js&#x27;/);
+  assert.doesNotMatch(notice, /\/home\/octo/);
 });
 
 test("the summary says what a failing optional check blocks, and it is not called ready without a word", () => {
