@@ -1,8 +1,30 @@
-import { ExternalLink, GitCommitHorizontal, Undo2 } from "lucide-react";
+import {
+  CircleCheck,
+  CircleStop,
+  CircleX,
+  Clock3,
+  ExternalLink,
+  GitCommitHorizontal,
+  LoaderCircle,
+  MessagesSquare,
+  Undo2,
+  type LucideIcon,
+} from "lucide-react";
 import type { FollowUpRound } from "../../shared/followups";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
 import { useFormat, useT } from "../i18n";
 import { rich } from "./rich";
+import "./rounds.css";
+
+/** Each status's icon; the chip always says the status in words too. */
+const statusIcons: Record<FollowUpRound["status"], LucideIcon> = {
+  running: LoaderCircle,
+  review: Clock3,
+  published: CircleCheck,
+  failed: CircleX,
+  cancelled: CircleStop,
+  discarded: Undo2,
+};
 
 interface Props {
   rounds: FollowUpRound[];
@@ -46,23 +68,34 @@ export function FollowUpRounds({
     );
   return (
     <section className="follow-up-rounds" aria-labelledby="follow-up-rounds-title">
-      <h2 id="follow-up-rounds-title">{t.title}</h2>
+      <h2 id="follow-up-rounds-title">
+        <MessagesSquare size={16} aria-hidden="true" />
+        {t.title}
+      </h2>
       <p>{t.intro}</p>
       <ol>
         {[...rounds].reverse().map((round) => {
           const number = rounds.indexOf(round) + 1;
+          const StatusIcon = statusIcons[round.status];
           return (
             <li key={round.id} className={`is-${round.status}`}>
               <div className="follow-up-round-head">
-                <strong>
+                <h3>
                   {t.round({ number })}
                   {round.adopted
                     ? ` · ${t.adopted}`
                     : round.kind === "sync"
                       ? ` · ${t.syncRound}`
                       : ""}
-                </strong>
-                <span className="follow-up-status">{t.status[round.status]}</span>
+                </h3>
+                <span className={`follow-up-status is-${round.status}`}>
+                  <StatusIcon
+                    size={12}
+                    aria-hidden="true"
+                    className={round.status === "running" ? "spin" : undefined}
+                  />
+                  {t.status[round.status]}
+                </span>
                 <time dateTime={round.requestedAt}>
                   {fmt.dateTime(round.requestedAt)}
                 </time>

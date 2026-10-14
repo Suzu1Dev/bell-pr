@@ -16,6 +16,12 @@ const m: Translation<typeof en> = {
     demo: "團隊協作示範",
     engine: ({ provider }) => `${provider} · ${product.name} 協作引擎`,
     capacity: ({ count }) => `最多 ${count} 位成員同時工作`,
+    planLimit: {
+      free: ({ count }) => `Free 方案：最多 ${count} 位成員同時工作`,
+      trial: ({ count }) => `Pro 試用：最多 ${count} 位成員同時工作`,
+      pro: ({ count }) => `Pro：最多 ${count} 位成員同時工作`,
+    },
+    keptSize: "這個任務沿用開始時的團隊人數。",
   },
   flow: {
     plan: "Lead 規劃",
@@ -24,6 +30,7 @@ const m: Translation<typeof en> = {
     parallel: "Teammates 並行",
     integrate: "整合與審查",
   },
+  queued: "等待開始",
   phase: {
     planning: "Lead 正在規劃",
     awaiting_approval: "等待你確認開發計畫",
@@ -36,7 +43,9 @@ const m: Translation<typeof en> = {
   },
   progress: ({ done, total }) => `${done} / ${total} 子任務完成`,
   plan: {
+    queued: "任務正在排隊；輪到執行時，Lead 會立即開始規劃。",
     replanning: "Lead 正依你的意見重新規劃。",
+    none: "Lead 完成計畫前，團隊就已停止。",
     reading: "正在閱讀專案並建立有明確範圍與相依關係的計畫。",
   },
   revisions: {
@@ -78,9 +87,12 @@ const m: Translation<typeof en> = {
     done: "已完成",
   },
   laneEmpty: {
+    todo: "目前沒有等待中的子任務",
     running: "目前沒有正在執行的子任務",
-    other: "目前沒有任務",
+    done: "還沒有完成的子任務",
   },
+  laneEmptyPlanning: "Lead 的計畫完成後，子任務會出現在這裡。",
+  laneEmptyAwaiting: "你確認計畫後，子任務才會開始。",
   task: {
     worktree: "獨立 worktree",
     worktreeRemoved: "獨立 worktree 已清理",
@@ -112,6 +124,7 @@ const m: Translation<typeof en> = {
     teamLead: "Team lead",
     closedRecipient: ({ name }) => `${name}（已停止收件）`,
     messageLabel: "團隊訊息",
+    messagesLabel: "團隊訊息列表",
     finishedPlaceholder: "此團隊已結束，可在程式碼閱讀區追問。",
     placeholder: "例如：請保留目前的 API 相容性…",
     demoHint: "示範訊息僅保留在畫面",
@@ -119,6 +132,12 @@ const m: Translation<typeof en> = {
     send: "傳送團隊訊息",
     unavailable: "這個任務已停止收件，請選擇 Lead 或其他成員。",
   },
+  runDetails: {
+    title: "執行細節",
+    hint: "模型、推理強度與 AI 用量",
+    calls: ({ count }) => `${count} 次 AI 呼叫`,
+  },
+  howItWorks: "運作方式",
   protocolNote: ({ provider }) =>
     `${product.name} 使用共享任務、獨立工作目錄及回合間訊息協作。這是由 ${provider} 逐回合驅動的 ${product.name} 實作，並非 Claude Code 原生 Agent Teams。`,
 };

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import type { EfficiencyMetrics } from "../../shared/efficiency";
+import {
+  ponytailSource,
+  ponytailVersion,
+  type EfficiencyMetrics,
+} from "../../shared/efficiency";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { EfficiencySummary, groupByRole } from "./EfficiencySummary";
 
@@ -72,7 +76,7 @@ test("measured calls render zh-TW formatted tokens and summed time", () => {
   assert.match(html, /<dd>1,234<\/dd>/);
   assert.match(html, /12\.3 秒/);
   assert.match(html, /用量回報 2 \/ 2/);
-  assert.match(html, /Ponytail · 輕量/);
+  assert.match(html, /效率模式：輕量/);
 });
 
 test("calls without reported usage show 未回報 instead of zero", () => {
@@ -105,8 +109,7 @@ test("English renders format tokens, seconds and the usage note", () => {
   const html = renderEnglish({ metrics });
   assert.match(html, /aria-label="Team AI usage"/);
   assert.match(html, /<strong>Team AI usage<\/strong>/);
-  assert.match(html, /Ponytail · Lite/);
-  assert.match(html, /title="Ponytail \d+\.\d+\.\d+ upstream project"/);
+  assert.match(html, /<summary title="The efficiency modes build on Ponytail \d+\.\d+\.\d+ by DietrichGebert \(MIT license\)\.[^"]*">Efficiency mode: Lean<svg/);
   assert.match(html, /<dt>Input tokens<\/dt><dd>123,456<\/dd>/);
   assert.match(html, /<dt>Of which cached<\/dt><dd>7,890<\/dd>/);
   assert.match(html, /<dt>Output tokens<\/dt><dd>1,234<\/dd>/);
@@ -160,7 +163,7 @@ test("English sample and unmeasured runs report no measurement", () => {
     /No measurements yet\. The sample did not call AI\./,
   );
   const off = renderEnglish({ mode: "off" });
-  assert.match(off, /Ponytail · Off/);
+  assert.match(off, /Efficiency mode: Off/);
   assert.match(off, /No measurements yet\. Reported usage and time appear/);
 });
 
@@ -176,4 +179,38 @@ test("groupByRole orders the known roles by id and puts unknown keys last", () =
     rows.map((row) => row.key),
     ["member", "tester", "sync", "alpha", "zeta"],
   );
+});
+
+test("the mode chip reads Efficiency mode and opens the Ponytail credit and link", () => {
+  const html = renderEnglish({ metrics });
+  // The user-facing name is the efficiency mode; Ponytail is credited, not the label.
+  assert.doesNotMatch(html, /Ponytail ·/);
+  assert.match(
+    html,
+    new RegExp(
+      `<details class="efficiency-mode"><summary title="[^"]+">Efficiency mode: Lean<svg[\\s\\S]*?</svg></summary><div class="efficiency-credit" role="note" tabindex="-1"><p>The efficiency modes build on Ponytail ${ponytailVersion} by DietrichGebert \\(MIT license\\)\\. Lean gives the agents a short adaptation of its principles, Full gives them its complete rules, and Off adds neither\\.</p><a href="${ponytailSource}" target="_blank" rel="noreferrer">Ponytail upstream project<svg`,
+    ),
+  );
+  assert.match(renderEnglish({ mode: "full" }), /Efficiency mode: Full/);
+  // Without a recorded mode there is no chip and no credit.
+  assert.doesNotMatch(renderEnglish({}), /efficiency-mode|Ponytail/);
+  assert.match(render({ metrics }), /Ponytail \d+\.\d+\.\d+（MIT 授權）/);
+});
+
+test("without measured calls the summary folds into one line, and the sample is marked", () => {
+  assert.match(renderEnglish({ mode: "lite" }), /<section class="efficiency-summary is-empty"/);
+  assert.match(renderEnglish({ metrics }), /<section class="efficiency-summary "/);
+  const sample = renderEnglish({ metrics, mode: "lite", demo: true });
+  assert.match(sample, /<section class="efficiency-summary is-empty"/);
+  assert.match(sample, /<strong>Team AI usage<\/strong><\/span><span class="efficiency-sample">Sample<\/span>/);
+  assert.doesNotMatch(renderEnglish({ metrics }), /efficiency-sample/);
+  assert.match(render({ demo: true }), /class="efficiency-sample">示範</);
+});
+
+test("follow-up and sync calls have their own rows", () => {
+  const html = renderEnglish({
+    metrics: { ...metrics, byRole: { followup: byRole.custom, sync: byRole.custom } },
+  });
+  assert.match(html, /<th scope="row">Review fixes<\/th>/);
+  assert.match(html, /<th scope="row">Conflict resolution<\/th>/);
 });

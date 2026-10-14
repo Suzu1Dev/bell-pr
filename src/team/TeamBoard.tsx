@@ -9,6 +9,7 @@ import {
   Clock3,
   GitBranch,
   GitMerge,
+  Info,
   Layers3,
   ListChecks,
   Loader2,
@@ -18,17 +19,34 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react";
+import type { Entitlements } from "../../shared/plans";
 import {
   maxPlanRevisions,
+  type AgentTeam,
   type TeamTask,
 } from "../../shared/team";
 import type { Run } from "../types";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
 import { useFormat, useT } from "../i18n";
+import { useEntitlements } from "../license/useEntitlements";
 import { ModelSummary } from "../models/ModelSummary";
 import { providerLabels } from "../../shared/models";
-import { teamLanes } from "./lanes";
+import { teamLanes, type TeamLaneId } from "./lanes";
 import "./team.css";
+
+/** No status to start from: useEntitlements then reads the license. */
+const readLicense = {};
+
+/** The step of the team flow a phase belongs to; none once the team is done. */
+const flowSteps: Partial<
+  Record<AgentTeam["phase"], "plan" | "approve" | "parallel" | "integrate">
+> = {
+  planning: "plan",
+  awaiting_approval: "approve",
+  developing: "parallel",
+  integrating: "integrate",
+  reviewing: "integrate",
+};
 
 export function TeamBoard({
   run,
@@ -38,19 +56,30 @@ export function TeamBoard({
   onMessage,
   onRetry,
   busy,
+  entitlements,
 }: {
   run: Run;
   demo: boolean;
+  /** Approves the plan; in the demo, the playback's approvePlan. */
   onApprove: () => void;
   /** Sends the plan back to the lead with feedback; rejects with the server's message. */
   onRevise: (feedback: string) => Promise<void>;
   onMessage: (to: string, content: string) => Promise<void>;
   onRetry?: (message: string) => Promise<void>;
   busy: boolean;
+  /**
+   * The plan's limits, for "up to N members at once"; read from the license
+   * when not given. The demo shows its sample team without a plan limit.
+   */
+  entitlements?: Entitlements;
 }) {
   const t = useT("team");
   const taskLabels = useT("common").teamTaskStatus;
   const fmt = useFormat();
+  const license = useEntitlements(
+    demo || entitlements || !run.team ? undefined : readLicense,
+  );
+  const plan = demo ? undefined : (entitlements ?? license.entitlements);
   const [recipient, setRecipient] = useState("all");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -99,6 +128,36 @@ export function TeamBoard({
   const retriedCount = team.tasks.filter((task) =>
     ["failed", "blocked"].includes(task.status),
   ).length;
+  const queued = run.status === "queued";
+  const working = ["planning", "developing", "integrating", "reviewing"].includes(
+    team.phase,
+  );
+  const currentStep = queued ? undefined : flowSteps[team.phase];
+  const step = (id: NonNullable<typeof currentStep>) =>
+    currentStep === id
+      ? { className: "is-current", "aria-current": "step" as const }
+      : {};
+  // Empty-lane messages follow the lane id and the phase, never a label.
+  const emptyLane = (id: TeamLaneId) =>
+    id === "todo" && team.phase === "planning"
+      ? t.laneEmptyPlanning
+      : id === "running" && team.phase === "awaiting_approval"
+        ? t.laneEmptyAwaiting
+        : t.laneEmpty[id];
+  // Folded so the board stays in the first screen; the summary line names
+  // what the run recorded.
+  const execution = demo ? undefined : run.modelExecution;
+  const calls = demo ? 0 : (run.efficiency?.calls ?? 0);
+  const detailFacts = [
+    execution &&
+      [
+        providerLabels[execution.provider ?? team.config.provider],
+        execution.reported?.model ?? execution.model,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    calls > 0 && t.runDetails.calls({ count: calls }),
+  ].filter(Boolean);
   return (
     <section className="team-board" aria-label={t.boardLabel}>
       <div className="team-board-header">
@@ -118,35 +177,54 @@ export function TeamBoard({
             <small>
               {t.runtime.capacity({ count: team.config.maxTeammates })}
             </small>
+            {plan && (
+              <small className="team-plan-limit">
+                {t.runtime.planLimit[plan.plan]({ count: plan.maxTeammates })}
+              </small>
+            )}
+            {plan && team.config.maxTeammates > plan.maxTeammates && (
+              <small className="team-plan-limit">{t.runtime.keptSize}</small>
+            )}
           </span>
         </div>
       </div>
-      <ModelSummary execution={run.modelExecution} demo={demo} />
-      <EfficiencySummary
-        metrics={run.efficiency}
-        mode={run.contributionSettings?.ponytailMode}
-        demo={demo}
-      />
+      <details className="team-run-details">
+        <summary>
+          <strong>{t.runDetails.title}</strong>
+          <span>
+            {detailFacts.length ? detailFacts.join(" · ") : t.runDetails.hint}
+          </span>
+          <ChevronDown size={15} aria-hidden="true" />
+        </summary>
+        <div className="team-run-details-body">
+          <ModelSummary execution={run.modelExecution} demo={demo} />
+          <EfficiencySummary
+            metrics={run.efficiency}
+            mode={run.contributionSettings?.ponytailMode}
+            demo={demo}
+          />
+        </div>
+      </details>
       <div className="team-flow">
-        <span>
-          <ListChecks size={18} />
+        <span {...step("plan")}>
+          <ListChecks size={18} aria-hidden="true" />
           {t.flow.plan}
         </span>
         <i />
-        <span>
-          <ShieldCheck size={18} />
+        <span {...step("approve")}>
+          <ShieldCheck size={18} aria-hidden="true" />
           {team.config.requirePlanApproval
             ? t.flow.approve
             : t.flow.autoApprove}
         </span>
         <i />
-        <span>
-          <Users size={18} />
+        <span {...step("parallel")}>
+          <Users size={18} aria-hidden="true" />
           {t.flow.parallel}
         </span>
         <i />
-        <span>
-          <GitMerge size={18} />
+        <span {...step("integrate")}>
+          <GitMerge size={18} aria-hidden="true" />
           {t.flow.integrate}
         </span>
       </div>
@@ -155,14 +233,26 @@ export function TeamBoard({
       >
         <div className="team-plan-heading">
           <h3>
-            <Layers3 size={18} />
-            {t.phase[team.phase]}
+            {working && !queued ? (
+              <Loader2 size={18} className="spin" aria-hidden="true" />
+            ) : (
+              <Layers3 size={18} aria-hidden="true" />
+            )}
+            {queued ? t.queued : t.phase[team.phase]}
           </h3>
-          <span>{t.progress({ done, total: team.tasks.length })}</span>
+          {team.tasks.length > 0 && (
+            <span>{t.progress({ done, total: team.tasks.length })}</span>
+          )}
         </div>
         <p>
           {team.planSummary ||
-            (revisions.length ? t.plan.replanning : t.plan.reading)}
+            (queued
+              ? t.plan.queued
+              : ["failed", "cancelled"].includes(team.phase)
+                ? t.plan.none
+                : revisions.length
+                  ? t.plan.replanning
+                  : t.plan.reading)}
         </p>
         {revisions.length > 0 && (
           <ol className="team-plan-revisions" aria-label={t.revisions.label}>
@@ -326,9 +416,14 @@ export function TeamBoard({
         )}
       </div>
       <div className="team-board-content">
-        <div className="team-kanban">
+        <div
+          className={`team-kanban ${team.tasks.length ? "has-tasks" : ""}`}
+        >
           {teamLanes.map((group) => (
-            <section className="team-lane" key={group.id}>
+            <section
+              className={`team-lane ${team.tasks.some((task) => group.states.includes(task.status)) ? "" : "is-empty"}`}
+              key={group.id}
+            >
               <h3>
                 {t.lanes[group.id]}
                 <span>
@@ -439,11 +534,7 @@ export function TeamBoard({
               {!team.tasks.some((task) =>
                 group.states.includes(task.status),
               ) && (
-                <div className="team-lane-empty">
-                  {group.id === "running"
-                    ? t.laneEmpty.running
-                    : t.laneEmpty.other}
-                </div>
+                <div className="team-lane-empty">{emptyLane(group.id)}</div>
               )}
             </section>
           ))}
@@ -467,7 +558,14 @@ export function TeamBoard({
                   : t.mailbox.delivery.lead
                 : t.mailbox.delivery.members}
           </p>
-          <div className="team-messages" aria-live="polite">
+          {/* Scrolls on small screens, so it takes focus for keyboard scrolling. */}
+          <div
+            className="team-messages"
+            role="log"
+            aria-live="polite"
+            aria-label={t.mailbox.messagesLabel}
+            tabIndex={0}
+          >
             {team.messages.map((item) => (
               <article
                 key={item.id}
@@ -592,10 +690,17 @@ export function TeamBoard({
           </form>
         </aside>
       </div>
-      <p className="team-protocol-note">
-        <ShieldCheck size={14} />
-        {t.protocolNote({ provider: providerLabels[team.config.provider] })}
-      </p>
+      <details className="team-how">
+        <summary>
+          <Info size={14} aria-hidden="true" />
+          {t.howItWorks}
+          <ChevronDown size={14} aria-hidden="true" />
+        </summary>
+        <p className="team-protocol-note">
+          <ShieldCheck size={14} aria-hidden="true" />
+          {t.protocolNote({ provider: providerLabels[team.config.provider] })}
+        </p>
+      </details>
     </section>
   );
 }

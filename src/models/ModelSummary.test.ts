@@ -5,7 +5,7 @@ import { reasoningEfforts } from "../../shared/models";
 import en from "../i18n/en";
 import zhTW from "../i18n/zh-TW";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
-import { ModelSummary, reasoningLabels } from "./ModelSummary";
+import { ModelSummary } from "./ModelSummary";
 
 type Props = Parameters<typeof ModelSummary>[0];
 
@@ -142,9 +142,16 @@ test("English analysis, sample and unrecorded summaries", () => {
   assert.match(renderEnglish({}), /This older run did not record its model\./);
 });
 
-test("the deprecated reasoningLabels alias is the English common labels", () => {
-  assert.equal(reasoningLabels, en.common.reasoningEffort);
-  assert.equal(reasoningLabels.xhigh, "Extra high");
+test("the sample carries a Sample chip; real summaries do not", () => {
+  assert.match(
+    renderEnglish({ demo: true }),
+    /<strong>Run model<\/strong><span class="model-summary-sample">Sample<\/span><\/div>/,
+  );
+  assert.match(render({ demo: true }), /class="model-summary-sample">示範</);
+  assert.doesNotMatch(
+    renderEnglish({ execution: { source: "cli-default" } }),
+    /model-summary-sample/,
+  );
 });
 
 test("an effort shows its CLI id only where the label does not already read as it", () => {

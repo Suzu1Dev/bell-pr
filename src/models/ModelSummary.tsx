@@ -1,22 +1,7 @@
 import { Cpu } from "lucide-react";
-import {
-  providerLabels,
-  type ModelExecution,
-  type ReasoningEffort,
-} from "../../shared/models";
+import { providerLabels, type ModelExecution } from "../../shared/models";
 import { useFormat, useT } from "../i18n";
-import enCommon from "../i18n/en/common";
 import "./models.css";
-
-/**
- * English reasoning-effort labels.
- *
- * @deprecated Read `useT("common").reasoningEffort`, which follows the UI
- * locale. This alias only keeps older importers compiling; remove it once
- * nothing imports it.
- */
-export const reasoningLabels: Record<ReasoningEffort, string> =
-  enCommon.reasoningEffort;
 
 export function ModelSummary({
   execution,
@@ -61,6 +46,7 @@ export function ModelSummary({
       <div className="model-summary-heading">
         <Cpu size={16} aria-hidden="true" />
         <strong>{t.heading[kind]}</strong>
+        {demo && <span className="model-summary-sample">{t.sampleChip}</span>}
       </div>
       {demo ? (
         <p>{t.sample}</p>

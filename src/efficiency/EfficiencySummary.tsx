@@ -1,4 +1,5 @@
-import { Gauge, ArrowUpRight } from "lucide-react";
+import { useRef } from "react";
+import { Gauge, ArrowUpRight, Info } from "lucide-react";
 import {
   ponytailSource,
   ponytailVersion,
@@ -55,6 +56,11 @@ export function groupByRole(byRole: Record<string, RoleEfficiency>) {
     .map(([key, entry]) => ({ key, ...entry }));
 }
 
+/**
+ * The efficiency mode and the provider-reported AI usage of a run, an
+ * analysis or a discovery. Without measured calls it folds into one line.
+ * The mode chip opens the credit to Ponytail, which the modes build on.
+ */
 export function EfficiencySummary({
   metrics,
   mode,
@@ -79,27 +85,56 @@ export function EfficiencySummary({
   const roleLabel = (key: string) =>
     Object.hasOwn(t.roles, key) ? t.roles[key as RoleGroup] : key;
   const rows = data?.byRole ? groupByRole(data.byRole) : [];
+  const credit = t.credit.text({ version: ponytailVersion });
+  const toggletip = useRef<HTMLDetailsElement>(null);
+  const closeCredit = (focusChip: boolean) => {
+    const details = toggletip.current;
+    if (!details?.open) return;
+    details.open = false;
+    if (focusChip) details.querySelector("summary")?.focus();
+  };
   return (
-    <section className="efficiency-summary" aria-label={heading}>
+    <section
+      className={`efficiency-summary ${data?.calls ? "" : "is-empty"}`}
+      aria-label={heading}
+    >
       <div className="efficiency-heading">
         <span>
           <Gauge size={15} aria-hidden="true" />
           <strong>{heading}</strong>
         </span>
+        {demo && <span className="efficiency-sample">{t.sample}</span>}
         {recordedMode && (
-          <span className="efficiency-mode">
-            Ponytail · {t.modes[recordedMode]}
-          </span>
+          // A toggletip: the chip shows the credit on hover and opens it,
+          // with the upstream link, on click or Enter.
+          // Escape or moving focus away closes it again.
+          <details
+            className="efficiency-mode"
+            ref={toggletip}
+            onKeyDown={(event) => {
+              if (event.key !== "Escape" || !toggletip.current?.open) return;
+              event.stopPropagation();
+              closeCredit(true);
+            }}
+            onBlur={(event) => {
+              if (!toggletip.current?.contains(event.relatedTarget as Node | null))
+                closeCredit(false);
+            }}
+          >
+            <summary title={credit}>
+              {t.modeLabel({ mode: t.modes[recordedMode] })}
+              <Info size={12} aria-hidden="true" />
+            </summary>
+            {/* Focusable, so selecting its text does not close it. */}
+            <div className="efficiency-credit" role="note" tabIndex={-1}>
+              <p>{credit}</p>
+              <a href={ponytailSource} target="_blank" rel="noreferrer">
+                {t.credit.link}
+                <ArrowUpRight size={13} aria-hidden="true" />
+              </a>
+            </div>
+          </details>
         )}
-        <a
-          href={ponytailSource}
-          target="_blank"
-          rel="noreferrer"
-          title={t.sourceTitle({ version: ponytailVersion })}
-        >
-          Ponytail {ponytailVersion}
-          <ArrowUpRight size={13} aria-hidden="true" />
-        </a>
       </div>
       {data?.calls ? (
         <>

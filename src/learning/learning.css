@@ -97,3 +97,61 @@
   font-size: var(--text-sm);
   margin: 8px 0 18px;
 }
+.learning-ai-note {
+  margin-top: 6px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.note-card .note-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 30px 0 12px;
+}
+.note-card .note-tags .note-tag {
+  margin: 0;
+}
+.note-ai-label {
+  padding: 3px 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
+}
+.note-card h2:focus-visible {
+  outline: 2px solid var(--color-accent-500);
+  outline-offset: 3px;
+}
+.learning-own-note {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--color-accent-300);
+  background: var(--color-surface-sunken);
+  border-radius: 0 6px 6px 0;
+}
+.learning-own-note strong {
+  display: block;
+  font-size: var(--text-2xs);
+  letter-spacing: 1px;
+  color: var(--color-accent-600);
+}
+.note-card .learning-own-note p {
+  min-height: 0;
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.learning-empty.is-error h2 {
+  color: var(--color-danger);
+}
+.learning-empty .button {
+  margin-top: 12px;
+}
+.learning-more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+}

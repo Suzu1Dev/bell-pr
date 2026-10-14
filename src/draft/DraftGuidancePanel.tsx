@@ -3,26 +3,35 @@ import {
   ArrowDownToLine,
   ArrowUpRight,
   BookOpen,
+  Bot,
   ChevronDown,
   Circle,
+  CircleAlert,
+  CircleCheck,
   ClipboardList,
   FileText,
   GitCommitHorizontal,
   Info,
   LoaderCircle,
   MessagesSquare,
+  OctagonX,
   Quote,
   RefreshCw,
+  ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { issueRule } from "../../shared/draft-checks";
+import { issueRule, type DraftCheck } from "../../shared/draft-checks";
 import {
+  aiDisclosureLine,
   linuxContributionUrl,
+  withAiDisclosure,
+  withoutAiDisclosure,
   type DraftPreparation,
   type DraftProposal,
 } from "../../shared/drafts";
 import { useFormat, useT } from "../i18n";
 import { MarkdownContent } from "../review/MarkdownContent";
+import { disclosureRule } from "./disclosure";
 import { rich } from "./rich";
 import "./drafts.css";
 
@@ -37,6 +46,27 @@ interface Props {
   onApply: (proposal: DraftProposal) => void;
   /** True while the editor holds this proposal's title and body unchanged. */
   applied?: boolean;
+  /**
+   * The saved AI-assistance choice, `run.draft.aiDisclosure`; undefined
+   * means the person has not chosen yet.
+   */
+  aiDisclosure?: boolean;
+  /** The app setting that turns the disclosure on for every new draft. */
+  alwaysDiscloseAi?: boolean;
+  /**
+   * Saves the choice through the draft PATCH (`aiDisclosure`); the server
+   * then adds or removes the line in the saved description. Without it the
+   * choice is local: it shapes the preview and what "Apply" puts in the
+   * editor, which the draft's own save keeps.
+   */
+  onAiDisclosureChange?: (on: boolean) => void;
+  /**
+   * The publish preflight for the saved draft (draftPreflight plus the
+   * server's GET /api/runs/:id/preflight). Not shown when absent.
+   */
+  checks?: DraftCheck[];
+  /** The run is published: the guidance stays for reference, without actions. */
+  readOnly?: boolean;
 }
 
 /**
@@ -64,11 +94,18 @@ export function DraftGuidancePanel({
   onGenerate,
   onApply,
   applied = false,
+  aiDisclosure,
+  alwaysDiscloseAi,
+  onAiDisclosureChange,
+  checks,
+  readOnly = false,
 }: Props) {
   const t = useT("draft").guidance;
   const fmt = useFormat();
   const prefix = useId().replaceAll(":", "");
   const [confirmed, setConfirmed] = useState<string[]>([]);
+  // The choice made here while nothing saves it (no onAiDisclosureChange).
+  const [localDisclosure, setLocalDisclosure] = useState<boolean>();
   const issueLink = webLink(issueUrl);
   const proposal = preparation?.proposal;
   const sources = preparation?.context?.sources ?? [];
@@ -76,6 +113,29 @@ export function DraftGuidancePanel({
     (source) => source.id === proposal?.templateSourceId,
   );
   const issueRequirement = issueRule(sources);
+  const disclosureRequirement = disclosureRule(sources);
+  // The server adds the line to new suggestions while the setting is on.
+  const settingOn =
+    alwaysDiscloseAi ?? !!proposal?.body.includes(aiDisclosureLine);
+  // Off unless the person's setting or the project's rules ask for it.
+  const savedDisclosure =
+    aiDisclosure ?? (settingOn || !!disclosureRequirement);
+  const disclose = onAiDisclosureChange
+    ? savedDisclosure
+    : (localDisclosure ?? savedDisclosure);
+  const disclosureReason =
+    aiDisclosure !== undefined || localDisclosure !== undefined
+      ? undefined
+      : settingOn
+        ? t.disclosure.setting
+        : undefined;
+  const proposalBody = proposal
+    ? disclose
+      ? withAiDisclosure(proposal.body)
+      : withoutAiDisclosure(proposal.body)
+    : "";
+  const blocking = checks?.filter((check) => check.kind === "block") ?? [];
+  const confirming = checks?.filter((check) => check.kind === "confirm") ?? [];
   const checkedAt = preparation?.context?.checkedAt;
   const checkedDate = checkedAt ? new Date(checkedAt) : undefined;
   const generating = busy || preparation?.status === "generating";
@@ -97,6 +157,55 @@ export function DraftGuidancePanel({
         : demo
           ? t.generate.demo
           : t.generate.first;
+
+  const disclosure = (
+    <section
+      className="draft-guidance-disclosure"
+      aria-labelledby={`draft-disclosure-${prefix}`}
+    >
+      <div className="draft-guidance-disclosure-head">
+        <h3 id={`draft-disclosure-${prefix}`}>
+          <Bot size={16} aria-hidden="true" /> {t.disclosure.title}
+        </h3>
+        <label className="draft-guidance-switch">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={disclose}
+            disabled={readOnly || disabled}
+            aria-describedby={`draft-disclosure-help-${prefix}`}
+            onChange={(event) => {
+              const on = event.target.checked;
+              if (onAiDisclosureChange) onAiDisclosureChange(on);
+              else setLocalDisclosure(on);
+            }}
+          />
+          <span>{t.disclosure.label}</span>
+          <b aria-hidden="true">{disclose ? t.disclosure.on : t.disclosure.off}</b>
+        </label>
+      </div>
+      <p id={`draft-disclosure-help-${prefix}`}>
+        {disclose
+          ? t.disclosure.lineOn({ line: aiDisclosureLine })
+          : t.disclosure.lineOff}
+        {disclosureReason && ` ${disclosureReason}`}
+      </p>
+      {disclosureRequirement && (
+        <p className="draft-guidance-disclosure-rule" role="note">
+          <strong>{t.disclosure.rule}</strong>
+          {t.disclosure.quote({ quote: disclosureRequirement.quote })}
+          <small>
+            {t.disclosure.ruleSource({ source: disclosureRequirement.label })}
+          </small>
+        </p>
+      )}
+      {!onAiDisclosureChange && proposal && !readOnly && (
+        <p className="draft-guidance-disclosure-hint">
+          {t.disclosure.applyHint}
+        </p>
+      )}
+    </section>
+  );
 
   return (
     <section
@@ -125,23 +234,32 @@ export function DraftGuidancePanel({
                 : t.policy.linux}
             </span>
           )}
-          <button
-            type="button"
-            className="button secondary draft-guidance-generate"
-            onClick={onGenerate}
-            disabled={disabled || generating}
-          >
-            {generating ? (
-              <LoaderCircle className="spin" size={15} />
-            ) : preparation ? (
-              <RefreshCw size={15} />
-            ) : (
-              <Sparkles size={15} />
-            )}
-            {generateLabel}
-          </button>
+          {!readOnly && (
+            <button
+              type="button"
+              className="button secondary draft-guidance-generate"
+              onClick={onGenerate}
+              disabled={disabled || generating}
+            >
+              {generating ? (
+                <LoaderCircle className="spin" size={15} />
+              ) : preparation ? (
+                <RefreshCw size={15} />
+              ) : (
+                <Sparkles size={15} />
+              )}
+              {generateLabel}
+            </button>
+          )}
         </div>
       </header>
+
+      {readOnly && (
+        <p className="draft-guidance-readonly" role="note">
+          <Info size={16} aria-hidden="true" />
+          {t.readOnly}
+        </p>
+      )}
 
       {statusMessage && (
         <div
@@ -158,7 +276,7 @@ export function DraftGuidancePanel({
         </div>
       )}
 
-      {!preparation && (
+      {!preparation && !readOnly && (
         <div className="draft-guidance-empty">
           <span>
             <FileText size={16} /> {t.empty.rules}
@@ -287,6 +405,7 @@ export function DraftGuidancePanel({
             </div>
           </div>
 
+          {disclosure}
           <details className="draft-guidance-proposal">
             <summary>
               <span className="draft-guidance-proposal-label">
@@ -300,22 +419,24 @@ export function DraftGuidancePanel({
             </summary>
             <div className="draft-guidance-proposal-content">
               <h3>{proposal.title}</h3>
-              <MarkdownContent>{proposal.body}</MarkdownContent>
+              <MarkdownContent>{proposalBody}</MarkdownContent>
             </div>
           </details>
-          <div className="draft-guidance-apply">
-            <p>
-              {applied ? t.apply.appliedNote : t.apply.note}
-            </p>
-            <button
-              type="button"
-              className="button primary"
-              onClick={() => onApply(proposal)}
-              disabled={disabled || generating || !ready || applied}
-            >
-              <ArrowDownToLine size={15} /> {applied ? t.apply.applied : t.apply.apply}
-            </button>
-          </div>
+          {!readOnly && (
+            <div className="draft-guidance-apply">
+              <p>
+                {applied ? t.apply.appliedNote : t.apply.note}
+              </p>
+              <button
+                type="button"
+                className="button primary"
+                onClick={() => onApply({ ...proposal, body: proposalBody })}
+                disabled={disabled || generating || !ready || applied}
+              >
+                <ArrowDownToLine size={15} /> {applied ? t.apply.applied : t.apply.apply}
+              </button>
+            </div>
+          )}
 
           {proposal.commitMessageSuggestion && (
             <div className="draft-guidance-commit">
@@ -364,6 +485,50 @@ export function DraftGuidancePanel({
             </div>
           )}
         </>
+      )}
+
+      {!proposal && onAiDisclosureChange && disclosure}
+
+      {checks && (
+        <section
+          className="draft-guidance-preflight"
+          aria-labelledby={`draft-preflight-${prefix}`}
+        >
+          <h3 id={`draft-preflight-${prefix}`}>
+            <ShieldCheck size={16} aria-hidden="true" /> {t.preflight.title}
+          </h3>
+          <p>{t.preflight.intro}</p>
+          {checks.length ? (
+            <ul>
+              {[...blocking, ...confirming].map((check) => (
+                <li key={check.id} className={`is-${check.kind}`}>
+                  <span className="draft-guidance-preflight-kind">
+                    {check.kind === "block" ? (
+                      <OctagonX size={14} aria-hidden="true" />
+                    ) : (
+                      <CircleAlert size={14} aria-hidden="true" />
+                    )}
+                    {check.kind === "block"
+                      ? t.preflight.block
+                      : t.preflight.confirm}
+                  </span>
+                  <strong>{check.message}</strong>
+                  {check.details.length > 0 && (
+                    <ul>
+                      {check.details.map((detail, index) => (
+                        <li key={index}>{detail}</li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="draft-guidance-preflight-clear">
+              <CircleCheck size={15} aria-hidden="true" /> {t.preflight.clear}
+            </p>
+          )}
+        </section>
       )}
 
       {!demo && preparation?.context && (
@@ -449,6 +614,7 @@ export function DraftGuidancePanel({
                 <input
                   id={inputId}
                   type="checkbox"
+                  disabled={readOnly}
                   checked={confirmed.includes(id)}
                   onChange={(event) =>
                     setConfirmed((previous) =>

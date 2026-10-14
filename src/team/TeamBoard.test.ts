@@ -2,15 +2,26 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import {
+  freeEntitlements,
+  proEntitlements,
+  type Entitlements,
+} from "../../shared/plans";
 import type { AgentTeam } from "../../shared/team";
 import { demoRun, demoTeam, getDemo } from "../demo";
+import { createDemoPlayback, type PlaybackClock } from "../demo/playback";
 import { LocaleProvider } from "../i18n";
 import en from "../i18n/en";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Run } from "../types";
 import { TeamBoard } from "./TeamBoard";
 
-const board = (run: Run, demo: boolean, onRetry?: () => Promise<void>) =>
+const board = (
+  run: Run,
+  demo: boolean,
+  onRetry?: () => Promise<void>,
+  entitlements?: Entitlements,
+) =>
   createElement(TeamBoard, {
     run,
     demo,
@@ -19,8 +30,10 @@ const board = (run: Run, demo: boolean, onRetry?: () => Promise<void>) =>
     async onMessage() {},
     onRetry,
     busy: false,
+    entitlements,
   });
 const render = (run: Run, demo = true) => renderZh(board(run, demo));
+const demoRunZh: Run = { ...demoRun, team: demoTeam };
 
 test("demo team renders its phase, members, tasks and messages", () => {
   const html = render({ ...demoRun, team: demoTeam });
@@ -119,7 +132,10 @@ test("a plan awaiting approval offers 退回並補充意見 with the revision hi
 
 /** Each lane's markup, in display order. */
 const lanes = (html: string) =>
-  html.split('<section class="team-lane">').slice(1).map((lane) => lane.split("</section>")[0]);
+  html
+    .split(/<section class="team-lane[^"]*">/)
+    .slice(1)
+    .map((lane) => lane.split("</section>")[0]);
 
 test("lanes keep their grouping and the empty running lane has its own message", () => {
   const [first, second, third, fourth] = demoTeam.tasks;
@@ -152,7 +168,11 @@ test("lanes keep their grouping and the empty running lane has its own message",
   );
   assert.deepEqual(
     empty.map((lane) => /team-lane-empty">([^<]*)</.exec(lane)?.[1]),
-    ["目前沒有任務", "目前沒有正在執行的子任務", "目前沒有任務"],
+    [
+      "Lead 的計畫完成後，子任務會出現在這裡。",
+      "目前沒有正在執行的子任務",
+      "還沒有完成的子任務",
+    ],
   );
 });
 
@@ -364,9 +384,9 @@ test("the empty running lane message is chosen by lane id, not by its label", ()
     ),
   );
   const [todo, running, done] = lanes(html);
-  assert.match(todo, /^<h3>To do<span>0<\/span><\/h3>[\s\S]*No tasks right now/);
+  assert.match(todo, /^<h3>To do<span>0<\/span><\/h3>[\s\S]*Subtasks appear here once the lead&#x27;s plan is ready\./);
   assert.match(running, /^<h3>Done<span>0<\/span><\/h3>[\s\S]*No subtask is running right now/);
-  assert.match(done, /^<h3>In progress<span>0<\/span><\/h3>[\s\S]*No tasks right now/);
+  assert.match(done, /^<h3>In progress<span>0<\/span><\/h3>[\s\S]*No subtask has finished yet/);
   assert.doesNotMatch(done, /No subtask is running/);
 });
 
@@ -380,5 +400,259 @@ test(
   () => {
     const sample = getDemo("en");
     assertNoHan(renderEn(board({ ...sample.run, team: sample.team }, true)));
+  },
+);
+
+/** The English board for `run` on a real (non-demo) run, checked for Han. */
+const english = (run: Run, entitlements?: Entitlements) => {
+  const html = renderEn(board(run, false, undefined, entitlements));
+  assertNoHan(html);
+  return html;
+};
+
+test("a queued run says it waits to start, with no progress count yet", () => {
+  const html = english({
+    ...englishRun,
+    status: "queued",
+    team: { ...englishTeam, phase: "planning", planSummary: "", tasks: [], messages: [] },
+  });
+  // A queued run is not at work yet: no spinner.
+  assert.match(html, /<h3><svg[^>]*lucide-layers[^>]*>[\s\S]*?<\/svg>Waiting to start<\/h3>/);
+  assert.match(html, /The run is in the queue\. The lead starts planning as soon as it can run\./);
+  assert.doesNotMatch(html, /subtasks done/);
+  // No flow step is current while the run waits.
+  assert.doesNotMatch(html, /aria-current/);
+});
+
+test("a team that stopped before its plan says so instead of planning", () => {
+  for (const phase of ["failed", "cancelled"] as const) {
+    const html = english({
+      ...englishRun,
+      status: phase,
+      team: { ...englishTeam, phase, planSummary: "", tasks: [], messages: [] },
+    });
+    assert.match(html, /The team stopped before the lead finished a plan\./, phase);
+    assert.doesNotMatch(html, /Reading the project/, phase);
+  }
+});
+
+test("the English planning phase shows the lead at work and lane messages chosen by id", () => {
+  const html = english({
+    ...englishRun,
+    status: "running",
+    team: { ...englishTeam, phase: "planning", planSummary: "", tasks: [], messages: [] },
+  });
+  assert.match(html, /<h3><svg[^>]*class="[^"]*spin[^"]*"[^>]*>[\s\S]*?<\/svg>The lead is planning<\/h3>/);
+  assert.match(html, /Reading the project and building a plan/);
+  assert.doesNotMatch(html, /subtasks done/);
+  assert.match(html, /<span class="is-current" aria-current="step"><svg[^>]*>[\s\S]*?<\/svg>Lead plans<\/span>/);
+  assert.equal(html.match(/aria-current="step"/g)?.length, 1);
+  assert.deepEqual(
+    lanes(html).map((lane) => /team-lane-empty">([^<]*)</.exec(lane)?.[1]),
+    [
+      "Subtasks appear here once the lead&#x27;s plan is ready.",
+      "No subtask is running right now",
+      "No subtask has finished yet",
+    ],
+  );
+  // Every lane is empty, so none of them is hidden on a phone.
+  assert.match(html, /<div class="team-kanban ">/);
+  assert.match(html, /The lead is planning\. Once the plan is ready, you can send the members more instructions\./);
+  assert.match(html, /<textarea aria-label="Team message"[^>]*disabled=""/);
+});
+
+test("the English approval phase offers the approve button and says subtasks wait for it", () => {
+  const html = english({
+    ...englishRun,
+    status: "awaiting_plan",
+    team: {
+      ...englishTeam,
+      phase: "awaiting_approval",
+      tasks: englishTeam.tasks.map((task) => ({ ...task, status: "pending" })),
+      messages: [],
+    },
+  });
+  assert.match(html, /class="team-plan needs-approval"/);
+  assert.match(html, /Waiting for you to approve the plan/);
+  assert.match(html, /0 \/ 4 subtasks done/);
+  assert.match(html, /<button class="button primary">[\s\S]*?Approve the plan and start development<\/button>/);
+  assert.match(html, /<span class="is-current" aria-current="step"><svg[^>]*>[\s\S]*?<\/svg>You approve the plan<\/span>/);
+  const [todo, running, done] = lanes(html);
+  assert.match(todo, /^<h3>To do<span>4<\/span><\/h3>/);
+  assert.match(running, /Subtasks start once you approve the plan\./);
+  assert.match(done, /No subtask has finished yet/);
+  // With tasks on the board, empty lanes may fold away on a phone.
+  assert.match(html, /<div class="team-kanban has-tasks">/);
+  assert.match(html, /<section class="team-lane is-empty">/);
+});
+
+test("the English developing phase marks the running lane's tasks and the parallel step", () => {
+  const [first, second, third, fourth] = englishTeam.tasks;
+  const html = english({
+    ...englishRun,
+    status: "running",
+    team: {
+      ...englishTeam,
+      phase: "developing",
+      tasks: [
+        { ...first, status: "complete" },
+        { ...second, status: "running" },
+        { ...third, status: "running" },
+        { ...fourth, status: "pending" },
+      ],
+    },
+  });
+  assert.match(html, /<h3><svg[^>]*spin[^>]*>[\s\S]*?<\/svg>Teammates are working together<\/h3>/);
+  assert.match(html, /<span class="is-current" aria-current="step"><svg[^>]*>[\s\S]*?<\/svg>Teammates work in parallel<\/span>/);
+  const [, running] = lanes(html);
+  assert.match(running, /^<h3>In progress<span>2<\/span><\/h3>/);
+  assert.doesNotMatch(running, /team-lane-empty/);
+});
+
+test("the runtime badge shows the plan's member limit from the entitlements", () => {
+  const run: Run = {
+    ...englishRun,
+    status: "running",
+    team: {
+      ...englishTeam,
+      phase: "developing",
+      config: { ...englishTeam.config, maxTeammates: 2 },
+    },
+  };
+  const free = english(run, freeEntitlements);
+  assert.match(free, /Up to 2 members work at the same time/);
+  assert.match(free, /<small class="team-plan-limit">Free plan: up to 2 members at once<\/small>/);
+  const pro = english(run, proEntitlements(2));
+  assert.match(pro, /<small class="team-plan-limit">Pro: up to 4 members at once<\/small>/);
+  const trial = english(run, { ...proEntitlements(2), plan: "trial" });
+  assert.match(trial, /Pro trial: up to 4 members at once/);
+  // A run that started on Pro with 4 members keeps them after a downgrade.
+  const kept = english(
+    { ...run, team: { ...run.team!, config: { ...run.team!.config, maxTeammates: 4 } } },
+    freeEntitlements,
+  );
+  assert.match(kept, /Up to 4 members work at the same time/);
+  assert.match(
+    kept,
+    /Free plan: up to 2 members at once<\/small><small class="team-plan-limit">This run keeps the team size it started with\.<\/small>/,
+  );
+  // Until the plan is known, and in the sample, no plan line is shown.
+  assert.doesNotMatch(english(run), /team-plan-limit/);
+  assert.doesNotMatch(
+    renderEn(board(englishRun, true, undefined, freeEntitlements)),
+    /team-plan-limit/,
+  );
+  assert.match(
+    renderZh(board(run, false, undefined, freeEntitlements)),
+    /Free 方案：最多 2 位成員同時工作/,
+  );
+});
+
+test("the protocol note sits in a How it works disclosure", () => {
+  const html = english(englishRun);
+  assert.match(
+    html,
+    /<details class="team-how"><summary><svg[^>]*>[\s\S]*?<\/svg>How it works<svg[^>]*>[\s\S]*?<\/svg><\/summary><p class="team-protocol-note"><svg[^>]*>[\s\S]*?<\/svg>BELL PR coordinates the team[^<]*it is not Claude Code&#x27;s native Agent Teams\.<\/p><\/details>/,
+  );
+  assert.match(renderZh(board(demoRunZh, true)), /<summary>[\s\S]*?運作方式[\s\S]*?並非 Claude Code 原生 Agent Teams/);
+});
+
+test("the message list can take focus and is named for screen readers", () => {
+  const html = english(englishRun);
+  assert.match(
+    html,
+    /<div class="team-messages" role="log" aria-live="polite" aria-label="Team messages" tabindex="0">/,
+  );
+});
+
+test("the model and usage cards fold into Run details, whose summary names what the run recorded", () => {
+  const sample = renderEn(board(englishRun, true));
+  assert.match(sample, /<details class="team-run-details"><summary><strong>Run details<\/strong><span>Model, reasoning effort and AI usage<\/span>/);
+  assert.match(sample, /class="team-run-details-body"><section class="model-summary"/);
+  const recorded = english({
+    ...englishRun,
+    modelExecution: { provider: "claude", model: "opus", source: "selected", reported: { model: "claude-opus-4-1" } },
+    efficiency: {
+      policyVersion: "bell-ponytail-v1",
+      mode: "lite",
+      calls: 9,
+      completedCalls: 9,
+      failedCalls: 0,
+      measuredCalls: 9,
+      durationMs: 1000,
+      inputTokens: 10,
+      cachedInputTokens: 0,
+      outputTokens: 1,
+    },
+  });
+  // Folded even with data, so the board stays in the first screen.
+  assert.match(recorded, /<details class="team-run-details"><summary><strong>Run details<\/strong><span>Claude Code · claude-opus-4-1 · 9 AI calls<\/span>/);
+  assert.match(
+    english({ ...englishRun, modelExecution: { source: "cli-default" }, efficiency: undefined }),
+    /<span>Codex<\/span>/,
+  );
+  const older = english({ ...englishRun, modelExecution: undefined, efficiency: undefined });
+  assert.match(older, /<span>Model, reasoning effort and AI usage<\/span>/);
+});
+
+test(
+  "the English board renders every state the demo playback goes through",
+  {
+    skip:
+      getDemo("en") === getDemo("zh-TW") &&
+      "the English demo content is not filled in yet",
+  },
+  () => {
+    // Time moves only when the test fires the next timer.
+    let now = Date.parse("2026-10-03T01:30:00.000Z");
+    const timers: { at: number; callback: () => void }[] = [];
+    const clock: PlaybackClock = {
+      now: () => now,
+      setTimeout(callback, ms) {
+        const timer = { at: now + ms, callback };
+        timers.push(timer);
+        return timer;
+      },
+      clearTimeout(handle) {
+        timers.splice(timers.indexOf(handle as (typeof timers)[number]), 1);
+      },
+    };
+    const fireNext = () => {
+      timers.sort((a, b) => a.at - b.at);
+      const timer = timers.shift();
+      if (!timer) return false;
+      now = timer.at;
+      timer.callback();
+      return true;
+    };
+    const playback = createDemoPlayback({ demo: getDemo("en"), clock });
+    const seen = new Map<string, string>();
+    playback.subscribe((event) => {
+      if (event.kind !== "run" || !event.run.team) return;
+      const key = event.run.status === "queued" ? "queued" : event.run.team.phase;
+      const html = renderEn(board(event.run, true));
+      assert.doesNotThrow(() => assertNoHan(html), key);
+      assert.doesNotMatch(html, /Invalid Date|NaN/, key);
+      seen.set(key, html);
+    });
+    playback.start();
+    for (let steps = 0; steps < 500 && playback.current()?.run.status !== "awaiting_plan"; steps++)
+      fireNext();
+    assert.equal(playback.current()?.run.status, "awaiting_plan");
+    assert.ok(playback.approvePlan());
+    for (let steps = 0; steps < 500 && fireNext(); steps++);
+    assert.deepEqual(
+      [...seen.keys()],
+      ["queued", "planning", "awaiting_approval", "developing", "integrating", "reviewing", "complete"],
+    );
+    assert.match(seen.get("queued")!, /Waiting to start/);
+    assert.match(seen.get("planning")!, /The lead is planning/);
+    assert.match(seen.get("planning")!, /Subtasks appear here once the lead&#x27;s plan is ready\./);
+    // The sample's approve button calls onApprove, which 5B points at the playback.
+    assert.match(seen.get("awaiting_approval")!, /Approve the plan and start development/);
+    assert.match(seen.get("awaiting_approval")!, /Subtasks start once you approve the plan\./);
+    assert.match(seen.get("developing")!, /aria-current="step"><svg[^>]*>[\s\S]*?<\/svg>Teammates work in parallel/);
+    assert.match(seen.get("complete")!, /Team work is complete/);
+    playback.stop();
   },
 );

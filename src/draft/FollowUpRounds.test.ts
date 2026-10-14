@@ -128,15 +128,22 @@ test("English rounds show every status, section and commit state without Han", (
   );
   assertNoHan(html);
   assert.match(html, /Changes made after review/);
-  for (const status of [
-    "Pushed",
-    "Not completed",
-    "Stopped",
-    "Discarded",
-    "Making changes",
-    "Waiting for review and push",
+  // Each chip says its status in words beside the icon, not by color alone.
+  for (const [id, status] of [
+    ["published", "Pushed"],
+    ["failed", "Not completed"],
+    ["cancelled", "Stopped"],
+    ["discarded", "Discarded"],
+    ["running", "Making changes"],
+    ["review", "Waiting for review and push"],
   ])
-    assert.match(html, new RegExp(`class="follow-up-status">${status}<`), status);
+    assert.match(
+      html,
+      new RegExp(`class="follow-up-status is-${id}"><svg[^>]*aria-hidden="true"[^>]*>[\\s\\S]*?</svg>${status}<`),
+      status,
+    );
+  assert.match(html, /<svg[^>]*class="[^"]*spin[^"]*"[^>]*>[\s\S]*?<\/svg>Making changes</);
+  assert.match(html, /<h3>Round 2 · Target branch sync<\/h3>/);
   assert.ok(html.indexOf("Round 6") < html.indexOf("Round 1"));
   assert.match(html, /Round 2 · Target branch sync/);
   assert.match(html, /Round 3 · Picked up from GitHub/);

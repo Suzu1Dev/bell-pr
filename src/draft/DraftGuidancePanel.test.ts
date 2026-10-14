@@ -4,20 +4,36 @@ import { createElement } from "react";
 import { demoDraftPreparation, getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { DraftGuidancePanel } from "./DraftGuidancePanel";
-import type { DraftPreparation } from "../../shared/drafts";
+import { draftPreflight, type DraftCheck } from "../../shared/draft-checks";
+import {
+  aiDisclosureLine,
+  withAiDisclosure,
+  type DraftPreparation,
+} from "../../shared/drafts";
+
+type PanelOptions = {
+  applied?: boolean;
+  demo?: boolean;
+  busy?: boolean;
+  disabled?: boolean;
+  issueUrl?: string;
+  aiDisclosure?: boolean;
+  alwaysDiscloseAi?: boolean;
+  onAiDisclosureChange?: (on: boolean) => void;
+  checks?: DraftCheck[];
+  readOnly?: boolean;
+};
 
 const panel = (
   preparation: DraftPreparation | undefined,
-  options: { applied?: boolean; demo?: boolean; busy?: boolean; issueUrl?: string } = {},
+  options: PanelOptions = {},
 ) =>
   createElement(DraftGuidancePanel, {
+    ...options,
     preparation,
     busy: options.busy ?? false,
-    demo: options.demo,
-    issueUrl: options.issueUrl,
     onGenerate: () => {},
     onApply: () => {},
-    applied: options.applied,
   });
 const render = (preparation: DraftPreparation, applied?: boolean) =>
   renderZh(panel(preparation, { applied }));
@@ -213,3 +229,178 @@ test(
       assertNoHan(renderEn(panel(draftPreparation, { demo })));
   },
 );
+
+/** Renders in English and checks that no zh-TW text is left. */
+const renderEnglish = (
+  preparation: DraftPreparation | undefined,
+  options: PanelOptions = {},
+) => {
+  const html = renderEn(panel(preparation, options));
+  assertNoHan(html);
+  return html;
+};
+/** The rendered body of the suggested draft's preview. */
+const preview = (html: string) =>
+  /<div class="draft-guidance-proposal-content">([\s\S]*?)<\/div><\/details>/.exec(html)?.[1] ?? "";
+const switchOf = (html: string) =>
+  /<input type="checkbox" role="switch"[^>]*>/.exec(html)?.[0] ?? "";
+const line = aiDisclosureLine.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+test("the AI-assistance disclosure is off by default and the preview leaves the line out", () => {
+  const html = renderEnglish(english);
+  assert.match(html, /<h3 id="draft-disclosure-[^"]+"><svg[\s\S]*?<\/svg> AI-assistance disclosure<\/h3>/);
+  assert.doesNotMatch(switchOf(html), /checked/);
+  assert.match(html, /<span>Add an AI-assistance line to the description<\/span><b aria-hidden="true">Off<\/b>/);
+  assert.match(html, /The description does not mention AI\. Whether to disclose AI help is your decision\./);
+  assert.match(preview(html), /Retries temporary GET failures\./);
+  assert.doesNotMatch(html, new RegExp(line));
+  // Nothing saves the choice here, so it says what Apply and Save do.
+  assert.match(html, /The preview below follows this choice/);
+});
+
+test("turning the disclosure on adds the editable line to the preview; off removes it", () => {
+  const on = renderEnglish(english, { aiDisclosure: true });
+  assert.match(switchOf(on), /checked=""/);
+  assert.match(preview(on), new RegExp(`<p>${line}</p>`));
+  assert.match(on, new RegExp(`The description ends with this line: “${line}” You can reword it`));
+  // A suggestion the server prepared with the line loses it when the toggle is off.
+  const withLine: DraftPreparation = {
+    ...english,
+    proposal: { ...english.proposal!, body: withAiDisclosure(english.proposal!.body) },
+  };
+  const off = renderEnglish(withLine, { aiDisclosure: false });
+  assert.doesNotMatch(switchOf(off), /checked/);
+  assert.doesNotMatch(preview(off), new RegExp(line));
+  assert.match(preview(off), /npm test/);
+  assert.match(preview(renderEnglish(withLine, { aiDisclosure: true })), new RegExp(line));
+});
+
+test("the setting turns the disclosure on by default and says so", () => {
+  const html = renderEnglish(english, { alwaysDiscloseAi: true });
+  assert.match(switchOf(html), /checked=""/);
+  assert.match(html, /On by default because of your setting “Always add an AI-assistance note to my pull requests”\./);
+  assert.match(preview(html), new RegExp(line));
+  // Without the setting passed in, a suggestion that carries the line shows it came from the setting.
+  const inferred = renderEnglish({
+    ...english,
+    proposal: { ...english.proposal!, body: withAiDisclosure(english.proposal!.body) },
+  });
+  assert.match(switchOf(inferred), /checked=""/);
+  assert.match(inferred, /On by default because of your setting/);
+  // A saved choice is the person's own: no reason is given for it.
+  assert.doesNotMatch(
+    renderEnglish(english, { alwaysDiscloseAi: true, aiDisclosure: true }),
+    /On by default/,
+  );
+  assert.doesNotMatch(switchOf(renderEnglish(english, { alwaysDiscloseAi: false })), /checked/);
+});
+
+test("a project rule that asks for a disclosure turns it on and is quoted with its source", () => {
+  const ruled: DraftPreparation = {
+    ...english,
+    context: {
+      ...english.context!,
+      sources: [
+        ...english.context!.sources,
+        {
+          id: "ai-policy",
+          kind: "contributing",
+          label: "AI_POLICY.md",
+          content: "# AI policy\n\nIf you use AI tools, you must disclose it in the pull request.",
+        },
+      ],
+    },
+  };
+  const html = renderEnglish(ruled);
+  assert.match(switchOf(html), /checked=""/);
+  assert.match(
+    html,
+    /<p class="draft-guidance-disclosure-rule" role="note"><strong>This project asks for a disclosure: <\/strong>“If you use AI tools, you must disclose it in the pull request\.”<small>Source: AI_POLICY\.md<\/small><\/p>/,
+  );
+  // Turned off, the rule stays visible so the person decides knowingly.
+  const off = renderEnglish(ruled, { aiDisclosure: false });
+  assert.doesNotMatch(switchOf(off), /checked/);
+  assert.match(off, /This project asks for a disclosure/);
+  assert.match(renderZh(panel(ruled)), /這個專案要求揭露：/);
+});
+
+test("a saved choice is controlled by the draft PATCH callback; read-only panels lock it", () => {
+  const wired = renderEnglish(english, { aiDisclosure: true, onAiDisclosureChange() {} });
+  assert.match(switchOf(wired), /checked=""/);
+  assert.doesNotMatch(wired, /The preview below follows this choice/);
+  // Without a proposal, a wired toggle still sets the saved draft's line.
+  assert.match(renderEnglish(undefined, { onAiDisclosureChange() {} }), /AI-assistance disclosure/);
+  assert.doesNotMatch(renderEnglish(undefined), /AI-assistance disclosure/);
+  assert.match(switchOf(renderEnglish(english, { disabled: true })), /disabled=""/);
+});
+
+const token = `ghp_${"a".repeat(36)}`;
+const preflight = draftPreflight(
+  {
+    title: "Retry GET requests",
+    body: `Adds retries.\n\nDebug token: ${token}\nLogs in /home/someone/project/out.log`,
+    localDirectories: ["/home/someone"],
+    changedPaths: [".github/workflows/ci.yml", "src/client.ts"],
+    commitEmails: ["alex@contributor.dev"],
+  },
+  "en",
+);
+
+test("the preflight lists the secret block first, then the path, workflow and e-mail confirmations", () => {
+  assert.deepEqual(
+    preflight.map((check) => check.id),
+    ["secret", "local-paths", "workflows", "author-email"],
+  );
+  // Confirmations first in the input: the panel still puts the block on top.
+  const html = renderEnglish(english, {
+    checks: [...preflight.slice(1), preflight[0]],
+  });
+  assert.match(html, /<h3 id="draft-preflight-[^"]+"><svg[\s\S]*?<\/svg> Checks before publishing<\/h3>/);
+  const items = [
+    ...html.matchAll(/<li class="is-(block|confirm)"><span class="draft-guidance-preflight-kind"><svg[\s\S]*?<\/svg>([^<]+)<\/span><strong>([^<]+)<\/strong>/g),
+  ].map((match) => [match[1], match[2], match[3]]);
+  assert.deepEqual(
+    items.map(([kind, label]) => [kind, label]),
+    [
+      ["block", "Blocks publishing"],
+      ["confirm", "Confirm before publishing"],
+      ["confirm", "Confirm before publishing"],
+      ["confirm", "Confirm before publishing"],
+    ],
+  );
+  for (const check of [preflight[0], ...preflight.slice(1)])
+    assert.ok(
+      items.some(([, , message]) => message === check.message.replace(/'/g, "&#x27;").replace(/"/g, "&quot;")),
+      check.id,
+    );
+  for (const detail of preflight.flatMap((check) => check.details))
+    assert.ok(html.includes(`<li>${detail.replace(/'/g, "&#x27;").replace(/"/g, "&quot;")}</li>`), detail);
+  assert.ok(html.includes(".github/workflows/ci.yml"));
+  assert.ok(html.includes("/home/someone"));
+  // The zh-TW panel labels them in its own words.
+  const zh = renderZh(panel(english, { checks: draftPreflight({ body: token }, "zh-TW") }));
+  assert.match(zh, /阻擋發布/);
+});
+
+test("an empty preflight says nothing needs attention; without checks there is no section", () => {
+  assert.match(
+    renderEnglish(english, { checks: [] }),
+    /No check needs your attention in the saved draft\./,
+  );
+  assert.doesNotMatch(renderEnglish(english), /draft-guidance-preflight/);
+});
+
+test("a published run shows the guidance read-only", () => {
+  const html = renderEnglish(english, { readOnly: true, aiDisclosure: true, checks: [] });
+  assert.match(html, /This pull request is published\. The guidance stays here for reference\./);
+  assert.doesNotMatch(html, /draft-guidance-generate/);
+  assert.doesNotMatch(html, /Apply the suggested draft|draft-guidance-apply/);
+  assert.match(switchOf(html), /checked=""/);
+  assert.match(switchOf(html), /disabled=""/);
+  assert.equal(html.match(/<input id="draft-etiquette-[^"]+" type="checkbox" disabled=""/g)?.length, 2);
+  // The suggestion, its sources and the saved draft's checks stay readable.
+  assert.match(preview(html), new RegExp(line));
+  assert.match(html, /Source documents/);
+  assert.match(html, /Checks before publishing/);
+  assert.doesNotMatch(renderEnglish(undefined, { readOnly: true }), /draft-guidance-empty/);
+});

@@ -9,6 +9,7 @@ const m: Translation<typeof en> = {
     analysis: "這次分析的模型設定",
   },
   sample: "示範內容，尚未執行模型。",
+  sampleChip: "示範",
   notRecorded: {
     run: "舊任務未記錄模型。",
     analysis: "此分析未記錄模型。",
