@@ -2,7 +2,7 @@ import type { LearnerNote, StoredExplanation } from "./explanations.js";
 import type { EfficiencyMetrics } from "./efficiency.js";
 import type { AgentTeam } from "./team.js";
 import type { ContributionSettings } from "./insights.js";
-import type { DraftPreparation } from "./drafts.js";
+import type { DraftPreparation, RunDraft } from "./drafts.js";
 import type { ModelExecution } from "./models.js";
 import type { FileConversation } from "./chat.js";
 import type { PrFeedback } from "./pr-feedback.js";
@@ -86,12 +86,7 @@ export interface RunCore {
    * is used, which is how runs saved before this field existed were published.
    * publishBranch is the branch name pushed to GitHub; absent means `branch`.
    */
-  draft: {
-    title: string;
-    body: string;
-    commitMessage?: string;
-    publishBranch?: string;
-  };
+  draft: RunDraft;
   reviewedFiles: string[];
   /** Learner notes keyed by diff path; absent on runs saved before notes existed. */
   notes?: Record<string, LearnerNote>;

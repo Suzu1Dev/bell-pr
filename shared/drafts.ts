@@ -60,9 +60,9 @@ export interface DraftPreparation {
 }
 
 /**
- * The PR text the person edits, reviews and publishes (`run.draft`). It is
- * `RunCore["draft"]` plus the fields added since, all optional, so a draft
- * saved by an older build reads as one with every new choice off.
+ * The PR text the person edits, reviews and publishes (`run.draft`). Every
+ * field added after title and body is optional, so a draft saved by an
+ * older build reads as one with every new choice off.
  */
 export interface RunDraft {
   title: string;
