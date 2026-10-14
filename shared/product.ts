@@ -64,4 +64,4 @@ export function productEmail(
  * string. Accepting the terms records it as `eulaAcceptedVersion` in the app
  * settings; a new version asks again. Bump it whenever the terms change.
  */
-export const eulaVersion = "draft-1";
+export const eulaVersion = "1.0-draft-2026-10-14";

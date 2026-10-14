@@ -28,13 +28,17 @@ meaning that the license terms in LICENSE.md (the "EULA") give them.
 ## Delivery of your License Key
 
 We deliver License Keys
-[OWNER: delivery method, either "instantly after payment, from a pool of pre-signed keys" or "by hand, by e-mail"].
+[OWNER: delivery method, either "instantly after payment, from a pool of pre-signed keys" or "by hand, by e-mail"]. <!-- claim:REFUND-01 -->
 If we deliver by hand, you receive your key by e-mail within
-[OWNER: N] business days after your payment.
+[OWNER: N] business days after your payment. <!-- claim:REFUND-02 -->
 
 A License Key is text that you paste into the License section of Settings,
-or pass to `bell-pr license activate`. A key from a pool of pre-signed keys
-contains no name or e-mail address.
+or pass to `bell-pr license activate`. <!-- claim:REFUND-03 -->
+Activating it needs no internet connection and sends nothing anywhere. <!-- claim:REFUND-04 -->
+A key from a pool of pre-signed keys contains no name or e-mail address. <!-- claim:REFUND-05 -->
+The License section of Settings and `bell-pr license status` show the
+dates your key carries: "updates until", the last release date of the
+Builds it covers, or the expiry date of a subscription. <!-- claim:REFUND-06 -->
 
 ## Immediate delivery and statutory cancellation rights
 
@@ -44,44 +48,47 @@ that consent:
 
 - **Consumers in the EU and the EEA:** you agree that we start supplying the
   key before the 14-day withdrawal period ends, and you acknowledge that you
-  lose your right of withdrawal once we have supplied it.
+  lose your right of withdrawal once we have supplied it. <!-- claim:REFUND-07 -->
 - **Consumers in Taiwan:** the 7-day cancellation right for distance sales
   does not apply to digital content that is not supplied on a physical
-  medium once you have agreed to its supply.
+  medium once you have agreed to its supply. <!-- claim:REFUND-08 -->
 
 Our voluntary refund window below applies regardless of these rules.
 Nothing in this policy limits rights you have under mandatory consumer law,
-for example when a product is faulty.
+for example when a product is faulty. <!-- claim:REFUND-09 -->
 
 ## Refunds
 
 You can ask for a full refund within [OWNER: 14 or 30] days of your
-purchase, for any reason. For an order with several seats, you can ask for a
-refund of the whole order or of some of its seats. The refund goes back to
-your original payment method through the Merchant of Record.
+purchase, for any reason. <!-- claim:REFUND-10 -->
+For an order with several seats, you can ask for a refund of the whole
+order or of some of its seats. The refund goes back to your original
+payment method through the Merchant of Record. <!-- claim:REFUND-11 -->
 
 The free 14-day Pro trial in the app lets you try Pro before you buy. Please
-use it to check that Pro works for you.
+use it to check that Pro works for you. <!-- claim:REFUND-12 -->
 
-After the refund window ends, we refund only where the law requires it.
+After the refund window ends, we refund only where the law requires it. <!-- claim:REFUND-13 -->
 
 ## What happens to a refunded key
 
 When we refund an order or seats, or a payment is charged back, we revoke
 the License Keys for the refunded seats, and the Pro License for them ends
-(EULA section 16). Stop using Pro with those keys and remove them: in the
-License section of Settings, with `bell-pr license deactivate`, or by
-removing `BELLPR_LICENSE_KEY` if you set the key there.
+(EULA section 16). A revocation covers a whole License Key, so if a key also
+holds seats that you keep, we send you a new key for those seats. <!-- claim:REFUND-14 -->
+Stop using Pro with those keys and remove them: in the License section of
+Settings, with `bell-pr license deactivate`, or by removing
+`BELLPR_LICENSE_KEY` if you set the key there. <!-- claim:REFUND-15 -->
 
-**Revoking a refunded key takes effect in builds released after the revocation; older builds keep accepting it offline.**
-Using a refunded key in any build breaches the EULA.
+**Revoking a refunded key takes effect in builds released after the revocation; older builds keep accepting it offline.** <!-- claim:REFUND-16 -->
+Using a refunded key in any build breaches the EULA. <!-- claim:REFUND-17 -->
 
 ## How to ask for a refund
 
 Ask through the order page or the receipt of our Merchant of Record,
 [OWNER: provider]. You can also write to
-[OWNER: refund contact] with your order number.
+[OWNER: refund contact] with your order number. <!-- claim:REFUND-18 -->
 
 ## Changes
 
-A change to this policy applies to purchases made after we publish it.
+A change to this policy applies to purchases made after we publish it. <!-- claim:REFUND-19 -->

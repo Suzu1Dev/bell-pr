@@ -19,6 +19,7 @@
     <!-- /generated:product-meta -->
     <!-- generated:product-meta key=homepageUrl property="og:image" path="assets/brand/og-image.png" -->
     <!-- /generated:product-meta -->
+    <meta property="og:image" content="assets/brand/og-image.png">
     <meta name="twitter:card" content="summary_large_image">
     <link rel="stylesheet" href="site.css">
     <script src="site.js" defer></script>
@@ -99,7 +100,43 @@
         </div>
       </section>
 
-      <section class="section" id="features" aria-labelledby="features-title">
+      <section class="section" id="screenshots" aria-labelledby="screenshots-title">
+        <div class="wrap">
+          <div class="section-head">
+            <p class="eyebrow">A closer look</p>
+            <h2 id="screenshots-title">What you work with</h2>
+            <p>Screens from the sample project that comes with BELL PR. Select one to see it at full size.</p>
+          </div>
+          <ul class="shots">
+            <li>
+              <figure class="shot">
+                <a href="assets/screenshots/repo-overview-1440.png"><img src="assets/screenshots/repo-overview-1440.png" alt="The project overview of the sample project: what the project does, who uses it, and tabs for directions and where to start reading." width="1440" height="900" loading="lazy" decoding="async"></a>
+                <figcaption><strong>Understand the project first</strong>The analysis explains what the project does, who uses it and where to start reading, before you choose a contribution direction.</figcaption>
+              </figure>
+            </li>
+            <li>
+              <figure class="shot">
+                <a href="assets/screenshots/team-1440.png"><img src="assets/screenshots/team-1440.png" alt="The agent team page: a team lead, teammates, a team inbox, and review and tests." width="1440" height="900" loading="lazy" decoding="async"></a>
+                <figcaption><strong>One goal, one agent team</strong>A Lead plans the work, teammates build it in their own worktrees, and a Reviewer and a Test analyst check the result.</figcaption>
+              </figure>
+            </li>
+            <li>
+              <figure class="shot">
+                <a href="assets/screenshots/run-changes-1440.png"><img src="assets/screenshots/run-changes-1440.png" alt="The code changes of a sample contribution: the changed files, a diff, and a plain-language explanation of the selected file beside it." width="1440" height="900" loading="lazy" decoding="async"></a>
+                <figcaption><strong>Every change, explained</strong>Read each changed file next to a plain-language explanation with examples, mark it reviewed, and ask about any line.</figcaption>
+              </figure>
+            </li>
+            <li>
+              <figure class="shot">
+                <a href="assets/screenshots/run-draft-1440.png"><img src="assets/screenshots/run-draft-1440.png" alt="The pull request draft of a sample contribution: a contribution guide, the AI-assistance disclosure switch, and reminders before publishing." width="1440" height="900" loading="lazy" decoding="async"></a>
+                <figcaption><strong>A pull request that fits the project</strong>The draft follows the project&#39;s rules and template, and whether to mention AI help is your decision.</figcaption>
+              </figure>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section section-tinted" id="features" aria-labelledby="features-title">
         <div class="wrap">
           <div class="section-head">
             <h2 id="features-title">Built for contributions you can stand behind</h2>
@@ -133,7 +170,7 @@
         </div>
       </section>
 
-      <section class="section section-tinted" id="plans" aria-labelledby="plans-title">
+      <section class="section" id="plans" aria-labelledby="plans-title">
         <div class="wrap">
           <div class="section-head">
             <h2 id="plans-title">Free covers the whole loop. Pro adds scale.</h2>
@@ -174,7 +211,7 @@
         </div>
       </section>
 
-      <section class="section" id="privacy" aria-labelledby="privacy-title">
+      <section class="section section-tinted" id="privacy" aria-labelledby="privacy-title">
         <div class="wrap">
           <div class="section-head">
             <p class="eyebrow">Privacy and trust</p>
@@ -201,7 +238,7 @@
         </div>
       </section>
 
-      <section class="section section-tinted" id="faq" aria-labelledby="faq-title">
+      <section class="section" id="faq" aria-labelledby="faq-title">
         <div class="wrap">
           <div class="faq">
             <h2 id="faq-title">Questions</h2>
@@ -224,6 +261,10 @@
             <details>
               <summary>What is free?</summary>
               <p>The whole contribution loop, one contribution at a time, with a Lead, two teammates, a Reviewer and a Test analyst. A 14-day Pro trial starts only when you choose. See <a href="pricing.html">pricing</a> for the full comparison.</p>
+            </details>
+            <details>
+              <summary>Does the pull request say that AI helped?</summary>
+              <p>Only if you choose. The draft can end with an editable line saying that AI coding agents helped prepare the change and that you reviewed it. The line is off unless you turn it on, or the project&#39;s own rules ask for a disclosure. Follow each project&#39;s rules on AI-assisted contributions; the <a href="legal/terms.html#4-responsible-contribution">terms</a> explain what responsible use means.</p>
             </details>
             <details>
               <summary>Is BELL PR made by GitHub, OpenAI or Anthropic?</summary>
