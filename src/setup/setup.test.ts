@@ -1,0 +1,260 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createElement } from "react";
+import type { DoctorCheck, DoctorReport } from "../../shared/doctor";
+import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
+import { CopyCommand } from "./CopyCommand";
+import { ReadinessNotice, readinessOf } from "./ReadinessNotice";
+import { SetupChecklist } from "./SetupChecklist";
+import { requiredCheckFails, type DoctorState } from "./useDoctor";
+
+const check = (value: Partial<DoctorCheck> & Pick<DoctorCheck, "id">): DoctorCheck => ({
+  status: "ok",
+  required: false,
+  ...value,
+});
+
+/** A report as GET /api/doctor answers it: GitHub signed out, no provider ready. */
+const notReady: DoctorReport = {
+  checkedAt: "2026-10-14T09:30:00.000Z",
+  platform: "linux",
+  ready: false,
+  checks: [
+    check({ id: "node", required: true, version: "v22.22.1" }),
+    check({ id: "git", required: true, version: "2.45.1" }),
+    check({ id: "git-identity", detail: "Octo Cat <octo@example.com>" }),
+    check({ id: "gh", version: "2.46.0" }),
+    check({
+      id: "gh-auth",
+      status: "warn",
+      reason: "signed-out",
+      detail: "Not signed in.",
+      fixes: [{ label: "Sign in to GitHub", command: "gh auth login" }],
+    }),
+    check({ id: "gh-scopes", status: "skip" }),
+    check({
+      id: "codex",
+      status: "skip",
+      reason: "missing",
+      detail: "Not installed.",
+      fixes: [{ label: "Install the Codex CLI", command: "npm install -g @openai/codex" }],
+    }),
+    check({ id: "codex-auth", status: "skip" }),
+    check({ id: "claude", version: "2.1.292" }),
+    check({
+      id: "claude-auth",
+      status: "warn",
+      reason: "signed-out",
+      detail: "Not signed in.",
+      fixes: [{ label: "Sign in to Claude Code", command: "claude auth login" }],
+    }),
+    check({ id: "claude-sandbox", detail: "Available." }),
+    check({
+      id: "provider-ready",
+      required: true,
+      status: "fail",
+      reason: "none-ready",
+      detail: "Install and sign in to the Codex CLI or Claude Code.",
+      fixes: [
+        { label: "Install the Codex CLI", command: "npm install -g @openai/codex" },
+        { label: "Sign in to Claude Code", command: "claude auth login" },
+      ],
+    }),
+    check({
+      id: "data-dir",
+      required: true,
+      detail: "Writable, 20 GB free.",
+      params: { path: "/home/octo/.bellpr", freeBytes: 20 * 1024 ** 3 },
+    }),
+    check({ id: "app", version: "1.0.0", detail: "Version 1.0.0." }),
+    check({ id: "platform", detail: "linux x64" }),
+  ],
+};
+
+/** The same machine after signing in to GitHub and Claude Code. */
+const ready: DoctorReport = {
+  ...notReady,
+  ready: true,
+  checks: notReady.checks.map((value) =>
+    value.id === "gh-auth"
+      ? check({ id: "gh-auth", detail: "octocat", params: { login: "octocat" } })
+      : value.id === "gh-scopes"
+        ? check({ id: "gh-scopes", detail: "repo, workflow" })
+        : value.id === "claude-auth"
+          ? check({ id: "claude-auth", detail: "claude.ai · Max" })
+          : value.id === "provider-ready"
+            ? check({ id: "provider-ready", required: true, detail: "Ready: Claude Code." })
+            : value,
+  ),
+};
+
+const doctor = (report: DoctorReport | null, extra: Partial<DoctorState> = {}): DoctorState => ({
+  report,
+  checking: false,
+  error: "",
+  refresh: async () => undefined,
+  ...extra,
+});
+
+const mask = {
+  maskUser: () => "you",
+  maskPath: (value: string) => value.replace("/home/octo", "~"),
+};
+
+test("the checklist shows each check with its state, version, detail and the fixes of problem rows", () => {
+  const html = renderEn(createElement(SetupChecklist, { ...doctor(notReady), ...mask }));
+  assertNoHan(html);
+  assert.equal(html.match(/<li class="setup-check /g)?.length, notReady.checks.length);
+  assert.match(html, /1 required item needs your attention\./);
+  assert.match(html, /data-check="provider-ready".*?<strong>AI provider<\/strong><span class="setup-check-required">Required<\/span>.*?<span class="setup-check-status">Not ready<\/span>/);
+  assert.match(html, /<code class="setup-check-version">2\.45\.1<\/code>/);
+  // Fix commands appear on the rows that need attention only.
+  assert.match(html, /<code>gh auth login<\/code>/);
+  assert.match(html, /<code>claude auth login<\/code>/);
+  assert.doesNotMatch(html, /data-check="codex".*?npm install -g @openai\/codex.*?data-check="codex-auth"/);
+  assert.match(html, /aria-label="Copy the command: gh auth login"/);
+  // Personal details are masked: the Git identity and the data directory.
+  assert.doesNotMatch(html, /octo@example\.com|\/home\/octo/);
+  assert.match(html, /Folder: ~\/\.bellpr/);
+  assert.match(html, />Re-check</);
+  assert.match(html, /Checked at /);
+  // Every fix, also on rows that are fine or not used, on request.
+  const all = renderEn(createElement(SetupChecklist, { report: notReady, fixes: "all" }));
+  assert.match(all, /data-check="codex".*?npm install -g @openai\/codex.*?data-check="codex-auth"/s);
+});
+
+test("the checklist masks the GitHub login and the Claude account in presentations", () => {
+  const html = renderEn(createElement(SetupChecklist, { ...doctor(ready), ...mask }));
+  assertNoHan(html);
+  assert.match(html, /Everything BELL PR needs is ready\./);
+  assert.doesNotMatch(html, /octocat|claude\.ai · Max/);
+  assert.equal(html.match(/<p class="setup-check-detail">you<\/p>/g)?.length, 3);
+  assert.doesNotMatch(html, /setup-check-fixes/);
+  const plain = renderEn(createElement(SetupChecklist, { report: ready }));
+  assert.match(plain, /octocat/);
+});
+
+test("the checklist says it is checking while the first report loads, and reports a failed request", () => {
+  const html = renderEn(createElement(SetupChecklist, { ...doctor(null, { checking: true }) }));
+  assertNoHan(html);
+  assert.match(html, /Checking your environment…/);
+  assert.match(html, /aria-busy="true"/);
+  assert.equal(html.match(/setup-check-checking/g)?.length, 15);
+  assert.doesNotMatch(html, /Not installed|Not ready/);
+  assert.match(html, /<button type="button" class="button secondary setup-recheck" disabled="">/);
+  const failed = renderEn(
+    createElement(SetupChecklist, { ...doctor(notReady, { error: "The server did not answer." }) }),
+  );
+  assert.match(failed, /role="alert">The environment check did not answer: The server did not answer\./);
+});
+
+test("the checklist summary lists only what needs attention and links to the details", () => {
+  const html = renderEn(
+    createElement(SetupChecklist, {
+      report: notReady,
+      variant: "summary",
+      detailsHref: "#/settings/environment",
+    }),
+  );
+  assertNoHan(html);
+  assert.equal(html.match(/<li class="setup-check /g)?.length, 3);
+  assert.doesNotMatch(html, /setup-check-fixes|<code/);
+  assert.match(html, /<a class="setup-checklist-link" href="#\/settings\/environment">Open the environment settings<\/a>/);
+  const fine = renderEn(createElement(SetupChecklist, { report: ready, variant: "summary" }));
+  assert.match(fine, /Everything BELL PR needs is ready\./);
+  assert.doesNotMatch(fine, /<ul/);
+});
+
+test("the checklist reads in zh-TW", () => {
+  const html = renderZh(createElement(SetupChecklist, { ...doctor(notReady) }));
+  assert.match(html, /有 1 個必要項目需要處理。/);
+  assert.match(html, /<strong>AI 服務<\/strong><span class="setup-check-required">必要<\/span>/);
+  assert.match(html, />重新檢查</);
+  assert.match(html, /請執行以下指令修正：/);
+});
+
+test("a copyable command shows the command and a labelled copy button", () => {
+  const html = renderEn(
+    createElement(CopyCommand, { command: "codex login", label: "Sign in to Codex" }),
+  );
+  assertNoHan(html);
+  assert.match(html, /<span class="copy-command-label">Sign in to Codex<\/span>/);
+  assert.match(html, /<code>codex login<\/code>/);
+  assert.match(html, /<button type="button" class="button secondary copy-command-button" aria-label="Copy the command: codex login">/);
+  assert.match(html, /role="status" aria-live="polite"><\/span>/);
+  const zh = renderZh(createElement(CopyCommand, { command: "codex login" }));
+  assert.match(zh, /aria-label="複製指令：codex login"/);
+  assert.match(zh, /<span>複製<\/span>/);
+});
+
+test("readiness follows the provider, GitHub and Git identity checks", () => {
+  assert.deepEqual(readinessOf(null, ["provider"]), { ready: false, checking: true, missing: [] });
+  const blocked = readinessOf(notReady, ["provider", "gh", "git-identity"]);
+  assert.equal(blocked.ready, false);
+  assert.deepEqual(
+    blocked.missing.map(({ requirement, checks }) => [requirement, checks.map((value) => value.id)]),
+    [
+      ["provider", ["provider-ready"]],
+      ["gh", ["gh-auth"]],
+    ],
+  );
+  assert.equal(readinessOf(ready, ["provider", "gh", "git-identity"]).ready, true);
+  // A guessed e-mail address still commits; a missing identity does not.
+  const guessed = {
+    ...ready,
+    checks: ready.checks.map((value) =>
+      value.id === "git-identity" ? { ...value, status: "warn" as const } : value,
+    ),
+  };
+  assert.equal(readinessOf(guessed, ["git-identity"]).ready, true);
+  const missing = {
+    ...ready,
+    checks: ready.checks.map((value) =>
+      value.id === "git-identity" ? { ...value, status: "fail" as const } : value,
+    ),
+  };
+  assert.equal(readinessOf(missing, ["git-identity"]).ready, false);
+  // Unknown token scopes (fine-grained) do not block; missing repo access does.
+  const unknownScopes = {
+    ...ready,
+    checks: ready.checks.map((value) =>
+      value.id === "gh-scopes" ? { ...value, status: "skip" as const } : value,
+    ),
+  };
+  assert.equal(readinessOf(unknownScopes, ["gh"]).ready, true);
+  assert.equal(requiredCheckFails(notReady), true);
+  assert.equal(requiredCheckFails(ready), false);
+  assert.equal(requiredCheckFails(null), false);
+});
+
+test("the readiness notice explains the requirement with fixes, and renders nothing when ready or bypassed", () => {
+  const html = renderEn(
+    createElement(ReadinessNotice, { requires: ["provider", "gh"], doctor: doctor(notReady), maskUser: () => "you" }),
+  );
+  assertNoHan(html);
+  assert.match(html, /This needs an AI provider: install and sign in to the Codex CLI or Claude Code\./);
+  assert.match(html, /This needs the GitHub CLI, installed and signed in\./);
+  assert.match(html, /Unavailable until this is fixed\./);
+  assert.match(html, /AI provider: Install and sign in to the Codex CLI or Claude Code\./);
+  assert.match(html, /<code>npm install -g @openai\/codex<\/code>/);
+  assert.match(html, /<code>gh auth login<\/code>/);
+  assert.equal(renderEn(createElement(ReadinessNotice, { requires: ["provider"], doctor: doctor(ready) })), "");
+  // The demo needs no tools: nothing is shown, whatever the report says.
+  assert.equal(
+    renderEn(createElement(ReadinessNotice, { requires: ["provider", "gh"], doctor: doctor(notReady), bypass: true })),
+    "",
+  );
+  assert.equal(renderEn(createElement(ReadinessNotice, { requires: ["provider"], bypass: true })), "");
+  const checking = renderEn(createElement(ReadinessNotice, { requires: ["provider"], doctor: doctor(null) }));
+  assert.match(checking, /Checking your environment…/);
+  const zh = renderZh(createElement(ReadinessNotice, { requires: ["git-identity"], doctor: doctor({
+    ...ready,
+    checks: ready.checks.map((value) =>
+      value.id === "git-identity"
+        ? { ...value, status: "fail" as const, detail: "尚未設定。", fixes: [{ label: "設定你的名字", command: 'git config --global user.name "你的名字"' }] }
+        : value,
+    ),
+  }) }));
+  assert.match(zh, /這需要你的 Git 名字與電子郵件地址/);
+  assert.match(zh, /Git 名字與電子郵件：尚未設定。/);
+});
