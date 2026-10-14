@@ -1183,6 +1183,8 @@ test("bell-pr license follows the language saved in the app", async (t) => {
   // Either way round, so BELLPR_LOCALE cannot be what decides.
   writeFileSync(path.join(dataDir, "app-settings.json"), JSON.stringify({ locale: "zh-TW" }));
   assert.match(await status(), /^方案：/);
+  // Each fix and its command, with the full-width colon.
+  assert.match(await status(), /\n開始 14 天 Pro 試用：bell-pr license trial\n/);
   writeFileSync(path.join(dataDir, "app-settings.json"), JSON.stringify({ locale: "en" }));
   assert.match(await status(), /^Plan: Free\n/);
 });

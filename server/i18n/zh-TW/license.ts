@@ -72,6 +72,7 @@ const m: Translation<typeof en> = {
       trial: "開始 14 天 Pro 試用",
       activate: "啟用授權金鑰",
     },
+    fixLine: ({ label, command }) => `${label}：${command}`,
     activated: "授權已啟用。",
     deactivated: "已移除授權金鑰。",
     nothingToRemove: "這個資料目錄沒有儲存授權金鑰。",
