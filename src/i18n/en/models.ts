@@ -13,6 +13,8 @@ const models = {
     analysis: "Model settings for this analysis",
   },
   sample: "Sample content. No model has run yet.",
+  /** Marks the summary of the built-in sample. */
+  sampleChip: "Sample",
   /** Records written before models were recorded. */
   notRecorded: {
     run: "This older run did not record its model.",
