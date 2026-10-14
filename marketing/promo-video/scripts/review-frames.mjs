@@ -5,7 +5,8 @@
  *
  * - the midpoint of every shot and of every caption;
  * - two frames either side of every cut (between shots, between the
- *   stills of a shot, and where a clip cuts over a skipped stretch);
+ *   stills of a shot, where a clip cuts over a skipped stretch, and where
+ *   the capture cut inside a clip);
  * - the measured music hit and the frame the end-card logo lands on.
  *
  * It also writes out/contact-sheet.png, a grid of 24 frames spread evenly
@@ -28,6 +29,19 @@ const out = path.join(packageRoot, "out", "review");
 const shotAt = (frame) =>
   timeline.shots.find((shot) => frame >= shot.from && frame < shot.to) ?? timeline.shots.at(-1);
 
+/** The named moments each clip's capture recorded. */
+const marks = {};
+for (const shot of timeline.shots) {
+  try {
+    const targets = JSON.parse(
+      await readFile(path.join(packageRoot, "public", "footage", shot.id, "targets.json"), "utf8"),
+    );
+    if (targets.marks) marks[shot.id] = targets.marks;
+  } catch {
+    // Not captured, or a card.
+  }
+}
+
 /** Every frame to look at, with why. */
 function reviewFrames() {
   const frames = new Map();
@@ -45,6 +59,9 @@ function reviewFrames() {
     for (const still of shot.stills?.slice(1) ?? []) cut(shot.from + still.from, "still change");
     for (const [skipFrom] of shot.clip?.skip ?? [])
       cut(shot.from + Math.ceil((skipFrom - shot.clip.startAt) * fps), "clip cut");
+    // Cuts the capture made inside a clip (targets.json marks).
+    for (const [name, seconds] of Object.entries(marks[shot.id] ?? {}))
+      cut(shot.from + Math.round((seconds - (shot.clip?.startAt ?? 0)) * fps), `clip cut "${name}"`);
   }
   timeline.captions.forEach((cue) => add(Math.floor((cue.from + cue.to) / 2), `caption "${cue.text.split("\n")[0]}"`));
   add(music.events.finalHit, "music hit");
@@ -55,7 +72,8 @@ function reviewFrames() {
 async function extract(frame, file) {
   await remotion([
     "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-    "-ss", ((frame + 0.5) / fps).toFixed(4), "-i", path.join(packageRoot, video),
+    // Input seeking returns the first frame at or after the time.
+    "-ss", (frame / fps - 0.001).toFixed(4), "-i", path.join(packageRoot, video),
     "-frames:v", "1", file,
   ]);
 }
