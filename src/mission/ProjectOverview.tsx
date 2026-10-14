@@ -39,6 +39,7 @@ import {
   moveRecommendation,
   orderedRecommendations,
 } from "./recommendation-preferences";
+import { PremiseNotice } from "../team/PremiseNotice";
 import "./mission.css";
 
 export interface ProjectOverviewProps {
@@ -65,6 +66,9 @@ export interface ProjectOverviewProps {
   /** Updates BELL's clone to the latest default branch; absent for local imports and the demo. */
   onUpdateRepo?: () => void;
   updatingRepo?: boolean;
+  /** Checks the request's assumption for a finished run made before premise checks existed. */
+  onCheckPremise?: () => void;
+  checkingPremise?: boolean;
 }
 
 const effortLabels = { small: "小型", medium: "中型", large: "大型" };
@@ -163,7 +167,25 @@ function EvidencePaths({
   );
 }
 
-function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
+function Brief({
+  run,
+  brief,
+  onCheckPremise,
+  checkingPremise = false,
+}: {
+  run: Run;
+  brief?: ContributionBrief;
+  onCheckPremise?: () => void;
+  checkingPremise?: boolean;
+}) {
+  const premise = run.team?.premise;
+  // Text copied from the request still states the assumption; it is labelled, never rewritten.
+  const tag =
+    premise?.verdict === "refuted"
+      ? "依你的假設，查證後不成立"
+      : premise?.verdict === "unclear"
+        ? "依你的假設，尚未能確認"
+        : undefined;
   return (
     <section
       className="mission-contribution"
@@ -179,6 +201,28 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
         </span>
       </div>
       <h3 className="mission-contribution-name">{run.title}</h3>
+      <PremiseNotice premise={premise} />
+      {!premise && onCheckPremise && (
+        <div className="mission-premise-missing">
+          <p>
+            這個貢獻建立時還沒有前提查核，需求裡的假設是否成立沒有記錄下來。可以請 Lead
+            依目前的程式碼與審查報告補做一次；完成後，變更解說與程式碼解說會依結論重新產生。
+          </p>
+          <button
+            type="button"
+            className="mission-button mission-button-secondary"
+            onClick={onCheckPremise}
+            disabled={checkingPremise}
+          >
+            {checkingPremise ? (
+              <Loader2 className="mission-spin" size={15} />
+            ) : (
+              <Check size={15} />
+            )}
+            {checkingPremise ? "正在查核前提…" : "依審查結果查核前提"}
+          </button>
+        </div>
+      )}
       {brief ? (
         <>
           <div className="mission-contribution-reason">
@@ -187,7 +231,10 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
               <p>{brief.problem}</p>
             </div>
             <div>
-              <span>為什麼值得現在改善</span>
+              <span>
+                為什麼值得現在改善
+                {tag && <em className="mission-premise-tag">{tag}</em>}
+              </span>
               <p>{brief.motivation}</p>
             </div>
           </div>
@@ -213,12 +260,15 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
             <article className="mission-after">
               <span className="mission-change-label">
                 AFTER <span>希望帶來的改善</span>
+                {tag && <em className="mission-premise-tag">{tag}</em>}
               </span>
               <p>{brief.after}</p>
             </article>
           </div>
           <p className="mission-impact-note">
-            以上是這次貢獻的目標；是否達成，仍需根據實作與驗證結果確認。
+            {premise?.verdict === "refuted"
+              ? "前提查核顯示這個假設不成立：上面依假設描述的問題與影響實際上不會發生，請以查核結果與 Lead 的整合摘要為準。"
+              : "以上是這次貢獻的目標；是否達成，仍需根據實作與驗證結果確認。"}
           </p>
           <div className="mission-validation-grid">
             {brief.validation.length > 0 && (
@@ -284,6 +334,8 @@ export function ProjectOverview({
   onStartContribution,
   onUpdateRepo,
   updatingRepo = false,
+  onCheckPremise,
+  checkingPremise = false,
 }: ProjectOverviewProps) {
   const ideaRail = useRef<HTMLDivElement>(null);
   const hiddenSummary = useRef<HTMLElement>(null);
@@ -836,7 +888,14 @@ export function ProjectOverview({
         </>
       )}
 
-      {run && <Brief run={run} brief={brief} />}
+      {run && (
+        <Brief
+          run={run}
+          brief={brief}
+          onCheckPremise={onCheckPremise}
+          checkingPremise={checkingPremise}
+        />
+      )}
 
       {insights && (
         <section

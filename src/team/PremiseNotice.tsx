@@ -27,7 +27,7 @@ export function PremiseNotice({
       <strong>前提查核：{label}</strong>
     </>
   );
-  const source = "由 Lead 在規劃前閱讀程式碼得出，可對照引用的位置確認。";
+  const source = "由 Lead 閱讀程式碼得出，可對照引用的位置確認。";
   return (
     <section
       className={`premise-notice premise-${premise.verdict}${compact ? " premise-compact" : ""}`}

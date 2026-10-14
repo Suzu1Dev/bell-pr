@@ -1696,3 +1696,32 @@
     text-align: left;
   }
 }
+
+/* The lead's premise check inside the contribution brief. */
+.mission-contribution .premise-notice {
+  margin: -8px 0 18px;
+}
+.mission-premise-tag {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #fff1e4;
+  color: #8a4f25;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.mission-premise-missing {
+  margin: -8px 0 18px;
+  padding: 12px 14px;
+  border: 1px dashed #d9e2d2;
+  border-radius: 9px;
+  background: #fbfcf8;
+}
+.mission-premise-missing p {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.75;
+  color: #5d6e55;
+}
