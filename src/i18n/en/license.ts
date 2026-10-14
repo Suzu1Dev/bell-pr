@@ -1,6 +1,7 @@
 /** Plans, the license, the trial and upgrading to Pro. */
 import { formatters } from "../../../shared/i18n/locale";
 import plans from "../../../shared/i18n/plans.en";
+import type { ProFeature } from "../../../shared/plans";
 import { product } from "../../../shared/product";
 
 const fmt = formatters("en");
@@ -28,9 +29,26 @@ export default {
   },
   upgrade: {
     title: "Upgrade to Pro",
-    /** When the dialog opens without a message from the server. */
-    featureLocked: ({ feature }: { feature: string }) =>
-      `${feature} is part of Pro.`,
+    /** When the dialog opens for a feature without a message from the server. */
+    featureNeedsPro: {
+      teamSize: "Teams of 3 or 4 teammates need a Pro license.",
+      parallelRuns:
+        "Running more than one contribution at a time needs a Pro license.",
+      discovery:
+        "Finding projects to contribute to across GitHub needs a Pro license.",
+      moreRecommendations: "Generating more recommendations needs a Pro license.",
+      learningExport: "Exporting the learning record needs a Pro license.",
+      prFeedback:
+        "Maintainer feedback coaching and follow-up rounds need a Pro license.",
+      webAccess: "Web access for agents needs a Pro license.",
+      deepReasoning:
+        "The xhigh, max and ultra reasoning efforts need a Pro license.",
+    } satisfies Record<ProFeature, string>,
+    /** What Pro allows on the rows that Free has with a smaller limit. */
+    proLimits: {
+      teamSize: "Pro: 3 or 4 teammates",
+      parallelRuns: "Pro: up to 8 runs at once",
+    } satisfies Partial<Record<ProFeature, string>>,
     general: "Pro adds bigger and parallel agent teams, discovery and more.",
     proList: "What Pro adds",
     thisFeature: "The feature you tried",

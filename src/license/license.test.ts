@@ -99,11 +99,18 @@ test("the upgrade dialog names the feature, lists Pro and offers the trial and a
   const html = renderEn(dialog("discovery"));
   assertNoHan(html);
   assert.match(html, /<h2 id="modal-title">Upgrade to Pro<\/h2>/);
-  assert.match(html, /Discovery \(GitHub-wide recommendations\) is part of Pro\./);
+  assert.match(html, /Finding projects to contribute to across GitHub needs a Pro license\./);
+  assert.doesNotMatch(html, /is part of Pro/);
   assert.match(html, /What Pro adds/);
   for (const label of ["Agent team size", "Concurrent runs", "Learning record export (Markdown)", "Web access for agents"])
     assert.ok(html.includes(label), label);
   assert.match(html, /class="upgrade-feature current"><span class="pro-badge"[^>]*>PRO<\/span><span>Discovery \(GitHub-wide recommendations\)<\/span><span class="upgrade-feature-tag">The feature you tried<\/span>/);
+  // Free has a team and one run at a time: the list says what Pro allows.
+  assert.match(html, /<span>Agent team size<\/span><span class="upgrade-feature-limit">Pro: 3 or 4 teammates<\/span>/);
+  assert.match(html, /<span>Concurrent runs<\/span><span class="upgrade-feature-limit">Pro: up to 8 runs at once<\/span>/);
+  const team = renderEn(dialog("teamSize"));
+  assert.match(team, /Teams of 3 or 4 teammates need a Pro license\./);
+  assert.match(renderZh(dialog("parallelRuns")), /同時進行多項貢獻需要 Pro 授權。/);
   // Free rows, and the license term, which is not a feature, are not in the Pro list.
   assert.doesNotMatch(html, /Learning notes page/);
   assert.doesNotMatch(html, /Pro license term/);

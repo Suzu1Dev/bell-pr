@@ -20,7 +20,20 @@ const m: Translation<typeof en> = {
   },
   upgrade: {
     title: "升級到 Pro",
-    featureLocked: ({ feature }) => `「${feature}」屬於 Pro 功能。`,
+    featureNeedsPro: {
+      teamSize: "3 或 4 位隊友的團隊需要 Pro 授權。",
+      parallelRuns: "同時進行多項貢獻需要 Pro 授權。",
+      discovery: "在整個 GitHub 探索可貢獻的專案需要 Pro 授權。",
+      moreRecommendations: "產出更多建議需要 Pro 授權。",
+      learningExport: "匯出學習紀錄需要 Pro 授權。",
+      prFeedback: "維護者回饋指導與後續修改回合需要 Pro 授權。",
+      webAccess: "Agent 網路存取需要 Pro 授權。",
+      deepReasoning: "xhigh、max 與 ultra 思考強度需要 Pro 授權。",
+    },
+    proLimits: {
+      teamSize: "Pro：3 或 4 位隊友",
+      parallelRuns: "Pro：最多同時執行 8 項工作",
+    },
     general: "Pro 提供更大的平行 Agent 團隊、探索貢獻等更多功能。",
     proList: "Pro 提供的功能",
     thisFeature: "你剛才使用的功能",

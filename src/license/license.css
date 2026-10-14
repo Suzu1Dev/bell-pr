@@ -77,6 +77,10 @@
   color: var(--color-text);
   font-weight: 600;
 }
+.upgrade-feature-limit {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
 .upgrade-feature-tag {
   color: var(--color-violet);
   font-size: var(--text-2xs);

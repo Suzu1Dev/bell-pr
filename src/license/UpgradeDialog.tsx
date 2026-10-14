@@ -89,9 +89,11 @@ export function UpgradeDialog({
   );
   const subtitle =
     request.error ||
-    (triggered
-      ? t.upgrade.featureLocked({ feature: t.plans.features[triggered.id].label })
+    (triggered?.feature
+      ? t.upgrade.featureNeedsPro[triggered.feature]
       : t.upgrade.general);
+  // Free has these with a smaller limit: say what Pro allows.
+  const proLimits: Partial<Record<ProFeature, string>> = t.upgrade.proLimits;
   // The rows a Pro feature gates; the license term row is not a feature.
   const proRows = planFeatureTable.filter((row) => row.feature !== undefined);
   const purchaseUrl = productLink("purchaseUrl");
@@ -138,6 +140,9 @@ export function UpgradeDialog({
               >
                 <ProBadge />
                 <span>{t.plans.features[row.id].label}</span>
+                {row.feature && proLimits[row.feature] && (
+                  <span className="upgrade-feature-limit">{proLimits[row.feature]}</span>
+                )}
                 {row === triggered && (
                   <span className="upgrade-feature-tag">{t.upgrade.thisFeature}</span>
                 )}
