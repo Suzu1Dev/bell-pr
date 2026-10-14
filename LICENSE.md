@@ -10,10 +10,7 @@ EULA version: 1.0-draft-2026-10-14
 ## Owner placeholders
 
 Fill in each item, then delete this list. Each item appears exactly once in
-the text below, as a bracketed placeholder that starts with OWNER. When this
-text changes, change the version line above and `eulaVersion` in
-`shared/product.ts` together; once counsel has approved the text, the
-version becomes `1.0` and the DRAFT banner goes.
+the text below, as a bracketed placeholder that starts with OWNER.
 
 - [ ] **Licensor** (preamble): the seller's legal name, legal form and
   postal address.
