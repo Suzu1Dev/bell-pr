@@ -28,6 +28,7 @@ import { synchronizeExplanations } from "./explanations.js";
 import { currentLocale, sm } from "./i18n/index.js";
 import { log } from "./log.js";
 import * as cleanup from "./cleanup.js";
+import { runJanitor } from "./janitor.js";
 
 import { collectDraftContext } from "./draft-sources.js";
 import { synchronizeDraftPreparation } from "./drafts.js";
@@ -147,7 +148,7 @@ export class Workbench {
    */
   readonly entitlements: () => Entitlements;
   private readonly context: WorkbenchContext;
-  /** The first retention pass; never rejects. */
+  /** The startup janitor, then the first retention pass; never rejects. */
   readonly maintenance: Promise<void>;
   private retentionTimer?: NodeJS.Timeout;
   constructor(
@@ -208,7 +209,8 @@ export class Workbench {
       explanations: (id) => this.explanations(id),
       prepareRunDraft: (id, options) => this.prepareRunDraft(id, options),
     };
-    this.maintenance = this.startMaintenance();
+    const startedAt = Date.now();
+    this.maintenance = this.startMaintenance(startedAt);
     this.retentionTimer = setInterval(() => {
       void this.applyRetention();
     }, retentionIntervalMs);
@@ -216,9 +218,13 @@ export class Workbench {
     this.resume();
   }
 
-  /** Frees the files of runs past the retention period once at the start. */
-  private async startMaintenance() {
+  /**
+   * Removes crash leftovers (janitor.ts), then frees the files of runs
+   * past the retention period. Entries newer than `startedAt` are kept.
+   */
+  private async startMaintenance(startedAt: number) {
     try {
+      await runJanitor(this.context, { startedAt });
       await this.applyRetention();
     } catch (error) {
       log.warn("maintenance.failed", { error });
