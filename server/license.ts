@@ -40,6 +40,7 @@ import {
 } from "../shared/plans.js";
 import { product, productLink } from "../shared/product.js";
 import { defaultActiveRunLimit } from "./agent-slots.js";
+import { AppSettingsService, withAppSettings } from "./app-settings.js";
 import { buildDate as currentBuildDate } from "./build-info.js";
 import { resolveDataDir } from "./config.js";
 import { writeDurable } from "./fs-atomic.js";
@@ -880,6 +881,19 @@ export async function runLicenseCli(
   argv: string[],
   deps: LicenseCliDeps = {},
 ): Promise<number> {
+  // The language chosen in the app applies, as in `bell-pr doctor`: after
+  // a locale in effect, before BELLPR_LOCALE.
+  const env = deps.env ?? process.env;
+  const dataDir = deps.dataDir ?? resolveDataDir({}, env);
+  return withAppSettings(new AppSettingsService(dataDir, { env }), () =>
+    licenseCli(argv, { ...deps, dataDir }),
+  );
+}
+
+async function licenseCli(
+  argv: string[],
+  deps: LicenseCliDeps & { dataDir: string },
+): Promise<number> {
   const stdout = deps.stdout ?? process.stdout;
   const stderr = deps.stderr ?? process.stderr;
   const env = deps.env ?? process.env;
@@ -921,7 +935,7 @@ export async function runLicenseCli(
     return usage(m.license.cli.missingKey);
 
   const license = new OfflineLicenseService(
-    deps.dataDir ?? resolveDataDir({}, env),
+    deps.dataDir,
     {
       envKey: env.BELLPR_LICENSE_KEY,
       publicKeys: deps.publicKeys ?? licensePublicKeys,

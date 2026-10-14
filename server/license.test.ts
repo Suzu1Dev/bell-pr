@@ -1163,6 +1163,30 @@ test("bell-pr license refuses mistakes, invalid keys and keys set in the environ
   assert.doesNotMatch(status.stdout, /bell-pr license activate/);
 });
 
+test("bell-pr license follows the language saved in the app", async (t) => {
+  const dataDir = path.join(await tempDir(t), "data");
+  mkdirSync(dataDir);
+  const status = async () => {
+    const stdout = output();
+    // No locale in effect, as on the command line.
+    await runLicenseCli([], {
+      dataDir,
+      stdout: stdout.stream,
+      stderr: output().stream,
+      env: {},
+      publicKeys,
+      revoked: [],
+      now: () => now,
+    });
+    return stdout.text();
+  };
+  // Either way round, so BELLPR_LOCALE cannot be what decides.
+  writeFileSync(path.join(dataDir, "app-settings.json"), JSON.stringify({ locale: "zh-TW" }));
+  assert.match(await status(), /^方案：/);
+  writeFileSync(path.join(dataDir, "app-settings.json"), JSON.stringify({ locale: "en" }));
+  assert.match(await status(), /^Plan: Free\n/);
+});
+
 // ---------------------------------------------------------------------------
 // tools/license
 
