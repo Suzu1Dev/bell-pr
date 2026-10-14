@@ -124,3 +124,43 @@ test("the demo shows a preview and a completion button instead of sending", () =
   assert.doesNotMatch(html, /會送到 GitHub 的 PR 說明/);
   assert.doesNotMatch(html, /disabled=""/);
 });
+
+test("a follow-up round previews its commit and pushes to the PR branch instead of opening a PR", () => {
+  const round = {
+    id: "r2",
+    requestedAt: "2026-10-11T01:00:00Z",
+    feedbackUrls: [],
+    status: "review" as const,
+    parentCommit: "b".repeat(40),
+  };
+  const roundRun: Run = {
+    ...run,
+    prUrl: "https://github.com/openfetch-sample/open-fetch/pull/3",
+    publishedBranch: "retry-backoff",
+    draft: {
+      ...run.draft,
+      publishBranch: "ignored-branch",
+      commitMessage: "Rename the option\n\nAddress the review on retry.ts.",
+    },
+    followUps: [round],
+  };
+  const html = render({ run: roundRun }, { followUp: round });
+  assert.match(html, /<h2 id="modal-title">把這輪修正推到 PR。<\/h2>/);
+  assert.match(html, /PR 標題與說明不變，也不會覆蓋 GitHub 上的其他提交/);
+  // The pushed branch is fixed once the PR exists.
+  assert.match(html, /retry-backoff<span>→<\/span>main/);
+  assert.doesNotMatch(html, /ignored-branch/);
+  assert.match(
+    html,
+    /<strong>這輪的提交訊息<\/strong><pre>Rename the option\n\nAddress the review on retry\.ts\.<\/pre>/,
+  );
+  assert.doesNotMatch(html, /會送到 GitHub 的 PR 說明/);
+  assert.match(html, /<button class="button primary">.*推送這輪修正<\/button>/);
+
+  const sync = render(
+    { run: roundRun },
+    { followUp: { ...round, kind: "sync" } },
+  );
+  assert.match(sync, /<h2 id="modal-title">把同步結果推到 PR。<\/h2>/);
+  assert.match(sync, /這會在 PR 分支加上一個合併 commit/);
+});
