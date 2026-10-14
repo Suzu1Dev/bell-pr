@@ -17,6 +17,10 @@ export function Modal({
 }) {
   const t = useT("modals");
   const panel = useRef<HTMLDivElement>(null);
+  // The latest onClose, so a parent that passes a new function on every
+  // render does not move the focus back to the first field each time.
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     const before = document.activeElement as HTMLElement;
     // Land on the first real field or action; the close button is the
@@ -28,7 +32,7 @@ export function Modal({
     first?.focus();
     const handler = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing || document.querySelector("dialog[open]")) return;
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") close.current();
       if (event.key === "Tab") {
         const nodes = panel.current?.querySelectorAll<HTMLElement>(
           "button:not(:disabled), input, textarea, select, a[href]",
@@ -51,7 +55,7 @@ export function Modal({
       document.removeEventListener("keydown", handler);
       before?.focus();
     };
-  }, [onClose]);
+  }, []);
   return (
     <div
       className="modal-backdrop"
