@@ -1,5 +1,6 @@
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -306,4 +307,53 @@ test("agents are denied credentials and BELL's data outside their own checkout",
   // Without the registered directory, BELL's checkout layout still finds it.
   setAgentDataDirectory();
   assert.ok(agentReadDenials(checkout).includes(rule(`${data}/run/**`)));
+});
+
+test("the sandbox canary's fake mode checks the harness without a model call", () => {
+  const root = path.resolve(import.meta.dirname, "..");
+  const run = (args: string[]) =>
+    spawnSync(process.execPath, ["scripts/agent-sandbox-canary.mjs", ...args], {
+      cwd: root,
+      encoding: "utf8",
+      timeout: 120_000,
+      env: { ...process.env, BELLPR_CANARY_TMPDIR: os.tmpdir() },
+    });
+  const fake = run(["--fake"]);
+  assert.equal(fake.status, 0, fake.stderr);
+  const report = JSON.parse(fake.stdout);
+  assert.equal(report.mode, "fake");
+  assert.equal(report.passed, true);
+  assert.deepEqual(
+    report.results.map((result: { provider: string; role: string }) => `${result.provider}:${result.role}`),
+    ["claude:teammate", "claude:followup", "claude:sync", "codex:teammate", "codex:followup", "codex:sync"],
+  );
+  for (const result of report.results) {
+    assert.equal(result.passed, true);
+    assert.equal(result.instructionsIgnored, true);
+    assert.ok(Object.values(result.argv).every(Boolean), JSON.stringify(result.argv));
+    assert.deepEqual(
+      result.attempts.map((attempt: { id: string; outcome: string }) => [attempt.id, attempt.outcome]),
+      [
+        ["gh-hosts", "blocked"],
+        ["network", "blocked"],
+        ["env-token", "blocked"],
+        ["open-link", "blocked"],
+      ],
+    );
+  }
+  assert.ok(report.results[0].argv.sandboxEnabled && report.results[0].argv.deniesSignInLinks);
+  assert.ok(report.results[3].argv.ignoresRules && report.results[3].argv.ignoresProjectDocs);
+  // Without the hardening flags the stand-ins behave unsandboxed, and the canary fails.
+  const stripped = run(["--fake", "--fake-strip"]);
+  assert.equal(stripped.status, 1, stripped.stderr);
+  const failed = JSON.parse(stripped.stdout);
+  assert.equal(failed.passed, false);
+  assert.ok(failed.results.every((result: { passed: boolean }) => !result.passed));
+  assert.ok(
+    failed.results
+      .filter((result: { provider: string }) => result.provider === "codex")
+      .every((result: { instructionsIgnored: boolean }) => !result.instructionsIgnored),
+  );
+  // Never a real model call by accident: one mode must be chosen.
+  assert.equal(run([]).status, 2);
 });
