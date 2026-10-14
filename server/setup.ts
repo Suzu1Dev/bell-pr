@@ -35,8 +35,10 @@ export const setupJsonSchema = {
   },
 };
 
-// The person may run these with sudo: one line, and never a download piped into a shell.
-const unsafeCommand = /[\r\n]|\b(?:curl|wget)\b|\|\s*(?:sudo\s+)?\S*sh\b/;
+// The person may run these with sudo: one line, and never a download run by a
+// shell, whether piped (`| sh`) or substituted (`sh <(curl …)`, `$(wget …)`).
+const unsafeCommand =
+  /[\r\n]|\|\s*(?:sudo\s+)?\S*sh\b|[<$]\(\s*(?:curl|wget)\b/;
 
 /** Keeps well-formed needs and drops the rest; an agent's answer is not trusted. */
 export function parseSetupNeeds(value: unknown): SetupNeed[] {

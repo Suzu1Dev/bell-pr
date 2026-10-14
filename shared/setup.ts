@@ -19,7 +19,8 @@ export function mergeSetupNeeds(
   const merged = new Map<string, SetupNeed & { from: string[] }>();
   for (const { from, needs } of sources)
     for (const need of needs ?? []) {
-      const key = need.command.replace(/\s+/g, " ").trim();
+      // Spacing inside quotes can matter to a shell, so only the ends are trimmed.
+      const key = need.command.trim();
       const entry = merged.get(key);
       if (!entry) merged.set(key, { ...need, from: [from] });
       else if (!entry.from.includes(from)) entry.from.push(from);

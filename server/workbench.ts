@@ -94,6 +94,7 @@ import {
   installBoundaries,
   setupInstruction,
 } from "./setup.js";
+import { mergeSetupNeeds } from "../shared/setup.js";
 import {
   checkoutTreeOnto,
   conflictJsonSchema,
@@ -1791,8 +1792,12 @@ export class Workbench {
         const result = parseMemberResult(answer);
         task.report = result.report;
         run.reports![task.id] = result.report;
-        if (result.setup.length) task.setup = result.setup;
-        else delete task.setup;
+        // A later turn may not repeat what an earlier one could not run.
+        const setup = mergeSetupNeeds([
+          { from: task.owner, needs: task.setup },
+          { from: task.owner, needs: result.setup },
+        ]).map(({ from: _from, ...need }) => need);
+        if (setup.length) task.setup = setup;
         for (const message of result.messages) {
           try {
             this.queueTeamMessage(run, task.owner, message.to, message.content);

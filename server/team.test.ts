@@ -609,7 +609,21 @@ test("team execution waits for plan approval, runs isolated independent members 
                 },
               ],
             }
-          : `${taskId} complete; fake runner only.`,
+          : taskId === "alpha" && !input.prompt.includes("Use alpha-final")
+            ? {
+                summary: "alpha first turn; fake runner only.",
+                checks: [],
+                tradeoffs: "",
+                limitations: "",
+                setup: [
+                  {
+                    need: "GLib 開發標頭",
+                    command: "sudo apt install libglib2.0-dev",
+                    reason: "cargo test 需要它。",
+                  },
+                ],
+              }
+            : `${taskId} complete; fake runner only.`,
       messages:
         taskId === "beta" ? [{ to: "lead", content: "beta ready" }] : [],
     });
@@ -706,7 +720,11 @@ test("team execution waits for plan approval, runs isolated independent members 
     assert.deepEqual(run.team!.tasks.find((task) => task.id === "beta")!.setup, [
       { need: "rustfmt", command: "rustup component add rustfmt", reason: "cargo fmt --check 需要它。" },
     ]);
-    assert.equal(run.team!.tasks.find((task) => task.id === "alpha")!.setup, undefined);
+    // alpha's second turn reported no setup; what its first turn could not run stays.
+    assert.deepEqual(run.team!.tasks.find((task) => task.id === "alpha")!.setup, [
+      { need: "GLib 開發標頭", command: "sudo apt install libglib2.0-dev", reason: "cargo test 需要它。" },
+    ]);
+    assert.equal(run.team!.tasks.find((task) => task.id === "join")!.setup, undefined);
     // Integrated tasks no longer need their checkout; the path stays as a record.
     const registered = (await git(run.worktreePath, ["worktree", "list"]))
       .stdout;
