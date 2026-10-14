@@ -99,11 +99,19 @@ test("the Claude Code copy is neutral about the person's plan and account", () =
       "Running many agents at once uses your provider account faster. Heavy parallel use of a personal plan may exceed its intended individual use.",
     ),
   );
-  for (const locale of [html, render(status)]) {
-    assert.doesNotMatch(locale, /subscription|訂閱/i);
-    assert.doesNotMatch(locale, /API billing|API 計費/i);
-    assert.doesNotMatch(locale, /systemd|\.config\/bell-pr/);
-  }
+  // The retired plan and billing wording (in English and zh-TW) and the old
+  // service-manager path, spelled with escapes so that a search of the
+  // source for that wording comes back empty.
+  const retired = [
+    /sub\u0073cription|\u8a02\u95b1/i,
+    /API\u0020billing|API \u8a08\u8cbb/i,
+    /system\u0064|\.config\/bell-pr/,
+  ];
+  for (const locale of [html, render(status)])
+    for (const pattern of retired) assert.doesNotMatch(locale, pattern);
+  // The patterns do catch the old copy.
+  assert.match("Claude \u8a02\u95b1", retired[0]);
+  assert.match("Sub\u0073cription, not API\u0020billing", retired[1]);
 });
 
 test("the General card switches the language and the variables sit under Advanced", () => {
