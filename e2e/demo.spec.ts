@@ -56,6 +56,14 @@ test("the sample goes from reviewing every file to its published sample PR", asy
   await expect(page.locator(".sample-published")).toContainText(demo.publishedCard!.title);
   await expect(page.locator(".workspace-heading .status-badge")).toHaveText(common.runStatus.published);
   await expect(approve).toBeDisabled();
+  // As on a real PR, the opened sample takes no more review marks.
+  await tab(page, "changes").click();
+  const reviewed = page.getByRole("checkbox", { name: review.diff.reviewed });
+  await expect(reviewed).toBeChecked();
+  await reviewed.click();
+  await expect(reviewed).toBeChecked();
+  await expect(page.locator(".workspace-heading .status-badge")).toHaveText(common.runStatus.published);
+  await tab(page, "draft").click();
   // The sample PR links nowhere, and its feedback is a labelled sample.
   await expect(page.locator('a[href^="#demo-pr"]')).toHaveCount(0);
   await page.getByRole("button", { name: new RegExp(workspace.feedback.fetch) }).click();

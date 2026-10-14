@@ -664,6 +664,10 @@ export function useRunActions({
     if (!file) return;
     const reviewed = !run.reviewedFiles.includes(file.path);
     if (demo) {
+      // As on the server, only a run in review takes review marks: the
+      // sample PR, once opened (or on its way), stays as it was approved.
+      if (!["review", "approved"].includes(run.status) || run.publishing)
+        return;
       setRun((previous) => ({
         ...previous,
         status: "review",
