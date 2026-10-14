@@ -11,6 +11,16 @@
     <link rel="icon" href="../assets/brand/favicon.svg" type="image/svg+xml">
     <link rel="icon" href="../assets/brand/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon.png">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="BELL PR">
+    <meta property="og:title" content="End User License Agreement: BELL PR">
+    <meta property="og:description" content="The terms under which you may install and use BELL PR, on the Free plan and with a Pro license.">
+    <!-- generated:product-meta key=homepageUrl property="og:url" path="legal/eula.html" -->
+    <!-- /generated:product-meta -->
+    <!-- generated:product-meta key=homepageUrl property="og:image" path="assets/brand/og-image.png" -->
+    <!-- /generated:product-meta -->
+    <meta property="og:image" content="../assets/brand/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
     <link rel="stylesheet" href="../site.css">
   </head>
   <body>
@@ -34,15 +44,105 @@
           <p class="eyebrow">Legal</p>
           <h1>End User License Agreement</h1>
           <p class="lead">The terms under which you may install and use BELL PR, on the Free plan and with a Pro license.</p>
+          <p class="doc-source">This page shows <code>LICENSE.md</code>, which ships with BELL PR.</p>
         </div>
       </section>
 
       <section class="section section-tinted">
         <div class="wrap">
-          <div class="prose">
-            <!-- TODO [OWNER] Placeholder page: 7B generates the final page from LICENSE.md with site/build-legal.mjs. -->
-            <p class="notice"><span class="owner">[OWNER]</span> This document is a draft pending review. Its final text is published on this page before purchasing opens. Until then, the current draft ships with BELL PR as <code>LICENSE.md</code>.</p>
-          </div>
+          <article class="prose legal">
+            <blockquote class="notice">
+              <p><strong>DRAFT, pending counsel review.</strong> This is a working draft. It is not in force and it is not legal advice. Do not ship it in a release or sell licenses under it until counsel has reviewed it and every owner placeholder below is filled in.</p>
+            </blockquote>
+            <p>EULA version: 1.0-draft-2026-10-14</p>
+            <h2 id="owner-placeholders">Owner placeholders</h2>
+            <p>Fill in each item, then delete this list. Each item appears exactly once in the text below, as a bracketed placeholder that starts with OWNER. When this text changes, change the version line above and <code>eulaVersion</code> in <code>shared/product.ts</code> together; once counsel has approved the text, the version becomes <code>1.0</code> and the DRAFT banner goes.</p>
+            <ul>
+              <li><strong>Licensor</strong> (preamble): the seller&#39;s legal name, legal form and postal address.</li>
+              <li><strong>Free commercial use</strong> (section 3.2): confirm that the Free License allows commercial use, or restrict it.</li>
+              <li><strong>Pro term</strong> (section 4.2): confirm a perpetual license with 12 months of updates, or change it to a subscription term. Keys from a pre-signed pool count their update period from the day the pool was issued, not from the sale, so issue pools close to the sale or with a longer period.</li>
+              <li><strong>Governing law and venue</strong> (section 18).</li>
+              <li><strong>Notices</strong> (section 20.5): the address for legal notices.</li>
+            </ul>
+            <hr>
+            <p>This End User License Agreement (the &quot;Agreement&quot;) is a contract between you and <span class="owner">[OWNER: licensor legal name, legal form and address]</span> (&quot;we&quot;, &quot;us&quot; or &quot;our&quot;). It governs your use of BELL PR. Please read it carefully.</p>
+            <h2 id="1-definitions">1. Definitions</h2>
+            <ul>
+              <li><strong>&quot;Software&quot;</strong> means BELL PR in every form we distribute it, including the npm package, container images, documentation and any updates we provide.</li>
+              <li><strong>&quot;Build&quot;</strong> means one released version of the Software, identified by its version number and release date.</li>
+              <li><strong>&quot;Free Feature Set&quot;</strong> means the features the Software provides without an active Pro license or trial.</li>
+              <li><strong>&quot;Pro Feature Set&quot;</strong> means the additional features that the Software unlocks with an active License Key or trial. The Software&#39;s plan comparison and the feature table in TERMS.md list them.</li>
+              <li><strong>&quot;License Key&quot;</strong> means a key we issue that unlocks the Pro Feature Set for a number of seats.</li>
+              <li><strong>&quot;Named User&quot;</strong> means one individual person to whom one seat is assigned.</li>
+              <li><strong>&quot;Update Period&quot;</strong> has the meaning given in section 4.2.</li>
+              <li><strong>&quot;Third-Party Services&quot;</strong> means the services the Software uses through tools you install and sign in to yourself, such as GitHub, OpenAI and Anthropic.</li>
+            </ul>
+            <h2 id="2-accepting-this-agreement">2. Accepting this Agreement</h2>
+            <p>2.1 By installing or using the Software, you agree to this Agreement. If you do not agree, do not install or use the Software.</p>
+            <p>2.2 The Software&#39;s web interface asks you to accept this version of the Agreement before you first use it, and again whenever the version changes; until you accept, the rest of the interface stays locked. The version is the &quot;EULA version&quot; line at the top of this Agreement.</p>
+            <p>2.3 If you accept on behalf of an organization, you confirm that you are authorized to bind it, and &quot;you&quot; includes that organization.</p>
+            <h2 id="3-free-license">3. Free License</h2>
+            <p>3.1 Subject to this Agreement, we grant you a non-exclusive, non-transferable, non-sublicensable, royalty-free license to install and use the Software, with the Free Feature Set, on computers you own or control.</p>
+            <p>3.2 You may use the Free License for personal and commercial purposes <span class="owner">[OWNER: confirm that the Free License allows commercial use]</span>.</p>
+            <h2 id="4-pro-license">4. Pro License</h2>
+            <p>4.1 <strong>Grant.</strong> When you buy a Pro license and we deliver a License Key, we grant you a non-exclusive, non-transferable, non-sublicensable license, for each seat you paid for, for one Named User to use the Pro Feature Set on computers that person owns or controls. A Named User may install the Software on several of their own computers.</p>
+            <p>4.2 <strong>Term and updates.</strong> The Pro License is perpetual for every Build released within the Update Period. The Update Period ends on the &quot;updates until&quot; date that your License Key carries, which the Software shows in the License section of its settings and with <code>bell-pr license status</code>. Unless your order states otherwise, that date is 12 months after your purchase <span class="owner">[OWNER: confirm a perpetual license with 12 months of updates, or change it to a subscription term]</span>. After the Update Period ends, you may keep using the Pro Feature Set in the Builds released within it. Builds released later run with the Free Feature Set unless you renew. If your License Key carries an expiry date instead, the Pro Feature Set ends 7 days after that date (a grace period).</p>
+            <p>4.3 <strong>Named Users.</strong> Each seat belongs to one Named User at a time. You may reassign a seat permanently to a different person, for example when someone leaves your organization, but you may not share a seat between people.</p>
+            <p>4.4 <strong>Trial.</strong> The Software offers one 14-day trial of the Pro Feature Set per data directory. It starts only when you start it, and it ends automatically. The trial is free of charge, and this section 4 applies to it except for payment.</p>
+            <p>4.5 <strong>License Keys.</strong> The Software checks License Keys offline, on your computer, and never sends them anywhere. Keep your License Key confidential; you are responsible for its use. We may revoke a License Key that was refunded, charged back, leaked or obtained in breach of this Agreement. A revocation takes effect in the Builds released after it; earlier Builds keep accepting the key offline, but using a revoked key in any Build breaches this Agreement.</p>
+            <h2 id="5-restrictions">5. Restrictions</h2>
+            <p>These restrictions apply to the Free License, the Pro License and the trial. You must not, and must not allow anyone else to:</p>
+            <p>(a) redistribute, sell, resell, rent, lease, lend or sublicense the Software, its package or any License Key, or otherwise make them available to others, except as this Agreement allows;</p>
+            <p>(b) remove, disable, modify or get around any license check, License Key verification, trial limit, acceptance prompt, or copyright, trademark or license notice in the Software;</p>
+            <p>(c) host or operate the Software for others, or offer it as a service. One installation serves one person, who uses it with their own GitHub, OpenAI and Anthropic accounts;</p>
+            <p>(d) publish, share or generate License Keys, or use a License Key that we did not issue to you or that was revoked;</p>
+            <p>(e) use the Software in breach of any law or of the terms of a Third-Party Service.</p>
+            <h2 id="6-third-party-components">6. Third-party components</h2>
+            <p>The Software includes open-source components. Each is licensed under its own terms, listed in THIRD_PARTY_NOTICES.md, and those terms apply to that component instead of this Agreement. Nothing in this Agreement limits the rights those licenses give you. For the programs under the GNU GPL or LGPL in the container image, THIRD_PARTY_NOTICES.md also contains a written offer for their source code.</p>
+            <h2 id="7-third-party-services-and-your-accounts">7. Third-party services and your accounts</h2>
+            <p>7.1 The Software works through tools you install and sign in to yourself: git, the GitHub CLI, and the OpenAI Codex CLI or Claude Code. It uses those tools, and the Third-Party Services behind them, under your own accounts. It never reads or stores the passwords or tokens those tools keep.</p>
+            <p>7.2 Each Third-Party Service&#39;s own terms and policies govern your use of it. You are responsible for following them and for any fees, usage limits and quotas, which count against your own accounts.</p>
+            <p>7.3 We do not provide, control or support the Third-Party Services. We are not responsible for their availability, their output, their changes or the way they handle your data. BELL PR is not affiliated with, or endorsed by, GitHub, OpenAI or Anthropic.</p>
+            <h2 id="8-ai-output">8. AI output</h2>
+            <p>8.1 The Software uses AI models, through the tools in section 7, to analyse projects, plan work, write and change code, explain changes and draft pull request text. AI output can be wrong, incomplete or insecure, and it can resemble existing code that is under other licenses.</p>
+            <p>8.2 You must review every change, explanation and text before you publish it or rely on it. The Software publishes nothing until you have marked every changed file as reviewed and approved the pull request text. You are responsible for what you publish, including following each project&#39;s contribution rules and licenses.</p>
+            <p>8.3 The Software labels text that AI models wrote, such as project analyses, recommendations, explanations and the agents&#39; answers, as AI-generated. Whether a pull request says that AI helped is your decision: the Software offers an editable disclosure line, which is off unless you turn it on or the project&#39;s own rules ask for a disclosure (TERMS.md section 4.4).</p>
+            <h2 id="9-agent-execution-risk">9. Agent execution risk</h2>
+            <p>9.1 Agents run commands on your computer. To build, test and change the projects you import, they also run those projects&#39; own code, scripts and dependencies, which you have not reviewed and which may be harmful.</p>
+            <p>9.2 The Software gives each run its own working copy and runs agents in the sandboxes that the agent tools provide: Claude Code agents that change code run only inside Claude Code&#39;s sandbox, and Codex CLI agents run inside the Codex sandbox. No sandbox is complete. If you allow agents to run without a sandbox, they run with all the permissions of your user account, and the Software marks every run in which they did.</p>
+            <p>9.3 Import only projects you are willing to run on that computer, do not run the Software as an administrator or root, and keep backups. SECURITY.md describes the safeguards and their limits. You accept the risks described in this section.</p>
+            <h2 id="10-your-data">10. Your data</h2>
+            <p>The Software runs on your computer and stores its data there. It sends us no telemetry and never contacts us. PRIVACY.md describes what the Software stores and what the tools it runs send to Third-Party Services.</p>
+            <h2 id="11-updates-and-support">11. Updates and support</h2>
+            <p>We may release new Builds, but we are not obliged to provide updates, support or any particular feature, except for the Pro Feature Set in Builds released within the Update Period. Features may change from one Build to the next.</p>
+            <h2 id="12-ownership">12. Ownership</h2>
+            <p>We and our licensors own the Software and all intellectual property in it. This Agreement licenses the Software to you; it does not sell it. We reserve every right that this Agreement does not expressly grant. As between you and us, we claim no ownership of the code and text that the Software helps you produce.</p>
+            <h2 id="13-warranty-disclaimer">13. Warranty disclaimer</h2>
+            <p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SOFTWARE OR ITS AI OUTPUT IS CORRECT, SECURE OR FREE OF ERRORS, THAT ANY SANDBOX WILL CONTAIN HARMFUL CODE, OR THAT A PROJECT WILL ACCEPT YOUR CONTRIBUTION.</p>
+            <h2 id="14-limitation-of-liability">14. Limitation of liability</h2>
+            <p>14.1 TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE ARE NOT LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF PROFITS, REVENUE, DATA OR GOODWILL, ARISING OUT OF OR RELATED TO THIS AGREEMENT OR THE SOFTWARE, EVEN IF WE WERE TOLD THEY WERE POSSIBLE.</p>
+            <p>14.2 TO THE MAXIMUM EXTENT PERMITTED BY LAW, OUR TOTAL LIABILITY ARISING OUT OF OR RELATED TO THIS AGREEMENT OR THE SOFTWARE IS LIMITED TO THE FEES YOU PAID US FOR THE SOFTWARE IN THE 12 MONTHS BEFORE THE EVENT THAT GAVE RISE TO THE CLAIM.</p>
+            <p>14.3 Nothing in this Agreement limits liability that the law does not allow to be limited, such as liability for death or personal injury caused by negligence, for fraud, or for intent or gross negligence where the law requires it.</p>
+            <h2 id="15-consumer-rights">15. Consumer rights</h2>
+            <p>If you are a consumer, the mandatory consumer laws of the country where you live may give you rights that this Agreement cannot exclude or limit. Sections 13 and 14 apply only as far as those laws allow.</p>
+            <h2 id="16-termination">16. Termination</h2>
+            <p>16.1 This Agreement lasts until it ends under this section. You may end it at any time by uninstalling the Software and deleting your License Keys.</p>
+            <p>16.2 Your licenses end automatically if you breach section 5. We may end your licenses by notice if you materially breach any other part of this Agreement and do not cure the breach within 30 days after our notice. A Pro License also ends when we refund it.</p>
+            <p>16.3 When a license ends, you must stop using what it covered and delete the License Keys it applied to. Sections 8, 9 and 12 to 20 survive the end of this Agreement.</p>
+            <h2 id="17-export-compliance">17. Export compliance</h2>
+            <p>You must comply with the export control and sanctions laws that apply to you and to the Software. You confirm that you are not located in, or ordinarily resident in, a country or region under comprehensive embargo, and that you are not on a government list of restricted parties. You must not use, export or re-export the Software in breach of those laws.</p>
+            <h2 id="18-governing-law-and-venue">18. Governing law and venue</h2>
+            <p>This Agreement is governed by the law, and disputes about it go to the courts, named here: <span class="owner">[OWNER: governing law and venue]</span>. Section 15 still applies.</p>
+            <h2 id="19-changes-to-this-agreement">19. Changes to this Agreement</h2>
+            <p>We may publish new versions of this Agreement. Each version has its own &quot;EULA version&quot; line, and a new Build may ship with a new version. The Software asks you to accept the new version before you use a Build that ships with it. If you do not accept it, you may keep using earlier Builds under the version you accepted for them.</p>
+            <h2 id="20-general">20. General</h2>
+            <p>20.1 <strong>Entire agreement.</strong> This Agreement, together with the terms of sale in TERMS.md and the refund policy in REFUND.md for purchases, is the entire agreement between you and us about the Software.</p>
+            <p>20.2 <strong>Severability.</strong> If a court finds part of this Agreement unenforceable, the rest stays in effect.</p>
+            <p>20.3 <strong>No waiver.</strong> If we do not enforce a part of this Agreement, we do not waive our right to enforce it later.</p>
+            <p>20.4 <strong>Assignment.</strong> You may not transfer this Agreement or your licenses without our written consent, except for reassigning a seat under section 4.3. We may transfer them as part of a merger, an acquisition or a sale of the business that the Software belongs to.</p>
+            <p>20.5 <strong>Notices.</strong> Send legal notices to <span class="owner">[OWNER: address for legal notices]</span>. We may send notices to you at the e-mail address you gave when you bought a license, or in the release notes of a Build.</p>
+            <p>20.6 <strong>Language.</strong> The English version of this Agreement controls. Translations are provided for convenience only.</p>
+          </article>
         </div>
       </section>
     </main>

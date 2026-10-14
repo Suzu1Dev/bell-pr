@@ -11,6 +11,16 @@
     <link rel="icon" href="../assets/brand/favicon.svg" type="image/svg+xml">
     <link rel="icon" href="../assets/brand/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon.png">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="BELL PR">
+    <meta property="og:title" content="Privacy Policy: BELL PR">
+    <meta property="og:description" content="What BELL PR does with data on your computer, and what the seller does with data when you buy a license or ask for support.">
+    <!-- generated:product-meta key=homepageUrl property="og:url" path="legal/privacy.html" -->
+    <!-- /generated:product-meta -->
+    <!-- generated:product-meta key=homepageUrl property="og:image" path="assets/brand/og-image.png" -->
+    <!-- /generated:product-meta -->
+    <meta property="og:image" content="../assets/brand/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
     <link rel="stylesheet" href="../site.css">
   </head>
   <body>
@@ -34,15 +44,110 @@
           <p class="eyebrow">Legal</p>
           <h1>Privacy Policy</h1>
           <p class="lead">What BELL PR does with data on your computer, and what the seller does with data when you buy a license or ask for support.</p>
+          <p class="doc-source">This page shows <code>PRIVACY.md</code>, which ships with BELL PR.</p>
         </div>
       </section>
 
       <section class="section section-tinted">
         <div class="wrap">
-          <div class="prose">
-            <!-- TODO [OWNER] Placeholder page: 7B generates the final page from PRIVACY.md with site/build-legal.mjs. -->
-            <p class="notice"><span class="owner">[OWNER]</span> This document is a draft pending review. Its final text is published on this page before purchasing opens. Until then, the current draft ships with BELL PR as <code>PRIVACY.md</code>.</p>
-          </div>
+          <article class="prose legal">
+            <blockquote class="notice">
+              <p><strong>DRAFT, pending counsel review.</strong> This is a working draft. It is not in force and it is not legal advice. Do not publish it until counsel has reviewed it and every owner placeholder below is filled in.</p>
+            </blockquote>
+            <h2 id="owner-placeholders">Owner placeholders</h2>
+            <p>Fill in each item, then delete this list. Each item appears exactly once in the text below, as a bracketed placeholder that starts with OWNER.</p>
+            <ul>
+              <li><strong>Seller</strong> (Who we are): the seller&#39;s legal name, legal form and postal address.</li>
+              <li><strong>Merchant of Record</strong> (Buying a Pro license): the payment provider.</li>
+              <li><strong>Order record retention</strong> (Buying a Pro license): how long order records are kept.</li>
+              <li><strong>Privacy contact</strong> (Your rights): an e-mail address or form for privacy requests.</li>
+            </ul>
+            <hr>
+            <h2 id="summary">Summary</h2>
+            <ul>
+              <li>BELL PR runs on your computer. There is no BELL PR cloud service and no BELL PR account.</li>
+              <li>BELL PR sends no telemetry, analytics or crash reports, and there is no license server. The app never contacts us.</li>
+              <li>Your code and your questions go only to the services you set up yourself: the AI provider behind the coding CLI you choose, and GitHub. They go there under your own accounts and those services&#39; privacy policies.</li>
+              <li>Web access for agents is off unless you turn it on.</li>
+              <li>Everything BELL PR stores stays in its data directory on your computer, and you can delete it from the app.</li>
+            </ul>
+            <h2 id="who-we-are">Who we are</h2>
+            <p><span class="owner">[OWNER: seller legal name, legal form and address]</span> (&quot;we&quot;) makes BELL PR. This policy explains what the BELL PR app does with data on your computer, and what we do with data when you buy a Pro license or contact us.</p>
+            <h2 id="what-bell-pr-does-not-do">What BELL PR does not do</h2>
+            <ul>
+              <li>It sends no telemetry, usage analytics, crash reports or diagnostics to us or to anyone else. It does not check for updates either.</li>
+              <li>It uses no license server. License keys are checked offline on your computer; activating a key, removing it or starting the trial sends nothing anywhere.</li>
+              <li>Its web interface loads nothing from other sites. Fonts and icons are bundled with the app (self-hosted), and its content security policy blocks requests to other sites.</li>
+              <li>It does not read or store the passwords and tokens of the tools it runs. git, the GitHub CLI, the Codex CLI and Claude Code keep their own sign-ins.</li>
+            </ul>
+            <h2 id="what-leaves-your-computer-and-where-it-goes">What leaves your computer, and where it goes</h2>
+            <p>BELL PR runs command-line tools that you installed and signed in to. Those tools send data to their providers under your accounts. Each provider&#39;s own terms and privacy policy decide what it keeps, for how long, and whether it may use the data to train models. The tools may also send their own usage data to their providers, as their own settings decide; BELL PR neither adds to it nor turns it off.</p>
+            <h3 id="the-ai-coding-cli-you-choose">The AI coding CLI you choose</h3>
+            <p>Contribution runs, project analysis, discovery, explanations, follow-up questions, pull request drafts, maintainer-feedback coaching and follow-up rounds use the OpenAI Codex CLI or Claude Code. The CLI sends data to its provider: OpenAI for the Codex CLI, and Anthropic for Claude Code, or the cloud platform you set Claude Code up to use, such as Amazon Bedrock, Google Vertex AI or Microsoft Foundry. It sends:</p>
+            <ul>
+              <li>the instructions BELL PR writes for each task, including the contribution direction you describe and the plan you approved;</li>
+              <li>source code and other files of the repository you imported: the files the agents open, the excerpts BELL PR selects for project analysis, diffs, and the project&#39;s contribution guidelines and pull request template;</li>
+              <li>the output of the commands the agents run in the working copy, such as builds and tests;</li>
+              <li>the questions you ask about a change, with the diff, explanation and review reports they refer to;</li>
+              <li>the review comments and check results of your pull request, when you ask for maintainer-feedback coaching or start a follow-up round;</li>
+              <li>for discovery, your search interests and the public details, documents, open issues and comments of the GitHub repositories that the search found.</li>
+            </ul>
+            <p>Before BELL PR saves run logs, agent answers, your questions and team messages, it masks text shaped like a credential, such as GitHub tokens, API keys, license keys and private keys. It does the same with the context of a pull request draft before an agent sees it.</p>
+            <h3 id="github-through-the-github-cli-and-git">GitHub, through the GitHub CLI and git</h3>
+            <p>Under your GitHub account, BELL PR:</p>
+            <ul>
+              <li>clones and fetches the repositories you import, and reads their details, issues, contribution guidelines and templates;</li>
+              <li>searches GitHub for projects, when you run discovery;</li>
+              <li>reads the review comments and check results of your pull requests, when you ask for maintainer-feedback coaching;</li>
+              <li>writes only after you approve: it creates a fork when needed, pushes a branch and opens a draft pull request with the title, description and commits you approved, and later pushes only the follow-up commits you approved. It never force-pushes.</li>
+            </ul>
+            <p>Commits carry the git name and e-mail address you configured, and they become public on GitHub. The app asks you to confirm, once per address, before it publishes a commit e-mail address that is not a GitHub no-reply address.</p>
+            <h3 id="web-access-for-agents-off-by-default">Web access for agents (off by default)</h3>
+            <p>Web access is a Pro feature that you turn on in the AI provider settings. While it is on, the agents that work on a contribution (the team, the mentor that answers your follow-up questions, conflict resolution and follow-up rounds) can search the web and read web pages through the AI CLI&#39;s own web tools. Project analysis, discovery, explanations and pull request drafts never get it. Search queries go to the provider&#39;s search service. With Claude Code, agents may open pages only on github.com, docs.github.com and raw.githubusercontent.com; the Codex CLI uses OpenAI&#39;s own web search. The run log records the queries and addresses, not the page contents. Agents are told not to put repository contents, file paths or secrets into queries, but that is an instruction to an AI model, not a guarantee: leave web access off for confidential code.</p>
+            <h2 id="what-bell-pr-stores-on-your-computer">What BELL PR stores on your computer</h2>
+            <p>BELL PR keeps its data in one data directory: <code>~/.bellpr</code> by default, or the directory you choose with <code>--data-dir</code> or <code>BELLPR_DATA_DIR</code>. BELL PR keeps the directory at permissions 0700, so other user accounts cannot read anything in it, and creates its files readable by your user account only.</p>
+            <div class="table-frame">
+            <table class="doc-table">
+              <thead>
+                <tr><th scope="col">Item</th><th scope="col">What it holds</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row"><code>state.json</code>, with <code>state.json.bak.1</code> to <code>.bak.3</code>, <code>state.quarantine.json</code> and <code>state.json.corrupt-&lt;time&gt;</code></th><td data-label="What it holds">The repositories you imported and your runs: contribution directions, plans, agent logs and reports, review progress, explanations, follow-up questions and answers, notes and pull request drafts. A damaged file is kept aside, never silently dropped.</td></tr>
+                <tr><th scope="row"><code>repositories/</code></th><td data-label="What it holds">BELL PR&#39;s own clones of the repositories you imported, from GitHub or from a folder on your computer.</td></tr>
+                <tr><th scope="row"><code>worktrees/</code> and <code>team-worktrees/</code></th><td data-label="What it holds">A working copy for each run and each teammate, with the changes the agents made.</td></tr>
+                <tr><th scope="row"><code>insights/</code></th><td data-label="What it holds">Each project&#39;s cached analysis, recommendations and contribution preferences.</td></tr>
+                <tr><th scope="row"><code>model-settings.json</code></th><td data-label="What it holds">The agent tool, model, reasoning effort and web access setting you chose.</td></tr>
+                <tr><th scope="row"><code>discovery.json</code></th><td data-label="What it holds">Discovery preferences, jobs and results.</td></tr>
+                <tr><th scope="row"><code>license.json</code></th><td data-label="What it holds">The license key you activated, when you activated it, the latest time the app saw (to notice a clock that was set back), and the trial start date.</td></tr>
+                <tr><th scope="row"><code>app-settings.json</code></th><td data-label="What it holds">Language, limits, onboarding status, the version of the license terms you accepted, safety settings, the AI-assistance note setting and the retention period.</td></tr>
+                <tr><th scope="row"><code>author-emails.json</code></th><td data-label="What it holds">SHA-256 fingerprints of the commit e-mail addresses you confirmed when publishing, so the app asks only once per address.</td></tr>
+                <tr><th scope="row"><code>children.json</code></th><td data-label="What it holds">Process IDs of the agent tools that are running, so that BELL PR can stop leftovers after a crash.</td></tr>
+                <tr><th scope="row"><code>logs/</code></th><td data-label="What it holds">Daily log files, at most 7 files and 50 MB in total. Secret-shaped text is masked, and BELL PR does not write prompts or page contents to them.</td></tr>
+                <tr><th scope="row"><code>bellpr.lock</code> and <code>run/</code></th><td data-label="What it holds">The running instance&#39;s process ID, port and version, and the one-time sign-in link for <code>bell-pr open</code>, which that command deletes as soon as it has read it.</td></tr>
+              </tbody>
+            </table>
+            </div>
+            <p>While a run works, Git may also keep short-lived temporary files in the data directory. BELL PR deletes them when the step is done, or at the next start after a crash.</p>
+            <p>Your browser also keeps some data for this local site only: the language you chose, the contribution you opened last, layout preferences and the sample project&#39;s progress (in local storage), a note that the page reloaded once after an update (in session storage), and a sign-in cookie that is valid for 30 days.</p>
+            <p>If you set <code>BELLPR_LICENSE_KEY</code>, the key is also wherever you set that variable.</p>
+            <p>The working copies of cancelled and failed runs are removed automatically 14 days after their last activity, or after the retention period you set in Settings (1 to 365 days). Runs in review, approved runs and published runs keep their working copy until you free it, because reviews, follow-up rounds and syncing need it. The run records stay until you delete them.</p>
+            <h2 id="deleting-your-data">Deleting your data</h2>
+            <p>In the app you can free a run&#39;s working copy, delete a run, and remove an imported repository together with BELL PR&#39;s clone and its cached analysis. &quot;Delete all data&quot; in Settings erases every project, run, analysis, discovery result, log and backup at once; it keeps your settings, your license and the running server&#39;s own files. To remove everything, stop BELL PR, delete the data directory, and clear the site data that your browser keeps for BELL PR&#39;s address.</p>
+            <p>Data you sent to GitHub or to an AI provider is under that service&#39;s control. Delete it there under that service&#39;s policies, for example by closing a pull request or deleting a fork. We never receive your project data, so we cannot delete it for you.</p>
+            <h2 id="license-keys">License keys</h2>
+            <p>A license key is checked offline against a public key built into the app. The key contains a license ID, the plan, the number of seats, and dates: the issue date, and either the end of the update period or, for subscriptions, the expiry date. It contains a name and an e-mail address only if the seller embeds them when issuing the key; keys from a pre-issued pool contain neither. The key stays on your computer, in <code>license.json</code> or in <code>BELLPR_LICENSE_KEY</code>. The app shows its name and e-mail address, when it has them, in the License section of Settings, in the About dialog and in <code>bell-pr license status</code>. Logs record only the license ID and the plan.</p>
+            <h2 id="buying-a-pro-license">Buying a Pro license</h2>
+            <p>Pro licenses are sold through our Merchant of Record, <span class="owner">[OWNER: provider]</span>, which processes your payment, taxes and invoices under its own privacy policy. We do not receive your payment card details.</p>
+            <p>From the Merchant of Record we receive what we need to deliver and support your license: your name, e-mail address, country, order number and the license ID we issued. We use this information to deliver license keys, handle refunds and revocations, answer your support requests, and meet our tax and accounting obligations. We keep these order records for <span class="owner">[OWNER: retention period for order records]</span>. We do not sell them or use them for advertising.</p>
+            <h2 id="contacting-us">Contacting us</h2>
+            <p>If you contact us, we receive what you send, and we use it only to answer you. The About dialog can copy a diagnostics report to your clipboard: the app and Node.js versions, the operating system, the versions and sign-in status of the tools BELL PR uses, its limits, the size of the data directory and the number of projects and runs, and up to 500 recent log lines. Secrets, paths and your GitHub user name are masked in it. It reaches us only if you choose to send it, so check it before you do.</p>
+            <h2 id="your-rights">Your rights</h2>
+            <p>Depending on where you live, you may have the right to access, correct or delete the personal data we hold about you (in practice, order and support records), to object to or restrict its use, and to receive a copy of it. To make a request, contact <span class="owner">[OWNER: privacy contact]</span>. You may also complain to your data protection authority.</p>
+            <h2 id="children">Children</h2>
+            <p>BELL PR is a developer tool and is not directed at children.</p>
+            <h2 id="changes-to-this-policy">Changes to this policy</h2>
+            <p>We publish changes to this policy with the release notes of the app. Each release ships with the version of this policy that applies to it.</p>
+          </article>
         </div>
       </section>
     </main>

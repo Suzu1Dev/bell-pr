@@ -770,6 +770,117 @@ main {
   color: var(--text);
 }
 
+/* Legal documents, rendered from the Markdown by build-legal.mjs */
+.doc-source {
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: 15px;
+}
+.legal blockquote {
+  margin: 0;
+}
+.legal blockquote > :first-child {
+  margin-top: 0;
+}
+.legal h2 {
+  scroll-margin-top: 16px;
+}
+.legal hr {
+  margin: 40px 0 0;
+  border: 0;
+  border-top: 1px solid var(--border-strong);
+}
+.legal hr + h2 {
+  margin-top: 40px;
+}
+.legal ul,
+.legal ol {
+  padding-left: 1.4em;
+}
+.legal li::marker {
+  color: var(--brand-600);
+}
+.legal code {
+  overflow-wrap: anywhere;
+}
+.legal .table-frame {
+  margin-top: 14px;
+}
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.doc-table th,
+.doc-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.doc-table thead th {
+  background: var(--sunken);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.doc-table tbody th {
+  font-weight: 600;
+}
+.doc-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+@media (max-width: 760px) {
+  .legal .table-frame {
+    overflow: visible;
+    border: 0;
+    background: none;
+  }
+  .doc-table,
+  .doc-table tbody,
+  .doc-table tr,
+  .doc-table th,
+  .doc-table td {
+    display: block;
+  }
+  .doc-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .doc-table tbody tr {
+    margin-bottom: 12px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+  }
+  .doc-table th,
+  .doc-table td,
+  .doc-table tbody tr:last-child > * {
+    padding: 0;
+    border: 0;
+  }
+  .doc-table td {
+    margin-top: 8px;
+  }
+  .doc-table td::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+}
+
 /* FAQ */
 .faq {
   max-width: 820px;

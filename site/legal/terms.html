@@ -6,11 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="referrer" content="no-referrer">
     <title>Terms of Sale and Responsible Use: BELL PR</title>
-    <meta name="description" content="The terms of sale for Pro licenses, and the rules for contributing to other people's projects responsibly with BELL PR.">
+    <meta name="description" content="The terms of sale for Pro licenses, and the rules for contributing to other people&#39;s projects responsibly with BELL PR.">
     <meta name="theme-color" content="#1f6d50">
     <link rel="icon" href="../assets/brand/favicon.svg" type="image/svg+xml">
     <link rel="icon" href="../assets/brand/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon.png">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="BELL PR">
+    <meta property="og:title" content="Terms of Sale and Responsible Use: BELL PR">
+    <meta property="og:description" content="The terms of sale for Pro licenses, and the rules for contributing to other people&#39;s projects responsibly with BELL PR.">
+    <!-- generated:product-meta key=homepageUrl property="og:url" path="legal/terms.html" -->
+    <!-- /generated:product-meta -->
+    <!-- generated:product-meta key=homepageUrl property="og:image" path="assets/brand/og-image.png" -->
+    <!-- /generated:product-meta -->
+    <meta property="og:image" content="../assets/brand/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
     <link rel="stylesheet" href="../site.css">
   </head>
   <body>
@@ -33,16 +43,97 @@
         <div class="wrap">
           <p class="eyebrow">Legal</p>
           <h1>Terms of Sale and Responsible Use</h1>
-          <p class="lead">The terms of sale for Pro licenses, and the rules for contributing to other people's projects responsibly with BELL PR.</p>
+          <p class="lead">The terms of sale for Pro licenses, and the rules for contributing to other people&#39;s projects responsibly with BELL PR.</p>
+          <p class="doc-source">This page shows <code>TERMS.md</code>, which ships with BELL PR.</p>
         </div>
       </section>
 
       <section class="section section-tinted">
         <div class="wrap">
-          <div class="prose">
-            <!-- TODO [OWNER] Placeholder page: 7B generates the final page from TERMS.md with site/build-legal.mjs. -->
-            <p class="notice"><span class="owner">[OWNER]</span> This document is a draft pending review. Its final text is published on this page before purchasing opens.</p>
-          </div>
+          <article class="prose legal">
+            <blockquote class="notice">
+              <p><strong>DRAFT, pending counsel review.</strong> This is a working draft. It is not in force and it is not legal advice. Do not publish it or take payment under it until counsel has reviewed it and every owner placeholder below is filled in.</p>
+            </blockquote>
+            <h2 id="owner-placeholders">Owner placeholders</h2>
+            <p>Fill in each item, then delete this list. Each item appears exactly once in the text below, as a bracketed placeholder that starts with OWNER.</p>
+            <ul>
+              <li><strong>Seller</strong> (section 1): the seller&#39;s legal name, legal form and postal address.</li>
+              <li><strong>Seller disclosures</strong> (section 1): any seller information the law requires you to publish, such as a German Impressum or the seller disclosure required by Japan&#39;s Act on Specified Commercial Transactions, or delete the sentence.</li>
+              <li><strong>Merchant of Record</strong> (section 2.1): the payment provider.</li>
+              <li><strong>Support contact</strong> (section 9): use <code>supportEmail</code> from <code>shared/product.ts</code> once the owner sets it. THIRD_PARTY_NOTICES.md section E points source-code requests to this contact.</li>
+            </ul>
+            <hr>
+            <h2 id="1-about-these-terms">1. About these terms</h2>
+            <p>These terms cover buying BELL PR Pro licenses and how you may use BELL PR to contribute to projects that other people maintain. They work together with:</p>
+            <ul>
+              <li>the license terms in LICENSE.md (the &quot;EULA&quot;), which govern your use of the software and prevail over these terms if the two conflict about it;</li>
+              <li>the privacy policy in PRIVACY.md;</li>
+              <li>the refund and delivery policy in REFUND.md.</li>
+            </ul>
+            <p>Capitalized terms, such as &quot;License Key&quot; and &quot;Named User&quot;, have the meaning that the EULA gives them. The seller is <span class="owner">[OWNER: seller legal name, legal form and address]</span> (&quot;we&quot;). <span class="owner">[OWNER: seller disclosures required by law, or delete this sentence]</span></p>
+            <h2 id="2-buying-a-pro-license">2. Buying a Pro license</h2>
+            <p>2.1 <strong>Merchant of Record.</strong> Pro licenses are sold through a Merchant of Record, <span class="owner">[OWNER: provider]</span>, which resells them to you, takes your payment, charges and pays sales taxes such as VAT, and issues your invoice. Its checkout terms also apply to your payment.</p>
+            <p>2.2 <strong>Price.</strong> The checkout shows the price, the currency and the taxes before you pay.</p>
+            <p>2.3 <strong>What you get.</strong> A License Key for the number of seats you bought. Each seat unlocks the Pro Feature Set for one Named User, for the Builds released within the Update Period, as section 4 of the EULA describes. The feature table at the end of these terms lists what Free and Pro include in this Build. A Pro license does not include any AI or GitHub usage: those run under your own accounts with those services.</p>
+            <p>2.4 <strong>Delivery.</strong> REFUND.md says how and when we deliver License Keys, and explains the consent to immediate delivery that the checkout asks for.</p>
+            <p>2.5 <strong>Try first.</strong> The app offers a free 14-day Pro trial, once per data directory, so you can check that Pro works for you before you buy.</p>
+            <p>2.6 <strong>Refunds.</strong> REFUND.md describes the refund window and what happens to a refunded License Key.</p>
+            <p>2.7 <strong>Organizations.</strong> If you buy for an organization, you assign each seat to one Named User and make sure that each of them follows the EULA and these terms.</p>
+            <h2 id="3-free-use">3. Free use</h2>
+            <p>The Free Feature Set needs no purchase, no license key and no account, and it has no time limit.</p>
+            <h2 id="4-responsible-contribution">4. Responsible contribution</h2>
+            <p>BELL PR helps you contribute to projects that other people maintain, often in their spare time. When you use it, you agree to the following.</p>
+            <p>4.1 <strong>You approve every pull request.</strong> BELL PR publishes nothing until you have marked every changed file as reviewed and approved the pull request text, and it then opens the pull request as a draft. Approve only changes that you understand and can explain, and be ready to answer the maintainers&#39; review. You are the author of what you publish.</p>
+            <p>4.2 <strong>Follow each project&#39;s rules.</strong> Read and follow the project&#39;s CONTRIBUTING guide, code of conduct, pull request template, any Contributor License Agreement (CLA) or Developer Certificate of Origin (DCO), and any policy on AI-assisted contributions. Some projects do not accept AI-assisted contributions at all; respect that. BELL PR shows the contribution rules and templates it finds, with their sources, but it can miss some, so check the project yourself.</p>
+            <p>4.3 <strong>Sign only what you can certify.</strong> BELL PR never adds a <code>Signed-off-by</code> line or any other sign-off for you, and it refuses a suggested description or commit message that contains one. Add one yourself only if you can make the certification it stands for.</p>
+            <p>4.4 <strong>Be open about AI assistance.</strong> BELL PR can add an editable line to a pull request description saying that the change was prepared with AI coding agents and reviewed by you. The line is off unless you turn it on, for one pull request or for all of them in Settings; when the project&#39;s own rules ask for a disclosure, BELL PR quotes the rule and includes the line in its suggested description. Keep an accurate disclosure wherever the project asks for one. In the app, text that AI models wrote, such as analyses, explanations and answers, is labelled as AI-generated; check it before you rely on it.</p>
+            <p>4.5 <strong>No bulk or unsolicited pull requests.</strong> Do not use BELL PR to open many pull requests across projects, to send changes that maintainers did not ask for and are unlikely to want (such as mass reformatting, renames or trivial fixes), or to inflate contribution counts. For anything beyond a small fix, ask the maintainers first, for example in an issue.</p>
+            <p>4.6 <strong>Follow the platforms&#39; rules.</strong> Follow GitHub&#39;s Acceptable Use Policies and your AI provider&#39;s usage policies, including any limits on automated activity.</p>
+            <p>If you use BELL PR in breach of this section, we may end your licenses under section 16 of the EULA.</p>
+            <h2 id="5-your-accounts-and-third-party-services">5. Your accounts and third-party services</h2>
+            <p>BELL PR uses GitHub, OpenAI and Anthropic services through tools that you install and sign in to yourself, under your own accounts. Their terms apply to you, and their fees, usage limits and quotas count against your accounts. We do not provide, control or support those services.</p>
+            <h2 id="6-non-affiliation-and-trademarks">6. Non-affiliation and trademarks</h2>
+            <p>BELL PR is an independent product. It is not affiliated with, endorsed by or sponsored by GitHub, OpenAI or Anthropic. GitHub, OpenAI, Codex, Anthropic, Claude and Claude Code are trademarks of their respective owners. BELL PR uses these names only to say which tools it works with.</p>
+            <h2 id="7-changes">7. Changes</h2>
+            <p>We may change BELL PR and these terms. A change to these terms applies to purchases made after we publish it.</p>
+            <h2 id="8-your-statutory-rights">8. Your statutory rights</h2>
+            <p>Nothing in these terms limits the rights you have under the mandatory consumer laws of the country where you live.</p>
+            <h2 id="9-contact">9. Contact</h2>
+            <p>For questions about an order or about these terms, contact <span class="owner">[OWNER: support contact]</span>. Requests for source code under the written offer in THIRD_PARTY_NOTICES.md go to the same contact.</p>
+            <h2 id="10-governing-law">10. Governing law</h2>
+            <p>These terms are governed by the same law, and disputes about them go to the same courts, as section 18 of the EULA names.</p>
+            <h2 id="feature-table">Feature table</h2>
+            <p>What Free and Pro include in this Build, generated from the same source as the plan comparison in the app. Section 4 of the EULA governs the license term.</p>
+            <div class="table-frame">
+            <table class="doc-table">
+              <thead>
+                <tr><th scope="col">Feature</th><th scope="col">Plan</th><th scope="col">Limits</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">Repositories and contribution runs</th><td data-label="Plan">Free</td><td data-label="Limits">Unlimited repositories and runs</td></tr>
+                <tr><th scope="row">Project analysis with verified recommendations</th><td data-label="Plan">Free</td><td data-label="Limits">Up to 5 recommendations per analysis; re-analysis is allowed. Recommendations you already generated (up to 30) stay visible after a downgrade.</td></tr>
+                <tr><th scope="row">More recommendations (&quot;Generate 5 more&quot;, up to 30 per project)</th><td data-label="Plan">Pro</td><td data-label="Limits">Free: 5. Pro: up to 30 per project.</td></tr>
+                <tr><th scope="row">Agent team size</th><td data-label="Plan">Free (limited)</td><td data-label="Limits">Free: Lead, 2 teammates, Reviewer and Test analyst. Pro and trial: 3 or 4 teammates.</td></tr>
+                <tr><th scope="row">Concurrent runs</th><td data-label="Plan">Free (limited)</td><td data-label="Limits">Free: one contribution at a time; other runs wait in the queue. Pro: up to your configured limit (2 by default, at most 8).</td></tr>
+                <tr><th scope="row">Plan approval and revision, team inbox, retry of failed subtasks</th><td data-label="Plan">Free</td><td data-label="Limits">Up to 3 plan revisions</td></tr>
+                <tr><th scope="row">Diff review, explanations, follow-up chat, notes, suggested review order</th><td data-label="Plan">Free</td><td data-label="Limits">No limit</td></tr>
+                <tr><th scope="row">Re-run Reviewer and Test analyst</th><td data-label="Plan">Free</td><td data-label="Limits">No limit (part of the human review safety gate)</td></tr>
+                <tr><th scope="row">Rule-aware PR draft, preflight checks, publishing a Draft PR</th><td data-label="Plan">Free</td><td data-label="Limits">Human approval is required on every plan</td></tr>
+                <tr><th scope="row">Syncing a run onto the latest target branch, agent conflict resolution, updating a project&#39;s local clone</th><td data-label="Plan">Free</td><td data-label="Limits">No limit (unpublished runs and published PRs)</td></tr>
+                <tr><th scope="row">Learning notes page</th><td data-label="Plan">Free</td><td data-label="Limits">No limit</td></tr>
+                <tr><th scope="row">Learning record export (Markdown)</th><td data-label="Plan">Pro</td><td data-label="Limits">Free: not available (the notes page stays Free)</td></tr>
+                <tr><th scope="row">Maintainer feedback, CI coaching and AI follow-up rounds</th><td data-label="Plan">Pro</td><td data-label="Limits">Free: not available; the sample project shows example feedback labelled PRO. Follow-up rounds already on a run stay readable after a downgrade, and an open round can still be reviewed, pushed, stopped or discarded.</td></tr>
+                <tr><th scope="row">Discovery (GitHub-wide recommendations)</th><td data-label="Plan">Pro</td><td data-label="Limits">Free: labelled sample results only. Results you already have stay readable, and a running discovery can still be cancelled.</td></tr>
+                <tr><th scope="row">Web access for agents</th><td data-label="Plan">Pro</td><td data-label="Limits">Free: off. Pro: on, limited to an allowlist of domains</td></tr>
+                <tr><th scope="row">Deep reasoning efforts (xhigh, max, ultra)</th><td data-label="Plan">Pro</td><td data-label="Limits">Free: choose none to high. Leaving the effort on &quot;Default&quot; uses the model&#39;s own default effort on every plan.</td></tr>
+                <tr><th scope="row">Providers, model choice, Efficiency modes</th><td data-label="Plan">Free</td><td data-label="Limits">Codex CLI and Claude Code, all models, all efficiency modes</td></tr>
+                <tr><th scope="row">Sample project / demo (Pro features shown with sample data)</th><td data-label="Plan">Free</td><td data-label="Limits">Sample data in your browser only</td></tr>
+                <tr><th scope="row">14-day Pro trial</th><td data-label="Plan">Free</td><td data-label="Limits">One per data directory, started only when you choose (in the app or with bell-pr license trial)</td></tr>
+                <tr><th scope="row">Pro license term and updates</th><td data-label="Plan">Pro</td><td data-label="Limits">Per named user; perpetual use of the builds released within 12 months of purchase</td></tr>
+              </tbody>
+            </table>
+            </div>
+          </article>
         </div>
       </section>
     </main>

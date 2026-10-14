@@ -11,6 +11,16 @@
     <link rel="icon" href="../assets/brand/favicon.svg" type="image/svg+xml">
     <link rel="icon" href="../assets/brand/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon.png">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="BELL PR">
+    <meta property="og:title" content="Security Policy: BELL PR">
+    <meta property="og:description" content="How BELL PR protects your computer and your accounts, and how to report a vulnerability privately.">
+    <!-- generated:product-meta key=homepageUrl property="og:url" path="legal/security.html" -->
+    <!-- /generated:product-meta -->
+    <!-- generated:product-meta key=homepageUrl property="og:image" path="assets/brand/og-image.png" -->
+    <!-- /generated:product-meta -->
+    <meta property="og:image" content="../assets/brand/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
     <link rel="stylesheet" href="../site.css">
   </head>
   <body>
@@ -34,15 +44,103 @@
           <p class="eyebrow">Legal</p>
           <h1>Security Policy</h1>
           <p class="lead">How BELL PR protects your computer and your accounts, and how to report a vulnerability privately.</p>
+          <p class="doc-source">This page shows <code>SECURITY.md</code>, which ships with BELL PR.</p>
         </div>
       </section>
 
       <section class="section section-tinted">
         <div class="wrap">
-          <div class="prose">
-            <!-- TODO [OWNER] Placeholder page: 7B generates the final page from SECURITY.md with site/build-legal.mjs. -->
-            <p class="notice"><span class="owner">[OWNER]</span> This document is a draft pending review. Its final text is published on this page before purchasing opens. Until then, the current draft ships with BELL PR as <code>SECURITY.md</code>.</p>
-          </div>
+          <article class="prose legal">
+            <blockquote class="notice">
+              <p><strong>DRAFT, pending owner review.</strong> This policy describes BELL PR 1.0 as released. Fill in the owner placeholder below before you publish it.</p>
+            </blockquote>
+            <h2 id="owner-placeholders">Owner placeholders</h2>
+            <p>Fill in each item, then delete this list. Each item appears exactly once in the text below, as a bracketed placeholder that starts with OWNER.</p>
+            <ul>
+              <li><strong>Security contact</strong> (Reporting a vulnerability): the private address for security reports. Use <code>securityEmail</code> from <code>shared/product.ts</code> once the owner sets it.</li>
+            </ul>
+            <hr>
+            <h2 id="supported-versions">Supported versions</h2>
+            <div class="table-frame">
+            <table class="doc-table">
+              <thead>
+                <tr><th scope="col">Version</th><th scope="col">Security fixes</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">Latest 1.x release</th><td data-label="Security fixes">Yes</td></tr>
+                <tr><th scope="row">Earlier 1.x releases</th><td data-label="Security fixes">No: update to the latest release</td></tr>
+                <tr><th scope="row">Pre-releases (beta and release candidates)</th><td data-label="Security fixes">No</td></tr>
+              </tbody>
+            </table>
+            </div>
+            <p>Security fixes ship as new releases. A Pro license covers the releases published within its update period. A release published after that period runs with the Free feature set unless you renew, but you can still install it to get the fix.</p>
+            <h2 id="reporting-a-vulnerability">Reporting a vulnerability</h2>
+            <p>Report vulnerabilities privately to <span class="owner">[OWNER: security contact]</span>. Do not open a public issue, pull request or discussion about a vulnerability.</p>
+            <p>Please include:</p>
+            <ul>
+              <li>the BELL PR version (<code>bell-pr --version</code>), your operating system, and the versions of the agent CLIs involved (<code>bell-pr doctor</code> lists them);</li>
+              <li>the steps to reproduce the problem, and what an attacker gains;</li>
+              <li>whether and when you plan to publish your findings.</li>
+            </ul>
+            <p>Do not include real tokens, license keys or private data; use test values.</p>
+            <p>What happens next:</p>
+            <ul>
+              <li>We acknowledge your report within 5 business days and keep you informed while we investigate and fix it.</li>
+              <li>We credit you in the release notes, unless you prefer not to be named.</li>
+              <li><strong>Disclosure:</strong> please wait 90 days after your report, or until a fix is released if that is sooner, before you publish details. If we need more time, we explain why and agree on a date with you.</li>
+            </ul>
+            <p>We will not take legal action against good-faith research that follows this policy, stays within your own installation and accounts, and does not harm other people&#39;s data, privacy or services.</p>
+            <h2 id="threat-model">Threat model</h2>
+            <p>BELL PR is a single-user tool. It runs on your computer as your user account, and it drives AI coding agents in copies of other people&#39;s repositories. These are the safeguards it relies on, and their limits.</p>
+            <h3 id="the-local-server">The local server</h3>
+            <ul>
+              <li>BELL PR listens on the loopback interface (127.0.0.1) by default.</li>
+              <li>To listen on another address you set <code>--host</code> or <code>BELLPR_HOST</code>, and unless that address covers every interface you also set <code>BELLPR_PUBLIC_URL</code>. A public URL or allowed origin other than this computer must use HTTPS, through a reverse proxy that you secure yourself.</li>
+              <li>The server answers only requests for its own host names and allowed origins, refuses cross-site requests, accepts changes only as JSON, and sends a strict content security policy with every page.</li>
+              <li>Listening on every interface (<code>0.0.0.0</code>, as the Docker image does inside its container) lets anyone who can reach the port reach the sign-in page. Publish such a port on 127.0.0.1 only.</li>
+            </ul>
+            <h3 id="the-session-token-and-sign-in-links">The session token and sign-in links</h3>
+            <ul>
+              <li>At every start, BELL PR creates a random 32-byte session token. It is kept in the server&#39;s memory and never written to a file, an environment variable or BELL PR&#39;s own command line. A restart signs every browser out.</li>
+              <li>BELL PR prints a sign-in link that holds this token, and works until the next restart. Keep that link, and any terminal scrollback or service log that shows it, as private as a password.</li>
+              <li>When BELL PR opens that link in your browser for you at start, it passes the link to your system&#39;s <code>open</code> or <code>xdg-open</code> command, whose command line other user accounts on the same computer may be able to see. On a computer that you share with other users, start BELL PR with <code>--no-open</code> and open the printed link yourself, or get a one-time link with <code>bell-pr open --print</code>.</li>
+              <li>Opening a sign-in link stores the token in an HttpOnly, SameSite=Strict cookie that lasts 30 days. Every request except the health check and the sign-in page itself needs that cookie.</li>
+              <li><code>bell-pr open</code> asks the running server for a one-time sign-in link. Each link works once and expires after 120 seconds, at most 5 can be open at a time, and the server keeps only a digest of each.</li>
+              <li>The server passes the link to <code>bell-pr open</code> through a file in the data directory that only your user account can read, and <code>bell-pr open</code> deletes that file as soon as it has read it.</li>
+              <li>Any program that runs as your user account can ask for such a link, just as it can read your other files. Every program you run as that user is therefore trusted.</li>
+            </ul>
+            <h3 id="imported-repositories-are-untrusted">Imported repositories are untrusted</h3>
+            <p>The code, scripts, git configuration and agent instruction files of a repository you import may be hostile. BELL PR:</p>
+            <ul>
+              <li>clones a repository you import from your own disk into its data directory instead of working in your own copy;</li>
+              <li>runs git with overrides for programs a repository could configure, and refuses a repository whose local git configuration sets filters, diff or merge drivers, credential helpers, includes or similar programs;</li>
+              <li>does not let agents load the project&#39;s own agent instructions and settings, such as <code>AGENTS.md</code>, <code>CLAUDE.md</code> or <code>.claude/settings.json</code>, as instructions;</li>
+              <li>passes agent reports, diffs and maintainer feedback to other agents as untrusted data;</li>
+              <li>checks pull request text for secrets and local paths, and asks you to confirm changes to CI workflow files, before it publishes anything.</li>
+            </ul>
+            <h3 id="the-agent-sandbox-and-its-limits">The agent sandbox and its limits</h3>
+            <ul>
+              <li>Agents that change code also run the project&#39;s builds and tests.</li>
+              <li>Claude Code agents that change code run every command inside Claude Code&#39;s sandbox (bubblewrap and socat on Linux, the built-in sandbox on macOS): those commands can write only in the run&#39;s working copy, and they have no network access.</li>
+              <li>Every Claude Code agent is denied reading common credential files, such as SSH keys, the GitHub CLI&#39;s sign-in, cloud credentials and the agent CLIs&#39; own sign-ins, and BELL PR&#39;s data outside the current working copy.</li>
+              <li>Claude Code agents that only read, such as the Reviewer, the Test analyst and the mentor, cannot run commands and can read only their working directory.</li>
+              <li>Codex CLI agents run in the Codex sandbox, which limits writing to the working copy and turns network access off, but lets them read any file your user account can read.</li>
+              <li>BELL PR passes no agent your GitHub token or a BELL PR license key: each agent CLI&#39;s environment holds only the basics and its own sign-in settings.</li>
+              <li>With web access on (Pro), agents can search the web, and Claude Code agents may open pages on github.com, docs.github.com and raw.githubusercontent.com only. Search results and pages are treated as untrusted data.</li>
+              <li>If the Claude Code sandbox is not available, BELL PR refuses to start Claude Code agents that change code, unless you turn on unsandboxed agents in Settings or set <code>BELLPR_ALLOW_UNSANDBOXED_AGENTS=1</code>. The app marks every run that used unsandboxed agents.</li>
+              <li>Unsandboxed agents run with all the permissions of your user account, including your files, credentials and network.</li>
+              <li>A sandbox depends on the agent CLI version and on the operating system, and it can have flaws. Do not run BELL PR as root or an administrator, and run it under a user account whose data you are willing to expose to the projects you import.</li>
+              <li>In Docker, the container adds another boundary, but the agents&#39; sandbox cannot start under Docker&#39;s default security options; the Docker documentation describes the options that let it start, and what they relax.</li>
+            </ul>
+            <h3 id="out-of-scope">Out of scope</h3>
+            <ul>
+              <li>Attacks that need code already running as your user account, or administrator access to your computer.</li>
+              <li>Vulnerabilities in GitHub, OpenAI, Anthropic, the GitHub CLI, the Codex CLI or Claude Code. Report those to their vendors.</li>
+              <li>Effects of a hostile repository that stay within the limits described above, such as changes to its own working copy.</li>
+              <li>Pull requests that you approved and published.</li>
+              <li>Runs with unsandboxed agents, which you chose to trust fully.</li>
+            </ul>
+          </article>
         </div>
       </section>
     </main>

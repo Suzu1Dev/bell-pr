@@ -11,6 +11,16 @@
     <link rel="icon" href="../assets/brand/favicon.svg" type="image/svg+xml">
     <link rel="icon" href="../assets/brand/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon.png">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="BELL PR">
+    <meta property="og:title" content="Refund and Delivery Policy: BELL PR">
+    <meta property="og:description" content="How license keys are delivered, and when and how you can get a refund.">
+    <!-- generated:product-meta key=homepageUrl property="og:url" path="legal/refund.html" -->
+    <!-- /generated:product-meta -->
+    <!-- generated:product-meta key=homepageUrl property="og:image" path="assets/brand/og-image.png" -->
+    <!-- /generated:product-meta -->
+    <meta property="og:image" content="../assets/brand/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
     <link rel="stylesheet" href="../site.css">
   </head>
   <body>
@@ -34,15 +44,49 @@
           <p class="eyebrow">Legal</p>
           <h1>Refund and Delivery Policy</h1>
           <p class="lead">How license keys are delivered, and when and how you can get a refund.</p>
+          <p class="doc-source">This page shows <code>REFUND.md</code>, which ships with BELL PR.</p>
         </div>
       </section>
 
       <section class="section section-tinted">
         <div class="wrap">
-          <div class="prose">
-            <!-- TODO [OWNER] Placeholder page: 7B generates the final page from REFUND.md with site/build-legal.mjs. -->
-            <p class="notice"><span class="owner">[OWNER]</span> This document is a draft pending review. Its final text is published on this page before purchasing opens.</p>
-          </div>
+          <article class="prose legal">
+            <blockquote class="notice">
+              <p><strong>DRAFT, pending counsel review.</strong> This is a working draft. It is not in force and it is not legal advice. Do not publish it or take payment under it until counsel has reviewed it and every owner placeholder below is filled in.</p>
+            </blockquote>
+            <h2 id="owner-placeholders">Owner placeholders</h2>
+            <p>Fill in each item, then delete this list. Each item appears exactly once in the text below, as a bracketed placeholder that starts with OWNER.</p>
+            <ul>
+              <li><strong>Delivery method</strong> (Delivery of your License Key): instant, from a pool of pre-signed keys, or by hand.</li>
+              <li><strong>Manual delivery time</strong> (Delivery of your License Key): the number of business days; delete that sentence if delivery is instant.</li>
+              <li><strong>Refund window</strong> (Refunds): 14 or 30 days.</li>
+              <li><strong>Merchant of Record</strong> (How to ask for a refund): the payment provider.</li>
+              <li><strong>Refund contact</strong> (How to ask for a refund).</li>
+            </ul>
+            <hr>
+            <p>This policy explains how you receive a BELL PR Pro License Key, how to get a refund, and what happens to a refunded key. Capitalized terms have the meaning that the license terms in LICENSE.md (the &quot;EULA&quot;) give them.</p>
+            <h2 id="delivery-of-your-license-key">Delivery of your License Key</h2>
+            <p>We deliver License Keys <span class="owner">[OWNER: delivery method, either &quot;instantly after payment, from a pool of pre-signed keys&quot; or &quot;by hand, by e-mail&quot;]</span>. If we deliver by hand, you receive your key by e-mail within <span class="owner">[OWNER: N]</span> business days after your payment.</p>
+            <p>A License Key is text that you paste into the License section of Settings, or pass to <code>bell-pr license activate</code>. Activating it needs no internet connection and sends nothing anywhere. A key from a pool of pre-signed keys contains no name or e-mail address. The License section of Settings and <code>bell-pr license status</code> show the dates your key carries: &quot;updates until&quot;, the last release date of the Builds it covers, or the expiry date of a subscription.</p>
+            <h2 id="immediate-delivery-and-statutory-cancellation-rights">Immediate delivery and statutory cancellation rights</h2>
+            <p>A License Key is digital content that is not supplied on a physical medium. At checkout we ask you to agree that we deliver it immediately. Because of that consent:</p>
+            <ul>
+              <li><strong>Consumers in the EU and the EEA:</strong> you agree that we start supplying the key before the 14-day withdrawal period ends, and you acknowledge that you lose your right of withdrawal once we have supplied it.</li>
+              <li><strong>Consumers in Taiwan:</strong> the 7-day cancellation right for distance sales does not apply to digital content that is not supplied on a physical medium once you have agreed to its supply.</li>
+            </ul>
+            <p>Our voluntary refund window below applies regardless of these rules. Nothing in this policy limits rights you have under mandatory consumer law, for example when a product is faulty.</p>
+            <h2 id="refunds">Refunds</h2>
+            <p>You can ask for a full refund within <span class="owner">[OWNER: 14 or 30]</span> days of your purchase, for any reason. For an order with several seats, you can ask for a refund of the whole order or of some of its seats. The refund goes back to your original payment method through the Merchant of Record.</p>
+            <p>The free 14-day Pro trial in the app lets you try Pro before you buy. Please use it to check that Pro works for you.</p>
+            <p>After the refund window ends, we refund only where the law requires it.</p>
+            <h2 id="what-happens-to-a-refunded-key">What happens to a refunded key</h2>
+            <p>When we refund an order or seats, or a payment is charged back, we revoke the License Keys for the refunded seats, and the Pro License for them ends (EULA section 16). Stop using Pro with those keys and remove them: in the License section of Settings, with <code>bell-pr license deactivate</code>, or by removing <code>BELLPR_LICENSE_KEY</code> if you set the key there.</p>
+            <p><strong>Revoking a refunded key takes effect in builds released after the revocation; older builds keep accepting it offline.</strong> Using a refunded key in any build breaches the EULA.</p>
+            <h2 id="how-to-ask-for-a-refund">How to ask for a refund</h2>
+            <p>Ask through the order page or the receipt of our Merchant of Record, <span class="owner">[OWNER: provider]</span>. You can also write to <span class="owner">[OWNER: refund contact]</span> with your order number.</p>
+            <h2 id="changes">Changes</h2>
+            <p>A change to this policy applies to purchases made after we publish it.</p>
+          </article>
         </div>
       </section>
     </main>
