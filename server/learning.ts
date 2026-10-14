@@ -14,7 +14,7 @@ import {
   conversationMessageLimit,
   type ChatMessage,
 } from "../shared/chat.js";
-import { AppError, type Run } from "./types.js";
+import { AppError, withRunLocale, type Run } from "./types.js";
 import { log } from "./log.js";
 import { shuttingDown, sm } from "./i18n/index.js";
 import {
@@ -77,7 +77,8 @@ export async function rerunReview(ctx: WorkbenchContext, id: string) {
     "user",
     sm().run.review.rerunRequested({ files: files.length }),
   );
-  const job = (async () => {
+  // The rerun is background work of the run: it uses the run's locale.
+  const job = withRunLocale(run, async () => {
     try {
       await runIndependentReview(
         ctx,
@@ -110,7 +111,7 @@ export async function rerunReview(ctx: WorkbenchContext, id: string) {
       ctx.reviewJobs.delete(id);
       await ctx.store.save();
     }
-  })()
+  })
     // Nothing awaits this job until shutdown or cancel; a failed save above
     // must not become an unhandled rejection that stops the server.
     .catch((error) =>

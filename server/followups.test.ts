@@ -269,6 +269,39 @@ async function settled(run: Run) {
   }
 }
 
+test("a follow-up round works in the run's locale, whatever the locale of the request that started it", async () => {
+  let prompt = "";
+  const f = await publishedFixture(async (input) => {
+    prompt = input.prompt;
+    await writeFile(path.join(input.cwd, "hello.ts"), 'export const hello = "world";\n');
+    return JSON.stringify({
+      summary: "Changed the greeting to world.",
+      addressed: [{ url: feedbackItem.url, change: "Changed the greeting." }],
+      notAddressed: [],
+      checks: [],
+      commitMessage: "Greet the world",
+    });
+  });
+  try {
+    f.run.locale = "en";
+    // Started under the zh-TW default; the round is background work of the run.
+    await f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackItem.url] });
+    await settled(f.run);
+    assert.match(prompt, /Please say hello to the world\./);
+    assert.equal(f.run.followUps![0].status, "review");
+    assert.equal(
+      f.run.logs.at(-1)?.message,
+      "Follow-up round 1 is done; review the files this round changed one by one and check the commit message before you push.",
+    );
+    assert.equal(
+      f.run.agents.find((agent) => agent.id === "followup")?.detail,
+      "Revision done; waiting for review",
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test("a review follow-up round becomes one more commit on the same PR branch after the person reviews it", async () => {
   let edit: ((cwd: string) => Promise<void>) | undefined;
   let prompt = "";

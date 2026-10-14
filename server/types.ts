@@ -5,7 +5,13 @@ import type {
 import type { ErrorCode, Fix } from "../shared/errors.js";
 import type { RunDetailField } from "../shared/runs.js";
 import type { Repository, RunCore } from "../shared/types.js";
-import { sm, type ServerMessages } from "./i18n/index.js";
+import { parseLocale } from "../shared/i18n/locale.js";
+import {
+  currentLocale,
+  sm,
+  withLocale,
+  type ServerMessages,
+} from "./i18n/index.js";
 
 export type {
   Agent,
@@ -23,6 +29,17 @@ export interface Run extends RunCore {
 
 /** What GET /api/runs returns for each run (see shared/runs.ts). */
 export type RunSummary = Omit<Run, RunDetailField>;
+
+/**
+ * Runs `fn`, and the async work it starts, in the locale the run was
+ * created in, so a run's background work writes its logs and agent details
+ * and prompts its agents in one language. A run saved before runs recorded
+ * a locale, or with one this build does not know, uses the locale in
+ * effect.
+ */
+export function withRunLocale<T>(run: Pick<Run, "locale">, fn: () => T): T {
+  return withLocale(parseLocale(run.locale) ?? currentLocale(), fn);
+}
 
 export interface DiffFile {
   explanation?: ChangeExplanation;

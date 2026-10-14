@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, readFile, rm, mkdir } from "node:fs/promises";
+import {
+  mkdtemp,
+  writeFile,
+  readFile,
+  rm,
+  mkdir,
+  symlink,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { once } from "node:events";
@@ -20,6 +27,8 @@ import { Workbench } from "./workbench.js";
 import { createApp } from "./index.js";
 import { AppError, type Run } from "./types.js";
 import { defaultContributionSettings } from "../shared/insights.js";
+import { draftFingerprint } from "./drafts.js";
+import { withLocale } from "./i18n/index.js";
 
 async function http(
   url: string,
@@ -395,6 +404,51 @@ test("sensitive files and credential-like diff content are blocked and hidden", 
         true,
         files.find((file) => file.path === ".env")!.fingerprint,
       ),
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a held-back file's reason follows the run's locale, so reading the diff in another language changes no fingerprint", async () => {
+  const f = await fixture();
+  try {
+    await writeFile(path.join(f.repository, ".env"), "PASSWORD=private-value");
+    // An untracked symbolic link has no patch: its reason is its fingerprint.
+    await symlink("hello.ts", path.join(f.repository, "link.ts"));
+    f.run.locale = "zh-TW";
+    const chinese = await readDiff(f.run);
+    const english = await withLocale("en", () => readDiff(f.run));
+    assert.deepEqual(english, chinese);
+    assert.equal(
+      chinese.find((file) => file.path === ".env")?.blocked,
+      "敏感檔案或產物不會被加入 PR；請先從本次變更移除。",
+    );
+    assert.equal(
+      draftFingerprint(f.run, english),
+      draftFingerprint(f.run, chinese),
+    );
+    // An English run words them in English under any request locale.
+    f.run.locale = "en";
+    const held = await readDiff(f.run);
+    assert.deepEqual(
+      held.filter((file) => file.blocked).map(({ path, blocked, patch }) => ({ path, blocked, patch })),
+      [
+        {
+          path: ".env",
+          blocked:
+            "Sensitive files and build artifacts are never added to the PR; remove this file from the changes first.",
+          patch:
+            "Publishing this file is on hold: Sensitive files and build artifacts are never added to the PR; remove this file from the changes first.",
+        },
+        {
+          path: "link.ts",
+          blocked:
+            "A new file must be a regular file; symbolic links need manual handling.",
+          patch:
+            "Publishing this file is on hold: A new file must be a regular file; symbolic links need manual handling.",
+        },
+      ],
     );
   } finally {
     await f.cleanup();

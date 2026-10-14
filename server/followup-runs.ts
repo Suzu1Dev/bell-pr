@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { git, redact } from "./process.js";
 import { readDiff } from "./git.js";
-import { AppError, type Run } from "./types.js";
+import { AppError, withRunLocale, type Run } from "./types.js";
 import type { TeamCheck } from "../shared/team.js";
 import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
 import { followUpJsonSchema, parseFollowUpResult } from "./followups.js";
@@ -112,7 +112,9 @@ export async function startFollowUp(
     );
     const controller = new AbortController();
     ctx.controllers.set(id, controller);
-    const job = runFollowUp(ctx, run, round, controller)
+    const job = withRunLocale(run, () =>
+      runFollowUp(ctx, run, round, controller),
+    )
       // Nothing awaits this job until shutdown or cancel; a failed save
       // must not become an unhandled rejection that stops the server.
       .catch((error) =>

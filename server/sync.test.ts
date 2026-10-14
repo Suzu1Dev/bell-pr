@@ -444,6 +444,43 @@ test("an agent resolves sync conflicts for review, leftover markers keep blockin
   }
 });
 
+test("a conflict resolution works in the run's locale, whatever the locale of the request that started it", async () => {
+  let prompt = "";
+  const f = await unpublishedRun("review", async (input) => {
+    prompt = input.prompt;
+    await writeFile(
+      path.join(input.cwd, "hello.ts"),
+      "line one\nline two, theirs and mine\nline three\n",
+    );
+    return JSON.stringify({
+      summary: "Kept the target branch's line and added this change.",
+      files: [{ path: "hello.ts", resolution: "Merged both edits into one line." }],
+    });
+  });
+  try {
+    f.run.locale = "en";
+    await f.write("hello.ts", "line one\nline two, mine\nline three\n");
+    await f.github.upstreamCommit({ "hello.ts": "line one\nline two, theirs\nline three\n" });
+    await f.workbench.syncRun(f.run.id);
+    // Requested under the zh-TW default; the agent's turn belongs to the run.
+    await f.workbench.resolveConflicts(f.run.id);
+    await until(() => f.run.status === "review");
+    assert.match(prompt, /hello\.ts/);
+    assert.equal(
+      f.run.logs.at(-1)?.message,
+      "The agent resolved the merge conflicts; review these files one by one.",
+    );
+    const agent = f.run.agents.find((entry) => entry.id === "sync");
+    assert.equal(agent?.detail, "Conflicts resolved; waiting for review");
+    assert.equal(
+      f.run.sync!.report,
+      "Kept the target branch's line and added this change.",
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
 /** A run published as a PR through the fake GitHub. */
 async function publishedRun(runner?: TeamAgentRunner) {
   const f = await unpublishedRun("review", runner);

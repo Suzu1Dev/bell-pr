@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { Database } from "./types.js";
+import { withRunLocale, type Database } from "./types.js";
 import { activeFollowUp } from "../shared/followups.js";
 import { sm } from "./i18n/index.js";
 
@@ -33,7 +33,9 @@ export class Store {
         );
     }
     for (const run of this.data.runs) {
-      const recovery = sm().run.recovery;
+      // Each run explains the interruption in its own language, whatever
+      // the server's default is now.
+      const recovery = withRunLocale(run, () => sm().run.recovery);
       if (run.draftPreparation?.status === "generating") {
         run.draftPreparation.status = "failed";
         run.draftPreparation.error = recovery.draft;

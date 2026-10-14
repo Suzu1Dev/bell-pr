@@ -14,6 +14,7 @@ import {
 import { defaultAgentTimeoutScale } from "./agent-timeouts.js";
 import {
   AppError,
+  withRunLocale,
   type DiffFile,
   type Repository,
   type Run,
@@ -24,7 +25,7 @@ import { agentLoginCheck, type TransientSleep } from "./agent-cli.js";
 import type { AgentProvider } from "../shared/models.js";
 import { proEntitlements, type Entitlements } from "../shared/plans.js";
 import { synchronizeExplanations } from "./explanations.js";
-import { sm } from "./i18n/index.js";
+import { currentLocale, sm } from "./i18n/index.js";
 
 import { collectDraftContext } from "./draft-sources.js";
 import { synchronizeDraftPreparation } from "./drafts.js";
@@ -321,6 +322,8 @@ export class Workbench {
       baseSha: "",
       worktreePath: path.join(this.store.directory, "worktrees", id),
       createdAt: now(),
+      // The request's locale; the run's background work and agents use it.
+      locale: currentLocale(),
       agents: [
         {
           id: "lead",
@@ -389,10 +392,14 @@ export class Workbench {
     if (this.stopping) return;
     while (this.active < this.maxActiveRuns && this.queue.length) {
       const id = this.queue.shift()!;
-      if (this.run(id).status !== "queued") continue;
+      const run = this.run(id);
+      if (run.status !== "queued") continue;
       this.active++;
-      const job = executor
-        .executeRun(this.context, id)
+      // Whoever drains the queue (a request, another run finishing), the
+      // run executes in its own locale.
+      const job = withRunLocale(run, () =>
+        executor.executeRun(this.context, id),
+      )
         .catch((error) => {
           console.error(
             `[BELL-PR] run ${id} could not persist final state:`,

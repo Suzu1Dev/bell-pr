@@ -11,7 +11,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { git, redact } from "./process.js";
-import { AppError, type Run } from "./types.js";
+import { AppError, withRunLocale, type Run } from "./types.js";
 import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
 import {
   checkoutTreeOnto,
@@ -346,13 +346,8 @@ export async function resolveConflicts(ctx: WorkbenchContext, id: string) {
     ctx.log(run, "user", sm().run.sync.resolveRequested({ files: open }));
     const controller = new AbortController();
     ctx.controllers.set(id, controller);
-    const job = runConflictResolution(
-      ctx,
-      run,
-      open,
-      controller,
-      sync,
-      target.head,
+    const job = withRunLocale(run, () =>
+      runConflictResolution(ctx, run, open, controller, sync, target.head),
     )
       // Nothing awaits this job until shutdown or cancel; a failed save
       // must not become an unhandled rejection that stops the server.

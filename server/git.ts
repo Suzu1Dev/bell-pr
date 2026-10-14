@@ -3,7 +3,7 @@ import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
 import { git } from "./process.js";
 import { secretInPatch } from "./secrets.js";
-import { AppError, type DiffFile, type Run } from "./types.js";
+import { AppError, withRunLocale, type DiffFile, type Run } from "./types.js";
 import { sm } from "./i18n/index.js";
 
 export { secretInPatch };
@@ -129,10 +129,14 @@ export function parseNumstat(
 }
 
 export async function readDiff(
-  run: Pick<Run, "worktreePath" | "baseSha">,
+  run: Pick<Run, "worktreePath" | "baseSha" | "locale">,
 ): Promise<DiffFile[]> {
   if (!run.baseSha || !run.worktreePath) return [];
-  const held = sm().run.diff.blocked;
+  // A held-back file's reason is part of its fingerprint and of the draft
+  // fingerprint, so it is worded in the run's locale: reading the diff in
+  // another language must not make a reviewed draft stale.
+  const messages = withRunLocale(run, () => sm().run.diff);
+  const held = messages.blocked;
   const common = ["--no-ext-diff", "--no-textconv", "--no-renames"];
   const stats = parseNumstat(
     (
@@ -233,7 +237,7 @@ export async function readDiff(
     const fingerprint = digest(
       stat.path + "\0" + (patch || fileMode + blocked),
     );
-    if (blocked) patch = sm().run.diff.heldBack({ reason: blocked });
+    if (blocked) patch = messages.heldBack({ reason: blocked });
     total += Buffer.byteLength(patch);
     if (total > 2_000_000)
       throw new AppError((m) => m.run.diff.tooLarge, 422);
