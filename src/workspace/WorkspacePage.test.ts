@@ -167,6 +167,18 @@ test("a queued run says why on Free only", () => {
     renderEn(element({ run: queued, active: true }, planOf(proEntitlements(2)))),
     /Free runs one contribution/,
   );
+  // The sample's playback is queued for a moment behind no other run.
+  assert.doesNotMatch(
+    renderEn(
+      element({
+        run: { ...demo.run, status: "queued" },
+        demo: true,
+        editable: false,
+        active: true,
+      }),
+    ),
+    /Free runs one contribution/,
+  );
 });
 
 test("a published sample keeps its approve button off and links to no PR", () => {

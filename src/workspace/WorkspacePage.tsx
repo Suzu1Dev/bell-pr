@@ -154,8 +154,11 @@ export function WorkspacePage({
   const { draftDirty, draftUnfinished, followUp, commitMessageUnfinished } =
     draft;
   const { approve, plan, exporting, exportLearning } = actions;
+  // The sample's playback queues for a moment behind nothing.
   const queuedOnFree =
-    run.status === "queued" && plan.entitlements?.maxActiveRuns === 1;
+    !demo &&
+    run.status === "queued" &&
+    plan.entitlements?.maxActiveRuns === 1;
   // The learning record is Pro: on Free the button shows a lock and opens
   // the upgrade dialog without a request; the sample builds its own record
   // and shows the PRO chip.
