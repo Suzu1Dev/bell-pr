@@ -48,7 +48,14 @@ export function synchronizeWalkthroughs(run: Run, files: DiffFile[]) {
     if (!unavailable && ++eligible > walkthroughFileLimit)
       unavailable = `這次修改超過 ${walkthroughFileLimit} 個程式檔，只為前 ${walkthroughFileLimit} 個自動產生程式碼解說；其他檔案可以在「追問 Agent」詢問。`;
     let stored = walkthroughs[file.path];
-    if (!stored || stored.fingerprint !== file.fingerprint || unavailable)
+    // An unavailable entry is retried once the file qualifies again, for
+    // example when other files leave the diff and it falls under the limit.
+    if (
+      !stored ||
+      stored.fingerprint !== file.fingerprint ||
+      unavailable ||
+      stored.status === "unavailable"
+    )
       stored = walkthroughs[file.path] = {
         fingerprint: file.fingerprint,
         status: unavailable ? "unavailable" : "pending",
@@ -101,6 +108,7 @@ export const walkthroughJsonSchema = {
           change: { type: "string" },
           steps: {
             type: "array",
+            minItems: 2,
             maxItems: stepLimit,
             items: {
               type: "object",

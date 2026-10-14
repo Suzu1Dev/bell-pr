@@ -68,6 +68,10 @@ test("only modified code files get a walkthrough, at most a fixed number per run
     [...Array(walkthroughFileLimit).fill("pending"), "unavailable"],
   );
   assert.match(code.at(-1)!.walkthroughError!, /追問 Agent/);
+  // When another file leaves the diff, the one past the limit qualifies again.
+  synchronizeWalkthroughs(run, files.filter((entry) => entry !== code[0]));
+  assert.equal(code.at(-1)!.walkthroughStatus, "pending");
+  synchronizeWalkthroughs(run, files);
 
   // A ready walkthrough is kept for the same diff and dropped when it changes.
   const content = { functions: [] };
@@ -143,6 +147,10 @@ test("the walkthrough schema is closed and fully required, and the prompt is rea
     if (schema.type === "array") closed(schema.items as Record<string, unknown>);
   };
   closed(walkthroughJsonSchema);
+  // The prompt asks for 2 to 8 parts; structured output holds the agent to it.
+  const steps = walkthroughJsonSchema.properties.functions.items.properties.steps;
+  assert.equal(steps.minItems, 2);
+  assert.equal(steps.maxItems, 8);
   const prompt = walkthroughPrompt({ contributionContext: "CONTEXT", file: file({}) });
   assert.match(prompt, /Work read-only/);
   assert.match(prompt, /do not modify files, execute code/);

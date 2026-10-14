@@ -1598,7 +1598,7 @@
 .rv-line-highlighted {
   box-shadow: inset 3px 0 0 #8ca780;
 }
-.rv-line-context.rv-line-highlighted {
+.rv-line-context.rv-line-highlighted:not(.rv-line-selected) {
   background: #f1f7ea;
 }
 
@@ -1622,7 +1622,7 @@
   font-weight: 500;
 }
 .walkthrough-locate,
-.walkthrough-steps li > button {
+.walkthrough-step-lines {
   font: inherit;
   cursor: pointer;
 }
@@ -1685,33 +1685,39 @@
   padding: 0;
   list-style: none;
 }
-.walkthrough-steps li > button {
-  display: block;
-  width: 100%;
+.walkthrough-steps li {
   padding: 8px 10px;
   border: 1px solid #e8ece3;
   border-radius: 7px;
   background: #fff;
-  color: inherit;
-  text-align: left;
   font-size: 12px;
   line-height: 1.7;
 }
-.walkthrough-steps li > button:hover,
-.walkthrough-steps li > button:focus-visible {
-  border-color: #cbdcc3;
-}
-.walkthrough-steps li > button[aria-pressed="true"] {
+.walkthrough-steps li.walkthrough-step-selected {
   border-color: #8ca780;
   background: #f4f8ee;
   box-shadow: inset 3px 0 0 #8ca780;
 }
 .walkthrough-step-lines {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin-bottom: 2px;
-  color: #73916a;
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: #56704b;
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 10px;
+}
+.walkthrough-step-lines:hover,
+.walkthrough-step-lines:focus-visible {
+  border-color: #cbdcc3;
+}
+.walkthrough-step-lines[aria-pressed="true"] {
+  border-color: #b9cfa9;
+  background: #eef5e7;
 }
 .walkthrough-references ul {
   display: grid;

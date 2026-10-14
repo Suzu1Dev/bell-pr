@@ -2300,7 +2300,8 @@ export class Workbench {
         }),
         controller.signal,
         true,
-        { outputSchema },
+        // Isolated keeps it offline and out of the team inbox; it still reads this checkout.
+        { outputSchema, isolated: true },
       );
       const content = parseWalkthrough(
         answer,

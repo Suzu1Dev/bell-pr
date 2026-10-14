@@ -17,8 +17,10 @@ test("a ready walkthrough shows the function, its parts with their lines, caller
   assert.match(html, /這次修改與它的關係/);
   assert.match(html, /逐步拆解/);
   // The selected part is pressed; the others are not.
-  assert.match(html, /aria-pressed="true"><span class="walkthrough-step-lines">第 12–16 行/);
-  assert.match(html, /aria-pressed="false"><span class="walkthrough-step-lines">第 10–11 行/);
+  assert.match(html, /class="walkthrough-step-lines" aria-pressed="true"[^>]*>(?:(?!<\/button>).)*第 12–16 行<\/button>/);
+  assert.match(html, /class="walkthrough-step-lines" aria-pressed="false"[^>]*>(?:(?!<\/button>).)*第 10–11 行<\/button>/);
+  // Explanations render outside the buttons, so their paragraphs and links stay valid.
+  assert.doesNotMatch(html, /<button[^>]*>(?:(?!<\/button>).)*<(?:p|a|table)\b/);
   assert.match(html, /誰呼叫它/);
   assert.match(html, /<code>README\.md:11<\/code>/);
   assert.match(html, /它呼叫什麼/);

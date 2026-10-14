@@ -329,9 +329,15 @@ export default function App() {
   const [highlight, setHighlight] = useState<{
     runId: string;
     path: string;
+    /** The diff version the line numbers belong to. */
+    fingerprint?: string;
     startLine: number;
     endLine: number;
   } | null>(null);
+  /** The learning panel's tab, kept as the reader moves from file to file. */
+  const [panelTab, setPanelTab] = useState<
+    "explain" | "walkthrough" | "reports" | "chat"
+  >("explain");
   const [explanationRequests, setExplanationRequests] = useState<Set<string>>(
     new Set(),
   );
@@ -2618,7 +2624,8 @@ export default function App() {
                           }
                           highlight={
                             highlight?.runId === run.id &&
-                            highlight.path === file.path
+                            highlight.path === file.path &&
+                            highlight.fingerprint === file.fingerprint
                               ? highlight
                               : undefined
                           }
@@ -2706,14 +2713,20 @@ export default function App() {
                                 explanationBusy={explanationRequests.has(run.id)}
                                 highlight={
                                   highlight?.runId === run.id &&
-                                  highlight.path === file.path
+                                  highlight.path === file.path &&
+                                  highlight.fingerprint === file.fingerprint
                                     ? highlight
                                     : undefined
                                 }
                                 onHighlight={(range) =>
                                   setHighlight(
                                     range
-                                      ? { runId: run.id, path: file.path, ...range }
+                                      ? {
+                                          runId: run.id,
+                                          path: file.path,
+                                          fingerprint: file.fingerprint,
+                                          ...range,
+                                        }
                                       : null,
                                   )
                                 }
@@ -2728,6 +2741,8 @@ export default function App() {
                                         )
                                 }
                                 walkthroughBusy={walkthroughBusy}
+                                initialTab={panelTab === "chat" ? "explain" : panelTab}
+                                onTabChange={setPanelTab}
                                 demo={demo}
                                 reports={run.reports}
                                 modules={

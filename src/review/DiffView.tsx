@@ -146,12 +146,17 @@ export function DiffView({
     for (let line = highlightStart; line <= highlightEnd && !missing; line++)
       missing = !shown.has(line);
     if (!missing || !readable) return;
+    let active = true;
     void readBase().then((value) => {
-      if (value)
+      // A range chosen or cleared meanwhile must not open the old one.
+      if (value && active)
         setReveal((current) =>
           revealLines(parsed, value, current, highlightStart, highlightEnd),
         );
     });
+    return () => {
+      active = false;
+    };
   }, [highlightStart, highlightEnd, version]);
   useEffect(() => {
     if (!scrollPending.current) return;

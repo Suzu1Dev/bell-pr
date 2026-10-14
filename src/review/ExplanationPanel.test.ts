@@ -313,3 +313,20 @@ test("the reports tab offers a re-review button for real runs only and shows the
   assert.doesNotMatch(render({}), /重新執行審查/);
   assert.doesNotMatch(render({ onRerunReview() {}, demo: true }), /重新執行審查/);
 });
+
+test("the panel opens on the tab the reader last chose and reports each change of tab", () => {
+  const chosen: string[] = [];
+  const html = renderToStaticMarkup(
+    createElement(ExplanationPanel, {
+      file: demoFiles.find((file) => file.path === "src/client.ts")!,
+      messages: [],
+      loading: false,
+      onAsk() {},
+      demo: true,
+      initialTab: "walkthrough",
+      onTabChange: (tab) => chosen.push(tab),
+    }),
+  );
+  assert.match(html, /aria-selected="true"[^>]*>(?:(?!<\/button>).)*程式碼解說/);
+  assert.match(html, /createClient/);
+});

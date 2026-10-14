@@ -56,7 +56,12 @@ export interface ExplanationPanelProps {
   onHighlight?: (range: { startLine: number; endLine: number } | undefined) => void;
   onRetryWalkthrough?: () => void;
   walkthroughBusy?: boolean;
+  /** The tab to open on; the panel remounts per file, so the caller keeps the reader's choice. */
+  initialTab?: PanelTab;
+  onTabChange?: (tab: PanelTab) => void;
 }
+
+export type PanelTab = "explain" | "walkthrough" | "reports" | "chat";
 
 /** Longest module path that is the file itself or one of its parent directories. */
 export function moduleFor(
@@ -274,10 +279,13 @@ export function ExplanationPanel({
   onHighlight,
   onRetryWalkthrough,
   walkthroughBusy,
+  initialTab = "explain",
+  onTabChange,
 }: ExplanationPanelProps) {
-  const [tab, setTab] = useState<"explain" | "walkthrough" | "reports" | "chat">(
-    chatRequestId ? "chat" : "explain",
+  const [tab, setTab] = useState<PanelTab>(
+    chatRequestId ? "chat" : initialTab,
   );
+  useEffect(() => onTabChange?.(tab), [tab]);
   const [question, setQuestion] = useState("");
   const [showAnswer, setShowAnswer] = useState(false);
   const [noteDraft, setNoteDraft] = useState(note?.text ?? "");

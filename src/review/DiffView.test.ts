@@ -129,10 +129,16 @@ test("a highlighted range marks its lines in the changed version only", () => {
       highlight: { startLine: 12, endLine: 16 },
     }),
   );
-  const marked = html.match(/rv-line-highlighted/g) ?? [];
+  // Each marked row's new-file number, from its second gutter.
+  const marked = [
+    ...html.matchAll(
+      /class="rv-line [^"]*rv-line-highlighted[^"]*"[^>]*>(?:<span class="rv-gutter rv-gutter-old">\d*<\/span>)<span class="rv-gutter">(\d+)<\/span>/g,
+    ),
+  ].map((match) => Number(match[1]));
   // Lines 12 to 16 of the new file; the two removed lines in between are not marked.
-  assert.equal(marked.length, 5);
-  assert.doesNotMatch(html, /rv-line-removed rv-line-highlighted|rv-line-removed[^"]*rv-line-highlighted/);
+  assert.deepEqual(marked, [12, 13, 14, 15, 16]);
+  assert.doesNotMatch(html, /rv-line-removed[^"]*rv-line-highlighted/);
+});
 
 test("a submodule or a mode-only change offers no expansion", () => {
   const withLoader = (file: DiffFile) =>
