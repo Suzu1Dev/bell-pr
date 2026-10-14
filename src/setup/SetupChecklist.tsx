@@ -119,7 +119,11 @@ export function SetupChecklist({
             {check.version && !summary && (
               <code className="setup-check-version">{check.version}</code>
             )}
-            <span className="setup-check-status">{t.status[check.status]}</span>
+            <span className="setup-check-status">
+              {check.status === "skip" && check.reason === "unknown"
+                ? t.notChecked
+                : t.status[check.status]}
+            </span>
           </div>
           {detail && <p className="setup-check-detail">{detail}</p>}
           {folder && !summary && (

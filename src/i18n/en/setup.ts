@@ -44,6 +44,8 @@ export default {
       fail: "Not ready",
       skip: "Not used",
     } satisfies Record<DoctorCheckStatus, string>,
+    /** A skipped check that applies but could not be checked (reason "unknown"), such as a token's permissions. */
+    notChecked: "Not checked",
     summaryReady: `Everything ${product.name} needs is ready.`,
     summaryNotReady: ({ count }: { count: number }) =>
       fmt.plural(count) === "one"

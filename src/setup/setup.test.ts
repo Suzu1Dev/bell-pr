@@ -194,6 +194,22 @@ test("the summary says what a failing optional check blocks, and it is not calle
   assert.match(renderZh(createElement(SetupChecklist, { report: blocked })), /可以開始使用，但還有 1 個項目需要修正，否則有些步驟無法進行。/);
 });
 
+test("token permissions that cannot be read are not checked, rather than not used", () => {
+  const unknown: DoctorReport = {
+    ...ready,
+    checks: ready.checks.map((value) =>
+      value.id === "gh-scopes"
+        ? check({ id: "gh-scopes", status: "skip", reason: "unknown", detail: "This kind of token does not report its permissions, so they are not checked." })
+        : value,
+    ),
+  };
+  const html = renderEn(createElement(SetupChecklist, { report: unknown }));
+  assertNoHan(html);
+  assert.match(html, /data-check="gh-scopes".*?<span class="setup-check-status">Not checked<\/span>/);
+  assert.match(html, /data-check="codex-auth".*?<span class="setup-check-status">Not used<\/span>/);
+  assert.match(renderZh(createElement(SetupChecklist, { report: unknown })), /data-check="gh-scopes".*?<span class="setup-check-status">未檢查<\/span>/);
+});
+
 test("the checklist says it is checking while the first report loads, and reports a failed request", () => {
   const html = renderEn(createElement(SetupChecklist, { ...doctor(null, { checking: true }) }));
   assertNoHan(html);

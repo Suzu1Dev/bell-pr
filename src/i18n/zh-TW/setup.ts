@@ -37,6 +37,7 @@ const m: Translation<typeof en> = {
       fail: "尚未就緒",
       skip: "未使用",
     },
+    notChecked: "未檢查",
     summaryReady: `${product.name} 需要的一切都已就緒。`,
     summaryNotReady: ({ count }) => `有 ${count} 個必要項目需要處理。`,
     summaryBlocked: ({ count }) =>
