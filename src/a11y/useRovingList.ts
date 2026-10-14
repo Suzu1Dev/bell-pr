@@ -111,7 +111,7 @@ export interface RovingList {
   /** Moves the tab stop without moving focus. */
   setActiveIndex: (index: number) => void;
   /** Moves the tab stop to `index` and focuses that item. */
-  focusItem: (index: number) => void;
+  focusItem: (index: number, options?: FocusOptions) => void;
   /** Spread onto item `index`; give each index to one element only. */
   itemProps: (index: number) => RovingItemProps;
   /**
@@ -138,9 +138,9 @@ export function useRovingList(
     ? (nearestEnabled(clamped, count, options.disabled) ?? clamped)
     : clamped;
 
-  function focusItem(index: number) {
+  function focusItem(index: number, focusOptions?: FocusOptions) {
     setActive(index);
-    items.current[index]?.focus();
+    items.current[index]?.focus(focusOptions);
   }
 
   return {

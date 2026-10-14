@@ -175,3 +175,20 @@ test("a moving key focuses the next item and prevents scrolling; chords and othe
   }
   assert.deepEqual(focused, [1, 4, 2]);
 });
+
+test("focusItem moves the tab stop and passes its focus options on", () => {
+  let list: RovingList | undefined;
+  renderEn(createElement(List, { count: 3, capture: (value) => (list = value) }));
+  assert.ok(list);
+  const calls: [number, FocusOptions | undefined][] = [];
+  for (let index = 0; index < 3; index++) {
+    const element = { focus: (options?: FocusOptions) => calls.push([index, options]) };
+    list.itemProps(index).ref(element as unknown as HTMLElement);
+  }
+  list.focusItem(2, { preventScroll: true });
+  list.focusItem(1);
+  assert.deepEqual(calls, [
+    [2, { preventScroll: true }],
+    [1, undefined],
+  ]);
+});

@@ -262,7 +262,9 @@ export function DiffView({
     );
     const onClick = (event: MouseEvent) => {
       select(line, event.shiftKey);
-      roving.setActiveIndex(position);
+      // The old side's copy of an unchanged line cannot take focus itself:
+      // its entry in the list does, so the keys go on from the clicked line.
+      roving.focusItem(position, { preventScroll: true });
     };
     // Split view shows an unchanged line on both sides. Its new side is the
     // line's entry in the list; the old side is a copy for the mouse only.

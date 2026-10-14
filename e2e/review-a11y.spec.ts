@@ -164,6 +164,28 @@ test("Shift+ArrowDown selects lines and Enter brings up the ask bar", async ({ p
   await expect(lines(page).first()).toBeFocused();
 });
 
+test("a click on either side of the split view leaves the keys working from that line", async ({ page }) => {
+  await openChanges(page);
+  await page.locator(".view-toggle button").nth(1).click();
+  await expect(page.locator(".rv-diff-split [role=listbox]")).toBeVisible();
+  // The old side's copy of an unchanged line is for the mouse only; a click
+  // on it focuses the line's entry in the list.
+  const copies = page.locator('.rv-split-row > .rv-line-context[aria-hidden="true"]');
+  await copies.nth(1).click();
+  await expect(lines(page).nth(1)).toBeFocused();
+  await expect(lines(page).nth(1)).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Shift+ArrowDown");
+  await expect(lines(page).nth(2)).toBeFocused();
+  await expect(selectedLines(page)).toHaveCount(2);
+  // A click on a line in the list itself does the same.
+  await lines(page).nth(4).click();
+  await expect(lines(page).nth(4)).toBeFocused();
+  await page.keyboard.press("Shift+ArrowUp");
+  await expect(lines(page).nth(3)).toBeFocused();
+  await expect(selectedLines(page)).toHaveCount(2);
+  await expect(page.locator('.rv-diff [role=listbox] [tabindex="0"]')).toHaveCount(1);
+});
+
 test("the explanation panel's tabs move with the arrow keys and keep one tab stop", async ({ page }) => {
   await openChanges(page);
   const tab = (name: keyof typeof review.panel.tabs) =>
