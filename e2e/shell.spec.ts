@@ -532,6 +532,8 @@ test("after the session ends, a view whose code cannot load keeps the page and t
   const typed = "Typed before the session ended";
   try {
     await page.goto(`/#/runs/${run.id}/draft`);
+    // The saved title shows first; then the person types over it.
+    await expect(page.locator("#pr-title")).toHaveValue(run.title);
     await page.locator("#pr-title").fill(typed);
     let loads = 0;
     page.on("load", () => loads++);
