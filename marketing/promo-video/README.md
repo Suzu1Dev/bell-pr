@@ -28,6 +28,9 @@ is never published.
   headless shell on first use; that is the fallback, not the default.
 - Port 4573 on 127.0.0.1 free during the capture (`PROMO_CAPTURE_PORT`
   changes it).
+- The capture's temporary HOME and data dir (`bellpr-7C-*`) and Remotion's
+  temporary files go to the system temp dir; set `TMPDIR` to keep them
+  elsewhere. The capture removes its own directory when it ends.
 
 No system ffmpeg is needed: Remotion ships its own (`npx remotion ffmpeg`,
 `npx remotion ffprobe`).
