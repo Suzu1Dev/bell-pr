@@ -96,8 +96,8 @@ export interface DirectionSettingsProps {
   /** A useDoctor() state to share; the form loads its own otherwise. */
   doctor?: DoctorState;
   /**
-   * The model catalog to show before the request for it answers, such as a
-   * fixture in tests. The form still loads the catalog when it mounts.
+   * The model catalog for a render that runs no effects, such as a static
+   * render in tests. A mounted form loads the catalog and shows that one.
    */
   initialCatalog?: ModelCatalog;
 }
