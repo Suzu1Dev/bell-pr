@@ -32,9 +32,13 @@ const review = {
     blankLine: "blank line",
     /** The accessible name of the list of diff lines, one tab stop. */
     listLabel: "Diff lines",
-    /** Read out with the list of lines: how to use it from the keyboard. */
-    keyboardHint:
-      "Use the arrow keys to move between lines and Shift with an arrow key to select several. Press Enter to ask about the selection and Escape to clear it.",
+    /**
+     * Read out with the list of lines: how to use it from the keyboard.
+     * `button` is askSelection; Enter selects the line when nothing is
+     * selected yet and moves to that button, which then asks.
+     */
+    keyboardHint: ({ button }: { button: string }) =>
+      `Use the arrow keys to move between lines and Shift with an arrow key to select several. Press Enter to go to “${button}” for the selection, and Escape to clear it.`,
     /** The accessible name of one hunk: where its lines start in each version. */
     hunkLabel: ({ oldLine, newLine }: { oldLine: number; newLine: number }) =>
       `Changes from old line ${oldLine}, new line ${newLine}`,

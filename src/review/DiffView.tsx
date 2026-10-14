@@ -417,7 +417,7 @@ export function DiffView({
       {!file.blocked && codeLines.length > 0 && (
         <>
           <p className="rv-visually-hidden" id={hintId}>
-            {t.diff.keyboardHint}
+            {t.diff.keyboardHint({ button: t.diff.askSelection })}
           </p>
           <span className="rv-visually-hidden" role="status">
             {selectedLines.length

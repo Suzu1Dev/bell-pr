@@ -221,7 +221,7 @@ test("the list of lines explains its keys and has a status for the selection", (
   const describedBy = /role="listbox"[^>]*aria-describedby="([^"]+)"/.exec(html)![1];
   assert.match(
     html,
-    new RegExp(`<p class="rv-visually-hidden" id="${describedBy}">Use the arrow keys to move between lines and Shift with an arrow key to select several\\. Press Enter to ask about the selection and Escape to clear it\\.</p>`),
+    new RegExp(`<p class="rv-visually-hidden" id="${describedBy}">Use the arrow keys to move between lines and Shift with an arrow key to select several\\. Press Enter to go to “Explain this code” for the selection, and Escape to clear it\\.</p>`),
   );
   // Empty until lines are selected, so a screen reader hears the count change.
   assert.match(html, /<span class="rv-visually-hidden" role="status"><\/span>/);
@@ -235,7 +235,7 @@ test("the list of lines explains its keys and has a status for the selection", (
     }),
   );
   assert.match(zh, /aria-label="差異的各行"/);
-  assert.match(zh, /用方向鍵在各行之間移動/);
+  assert.match(zh, /用方向鍵在各行之間移動.*按 Enter 前往選取範圍的「解說這段程式碼」/);
   assert.match(zh, /aria-label="export function first\(\) \{ 中，從舊版第 1 行、新版第 1 行起的變更"/);
 });
 

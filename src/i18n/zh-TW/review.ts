@@ -13,8 +13,8 @@ const m: Translation<typeof en> = {
     },
     blankLine: "空白行",
     listLabel: "差異的各行",
-    keyboardHint:
-      "用方向鍵在各行之間移動，按住 Shift 再按方向鍵可選取多行；按 Enter 針對選取範圍提問，按 Esc 清除選取。",
+    keyboardHint: ({ button }) =>
+      `用方向鍵在各行之間移動，按住 Shift 再按方向鍵可選取多行；按 Enter 前往選取範圍的「${button}」，按 Esc 清除選取。`,
     hunkLabel: ({ oldLine, newLine }) =>
       `從舊版第 ${oldLine} 行、新版第 ${newLine} 行起的變更`,
     hunkLabelIn: ({ oldLine, newLine, context }) =>
