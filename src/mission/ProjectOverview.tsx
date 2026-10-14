@@ -546,6 +546,161 @@ export function ProjectOverview({
         : (insights?.recommendations.length ?? 0) >= maxProjectRecommendations
           ? t.ideas.moreLimit({ max: maxProjectRecommendations })
           : t.ideas.moreHint;
+  // How people use the project, where to start reading and its parts.
+  const projectContext = insights && (
+    <>
+      {insights.userJourney.length > 0 && (
+        <section
+          className="mission-journey"
+          aria-labelledby="mission-journey-title"
+        >
+          <div className="mission-section-heading">
+            <div>
+              <span className="mission-kicker">{t.journey.kicker}</span>
+              <h2 id="mission-journey-title">
+                <Route size={18} />
+                {t.journey.title}
+              </h2>
+            </div>
+          </div>
+          <ol>
+            {insights.userJourney.map((step, index) => (
+              <li key={index}>
+                <span className="mission-journey-number">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <p>{step}</p>
+                {index < insights.userJourney.length - 1 && (
+                  <ChevronRight size={16} aria-hidden="true" />
+                )}
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {!!insights.readingPath?.length && (
+        <section
+          className="mission-reading-path"
+          aria-labelledby="mission-reading-title"
+        >
+          <div className="mission-section-heading">
+            <div>
+              <span className="mission-kicker">{t.reading.kicker}</span>
+              <h2 id="mission-reading-title">
+                <BookOpen size={18} />
+                {t.reading.title}
+              </h2>
+              <p>{t.reading.lead}</p>
+            </div>
+          </div>
+          {insights.howItFitsTogether && (
+            <div className="mission-reading-flow">
+              <span>{t.reading.flow}</span>
+              <p>{insights.howItFitsTogether}</p>
+            </div>
+          )}
+          <ol className="mission-reading-steps">
+            {insights.readingPath.map((step, index) => {
+              const module = insights.modules.find(
+                (entry) => entry.path === step.path,
+              );
+              const evidence = insights.evidence.find(
+                (entry) => entry.path === step.path,
+              );
+              return (
+                <li key={`${step.path}-${index}`}>
+                  <span className="mission-journey-number">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <code>{step.path}</code>
+                  {step.sampled === false && (
+                    <span className="mission-reading-unsampled">
+                      {t.reading.unsampled}
+                    </span>
+                  )}
+                  <p>{step.why}</p>
+                  <p>
+                    <strong>{t.reading.lookFor}</strong>
+                    {step.lookFor}
+                  </p>
+                  {(module || evidence) && (
+                    <details className="mission-reading-context">
+                      <summary>
+                        {t.reading.context}
+                        <ChevronRight size={14} aria-hidden="true" />
+                      </summary>
+                      {module && (
+                        <p>
+                          <strong>{t.fields.modules}</strong>
+                          {module.purpose}
+                        </p>
+                      )}
+                      {evidence && (
+                        <p>
+                          <strong>{t.fields.evidence}</strong>
+                          {evidence.note}
+                        </p>
+                      )}
+                    </details>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      )}
+
+      {(insights.modules.length > 0 || insights.evidence.length > 0) && (
+        <div className="mission-project-details">
+          {insights.modules.length > 0 && (
+            <details className="mission-detail-block">
+              <summary>
+                <FolderTree size={16} />
+                <span>{t.details.modules}</span>
+                <span className="mission-detail-count">
+                  {t.details.moduleCount({
+                    count: insights.modules.length,
+                  })}
+                </span>
+                <ChevronRight size={15} />
+              </summary>
+              <div className="mission-module-list">
+                {insights.modules.map((module, index) => (
+                  <div key={`${module.path}-${index}`}>
+                    <code>{module.path}</code>
+                    <p>{module.purpose}</p>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+          {insights.evidence.length > 0 && (
+            <details className="mission-detail-block">
+              <summary>
+                <FileSearch size={16} />
+                <span>{t.details.sources}</span>
+                <span className="mission-detail-count">
+                  {t.details.sourceCount({
+                    count: insights.evidence.length,
+                  })}
+                </span>
+                <ChevronRight size={15} />
+              </summary>
+              <div className="mission-module-list">
+                {insights.evidence.map((evidence, index) => (
+                  <div key={`${evidence.path}-${index}`}>
+                    <code>{evidence.path}</code>
+                    <p>{evidence.note}</p>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+    </>
+  );
   return (
     <div className="mission-overview">
       <div className="mission-overview-heading">
@@ -768,156 +923,7 @@ export function ProjectOverview({
             />
           </section>
 
-          {insights.userJourney.length > 0 && (
-            <section
-              className="mission-journey"
-              aria-labelledby="mission-journey-title"
-            >
-              <div className="mission-section-heading">
-                <div>
-                  <span className="mission-kicker">{t.journey.kicker}</span>
-                  <h2 id="mission-journey-title">
-                    <Route size={18} />
-                    {t.journey.title}
-                  </h2>
-                </div>
-              </div>
-              <ol>
-                {insights.userJourney.map((step, index) => (
-                  <li key={index}>
-                    <span className="mission-journey-number">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <p>{step}</p>
-                    {index < insights.userJourney.length - 1 && (
-                      <ChevronRight size={16} aria-hidden="true" />
-                    )}
-                  </li>
-                ))}
-              </ol>
-            </section>
-          )}
-
-          {!!insights.readingPath?.length && (
-            <section
-              className="mission-reading-path"
-              aria-labelledby="mission-reading-title"
-            >
-              <div className="mission-section-heading">
-                <div>
-                  <span className="mission-kicker">{t.reading.kicker}</span>
-                  <h2 id="mission-reading-title">
-                    <BookOpen size={18} />
-                    {t.reading.title}
-                  </h2>
-                  <p>{t.reading.lead}</p>
-                </div>
-              </div>
-              {insights.howItFitsTogether && (
-                <div className="mission-reading-flow">
-                  <span>{t.reading.flow}</span>
-                  <p>{insights.howItFitsTogether}</p>
-                </div>
-              )}
-              <ol className="mission-reading-steps">
-                {insights.readingPath.map((step, index) => {
-                  const module = insights.modules.find(
-                    (entry) => entry.path === step.path,
-                  );
-                  const evidence = insights.evidence.find(
-                    (entry) => entry.path === step.path,
-                  );
-                  return (
-                    <li key={`${step.path}-${index}`}>
-                      <span className="mission-journey-number">
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
-                      <code>{step.path}</code>
-                      {step.sampled === false && (
-                        <span className="mission-reading-unsampled">
-                          {t.reading.unsampled}
-                        </span>
-                      )}
-                      <p>{step.why}</p>
-                      <p>
-                        <strong>{t.reading.lookFor}</strong>
-                        {step.lookFor}
-                      </p>
-                      {(module || evidence) && (
-                        <details className="mission-reading-context">
-                          <summary>
-                            {t.reading.context}
-                            <ChevronRight size={14} aria-hidden="true" />
-                          </summary>
-                          {module && (
-                            <p>
-                              <strong>{t.fields.modules}</strong>
-                              {module.purpose}
-                            </p>
-                          )}
-                          {evidence && (
-                            <p>
-                              <strong>{t.fields.evidence}</strong>
-                              {evidence.note}
-                            </p>
-                          )}
-                        </details>
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
-            </section>
-          )}
-
-          {(insights.modules.length > 0 || insights.evidence.length > 0) && (
-            <div className="mission-project-details">
-              {insights.modules.length > 0 && (
-                <details className="mission-detail-block">
-                  <summary>
-                    <FolderTree size={16} />
-                    <span>{t.details.modules}</span>
-                    <span className="mission-detail-count">
-                      {t.details.moduleCount({
-                        count: insights.modules.length,
-                      })}
-                    </span>
-                    <ChevronRight size={15} />
-                  </summary>
-                  <div className="mission-module-list">
-                    {insights.modules.map((module, index) => (
-                      <div key={`${module.path}-${index}`}>
-                        <code>{module.path}</code>
-                        <p>{module.purpose}</p>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              )}
-              {insights.evidence.length > 0 && (
-                <details className="mission-detail-block">
-                  <summary>
-                    <FileSearch size={16} />
-                    <span>{t.details.sources}</span>
-                    <span className="mission-detail-count">
-                      {t.details.sourceCount({
-                        count: insights.evidence.length,
-                      })}
-                    </span>
-                    <ChevronRight size={15} />
-                  </summary>
-                  <div className="mission-module-list">
-                    {insights.evidence.map((evidence, index) => (
-                      <div key={`${evidence.path}-${index}`}>
-                        <code>{evidence.path}</code>
-                        <p>{evidence.note}</p>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              )}
-            </div>
-          )}
+          {projectContext}
         </>
       )}
 
