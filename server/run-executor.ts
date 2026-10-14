@@ -51,7 +51,7 @@ import {
 import { draftFingerprint } from "./drafts.js";
 import { cancelled, currentLocale, sm } from "./i18n/index.js";
 import type { Locale } from "../shared/i18n/locale.js";
-import { createRunWorktree } from "./repositories.js";
+import { adoptLegacyCheckout, createRunWorktree } from "./repositories.js";
 import {
   agentSpawn,
   enterPhase,
@@ -673,9 +673,11 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
     if (!run.baseSha) {
       ctx.log(run, "system", sm().run.team.creatingWorktree);
       await ctx.store.save();
-      await ctx.lock(`repository:${repo.id}`, () =>
-        createRunWorktree(run, repo, signal),
-      );
+      await ctx.lock(`repository:${repo.id}`, async () => {
+        // A project an earlier build worked on in place moves to a clone.
+        await adoptLegacyCheckout(ctx, repo, run);
+        await createRunWorktree(run, repo, signal);
+      });
       await ctx.store.save();
     }
     // The run's locale: the Workbench queue runs executeRun under withRunLocale.

@@ -25,7 +25,7 @@ import { fakeGitHub } from "../test/fake-github.js";
 import { createApp } from "./index.js";
 import { git } from "./process.js";
 import { readDiff, reviewFingerprint } from "./git.js";
-import { createRunWorktree } from "./repositories.js";
+import { adoptLegacyCheckout, createRunWorktree } from "./repositories.js";
 import { publishChecks } from "./publish.js";
 import {
   checkoutTreeOnto,
@@ -37,7 +37,7 @@ import {
 import { assertTeammateWorktree, integrateTeamTask } from "./team-workspace.js";
 import { Store } from "./store.js";
 import { AppError, type Run } from "./types.js";
-import { Workbench } from "./workbench.js";
+import { Workbench, type WorkbenchContext } from "./workbench.js";
 import { withLocale } from "./i18n/index.js";
 import type { TeamTask } from "../shared/team.js";
 
@@ -317,6 +317,65 @@ test("a local import is cloned, so runs never add worktrees or branches to the p
     url: "",
   });
   assert.equal((await workbench.importRepository(legacy)).id, "legacy");
+});
+
+test("a project an earlier build worked on in place moves to a clone once none of its runs works there", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-security-legacy-"));
+  const legacy = path.join(directory, "legacy");
+  const baseSha = await repository(legacy, { "old.ts": "old\n" });
+  const store = new Store(path.join(directory, "state"));
+  await store.initialize();
+  const workbench = new Workbench(store);
+  t.after(async () => {
+    await workbench.shutdown();
+    await store.save();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const ctx = (workbench as unknown as { context: WorkbenchContext }).context;
+  const repo = {
+    id: "legacy",
+    name: "legacy",
+    owner: "local",
+    fullName: "local/legacy",
+    path: legacy,
+    defaultBranch: "main",
+    url: "",
+  };
+  store.data.repos.push(repo);
+  const runOf = (id: string) =>
+    baseRun({
+      id,
+      repoId: repo.id,
+      worktreePath: path.join(store.directory, "worktrees", id),
+      baseSha: "",
+      branch: `fix/${id.slice(0, 8)}`,
+    });
+  // A run of that build still has its worktree in the person's repository.
+  const old = { ...runOf("old-run1"), baseSha };
+  await git(legacy, ["worktree", "add", "-q", "-b", old.branch, old.worktreePath, baseSha]);
+  store.data.runs.push(old);
+  const first = runOf("first-run");
+  store.data.runs.push(first);
+  assert.equal(await adoptLegacyCheckout(ctx, repo, first), false);
+  assert.equal(repo.path, legacy);
+
+  // Once its files are freed, the next run moves the project to a clone.
+  await git(legacy, ["worktree", "remove", "--force", old.worktreePath]);
+  old.workspaceRemovedAt = new Date().toISOString();
+  const before = await repositoryState(legacy);
+  const second = runOf("second-run");
+  store.data.runs.push(second);
+  assert.equal(await adoptLegacyCheckout(ctx, repo, second), true);
+  assert.ok(repo.path.startsWith(path.join(store.directory, "repositories") + path.sep));
+  await createRunWorktree(second, repo, new AbortController().signal);
+  assert.equal(second.baseSha, baseSha);
+  assert.match((await git(repo.path, ["branch", "--list"])).stdout, /fix\/second-r/);
+  assert.deepEqual(await repositoryState(legacy), before);
+  // The move is saved, and importing the checkout again finds the project.
+  const saved = JSON.parse(await readFile(path.join(store.directory, "state.json"), "utf8"));
+  assert.equal(saved.repos.find((entry: { id: string }) => entry.id === repo.id).path, repo.path);
+  assert.equal((await workbench.importRepository(legacy)).id, repo.id);
+  assert.equal(await adoptLegacyCheckout(ctx, repo, runOf("third-run")), false);
 });
 
 test("diff paths that would reach an object prototype are refused", async (t) => {

@@ -156,8 +156,11 @@ other's keys, and no agent receives GitHub tokens or a BELL PR license key.
   runs never add worktrees or branches to your own repository. If the
   checkout's origin is on GitHub, BELL PR's clone points at GitHub and runs
   fetch from there; otherwise the clone keeps no remote and runs start from
-  its own branches. A checkout imported by an earlier version keeps working
-  where it is.
+  its own branches. A project that an earlier version imported in place
+  moves to such a clone when its next run starts, once none of its runs
+  still has a worktree in your repository; until then its runs, new ones
+  included, keep working there. Branches those runs already added stay in
+  your repository; delete them yourself if you no longer need them.
 - **Hardened Git.** Every Git command runs with hooks, the file-system
   monitor and the global attributes file switched off, and with BELL PR's
   own pager, editor, password prompt and SSH command. Fetches, `ls-remote`

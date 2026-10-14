@@ -4,12 +4,13 @@
  * the Git worktree each run works in.
  */
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, realpath, rm } from "node:fs/promises";
+import { lstat, mkdir, realpath, rm } from "node:fs/promises";
 import path from "node:path";
 import { command, git, gitNetwork } from "./process.js";
 import { assertRefName, parseGitHubSource } from "./git.js";
 import { AppError, type Repository, type Run } from "./types.js";
 import type { WorkbenchContext } from "./workbench.js";
+import { log } from "./log.js";
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
@@ -328,6 +329,57 @@ export async function updateRepository(ctx: WorkbenchContext, id: string) {
     await ctx.store.save();
     return { repo, from, to, updated: from !== to };
   });
+}
+
+/** True when `child` lies strictly inside `parent`. */
+function inside(parent: string, child: string) {
+  const relative = path.relative(path.resolve(parent), path.resolve(child));
+  return (
+    relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative)
+  );
+}
+
+/**
+ * A project that an earlier build imported from a local checkout works in
+ * the person's own repository (`repo.path` is the checkout). Before a new
+ * run adds its worktree, such a project moves to a BELL clone of that
+ * checkout under <data>/repositories, so the run adds no worktree or
+ * branch there. While another of its runs still has a worktree in the
+ * person's repository, the project stays: those runs fetch and sync
+ * through it, and keep working where they are. Returns whether it moved.
+ * The caller holds the repository lock.
+ */
+export async function adoptLegacyCheckout(
+  ctx: WorkbenchContext,
+  repo: Repository,
+  run: Run,
+) {
+  const root = path.join(ctx.store.directory, "repositories");
+  if (inside(root, repo.path)) return false;
+  for (const other of ctx.store.data.runs) {
+    if (
+      other.repoId !== repo.id ||
+      other.id === run.id ||
+      !other.worktreePath ||
+      other.workspaceRemovedAt
+    )
+      continue;
+    const present = await lstat(other.worktreePath).then(
+      () => true,
+      () => false,
+    );
+    if (present) return false;
+  }
+  await mkdir(root, { recursive: true, mode: 0o700 });
+  const destination = path.join(
+    root,
+    `${localClonePrefix(repo.path)}${newId().slice(0, 8)}`,
+  );
+  await cloneLocalCheckout(repo.path, destination, repo.url || undefined);
+  log.info("repo.moved_to_clone", { repoId: repo.id });
+  repo.path = destination;
+  await ctx.store.save();
+  return true;
 }
 
 /**
