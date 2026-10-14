@@ -111,11 +111,20 @@ export async function directorySize(target: string): Promise<number> {
  * The working files are gone: the diff, reviews, publishing and the
  * agents need them. Throws 410 `workspace_removed`.
  */
-export function assertWorkspacePresent(run: Pick<Run, "workspaceRemovedAt">) {
+export function assertWorkspacePresent(
+  run: Pick<Run, "workspaceRemovedAt" | "prUrl">,
+  options: { update?: boolean } = {},
+) {
   if (run.workspaceRemovedAt)
-    throw new AppError((m) => m.storage.workspace.removed, 410, {
-      code: "workspace_removed",
-    });
+    throw new AppError(
+      (m) =>
+        // Syncing a published PR or starting a round needs its checkout.
+        options.update && run.prUrl
+          ? m.storage.workspace.removedPublished
+          : m.storage.workspace.removed,
+      410,
+      { code: "workspace_removed" },
+    );
 }
 
 /** Queued, running, paused or publishing, or an agent job still works on it. */

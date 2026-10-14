@@ -242,6 +242,8 @@ test("freeing a run's workspace removes its directories, Git records, branch and
     const refused = await f.call("POST", `/api/runs/${value.id}/${action}`, {});
     assert.equal(refused.status, 410, action);
     assert.equal(refused.body.code, "workspace_removed", action);
+    // The published PR's checkout is gone: say what that means for it.
+    assert.match(refused.body.error, /can no longer be synced or given a follow-up round here/, action);
   }
   // Freeing it again changes nothing.
   const again = await f.call("DELETE", `/api/runs/${value.id}/workspace`, {});
