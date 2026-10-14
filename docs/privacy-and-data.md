@@ -64,8 +64,8 @@ BELL PR runs in:
   `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, which turns off all of its
   non-essential traffic.
 
-BELL PR starts the Codex CLI as `codex exec --ignore-user-config`, which does
-not load `$CODEX_HOME/config.toml` (sign-in still uses `CODEX_HOME`). This
+BELL PR starts each Codex agent with `codex exec --ignore-user-config`, which
+does not load `$CODEX_HOME/config.toml` (sign-in still uses `CODEX_HOME`). This
 keeps your personal Codex settings out of the agents' work, but it also
 means that a setting you made only in that file, such as
 `[analytics] enabled = false`, does not apply to the agents BELL PR runs:
