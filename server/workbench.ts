@@ -25,7 +25,8 @@ import { agentLoginCheck, type TransientSleep } from "./agent-cli.js";
 import type { AgentProvider } from "../shared/models.js";
 import { proEntitlements, type Entitlements } from "../shared/plans.js";
 import { synchronizeExplanations } from "./explanations.js";
-import { currentLocale, sm } from "./i18n/index.js";
+import { currentLocale, sm, withLocale } from "./i18n/index.js";
+import { parseLocale, type Locale } from "../shared/i18n/locale.js";
 import { initLog, log } from "./log.js";
 import { logged, logRunQueued } from "./run-events.js";
 import { activeFollowUp } from "../shared/followups.js";
@@ -45,6 +46,8 @@ import * as followUps from "./followup-runs.js";
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
+/** The only language of the builds that saved runs without a locale (as in git.ts readDiff). */
+const legacyRunLocale: Locale = "zh-TW";
 /** How often the retention period is applied while the server runs. */
 const retentionIntervalMs = 24 * 60 * 60 * 1000;
 
@@ -641,8 +644,12 @@ export class Workbench {
     const run = this.run(id);
     cleanup.assertWorkspacePresent(run);
     const files = await readDiff(run);
-    synchronizeExplanations(run, files);
-    synchronizeDraftPreparation(run, files);
+    // Text saved on the run is worded in the run's language, never the
+    // viewer's; runs saved without a locale were written in zh-TW.
+    withLocale(parseLocale(run.locale) ?? legacyRunLocale, () => {
+      synchronizeExplanations(run, files);
+      synchronizeDraftPreparation(run, files);
+    });
     if (run.status !== "published") {
       synchronizeReview(run, files);
     }

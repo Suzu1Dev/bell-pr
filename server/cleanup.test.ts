@@ -591,3 +591,25 @@ test("the learning record pages runs with ready explanations and notes, newest f
   assert.equal(invalid.status, 400);
   assert.equal(invalid.body.error, "This page of learning notes is out of date; reload the list.");
 });
+
+test("the diff updates explanation and draft state in the run's language, never the viewer's", async (t) => {
+  const f = await fixture();
+  t.after(f.cleanup);
+  const repoPath = path.join(f.directory, "repo");
+  const baseSha = await gitRepository(repoPath);
+  const repo = await f.workbench.importRepository(repoPath);
+  await writeFile(path.join(repoPath, "hello.ts"), 'export const hello = "after";\n');
+  const stalePreparation = () => ({ status: "ready" as const, fingerprint: "f".repeat(64) });
+  // Saved before runs had a locale: the builds then wrote zh-TW only.
+  const legacy = run("legacy-run", repo, { status: "review", baseSha, worktreePath: repoPath, draftPreparation: stalePreparation() });
+  const english = run("english-run", repo, { status: "review", baseSha, worktreePath: repoPath, locale: "en", draftPreparation: stalePreparation() });
+  f.store.data.runs.push(legacy, english);
+  await withLocale("en", () => f.workbench.diff(legacy.id));
+  assert.equal(legacy.draftPreparation?.status, "stale");
+  assert.equal(legacy.draftPreparation?.error, "程式碼差異已更新；請重新產生符合目前變更的 PR 草稿建議。");
+  await withLocale("zh-TW", () => f.workbench.diff(english.id));
+  assert.equal(
+    english.draftPreparation?.error,
+    "The code diff has changed. Generate a new PR draft suggestion for the current changes.",
+  );
+});
