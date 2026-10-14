@@ -47,6 +47,11 @@ const m: Translation<typeof en> = {
   provenance: {
     ai: "AI 生成 · 內容可能有誤",
     sample: "示範內容 · 預先寫好，未呼叫 AI",
+    otherLanguage: ({ language }) => `這些解說是以${language}產生的。`,
+    languages: {
+      en: "英文",
+      "zh-TW": "繁體中文",
+    },
   },
   markdown: {
     imageOmitted: "圖片已省略",

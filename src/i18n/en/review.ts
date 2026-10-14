@@ -7,7 +7,7 @@
  * component renders it through src/review/withNodes.tsx: put that parameter
  * where the element belongs in the sentence.
  */
-import { formatters } from "../../../shared/i18n/locale";
+import { formatters, type Locale } from "../../../shared/i18n/locale";
 import { product } from "../../../shared/product";
 
 const { plural } = formatters("en");
@@ -92,6 +92,14 @@ const review = {
   provenance: {
     ai: "AI-generated · may be inaccurate",
     sample: "Sample · prewritten, no AI call",
+    /** `language` is one of `languages`, the run's own language. */
+    otherLanguage: ({ language }: { language: string }) =>
+      `These explanations were generated in ${language}.`,
+    /** Each language's name in this language. */
+    languages: {
+      en: "English",
+      "zh-TW": "Traditional Chinese",
+    } satisfies Record<Locale, string>,
   },
   /** MarkdownContent: explanations, reports and other agent-written text. */
   markdown: {

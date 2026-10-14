@@ -10,6 +10,7 @@ import {
   FlaskConical,
   FolderTree,
   HelpCircle,
+  Languages,
   Lightbulb,
   ListOrdered,
   LoaderCircle,
@@ -20,10 +21,11 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { LearnerNote } from "../../shared/explanations";
+import { parseLocale, type Locale } from "../../shared/i18n/locale";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
 import { parseReviewOrder } from "../../shared/review-order";
 import { useTablistKeys } from "../a11y/useTablistKeys";
-import { useFormat, useT } from "../i18n";
+import { useFormat, useLocale, useT } from "../i18n";
 import type { ChatMessage, DiffFile, Run } from "../types";
 import { MarkdownContent } from "./MarkdownContent";
 import { withNodes } from "./withNodes";
@@ -51,6 +53,11 @@ export interface ExplanationPanelProps {
   /** Re-runs the reviewer and test analyst on the current diff; the button renders when given. */
   onRerunReview?: () => void;
   reviewBusy?: boolean;
+  /**
+   * The language the run's agents wrote in (`run.locale`). When it is not
+   * the UI language, the explanation tab says which language it is in.
+   */
+  runLocale?: Locale;
 }
 
 /**
@@ -267,9 +274,11 @@ export function ExplanationPanel({
   feedback = [],
   onRerunReview,
   reviewBusy,
+  runLocale,
 }: ExplanationPanelProps) {
   const t = useT("review");
   const fmt = useFormat();
+  const [locale] = useLocale();
   const [tab, setTab] = useState<"explain" | "reports" | "chat">(
     chatRequestId ? "chat" : "explain",
   );
@@ -358,6 +367,15 @@ export function ExplanationPanel({
     note && file.fingerprint && note.fingerprint !== file.fingerprint,
   );
   const noteDirty = noteDraft !== (note?.text ?? "");
+  // Saved explanations keep the language they were written in; regenerating
+  // them in the UI language is not offered yet.
+  const otherLanguage = parseLocale(runLocale);
+  const languageNote =
+    !demo && otherLanguage && otherLanguage !== locale
+      ? t.provenance.otherLanguage({
+          language: t.provenance.languages[otherLanguage],
+        })
+      : undefined;
   const presets = [
     t.presets.why,
     t.presets.risks,
@@ -472,6 +490,12 @@ export function ExplanationPanel({
             ) : explanation ? (
               <>
                 <ProvenanceLabel demo={demo} />
+                {languageNote && (
+                  <p className="explain-language-note" role="note">
+                    <Languages size={13} />
+                    {languageNote}
+                  </p>
+                )}
                 {isTestFile && (
                   <p className="explain-test-hint">
                     <FlaskConical size={13} />

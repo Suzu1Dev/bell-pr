@@ -694,6 +694,43 @@ test("answers carry the AI label; failed turns, questions and demo answers do no
   assert.equal(zh.match(/AI 生成 · 內容可能有誤/g)?.length, 2);
 });
 
+test("explanations written in another language than the UI say which", () => {
+  const notice = "These explanations were generated in Traditional Chinese.";
+  const zhRun = renderPanel({ runLocale: "zh-TW" });
+  assertNoHan(zhRun);
+  assert.ok(zhRun.includes(`<p class="explain-language-note" role="note">`));
+  assert.ok(zhRun.includes(notice));
+  assert.ok(!renderPanel({ runLocale: "en" }).includes("explain-language-note"));
+  // Runs without a recorded language, the demo (always in the UI language)
+  // and files without an explanation yet show no notice.
+  assert.ok(!renderPanel().includes("explain-language-note"));
+  assert.ok(!renderPanel({ runLocale: "zh-TW", demo: true }).includes("explain-language-note"));
+  assert.ok(
+    !renderPanel({
+      runLocale: "zh-TW",
+      file: { ...englishFile("src/utils/retry.ts"), explanation: undefined, explanationStatus: "pending" },
+    }).includes("explain-language-note"),
+  );
+  // A language this build does not know is not named.
+  assert.ok(
+    !renderPanel({ runLocale: "ja" as unknown as ExplanationPanelProps["runLocale"] }).includes(
+      "explain-language-note",
+    ),
+  );
+  const zhUi = renderZh(
+    createElement(ExplanationPanel, {
+      file: demoFiles[0],
+      messages: [],
+      loading: false,
+      onAsk() {},
+      demo: false,
+      runLocale: "en",
+    }),
+  );
+  assert.match(zhUi, /這些解說是以英文產生的。/);
+  assert.match(zhUi, /AI 生成 · 內容可能有誤/);
+});
+
 test("every English review message is free of Han for any count", () => {
   const texts: string[] = [];
   const visit = (value: unknown) => {
