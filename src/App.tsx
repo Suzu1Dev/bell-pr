@@ -2694,25 +2694,34 @@ export default function App() {
                           </div>
                         </div>
                       </div>
-                      {!demo && (
-                        <PremiseNotice premise={run.team?.premise} compact />
-                      )}
-                      {editable && run.worktreePath && (
-                        <div className="worktree-hint">
-                          <FolderGit2 size={14} />
-                          <span>
-                            你可以直接在這個目錄修改，重新整理差異後會重新解說與審閱狀態
-                          </span>
-                          <code>{run.worktreePath}</code>
-                          <button
-                            type="button"
-                            className="icon-button"
-                            aria-label="複製工作目錄路徑"
-                            title="複製工作目錄路徑"
-                            onClick={copyWorktreePath}
-                          >
-                            <Copy size={13} />
-                          </button>
+                      {((!demo && run.team?.premise) ||
+                        (editable && run.worktreePath)) && (
+                        // The premise check and the worktree share one row above the diff.
+                        <div className="diff-context-bar">
+                          {!demo && (
+                            <PremiseNotice premise={run.team?.premise} compact />
+                          )}
+                          {editable && run.worktreePath && (
+                            <div
+                              className="worktree-hint"
+                              title="你可以直接在這個目錄修改，重新整理差異後會重新解說與審閱狀態"
+                            >
+                              <FolderGit2 size={14} />
+                              <span>工作目錄</span>
+                              <code>
+                                <span>{run.worktreePath}</span>
+                              </code>
+                              <button
+                                type="button"
+                                className="icon-button"
+                                aria-label="複製工作目錄路徑"
+                                title="複製工作目錄路徑"
+                                onClick={copyWorktreePath}
+                              >
+                                <Copy size={13} />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                       {file ? (
