@@ -888,6 +888,10 @@ test("preflight blocks unfinished text and asks the person to confirm empty boxe
   );
   assert.ok(sameDraftProse(ticked, shortProposal));
   assert.ok(!sameDraftProse(`${ticked}\nMore.`, shortProposal));
+  // Nor is turning the AI-disclosure line on, on either side.
+  assert.ok(sameDraftProse(withAiDisclosure(ticked), shortProposal));
+  assert.ok(sameDraftProse(ticked, withAiDisclosure(shortProposal)));
+  assert.ok(!sameDraftProse(withAiDisclosure(`${ticked}\nMore.`), shortProposal));
   assert.deepEqual(
     draftPreflight({
       body: ticked,
@@ -896,6 +900,12 @@ test("preflight blocks unfinished text and asks the person to confirm empty boxe
     }).map((check) => check.id),
     ["unchecked", "issue", "brevity"],
   );
+  // BELL's disclosure line leaves the suggestion unrevised.
+  const brevity = (body: string) =>
+    draftPreflight({ body, sources: opencodeSources, proposalBody: shortProposal })
+      .find((check) => check.id === "brevity")?.message;
+  assert.ok(brevity(ticked));
+  assert.equal(brevity(withAiDisclosure(ticked)), brevity(ticked));
   // Without collected sources only the text itself is checked.
   assert.deepEqual(
     draftPreflight({ body: "A finished description." }),

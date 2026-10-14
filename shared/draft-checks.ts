@@ -7,7 +7,7 @@ import type { Nodes as MdastNode } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfm } from "micromark-extension-gfm";
-import type { DraftSource } from "./drafts.js";
+import { withoutAiDisclosure, type DraftSource } from "./drafts.js";
 import en from "./i18n/draft-checks.en.js";
 import zhTW from "./i18n/draft-checks.zh-TW.js";
 import type { Locale } from "./i18n/locale.js";
@@ -176,10 +176,13 @@ function findRule(sources: DraftSource[], pattern: RegExp) {
   return undefined;
 }
 
-/** True when two bodies differ at most in which task items are ticked; ticking is not a rewrite. */
+/**
+ * True when two bodies differ at most in which task items are ticked and
+ * in BELL's AI-disclosure line; neither is a rewrite of the text.
+ */
 export function sameDraftProse(a: string, b: string) {
   const prose = (body: string) =>
-    body
+    withoutAiDisclosure(body)
       .split("\n")
       .map((line) =>
         line.replace(
