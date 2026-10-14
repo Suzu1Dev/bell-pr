@@ -4,6 +4,7 @@ import { assertNoHan } from "../../test-utils/render";
 import en from "../../i18n/en";
 import zhTW from "../../i18n/zh-TW";
 import {
+  answerTyping,
   mergePlaybackRun,
   readRunFiles,
   runPath,
@@ -200,4 +201,26 @@ test("a playback step brings the run's progress and keeps what the reader did", 
     mergePlaybackRun(previous, { ...step, team: previous.team }).team?.messages.length,
     2,
   );
+});
+
+test("a playback answer waits 300-900 ms, then types out in growing slices", () => {
+  const answer = "Full jitter spreads the retries of many clients over time.".repeat(8);
+  const quick = answerTyping(answer, 1, () => 0);
+  const slow = answerTyping(answer, 1, () => 0.999);
+  assert.equal(quick.delay, 300);
+  assert.ok(slow.delay >= 300 && slow.delay < 900, String(slow.delay));
+  // Each slice starts the answer and grows it; the last one is the answer.
+  assert.ok(quick.slices.length > 1 && quick.slices.length <= 40);
+  quick.slices.forEach((slice, index) => {
+    assert.ok(answer.startsWith(slice));
+    if (index) assert.ok(slice.length > quick.slices[index - 1].length);
+  });
+  assert.equal(quick.slices.at(-1), answer);
+  // About 1.2 s in all at speed 1, a quarter of it at speed 4, never under 16 ms a slice.
+  const total = quick.pause * (quick.slices.length - 1);
+  assert.ok(total > 1000 && total <= 1300, String(total));
+  assert.ok(answerTyping(answer, 4, () => 0).pause < quick.pause);
+  assert.equal(answerTyping(answer, 400, () => 0).pause, 16);
+  // A short answer still arrives whole.
+  assert.deepEqual(answerTyping("Yes.", 1, () => 0).slices, ["Yes."]);
 });

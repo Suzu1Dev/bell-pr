@@ -106,6 +106,29 @@ const wait = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
+ * How a playback answer types out: a pause of 300-900 ms first, then the
+ * text in at most 40 growing slices about 1.2 s apart in total at speed 1
+ * (faster at a higher speed, never under 16 ms a slice).
+ */
+export function answerTyping(
+  answer: string,
+  speed: number,
+  random: () => number = Math.random,
+): { delay: number; pause: number; slices: string[] } {
+  const steps = Math.max(1, Math.min(40, Math.ceil(answer.length / 8)));
+  const size = Math.max(1, Math.ceil(answer.length / steps));
+  const slices: string[] = [];
+  for (let end = size; end < answer.length; end += size)
+    slices.push(answer.slice(0, end));
+  slices.push(answer);
+  return {
+    delay: 300 + Math.floor(random() * 600),
+    pause: Math.max(16, Math.round(1200 / speed / slices.length)),
+    slices,
+  };
+}
+
+/**
  * What stopping a run reports, from the run as it was when the person pressed
  * stop and the run the server returned, in the language of `notices`.
  */
@@ -740,19 +763,14 @@ export function useRunActions({
     answer: string,
     fingerprint?: string,
   ) {
-    await wait(300 + Math.random() * 600);
-    const steps = Math.max(1, Math.min(40, Math.ceil(answer.length / 8)));
-    const size = Math.ceil(answer.length / steps);
-    const pause = Math.max(16, Math.round(1200 / presentation.speed / steps));
+    const { delay, pause, slices } = answerTyping(answer, presentation.speed);
+    await wait(delay);
     let shown: ChatMessage | undefined;
-    for (let end = size; ; end += size) {
+    for (const [index, content] of slices.entries()) {
+      if (index) await wait(pause);
       if (runIdRef.current !== runId) return;
       const previousTurn = shown;
-      const turn: ChatMessage = {
-        role: "assistant",
-        content: answer.slice(0, Math.min(end, answer.length)),
-        fingerprint,
-      };
+      const turn: ChatMessage = { role: "assistant", content, fingerprint };
       shown = turn;
       setMessages((previous) => {
         const list = previous[key] || [];
@@ -764,8 +782,6 @@ export function useRunActions({
           [key]: list.map((each) => (each === previousTurn ? turn : each)),
         };
       });
-      if (end >= answer.length) return;
-      await wait(pause);
     }
   }
   async function approve() {
