@@ -47,6 +47,12 @@ test("other lines, other sources, code and negations are not disclosure rules", 
     "```\nPlease disclose any use of AI tools.\n```",
     "<!-- Please disclose any use of AI tools. -->",
     "Every PR must reference an existing issue.",
+    // Lines about an AI feature of the project, not about using AI.
+    "Please state which OS you tested on and whether the AI module changed.",
+    "Mention the issue number in the title; AI features live in src/ai.",
+    "Please let us know if you need help with the AI backend.",
+    "Tell us about your AI experience in Discord.",
+    "If your change touches the AI module, you should mention the maintainers.",
   ])
     assert.equal(disclosureRule([source(content)]), undefined, content);
   // Only contributing guides and templates count, like the other rule quotes.
