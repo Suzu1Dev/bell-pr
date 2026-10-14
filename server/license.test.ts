@@ -535,6 +535,25 @@ test("a running server picks up a license changed by another process", async (t)
   }
 });
 
+test("a change another process made is kept when this one changes the license", async (t) => {
+  // A running server, and `bell-pr license trial` in another process before
+  // the server's watcher noticed it.
+  const dataDir = await tempDir(t);
+  const running = offline(dataDir).service;
+  await running.initialize();
+  await offline(dataDir).service.startTrial();
+  await running.activate(issue());
+  assert.ok(JSON.parse(readFileSync(path.join(dataDir, "license.json"), "utf8")).trial?.startedAt);
+  assert.equal((await running.deactivate()).plan, "trial");
+
+  // The trial another process started cannot start a second time here.
+  const other = await tempDir(t);
+  const server = offline(other).service;
+  await server.initialize();
+  await offline(other).service.startTrial();
+  await rejectsWith(() => server.startTrial(), 409, "trial_unavailable");
+});
+
 test("the startup line names the plan and, on Free, why and how to try Pro", () => {
   const line = (summary: Parameters<typeof startupPlanLine>[0]) => withLocale("en", () => startupPlanLine(summary));
   assert.equal(

@@ -458,6 +458,7 @@ export class OfflineLicenseService implements LicenseService {
   async activate(key: string): Promise<LicenseSummary> {
     return this.enqueue(async () => {
       this.assertNotEnvLocked();
+      await this.read();
       const normalized = normalizeLicenseKey(key);
       const result = this.check(normalized);
       if (!result.ok) throw this.invalidKey(result);
@@ -480,6 +481,7 @@ export class OfflineLicenseService implements LicenseService {
   async deactivate(): Promise<LicenseSummary> {
     return this.enqueue(async () => {
       this.assertNotEnvLocked();
+      await this.read();
       if (this.state?.key !== undefined) {
         const previous = this.decode(this.state.key);
         const { key: _key, activatedAt: _activatedAt, ...rest } = this.state;
@@ -495,6 +497,7 @@ export class OfflineLicenseService implements LicenseService {
 
   async startTrial(): Promise<LicenseSummary> {
     return this.enqueue(async () => {
+      await this.read();
       if (this.state?.trial)
         throw new AppError((m) => m.license.trialUsed, 409, {
           code: "trial_unavailable",
@@ -537,7 +540,10 @@ export class OfflineLicenseService implements LicenseService {
     };
     watchFile(this.file, { interval: watchIntervalMs, persistent: false }, listener);
     const timer = setInterval(() => {
-      void this.enqueue(() => this.recordLastSeen()).catch(() => undefined);
+      void this.enqueue(async () => {
+        await this.read();
+        await this.recordLastSeen();
+      }).catch(() => undefined);
     }, lastSeenIntervalMs);
     timer.unref();
     return () => {
@@ -572,6 +578,10 @@ export class OfflineLicenseService implements LicenseService {
     return Math.max(clock, this.highWater, toTime(this.state?.lastSeenAt) ?? 0);
   }
 
+  /**
+   * Loads license.json. Every change reads it first, so it builds on what
+   * `bell-pr license` in another process may have written since.
+   */
   private async read() {
     let text: string;
     try {
