@@ -10,21 +10,13 @@ import {
 import {
   doctorCheckIds,
   type DoctorCheck,
-  type DoctorCheckId,
   type DoctorCheckStatus,
   type DoctorReport,
 } from "../../shared/doctor";
 import { useFormat, useT } from "../i18n";
 import { CopyCommand } from "./CopyCommand";
+import { maskCheckValues, maskedDetail } from "./mask";
 import "./setup.css";
-
-/** Checks whose detail names the person (account, plan, name and e-mail). */
-const userDetails: readonly DoctorCheckId[] = [
-  "gh-auth",
-  "claude-auth",
-  "codex-auth",
-  "git-identity",
-];
 
 const icons: Record<DoctorCheckStatus, ReactNode> = {
   ok: <CircleCheck size={18} aria-hidden="true" />,
@@ -44,7 +36,11 @@ export interface SetupChecklistProps {
   error?: string;
   /** Probes again; without it there is no Re-check button. */
   refresh?: () => unknown;
-  /** Masks the GitHub login, the agent CLIs' account details and the Git identity. */
+  /**
+   * Masks the GitHub login, the agent CLIs' account details and the Git
+   * identity of passing checks, and the e-mail addresses in problem rows
+   * and their fix commands.
+   */
   maskUser?: (value: string) => string;
   /** Masks the data directory's path. */
   maskPath?: (value: string) => string;
@@ -100,10 +96,7 @@ export function SetupChecklist({
 
   const row = (check: DoctorCheck) => {
     const label = t.labels[check.id];
-    const detail =
-      check.detail && userDetails.includes(check.id)
-        ? maskUser(check.detail)
-        : check.detail;
+    const detail = maskedDetail(check, maskUser);
     const folder =
       check.id === "data-dir" && typeof check.params?.path === "string"
         ? maskPath(check.params.path)
@@ -139,7 +132,7 @@ export function SetupChecklist({
                 <CopyCommand
                   key={`${fix.label}\n${fix.command}`}
                   label={fix.label}
-                  command={fix.command}
+                  command={maskCheckValues(fix.command, [check], maskUser)}
                 />
               ))}
             </div>

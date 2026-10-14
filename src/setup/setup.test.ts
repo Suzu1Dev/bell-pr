@@ -117,6 +117,9 @@ test("the checklist shows each check with its state, version, detail and the fix
   // Personal details are masked: the Git identity and the data directory.
   assert.doesNotMatch(html, /octo@example\.com|\/home\/octo/);
   assert.match(html, /Folder: ~\/\.bellpr/);
+  // A problem keeps its explanation.
+  assert.match(html, /data-check="gh-auth".*?<p class="setup-check-detail">Not signed in\.<\/p>/);
+  assert.match(html, /data-check="claude-auth".*?<p class="setup-check-detail">Not signed in\.<\/p>/);
   assert.match(html, />Re-check</);
   assert.match(html, /Checked at /);
   // Every fix, also on rows that are fine or not used, on request.
@@ -133,6 +136,44 @@ test("the checklist masks the GitHub login and the Claude account in presentatio
   assert.doesNotMatch(html, /setup-check-fixes/);
   const plain = renderEn(createElement(SetupChecklist, { report: ready }));
   assert.match(plain, /octocat/);
+});
+
+test("a Git identity problem keeps its words, and only the e-mail addresses are masked in presentations", () => {
+  const noreply = "583231+octocat@users.noreply.github.com";
+  const identity = (value: DoctorCheck): DoctorReport => ({
+    ...ready,
+    checks: ready.checks.map((entry) => (entry.id === "git-identity" ? value : entry)),
+  });
+  const guessed = check({
+    id: "git-identity",
+    status: "warn",
+    reason: "autodetected",
+    detail: "No e-mail address is set. Git guessed octo@octo-laptop.local, which would be published with your commits.",
+    params: { email: "octo@octo-laptop.local", noreply },
+    fixes: [{ label: "Use your private GitHub no-reply address", command: `git config --global user.email "${noreply}"` }],
+  });
+  const html = renderEn(createElement(SetupChecklist, { ...doctor(identity(guessed)), ...mask }));
+  assertNoHan(html);
+  assert.doesNotMatch(html, /octocat|583231|octo-laptop/);
+  assert.match(html, /No e-mail address is set\. Git guessed you, which would be published with your commits\./);
+  assert.match(html, /<code>git config --global user\.email &quot;you&quot;<\/code>/);
+  const missing = check({
+    id: "git-identity",
+    status: "fail",
+    reason: "missing",
+    detail: "Not set: Git does not know your name and e-mail address, so nothing can be committed or published.",
+    params: { noreply },
+    fixes: guessed.fixes,
+  });
+  const notice = renderEn(
+    createElement(ReadinessNotice, { requires: ["git-identity"], doctor: doctor(identity(missing)), ...mask }),
+  );
+  assertNoHan(notice);
+  assert.match(notice, /Git name and e-mail: Not set: Git does not know your name and e-mail address/);
+  assert.doesNotMatch(notice, /583231|octocat/);
+  // Outside presentations the command is the real one.
+  const plain = renderEn(createElement(SetupChecklist, { report: identity(missing) }));
+  assert.match(plain, /583231\+octocat@users\.noreply\.github\.com/);
 });
 
 test("the checklist says it is checking while the first report loads, and reports a failed request", () => {
@@ -239,6 +280,8 @@ test("the readiness notice explains the requirement with fixes, and renders noth
   assert.match(html, /AI provider: Install and sign in to the Codex CLI or Claude Code\./);
   assert.match(html, /<code>npm install -g @openai\/codex<\/code>/);
   assert.match(html, /<code>gh auth login<\/code>/);
+  // The problem is told, not masked.
+  assert.match(html, /GitHub sign-in: Not signed in\./);
   assert.equal(renderEn(createElement(ReadinessNotice, { requires: ["provider"], doctor: doctor(ready) })), "");
   // The demo needs no tools: nothing is shown, whatever the report says.
   assert.equal(

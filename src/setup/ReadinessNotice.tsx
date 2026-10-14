@@ -4,6 +4,7 @@ import type { DoctorCheck, DoctorCheckId, DoctorReport } from "../../shared/doct
 import type { Fix } from "../../shared/errors";
 import { useT } from "../i18n";
 import { CopyCommand } from "./CopyCommand";
+import { maskCheckValues, maskedDetail } from "./mask";
 import { useDoctor, type DoctorState } from "./useDoctor";
 import "./setup.css";
 
@@ -81,7 +82,7 @@ export interface ReadinessNoticeProps {
   doctor?: DoctorState;
   /** Told whether the requirements are met, for example to disable a button. */
   onReadyChange?: (ready: boolean) => void;
-  /** Masks the account names that check details may contain. */
+  /** Masks the e-mail addresses that check details and fixes may contain. */
   maskUser?: (value: string) => string;
 }
 
@@ -149,10 +150,7 @@ export function ReadinessMessage({
                 <p key={check.id} className="readiness-detail">
                   {t.readiness.detail({
                     check: t.checklist.labels[check.id],
-                    detail:
-                      check.id === "gh-auth" || check.id === "git-identity"
-                        ? maskUser(check.detail!)
-                        : check.detail!,
+                    detail: maskedDetail(check, maskUser)!,
                   })}
                 </p>
               ))}
@@ -160,7 +158,7 @@ export function ReadinessMessage({
               <CopyCommand
                 key={`${fix.label}\n${fix.command}`}
                 label={fix.label}
-                command={fix.command}
+                command={maskCheckValues(fix.command, checks, maskUser)}
               />
             ))}
           </div>
