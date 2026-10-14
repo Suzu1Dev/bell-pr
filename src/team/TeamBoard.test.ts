@@ -9,6 +9,7 @@ import {
 } from "../../shared/plans";
 import type { AgentTeam } from "../../shared/team";
 import { demoRun, demoTeam, getDemo } from "../demo";
+import { createDemoPlayback, type PlaybackClock } from "../demo/playback";
 import { LocaleProvider } from "../i18n";
 import en from "../i18n/en";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
@@ -593,3 +594,65 @@ test("the model and usage cards fold into Run details, whose summary names what 
   const older = english({ ...englishRun, modelExecution: undefined, efficiency: undefined });
   assert.match(older, /<span>Model, reasoning effort and AI usage<\/span>/);
 });
+
+test(
+  "the English board renders every state the demo playback goes through",
+  {
+    skip:
+      getDemo("en") === getDemo("zh-TW") &&
+      "the English demo content is not filled in yet",
+  },
+  () => {
+    // Time moves only when the test fires the next timer.
+    let now = Date.parse("2026-10-03T01:30:00.000Z");
+    const timers: { at: number; callback: () => void }[] = [];
+    const clock: PlaybackClock = {
+      now: () => now,
+      setTimeout(callback, ms) {
+        const timer = { at: now + ms, callback };
+        timers.push(timer);
+        return timer;
+      },
+      clearTimeout(handle) {
+        timers.splice(timers.indexOf(handle as (typeof timers)[number]), 1);
+      },
+    };
+    const fireNext = () => {
+      timers.sort((a, b) => a.at - b.at);
+      const timer = timers.shift();
+      if (!timer) return false;
+      now = timer.at;
+      timer.callback();
+      return true;
+    };
+    const playback = createDemoPlayback({ demo: getDemo("en"), clock });
+    const seen = new Map<string, string>();
+    playback.subscribe((event) => {
+      if (event.kind !== "run" || !event.run.team) return;
+      const key = event.run.status === "queued" ? "queued" : event.run.team.phase;
+      const html = renderEn(board(event.run, true));
+      assert.doesNotThrow(() => assertNoHan(html), key);
+      assert.doesNotMatch(html, /Invalid Date|NaN/, key);
+      seen.set(key, html);
+    });
+    playback.start();
+    for (let steps = 0; steps < 500 && playback.current()?.run.status !== "awaiting_plan"; steps++)
+      fireNext();
+    assert.equal(playback.current()?.run.status, "awaiting_plan");
+    assert.ok(playback.approvePlan());
+    for (let steps = 0; steps < 500 && fireNext(); steps++);
+    assert.deepEqual(
+      [...seen.keys()],
+      ["queued", "planning", "awaiting_approval", "developing", "integrating", "reviewing", "complete"],
+    );
+    assert.match(seen.get("queued")!, /Waiting to start/);
+    assert.match(seen.get("planning")!, /The lead is planning/);
+    assert.match(seen.get("planning")!, /Subtasks appear here once the lead&#x27;s plan is ready\./);
+    // The sample's approve button calls onApprove, which 5B points at the playback.
+    assert.match(seen.get("awaiting_approval")!, /Approve the plan and start development/);
+    assert.match(seen.get("awaiting_approval")!, /Subtasks start once you approve the plan\./);
+    assert.match(seen.get("developing")!, /aria-current="step"><svg[^>]*>[\s\S]*?<\/svg>Teammates work in parallel/);
+    assert.match(seen.get("complete")!, /Team work is complete/);
+    playback.stop();
+  },
+);
