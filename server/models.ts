@@ -14,7 +14,7 @@ import {
   type ReasoningEffort,
 } from "../shared/models.js";
 import { sm } from "./i18n/index.js";
-import { agentEnvironment } from "./process.js";
+import { agentEnvironment, observeChild } from "./process.js";
 import { AppError } from "./types.js";
 
 export const modelId = z
@@ -120,6 +120,8 @@ export async function readModelCatalog(
     cwd = await mkdtemp(path.join(tmpdir(), "bell-models-"));
     return await new Promise<ModelCatalog>((resolve) => {
       const child = start(cwd!);
+      // Recorded like every agent CLI, so a crash cannot leave it running.
+      observeChild(child, "codex");
       let buffer = "";
       let bytes = 0;
       let requestId = 0;
