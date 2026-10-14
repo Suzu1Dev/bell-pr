@@ -98,10 +98,10 @@ export function DraftGuidancePanel({
   const ready = preparation?.status === "ready" && !!proposal;
   const sourceAnchor = (index: number) => `draft-source-${prefix}-${index}`;
   const statusMessage = generating
-    ? "正在閱讀貢獻規範與 PR 範本，並對照本次變更整理建議。你可以繼續編輯下方草稿。"
+    ? "正在閱讀貢獻規範與 PR 範本，並對照本次變更整理建議。你可以繼續編輯上方草稿。"
     : preparation?.status === "failed"
       ? preparation.error ||
-        "這次未能整理草稿，請稍後重試。下方編輯內容已保留。"
+        "這次未能整理草稿，請稍後重試。上方編輯內容已保留。"
       : preparation?.status === "stale"
         ? "變更內容已更新，這份建議需要重新整理。請產生新版建議後再套用。"
         : undefined;
@@ -335,7 +335,7 @@ export function DraftGuidancePanel({
           <div className="draft-guidance-apply">
             <p>
               {applied
-                ? "下方編輯區就是這份建議的原文。說明會原樣送到 GitHub，請用自己的話確認後再送出。"
+                ? "上方編輯區就是這份建議的原文。說明會原樣送到 GitHub，請用自己的話確認後再送出。"
                 : "套用後仍可編輯，儲存後才更新草稿。"}
             </p>
             <button
