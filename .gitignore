@@ -14,6 +14,7 @@ build/
 
 # Package tarballs from `npm pack`
 /bell-pr-*.tgz
+.README.md.orig
 
 # Keys and certificates never enter the repository
 *.pem
