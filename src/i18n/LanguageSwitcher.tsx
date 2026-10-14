@@ -8,16 +8,23 @@ import { api, send } from "../api";
 import { useLocale, useT } from "./index";
 
 /**
- * Switches the UI to `next` with `change` (the setter from useLocale), then
- * saves it in the app settings, so work the server does on its own
+ * Saves `locale` in the app settings, so work the server does on its own
  * (recovery, queued runs, cleanup, the command line) uses it too. Saving is
  * best effort: a failure (the demo, before sign-in) changes nothing.
  */
+export function saveLocale(locale: Locale) {
+  api("/app-settings", send("PUT", { locale })).catch(() => {
+    // The UI language is what the person sees either way.
+  });
+}
+
+/**
+ * Switches the UI to `next` with `change` (the setter from useLocale), then
+ * saves it in the app settings (see `saveLocale`).
+ */
 export function chooseLocale(next: Locale, change: (locale: Locale) => void) {
   change(next);
-  api("/app-settings", send("PUT", { locale: next })).catch(() => {
-    // The UI language already changed.
-  });
+  saveLocale(next);
 }
 
 /**

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import type { DoctorCheck, DoctorReport } from "../../shared/doctor";
-import { chooseLocale } from "../i18n/LanguageSwitcher";
+import { chooseLocale, saveLocale } from "../i18n/LanguageSwitcher";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { CopyCommand } from "./CopyCommand";
 import { ReadinessNotice, readinessOf } from "./ReadinessNotice";
@@ -280,6 +280,14 @@ test("choosing a language also saves it in the app settings, and a failure is ig
   assert.deepEqual(requests, [
     { url: "/api/app-settings", method: "PUT", body: JSON.stringify({ locale: "zh-TW" }) },
   ]);
+  // Keeping the suggested language in the welcome flow saves it the same way.
+  saveLocale("en");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(requests.at(-1), {
+    url: "/api/app-settings",
+    method: "PUT",
+    body: JSON.stringify({ locale: "en" }),
+  });
   // In the demo or before sign-in the request fails; nothing else happens.
   globalThis.fetch = (async () => {
     throw new TypeError("fetch failed");

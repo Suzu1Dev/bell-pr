@@ -21,8 +21,8 @@ import {
 } from "../../shared/models";
 import { eulaVersion } from "../../shared/product";
 import { api, send } from "../api";
-import { useT } from "../i18n";
-import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
+import { useLocale, useT } from "../i18n";
+import { LanguageSwitcher, saveLocale } from "../i18n/LanguageSwitcher";
 import { readinessOf } from "../setup/ReadinessNotice";
 import { SetupChecklist } from "../setup/SetupChecklist";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
@@ -112,6 +112,7 @@ export function Welcome({
   initialStep = "language",
 }: WelcomeProps) {
   const t = useT("onboarding");
+  const [locale] = useLocale();
   const own = useDoctor({ enabled: !doctor });
   const environment = doctor ?? own;
   const [step, setStep] = useState<WelcomeStep>(initialStep);
@@ -314,7 +315,12 @@ export function Welcome({
               <button
                 type="button"
                 className="button primary"
-                onClick={() => go(welcomeSteps[index + 1])}
+                onClick={() => {
+                  // The language shown is the one chosen, even when the
+                  // person kept the one the browser suggested.
+                  if (step === "language") saveLocale(locale);
+                  go(welcomeSteps[index + 1]);
+                }}
                 disabled={busy}
               >
                 {t.next}
