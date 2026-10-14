@@ -49,6 +49,11 @@ export default {
       fmt.plural(count) === "one"
         ? `${count} required item needs your attention.`
         : `${count} required items need your attention.`,
+    /** No required check fails, but others do (for example the Git identity publishing needs). */
+    summaryBlocked: ({ count }: { count: number }) =>
+      fmt.plural(count) === "one"
+        ? `Ready to start, but ${count} item must be fixed before every step works.`
+        : `Ready to start, but ${count} items must be fixed before every step works.`,
     summaryWarnings: ({ count }: { count: number }) =>
       fmt.plural(count) === "one"
         ? `Ready, with ${count} item worth a look.`

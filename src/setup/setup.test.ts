@@ -176,6 +176,24 @@ test("a Git identity problem keeps its words, and only the e-mail addresses are 
   assert.match(plain, /583231\+octocat@users\.noreply\.github\.com/);
 });
 
+test("the summary says what a failing optional check blocks, and it is not called ready without a word", () => {
+  const blocked: DoctorReport = {
+    ...ready,
+    checks: ready.checks.map((value) =>
+      value.id === "git-identity"
+        ? check({ id: "git-identity", status: "fail", reason: "missing", detail: "Not set." })
+        : value.id === "gh-scopes"
+          ? check({ id: "gh-scopes", status: "warn", reason: "missing-workflow", detail: "No workflow scope." })
+          : value,
+    ),
+  };
+  const html = renderEn(createElement(SetupChecklist, { report: blocked }));
+  assertNoHan(html);
+  assert.match(html, /Ready to start, but 1 item must be fixed before every step works\./);
+  assert.doesNotMatch(html, /items? worth a look/);
+  assert.match(renderZh(createElement(SetupChecklist, { report: blocked })), /可以開始使用，但還有 1 個項目需要修正，否則有些步驟無法進行。/);
+});
+
 test("the checklist says it is checking while the first report loads, and reports a failed request", () => {
   const html = renderEn(createElement(SetupChecklist, { ...doctor(null, { checking: true }) }));
   assertNoHan(html);

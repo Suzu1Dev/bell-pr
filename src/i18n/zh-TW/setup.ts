@@ -39,6 +39,8 @@ const m: Translation<typeof en> = {
     },
     summaryReady: `${product.name} 需要的一切都已就緒。`,
     summaryNotReady: ({ count }) => `有 ${count} 個必要項目需要處理。`,
+    summaryBlocked: ({ count }) =>
+      `可以開始使用，但還有 ${count} 個項目需要修正，否則有些步驟無法進行。`,
     summaryWarnings: ({ count }) => `已就緒，另有 ${count} 個項目值得留意。`,
     openDetails: "開啟工作環境設定",
   },

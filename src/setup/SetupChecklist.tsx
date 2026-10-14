@@ -159,14 +159,20 @@ export function SetupChecklist({
   const failing = report
     ? report.checks.filter((check) => check.required && check.status === "fail")
     : [];
+  // Not required to start, but a step needs it (the Git identity, repo access).
+  const blocking = report
+    ? report.checks.filter((check) => !check.required && check.status === "fail")
+    : [];
   const attention = report ? report.checks.filter(needsAttention) : [];
   const overall = !report
     ? t.checking
     : failing.length
       ? t.summaryNotReady({ count: failing.length })
-      : attention.length
-        ? t.summaryWarnings({ count: attention.length })
-        : t.summaryReady;
+      : blocking.length
+        ? t.summaryBlocked({ count: blocking.length })
+        : attention.length
+          ? t.summaryWarnings({ count: attention.length })
+          : t.summaryReady;
 
   return (
     <section
