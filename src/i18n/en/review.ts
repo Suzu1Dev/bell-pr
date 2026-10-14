@@ -66,6 +66,12 @@ const review = {
     truncated:
       "[Excerpt] The selection is long, so only part of it is included below. Please explain this excerpt first.",
   },
+  /** MarkdownContent: explanations, reports and other agent-written text. */
+  markdown: {
+    imageOmitted: "Image omitted",
+    imageOmittedWithAlt: ({ alt }: { alt: string }) => `Image omitted: ${alt}`,
+    tableLabel: "Explanation table",
+  },
 };
 
 export default review;

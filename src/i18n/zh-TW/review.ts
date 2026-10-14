@@ -36,6 +36,11 @@ const m: Translation<typeof en> = {
     truncated:
       "[內容已節錄] 選取範圍較長，下方僅附部分內容，請優先解釋這段節錄。",
   },
+  markdown: {
+    imageOmitted: "圖片已省略",
+    imageOmittedWithAlt: ({ alt }) => `圖片已省略：${alt}`,
+    tableLabel: "解說表格",
+  },
 };
 
 export default m;
