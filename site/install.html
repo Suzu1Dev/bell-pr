@@ -42,7 +42,7 @@
       <section class="page-head">
         <div class="wrap">
           <h1>Install BELL PR</h1>
-          <p class="lead">BELL PR runs on your own computer. Start it with one npm command or run the Docker image, then sign in through the one-time link it prints.</p>
+          <p class="lead">BELL PR runs on your own computer. Start it with one npm command or run the Docker image, then sign in through the link it prints.</p>
           <div class="hero-actions">
             <div class="command"><code id="start-command">npx bell-pr</code><button class="copy-button" type="button" data-copy="start-command" hidden>Copy</button></div>
           </div>
@@ -63,20 +63,21 @@
 
             <h2 id="npm">Start with npm</h2>
             <pre><code>npx bell-pr</code></pre>
-            <p>BELL PR starts on <code>http://127.0.0.1:4311</code> and opens a one-time sign-in link in your browser. Keep the terminal open while you work; <kbd>Ctrl</kbd>+<kbd>C</kbd> stops BELL PR.</p>
+            <p>BELL PR starts on <code>http://127.0.0.1:4311</code> and opens a sign-in link in your browser. That link works until BELL PR restarts, so keep it to yourself. Keep the terminal open while you work; <kbd>Ctrl</kbd>+<kbd>C</kbd> stops BELL PR.</p>
             <p>To install the <code>bell-pr</code> command instead:</p>
             <pre><code>npm install -g bell-pr
 bell-pr</code></pre>
             <h3 id="commands">Useful commands</h3>
             <ul>
-              <li><code>bell-pr open</code> opens a new sign-in link when you closed the tab or lost the link.</li>
+              <li><code>bell-pr open</code> opens a new sign-in link when you closed the tab or lost the link. Each of these links works once, within two minutes.</li>
               <li><code>bell-pr doctor</code> checks Git, the GitHub CLI and the AI coding CLIs, and says how to fix what is missing.</li>
               <li><code>bell-pr start --port 4400</code> uses another port.</li>
               <li><code>bell-pr start --data-dir ./bellpr-data</code> keeps the data somewhere other than the default <code>~/.bellpr</code>.</li>
               <li><code>bell-pr license trial</code> starts the 14-day Pro trial.</li>
             </ul>
 
-            <h2 id="docker">Run with Docker</h2>
+            <h2 id="docker">Run with Docker (beta)</h2>
+            <p class="notice">Docker support is in beta. Under Docker's default security settings the agents cannot start their sandbox, so analysis, reviews and code changes stall. To let them work, add <code>--security-opt seccomp=unconfined --security-opt apparmor=unconfined --security-opt systempaths=unconfined</code> to <code>docker run</code>. These options relax the container's own confinement so that the agent sandbox can start; use them only on a machine you control.</p>
             <pre><code>docker run -d --name bell-pr \
   -p 127.0.0.1:4311:4311 \
   -v bellpr-data:/data \

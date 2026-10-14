@@ -73,8 +73,9 @@ an HTML comment.
 ### Work for later waves (TODO)
 
 - 7B: generate `legal/*.html` from the final Markdown documents, add the
-  screenshots to `assets/`, finish the copy, and label Docker "beta" on
-  `install.html` if `docs/docker.md` (3A) says the Codex sandbox needs it.
+  screenshots to `assets/`, and finish the copy. Docker is labelled "beta"
+  on `install.html` with the security options from `docs/docker.md` (3A);
+  keep the two in step.
 - 7C: render the video files into `media/` (below).
 
 ## Hidden while a product value is empty
