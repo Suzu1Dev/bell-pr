@@ -7,9 +7,11 @@ import {
   draftWordBudget,
   findDraftPlaceholders,
 } from "../shared/draft-checks.js";
+import { formatters } from "../shared/i18n/locale.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
 import { quoteMatches } from "./evidence.js";
 import { parseGitHubIssueUrl } from "./git.js";
+import { currentLocale, sm } from "./i18n/index.js";
 import { redact } from "./process.js";
 
 const text = z.string().trim().min(1);
@@ -118,8 +120,7 @@ export function synchronizeDraftPreparation(run: Run, files: DiffFile[]) {
   const preparation = run.draftPreparation;
   if (preparation && preparation.fingerprint !== draftFingerprint(run, files)) {
     preparation.status = "stale";
-    preparation.error =
-      "程式碼差異已更新；請重新產生符合目前變更的 PR 草稿建議。";
+    preparation.error = sm().analysis.drafts.stale;
   }
 }
 
@@ -151,15 +152,12 @@ export function parseDraftProposal(
       ? { ...parsed, commitMessageSuggestion }
       : parsed;
   } catch {
-    throw new AppError("PR 草稿建議格式不完整，請重新產生。", 422);
+    throw new AppError((m) => m.analysis.drafts.incompleteAnswer, 422);
   }
   const suggestion = proposal.commitMessageSuggestion;
   if (suggestion) {
     if (personTrailer.test(suggestion.message))
-      throw new AppError(
-        "提交訊息建議不能包含 Signed-off-by 等署名欄位；簽署只能由本人輸入。",
-        422,
-      );
+      throw new AppError((m) => m.analysis.drafts.commitMessageTrailer, 422);
     // Each cited source must be a supplied, non-example source, like a rule.
     if (
       suggestion.sources.some((id) => {
@@ -167,7 +165,7 @@ export function parseDraftProposal(
         return !source || source.kind === "example";
       })
     )
-      throw new AppError("提交訊息建議引用的來源不存在，請重新產生。", 422);
+      throw new AppError((m) => m.analysis.drafts.commitMessageSource, 422);
   }
   for (const rule of proposal.rules) {
     const source = context.sources.find((item) => item.id === rule.sourceId);
@@ -176,7 +174,7 @@ export function parseDraftProposal(
       source.kind === "example" ||
       !quoteMatches(source.content, rule.quote)
     )
-      throw new AppError("PR 草稿的規範引用無法對應來源，請重新產生。", 422);
+      throw new AppError((m) => m.analysis.drafts.ruleQuoteMismatch, 422);
   }
   const templates = context.sources.filter(
     (source) => source.kind === "template",
@@ -188,7 +186,7 @@ export function parseDraftProposal(
     (proposal.templateSourceId && !template) ||
     (templates.length && !template)
   )
-    throw new AppError("PR 草稿未採用目標專案提供的範本，請重新產生。", 422);
+    throw new AppError((m) => m.analysis.drafts.templateNotUsed, 422);
   if (template) {
     const generatedHeadings = new Set(headings(proposal.body));
     if (
@@ -196,10 +194,13 @@ export function parseDraftProposal(
         (heading) => !generatedHeadings.has(heading),
       )
     )
-      throw new AppError("PR 草稿缺少專案範本的段落標題，請重新產生。", 422);
+      throw new AppError(
+        (m) => m.analysis.drafts.templateHeadingsMissing,
+        422,
+      );
   }
   if (proposal.policy === "repository" && !template && !proposal.rules.length)
-    throw new AppError("專案規範需要可核對的來源，請重新產生。", 422);
+    throw new AppError((m) => m.analysis.drafts.rulesWithoutSource, 422);
   if (
     proposal.policy === "linux" &&
     (template ||
@@ -208,33 +209,30 @@ export function parseDraftProposal(
         (source) => source.kind === "contributing" && source.content.trim(),
       ))
   )
-    throw new AppError(
-      "已有適用的專案規範，不能以 Linux 預設取代，請重新產生。",
-      422,
-    );
+    throw new AppError((m) => m.analysis.drafts.linuxOverridesRules, 422);
   if (
     /^\s*(?:Signed-off-by|Reviewed-by|Acked-by|Tested-by)\s*:/im.test(
       proposal.body,
     ) ||
     /^\s*[-*+]\s*\[[xX]\]/m.test(proposal.body)
   )
-    throw new AppError(
-      "PR 草稿不能代替使用者簽署、背書或勾選已完成的確認項目。",
-      422,
-    );
+    throw new AppError((m) => m.analysis.drafts.certifiesForPerson, 422);
   // The body is sent to GitHub as written; to-dos belong in the checklist.
   const placeholders = findDraftPlaceholders(proposal.body);
-  if (placeholders.length)
+  if (placeholders.length) {
+    const lines = placeholders.slice(0, 3).map((item) => String(item.line));
     throw new AppError(
-      `PR 草稿把待辦事項或未填的範本欄位寫進了會送到 GitHub 的說明（第 ${placeholders
-        .slice(0, 3)
-        .map((item) => item.line)
-        .join("、")} 行），請重新產生。`,
+      (m) =>
+        m.analysis.drafts.placeholdersInBody({
+          count: lines.length,
+          lines: formatters(currentLocale()).list(lines, { type: "unit" }),
+        }),
       422,
     );
+  }
   if (proposal.policy === "linux" && context.warnings.length) {
     proposal.summary =
-      `來源查找有範圍限制或未完成項目，暫用 Linux 投稿寫作原則；送出前請人工確認專案規定。\n${proposal.summary}`.slice(
+      `${sm().analysis.drafts.provisionalLinuxPolicy}\n${proposal.summary}`.slice(
         0,
         3000,
       );
@@ -250,15 +248,12 @@ export function draftPrompt(
 ) {
   const safeFiles = files.filter((file) => !file.blocked);
   if (!safeFiles.length)
-    throw new AppError("目前沒有可用來撰寫 PR 的安全程式碼差異。", 422);
+    throw new AppError((m) => m.analysis.drafts.noSafeDiff, 422);
   if (
     safeFiles.reduce((size, file) => size + Buffer.byteLength(file.patch), 0) >
     100_000
   )
-    throw new AppError(
-      "差異超過 PR 草稿的 100 KB 上限；請拆分變更後重試。",
-      422,
-    );
+    throw new AppError((m) => m.analysis.drafts.diffTooLarge, 422);
   // The issue comes from the user's settings, never from the model or the diff.
   const issue = parseGitHubIssueUrl(run.contributionSettings?.issueUrl ?? "");
   const brevity = brevityRule(context.sources);

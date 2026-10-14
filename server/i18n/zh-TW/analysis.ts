@@ -141,5 +141,70 @@ const m: Translation<typeof en> = {
     noCandidates:
       "候選資料未能通過公開狀態與來源驗證，這次沒有可分析的專案；可稍後重試或調整條件。",
   },
+  draftSources: {
+    invalidBase: "草稿規範需要有效的基準版本。",
+    cancelled: "草稿規範讀取已取消。",
+    unreadableText: ({ label }) => `${label} 不是可安全讀取的文字，已略過。`,
+    sensitive: ({ label }) => `${label} 疑似包含敏感資訊，已略過。`,
+    totalLimit: "規範來源達到 80 KB 上限；尚未完整檢查所有文件與討論。",
+    truncated: ({ label, bytes }) =>
+      `${label} 僅讀取前 ${bytes} bytes；後續內容尚未檢查。`,
+    accountDefault: ({ path }) => `共用預設 · ${path}`,
+    notRegularFile: ({ label }) =>
+      `${label} 不是一般檔案，已略過符號連結或子模組。`,
+    tooLarge: ({ label }) =>
+      `${label} 超過單檔讀取上限或大小不明，尚未檢查其內容。`,
+    documentLimit: "文件取樣達到 16 份或 80 KB 上限；尚未完整檢查所有規範。",
+    readFailed: ({ label }) => `${label} 讀取失敗，尚未確認其規範。`,
+    searchScope:
+      "本機規範搜尋範圍為基準版本的根目錄、.github、docs 與 documentation 內常見貢獻指南、README、維護者文件及 PR 模板，根目錄的 AGENTS.md／CLAUDE.md，以及 .github/workflows 中會自動檢查 PR 的流程；未追蹤文件中的外部連結。",
+    automationLimit: ({ max, remaining }) =>
+      `自動檢查流程最多收錄 ${max} 份；其餘 ${remaining} 個 workflow 尚未檢查。`,
+    workflowScanLimit: ({ total, max }) =>
+      `.github/workflows 有 ${total} 個檔案，只檢查了前 ${max} 個是否會自動檢查 PR。`,
+    workflowReadFailed: ({ path }) =>
+      `${path} 讀取失敗，尚未確認它是否會自動檢查 PR。`,
+    baseUnreadable: "無法讀取任務基準版本的規範文件；不能據此判定專案沒有規範。",
+    noRemote:
+      "未提供可驗證的 github.com 專案網址，尚未檢查 GitHub 維護者討論與帳號共用預設規範。",
+    metadataFailed:
+      "GitHub 維護者討論與帳號共用資訊讀取失敗（可能是權限、連線或 API 限制）；不能據此判定沒有額外規範。",
+    defaultsTruncated:
+      "帳號共用 .github 的檔案清單已截斷；尚未完整檢查預設規範。",
+    defaultsNotPublic:
+      "帳號共用 .github 未確認為公開 repository，未採用其預設規範。",
+    defaultsNoBranch:
+      "帳號共用 .github 沒有可讀取的預設分支，尚未確認預設規範。",
+    defaultsFailed:
+      "帳號共用 .github 預設規範讀取失敗；尚未確認是否存在適用規範。",
+    maintainerSample:
+      "維護者偏好僅取樣最近更新的 3 個已合併 PR，各最多 5 則留言及 5 則 review；已合併不等於規範認可，仍需人工確認適用性。",
+    maintainerComment: ({ number, association }) =>
+      `PR #${number} · ${association} 留言`,
+    maintainerReview: ({ number, association }) =>
+      `PR #${number} · ${association} 審查`,
+    mergedExample: ({ number }) => `PR #${number} · 已合併範例（非規範）`,
+  },
+  drafts: {
+    stale: "程式碼差異已更新；請重新產生符合目前變更的 PR 草稿建議。",
+    incompleteAnswer: "PR 草稿建議格式不完整，請重新產生。",
+    commitMessageTrailer:
+      "提交訊息建議不能包含 Signed-off-by 等署名欄位；簽署只能由本人輸入。",
+    commitMessageSource: "提交訊息建議引用的來源不存在，請重新產生。",
+    ruleQuoteMismatch: "PR 草稿的規範引用無法對應來源，請重新產生。",
+    templateNotUsed: "PR 草稿未採用目標專案提供的範本，請重新產生。",
+    templateHeadingsMissing: "PR 草稿缺少專案範本的段落標題，請重新產生。",
+    rulesWithoutSource: "專案規範需要可核對的來源，請重新產生。",
+    linuxOverridesRules:
+      "已有適用的專案規範，不能以 Linux 預設取代，請重新產生。",
+    certifiesForPerson:
+      "PR 草稿不能代替使用者簽署、背書或勾選已完成的確認項目。",
+    placeholdersInBody: ({ lines }) =>
+      `PR 草稿把待辦事項或未填的範本欄位寫進了會送到 GitHub 的說明（第 ${lines} 行），請重新產生。`,
+    provisionalLinuxPolicy:
+      "來源查找有範圍限制或未完成項目，暫用 Linux 投稿寫作原則；送出前請人工確認專案規定。",
+    noSafeDiff: "目前沒有可用來撰寫 PR 的安全程式碼差異。",
+    diffTooLarge: "差異超過 PR 草稿的 100 KB 上限；請拆分變更後重試。",
+  },
 };
 export default m;

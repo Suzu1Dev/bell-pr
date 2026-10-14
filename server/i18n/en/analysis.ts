@@ -252,4 +252,100 @@ export default {
     noCandidates:
       "No candidate passed the public status and source checks, so there is no project to analyze this time. Try again later or adjust the criteria.",
   },
+  /** Contribution rules read for a PR draft (server/draft-sources.ts). */
+  draftSources: {
+    invalidBase: "Reading the draft rules needs a valid base commit.",
+    cancelled: "Reading the draft rules was cancelled.",
+    unreadableText: ({ label }: { label: string }) =>
+      `Skipped ${label}: it is not text that can be read safely.`,
+    sensitive: ({ label }: { label: string }) =>
+      `Skipped ${label}: it appears to contain sensitive information.`,
+    totalLimit:
+      "The rule sources reached the 80 KB limit; not every document and discussion was fully checked.",
+    truncated: ({ label, bytes }: { label: string; bytes: string }) =>
+      `Read only the first ${bytes} bytes of ${label}; the rest was not checked.`,
+    /** Label of a document from the account-wide .github repository. */
+    accountDefault: ({ path }: { path: string }) => `Account default · ${path}`,
+    notRegularFile: ({ label }: { label: string }) =>
+      `Skipped ${label}: it is not a regular file, and symbolic links and submodules are skipped.`,
+    tooLarge: ({ label }: { label: string }) =>
+      `${label} is over the per-file read limit or its size is unknown; its content was not checked.`,
+    documentLimit:
+      "Document sampling reached its limit of 16 documents or 80 KB; not every rule was fully checked.",
+    readFailed: ({ label }: { label: string }) =>
+      `${label} could not be read; its rules were not checked.`,
+    searchScope:
+      "The local rule search covers the common contribution guides, READMEs, maintainer documents and PR templates in the base commit's root, .github, docs and documentation folders, AGENTS.md and CLAUDE.md in the root, and the .github/workflows files that check pull requests automatically. Links to other places in those documents are not followed.",
+    automationLimit: ({ max, remaining }: { max: number; remaining: number }) =>
+      remaining === 1
+        ? `At most ${max} pull request check workflows are included; 1 more workflow was not checked.`
+        : `At most ${max} pull request check workflows are included; ${remaining} more workflows were not checked.`,
+    workflowScanLimit: ({ total, max }: { total: number; max: number }) =>
+      `.github/workflows has ${total} files; only the first ${max} were checked for automatic pull request checks.`,
+    workflowReadFailed: ({ path }: { path: string }) =>
+      `${path} could not be read, so whether it checks pull requests automatically is not known.`,
+    baseUnreadable:
+      "The rule documents in the task's base commit could not be read; this does not mean the project has no rules.",
+    noRemote:
+      "No verifiable github.com project URL is available, so maintainer discussions and account-wide default rules on GitHub were not checked.",
+    metadataFailed:
+      "Maintainer discussions and account-wide information could not be read from GitHub, possibly because of permissions, the connection or API limits; this does not mean there are no further rules.",
+    defaultsTruncated:
+      "The file list of the account-wide .github repository was truncated; its default rules were not fully checked.",
+    defaultsNotPublic:
+      "The account-wide .github repository is not confirmed to be public, so its default rules were not used.",
+    defaultsNoBranch:
+      "The account-wide .github repository has no readable default branch, so its default rules were not checked.",
+    defaultsFailed:
+      "The default rules in the account-wide .github repository could not be read; whether any of them apply was not checked.",
+    maintainerSample:
+      "Maintainer preferences come from the 3 most recently updated merged PRs, with up to 5 comments and 5 reviews each. A merged PR is not an endorsed rule; check whether each preference applies.",
+    maintainerComment: ({
+      number,
+      association,
+    }: {
+      number: number;
+      association: string;
+    }) => `PR #${number} · ${association} comment`,
+    maintainerReview: ({
+      number,
+      association,
+    }: {
+      number: number;
+      association: string;
+    }) => `PR #${number} · ${association} review`,
+    mergedExample: ({ number }: { number: number }) =>
+      `PR #${number} · merged example (not a rule)`,
+  },
+  /** PR draft suggestions (server/drafts.ts). */
+  drafts: {
+    stale:
+      "The code diff has changed. Generate a new PR draft suggestion for the current changes.",
+    incompleteAnswer:
+      "The PR draft suggestion came back incomplete. Generate it again.",
+    commitMessageTrailer:
+      "The suggested commit message cannot include sign-off trailers such as Signed-off-by. Only you can add your own sign-off.",
+    commitMessageSource:
+      "The suggested commit message cites a source that does not exist. Generate it again.",
+    ruleQuoteMismatch:
+      "A rule quoted in the PR draft does not match its source. Generate it again.",
+    templateNotUsed:
+      "The PR draft does not use the template the target project provides. Generate it again.",
+    templateHeadingsMissing:
+      "The PR draft is missing headings from the project's template. Generate it again.",
+    rulesWithoutSource:
+      "A draft that follows project rules needs a source those rules can be checked against. Generate it again.",
+    linuxOverridesRules:
+      "The project has applicable rules, so the Linux defaults cannot replace them. Generate the draft again.",
+    certifiesForPerson:
+      "A PR draft cannot sign off, endorse or tick confirmation items on your behalf.",
+    placeholdersInBody: ({ count, lines }: { count: number; lines: string }) =>
+      `The PR draft put to-dos or unfilled template fields into the description that is sent to GitHub (${count === 1 ? "line" : "lines"} ${lines}). Generate it again.`,
+    /** Put above the summary when the Linux defaults stand in for rules not found. */
+    provisionalLinuxPolicy:
+      "Looking up the project's sources was limited or incomplete, so the Linux contribution writing principles are used for now. Check the project's own rules before you publish.",
+    noSafeDiff: "There is no safe code diff to write a PR from yet.",
+    diffTooLarge:
+      "The diff is over the 100 KB limit for PR drafts. Split the change and try again.",
+  },
 };

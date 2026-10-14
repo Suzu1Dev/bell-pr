@@ -38,6 +38,7 @@ import { Workbench } from "./workbench.js";
 import { createApp } from "./index.js";
 import { git } from "./process.js";
 import { assertNoHan } from "../src/test-utils/render.js";
+import { withLocale } from "./i18n/index.js";
 
 const context: DraftContext = {
   sources: [],
@@ -998,6 +999,36 @@ test("draft proposals that put the person's to-dos into the published body are r
   const properties = draftJsonSchema.properties as Record<string, { maxItems?: number }>;
   assert.equal(properties.rules.maxItems, 24);
   assert.equal(properties.checklist.maxItems, 24);
+});
+
+test("in English, draft rejections and the provisional-policy note carry no Han", () => {
+  const withLines = (body: string) =>
+    withLocale("en", () =>
+      parseDraftProposal(JSON.stringify({ ...proposal, body }), context),
+    );
+  assert.throws(() => withLines(`${proposal.body}\n\n_TODO: add the output_`), {
+    message:
+      "The PR draft put to-dos or unfilled template fields into the description that is sent to GitHub (line 13). Generate it again.",
+  });
+  assert.throws(
+    () => withLines(`Closes #\n\n${proposal.body}\n\nResults go here.\n\nTBD: owner`),
+    /\(lines 1, 15, 17\)/,
+  );
+  assert.throws(
+    () => withLocale("en", () => parseDraftProposal("{}", context)),
+    { message: "The PR draft suggestion came back incomplete. Generate it again." },
+  );
+  const provisional = withLocale("en", () =>
+    parseDraftProposal(JSON.stringify(proposal), {
+      ...context,
+      warnings: ["Lookup was sampled."],
+    }),
+  );
+  assert.match(
+    provisional.summary,
+    /^Looking up the project's sources was limited or incomplete, so the Linux contribution writing principles are used for now\./,
+  );
+  assertNoHan(provisional.summary.split("\n")[0]);
 });
 
 test("draft prompt routes the person's to-dos to the checklist and passes the branch and word budget", () => {
