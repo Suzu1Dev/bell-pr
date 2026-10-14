@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { parsePresentationFlags } from "./app/presentation";
 import { LocaleProvider, initialLocale, loadLocale } from "./i18n";
 import { defaultLocale, type Locale } from "../shared/i18n/locale";
 import "./styles.css";
@@ -20,7 +21,10 @@ function render(locale: Locale) {
 
 // The dictionary loads before the first render, so the UI never flashes in
 // another language. If it cannot load, the app still starts in English.
-const locale = initialLocale();
+// A locale= flag in the address (presentation and capture) wins over the
+// saved choice and the browser language, and is never saved.
+const locale =
+  parsePresentationFlags(window.location.hash).locale ?? initialLocale();
 void loadLocale(locale).then(
   () => render(locale),
   (error: unknown) => {
