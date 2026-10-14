@@ -30,7 +30,8 @@ export const privacyPattern = new RegExp(
  * Fictional examples the product itself prints, removed before the check.
  * The import dialog suggests "/home/you/projects/repository" as the form of
  * a local path (src/repos/ImportRepoModal.tsx examplePath()); "you" is not a
- * person, and the promo frames it out of the shot.
+ * person. The hint is on screen in S3, so the owner decides at sign-off
+ * whether it may stay (review.md).
  */
 export const allowedPlaceholders = ["/home/you/projects/repository"];
 
