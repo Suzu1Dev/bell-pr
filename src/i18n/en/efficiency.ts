@@ -42,7 +42,7 @@ const efficiency = {
   usageNote: ({ calls, measured }: { calls: number; measured: number }) =>
     `${fmt.number(calls)} ${fmt.plural(calls) === "one" ? "call" : "calls"} · usage reported for ${fmt.number(measured)} of ${fmt.number(calls)}${
       measured < calls ? ", so the totals include only the reported calls." : "."
-    } Cached input is part of the input. The time is the sum of all calls, not the time you waited.`,
+    } Cached input is included in the input tokens. The time is the sum of all calls, not the time you waited.`,
   byRole: ({ count }: { count: number }) =>
     `By role (${fmt.number(count)} ${fmt.plural(count) === "one" ? "group" : "groups"})`,
   columns: {

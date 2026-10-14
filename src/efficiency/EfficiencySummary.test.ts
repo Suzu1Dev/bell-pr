@@ -111,7 +111,10 @@ test("English renders format tokens, seconds and the usage note", () => {
   assert.match(html, /<dt>Of which cached<\/dt><dd>7,890<\/dd>/);
   assert.match(html, /<dt>Output tokens<\/dt><dd>1,234<\/dd>/);
   assert.match(html, /<dt>Total agent time<\/dt><dd>12\.3 s<\/dd>/);
-  assert.match(html, /2 calls · usage reported for 2 of 2\. Cached input/);
+  assert.match(
+    html,
+    /2 calls · usage reported for 2 of 2\. Cached input is included in the input tokens\./,
+  );
 
   const partial = renderEnglish({
     metrics: { ...metrics, calls: 1, measuredCalls: 0, completedCalls: 0 },
