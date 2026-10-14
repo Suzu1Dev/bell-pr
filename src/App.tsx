@@ -73,6 +73,8 @@ import {
 } from "../shared/followups";
 import { FollowUpRounds } from "./draft/FollowUpRounds";
 import { SyncPanel } from "./draft/SyncPanel";
+import { SetupChecklist } from "./team/SetupChecklist";
+import { mergeSetupNeeds } from "../shared/setup";
 import { parseViewSearch, viewSearch, type Page, type Tab } from "./view-url";
 
 /** The draft checks bring a Markdown parser, so they load beside the first screen. */
@@ -1270,6 +1272,14 @@ export default function App() {
       notify("無法使用剪貼簿，請直接選取路徑複製。", "error");
     }
   }
+  async function copySetupCommand(command: string) {
+    try {
+      await navigator.clipboard.writeText(command);
+      notify("已複製指令，執行前請先確認內容");
+    } catch {
+      notify("無法使用剪貼簿，請直接選取指令複製。", "error");
+    }
+  }
   async function rerunReview() {
     if (demo) {
       notify("目前是示範資料。匯入自己的 repository 後可重新執行審查。");
@@ -2295,6 +2305,23 @@ export default function App() {
                 id="workspace-panel"
                 aria-labelledby={`workspace-tab-${tab}`}
               >
+                {tab === "overview" && !demo && (
+                  <SetupChecklist
+                    needs={mergeSetupNeeds([
+                      ...(run.team?.tasks ?? []).map((task) => ({
+                        from:
+                          run.agents.find((agent) => agent.id === task.owner)
+                            ?.name ?? task.owner,
+                        needs: task.setup,
+                      })),
+                      ...(run.followUps ?? []).map((round, index) => ({
+                        from: `修正第 ${index + 1} 輪`,
+                        needs: round.setup,
+                      })),
+                    ])}
+                    onCopy={(command) => void copySetupCommand(command)}
+                  />
+                )}
                 {tab === "overview" && currentRepo && (
                   <ProjectOverview
                     repo={currentRepo}
