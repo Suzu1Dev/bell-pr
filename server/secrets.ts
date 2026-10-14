@@ -23,6 +23,12 @@ export const secretPatterns: readonly SecretPattern[] = [
     blocks: true,
   },
   {
+    // BELL PR license keys: the BELLPR1 version tag, the payload and its signature.
+    pattern: /BELLPR1\.[A-Za-z0-9_-]{40,}\.[A-Za-z0-9_-]{60,}/g,
+    replacement: "[REDACTED]",
+    blocks: true,
+  },
+  {
     // PEM private keys; a block cut off before its END marker is masked to the end of the text.
     pattern:
       /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----[\s\S]*?(?:-----END (?:[A-Z]+ )?PRIVATE KEY-----|$)/g,
