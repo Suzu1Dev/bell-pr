@@ -23,6 +23,7 @@ import {
 import type { LearnerNote } from "../../shared/explanations";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
 import { parseReviewOrder } from "../../shared/review-order";
+import { useTablistKeys } from "../a11y/useTablistKeys";
 import { useFormat, useT } from "../i18n";
 import type { ChatMessage, DiffFile, Run } from "../types";
 import { MarkdownContent } from "./MarkdownContent";
@@ -269,6 +270,7 @@ export function ExplanationPanel({
   const chatEnd = useRef<HTMLDivElement>(null);
   const lastMessageCount = useRef(messages.length);
   const panelId = useId();
+  const tablistKeys = useTablistKeys();
 
   useEffect(() => {
     setQuestion("");
@@ -373,11 +375,13 @@ export function ExplanationPanel({
         className="explain-tabs"
         role="tablist"
         aria-label={t.panel.tabsLabel}
+        onKeyDown={tablistKeys}
       >
         <button
           type="button"
           role="tab"
           id={`${panelId}-explain`}
+          tabIndex={tab === "explain" ? 0 : -1}
           aria-selected={tab === "explain"}
           aria-controls={`${panelId}-content`}
           className={tab === "explain" ? "explain-tab-active" : ""}
@@ -390,6 +394,7 @@ export function ExplanationPanel({
           type="button"
           role="tab"
           id={`${panelId}-reports`}
+          tabIndex={tab === "reports" ? 0 : -1}
           aria-selected={tab === "reports"}
           aria-controls={`${panelId}-content`}
           className={tab === "reports" ? "explain-tab-active" : ""}
@@ -402,6 +407,7 @@ export function ExplanationPanel({
           type="button"
           role="tab"
           id={`${panelId}-chat`}
+          tabIndex={tab === "chat" ? 0 : -1}
           aria-selected={tab === "chat"}
           aria-controls={`${panelId}-content`}
           className={tab === "chat" ? "explain-tab-active" : ""}
@@ -437,6 +443,9 @@ export function ExplanationPanel({
         id={`${panelId}-content`}
         role="tabpanel"
         aria-labelledby={`${panelId}-${tab}`}
+        // Its text starts before anything focusable, so the panel itself is
+        // a stop: keyboard users can scroll a long explanation.
+        tabIndex={0}
       >
         {tab === "explain" ? (
           <>

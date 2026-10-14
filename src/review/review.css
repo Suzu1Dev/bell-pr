@@ -595,6 +595,11 @@
   scrollbar-width: thin;
   scrollbar-color: var(--color-border-strong) transparent;
 }
+/* The tab panel is a tab stop; the panel's own edges would clip an outer
+   ring, so it rings inside (after the shared rule in styles.css). */
+:root .explain-panel .explain-content:focus-visible {
+  box-shadow: var(--focus-ring-inset);
+}
 .explain-ready-label {
   display: flex;
   align-items: center;

@@ -465,6 +465,26 @@ test("an English render of the explanation tab has no Han in its own text", () =
   assert.match(testFile, /Tests are behavior specs/);
 });
 
+test("only the selected tab is a tab stop, and the tab panel is one too", () => {
+  const tabs = (html: string) =>
+    [
+      ...html.matchAll(
+        /<button type="button" role="tab" id="[^"]+-(\w+)" tabindex="(-?\d)" aria-selected="(\w+)"/g,
+      ),
+    ].map(([, name, tabIndex, selected]) => `${name} ${tabIndex} ${selected}`);
+  const explain = renderPanel();
+  assertNoHan(explain);
+  assert.deepEqual(tabs(explain), ["explain 0 true", "reports -1 false", "chat -1 false"]);
+  assert.deepEqual(tabs(renderPanel({ chatRequestId: 1 })), [
+    "explain -1 false",
+    "reports -1 false",
+    "chat 0 true",
+  ]);
+  // The panel's text comes before anything focusable, so it can be
+  // focused and scrolled from the keyboard.
+  assert.match(explain, /role="tabpanel" aria-labelledby="[^"]+-explain" tabindex="0"/);
+});
+
 test("every explanation state renders English text without Han", () => {
   const file = englishFile("src/utils/retry.ts");
   const withoutExample = {
