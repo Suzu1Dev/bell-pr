@@ -14,7 +14,8 @@ import {
   runDoctor,
   runDoctorCli,
 } from "./doctor.js";
-import { withLocale } from "./i18n/index.js";
+import { currentLocale, withLocale } from "./i18n/index.js";
+import { allowUnsandboxedAgents } from "./sandbox.js";
 
 /**
  * Stand-in CLIs, the only directory on PATH, so no real git, gh, codex or
@@ -436,6 +437,36 @@ test("bell-pr doctor prints the checklist with fix commands and exits by readine
     0,
   );
   assert.match(zh, /已就緒：所有必要的檢查都通過了。/);
+});
+
+test("bell-pr doctor follows the saved language and sandbox opt-in, then leaves the defaults as they were", async (t) => {
+  const f = await fakes(t, { git: git(), claude: claude() });
+  const dataDir = path.join(f.directory, "data");
+  await mkdir(dataDir);
+  await writeFile(
+    path.join(dataDir, "app-settings.json"),
+    JSON.stringify({ locale: "en", allowUnsandboxedAgents: true }),
+  );
+  const previous = process.env.BELLPR_LOCALE;
+  process.env.BELLPR_LOCALE = "zh-TW";
+  t.after(() => {
+    if (previous === undefined) delete process.env.BELLPR_LOCALE;
+    else process.env.BELLPR_LOCALE = previous;
+  });
+  // No locale in effect, as on the command line: the saved one wins over
+  // BELLPR_LOCALE.
+  let text = "";
+  const code = await runDoctorCli([], {
+    dataDir,
+    stdout: { write: (chunk: string) => (text += chunk) },
+  });
+  assert.equal(code, 0);
+  assert.match(text, /^BELL PR environment check\n/);
+  // Only the stand-ins are on PATH, so the sandbox is missing, but allowed.
+  assert.match(text, /! Claude Code sandbox +Not available\. Claude Code agents may edit files without it because you allowed that/);
+  // Afterwards the defaults are the environment's again.
+  assert.equal(currentLocale(), "zh-TW");
+  assert.equal(allowUnsandboxedAgents(), false);
 });
 
 test("the GitHub user answer and the Claude auth JSON are read defensively", () => {

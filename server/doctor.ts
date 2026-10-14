@@ -25,7 +25,7 @@ import type { Plan } from "../shared/plans.js";
 import { product } from "../shared/product.js";
 import { agentLoginCheck } from "./agent-cli.js";
 import { defaultActiveRunLimit, defaultAgentProcessLimit } from "./agent-slots.js";
-import { AppSettingsService } from "./app-settings.js";
+import { AppSettingsService, withAppSettings } from "./app-settings.js";
 import { version as appVersion } from "./build-info.js";
 import {
   fixesFor,
@@ -964,6 +964,20 @@ export async function runDoctorCli(
   argv: string[],
   deps: DoctorCliDeps = {},
 ): Promise<number> {
+  // The saved settings apply as in the server: the language chosen in the
+  // app (after a locale in effect, before BELLPR_LOCALE) and the
+  // unsandboxed-agents opt-in the sandbox check reports.
+  const saved = deps.dataDir ? new AppSettingsService(deps.dataDir) : undefined;
+  return saved
+    ? withAppSettings(saved, () => doctorCli(argv, deps, saved))
+    : doctorCli(argv, deps);
+}
+
+async function doctorCli(
+  argv: string[],
+  deps: DoctorCliDeps,
+  saved?: AppSettingsService,
+): Promise<number> {
   const out = deps.stdout ?? process.stdout;
   const m = sm().setup.cli;
   let json = false;
@@ -979,7 +993,7 @@ export async function runDoctorCli(
   }
   // The limits the server would start with: the environment, the saved
   // settings, then the defaults.
-  const settings = deps.dataDir ? new AppSettingsService(deps.dataDir).get() : {};
+  const settings = saved?.get() ?? {};
   const port = Number(process.env.BELLPR_PORT?.trim() || defaultPort);
   const report = await runDoctor({
     force: true,

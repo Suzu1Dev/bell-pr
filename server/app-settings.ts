@@ -262,3 +262,25 @@ export function deactivateAppSettings(service: AppSettingsService) {
   setRetentionDaysSource();
   setAlwaysDiscloseAiSource();
 }
+
+/**
+ * Runs `fn` with `service` active (see activateAppSettings), then gives
+ * the sources back to the service that was active before, if any. The
+ * command line uses it, so its output follows the saved language and its
+ * checks the saved opt-ins.
+ */
+export async function withAppSettings<T>(
+  service: AppSettingsService,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const previous = active;
+  activateAppSettings(service);
+  try {
+    return await fn();
+  } finally {
+    if (active === service) {
+      if (previous) activateAppSettings(previous);
+      else deactivateAppSettings(service);
+    }
+  }
+}

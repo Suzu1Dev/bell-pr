@@ -11,6 +11,7 @@ import {
   AppSettingsService,
   deactivateAppSettings,
   parseSavedAppSettings,
+  withAppSettings,
 } from "./app-settings.js";
 import { retentionDays } from "./cleanup.js";
 import { alwaysDiscloseAi } from "./drafts.js";
@@ -198,4 +199,24 @@ test("the active settings feed the retention period, the sandbox opt-in and the 
   deactivateAppSettings(second);
   assert.equal(allowUnsandboxedAgents(), false);
   assert.equal(alwaysDiscloseAi(), false);
+});
+
+test("withAppSettings gives the sources back to the service that was active before", async (t) => {
+  const directory = await dataDir(t);
+  const server = new AppSettingsService(path.join(directory, "server"), { env: {} });
+  const command = new AppSettingsService(path.join(directory, "command"), { env: {} });
+  t.after(() => deactivateAppSettings(server));
+  await server.update({ locale: "zh-TW" });
+  await command.update({ locale: "en" });
+  activateAppSettings(server);
+  assert.equal(await withAppSettings(command, async () => currentLocale()), "en");
+  assert.equal(currentLocale(), "zh-TW");
+  // Also when the work fails.
+  await assert.rejects(
+    withAppSettings(command, async () => {
+      throw new Error("failed");
+    }),
+    /failed/,
+  );
+  assert.equal(currentLocale(), "zh-TW");
 });
