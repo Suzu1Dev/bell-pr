@@ -6,6 +6,7 @@ import type en from "../en/app";
 const m: Translation<typeof en> = {
   title: `${product.name} · 你的開源貢獻工作台`,
   skipToContent: "跳至主要內容",
+  maskedUser: "你",
   busySwitching: "正在完成目前操作，稍後即可切換。",
   dismissConnectionNotice: "關閉連線提示",
   dismissNotice: "關閉通知",

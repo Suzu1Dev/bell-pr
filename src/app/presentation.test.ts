@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { setLocale } from "../i18n";
 import {
   applyCaptureAttribute,
   isPresenting,
@@ -149,4 +150,13 @@ test("usePresentation renders with presentation off on the server", () => {
     renderToStaticMarkup(createElement(Probe)),
     "<output>off:real-user</output>",
   );
+});
+
+test("the masked login reads 'you' in the UI language", async (t) => {
+  t.after(() => setLocale("en"));
+  await setLocale("zh-TW");
+  assert.equal(maskUser("real-user", true), "你");
+  assert.equal(maskUser("real-user", false), "real-user");
+  await setLocale("en");
+  assert.equal(maskUser("real-user", true), "you");
 });

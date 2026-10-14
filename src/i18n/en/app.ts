@@ -11,6 +11,8 @@ const app = {
   /** The document title; `setLocale` applies it. */
   title: `${product.name} — AI contribution workbench`,
   skipToContent: "Skip to main content",
+  /** What a GitHub login, an account or an e-mail address reads while presenting (`present=1`). */
+  maskedUser: "you",
   busySwitching: "Finishing the current action. You can switch in a moment.",
   dismissConnectionNotice: "Dismiss connection notice",
   dismissNotice: "Dismiss notification",

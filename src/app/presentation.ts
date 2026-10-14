@@ -4,8 +4,8 @@
  * setting.
  *
  *   demo=play    the sample project plays its scripted timeline
- *   present=1    presenting: the GitHub login reads "you", paths lose
- *                their folders
+ *   present=1    presenting: the GitHub login reads "you" (in the UI
+ *                language), paths lose their folders
  *   locale=en    the UI language for this page load (applied in main.tsx,
  *                never saved); zh-TW works too
  *   speed=1..4   how fast the playback runs
@@ -19,6 +19,7 @@
  */
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { parseLocale, type Locale } from "../../shared/i18n/locale";
+import { getCurrentMessages, useT } from "../i18n";
 import {
   currentRouteHash,
   hashQuery,
@@ -86,15 +87,17 @@ export function isPresenting(): boolean {
   return flagsNow().present;
 }
 
-/** What a masked GitHub login, account or e-mail address reads. */
-export const maskedUser = "you";
-
 /**
- * A login or account name to show: "you" while presenting, else the name
- * itself. An empty name stays empty, so the caller's fallback still shows.
+ * A login or account name to show: `label` ("you" in the current
+ * language) while presenting, else the name itself. An empty name stays
+ * empty, so the caller's fallback still shows.
  */
-export function maskUser(login: string, presenting = isPresenting()): string {
-  return presenting && login ? maskedUser : login;
+export function maskUser(
+  login: string,
+  presenting = isPresenting(),
+  label = getCurrentMessages().app.maskedUser,
+): string {
+  return presenting && login ? label : login;
 }
 
 const separator = /[\\/]/;
@@ -161,14 +164,15 @@ export interface Presentation extends PresentationFlags {
  */
 export function usePresentation(): Presentation {
   const flags = useSyncExternalStore(subscribeToRoute, flagsNow, () => noFlags);
+  const masked = useT("app").maskedUser;
   useEffect(() => applyCaptureAttribute(flags), [flags]);
   return useMemo(
     () => ({
       ...flags,
-      maskUser: (login: string) => maskUser(login, flags.present),
+      maskUser: (login: string) => maskUser(login, flags.present, masked),
       maskPath: (path: string, worktreeRoot?: string) =>
         maskPath(path, worktreeRoot, flags.present),
     }),
-    [flags],
+    [flags, masked],
   );
 }
