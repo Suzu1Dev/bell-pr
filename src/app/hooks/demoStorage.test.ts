@@ -167,3 +167,13 @@ test("an opened sample PR stays open after a reload and a language switch", () =
   assert.equal(reviewing.prUrl, undefined);
   assert.equal(reviewing.prFeedback, undefined);
 });
+
+test("a stopped sample shows the finished sample in the new language, as a reload does", () => {
+  const en = getDemo("en");
+  const stopped = demoRunInLocale(
+    { ...en.run, status: "cancelled", reviewedFiles: [] },
+    "zh-TW",
+  );
+  assert.equal(stopped.status, "review");
+  assert.deepEqual(stopped.team, getDemo("zh-TW").team);
+});

@@ -78,7 +78,13 @@ export function demoRunInLocale(previous: Run, locale: Locale): Run {
     team: structuredClone(team),
     reviewedFiles: previous.reviewedFiles,
     draft: previous.draft,
-    status: published ? "published" : previous.status,
+    // The fixtures are the finished sample: a stopped playback shows it in
+    // review, as a reload does.
+    status: published
+      ? "published"
+      : previous.status === "approved"
+        ? "approved"
+        : "review",
     notes: previous.notes,
     draftPreparation:
       previous.draftPreparation && structuredClone(draftPreparation),
