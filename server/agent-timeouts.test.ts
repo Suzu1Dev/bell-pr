@@ -130,6 +130,16 @@ test("time limits and command failures are worded in the locale in effect", asyn
         error.statusCode === 504 &&
         error.message === `${process.execPath} timed out.`,
     );
+    // A command aborted from another locale is cancelled in the caller's.
+    const controller = new AbortController();
+    const aborted = command(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+      signal: controller.signal,
+    });
+    setTimeout(() => withLocale("zh-TW", () => controller.abort()), 50);
+    await assert.rejects(aborted, {
+      statusCode: 409,
+      message: "The operation was cancelled.",
+    });
     // A missing executable is one whole sentence, with the reason kept as the cause.
     await assert.rejects(
       command("bell-pr-missing-executable", []),

@@ -1,5 +1,5 @@
 import { AppError } from "./types.js";
-import { cancelled } from "./i18n/index.js";
+import { cancelled, currentLocale, withLocale } from "./i18n/index.js";
 
 export const defaultAgentProcessLimit = 3;
 
@@ -32,11 +32,14 @@ export class AgentSlots {
       this.activeCount++;
       return Promise.resolve(this.releaser());
     }
+    // An abort listener runs in the scope of whoever aborted, so the
+    // cancellation is worded in the locale of the work that waits here.
+    const locale = currentLocale();
     return new Promise((resolve, reject) => {
       const onAbort = () => {
         const index = this.waiters.indexOf(waiter);
         if (index >= 0) this.waiters.splice(index, 1);
-        reject(new AppError(cancelled(), 409));
+        reject(new AppError(withLocale(locale, cancelled), 409));
       };
       const waiter = {
         grant: () => {

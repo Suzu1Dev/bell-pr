@@ -7,6 +7,7 @@ import {
   parseAgentProcessLimit,
 } from "./agent-slots.js";
 import { AppError } from "./types.js";
+import { withLocale } from "./i18n/index.js";
 
 test("slots respect the limit and grant waiters in FIFO order", async () => {
   const slots = new AgentSlots(2);
@@ -62,6 +63,20 @@ test("aborting while waiting rejects and does not leak a slot", async () => {
   assert.equal(slots.active, 0);
   (await slots.acquire())();
   assert.equal(slots.active, 0);
+});
+
+test("a waiter cancelled from another locale is told so in its own locale", async () => {
+  const slots = new AgentSlots(1);
+  const release = await slots.acquire();
+  const controller = new AbortController();
+  // An English run waits for a slot; a request in zh-TW cancels it.
+  const waiting = withLocale("en", () => slots.acquire(controller.signal));
+  withLocale("zh-TW", () => controller.abort());
+  await assert.rejects(waiting, {
+    statusCode: 409,
+    message: "The operation was cancelled.",
+  });
+  release();
 });
 
 test("releasing twice frees only one slot", async () => {

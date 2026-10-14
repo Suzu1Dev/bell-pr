@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { log } from "./log.js";
 import { redact } from "./secrets.js";
 import { AppError } from "./types.js";
-import { cancelled } from "./i18n/index.js";
+import { cancelled, currentLocale, withLocale } from "./i18n/index.js";
 
 export { redact };
 
@@ -121,7 +121,11 @@ export async function command(
         killTimer = setTimeout(() => kill("SIGKILL"), 1500);
         killTimer.unref();
       };
-      const abort = () => stop(new AppError(cancelled(), 409));
+      // An abort listener runs in the scope of whoever aborted, so the
+      // cancellation is worded in the locale of the work that ran this.
+      const locale = currentLocale();
+      const abort = () =>
+        stop(new AppError(withLocale(locale, cancelled), 409));
       options.signal?.addEventListener("abort", abort, { once: true });
       const timer = setTimeout(
         () =>
