@@ -20,6 +20,7 @@ import { activeFollowUp } from "../shared/followups.js";
 import { editable } from "./publish.js";
 import { runAgent } from "./run-executor.js";
 import type { WorkbenchContext } from "./workbench.js";
+import { shuttingDown, sm } from "./i18n/index.js";
 
 const now = () => new Date().toISOString();
 
@@ -37,19 +38,16 @@ export async function prepareRunDraft(
   id: string,
   options: DraftOptions = {},
 ) {
-  if (ctx.stopping()) throw new AppError("服務正在關閉，請稍後重試。", 503);
+  if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   let pending: Promise<void> | undefined;
   await ctx.lock(id, async () => {
-    if (ctx.stopping()) throw new AppError("服務正在關閉，請稍後重試。", 503);
+    if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
     const run = ctx.run(id);
     editable(run);
     if (activeFollowUp(run.followUps))
-      throw new AppError(
-        "這輪修正只推送新的 commit，不會更新 PR 說明，因此不需要產生草稿建議。",
-        409,
-      );
+      throw new AppError((m) => m.run.draft.notForRound, 409);
     const files = await ctx.diff(id);
-    if (ctx.stopping()) throw new AppError("服務正在關閉，請稍後重試。", 503);
+    if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
     pending = ctx.draftJobs.get(id);
     if (pending) return;
     if (
@@ -101,12 +99,12 @@ async function generateDraft(
   try {
     await ctx.store.save();
     if (controller.signal.aborted)
-      throw new AppError("PR 草稿產生已取消。", 409);
+      throw new AppError((m) => m.run.draft.cancelled, 409);
     preparation.context = await (
       ctx.dependencies.collectDraftContext ?? collectDraftContext
     )(ctx.repo(run.repoId), run, { signal: controller.signal });
     if (controller.signal.aborted)
-      throw new AppError("PR 草稿產生已取消。", 409);
+      throw new AppError((m) => m.run.draft.cancelled, 409);
     const prompt = draftPrompt(run, files, preparation.context);
     temporary = await mkdtemp(path.join(os.tmpdir(), "bell-draft-"));
     const outputSchema = path.join(temporary, "response-schema.json");
@@ -128,8 +126,7 @@ async function generateDraft(
       const currentFiles = await readDiff(run);
       if (fingerprint !== draftFingerprint(run, currentFiles)) {
         preparation.status = "stale";
-        preparation.error =
-          "程式碼差異已更新；請重新產生符合目前變更的 PR 草稿建議。";
+        preparation.error = sm().run.draft.stale;
         return;
       }
       preparation.status = "ready";
@@ -155,31 +152,21 @@ async function generateDraft(
             ? { publishBranch: run.draft.publishBranch }
             : {}),
         };
-        ctx.log(
-          run,
-          "draft",
-          "已把 PR 草稿建議放進編輯區。這是模型寫的原文，送出前請用自己的話確認內容，並處理核對清單與勾選項目。",
-        );
+        ctx.log(run, "draft", sm().run.draft.applied);
       } else {
-        ctx.log(
-          run,
-          "draft",
-          "PR 草稿建議已準備完成，現有草稿保留；可在 PR 草稿區檢視並套用。",
-        );
+        ctx.log(run, "draft", sm().run.draft.ready);
       }
     });
   } catch (error) {
     if (preparation.status !== "stale") {
       preparation.status = "failed";
       preparation.error = controller.signal.aborted
-        ? "PR 草稿建議產生已中斷；現有草稿與已完成變更仍保留，可重新產生。"
+        ? sm().run.draft.stopped
         : redact(
-            error instanceof Error
-              ? error.message
-              : "PR 草稿建議產生失敗，請重試。",
+            error instanceof Error ? error.message : sm().run.draft.failed,
           );
     }
-    ctx.log(run, "draft", preparation.error ?? "PR 草稿建議未完成。");
+    ctx.log(run, "draft", preparation.error ?? sm().run.draft.incomplete);
   } finally {
     if (ctx.controllers.get(key) === controller)
       ctx.controllers.delete(key);

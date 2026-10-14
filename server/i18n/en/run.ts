@@ -21,6 +21,7 @@ export default {
       `Waiting for other agents to finish (${queued} queued)`,
     complete: "Done; the report is ready to read",
     failed: "Stopped or failed",
+    rerunWaiting: "Waiting to review again…",
   },
   /** Starting, queueing, approving and cancelling runs. */
   queue: {
@@ -356,14 +357,155 @@ export default {
         `Design tradeoffs (approaches considered but not taken):\n${tradeoffs || "(Not reported.)"}`,
       ].join("\n\n"),
   },
+  /** Explanations, notes, questions, maintainer feedback and review reruns on a finished run. */
+  review: {
+    rerunNotAllowed:
+      "Only runs in review or approved can have their review run again.",
+    rerunRunning:
+      "The review of this run is already running again; wait for it to finish or stop it first.",
+    nothingToReview: "There are no code changes to review.",
+    rerunRequested: ({ files }: { files: number }) =>
+      `Requested a new independent review of the ${count(files, "changed file", "changed files")} in the current working directory.`,
+    rerunDone:
+      "The independent review is updated. The reports are advice: review marks and approval are unchanged.",
+    rerunStopped:
+      "Stopped the new review; the earlier reports and review marks are kept.",
+    rerunIncomplete: "The new review did not finish.",
+    explanationsTooEarly:
+      "Wait for development to finish before generating explanations.",
+    fileNotFound: "This changed file was not found.",
+    explanationsStopped:
+      "Generating explanations stopped; the finished code changes are kept and you can retry the explanations.",
+    explanationsFailed: "Generating the explanations failed; try again.",
+    explanationsCancelled: "Generating explanations was cancelled.",
+    notesTooEarly:
+      "Wait for development to finish before writing down what you understood.",
+    chatTooEarly: "Wait for development to finish before asking questions.",
+    chatUnavailable: "This file cannot be discussed right now.",
+    feedbackUnpublished:
+      "The PR has not been sent yet, so there is no maintainer feedback to read.",
+    feedbackMismatch:
+      "The PR URL does not match this repository, so its feedback cannot be read.",
+    githubInvalidJson: "GitHub's response is not valid JSON.",
+    feedbackRead: ({ number, items }: { number: number; items: number }) =>
+      `Read the maintainer feedback on PR #${number}: ${count(items, "item", "items")}.`,
+  },
+  /** PR draft suggestions. */
+  draft: {
+    notForRound:
+      "A follow-up round only pushes a new commit and leaves the PR description unchanged, so no draft suggestion is needed.",
+    cancelled: "Generating the PR draft was cancelled.",
+    stale:
+      "The code changes were updated; generate a new PR draft suggestion that matches them.",
+    applied:
+      "Put the PR draft suggestion in the editor. This is the model's own text: before you send it, check it in your own words and work through the checklist and checkboxes.",
+    ready:
+      "The PR draft suggestion is ready and your current draft is kept; review and apply it in the PR draft area.",
+    stopped:
+      "Generating the PR draft suggestion stopped; your current draft and the finished changes are kept, and you can generate it again.",
+    failed: "Generating the PR draft suggestion failed; try again.",
+    incomplete: "The PR draft suggestion did not finish.",
+  },
   /** The projects BELL works on and its own clones of them. */
   repos: {
     notFound: "Repository not found.",
+    importSource:
+      "Enter a GitHub HTTPS URL or the absolute path of a local repository.",
+    bare: "Choose a repository that has a working directory.",
+    localNotUpdated:
+      "This is your own local repository, and BELL never changes it; run git pull in a terminal yourself, then analyse the project again.",
+    cloneChanged:
+      "BELL's copy of the project has unexpected changes, so the update stopped; check it and try again.",
   },
-  /** Publishing a run's reviewed changes as a pull request. */
+  /** The human review gate and publishing: draft, file reviews, approval and push. */
   publish: {
     commitMessageInvalid: "A commit message may only contain text and line breaks.",
     invalidBranch:
       "A GitHub branch name may only use letters, digits and . _ - /, must not contain .., and must not end with . or .lock.",
+    notEditable: "Wait for the run to finish before reviewing or editing.",
+    roundKeepsPrText:
+      "A follow-up round only pushes a new commit; the PR title and description stay as they are and cannot be changed here.",
+    branchIsTarget: ({ branch }: { branch: string }) =>
+      `The GitHub branch cannot be the target branch ${branch}: that would push straight to it instead of opening a PR. Use a new branch name.`,
+    branchLocked: ({ branch }: { branch: string }) =>
+      `An earlier publish already pushed to the GitHub branch ${branch}. After a push the branch cannot change, so that no second PR is opened; restore the branch name or start a new run.`,
+    fileChanged:
+      "This file's diff changed; reload and review the latest version before you mark it reviewed.",
+    draftChanged:
+      "The PR draft changed; reload, check the latest title and description, and approve again.",
+    reviewAllFirst:
+      "Review every latest change and remove the blocked files first.",
+    prTextRequired: "Fill in the PR title and description first.",
+    roundMessageRequired:
+      "Write this follow-up round's commit message and leave no placeholders in it.",
+    approvalStale:
+      "The approved version changed or expired; reload, review and approve again before you send the PR.",
+    approveFirst: "Finish the review and approve the PR first.",
+    noGithubOrigin:
+      "This repository has no GitHub origin, so it cannot be published.",
+    diffChanged:
+      "The changes differ from what you approved; review and approve them again.",
+    notAllReviewed: "Not every latest change has been reviewed.",
+    prAlreadySent:
+      "This PR was already sent; to push new changes, start a follow-up round from the maintainer feedback.",
+    branchIsTargetReapprove: ({ branch }: { branch: string }) =>
+      `The GitHub branch cannot be the target branch ${branch}; change the branch name and approve again.`,
+    branchLockedPublish: ({ branch }: { branch: string }) =>
+      `An earlier publish already pushed to the GitHub branch ${branch}; restore the branch name or start a new run.`,
+    /** `items` are the preflight messages, each a whole sentence. */
+    confirmFirst: ({ items }: { items: string[] }) =>
+      `Before sending, confirm each item in the preview: ${items.join(" ")}`,
+    githubUserInvalid: "The GitHub user information is not valid.",
+    defaultBranchChanged:
+      "The remote default branch changed; start a new run from the latest branch.",
+    targetMoved:
+      "The target branch has new commits; first press “Sync to the latest target branch” on the PR draft tab, review, then send.",
+    targetMovedAfterCommit:
+      "The target branch has new commits. An earlier publish already made a commit that may be on GitHub, so this run can no longer be synced or have a sync undone; start a new run from the latest version.",
+    branchChanged: "The run's branch changed, so publishing stopped.",
+    priorCommitDiffers:
+      "An earlier publish made a different commit. Start a new run so that a branch that may already be pushed is not overwritten.",
+    priorMessageDiffers:
+      "The commit of an earlier publish has a different commit message, which cannot change after a push. Restore the commit message or start a new run.",
+    notAFork:
+      "Your repository with this name is not a fork of the target project; sort out the GitHub fork first.",
+    noPrUrl:
+      "GitHub returned no PR URL; check on GitHub first so the PR is not published twice.",
+    prCreated: "Created the GitHub draft PR.",
+    failed: "Publishing failed.",
+    failedAfterPush: ({ error }: { error: string }) =>
+      `${error} If the push went through, the branch stays on GitHub; check the remote before you retry.`,
+    roundReverts: ({ files }: { files: string[] }) =>
+      `This follow-up round puts pushed files back to their original version or deletes them: ${list(files)}. BELL cannot show such changes for file-by-file review, so they are not pushed; restore these files or discard the round.`,
+    roundMessageMissing: "Write this follow-up round's commit message.",
+    roundMessagePlaceholders:
+      "The commit message still has placeholders; complete it before pushing.",
+    roundNoPushTarget:
+      "Cannot find where this PR is pushed, so the round cannot be pushed.",
+    roundPushed: ({
+      round,
+      branch,
+      commit,
+    }: {
+      round: number;
+      branch: string;
+      commit: string;
+    }) => `Pushed follow-up round ${round} to the PR branch ${branch} (${commit}).`,
+    branchChangedPush: "The run's branch changed, so pushing stopped.",
+    commitChangedPush:
+      "The run's branch moved to another commit, so pushing stopped.",
+    prMerged: "This PR was merged; no more follow-up rounds can be pushed.",
+    prClosed: "This PR was closed; no more follow-up rounds can be pushed.",
+    roundEmpty:
+      "This follow-up round has no new changes to push; you can discard it.",
+    roundCommitDiffers:
+      "This follow-up round already made a commit with different content; restore the changes and the commit message before you push, or discard the round.",
+    pushFailed: "Pushing failed.",
+    stagedFilesDiffer:
+      "The files prepared for the commit differ from the approved changes.",
+    fileChangedWhileStaging: ({ path }: { path: string }) =>
+      `${path} changed while the commit was being prepared; review it again.`,
+    filesChangedWhilePublishing:
+      "Files changed while publishing was being prepared; review them again.",
   },
 };

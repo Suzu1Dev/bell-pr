@@ -16,8 +16,9 @@ import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
 import { networkConfig } from "./repositories.js";
 import { assertRemoteHead, prHasCommit, remoteBranchHead } from "./pr-branch.js";
-import { assertConflictsResolved, partlyPublished } from "./sync-runs.js";
+import { assertConflictsResolved } from "./sync-runs.js";
 import type { WorkbenchContext } from "./workbench.js";
+import { sm } from "./i18n/index.js";
 
 const now = () => new Date().toISOString();
 
@@ -26,7 +27,7 @@ const json = <T>(value: string) => JSON.parse(value) as T;
 /** The draft, file reviews and approval change only in review or approved, never while publishing. */
 export function editable(run: Run) {
   if (!["review", "approved"].includes(run.status) || run.publishing)
-    throw new AppError("請等待工作完成後再審閱與編輯。", 409);
+    throw new AppError((m) => m.run.publish.notEditable, 409);
 }
 
 export async function saveDraft(
@@ -41,23 +42,17 @@ export async function saveDraft(
       activeFollowUp(run.followUps) &&
       (draft.title !== run.draft.title || draft.body !== run.draft.body)
     )
-      throw new AppError(
-        "這輪修正只推送新的 commit，PR 標題與說明維持原樣，不能在這裡修改。",
-        409,
-      );
+      throw new AppError((m) => m.run.publish.roundKeepsPrText, 409);
     // An empty message is stored as absent so the title-only fallback applies.
     const commitMessage = draft.commitMessage?.trim();
     // Likewise an empty GitHub branch falls back to the run's own branch.
     const publishBranch = draft.publishBranch?.trim();
     if (publishBranch && !validBranchName(publishBranch))
-      throw new AppError(
-        "GitHub 分支名稱只能用英數字與 . _ - /，不能有 ..，也不能以 . 或 .lock 結尾。",
-        422,
-      );
+      throw new AppError((m) => m.run.publish.invalidBranch, 422);
     // Pushing the reviewed commit to the target branch would skip the PR entirely.
     if (publishBranch?.toLowerCase() === run.baseBranch.toLowerCase())
       throw new AppError(
-        `GitHub 分支不能是目標分支 ${run.baseBranch}，否則會直接推送到目標分支而不是建立 PR；請用新的分支名稱。`,
+        (m) => m.run.publish.branchIsTarget({ branch: run.baseBranch }),
         422,
       );
     // After a push, another branch would let a retry open a second PR.
@@ -66,7 +61,7 @@ export async function saveDraft(
       (publishBranch || run.branch) !== run.publishedBranch
     )
       throw new AppError(
-        `先前發佈已推送到 GitHub 分支 ${run.publishedBranch}，推送後不能改分支，以免重複建立 PR。請還原分支名稱，或建立新工作。`,
+        (m) => m.run.publish.branchLocked({ branch: run.publishedBranch! }),
         409,
       );
     run.draft = {
@@ -94,12 +89,9 @@ export async function review(
     editable(run);
     const files = await ctx.diff(id);
     const file = files.find((value) => value.path === filePath);
-    if (!file) throw new AppError("找不到此差異檔案。", 404);
+    if (!file) throw new AppError((m) => m.run.review.fileNotFound, 404);
     if (file.fingerprint !== displayedFingerprint)
-      throw new AppError(
-        "檔案差異已更新；請重新載入並審閱最新內容，再標記為已審閱。",
-        409,
-      );
+      throw new AppError((m) => m.run.publish.fileChanged, 409);
     if (file.blocked) throw new AppError(file.blocked, 422);
     if (reviewed) run.reviewedFingerprints[filePath] = file.fingerprint;
     else delete run.reviewedFingerprints[filePath];
@@ -127,10 +119,7 @@ export async function approve(
       (displayedDraft.publishBranch?.trim() ?? "") !==
         (run.draft.publishBranch ?? "")
     )
-      throw new AppError(
-        "PR 草稿已更新；請重新載入並確認最新標題與內容，再重新核准。",
-        409,
-      );
+      throw new AppError((m) => m.run.publish.draftChanged, 409);
     const files = await ctx.diff(id);
     if (
       !files.length ||
@@ -140,20 +129,17 @@ export async function approve(
           run.reviewedFingerprints[file.path] !== file.fingerprint,
       )
     ) {
-      throw new AppError("請先審閱所有最新差異，並移除被擋下的檔案。", 409);
+      throw new AppError((m) => m.run.publish.reviewAllFirst, 409);
     }
     if (!run.draft.title.trim() || !run.draft.body.trim())
-      throw new AppError("請先填寫 PR 標題與內容。", 422);
+      throw new AppError((m) => m.run.publish.prTextRequired, 422);
     await assertConflictsResolved(run);
     // A follow-up round pushes only a commit, so its message is what goes out.
     const round = activeFollowUp(run.followUps);
     if (round) {
       const message = run.draft.commitMessage?.trim();
       if (!message || findDraftPlaceholders(message).length)
-        throw new AppError(
-          "請填好這輪修正的提交訊息，不要留下待填寫的內容。",
-          422,
-        );
+        throw new AppError((m) => m.run.publish.roundMessageRequired, 422);
       const unreviewable = await unreviewableRoundPaths(run, round, files);
       if (unreviewable.length) throw unreviewableError(unreviewable);
     } else {
@@ -190,25 +176,19 @@ export async function publish(
       !run.approvedFingerprint ||
       displayedFingerprint !== run.approvedFingerprint
     )
-      throw new AppError(
-        "核准版本已更新或失效；請重新載入、審閱並核准，再送出 PR。",
-        409,
-      );
+      throw new AppError((m) => m.run.publish.approvalStale, 409);
     if (run.status === "published") return run;
     const repo = ctx.repo(run.repoId);
     if (run.status !== "approved" || !run.approvedFingerprint)
-      throw new AppError("請先完成審閱並核准 PR。", 409);
+      throw new AppError((m) => m.run.publish.approveFirst, 409);
     if (!repo.url || !parseGitHubSource(repo.url))
-      throw new AppError(
-        "此 Repository 尚未連結 GitHub origin，無法發佈。",
-        422,
-      );
+      throw new AppError((m) => m.run.publish.noGithubOrigin, 422);
     const files = await ctx.diff(id);
     if (
       run.status !== "approved" ||
       run.approvedFingerprint !== reviewFingerprint(files, run.draft)
     )
-      throw new AppError("差異已變更，請重新審閱與核准。", 409);
+      throw new AppError((m) => m.run.publish.diffChanged, 409);
     if (
       files.some(
         (file) =>
@@ -216,14 +196,11 @@ export async function publish(
           run.reviewedFingerprints[file.path] !== file.fingerprint,
       )
     )
-      throw new AppError("最新差異尚未全部審閱。", 409);
+      throw new AppError((m) => m.run.publish.notAllReviewed, 409);
     const round = activeFollowUp(run.followUps);
     if (round) return publishFollowUp(ctx, run, round, files);
     if (run.prUrl)
-      throw new AppError(
-        "這個 PR 已經送出；要推送新的修改，請從維護者回饋開始一輪修正。",
-        409,
-      );
+      throw new AppError((m) => m.run.publish.prAlreadySent, 409);
     await assertConflictsResolved(run);
     const headBranch = run.draft.publishBranch || run.branch;
     if (
@@ -231,12 +208,14 @@ export async function publish(
       headBranch.toLowerCase() === run.baseBranch.toLowerCase()
     )
       throw new AppError(
-        `GitHub 分支不能是目標分支 ${run.baseBranch}；請修改分支名稱並重新核准。`,
+        (m) =>
+          m.run.publish.branchIsTargetReapprove({ branch: run.baseBranch }),
         422,
       );
     if (run.publishedBranch && run.publishedBranch !== headBranch)
       throw new AppError(
-        `先前發佈已推送到 GitHub 分支 ${run.publishedBranch}；請還原分支名稱，或建立新工作。`,
+        (m) =>
+          m.run.publish.branchLockedPublish({ branch: run.publishedBranch! }),
         409,
       );
     // Runs approved before these checks existed are held to them as well.
@@ -256,7 +235,10 @@ export async function publish(
     );
     if (unconfirmed.length)
       throw new AppError(
-        `送出前請在預覽視窗逐項確認：${unconfirmed.map((check) => check.message).join(" ")}`,
+        (m) =>
+          m.run.publish.confirmFirst({
+            items: unconfirmed.map((check) => check.message),
+          }),
         422,
       );
     run.publishing = true;
@@ -269,7 +251,7 @@ export async function publish(
         })
       ).stdout.trim();
       if (!/^[A-Za-z0-9-]+$/.test(githubUser))
-        throw new AppError("GitHub 使用者資訊不正確。", 422);
+        throw new AppError((m) => m.run.publish.githubUserInvalid, 422);
       const metadata = json<{
         viewerPermission: string;
         defaultBranchRef: { name: string };
@@ -285,10 +267,7 @@ export async function publish(
         ).stdout,
       );
       if (metadata.defaultBranchRef.name !== run.baseBranch)
-        throw new AppError(
-          "遠端預設分支已變更，請從最新分支建立新工作。",
-          409,
-        );
+        throw new AppError((m) => m.run.publish.defaultBranchChanged, 409);
       const remoteSha = (
         await command("gh", [
           "api",
@@ -299,16 +278,17 @@ export async function publish(
       ).stdout.trim();
       if (remoteSha !== run.baseSha)
         throw new AppError(
-          run.publishCommit
-            ? `目標分支已有新提交；${partlyPublished}`
-            : "目標分支已有新提交；請先在 PR 草稿頁按「同步到最新目標分支」，審閱後再送出。",
+          (m) =>
+            run.publishCommit
+              ? m.run.publish.targetMovedAfterCommit
+              : m.run.publish.targetMoved,
           409,
         );
       const head = (
         await git(run.worktreePath, ["symbolic-ref", "--short", "HEAD"])
       ).stdout.trim();
       if (head !== run.branch)
-        throw new AppError("工作分支已改變，已停止發佈。", 409);
+        throw new AppError((m) => m.run.publish.branchChanged, 409);
       const previousHead = (
         await git(run.worktreePath, ["rev-parse", "HEAD"])
       ).stdout.trim();
@@ -326,18 +306,12 @@ export async function publish(
           await git(run.worktreePath, ["rev-parse", `${commit}^{tree}`])
         ).stdout.trim();
         if (priorTree !== tree)
-          throw new AppError(
-            "先前發佈已建立不同的提交。請建立新工作，以避免覆寫可能已推送的分支。",
-            409,
-          );
+          throw new AppError((m) => m.run.publish.priorCommitDiffers, 409);
         const priorMessage = (
           await git(run.worktreePath, ["log", "-1", "--format=%B", commit])
         ).stdout.trim();
         if (priorMessage !== (run.draft.commitMessage?.trim() || run.draft.title))
-          throw new AppError(
-            "先前發佈的提交已帶有不同的提交訊息，推送後無法更改。請還原提交訊息，或建立新工作。",
-            409,
-          );
+          throw new AppError((m) => m.run.publish.priorMessageDiffers, 409);
       } else {
         commit = (
           await git(
@@ -388,10 +362,7 @@ export async function publish(
           fork.parent?.nameWithOwner.toLowerCase() !==
           repo.fullName.toLowerCase()
         )
-          throw new AppError(
-            "同名 Repository 不是目標專案的 fork，請先處理 GitHub fork。",
-            409,
-          );
+          throw new AppError((m) => m.run.publish.notAFork, 409);
         headOwner = githubUser;
       }
       run.headRepository = headRepository;
@@ -452,20 +423,16 @@ export async function publish(
         )?.[0];
       }
       if (!prUrl)
-        throw new AppError(
-          "GitHub 未回傳 PR URL，請先到 GitHub 確认，避免重複發佈。",
-          502,
-        );
+        throw new AppError((m) => m.run.publish.noPrUrl, 502);
       run.prUrl = prUrl;
       run.status = "published";
-      ctx.log(run, "system", "已建立 GitHub Draft PR。");
+      ctx.log(run, "system", sm().run.publish.prCreated);
     } catch (error) {
       run.error = redact(
-        error instanceof Error ? error.message : "發佈失敗。",
+        error instanceof Error ? error.message : sm().run.publish.failed,
       );
       if (run.publishCommit)
-        run.error +=
-          " 若推送已完成，分支會保留在 GitHub；重試前請確認遠端狀態。";
+        run.error = sm().run.publish.failedAfterPush({ error: run.error });
       ctx.log(run, "system", run.error);
       throw error;
     } finally {
@@ -505,7 +472,7 @@ async function unreviewableRoundPaths(
 
 function unreviewableError(paths: string[]) {
   return new AppError(
-    `這輪修正把已推送的檔案改回原始版本或刪除：${paths.slice(0, 10).join("、")}。這類修改無法在 BELL 逐檔審閱，因此不會推送；請還原這些檔案或放棄這輪修正。`,
+    (m) => m.run.publish.roundReverts({ files: paths.slice(0, 10) }),
     409,
   );
 }
@@ -523,12 +490,13 @@ async function publishFollowUp(
   files: DiffFile[],
 ) {
   const message = run.draft.commitMessage?.trim();
-  if (!message) throw new AppError("請填寫這輪修正的提交訊息。", 422);
+  if (!message)
+    throw new AppError((m) => m.run.publish.roundMessageMissing, 422);
   await assertConflictsResolved(run);
   if (findDraftPlaceholders(message).length)
-    throw new AppError("提交訊息還有待填寫的內容，請改好再推送。", 422);
+    throw new AppError((m) => m.run.publish.roundMessagePlaceholders, 422);
   if (!run.prUrl || !run.headRepository)
-    throw new AppError("找不到這個 PR 的推送位置，無法推送修正。", 409);
+    throw new AppError((m) => m.run.publish.roundNoPushTarget, 409);
   const branch = run.publishedBranch ?? run.branch;
   const roundNumber = (run.followUps?.indexOf(round) ?? 0) + 1;
   const finish = (commit: string) => {
@@ -539,7 +507,11 @@ async function publishFollowUp(
     ctx.log(
       run,
       "system",
-      `已把第 ${roundNumber} 輪修正推送到 PR 分支 ${branch}（${commit.slice(0, 7)}）。`,
+      sm().run.publish.roundPushed({
+        round: roundNumber,
+        branch,
+        commit: commit.slice(0, 7),
+      }),
     );
   };
   run.publishing = true;
@@ -550,12 +522,12 @@ async function publishFollowUp(
       await git(run.worktreePath, ["symbolic-ref", "--short", "HEAD"])
     ).stdout.trim();
     if (head !== run.branch)
-      throw new AppError("工作分支已改變，已停止推送。", 409);
+      throw new AppError((m) => m.run.publish.branchChangedPush, 409);
     const previousHead = (
       await git(run.worktreePath, ["rev-parse", "HEAD"])
     ).stdout.trim();
     if (previousHead !== round.parentCommit && previousHead !== round.commit)
-      throw new AppError("工作分支的提交已改變，已停止推送。", 409);
+      throw new AppError((m) => m.run.publish.commitChangedPush, 409);
     // A retry after the push landed but before BELL recorded it, also when
     // the branch moved on or the PR was merged since.
     if (round.commit && (await prHasCommit(ctx, run, round.commit))) {
@@ -578,7 +550,8 @@ async function publishFollowUp(
     ).stdout.trim();
     if (state !== "OPEN")
       throw new AppError(
-        `這個 PR 已${state === "MERGED" ? "合併" : "關閉"}，不能再推送修正。`,
+        (m) =>
+          state === "MERGED" ? m.run.publish.prMerged : m.run.publish.prClosed,
         409,
       );
     const tree = await reviewedTree(ctx, run, files);
@@ -586,10 +559,7 @@ async function publishFollowUp(
       await git(run.worktreePath, ["rev-parse", `${round.parentCommit}^{tree}`])
     ).stdout.trim();
     if (tree === parentTree)
-      throw new AppError(
-        "這輪沒有新的修改可以推送；可以放棄這輪修正。",
-        422,
-      );
+      throw new AppError((m) => m.run.publish.roundEmpty, 422);
     const unreviewable = await unreviewableRoundPaths(run, round, files, tree);
     if (unreviewable.length) throw unreviewableError(unreviewable);
     let commit = round.commit;
@@ -606,10 +576,7 @@ async function publishFollowUp(
           [round.parentCommit, round.mergeParent].filter(Boolean).join(" ") ||
         priorMessage.stdout.trim() !== message
       )
-        throw new AppError(
-          "這輪修正先前已建立不同內容的 commit；請還原修改與提交訊息後再推送，或放棄這輪修正。",
-          409,
-        );
+        throw new AppError((m) => m.run.publish.roundCommitDiffers, 409);
     } else {
       commit = (
         await git(
@@ -651,7 +618,9 @@ async function publishFollowUp(
     );
     finish(commit);
   } catch (error) {
-    run.error = redact(error instanceof Error ? error.message : "推送失敗。");
+    run.error = redact(
+      error instanceof Error ? error.message : sm().run.publish.pushFailed,
+    );
     ctx.log(run, "system", run.error);
     throw error;
   } finally {
@@ -720,7 +689,7 @@ async function reviewedTree(
     JSON.stringify(stagedFiles) !==
     JSON.stringify(files.map((file) => file.path).sort())
   )
-    throw new AppError("準備提交的檔案與已核准差異不同。", 409);
+    throw new AppError((m) => m.run.publish.stagedFilesDiffer, 409);
   for (const file of files) {
     const stagedPatch = (
       await git(
@@ -741,13 +710,13 @@ async function reviewedTree(
     ).stdout;
     if (stagedPatch !== file.patch)
       throw new AppError(
-        `${file.path} 在準備提交時變更，請重新審閱。`,
+        (m) => m.run.publish.fileChangedWhileStaging({ path: file.path }),
         409,
       );
   }
   const latest = await readDiff(run);
   if (reviewFingerprint(latest, run.draft) !== run.approvedFingerprint)
-    throw new AppError("檔案在發佈準備期间變更，請重新審閱。", 409);
+    throw new AppError((m) => m.run.publish.filesChangedWhilePublishing, 409);
   return (
     await git(run.worktreePath, ["write-tree"], { env: indexEnv })
   ).stdout.trim();

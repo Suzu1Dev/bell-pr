@@ -15,6 +15,7 @@ const m: Translation<typeof en> = {
     waitingForSlot: ({ queued }) => `等待其他 Agent 完成（${queued} 個排隊中）`,
     complete: "已完成，報告可供審閱",
     failed: "執行中斷或失敗",
+    rerunWaiting: "等待重新審查…",
   },
   queue: {
     runNotFound: "找不到工作。",
@@ -190,13 +191,113 @@ const m: Translation<typeof en> = {
         `設計取捨（考慮過但未採用的做法）：\n${tradeoffs || "（未回報）"}`,
       ].join("\n\n"),
   },
+  review: {
+    rerunNotAllowed: "只有審閱中或已核准的工作可以重新執行審查。",
+    rerunRunning: "這個工作的審查正在重新執行，請等待完成或先停止。",
+    nothingToReview: "目前沒有程式碼差異可供審查。",
+    rerunRequested: ({ files }) =>
+      `要求依目前工作目錄的 ${files} 個變更檔案重新執行獨立審查。`,
+    rerunDone: "獨立審查已更新；報告是建議，審閱狀態與核准不變。",
+    rerunStopped: "已停止重新審查；原有報告與審閱狀態保留。",
+    rerunIncomplete: "重新審查未完成。",
+    explanationsTooEarly: "請等待開發完成後再產生變更解說。",
+    fileNotFound: "找不到此差異檔案。",
+    explanationsStopped: "解說產生已中斷；已完成的程式碼變更仍保留，可重試解說。",
+    explanationsFailed: "變更解說產生失敗，請重試。",
+    explanationsCancelled: "解說產生已取消。",
+    notesTooEarly: "請等待開發完成後再寫下理解。",
+    chatTooEarly: "請等待開發完成後再追問。",
+    chatUnavailable: "此檔案目前無法用於追問。",
+    feedbackUnpublished: "PR 尚未送出，還沒有維護者回饋可以讀取。",
+    feedbackMismatch: "PR 網址與此 Repository 不一致，無法讀取回饋。",
+    githubInvalidJson: "GitHub 回應不是有效的 JSON。",
+    feedbackRead: ({ number, items }) =>
+      `已讀取 PR #${number} 的維護者回饋：${items} 則。`,
+  },
+  draft: {
+    notForRound:
+      "這輪修正只推送新的 commit，不會更新 PR 說明，因此不需要產生草稿建議。",
+    cancelled: "PR 草稿產生已取消。",
+    stale: "程式碼差異已更新；請重新產生符合目前變更的 PR 草稿建議。",
+    applied:
+      "已把 PR 草稿建議放進編輯區。這是模型寫的原文，送出前請用自己的話確認內容，並處理核對清單與勾選項目。",
+    ready: "PR 草稿建議已準備完成，現有草稿保留；可在 PR 草稿區檢視並套用。",
+    stopped:
+      "PR 草稿建議產生已中斷；現有草稿與已完成變更仍保留，可重新產生。",
+    failed: "PR 草稿建議產生失敗，請重試。",
+    incomplete: "PR 草稿建議未完成。",
+  },
   repos: {
     notFound: "找不到 Repository。",
+    importSource: "請輸入 GitHub HTTPS URL 或本機 Repository 的絕對路徑。",
+    bare: "請選擇有工作目錄的 Repository。",
+    localNotUpdated:
+      "這是你本機的 repository，BELL 不會更動它；請在終端機自行 git pull 後再重新分析。",
+    cloneChanged: "BELL 的專案副本有未預期的修改，已停止更新；請檢查後再試。",
   },
   publish: {
     commitMessageInvalid: "提交訊息只能包含文字與換行。",
     invalidBranch:
       "GitHub 分支名稱只能用英數字與 . _ - /，不能有 ..，也不能以 . 或 .lock 結尾。",
+    notEditable: "請等待工作完成後再審閱與編輯。",
+    roundKeepsPrText:
+      "這輪修正只推送新的 commit，PR 標題與說明維持原樣，不能在這裡修改。",
+    branchIsTarget: ({ branch }) =>
+      `GitHub 分支不能是目標分支 ${branch}，否則會直接推送到目標分支而不是建立 PR；請用新的分支名稱。`,
+    branchLocked: ({ branch }) =>
+      `先前發佈已推送到 GitHub 分支 ${branch}，推送後不能改分支，以免重複建立 PR。請還原分支名稱，或建立新工作。`,
+    fileChanged: "檔案差異已更新；請重新載入並審閱最新內容，再標記為已審閱。",
+    draftChanged: "PR 草稿已更新；請重新載入並確認最新標題與內容，再重新核准。",
+    reviewAllFirst: "請先審閱所有最新差異，並移除被擋下的檔案。",
+    prTextRequired: "請先填寫 PR 標題與內容。",
+    roundMessageRequired: "請填好這輪修正的提交訊息，不要留下待填寫的內容。",
+    approvalStale: "核准版本已更新或失效；請重新載入、審閱並核准，再送出 PR。",
+    approveFirst: "請先完成審閱並核准 PR。",
+    noGithubOrigin: "此 Repository 尚未連結 GitHub origin，無法發佈。",
+    diffChanged: "差異已變更，請重新審閱與核准。",
+    notAllReviewed: "最新差異尚未全部審閱。",
+    prAlreadySent:
+      "這個 PR 已經送出；要推送新的修改，請從維護者回饋開始一輪修正。",
+    branchIsTargetReapprove: ({ branch }) =>
+      `GitHub 分支不能是目標分支 ${branch}；請修改分支名稱並重新核准。`,
+    branchLockedPublish: ({ branch }) =>
+      `先前發佈已推送到 GitHub 分支 ${branch}；請還原分支名稱，或建立新工作。`,
+    confirmFirst: ({ items }) => `送出前請在預覽視窗逐項確認：${items.join(" ")}`,
+    githubUserInvalid: "GitHub 使用者資訊不正確。",
+    defaultBranchChanged: "遠端預設分支已變更，請從最新分支建立新工作。",
+    targetMoved:
+      "目標分支已有新提交；請先在 PR 草稿頁按「同步到最新目標分支」，審閱後再送出。",
+    targetMovedAfterCommit:
+      "目標分支已有新提交；先前的發佈已建立提交，可能已推送到 GitHub，因此不能再同步或復原同步；請從最新版本建立新工作。",
+    branchChanged: "工作分支已改變，已停止發佈。",
+    priorCommitDiffers:
+      "先前發佈已建立不同的提交。請建立新工作，以避免覆寫可能已推送的分支。",
+    priorMessageDiffers:
+      "先前發佈的提交已帶有不同的提交訊息，推送後無法更改。請還原提交訊息，或建立新工作。",
+    notAFork: "同名 Repository 不是目標專案的 fork，請先處理 GitHub fork。",
+    noPrUrl: "GitHub 未回傳 PR URL，請先到 GitHub 確认，避免重複發佈。",
+    prCreated: "已建立 GitHub Draft PR。",
+    failed: "發佈失敗。",
+    failedAfterPush: ({ error }) =>
+      `${error} 若推送已完成，分支會保留在 GitHub；重試前請確認遠端狀態。`,
+    roundReverts: ({ files }) =>
+      `這輪修正把已推送的檔案改回原始版本或刪除：${list(files)}。這類修改無法在 BELL 逐檔審閱，因此不會推送；請還原這些檔案或放棄這輪修正。`,
+    roundMessageMissing: "請填寫這輪修正的提交訊息。",
+    roundMessagePlaceholders: "提交訊息還有待填寫的內容，請改好再推送。",
+    roundNoPushTarget: "找不到這個 PR 的推送位置，無法推送修正。",
+    roundPushed: ({ round, branch, commit }) =>
+      `已把第 ${round} 輪修正推送到 PR 分支 ${branch}（${commit}）。`,
+    branchChangedPush: "工作分支已改變，已停止推送。",
+    commitChangedPush: "工作分支的提交已改變，已停止推送。",
+    prMerged: "這個 PR 已合併，不能再推送修正。",
+    prClosed: "這個 PR 已關閉，不能再推送修正。",
+    roundEmpty: "這輪沒有新的修改可以推送；可以放棄這輪修正。",
+    roundCommitDiffers:
+      "這輪修正先前已建立不同內容的 commit；請還原修改與提交訊息後再推送，或放棄這輪修正。",
+    pushFailed: "推送失敗。",
+    stagedFilesDiffer: "準備提交的檔案與已核准差異不同。",
+    fileChangedWhileStaging: ({ path }) => `${path} 在準備提交時變更，請重新審閱。`,
+    filesChangedWhilePublishing: "檔案在發佈準備期间變更，請重新審閱。",
   },
 };
 export default m;
