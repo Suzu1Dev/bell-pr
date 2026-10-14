@@ -253,22 +253,137 @@ export async function command(
   );
 }
 
+/**
+ * Settings every Git command runs with, ahead of the repository's own
+ * configuration: no hooks, no file monitor, no global attributes file, and
+ * no pager, editor, password prompt or SSH command taken from the
+ * repository. Filters, diff and merge drivers can only come from
+ * configuration, and assertGitConfigSafe refuses a repository that sets
+ * them.
+ */
+const hardenedGitConfig = [
+  "-c",
+  "core.hooksPath=/dev/null",
+  "-c",
+  "core.fsmonitor=false",
+  "-c",
+  "core.quotePath=false",
+  "-c",
+  "core.attributesFile=/dev/null",
+  "-c",
+  "core.sshCommand=ssh",
+  "-c",
+  "core.pager=cat",
+  "-c",
+  "core.editor=true",
+  "-c",
+  "core.askPass=",
+];
+
 export async function git(
   cwd: string,
   args: string[],
   options: Omit<CommandOptions, "cwd"> = {},
 ) {
-  return command(
-    "git",
-    [
-      "-c",
-      "core.hooksPath=/dev/null",
-      "-c",
-      "core.fsmonitor=false",
-      "-c",
-      "core.quotePath=false",
-      ...args,
-    ],
-    { ...options, cwd },
+  return command("git", [...hardenedGitConfig, ...args], { ...options, cwd });
+}
+
+/**
+ * Options for every fetch, ls-remote, clone and push to GitHub: credentials
+ * come from gh alone, only HTTPS and SSH transports are allowed (SSH for a
+ * person whose Git rewrites GitHub URLs to it), and submodules are never
+ * followed.
+ */
+export const gitNetworkConfig = [
+  "-c",
+  "credential.helper=",
+  "-c",
+  "credential.helper=!gh auth git-credential",
+  "-c",
+  "protocol.allow=never",
+  "-c",
+  "protocol.https.allow=always",
+  "-c",
+  "protocol.ssh.allow=always",
+  "-c",
+  "protocol.file.allow=never",
+  "-c",
+  "protocol.ext.allow=never",
+  "-c",
+  "submodule.recurse=false",
+];
+
+/**
+ * A Git command that talks to GitHub: the hardened settings of git(), the
+ * network options above, and an environment that never prompts for a
+ * password, whatever the caller passes.
+ */
+export async function gitNetwork(
+  cwd: string,
+  args: string[],
+  options: Omit<CommandOptions, "cwd"> = {},
+) {
+  return git(cwd, [...gitNetworkConfig, ...args], {
+    ...options,
+    env: {
+      ...(options.env ?? process.env),
+      GIT_TERMINAL_PROMPT: "0",
+      GCM_INTERACTIVE: "never",
+      GH_PROMPT_DISABLED: "1",
+      NO_COLOR: "1",
+    },
+  });
+}
+
+/**
+ * Repository settings that can make Git run a command or send credentials
+ * somewhere else. `git config --get-regexp` matches lower-cased section and
+ * key names, so the pattern is lower case; subsection names keep their case.
+ */
+const unsafeConfigPattern =
+  "^(filter|diff|merge)\\.|^core\\.(sshcommand|pager|editor|askpass|fsmonitor|hookspath)|^credential\\.|^protocol\\.|^include(if)?\\.";
+
+/**
+ * Of the keys the pattern lists, the ones that really name a program or
+ * redirect configuration. Plain diff and merge preferences such as
+ * `diff.renames` or `merge.conflictStyle` cannot run anything.
+ */
+function unsafeConfigKey(key: string) {
+  if (/^(?:filter|credential|protocol|include|includeif)\./.test(key))
+    return true;
+  if (/^core\./.test(key)) return true;
+  if (key === "diff.external") return true;
+  if (/^diff\..+\.(?:command|textconv)$/.test(key)) return true;
+  return /^merge\..+\.driver$/.test(key);
+}
+
+/**
+ * Refuses a repository whose own configuration (`.git/config`, and the
+ * worktree configuration when enabled) defines filters, diff or merge
+ * drivers, a pager, editor, password prompt, SSH command, file monitor or
+ * hooks path, credential helpers, protocol rules or includes. BELL's own
+ * clones never have them, so finding one means the repository was changed
+ * by hand or by an agent; nothing more runs in it.
+ */
+export async function assertGitConfigSafe(directory: string) {
+  const { stdout, code } = await git(
+    directory,
+    ["config", "--local", "--null", "--get-regexp", unsafeConfigPattern],
+    { allowedCodes: [0, 1] },
+  );
+  if (code !== 0) return;
+  const keys = [
+    ...new Set(
+      stdout
+        .split("\0")
+        .map((entry) => entry.split("\n", 1)[0])
+        .filter((key) => key && unsafeConfigKey(key)),
+    ),
+  ];
+  if (!keys.length) return;
+  throw new AppError(
+    (m) => m.security.gitConfigUnsafe({ keys: keys.slice(0, 5) }),
+    409,
+    { code: "git_config_unsafe", params: { keys: keys.slice(0, 5).join(", ") } },
   );
 }

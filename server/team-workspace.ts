@@ -1,12 +1,57 @@
 import { randomUUID } from "node:crypto";
-import { rm } from "node:fs/promises";
+import { lstat, readFile, realpath, rm } from "node:fs/promises";
 import path from "node:path";
 import { readDiff } from "./git.js";
-import { git } from "./process.js";
+import { assertGitConfigSafe, git } from "./process.js";
 import { AppError, type Run } from "./types.js";
 import { cancelled } from "./i18n/index.js";
 import { scopeContains } from "./team.js";
 import type { TeamTask } from "../shared/team.js";
+
+/**
+ * Checks that a teammate's checkout is still a worktree of the run's
+ * repository before any Git command runs in it: its `.git` must be a plain
+ * file holding exactly `gitdir: <common>/worktrees/<name>`, and Git's own
+ * record of that worktree must point back at it. An agent that rewrote the
+ * pointer could otherwise make BELL run Git against another repository.
+ */
+export async function assertTeammateWorktree(run: Run, worktreePath: string) {
+  const forged = () => new AppError((m) => m.security.worktreeForged, 409);
+  const common = path.resolve(
+    run.worktreePath,
+    (
+      await git(run.worktreePath, ["rev-parse", "--git-common-dir"])
+    ).stdout.trim(),
+  );
+  const pointerPath = path.join(worktreePath, ".git");
+  const metadata = await lstat(pointerPath).catch(() => undefined);
+  if (!metadata?.isFile()) throw forged();
+  const pointer = /^gitdir: ([^\n]+)\n?$/.exec(
+    await readFile(pointerPath, "utf8"),
+  )?.[1];
+  if (!pointer) throw forged();
+  // Git writes a relative pointer when worktree.useRelativePaths is set.
+  const target = path.resolve(worktreePath, pointer);
+  const name = path.basename(target);
+  const canonical = (value: string) => realpath(value).catch(() => undefined);
+  const [parent, worktrees] = await Promise.all([
+    canonical(path.dirname(target)),
+    canonical(path.join(common, "worktrees")),
+  ]);
+  if (!name || name === "." || name === ".." || !parent || parent !== worktrees)
+    throw forged();
+  // Git's own record of the worktree points back at this checkout.
+  const back = await readFile(path.join(target, "gitdir"), "utf8").catch(
+    () => "",
+  );
+  const [expected, actual] = await Promise.all([
+    canonical(pointerPath),
+    back.trim()
+      ? canonical(path.resolve(target, back.trim()))
+      : Promise.resolve(undefined),
+  ]);
+  if (!expected || expected !== actual) throw forged();
+}
 
 /** A temporary Git object captures integrated predecessors without advancing the review branch. */
 export async function createTeamSnapshot(
@@ -15,6 +60,7 @@ export async function createTeamSnapshot(
   signal?: AbortSignal,
 ) {
   if (signal?.aborted) throw new AppError(cancelled(), 409);
+  await assertGitConfigSafe(run.worktreePath);
   const files = await readDiff(run);
   if (signal?.aborted) throw new AppError(cancelled(), 409);
   if (!files.length) return run.baseSha;
@@ -98,6 +144,8 @@ export async function integrateTeamTask(
   if (signal?.aborted) throw new AppError(cancelled(), 409);
   if (!task.worktreePath || !task.baseSha)
     throw new AppError((m) => m.run.integration.noWorktree, 422);
+  await assertGitConfigSafe(run.worktreePath);
+  await assertTeammateWorktree(run, task.worktreePath);
   const head = (
     await git(task.worktreePath, ["rev-parse", "HEAD"], { signal })
   ).stdout.trim();

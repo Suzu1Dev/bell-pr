@@ -6,11 +6,15 @@
  * builds on the commit GitHub has.
  */
 import { randomUUID } from "node:crypto";
-import { command, git } from "./process.js";
-import { parseGitHubSource } from "./git.js";
+import { assertGitConfigSafe, command, git, gitNetwork } from "./process.js";
+import {
+  assertGitHubRepository,
+  assertRefName,
+  parseGitHubSource,
+} from "./git.js";
 import { prNumberOf } from "./pr-feedback.js";
 import { AppError, type Run } from "./types.js";
-import { fetchBranchCommit, networkConfig } from "./repositories.js";
+import { fetchBranchCommit } from "./repositories.js";
 import { sm } from "./i18n/index.js";
 import type { WorkbenchContext } from "./workbench.js";
 
@@ -28,17 +32,27 @@ export async function worktreeDirty(run: Run) {
   ).stdout.trim();
 }
 
+/**
+ * The PR's branch and the repository it was pushed to, checked before
+ * either reaches a URL or refspec: both come from the saved run.
+ */
+function pushTarget(run: Run) {
+  const branch = run.publishedBranch ?? run.branch;
+  assertGitHubRepository(run.headRepository ?? "");
+  assertRefName(branch);
+  return { branch, url: `https://github.com/${run.headRepository}.git` };
+}
+
 /** The commit GitHub's PR branch points at now; empty when the branch is gone. */
 export async function remoteBranchHead(run: Run) {
-  const branch = run.publishedBranch ?? run.branch;
+  const { branch, url } = pushTarget(run);
   const output = (
-    await git(
+    await gitNetwork(
       run.worktreePath,
       [
-        ...networkConfig,
         "ls-remote",
         "--",
-        `https://github.com/${run.headRepository}.git`,
+        url,
         `refs/heads/${branch}`,
       ],
       { timeoutMs: 60_000 },
@@ -107,15 +121,14 @@ export function assertRemoteHead(
 export async function adoptRemoteCommits(ctx: WorkbenchContext, run: Run) {
   const remoteHead = await remoteBranchHead(run);
   if (!remoteHead || remoteHead === run.publishCommit) return false;
-  const branch = run.publishedBranch ?? run.branch;
-  await git(
+  const { branch, url } = pushTarget(run);
+  await gitNetwork(
     run.worktreePath,
     [
-      ...networkConfig,
       "fetch",
       "--no-tags",
       "--no-recurse-submodules",
-      `https://github.com/${run.headRepository}.git`,
+      url,
       `refs/heads/${branch}`,
     ],
     { timeoutMs: 120_000 },
@@ -153,6 +166,7 @@ export async function adoptRemoteCommits(ctx: WorkbenchContext, run: Run) {
     ).stdout.trim(),
   );
   // The checkout is clean (callers check), so moving it loses nothing.
+  await assertGitConfigSafe(run.worktreePath);
   await git(run.worktreePath, ["reset", "-q", "--hard", fetched]);
   (run.followUps ??= []).push({
     id: newId().slice(0, 8),
@@ -183,6 +197,9 @@ export async function adoptRemoteCommits(ctx: WorkbenchContext, run: Run) {
  * the checkout as uncommitted changes, so they are reviewed like any edit.
  */
 export async function restoreAgentHead(run: Run, commit: string) {
+  assertRefName(run.branch);
+  // A writable agent just ran here; its Git settings are checked first.
+  await assertGitConfigSafe(run.worktreePath);
   const ref = (
     await git(run.worktreePath, ["symbolic-ref", "-q", "HEAD"], {
       allowedCodes: [0, 1],

@@ -6,26 +6,14 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, realpath } from "node:fs/promises";
 import path from "node:path";
-import { command, git } from "./process.js";
-import { parseGitHubSource } from "./git.js";
+import { command, git, gitNetwork } from "./process.js";
+import { assertRefName, parseGitHubSource } from "./git.js";
 import { AppError, type Repository, type Run } from "./types.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
 const json = <T>(value: string) => JSON.parse(value) as T;
-/** Git network options: credentials come from gh, and local file and ext transports are refused. */
-export const networkConfig = [
-  "-c",
-  "credential.helper=",
-  "-c",
-  "credential.helper=!gh auth git-credential",
-  "-c",
-  "protocol.file.allow=never",
-  "-c",
-  "protocol.ext.allow=never",
-];
-
 export async function importRepository(
   ctx: WorkbenchContext,
   source: string,
@@ -51,10 +39,9 @@ export async function importRepository(
         root,
         `${github.owner}-${github.name}-${newId().slice(0, 8)}`,
       );
-      await git(
+      await gitNetwork(
         root,
         [
-          ...networkConfig,
           "clone",
           "--no-recurse-submodules",
           "--",
@@ -173,6 +160,7 @@ export async function fetchBranchCommit(
   branch: string,
   signal?: AbortSignal,
 ) {
+  assertRefName(branch);
   if (!repo.url)
     return (
       await git(
@@ -181,10 +169,11 @@ export async function fetchBranchCommit(
         { signal },
       )
     ).stdout.trim();
-  await git(
+  if (!parseGitHubSource(repo.url))
+    throw new AppError((m) => m.security.invalidRemote, 409);
+  await gitNetwork(
     repo.path,
     [
-      ...networkConfig,
       "fetch",
       "--no-tags",
       "--no-recurse-submodules",
@@ -250,6 +239,7 @@ export async function createRunWorktree(
   repo: Repository,
   signal: AbortSignal,
 ) {
+  assertRefName(run.branch);
   run.baseSha = await fetchBranchCommit(repo, run.baseBranch, signal);
   await mkdir(path.dirname(run.worktreePath), {
     recursive: true,

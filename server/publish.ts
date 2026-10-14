@@ -5,8 +5,20 @@
  * branch. Nothing reaches GitHub without that approval.
  */
 import path from "node:path";
-import { command, git, redact } from "./process.js";
-import { parseGitHubSource, readDiff, reviewFingerprint } from "./git.js";
+import {
+  assertGitConfigSafe,
+  command,
+  git,
+  gitNetwork,
+  redact,
+} from "./process.js";
+import {
+  assertGitHubRepository,
+  assertRefName,
+  parseGitHubSource,
+  readDiff,
+  reviewFingerprint,
+} from "./git.js";
 import { validBranchName } from "../shared/drafts.js";
 import {
   draftPreflight,
@@ -14,7 +26,6 @@ import {
 } from "../shared/draft-checks.js";
 import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
-import { networkConfig } from "./repositories.js";
 import { assertRemoteHead, prHasCommit, remoteBranchHead } from "./pr-branch.js";
 import { assertConflictsResolved } from "./sync-runs.js";
 import type { WorkbenchContext } from "./workbench.js";
@@ -186,6 +197,8 @@ export async function publish(
       throw new AppError((m) => m.run.publish.approveFirst, 409);
     if (!repo.url || !parseGitHubSource(repo.url))
       throw new AppError((m) => m.run.publish.noGithubOrigin, 422);
+    // Nothing is committed or pushed from a checkout whose Git settings could run commands.
+    await assertGitConfigSafe(run.worktreePath);
     const files = await ctx.diff(id);
     if (
       run.status !== "approved" ||
@@ -221,6 +234,7 @@ export async function publish(
           m.run.publish.branchLockedPublish({ branch: run.publishedBranch! }),
         409,
       );
+    assertRefName(headBranch);
     // Runs approved before these checks existed are held to them as well.
     const checks = draftPreflight(
       {
@@ -371,12 +385,12 @@ export async function publish(
           throw new AppError((m) => m.run.publish.notAFork, 409);
         headOwner = githubUser;
       }
+      assertGitHubRepository(headRepository);
       run.headRepository = headRepository;
       await ctx.store.save();
-      await git(
+      await gitNetwork(
         run.worktreePath,
         [
-          ...networkConfig,
           "push",
           "--",
           `https://github.com/${headRepository}.git`,
@@ -504,6 +518,9 @@ async function publishFollowUp(
   if (!run.prUrl || !run.headRepository)
     throw new AppError((m) => m.run.publish.roundNoPushTarget, 409);
   const branch = run.publishedBranch ?? run.branch;
+  assertGitHubRepository(run.headRepository);
+  assertRefName(branch);
+  await assertGitConfigSafe(run.worktreePath);
   const roundNumber = (run.followUps?.indexOf(round) ?? 0) + 1;
   const finish = (commit: string) => {
     round.status = "published";
@@ -611,10 +628,9 @@ async function publishFollowUp(
       ]);
     await git(run.worktreePath, ["read-tree", commit]);
     // A plain push: GitHub rejects it if the branch moved since the check above.
-    await git(
+    await gitNetwork(
       run.worktreePath,
       [
-        ...networkConfig,
         "push",
         "--",
         `https://github.com/${run.headRepository}.git`,

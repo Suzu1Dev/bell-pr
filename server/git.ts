@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
-import { git } from "./process.js";
+import { assertGitConfigSafe, git } from "./process.js";
 import { secretInPatch } from "./secrets.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
 import { sm, withLocale } from "./i18n/index.js";
@@ -46,13 +46,59 @@ export function parseGitHubIssueUrl(
   };
 }
 
+/**
+ * Path segments that would reach an object's prototype when a path is used
+ * as a key, as notes, explanations, reviews and conversations are stored.
+ */
+const prototypeSegments = new Set(["__proto__", "constructor", "prototype"]);
+
 export function safeRelativePath(filePath: string) {
   return (
     !!filePath &&
     !path.isAbsolute(filePath) &&
-    !filePath.split("/").some((part) => part === ".." || part === ".git") &&
+    !filePath
+      .split("/")
+      .some(
+        (part) =>
+          part === ".." || part === ".git" || prototypeSegments.has(part),
+      ) &&
     !/[\x00-\x1f\x7f\\]/.test(filePath)
   );
+}
+
+/**
+ * A branch name that is safe in a refspec and a ref path, following
+ * `git check-ref-format`: no leading "-" or "+" (an option or a forced
+ * push), no ":" (a second refspec side), no "..", "@{", glob or control
+ * characters, and no "/." or ".lock" components.
+ */
+export function safeRefName(name: string) {
+  return (
+    !!name &&
+    name.length <= 255 &&
+    !/^[-+/.]/.test(name) &&
+    !/[/.]$/.test(name) &&
+    name !== "@" &&
+    !name.includes("..") &&
+    !name.includes("//") &&
+    !name.includes("@{") &&
+    !name.includes("/.") &&
+    !/\.lock(?:\/|$)/.test(name) &&
+    !/[ ~^:?*[\\]/.test(name) &&
+    ![...name].some((char) => char.charCodeAt(0) < 0x20 || char === "\u007f")
+  );
+}
+
+/** Throws before an unsafe branch name reaches a URL, ref or refspec. */
+export function assertRefName(name: string) {
+  if (!safeRefName(name))
+    throw new AppError((m) => m.security.invalidRemote, 409);
+}
+
+/** Throws unless `fullName` is a plain GitHub owner/name pair. */
+export function assertGitHubRepository(fullName: string) {
+  if (parseGitHubSource(`https://github.com/${fullName}`)?.fullName !== fullName)
+    throw new AppError((m) => m.security.invalidRemote, 409);
 }
 
 export function sensitivePath(filePath: string): boolean {
@@ -136,6 +182,8 @@ export async function readDiff(
   run: Pick<Run, "worktreePath" | "baseSha" | "locale">,
 ): Promise<DiffFile[]> {
   if (!run.baseSha || !run.worktreePath) return [];
+  // Diffing runs the checkout's filters; refuse a configuration that sets any.
+  await assertGitConfigSafe(run.worktreePath);
   // A held-back file's reason is part of its fingerprint and of the draft
   // fingerprint, so it is worded in the run's locale: reading the diff in
   // another language must not make a reviewed draft stale. A run saved

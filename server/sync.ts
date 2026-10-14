@@ -1,7 +1,7 @@
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { lstat, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { safeRelativePath } from "./git.js";
-import { git } from "./process.js";
+import { assertGitConfigSafe, git } from "./process.js";
 import { AppError } from "./types.js";
 
 /** Internal commits that never leave the machine carry BELL's own identity. */
@@ -16,10 +16,17 @@ const internalIdentity = {
  * Commits the checkout as it is, tracked edits and new files that are not
  * ignored, on top of HEAD. A private index is used, so the checkout's own
  * index and files are untouched. The commit is a local backup, never pushed.
+ *
+ * The checkout's .gitattributes may name filters and merge drivers, but
+ * only Git configuration defines them, so the repository's configuration
+ * is checked first (assertGitConfigSafe) and every Git command here runs
+ * with BELL's hardened settings. The private index and its lock are removed
+ * in every case.
  */
 export async function snapshotCheckout(cwd: string, indexPath: string) {
   const env = { ...process.env, GIT_INDEX_FILE: indexPath };
   try {
+    await assertGitConfigSafe(cwd);
     await git(cwd, ["read-tree", "HEAD"], { env });
     await git(cwd, ["add", "-A", "--", "."], { env });
     const tree = (await git(cwd, ["write-tree"], { env })).stdout.trim();
@@ -31,6 +38,7 @@ export async function snapshotCheckout(cwd: string, indexPath: string) {
     ).stdout.trim();
   } finally {
     await rm(indexPath, { force: true });
+    await rm(`${indexPath}.lock`, { force: true });
   }
 }
 
@@ -44,6 +52,7 @@ export async function mergeCommits(
   theirs: string,
   base?: string,
 ) {
+  await assertGitConfigSafe(cwd);
   const result = await git(
     cwd,
     [
@@ -138,8 +147,26 @@ export async function conflictsWithoutMarkers(
  * keeps a contribution until it is published. HEAD is not moved.
  */
 export async function checkoutTreeOnto(cwd: string, tree: string, base: string) {
+  await assertGitConfigSafe(cwd);
   await git(cwd, ["read-tree", "-u", "--reset", tree]);
   await git(cwd, ["read-tree", base]);
+}
+
+/**
+ * The full path of a conflicted file when it is a regular file inside the
+ * checkout. A symlink, or a path that resolves outside the checkout, is
+ * never read or rewritten: the target project controls both.
+ */
+async function checkoutFile(cwd: string, file: string) {
+  if (!safeRelativePath(file)) return undefined;
+  const full = path.join(cwd, file);
+  try {
+    if (!(await lstat(full)).isFile()) return undefined;
+    const [root, resolved] = await Promise.all([realpath(cwd), realpath(full)]);
+    return resolved.startsWith(root + path.sep) ? full : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** The conflicted files that still hold conflict markers. */
@@ -148,7 +175,11 @@ export async function filesWithConflictMarkers(cwd: string, files: string[]) {
   const widths = await markerWidths(cwd, safe);
   const open: string[] = [];
   for (const file of safe) {
-    const content = await readFile(path.join(cwd, file), "utf8").catch(() => "");
+    // A deleted file has no markers; a symlink or special file is never
+    // followed (it could point outside the checkout or at a device).
+    const full = await checkoutFile(cwd, file);
+    if (!full) continue;
+    const content = await readFile(full, "utf8").catch(() => "");
     if (markerLine(widths.get(file) ?? 7).test(content)) open.push(file);
   }
   return open;
@@ -167,7 +198,8 @@ export async function labelConflictMarkers(
   const safe = files.filter((file) => safeRelativePath(file));
   const widths = await markerWidths(cwd, safe);
   for (const file of safe) {
-    const full = path.join(cwd, file);
+    const full = await checkoutFile(cwd, file);
+    if (!full) continue;
     const content = await readFile(full, "latin1").catch(() => undefined);
     if (content === undefined) continue;
     const width = widths.get(file) ?? 7;

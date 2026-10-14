@@ -1,6 +1,17 @@
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { agentEnvironment } from "./process.js";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import {
+  agentEnvironment,
+  assertGitConfigSafe,
+  git,
+  gitNetwork,
+  gitNetworkConfig,
+} from "./process.js";
+import { AppError } from "./types.js";
+import { withLocale } from "./i18n/index.js";
 
 /** Sets environment variables for one test and restores them afterwards. */
 function withEnv(t: TestContext, values: Record<string, string | undefined>) {
@@ -88,4 +99,122 @@ test("empty variables are left out", (t) => {
   withEnv(t, { ANTHROPIC_API_KEY: "", OPENAI_API_KEY: "" });
   assert.equal("ANTHROPIC_API_KEY" in agentEnvironment("claude"), false);
   assert.equal("OPENAI_API_KEY" in agentEnvironment("codex"), false);
+});
+
+/** A git stand-in first on PATH that records its arguments and environment. */
+async function recordingGit(t: TestContext) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-process-git-"));
+  const record = path.join(directory, "calls.jsonl");
+  await writeFile(
+    path.join(directory, "git"),
+    `#!${process.execPath}
+require('node:fs').appendFileSync(${JSON.stringify(record)}, JSON.stringify({
+  args: process.argv.slice(2),
+  prompt: process.env.GIT_TERMINAL_PROMPT,
+}) + '\\n');
+`,
+    { mode: 0o755 },
+  );
+  withEnv(t, { PATH: `${directory}${path.delimiter}${process.env.PATH}` });
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  return async () =>
+    (await readFile(record, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { args: string[]; prompt?: string });
+}
+
+/** The value of each `-c key=value` pair in an argument list. */
+const configOf = (args: string[]) =>
+  args.flatMap((arg, index) => (args[index - 1] === "-c" ? [arg] : []));
+
+test("every Git command overrides hooks, monitors, pagers, editors, prompts and SSH from the repository", async (t) => {
+  const calls = await recordingGit(t);
+  await git(os.tmpdir(), ["status"]);
+  const [call] = await calls();
+  assert.deepEqual(configOf(call.args), [
+    "core.hooksPath=/dev/null",
+    "core.fsmonitor=false",
+    "core.quotePath=false",
+    "core.attributesFile=/dev/null",
+    "core.sshCommand=ssh",
+    "core.pager=cat",
+    "core.editor=true",
+    "core.askPass=",
+  ]);
+  assert.equal(call.args.at(-1), "status");
+});
+
+test("network Git commands use gh credentials, HTTPS or SSH only, and never prompt", async (t) => {
+  const calls = await recordingGit(t);
+  await gitNetwork(os.tmpdir(), ["ls-remote", "--", "https://github.com/o/r.git"], {
+    // A caller's own environment cannot turn prompting back on.
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "1" },
+  });
+  const [call] = await calls();
+  const config = configOf(call.args);
+  for (const value of configOf(gitNetworkConfig)) assert.ok(config.includes(value), value);
+  assert.ok(config.includes("protocol.allow=never"));
+  assert.ok(config.includes("protocol.ext.allow=never"));
+  assert.ok(config.includes("protocol.file.allow=never"));
+  assert.ok(config.includes("credential.helper=!gh auth git-credential"));
+  // The empty helper comes first, so no configured helper is asked.
+  assert.ok(config.indexOf("credential.helper=") < config.indexOf("credential.helper=!gh auth git-credential"));
+  assert.ok(config.includes("core.hooksPath=/dev/null"));
+  assert.equal(call.prompt, "0");
+});
+
+async function repository(t: TestContext) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-process-repo-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await git(directory, ["init", "-q", "-b", "main"]);
+  return directory;
+}
+
+test("a repository whose own Git configuration could run commands is refused", async (t) => {
+  const directory = await repository(t);
+  // Ordinary settings, including harmless diff and merge preferences, pass.
+  for (const [key, value] of [
+    ["user.name", "Someone"],
+    ["diff.renames", "true"],
+    ["diff.algorithm", "histogram"],
+    ["merge.conflictStyle", "diff3"],
+    ["diff.custom.xfuncname", "^def"],
+    ["merge.custom.name", "A custom driver"],
+  ])
+    await git(directory, ["config", key, value]);
+  await assertGitConfigSafe(directory);
+
+  for (const [key, value] of [
+    ["filter.lfs.clean", "touch pwned"],
+    ["filter.x.process", "touch pwned"],
+    ["diff.external", "touch pwned"],
+    ["diff.x.textconv", "touch pwned"],
+    ["diff.x.command", "touch pwned"],
+    ["merge.x.driver", "touch pwned"],
+    ["core.sshCommand", "touch pwned"],
+    ["core.pager", "touch pwned"],
+    ["core.editor", "touch pwned"],
+    ["core.askPass", "touch pwned"],
+    ["core.fsmonitor", "touch pwned"],
+    ["core.hooksPath", "/tmp"],
+    ["credential.helper", "store"],
+    ["credential.https://github.com.username", "x"],
+    ["protocol.ext.allow", "always"],
+    ["include.path", "/tmp/other.config"],
+    ["includeIf.gitdir:/tmp/.path", "/tmp/other.config"],
+  ]) {
+    await git(directory, ["config", key, value]);
+    await assert.rejects(
+      withLocale("en", () => assertGitConfigSafe(directory)),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 409 &&
+        error.code === "git_config_unsafe" &&
+        error.message.includes(key.toLowerCase().split(".")[0]),
+      key,
+    );
+    await git(directory, ["config", "--unset-all", key]);
+  }
+  await assertGitConfigSafe(directory);
 });
