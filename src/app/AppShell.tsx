@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type SetStateAction,
 } from "react";
 import { Terminal, X } from "lucide-react";
 // Stylesheets enter the bundle in import order and later rules win ties.
@@ -16,10 +17,17 @@ import "../efficiency/efficiency.css";
 import "../models/models.css";
 import "../mission/mission.css";
 import "../team/team.css";
+import { ApiError } from "../api";
 import { getDemo } from "../demo";
 import { useLocale, useT } from "../i18n";
 import type { Run, DiffFile } from "../types";
 import { CommandPalette } from "../navigation/CommandPalette";
+import {
+  currentRoute,
+  navigate as navigateTo,
+  useHashRoute,
+  type Route,
+} from "../navigation/route";
 import { useProjectInsights } from "../mission/useProjectInsights";
 import { HelpModal } from "../modals/HelpModal";
 import { NewTaskModal } from "../modals/NewTaskModal";
@@ -78,13 +86,71 @@ export default function App() {
   );
 }
 
+// The address (src/navigation/route.ts) is the source of the page, the open
+// run, its tab and its file. An empty hash keeps the start view: the sample
+// workspace, which #/home, #/demo and #/about show as well for now.
+
+/** The page a route shows; a repository that is not listed shows the list. */
+function pageFor(route: Route | null, knownRepo: boolean): Page {
+  switch (route?.name) {
+    case "repos":
+      return "repos";
+    case "repo":
+      return knownRepo ? "explore" : "repos";
+    case "discover":
+      return "discovery";
+    case "team":
+      return "team";
+    case "learning":
+      return "learning";
+    case "settings":
+      return "settings";
+    default:
+      return "workspace";
+  }
+}
+
+/** The route of each page that takes no parameters. */
+const pageRoutes = {
+  repos: "repos",
+  discovery: "discover",
+  team: "team",
+  learning: "learning",
+  settings: "settings",
+} as const satisfies Record<
+  Exclude<Page, "workspace" | "explore">,
+  Route["name"]
+>;
+
+/** The run the address shows in the workspace; undefined on other pages. */
+function addressedRunId(route: Route | null, demoRunId: string) {
+  if (route?.name === "run") return route.runId;
+  if (!route || ["home", "demo", "about"].includes(route.name)) return demoRunId;
+  return undefined;
+}
+
+/**
+ * Whether a run id from the address can name a run: ids are plain names
+ * (UUIDs, `demo-run`), so one that a URL path would have to escape, or a
+ * dot segment, is never sent to the API.
+ */
+function isRunId(id: string) {
+  return id === encodeURIComponent(id) && !/^\.+$/.test(id);
+}
+
+/** What the workspace shows of a run: its tab and, when chosen, its file. */
+interface WorkspaceView {
+  runId: string;
+  tab: Tab;
+  file?: string;
+}
+
 function AppShell() {
   const t = useT("app");
   const [locale] = useLocale();
   // The sample project in the UI language; its ids are the same in every locale.
   const sample = getDemo(locale);
-  const [page, setPage] = useState<Page>("workspace");
-  const [tab, setTab] = useState<Tab>("overview");
+  const route = useHashRoute();
   const {
     repos,
     setRepos,
@@ -95,16 +161,89 @@ function AppShell() {
     apiError,
     setApiError,
   } = useAppData();
-  const [run, setRun] = useState<Run>(() => loadDemo(locale));
+  const [run, setRunState] = useState<Run>(() => loadDemo(locale));
+  // The run the latest action opened, ahead of the next render; the setters
+  // below write it into the address.
+  const openRunId = useRef(run.id);
+  const setRun = useCallback((value: SetStateAction<Run>) => {
+    if (typeof value !== "function") openRunId.current = value.id;
+    setRunState(value);
+  }, []);
   const [files, setFiles] = useState<DiffFile[]>(() => sample.files);
-  const [selectedPath, setSelectedPath] = useState(
-    () => sample.files[0]?.path || "",
+  // The workspace's tab and file while another page is shown, and the
+  // repository the overview page shows next.
+  const workspaceMemory = useRef<WorkspaceView>({
+    runId: run.id,
+    tab: "overview",
+  });
+  const exploreMemory = useRef(sample.repo.id);
+  // Above 0 while a run the address names loads; its own tab and file
+  // changes then stay out of the address.
+  const followingAddress = useRef(0);
+  /** The workspace's tab and file now, and whether the address shows it. */
+  const workspaceView = useCallback((): WorkspaceView & {
+    shown: boolean;
+  } => {
+    const runId = openRunId.current;
+    const now = currentRoute();
+    if (now?.name === "run")
+      return {
+        shown: true,
+        runId,
+        tab: now.tab ?? "overview",
+        // A file of the run shown before belongs to that run only.
+        ...(now.file && now.runId === runId ? { file: now.file } : {}),
+      };
+    if (pageFor(now, false) === "workspace")
+      return { shown: true, runId, tab: "overview" };
+    const memory = workspaceMemory.current;
+    return {
+      shown: false,
+      runId,
+      tab: memory.tab,
+      ...(memory.file && memory.runId === runId ? { file: memory.file } : {}),
+    };
+  }, []);
+  const showWorkspace = useCallback((view: WorkspaceView) => {
+    workspaceMemory.current = view;
+    navigateTo({ name: "run", ...view });
+  }, []);
+  const setTab = useCallback(
+    (value: SetStateAction<Tab>) => {
+      if (followingAddress.current) return;
+      const { shown, ...view } = workspaceView();
+      const tab = typeof value === "function" ? value(view.tab) : value;
+      if (shown) showWorkspace({ ...view, tab });
+      else workspaceMemory.current = { ...view, tab };
+    },
+    [workspaceView, showWorkspace],
   );
+  const setSelectedPath = useCallback(
+    (value: SetStateAction<string>) => {
+      if (followingAddress.current) return;
+      const { shown, file: previous, ...view } = workspaceView();
+      const file =
+        (typeof value === "function" ? value(previous ?? "") : value) ||
+        undefined;
+      const next = file ? { ...view, file } : view;
+      if (shown) showWorkspace(next);
+      else workspaceMemory.current = next;
+    },
+    [workspaceView, showWorkspace],
+  );
+  const setExploreRepoId = useCallback((value: SetStateAction<string>) => {
+    const now = currentRoute();
+    const previous =
+      now?.name === "repo" ? now.repoId : exploreMemory.current;
+    const repoId = typeof value === "function" ? value(previous) : value;
+    exploreMemory.current = repoId;
+    if (now?.name === "repo") navigateTo({ name: "repo", repoId });
+  }, []);
   const [toast, setToast] = useState<Toast | null>(null);
   const [commandOpen, setCommandOpen] = useState(false);
   const mainContent = useRef<HTMLElement>(null);
   const [modal, setModal] = useState<ModalName>(null);
-  const [exploreRepoId, setExploreRepoId] = useState(sample.repo.id);
+  const exploreRepoId = route?.name === "repo" ? route.repoId : undefined;
   const settingsRequest = useRef(0);
   const [showFiles, setShowFiles] = useState(true);
   const [showExplanation, setShowExplanation] = useState(true);
@@ -146,9 +285,17 @@ function AppShell() {
     exploreRepoId === sample.repo.id
       ? sample.repo
       : repos.find((repo) => repo.id === exploreRepoId);
+  const page = pageFor(route, Boolean(exploreRepo));
   const insightRepo = page === "explore" ? exploreRepo : currentRepo;
   const intelligence = useProjectInsights(insightRepo?.id);
+  const tab: Tab = (route?.name === "run" && route.tab) || "overview";
   const reading = page === "workspace" && tab === "changes";
+  // ?file= selects a file of the run when it has one, else the first file.
+  const routeFile = route?.name === "run" ? route.file : undefined;
+  const selectedPath =
+    routeFile && files.some((f) => f.path === routeFile)
+      ? routeFile
+      : files[0]?.path || "";
   const file = files.find((f) => f.path === selectedPath) || files[0];
   const additions = files.reduce((sum, f) => sum + f.additions, 0);
   const deletions = files.reduce((sum, f) => sum + f.deletions, 0);
@@ -280,7 +427,15 @@ function AppShell() {
   }
   function navigate(value: Page) {
     navigationIntent.current++;
-    setPage(value);
+    if (value === "workspace") {
+      // Opening a run the address names already shows the workspace.
+      if (!followingAddress.current) {
+        const { shown: _shown, ...view } = workspaceView();
+        showWorkspace(view);
+      }
+    } else if (value === "explore")
+      navigateTo({ name: "repo", repoId: exploreMemory.current });
+    else navigateTo({ name: pageRoutes[value] });
     setSidebarOpen(false);
   }
   const setup = useTaskSetup({
@@ -333,6 +488,66 @@ function AppShell() {
     setup,
   });
   const { chooseRun, importRepo, startTask, publish } = actions;
+
+  // The workspace and the overview page come back as they were left.
+  useEffect(() => {
+    if (route?.name === "run")
+      workspaceMemory.current = {
+        runId: route.runId,
+        tab: route.tab ?? "overview",
+        ...(route.file ? { file: route.file } : {}),
+      };
+    if (route?.name === "repo") exploreMemory.current = route.repoId;
+  }, [route]);
+
+  // A link, Back, Forward or a reload names a run: open it. An unknown run
+  // opens the sample instead; a run that cannot open now (the reader keeps
+  // an unsaved draft, or the server fails) leaves the address on the run
+  // shown.
+  const addressRunId = addressedRunId(route, sample.run.id);
+  const shownRunId = useRef(run.id);
+  const loadingRunId = useRef<string | undefined>(undefined);
+  const addressLoads = useRef(0);
+  const openRun = useRef(chooseRun);
+  openRun.current = chooseRun;
+  useEffect(() => {
+    const previous = shownRunId.current;
+    shownRunId.current = run.id;
+    if (!addressRunId || addressRunId === run.id) return;
+    /** Puts `runId` in the address in place of the run it names. */
+    const showInstead = (runId: string) => {
+      const { shown: _shown, ...view } = workspaceView();
+      navigateTo({ ...view, name: "run", runId }, { replace: true });
+    };
+    if (previous !== run.id && addressRunId === previous) {
+      // An action opened another run without naming it in the address.
+      showInstead(run.id);
+      return;
+    }
+    if (!isRunId(addressRunId)) {
+      showInstead(sample.run.id);
+      return;
+    }
+    if (loadingRunId.current === addressRunId) return;
+    const load = ++addressLoads.current;
+    loadingRunId.current = addressRunId;
+    followingAddress.current++;
+    let missing = false;
+    openRun
+      .current(addressRunId, false)
+      .catch((error: unknown) => {
+        missing = error instanceof ApiError && error.status === 404;
+        if (!missing) notify((error as Error).message, "error");
+        return false;
+      })
+      .then((opened) => {
+        followingAddress.current--;
+        if (load === addressLoads.current) loadingRunId.current = undefined;
+        const asked = addressedRunId(currentRoute(), sample.run.id);
+        if (opened || asked !== addressRunId) return;
+        showInstead(missing ? sample.run.id : openRunId.current);
+      });
+  }, [addressRunId, run.id, sample.run.id, notify, workspaceView]);
   const rounds = useRunRounds({
     run,
     setRun,

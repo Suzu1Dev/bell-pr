@@ -1,0 +1,8 @@
+[
+  {
+    "rule": "scrollable-region-focusable",
+    "selector": ".team-messages",
+    "view": "workspace-activity",
+    "reason": "At 390 px the team message list in TeamBoard (src/team/TeamBoard.tsx) scrolls, but keyboard users cannot focus it to scroll; give it tabIndex={0} with a label, or let it grow instead of scrolling."
+  }
+]
