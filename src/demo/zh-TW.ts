@@ -128,11 +128,11 @@ const zhTW: DemoContent = buildDemoContent({
     },
     reports: {
       implementer:
-        "示範 · Lead 整合摘要（預寫內容）\n\n三個任務已整合：`src/utils/retry.ts` 的 `withRetry` 改為指數退避搭配 full jitter，並新增 `baseDelay`、`maxDelay` 與 `shouldRetry` 選項；`src/client.ts` 只對 GET 請求啟用重試；`tests/retry.test.ts` 補上兩個案例；README.md 記錄新的設定方式。\n\n靜態檢查：各任務回報的變更與整合後的 diff 一致。本示範未執行專案測試。\n\n未完成事項：`retry.delay` 更名為 `retry.baseDelay` 屬於不相容變更，仍需維護者確認版本號與遷移說明。\n\n## Suggested review order:\n\n先讀型別定義，知道新選項有哪些；再讀實作與呼叫端，看它們怎麼使用；測試放最後，用來驗證前面讀到的理解。\n\n1. `src/types.ts` — 新增的 `baseDelay`、`maxDelay`、`shouldRetry` 在這裡定義，其他檔案都依賴它。\n2. `src/utils/retry.ts` — 指數退避與 jitter 的實作，是這次變更的核心。\n3. `src/client.ts` — 呼叫端，只對 GET 請求啟用重試。\n4. `tests/retry.test.ts` — 兩個案例對應上面讀到的行為。\n5. `README.md` — 最後看使用者會讀到的設定說明是否一致。",
+        "示範 · Lead 整合摘要（預寫內容）\n\n四個任務已整合：`src/utils/retry.ts` 的 `withRetry` 改為指數退避搭配 full jitter，並新增 `baseDelay`、`maxDelay` 與 `shouldRetry` 選項；`src/client.ts` 只對 GET 請求啟用重試；`tests/retry.test.ts` 補上兩個案例；README.md 記錄新的設定方式。\n\n靜態檢查：各任務回報的變更與整合後的 diff 一致。本示範未執行專案測試。\n\n未完成事項：`retry.delay` 更名為 `retry.baseDelay` 屬於不相容變更，仍需維護者確認版本號與遷移說明。\n\n## Suggested review order:\n\n先讀型別定義，知道新選項有哪些；再讀實作與呼叫端，看它們怎麼使用；測試放最後，用來驗證前面讀到的理解。\n\n1. `src/types.ts` — 新增的 `baseDelay`、`maxDelay`、`shouldRetry` 在這裡定義，其他檔案都依賴它。\n2. `src/utils/retry.ts` — 指數退避與 jitter 的實作，是這次變更的核心。\n3. `src/client.ts` — 呼叫端，只對 GET 請求啟用重試。\n4. `tests/retry.test.ts` — 兩個案例對應上面讀到的行為。\n5. `README.md` — 最後看使用者會讀到的設定說明是否一致。",
       reviewer:
-        "示範 · 獨立審查（預寫內容）\n\n**正確性**：`src/utils/retry.ts` 以 `Math.floor(Math.random() * ceiling)` 計算等待時間，`ceiling` 以 `maxDelay` 封頂，等待不會超過上限；但 `maxRetries` 為負數或非整數時會直接拋出第一次錯誤而沒有提示。\n\n**相容性**：`src/client.ts` 改讀 `retry.baseDelay`，仍傳 `retry.delay` 的舊呼叫端會被靜默忽略，建議在型別或執行期提醒。\n\n**可維護性**：重試與否集中在 `shouldRetry`，之後支援 `Retry-After` 時只需擴充一處。\n\n本審查為靜態閱讀 diff，未執行程式碼。",
+        "示範 · 獨立審查（預寫內容）\n\n**正確性**：`src/utils/retry.ts` 以 `Math.floor(Math.random() * ceiling)` 計算等待時間，`ceiling` 以 `maxDelay` 封頂，等待不會超過上限；但 `maxRetries` 從未驗證：負數會直接拋出第一次錯誤而不說明原因，`NaN` 則永遠到不了上限，呼叫會一直重試下去。\n\n**相容性**：`src/client.ts` 改讀 `retry.baseDelay`，仍傳 `retry.delay` 的舊呼叫端會被靜默忽略，建議在型別或執行期提醒。\n\n**可維護性**：重試與否集中在 `shouldRetry`，之後支援 `Retry-After` 時只需擴充一處。\n\n本審查為靜態閱讀 diff，未執行程式碼。",
       tester:
-        "示範 · 測試分析（預寫內容）\n\n`tests/retry.test.ts` 目前有兩個案例：暫時失敗後第二次成功、`shouldRetry` 回傳 false 時保留原始錯誤並只呼叫一次。\n\n缺少的案例：\n\n1. 達到 `maxRetries` 後仍失敗，應拋出最後一次的錯誤。\n2. 固定 `Math.random` 後驗證每一輪等待都不超過 `maxDelay`。\n3. `src/client.ts` 對 POST 不重試。\n\n回歸風險：`retry.delay` 改名後，舊設定會以預設 `baseDelay` 執行，現有測試無法察覺這種靜默變更。\n\n本分析未執行測試，以上皆為靜態閱讀。",
+        "示範 · 測試分析（預寫內容）\n\n`tests/retry.test.ts` 目前有兩個案例：暫時失敗後第二次成功、`shouldRetry` 回傳 false 時保留原始錯誤並只呼叫一次。\n\n缺少的案例：\n\n1. 達到 `maxRetries` 後仍失敗，應拋出最後一次的錯誤。\n2. 固定 `Math.random` 後驗證每一輪等待都不超過 `maxDelay`。\n3. `src/client.ts` 會重試 503，但遇到 404 時呼叫一次就失敗。\n\n回歸風險：`retry.delay` 改名後，舊設定會以預設 `baseDelay` 執行，現有測試無法察覺這種靜默變更。\n\n本分析未執行測試，以上皆為靜態閱讀。",
     },
   },
   insights: {
