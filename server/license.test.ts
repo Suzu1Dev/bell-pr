@@ -521,14 +521,18 @@ test("a running server picks up a license changed by another process", async (t)
   const stop = service.watch(() => {
     changes += 1;
   });
-  t.after(stop);
-  // `bell-pr license trial` in another process.
-  await offline(dataDir).service.startTrial();
-  const deadline = Date.now() + 15_000;
-  while (service.summary().plan !== "trial" && Date.now() < deadline)
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  assert.equal(service.summary().plan, "trial");
-  assert.ok(changes >= 1);
+  try {
+    // `bell-pr license trial` in another process.
+    await offline(dataDir).service.startTrial();
+    const deadline = Date.now() + 15_000;
+    while (service.summary().plan !== "trial" && Date.now() < deadline)
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(service.summary().plan, "trial");
+    assert.ok(changes >= 1);
+  } finally {
+    // Before the directory goes away.
+    stop();
+  }
 });
 
 test("the startup line names the plan and, on Free, why and how to try Pro", () => {
@@ -964,7 +968,20 @@ test("startServer on a fresh data directory is Free: POST /api/discovery answers
       print: (line) => lines.push(line),
     }),
   );
-  t.after(() => running.shutdown());
+  // Stopped in the test, before t.after removes its directory.
+  try {
+    await failClosedChecks(running, port, dataDir, lines);
+  } finally {
+    await running.shutdown();
+  }
+});
+
+async function failClosedChecks(
+  running: Awaited<ReturnType<typeof startServer>>,
+  port: number,
+  dataDir: string,
+  lines: string[],
+) {
   assert.ok(
     lines.includes("Plan: Free. Start the 14-day Pro trial in Settings or with `bell-pr license trial`."),
     lines.join("\n"),
@@ -1003,7 +1020,7 @@ test("startServer on a fresh data directory is Free: POST /api/discovery answers
   // Reading the results stays open.
   assert.equal((await get(`http://127.0.0.1:${port}/api/discovery`, { cookie })).status, 200);
   assert.equal(existsSync(path.join(dataDir, "license.json")), false);
-});
+}
 
 // ---------------------------------------------------------------------------
 // bell-pr license
