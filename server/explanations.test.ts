@@ -22,6 +22,7 @@ import type { TeamAgentRunner } from "./team.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
 import { git } from "./process.js";
+import { withLocale } from "./i18n/index.js";
 
 const diff = (name: string, patch = "+example"): DiffFile => ({
   path: name,
@@ -139,6 +140,24 @@ test("explanations retain bounded complete diffs, exclude blocked content, and r
         files.slice(0, 2),
       ),
     /完整對應/,
+  );
+});
+
+test("in English, oversized diffs and malformed explanations are reported in English", () => {
+  const huge = diff("big.ts", `+${"x".repeat(100_001)}`);
+  assert.throws(() => withLocale("en", () => explanationBatches([huge])), {
+    message:
+      'The diff of "big.ts" is over the 100 KB limit for explanations. Split the change and try again.',
+  });
+  const run = { explanations: {} } as unknown as Run;
+  withLocale("en", () => synchronizeExplanations(run, [huge]));
+  assert.equal(
+    run.explanations?.["big.ts"]?.error,
+    "This diff is over the 100 KB limit for automatic explanations. Split the change and reload.",
+  );
+  assert.throws(
+    () => withLocale("en", () => parseExplanations("not json", [diff("a.ts")])),
+    { message: "The change explanations came back incomplete. Generate them again." },
   );
 });
 

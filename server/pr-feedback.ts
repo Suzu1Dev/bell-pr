@@ -6,6 +6,7 @@ import {
   type PrFeedbackItem,
 } from "../shared/pr-feedback.js";
 import { validPrUrl } from "./draft-sources.js";
+import { sm } from "./i18n/index.js";
 import { redact } from "./process.js";
 import { AppError } from "./types.js";
 
@@ -96,13 +97,19 @@ export function parsePrFeedback(
 ): PrFeedback {
   if (Array.isArray(response?.errors) && response.errors.length)
     throw new AppError(
-      `GitHub 回傳錯誤：${redact(text(response.errors[0]?.message) || "unknown error").slice(0, 300)}`,
+      (m) =>
+        m.analysis.prFeedback.githubError({
+          message: redact(
+            text(response.errors[0]?.message) || "unknown error",
+          ).slice(0, 300),
+        }),
       502,
     );
   const pr = response?.data?.repository?.pullRequest;
-  if (!pr) throw new AppError("在 GitHub 找不到這個 PR。", 404);
+  if (!pr) throw new AppError((m) => m.analysis.prFeedback.notFound, 404);
   if (!validPrUrl(pr.url, options.repositoryUrl, options.prNumber))
-    throw new AppError("GitHub 回傳的 PR 網址與工作紀錄不一致。", 422);
+    throw new AppError((m) => m.analysis.prFeedback.urlMismatch, 422);
+  const messages = sm().analysis.prFeedback;
 
   const warnings: string[] = [];
   const warn = (message: string) => {
@@ -141,17 +148,22 @@ export function parsePrFeedback(
       createdAt: text(node.createdAt),
     });
   };
-  const partial = (connection: any, label: string) => {
+  /** Warns when GitHub has more of `connection` than this page holds. */
+  const partial = (
+    connection: any,
+    message: (counts: { shown: number; total: number }) => string,
+  ) => {
     const total = connection?.totalCount;
-    if (Number.isSafeInteger(total) && total > nodes(connection).length)
-      warn(`${label}只讀取最近 ${nodes(connection).length} 則，共 ${total} 則。`);
+    const shown = nodes(connection).length;
+    if (Number.isSafeInteger(total) && total > shown)
+      warn(message({ shown, total }));
   };
 
   for (const review of nodes(pr.reviews))
     add(review, "review", { state: text(review?.state) || undefined });
-  partial(pr.reviews, "Review ");
+  partial(pr.reviews, messages.partialReviews);
   for (const comment of nodes(pr.comments)) add(comment, "comment");
-  partial(pr.comments, "對話留言");
+  partial(pr.comments, messages.partialComments);
   for (const thread of nodes(pr.reviewThreads)) {
     const path = text(thread?.path) || undefined;
     for (const comment of nodes(thread?.comments))
@@ -161,13 +173,15 @@ export function parsePrFeedback(
         isResolved:
           typeof thread?.isResolved === "boolean" ? thread.isResolved : undefined,
       });
-    partial(thread?.comments, `${path ?? "討論串"} 的回覆`);
-  }
-  partial(pr.reviewThreads, "程式碼討論串");
-  if (dropped)
-    warn(
-      `${dropped} 則留言未納入：超過 ${prFeedbackItemLimit} 則上限，或連結不屬於這個 PR。`,
+    partial(thread?.comments, (counts) =>
+      path
+        ? messages.partialThreadReplies({ path, ...counts })
+        : messages.partialUnnamedThreadReplies(counts),
     );
+  }
+  partial(pr.reviewThreads, messages.partialThreads);
+  if (dropped)
+    warn(messages.dropped({ count: dropped, limit: prFeedbackItemLimit }));
 
   const rollup = nodes(pr.commits)[0]?.commit?.statusCheckRollup;
   const checks: PrCheck[] = nodes(rollup?.contexts).flatMap((context: any) => {
@@ -197,7 +211,7 @@ export function parsePrFeedback(
     }
     return [];
   });
-  partial(rollup?.contexts, "CI 檢查");
+  partial(rollup?.contexts, messages.partialChecks);
 
   const labels = nodes(pr.labels)
     .map((label) => text(label?.name).slice(0, 100))
@@ -209,7 +223,10 @@ export function parsePrFeedback(
     labelTotal > nodes(pr.labels).length
   )
     warn(
-      `PR 標籤只讀取 ${nodes(pr.labels).length} 個，共 ${labelTotal} 個；未列出的標籤可能包含 needs: 開頭的標籤。`,
+      messages.partialLabels({
+        shown: nodes(pr.labels).length,
+        total: labelTotal,
+      }),
     );
   return {
     fetchedAt: options.fetchedAt,

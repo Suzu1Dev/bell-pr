@@ -206,5 +206,46 @@ const m: Translation<typeof en> = {
     noSafeDiff: "目前沒有可用來撰寫 PR 的安全程式碼差異。",
     diffTooLarge: "差異超過 PR 草稿的 100 KB 上限；請拆分變更後重試。",
   },
+  explanations: {
+    tooLargeForAutomatic:
+      "差異超過自動解說的 100 KB 上限；請拆分變更後重新載入。",
+    tooLarge: ({ path }) =>
+      `「${path}」的差異超過解說的 100 KB 上限；請拆分變更後重試。`,
+    incompleteAnswer: "變更解說格式不完整，請重試產生解說。",
+    mismatchedFiles: "變更解說沒有完整對應本次差異，請重試產生解說。",
+  },
+  prFeedback: {
+    githubError: ({ message }) => `GitHub 回傳錯誤：${message}`,
+    notFound: "在 GitHub 找不到這個 PR。",
+    urlMismatch: "GitHub 回傳的 PR 網址與工作紀錄不一致。",
+    partialReviews: ({ shown, total }) =>
+      `Review 只讀取最近 ${shown} 則，共 ${total} 則。`,
+    partialComments: ({ shown, total }) =>
+      `對話留言只讀取最近 ${shown} 則，共 ${total} 則。`,
+    partialThreadReplies: ({ path, shown, total }) =>
+      `${path} 的回覆只讀取前 ${shown} 則，共 ${total} 則。`,
+    partialUnnamedThreadReplies: ({ shown, total }) =>
+      `討論串的回覆只讀取前 ${shown} 則，共 ${total} 則。`,
+    partialThreads: ({ shown, total }) =>
+      `程式碼討論串只讀取最近 ${shown} 則，共 ${total} 則。`,
+    partialChecks: ({ shown, total }) =>
+      `CI 檢查只讀取前 ${shown} 則，共 ${total} 則。`,
+    dropped: ({ count, limit }) =>
+      `${count} 則留言未納入：超過 ${limit} 則上限，或連結不屬於這個 PR。`,
+    partialLabels: ({ shown, total }) =>
+      `PR 標籤只讀取 ${shown} 個，共 ${total} 個；未列出的標籤可能包含 needs: 開頭的標籤。`,
+  },
+  models: {
+    catalogUnavailable:
+      "暫時無法讀取 Codex 模型目錄。請確認 CLI 已安裝並登入，稍後再試。",
+    claudeOpus: "適合複雜的程式修改、審查與多步驟推理。",
+    claudeSonnet: "速度與能力較平衡，適合日常開發與分析。",
+    claudeFable: "能力最強，單次工作可能較久；需方案支援。",
+    claudeHaiku: "最快、用量最低；不支援思考強度設定。",
+    invalidSettings: "模型設定格式不正確，請重新選擇。",
+    providerMismatch: "模型目錄與所選 Agent 不一致，請重新載入後再選擇。",
+    unknownModel: "無法確認這組模型設定，請重新載入模型目錄並選擇。",
+    unsupportedEffort: "所選模型不支援這個思考強度，請重新選擇。",
+  },
 };
 export default m;

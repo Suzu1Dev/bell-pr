@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { PrFeedbackItem } from "../shared/pr-feedback.js";
+import { sm } from "./i18n/index.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
 
 const paragraph = z.string().trim().min(1).max(1800);
@@ -101,7 +102,7 @@ export function synchronizeExplanations(run: Run, files: DiffFile[]) {
     const unavailable =
       file.blocked ||
       (Buffer.byteLength(file.patch) > 100_000
-        ? "差異超過自動解說的 100 KB 上限；請拆分變更後重新載入。"
+        ? sm().analysis.explanations.tooLargeForAutomatic
         : undefined);
     let stored = explanations[file.path];
     if (!stored || stored.fingerprint !== file.fingerprint || unavailable) {
@@ -129,7 +130,7 @@ export function explanationBatches(files: DiffFile[]) {
     const size = Buffer.byteLength(file.patch);
     if (size > 100_000)
       throw new AppError(
-        `「${file.path}」的差異超過解說的 100 KB 上限；請拆分變更後重試。`,
+        (m) => m.analysis.explanations.tooLarge({ path: file.path }),
         422,
       );
     if (current.length && (current.length >= 8 || bytes + size > 100_000)) {
@@ -156,7 +157,7 @@ export function parseExplanations(answer: string, files: DiffFile[]) {
       ),
     );
   } catch {
-    throw new AppError("變更解說格式不完整，請重試產生解說。", 422);
+    throw new AppError((m) => m.analysis.explanations.incompleteAnswer, 422);
   }
   const actualPaths = new Set(files.map((file) => file.path));
   if (
@@ -164,7 +165,7 @@ export function parseExplanations(answer: string, files: DiffFile[]) {
     new Set(parsed.files.map((file) => file.path)).size !== files.length ||
     parsed.files.some((file) => !actualPaths.has(file.path))
   )
-    throw new AppError("變更解說沒有完整對應本次差異，請重試產生解說。", 422);
+    throw new AppError((m) => m.analysis.explanations.mismatchedFiles, 422);
   return parsed.files;
 }
 

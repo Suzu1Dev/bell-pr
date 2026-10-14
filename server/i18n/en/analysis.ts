@@ -348,4 +348,76 @@ export default {
     diffTooLarge:
       "The diff is over the 100 KB limit for PR drafts. Split the change and try again.",
   },
+  /** Per-file change explanations (server/explanations.ts). */
+  explanations: {
+    /** Saved on a file whose diff is too large to explain automatically. */
+    tooLargeForAutomatic:
+      "This diff is over the 100 KB limit for automatic explanations. Split the change and reload.",
+    tooLarge: ({ path }: { path: string }) =>
+      `The diff of "${path}" is over the 100 KB limit for explanations. Split the change and try again.`,
+    incompleteAnswer:
+      "The change explanations came back incomplete. Generate them again.",
+    mismatchedFiles:
+      "The change explanations did not match the files in this diff. Generate them again.",
+  },
+  /** Maintainer feedback read from a published PR (server/pr-feedback.ts). */
+  prFeedback: {
+    githubError: ({ message }: { message: string }) =>
+      `GitHub returned an error: ${message}`,
+    notFound: "This PR was not found on GitHub.",
+    urlMismatch:
+      "The PR URL GitHub returned does not match the one recorded for this run.",
+    partialReviews: ({ shown, total }: { shown: number; total: number }) =>
+      `Only the latest ${shown} of ${total} reviews were read.`,
+    partialComments: ({ shown, total }: { shown: number; total: number }) =>
+      `Only the latest ${shown} of ${total} conversation comments were read.`,
+    partialThreadReplies: ({
+      path,
+      shown,
+      total,
+    }: {
+      path: string;
+      shown: number;
+      total: number;
+    }) => `Only the first ${shown} of ${total} replies on ${path} were read.`,
+    partialUnnamedThreadReplies: ({
+      shown,
+      total,
+    }: {
+      shown: number;
+      total: number;
+    }) =>
+      `Only the first ${shown} of ${total} replies in a review thread were read.`,
+    partialThreads: ({ shown, total }: { shown: number; total: number }) =>
+      `Only the latest ${shown} of ${total} code review threads were read.`,
+    partialChecks: ({ shown, total }: { shown: number; total: number }) =>
+      `Only the first ${shown} of ${total} CI checks were read.`,
+    dropped: ({ count, limit }: { count: number; limit: number }) =>
+      count === 1
+        ? `1 comment was left out: it is over the limit of ${limit}, or its link does not belong to this PR.`
+        : `${count} comments were left out: they are over the limit of ${limit}, or their links do not belong to this PR.`,
+    partialLabels: ({ shown, total }: { shown: number; total: number }) =>
+      `Only ${shown} of ${total} PR labels were read; the labels left out may include ones that start with needs:.`,
+  },
+  /** Model catalogs and model settings (server/models.ts). */
+  models: {
+    catalogUnavailable:
+      "The Codex model list cannot be read right now. Check that the CLI is installed and signed in, then try again later.",
+    /** Descriptions of the Claude Code model aliases. */
+    claudeOpus:
+      "Suited to complex code changes, reviews and multi-step reasoning.",
+    claudeSonnet:
+      "Balances speed and capability; suited to everyday development and analysis.",
+    claudeFable:
+      "The most capable model; one task may take longer. Your plan must include it.",
+    claudeHaiku:
+      "The fastest, with the lowest usage. It does not support reasoning effort settings.",
+    invalidSettings: "The model settings are not valid. Choose them again.",
+    providerMismatch:
+      "The model list does not match the selected agent. Reload, then choose again.",
+    unknownModel:
+      "These model settings cannot be confirmed. Reload the model list and choose again.",
+    unsupportedEffort:
+      "The selected model does not support this reasoning effort. Choose another one.",
+  },
 };
