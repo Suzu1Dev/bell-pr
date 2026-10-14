@@ -1,0 +1,38 @@
+{
+  "name": "bell-pr-promo-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The 75-second BELL PR promo video, built with Remotion from real UI footage of the sample playback.",
+  "type": "module",
+  "scripts": {
+    "capture": "node scripts/capture.mjs",
+    "studio": "remotion studio src/index.ts",
+    "render": "npm run render:mp4 && npm run render:webm && npm run render:poster && npm run captions && npm run check",
+    "render:mp4": "remotion render src/index.ts Promo out/bell-pr-promo-en-1080p.mp4 --codec=h264 --crf=23 --x264-preset=slow --audio-codec=aac --audio-bitrate=192k",
+    "render:webm": "remotion render src/index.ts Promo out/bell-pr-promo-en-1080p.webm --codec=vp9 --crf=36 --audio-codec=opus --audio-bitrate=192k",
+    "render:poster": "remotion still src/index.ts Promo out/poster.jpg --frame=2200 --image-format=jpeg --jpeg-quality=85",
+    "captions": "node scripts/export-captions.mjs",
+    "build": "npm run capture && npm run render",
+    "check": "node scripts/check-output.mjs",
+    "review": "node scripts/review-frames.mjs",
+    "site": "node scripts/copy-to-site.mjs",
+    "hit": "node scripts/measure-hit.mjs",
+    "test": "tsx --test \"src/**/*.test.ts\" \"scripts/**/*.test.mjs\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource-variable/dm-sans": "5.3.0",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@remotion/cli": "4.0.531",
+    "playwright-core": "~1.64.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.531",
+    "tsx": "4.23.15"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "@types/react": "19.3.0",
+    "typescript": "5.9.3"
+  }
+}
