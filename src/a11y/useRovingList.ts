@@ -16,6 +16,12 @@ export interface RovingKeyOptions {
   loop?: boolean;
   /** How far PageUp and PageDown move; 0 (the default) leaves them alone. */
   pageSize?: number;
+  /**
+   * Items that cannot take focus, such as a disabled button in a toolbar.
+   * Keys skip them, and the tab stop does not rest on one while another
+   * item can take it.
+   */
+  disabled?: (index: number) => boolean;
 }
 
 /**
@@ -27,17 +33,36 @@ export function rovingTarget(
   key: string,
   index: number,
   count: number,
-  { orientation = "vertical", loop = false, pageSize = 0 }: RovingKeyOptions = {},
+  {
+    orientation = "vertical",
+    loop = false,
+    pageSize = 0,
+    disabled,
+  }: RovingKeyOptions = {},
 ): number | undefined {
   if (count <= 0) return undefined;
   const last = count - 1;
   const current = Math.min(Math.max(index, 0), last);
   const vertical = orientation !== "horizontal";
   const horizontal = orientation !== "vertical";
-  const step = (delta: number) =>
-    loop
-      ? (((current + delta) % count) + count) % count
-      : Math.min(Math.max(current + delta, 0), last);
+  /** The first item from `from` on, walking by `direction`, that can take focus. */
+  const seek = (from: number, direction: 1 | -1, wrap = false) => {
+    for (let offset = 0; offset < count; offset++) {
+      let next = from + offset * direction;
+      if (wrap) next = ((next % count) + count) % count;
+      else if (next < 0 || next > last) return undefined;
+      if (!disabled?.(next)) return next;
+    }
+    return undefined;
+  };
+  const step = (direction: 1 | -1) =>
+    seek(current + direction, direction, loop) ?? current;
+  /** Up to `pageSize` items away, but never past an item that cannot take focus to go back. */
+  const page = (direction: 1 | -1) => {
+    const target = Math.min(Math.max(current + direction * pageSize, 0), last);
+    const found = seek(target, direction === 1 ? -1 : 1);
+    return found === undefined || (found - current) * direction < 0 ? current : found;
+  };
   switch (key) {
     case "ArrowDown":
       return vertical ? step(1) : undefined;
@@ -48,16 +73,28 @@ export function rovingTarget(
     case "ArrowLeft":
       return horizontal ? step(-1) : undefined;
     case "Home":
-      return 0;
+      return seek(0, 1) ?? current;
     case "End":
-      return last;
+      return seek(last, -1) ?? current;
     case "PageDown":
-      return pageSize > 0 ? Math.min(current + pageSize, last) : undefined;
+      return pageSize > 0 ? page(1) : undefined;
     case "PageUp":
-      return pageSize > 0 ? Math.max(current - pageSize, 0) : undefined;
+      return pageSize > 0 ? page(-1) : undefined;
     default:
       return undefined;
   }
+}
+
+/** The item closest to `index` (after it first) that is not disabled. */
+function nearestEnabled(
+  index: number,
+  count: number,
+  disabled: (index: number) => boolean,
+) {
+  for (let offset = 1; offset < count; offset++)
+    for (const next of [index + offset, index - offset])
+      if (next >= 0 && next < count && !disabled(next)) return next;
+  return undefined;
 }
 
 /** The props one item of a roving list needs. */
@@ -94,7 +131,12 @@ export function useRovingList(
 ): RovingList {
   const [active, setActive] = useState(options.initialIndex ?? 0);
   const items = useRef<(HTMLElement | null)[]>([]);
-  const activeIndex = count > 0 ? Math.min(Math.max(active, 0), count - 1) : 0;
+  const clamped = count > 0 ? Math.min(Math.max(active, 0), count - 1) : 0;
+  // A tab stop on an item that became disabled moves to the nearest one that
+  // can take focus, so the list never drops out of the tab order.
+  const activeIndex = options.disabled?.(clamped)
+    ? (nearestEnabled(clamped, count, options.disabled) ?? clamped)
+    : clamped;
 
   function focusItem(index: number) {
     setActive(index);

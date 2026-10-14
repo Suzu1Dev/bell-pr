@@ -44,16 +44,39 @@ test("an empty list never moves and an index out of range is clamped first", () 
   assert.equal(rovingTarget("ArrowDown", -4, 5), 1);
 });
 
+test("disabled items are skipped by every key, and an end stays put when only disabled items lie beyond", () => {
+  const off = (...indexes: number[]) => ({ disabled: (index: number) => indexes.includes(index) });
+  assert.equal(rovingTarget("ArrowDown", 0, 5, off(1, 2)), 3);
+  assert.equal(rovingTarget("ArrowUp", 3, 5, off(1, 2)), 0);
+  assert.equal(rovingTarget("ArrowDown", 3, 5, off(4)), 3);
+  assert.equal(rovingTarget("ArrowDown", 4, 5, { loop: true, ...off(0) }), 1);
+  assert.equal(rovingTarget("ArrowUp", 1, 5, { loop: true, ...off(0) }), 4);
+  assert.equal(rovingTarget("Home", 3, 5, off(0)), 1);
+  assert.equal(rovingTarget("End", 1, 5, off(4)), 3);
+  assert.equal(rovingTarget("Home", 2, 5, off(0, 1, 3, 4)), 2);
+  assert.equal(rovingTarget("ArrowRight", 0, 3, { orientation: "horizontal", ...off(1) }), 2);
+  assert.equal(rovingTarget("PageDown", 0, 10, { pageSize: 3, ...off(3) }), 2);
+  assert.equal(rovingTarget("PageDown", 0, 10, { pageSize: 3, ...off(1, 2, 3) }), 0);
+  assert.equal(rovingTarget("PageUp", 9, 10, { pageSize: 3, ...off(6) }), 7);
+  assert.equal(rovingTarget("PageUp", 9, 10, { pageSize: 3, ...off(6, 7, 8) }), 9);
+});
+
 function List({
   count,
   initialIndex,
+  disabled,
   capture,
 }: {
   count: number;
   initialIndex?: number;
+  disabled?: number[];
   capture?: (list: RovingList) => void;
 }) {
-  const roving = useRovingList(count, { initialIndex, pageSize: 2 });
+  const roving = useRovingList(count, {
+    initialIndex,
+    pageSize: 2,
+    disabled: disabled && ((index) => disabled.includes(index)),
+  });
   capture?.(roving);
   return createElement(
     "ul",
@@ -89,6 +112,15 @@ test("exactly one item is a tab stop, the first unless told otherwise", () => {
     ["-1", "-1", "0"],
   );
   assert.equal(renderEn(createElement(List, { count: 0 })).includes("tabindex"), false);
+  // A tab stop on a disabled item moves to the nearest item that can take it.
+  assert.deepEqual(
+    tabStops(renderEn(createElement(List, { count: 4, disabled: [0] }))),
+    ["-1", "0", "-1", "-1"],
+  );
+  assert.deepEqual(
+    tabStops(renderEn(createElement(List, { count: 4, initialIndex: 3, disabled: [3] }))),
+    ["-1", "-1", "0", "-1"],
+  );
 });
 
 /** A keydown on the list, recording whether its default was prevented. */
