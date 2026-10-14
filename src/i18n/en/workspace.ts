@@ -91,6 +91,8 @@ const workspace = {
     enterFocus: "Enter focus mode",
     focus: "Focused reading",
     refresh: "Refresh the diff",
+    /** The row of buttons above the diff, one tab stop. */
+    toolbar: "Diff tools",
     viewMode: "Diff view mode",
     unified: "Unified view",
     split: "Split view",

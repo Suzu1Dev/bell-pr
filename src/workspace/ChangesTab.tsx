@@ -37,6 +37,7 @@ import { languageBadge } from "../review/diff";
 import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { Tab } from "../app/AppShell";
 import { ErrorBoundary } from "../app/ErrorBoundary";
+import { useRovingList } from "../a11y/useRovingList";
 import { fileStatusLabel } from "../app/labels";
 import { usePresentation } from "../app/presentation";
 import type { RunActions } from "../app/hooks/useRunActions";
@@ -168,6 +169,22 @@ export function ChangesTab({
   useEffect(() => {
     if (searchOpen) searchInput.current?.focus();
   }, [searchOpen]);
+  // The diff toolbar is one tab stop; the arrow keys move between its eight
+  // buttons and skip the disabled ones.
+  const toolbarDisabled = [
+    false,
+    codeFont <= 12,
+    codeFont >= 20,
+    false,
+    false,
+    active,
+    false,
+    false,
+  ];
+  const toolbar = useRovingList(toolbarDisabled.length, {
+    orientation: "horizontal",
+    disabled: (index) => toolbarDisabled[index],
+  });
   function changeCodeFont(delta: number) {
     const next = Math.max(12, Math.min(20, codeFont + delta));
     setCodeFont(next);
@@ -357,8 +374,14 @@ export function ChangesTab({
             <span className="diff-topbar-arrow">←</span>{" "}
             {run.branch}
           </span>
-          <div className="diff-toolbar-actions">
+          <div
+            className="diff-toolbar-actions"
+            role="toolbar"
+            aria-label={t.toolbar}
+            onKeyDown={(event) => toolbar.handleKeyDown(event)}
+          >
             <button
+              {...toolbar.itemProps(0)}
               className="icon-button"
               aria-label={showFiles ? t.hideFiles : t.showFiles}
               title={t.toggleFiles}
@@ -368,6 +391,7 @@ export function ChangesTab({
             </button>
             <div className="code-size-control">
               <button
+                {...toolbar.itemProps(1)}
                 aria-label={t.smallerCode}
                 disabled={codeFont <= 12}
                 onClick={() => changeCodeFont(-1)}
@@ -376,6 +400,7 @@ export function ChangesTab({
               </button>
               <span>{codeFont}</span>
               <button
+                {...toolbar.itemProps(2)}
                 aria-label={t.largerCode}
                 disabled={codeFont >= 20}
                 onClick={() => changeCodeFont(1)}
@@ -384,6 +409,7 @@ export function ChangesTab({
               </button>
             </div>
             <button
+              {...toolbar.itemProps(3)}
               className="icon-button"
               aria-label={
                 showExplanation ? t.hideExplanation : t.showExplanation
@@ -398,6 +424,7 @@ export function ChangesTab({
               )}
             </button>
             <button
+              {...toolbar.itemProps(4)}
               className="icon-button"
               aria-label={focusMode ? t.exitFocus : t.enterFocus}
               title={t.focus}
@@ -410,6 +437,7 @@ export function ChangesTab({
               )}
             </button>
             <button
+              {...toolbar.itemProps(5)}
               className="icon-button"
               aria-label={t.refresh}
               title={t.refresh}
@@ -420,6 +448,7 @@ export function ChangesTab({
             </button>
             <div className="view-toggle" role="group" aria-label={t.viewMode}>
               <button
+                {...toolbar.itemProps(6)}
                 aria-label={t.unified}
                 title={t.unified}
                 aria-pressed={diffView === "unified"}
@@ -429,6 +458,7 @@ export function ChangesTab({
                 <ListTree size={15} />
               </button>
               <button
+                {...toolbar.itemProps(7)}
                 aria-label={t.split}
                 title={t.split}
                 aria-pressed={diffView === "split"}
@@ -560,6 +590,7 @@ export function ChangesTab({
                     reviewBusy={
                       reviewRerunning || rerunRequests.has(run.id)
                     }
+                    runLocale={run.locale}
                   />
                 </Suspense>
               </ErrorBoundary>

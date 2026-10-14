@@ -143,6 +143,24 @@ test("the diff view buttons form a labelled group with the pressed one marked", 
   assert.match(renderZh(element()), /只看尚未審查/);
 });
 
+test("the diff toolbar is one labelled tab stop", () => {
+  /** The toolbar's markup and the tabindex of each of its buttons. */
+  const toolbar = (props: Partial<Props> = {}) => {
+    const html = renderEn(element(props));
+    const start = html.indexOf('role="toolbar"');
+    const markup = html.slice(start, html.indexOf('<div class="worktree-hint', start));
+    return {
+      html,
+      stops: [...markup.matchAll(/<button[^>]*tabindex="(-?\d)"/g)].map((match) => match[1]),
+    };
+  };
+  const { html, stops } = toolbar();
+  assert.match(html, /<div class="diff-toolbar-actions" role="toolbar" aria-label="Diff tools">/);
+  assert.deepEqual(stops, ["0", "-1", "-1", "-1", "-1", "-1", "-1", "-1"]);
+  assertNoHan(html);
+  assert.match(renderZh(element()), /role="toolbar" aria-label="Diff 工具"/);
+});
+
 test("the worktree path can be copied, except while presenting, when it loses its folders", () => {
   const html = renderEn(element());
   assert.match(html, /<code>\/home\/someone\/\.bellpr\/worktrees\/run-1<\/code>/);

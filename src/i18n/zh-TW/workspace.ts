@@ -80,6 +80,7 @@ const m: Translation<typeof en> = {
     enterFocus: "進入專注模式",
     focus: "專注閱讀",
     refresh: "重新整理差異",
+    toolbar: "Diff 工具",
     viewMode: "Diff 顯示模式",
     unified: "統一檢視",
     split: "並排檢視",
