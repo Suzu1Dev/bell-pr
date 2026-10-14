@@ -189,7 +189,8 @@ test("stopping the sample's team sends nothing and leaves it stopped", async ({ 
     await expect(badge).toHaveText(status.awaiting_plan, { timeout: 20_000 });
     await page.getByRole("button", { name: workspace.activity.stopTask }).click();
     await expect(badge).toHaveText(status.cancelled);
-    await expect(page.getByText(workspace.notices.demoStopped)).toBeVisible();
+    // The toast shows the notice; a live region outside it reads it out.
+    await expect(page.locator(".toast", { hasText: workspace.notices.demoStopped })).toBeVisible();
     await expect(page.getByRole("button", { name: workspace.activity.stopTask })).toHaveCount(0);
     // Nothing plays on after the stop.
     await page.waitForTimeout(1_500);
