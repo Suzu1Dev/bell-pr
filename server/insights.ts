@@ -1102,7 +1102,9 @@ export class ProjectInsightsService {
     if (this.stopping)
       throw new AppError((m) => m.analysis.insights.shuttingDown, 503);
     if (this.generating.has(repoId))
-      throw new AppError((m) => m.analysis.insights.alreadyRunning, 409);
+      throw new AppError((m) => m.analysis.insights.alreadyRunning, 409, {
+        code: "already_running",
+      });
     if (this.generating.size >= 2)
       throw new AppError((m) => m.analysis.insights.tooManyRunning, 429);
     this.generating.add(repoId);

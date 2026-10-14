@@ -204,7 +204,7 @@ Commands run on the tree of this review, test files excluded:
 | EULA-29 | Third-party terms, fees and quotas are the person's | Owner decision: counsel review (G4) |
 | EULA-30 | The seller does not control or answer for third-party services | Owner decision: counsel review (G4) |
 | EULA-31 | No affiliation with GitHub, OpenAI or Anthropic | Owner decision: trademark and provider terms (G1, G5) |
-| EULA-32 | AI models analyse, plan, change code, explain and draft PR text | `server/insights.ts:1255`, `server/run-executor.ts:695`, `server/run-executor.ts:753`, `server/learning.ts:229`, `server/draft-jobs.ts:121` |
+| EULA-32 | AI models analyse, plan, change code, explain and draft PR text | `server/insights.ts:1257`, `server/run-executor.ts:695`, `server/run-executor.ts:753`, `server/learning.ts:229`, `server/draft-jobs.ts:121` |
 | EULA-33 | AI output can be wrong, insecure or resemble licensed code | Owner decision: counsel review (G4); the app says so at `src/i18n/en/review.ts:97` |
 | EULA-34 | The person must review everything before relying on it | Owner decision: counsel review (G4) |
 | EULA-35 | Nothing is published until every changed file is reviewed and the PR text approved | `server/publish.ts:269`, `server/publish.ts:332`, `server/publish.ts:352` |
@@ -258,11 +258,11 @@ Commands run on the tree of this review, test files excluded:
 | PRIV-12 | The tools may send their own usage data; BELL PR neither adds nor removes it, passes only the variables each CLI needs plus the person's usage-data opt-outs (`DO_NOT_TRACK` to both, Claude Code's documented ones to Claude Code), and starts Codex without its `config.toml`, so an opt-out made only there does not reach the agents | `server/process.ts:50`, `server/process.ts:108`, `server/process.ts:109`, `server/process.ts:125` (only listed variables are passed; none is set or removed), `server/agent-cli.ts:191` (`--ignore-user-config`); see finding 7 |
 | PRIV-13 | Which features use the AI CLI, and which providers Claude Code may use | `server/agent-cli.ts:149`, `server/sync-runs.ts:398` (conflict resolution), `server/process.ts:70`, `server/process.ts:76` |
 | PRIV-14 | BELL PR's instructions, the direction and the approved plan are sent | `server/run-executor.ts:695`, `server/run-executor.ts:753` |
-| PRIV-15 | Repository files, analysis excerpts, diffs, rules and templates are sent | `server/insights.ts:1218`, `server/drafts.ts:384`, `server/learning.ts:229` |
+| PRIV-15 | Repository files, analysis excerpts, diffs, rules and templates are sent | `server/insights.ts:1220`, `server/drafts.ts:384`, `server/learning.ts:229` |
 | PRIV-16 | Output of the agents' commands is sent | `server/agent-cli.ts:54` (write roles run commands through the CLI, which returns the output to its model) |
 | PRIV-17 | Questions are sent with the diff, explanation and reports | `server/explanations.ts:271`, `server/learning.ts:358` |
 | PRIV-18 | Review comments and check results are sent for coaching and follow-up rounds | `server/pr-feedback.ts:42`, `server/explanations.ts:216`, `server/followup-runs.ts:44` |
-| PRIV-19 | Discovery sends the interests and the found repositories' details, documents, issues and comments | `server/discovery.ts:690`, `server/discovery-sources.ts:88`, `server/discovery-sources.ts:239` |
+| PRIV-19 | Discovery sends the interests and the found repositories' details, documents, issues and comments | `server/discovery.ts:694`, `server/discovery-sources.ts:88`, `server/discovery-sources.ts:239` |
 | PRIV-20 | Credential-shaped text is masked before logs, answers, questions and team messages are saved, and in draft context | `server/secrets.ts:17`, `server/run-executor.ts:91`, `server/run-executor.ts:204`, `server/run-executor.ts:427`, `server/learning.ts:373`, `server/drafts.ts:384` |
 | PRIV-21 | Imported repositories are cloned and fetched; details, issues, guidelines and templates are read | `server/repositories.ts:53`, `server/repositories.ts:270`, `server/draft-sources.ts:41` |
 | PRIV-22 | Discovery searches GitHub | `server/discovery-sources.ts:239` |
@@ -271,7 +271,7 @@ Commands run on the tree of this review, test files excluded:
 | PRIV-25 | Commits carry the configured git identity and become public | `server/publish.ts:303` |
 | PRIV-26 | A non-no-reply commit e-mail needs confirmation, once per address | `shared/draft-checks.ts:468`, `shared/draft-checks.ts:473`, `server/publish.ts:116`, `server/publish.ts:402` |
 | PRIV-27 | Web access is Pro and turned on in the AI provider settings | `server/license.ts:286`, `src/i18n/en/settings.ts:119` |
-| PRIV-28 | Which agents may use the web, and which never do | `server/run-executor.ts:134`, `server/learning.ts:242`, `server/draft-jobs.ts:128`, `server/insights.ts:1257`, `server/discovery.ts:685`, `server/followup-runs.ts:189` |
+| PRIV-28 | Which agents may use the web, and which never do | `server/run-executor.ts:134`, `server/learning.ts:242`, `server/draft-jobs.ts:128`, `server/insights.ts:1259`, `server/discovery.ts:689`, `server/followup-runs.ts:189` |
 | PRIV-29 | Claude Code may open pages on three GitHub domains only; Codex uses OpenAI's web search | `server/agent-cli.ts:38`, `server/agent-cli.ts:63`, `server/agent-cli.ts:205` |
 | PRIV-30 | The run log keeps queries and addresses, not page contents | `server/run-executor.ts:292` |
 | PRIV-31 | Agents are told not to put contents or secrets in queries | `server/prompts/team.ts:28` |

@@ -516,14 +516,18 @@ export class DiscoveryService {
     if (this.stopping)
       throw new AppError((m) => m.analysis.discovery.shuttingDown, 503);
     if (this.active)
-      throw new AppError((m) => m.analysis.discovery.alreadyRunning, 409);
+      throw new AppError((m) => m.analysis.discovery.alreadyRunning, 409, {
+        code: "already_running",
+      });
     // gh and the provider before a job exists: a refusal leaves the last
     // result as it is.
     await this.preflight(preferences);
     if (this.stopping)
       throw new AppError((m) => m.analysis.discovery.shuttingDown, 503);
     if (this.active)
-      throw new AppError((m) => m.analysis.discovery.alreadyRunning, 409);
+      throw new AppError((m) => m.analysis.discovery.alreadyRunning, 409, {
+        code: "already_running",
+      });
     const prior =
       this.job?.status === "ready" && this.job.opportunities.length
         ? {
