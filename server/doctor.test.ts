@@ -444,6 +444,17 @@ test("probes are cached for 10 seconds and shared; force probes again; the wordi
   assert.equal((await f.calls()).length, probes * 2);
 });
 
+test("Re-check (a forced doctor run) sees sandbox tools installed while the server runs", { skip: process.platform !== "linux" }, async (t) => {
+  const f = await fakes(t, { git: git(), claude: claude(), socat: "exit 0" });
+  const report = () => withLocale("en", () => runDoctor({ platform: "linux" }));
+  const recheck = () => withLocale("en", () => runDoctor({ force: true, platform: "linux" }));
+  assert.equal(check(await recheck(), "claude-sandbox").reason, "missing");
+  // bubblewrap gets installed; the same PATH answered "missing" before.
+  await writeFile(path.join(f.directory, "bin", "bwrap"), "#!/bin/sh\nexit 0\n", { mode: 0o700 });
+  assert.equal(check(await report(), "claude-sandbox").reason, "missing");
+  assert.equal(check(await recheck(), "claude-sandbox").status, "ok");
+});
+
 test("a data directory that cannot be written fails the required check", { skip: process.getuid?.() === 0 }, async (t) => {
   const f = await fakes(t, { git: git(), codex: codex() });
   const locked = path.join(f.directory, "locked");

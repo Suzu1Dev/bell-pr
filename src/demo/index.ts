@@ -13,16 +13,6 @@ export function getDemo(locale: Locale): DemoContent {
   return demos[locale];
 }
 
-// The zh-TW fixtures under their old names, for the current UI and the tests
-// written before getDemo(); remove each one once nothing imports it.
-export const demoRepo = zhTW.repo;
-export const demoFiles = zhTW.files;
-export const demoRun = zhTW.run;
-export const demoInsights = zhTW.insights;
-export const demoContributionBrief = zhTW.contributionBrief;
-export const demoTeam = zhTW.team;
-export const demoDraftPreparation = zhTW.draftPreparation;
-
 /**
  * Local fixture responses, never represented as a model-generated answer.
  * The first topic whose keywords match the question answers, in the order of

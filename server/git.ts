@@ -10,8 +10,12 @@ import { ciConfigPath } from "../shared/draft-checks.js";
 
 export { ciConfigPath, secretInPatch };
 
-/** The only language of the builds that saved runs without a locale. */
-const legacyRunLocale: Locale = "zh-TW";
+/**
+ * The only language of the builds that saved runs without a locale: text
+ * those builds saved on a run (diff reasons, explanations, the draft) is
+ * read and kept in it.
+ */
+export const legacyRunLocale: Locale = "zh-TW";
 
 export const digest = (value: string) =>
   createHash("sha256").update(value).digest("hex");

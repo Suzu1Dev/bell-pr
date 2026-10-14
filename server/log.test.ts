@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/
 import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { initLog, log, recentLogLines } from "./log.js";
+import { closeLog, initLog, log, recentLogLines } from "./log.js";
 import { command, git } from "./process.js";
 import { agentSpawn } from "./run-events.js";
 import { Store } from "./store.js";
@@ -327,4 +327,27 @@ test("agent.exit records the exit code of an agent process that failed", async (
       { outcome: "failed", exitCode: undefined },
     ],
   );
+});
+
+test("after the Workbench shuts down, the process logs to stderr, not into the data directory it left", async (t) => {
+  const first = await logDirectory();
+  const second = await logDirectory();
+  t.after(first.cleanup);
+  t.after(second.cleanup);
+  const workbench = new Workbench(new Store(first.directory));
+  await workbench.store.initialize();
+  log.info("first.running");
+  await workbench.shutdown();
+  const before = await recentLogLines(first.directory);
+  assert.ok(before.some((line) => line.includes("first.running")));
+  log.warn("after.shutdown");
+  assert.deepEqual(await recentLogLines(first.directory), before);
+  // Closing another directory's log leaves the current one open.
+  initLog(second.directory, { stderr: capture(false).stream });
+  closeLog(first.directory);
+  log.info("second.running");
+  assert.ok((await recentLogLines(second.directory)).some((line) => line.includes("second.running")));
+  closeLog();
+  log.warn("closed.again");
+  assert.ok(!(await recentLogLines(second.directory)).some((line) => line.includes("closed.again")));
 });

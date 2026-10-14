@@ -6,7 +6,7 @@ import type { DraftCheck } from "../../shared/draft-checks";
 import type { DoctorCheck, DoctorReport } from "../../shared/doctor";
 import { maskPath } from "../app/presentation";
 import type { DoctorState } from "../setup/useDoctor";
-import { demoFiles, demoRepo, demoRun } from "../demo";
+import { getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Run } from "../types";
 import {
@@ -15,6 +15,8 @@ import {
   PublishModal,
   publishIdentity,
 } from "./PublishModal";
+
+const { files: demoFiles, repo: demoRepo, run: demoRun } = getDemo("zh-TW");
 
 type Props = Parameters<typeof PublishModal>[0];
 

@@ -10,7 +10,7 @@ import type { RunStatus } from "../../shared/types";
 import { api } from "../api";
 import { getDemo } from "../demo";
 import { useFormat, useLocale, useT } from "../i18n";
-import type { DiffFile, Repo, RunSummary } from "../types";
+import type { DiffFile, Repo } from "../types";
 import "./learning.css";
 
 // Stored concepts use inline backticks and line breaks like the review panel; share its renderer and chunk.
@@ -63,12 +63,6 @@ export interface LearningNote {
 }
 
 export interface LearningNotesProps {
-  /**
-   * @deprecated Not read. The runs list no longer carries explanations or
-   * notes; the page loads them from GET /api/learning. Kept optional so
-   * callers that still pass the list compile.
-   */
-  runs?: RunSummary[];
   repos: Repo[];
   demoFiles: DiffFile[];
   /** Opens the task and selects the file; the App decides how to navigate. */

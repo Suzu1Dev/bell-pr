@@ -6,6 +6,7 @@ import {
   ponytailVersion,
   type EfficiencyMetrics,
 } from "../../shared/efficiency";
+import { getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { EfficiencySummary, groupByRole } from "./EfficiencySummary";
 
@@ -205,6 +206,24 @@ test("without measured calls the summary folds into one line, and the sample is 
   assert.match(sample, /<strong>Team AI usage<\/strong><\/span><span class="efficiency-sample">Sample<\/span>/);
   assert.doesNotMatch(renderEnglish({ metrics }), /efficiency-sample/);
   assert.match(render({ demo: true }), /class="efficiency-sample">示範</);
+});
+
+test("the sample shows the mode it recorded, with the credit, but never counts", () => {
+  const sample = getDemo("en").run;
+  const html = renderEnglish({ metrics: sample.efficiency, demo: true });
+  assert.match(html, /Efficiency mode: Lean/);
+  assert.match(html, /Ponytail upstream project/);
+  assert.match(html, /<section class="efficiency-summary is-empty"/);
+  assert.doesNotMatch(html, /efficiency-metrics/);
+  // A mode chosen for the replay wins over the recorded one.
+  assert.match(
+    renderEnglish({ metrics: sample.efficiency, mode: "full", demo: true }),
+    /Efficiency mode: Full/,
+  );
+  assert.match(
+    renderZh(createElement(EfficiencySummary, { metrics: getDemo("zh-TW").run.efficiency, demo: true })),
+    /class="efficiency-mode"/,
+  );
 });
 
 test("follow-up and sync calls have their own rows", () => {

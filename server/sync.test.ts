@@ -15,6 +15,7 @@ import { filesWithConflictMarkers, labelConflictMarkers } from "./sync.js";
 import { AppError, type Run } from "./types.js";
 import type { TeamAgentRunner } from "./team.js";
 import { outputLanguage, respondIn } from "./prompt-language.js";
+import { withLocale } from "./i18n/index.js";
 
 async function getJson(url: string) {
   return new Promise<any>((resolve, reject) => {
@@ -66,10 +67,22 @@ test("BELL's clone of a GitHub repository updates to the latest default branch; 
     const localRepo = await workbench.importRepository(local);
     assert.equal(workbench.managedClone(localRepo), false);
     const localHead = (await git(local, ["rev-parse", "HEAD"])).stdout.trim();
+    // BELL cloned it, but there is no GitHub source to update from.
     await assert.rejects(
-      workbench.updateRepository(localRepo.id),
-      (error: AppError) => error.statusCode === 409 && /git pull/.test(error.message),
+      withLocale("en", () => workbench.updateRepository(localRepo.id)),
+      (error: AppError) =>
+        error.statusCode === 409 &&
+        /has no GitHub source/.test(error.message) &&
+        /import it again/.test(error.message),
     );
+    // A checkout an earlier build imported in place is the person's own.
+    const legacy = { ...localRepo, id: "legacy-checkout", path: local, url: "https://github.com/octo/legacy" };
+    store.data.repos.push(legacy);
+    await assert.rejects(
+      withLocale("en", () => workbench.updateRepository(legacy.id)),
+      (error: AppError) => error.statusCode === 409 && /run git pull/.test(error.message),
+    );
+    store.data.repos.pop();
     assert.equal((await git(local, ["rev-parse", "HEAD"])).stdout.trim(), localHead);
 
     // The list tells the UI which repositories BELL may update.

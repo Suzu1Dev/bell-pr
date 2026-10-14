@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { command, redact } from "./process.js";
-import { readDiff, synchronizeReview } from "./git.js";
+import { legacyRunLocale, readDiff, synchronizeReview } from "./git.js";
 import type { TeamAgentRunner } from "./team.js";
 import { maxPlanRevisions } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
@@ -40,8 +40,8 @@ import { analysisRunning } from "./insights.js";
 import { discoveryRunning, resetDiscovery } from "./discovery.js";
 import { synchronizeExplanations } from "./explanations.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
-import { parseLocale, type Locale } from "../shared/i18n/locale.js";
-import { initLog, log } from "./log.js";
+import { parseLocale } from "../shared/i18n/locale.js";
+import { closeLog, initLog, log } from "./log.js";
 import { logged, logRunQueued } from "./run-events.js";
 import { activeFollowUp } from "../shared/followups.js";
 import * as cleanup from "./cleanup.js";
@@ -60,8 +60,6 @@ import * as followUps from "./followup-runs.js";
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
-/** The only language of the builds that saved runs without a locale (as in git.ts readDiff). */
-const legacyRunLocale: Locale = "zh-TW";
 /** How often the retention period is applied while the server runs. */
 const retentionIntervalMs = 24 * 60 * 60 * 1000;
 
@@ -182,6 +180,12 @@ export class Workbench {
       sleep?: TransientSleep;
       /** The plan's limits; Pro with maxActiveRuns when absent (library and tests). */
       entitlements?: () => Entitlements;
+      /**
+       * The app settings of the store's data directory, when the caller
+       * activated them before the store loaded (startServer); read from the
+       * data directory when absent.
+       */
+      appSettings?: AppSettingsService;
     } = {},
   ) {
     this.agentSlots =
@@ -197,7 +201,8 @@ export class Workbench {
       this.base.maxActiveRuns < 1
     )
       throw new Error("Workbench maxActiveRuns must be a positive integer.");
-    this.appSettings = new AppSettingsService(store.directory);
+    this.appSettings =
+      dependencies.appSettings ?? new AppSettingsService(store.directory);
     // Work no request asked for (recovery, the resumed queue, retention)
     // follows the language chosen in the app.
     activateAppSettings(this.appSettings);
@@ -922,9 +927,9 @@ export class Workbench {
     return result;
   }
 
-  /** Disk use per project and run (cleanup.ts), cached for a minute. */
-  async storage() {
-    return cleanup.storageReport(this.context);
+  /** Disk use per project and run (cleanup.ts), cached for a minute unless `refresh`. */
+  async storage(options: { refresh?: boolean } = {}) {
+    return cleanup.storageReport(this.context, options);
   }
 
   async shutdown() {
@@ -941,5 +946,7 @@ export class Workbench {
     for (const controller of this.controllers.values()) controller.abort();
     await Promise.allSettled([...this.jobs, this.maintenance]);
     await this.store.save();
+    // Later entries of this process go to stderr, not this data directory.
+    closeLog(this.store.directory);
   }
 }

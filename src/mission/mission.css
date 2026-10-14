@@ -56,13 +56,6 @@
 .mission-overview [id^="overview-"]:focus:not(:focus-visible) {
   outline: none;
 }
-/* The workspace card clips its corners with overflow: hidden, which would
-   make it the sticky nav's scroll container; clip keeps the corners and
-   lets the nav stick to the page. */
-.review-area:has(.mission-section-nav) {
-  overflow: clip;
-}
-
 .mission-overview-heading,
 .mission-section-heading,
 .mission-project-meta,

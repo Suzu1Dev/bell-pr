@@ -56,16 +56,26 @@ export interface GuardOptions {
   allowedOrigins: string[];
   /**
    * The session secret. When set, every request outside `publicPaths`
-   * needs the `bellpr_session` cookie holding it; without it there is no
-   * sign-in (development mode).
+   * needs the session cookie holding it; without it there is no sign-in
+   * (development mode).
    */
   sessionToken?: string;
   /** Paths reachable without a session, with everything below them. */
   publicPaths: string[];
 }
 
-/** The cookie that carries the session secret. */
-export const sessionCookie = "bellpr_session";
+/**
+ * The cookie that carries the session secret, named after the port in the
+ * address the browser uses (the Host header; 80 or 443 when it names
+ * none). Browsers keep cookies per host, not per port, so two servers on
+ * one host (npx on 4311 and Docker published on 4535, which listens on
+ * 4311 inside its container) would otherwise overwrite each other's cookie
+ * and sign each other out.
+ */
+export function sessionCookieName(req: Request) {
+  const port = /:(\d+)$/.exec(req.headers.host ?? "")?.[1] ?? (req.secure ? "443" : "80");
+  return `bellpr_session_${port}`;
+}
 /** How long a browser stays signed in: 30 days. */
 export const sessionMaxAgeSeconds = 2_592_000;
 
@@ -92,7 +102,7 @@ export function requestCookie(req: Request, name: string) {
 
 /** True when the request carries the session cookie for `sessionToken`. */
 export function hasSession(req: Request, sessionToken: string) {
-  const value = requestCookie(req, sessionCookie);
+  const value = requestCookie(req, sessionCookieName(req));
   return !!value && sameSecret(value, sessionToken);
 }
 

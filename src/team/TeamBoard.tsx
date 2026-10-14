@@ -704,4 +704,3 @@ export function TeamBoard({
     </section>
   );
 }
-export { demoTeam } from "../demo";

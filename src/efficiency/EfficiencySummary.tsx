@@ -77,7 +77,9 @@ export function EfficiencySummary({
   const fmt = useFormat();
   const heading = title ?? t.title;
   const data = demo ? undefined : metrics;
-  const recordedMode = data?.mode ?? mode;
+  // The sample's counts are never shown, but its recorded mode is, unless
+  // the person chose another one for the replay.
+  const recordedMode = data?.mode ?? mode ?? (demo ? metrics?.mode : undefined);
   const measured = !!data?.measuredCalls;
   const tokens = (value: number | undefined) =>
     measured && value !== undefined ? fmt.number(value) : t.notReported;

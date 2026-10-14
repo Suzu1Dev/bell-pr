@@ -415,10 +415,13 @@ button {
 /* Presentation mode (src/app/presentation.ts). present=1 keeps a badge on
    screen while the sample shows; cursor=1 draws a ring around the pointer;
    capture=1 (data-capture on <html>) hides scrollbars and the caret. */
+/* Top center, in the top bar's empty middle: in a corner it covered the
+   review footer's Approve button. */
 .presentation-sample-badge {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 150;
   padding: 6px 12px;
   border: 1px solid var(--color-brand-200);
@@ -835,7 +838,10 @@ button {
   border: 1px solid var(--color-border-strong);
   border-radius: 8px;
   background: var(--color-surface);
-  overflow: hidden;
+  /* clip, not hidden: the corners stay clipped without making the card a
+     scroll container, so sticky content inside (the project overview's
+     section nav) sticks to the page. */
+  overflow: clip;
   box-shadow: var(--shadow-2);
 }
 .review-toolbar {
@@ -1113,6 +1119,9 @@ button {
   min-width: 0;
   overflow: hidden;
   background: var(--color-surface);
+  /* The rules below follow the pane's width, which the file list, the
+     explanation and the sidebar share with it, not the window's. */
+  container: diff-panel / inline-size;
 }
 .diff-topbar {
   height: 45px;
@@ -1136,6 +1145,15 @@ button {
 }
 .diff-topbar-arrow {
   color: var(--color-text-muted);
+}
+/* A narrow pane drops what is said elsewhere, so the file name and the
+   toolbar keep their full width: the run's header names both branches,
+   and the file list shows each file's folder. */
+@container diff-panel (max-width: 640px) {
+  .diff-topbar > span,
+  .rv-breadcrumb {
+    display: none;
+  }
 }
 .worktree-hint {
   display: flex;

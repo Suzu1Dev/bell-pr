@@ -72,7 +72,7 @@ async function standIns(
     (await readFile(calls, "utf8").catch(() => "")).split("\n").filter(Boolean);
 }
 
-test("an import accepts owner/repo and clones GitHub without past file contents", async (t) => {
+test("an import accepts owner/repo and clones GitHub in full", async (t) => {
   const f = await temporary(t);
   const calls = await standIns(f, {
     // No network: every clone fails after it is recorded.
@@ -93,8 +93,11 @@ test("an import accepts owner/repo and clones GitHub without past file contents"
   for (const line of clones) {
     assert.match(
       line,
-      / clone --filter=blob:none --no-recurse-submodules -- https:\/\/github\.com\/octo-org\/hello\.git \S+\/repositories\/octo-org-hello-[0-9a-f]{8}$/,
+      / clone --no-recurse-submodules -- https:\/\/github\.com\/octo-org\/hello\.git \S+\/repositories\/octo-org-hello-[0-9a-f]{8}$/,
     );
+    // A full clone: lazily fetched blobs would miss gh's credentials and
+    // the network that sandboxed agents do not have.
+    assert.doesNotMatch(line, /--filter/);
     // Credentials come from gh alone.
     assert.match(line, /credential\.helper=!gh auth git-credential/);
   }

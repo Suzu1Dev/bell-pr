@@ -12,7 +12,9 @@ export default defineConfig(
     "dist/",
     "build/",
     "vendor/",
-    "site/",
+    // The rendered promo video and its poster; the site's own scripts are
+    // linted below.
+    "site/media/",
     "marketing/",
     "e2e/output/",
     "test-results/",
@@ -54,6 +56,16 @@ export default defineConfig(
       "*.{ts,mjs,js}",
     ],
     languageOptions: { globals: globals.node },
+  },
+  {
+    // The landing site's script runs in the browser; its checker in Node.
+    files: ["site/**/*.js"],
+    languageOptions: { globals: globals.browser, sourceType: "script" },
+  },
+  {
+    // The checker runs in Node; its page.evaluate() callbacks in Chromium.
+    files: ["site/**/*.mjs"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {
     // shared/ runs in both the server and the browser bundle.

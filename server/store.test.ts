@@ -609,8 +609,11 @@ test("save() shares one pending write between the calls made while another write
   assert.notEqual(first, second);
   assert.equal(second, third);
   await Promise.all([first, second, third]);
-  // Once idle, a call starts a write of its own.
-  assert.notEqual(store.save(), second);
+  // Once idle, a call starts a write of its own. It is awaited before the
+  // test ends, so cleanup never removes the directory under a running write.
+  const fourth = store.save();
+  assert.notEqual(fourth, second);
+  await fourth;
 });
 
 test("the data directory is made private, and one owned by another user is refused", async (t) => {

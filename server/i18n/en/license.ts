@@ -100,6 +100,9 @@ export default {
       trial: "Start the 14-day Pro trial",
       activate: "Activate a license key",
     },
+    /** One of the fixes above on its line, then its command. */
+    fixLine: ({ label, command }: { label: string; command: string }) =>
+      `${label}: ${command}`,
     activated: "License activated.",
     deactivated: "License key removed.",
     nothingToRemove: "No license key is saved in this data directory.",

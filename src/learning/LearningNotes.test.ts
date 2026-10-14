@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { splitConceptHeading } from "../../shared/explanations";
-import { demoFiles, getDemo } from "../demo";
+import { getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { DiffFile, Repo } from "../types";
 import {
@@ -12,6 +12,8 @@ import {
   type LearningRecordPage,
   type LearningRun,
 } from "./LearningNotes";
+
+const demoFiles = getDemo("zh-TW").files;
 
 const repos: Repo[] = [
   {

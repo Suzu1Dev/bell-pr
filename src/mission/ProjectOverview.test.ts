@@ -7,10 +7,11 @@ import { freeEntitlements, proEntitlements } from "../../shared/plans";
 import { getDemo } from "../demo";
 import type { PlaybackClock } from "../demo/playback";
 import { assertNoHan, renderEn, renderWith, renderZh } from "../test-utils/render";
-import { demoInsights } from "./demo";
 import { ProjectOverview, type ProjectOverviewProps } from "./ProjectOverview";
 import { playSampleAnalysis, stopSampleAnalysis } from "./sample-analysis";
 import { mount } from "./test-dom";
+
+const demoInsights = getDemo("zh-TW").insights;
 
 const repo = {
   id: "demo-repo",

@@ -13,7 +13,7 @@ import {
 import type { AppSettingsView } from "../../shared/app-settings";
 import type { LicenseSummary } from "../../shared/plans";
 import { api } from "../api";
-import type { Notify, Page, Tab } from "../app/AppShell";
+import type { Page, Tab } from "../app/AppShell";
 import type { Status } from "../app/hooks/useAppData";
 import { usePresentation } from "../app/presentation";
 import { useT } from "../i18n";
@@ -36,10 +36,6 @@ interface SettingsPageProps {
   status: Status | null;
   setStatus: Dispatch<SetStateAction<Status | null>>;
   setApiError: Dispatch<SetStateAction<string>>;
-  /** Unused: each section reports its results in place. */
-  notify?: Notify;
-  /** Unused: the AI provider section edits the shared models in place. */
-  configureContributionModels?: () => void;
   setTab: Dispatch<SetStateAction<Tab>>;
   navigate: (value: Page) => void;
   /**

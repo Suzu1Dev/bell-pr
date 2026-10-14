@@ -15,7 +15,7 @@ import {
   hasSession,
   sameSecret,
   sendSignInPage,
-  sessionCookie,
+  sessionCookieName,
   sessionMaxAgeSeconds,
 } from "../http-guard.js";
 import { sm } from "../i18n/index.js";
@@ -60,7 +60,7 @@ function consumeOneTimeToken(state: SignInState, token: string) {
 /** `Secure` only over HTTPS (through a TLS proxy BELL trusts), never on plain HTTP. */
 function cookieHeader(req: Request, value: string) {
   return [
-    `${sessionCookie}=${value}`,
+    `${sessionCookieName(req)}=${value}`,
     "HttpOnly",
     "SameSite=Strict",
     "Path=/",

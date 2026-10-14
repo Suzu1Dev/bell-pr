@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import type { LicenseSummary } from "../../shared/plans";
-import { demoRun } from "../demo";
+import { getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { RunSummary } from "../types";
 import { Sidebar } from "./Sidebar";
 import { withoutOtherLanguages } from "./test-markup";
+
+const demoRun = getDemo("zh-TW").run;
 
 type Props = Parameters<typeof Sidebar>[0];
 

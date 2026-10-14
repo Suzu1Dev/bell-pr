@@ -135,8 +135,6 @@ const page = (value: Status | null) =>
     status: value,
     setStatus() {},
     setApiError() {},
-    notify() {},
-    configureContributionModels() {},
     setTab() {},
     navigate() {},
     doctor: doctor(null),

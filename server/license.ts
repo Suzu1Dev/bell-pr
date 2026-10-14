@@ -859,7 +859,7 @@ function statusLines(summary: LicenseSummary): string[] {
     lines.push(m.cli.source[summary.source]);
   if (summary.envLocked && summary.source !== "env") lines.push(m.cli.envLocked);
   for (const fix of licenseFixes(summary))
-    lines.push(`${fix.label}: ${fix.command}`);
+    lines.push(m.cli.fixLine({ label: fix.label, command: fix.command }));
   return lines;
 }
 

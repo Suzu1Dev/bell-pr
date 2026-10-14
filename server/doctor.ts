@@ -40,7 +40,12 @@ import { sm } from "./i18n/index.js";
 import { OfflineLicenseService } from "./license.js";
 import { licensePublicKeys, revokedLicenseIds } from "./license-keys.js";
 import { agentEnvironment, command, git, redact } from "./process.js";
-import { allowUnsandboxedAgents, detectClaudeSandbox, type SandboxDetection } from "./sandbox.js";
+import {
+  allowUnsandboxedAgents,
+  detectClaudeSandbox,
+  forgetClaudeSandboxDetection,
+  type SandboxDetection,
+} from "./sandbox.js";
 import { AppError } from "./types.js";
 
 /** Runs one command; `command` from process.ts unless a test replaces it. */
@@ -887,6 +892,9 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
   const key = cacheKey(opts.dataDir);
   let entry = cache.get(key);
   if (opts.force || !entry || Date.now() - entry.time >= cacheMs) {
+    // A forced check also looks for the sandbox tools again (sandbox.ts
+    // keeps that answer for the process otherwise).
+    if (opts.force) forgetClaudeSandboxDetection();
     entry = { time: Date.now(), facts: probe(exec, opts.dataDir) };
     cache.set(key, entry);
   }

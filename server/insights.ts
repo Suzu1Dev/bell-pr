@@ -50,7 +50,7 @@ import {
   type ServerMessages,
 } from "./i18n/index.js";
 import { respondIn } from "./prompt-language.js";
-import { AppError, type Repository, type Run } from "./types.js";
+import { AppError, type Repository } from "./types.js";
 import { lenientRead } from "./persisted-schema.js";
 import { locales, type Locale } from "../shared/i18n/locale.js";
 import { setupError, withCliSetupHint } from "./cli-errors.js";
@@ -619,8 +619,7 @@ export function analysisRunning(store: Store, repoId?: string): boolean {
  * The run-events helpers name a run; an analysis has none, so its log
  * lines carry `analysis:<repoId>` in that field.
  */
-const analysisLogRun = (repoId: string) =>
-  ({ id: `analysis:${repoId}` }) as Run;
+const analysisLogRun = (repoId: string) => ({ id: `analysis:${repoId}` });
 
 /** Separate persistence keeps contribution preferences independent of run lifecycle writes. */
 export class ProjectInsightsService {
