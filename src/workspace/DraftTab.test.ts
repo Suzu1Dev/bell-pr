@@ -4,7 +4,6 @@ import { createElement } from "react";
 import * as draftChecks from "../../shared/draft-checks";
 import type { FollowUpRound } from "../../shared/followups";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
-import { withoutElement } from "../app/test-markup";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Run } from "../types";
 import { DraftTab } from "./DraftTab";
@@ -142,14 +141,6 @@ const render = (
   rounds: Partial<Props["rounds"]> = {},
 ) => renderZh(element(props, draft, rounds));
 
-// The sync panel and the round history belong to the draft panels, which
-// are translated and tested in English on their own.
-const ownMarkup = (html: string) =>
-  withoutElement(
-    withoutElement(html, 'class="sync-panel"'),
-    'class="follow-up-rounds"',
-  );
-
 /** The opening tag of the first element whose attributes match `marker`. */
 const tag = (html: string, marker: RegExp) =>
   html.match(new RegExp(`<[a-z]+[^>]*${marker.source}[^>]*>`))?.[0] ?? "";
@@ -251,7 +242,7 @@ test("an open follow-up round's draft tab reads in English with no Chinese left"
   // The run's own branch sits inside the help sentence as code.
   assert.match(html, /Left empty, <code>fix\/run1<\/code> is used\./);
   assert.match(html, /Once pushed to GitHub, the branch can no longer change/);
-  assertNoHan(ownMarkup(html));
+  assertNoHan(html);
 
   const sync = renderEn(
     element(
@@ -260,7 +251,7 @@ test("an open follow-up round's draft tab reads in English with no Chinese left"
     ),
   );
   assert.match(sync, /This sync adds one merge commit to the PR branch/);
-  assertNoHan(ownMarkup(sync));
+  assertNoHan(sync);
 });
 
 test("maintainer feedback and the next round's form read in English with no Chinese left", () => {
@@ -276,7 +267,7 @@ test("maintainer feedback and the next round's form read in English with no Chin
   assert.match(picked, /Note <span>Optional<\/span>/);
   assert.match(picked, /<span>Line 1<\/span>/);
   assert.match(picked, /Read at /);
-  assertNoHan(ownMarkup(picked));
+  assertNoHan(picked);
   assert.match(
     renderEn(element({}, {}, { followUpSelection: [items[0].url, items[1].url] })),
     /Fix the 2 selected comments</,
@@ -302,7 +293,7 @@ test("maintainer feedback and the next round's form read in English with no Chin
   assert.match(draft, /0 \/ 0 files/);
   assert.match(draft, /There are unsaved edits/);
   assert.match(draft, /Submit as a Draft PR/);
-  assertNoHan(ownMarkup(draft));
+  assertNoHan(draft);
 });
 
 test("the feedback summary formats the time, the checks and the labels for the locale", () => {
@@ -326,7 +317,7 @@ test("the feedback summary formats the time, the checks and the labels for the l
   );
   assert.match(english, /The PR has a label that starts with “needs:”/);
   assert.match(english, /No reviews or comments yet\./);
-  assertNoHan(ownMarkup(english));
+  assertNoHan(english);
   const chinese = render({ run: withChecks });
   assert.match(
     chinese,

@@ -256,13 +256,6 @@ const renderEnglish = (overrides: Partial<ProjectOverviewProps> = {}) =>
     }),
   );
 
-// ModelSummary (src/models) and EfficiencySummary (src/efficiency) have their
-// own English tests; leave their sections out so these tests check the
-// overview's own text.
-const summarySections =
-  /<section class="(?:model|efficiency)-summary"[^>]*>[\s\S]*?<\/section>/g;
-const overviewText = (html: string) => html.replace(summarySections, "");
-
 const en = formatters("en");
 
 test("the English overview has no Han, wherever the overview writes text", () => {
@@ -320,7 +313,7 @@ test("the English overview has no Han, wherever the overview writes text", () =>
   for (const state of states) {
     const html = renderEnglish(state);
     assert.ok(html.length > 0);
-    assertNoHan(overviewText(html));
+    assertNoHan(html);
   }
 });
 

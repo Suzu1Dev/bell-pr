@@ -195,14 +195,6 @@ const englishTeam: AgentTeam = {
 };
 const englishRun: Run = { ...demoRun, team: englishTeam };
 
-// ModelSummary and EfficiencySummary are other components with tests of
-// their own; this file checks the board's own copy.
-const boardOnly = (html: string) =>
-  html.replace(
-    /<section class="(?:model|efficiency)-summary"[\s\S]*?<\/section>/g,
-    "",
-  );
-
 test("the English board renders every phase without Han", () => {
   const [first, second, third, fourth] = englishTeam.tasks;
   const runs: [string, Run, boolean][] = [
@@ -280,7 +272,7 @@ test("the English board renders every phase without Han", () => {
   ];
   for (const [name, run, demo] of runs) {
     const html = renderEn(board(run, demo, async () => {}));
-    assert.doesNotThrow(() => assertNoHan(boardOnly(html)), name);
+    assert.doesNotThrow(() => assertNoHan(html), name);
   }
   const sample = renderEn(board(englishRun, true));
   assert.match(sample, /aria-label="Shared tasks and team messages"/);

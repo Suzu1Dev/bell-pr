@@ -53,7 +53,6 @@ test("the runs list reads in English with no Chinese left", () => {
   assert.match(html, /<small>octo\/widgets · fix\/retry<\/small><\/span><em>In progress<\/em>/);
   assert.match(html, /<small>Interactive demo · /);
   assert.match(html, />New contribution<\/button>/);
-  // The demo run's own title is demo copy, which src/demo checks itself.
-  assertNoHan(html.replace(`<strong>${getDemo("en").run.title}</strong>`, ""));
+  assertNoHan(html);
   assert.match(renderZh(element), /<small>octo\/widgets · fix\/retry<\/small><\/span><em>開發中<\/em>/);
 });

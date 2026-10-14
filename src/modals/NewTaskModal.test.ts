@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { defaultContributionSettings } from "../../shared/insights";
-import { withoutElement } from "../app/test-markup";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Repo } from "../types";
 import { NewTaskModal } from "./NewTaskModal";
@@ -53,11 +52,6 @@ const render = (
   setup: Partial<Props["setup"]> = {},
   props: Partial<Omit<Props, "setup">> = {},
 ) => renderZh(element(setup, props));
-
-// The direction settings inside the dialog belong to the mission panel,
-// which is translated and tested in English on its own.
-const ownMarkup = (html: string) =>
-  withoutElement(html, 'class="direction-settings-container"');
 
 const submit = (html: string) =>
   html.match(/<button class="button primary" type="submit"[^>]*>/)?.[0] ?? "";
@@ -124,19 +118,19 @@ test("the new-task dialog reads in English with no Chinese left", () => {
   assert.match(html, /The task runs with the Codex CLI signed in on this computer/);
   assert.match(html, />Generate the team plan<\/button>/);
   assert.match(html, />Cancel<\/button>/);
-  assertNoHan(ownMarkup(html));
+  assertNoHan(html);
 
   const demo = renderEn(element({ taskRepoId: "demo-repo" }));
   assert.match(demo, /Demo settings can be changed freely; no real agent starts\./);
   assert.match(demo, />Save demo direction<\/button>/);
-  assertNoHan(ownMarkup(demo));
+  assertNoHan(demo);
 
   const loading = renderEn(element({ settingsLoading: true, settingsReady: false }));
   assert.match(loading, /Loading this project&#x27;s contribution settings…/);
-  assertNoHan(ownMarkup(loading));
+  assertNoHan(loading);
   const failed = renderEn(element({ settingsReady: false }));
   assert.match(failed, />Reload project settings<\/button>/);
-  assertNoHan(ownMarkup(failed));
+  assertNoHan(failed);
 
   const solo = renderEn(
     element({
