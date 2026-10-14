@@ -58,7 +58,7 @@ const m: Translation<typeof en> = {
     stars: "星數",
   },
   locked: {
-    body: "即時探索會搜尋 GitHub，並請你的 AI provider 評估每個專案，屬於 Pro 功能；你已有的結果仍可閱讀。",
+    body: "即時探索會搜尋 GitHub，並請你的 AI 服務評估每個專案，屬於 Pro 功能；你已有的結果仍可閱讀。",
     startTrial: ({ days }) => `開始 ${fmt.number(days)} 天試用`,
     upgrade: "升級到 Pro",
   },
