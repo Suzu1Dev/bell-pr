@@ -4,11 +4,19 @@ import { agentProviders } from "../../shared/models.js";
 import { AppError } from "../types.js";
 import type { RouteDeps } from "./types.js";
 
-/** CLI readiness with the configured limits, and the model catalogs. */
+/**
+ * CLI readiness with the configured limits and, after a start that had to
+ * repair state.json, what was repaired; and the model catalogs.
+ */
 export function registerStatusRoutes(app: Express, { workbench }: RouteDeps) {
   app.get("/api/status", async (_req, res) => {
     // CLI checks stay behind the 10-second cache; the limits are static config.
-    res.json({ ...(await workbench.status()), limits: workbench.limits });
+    const recovery = workbench.store.recovery;
+    res.json({
+      ...(await workbench.status()),
+      limits: workbench.limits,
+      ...(recovery ? { recovery } : {}),
+    });
   });
   app.get("/api/models", async (req, res) => {
     // Without a provider the Codex catalog is returned, as before.
