@@ -149,7 +149,8 @@ also contains a written offer for their source code. <!-- claim:EULA-26 -->
 7.1 The Software works through tools you install and sign in to yourself:
 git, the GitHub CLI, and the OpenAI Codex CLI or Claude Code. It uses those
 tools, and the Third-Party Services behind them, under your own accounts. <!-- claim:EULA-27 -->
-It never reads or stores the passwords or tokens those tools keep. <!-- claim:EULA-28 -->
+It does not store the passwords or tokens those tools keep; it only asks
+the tools whether you are signed in. <!-- claim:EULA-28 -->
 
 7.2 Each Third-Party Service's own terms and policies govern your use of it.
 You are responsible for following them and for any fees, usage limits and

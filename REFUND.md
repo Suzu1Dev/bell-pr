@@ -74,7 +74,8 @@ After the refund window ends, we refund only where the law requires it. <!-- cla
 
 When we refund an order or seats, or a payment is charged back, we revoke
 the License Keys for the refunded seats, and the Pro License for them ends
-(EULA section 16). <!-- claim:REFUND-14 -->
+(EULA section 16). A revocation covers a whole License Key, so if a key also
+holds seats that you keep, we send you a new key for those seats. <!-- claim:REFUND-14 -->
 Stop using Pro with those keys and remove them: in the License section of
 Settings, with `bell-pr license deactivate`, or by removing
 `BELLPR_LICENSE_KEY` if you set the key there. <!-- claim:REFUND-15 -->

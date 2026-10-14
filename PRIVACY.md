@@ -48,9 +48,9 @@ and what we do with data when you buy a Pro license or contact us. <!-- claim:PR
 - Its web interface loads nothing from other sites. Fonts and icons are
   bundled with the app (self-hosted), and its content security policy
   blocks requests to other sites. <!-- claim:PRIV-09 -->
-- It does not read or store the passwords and tokens of the tools it runs.
-  git, the GitHub CLI, the Codex CLI and Claude Code keep their own
-  sign-ins. <!-- claim:PRIV-10 -->
+- It does not store the passwords and tokens of the tools it runs. git, the
+  GitHub CLI, the Codex CLI and Claude Code keep their own sign-ins; BELL PR
+  only asks them whether you are signed in. <!-- claim:PRIV-10 -->
 
 ## What leaves your computer, and where it goes
 
@@ -58,14 +58,18 @@ BELL PR runs command-line tools that you installed and signed in to. Those
 tools send data to their providers under your accounts. Each provider's own
 terms and privacy policy decide what it keeps, for how long, and whether it
 may use the data to train models. <!-- claim:PRIV-11 -->
-The tools may also send their own usage data to their providers, as their
-own settings decide; BELL PR neither adds to it nor turns it off. <!-- claim:PRIV-12 -->
+The tools may also send their own usage data to their providers; BELL PR
+neither adds to that data nor turns it off. BELL PR starts each agent CLI
+with only the environment variables it needs to run and sign in, and starts
+the Codex CLI without its `config.toml`, so a usage-data setting that you
+made in another environment variable, or in that file, does not reach the
+agents BELL PR runs. <!-- claim:PRIV-12 -->
 
 ### The AI coding CLI you choose
 
 Contribution runs, project analysis, discovery, explanations, follow-up
-questions, pull request drafts, maintainer-feedback coaching and follow-up
-rounds use the OpenAI Codex CLI or Claude Code. The CLI sends data to its
+questions, pull request drafts, maintainer-feedback coaching, conflict
+resolution and follow-up rounds use the OpenAI Codex CLI or Claude Code. The CLI sends data to its
 provider: OpenAI for the Codex CLI, and Anthropic for Claude Code, or the
 cloud platform you set Claude Code up to use, such as Amazon Bedrock,
 Google Vertex AI or Microsoft Foundry. <!-- claim:PRIV-13 -->

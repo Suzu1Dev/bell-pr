@@ -161,7 +161,8 @@ same courts, as section 18 of the EULA names. <!-- claim:TERMS-33 -->
 
 What Free and Pro include in this Build, generated from the same source as
 the plan comparison in the app. Section 4 of the EULA governs the license
-term. <!-- claim:TERMS-34 -->
+term, and the privacy policy says which web pages and search services agents
+with web access may use. <!-- claim:TERMS-34 -->
 
 <!-- generated:plan-table locale=en -->
 
