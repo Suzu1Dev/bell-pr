@@ -337,11 +337,12 @@ export async function gitNetwork(
 
 /**
  * Repository settings that can make Git run a command or send credentials
- * somewhere else. `git config --get-regexp` matches lower-cased section and
- * key names, so the pattern is lower case; subsection names keep their case.
+ * or pushes somewhere else (`url.<base>.insteadOf` rewrites GitHub URLs).
+ * `git config --get-regexp` matches lower-cased section and key names, so
+ * the pattern is lower case; subsection names keep their case.
  */
 const unsafeConfigPattern =
-  "^(filter|diff|merge)\\.|^core\\.(sshcommand|pager|editor|askpass|fsmonitor|hookspath)|^credential\\.|^protocol\\.|^include(if)?\\.";
+  "^(filter|diff|merge)\\.|^core\\.(sshcommand|pager|editor|askpass|fsmonitor|hookspath|alternaterefscommand)|^credential\\.|^protocol\\.|^include(if)?\\.|^url\\.";
 
 /**
  * Of the keys the pattern lists, the ones that really name a program or
@@ -349,7 +350,7 @@ const unsafeConfigPattern =
  * `diff.renames` or `merge.conflictStyle` cannot run anything.
  */
 function unsafeConfigKey(key: string) {
-  if (/^(?:filter|credential|protocol|include|includeif)\./.test(key))
+  if (/^(?:filter|credential|protocol|include|includeif|url)\./.test(key))
     return true;
   if (/^core\./.test(key)) return true;
   if (key === "diff.external") return true;
@@ -359,27 +360,30 @@ function unsafeConfigKey(key: string) {
 
 /**
  * Refuses a repository whose own configuration (`.git/config`, and the
- * worktree configuration when enabled) defines filters, diff or merge
- * drivers, a pager, editor, password prompt, SSH command, file monitor or
- * hooks path, credential helpers, protocol rules or includes. BELL's own
- * clones never have them, so finding one means the repository was changed
- * by hand or by an agent; nothing more runs in it.
+ * worktree's `config.worktree` when enabled) defines filters, diff or merge
+ * drivers, a pager, editor, password prompt, SSH command, file monitor,
+ * hooks path or alternate-refs command, credential helpers, protocol
+ * rules, URL rewrites or includes. BELL's own clones never have them, so
+ * finding one means the repository was changed by hand or by an agent;
+ * nothing more runs in it. The person's global and system configuration
+ * are theirs and are not checked.
  */
 export async function assertGitConfigSafe(directory: string) {
   const { stdout, code } = await git(
     directory,
-    ["config", "--local", "--null", "--get-regexp", unsafeConfigPattern],
+    ["config", "--show-scope", "--null", "--get-regexp", unsafeConfigPattern],
     { allowedCodes: [0, 1] },
   );
   if (code !== 0) return;
-  const keys = [
-    ...new Set(
-      stdout
-        .split("\0")
-        .map((entry) => entry.split("\n", 1)[0])
-        .filter((key) => key && unsafeConfigKey(key)),
-    ),
-  ];
+  // Each entry is "<scope>\0<key>\n<value>\0".
+  const fields = stdout.split("\0");
+  const found = new Set<string>();
+  for (let at = 0; at + 1 < fields.length; at += 2) {
+    const key = fields[at + 1].split("\n", 1)[0];
+    if (["local", "worktree"].includes(fields[at]) && unsafeConfigKey(key))
+      found.add(key);
+  }
+  const keys = [...found];
   if (!keys.length) return;
   throw new AppError(
     (m) => m.security.gitConfigUnsafe({ keys: keys.slice(0, 5) }),

@@ -162,11 +162,13 @@ other's keys, and no agent receives GitHub tokens or a BELL PR license key.
 - **Repository configuration.** Before a diff is read, a teammate's work is
   integrated or a snapshot taken, a checkout is synced, an agent's moved
   HEAD is put back, or anything is published, BELL PR refuses a repository
-  whose own configuration defines filters, diff or merge drivers, a pager,
-  editor, password prompt, SSH command, file-system monitor or hooks path,
-  credential helpers, protocol rules or includes (error code
-  `git_config_unsafe`). A `.gitattributes` file in the project can name a
-  driver, but only configuration can define one.
+  whose own configuration (`.git/config` or the worktree's
+  `config.worktree`) defines filters, diff or merge drivers, a pager,
+  editor, password prompt, SSH command, file-system monitor, hooks path or
+  alternate-refs command, credential helpers, protocol rules, URL rewrites
+  or includes (error code `git_config_unsafe`). Your global and system
+  configuration are not checked. A `.gitattributes` file in the project
+  can name a driver, but only configuration can define one.
 - **Teammate checkouts.** Before Git runs in a teammate's checkout, its
   `.git` must be a plain file pointing at `<repository>/worktrees/<name>`,
   and Git's own record of that worktree must point back at it.

@@ -203,6 +203,8 @@ test("a repository whose own Git configuration could run commands is refused", a
     ["protocol.ext.allow", "always"],
     ["include.path", "/tmp/other.config"],
     ["includeIf.gitdir:/tmp/.path", "/tmp/other.config"],
+    ["core.alternateRefsCommand", "touch pwned"],
+    ["url.https://evil.example/.insteadOf", "https://github.com/"],
   ]) {
     await git(directory, ["config", key, value]);
     await assert.rejects(
@@ -216,5 +218,24 @@ test("a repository whose own Git configuration could run commands is refused", a
     );
     await git(directory, ["config", "--unset-all", key]);
   }
+  await assertGitConfigSafe(directory);
+
+  // The worktree's own configuration counts as the repository's.
+  await git(directory, ["config", "extensions.worktreeConfig", "true"]);
+  await assertGitConfigSafe(directory);
+  await git(directory, ["config", "--worktree", "filter.w.clean", "touch pwned"]);
+  await assert.rejects(assertGitConfigSafe(directory), (error: unknown) =>
+    error instanceof AppError && error.code === "git_config_unsafe",
+  );
+  await git(directory, ["config", "--worktree", "--unset", "filter.w.clean"]);
+
+  // The person's global configuration is theirs: Git LFS filters and URL
+  // rewrites there are not the repository's doing.
+  const global = path.join(directory, "global.gitconfig");
+  await writeFile(
+    global,
+    '[filter "lfs"]\n\tclean = git-lfs clean -- %f\n[url "git@github.com:"]\n\tinsteadOf = https://github.com/\n',
+  );
+  withEnv(t, { GIT_CONFIG_GLOBAL: global });
   await assertGitConfigSafe(directory);
 });
