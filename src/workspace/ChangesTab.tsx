@@ -155,11 +155,13 @@ export function ChangesTab({
   } = actions;
   const reviewGridRef = useRef<HTMLDivElement>(null);
   function changeCodeFont(delta: number) {
-    setCodeFont((current) => {
-      const next = Math.max(12, Math.min(20, current + delta));
+    const next = Math.max(12, Math.min(20, codeFont + delta));
+    setCodeFont(next);
+    try {
       localStorage.setItem("bellpr-code-font", String(next));
-      return next;
-    });
+    } catch {
+      // Not remembered after a reload; the current session still works.
+    }
   }
   function startResize(event: React.PointerEvent<HTMLDivElement>) {
     event.preventDefault();

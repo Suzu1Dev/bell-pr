@@ -109,9 +109,13 @@ function AppShell() {
   const [showFiles, setShowFiles] = useState(true);
   const [showExplanation, setShowExplanation] = useState(true);
   const [focusMode, setFocusMode] = useState(false);
-  const [codeFont, setCodeFont] = useState(
-    () => Number(localStorage.getItem("bellpr-code-font")) || 14,
-  );
+  const [codeFont, setCodeFont] = useState(() => {
+    try {
+      return Number(localStorage.getItem("bellpr-code-font")) || 14;
+    } catch {
+      return 14;
+    }
+  });
   const [explanationWidth, setExplanationWidth] = useState(340);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
