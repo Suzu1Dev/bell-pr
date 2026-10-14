@@ -49,7 +49,8 @@ import {
   retryTransientAuth,
 } from "./agent-cli.js";
 import { draftFingerprint } from "./drafts.js";
-import { cancelled, sm } from "./i18n/index.js";
+import { cancelled, currentLocale, sm } from "./i18n/index.js";
+import type { Locale } from "../shared/i18n/locale.js";
 import { createRunWorktree } from "./repositories.js";
 import {
   coordinationPrompt,
@@ -59,7 +60,6 @@ import {
   memberPrompt,
   memberTurnPrompt,
   reviewerPrompt,
-  teamBoundaries,
   testerPrompt,
   webBoundaries,
 } from "./prompts/team.js";
@@ -427,19 +427,21 @@ export async function runIndependentReview(
   signal: AbortSignal,
 ) {
   const reviewContext = independentReviewContext(run, files, leadReport);
+  // Both callers run under the run's locale (withRunLocale).
+  const locale = currentLocale();
   const results = await Promise.allSettled([
     runAgent(
       ctx,
       run,
       "reviewer",
-      reviewerPrompt(reviewContext),
+      reviewerPrompt(reviewContext, locale),
       signal,
     ),
     runAgent(
       ctx,
       run,
       "tester",
-      testerPrompt(reviewContext, run.team),
+      testerPrompt(reviewContext, run.team, locale),
       signal,
     ),
   ]);
@@ -452,7 +454,7 @@ async function executeTeamTask(
   ctx: WorkbenchContext,
   run: Run,
   task: TeamTask,
-  boundaries: string,
+  locale: Locale,
   reportSchema: string,
   signal: AbortSignal,
 ) {
@@ -489,7 +491,7 @@ async function executeTeamTask(
     });
     ctx.log(run, task.owner, sm().run.team.taskClaimed({ title: task.title }));
     await ctx.store.save();
-    const context = memberPrompt(boundaries, run, team, task);
+    const context = memberPrompt(locale, run, team, task);
     // Commands seen across all turns of this task; stored only when the CLI reported some.
     const checks: TeamCheck[] = task.checks ?? [];
     for (let turn = 0; turn < 3; turn++) {
@@ -586,7 +588,7 @@ async function executeTeamTask(
 async function executeTeamTasks(
   ctx: WorkbenchContext,
   run: Run,
-  boundaries: string,
+  locale: Locale,
   reportSchema: string,
   signal: AbortSignal,
 ) {
@@ -603,7 +605,7 @@ async function executeTeamTasks(
           ctx,
           run,
           task,
-          boundaries,
+          locale,
           reportSchema,
           workerSignal,
         )
@@ -656,7 +658,8 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
       );
       await ctx.store.save();
     }
-    const boundaries = teamBoundaries;
+    // The run's locale: the Workbench queue runs executeRun under withRunLocale.
+    const locale = currentLocale();
     const team = run.team;
     if (!team) throw new AppError((m) => m.run.team.legacyRun, 409);
     if (!team.tasks.length) {
@@ -667,7 +670,7 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
         run,
         "lead",
         leadPlanPrompt(
-          boundaries,
+          locale,
           run,
           team.config.maxTeammates,
           revisions,
@@ -711,7 +714,7 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
     }
     team.phase = "developing";
     await ctx.store.save();
-    await executeTeamTasks(ctx, run, boundaries, reportSchema, signal);
+    await executeTeamTasks(ctx, run, locale, reportSchema, signal);
     const files = await readDiff(run);
     if (!files.length) throw new AppError((m) => m.run.team.noChanges, 422);
     team.phase = "integrating";
@@ -722,7 +725,7 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
       ctx,
       run,
       "lead",
-      integrationPrompt(boundaries, run, team, diffContext),
+      integrationPrompt(locale, run, team, diffContext),
       signal,
     );
     run.reports!.implementer = implementation;
@@ -733,7 +736,7 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
         ctx,
         run,
         "lead",
-        coordinationPrompt(boundaries, run, diffContext, implementation),
+        coordinationPrompt(locale, run, diffContext, implementation),
         signal,
       );
     }

@@ -966,7 +966,7 @@ test("agent CLI notices, outcomes and failures follow the locale in effect", asy
     ],
   );
   assert.doesNotMatch(JSON.stringify(events), cjk);
-  // The same events read under zh-TW keep their Traditional Chinese text.
+  // The same events read under zh-TW keep their zh-TW text.
   const chinese = withLocale("zh-TW", () =>
     agentEventReader("claude")({
       type: "result",

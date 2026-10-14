@@ -28,6 +28,7 @@ import type { ContributionSettings } from "../shared/insights.js";
 import { ProjectInsightsService } from "./insights.js";
 import { AgentSlots } from "./agent-slots.js";
 import { withLocale } from "./i18n/index.js";
+import { outputLanguage, respondIn } from "./prompt-language.js";
 
 const settings: ContributionSettings = {
   direction: "feature",
@@ -465,10 +466,12 @@ test("member results accept the structured report, the earlier string report and
   });
 
   // Intent text keeps only the five user-written fields and skips empty ones.
+  // Its labels are English like the prompt around them; the values are the
+  // person's own words.
   assert.equal(contributionIntentText(undefined), "");
   assert.equal(
     contributionIntentText({ ...settings, targetUser: "", outcome: " " }),
-    "需求：feature\n限制：保留 API\n驗收條件：既有測試通过",
+    "Direction: feature\nConstraints: 保留 API\nAcceptance criteria: 既有測試通过",
   );
 });
 
@@ -567,8 +570,8 @@ test("team execution waits for plan approval, runs isolated independent members 
       assert.match(input.prompt, /complete teaching explanation/);
       // The mentor gets the user's contribution settings and the named
       // reviewer/tester reports, labelled as untrusted static review.
-      assert.match(input.prompt, /限制：保留 API/);
-      assert.match(input.prompt, /驗收條件：既有測試通过/);
+      assert.match(input.prompt, /Constraints: 保留 API/);
+      assert.match(input.prompt, /Acceptance criteria: 既有測試通过/);
       assert.match(
         input.prompt,
         /UNTRUSTED DATA[^\n]*\n\{"reviewer":"獨立靜態審查：未發現問題；本輪未執行專案程式碼。","tester":"獨立靜態審查：未發現問題；本輪未執行專案程式碼。"\}/,
@@ -619,12 +622,17 @@ test("team execution waits for plan approval, runs isolated independent members 
       cwd: input.cwd,
     });
     // Members get the person's intent and their task, not runtime settings.
-    assert.match(input.prompt, /驗收條件：既有測試通过/);
+    assert.match(input.prompt, /Acceptance criteria: 既有測試通过/);
     assert.doesNotMatch(
       input.prompt,
       /worktreePath|reasoningEffort|requirePlanApproval|ponytailMode/,
     );
-    assert.match(input.prompt, /report\.tradeoffs \(設計取捨\)/);
+    assert.match(input.prompt, /report\.tradeoffs names the alternatives/);
+    assert.ok(
+      input.prompt.includes(
+        `Finish with the report object in ${outputLanguage("zh-TW")}:`,
+      ),
+    );
     running.add(taskId);
     peak = Math.max(peak, running.size);
     if (taskId === "alpha" || taskId === "beta") await barrier;
@@ -2051,10 +2059,14 @@ if (prompt.includes('You are the team lead with read-only access')) {
 /** Han characters and CJK punctuation; the Latin middle dot is not one. */
 const cjk = /(?!\u00B7)[\p{Script_Extensions=Han}\u3000-\u303F\uFF00-\uFFEF]/u;
 
-/** An English team: a two-task plan, members that report and message the lead, and reviewers. */
+/**
+ * An English team: a two-task plan, members that report and message the
+ * lead, and reviewers. Team prompts are collected in `options.prompts`.
+ */
 const englishTeam =
-  (options: { failBetaOnce?: boolean } = {}): TeamAgentRunner =>
+  (options: { failBetaOnce?: boolean; prompts?: string[] } = {}): TeamAgentRunner =>
   async (input) => {
+    options.prompts?.push(input.prompt);
     if (input.role === "lead") {
       if (input.prompt.includes("You are the team lead"))
         return JSON.stringify({
@@ -2121,7 +2133,8 @@ const settled = (run: Run) =>
   );
 
 test("a run created under en records its locale, and its log, agent details and errors stay in English", async () => {
-  const f = await fixture(englishTeam({ failBetaOnce: true }));
+  const prompts: string[] = [];
+  const f = await fixture(englishTeam({ failBetaOnce: true, prompts }));
   try {
     const run = await withLocale("en", () =>
       f.workbench.createRun(
@@ -2184,13 +2197,22 @@ test("a run created under en records its locale, and its log, agent details and 
     );
     // The default locale (zh-TW in these tests) does not leak into the run.
     assert.doesNotMatch(JSON.stringify(run.logs), /開始工作|領取任務/);
+    // Every team agent was asked to answer in English: the plan, both
+    // members (beta twice), integration, reviewer and test analyst.
+    assert.equal(prompts.length, 7);
+    for (const prompt of prompts) {
+      // A retried task's first turn leads with why the last attempt failed.
+      assert.ok(prompt.includes(`${respondIn("en")} `), prompt.slice(0, 80));
+      assert.ok(!prompt.includes(outputLanguage("zh-TW")));
+    }
   } finally {
     await f.cleanup();
   }
 });
 
 test("a run's background work keeps the run's locale when a request in another locale resumes it", async () => {
-  const f = await fixture(englishTeam());
+  const prompts: string[] = [];
+  const f = await fixture(englishTeam({ prompts }));
   try {
     // Created under the zh-TW default, then approved and re-reviewed from en requests.
     const run = await f.workbench.createRun(
@@ -2218,6 +2240,11 @@ test("a run's background work keeps the run's locale when a request in another l
       ),
     );
     assert.match(run.team!.tasks[0].report!, /驗證證據/);
+    // The agents answer in the run's language, not the approving request's.
+    assert.ok(prompts.length >= 6);
+    for (const prompt of prompts)
+      assert.ok(prompt.startsWith(respondIn("zh-TW")), prompt.slice(0, 80));
+    const before = prompts.length;
     // The review rerun is background work of the run as well. It can start
     // once the run's own job has let go of the run.
     const deadline = Date.now() + 8000;
@@ -2239,6 +2266,12 @@ test("a run's background work keeps the run's locale when a request in another l
     assert.equal(
       run.logs.at(-1)?.message,
       "獨立審查已更新；報告是建議，審閱狀態與核准不變。",
+    );
+    assert.deepEqual(
+      prompts
+        .slice(before)
+        .map((prompt) => prompt.startsWith(respondIn("zh-TW"))),
+      [true, true],
     );
   } finally {
     await f.cleanup();

@@ -17,21 +17,25 @@ export function contributionIntent(settings: ContributionSettings | undefined) {
   return { direction, targetUser, outcome, constraints, acceptance };
 }
 
-/** Labelled lines for prompts; empty fields are skipped, no settings yields "". */
+/**
+ * Labelled lines for prompts; empty fields are skipped, no settings yields "".
+ * The labels are English in every locale, like the prompt around them; the
+ * values are the person's own words.
+ */
 export function contributionIntentText(
   settings: ContributionSettings | undefined,
 ) {
   const intent = contributionIntent(settings);
   const labels: [keyof typeof intent, string][] = [
-    ["direction", "需求"],
-    ["targetUser", "目標使用者"],
-    ["outcome", "預期結果"],
-    ["constraints", "限制"],
-    ["acceptance", "驗收條件"],
+    ["direction", "Direction"],
+    ["targetUser", "Target users"],
+    ["outcome", "Expected outcome"],
+    ["constraints", "Constraints"],
+    ["acceptance", "Acceptance criteria"],
   ];
   return labels
     .filter(([key]) => intent[key]?.trim())
-    .map(([key, label]) => `${label}：${intent[key]!.trim()}`)
+    .map(([key, label]) => `${label}: ${intent[key]!.trim()}`)
     .join("\n");
 }
 

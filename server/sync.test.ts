@@ -14,6 +14,7 @@ import { readDiff } from "./git.js";
 import { filesWithConflictMarkers, labelConflictMarkers } from "./sync.js";
 import { AppError, type Run } from "./types.js";
 import type { TeamAgentRunner } from "./team.js";
+import { outputLanguage, respondIn } from "./prompt-language.js";
 
 async function getJson(url: string) {
   return new Promise<any>((resolve, reject) => {
@@ -466,6 +467,10 @@ test("a conflict resolution works in the run's locale, whatever the locale of th
     await f.workbench.resolveConflicts(f.run.id);
     await until(() => f.run.status === "review");
     assert.match(prompt, /hello\.ts/);
+    assert.ok(prompt.startsWith(respondIn("en")));
+    assert.ok(!prompt.includes(outputLanguage("zh-TW")));
+    // The labels written into the files stay English.
+    assert.match(prompt, /labelled "latest main"/);
     assert.equal(
       f.run.logs.at(-1)?.message,
       "The agent resolved the merge conflicts; review these files one by one.",

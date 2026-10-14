@@ -24,10 +24,10 @@ import {
   worktreeDirty,
 } from "./pr-branch.js";
 import { runAgent } from "./run-executor.js";
-import { contributionContext, teamBoundaries } from "./prompts/team.js";
+import { contributionContext } from "./prompts/team.js";
 import { followUpPrompt } from "./prompts/followups.js";
 import { log } from "./log.js";
-import { shuttingDown, sm } from "./i18n/index.js";
+import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 const now = () => new Date().toISOString();
@@ -181,7 +181,8 @@ async function runFollowUp(
       run,
       "followup",
       followUpPrompt({
-        boundaries: teamBoundaries,
+        // The run's locale: startFollowUp runs this job under withRunLocale.
+        locale: currentLocale(),
         contributionContext: contributionContext(run),
         pullRequest: {
           url: run.prUrl!,

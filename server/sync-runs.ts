@@ -32,10 +32,10 @@ import {
   worktreeDirty,
 } from "./pr-branch.js";
 import { runAgent } from "./run-executor.js";
-import { contributionContext, teamBoundaries } from "./prompts/team.js";
+import { contributionContext } from "./prompts/team.js";
 import { conflictPrompt } from "./prompts/sync.js";
 import { log } from "./log.js";
-import { shuttingDown, sm } from "./i18n/index.js";
+import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 const now = () => new Date().toISOString();
@@ -389,7 +389,8 @@ async function runConflictResolution(
       run,
       "sync",
       conflictPrompt({
-        boundaries: teamBoundaries,
+        // The run's locale: resolveConflicts runs this job under withRunLocale.
+        locale: currentLocale(),
         contributionContext: contributionContext(run),
         task: { title: run.title, prompt: run.prompt },
         baseBranch: run.baseBranch,

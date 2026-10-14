@@ -23,7 +23,7 @@ export interface FollowUpRound {
   status: "running" | "review" | "published" | "failed" | "cancelled" | "discarded";
   /** The PR head this round builds on; the round's commit has it as parent. */
   parentCommit: string;
-  /** What the agent changed and why, in Traditional Chinese. */
+  /** What the agent changed and why, in the run's language. */
   report?: string;
   addressed?: { url: string; change: string }[];
   notAddressed?: { url: string; reason: string }[];
