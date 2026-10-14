@@ -349,6 +349,12 @@ test("About shows the versions and the local documents, and no link for an empty
   await expect(dialog).toBeVisible();
   // Home is behind it; the address names About until it closes.
   await expect(homeHeading(page)).toHaveText(home.tagline);
+  // It counts as the open dialog: "?" opens no user guide over it.
+  await page.keyboard.press("Shift+?");
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  expect(await page.getByRole("dialog").count()).toBe(1);
   const version = (await (await page.request.get("/api/health")).json()).version;
   await expect(dialog.locator("dd").nth(1)).toHaveText(version);
   await expect(dialog.locator("dd").first()).toHaveText(version);

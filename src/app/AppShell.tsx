@@ -607,6 +607,8 @@ function AppShell({
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing || modal || commandOpen || blocked) return;
+      // #/about shows its dialog without setting `modal`; it is open all the same.
+      if (currentRoute()?.name === "about") return;
       if (event.key === "Escape") setFocusMode(false);
       // "?" opens the guide unless the reader is typing in a field.
       const typing = (event.target as Element | null)?.closest(
