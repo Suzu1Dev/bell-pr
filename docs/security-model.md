@@ -44,8 +44,11 @@ what BELL PR trusts, what it does not, and the limits of each protection.
   (`/auth?t=…`). That link carries the session secret itself, so it works
   until the server restarts: keep it, and any log that holds it (terminal
   scrollback, `docker logs`, the journal), as private as a password.
-  Opening it sets the cookie `bellpr_session`
-  (`HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000`, that is 30 days).
+  Opening it sets the cookie `bellpr_session_<port>`, for example
+  `bellpr_session_4311` (`HttpOnly; SameSite=Strict; Path=/;
+  Max-Age=2592000`, that is 30 days). Browsers keep cookies per host, not per
+  port, so the port in the name keeps two servers on one machine (say `npx`
+  on 4311 and Docker on 4535) from signing each other out.
   Every API request except `/api/health` and the sign-in page itself needs
   the cookie; it is compared in constant time. Without it the API answers
   `401` with the code `auth_required`, and a page load shows a sign-in page

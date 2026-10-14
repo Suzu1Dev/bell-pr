@@ -15,9 +15,10 @@ import {
   hasSession,
   sameSecret,
   sendSignInPage,
-  sessionCookie,
+  sessionCookieName,
   sessionMaxAgeSeconds,
 } from "../http-guard.js";
+import { defaultPort } from "../config.js";
 import { sm } from "../i18n/index.js";
 import { setAgentDataDirectory } from "../sandbox.js";
 import type { RouteDeps } from "./types.js";
@@ -30,6 +31,8 @@ export const oneTimeTokenLimit = 5;
 interface SignInState {
   /** The session secret; sign-in links exist only when there is one. */
   sessionToken?: string;
+  /** The session cookie's name, which carries the server's port. */
+  cookieName: string;
   /** Digest of each outstanding one-time token → when it expires (ms). */
   oneTimeTokens: Map<string, number>;
 }
@@ -58,9 +61,9 @@ function consumeOneTimeToken(state: SignInState, token: string) {
 }
 
 /** `Secure` only over HTTPS (through a TLS proxy BELL trusts), never on plain HTTP. */
-function cookieHeader(req: Request, value: string) {
+function cookieHeader(req: Request, name: string, value: string) {
   return [
-    `${sessionCookie}=${value}`,
+    `${name}=${value}`,
     "HttpOnly",
     "SameSite=Strict",
     "Path=/",
@@ -72,6 +75,7 @@ function cookieHeader(req: Request, value: string) {
 export function registerAuthRoutes(app: Express, deps: RouteDeps) {
   const state: SignInState = {
     sessionToken: deps.options.sessionToken,
+    cookieName: sessionCookieName(deps.options.port ?? defaultPort),
     oneTimeTokens: new Map(),
   };
   app.locals.signIn = state;
@@ -93,8 +97,9 @@ export function registerAuthRoutes(app: Express, deps: RouteDeps) {
         !!token &&
         token.length <= 512 &&
         (sameSecret(token, session) || consumeOneTimeToken(state, token));
-      if (accepted) res.setHeader("Set-Cookie", cookieHeader(req, session));
-      else if (!hasSession(req, session)) {
+      if (accepted)
+        res.setHeader("Set-Cookie", cookieHeader(req, state.cookieName, session));
+      else if (!hasSession(req, session, state.cookieName)) {
         sendSignInPage(res, 401, { linkInvalid: !!token });
         return;
       }

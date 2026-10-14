@@ -8,11 +8,15 @@ import { AppError } from "./types.js";
 import { redact } from "./process.js";
 import { DiscoveryService } from "./discovery.js";
 import type { AgentSlots } from "./agent-slots.js";
-import { localhostGuard, parseAllowedOrigins } from "./http-guard.js";
+import {
+  localhostGuard,
+  parseAllowedOrigins,
+  sessionCookieName,
+} from "./http-guard.js";
 import { fixedLicense, type LicenseService } from "./license.js";
 import type { ApiErrorBody } from "../shared/errors.js";
 import { formatters, htmlLang, parseLocale } from "../shared/i18n/locale.js";
-import { defaultStaticDir } from "./config.js";
+import { defaultPort, defaultStaticDir } from "./config.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
 import { log } from "./log.js";
 import { registerAppSettingsRoutes } from "./routes/app-settings.js";
@@ -107,7 +111,7 @@ export interface AppOptions {
 
 export function createApp(workbench: Workbench, options: AppOptions = {}) {
   const {
-    port = 4311,
+    port = defaultPort,
     frontendPort = 4310,
     dev = false,
     staticDirectory = defaultStaticDir(),
@@ -160,6 +164,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
         ),
       ],
       sessionToken: options.sessionToken,
+      sessionCookie: sessionCookieName(port),
       publicPaths: ["/api/health", "/auth"],
     }),
   );
