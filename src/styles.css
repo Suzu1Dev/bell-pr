@@ -412,6 +412,57 @@ button {
   font: inherit;
   color: var(--color-text-muted);
 }
+/* Presentation mode (src/app/presentation.ts). present=1 keeps a badge on
+   screen while the sample shows; cursor=1 draws a ring around the pointer;
+   capture=1 (data-capture on <html>) hides scrollbars and the caret. */
+.presentation-sample-badge {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 150;
+  padding: 6px 12px;
+  border: 1px solid var(--color-brand-200);
+  border-radius: var(--radius-pill);
+  background: var(--color-brand-50);
+  color: var(--color-brand-700);
+  box-shadow: var(--shadow-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  pointer-events: none;
+}
+.presentation-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border: 2px solid var(--color-brand-600);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-brand-300) 35%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.06s linear,
+    scale 0.12s ease,
+    opacity 0.2s;
+}
+.presentation-cursor.is-visible {
+  opacity: 1;
+}
+.presentation-cursor.is-pressed {
+  scale: 0.8;
+  background: color-mix(in srgb, var(--color-brand-500) 45%, transparent);
+}
+[data-capture],
+[data-capture] * {
+  scrollbar-width: none;
+  caret-color: transparent;
+}
+[data-capture] *::-webkit-scrollbar {
+  display: none;
+}
 /* Read by screen readers, not shown: live regions and extra labels. */
 .visually-hidden {
   position: absolute;

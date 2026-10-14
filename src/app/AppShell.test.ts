@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
-import { SessionEndedNotice } from "./AppShell";
+import { PresentationCursor, SessionEndedNotice } from "./AppShell";
 
 test("an ended session says how to sign in again, in English with no Chinese left", () => {
   const html = renderEn(createElement(SessionEndedNotice, { onDismiss() {} }));
@@ -15,5 +15,12 @@ test("an ended session says how to sign in again, in English with no Chinese lef
   assert.match(
     renderZh(createElement(SessionEndedNotice, { onDismiss() {} })),
     /<strong>工作階段已結束。<\/strong>/,
+  );
+});
+
+test("the presentation cursor is a ring that assistive technology skips", () => {
+  assert.equal(
+    renderEn(createElement(PresentationCursor)),
+    '<div class="presentation-cursor" aria-hidden="true"></div>',
   );
 });

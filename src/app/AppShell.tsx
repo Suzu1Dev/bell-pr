@@ -221,6 +221,33 @@ function useSessionEnded() {
   return [ended, setEnded] as const;
 }
 
+/**
+ * cursor=1: a ring that follows the mouse, so a recording or a screen share
+ * shows where the presenter points. It never takes a click.
+ */
+export function PresentationCursor() {
+  const ring = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const move = (event: PointerEvent) => {
+      const node = ring.current;
+      if (!node) return;
+      node.style.transform = `translate(${event.clientX}px, ${event.clientY}px)`;
+      node.classList.add("is-visible");
+    };
+    const press = () => ring.current?.classList.add("is-pressed");
+    const release = () => ring.current?.classList.remove("is-pressed");
+    window.addEventListener("pointermove", move, { passive: true });
+    window.addEventListener("pointerdown", press);
+    window.addEventListener("pointerup", release);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerdown", press);
+      window.removeEventListener("pointerup", release);
+    };
+  }, []);
+  return <div ref={ring} className="presentation-cursor" aria-hidden="true" />;
+}
+
 /** The ended session: the command that prints a new sign-in link. */
 export function SessionEndedNotice({ onDismiss }: { onDismiss: () => void }) {
   const t = useT("app");
@@ -844,6 +871,12 @@ function AppShell({
     notify(repoMessages.list.deleted({ name: repo.fullName }));
   }
 
+  // Presenting the sample (or its playback): a badge says it is sample data.
+  const showingSample =
+    presentation.play ||
+    (page === "workspace" && demo) ||
+    (page === "explore" && exploreRepo === sample.repo);
+
   /** The sample's import played in the browser: list it and open it. */
   function openImportedSample(repo: Repo) {
     closeModal();
@@ -1163,6 +1196,10 @@ function AppShell({
       )}
       {/* Mounted once: every 402 and locked control opens it. */}
       <UpgradeDialog summary={entitlements.summary} demo={presentation.play} />
+      {presentation.present && showingSample && (
+        <p className="presentation-sample-badge">{t.presentation.sampleBadge}</p>
+      )}
+      {presentation.cursor && <PresentationCursor />}
       {/* Outside the inert shell in the page, so it alone stays usable. */}
       {blocked &&
         createPortal(
