@@ -40,13 +40,17 @@
   white-space: nowrap;
   border: 0;
 }
+/* The name and the actions share a row while both fit. In a narrow pane
+   the actions move below the name, and a name longer than the row wraps,
+   so no file name is cut off. */
 .rv-file-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-1) 12px;
   min-height: 50px;
-  padding: 0 17px;
+  padding: 6px 17px;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-bg);
   flex-shrink: 0;
@@ -67,9 +71,7 @@
 .rv-file-path strong {
   color: var(--color-text);
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .rv-breadcrumb {
   display: flex;
@@ -95,10 +97,15 @@
   max-width: 72px;
   overflow: hidden;
 }
+/* In a pane too narrow for the whole row (the collapsed rail at 768 px),
+   the reviewed checkbox wraps instead of being cut off at the edge. */
 .rv-file-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 7px;
+  margin-left: auto;
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   white-space: nowrap;
@@ -1470,14 +1477,11 @@
 }
 @media (max-width: 600px) {
   .rv-file-header {
-    padding: 0 10px;
+    padding: 6px 10px;
     gap: 5px;
   }
   .rv-file-path {
     gap: 5px;
-  }
-  .rv-file-path strong {
-    max-width: 140px;
   }
   .rv-file-language {
     display: none;

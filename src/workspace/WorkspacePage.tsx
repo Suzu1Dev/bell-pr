@@ -210,7 +210,7 @@ export function WorkspacePage({
             className="button secondary new-task-button"
             onClick={() => beginContribution()}
           >
-            <Plus size={15} /> {t.newContribution}
+            <Plus size={15} /> <span className="new-task-label">{t.newContribution}</span>
           </button>
         </div>
         <div className="title-row">

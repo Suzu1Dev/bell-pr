@@ -13,6 +13,12 @@
   font-size: var(--text-sm);
   white-space: nowrap;
 }
+/* The tabs fill the top edge of the review card, which clips its overflow,
+   and up to 1100 px the tab row scrolls sideways: an outer focus ring
+   would be cut off. */
+:root .review-tabs > [role="tab"]:focus-visible {
+  box-shadow: var(--focus-ring-inset);
+}
 .review-toolbar {
   height: 58px;
 }
@@ -258,6 +264,10 @@
     clip-path: inset(50%);
     width: 1px;
     height: 1px;
+    /* A padded badge (PRO) would keep a box larger than 1 px, and the
+       overflow check would read its hidden text as cut off. */
+    padding: 0;
+    border: 0;
     overflow: hidden;
     white-space: nowrap;
   }
@@ -470,10 +480,11 @@
   .is-reading:not(.is-sidebar-collapsed):not(.is-focused) .pane-resizer {
     display: none;
   }
-  .is-reading:not(.is-sidebar-collapsed) .review-toolbar {
+  /* Every tab scrolls the tab row sideways when it does not fit. */
+  .review-toolbar {
     overflow-x: auto;
   }
-  .is-reading:not(.is-sidebar-collapsed) .review-tabs {
+  .review-tabs {
     flex-shrink: 0;
   }
   .is-reading .diff-topbar > span {

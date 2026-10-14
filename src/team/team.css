@@ -275,6 +275,17 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+  container: team-kanban / inline-size;
+}
+/* Too narrow for three readable lanes (the activity tab on a tablet): the
+   lanes stack, as they do on a phone. */
+@container team-kanban (max-width: 560px) {
+  .team-lane {
+    grid-column: 1 / -1;
+  }
+  .team-kanban.has-tasks .team-lane.is-empty {
+    display: none;
+  }
 }
 .team-lane {
   min-width: 0;
@@ -309,6 +320,7 @@
 }
 .team-task-label {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 5px;
   font-size: var(--text-2xs);
