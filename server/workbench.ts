@@ -6,6 +6,7 @@ import { command, git, agentEnvironment, redact } from "./process.js";
 import {
   parseGitHubSource,
   baseFileLines,
+  checkoutLineCount,
   readDiff,
   reviewFingerprint,
   synchronizeReview,
@@ -91,6 +92,12 @@ import {
 } from "../shared/draft-checks.js";
 import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
 import {
+  parseWalkthrough,
+  synchronizeWalkthroughs,
+  walkthroughJsonSchema,
+  walkthroughPrompt,
+} from "./walkthroughs.js";
+import {
   commandEnvironment,
   installBoundaries,
   setupInstruction,
@@ -170,6 +177,8 @@ export class Workbench {
   private runJobs = new Map<string, Set<Promise<void>>>();
   private locks = new Map<string, Promise<unknown>>();
   private explanationJobs = new Map<string, Promise<void>>();
+  /** One walkthrough per run and file at a time, keyed `${runId}\0${path}`. */
+  private walkthroughJobs = new Map<string, Promise<void>>();
   private draftJobs = new Map<string, Promise<void>>();
   /** Learner-requested reviewer/tester reruns; one per run, aborted through controllers[run.id]. */
   private reviewJobs = new Map<string, Promise<void>>();
@@ -2226,6 +2235,7 @@ export class Workbench {
     const run = this.run(id);
     const files = await readDiff(run);
     synchronizeExplanations(run, files);
+    synchronizeWalkthroughs(run, files);
     synchronizeDraftPreparation(run, files);
     if (run.status !== "published") {
       synchronizeReview(run, files);
@@ -2239,6 +2249,101 @@ export class Workbench {
       );
     await this.store.save();
     return files;
+  }
+
+  /**
+   * Explains the functions around one file's changes, from the current
+   * checkout, with a read-only agent that may search for callers. Cached by
+   * the file's diff fingerprint; a result for an older diff is discarded.
+   */
+  async walkthrough(id: string, filePath: string, retry = false) {
+    if (this.stopping) throw new AppError("服務正在關閉，請稍後重試。", 503);
+    const run = this.run(id);
+    if (!readableStatuses.includes(run.status) || run.publishing)
+      throw new AppError("請等待開發完成後再產生程式碼解說。", 409);
+    const key = `${id}\0${filePath}`;
+    const existing = this.walkthroughJobs.get(key);
+    if (existing) await existing;
+    else {
+      const file = (await this.lock(id, () => this.diff(id))).find(
+        (entry) => entry.path === filePath,
+      );
+      if (!file) throw new AppError("找不到此差異檔案。", 404);
+      const wanted =
+        file.walkthroughStatus === "pending" ||
+        (retry && file.walkthroughStatus === "failed");
+      if (wanted) {
+        const job = this.generateWalkthrough(run, file).finally(() => {
+          this.walkthroughJobs.delete(key);
+          this.jobs.delete(job);
+        });
+        this.walkthroughJobs.set(key, job);
+        this.jobs.add(job);
+        await job;
+      }
+    }
+    return { run, files: await this.lock(id, () => this.diff(id)) };
+  }
+
+  private async generateWalkthrough(run: Run, file: DiffFile) {
+    const controller = new AbortController();
+    // Ends with the run id, so runBusy and cancellation see it.
+    const key = `walkthrough:${file.path}:${run.id}`;
+    this.controllers.set(key, controller);
+    run.walkthroughs![file.path] = {
+      fingerprint: file.fingerprint,
+      status: "generating",
+    };
+    let temporary: string | undefined;
+    try {
+      await this.store.save();
+      temporary = await mkdtemp(path.join(os.tmpdir(), "bell-walkthrough-"));
+      const outputSchema = path.join(temporary, "walkthrough-schema.json");
+      await writeFile(outputSchema, JSON.stringify(walkthroughJsonSchema), {
+        mode: 0o600,
+      });
+      const answer = await this.runAgent(
+        run,
+        "walkthrough",
+        walkthroughPrompt({
+          contributionContext: `${run.title}\n${this.contributionContext(run)}`,
+          file,
+        }),
+        controller.signal,
+        true,
+        // Isolated keeps it offline and out of the team inbox; it still reads this checkout.
+        { outputSchema, isolated: true },
+      );
+      const content = parseWalkthrough(
+        answer,
+        await checkoutLineCount(run, file.path),
+      );
+      const current = (await readDiff(run)).find(
+        (entry) => entry.path === file.path,
+      );
+      // The file changed while the agent read it: the next diff asks again.
+      if (current?.fingerprint !== file.fingerprint || current.blocked) return;
+      run.walkthroughs![file.path] = {
+        fingerprint: file.fingerprint,
+        status: "ready",
+        content,
+        generatedAt: now(),
+      };
+    } catch (error) {
+      const stored = run.walkthroughs?.[file.path];
+      const message = controller.signal.aborted
+        ? "程式碼解說已中斷，可以重試。"
+        : redact(
+            error instanceof Error ? error.message : "程式碼解說產生失敗，請重試。",
+          );
+      if (stored?.fingerprint === file.fingerprint && stored.status === "generating")
+        run.walkthroughs![file.path] = { ...stored, status: "failed", error: message };
+      this.log(run, "walkthrough", `${file.path} 的程式碼解說未完成：${message}`);
+    } finally {
+      if (this.controllers.get(key) === controller) this.controllers.delete(key);
+      if (temporary) await rm(temporary, { recursive: true, force: true });
+      await this.store.save();
+    }
   }
 
   /**

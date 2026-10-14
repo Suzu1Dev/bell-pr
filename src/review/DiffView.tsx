@@ -18,6 +18,7 @@ import {
   expandDiff,
   languageBadges,
   parseDiff,
+  revealLines,
   selectionQuestion,
   splitDiff,
   type DiffLine,
@@ -35,6 +36,8 @@ export interface DiffViewProps {
   hasNote?: boolean;
   /** Reads the base version of a modified file, so the code around its changes can be shown. */
   onLoadBase?: () => Promise<string[]>;
+  /** Lines of the current file to mark, such as a walkthrough step; shown and scrolled to. */
+  highlight?: { startLine: number; endLine: number };
 }
 
 /** Lines one click on an expand arrow shows. */
@@ -78,6 +81,7 @@ export function DiffView({
   view,
   hasNote,
   onLoadBase,
+  highlight,
 }: DiffViewProps) {
   const parsed = useMemo(
     () => (file.blocked ? [] : parseDiff(file.patch)),
@@ -121,6 +125,46 @@ export function DiffView({
   }, [version]);
   // Shown lines are renumbered whenever more code appears.
   useEffect(() => setSelection(null), [file.blocked, lines]);
+
+  const highlightStart = highlight?.startLine;
+  const highlightEnd = highlight?.endLine;
+  const scrollPending = useRef(false);
+  const codeScroll = useRef<HTMLDivElement>(null);
+  const highlighted = (line: DiffLine) =>
+    highlightStart !== undefined &&
+    highlightEnd !== undefined &&
+    line.kind !== "removed" &&
+    line.newLine !== null &&
+    line.newLine >= highlightStart &&
+    line.newLine <= highlightEnd;
+  // A marked range outside the shown hunks opens just enough of the file.
+  useEffect(() => {
+    if (highlightStart === undefined || highlightEnd === undefined) return;
+    scrollPending.current = true;
+    const shown = new Set(lines.map((line) => line.newLine));
+    let missing = false;
+    for (let line = highlightStart; line <= highlightEnd && !missing; line++)
+      missing = !shown.has(line);
+    if (!missing || !readable) return;
+    let active = true;
+    void readBase().then((value) => {
+      // A range chosen or cleared meanwhile must not open the old one.
+      if (value && active)
+        setReveal((current) =>
+          revealLines(parsed, value, current, highlightStart, highlightEnd),
+        );
+    });
+    return () => {
+      active = false;
+    };
+  }, [highlightStart, highlightEnd, version]);
+  useEffect(() => {
+    if (!scrollPending.current) return;
+    const first = codeScroll.current?.querySelector(".rv-line-highlighted");
+    if (!first) return;
+    scrollPending.current = false;
+    first.scrollIntoView?.({ block: "center", behavior: "smooth" });
+  }, [lines, highlightStart, highlightEnd]);
 
   /** The base version, read once per diff version; null when it cannot be read. */
   function readBase(): Promise<string[] | null> {
@@ -212,7 +256,7 @@ export function DiffView({
     return (
       <div
         key={`${side ?? "unified"}-${line.id}`}
-        className={`rv-line rv-line-${line.kind}${line.expanded ? " rv-line-expanded" : ""}${isSelected ? " rv-line-selected" : ""}`}
+        className={`rv-line rv-line-${line.kind}${line.expanded ? " rv-line-expanded" : ""}${highlighted(line) ? " rv-line-highlighted" : ""}${isSelected ? " rv-line-selected" : ""}`}
         role="button"
         tabIndex={0}
         aria-pressed={isSelected}
@@ -382,7 +426,7 @@ export function DiffView({
           </p>
         </div>
       ) : (
-        <div className="rv-code-scroll">
+        <div className="rv-code-scroll" ref={codeScroll}>
           {view === "split" ? (
             <div className="rv-split-content">
               <div className="rv-split-labels">

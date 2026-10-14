@@ -19,12 +19,14 @@ import {
   RotateCcw,
   Shuffle,
   Sparkles,
+  Workflow,
 } from "lucide-react";
 import type { LearnerNote } from "../../shared/explanations";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
 import { parseReviewOrder } from "../../shared/review-order";
 import type { ChatMessage, DiffFile, Run } from "../types";
 import { MarkdownContent } from "./MarkdownContent";
+import { WalkthroughCards } from "./WalkthroughCards";
 import "./review.css";
 
 export interface ExplanationPanelProps {
@@ -49,7 +51,17 @@ export interface ExplanationPanelProps {
   /** Re-runs the reviewer and test analyst on the current diff; the button renders when given. */
   onRerunReview?: () => void;
   reviewBusy?: boolean;
+  /** The current-file lines a walkthrough part marks in the diff. */
+  highlight?: { startLine: number; endLine: number };
+  onHighlight?: (range: { startLine: number; endLine: number } | undefined) => void;
+  onRetryWalkthrough?: () => void;
+  walkthroughBusy?: boolean;
+  /** The tab to open on; the panel remounts per file, so the caller keeps the reader's choice. */
+  initialTab?: PanelTab;
+  onTabChange?: (tab: PanelTab) => void;
 }
+
+export type PanelTab = "explain" | "walkthrough" | "reports" | "chat";
 
 /** Longest module path that is the file itself or one of its parent directories. */
 export function moduleFor(
@@ -263,10 +275,17 @@ export function ExplanationPanel({
   feedback = [],
   onRerunReview,
   reviewBusy,
+  highlight,
+  onHighlight,
+  onRetryWalkthrough,
+  walkthroughBusy,
+  initialTab = "explain",
+  onTabChange,
 }: ExplanationPanelProps) {
-  const [tab, setTab] = useState<"explain" | "reports" | "chat">(
-    chatRequestId ? "chat" : "explain",
+  const [tab, setTab] = useState<PanelTab>(
+    chatRequestId ? "chat" : initialTab,
   );
+  useEffect(() => onTabChange?.(tab), [tab]);
   const [question, setQuestion] = useState("");
   const [showAnswer, setShowAnswer] = useState(false);
   const [noteDraft, setNoteDraft] = useState(note?.text ?? "");
@@ -278,9 +297,13 @@ export function ExplanationPanel({
   useEffect(() => {
     setQuestion("");
     setShowAnswer(false);
-    // Reports are run-level, so stay on that tab when the reader clicks through files.
+    // Reports are run-level and walkthroughs are read file after file, so those tabs stay.
     setTab((current) =>
-      chatRequestId ? "chat" : current === "reports" ? "reports" : "explain",
+      chatRequestId
+        ? "chat"
+        : current === "reports" || current === "walkthrough"
+          ? current
+          : "explain",
     );
     lastMessageCount.current = messages.length;
   }, [file.path]);
@@ -393,6 +416,18 @@ export function ExplanationPanel({
         >
           <BookOpen size={14} />
           變更解說
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id={`${panelId}-walkthrough`}
+          aria-selected={tab === "walkthrough"}
+          aria-controls={`${panelId}-content`}
+          className={tab === "walkthrough" ? "explain-tab-active" : ""}
+          onClick={() => setTab("walkthrough")}
+        >
+          <Workflow size={14} />
+          程式碼解說
         </button>
         <button
           type="button"
@@ -739,6 +774,15 @@ export function ExplanationPanel({
               </section>
             )}
           </>
+        ) : tab === "walkthrough" ? (
+          <WalkthroughCards
+            file={file}
+            demo={demo}
+            highlight={highlight}
+            onHighlight={onHighlight}
+            onRetry={onRetryWalkthrough}
+            busy={walkthroughBusy}
+          />
         ) : tab === "reports" ? (
           <ReviewReports
             file={file}

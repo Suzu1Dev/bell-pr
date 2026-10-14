@@ -1,3 +1,4 @@
+import type { FileWalkthrough, StoredWalkthrough } from "../shared/walkthroughs.js";
 import type {
   ChangeExplanation,
   ExplanationStatus,
@@ -63,6 +64,8 @@ export interface Run {
   draftPreparation?: DraftPreparation;
   modelExecution?: ModelExecution;
   explanations?: Record<string, StoredExplanation>;
+  /** Walkthroughs of the functions around each change; absent before they existed. */
+  walkthroughs?: Record<string, StoredWalkthrough>;
   efficiency?: EfficiencyMetrics;
   id: string;
   repoId: string;
@@ -120,6 +123,9 @@ export interface DiffFile {
   explanation?: ChangeExplanation;
   explanationStatus?: ExplanationStatus;
   explanationError?: string;
+  walkthrough?: FileWalkthrough;
+  walkthroughStatus?: ExplanationStatus;
+  walkthroughError?: string;
   path: string;
   language: string;
   additions: number;

@@ -77,6 +77,17 @@ claude auth login   # 只在要改用 Claude Code 時需要
 
 每批最多 8 份完整 diff、100 KB，以唯讀方式處理；被阻擋或單檔超過上限的差異會標明原因。產生失敗不影響已完成的開發成果，可在該檔案解說頁重試。解說與追問分開保存，背景結果不會切換正在閱讀的頁籤。卡片和問答支援 Markdown 段落、清單、行內程式碼、程式碼區塊與表格。
 
+### 程式碼解說
+
+變更解說只看 diff；「程式碼解說」則解釋每段變更所在的函式原本怎麼運作，讓你在判斷修改前先讀懂原本的邏輯。開發完成後，BELL 會在背景依序為每個修改過的程式檔產生，先從你正在看的檔案開始；解說面板的「程式碼解說」分頁會顯示：
+
+- 函式名稱與範圍，以及它現在怎麼運作（用途、輸入、輸出、副作用）和這次修改與它的關係；
+- 逐步拆解：2–8 段依序的程式碼，點一段就在 diff 裡標亮那幾行，範圍在 diff 以外時會自動展開剛好需要的行並捲到該處；
+- 誰呼叫它、它呼叫什麼（Agent 實際搜尋這個 repository 得到，附檔案與行號）；
+- 換個方式想的生活比喻，以及一題答案先收起來的自我檢查。
+
+每個檔案一次唯讀的 Agent 呼叫，不開放上網：Claude Code 只能使用 Read、Grep、Glob 讀取與搜尋這次工作的目錄；Codex 在唯讀沙盒中執行，無法寫入，但能否執行唯讀指令由沙盒決定，提示詞要求它不修改、不執行專案程式碼；行號一律指變更後的版本，超出檔案或函式範圍的段落與不安全的路徑會被丟棄。結果依 diff 版本快取，檔案改變後會重新產生；失敗可在分頁重試，服務重啟時中斷的會標示失敗。新增、刪除、被阻擋的檔案，Markdown、JSON、YAML、CSS、HTML 等沒有函式的檔案，以及差異超過 100 KB 的檔案不產生；一次工作最多自動解說 12 個程式檔，其餘可在「追問 Agent」詢問。用量依角色列在「程式碼解說」。示範資料為 `src/client.ts` 準備了一份。
+
 ### 協作方式
 
 這是由 **Codex CLI 或 Claude Code CLI 逐回合驅動的 BELL 協作引擎**，並非 Claude Code 原生 Agent Teams。Lead 先產生 1–8 個子任務，指定各任務的檔案範圍與相依關係；排程器在依賴完成後認領任務，最多同時執行設定的 2–4 位 teammates。每位 teammate 在獨立 worktree 中取得自己的任務、依賴報告與團隊訊息，修改超出分配範圍的檔案會被拒絕整合。
@@ -169,7 +180,7 @@ PR 草稿會優先採用目標專案的 `CONTRIBUTING`、PR 模板與相關投�
 模型設定的「Agent」可改選 **Claude Code**，所有專案共用。BELL 直接呼叫本機 `claude -p`，沿用 `claude auth login` 的 Claude 訂閱登入；傳給 Agent 的環境變數不包含 `ANTHROPIC_API_KEY`，因此不會改走 API 計費。「設定」頁會顯示 Claude Code CLI 是否已安裝與登入。Claude Code 每回合通常比 Codex 預設慢，BELL 對 Claude Code 的回合逾時為基準的 2.5 倍（見「模型與思考強度」），任務日誌與探索進度訊息會顯示最多等待的分鐘數，專案分析則寫入伺服器記錄。
 
 - 模型清單為固定的別名 `opus`、`sonnet`、`fable`、`haiku`，各自指向該系列的最新模型；Claude Code 沒有列出模型的指令，實際可用模型依訂閱方案而定。選「Claude Code 預設」時不傳 `--model`。Haiku 不提供思考強度選項，其餘為 low–max。Claude Code 會在 `system/init` 事件回報解析後的實際模型 ID（例如別名 `haiku` 對應 `claude-haiku-4-5-20251001`）與 CLI 版本，BELL 記錄後在任務、專案分析與探索的模型摘要顯示為「傳入 → 回報」，若結果事件 `modelUsage` 出現了其他模型，會另列出本次執行呼叫過的模型；這些是 CLI 回報值，不是供應端帳單，費用欄位不會顯示。
-- 專案分析與探索不開放任何工具，只讀 BELL 提供的節錄並以 `--json-schema` 回傳結構化結果；Lead、Reviewer、Test analyst 與解說只能使用 Read、Grep、Glob；Teammates 可使用 Read、Grep、Glob、Edit、Write 與 Bash。檔案編輯以 `acceptEdits` 限制在工作目錄內，但 **Bash 不在沙箱中執行**；除下列拒絕規則外，其餘 Bash 指令可存取這台機器上服務帳號能存取的任何檔案與網路。
+- 專案分析與探索不開放任何工具，只讀 BELL 提供的節錄並以 `--json-schema` 回傳結構化結果；Lead、Reviewer、Test analyst、變更解說、追問與程式碼解說只能使用 Read、Grep、Glob；Teammates 可使用 Read、Grep、Glob、Edit、Write 與 Bash。檔案編輯以 `acceptEdits` 限制在工作目錄內，但 **Bash 不在沙箱中執行**；除下列拒絕規則外，其餘 Bash 指令可存取這台機器上服務帳號能存取的任何檔案與網路。
 - Teammates 的 Bash 以 `--disallowedTools` 拒絕 `git push`、`gh`、`curl`、`wget` 開頭的指令（拒絕規則優先於允許規則），推送與 PR 仍由 BELL 自己的流程處理。這是縱深防禦，不是沙箱：實測中 `git push --dry-run origin HEAD` 與 `curl https://example.com` 被 Claude Code 回絕為「Permission to use Bash with command … has been denied」，並列在結果事件的 `permission_denials`；`git status` 與 `git log` 照常執行並回傳輸出。被拒絕的工具（`system/permission_denied` 事件與結果的 `permission_denials`）會即時寫入任務日誌，讓你看得出 teammate 是因權限被拒才沒跑某個指令；這不會讓任務失敗。
 - 開啟「允許 Agent 上網搜尋與讀取網頁」時，唯讀與可寫角色的 `--tools` 與 `--allowedTools` 會加上 Claude Code 內建的 `WebSearch` 與 `WebFetch`；`curl`、`wget` 的拒絕規則不變，`WebFetch` 是讀取網頁的唯一途徑，專案分析與探索（不開放工具）不受影響。實測（Claude Code 2.1.292、`haiku`、唯讀加上網）：`system/init` 的工具清單列出 `WebFetch`、`WebSearch`，助理事件的 `tool_use` 帶 `{ name: "WebSearch", input: { query } }` 與 `{ name: "WebFetch", input: { url, prompt } }`，BELL 只把查詢字串或網址寫進日誌。
 - 執行時加上 `--strict-mcp-config`，不載入 claude.ai 連接器（Gmail、Drive 等）或其他 MCP 伺服器，避免 Agent 讀到不可信內容時被誘導使用你的帳號服務。

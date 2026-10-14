@@ -340,6 +340,16 @@ export function createApp(
       .parse(req.body);
     res.json(await workbench.explanations(req.params.id, options));
   });
+  app.post("/api/runs/:id/walkthroughs", async (req, res) => {
+    const { filePath, retry } = z
+      .object({
+        filePath: z.string().min(1).max(1024),
+        retry: z.boolean().optional(),
+      })
+      .strict()
+      .parse(req.body);
+    res.json(await workbench.walkthrough(req.params.id, filePath, retry));
+  });
   app.post("/api/runs/:id/draft/prepare", async (req, res) => {
     const options = z
       .object({ refresh: z.boolean().optional() })

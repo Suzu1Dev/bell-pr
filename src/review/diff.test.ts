@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   expandDiff,
+  revealLines,
   languageBadge,
   languageBadges,
   parseDiff,
@@ -198,4 +199,21 @@ test("the whole file rebuilds both versions with every line number in order", ()
   const rows = splitDiff(shown);
   assert.ok(rows.every((row) => !row.hunk));
   assert.equal(rows.find((row) => row.left?.text === "line 30")?.right?.newLine, 31);
+});
+
+test("revealing a range opens upward above a change and downward below it, no further", () => {
+  const parsed = parseDiff(twoHunks);
+  // A function from line 14 to 26 (new numbers) wraps the second hunk (new 18–24).
+  const reveal = revealLines(parsed, oldFile, {}, 14, 26);
+  assert.deepEqual(reveal, {
+    1: { below: 0, above: 4 },
+    2: { below: 2, above: 0 },
+  });
+  const shown = expandDiff(parsed, oldFile, reveal, true);
+  const numbers = new Set(shown.map((line) => line.newLine));
+  for (let line = 14; line <= 26; line++) assert.ok(numbers.has(line), `line ${line}`);
+  assert.ok(!numbers.has(12));
+  assert.ok(!numbers.has(27));
+  // Lines already shown leave the reveal as it was.
+  assert.deepEqual(revealLines(parsed, oldFile, reveal, 15, 16), reveal);
 });

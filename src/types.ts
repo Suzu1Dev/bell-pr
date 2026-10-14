@@ -1,3 +1,4 @@
+import type { FileWalkthrough, StoredWalkthrough } from "../shared/walkthroughs";
 import type {
   ChangeExplanation,
   ExplanationStatus,
@@ -97,6 +98,8 @@ export interface Run {
   reports?: Record<string, string>;
   /** Stored per-file explanations keyed by path; the learning page aggregates the ready ones. */
   explanations?: Record<string, StoredExplanation>;
+  /** Walkthroughs of the functions around each change; absent before they existed. */
+  walkthroughs?: Record<string, StoredWalkthrough>;
   prUrl?: string;
   /** The GitHub branch a publish already pushed to; the branch field is locked once set. */
   publishedBranch?: string;
@@ -127,6 +130,9 @@ export interface DiffFile {
   explanation?: ChangeExplanation;
   explanationStatus?: ExplanationStatus;
   explanationError?: string;
+  walkthrough?: FileWalkthrough;
+  walkthroughStatus?: ExplanationStatus;
+  walkthroughError?: string;
   hunks?: unknown;
   blocked?: string;
 }

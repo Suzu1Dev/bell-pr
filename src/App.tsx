@@ -318,6 +318,22 @@ export default function App() {
   const pendingChats = useRef(new Set<string>());
   const [chatRequests, setChatRequests] = useState<Record<string, number>>({});
   const pendingExplanations = useRef(new Set<string>());
+  // One walkthrough request at a time; each is a full agent turn.
+  const pendingWalkthrough = useRef(false);
+  const [walkthroughBusy, setWalkthroughBusy] = useState(false);
+  /** Current-file lines a walkthrough part marks in the diff. */
+  const [highlight, setHighlight] = useState<{
+    runId: string;
+    path: string;
+    /** The diff version the line numbers belong to. */
+    fingerprint?: string;
+    startLine: number;
+    endLine: number;
+  } | null>(null);
+  /** The learning panel's tab, kept as the reader moves from file to file. */
+  const [panelTab, setPanelTab] = useState<
+    "explain" | "walkthrough" | "reports" | "chat"
+  >("explain");
   const [explanationRequests, setExplanationRequests] = useState<Set<string>>(
     new Set(),
   );
@@ -813,6 +829,60 @@ export default function App() {
       return;
     void prepareExplanations(run.id);
   }, [run.id, demo, active, files, prepareExplanations]);
+
+  const requestWalkthrough = useCallback(
+    async (id: string, filePath: string, retry = false) => {
+      if (pendingWalkthrough.current) return;
+      pendingWalkthrough.current = true;
+      setWalkthroughBusy(true);
+      const epoch = draftMutationEpoch.current;
+      if (runIdRef.current === id)
+        setFiles((previous) =>
+          previous.map((value) =>
+            value.path === filePath
+              ? { ...value, walkthroughStatus: "generating", walkthroughError: undefined }
+              : value,
+          ),
+        );
+      try {
+        const result = await api<{ files: DiffFile[]; run: Run }>(
+          `/runs/${id}/walkthroughs`,
+          send("POST", { filePath, retry }),
+        );
+        if (runIdRef.current !== id) return;
+        setFiles(result.files);
+        setRun((previous) =>
+          epoch === draftMutationEpoch.current ? result.run : previous,
+        );
+      } catch (error) {
+        if (runIdRef.current === id)
+          setFiles((previous) =>
+            previous.map((value) =>
+              value.path === filePath && value.walkthroughStatus === "generating"
+                ? {
+                    ...value,
+                    walkthroughStatus: "failed",
+                    walkthroughError: (error as Error).message,
+                  }
+                : value,
+            ),
+          );
+      } finally {
+        pendingWalkthrough.current = false;
+        setWalkthroughBusy(false);
+      }
+    },
+    [],
+  );
+
+  // Walkthroughs are prepared one file at a time, the file being read first.
+  useEffect(() => {
+    if (demo || active || walkthroughBusy) return;
+    const waiting = files.filter((value) => value.walkthroughStatus === "pending");
+    const next =
+      waiting.find((value) => value.path === selectedPath) ?? waiting[0];
+    if (next) void requestWalkthrough(run.id, next.path);
+  }, [run.id, demo, active, files, selectedPath, walkthroughBusy, requestWalkthrough]);
 
   function changeCodeFont(delta: number) {
     setCodeFont((current) => {
@@ -2609,6 +2679,13 @@ export default function App() {
                               ? () => loadBaseLines(run.id, file)
                               : undefined
                           }
+                          highlight={
+                            highlight?.runId === run.id &&
+                            highlight.path === file.path &&
+                            highlight.fingerprint === file.fingerprint
+                              ? highlight
+                              : undefined
+                          }
                         />
                       ) : (
                         <div className="empty-state">
@@ -2691,6 +2768,38 @@ export default function App() {
                                   }))
                                 }
                                 explanationBusy={explanationRequests.has(run.id)}
+                                highlight={
+                                  highlight?.runId === run.id &&
+                                  highlight.path === file.path &&
+                                  highlight.fingerprint === file.fingerprint
+                                    ? highlight
+                                    : undefined
+                                }
+                                onHighlight={(range) =>
+                                  setHighlight(
+                                    range
+                                      ? {
+                                          runId: run.id,
+                                          path: file.path,
+                                          fingerprint: file.fingerprint,
+                                          ...range,
+                                        }
+                                      : null,
+                                  )
+                                }
+                                onRetryWalkthrough={
+                                  demo
+                                    ? undefined
+                                    : () =>
+                                        void requestWalkthrough(
+                                          run.id,
+                                          file.path,
+                                          true,
+                                        )
+                                }
+                                walkthroughBusy={walkthroughBusy}
+                                initialTab={panelTab === "chat" ? "explain" : panelTab}
+                                onTabChange={setPanelTab}
                                 demo={demo}
                                 reports={run.reports}
                                 modules={

@@ -53,7 +53,7 @@ export function applyPonytail(
   const scope =
     role === "insights"
       ? "Analyze only the supplied excerpts. Do not call tools, inspect other files, execute code, or change files. Preserve exact source quotations and the required output schema."
-      : role === "guide"
+      : role === "guide" || role === "walkthrough"
         ? "Preserve the requested complete teaching explanation, concrete examples, and design tradeoffs. Do not shorten away information that helps the learner."
         : readonly
           ? "Keep this role read-only; do not edit files or execute project code. Give the required evidence and review findings."
