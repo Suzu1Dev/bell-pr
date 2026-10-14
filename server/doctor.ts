@@ -21,7 +21,7 @@ import {
   providerLabels,
   type AgentProvider,
 } from "../shared/models.js";
-import type { Plan } from "../shared/plans.js";
+import type { Entitlements, Plan } from "../shared/plans.js";
 import { product } from "../shared/product.js";
 import { agentLoginCheck } from "./agent-cli.js";
 import { defaultActiveRunLimit, defaultAgentProcessLimit } from "./agent-slots.js";
@@ -36,6 +36,8 @@ import {
 } from "./cli-errors.js";
 import { defaultPort } from "./config.js";
 import { sm } from "./i18n/index.js";
+import { OfflineLicenseService } from "./license.js";
+import { licensePublicKeys, revokedLicenseIds } from "./license-keys.js";
 import { agentEnvironment, command, git, redact } from "./process.js";
 import { allowUnsandboxedAgents, detectClaudeSandbox, type SandboxDetection } from "./sandbox.js";
 import { AppError } from "./types.js";
@@ -1014,6 +1016,26 @@ export async function runDoctorCli(
     : doctorCli(argv, deps);
 }
 
+/**
+ * The plan the server would start with on `dataDir`, read as it does
+ * (Free without a valid key or trial); undefined when license.json cannot
+ * be read.
+ */
+async function planEntitlements(dataDir: string): Promise<Entitlements | undefined> {
+  const license = new OfflineLicenseService(dataDir, {
+    envKey: process.env.BELLPR_LICENSE_KEY,
+    publicKeys: licensePublicKeys,
+    revoked: revokedLicenseIds,
+    quiet: true,
+  });
+  try {
+    await license.initialize();
+    return license.entitlements();
+  } catch {
+    return undefined;
+  }
+}
+
 async function doctorCli(
   argv: string[],
   deps: DoctorCliDeps,
@@ -1033,9 +1055,11 @@ async function doctorCli(
     }
   }
   // The limits the server would start with: the environment, the saved
-  // settings, then the defaults.
+  // settings, then the defaults, capped by the plan of this data directory.
   const settings = saved?.get() ?? {};
   const port = Number(process.env.BELLPR_PORT?.trim() || defaultPort);
+  const maxActiveRuns = settings.maxActiveRuns ?? defaultActiveRunLimit;
+  const plan = deps.dataDir ? await planEntitlements(deps.dataDir) : undefined;
   const report = await runDoctor({
     force: true,
     ...(deps.exec ? { exec: deps.exec } : {}),
@@ -1043,7 +1067,13 @@ async function doctorCli(
     app: {
       version: appVersion,
       ...(Number.isInteger(port) ? { port } : {}),
-      maxActiveRuns: settings.maxActiveRuns ?? defaultActiveRunLimit,
+      maxActiveRuns,
+      ...(plan
+        ? {
+            effectiveMaxActiveRuns: Math.min(maxActiveRuns, plan.maxActiveRuns),
+            plan: plan.plan,
+          }
+        : {}),
       maxAgentProcesses: settings.maxAgentProcesses ?? defaultAgentProcessLimit,
     },
   });

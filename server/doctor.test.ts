@@ -16,6 +16,7 @@ import {
   runDoctorCli,
 } from "./doctor.js";
 import { currentLocale, withLocale } from "./i18n/index.js";
+import { runLicenseCli } from "./license.js";
 import { command } from "./process.js";
 import { allowUnsandboxedAgents } from "./sandbox.js";
 import { AppError } from "./types.js";
@@ -518,6 +519,44 @@ test("bell-pr doctor follows the saved language and sandbox opt-in, then leaves 
   // Afterwards the defaults are the environment's again.
   assert.equal(currentLocale(), "zh-TW");
   assert.equal(allowUnsandboxedAgents(), false);
+});
+
+test("bell-pr doctor reports the runs the plan lets execute at once", async (t) => {
+  const f = await fakes(t, { git: git(), codex: codex() });
+  const dataDir = path.join(f.directory, "data");
+  await mkdir(dataDir);
+  await writeFile(path.join(dataDir, "app-settings.json"), JSON.stringify({ maxActiveRuns: 3 }));
+  const previous = process.env.BELLPR_LICENSE_KEY;
+  delete process.env.BELLPR_LICENSE_KEY;
+  t.after(() => {
+    if (previous !== undefined) process.env.BELLPR_LICENSE_KEY = previous;
+  });
+  const app = async () => {
+    let json = "";
+    await runDoctorCli(["--json"], { dataDir, stdout: { write: (chunk: string) => (json += chunk) } });
+    return check(JSON.parse(json) as DoctorReport, "app");
+  };
+  // Free runs one contribution at a time, whatever is configured.
+  const free = await withLocale("en", app);
+  assert.deepEqual(
+    {
+      configured: free.params?.maxActiveRuns,
+      effective: free.params?.effectiveMaxActiveRuns,
+      plan: free.params?.plan,
+    },
+    { configured: 3, effective: 1, plan: "free" },
+  );
+  assert.match(free.detail!, /, 1 run at a time,/);
+  const trial = await withLocale("en", () =>
+    runLicenseCli(["trial"], { dataDir, stdout: { write: () => true }, env: {} }),
+  );
+  assert.equal(trial, 0);
+  const pro = await withLocale("en", app);
+  assert.deepEqual(
+    { effective: pro.params?.effectiveMaxActiveRuns, plan: pro.params?.plan },
+    { effective: 3, plan: "trial" },
+  );
+  assert.match(pro.detail!, /, 3 runs at a time,/);
 });
 
 test("the GitHub user answer and the Claude auth JSON are read defensively", () => {
