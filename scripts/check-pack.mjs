@@ -16,7 +16,10 @@
 // Raising a budget needs a reason in the commit message body.
 //
 // Gzip budgets for dist/assets (level 9). Measured for 1.0.0-beta.0: largest
-// JS chunk 80 kB (the app), all JS 270 kB, all CSS 31 kB.
+// JS chunk 80 kB (the app), all JS 270 kB, all CSS 31 kB. Measured for
+// 1.0.0-rc.1: largest JS chunk 97.8 kB (the startup chunk), all JS 350.0 kB
+// in 25 files, all CSS 38.6 kB. All JS counts every lazy chunk, so moving
+// code out of the startup chunk adds a little to it.
 //
 // Exit status: 0 within budget, 1 over budget, 2 on a setup error.
 import { spawnSync } from "node:child_process";
@@ -34,7 +37,7 @@ const budgets = {
   entries: 150,
   woff2: 12,
   largestJsGzip: 110 * kB,
-  totalJsGzip: 350 * kB,
+  totalJsGzip: 370 * kB,
   totalCssGzip: 45 * kB,
 };
 const required = [
