@@ -16,7 +16,7 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Usage-data opt-outs set in BELL PR's environment reach the agent CLIs:
-  `DO_NOT_TRACK` for both, and Claude Code's `DISABLE_TELEMETRY`,
+  `DO_NOT_TRACK` for both, and `DISABLE_TELEMETRY`,
   `DISABLE_ERROR_REPORTING`, `DISABLE_BUG_COMMAND`,
   `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY` and
   `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` for Claude Code.
