@@ -184,6 +184,8 @@ export default {
     notReady:
       "Not ready: fix the required checks marked ✗, then run the check again.",
     dataDir: ({ path }: { path: string }) => `Data directory: ${path}`,
+    /** The line above a fix command. */
+    fix: ({ label }: { label: string }) => `${label}:`,
     usage: `Usage: ${product.binNames[0]} doctor [--json] [--data-dir <dir>]`,
     unknownArgument: ({ argument }: { argument: string }) =>
       `Unknown argument "${argument}".`,

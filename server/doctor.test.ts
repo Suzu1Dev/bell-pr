@@ -498,4 +498,13 @@ test("the GitHub user answer and the Claude auth JSON are read defensively", () 
     withLocale("en", () => formatDoctorReport(report)),
     "BELL PR environment check\n\n  ✗ Node.js    v20.0.0  Too old.\n      L:\n        c\n  - Codex CLI  Not installed.\n\nNot ready: fix the required checks marked ✗, then run the check again.\n",
   );
+  // Chinese labels take two columns per character, and the punctuation
+  // comes from the dictionary.
+  const zh = withLocale("zh-TW", () =>
+    formatDoctorReport({
+      ...report,
+      checks: [report.checks[0], { id: "git-identity", status: "skip", required: false, detail: "D" }],
+    }),
+  );
+  assert.match(zh, /\n  ✗ Node\.js   v20\.0\.0  Too old\.\n      L：\n        c\n  - Git 身分  D\n/);
 });

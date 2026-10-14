@@ -149,6 +149,7 @@ const m: Translation<typeof en> = {
     ready: "已就緒：所有必要的檢查都通過了。",
     notReady: "尚未就緒：請修正標示 ✗ 的必要檢查，再重新檢查一次。",
     dataDir: ({ path }) => `資料目錄：${path}`,
+    fix: ({ label }) => `${label}：`,
     usage: `用法：${product.binNames[0]} doctor [--json] [--data-dir <目錄>]`,
     unknownArgument: ({ argument }) => `沒有「${argument}」這個參數。`,
   },

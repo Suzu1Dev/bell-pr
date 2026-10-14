@@ -937,21 +937,33 @@ const symbols: Record<DoctorCheck["status"], string> = {
   skip: "-",
 };
 
+/** Wide characters (CJK and fullwidth forms) take two terminal columns. */
+const wideCharacter =
+  /[\u1100-\u115f\u2e80-\u303e\u3041-\u33ff\u3400-\u4dbf\u4e00-\u9fff\ua000-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]/u;
+
+/** How many terminal columns `text` takes. */
+function columns(text: string) {
+  let count = 0;
+  for (const character of text) count += wideCharacter.test(character) ? 2 : 1;
+  return count;
+}
+
 /** The checklist `bell-pr doctor` prints. */
 export function formatDoctorReport(report: DoctorReport, dataDir?: string): string {
   const m = sm().setup;
   const labels = m.doctor.labels;
-  const width = Math.max(...report.checks.map((check) => labels[check.id].length));
+  const width = Math.max(...report.checks.map((check) => columns(labels[check.id])));
   const lines = [m.cli.title, ""];
   for (const check of report.checks) {
     const text = [check.version, check.detail].filter(Boolean).join("  ");
+    const label = labels[check.id];
     lines.push(
-      `  ${symbols[check.status]} ${labels[check.id].padEnd(width)}  ${text}`.trimEnd(),
+      `  ${symbols[check.status]} ${label}${" ".repeat(width - columns(label))}  ${text}`.trimEnd(),
     );
     // Fixes for what needs attention; a tool that is not used needs none.
     if (check.status === "fail" || check.status === "warn")
       for (const fix of check.fixes ?? [])
-        lines.push(`      ${fix.label}:`, `        ${fix.command}`);
+        lines.push(`      ${m.cli.fix({ label: fix.label })}`, `        ${fix.command}`);
   }
   lines.push("");
   if (dataDir) lines.push(m.cli.dataDir({ path: dataDir }));
