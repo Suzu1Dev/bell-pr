@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { DiscoveryJob } from "../../shared/discovery";
 import {
   formatters,
   intlLocale,
@@ -27,6 +28,7 @@ import {
   demoTeam,
   getDemo,
   type DemoAnswerTopic,
+  type DemoContent,
 } from "./index";
 
 // String values under these keys are structure (ids, paths, times, enum
@@ -560,4 +562,227 @@ test("the sample PR feedback is fictional and points at the demo diff", () => {
       assert.ok(drafted < created && created <= fetched, item.createdAt);
     }
   }
+});
+
+// Character budgets for the English copy, at about 1440 px: titles, chips,
+// task titles and card headings fit on one line, and one-line card summaries
+// in about two. Long-form bodies are not budgeted: the explanation cards
+// after their summary, the reports, the PR draft, the source documents, the
+// answers and the maintainer's comments.
+const titleBudget = 72;
+const summaryBudget = 180;
+// The review panel shows a module's purpose after its path on one 340 px line.
+const modulePurposeBudget = 25;
+
+type Strings = (string | undefined)[];
+const recommendationsOf = (demo: DemoContent) => [
+  ...demo.insights.recommendations,
+  ...(demo.extraRecommendations ?? []),
+];
+const budgets: {
+  field: string;
+  budget: number;
+  values: (demo: DemoContent, job: DiscoveryJob) => Strings;
+}[] = [
+  { field: "run title", budget: titleBudget, values: (d) => [d.run.title] },
+  {
+    field: "agent role chips",
+    budget: titleBudget,
+    values: (d) => d.run.agents.map((agent) => agent.role),
+  },
+  {
+    field: "project card heading",
+    budget: titleBudget,
+    values: (d) => [d.insights.summary],
+  },
+  {
+    field: "audience chips",
+    budget: titleBudget,
+    values: (d) => d.insights.audience,
+  },
+  {
+    field: "recommendation titles",
+    budget: titleBudget,
+    values: (d) => recommendationsOf(d).map((item) => item.title),
+  },
+  {
+    field: "beneficiary chips",
+    budget: titleBudget,
+    values: (d) => d.contributionBrief.beneficiaries,
+  },
+  {
+    field: "task titles",
+    budget: titleBudget,
+    values: (d) => d.team.tasks.map((task) => task.title),
+  },
+  {
+    field: "draft source labels",
+    budget: titleBudget,
+    values: (d) => (d.draftPreparation.context?.sources ?? []).map((s) => s.label),
+  },
+  {
+    field: "draft proposal title",
+    budget: titleBudget,
+    values: (d) => [d.draftPreparation.proposal?.title],
+  },
+  {
+    field: "concept card headings",
+    budget: titleBudget,
+    values: (d) => d.files.map((f) => f.explanation?.concept.split("\n")[0]),
+  },
+  {
+    field: "lookup chips",
+    budget: titleBudget,
+    values: (d) => d.files.flatMap((f) => f.explanation?.lookup ?? []),
+  },
+  {
+    field: "discovery interests",
+    budget: titleBudget,
+    values: (_, job) => [job.preferences.interests],
+  },
+  {
+    field: "opportunity titles",
+    budget: titleBudget,
+    values: (_, job) => job.opportunities.map((item) => item.title),
+  },
+  {
+    field: "import and analysis steps",
+    budget: titleBudget,
+    values: (d) => [...(d.importSteps ?? []), ...(d.analysisSteps ?? [])],
+  },
+  {
+    field: "published card title",
+    budget: titleBudget,
+    values: (d) => [d.publishedCard?.title],
+  },
+  {
+    field: "CI check names",
+    budget: titleBudget,
+    values: (d) => (d.prFeedback?.checks ?? []).map((check) => check.name),
+  },
+  {
+    field: "module purposes",
+    budget: modulePurposeBudget,
+    values: (d) => d.insights.modules.map((item) => item.purpose),
+  },
+  {
+    field: "mission brief",
+    budget: summaryBudget,
+    values: (d) => [d.run.prompt],
+  },
+  {
+    field: "agent card details",
+    budget: summaryBudget,
+    values: (d) => d.run.agents.map((agent) => agent.detail),
+  },
+  {
+    field: "activity log lines",
+    budget: summaryBudget,
+    values: (d) => d.run.logs.map((log) => log.message),
+  },
+  {
+    field: "project card summaries",
+    budget: summaryBudget,
+    values: (d) => [
+      d.insights.purpose,
+      ...d.insights.userJourney,
+      ...(d.insights.readingPath ?? []).flatMap((s) => [s.why, s.lookFor]),
+      ...d.insights.evidence.map((item) => item.note),
+    ],
+  },
+  {
+    field: "recommendation card summaries",
+    budget: summaryBudget,
+    values: (d) =>
+      recommendationsOf(d).flatMap((item) => [
+        item.problem,
+        item.userImpact,
+        item.approach,
+        ...item.acceptance,
+      ]),
+  },
+  {
+    field: "contribution brief",
+    budget: summaryBudget,
+    values: ({ contributionBrief: brief }) => [
+      brief.problem,
+      brief.motivation,
+      brief.before,
+      brief.after,
+      ...brief.validation,
+      ...brief.risks,
+    ],
+  },
+  {
+    field: "team plan, tasks and messages",
+    budget: summaryBudget,
+    values: (d) => [
+      d.team.planSummary,
+      ...d.team.tasks.flatMap((task) => [task.description, task.report]),
+      ...d.team.messages.map((message) => message.content),
+    ],
+  },
+  {
+    field: "draft guidance summaries",
+    budget: summaryBudget,
+    values: ({ draftPreparation: { context, proposal } }) => [
+      ...(context?.warnings ?? []),
+      proposal?.summary,
+      ...(proposal?.rules ?? []).map((rule) => rule.text),
+      ...(proposal?.checklist ?? []),
+      proposal?.commitMessageSuggestion?.rationale,
+    ],
+  },
+  {
+    field: "explanation summaries and self-check questions",
+    budget: summaryBudget,
+    values: (d) =>
+      d.files.flatMap(({ explanation }) => [
+        explanation?.summary,
+        // Only some files have a self-check.
+        ...(explanation?.selfCheck ? [explanation.selfCheck.question] : []),
+      ]),
+  },
+  {
+    field: "discovery summaries",
+    budget: summaryBudget,
+    values: (_, job) => [
+      job.message,
+      ...job.warnings,
+      ...job.opportunities.flatMap((item) => [
+        item.summary,
+        item.userNeed,
+        item.contributionRules,
+        item.popularity,
+        item.feasibility,
+        item.effort,
+        ...item.firstSteps,
+        ...item.acceptanceChecks,
+        ...item.risks,
+        ...item.evidence.map((evidence) => evidence.reason),
+      ]),
+    ],
+  },
+  {
+    field: "PR feedback notice and published card note",
+    budget: summaryBudget,
+    values: (d) => [...(d.prFeedback?.warnings ?? []), d.publishedCard?.note],
+  },
+];
+
+test("the English copy fits its card budgets", () => {
+  const demo = getDemo("en");
+  const job = getSampleDiscoveryJob("en");
+  const over: string[] = [];
+  for (const { field, budget, values } of budgets) {
+    const found = values(demo, job);
+    assert.ok(found.length, `${field} has values`);
+    for (const value of found) {
+      assert.equal(typeof value, "string", field);
+      const length = Array.from(value as string).length;
+      assert.ok(length > 0, `${field} is empty`);
+      if (length > budget) over.push(`${field} (${length} > ${budget}): ${value}`);
+    }
+  }
+  assert.deepEqual(over, []);
 });
