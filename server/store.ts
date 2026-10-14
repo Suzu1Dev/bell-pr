@@ -236,7 +236,101 @@ export class Store {
     initLog(this.directory);
     this.recovery = undefined;
     this.data = await this.load();
-    this.recoverInterruptedWork();
+    const before = new Map(
+      this.data.runs.map((run) => [run, { status: run.status, publishing: !!run.publishing }]),
+    );
+    for (const run of this.data.runs) {
+      // Each run explains the interruption in its own language, whatever
+      // the server's default is now.
+      const recovery = withRunLocale(run, () => sm().run.recovery);
+      if (run.draftPreparation?.status === "generating") {
+        run.draftPreparation.status = "failed";
+        run.draftPreparation.error = recovery.draft;
+      }
+      for (const explanation of Object.values(run.explanations ?? {})) {
+        if (explanation.status === "generating") {
+          explanation.status = "failed";
+          explanation.error = recovery.explanation;
+        }
+      }
+      // A re-review interrupted by a crash leaves reviewer/tester agents "running" on a finished run.
+      if (!["running", "queued"].includes(run.status) && !run.publishing) {
+        for (const agent of run.agents)
+          if (agent.status === "running") {
+            agent.status = "failed";
+            agent.detail = recovery.review;
+          }
+      }
+      // An interrupted conflict resolution keeps its edits for review.
+      if (run.sync?.resolving && run.status === "running") {
+        run.sync.resolving = false;
+        run.sync.report = recovery.conflicts;
+        run.status = "review";
+        for (const agent of run.agents)
+          if (agent.status === "running") agent.status = "failed";
+        continue;
+      }
+      // An interrupted follow-up round leaves the published PR intact: its
+      // edits stay in the checkout for review, push or discard.
+      const round = activeFollowUp(run.followUps);
+      if (round?.resolving) {
+        round.resolving = false;
+        round.report = recovery.conflicts;
+      }
+      if (round && (run.status === "running" || run.publishing)) {
+        if (round.status === "running") {
+          round.status = "review";
+          round.error = recovery.round;
+          // Rounds saved before startFollowUp cleared it still hold the last pushed message.
+          delete run.draft.commitMessage;
+        }
+        run.status = "review";
+        run.publishing = false;
+        delete run.approvedFingerprint;
+        for (const agent of run.agents)
+          if (agent.status === "running") agent.status = "failed";
+        continue;
+      }
+      // A first publish that stopped part way: what reached GitHub is
+      // checked again on the next publish, which reuses its commit and
+      // finds its PR.
+      if (run.publishing) {
+        run.publishing = false;
+        if (run.status !== "published") {
+          run.status = run.approvedFingerprint ? "approved" : "review";
+          run.error = withRunLocale(
+            run,
+            () => sm().storage.recovery.publishingInterrupted,
+          );
+        }
+        continue;
+      }
+      // A queued run that never started has nothing to repair; the
+      // Workbench queues it again (Workbench.resume).
+      if (run.status === "queued" && !run.baseSha) continue;
+      if (run.status === "running" || run.status === "queued") {
+        run.status = "failed";
+        run.error = recovery.run;
+        for (const agent of run.agents)
+          if (agent.status === "running") agent.status = "failed";
+        if (run.team) {
+          run.team.phase = "failed";
+          for (const task of run.team.tasks)
+            if (task.status === "running") {
+              task.status = "failed";
+              task.error = recovery.task;
+            }
+        }
+      }
+    }
+    for (const [run, was] of before)
+      if (was.status !== run.status || was.publishing !== !!run.publishing)
+        log.warn("run.recovered", {
+          runId: run.id,
+          from: was.status,
+          to: run.status,
+          publishing: was.publishing,
+        });
     await this.save();
   }
 
@@ -379,109 +473,6 @@ export class Store {
         runs: [...existing.runs, ...entries.runs],
       }),
     );
-  }
-
-  /**
-   * Work that a restart interrupted. Each run explains it in its own
-   * language, whatever the server's default is now.
-   */
-  private recoverInterruptedWork() {
-    for (const run of this.data.runs) {
-      const recovery = withRunLocale(run, () => sm().run.recovery);
-      const before = { status: run.status, publishing: !!run.publishing };
-      this.recoverRun(run, recovery);
-      if (before.status !== run.status || before.publishing !== !!run.publishing)
-        log.warn("run.recovered", {
-          runId: run.id,
-          from: before.status,
-          to: run.status,
-          publishing: before.publishing,
-        });
-    }
-  }
-
-  private recoverRun(
-    run: Run,
-    recovery: ReturnType<typeof sm>["run"]["recovery"],
-  ) {
-    if (run.draftPreparation?.status === "generating") {
-      run.draftPreparation.status = "failed";
-      run.draftPreparation.error = recovery.draft;
-    }
-    for (const explanation of Object.values(run.explanations ?? {})) {
-      if (explanation.status === "generating") {
-        explanation.status = "failed";
-        explanation.error = recovery.explanation;
-      }
-    }
-    // A re-review interrupted by a crash leaves reviewer/tester agents "running" on a finished run.
-    if (!["running", "queued"].includes(run.status) && !run.publishing) {
-      for (const agent of run.agents)
-        if (agent.status === "running") {
-          agent.status = "failed";
-          agent.detail = recovery.review;
-        }
-    }
-    // An interrupted conflict resolution keeps its edits for review.
-    if (run.sync?.resolving && run.status === "running") {
-      run.sync.resolving = false;
-      run.sync.report = recovery.conflicts;
-      run.status = "review";
-      for (const agent of run.agents)
-        if (agent.status === "running") agent.status = "failed";
-      return;
-    }
-    // An interrupted follow-up round leaves the published PR intact: its
-    // edits stay in the checkout for review, push or discard.
-    const round = activeFollowUp(run.followUps);
-    if (round?.resolving) {
-      round.resolving = false;
-      round.report = recovery.conflicts;
-    }
-    if (round && (run.status === "running" || run.publishing)) {
-      if (round.status === "running") {
-        round.status = "review";
-        round.error = recovery.round;
-        // Rounds saved before startFollowUp cleared it still hold the last pushed message.
-        delete run.draft.commitMessage;
-      }
-      run.status = "review";
-      run.publishing = false;
-      delete run.approvedFingerprint;
-      for (const agent of run.agents)
-        if (agent.status === "running") agent.status = "failed";
-      return;
-    }
-    // A first publish that stopped part way: what reached GitHub is checked
-    // again on the next publish, which reuses its commit and finds its PR.
-    if (run.publishing) {
-      run.publishing = false;
-      if (run.status !== "published") {
-        run.status = run.approvedFingerprint ? "approved" : "review";
-        run.error = withRunLocale(
-          run,
-          () => sm().storage.recovery.publishingInterrupted,
-        );
-      }
-      return;
-    }
-    // A queued run that never started has nothing to repair; the Workbench
-    // queues it again (Workbench.resume).
-    if (run.status === "queued" && !run.baseSha) return;
-    if (run.status === "running" || run.status === "queued") {
-      run.status = "failed";
-      run.error = recovery.run;
-      for (const agent of run.agents)
-        if (agent.status === "running") agent.status = "failed";
-      if (run.team) {
-        run.team.phase = "failed";
-        for (const task of run.team.tasks)
-          if (task.status === "running") {
-            task.status = "failed";
-            task.error = recovery.task;
-          }
-      }
-    }
   }
 
   /**
