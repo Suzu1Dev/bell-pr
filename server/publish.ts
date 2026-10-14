@@ -22,7 +22,7 @@ import {
   readDiff,
   reviewFingerprint,
 } from "./git.js";
-import { validBranchName } from "../shared/drafts.js";
+import { validBranchName, type RunDraft } from "../shared/drafts.js";
 import {
   draftPreflight,
   findDraftPlaceholders,
@@ -33,6 +33,7 @@ import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
 import { assertRemoteHead, prHasCommit, remoteBranchHead } from "./pr-branch.js";
 import { assertConflictsResolved } from "./sync-runs.js";
+import { applyAiDisclosure } from "./drafts.js";
 import type { WorkbenchContext } from "./workbench.js";
 import { currentLocale, sm } from "./i18n/index.js";
 import { secretInPatch } from "./secrets.js";
@@ -144,11 +145,13 @@ export function editable(run: Run) {
 export async function saveDraft(
   ctx: WorkbenchContext,
   id: string,
-  draft: Run["draft"],
+  edited: RunDraft,
 ) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     editable(run);
+    // Turning the AI disclosure on or off adds or removes BELL's line.
+    const draft = applyAiDisclosure(run.draft, edited);
     if (
       activeFollowUp(run.followUps) &&
       (draft.title !== run.draft.title || draft.body !== run.draft.body)
@@ -175,12 +178,16 @@ export async function saveDraft(
         (m) => m.run.publish.branchLocked({ branch: run.publishedBranch! }),
         409,
       );
-    run.draft = {
+    const saved: RunDraft = {
       title: draft.title,
       body: draft.body,
       ...(commitMessage ? { commitMessage } : {}),
       ...(publishBranch ? { publishBranch } : {}),
+      ...(draft.aiDisclosure !== undefined
+        ? { aiDisclosure: draft.aiDisclosure }
+        : {}),
     };
+    run.draft = saved;
     run.status = "review";
     delete run.approvedFingerprint;
     await ctx.store.save();

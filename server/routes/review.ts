@@ -1,30 +1,13 @@
 import type { Express } from "express";
 import { z } from "zod";
-import { validBranchName } from "../../shared/drafts.js";
-import { commitMessageControl } from "../drafts.js";
+import { runDraftSchema } from "../drafts.js";
 import { learningExport } from "../learning-export.js";
 import { publishChecks } from "../publish.js";
-import { currentLocale, sm } from "../i18n/index.js";
+import { currentLocale } from "../i18n/index.js";
 import type { RouteDeps } from "./types.js";
 
 // The commit message is passed to git verbatim, so newline is the only control character allowed.
-const commitMessageField = z
-  .string()
-  .trim()
-  .max(4000)
-  // A message function, so the text follows the request's locale.
-  .refine((value) => !commitMessageControl.test(value), () => ({
-    message: sm().run.publish.commitMessageInvalid,
-  }));
-
-// The GitHub branch is pushed as a refspec; empty means the run's own branch.
-const publishBranchField = z
-  .string()
-  .trim()
-  .max(100)
-  .refine((value) => !value || validBranchName(value), () => ({
-    message: sm().run.publish.invalidBranch,
-  }));
+const commitMessageField = runDraftSchema.shape.commitMessage;
 
 /**
  * Reviewing a run's changes and publishing them: the learning export, the
@@ -79,14 +62,8 @@ export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
     res.json(await workbench.prepareDraft(req.params.id, options));
   });
   app.patch("/api/runs/:id/draft", async (req, res) => {
-    const draft = z
-      .object({
-        title: z.string().trim().min(1).max(180),
-        body: z.string().max(60_000),
-        commitMessage: commitMessageField.optional(),
-        publishBranch: publishBranchField.optional(),
-      })
-      .parse(req.body);
+    // aiDisclosure turns the PR's AI-assistance line on or off; absent keeps the saved choice.
+    const draft = runDraftSchema.parse(req.body);
     res.json({ run: await workbench.draft(req.params.id, draft) });
   });
   // Every check publishing runs, with the facts only the server has (local
@@ -142,7 +119,7 @@ export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
           title: z.string().min(1).max(180),
           body: z.string().max(60_000),
           // A stored message can come from an agent, so approval checks it like an edit.
-          commitMessage: commitMessageField.optional(),
+          commitMessage: commitMessageField,
           publishBranch: z.string().max(100).optional(),
         }),
       })

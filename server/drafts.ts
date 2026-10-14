@@ -1,7 +1,12 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import type { DraftContext, DraftProposal } from "../shared/drafts.js";
-import { linuxContributionUrl } from "../shared/drafts.js";
+import type { DraftContext, DraftProposal, RunDraft } from "../shared/drafts.js";
+import {
+  linuxContributionUrl,
+  validBranchName,
+  withAiDisclosure,
+  withoutAiDisclosure,
+} from "../shared/drafts.js";
 import {
   brevityRule,
   draftWordBudget,
@@ -60,6 +65,80 @@ const commitMessageSuggestionJsonSchema = {
 export const personTrailer = /^\s*[A-Za-z-]+-by\s*:/im;
 /** A commit message is passed to git verbatim, so newline is the only control character allowed. */
 export const commitMessageControl = /[\u0000-\u0009\u000b-\u001f\u007f]/;
+
+/**
+ * The PR draft as PATCH /api/runs/:id/draft takes it (`run.draft`). The
+ * same shape is what state.json keeps, so every field after title and body
+ * is optional.
+ */
+export const runDraftSchema = z.object({
+  title: z.string().trim().min(1).max(180),
+  body: z.string().max(60_000),
+  // The commit message is passed to git verbatim, so newline is the only control character allowed.
+  commitMessage: z
+    .string()
+    .trim()
+    .max(4000)
+    // A message function, so the text follows the request's locale.
+    .refine((value) => !commitMessageControl.test(value), () => ({
+      message: sm().run.publish.commitMessageInvalid,
+    }))
+    .optional(),
+  // The GitHub branch is pushed as a refspec; empty means the run's own branch.
+  publishBranch: z
+    .string()
+    .trim()
+    .max(100)
+    .refine((value) => !value || validBranchName(value), () => ({
+      message: sm().run.publish.invalidBranch,
+    }))
+    .optional(),
+  aiDisclosure: z.boolean().optional(),
+});
+
+let alwaysDiscloseAiSource: (() => boolean | undefined) | undefined;
+
+/**
+ * Sets where the "always disclose AI assistance" choice comes from, such as
+ * the app settings. Without a source, or when it returns undefined or
+ * throws, the choice is off. Call it without an argument to remove it.
+ */
+export function setAlwaysDiscloseAiSource(fn?: () => boolean | undefined) {
+  alwaysDiscloseAiSource = fn;
+}
+
+/** True only when the person opted in to disclosing AI help in every PR. */
+export function alwaysDiscloseAi() {
+  try {
+    return alwaysDiscloseAiSource?.() === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The draft to save when the person edits it: the disclosure line is added
+ * to the description when they turn `aiDisclosure` on, and BELL's own line
+ * is removed when they turn it off. A draft without the field keeps the
+ * saved choice (older clients do not send it). While the choice stays the
+ * same the description is saved exactly as written, so the line can be
+ * reworded or deleted like any other text.
+ */
+export function applyAiDisclosure(previous: RunDraft, next: RunDraft): RunDraft {
+  const before = previous.aiDisclosure ?? alwaysDiscloseAi();
+  const chosen = next.aiDisclosure ?? previous.aiDisclosure;
+  const after = chosen ?? alwaysDiscloseAi();
+  const body =
+    after === before
+      ? next.body
+      : after
+        ? withAiDisclosure(next.body)
+        : withoutAiDisclosure(next.body);
+  const draft: RunDraft = { ...next, body };
+  if (chosen === undefined) delete draft.aiDisclosure;
+  else draft.aiDisclosure = chosen;
+  return draft;
+}
 export const draftJsonSchema = {
   type: "object",
   properties: {
@@ -238,6 +317,8 @@ export function parseDraftProposal(
         3000,
       );
   }
+  // The model never mentions AI; the person's standing choice adds BELL's line.
+  if (alwaysDiscloseAi()) proposal.body = withAiDisclosure(proposal.body);
   return proposal;
 }
 
