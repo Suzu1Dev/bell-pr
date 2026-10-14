@@ -8,6 +8,7 @@ import path from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { aiDisclosureLine } from "../shared/drafts";
 import { getDemo } from "../src/demo";
+import security from "../server/i18n/en/security";
 import draftEn from "../src/i18n/en/draft";
 import license from "../src/i18n/en/license";
 import review from "../src/i18n/en/review";
@@ -370,6 +371,48 @@ test("the AI-assistance switch saves the line into the draft, and an applied sug
     await page.getByRole("button", { name: workspace.draft.edit, exact: true }).click();
     await expect(description).toHaveValue(withLine);
     await expect(page.getByText(workspace.draft.proposalNotice)).toBeVisible();
+  } finally {
+    await close();
+    await server.stop();
+  }
+});
+
+test("the draft guide lists the checks publishing runs on the saved draft", async ({ browser }) => {
+  const token = "ghp_" + "a".repeat(36);
+  const server = await launchServer({
+    seed: (dataDir) =>
+      seedState(dataDir, [
+        {
+          ...seededRun,
+          createdAt: now(),
+          worktreePath: path.join(dataDir, "worktrees", seededRun.id),
+          draft: { title: seededRun.draft.title, body: `Greets the whole world.\n\nToken: ${token}` },
+        },
+      ]),
+  });
+  const { page, close } = await openOn(browser, server);
+  const preflight = draftEn.guidance.preflight;
+  const checks = page.locator(".draft-guidance-preflight");
+  try {
+    await page.goto(`/#/runs/${seededRun.id}/draft?locale=en`);
+    await expect(checks.getByRole("heading", { name: preflight.title })).toBeVisible();
+    const secret = checks.locator("li.is-block");
+    await expect(secret).toContainText(preflight.block);
+    await expect(secret).toContainText(security.draftChecks.secret);
+    await expect(secret).toContainText(security.draftChecks.secretIn({ field: "body" }));
+
+    // Saving a draft without the token clears the block.
+    await page
+      .getByRole("textbox", { name: workspace.draft.bodyLabel })
+      .fill("Greets the whole world.");
+    await page.getByRole("button", { name: workspace.draft.save, exact: true }).click();
+    await expect(checks).toContainText(preflight.clear);
+    await expect(secret).toHaveCount(0);
+
+    // The sample has no server to check with.
+    await page.goto("/#/runs/demo-run/draft?locale=en");
+    await expect(page.locator(".draft-guidance-panel")).toBeVisible();
+    await expect(checks).toHaveCount(0);
   } finally {
     await close();
     await server.stop();

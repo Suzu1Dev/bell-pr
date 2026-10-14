@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -244,17 +245,20 @@ export function useDraftEditor({
    * the publish dialog can ask for every confirmation it needs. On failure
    * the local checks stay, and publishing names anything they miss.
    */
-  async function loadPublishChecks(id: string, fingerprint?: string) {
-    try {
-      const { checks } = await api<{ checks: DraftCheck[] }>(
-        `/runs/${id}/preflight`,
-      );
-      if (runIdRef.current === id)
-        setServerChecks({ runId: id, fingerprint, checks });
-    } catch {
-      if (runIdRef.current === id) setServerChecks(undefined);
-    }
-  }
+  const loadPublishChecks = useCallback(
+    async (id: string, fingerprint?: string) => {
+      try {
+        const { checks } = await api<{ checks: DraftCheck[] }>(
+          `/runs/${id}/preflight`,
+        );
+        if (runIdRef.current === id)
+          setServerChecks({ runId: id, fingerprint, checks });
+      } catch {
+        if (runIdRef.current === id) setServerChecks(undefined);
+      }
+    },
+    [runIdRef],
+  );
   function applyDraftProposal(proposal: DraftProposal) {
     setDraftTitle(proposal.title);
     setDraftBody(proposal.body);
@@ -363,6 +367,7 @@ export function useDraftEditor({
     publishBranchInvalid,
     followUp,
     commitMessageUnfinished,
+    publishChecks,
     publishBlocked,
     publishConfirmations,
     loadPublishChecks,

@@ -1,4 +1,10 @@
-import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import {
   AlertCircle,
   Check,
@@ -82,6 +88,8 @@ interface DraftTabProps {
     | "saveDraft"
     | "setAiDisclosure"
     | "alwaysDiscloseAi"
+    | "publishChecks"
+    | "loadPublishChecks"
   >;
   actions: Pick<RunActions, "feedbackLoading" | "fetchPrFeedback">;
   rounds: RunRounds;
@@ -188,8 +196,25 @@ export function DraftTab({
     saveDraft,
     setAiDisclosure,
     alwaysDiscloseAi,
+    publishChecks,
+    loadPublishChecks,
   } = draft;
   const { feedbackLoading, fetchPrFeedback } = actions;
+  // The guide lists the checks publishing runs on the saved draft, with
+  // the ones only the server can make (this computer's folders, changed CI
+  // files, the commit e-mail), read again whenever the saved draft changes.
+  const checkable =
+    !demo && !followUp && ["review", "approved"].includes(run.status);
+  useEffect(() => {
+    if (checkable) void loadPublishChecks(run.id, run.approvedFingerprint);
+  }, [
+    checkable,
+    loadPublishChecks,
+    run.id,
+    run.approvedFingerprint,
+    run.draft.title,
+    run.draft.body,
+  ]);
   const {
     followUpSelection,
     setFollowUpSelection,
@@ -256,6 +281,7 @@ export function DraftTab({
             aiDisclosure={run.draft.aiDisclosure}
             alwaysDiscloseAi={alwaysDiscloseAi}
             onAiDisclosureChange={(on) => void setAiDisclosure(on)}
+            checks={checkable && draftChecks ? publishChecks : undefined}
             readOnly={run.status === "published"}
           />
         </Suspense>

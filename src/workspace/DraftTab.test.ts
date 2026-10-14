@@ -120,6 +120,8 @@ const element = (
         async saveDraft() {},
         async setAiDisclosure() {},
         alwaysDiscloseAi: undefined,
+        publishChecks: [],
+        async loadPublishChecks() {},
         ...draft,
       },
       actions: { feedbackLoading: false, async fetchPrFeedback() {} },
