@@ -3,6 +3,7 @@
  * project analysis state (Traditional Chinese, Taiwan).
  */
 import { formatters, type Translation } from "../../../shared/i18n/locale";
+import { product } from "../../../shared/product";
 import type en from "../en/mission";
 
 const fmt = formatters("zh-TW");
@@ -203,6 +204,81 @@ const m: Translation<typeof en> = {
     testing: { label: "補足測試", hint: "保護重要行為與邊界" },
     docs: { label: "完善文件", hint: "讓理解與上手更容易" },
     maintenance: { label: "維護整理", hint: "降低後續修改的負擔" },
+  },
+  settings: {
+    directionLegend: "這次想從哪個方向貢獻？",
+    directionNote: "選一個主要方向，讓團隊圍繞同一個目標工作。",
+    optional: "選填",
+    targetUser: {
+      label: "誰會因此受益？",
+      placeholder: "例如：用這個 SDK 建立儀表板的前端開發者",
+    },
+    outcome: {
+      label: "完成後，使用者會有什麼不同？",
+      placeholder:
+        "例如：短暫網路中斷時，列表能自動重試載入，不需要手動重新整理。",
+    },
+    constraints: {
+      label: "開發界線",
+      placeholder: "例如：維持既有 API 相容；只處理 GET；不新增套件。",
+      help: "寫下不能改動的行為、相容性或範圍限制。",
+    },
+    acceptance: {
+      label: "怎樣算完成？",
+      placeholder:
+        "例如：\n暫時性失敗可重試成功\n401 不重試\n既有測試全部通過",
+      help: "以可觀察的結果或測試描述，一行一項。",
+    },
+    issue: {
+      label: "相關 issue 連結",
+      help: "只接受 GitHub issue 頁面網址。填了之後，PR 草稿才可以寫 Fixes／Refs #編號並連回這個 issue；送出前請先在 issue 留言表明要處理。",
+    },
+    model: {
+      heading: "模型與思考方式",
+      note: "所有專案與 Agents 共用此設定。新任務會記錄自己的設定，後續修改不會影響已建立的任務。",
+      agent: "Agent",
+      providerHelp: {
+        codex: "使用你已安裝並登入的 Codex CLI。",
+        claude:
+          "使用你已安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰皆可）。用量計入你自己的帳號，可用模型依你的方案而定。",
+      },
+      model: "執行模型",
+      providerDefault: ({ provider, model }) =>
+        `${provider} 預設${model ? ` · ${model}` : ""}`,
+      unconfirmed: ({ value }) => `${value} · 已儲存，待確認`,
+      loading: ({ provider }) => `正在讀取本機 ${provider} 可用模型…`,
+      unknownModel: "目前無法驗證這個已儲存的模型，請重新選擇或載入清單。",
+      defaultModelHelp: ({ provider }) => `沿用本機 ${provider} 的預設模型。`,
+      effort: "思考強度",
+      modelDefault: ({ effort }) => `模型預設${effort ? ` · ${effort}` : ""}`,
+      unknownEffort: "已儲存的強度未在此模型的清單中，請重新選擇。",
+      effortHelp: `只列出所選模型支援的強度；較高的強度每回合需要更久、用量也較多，${product.name} 會為 Claude Code 以及 xhigh、max 強度延長等待時間。`,
+      webAccess: "允許 Agent 上網搜尋與讀取網頁",
+      webAccessHelp:
+        "套用到 Lead、Teammates、Reviewer、Test analyst 與追問導師；專案分析與探索貢獻維持離線。網頁內容視為不可信資料；Claude Code 的 curl、wget 仍被拒絕。",
+      error: ({ message }) => `${message} 已儲存的選擇會保留。`,
+      loadFailed: ({ provider }) => `暫時無法讀取 ${provider} 模型清單。`,
+      reload: "重新載入",
+    },
+    ponytail: {
+      label: "Ponytail 開發方式",
+      modes: {
+        lite: "輕量 · 預設",
+        full: "完整",
+        off: "關閉",
+      },
+      help: "輕量：以精簡規則減少過度開發。完整：套用更多規則，優先重用現有程式與原生功能。關閉：方便比較不同方式的成果與用量。",
+      link: "查看 Ponytail",
+    },
+    team: {
+      legend: "協作規模",
+      teammates: "位隊友",
+      note: "設定團隊上限，實際分工由任務計畫決定。",
+    },
+    planApproval: {
+      label: "開發前，先讓我確認計畫",
+      help: "先看分工、範圍與驗收方式，確認後再進入實作。",
+    },
   },
 };
 

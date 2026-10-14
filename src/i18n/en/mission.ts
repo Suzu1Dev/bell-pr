@@ -5,12 +5,15 @@
  * Messages that take a count get the raw number and format it themselves, so
  * they can pick the singular or plural noun.
  */
+import type { PonytailMode } from "../../../shared/efficiency";
 import { formatters } from "../../../shared/i18n/locale";
 import type {
   ContributionDirection,
   ContributionRecommendation,
   RecommendationVerification,
 } from "../../../shared/insights";
+import type { AgentProvider } from "../../../shared/models";
+import { product } from "../../../shared/product";
 
 const fmt = formatters("en");
 const n = (value: number) => fmt.number(value);
@@ -293,6 +296,94 @@ const mission = {
       hint: "Make future changes easier",
     },
   } satisfies Record<ContributionDirection, { label: string; hint: string }>,
+  settings: {
+    directionLegend: "Which direction do you want to contribute in?",
+    directionNote: "Pick one main direction so the team works toward the same goal.",
+    optional: "Optional",
+    targetUser: {
+      label: "Who will benefit?",
+      placeholder:
+        "For example: front-end developers who build dashboards with this SDK",
+    },
+    outcome: {
+      label: "What will be different for users when it is done?",
+      placeholder:
+        "For example: after a brief network drop, the list retries loading on its own instead of needing a manual refresh.",
+    },
+    constraints: {
+      label: "Boundaries",
+      placeholder:
+        "For example: keep the existing API compatible; handle GET only; add no packages.",
+      help: "Note the behavior that must not change, compatibility needs, or limits on the scope.",
+    },
+    acceptance: {
+      label: "What counts as done?",
+      placeholder:
+        "For example:\nA temporary failure succeeds on retry\nNo retry on 401\nAll existing tests pass",
+      help: "Describe observable results or tests, one per line.",
+    },
+    issue: {
+      label: "Related issue link",
+      help: "Only GitHub issue page URLs are accepted. With one, the PR draft can write Fixes or Refs #number and link back to the issue. Before you submit, comment on the issue to say you will work on it.",
+    },
+    model: {
+      heading: "Model and reasoning",
+      note: "All projects and Agents share these settings. Each new run records its own settings, so later changes do not affect runs that already exist.",
+      agent: "Agent",
+      providerHelp: {
+        codex: "Uses the Codex CLI you installed and signed in to.",
+        claude:
+          "Uses the Claude Code CLI you installed and signed in to (Claude plan or Anthropic API key). Usage counts against your own account. Available models depend on your plan.",
+      } satisfies Record<AgentProvider, string>,
+      model: "Model",
+      providerDefault: ({ provider, model }: { provider: string; model?: string }) =>
+        `${provider} default${model ? ` · ${model}` : ""}`,
+      /** A saved model or effort that the loaded list does not offer. */
+      unconfirmed: ({ value }: { value: string }) =>
+        `${value} · saved, not confirmed yet`,
+      loading: ({ provider }: { provider: string }) =>
+        `Reading the models your local ${provider} offers…`,
+      unknownModel:
+        "This saved model cannot be checked right now. Choose again or reload the list.",
+      defaultModelHelp: ({ provider }: { provider: string }) =>
+        `Uses your local ${provider}'s default model.`,
+      effort: "Reasoning effort",
+      /** `effort` is the model's default effort, already labelled. */
+      modelDefault: ({ effort }: { effort?: string }) =>
+        `Model default${effort ? ` · ${effort}` : ""}`,
+      unknownEffort:
+        "The saved effort is not in this model's list. Choose again.",
+      effortHelp: `Only the efforts the selected model supports are listed. Higher efforts take longer per turn and use more; ${product.name} waits longer for Claude Code and for the xhigh and max efforts.`,
+      webAccess: "Let Agents search the web and read pages",
+      webAccessHelp:
+        "Applies to the Lead, Teammates, Reviewer, Test analyst and the follow-up tutor; project analysis and discovery stay offline. Web content is treated as untrusted data, and Claude Code's curl and wget stay blocked.",
+      /** `message` is the reason the list could not be loaded. */
+      error: ({ message }: { message: string }) =>
+        `${message} Your saved choice is kept.`,
+      loadFailed: ({ provider }: { provider: string }) =>
+        `Could not load the ${provider} model list.`,
+      reload: "Reload",
+    },
+    ponytail: {
+      label: "Ponytail development mode",
+      modes: {
+        lite: "Lite · default",
+        full: "Full",
+        off: "Off",
+      } satisfies Record<PonytailMode, string>,
+      help: "Lite: a short rule set that curbs overbuilding. Full: more rules, preferring existing code and native features. Off: lets you compare results and usage across modes.",
+      link: "About Ponytail",
+    },
+    team: {
+      legend: "Team size",
+      teammates: "teammates",
+      note: "Sets the most teammates the team may use; the run's plan decides the actual split.",
+    },
+    planApproval: {
+      label: "Let me approve the plan before development",
+      help: "Review the split, scope and acceptance checks first; implementation starts once you approve.",
+    },
+  },
 };
 
 export default mission;
