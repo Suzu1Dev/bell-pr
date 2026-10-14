@@ -262,6 +262,21 @@ test("the English board renders every phase without Han", () => {
       },
       false,
     ],
+    ...(["developing", "integrating", "reviewing", "cancelled"] as const).map(
+      (phase): [string, Run, boolean] => [
+        phase,
+        {
+          ...englishRun,
+          status: phase === "cancelled" ? "cancelled" : "running",
+          team: {
+            ...englishTeam,
+            phase,
+            config: { ...englishTeam.config, requirePlanApproval: false },
+          },
+        },
+        false,
+      ],
+    ),
   ];
   for (const [name, run, demo] of runs) {
     const html = renderEn(board(run, demo, async () => {}));
@@ -277,6 +292,12 @@ test("the English board renders every phase without Han", () => {
   assert.match(sample, /The app saw 2 commands run/);
   assert.match(sample, /Delivered · Sample/);
   assert.match(sample, /BELL PR coordinates the team/);
+  const integrating = renderEn(
+    board(runs.find(([name]) => name === "integrating")![1], false),
+  );
+  assert.match(integrating, /The lead is integrating/);
+  assert.match(integrating, /Plan runs automatically/);
+  assert.match(integrating, /Codex · BELL PR team engine/);
 });
 
 test("English plan revisions and retries use whole sentences with English plurals", () => {
