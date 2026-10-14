@@ -116,12 +116,19 @@ npm pack
 ```
 
 `prepack` builds the product and runs `node scripts/npm-readme.mjs --pre`,
-which rewrites `README.md` for npmjs.com: the package contains neither
-`docs/` nor the other READMEs, so relative screenshots and links become
-absolute URLs under `homepageUrl` from `shared/product.ts`, or plain text
-while it is empty. The original waits in `.README.md.orig` (gitignored) and
-`postpack` puts it back byte for byte. If a pack stops halfway, run
+which readies `README.md` for npmjs.com. The package does not contain
+`docs/`, so relative screenshots and links become absolute URLs under
+`homepageUrl` from `shared/product.ts`, or plain text while it is empty.
+npm packs every `README.*` at the root and takes the first one it finds as
+the package's README, so `README.zh-TW.md` is set aside during the pack.
+The originals wait in the folder `.README.md.orig` (gitignored) and
+`postpack` puts them back byte for byte. If a pack stops halfway, run
 `node scripts/npm-readme.mjs --post` before you pack again.
+
+Publish the packed tarball (`npm publish bell-pr-<version>.tgz`), as the
+release workflow does. `npm publish` from the folder reads the README again
+after `postpack` has restored the originals, so npmjs.com would show the
+unprocessed README, possibly the Chinese one.
 
 Try the result without installing it:
 
