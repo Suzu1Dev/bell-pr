@@ -56,7 +56,7 @@ test("the publish dialog summarises the reviewed branch before sending a Draft P
   const html = render();
   assert.match(html, /<h2 id="modal-title">將這次貢獻送上 GitHub。<\/h2>/);
   assert.match(html, /這會推送審查過的分支，並在目標 repository 建立 Draft PR。/);
-  assert.match(html, /acme-labs\/open-fetch/);
+  assert.match(html, /openfetch-sample\/open-fetch/);
   assert.match(html, /<h3>Add retry backoff<\/h3>/);
   assert.match(html, /bell\/retry-backoff<span>→<\/span>main/);
   assert.ok(html.includes(`${demoFiles.length} 個檔案已審閱`));

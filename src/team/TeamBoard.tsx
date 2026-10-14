@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import {
   maxPlanRevisions,
-  type AgentTeam,
   type TeamTask,
 } from "../../shared/team";
 import type { Run } from "../types";
@@ -600,87 +599,4 @@ export function TeamBoard({
     </section>
   );
 }
-export const demoTeam: AgentTeam = {
-  config: {
-    maxTeammates: 3,
-    requirePlanApproval: true,
-    provider: "codex",
-    protocol: "bell-shared-tasks",
-    messageDelivery: "between-turns",
-  },
-  phase: "complete",
-  planSummary:
-    "將重試策略、HTTP client 整合與驗證拆成明確範圍。先建立共用型別，再讓 client 與文件分頭作業；最後整合測試並交叉審閱，確認重試只套用在可恢復的 GET 失敗。",
-  tasks: [
-    {
-      id: "task-1",
-      title: "定義重試策略與型別",
-      description: "建立退避、jitter 與可重試條件，維持泛型回傳型別。",
-      owner: "member-1",
-      files: ["src/utils/retry.ts", "src/types.ts"],
-      dependsOn: [],
-      status: "complete",
-      report:
-        "示範報告：新增可配置的重試策略與型別。實際執行證據請以真實任務報告為準。",
-      checks: [
-        { command: "npm test -- retry", outcome: "exit 0" },
-        { command: "npx tsc --noEmit", outcome: "exit 0" },
-      ],
-      integratedFiles: ["src/utils/retry.ts", "src/types.ts"],
-    },
-    {
-      id: "task-2",
-      title: "接進使用者的 GET 請求",
-      description: "保留 HTTP 錯誤資訊，區分暫時性失敗與無法重試的狀態。",
-      owner: "member-2",
-      files: ["src/client.ts"],
-      dependsOn: ["task-1"],
-      status: "complete",
-      report: "示範報告：只有 GET 請求採用重試，沒有自動重送付款等寫入操作。",
-    },
-    {
-      id: "task-3",
-      title: "補齊使用範例與限制",
-      description: "向 SDK 使用者說明怎麼設定，以及重試不適用的情境。",
-      owner: "member-3",
-      files: ["README.md"],
-      dependsOn: ["task-1"],
-      status: "complete",
-      report: "示範報告：說明預設值、錯誤分類與相容性。",
-    },
-    {
-      id: "task-4",
-      title: "驗證邊界與整合行為",
-      description: "檢查重試上限、不可重試錯誤與最後一次失敗的回傳行為。",
-      owner: "member-1",
-      files: ["tests/retry.test.ts"],
-      dependsOn: ["task-2", "task-3"],
-      status: "complete",
-      report: "此為示範測試計畫，未執行真實 repository 的測試。",
-    },
-  ],
-  messages: [
-    {
-      id: "m1",
-      from: "lead",
-      to: "all",
-      content:
-        "這次的目標是讓短暫網路失敗有機會恢復。請只調整 GET 行為，保留既有介面。",
-      createdAt: "2026-10-03T01:20:00+08:00",
-      status: "delivered",
-      recipients: ["task-1", "task-2", "task-3", "task-4"],
-      deliveredTo: ["task-1", "task-2", "task-3", "task-4"],
-    },
-    {
-      id: "m2",
-      from: "member-1",
-      to: "task-2",
-      content:
-        "RetryOptions 已準備好。client 請透過 shouldRetry 傳入 HTTP 分類，不要在重試工具內耦合 HTTP。",
-      createdAt: "2026-10-03T01:24:00+08:00",
-      status: "delivered",
-      recipients: ["task-2"],
-      deliveredTo: ["task-2"],
-    },
-  ],
-};
+export { demoTeam } from "../demo";

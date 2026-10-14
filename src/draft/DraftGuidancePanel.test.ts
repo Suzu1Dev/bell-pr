@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { DraftGuidancePanel, demoDraftPreparation } from "./DraftGuidancePanel";
+import { demoDraftPreparation } from "../demo";
+import { DraftGuidancePanel } from "./DraftGuidancePanel";
 import type { DraftPreparation } from "../../shared/drafts";
 
 const render = (preparation: DraftPreparation, applied?: boolean) =>

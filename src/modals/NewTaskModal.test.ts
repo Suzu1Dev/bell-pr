@@ -58,7 +58,7 @@ test("the new-task dialog asks for the repository, the goal and the team setting
   assert.match(html, /<h2 id="modal-title">把想法交給你的 Agent team。<\/h2>/);
   assert.match(html, /描述你想改善什麼，以及完成後應該有的行為。/);
   assert.match(html, /<option value="repo-1" selected="">octo\/widgets<\/option>/);
-  assert.match(html, /<option value="demo-repo">acme-labs\/open-fetch（示範）<\/option>/);
+  assert.match(html, /<option value="demo-repo">openfetch-sample\/open-fetch（示範）<\/option>/);
   assert.match(html, /匯入其他專案/);
   assert.match(html, /先看 AI 推薦方向/);
   assert.match(html, /儲存為預設設定/);

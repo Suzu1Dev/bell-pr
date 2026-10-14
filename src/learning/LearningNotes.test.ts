@@ -11,11 +11,11 @@ const repos: Repo[] = [
   {
     id: "repo-1",
     name: "open-fetch",
-    owner: "acme-labs",
-    fullName: "acme-labs/open-fetch",
+    owner: "openfetch-sample",
+    fullName: "openfetch-sample/open-fetch",
     path: "/tmp/open-fetch",
     defaultBranch: "main",
-    url: "https://github.com/acme-labs/open-fetch",
+    url: "https://github.com/openfetch-sample/open-fetch",
   },
 ];
 
@@ -87,7 +87,7 @@ test("collectLearningNotes keeps only ready explanations, newest first", () => {
     notes.map((note) => note.path),
     ["src/cache.ts", "src/retry.ts"],
   );
-  assert.equal(notes[0].repoName, "acme-labs/open-fetch");
+  assert.equal(notes[0].repoName, "openfetch-sample/open-fetch");
   assert.equal(notes[1].runTitle, "加入重試機制");
 });
 
@@ -98,7 +98,7 @@ test("real notes render concept, tip, task, repo, path and a demo section", () =
   assert.match(html, /每次失敗後等待時間加倍/);
   assert.match(html, /先補一個失敗路徑的測試。/);
   assert.match(html, /<code>src\/retry\.ts<\/code>/);
-  assert.match(html, /acme-labs\/open-fetch/);
+  assert.match(html, /openfetch-sample\/open-fetch/);
   assert.match(html, /<dd>修正 token 快取<\/dd>/);
   assert.doesNotMatch(html, /src\/pending\.ts/);
   assert.doesNotMatch(html, /src\/broken\.ts/);

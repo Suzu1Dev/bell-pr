@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { demoRun } from "../demo";
+import { demoRun, demoTeam } from "../demo";
 import type { Run } from "../types";
-import { TeamBoard, demoTeam } from "./TeamBoard";
+import { TeamBoard } from "./TeamBoard";
 
 const render = (run: Run, demo = true) =>
   renderToStaticMarkup(
