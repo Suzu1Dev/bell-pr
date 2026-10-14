@@ -1212,14 +1212,13 @@
 .explain-message-user .explain-message-author {
   justify-content: flex-end;
 }
+/* A question shows in full, like an answer: a box that scrolled would need
+   a tab stop of its own for keyboard users. */
 .explain-message-user .explain-message-body {
   padding: 12px 14px;
   border-radius: 10px;
   background: var(--color-diff-add-bg);
   border: 1px solid var(--color-accent-200);
-  max-height: 220px;
-  overflow-y: auto;
-  scrollbar-width: thin;
 }
 .explain-loading {
   display: flex;
@@ -1368,6 +1367,24 @@
   font-size: var(--text-2xs);
   color: var(--color-accent-700);
   white-space: pre;
+}
+/* The lines a question quotes wrap instead of scrolling sideways. */
+.explain-panel .explain-message-user .markdown-content pre {
+  overflow-x: visible;
+}
+.explain-panel .explain-message-user .markdown-content pre,
+.explain-panel .explain-message-user .markdown-content pre code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* A fenced diff block, such as the lines a question is about. */
+.markdown-content .markdown-diff-added {
+  color: var(--color-diff-add-fg);
+  background: var(--color-diff-add-bg);
+}
+.markdown-content .markdown-diff-removed {
+  color: var(--color-diff-del-fg);
+  background: var(--color-diff-del-bg);
 }
 .explain-panel .markdown-content blockquote {
   margin: 14px 0;

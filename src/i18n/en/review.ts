@@ -12,8 +12,12 @@ import { product } from "../../../shared/product";
 
 const { plural } = formatters("en");
 
-/** The line numbers a selected diff line carries; null on the side it lacks. */
-type LineNumbers = { oldLine: number | null; newLine: number | null };
+/** The first and last line number of a selection in one version of a file. */
+type LineRange = { first: number; last: number };
+
+/** "line 9" or "lines 8–9". */
+const lineSpan = ({ first, last }: LineRange) =>
+  first === last ? `line ${first}` : `lines ${first}–${last}`;
 
 const review = {
   /** DiffView: one file's diff, with line selection for follow-up questions. */
@@ -79,13 +83,26 @@ const review = {
       plural(count) === "one"
         ? `Explain the selected line of code in ${path} in plain language: what it does, why it changed and what to watch out for.`
         : `Explain the ${count} selected lines of code in ${path} in plain language: what they do, why they changed and what to watch out for.`,
-    /** One quoted line; `text` is the code. */
-    addedLine: ({ newLine, text }: LineNumbers & { text: string }) =>
-      `Added, new L${newLine}: ${text}`,
-    removedLine: ({ oldLine, text }: LineNumbers & { text: string }) =>
-      `Removed, old L${oldLine}: ${text}`,
-    contextLine: ({ oldLine, newLine, text }: LineNumbers & { text: string }) =>
-      `Unchanged, old L${oldLine} / new L${newLine}: ${text}`,
+    /**
+     * The line between the question and the code block: the file (`path` is
+     * Markdown code) and the selected lines in the old and the new version.
+     * A version without selected lines (only additions or only removals) is
+     * left out; at least one is given.
+     */
+    lines: ({
+      path,
+      oldLines,
+      newLines,
+    }: {
+      path: string;
+      oldLines?: LineRange;
+      newLines?: LineRange;
+    }) =>
+      oldLines && newLines
+        ? `${path}, old ${lineSpan(oldLines)}, new ${lineSpan(newLines)}:`
+        : oldLines
+          ? `${path}, old ${lineSpan(oldLines)}:`
+          : `${path}, new ${lineSpan(newLines!)}:`,
     truncated:
       "[Excerpt] The selection is long, so only part of it is included below. Please explain this excerpt first.",
   },

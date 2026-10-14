@@ -7,6 +7,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { locales, type Locale } from "../shared/i18n/locale";
 import { getDemo } from "../src/demo";
 import en from "../src/i18n/en";
+import { isCodeLine, parseDiff } from "../src/review/diff";
 import zhTW from "../src/i18n/zh-TW";
 import { expectNoOverflow } from "./helpers/overflow";
 
@@ -235,6 +236,37 @@ async function axeProblems(page: Page) {
       ),
     );
 }
+
+for (const locale of locales)
+  test(`a question about selected lines shows them as a highlighted diff block (${locale})`, async ({ page }) => {
+    const t = messages[locale].review;
+    const file = getDemo(locale).files.find((entry) => entry.path === "src/utils/retry.ts")!;
+    await openChanges(page, locale, file.path);
+    // "): Promise<T> {", the removed line and the first two added lines.
+    await lines(page).nth(8).click();
+    await lines(page).nth(11).click({ modifiers: ["Shift"] });
+    await expect(selectedLines(page)).toHaveCount(4);
+    await page.getByRole("button", { name: t.diff.askSelection }).click();
+
+    const bubble = page.locator(".explain-message-user").last();
+    await expect(bubble.locator(".markdown-content > p").first()).toHaveText(
+      t.selection.question({ path: file.path, count: 4 }),
+    );
+    const code = bubble.locator("pre > code.language-diff");
+    await expect(code).toBeVisible();
+    // Each line keeps its prefix and its own indentation.
+    const expected = parseDiff(file.patch)
+      .filter(isCodeLine)
+      .slice(8, 12)
+      .map((line) => `${line.kind === "added" ? "+" : line.kind === "removed" ? "-" : " "}${line.text}`)
+      .join("\n");
+    expect(await code.textContent()).toBe(expected);
+    await expect(code.locator(".markdown-diff-removed")).toHaveCount(1);
+    await expect(code.locator(".markdown-diff-added")).toHaveCount(2);
+    // The sample answers it, as before.
+    await expect(page.locator(".explain-message-assistant").last()).toBeVisible();
+    await expectNoOverflow(page, [".explain-panel"]);
+  });
 
 for (const locale of locales)
   test(`axe finds no serious or critical issue on the changes tab in any review state (${locale})`, async ({ page }) => {
