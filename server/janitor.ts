@@ -13,6 +13,12 @@ import type { WorkbenchContext } from "./workbench.js";
 const rootLeftover = /^(?:team|publish|sync)-index-|\.tmp$/;
 /** Analysis scratch directories and temporary cache files. */
 const insightsLeftover = /^analysis-|\.tmp$/;
+/**
+ * The kernel stamps files from a coarse clock that can trail Date.now() by
+ * up to a scheduler tick, so a file written just after the start may look
+ * older than it. Entries this close to the start count as new.
+ */
+export const startClockSlackMs = 100;
 
 /** Run ids and worktree paths in state.quarantine.json, kept for a manual repair. */
 async function quarantinedRuns(directory: string) {
@@ -54,7 +60,7 @@ export async function runJanitor(
   /** Removes `entry` when it predates this start and has the expected kind. */
   const removeStale = async (entry: string, kind: "file" | "directory" | "any") => {
     const info = await lstat(entry).catch(() => undefined);
-    if (!info || info.mtimeMs >= startedAt) return;
+    if (!info || info.mtimeMs >= startedAt - startClockSlackMs) return;
     if (kind === "file" && !info.isFile()) return;
     if (kind === "directory" && !info.isDirectory()) return;
     await rm(entry, { recursive: true, force: true });

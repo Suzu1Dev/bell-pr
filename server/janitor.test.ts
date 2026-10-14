@@ -15,7 +15,7 @@ import path from "node:path";
 import { git } from "./process.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
-import { runJanitor } from "./janitor.js";
+import { runJanitor, startClockSlackMs } from "./janitor.js";
 import type { Repository, Run } from "./types.js";
 
 const exists = (target: string) =>
@@ -224,6 +224,27 @@ test("entries newer than the start are left alone", async (t) => {
   for (const name of p.leftovers)
     assert.equal(await exists(path.join(p.dataDir, name)), true, name);
   assert.equal(await exists(p.orphan), true);
+});
+
+test("a file written just after the start is kept although the file system clock trails", async (t) => {
+  const p = await plantedDataDirectory();
+  t.after(p.cleanup);
+  const startedAt = Date.now() + 60 * 60 * 1000;
+  // A state.json write in flight, stamped a few milliseconds before the start.
+  const inFlight = path.join(p.dataDir, `state.json.${process.pid}.0a1b2c3d4e5f.tmp`);
+  await writeFile(inFlight, "{}");
+  const stamp = new Date(startedAt - startClockSlackMs / 2);
+  await utimes(inFlight, stamp, stamp);
+  const removed = await runJanitor(
+    { store: p.store, lock: (_id, task) => task() },
+    { startedAt },
+  );
+  assert.equal(await exists(inFlight), true);
+  assert.deepEqual(removed.sort(), [
+    ...p.leftovers,
+    path.join("team-worktrees", "deleted-run"),
+    path.join("worktrees", "deleted-run"),
+  ].sort());
 });
 
 test("the Workbench runs the janitor when it starts", async (t) => {
