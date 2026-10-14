@@ -7,7 +7,8 @@ import {
   Plus,
   Sparkles,
 } from "lucide-react";
-import { demoRepo, demoRun } from "../demo";
+import { getDemo } from "../demo";
+import { useLocale, useT } from "../i18n";
 import type { Repo } from "../types";
 import type { ModalName, Page } from "../app/AppShell";
 
@@ -27,20 +28,23 @@ export function ReposPage({
   chooseRun,
   setExploreRepoId,
 }: ReposPageProps) {
+  const t = useT("repos").list;
+  const [locale] = useLocale();
+  const { repo: demoRepo, run: demoRun } = getDemo(locale);
   return (
     <section className="page-content">
       <div className="page-title">
         <div>
-          <span className="eyebrow">YOUR REPOSITORIES</span>
-          <h1 tabIndex={-1}>下一個貢獻，從這裡開始。</h1>
-          <p>帶入你在意的專案，讓想法成為真正的改動。</p>
+          <span className="eyebrow">{t.eyebrow}</span>
+          <h1 tabIndex={-1}>{t.title}</h1>
+          <p>{t.intro}</p>
         </div>
         <button
           className="button primary"
           onClick={() => openModal("import")}
         >
           <Plus size={16} />
-          匯入 Repository
+          {t.import}
         </button>
       </div>
       <button
@@ -51,13 +55,11 @@ export function ReposPage({
           <Sparkles size={24} />
         </span>
         <span>
-          <strong>還沒決定要貢獻哪個專案？</strong>
-          <small>
-            讓 AI 從 GitHub 找出有需求、適合你起步的開發機會。
-          </small>
+          <strong>{t.discoveryTitle}</strong>
+          <small>{t.discoveryText}</small>
         </span>
         <span className="discovery-entry-action">
-          推薦貢獻項目 <ArrowUpRight size={17} />
+          {t.discoveryAction} <ArrowUpRight size={17} />
         </span>
       </button>
       <div className="repository-grid">
@@ -68,25 +70,23 @@ export function ReposPage({
                 <FolderGit2 size={24} />
               </span>
               {repo.id === demoRepo.id ? (
-                <span className="demo-pill">示範專案</span>
+                <span className="demo-pill">{t.demoBadge}</span>
               ) : (
                 <span className="repo-ready">
                   <Check size={13} />
-                  已匯入
+                  {t.imported}
                 </span>
               )}
             </div>
             <span className="repo-owner">{repo.owner}</span>
             <h2>{repo.name}</h2>
             <p>
-              {repo.id === demoRepo.id
-                ? "透過 SDK 智慧重試的範例，體驗一次完整的貢獻與審查。"
-                : repo.path}
+              {repo.id === demoRepo.id ? t.demoDescription : repo.path}
             </p>
             <div className="repository-meta">
               <span>
                 <span className="language-dot" />
-                {repo.language || "Git repository"}
+                {repo.language || t.languageFallback}
               </span>
               <span>
                 <GitBranch size={13} />
@@ -103,9 +103,7 @@ export function ReposPage({
                 }
               }}
             >
-              {repo.id === demoRepo.id
-                ? "探索示範工作台"
-                : "了解專案與貢獻方向"}
+              {repo.id === demoRepo.id ? t.openDemo : t.explore}
               <ArrowUpRight size={15} />
             </button>
           </article>
@@ -115,8 +113,8 @@ export function ReposPage({
           onClick={() => openModal("import")}
         >
           <Plus size={27} />
-          <strong>加入你的 Repository</strong>
-          <span>GitHub 連結或本機 Git 專案</span>
+          <strong>{t.addTitle}</strong>
+          <span>{t.addText}</span>
         </button>
       </div>
     </section>

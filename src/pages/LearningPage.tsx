@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { MessageSquare } from "lucide-react";
-import { demoFiles } from "../demo";
+import { getDemo } from "../demo";
+import { useLocale, useT } from "../i18n";
 import type { Repo, RunSummary } from "../types";
 import { LearningNotes } from "../learning/LearningNotes";
 import type { Tab } from "../app/AppShell";
@@ -22,13 +23,15 @@ export function LearningPage({
   setSelectedPath,
   setTab,
 }: LearningPageProps) {
+  const t = useT("pages").learning;
+  const [locale] = useLocale();
   return (
     <section className="page-content">
       <ErrorBoundary>
         <LearningNotes
           runs={runs}
           repos={repos}
-          demoFiles={demoFiles}
+          demoFiles={getDemo(locale).files}
           onOpen={(id, path) => {
             chooseRun(id).then((opened) => {
               if (!opened) return;
@@ -41,10 +44,8 @@ export function LearningPage({
       <div className="team-note">
         <MessageSquare size={25} />
         <div>
-          <strong>你的下一個問題，就是下一個進步。</strong>
-          <p>
-            在工作台選取程式碼並提問。對話依檔案保留於目前工作階段，讓每個問題都有上下文。
-          </p>
+          <strong>{t.noteTitle}</strong>
+          <p>{t.noteText}</p>
         </div>
       </div>
     </section>

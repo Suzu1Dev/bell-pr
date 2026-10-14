@@ -1,7 +1,7 @@
 import { ChevronRight, GitPullRequest, Plus } from "lucide-react";
-import { demoRun } from "../demo";
+import { getDemo } from "../demo";
+import { useLocale, useT } from "../i18n";
 import type { Repo, RunSummary } from "../types";
-import { statusLabels } from "../app/labels";
 import { Modal } from "./Modal";
 
 interface RunsModalProps {
@@ -20,11 +20,15 @@ export function RunsModal({
   beginContribution,
   closeModal,
 }: RunsModalProps) {
+  const t = useT("modals").runs;
+  const statusLabels = useT("common").runStatus;
+  const [locale] = useLocale();
+  const demoRun = getDemo(locale).run;
   return (
     <Modal
       wide
-      title="每一個想法，都有進度。"
-      subtitle="切換任務以查看開發狀態、程式碼變更與 PR 草稿。"
+      title={t.title}
+      subtitle={t.subtitle}
       onClose={closeModal}
     >
       <div className="all-runs">
@@ -42,7 +46,7 @@ export function RunsModal({
               <strong>{job.title}</strong>
               <small>
                 {job.id === demoRun.id
-                  ? "互動示範"
+                  ? t.demo
                   : repos.find((repo) => repo.id === job.repoId)
                       ?.fullName}{" "}
                 · {job.branch}
@@ -58,7 +62,7 @@ export function RunsModal({
         onClick={() => beginContribution()}
       >
         <Plus size={15} />
-        新增貢獻
+        {t.newContribution}
       </button>
     </Modal>
   );

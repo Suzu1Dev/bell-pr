@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import { Target } from "lucide-react";
+import { useT } from "../i18n";
 import type { Repo } from "../types";
 import { ProjectOverview } from "../mission";
 import type { useProjectInsights } from "../mission/useProjectInsights";
@@ -27,20 +28,21 @@ export function ExplorePage({
   onUpdateRepo,
   updatingRepo,
 }: ExplorePageProps) {
+  const t = useT("repos").explore;
   return (
     <section className="page-content explore-page">
       <div className="page-title">
         <div>
-          <span className="eyebrow">REPOSITORY EXPLORER</span>
+          <span className="eyebrow">{t.eyebrow}</span>
           <h1 tabIndex={-1}>{exploreRepo.fullName}</h1>
-          <p>先了解使用者與問題，再決定這次貢獻的方向。</p>
+          <p>{t.intro}</p>
         </div>
         <button
           className="button primary"
           onClick={() => beginContribution(exploreRepo.id)}
         >
           <Target size={16} />
-          指定貢獻方向
+          {t.chooseDirection}
         </button>
       </div>
       <ProjectOverview
