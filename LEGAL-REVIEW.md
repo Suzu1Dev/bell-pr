@@ -110,7 +110,9 @@ own. The legal texts already describe the shipped behavior.
    process list that other local users can read. It now opens a one-time
    link (`mintOneTimeToken`, `server/index.ts:555`) instead,
    `server/cli.test.ts` checks the opener's arguments, and SECURITY.md
-   (SEC-14, SEC-16) and `docs/security-model.md` say so.
+   (SEC-14, SEC-16) and `docs/security-model.md` say so. The one-time link
+   can still be read there until the browser uses it, so SEC-16 keeps the
+   `--no-open` advice for computers shared with other users.
 2. **Update period of pool keys.** Copy fixed after the merge:
    `tools/license/issue.ts:154` sets `upd` 12 months from the day a key is
    issued, which for a pre-signed pool is the day the pool was made, while
@@ -387,7 +389,7 @@ Commands run on the tree of this review, test files excluded:
 | SEC-13 | Listening on all interfaces exposes the sign-in page; publish on 127.0.0.1 | `Dockerfile:80`, `server/config.ts:266`, `server/http-guard.ts:237` |
 | SEC-14 | A random 32-byte token in memory, never in a file, environment or command line; a restart signs out | `server/index.ts:529`, `server/index.ts:532`, `server/index.ts:556` |
 | SEC-15 | The printed link holds the token and works until restart | `server/index.ts:548` |
-| SEC-16 | The browser opened at start gets a one-time link, which goes to `open`/`xdg-open`; the token never does | `server/index.ts:556`, `server/routes/auth.ts:128`, `server/cli.ts:174`, `server/cli.ts:180`; `server/cli.test.ts` checks the opener's arguments; finding 1 |
+| SEC-16 | The browser opened at start gets a one-time link, which goes to `open`/`xdg-open`; the token never does; use `--no-open` on shared computers | `server/index.ts:556`, `server/routes/auth.ts:128`, `server/cli.ts:174`, `server/cli.ts:180`, `server/config.ts:306`; `server/cli.test.ts` checks the opener's arguments; finding 1 |
 | SEC-17 | HttpOnly, SameSite=Strict cookie for 30 days; all but the health check and sign-in page need it | `server/routes/auth.ts:65`, `server/routes/auth.ts:66`, `server/http-guard.ts:80`, `server/app.ts:163`, `server/http-guard.ts:237` |
 | SEC-18 | One-time links: once, 120 seconds, at most 5, digests only | `server/routes/auth.ts:27`, `server/routes/auth.ts:28`, `server/routes/auth.ts:138` |
 | SEC-19 | The link file is private and deleted once read | `server/index.ts:358`, `server/index.ts:359`, `server/cli.ts:242` |

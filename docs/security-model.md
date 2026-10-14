@@ -70,7 +70,12 @@ what BELL PR trusts, what it does not, and the limits of each protection.
   link for `bell-pr open` is handed over through
   `<dataDir>/run/open-link.json` (folder `0700`, file `0600`), which the CLI
   deletes as soon as it has read it. In Docker:
-  `docker exec <container> bell-pr open --print`.
+  `docker exec <container> bell-pr open --print`. A link that goes to the
+  opener is on its command line until the browser has used it, so another
+  user who reads it there first could sign in with it, and your browser
+  would then land on the sign-in page. On a computer you share with other
+  users, start with `--no-open` and use the printed link or
+  `bell-pr open --print`.
 - **The same-user caveat.** Any process running as your OS user can send that
   signal and read the link, just as it could read your browser's cookies.
   Sign-in links protect against other users, other machines and web pages,

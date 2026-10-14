@@ -88,7 +88,11 @@ repositories. These are the safeguards it relies on, and their limits.
 - When BELL PR opens your browser for you at start, it opens a one-time
   sign-in link, not the printed one. That link goes to your system's `open`
   or `xdg-open` command, whose command line other user accounts on the same
-  computer may be able to see, so the token itself never appears there. <!-- claim:SEC-16 -->
+  computer may be able to see, so the token itself never appears there.
+  Someone who reads the one-time link there could still use it before your
+  browser does, which would leave your browser on the sign-in page. On a
+  computer that you share with other users, start BELL PR with `--no-open`
+  and open the printed link yourself. <!-- claim:SEC-16 -->
 - Opening a sign-in link stores the token in an HttpOnly, SameSite=Strict
   cookie that lasts 30 days. Every request except the health check and the
   sign-in page itself needs that cookie. <!-- claim:SEC-17 -->
