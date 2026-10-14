@@ -329,8 +329,18 @@
   padding: 17px 20px;
   border-bottom: 1px solid var(--color-border-subtle);
 }
-.mission-reading-steps li:last-child {
+.mission-reading-steps li:last-child,
+.mission-reading-steps li:has(+ li[hidden]) {
   border-bottom: none;
+}
+.mission-reading-toggle {
+  margin-top: 10px;
+}
+.mission-reading-toggle .mission-chevron-down {
+  transform: rotate(90deg);
+}
+.mission-reading-toggle .mission-chevron-up {
+  transform: rotate(-90deg);
 }
 .mission-reading-steps code {
   display: block;

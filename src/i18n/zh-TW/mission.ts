@@ -80,6 +80,8 @@ const m: Translation<typeof en> = {
     unsampled: "未抽樣，內容未讀",
     lookFor: "看什麼",
     context: "這個檔案在分析中的其他說明",
+    showAll: ({ count }) => `顯示全部 ${n(count)} 步`,
+    showFirst: ({ count }) => `只顯示前 ${n(count)} 步`,
   },
   details: {
     modules: "主要模組怎麼分工？",

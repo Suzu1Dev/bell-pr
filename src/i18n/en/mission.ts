@@ -135,6 +135,9 @@ const mission = {
     unsampled: "Not sampled; content not read",
     lookFor: "Look for",
     context: "More about this file in the analysis",
+    showAll: ({ count }: { count: number }) => `Show all ${n(count)} steps`,
+    showFirst: ({ count }: { count: number }) =>
+      `Show only the first ${n(count)}`,
   },
   details: {
     modules: "What do the main modules do?",

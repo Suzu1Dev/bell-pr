@@ -558,3 +558,27 @@ test("without a run the directions come right after the project card", () => {
   assert.match(render(), />貢獻方向<\/a>/);
 });
 
+test("the reading path opens on its first two steps, with a button that shows the rest", () => {
+  const readingPath = ["a.ts", "b.ts", "c.ts", "d.ts"].map((path) => ({
+    path,
+    why: `Why ${path}`,
+    lookFor: `Look in ${path}`,
+  }));
+  const html = renderEnglish({ insights: { ...englishInsights, readingPath } });
+  assertNoHan(html);
+  const list = html.match(/<ol class="mission-reading-steps".*?<\/ol>/)?.[0] ?? "";
+  const steps = [...list.matchAll(/<li( hidden="")?><span class="mission-journey-number">(\d+)<\/span>/g)]
+    .map((match) => [match[2], !!match[1]]);
+  assert.deepEqual(steps, [["01", false], ["02", false], ["03", true], ["04", true]]);
+  // Hidden steps stay in the page, so "Show all" only reveals them.
+  assert.ok(html.includes("Look in d.ts"));
+  assert.match(
+    html,
+    /<button type="button" class="mission-text-button mission-reading-toggle" aria-expanded="false" aria-controls="mission-reading-steps">Show all 4 steps/,
+  );
+  assert.match(html, /<ol class="mission-reading-steps" id="mission-reading-steps">/);
+  // Two steps or fewer need no button.
+  assert.doesNotMatch(renderEnglish(), /mission-reading-toggle/);
+  assert.match(render({ insights: { ...demoInsights, readingPath } }), />顯示全部 4 步/);
+});
+

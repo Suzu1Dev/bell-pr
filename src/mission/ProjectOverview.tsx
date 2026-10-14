@@ -183,6 +183,9 @@ function EvidencePaths({
   );
 }
 
+/** The reading steps shown before "Show all". */
+const firstReadingSteps = 2;
+
 /** The overview's sections that the section nav links to. */
 type OverviewSection =
   | "purpose"
@@ -650,6 +653,11 @@ export function ProjectOverview({
         ...(run ? (["contribution", "directions"] as const) : []),
       ]
     : [];
+  // The reading path opens on its first steps; "Show all" lists the rest
+  // until another analysis or repository shows.
+  const [expandedReading, setExpandedReading] = useState<string>();
+  const readingKey = `${repo.id}:${insights?.generatedAt ?? ""}`;
+  const allReadingSteps = expandedReading === readingKey;
   // How people use the project, where to start reading and its parts.
   const projectContext = insights && (
     <>
@@ -708,7 +716,7 @@ export function ProjectOverview({
               <p>{insights.howItFitsTogether}</p>
             </div>
           )}
-          <ol className="mission-reading-steps">
+          <ol className="mission-reading-steps" id="mission-reading-steps">
             {insights.readingPath.map((step, index) => {
               const module = insights.modules.find(
                 (entry) => entry.path === step.path,
@@ -717,7 +725,10 @@ export function ProjectOverview({
                 (entry) => entry.path === step.path,
               );
               return (
-                <li key={`${step.path}-${index}`}>
+                <li
+                  key={`${step.path}-${index}`}
+                  hidden={!allReadingSteps && index >= firstReadingSteps}
+                >
                   <span className="mission-journey-number">
                     {String(index + 1).padStart(2, "0")}
                   </span>
@@ -756,6 +767,26 @@ export function ProjectOverview({
               );
             })}
           </ol>
+          {insights.readingPath.length > firstReadingSteps && (
+            <button
+              type="button"
+              className="mission-text-button mission-reading-toggle"
+              aria-expanded={allReadingSteps}
+              aria-controls="mission-reading-steps"
+              onClick={() =>
+                setExpandedReading(allReadingSteps ? undefined : readingKey)
+              }
+            >
+              {allReadingSteps
+                ? t.reading.showFirst({ count: firstReadingSteps })
+                : t.reading.showAll({ count: insights.readingPath.length })}
+              <ChevronRight
+                size={14}
+                aria-hidden="true"
+                className={allReadingSteps ? "mission-chevron-up" : "mission-chevron-down"}
+              />
+            </button>
+          )}
         </section>
       )}
 
