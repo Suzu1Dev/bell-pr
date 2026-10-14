@@ -73,6 +73,7 @@ import {
 } from "../shared/followups";
 import { FollowUpRounds } from "./draft/FollowUpRounds";
 import { SyncPanel } from "./draft/SyncPanel";
+import { parseViewSearch, viewSearch, type Page, type Tab } from "./view-url";
 
 /** The draft checks bring a Markdown parser, so they load beside the first screen. */
 type DraftChecks = typeof import("../shared/draft-checks");
@@ -117,15 +118,6 @@ import {
   type ContributionBrief,
 } from "../shared/insights";
 
-type Page =
-  | "workspace"
-  | "repos"
-  | "explore"
-  | "discovery"
-  | "team"
-  | "learning"
-  | "settings";
-type Tab = "overview" | "changes" | "activity" | "draft";
 type Status = {
   codex: boolean;
   codexAuthenticated?: boolean;
@@ -268,6 +260,8 @@ function Modal({
 export default function App() {
   const [page, setPage] = useState<Page>("workspace");
   const [tab, setTab] = useState<Tab>("overview");
+  // The address bar follows the view only after a reload's view is restored.
+  const [viewRestored, setViewRestored] = useState(false);
   const [repos, setRepos] = useState<Repo[]>([]);
   const [updatingRepo, setUpdatingRepo] = useState(false);
   const [runs, setRuns] = useState<RunSummary[]>([]);
@@ -627,6 +621,7 @@ export default function App() {
         setStatus(s);
         setRepos(r.repos);
         setRuns(jobs.runs);
+        void restoreView(r.repos);
       })
       .catch((error) => {
         if (!cancelled) setApiError(error.message);
@@ -635,6 +630,21 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+  useEffect(() => {
+    if (!viewRestored) return;
+    const search = viewSearch({
+      page,
+      tab,
+      runId: demo ? undefined : run.id,
+      repoId: exploreRepoId,
+    });
+    if (search !== window.location.search)
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${search}${window.location.hash}`,
+      );
+  }, [viewRestored, page, tab, demo, run.id, exploreRepoId]);
   useEffect(() => {
     let stopped = false;
     let fetching = false;
@@ -1189,6 +1199,26 @@ export default function App() {
       if (!reportError) throw error;
       notify((error as Error).message, "error");
       return false;
+    }
+  }
+
+  /** Returns a reload to the contribution, tab, project or page in the address bar. */
+  async function restoreView(knownRepos: Repo[]) {
+    const view = parseViewSearch(window.location.search);
+    try {
+      if (view?.runId) {
+        if (await chooseRun(view.runId)) setTab(view.tab ?? "overview");
+      } else if (view?.repoId) {
+        if (
+          view.repoId === demoRepo.id ||
+          knownRepos.some((repo) => repo.id === view.repoId)
+        ) {
+          setExploreRepoId(view.repoId);
+          navigate("explore");
+        }
+      } else if (view) navigate(view.page);
+    } finally {
+      setViewRestored(true);
     }
   }
 
