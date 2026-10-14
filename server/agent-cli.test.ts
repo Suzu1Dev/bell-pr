@@ -32,6 +32,10 @@ test("Codex arguments keep the existing sandbox, approval and schema flags", asy
     [
       "exec",
       "--ignore-user-config",
+      // The target repository's .rules files and AGENTS.md are never loaded.
+      "--ignore-rules",
+      "-c",
+      "project_doc_max_bytes=0",
       "--ephemeral",
       "--model",
       "codex-example",

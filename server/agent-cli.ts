@@ -109,6 +109,12 @@ export async function agentCommand(
     args: [
       "exec",
       "--ignore-user-config",
+      // The target repository's execpolicy .rules files and its AGENTS.md
+      // (project docs) are never loaded as instructions; verified with
+      // `codex exec --help` and the config keys of codex-cli 0.159.
+      "--ignore-rules",
+      "-c",
+      "project_doc_max_bytes=0",
       "--ephemeral",
       ...modelArguments(execution),
       "--sandbox",
