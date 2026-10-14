@@ -209,7 +209,8 @@ export class AppSettingsService {
       throw new AppError(
         (m) =>
           m.setup.settings.locked({
-            setting: refused,
+            // Only environmentLocks' settings can be locked.
+            setting: m.setup.settings.names[refused as keyof typeof environmentLocks],
             variable: lockedBy[refused]!,
           }),
         409,

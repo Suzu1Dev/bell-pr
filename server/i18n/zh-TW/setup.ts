@@ -27,8 +27,15 @@ const size = (bytes: number) => {
 
 const m: Translation<typeof en> = {
   settings: {
+    names: {
+      maxActiveRuns: "同時執行的工作數",
+      maxAgentProcesses: "同時執行的 Agent 程序數",
+      agentTimeoutScale: "Agent 時間上限倍數",
+      allowUnsandboxedAgents: "允許 Claude Code Agent 不用沙箱",
+      retentionDays: "已結束工作的檔案保留天數",
+    },
     locked: ({ setting, variable }) =>
-      `${setting} 這項設定來自環境變數 ${variable}。請修改或移除這個變數，再重新啟動 ${product.name}。`,
+      `「${setting}」這項設定來自環境變數 ${variable}。請修改或移除這個變數，再重新啟動 ${product.name}。`,
   },
   busy: {
     analysisRunning: "這個專案正在分析中。請等分析完成後再刪除專案。",

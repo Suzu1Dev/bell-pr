@@ -127,7 +127,20 @@ test("environment variables win, are reported in lockedBy and cannot be changed"
         setting: "maxActiveRuns",
         variable: "BELLPR_MAX_ACTIVE_RUNS",
       });
-      assert.match(error.message, /BELLPR_MAX_ACTIVE_RUNS/);
+      assert.equal(
+        error.message,
+        'The setting "Runs at a time" comes from the BELLPR_MAX_ACTIVE_RUNS environment variable. Change or remove the variable, then restart BELL PR.',
+      );
+      return true;
+    },
+  );
+  // The message names the setting in the reader's language, not its key.
+  await assert.rejects(
+    withLocale("zh-TW", () => service.update({ allowUnsandboxedAgents: true })),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.match(error.message, /^「允許 Claude Code Agent 不用沙箱」這項設定來自環境變數 BELLPR_ALLOW_UNSANDBOXED_AGENTS。/);
+      assert.equal(error.params?.setting, "allowUnsandboxedAgents");
       return true;
     },
   );

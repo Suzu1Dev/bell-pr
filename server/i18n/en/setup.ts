@@ -43,8 +43,16 @@ const labels: Record<DoctorCheckId, string> = {
 export default {
   /** PUT /api/app-settings. */
   settings: {
+    /** The settings an environment variable can fix, by name. */
+    names: {
+      maxActiveRuns: "Runs at a time",
+      maxAgentProcesses: "Agent processes at a time",
+      agentTimeoutScale: "Agent time limit scale",
+      allowUnsandboxedAgents: "Allow unsandboxed Claude Code agents",
+      retentionDays: "Days to keep a finished run's files",
+    },
     locked: ({ setting, variable }: { setting: string; variable: string }) =>
-      `The ${setting} setting comes from the ${variable} environment variable. Change or remove the variable, then restart ${product.name}.`,
+      `The setting "${setting}" comes from the ${variable} environment variable. Change or remove the variable, then restart ${product.name}.`,
   },
   /** Deleting while a project analysis runs. */
   busy: {
