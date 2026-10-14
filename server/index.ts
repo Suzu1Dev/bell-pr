@@ -6,6 +6,7 @@
  * Run directly (`tsx server/index.ts`, as `npm run dev:server` does), this
  * module behaves like `bell-pr start` with the given flags.
  */
+import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import {
   chmodSync,
@@ -147,9 +148,17 @@ export function processAlive(pid: number): boolean {
   }
 }
 
-/** The command line of a process on Linux; undefined where unknown. */
+/** The command line of a process (`ps` outside Linux); undefined where unknown. */
 function commandLine(pid: number): string[] | undefined {
-  if (process.platform !== "linux") return undefined;
+  if (process.platform === "win32") return undefined;
+  if (process.platform !== "linux") {
+    const ps = spawnSync("ps", ["-o", "command=", "-p", String(pid)], {
+      encoding: "utf8",
+      env: { ...process.env, LC_ALL: "C" },
+    });
+    const line = ps.status === 0 ? ps.stdout.trim() : "";
+    return line ? line.split(/\s+/) : undefined;
+  }
   try {
     return readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0").filter(Boolean);
   } catch {
@@ -175,6 +184,15 @@ function lockHolderAlive(lock: LockInfo, file: string): boolean {
     return false;
   const argv = commandLine(lock.pid);
   return !argv?.length || /node/i.test(path.basename(argv[0]));
+}
+
+/**
+ * Whether the BELL PR that wrote `lock` in `dataDir` may still be running,
+ * by the checks a start makes before it replaces the lock. `bell-pr open`
+ * signals only such a process: SIGUSR2 ends most other programs.
+ */
+export function lockHolderRunning(dataDir: string, lock: LockInfo): boolean {
+  return lockHolderAlive(lock, dataPaths(dataDir).lock);
 }
 
 /** Writes the lock exclusively, replacing a stale one. Returns its release. */

@@ -103,6 +103,33 @@ test("bell-pr open without a running instance exits 1 and says how to start", as
   });
 });
 
+test("bell-pr open never signals a reused pid, even where BELL PR answers on the lock's port", { skip: process.platform === "win32" }, async () => {
+  await withDataDir(async (dataDir, directory) => {
+    // Another BELL PR, with its own data directory, now uses the port the
+    // stale lock names, and the lock's pid belongs to another program.
+    const other = await inProcessServer(path.join(directory, "other-data"));
+    const stranger = spawn("sleep", ["30"], { stdio: "ignore" });
+    try {
+      await once(stranger, "spawn");
+      mkdirSync(dataDir, { recursive: true });
+      writeFileSync(
+        path.join(dataDir, "bellpr.lock"),
+        JSON.stringify({ pid: stranger.pid, port: Number(new URL(other.url).port), version: "1.0.0" }),
+      );
+      const signalled: number[] = [];
+      const result = await cli(["open", "--data-dir", dataDir], {
+        kill: (target) => signalled.push(target),
+      });
+      assert.equal(result.code, 1);
+      assert.match(result.stderr, /not running/);
+      assert.deepEqual(signalled, []);
+    } finally {
+      stranger.kill("SIGKILL");
+      await other.shutdown();
+    }
+  });
+});
+
 test("bell-pr open prints a fresh one-time link from the running server and deletes the link file", async () => {
   await withDataDir(async (dataDir) => {
     const minted: string[] = [];

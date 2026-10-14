@@ -19,8 +19,8 @@ import { runDoctorCli } from "./doctor.js";
 import { sm } from "./i18n/index.js";
 import {
   isEntryPoint,
+  lockHolderRunning,
   probeHealth,
-  processAlive,
   readLock,
   startServer,
   StartupError,
@@ -220,7 +220,7 @@ async function open(args: string[], ctx: Context): Promise<number> {
   // Only a live BELL PR gets the signal: SIGUSR2 ends other programs.
   if (
     !lock ||
-    !processAlive(lock.pid) ||
+    !lockHolderRunning(dataDir, lock) ||
     !(await probeHealth(lock.host ?? "127.0.0.1", lock.port))
   ) {
     ctx.stderr.write(`${m.notRunning}\n`);
