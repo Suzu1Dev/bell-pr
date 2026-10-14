@@ -81,7 +81,7 @@ const detections = new Map<string, Promise<SandboxDetection>>();
  * Whether Claude Code's sandbox can start here: on Linux bwrap and socat
  * on PATH, and bwrap able to create a sandbox; sandbox-exec on macOS;
  * other platforms have none. The answer is cached for the PATH it was
- * computed with.
+ * computed with, until forgetClaudeSandboxDetection().
  */
 export function detectClaudeSandbox(): Promise<SandboxDetection> {
   const platform = process.platform;
@@ -104,6 +104,15 @@ export function detectClaudeSandbox(): Promise<SandboxDetection> {
     detections.set(key, detection);
   }
   return detection;
+}
+
+/**
+ * Forgets every cached answer of detectClaudeSandbox, so the next call
+ * looks again: the doctor's "Re-check" sees a bubblewrap or socat installed
+ * while the server runs.
+ */
+export function forgetClaudeSandboxDetection(): void {
+  detections.clear();
 }
 
 let allowUnsandboxedSource: (() => boolean | undefined) | undefined;
