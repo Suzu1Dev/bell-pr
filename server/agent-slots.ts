@@ -10,10 +10,28 @@ export const defaultAgentProcessLimit = 3;
 export class AgentSlots {
   private activeCount = 0;
   private waiters: { grant: () => void }[] = [];
+  private currentLimit: number;
 
-  constructor(readonly limit: number) {
-    if (!Number.isInteger(limit) || limit < 1)
-      throw new Error("AgentSlots limit must be a positive integer.");
+  constructor(limit: number) {
+    assertLimit(limit);
+    this.currentLimit = limit;
+  }
+
+  /** How many processes may run at once. */
+  get limit() {
+    return this.currentLimit;
+  }
+
+  /**
+   * Changes the limit while work runs. A higher limit grants waiting
+   * callers at once; a lower one lets running processes finish and grants
+   * no slot until fewer than the new limit are active.
+   */
+  setLimit(limit: number) {
+    assertLimit(limit);
+    this.currentLimit = limit;
+    while (this.activeCount < this.currentLimit && this.waiters.length)
+      this.waiters.shift()!.grant();
   }
 
   get active() {
@@ -59,9 +77,14 @@ export class AgentSlots {
       if (released) return;
       released = true;
       this.activeCount--;
-      this.waiters.shift()?.grant();
+      if (this.activeCount < this.currentLimit) this.waiters.shift()?.grant();
     };
   }
+}
+
+function assertLimit(limit: number) {
+  if (!Number.isInteger(limit) || limit < 1)
+    throw new Error("AgentSlots limit must be a positive integer.");
 }
 
 /** Parses BELLPR_MAX_AGENT_PROCESSES; an unset variable means the default. */

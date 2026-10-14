@@ -221,10 +221,11 @@ test("a run whose Claude agent ran unsandboxed is marked once, with one notice",
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-sandbox-run-"));
   // A fake claude on PATH, and no bwrap or socat.
   await stubPath(t, [], true);
-  optIn(t, true);
   const store = new Store(path.join(directory, "state"));
   await store.initialize();
   const workbench = new Workbench(store);
+  // After the Workbench, which makes its app settings the source.
+  optIn(t, true);
   try {
     const worktreePath = path.join(store.directory, "worktrees", "unsandboxed");
     await mkdir(worktreePath, { recursive: true });

@@ -4,6 +4,8 @@ import {
   assertGitHubRepository,
   assertRefName,
   ciConfigPath,
+  normalizeRepositorySource,
+  parseGitHubSource,
   safeRefName,
   safeRelativePath,
   sensitivePath,
@@ -110,4 +112,49 @@ test("branch and repository names are checked before they reach a URL or refspec
     "evil.example/x@y",
   ])
     assert.throws(() => assertGitHubRepository(fullName), AppError, fullName);
+});
+
+test("what a person types to import a project is normalized before the import reads it", () => {
+  const home = "/home/someone";
+  const github = "https://github.com/octo-org/hello.world";
+  const table: [string, string][] = [
+    // owner/repo and github.com without a scheme.
+    ["octo-org/hello.world", github],
+    ["  octo-org/hello.world.git  ", github],
+    ["github.com/octo-org/hello.world", github],
+    ["www.github.com/octo-org/hello.world/", github],
+    ["GitHub.com/octo-org/hello.world", github],
+    ["http://github.com/octo-org/hello.world", github],
+    ["https://github.com/octo-org/hello.world.git", github],
+    // Pages inside the repository name the repository.
+    ["https://github.com/octo-org/hello.world/tree/main/src", github],
+    ["github.com/octo-org/hello.world/blob/main/README.md#L10", github],
+    ["https://github.com/octo-org/hello.world/issues/42", github],
+    ["https://github.com/octo-org/hello.world/issues", github],
+    ["https://github.com/octo-org/hello.world/pull/7/files", github],
+    ["https://github.com/octo-org/hello.world/pulls?q=is%3Aopen", github],
+    ["https://github.com/octo-org/hello.world?tab=readme-ov-file", github],
+    // The home directory.
+    ["~/code/project", "/home/someone/code/project"],
+    ["~", "/home/someone"],
+    // Everything else stays as typed, for the import to accept or refuse.
+    ["/srv/repos/project", "/srv/repos/project"],
+    ["git@github.com:octo-org/hello.world.git", "git@github.com:octo-org/hello.world.git"],
+    ["./relative/path", "./relative/path"],
+    ["relative/path/deeper", "relative/path/deeper"],
+    ["https://github.com/octo-org/hello.world/settings", "https://github.com/octo-org/hello.world/settings"],
+    ["https://github.com/octo-org", "https://github.com/octo-org"],
+    ["https://gitlab.com/octo-org/hello.world", "https://gitlab.com/octo-org/hello.world"],
+    ["https://user:secret@github.com/octo-org/hello.world", "https://user:secret@github.com/octo-org/hello.world"],
+    ["-owner/repo", "-owner/repo"],
+    ["owner/..", "owner/.."],
+    ["--upload-pack=x/y", "--upload-pack=x/y"],
+    ["~someone/repo", "~someone/repo"],
+  ];
+  for (const [input, expected] of table)
+    assert.equal(normalizeRepositorySource(input, home), expected, input);
+  // Every GitHub result is one the import accepts.
+  for (const [input, expected] of table)
+    if (expected.startsWith("https://github.com/") && expected === github)
+      assert.equal(parseGitHubSource(normalizeRepositorySource(input, home))?.url, github, input);
 });

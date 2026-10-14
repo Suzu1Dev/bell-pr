@@ -52,8 +52,12 @@ import {
   hasExtendedAgentTimeout,
   withAgentTimeoutHint,
 } from "./agent-timeouts.js";
-import { AppError } from "./types.js";
+import { AppError, type Run } from "./types.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
+import { setupError } from "./cli-errors.js";
+import { knownDoctorReport } from "./doctor.js";
+import { agentSpawn, parseAgentOutput } from "./run-events.js";
+import type { AgentProvider } from "../shared/models.js";
 import { lenientRead } from "./persisted-schema.js";
 import { respondIn } from "./prompt-language.js";
 import { formatters, locales } from "../shared/i18n/locale.js";
@@ -354,6 +358,44 @@ export function discoveryPrompt(
   );
 }
 
+/** The discovery services of each data directory (see resetDiscovery). */
+const services = new WeakMap<Store, Set<DiscoveryService>>();
+
+/** Whether a discovery search runs in the data directory of `store`. */
+export function discoveryRunning(store: Store): boolean {
+  return [...(services.get(store) ?? [])].some((service) => service.running);
+}
+
+/** Makes every discovery service of `store` forget its job, after all data was erased. */
+export function resetDiscovery(store: Store): void {
+  for (const service of services.get(store) ?? []) service.reset();
+}
+
+/**
+ * Refuses a search before it starts when the doctor already found that
+ * the GitHub CLI or the agent CLI it needs is missing or signed out. When
+ * the doctor has not run for this data directory, nothing is probed here:
+ * the search reports its own failure.
+ */
+async function assertDiscoveryReady(dataDir: string, provider: AgentProvider) {
+  const report = await knownDoctorReport(dataDir);
+  if (!report) return;
+  const reason = (id: string) =>
+    report.checks.find((check) => check.id === id)?.reason;
+  if (reason("gh") === "missing") throw setupError("gh_missing");
+  if (["signed-out", "rejected"].includes(reason("gh-auth") ?? ""))
+    throw setupError("gh_unauthenticated");
+  if (reason(provider) === "missing") throw setupError(`${provider}_missing`);
+  if (reason(`${provider}-auth`) === "signed-out")
+    throw setupError(`${provider}_unauthenticated`);
+}
+
+/**
+ * The run-events helpers name a run; a discovery search has none, so its
+ * log lines carry `discovery:<jobId>` in that field.
+ */
+const discoveryLogRun = (jobId: string) => ({ id: `discovery:${jobId}` }) as Run;
+
 export class DiscoveryService {
   private job: DiscoveryJob | null = null;
   private initialization?: Promise<void>;
@@ -365,7 +407,8 @@ export class DiscoveryService {
   private collect: typeof collectDiscoveryCandidates;
   private slots: AgentSlots;
   private sleep?: TransientSleep;
-  private timeoutScale: number;
+  private scale: number | (() => number);
+  private preflight: (preferences: DiscoveryPreferences) => Promise<void>;
   private file: string;
   constructor(
     private store: Store,
@@ -374,10 +417,18 @@ export class DiscoveryService {
       getModelCatalog?: typeof getModelCatalog;
       collectCandidates?: typeof collectDiscoveryCandidates;
       agentSlots?: AgentSlots;
-      /** BELLPR_AGENT_TIMEOUT_SCALE; multiplies every agent turn timeout. */
-      agentTimeoutScale?: number;
+      /**
+       * Multiplies every agent turn timeout; a function is read for each
+       * search, so a changed app setting applies.
+       */
+      agentTimeoutScale?: number | (() => number);
       /** Wait between retries of an analysis that lost the OAuth refresh race. */
       sleep?: TransientSleep;
+      /**
+       * Checks that the GitHub CLI and the provider are ready before a job
+       * is created; by default from the doctor's report.
+       */
+      preflight?: (preferences: DiscoveryPreferences) => Promise<void>;
     } = {},
   ) {
     this.file = path.join(store.directory, "discovery.json");
@@ -387,8 +438,30 @@ export class DiscoveryService {
     this.collect = dependencies.collectCandidates ?? collectDiscoveryCandidates;
     this.slots =
       dependencies.agentSlots ?? new AgentSlots(defaultAgentProcessLimit);
-    this.timeoutScale =
-      dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
+    this.scale = dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
+    this.preflight =
+      dependencies.preflight ??
+      ((preferences) =>
+        assertDiscoveryReady(store.directory, preferences.provider ?? "codex"));
+    let registered = services.get(store);
+    if (!registered) services.set(store, (registered = new Set()));
+    registered.add(this);
+  }
+  private get timeoutScale() {
+    return typeof this.scale === "function" ? this.scale() : this.scale;
+  }
+  /** Whether a search is running. */
+  get running() {
+    return this.active !== undefined;
+  }
+  /**
+   * Forgets the job after all data was erased, so neither the API nor a
+   * later save brings it back. A search started meanwhile is stopped.
+   */
+  reset() {
+    this.active?.controller.abort();
+    this.job = null;
+    this.initialization = undefined;
   }
   private initialize() {
     this.initialization ??= (async () => {
@@ -421,6 +494,8 @@ export class DiscoveryService {
     return this.initialization;
   }
   private save() {
+    // Nothing to keep after reset(); a stopped search must not write again.
+    if (!this.job) return this.writes;
     const value = JSON.stringify({ version: 1, job: this.job });
     this.writes = this.writes
       .catch(() => undefined)
@@ -438,6 +513,13 @@ export class DiscoveryService {
     await this.initialize();
     const completing = this.active;
     if (completing && this.job?.status !== "running") await completing.finished;
+    if (this.stopping)
+      throw new AppError((m) => m.analysis.discovery.shuttingDown, 503);
+    if (this.active)
+      throw new AppError((m) => m.analysis.discovery.alreadyRunning, 409);
+    // gh and the provider before a job exists: a refusal leaves the last
+    // result as it is.
+    await this.preflight(preferences);
     if (this.stopping)
       throw new AppError((m) => m.analysis.discovery.shuttingDown, 503);
     if (this.active)
@@ -614,11 +696,17 @@ export class DiscoveryService {
           efficiency = trackEfficiency(job.preferences.ponytailMode);
           const releaseSlot = await this.slots.acquire(signal);
           try {
+            const spawned = agentSpawn(
+              discoveryLogRun(job.id),
+              "discovery",
+              cli.executable,
+              timeoutMs,
+            );
             await this.execute(cli.executable, cli.args, {
               cwd: temporary,
               input,
               signal,
-              env: agentEnvironment(),
+              env: agentEnvironment(job.modelExecution?.provider ?? "codex"),
               timeoutMs,
               maxBytes: 1_000_000,
               onLine: (line, stream) => {
@@ -641,7 +729,8 @@ export class DiscoveryService {
                   /* Only structured agent messages are candidates for analysis output. */
                 }
               },
-            }).catch((error: unknown) => {
+            }).then(spawned.exited, (error: unknown) => {
+              spawned.failed(error);
               // claude exits non-zero after losing the OAuth refresh race; its result event
               // (flushed before the rejection) already classified the attempt as retryable.
               if (!retryable)
@@ -671,10 +760,8 @@ export class DiscoveryService {
         secretInPatch(answer)
       )
         throw new AppError((m) => m.analysis.discovery.unusableAnswer, 422);
-      const result = parseDiscoveryResult(
-        redact(answer),
-        eligible,
-        job.preferences,
+      const result = parseAgentOutput(discoveryLogRun(job.id), "discovery", () =>
+        parseDiscoveryResult(redact(answer), eligible, job.preferences),
       );
       job.opportunities = result.opportunities;
       job.warnings.push(...result.warnings);
@@ -725,5 +812,6 @@ export class DiscoveryService {
     await active?.finished;
     await this.initialization?.catch(() => undefined);
     await this.writes.catch(() => undefined);
+    services.get(this.store)?.delete(this);
   }
 }

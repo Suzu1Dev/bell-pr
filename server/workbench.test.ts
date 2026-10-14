@@ -544,11 +544,13 @@ test("GET /api/status reports the configured run, process and queue limits", asy
     assert.equal(body.codex, false);
     assert.deepEqual(body.limits, {
       maxActiveRuns: 3,
+      effectiveMaxActiveRuns: 3,
       maxAgentProcesses: 5,
       maxQueued: 8,
     });
     assert.deepEqual(new Workbench(f.store).limits, {
       maxActiveRuns: 2,
+      effectiveMaxActiveRuns: 2,
       maxAgentProcesses: 3,
       maxQueued: 8,
     });
@@ -825,7 +827,7 @@ test("HTTP errors follow X-Bell-Locale: validation, the guard, the error handler
       error: "The approved version changed or expired; reload, review and approve again before you send the PR.",
     });
     assert.deepEqual(await errorOf("en", "/api/repos", {
-      body: JSON.stringify({ source: "relative/path" }),
+      body: JSON.stringify({ source: "./relative/path" }),
     }), {
       status: 400,
       error: "Enter a GitHub HTTPS URL or the absolute path of a local repository.",

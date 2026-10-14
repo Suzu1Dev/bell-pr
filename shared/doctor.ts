@@ -35,6 +35,17 @@ export interface DoctorCheck {
   version?: string;
   /** Human-readable detail in the request's locale. */
   detail?: string;
+  /**
+   * Why the check has its status, as a stable id such as "missing",
+   * "signed-out", "offline" or "too-old"; clients branch on it, never on
+   * the detail text.
+   */
+  reason?: string;
+  /**
+   * Values behind the detail that clients format or mask themselves, such
+   * as `login` (gh-auth), `path` and `freeBytes` (data-dir) or `email`.
+   */
+  params?: Record<string, string | number>;
   fixes?: Fix[];
   docsUrl?: string;
 }

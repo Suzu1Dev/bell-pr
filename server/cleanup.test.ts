@@ -331,7 +331,7 @@ test("BELL's clone of a local-only checkout is its own: freeing a run deletes th
   assert.equal((await git(checkout, ["branch", "--list", value.branch])).stdout.trim(), "");
 });
 
-test("retention frees only finished runs past the period and never touches active ones", async (t) => {
+test("retention frees only failed and cancelled runs past the period and never touches active or published ones", async (t) => {
   const f = await fixture();
   const previous = process.env.BELLPR_RETENTION_DAYS;
   t.after(async () => {
@@ -355,9 +355,11 @@ test("retention frees only finished runs past the period and never touches activ
   const eligible = [
     await make("0000fail", { ...fields("failed"), locale: "zh-TW" }),
     await make("00cancel", fields("cancelled")),
-    await make("0publish", fields("published")),
   ];
   const kept = [
+    // A published PR keeps its checkout however old: maintainers may
+    // review weeks later, and rounds and syncing need it.
+    await make("0publish", fields("published")),
     await make("00queued", fields("queued")),
     await make("0running", fields("running")),
     await make("00paused", fields("awaiting_plan")),

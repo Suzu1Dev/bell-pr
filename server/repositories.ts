@@ -5,9 +5,15 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, mkdir, realpath, rm } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { command, git, gitNetwork } from "./process.js";
-import { assertRefName, parseGitHubSource } from "./git.js";
+import {
+  assertRefName,
+  normalizeRepositorySource,
+  parseGitHubSource,
+} from "./git.js";
+import { setupError } from "./cli-errors.js";
 import { AppError, type Repository, type Run } from "./types.js";
 import type { WorkbenchContext } from "./workbench.js";
 import { log } from "./log.js";
@@ -15,6 +21,8 @@ import { log } from "./log.js";
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
 const json = <T>(value: string) => JSON.parse(value) as T;
+/** How long a GitHub clone may take before the import gives up. */
+const cloneTimeoutMs = 600_000;
 /**
  * The folder name of BELL's clone of a local checkout. It starts with a
  * digest of the checkout's path, so importing the same checkout again finds
@@ -86,6 +94,41 @@ async function cloneLocalCheckout(
   }
 }
 
+/**
+ * Clones a GitHub repository without the file contents of past commits
+ * (Git fetches one when it is needed), so a long history clones in a
+ * fraction of the time. A clone that takes longer than `timeoutMs` stops
+ * with 504 `clone_timeout`, whose advice is to clone it yourself and
+ * import the path; a failed clone leaves nothing behind.
+ */
+export async function cloneGitHubRepository(
+  root: string,
+  url: string,
+  destination: string,
+  timeoutMs = cloneTimeoutMs,
+) {
+  try {
+    await gitNetwork(
+      root,
+      [
+        "clone",
+        "--filter=blob:none",
+        "--no-recurse-submodules",
+        "--",
+        `${url}.git`,
+        destination,
+      ],
+      { timeoutMs, maxBytes: 1_000_000 },
+    );
+  } catch (error) {
+    await rm(destination, { recursive: true, force: true });
+    // command() stops a command that runs too long with a 504.
+    if (error instanceof AppError && error.statusCode === 504 && !error.code)
+      throw setupError("clone_timeout", 504, { url, cause: error });
+    throw error;
+  }
+}
+
 /** The branch origin's HEAD names, else the branch checked out. */
 async function defaultBranchOf(directory: string) {
   try {
@@ -103,8 +146,10 @@ async function defaultBranchOf(directory: string) {
 
 export async function importRepository(
   ctx: WorkbenchContext,
-  source: string,
+  input: string,
 ) {
+  // owner/repo, github.com/… without a scheme, repository pages and ~/.
+  const source = normalizeRepositorySource(input, os.homedir());
   return ctx.lock("imports", async () => {
     const github = parseGitHubSource(source);
     let repositoryPath: string;
@@ -130,17 +175,7 @@ export async function importRepository(
         root,
         `${github.owner}-${github.name}-${newId().slice(0, 8)}`,
       );
-      await gitNetwork(
-        root,
-        [
-          "clone",
-          "--no-recurse-submodules",
-          "--",
-          `${github.url}.git`,
-          repositoryPath,
-        ],
-        { timeoutMs: 180_000, maxBytes: 1_000_000 },
-      );
+      await cloneGitHubRepository(root, github.url, repositoryPath);
       try {
         metadata = json(
           (

@@ -27,6 +27,11 @@ export const appSettingsSchema = z.object({
   allowUnsandboxedAgents: z.boolean().optional(),
   /** Days to keep finished runs' worktrees before cleanup removes them. */
   retentionDays: z.number().int().min(1).max(365).optional(),
+  /**
+   * Adds an AI-assistance note to every pull request draft. Absent means
+   * false: drafts mention AI only when the project's own rules ask for it.
+   */
+  alwaysDiscloseAi: z.boolean().optional(),
 });
 
 export type AppSettings = z.infer<typeof appSettingsSchema>;

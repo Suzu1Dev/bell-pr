@@ -22,7 +22,7 @@ import {
   type RecommendationPreferences,
   type RecommendationVerification,
 } from "../shared/insights.js";
-import type { ModelSettings } from "../shared/models.js";
+import type { AgentProvider, ModelSettings } from "../shared/models.js";
 import { quoteMatches } from "./evidence.js";
 import { contributionIntent } from "./team.js";
 import {
@@ -50,9 +50,12 @@ import {
   type ServerMessages,
 } from "./i18n/index.js";
 import { respondIn } from "./prompt-language.js";
-import { AppError, type Repository } from "./types.js";
+import { AppError, type Repository, type Run } from "./types.js";
 import { lenientRead } from "./persisted-schema.js";
 import { locales, type Locale } from "../shared/i18n/locale.js";
+import { setupError, withCliSetupHint } from "./cli-errors.js";
+import { defaultProviderFrom, knownDoctorReport } from "./doctor.js";
+import { agentSpawn, parseAgentOutput } from "./run-events.js";
 import {
   defaultPonytailMode,
   ponytailModes,
@@ -595,6 +598,30 @@ function novelRecommendations(
   return added;
 }
 
+/** The only language of the builds that saved analyses without a locale. */
+const legacyAnalysisLocale: Locale = "zh-TW";
+
+/** The services analyzing each data directory's projects (see analysisRunning). */
+const services = new WeakMap<Store, Set<ProjectInsightsService>>();
+
+/**
+ * Whether a project analysis runs for `repoId` (any project when absent) in
+ * the data directory of `store`, so deleting the project or all data can
+ * wait for it instead of having the analysis write its cache afterwards.
+ */
+export function analysisRunning(store: Store, repoId?: string): boolean {
+  return [...(services.get(store) ?? [])].some((service) =>
+    service.analysisRunning(repoId),
+  );
+}
+
+/**
+ * The run-events helpers name a run; an analysis has none, so its log
+ * lines carry `analysis:<repoId>` in that field.
+ */
+const analysisLogRun = (repoId: string) =>
+  ({ id: `analysis:${repoId}` }) as Run;
+
 /** Separate persistence keeps contribution preferences independent of run lifecycle writes. */
 export class ProjectInsightsService {
   private writes = new Map<string, Promise<unknown>>();
@@ -607,7 +634,8 @@ export class ProjectInsightsService {
   private modelCatalog: typeof getModelCatalog;
   private slots: AgentSlots;
   private sleep?: TransientSleep;
-  private timeoutScale: number;
+  private scale: number | (() => number);
+  private defaultProvider: () => Promise<AgentProvider | undefined>;
 
   constructor(
     public store: Store,
@@ -615,10 +643,19 @@ export class ProjectInsightsService {
       command?: typeof command;
       getModelCatalog?: typeof getModelCatalog;
       agentSlots?: AgentSlots;
-      /** BELLPR_AGENT_TIMEOUT_SCALE; multiplies every agent turn timeout. */
-      agentTimeoutScale?: number;
+      /**
+       * Multiplies every agent turn timeout; a function is read for each
+       * analysis, so a changed app setting applies.
+       */
+      agentTimeoutScale?: number | (() => number);
       /** Wait between retries of an analysis that lost the OAuth refresh race. */
       sleep?: TransientSleep;
+      /**
+       * The provider to use while no model settings were saved. By default
+       * the doctor's report decides: Claude Code when it is the only CLI
+       * signed in, else Codex.
+       */
+      defaultProvider?: () => Promise<AgentProvider | undefined>;
     } = {},
   ) {
     this.execute = dependencies.command ?? command;
@@ -626,8 +663,26 @@ export class ProjectInsightsService {
     this.modelCatalog = dependencies.getModelCatalog ?? getModelCatalog;
     this.slots =
       dependencies.agentSlots ?? new AgentSlots(defaultAgentProcessLimit);
-    this.timeoutScale =
-      dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
+    this.scale = dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
+    this.defaultProvider =
+      dependencies.defaultProvider ??
+      (async () =>
+        // The last results as they are: reading settings never waits for a probe.
+        defaultProviderFrom(
+          await knownDoctorReport(store.directory, { stale: true }),
+        ));
+    let registered = services.get(store);
+    if (!registered) services.set(store, (registered = new Set()));
+    registered.add(this);
+  }
+
+  private get timeoutScale() {
+    return typeof this.scale === "function" ? this.scale() : this.scale;
+  }
+
+  /** Whether an analysis of `repoId` (any project when absent) is running. */
+  analysisRunning(repoId?: string): boolean {
+    return repoId === undefined ? this.generating.size > 0 : this.generating.has(repoId);
   }
 
   private repository(id: string): Repository {
@@ -693,6 +748,11 @@ export class ProjectInsightsService {
     return path.join(this.store.directory, "model-settings.json");
   }
 
+  /**
+   * The shared model settings. Until some are saved, the provider is the
+   * one the environment has ready (Claude Code when it is the only CLI
+   * signed in, else Codex), and nothing is written.
+   */
   async getModelSettings(): Promise<ModelSettings> {
     await this.modelWrite.catch(() => undefined);
     try {
@@ -700,8 +760,10 @@ export class ProjectInsightsService {
         JSON.parse(await readFile(this.modelSettingsPath, "utf8")),
       );
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT")
-        return sharedModelSettingsSchema.parse({});
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        const provider = await this.defaultProvider().catch(() => undefined);
+        return sharedModelSettingsSchema.parse(provider ? { provider } : {});
+      }
       throw new AppError(
         (m) => m.analysis.insights.modelSettingsUnreadable,
         500,
@@ -1078,8 +1140,11 @@ export class ProjectInsightsService {
           409,
         );
       // One analysis keeps one language: more recommendations are written in
-      // the saved analysis's locale, or the request's when the cache predates it.
-      const locale = (more && previous.insights?.locale) || currentLocale();
+      // the saved analysis's locale; an analysis saved without one was
+      // written in zh-TW, the only language of the builds that saved it.
+      const locale = more
+        ? (previous.insights?.locale ?? legacyAnalysisLocale)
+        : currentLocale();
       const requestedCount = more
         ? Math.min(
             projectRecommendationBatchSize,
@@ -1087,26 +1152,43 @@ export class ProjectInsightsService {
           )
         : projectRecommendationBatchSize;
       const settings = await this.getSettings(repoId);
-      const login = agentLoginCheck(settings.provider);
+      const provider = settings.provider ?? "codex";
+      const login = agentLoginCheck(provider);
       try {
         await this.execute(login.executable, login.args, {
           timeoutMs: 10_000,
           maxBytes: 20_000,
-          env: agentEnvironment(),
+          env: agentEnvironment(provider),
           signal,
         });
-      } catch {
+      } catch (error) {
         this.assertActive(signal);
+        // A CLI that is missing says so; any other failure means signed out.
+        const hinted = withCliSetupHint(error, login.executable);
+        if (hinted instanceof AppError && hinted.code?.endsWith("_missing"))
+          throw hinted;
         throw new AppError(
           (m) =>
             m.analysis.insights.agentUnavailable({
-              agent: agentLabel(settings.provider),
+              agent: agentLabel(provider),
               login:
                 login.executable === "claude"
                   ? "claude auth login"
                   : "codex login",
             }),
           503,
+          {
+            code:
+              provider === "claude"
+                ? "claude_unauthenticated"
+                : "codex_unauthenticated",
+            fixes: setupError(
+              provider === "claude"
+                ? "claude_unauthenticated"
+                : "codex_unauthenticated",
+            ).fixes,
+            cause: error,
+          },
         );
       }
       this.assertActive(signal);
@@ -1206,10 +1288,16 @@ export class ProjectInsightsService {
           efficiency = trackEfficiency(mode);
           const releaseSlot = await this.slots.acquire(signal);
           try {
+            const spawned = agentSpawn(
+              analysisLogRun(repoId),
+              more ? "recommendations" : "analysis",
+              cli.executable,
+              timeoutMs,
+            );
             await this.execute(cli.executable, cli.args, {
               input,
               cwd: temporary,
-              env: agentEnvironment(),
+              env: agentEnvironment(modelExecution.provider ?? "codex"),
               signal,
               timeoutMs,
               maxBytes: 1_000_000,
@@ -1232,7 +1320,8 @@ export class ProjectInsightsService {
                   /* Raw tool output is not trusted analysis. */
                 }
               },
-            }).catch((error: unknown) => {
+            }).then(spawned.exited, (error: unknown) => {
+              spawned.failed(error);
               // claude exits non-zero after losing the OAuth refresh race; its result event
               // (flushed before the rejection) already classified the attempt as retryable.
               if (!retryable)
@@ -1257,9 +1346,14 @@ export class ProjectInsightsService {
       this.assertActive(signal);
       if (failed || !answer || Buffer.byteLength(answer) > 120_000)
         throw new AppError((m) => m.analysis.insights.unfinished, 422);
-      const { value: analysis, verification } = more
-        ? validateAnalysis(answer, context.files, safePaths, recommendationsSchema, locale)
-        : validateAnalysis(answer, context.files, safePaths, analysisSchema, locale);
+      const { value: analysis, verification } = parseAgentOutput(
+        analysisLogRun(repoId),
+        more ? "recommendations" : "analysis",
+        () =>
+          more
+            ? validateAnalysis(answer, context.files, safePaths, recommendationsSchema, locale)
+            : validateAnalysis(answer, context.files, safePaths, analysisSchema, locale),
+      );
       if (
         (await this.version(repo, signal)).fingerprint !== version.fingerprint
       )
@@ -1311,6 +1405,8 @@ export class ProjectInsightsService {
       let recommendationPreferences!: RecommendationPreferences;
       await this.update(repoId, (cache) => {
         this.assertActive(signal);
+        // A project deleted meanwhile (or all data) gets no cache again.
+        this.repository(repoId);
         cache.insights = { ...insights, source: "ai" };
         cache.fingerprint = version.fingerprint;
         const ids = new Set(insights.recommendations.map((entry) => entry.id));
@@ -1338,5 +1434,6 @@ export class ProjectInsightsService {
     for (const controller of this.controllers.values()) controller.abort();
     await Promise.allSettled([...this.jobs]);
     await Promise.allSettled([...this.writes.values()]);
+    services.get(this.store)?.delete(this);
   }
 }

@@ -430,7 +430,9 @@ test("an analysis records its locale outside the fingerprint, and more recommend
     assert.doesNotMatch(input, /Traditional Chinese/);
     assert.equal(expanded.insights.locale, "en");
     assert.deepEqual(expanded.insights.recommendationExpansion?.addedIds, ["examples"]);
-    // A cache written before the locale was recorded expands in the request's locale and stays unlabelled.
+    // A cache written before the locale was recorded was written in zh-TW,
+    // the only language of those builds: it expands in zh-TW from any page
+    // and stays unlabelled.
     delete saved.insights.locale;
     await writeFile(path.join(f.store.directory, "insights", cacheFile), JSON.stringify(saved));
     const legacy = fakeCodex(() => ({ recommendations: [] }));
@@ -441,7 +443,7 @@ test("an analysis records its locale outside the fingerprint, and more recommend
       }).generateMore(f.repo.id, {}),
     );
     assert.ok(
-      legacy.calls.find((call) => call.args[0] === "exec")!.options!.input!.includes(respondIn("en")),
+      legacy.calls.find((call) => call.args[0] === "exec")!.options!.input!.includes(respondIn("zh-TW")),
     );
     assert.equal(legacyResult.insights.locale, undefined);
   } finally {

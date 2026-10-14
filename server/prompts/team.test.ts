@@ -554,7 +554,7 @@ test("team messages add the continuation, inbox and coordination prompts exactly
  * workbench.ts: the entitlements stub and the guarded review rerun.
  */
 
-test("without an entitlements source the Workbench grants Pro at its own run limit, and entitlementsChanged changes nothing", async () => {
+test("without an entitlements source the Workbench grants Pro at its own run limit, and an injected source limits the runs at once", async () => {
   const directory = await mkdtemp(
     path.join(os.tmpdir(), "bell-entitlements-test-"),
   );
@@ -570,11 +570,13 @@ test("without an entitlements source the Workbench grants Pro at its own run lim
     assert.deepEqual(wider.entitlements(), proEntitlements(5));
     assert.deepEqual(wider.limits, {
       maxActiveRuns: 5,
+      effectiveMaxActiveRuns: 5,
       maxAgentProcesses: wider.agentSlots.limit,
       maxQueued: 10,
     });
 
-    // An injected source is kept as given and not consulted yet.
+    // An injected source is kept as given; it limits the runs at once and
+    // entitlementsChanged only drains the (empty) queue.
     let reads = 0;
     const free = new Workbench(store, undefined, {
       entitlements: () => {
@@ -585,9 +587,9 @@ test("without an entitlements source the Workbench grants Pro at its own run lim
     const saved = JSON.stringify(store.data);
     assert.equal(plain.entitlementsChanged(), undefined);
     assert.equal(free.entitlementsChanged(), undefined);
-    assert.equal(reads, 0);
+    assert.ok(reads > 0);
     assert.equal(free.maxActiveRuns, defaultActiveRunLimit);
-    assert.deepEqual(free.limits, plain.limits);
+    assert.deepEqual(free.limits, { ...plain.limits, effectiveMaxActiveRuns: 1 });
     assert.equal(JSON.stringify(store.data), saved);
     assert.equal(free.entitlements(), freeEntitlements);
   } finally {
