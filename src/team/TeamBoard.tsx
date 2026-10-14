@@ -144,8 +144,20 @@ export function TeamBoard({
       : id === "running" && team.phase === "awaiting_approval"
         ? t.laneEmptyAwaiting
         : t.laneEmpty[id];
-  const hasDetails =
-    !demo && (!!run.modelExecution || !!run.efficiency?.calls);
+  // Folded so the board stays in the first screen; the summary line names
+  // what the run recorded.
+  const execution = demo ? undefined : run.modelExecution;
+  const calls = demo ? 0 : (run.efficiency?.calls ?? 0);
+  const detailFacts = [
+    execution &&
+      [
+        providerLabels[execution.provider ?? team.config.provider],
+        execution.reported?.model ?? execution.model,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    calls > 0 && t.runDetails.calls({ count: calls }),
+  ].filter(Boolean);
   return (
     <section className="team-board" aria-label={t.boardLabel}>
       <div className="team-board-header">
@@ -168,17 +180,20 @@ export function TeamBoard({
             {plan && (
               <small className="team-plan-limit">
                 {t.runtime.planLimit[plan.plan]({ count: plan.maxTeammates })}
-                {team.config.maxTeammates > plan.maxTeammates &&
-                  ` ${t.runtime.keptSize}`}
               </small>
+            )}
+            {plan && team.config.maxTeammates > plan.maxTeammates && (
+              <small className="team-plan-limit">{t.runtime.keptSize}</small>
             )}
           </span>
         </div>
       </div>
-      <details className="team-run-details" open={hasDetails}>
+      <details className="team-run-details">
         <summary>
           <strong>{t.runDetails.title}</strong>
-          <span>{t.runDetails.hint}</span>
+          <span>
+            {detailFacts.length ? detailFacts.join(" · ") : t.runDetails.hint}
+          </span>
           <ChevronDown size={15} aria-hidden="true" />
         </summary>
         <div className="team-run-details-body">
@@ -233,9 +248,11 @@ export function TeamBoard({
           {team.planSummary ||
             (queued
               ? t.plan.queued
-              : revisions.length
-                ? t.plan.replanning
-                : t.plan.reading)}
+              : ["failed", "cancelled"].includes(team.phase)
+                ? t.plan.none
+                : revisions.length
+                  ? t.plan.replanning
+                  : t.plan.reading)}
         </p>
         {revisions.length > 0 && (
           <ol className="team-plan-revisions" aria-label={t.revisions.label}>

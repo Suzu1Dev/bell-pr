@@ -69,6 +69,8 @@ const team = {
     queued:
       "The run is in the queue. The lead starts planning as soon as it can run.",
     replanning: "The lead is re-planning with your feedback.",
+    /** A team that stopped before the lead's plan was ready. */
+    none: "The team stopped before the lead finished a plan.",
     reading:
       "Reading the project and building a plan with clear scopes and dependencies.",
   },
@@ -177,6 +179,8 @@ const team = {
   runDetails: {
     title: "Run details",
     hint: "Model, reasoning effort and AI usage",
+    calls: ({ count }: { count: number }) =>
+      count === 1 ? "1 AI call" : `${count} AI calls`,
   },
   /** The disclosure holding the protocol note. */
   howItWorks: "How it works",

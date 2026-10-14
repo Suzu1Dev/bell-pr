@@ -45,6 +45,7 @@ const m: Translation<typeof en> = {
   plan: {
     queued: "任務正在排隊；輪到執行時，Lead 會立即開始規劃。",
     replanning: "Lead 正依你的意見重新規劃。",
+    none: "Lead 完成計畫前，團隊就已停止。",
     reading: "正在閱讀專案並建立有明確範圍與相依關係的計畫。",
   },
   revisions: {
@@ -134,6 +135,7 @@ const m: Translation<typeof en> = {
   runDetails: {
     title: "執行細節",
     hint: "模型、推理強度與 AI 用量",
+    calls: ({ count }) => `${count} 次 AI 呼叫`,
   },
   howItWorks: "運作方式",
   protocolNote: ({ provider }) =>

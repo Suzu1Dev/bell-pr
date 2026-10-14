@@ -423,6 +423,18 @@ test("a queued run says it waits to start, with no progress count yet", () => {
   assert.doesNotMatch(html, /aria-current/);
 });
 
+test("a team that stopped before its plan says so instead of planning", () => {
+  for (const phase of ["failed", "cancelled"] as const) {
+    const html = english({
+      ...englishRun,
+      status: phase,
+      team: { ...englishTeam, phase, planSummary: "", tasks: [], messages: [] },
+    });
+    assert.match(html, /The team stopped before the lead finished a plan\./, phase);
+    assert.doesNotMatch(html, /Reading the project/, phase);
+  }
+});
+
 test("the English planning phase shows the lead at work and lane messages chosen by id", () => {
   const html = english({
     ...englishRun,
@@ -521,7 +533,7 @@ test("the runtime badge shows the plan's member limit from the entitlements", ()
   assert.match(kept, /Up to 4 members work at the same time/);
   assert.match(
     kept,
-    /Free plan: up to 2 members at once This run keeps the team size it started with\./,
+    /Free plan: up to 2 members at once<\/small><small class="team-plan-limit">This run keeps the team size it started with\.<\/small>/,
   );
   // Until the plan is known, and in the sample, no plan line is shown.
   assert.doesNotMatch(english(run), /team-plan-limit/);
@@ -552,15 +564,32 @@ test("the message list can take focus and is named for screen readers", () => {
   );
 });
 
-test("the model and usage cards fold into Run details, open only when the run recorded them", () => {
+test("the model and usage cards fold into Run details, whose summary names what the run recorded", () => {
   const sample = renderEn(board(englishRun, true));
   assert.match(sample, /<details class="team-run-details"><summary><strong>Run details<\/strong><span>Model, reasoning effort and AI usage<\/span>/);
   assert.match(sample, /class="team-run-details-body"><section class="model-summary"/);
   const recorded = english({
     ...englishRun,
-    modelExecution: { provider: "codex", source: "cli-default" },
+    modelExecution: { provider: "claude", model: "opus", source: "selected", reported: { model: "claude-opus-4-1" } },
+    efficiency: {
+      policyVersion: "bell-ponytail-v1",
+      mode: "lite",
+      calls: 9,
+      completedCalls: 9,
+      failedCalls: 0,
+      measuredCalls: 9,
+      durationMs: 1000,
+      inputTokens: 10,
+      cachedInputTokens: 0,
+      outputTokens: 1,
+    },
   });
-  assert.match(recorded, /<details class="team-run-details" open="">/);
+  // Folded even with data, so the board stays in the first screen.
+  assert.match(recorded, /<details class="team-run-details"><summary><strong>Run details<\/strong><span>Claude Code · claude-opus-4-1 · 9 AI calls<\/span>/);
+  assert.match(
+    english({ ...englishRun, modelExecution: { source: "cli-default" }, efficiency: undefined }),
+    /<span>Codex<\/span>/,
+  );
   const older = english({ ...englishRun, modelExecution: undefined, efficiency: undefined });
-  assert.match(older, /<details class="team-run-details">/);
+  assert.match(older, /<span>Model, reasoning effort and AI usage<\/span>/);
 });
