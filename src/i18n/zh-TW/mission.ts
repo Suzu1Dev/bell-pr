@@ -250,6 +250,7 @@ const m: Translation<typeof en> = {
       unknownModel: "目前無法驗證這個已儲存的模型，請重新選擇或載入清單。",
       defaultModelHelp: ({ provider }) => `沿用本機 ${provider} 的預設模型。`,
       effort: "思考強度",
+      proOption: ({ label }) => `${label} · Pro`,
       modelDefault: ({ effort }) => `模型預設${effort ? ` · ${effort}` : ""}`,
       unknownEffort: "已儲存的強度未在此模型的清單中，請重新選擇。",
       effortHelp: `只列出所選模型支援的強度；較高的強度每回合需要更久、用量也較多，${product.name} 會為 Claude Code 以及 xhigh、max 強度延長等待時間。`,
@@ -274,6 +275,8 @@ const m: Translation<typeof en> = {
       legend: "協作規模",
       teammates: "位隊友",
       note: "設定團隊上限，實際分工由任務計畫決定。",
+      clampNotice: ({ free, pro }) =>
+        `免費方案最多 ${n(free)} 位隊友，所以這個專案會使用 ${n(free)} 位。Pro 最多 ${n(pro)} 位。`,
     },
     planApproval: {
       label: "開發前，先讓我確認計畫",

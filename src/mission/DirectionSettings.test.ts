@@ -6,6 +6,7 @@ import {
   type ContributionSettings,
 } from "../../shared/insights";
 import type { ModelCatalog } from "../../shared/models";
+import { freeEntitlements, proEntitlements } from "../../shared/plans";
 import { ApiError } from "../api";
 import { setLocale } from "../i18n";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
@@ -14,6 +15,7 @@ import {
   loadModelCatalog,
   type DirectionSettingsProps,
 } from "./DirectionSettings";
+import { mount } from "./test-dom";
 
 const props = (
   value: Partial<ContributionSettings> = {},
@@ -150,4 +152,184 @@ test("a failed catalog request gives the server's structured error, and an abort
     assert.equal((error as Error).name, "AbortError");
     return true;
   });
+});
+
+// A catalog whose default model offers the Free efforts and the Pro ones.
+const catalog: ModelCatalog = {
+  source: "codex",
+  models: [
+    {
+      id: "gpt-test",
+      name: "GPT Test",
+      description: "A test model.",
+      isDefault: true,
+      reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+      defaultReasoningEffort: "medium",
+    },
+  ],
+};
+
+const gated = (
+  value: Partial<ContributionSettings>,
+  options: Partial<Omit<DirectionSettingsProps, "value">>,
+) => renderEn(props(value, { initialCatalog: catalog, ...options }));
+
+/** The first match of `pattern` in `html`; fails when there is none. */
+function find(html: string, pattern: RegExp) {
+  const found = html.match(pattern)?.[0];
+  assert.ok(found, `nothing matches ${pattern}`);
+  return found;
+}
+/** The team-size radio for `count` teammates, as rendered. */
+const teamRadio = (html: string, count: number) =>
+  find(html, new RegExp(`<label class="mission-team-choice[^"]*"><input type="radio"[^>]*>(?=<strong>${count}</strong>)`));
+const option = (html: string, value: string) =>
+  find(html, new RegExp(`<option value="${value}"[^>]*>[^<]*</option>`));
+const webAccess = (html: string) =>
+  find(html, /<input type="checkbox"[^>]*aria-describedby="[^"]*-web-help"[^>]*>/);
+const proChips = (html: string) => html.match(/class="pro-badge"/g)?.length ?? 0;
+
+test("on Free the larger teams, the deep efforts and web access are locked with a PRO chip", () => {
+  const html = gated({ maxTeammates: 2 }, { entitlements: freeEntitlements, demo: false });
+  assertNoHan(html);
+  assert.doesNotMatch(teamRadio(html, 2), /disabled/);
+  assert.match(teamRadio(html, 3), /disabled=""/);
+  assert.match(teamRadio(html, 4), /disabled=""/);
+  assert.match(html, /<label class="mission-team-choice locked">.*?<strong>3<\/strong><span>teammates<\/span><span class="pro-badge"[^>]*>PRO<\/span><\/label>/);
+  assert.equal(option(html, "high"), '<option value="high">High</option>');
+  assert.equal(option(html, "xhigh"), '<option value="xhigh" disabled="">Extra high · xhigh · Pro</option>');
+  assert.equal(option(html, "max"), '<option value="max" disabled="">Max · Pro</option>');
+  assert.match(webAccess(html), /disabled=""/);
+  assert.match(html, /Let Agents search the web and read pages<span class="pro-badge"/);
+  // Two team sizes and web access; the efforts say "· Pro" instead.
+  assert.equal(proChips(html), 3);
+  // A choice saved under Pro can still be turned off.
+  assert.doesNotMatch(webAccess(gated({ maxTeammates: 2, webAccess: true }, { entitlements: freeEntitlements })), /disabled/);
+});
+
+test("Pro and the trial unlock every choice without a chip", () => {
+  for (const entitlements of [proEntitlements(2), { ...proEntitlements(2), plan: "trial" as const }]) {
+    const html = gated({ maxTeammates: 4 }, { entitlements, demo: false });
+    assertNoHan(html);
+    for (const count of [2, 3, 4]) assert.doesNotMatch(teamRadio(html, count), /disabled/);
+    assert.equal(option(html, "xhigh"), '<option value="xhigh">Extra high · xhigh</option>');
+    assert.doesNotMatch(webAccess(html), /disabled/);
+    assert.equal(proChips(html), 0);
+    assert.doesNotMatch(html, /Free runs up to/);
+  }
+});
+
+test("the demo shows every Pro choice unlocked, with a PRO chip", () => {
+  const html = gated({ maxTeammates: 4 }, { entitlements: freeEntitlements, demo: true });
+  assertNoHan(html);
+  for (const count of [2, 3, 4]) assert.doesNotMatch(teamRadio(html, count), /disabled/);
+  assert.equal(option(html, "xhigh"), '<option value="xhigh">Extra high · xhigh · Pro</option>');
+  assert.doesNotMatch(webAccess(html), /disabled/);
+  assert.equal(proChips(html), 3);
+  assert.doesNotMatch(html, /Free runs up to/);
+});
+
+test("while the plan is unknown nothing is locked", () => {
+  const html = gated({ maxTeammates: 3 }, { demo: false });
+  for (const count of [2, 3, 4]) assert.doesNotMatch(teamRadio(html, count), /disabled/);
+  assert.equal(proChips(html), 0);
+  assert.doesNotMatch(html, /Free runs up to/);
+});
+
+test("Free lowers a team of 3 to 2 and says so; a team of 2 shows no notice", () => {
+  const notice =
+    "Free runs up to 2 teammates, so this project will use 2. Pro runs up to 4.";
+  const clamped = gated({ maxTeammates: 3 }, { entitlements: freeEntitlements, demo: false });
+  assert.ok(clamped.includes(`<p class="mission-clamp-notice" role="status">${notice}</p>`));
+  assertNoHan(clamped);
+  assert.ok(!gated({ maxTeammates: 2 }, { entitlements: freeEntitlements, demo: false }).includes(notice));
+  assert.match(
+    renderZh(props({ maxTeammates: 3 }, { entitlements: freeEntitlements, demo: false })),
+    /免費方案最多 2 位隊友，所以這個專案會使用 2 位。Pro 最多 4 位。/,
+  );
+});
+
+/** fetch answering the requests the form makes once it is mounted. */
+function stubApi() {
+  const urls: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    urls.push(url);
+    const body = url.startsWith("/api/models")
+      ? catalog
+      : url.startsWith("/api/doctor")
+        ? { checks: [], ready: true, checkedAt: "", platform: "linux" }
+        : { license: { plan: "free", source: "none", status: "none" } };
+    return json(200, body);
+  }) as typeof fetch;
+  return urls;
+}
+
+test("once mounted on Free, a team of 3 is reported back as 2, again whenever it arrives", async () => {
+  stubApi();
+  const calls: ContributionSettings[] = [];
+  const element = (maxTeammates: 2 | 3 | 4, entitlements = freeEntitlements) =>
+    props(
+      { maxTeammates, outcome: "Retries spread out." },
+      { entitlements, demo: false, onChange: (next) => calls.push(next) },
+    );
+  const view = await mount(element(3));
+  try {
+    assert.deepEqual(
+      calls.map((next) => [next.maxTeammates, next.outcome]),
+      [[2, "Retries spread out."]],
+    );
+    assert.ok(view.text().includes("so this project will use 2"));
+    // The parent applies the change: nothing more is reported, the notice stays.
+    await view.rerender(element(2));
+    assert.equal(calls.length, 1);
+    assert.ok(view.text().includes("so this project will use 2"));
+    // The project's saved settings arrive later and ask for 4.
+    await view.rerender(element(4));
+    assert.deepEqual(calls.map((next) => next.maxTeammates), [2, 2]);
+    // The trial starts: the notice goes and nothing is lowered any more.
+    await view.rerender(element(4, proEntitlements(2)));
+    assert.equal(calls.length, 2);
+    assert.ok(!view.text().includes("Free runs up to"));
+  } finally {
+    await view.unmount();
+  }
+});
+
+test("no team size is reported back on Pro, in the demo or in the models-only form", async () => {
+  const cases: Partial<Omit<DirectionSettingsProps, "value">>[] = [
+    { entitlements: proEntitlements(2), demo: false },
+    { entitlements: freeEntitlements, demo: true },
+    { entitlements: freeEntitlements, demo: false, modelsOnly: true },
+  ];
+  for (const options of cases) {
+    const urls = stubApi();
+    const calls: ContributionSettings[] = [];
+    const view = await mount(
+      props({ maxTeammates: 3 }, { ...options, onChange: (next) => calls.push(next) }),
+    );
+    try {
+      assert.deepEqual(calls, [], JSON.stringify(options));
+      assert.ok(!view.text().includes("Free runs up to"));
+      // Given the plan, the form reads no license.
+      assert.ok(!urls.some((url) => url.startsWith("/api/license")), urls.join());
+    } finally {
+      await view.unmount();
+    }
+  }
+});
+
+test("without a plan from its parent, the form reads the license once and then locks", async () => {
+  const urls = stubApi();
+  const calls: ContributionSettings[] = [];
+  const view = await mount(
+    props({ maxTeammates: 3 }, { demo: false, onChange: (next) => calls.push(next) }),
+  );
+  try {
+    assert.equal(urls.filter((url) => url === "/api/license").length, 1);
+    assert.deepEqual(calls.map((next) => next.maxTeammates), [2]);
+    assert.ok(view.text().includes("so this project will use 2"));
+  } finally {
+    await view.unmount();
+  }
 });

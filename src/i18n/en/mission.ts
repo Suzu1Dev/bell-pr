@@ -348,6 +348,8 @@ const mission = {
       defaultModelHelp: ({ provider }: { provider: string }) =>
         `Uses your local ${provider}'s default model.`,
       effort: "Reasoning effort",
+      /** An effort that needs Pro; `label` is the effort's own label. */
+      proOption: ({ label }: { label: string }) => `${label} · Pro`,
       /** `effort` is the model's default effort, already labelled. */
       modelDefault: ({ effort }: { effort?: string }) =>
         `Model default${effort ? ` · ${effort}` : ""}`,
@@ -378,6 +380,9 @@ const mission = {
       legend: "Team size",
       teammates: "teammates",
       note: "Sets the most teammates the team may use; the run's plan decides the actual split.",
+      /** The plan lowered a larger team size to `free`, the most Free runs. */
+      clampNotice: ({ free, pro }: { free: number; pro: number }) =>
+        `Free runs up to ${n(free)} teammates, so this project will use ${n(free)}. Pro runs up to ${n(pro)}.`,
     },
     planApproval: {
       label: "Let me approve the plan before development",
