@@ -318,6 +318,11 @@ test("the publish dialog reads in English with no Chinese left", () => {
   assert.match(html, /<h2 id="modal-title">Send this contribution to GitHub\.<\/h2>/);
   assert.ok(html.includes(`${demoFiles.length} files reviewed`));
   assert.match(html, /PR description sent to GitHub \(about \d+ words?\)/);
+  // The preview scrolls when long, so the keyboard can reach it.
+  assert.match(
+    html,
+    /<div class="markdown-preview" role="region" aria-label="PR description sent to GitHub" tabindex="0">/,
+  );
   assert.match(html, /Loading the preview…/);
   assert.match(html, /<button class="button primary">.*Submit Draft PR<\/button>/);
   assert.match(html, />Back to the draft<\/button>/);

@@ -241,7 +241,13 @@ export function PublishModal({
                 })
               : t.bodyPreview}
           </summary>
-          <div className="markdown-preview">
+          {/* It scrolls when long, so a keyboard can reach and scroll it. */}
+          <div
+            className="markdown-preview"
+            role="region"
+            aria-label={t.bodyPreview}
+            tabIndex={0}
+          >
             <ErrorBoundary>
               <Suspense fallback={<p>{workspace.loadingPreview}</p>}>
                 <MarkdownContent>{run.draft.body}</MarkdownContent>
