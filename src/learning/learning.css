@@ -1,5 +1,5 @@
 /* The cards reuse .learning-grid / .note-card / .note-tag from styles.css;
-   these rules only cover the filters, metadata and the demo section. */
+   these rules cover the code in a note, the filters, metadata and the demo section. */
 .learning-filters {
   display: flex;
   flex-wrap: wrap;
@@ -30,6 +30,30 @@
   font-size: 11px;
   color: #a1af91;
   padding-bottom: 10px;
+}
+/* Code inside a note's explanation stays part of the sentence. */
+.note-card .markdown-content code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  padding: 0 4px;
+  background: #f3f6ee;
+  border: 1px solid #e6ecdd;
+  border-radius: 4px;
+  color: #5d7a45;
+  overflow-wrap: anywhere;
+}
+.note-card .markdown-content pre {
+  margin: 10px 0;
+  padding: 10px;
+  overflow-x: auto;
+  background: #f7f9f3;
+  border: 1px solid #e8eddf;
+  border-radius: 5px;
+}
+.note-card .markdown-content pre code {
+  padding: 0;
+  background: none;
+  border: 0;
 }
 .learning-note-tip {
   min-height: 0;

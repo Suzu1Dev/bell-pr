@@ -1439,7 +1439,7 @@ export class Workbench {
           // claude exits non-zero after losing the OAuth refresh race; its result event
           // (flushed before the rejection) already classified the attempt as retryable.
           if (!retryable)
-            throw withAgentTimeoutHint(error, cli.executable, timeoutMs);
+            throw withAgentTimeoutHint(error, cli.executable, timeoutMs, terminalFailure);
         });
         return { retryable };
       } finally {

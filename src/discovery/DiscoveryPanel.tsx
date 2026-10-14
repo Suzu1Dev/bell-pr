@@ -29,6 +29,7 @@ import {
   type ReasoningEffort,
 } from "../../shared/models";
 import { api, send } from "../api";
+import { FailureText } from "../FailureText";
 import { ModelSummary, reasoningLabels } from "../models/ModelSummary";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
 import { MarkdownContent } from "../review/MarkdownContent";
@@ -445,7 +446,7 @@ export default function DiscoveryPanel({
       </form>
       {error && (
         <div className="discovery-alert" role="alert">
-          <span>{error}</span>
+          <span><FailureText text={error} /></span>
           <button
             className="button secondary"
             onClick={() => void reload()}
@@ -515,7 +516,7 @@ export default function DiscoveryPanel({
           className={`discovery-status ${job.status === "failed" ? "has-error" : ""}`}
           role="status"
         >
-          <span>{job.error || job.message}</span>
+          <span>{job.error ? <FailureText text={job.error} /> : job.message}</span>
           <small>查詢時間 {date(job.createdAt)}</small>
         </div>
       )}

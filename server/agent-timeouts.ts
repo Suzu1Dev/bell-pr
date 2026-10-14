@@ -64,14 +64,19 @@ export function describeAgentTimeout(timeoutMs: number): string {
 }
 
 /**
- * Replaces command()'s generic 504 with advice the person can act on; any
- * other error is returned unchanged so git/gh behaviour stays the same.
+ * Replaces command()'s generic 504 with advice the person can act on, and its
+ * exit failure (the raw tail of the CLI's output) with the error the CLI
+ * reported in its event stream, when it reported one; any other error is
+ * returned unchanged so git/gh behaviour stays the same.
  */
 export function withAgentTimeoutHint(
   error: unknown,
   executable: string,
   timeoutMs: number,
+  reported?: string,
 ): unknown {
+  if (error instanceof AppError && error.statusCode === 422 && reported)
+    return new AppError(`${executable} 執行失敗：${reported}`, 422);
   if (!(error instanceof AppError) || error.statusCode !== 504) return error;
   return new AppError(
     `${executable} 執行逾時（已等待 ${minutes(timeoutMs)} 分鐘）。較高的思考強度或大型專案需要更久；可降低思考強度、改用較快的模型，或提高 BELLPR_AGENT_TIMEOUT_SCALE。`,

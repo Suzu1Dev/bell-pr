@@ -70,7 +70,7 @@ test("only Claude or xhigh/max turns announce the longer wait", () => {
   assert.equal(describeAgentTimeout(2_250_000), "最多等待 37.5 分鐘");
 });
 
-test("only command()'s 504 is replaced with the actionable timeout message", () => {
+test("command()'s 504 gets the timeout advice and an explained exit failure its explanation", () => {
   const replaced = withAgentTimeoutHint(
     new AppError("claude 執行逾時。", 504),
     "claude",
@@ -84,6 +84,13 @@ test("only command()'s 504 is replaced with the actionable timeout message", () 
   );
   const failure = new AppError("codex 執行失敗：exit 1", 422);
   assert.equal(withAgentTimeoutHint(failure, "codex", 240_000), failure);
+  // An exit failure the CLI explained in its event stream shows that explanation.
+  const raw = new AppError('claude 執行失敗：..."result":"API Error: 500","session_id":"s"}', 422);
+  const explained = withAgentTimeoutHint(raw, "claude", 900_000, "API Error: 500");
+  assert.ok(explained instanceof AppError);
+  assert.equal(explained.statusCode, 422);
+  assert.equal(explained.message, "claude 執行失敗：API Error: 500");
+  assert.equal(withAgentTimeoutHint(raw, "claude", 900_000), raw);
   const plain = new Error("boom");
   assert.equal(withAgentTimeoutHint(plain, "codex", 240_000), plain);
 });

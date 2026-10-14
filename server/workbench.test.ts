@@ -1402,7 +1402,8 @@ test("a Claude Code turn that lost the OAuth refresh lock and exited non-zero is
     );
     assert.equal(f.run.agents[0].detail, "已完成，報告可供審閱");
 
-    // Any other API error still fails the turn at once with command()'s own message.
+    // Any other API error still fails the turn at once, with the error claude
+    // reported rather than the raw JSON tail command() keeps.
     let invocations = 0;
     waits.length = 0;
     const plain = new Workbench(f.store, undefined, {
@@ -1418,7 +1419,7 @@ test("a Claude Code turn that lost the OAuth refresh lock and exited non-zero is
           terminal_reason: "api_error",
           result: "API Error: 500 Internal server error",
         });
-        throw exitFailure("API Error: 500 Internal server error");
+        throw exitFailure(`{"type":"result","is_error":true,"result":"API Error: 500 Internal server error","session_id":"s"}`);
       },
     });
     await assert.rejects(

@@ -91,6 +91,7 @@ import { LearningNotes } from "./learning/LearningNotes";
 import { languageBadge } from "./review/diff";
 import { providerLabels, type ModelSettings } from "../shared/models";
 import { CommandPalette } from "./navigation/CommandPalette";
+import { FailureText } from "./FailureText";
 const ExplanationPanel = lazy(() =>
   import("./review/ExplanationPanel").then((module) => ({
     default: module.ExplanationPanel,
@@ -2082,20 +2083,6 @@ export default function App() {
           </button>
         </div>
         <div className="sidebar-bottom">
-          <div className="learning-card">
-            <div className="learning-card-icon">
-              <Sparkles size={17} />
-            </div>
-            <strong>每一次貢獻，都有所收穫。</strong>
-            <p>
-              理解改動背後的思考，
-              <br />
-              累積屬於你的開發經驗。
-            </p>
-            <button onClick={() => navigate("learning")}>
-              探索學習筆記 <ArrowUpRight size={14} />
-            </button>
-          </div>
           <button
             className="nav-item"
             title="連線與設定"
@@ -2754,8 +2741,11 @@ export default function App() {
                               : "尚無程式碼變更"}
                           </h3>
                           <p>
-                            {run.error ||
-                              "在 Agent 動態查看執行過程，完成後即可在這裡審查。"}
+                            {run.error ? (
+                              <FailureText text={run.error} />
+                            ) : (
+                              "在 Agent 動態查看執行過程，完成後即可在這裡審查。"
+                            )}
                           </p>
                           <button
                             className="button secondary"
@@ -3016,7 +3006,11 @@ export default function App() {
                           <p className="muted">這個角色目前沒有紀錄。</p>
                         )}
                       </div>
-                      {run.error && <p className="inline-error">{run.error}</p>}
+                      {run.error && (
+                        <p className="inline-error">
+                          <FailureText text={run.error} />
+                        </p>
+                      )}
                     </div>
                     <aside className="task-brief">
                       <span className="eyebrow">MISSION BRIEF</span>
@@ -3864,11 +3858,13 @@ export default function App() {
                   </div>
                   <span className="repo-owner">{repo.owner}</span>
                   <h2>{repo.name}</h2>
-                  <p>
-                    {repo.id === demoRepo.id
-                      ? "透過 SDK 智慧重試的範例，體驗一次完整的貢獻與審查。"
-                      : repo.path}
-                  </p>
+                  {repo.id === demoRepo.id ? (
+                    <p>透過 SDK 智慧重試的範例，體驗一次完整的貢獻與審查。</p>
+                  ) : (
+                    <p className="repository-path" title={repo.path}>
+                      <span>{repo.path}</span>
+                    </p>
+                  )}
                   <div className="repository-meta">
                     <span>
                       <span className="language-dot" />

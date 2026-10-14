@@ -758,7 +758,8 @@ test("discovery retries a Claude Code analysis that lost the OAuth refresh lock 
     await cancelled.cleanup();
   }
 
-  // Any other API error plus the non-zero exit fails at once with command()'s own message.
+  // Any other API error plus the non-zero exit fails at once, with the error claude
+  // reported rather than the raw JSON tail command() keeps.
   calls = 0;
   waits.length = 0;
   const plain = await fixture({
@@ -778,7 +779,7 @@ test("discovery retries a Claude Code analysis that lost the OAuth refresh lock 
         }),
         "stdout",
       );
-      throw exitFailure("API Error: 500 Internal server error");
+      throw exitFailure(`{"type":"result","is_error":true,"result":"API Error: 500 Internal server error","session_id":"s"}`);
     },
   });
   try {

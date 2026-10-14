@@ -578,6 +578,7 @@ export class DiscoveryService {
           answer = "";
           failed = false;
           let retryable = false;
+          let reported: string | undefined;
           efficiency = trackEfficiency(job.preferences.ponytailMode);
           const releaseSlot = await this.slots.acquire(signal);
           try {
@@ -598,6 +599,7 @@ export class DiscoveryService {
                     if (item.kind === "error") {
                       failed = true;
                       retryable = item.retryable === true;
+                      reported = redact(item.message);
                     }
                     if (item.kind === "message" || item.kind === "final")
                       answer = item.text;
@@ -612,7 +614,7 @@ export class DiscoveryService {
               // claude exits non-zero after losing the OAuth refresh race; its result event
               // (flushed before the rejection) already classified the attempt as retryable.
               if (!retryable)
-                throw withAgentTimeoutHint(error, cli.executable, timeoutMs);
+                throw withAgentTimeoutHint(error, cli.executable, timeoutMs, reported);
             });
           } finally {
             releaseSlot();

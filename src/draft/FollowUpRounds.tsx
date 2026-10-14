@@ -1,6 +1,7 @@
 import { ExternalLink, GitCommitHorizontal, Undo2 } from "lucide-react";
 import type { FollowUpRound } from "../../shared/followups";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
+import { FailureText } from "../FailureText";
 
 interface Props {
   rounds: FollowUpRound[];
@@ -77,7 +78,7 @@ export function FollowUpRounds({
               {round.note && <p className="follow-up-note">補充說明：{round.note}</p>}
               {round.error && (
                 <p className="follow-up-error" role="status">
-                  {round.error}
+                  <FailureText text={round.error} />
                 </p>
               )}
               {round.report && <p className="follow-up-report">{round.report}</p>}

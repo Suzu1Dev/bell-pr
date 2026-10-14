@@ -33,6 +33,7 @@ import {
 } from "../../shared/insights";
 import type { Repo, Run } from "../types";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
+import { FailureText } from "../FailureText";
 import { ModelSummary } from "../models/ModelSummary";
 import { directionOptions } from "./DirectionSettings";
 import {
@@ -626,7 +627,7 @@ export function ProjectOverview({
 
       {error && (
         <div className="mission-alert mission-alert-error" role="alert">
-          <span>{error}</span>
+          <span><FailureText text={error} /></span>
           <button
             type="button"
             onClick={onAnalyze}
@@ -1005,7 +1006,7 @@ export function ProjectOverview({
               className="mission-alert mission-alert-error mission-more-error"
               role="alert"
             >
-              <span>{recommendationError}</span>
+              <span><FailureText text={recommendationError} /></span>
               <button
                 type="button"
                 onClick={onRecommendMore}
