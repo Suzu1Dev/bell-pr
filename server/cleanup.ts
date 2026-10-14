@@ -237,6 +237,7 @@ export async function archiveRunWorkspace(
       bytes,
       reason: options.retentionDays ? "retention" : "request",
     });
+    invalidateStorageReport(ctx);
     await ctx.store.save();
     return run;
   });
@@ -254,6 +255,7 @@ export async function removeRun(ctx: WorkbenchContext, id: string) {
     const index = ctx.store.data.runs.indexOf(run);
     if (index >= 0) ctx.store.data.runs.splice(index, 1);
     log.info("run.removed", { runId: id });
+    invalidateStorageReport(ctx);
     await ctx.store.save();
   });
   return { removed: id };
@@ -288,6 +290,7 @@ export async function removeRepository(ctx: WorkbenchContext, id: string) {
     const index = ctx.store.data.repos.indexOf(repo);
     if (index >= 0) ctx.store.data.repos.splice(index, 1);
     log.info("repo.removed", { repoId: id, clone: managedClone(ctx.store.directory, repo) });
+    invalidateStorageReport(ctx);
     await ctx.store.save();
   });
   return { removed: id };
@@ -340,6 +343,7 @@ export async function eraseAll(ctx: WorkbenchContext, confirm: unknown) {
   data.repos.splice(0);
   data.runs.splice(0);
   ctx.store.recovery = undefined;
+  invalidateStorageReport(ctx);
   await ctx.store.save();
   log.warn("data.erased", counts);
   return { erased: counts };
@@ -391,4 +395,131 @@ export async function applyRetention(ctx: WorkbenchContext, now = Date.now()) {
   if (archived.length)
     log.info("retention.applied", { days, runs: archived.length });
   return archived;
+}
+
+/** Sizes by path, measured in one walk of the data directory. */
+async function measure(directory: string) {
+  const sizes = new Map<string, number>();
+  const split = new Set(["repositories", "worktrees", "team-worktrees"]);
+  let total = 0;
+  for (const name of await readdir(directory).catch(() => [] as string[])) {
+    const entry = path.join(directory, name);
+    if (!split.has(name)) {
+      const bytes = await directorySize(entry);
+      sizes.set(entry, bytes);
+      total += bytes;
+      continue;
+    }
+    // The folder itself, then each clone or worktree on its own.
+    const info = await lstat(entry).catch(() => undefined);
+    if (!info?.isDirectory()) continue;
+    total += typeof info.blocks === "number" && info.blocks > 0 ? info.blocks * 512 : info.size;
+    for (const child of await readdir(entry).catch(() => [] as string[])) {
+      const bytes = await directorySize(path.join(entry, child));
+      sizes.set(path.join(entry, child), bytes);
+      total += bytes;
+    }
+  }
+  return { sizes, total };
+}
+
+export interface StorageReport {
+  measuredAt: string;
+  retentionDays: number;
+  /** Everything in the data directory. */
+  totalBytes: number;
+  /** Log files and the analysis cache; the rest of the total is state, settings and leftovers. */
+  logsBytes: number;
+  insightsBytes: number;
+  repos: {
+    id: string;
+    fullName: string;
+    /** BELL's own clone in the data directory; false for a repository on the person's disk. */
+    managed: boolean;
+    /** The clone's size; null when it is not in the data directory. */
+    bytes: number | null;
+  }[];
+  runs: {
+    id: string;
+    repoId: string;
+    title: string;
+    status: Run["status"];
+    createdAt: string;
+    /** The worktree and teammates' checkouts; null when the worktree is outside the data directory. */
+    bytes: number | null;
+    workspaceRemovedAt?: string;
+    /** Bytes freed when the files were removed. */
+    workspaceBytes?: number;
+    /** DELETE /api/runs/:id/workspace would succeed now. */
+    removable: boolean;
+  }[];
+}
+
+const reports = new Map<string, { time: number; report: Promise<StorageReport> }>();
+
+function invalidateStorageReport(ctx: WorkbenchContext) {
+  reports.delete(ctx.store.directory);
+}
+
+/**
+ * Disk use per project and per run, from one asynchronous walk of the data
+ * directory, cached for 60 seconds. Paths are not included.
+ */
+export function storageReport(ctx: WorkbenchContext): Promise<StorageReport> {
+  const cached = reports.get(ctx.store.directory);
+  if (cached && Date.now() - cached.time < 60_000) return cached.report;
+  const report = buildStorageReport(ctx);
+  reports.set(ctx.store.directory, { time: Date.now(), report });
+  report.catch(() => invalidateStorageReport(ctx));
+  return report;
+}
+
+async function buildStorageReport(ctx: WorkbenchContext): Promise<StorageReport> {
+  const { directory, data } = ctx.store;
+  const { sizes, total } = await measure(directory);
+  const runs = await Promise.all(
+    data.runs.map(async (run) => {
+      const paths = runPaths(ctx, run);
+      const owned = await ownsWorkspace(ctx, run);
+      return {
+        id: run.id,
+        repoId: run.repoId,
+        title: run.title,
+        status: run.status,
+        createdAt: run.createdAt,
+        bytes: run.workspaceRemovedAt
+          ? 0
+          : owned
+            ? (paths.worktree ? (sizes.get(paths.worktree) ?? 0) : 0) +
+              (sizes.get(paths.team) ?? 0)
+            : null,
+        ...(run.workspaceRemovedAt
+          ? {
+              workspaceRemovedAt: run.workspaceRemovedAt,
+              workspaceBytes: run.workspaceBytes,
+            }
+          : {}),
+        removable: !run.workspaceRemovedAt && owned && !runActive(ctx, run),
+      };
+    }),
+  );
+  const clones = path.join(directory, "repositories");
+  return {
+    measuredAt: new Date().toISOString(),
+    retentionDays: retentionDays(),
+    totalBytes: total,
+    logsBytes: sizes.get(path.join(directory, "logs")) ?? 0,
+    insightsBytes: sizes.get(path.join(directory, "insights")) ?? 0,
+    repos: data.repos.map((repo) => {
+      const inside = insideDirectory(clones, repo.path);
+      return {
+        id: repo.id,
+        fullName: repo.fullName,
+        managed: managedClone(directory, repo),
+        // A clone is one directory directly under repositories/.
+        bytes: inside ? (sizes.get(path.resolve(repo.path)) ?? 0) : null,
+      };
+    }),
+    runs,
+  };
 }

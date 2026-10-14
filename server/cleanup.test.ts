@@ -15,6 +15,7 @@ import { request } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { git } from "./process.js";
+import { secretInPatch } from "./secrets.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
 import { createApp } from "./app.js";
@@ -28,6 +29,7 @@ import {
 import type { Repository, Run } from "./types.js";
 
 const dayMs = 24 * 60 * 60 * 1000;
+const token = `ghp_${"Z9y8X7w6".repeat(4)}`;
 
 const exists = (target: string) =>
   lstat(target).then(
@@ -441,3 +443,76 @@ test("erasing all data needs ERASE, waits for running work, and keeps settings a
     assert.ok(!(await readFile(path.join(f.dataDir, "logs", name), "utf8")).includes("before.erase"));
 });
 
+/** No credential shape, no GitHub login, and no absolute path in the text. */
+function assertShareable(text: string, f: Fixture, login: string) {
+  assert.equal(secretInPatch(text), false, "a token-shaped string");
+  assert.ok(!text.includes(token));
+  assert.ok(!text.toLowerCase().includes(login.toLowerCase()), "the GitHub login");
+  assert.ok(!text.includes(f.dataDir), "the data directory path");
+  assert.ok(!text.includes(os.homedir()), "the home directory");
+  // An absolute POSIX path in a JSON string or after a space.
+  assert.doesNotMatch(text, /(?:["\s(=]|\\n)\/(?:[\w.-]+\/)*[\w.-]+/);
+  assert.doesNotMatch(text, /[A-Za-z]:\\\\/);
+}
+
+test("storage and diagnostics report sizes, versions and logs without tokens, the login or outside paths", async (t) => {
+  const login = "octo-person";
+  const f = await fixture({ login });
+  t.after(f.cleanup);
+  const clonePath = path.join(f.dataDir, "repositories", "octo-person-example-0a1b2c3d");
+  const baseSha = await gitRepository(clonePath, "https://github.com/octo-person/example.git");
+  const repo = await f.workbench.importRepository(clonePath);
+  const value = await runWithWorkspace(f, repo, baseSha, "abababab-7777-4777-8777-777777777777");
+  // Log lines that carry everything diagnostics must not leak.
+  log.warn("probe.leaky", {
+    token,
+    remote: `https://octo-person:${token}@github.com/octo-person/example.git`,
+    home: path.join(os.homedir(), "projects", "example"),
+    outside: "/opt/tools/bin/codex",
+    windows: "C:\\Users\\octo\\project",
+    url: "file:///srv/bell/server.js",
+    data: path.join(f.dataDir, "worktrees", value.id),
+    user: "Octo-Person",
+  });
+
+  const storage = await f.call("GET", "/api/storage");
+  assert.equal(storage.status, 200);
+  assert.ok(storage.body.totalBytes > 0);
+  assert.equal(storage.body.retentionDays, retentionDays());
+  const [clone] = storage.body.repos;
+  assert.equal(clone.managed, true);
+  assert.ok(clone.bytes > 0);
+  const [measured] = storage.body.runs;
+  assert.equal(measured.id, value.id);
+  assert.ok(measured.bytes > 0);
+  assert.equal(measured.removable, true);
+  // The repository's full name is the project's, not a path or a secret.
+  assertShareable(storage.text.replaceAll(repo.fullName, "owner/name"), f, login);
+  // Cached for a minute, measured again after a cleanup.
+  assert.deepEqual((await f.call("GET", "/api/storage")).body, storage.body);
+  await f.call("DELETE", `/api/runs/${value.id}/workspace`, {});
+  const after = (await f.call("GET", "/api/storage")).body;
+  assert.equal(after.runs[0].bytes, 0);
+  assert.ok(after.runs[0].workspaceRemovedAt);
+
+  const diagnostics = await f.call("GET", "/api/diagnostics");
+  assert.equal(diagnostics.status, 200);
+  const body = diagnostics.body;
+  assert.equal(body.app.name, "BELL PR");
+  assert.ok(body.app.version);
+  assert.equal(body.node, process.version);
+  assert.equal(body.auth.github, true);
+  assert.ok(body.checks.every((check: Record<string, unknown>) => !("detail" in check)));
+  assert.ok(body.dataDir.totalBytes > 0);
+  assert.ok(body.logs.length > 0 && body.logs.length <= 500);
+  const leaky = body.logs.find((line: string) => line.includes("probe.leaky"));
+  assert.ok(leaky);
+  const entry = JSON.parse(leaky);
+  assert.equal(entry.home, "~/projects/example");
+  assert.equal(entry.outside, "[path]");
+  assert.equal(entry.windows, "[path]");
+  assert.equal(entry.url, "[path]");
+  assert.equal(entry.data, `<data>/worktrees/${value.id}`);
+  assert.equal(entry.user, "[github-user]");
+  assertShareable(diagnostics.text, f, login);
+});

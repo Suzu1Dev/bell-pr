@@ -762,6 +762,11 @@ export class Workbench {
     return cleanup.eraseAll(this.context, confirm);
   }
 
+  /** Disk use per project and run (cleanup.ts), cached for a minute. */
+  async storage() {
+    return cleanup.storageReport(this.context);
+  }
+
   async shutdown() {
     this.stopping = true;
     clearInterval(this.retentionTimer);
