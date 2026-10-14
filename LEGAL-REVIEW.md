@@ -129,9 +129,12 @@ own. The legal texts already describe the shipped behavior.
    copies that the app shows, and `scripts/check-pack.mjs` fails when one
    remains. The owner placeholder lists stay visible there while the texts
    are drafts.
-5. **REFUND.md is not in the app.** The About dialog offers the EULA,
-   privacy policy, terms and security policy; the refund policy that the
-   EULA and the terms refer to ships only on the site.
+5. **REFUND.md is not in the app.** Fixed after the merge: the About
+   dialog offered the EULA, privacy policy, terms and security policy, but
+   not the refund policy that the EULA and the terms refer to. The build
+   now copies REFUND.md to `dist/legal/REFUND.txt` like the others, without
+   its HTML comments, `scripts/check-pack.mjs` requires it, and About lists
+   it.
 6. **CI.** Fixed after the merge: the build-and-test job of
    `.github/workflows/ci.yml` now runs `node site/check-site.mjs` and
    `node site/build-legal.mjs --self-test`, so CI catches a stale legal

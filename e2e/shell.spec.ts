@@ -407,6 +407,7 @@ test("About shows the versions and the local documents, and no link for an empty
     [about.documentNames.eula, "/legal/EULA.txt"],
     [about.documentNames.privacy, "/legal/PRIVACY.txt"],
     [about.documentNames.terms, "/legal/TERMS.txt"],
+    [about.documentNames.refund, "/legal/REFUND.txt"],
     [about.documentNames.security, "/legal/SECURITY.txt"],
     [about.documentNames.notices, "/THIRD_PARTY_NOTICES.txt"],
   ] as const) {

@@ -31,6 +31,7 @@ const about = {
     eula: "End User License Agreement",
     privacy: "Privacy policy",
     terms: "Terms of sale and responsible use",
+    refund: "Refund and delivery policy",
     security: "Security policy",
     notices: "Third-party licenses",
   },

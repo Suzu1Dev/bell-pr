@@ -51,6 +51,7 @@ const required = [
   "dist/legal/EULA.txt",
   "dist/legal/PRIVACY.txt",
   "dist/legal/TERMS.txt",
+  "dist/legal/REFUND.txt",
   "dist/legal/SECURITY.txt",
   "vendor/ponytail/rules.md",
   "vendor/ponytail/LICENSE",

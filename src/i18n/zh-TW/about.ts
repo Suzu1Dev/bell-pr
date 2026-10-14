@@ -31,6 +31,7 @@ const m: Translation<typeof en> = {
     eula: "終端使用者授權合約",
     privacy: "隱私權政策",
     terms: "銷售與負責任使用條款",
+    refund: "退款與交付政策",
     security: "安全性政策",
     notices: "第三方授權",
   },

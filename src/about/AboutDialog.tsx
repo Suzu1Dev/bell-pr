@@ -50,6 +50,7 @@ export const aboutDocuments = [
   { id: "eula", href: "/legal/EULA.txt" },
   { id: "privacy", href: "/legal/PRIVACY.txt" },
   { id: "terms", href: "/legal/TERMS.txt" },
+  { id: "refund", href: "/legal/REFUND.txt" },
   { id: "security", href: "/legal/SECURITY.txt" },
   { id: "notices", href: "/THIRD_PARTY_NOTICES.txt" },
 ] as const;

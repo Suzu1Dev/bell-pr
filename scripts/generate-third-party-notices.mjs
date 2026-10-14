@@ -10,12 +10,12 @@
 // built from devDependencies.
 //
 // Writes THIRD_PARTY_NOTICES.md (committed) and dist/THIRD_PARTY_NOTICES.txt,
-// and copies LICENSE.md, PRIVACY.md, TERMS.md and SECURITY.md to
-// dist/legal/{EULA,PRIVACY,TERMS,SECURITY}.txt for the app (the license
-// step of Welcome, the agreement prompt, About and Settings). The copies
-// leave out HTML comments: the claim markers that LEGAL-REVIEW.md maps and
-// the generated-region markers are for maintainers, not for the person
-// who reads and accepts the text.
+// and copies LICENSE.md, PRIVACY.md, TERMS.md, REFUND.md and SECURITY.md to
+// dist/legal/{EULA,PRIVACY,TERMS,REFUND,SECURITY}.txt for the app (the
+// license step of Welcome, the agreement prompt, About and Settings). The
+// copies leave out HTML comments: the claim markers that LEGAL-REVIEW.md
+// maps and the generated-region markers are for maintainers, not for the
+// person who reads and accepts the text.
 //
 // --check writes nothing. It fails when THIRD_PARTY_NOTICES.md as staged in
 // git (or on disk outside a git checkout) differs from what this script
@@ -51,6 +51,7 @@ const legalCopies = [
   ["LICENSE.md", "EULA.txt"],
   ["PRIVACY.md", "PRIVACY.txt"],
   ["TERMS.md", "TERMS.txt"],
+  ["REFUND.md", "REFUND.txt"],
   ["SECURITY.md", "SECURITY.txt"],
 ];
 const fonts = [
