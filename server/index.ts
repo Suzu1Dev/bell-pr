@@ -46,14 +46,11 @@ import {
 import { sm } from "./i18n/index.js";
 import { log } from "./log.js";
 import { redact } from "./process.js";
-import { mintOneTimeToken } from "./routes/auth.js";
+import { mintOneTimeToken, oneTimeTokenLifetimeMs } from "./routes/auth.js";
 import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
 
 export { createApp, type AppOptions } from "./app.js";
-
-/** How long a one-time sign-in link stays valid (the auth routes' limit). */
-const oneTimeLinkMs = 120_000;
 
 /** A start that cannot go on; the message is for the person, translated. */
 export class StartupError extends Error {
@@ -344,7 +341,7 @@ export async function startServer(
         : token
           ? {
               url: `${url}/auth?t=${token}`,
-              expiresAt: new Date(Date.now() + oneTimeLinkMs).toISOString(),
+              expiresAt: new Date(Date.now() + oneTimeTokenLifetimeMs).toISOString(),
             }
           : { error: "unavailable" };
       mkdirSync(paths.run, { recursive: true, mode: 0o700 });
