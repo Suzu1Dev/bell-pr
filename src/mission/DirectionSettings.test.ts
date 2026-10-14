@@ -63,7 +63,7 @@ test("the English form has no Han in any layout or provider", () => {
   assert.match(html, /Reading the models your local Codex offers…/);
   assert.match(html, /<option value="" selected="">Codex default<\/option>/);
   assert.match(html, /<option value="" selected="">Model default<\/option>/);
-  assert.match(html, /<option value="lite" selected="">Lite · default<\/option>/);
+  assert.match(html, /<option value="lite" selected="">Lean · default<\/option>/);
   assert.match(html, /<strong>2<\/strong><span>teammates<\/span>/);
   // Compact layouts leave out the direction hints.
   assert.doesNotMatch(renderEn(props({}, { compact: true })), /Make it easier to understand and start/);

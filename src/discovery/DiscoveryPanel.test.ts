@@ -124,7 +124,7 @@ test("an English render of a finished discovery has no Han", () => {
   assert.match(html, /<option value="beginner" selected="">Beginner-friendly<\/option>/);
   assert.match(html, /<option value="stars" selected="">Stars<\/option>/);
   assert.match(html, /<option value=""[^>]*>Use the Codex default model<\/option>/);
-  assert.match(html, /<option value="lite" selected="">Lite · default<\/option>/);
+  assert.match(html, /<option value="lite" selected="">Lean · default<\/option>/);
   assert.match(
     html,
     /<label title="Efficiency mode is based on Ponytail by DietrichGebert \(MIT\)\.">Efficiency mode<select>/,

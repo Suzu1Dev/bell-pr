@@ -60,7 +60,7 @@ const discovery = {
     ponytailMode: "Efficiency mode",
     ponytailCredit: "Efficiency mode is based on Ponytail by DietrichGebert (MIT).",
     ponytailModes: {
-      lite: "Lite · default",
+      lite: "Lean · default",
       full: "Full",
       off: "Off",
     } satisfies Record<PonytailMode, string>,

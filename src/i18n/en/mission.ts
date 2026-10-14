@@ -411,11 +411,11 @@ const mission = {
       label: "Efficiency mode",
       credit: "Efficiency mode is based on Ponytail by DietrichGebert (MIT).",
       modes: {
-        lite: "Lite · default",
+        lite: "Lean · default",
         full: "Full",
         off: "Off",
       } satisfies Record<PonytailMode, string>,
-      help: "Lite: a short rule set that curbs overbuilding. Full: more rules, preferring existing code and native features. Off: lets you compare results and usage across modes.",
+      help: "Lean: a short rule set that curbs overbuilding. Full: more rules, preferring existing code and native features. Off: lets you compare results and usage across modes.",
       link: "About Ponytail",
     },
     team: {
