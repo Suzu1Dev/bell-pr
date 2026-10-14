@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
+import { reasoningEfforts } from "../../shared/models";
 import en from "../i18n/en";
+import zhTW from "../i18n/zh-TW";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { ModelSummary, reasoningLabels } from "./ModelSummary";
 
@@ -143,4 +145,20 @@ test("English analysis, sample and unrecorded summaries", () => {
 test("the deprecated reasoningLabels alias is the English common labels", () => {
   assert.equal(reasoningLabels, en.common.reasoningEffort);
   assert.equal(reasoningLabels.xhigh, "Extra high");
+});
+
+test("an effort shows its CLI id only where the label does not already read as it", () => {
+  assert.deepEqual(
+    reasoningEfforts.map((effort) => en.common.reasoningEffortWithId({ effort })),
+    ["Off · none", "Minimal", "Low", "Medium", "High", "Extra high · xhigh", "Max", "Ultra"],
+  );
+  assert.equal(zhTW.common.reasoningEffortWithId({ effort: "low" }), "低 · low");
+  assert.match(
+    renderEnglish({ execution: { reasoningEffort: "high", source: "selected" } }),
+    /<dd>High<\/dd>/,
+  );
+  assert.match(
+    render({ execution: { reasoningEffort: "high", source: "selected" } }),
+    /<dd>高 · high<\/dd>/,
+  );
 });

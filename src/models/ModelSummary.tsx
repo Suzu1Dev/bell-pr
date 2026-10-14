@@ -28,7 +28,7 @@ export function ModelSummary({
   analysis?: boolean;
 }) {
   const t = useT("models");
-  const effortLabels = useT("common").reasoningEffort;
+  const { reasoningEffortWithId } = useT("common");
   const fmt = useFormat();
   const kind = analysis ? "analysis" : "run";
   const label = providerLabels[execution?.provider ?? "codex"];
@@ -87,7 +87,7 @@ export function ModelSummary({
               <dt>{t.reasoningEffort}</dt>
               <dd>
                 {execution.reasoningEffort
-                  ? `${effortLabels[execution.reasoningEffort]} · ${execution.reasoningEffort}`
+                  ? reasoningEffortWithId({ effort: execution.reasoningEffort })
                   : t.providerDefault({ provider: label })}
               </dd>
             </div>

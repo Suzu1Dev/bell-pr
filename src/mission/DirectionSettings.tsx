@@ -77,7 +77,7 @@ export function DirectionSettings({
   modelsOnly = false,
 }: DirectionSettingsProps) {
   const { directions, settings: t } = useT("mission");
-  const efforts = useT("common").reasoningEffort;
+  const { reasoningEffort: efforts, reasoningEffortWithId } = useT("common");
   const id = useId();
   const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
   // The reason the catalog request failed; null while it has not failed.
@@ -361,7 +361,7 @@ export function DirectionSettings({
               )}
               {availableEfforts.map((effort) => (
                 <option key={effort} value={effort}>
-                  {efforts[effort]} · {effort}
+                  {reasoningEffortWithId({ effort })}
                 </option>
               ))}
             </select>

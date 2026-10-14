@@ -35,6 +35,14 @@ const common = {
     max: "Max",
     ultra: "Ultra",
   } satisfies Record<ReasoningEffort, string>,
+  /**
+   * An effort as the effort picker and the model summaries list it: the
+   * label, then the CLI's own id where the label does not already read as it.
+   */
+  reasoningEffortWithId: ({ effort }: { effort: ReasoningEffort }): string => {
+    const label = common.reasoningEffort[effort];
+    return label.toLowerCase() === effort ? label : `${label} · ${effort}`;
+  },
   teamTaskStatus: {
     pending: "Waiting on dependencies",
     ready: "Ready to claim",

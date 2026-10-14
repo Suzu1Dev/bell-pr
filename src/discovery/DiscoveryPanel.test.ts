@@ -127,7 +127,7 @@ test("an English render of a finished discovery has no Han", () => {
   assert.match(html, /Choose this opportunity<\/button>/);
   // The model and usage of the discovery
   assert.match(html, /<summary>Model and usage for this discovery<\/summary>/);
-  assert.match(html, /<dd>High · high<\/dd>/);
+  assert.match(html, /<dd>High<\/dd>/);
   assert.match(html, /<strong>Discovery AI usage<\/strong>/);
 });
 

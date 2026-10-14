@@ -29,6 +29,8 @@ const m: Translation<typeof en> = {
     max: "最高",
     ultra: "極高",
   },
+  reasoningEffortWithId: ({ effort }) =>
+    `${m.reasoningEffort[effort]} · ${effort}`,
   teamTaskStatus: {
     pending: "等待相依",
     ready: "可認領",
