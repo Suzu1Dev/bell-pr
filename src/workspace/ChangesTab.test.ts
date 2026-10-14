@@ -3,7 +3,8 @@ import test from "node:test";
 import { createElement } from "react";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { DiffFile, Run } from "../types";
-import { ChangesTab } from "./ChangesTab";
+import { maskPath } from "../app/presentation";
+import { ChangesTab, WorktreeHint } from "./ChangesTab";
 
 type Props = Parameters<typeof ChangesTab>[0];
 
@@ -140,4 +141,23 @@ test("the diff view buttons form a labelled group with the pressed one marked", 
   assert.match(tag(html, /aria-label="Unified view"/), /aria-pressed="false"/);
   assert.match(tag(html, /aria-label="Split view"/), /aria-pressed="true"/);
   assert.match(renderZh(element()), /只看尚未審查/);
+});
+
+test("the worktree path can be copied, except while presenting, when it loses its folders", () => {
+  const html = renderEn(element());
+  assert.match(html, /<code>\/home\/someone\/\.bellpr\/worktrees\/run-1<\/code>/);
+  assert.match(html, /aria-label="Copy the worktree path"/);
+  const path = run.worktreePath!;
+  const presenting = renderEn(
+    createElement(WorktreeHint, {
+      path,
+      presenting: true,
+      maskPath: (value: string) => maskPath(value, undefined, true),
+      onCopy() {},
+    }),
+  );
+  assert.match(presenting, /<code>…\/run-1<\/code>/);
+  assert.doesNotMatch(presenting, /someone|\/home\//);
+  assert.doesNotMatch(presenting, /Copy the worktree path/);
+  assertNoHan(presenting);
 });

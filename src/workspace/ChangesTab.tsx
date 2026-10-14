@@ -38,6 +38,7 @@ import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { Tab } from "../app/AppShell";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import { fileStatusLabel } from "../app/labels";
+import { usePresentation } from "../app/presentation";
 import type { RunActions } from "../app/hooks/useRunActions";
 
 const ExplanationPanel = lazy(() =>
@@ -156,6 +157,7 @@ export function ChangesTab({
     saveNote,
     ask,
   } = actions;
+  const { present, maskPath } = usePresentation();
   const reviewGridRef = useRef<HTMLDivElement>(null);
   // On a phone the file search hides behind an icon button; a query keeps it open.
   const [searchOpen, setSearchOpen] = useState(false);
@@ -437,20 +439,12 @@ export function ChangesTab({
           </div>
         </div>
         {editable && run.worktreePath && (
-          <div className="worktree-hint">
-            <FolderGit2 size={14} />
-            <span>{t.worktreeHint}</span>
-            <code>{run.worktreePath}</code>
-            <button
-              type="button"
-              className="icon-button"
-              aria-label={t.copyWorktree}
-              title={t.copyWorktree}
-              onClick={copyWorktreePath}
-            >
-              <Copy size={13} />
-            </button>
-          </div>
+          <WorktreeHint
+            path={run.worktreePath}
+            presenting={present}
+            maskPath={maskPath}
+            onCopy={copyWorktreePath}
+          />
         )}
         {file ? (
           <DiffView
@@ -565,6 +559,42 @@ export function ChangesTab({
             )}
           </aside>
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Where the run's checkout is, for editing files by hand. While presenting
+ * the path loses its folders (maskPath) and cannot be copied.
+ */
+export function WorktreeHint({
+  path,
+  presenting,
+  maskPath,
+  onCopy,
+}: {
+  path: string;
+  presenting: boolean;
+  maskPath: (path: string) => string;
+  onCopy: () => void;
+}) {
+  const t = useT("workspace").changes;
+  return (
+    <div className="worktree-hint">
+      <FolderGit2 size={14} />
+      <span>{t.worktreeHint}</span>
+      <code>{maskPath(path)}</code>
+      {!presenting && (
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={t.copyWorktree}
+          title={t.copyWorktree}
+          onClick={onCopy}
+        >
+          <Copy size={13} />
+        </button>
       )}
     </div>
   );
