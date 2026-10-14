@@ -1,7 +1,90 @@
-import type { Translation } from "../../../shared/i18n/locale.js";
+import { formatters, type Translation } from "../../../shared/i18n/locale.js";
 import type en from "../en/run.js";
 
+const list = (items: readonly string[]) =>
+  formatters("zh-TW").list(items, { type: "unit" });
+
 const m: Translation<typeof en> = {
+  agents: {
+    lead: "分析專案與拆解需求",
+    reviewer: "獨立審查正確性與維護性",
+    tester: "檢查測試證據與回歸風險",
+    member: "等待認領共享任務，使用獨立工作目錄",
+    memberRetry: "等待重新認領任務，使用新的獨立工作目錄",
+    running: ({ cli }) => `正在執行 ${cli}…`,
+    waitingForSlot: ({ queued }) => `等待其他 Agent 完成（${queued} 個排隊中）`,
+    complete: "已完成，報告可供審閱",
+    failed: "執行中斷或失敗",
+  },
+  queue: {
+    runNotFound: "找不到工作。",
+    claudeMissing: "尚未安裝 Claude Code CLI。請先安裝並執行 claude auth login。",
+    claudeSignedOut: "Claude Code 尚未登入。請先在終端機執行 claude auth login。",
+    codexMissing: "尚未安裝 Codex CLI。請先安裝並執行 codex login。",
+    codexSignedOut: "Codex 尚未登入。請先在終端機執行 codex login。",
+    full: ({ max }) => `最多可同時排入 ${max} 個工作；請等待現有工作完成。`,
+    teamStopped: "團隊已停止工作，請使用程式碼追問功能。",
+    noPlanToApprove: "目前沒有等待核准的團隊計畫。",
+    planApproved: "已核准任務分工與檔案範圍，團隊進入開發佇列。",
+    feedbackLength: "退回意見必須介於 1 至 4000 字。",
+    revisionLimit: ({ max }) =>
+      `已重擬 ${max} 次，請核准目前計畫，或取消後調整需求再建立新工作。`,
+    planSentBack: ({ revision, max }) =>
+      `已退回計畫並補充意見（第 ${revision}/${max} 次），Lead 將依意見重新規劃。`,
+    cancelNotAllowed: "只有排隊、等待計畫核准或執行中的工作可取消。",
+    cancelRequested:
+      "已要求取消；失敗或取消任務的隔離工作目錄保留，已整合任務的目錄已自動移除。可用「重試失敗的子任務」接續。",
+  },
+  team: {
+    started: ({ name, cli, model, effort, web, timeout, inbox }) =>
+      `${name} 開始工作。模型：${model ?? `${cli} CLI 預設（未記錄模型）`}；推理：${effort ?? "模型預設"}${web ? "；已允許上網" : ""}${timeout ? `；${timeout}` : ""}。${inbox ? ` 已在回合起點收到 ${inbox} 則團隊訊息。` : ""}`,
+    waitingForSlot: ({ queued }) => `等待其他 Agent 完成（${queued} 個排隊中）。`,
+    structuredResult: "結構化結果已回傳，正在驗證來源與內容。",
+    checkFinished: ({ outcome }) => `執行檢查完成（${outcome}）。`,
+    fileUpdated: ({ path }) => `已更新 ${path}。`,
+    filesUpdated: "已更新工作目錄中的檔案。",
+    webSearch: ({ detail }) => `搜尋網路：${detail}`,
+    webFetch: ({ detail }) => `讀取網頁：${detail}`,
+    reportedModel: ({ cli, model, requested, version }) =>
+      `${cli} 回報實際模型：${model}（${requested ? `--model 傳入 ${requested}` : "未傳入 --model"}${version ? `，CLI ${version}` : ""}）。`,
+    noReport: ({ cli }) => `${cli} 沒有回傳工作報告。`,
+    noTeam: "此工作沒有 Agent Team。",
+    messageTargetClosed: "此成員或任務已完成，無法再排入訊息；請傳給 Lead。",
+    messageLength: "團隊訊息必須介於 1 至 4000 字。",
+    messageLimit: "此工作的團隊訊息已達 200 則上限。",
+    messageQueued: ({ to }) =>
+      `已排入給 ${to} 的團隊訊息，將在下一回合起點送達。`,
+    taskClaimed: ({ title }) =>
+      `領取任務 ${title}；獨立工作目錄與檔案範圍已建立。`,
+    messageNotQueued: ({ reason }) => `協調訊息未排入：${reason}`,
+    turnLimit:
+      "已達每個任務 3 回合上限；尚未送達的訊息保留在團隊收件匣，交由 Lead 在整合時檢視。",
+    taskIntegrated: ({ title, files }) =>
+      `${title} 完成，${files.length} 個檔案通過範圍檢查並整合${files.length ? `：${list(files)}` : ""}。`,
+    checkoutRemoved: ({ owner }) =>
+      `整合後的差異已在本次工作的 worktree，${owner} 的獨立 checkout 已不需保留，已移除。`,
+    checkoutNotRemoved: ({ task, reason }) =>
+      `無法移除 ${task} 的隔離工作目錄，可手動清理：${reason}`,
+    taskFailed: "任務失敗。",
+    stuck: "任務依賴或檔案分工阻止團隊繼續，請檢視共享任務清單。",
+    creatingWorktree: "建立獨立 Git worktree。",
+    legacyRun: "舊工作無法重新派工，請建立新的 Agent Team 工作。",
+    planCreated: ({ tasks, max }) =>
+      `已建立 ${tasks} 個有依賴與檔案範圍的任務，最多 ${max} 位 teammate 同時工作。`,
+    awaitingApproval: "等待你核准計畫；尚未開始修改程式碼。",
+    noChanges: "Agent Team 沒有產生程式碼差異。請檢查任務報告或調整方向。",
+    done: ({ files }) =>
+      `團隊開發與獨立審查完成，共 ${files} 個變更檔案，等待逐檔審閱。`,
+    draftIncomplete: "PR 草稿建議未完成，請重試。",
+    runFailed: "工作失敗。",
+    retryNotAllowed: "只有已失敗或已取消、且 Lead 已建立計畫的團隊工作可以重試。",
+    stillStopping: "此工作仍在收尾，請稍後再重試。",
+    retryAwaitingApproval: "要求重試；計畫尚未核准，先回到等待核准。",
+    retryTasks: ({ kept, retried }) =>
+      `重試失敗的子任務：${kept} 個已完成任務不重跑，${retried} 個任務以新快照重新開始。`,
+    retryIntegration: "重試：所有子任務都已完成，直接重跑整合與獨立審查。",
+    retryPending: "重試：繼續執行尚未開始的子任務。",
+  },
   agentCli: {
     commandSucceeded: "成功",
     commandFailed: "失敗",
@@ -106,6 +189,9 @@ const m: Translation<typeof en> = {
         `限制與未達成的驗收條件：\n${limitations || "（未回報）"}`,
         `設計取捨（考慮過但未採用的做法）：\n${tradeoffs || "（未回報）"}`,
       ].join("\n\n"),
+  },
+  repos: {
+    notFound: "找不到 Repository。",
   },
   publish: {
     commitMessageInvalid: "提交訊息只能包含文字與換行。",

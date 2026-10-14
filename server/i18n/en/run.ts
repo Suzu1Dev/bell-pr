@@ -4,9 +4,143 @@ const fmt = formatters("en");
 /** A number with its noun in the matching form: "1 file", "3 files". */
 const count = (n: number, one: string, other: string) =>
   `${fmt.number(n)} ${fmt.plural(n) === "one" ? one : other}`;
+/** File names and similar items, separated as the locale separates a plain list. */
+const list = (items: readonly string[]) => fmt.list(items, { type: "unit" });
 
 /** Run pipeline messages: run logs, agent details and run errors. */
 export default {
+  /** What an agent card says the agent is doing (its `detail`). */
+  agents: {
+    lead: "Analysing the project and breaking down the request",
+    reviewer: "Reviewing correctness and maintainability independently",
+    tester: "Checking the test evidence and regression risk",
+    member: "Waiting to claim a shared task; works in its own directory",
+    memberRetry: "Waiting to claim the task again in a new working directory",
+    running: ({ cli }: { cli: string }) => `Running ${cli}…`,
+    waitingForSlot: ({ queued }: { queued: number }) =>
+      `Waiting for other agents to finish (${queued} queued)`,
+    complete: "Done; the report is ready to read",
+    failed: "Stopped or failed",
+  },
+  /** Starting, queueing, approving and cancelling runs. */
+  queue: {
+    runNotFound: "Run not found.",
+    claudeMissing:
+      "Claude Code CLI is not installed. Install it, then run claude auth login.",
+    claudeSignedOut:
+      "Claude Code is not signed in. Run claude auth login in a terminal first.",
+    codexMissing: "Codex CLI is not installed. Install it, then run codex login.",
+    codexSignedOut: "Codex is not signed in. Run codex login in a terminal first.",
+    full: ({ max }: { max: number }) =>
+      `Up to ${max} runs can be queued or in progress at once; wait for one to finish.`,
+    teamStopped:
+      "The team has stopped working on this run; ask about the code in the follow-up chat instead.",
+    noPlanToApprove: "No team plan is waiting for approval.",
+    planApproved:
+      "Approved the task split and file scopes; the team is queued for development.",
+    feedbackLength: "Feedback on the plan must be 1 to 4000 characters.",
+    revisionLimit: ({ max }: { max: number }) =>
+      `The plan was already revised ${count(max, "time", "times")}; approve the current plan, or cancel and start a new run with an adjusted request.`,
+    planSentBack: ({ revision, max }: { revision: number; max: number }) =>
+      `Sent the plan back with feedback (revision ${revision} of ${max}); the lead will plan again.`,
+    cancelNotAllowed:
+      "Only queued, running or plan-approval runs can be cancelled.",
+    cancelRequested:
+      "Cancellation requested. The isolated working directories of failed or cancelled tasks are kept; those of integrated tasks were removed. Use “Retry failed subtasks” to continue.",
+  },
+  /** The team's turns, tasks and phases in a run's log. */
+  team: {
+    /** The first line of every agent turn; a missing model or effort is the CLI's own default. */
+    started: ({
+      name,
+      cli,
+      model,
+      effort,
+      web,
+      timeout,
+      inbox,
+    }: {
+      name: string;
+      cli: string;
+      model?: string;
+      effort?: string;
+      web: boolean;
+      /** For example "waits up to 15 minutes" (agentCli.timeoutLimit). */
+      timeout?: string;
+      inbox: number;
+    }) =>
+      `${name} started. Model: ${model ?? `${cli} CLI default (not recorded)`}; reasoning effort: ${effort ?? "model default"}${web ? "; web access allowed" : ""}${timeout ? `; ${timeout}` : ""}.${inbox ? ` ${count(inbox, "team message", "team messages")} arrived at the start of this turn.` : ""}`,
+    waitingForSlot: ({ queued }: { queued: number }) =>
+      `Waiting for other agents to finish (${queued} queued).`,
+    structuredResult:
+      "Structured result returned; checking its sources and content.",
+    checkFinished: ({ outcome }: { outcome: string }) =>
+      `Check finished (${outcome}).`,
+    fileUpdated: ({ path }: { path: string }) => `Updated ${path}.`,
+    filesUpdated: "Updated files in the working directory.",
+    webSearch: ({ detail }: { detail: string }) => `Web search: ${detail}`,
+    webFetch: ({ detail }: { detail: string }) => `Read web page: ${detail}`,
+    reportedModel: ({
+      cli,
+      model,
+      requested,
+      version,
+    }: {
+      cli: string;
+      model: string;
+      requested?: string;
+      version?: string;
+    }) =>
+      `${cli} reported the model in use: ${model} (${requested ? `--model ${requested} was passed` : "no --model was passed"}${version ? `, CLI ${version}` : ""}).`,
+    noReport: ({ cli }: { cli: string }) => `${cli} returned no report.`,
+    noTeam: "This run has no agent team.",
+    messageTargetClosed:
+      "This member or task has finished and cannot take messages; send it to the lead.",
+    messageLength: "Team messages must be 1 to 4000 characters.",
+    messageLimit: "This run has reached its limit of 200 team messages.",
+    messageQueued: ({ to }: { to: string }) =>
+      `Queued a team message for ${to}; it is delivered at the start of the next turn.`,
+    taskClaimed: ({ title }: { title: string }) =>
+      `Claimed task ${title}; its own working directory and file scope are ready.`,
+    messageNotQueued: ({ reason }: { reason: string }) =>
+      `Coordination message not queued: ${reason}`,
+    turnLimit:
+      "Reached the limit of 3 turns per task; undelivered messages stay in the team inbox for the lead to review during integration.",
+    taskIntegrated: ({ title, files }: { title: string; files: string[] }) =>
+      files.length
+        ? `${title} is done; integrated ${count(files.length, "file", "files")} that passed the scope check: ${list(files)}.`
+        : `${title} is done; it changed no files to integrate.`,
+    checkoutRemoved: ({ owner }: { owner: string }) =>
+      `The integrated changes are now in this run's worktree, so ${owner}'s separate checkout was removed.`,
+    checkoutNotRemoved: ({ task, reason }: { task: string; reason: string }) =>
+      `Could not remove the isolated working directory of ${task}; you can delete it by hand: ${reason}`,
+    taskFailed: "The task failed.",
+    stuck:
+      "Task dependencies or file assignments stop the team from continuing; check the shared task list.",
+    creatingWorktree: "Creating a separate Git worktree.",
+    legacyRun:
+      "Older runs cannot be assigned to a team again; start a new agent team run.",
+    planCreated: ({ tasks, max }: { tasks: number; max: number }) =>
+      `Created ${count(tasks, "task", "tasks")} with dependencies and file scopes; up to ${count(max, "teammate works", "teammates work")} at once.`,
+    awaitingApproval:
+      "Waiting for you to approve the plan; no code has been changed yet.",
+    noChanges:
+      "The agent team produced no code changes. Check the task reports or adjust the direction.",
+    done: ({ files }: { files: number }) =>
+      `Team development and the independent review are done: ${count(files, "changed file waits", "changed files wait")} for your file-by-file review.`,
+    draftIncomplete: "The PR draft suggestion did not finish; try again.",
+    runFailed: "The run failed.",
+    retryNotAllowed:
+      "Only failed or cancelled team runs whose lead already made a plan can be retried.",
+    stillStopping: "This run is still finishing; try again in a moment.",
+    retryAwaitingApproval:
+      "Retry requested; the plan is not approved yet, so it waits for approval again.",
+    retryTasks: ({ kept, retried }: { kept: number; retried: number }) =>
+      `Retrying failed subtasks: ${count(kept, "completed task is", "completed tasks are")} kept, and ${count(retried, "task starts", "tasks start")} again from a fresh snapshot.`,
+    retryIntegration:
+      "Retry: every subtask is complete, so only integration and the independent review run again.",
+    retryPending: "Retry: continuing with the subtasks that have not started.",
+  },
   /** Agent CLI events, retries and time limits shown while an agent works. */
   agentCli: {
     /** The outcome of a shell command Claude Code ran, kept with the task's checks. */
@@ -221,6 +355,10 @@ export default {
         `Limitations and unmet acceptance criteria:\n${limitations || "(Not reported.)"}`,
         `Design tradeoffs (approaches considered but not taken):\n${tradeoffs || "(Not reported.)"}`,
       ].join("\n\n"),
+  },
+  /** The projects BELL works on and its own clones of them. */
+  repos: {
+    notFound: "Repository not found.",
   },
   /** Publishing a run's reviewed changes as a pull request. */
   publish: {
