@@ -83,8 +83,34 @@ test("demo=play plays the sample from queued to a published sample PR, with no t
     await page.getByRole("button", { name: team.approval.approve }).click();
     await expect(badge).toHaveText(status.review, { timeout: 30_000 });
 
-    // The reader reviews every file of the finished run.
+    // An answer in the playback waits a moment, then types out.
     await page.locator("#workspace-tab-changes").click();
+    await page.getByRole("button", { name: review.panel.askAboutChange }).click();
+    await page.evaluate(() => {
+      const typed: number[] = [];
+      (window as unknown as { typed: number[] }).typed = typed;
+      new MutationObserver(() => {
+        const answers = document.querySelectorAll(
+          ".explain-message-assistant .explain-message-body",
+        );
+        const length = answers[answers.length - 1]?.textContent?.length;
+        if (length && typed[typed.length - 1] !== length) typed.push(length);
+      }).observe(document.body, { subtree: true, childList: true, characterData: true });
+    });
+    const question = page.getByRole("textbox", { name: review.chat.inputLabel });
+    await question.fill("Why full jitter?");
+    await question.press("Enter");
+    await expect(page.locator(".explain-message-assistant")).toHaveCount(1);
+    await expect(page.locator(".explain-loading")).toHaveCount(0);
+    const typed = await page.evaluate(
+      () => (window as unknown as { typed: number[] }).typed,
+    );
+    // Markdown still open part way (a lone backtick) may shift a length by a
+    // character, so only the growth from the first slice to the whole is checked.
+    expect(typed.length, `answer lengths seen: ${typed.join(", ")}`).toBeGreaterThan(2);
+    expect(typed[0]).toBeLessThan(typed[typed.length - 1] / 2);
+
+    // The reader reviews every file of the finished run.
     for (const file of demo.files) {
       await page.locator(`.file-item[title="${file.path}"]`).click();
       const reviewed = page.getByRole("checkbox", { name: review.diff.reviewed });
