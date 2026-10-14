@@ -101,6 +101,8 @@ export interface Run {
   /** Walkthroughs of the functions around each change; absent before they existed. */
   walkthroughs?: Record<string, StoredWalkthrough>;
   prUrl?: string;
+  /** The PR head BELL last pushed; absent until the run is published. */
+  publishCommit?: string;
   /** The GitHub branch a publish already pushed to; the branch field is locked once set. */
   publishedBranch?: string;
   /** owner/name the PR branch was pushed to: the target repository or the person's fork. */

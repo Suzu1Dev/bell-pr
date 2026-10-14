@@ -306,6 +306,13 @@ export function createApp(
     );
     res.json({ files });
   });
+  app.get("/api/runs/:id/commits", async (req, res) => {
+    res.json({ commits: await workbench.commits(req.params.id) });
+  });
+  app.get("/api/runs/:id/commits/:sha", async (req, res) => {
+    const sha = z.string().regex(/^[0-9a-f]{40,64}$/).parse(req.params.sha);
+    res.json(await workbench.commit(req.params.id, sha));
+  });
   app.get("/api/runs/:id/context", async (req, res) => {
     const { path: filePath, fingerprint, base } = z
       .object({

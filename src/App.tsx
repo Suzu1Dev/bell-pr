@@ -44,6 +44,7 @@ import {
   PanelLeftOpen,
   Target,
   Globe2,
+  History,
   Minus,
   MessageSquare,
   Play,
@@ -73,6 +74,7 @@ import {
 } from "../shared/followups";
 import { FollowUpRounds } from "./draft/FollowUpRounds";
 import { SyncPanel } from "./draft/SyncPanel";
+import { CommitHistory } from "./review/CommitHistory";
 import { PremiseNotice } from "./team/PremiseNotice";
 import { SetupChecklist } from "./team/SetupChecklist";
 import { mergeSetupNeeds } from "../shared/setup";
@@ -2398,6 +2400,18 @@ export default function App() {
                     <FileText size={16} />
                     PR 草稿{draftDirty && <span>•</span>}
                   </button>
+                  <button
+                    role="tab"
+                    id="workspace-tab-commits"
+                    aria-controls="workspace-panel"
+                    tabIndex={tab === "commits" ? 0 : -1}
+                    aria-selected={tab === "commits"}
+                    className={tab === "commits" ? "selected" : ""}
+                    onClick={() => setTab("commits")}
+                  >
+                    <History size={16} />
+                    Commit 歷程
+                  </button>
                 </div>
                 <div className="review-totals">
                   <span className="additions">+{additions}</span>
@@ -2412,6 +2426,7 @@ export default function App() {
                 id="workspace-panel"
                 aria-labelledby={`workspace-tab-${tab}`}
               >
+                {tab === "commits" && <CommitHistory run={run} demo={demo} />}
                 {tab === "overview" && !demo && (
                   <>
                     <SetupChecklist
