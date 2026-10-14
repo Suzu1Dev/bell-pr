@@ -23,8 +23,10 @@ import {
 import type { LearnerNote } from "../../shared/explanations";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
 import { parseReviewOrder } from "../../shared/review-order";
+import { useFormat, useT } from "../i18n";
 import type { ChatMessage, DiffFile, Run } from "../types";
 import { MarkdownContent } from "./MarkdownContent";
+import { withNodes } from "./withNodes";
 import "./review.css";
 
 export interface ExplanationPanelProps {
@@ -73,11 +75,7 @@ const testFilePattern =
 
 // Explicit keys only: run.reports also stores teammate JSON, task ids and the
 // mentor's own answers, which are not review reports.
-const reportSections = [
-  { key: "implementer", title: "Lead 整合摘要", author: "Atlas · Team lead" },
-  { key: "reviewer", title: "程式審查", author: "Lens · Reviewer" },
-  { key: "tester", title: "測試分析", author: "Scout · Test analyst" },
-] as const;
+const reportKeys = ["implementer", "reviewer", "tester"] as const;
 
 /** Paragraphs (split on blank lines) that mention the path or its basename. */
 export function reportMentionCount(report: string, filePath: string) {
@@ -92,17 +90,20 @@ export function reportMentionCount(report: string, filePath: string) {
 
 /** Thread comments on the current file, shown as plain text: other people's words, not Markdown to trust. */
 export function MaintainerFeedback({ items }: { items: PrFeedbackItem[] }) {
+  const t = useT("review");
   if (!items.length) return null;
   return (
     <section className="explain-card explain-card-report">
       <h3>
         <MessageCircle size={15} />
-        維護者對此檔的留言
-        <span className="explain-report-author">{items.length} 則</span>
+        {t.feedback.title}
+        <span className="explain-report-author">
+          {t.feedback.count({ count: items.length })}
+        </span>
       </h3>
       <p className="explain-report-meta">
-        <span className="explain-report-badge">來自 GitHub，唯讀</span>
-        <span>回覆請到 PR 頁面；BELL 不會代你留言。</span>
+        <span className="explain-report-badge">{t.feedback.badge}</span>
+        <span>{t.feedback.replyNote}</span>
       </p>
       <ul className="explain-feedback-list">
         {items.map((item) => (
@@ -110,10 +111,12 @@ export function MaintainerFeedback({ items }: { items: PrFeedbackItem[] }) {
             <div className="explain-feedback-head">
               <strong>{item.author}</strong>
               <span>{item.authorAssociation}</span>
-              {typeof item.line === "number" && <span>第 {item.line} 行</span>}
-              {item.isResolved && <span>已解決</span>}
+              {typeof item.line === "number" && (
+                <span>{t.feedback.line({ line: item.line })}</span>
+              )}
+              {item.isResolved && <span>{t.feedback.resolved}</span>}
               <a href={item.url} target="_blank" rel="noopener noreferrer">
-                開啟
+                {t.feedback.open}
                 <ArrowUpRight size={12} />
               </a>
             </div>
@@ -140,9 +143,8 @@ export function ReviewReports({
   onRerunReview?: () => void;
   reviewBusy?: boolean;
 }) {
-  const available = reportSections.filter((section) =>
-    reports?.[section.key]?.trim(),
-  );
+  const t = useT("review");
+  const available = reportKeys.filter((key) => reports?.[key]?.trim());
   // Demo reports are fixed text, so there is nothing to re-run there.
   const rerun = onRerunReview && !demo && (
     <div className="explain-rerun">
@@ -158,12 +160,9 @@ export function ReviewReports({
         ) : (
           <RotateCcw size={14} />
         )}
-        {reviewBusy ? "正在重新審查…" : "重新執行審查"}
+        {reviewBusy ? t.reports.rerunBusy : t.reports.rerun}
       </button>
-      <small className="explain-empty-note">
-        依工作目錄目前的差異重新執行 Reviewer 與 Test analyst（唯讀，會使用 CLI
-        用量）。報告只是建議，不會改變已審閱與核准狀態。
-      </small>
+      <small className="explain-empty-note">{t.reports.rerunNote}</small>
     </div>
   );
   const reviewOrder = parseReviewOrder(reports?.implementer ?? "");
@@ -173,8 +172,8 @@ export function ReviewReports({
         <MaintainerFeedback items={feedback} />
         <div className="explain-empty">
           <Eye size={28} />
-          <h3>這次工作還沒有審查報告</h3>
-          <p>Lead 整合、Reviewer 與 Test analyst 完成後，報告全文會放在這裡。</p>
+          <h3>{t.reports.emptyTitle}</h3>
+          <p>{t.reports.emptyBody}</p>
           {rerun}
         </div>
       </>
@@ -184,21 +183,16 @@ export function ReviewReports({
       <MaintainerFeedback items={feedback} />
       <div className="explain-ready-label">
         <Check size={13} />
-        {demo ? "示範報告 · 預先整理的內容" : "團隊回報的完整內容"}
+        {demo ? t.reports.readyDemo : t.reports.readyLive}
       </div>
-      <p className="explain-reports-intro">
-        這些是獨立靜態審查，不是執行結果；每份報告保留全文，並標示提到目前檔案的段落數。
-      </p>
+      <p className="explain-reports-intro">{t.reports.intro}</p>
       {reviewOrder.length > 0 && (
         <section className="explain-card explain-card-order">
           <h3>
             <ListOrdered size={15} />
-            Lead 建議的閱讀順序
+            {t.reports.orderTitle}
           </h3>
-          <p className="explain-order-intro">
-            常見的讀法是先看定義與介面、再看呼叫端，測試放最前或最後；Lead
-            在整合摘要中說明了這次為何這樣排。左側檔案清單可切換「依建議順序」。
-          </p>
+          <p className="explain-order-intro">{t.reports.orderIntro}</p>
           <ol className="explain-order-list">
             {reviewOrder.map((entry) => (
               <li
@@ -213,11 +207,12 @@ export function ReviewReports({
         </section>
       )}
       {rerun}
-      {available.map((section) => {
-        const report = reports![section.key]!;
+      {available.map((key) => {
+        const report = reports![key]!;
+        const section = t.reports.sections[key];
         const mentions = reportMentionCount(report, file.path);
         return (
-          <section className="explain-card explain-card-report" key={section.key}>
+          <section className="explain-card explain-card-report" key={key}>
             <h3>
               <Eye size={15} />
               {section.title}
@@ -225,12 +220,12 @@ export function ReviewReports({
             </h3>
             <p className="explain-report-meta">
               <span className="explain-report-badge">
-                獨立靜態審查，非執行結果
+                {t.reports.staticBadge}
               </span>
               <span>
                 {mentions
-                  ? `本報告提到此檔 ${mentions} 處`
-                  : "此報告未直接提到本檔"}
+                  ? t.reports.mentions({ count: mentions })
+                  : t.reports.noMentions}
               </span>
             </p>
             <MarkdownContent>{report}</MarkdownContent>
@@ -238,9 +233,7 @@ export function ReviewReports({
         );
       })}
       <p className="explain-evidence-note">
-        {demo
-          ? "示範報告不是即時 AI 推論，也不代表測試結果。"
-          : "報告內容由各角色靜態檢視產生；實測結果以報告中明確列出的指令與輸出為準。"}
+        {demo ? t.reports.evidenceDemo : t.reports.evidenceLive}
       </p>
     </>
   );
@@ -264,6 +257,8 @@ export function ExplanationPanel({
   onRerunReview,
   reviewBusy,
 }: ExplanationPanelProps) {
+  const t = useT("review");
+  const fmt = useFormat();
   const [tab, setTab] = useState<"explain" | "reports" | "chat">(
     chatRequestId ? "chat" : "explain",
   );
@@ -352,36 +347,33 @@ export function ExplanationPanel({
   );
   const noteDirty = noteDraft !== (note?.text ?? "");
   const presets = [
-    "為什麼要這樣改？",
-    "有哪些需要注意的風險？",
-    "要怎麼測試這段程式碼？",
-    ...(explanation
-      ? [
-          "這個觀念在專案其他地方還能用在哪？",
-          "如果不這樣改，還有哪些做法？各有什麼取捨？",
-        ]
-      : []),
-    ...(isTestFile ? ["這個測試在保護什麼行為？"] : []),
-    ...(feedback.length
-      ? ["維護者這個意見對應 diff 哪幾行？有哪些回應方式與取捨？"]
-      : []),
+    t.presets.why,
+    t.presets.risks,
+    t.presets.test,
+    ...(explanation ? [t.presets.elsewhere, t.presets.alternatives] : []),
+    ...(isTestFile ? [t.presets.testFile] : []),
+    ...(feedback.length ? [t.presets.feedback] : []),
   ];
 
   return (
-    <aside className="explain-panel" aria-label="程式碼學習助手">
+    <aside className="explain-panel" aria-label={t.panel.label}>
       <div className="explain-header">
         <span className="explain-avatar">
           <Sparkles size={17} />
         </span>
         <div>
-          <h2>讀懂每一次改變</h2>
-          <p>從發生什麼，到為什麼這樣做</p>
+          <h2>{t.panel.title}</h2>
+          <p>{t.panel.subtitle}</p>
         </div>
         <span className={`explain-mode ${demo ? "explain-mode-demo" : ""}`}>
-          {demo ? "示範" : "AI"}
+          {demo ? t.panel.demoBadge : t.panel.liveBadge}
         </span>
       </div>
-      <div className="explain-tabs" role="tablist" aria-label="學習面板">
+      <div
+        className="explain-tabs"
+        role="tablist"
+        aria-label={t.panel.tabsLabel}
+      >
         <button
           type="button"
           role="tab"
@@ -392,7 +384,7 @@ export function ExplanationPanel({
           onClick={() => setTab("explain")}
         >
           <BookOpen size={14} />
-          變更解說
+          {t.panel.tabs.explain}
         </button>
         <button
           type="button"
@@ -404,7 +396,7 @@ export function ExplanationPanel({
           onClick={() => setTab("reports")}
         >
           <Eye size={14} />
-          審查者怎麼看
+          {t.panel.tabs.reports}
         </button>
         <button
           type="button"
@@ -416,7 +408,7 @@ export function ExplanationPanel({
           onClick={() => setTab("chat")}
         >
           <MessageCircle size={14} />
-          追問 Agent
+          {t.panel.tabs.chat}
           {questionCount > 0 && (
             <span className="explain-message-count">{questionCount}</span>
           )}
@@ -433,7 +425,10 @@ export function ExplanationPanel({
         >
           <FolderTree size={12} />
           <span>
-            所在模組 <code>{fileModule.path}</code>：{fileModule.purpose}
+            {withNodes(t.panel.module, {
+              path: <code>{fileModule.path}</code>,
+              purpose: fileModule.purpose,
+            })}
           </span>
         </p>
       )}
@@ -448,41 +443,38 @@ export function ExplanationPanel({
             {file.blocked || status === "unavailable" ? (
               <div className="explain-empty">
                 <AlertCircle size={28} />
-                <h3>目前無法解說此檔案</h3>
+                <h3>{t.explain.unavailableTitle}</h3>
                 <p>
                   {file.blocked ||
                     file.explanationError ||
-                    "這份變更目前沒有可供解說的文字差異。"}
+                    t.explain.unavailableBody}
                 </p>
               </div>
             ) : explanation ? (
               <>
                 <div className="explain-ready-label">
                   <Check size={13} />
-                  {demo
-                    ? "示範解說 · 預先整理的學習內容"
-                    : "已依這份 diff 自動整理"}
+                  {demo ? t.explain.readyDemo : t.explain.readyLive}
                 </div>
                 {isTestFile && (
                   <p className="explain-test-hint">
                     <FlaskConical size={13} />
-                    測試就是行為規格：先讀 it/test 描述，再對照 expect
-                    看它保護哪個邊界。
+                    {t.explain.testFileHint}
                   </p>
                 )}
                 <section className="explain-card explain-card-example">
                   <h3>
                     <MessageCircle size={15} />
-                    白話文舉例
+                    {t.explain.cards.example}
                   </h3>
                   {explanation.example ? (
                     <>
                       <p className="explain-example-intro">
-                        先用一個情境，看懂修改前後的差別。
+                        {t.explain.exampleIntro}
                       </p>
                       <div className="explain-example-scenario">
                         <span className="explain-example-label">
-                          想像這個情境
+                          {t.explain.exampleScenario}
                         </span>
                         <MarkdownContent>
                           {explanation.example.scenario}
@@ -490,7 +482,7 @@ export function ExplanationPanel({
                       </div>
                       <div className="explain-example-comparison">
                         <div className="explain-example-before">
-                          <h4>修改前</h4>
+                          <h4>{t.explain.exampleBefore}</h4>
                           <MarkdownContent>
                             {explanation.example.before}
                           </MarkdownContent>
@@ -498,7 +490,7 @@ export function ExplanationPanel({
                         <div className="explain-example-after">
                           <h4>
                             <ArrowRight size={13} />
-                            修改後
+                            {t.explain.exampleAfter}
                           </h4>
                           <MarkdownContent>
                             {explanation.example.after}
@@ -508,7 +500,7 @@ export function ExplanationPanel({
                     </>
                   ) : status === "failed" ? (
                     <div className="explain-example-status" role="alert">
-                      <p>白話例子尚未整理完成，其他解說可以繼續閱讀。</p>
+                      <p>{t.explain.exampleFailed}</p>
                       {file.explanationError && <p>{file.explanationError}</p>}
                       {onRetryExplanation && (
                         <button
@@ -519,8 +511,8 @@ export function ExplanationPanel({
                         >
                           <RotateCcw size={14} />
                           {explanationBusy
-                            ? "其他解說整理中…"
-                            : "重新整理白話例子"}
+                            ? t.explain.retryBusy
+                            : t.explain.retryExample}
                         </button>
                       )}
                     </div>
@@ -532,30 +524,30 @@ export function ExplanationPanel({
                     >
                       <p className="explain-example-progress">
                         <LoaderCircle className="explain-spin" size={15} />
-                        正在補上白話例子
+                        {t.explain.examplePending}
                       </p>
-                      <p>完成後會自動放在這裡，你可以先閱讀下方解說。</p>
+                      <p>{t.explain.examplePendingBody}</p>
                     </div>
                   )}
                 </section>
                 <section className="explain-card explain-card-summary">
                   <h3>
                     <span className="explain-card-number">01</span>
-                    這段改了什麼？
+                    {t.explain.cards.summary}
                   </h3>
                   <MarkdownContent>{explanation.summary}</MarkdownContent>
                 </section>
                 <section className="explain-card">
                   <h3>
                     <span className="explain-card-number">02</span>
-                    為什麼這樣改？
+                    {t.explain.cards.reason}
                   </h3>
                   <MarkdownContent>{explanation.reason}</MarkdownContent>
                 </section>
                 <section className="explain-card explain-card-concept">
                   <h3>
                     <Lightbulb size={15} />
-                    帶走一個開發觀念
+                    {t.explain.cards.concept}
                   </h3>
                   {hasConceptHeading ? (
                     <>
@@ -571,7 +563,7 @@ export function ExplanationPanel({
                 <section className="explain-card explain-card-tip">
                   <h3>
                     <BookOpen size={15} />
-                    審閱時，多想一步
+                    {t.explain.cards.tip}
                   </h3>
                   <MarkdownContent>{explanation.tip}</MarkdownContent>
                 </section>
@@ -579,12 +571,12 @@ export function ExplanationPanel({
                   <section className="explain-card explain-card-alternatives">
                     <h3>
                       <Shuffle size={15} />
-                      如果換個做法？
+                      {t.explain.cards.alternatives}
                     </h3>
                     <MarkdownContent>{explanation.alternatives}</MarkdownContent>
                     {explanation.lookup && explanation.lookup.length > 0 && (
                       <p className="explain-lookup">
-                        <span>可以查：</span>
+                        <span>{t.explain.lookup}</span>
                         {explanation.lookup.map((keyword) => (
                           <code key={keyword}>{keyword}</code>
                         ))}
@@ -596,7 +588,7 @@ export function ExplanationPanel({
                   <section className="explain-card explain-card-selfcheck">
                     <h3>
                       <HelpCircle size={15} />
-                      考考自己
+                      {t.explain.cards.selfCheck}
                     </h3>
                     <MarkdownContent>
                       {explanation.selfCheck.question}
@@ -608,7 +600,7 @@ export function ExplanationPanel({
                       aria-controls={showAnswer ? `${panelId}-answer` : undefined}
                       onClick={() => setShowAnswer((current) => !current)}
                     >
-                      {showAnswer ? "收起答案" : "看答案"}
+                      {showAnswer ? t.explain.hideAnswer : t.explain.showAnswer}
                     </button>
                     {showAnswer && (
                       <div className="explain-answer" id={`${panelId}-answer`}>
@@ -620,9 +612,7 @@ export function ExplanationPanel({
                   </section>
                 )}
                 <p className="explain-evidence-note">
-                  {demo
-                    ? "示範內容不是即時 AI 推論，也不代表測試結果。"
-                    : "解說以目前差異為依據；實際行為請搭配原始碼與測試確認。"}
+                  {demo ? t.explain.evidenceDemo : t.explain.evidenceLive}
                 </p>
               </>
             ) : status === "failed" ? (
@@ -631,11 +621,8 @@ export function ExplanationPanel({
                 role="alert"
               >
                 <AlertCircle size={28} />
-                <h3>這份解說尚未整理完成</h3>
-                <p>
-                  {file.explanationError ||
-                    "產生解說時發生問題，變更內容仍可正常審閱。"}
-                </p>
+                <h3>{t.explain.failedTitle}</h3>
+                <p>{file.explanationError || t.explain.failedBody}</p>
                 {onRetryExplanation && (
                   <button
                     className="explain-retry"
@@ -644,11 +631,11 @@ export function ExplanationPanel({
                     onClick={onRetryExplanation}
                   >
                     <RotateCcw size={14} />
-                    {explanationBusy ? "其他解說整理中…" : "重新整理解說"}
+                    {explanationBusy ? t.explain.retryBusy : t.explain.retry}
                   </button>
                 )}
                 <span className="explain-empty-note">
-                  完成後會直接出現在這裡
+                  {t.explain.failedNote}
                 </span>
               </div>
             ) : (
@@ -666,24 +653,24 @@ export function ExplanationPanel({
                   <div>
                     <h3>
                       {status === "generating"
-                        ? "正在把變更整理成白話"
-                        : "解說會自動準備好"}
+                        ? t.explain.generatingTitle
+                        : t.explain.pendingTitle}
                     </h3>
                     <p>
                       {status === "generating"
-                        ? "對照實際 diff，整理具體情境、設計原因與審閱重點。"
-                        : "Agents 完成變更後，就會在這裡整理解說。"}
+                        ? t.explain.generatingBody
+                        : t.explain.pendingBody}
                     </p>
                   </div>
                 </div>
                 <div className="explain-skeletons" aria-hidden="true">
                   {[
-                    "白話文舉例",
-                    "這段改了什麼？",
-                    "為什麼這樣改？",
-                    "帶走一個開發觀念",
-                    "如果換個做法？",
-                    "考考自己",
+                    t.explain.cards.example,
+                    t.explain.cards.summary,
+                    t.explain.cards.reason,
+                    t.explain.cards.concept,
+                    t.explain.cards.alternatives,
+                    t.explain.cards.selfCheck,
                   ].map((title) => (
                     <div className="explain-skeleton" key={title}>
                       <span>{title}</span>
@@ -699,33 +686,32 @@ export function ExplanationPanel({
               <section className="explain-card explain-card-note">
                 <h3>
                   <PenLine size={15} />
-                  <label htmlFor={`${panelId}-note`}>我的理解</label>
+                  <label htmlFor={`${panelId}-note`}>{t.note.label}</label>
                   {noteStale && (
-                    <span className="explain-note-badge">diff 已更新</span>
+                    <span className="explain-note-badge">
+                      {t.note.staleBadge}
+                    </span>
                   )}
                 </h3>
-                <p className="explain-note-intro">
-                  用自己的話寫下這份變更做了什麼、為什麼；筆記會和寫下時的 diff
-                  版本一起保存。
-                </p>
+                <p className="explain-note-intro">{t.note.intro}</p>
                 <textarea
                   id={`${panelId}-note`}
                   className="explain-note-input"
                   rows={3}
                   maxLength={2000}
-                  placeholder="例如：這次把固定等待改成指數退避，是為了……"
+                  placeholder={t.note.placeholder}
                   value={noteDraft}
                   onChange={(event) => setNoteDraft(event.target.value)}
                 />
                 <div className="explain-note-actions">
                   <span>
                     {noteStale
-                      ? "這段筆記寫於較早的 diff 版本，文字已保留；確認後重新儲存即可更新。"
+                      ? t.note.stale
                       : demo
-                        ? "示範模式的筆記不會保存，重新整理後會消失"
+                        ? t.note.demo
                         : note?.updatedAt
-                          ? `已儲存 · ${new Date(note.updatedAt).toLocaleString("zh-TW")}`
-                          : "尚未儲存"}
+                          ? t.note.saved({ time: fmt.dateTime(note.updatedAt) })
+                          : t.note.unsaved}
                   </span>
                   <button
                     type="button"
@@ -733,7 +719,7 @@ export function ExplanationPanel({
                     disabled={!(noteDirty || noteStale) || noteSaving}
                     onClick={() => void saveNote()}
                   >
-                    {noteSaving ? "儲存中…" : "儲存筆記"}
+                    {noteSaving ? t.note.saving : t.note.save}
                   </button>
                 </div>
               </section>
@@ -759,8 +745,8 @@ export function ExplanationPanel({
                 <span className="explain-chat-welcome-icon">
                   <MessageCircle size={22} />
                 </span>
-                <h3>讓理解，更進一步</h3>
-                <p>問設計原因、測試方式，或在左側選取一段程式碼深入討論。</p>
+                <h3>{t.chat.welcomeTitle}</h3>
+                <p>{t.chat.welcomeBody}</p>
                 <div className="explain-presets">
                   {presets.map((preset) => (
                     <button
@@ -777,9 +763,9 @@ export function ExplanationPanel({
               </div>
             )}
             {messages.map((message, index) => {
+              // The failure text follows the UI language; only the flag marks it.
               const failed =
-                message.role === "assistant" &&
-                message.content.startsWith("這次未能取得回答：");
+                message.role === "assistant" && message.failed === true;
               // Saved turns about an earlier diff stay readable but are marked.
               const stale =
                 message.fingerprint !== undefined &&
@@ -801,17 +787,19 @@ export function ExplanationPanel({
                             <Sparkles size={12} />
                           )}
                         </span>
-                        {failed ? "回答失敗" : "學習助手"}
+                        {failed ? t.chat.failed : t.chat.assistant}
                         {demo && (
-                          <span className="explain-inline-demo">示範</span>
+                          <span className="explain-inline-demo">
+                            {t.panel.demoBadge}
+                          </span>
                         )}
                       </>
                     ) : (
-                      "你"
+                      t.chat.you
                     )}
                     {stale && (
                       <span className="explain-inline-demo explain-inline-stale">
-                        針對較舊版本
+                        {t.chat.stale}
                       </span>
                     )}
                   </div>
@@ -826,7 +814,7 @@ export function ExplanationPanel({
                 <span />
                 <span />
                 <span />
-                <span className="explain-loading-text">正在閱讀變更…</span>
+                <span className="explain-loading-text">{t.chat.loading}</span>
               </div>
             )}
             <div ref={chatEnd} />
@@ -841,7 +829,7 @@ export function ExplanationPanel({
             disabled={Boolean(file.blocked)}
           >
             <MessageCircle size={15} />
-            針對這份變更追問
+            {t.panel.askAboutChange}
             <ArrowRight size={15} />
           </button>
         </div>
@@ -855,11 +843,9 @@ export function ExplanationPanel({
             }}
           >
             <textarea
-              aria-label="向 Agent 提問"
+              aria-label={t.chat.inputLabel}
               placeholder={
-                file.blocked
-                  ? "此檔案目前無法提供解說"
-                  : "想更深入了解哪個部分？"
+                file.blocked ? t.chat.placeholderBlocked : t.chat.placeholder
               }
               value={question}
               disabled={Boolean(file.blocked)}
@@ -880,11 +866,11 @@ export function ExplanationPanel({
             <div className="explain-input-bottom">
               <span>
                 <FileCode2 size={12} />
-                {file.blocked ? "無法附上檔案上下文" : "已附上檔案 diff"}
+                {file.blocked ? t.chat.contextBlocked : t.chat.contextAttached}
               </span>
               <button
                 type="submit"
-                aria-label="送出問題"
+                aria-label={t.chat.send}
                 disabled={!question.trim() || loading || Boolean(file.blocked)}
               >
                 <ArrowUp size={16} />
@@ -892,9 +878,7 @@ export function ExplanationPanel({
             </div>
           </form>
           <p className="explain-disclaimer">
-            {demo
-              ? "示範回覆為預寫內容，未呼叫 AI 模型"
-              : "Enter 送出 · Shift + Enter 換行"}
+            {demo ? t.chat.disclaimerDemo : t.chat.disclaimerLive}
           </p>
         </div>
       )}

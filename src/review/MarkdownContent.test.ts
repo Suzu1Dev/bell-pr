@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { MarkdownContent } from "./MarkdownContent";
 
 const render = (children: string) =>
-  renderToStaticMarkup(createElement(MarkdownContent, { children }));
+  renderZh(createElement(MarkdownContent, { children }));
 
 test("learning content renders paragraphs, GFM lists/tables, and code as readable HTML", () => {
   const html = render(
@@ -33,4 +33,17 @@ test("untrusted Markdown cannot execute HTML, load images, or link to non-web sc
     html,
     /href="https:\/\/example.com\/source" target="_blank" rel="noopener noreferrer"/,
   );
+});
+
+test("the renderer's own text follows the UI language", () => {
+  const html = renderEn(
+    createElement(MarkdownContent, {
+      children:
+        "![diagram](https://tracker.example/pixel) ![](https://tracker.example/x)\n\n| Item | State |\n| --- | --- |\n| Tests | Pending |",
+    }),
+  );
+  assertNoHan(html);
+  assert.match(html, /Image omitted: diagram/);
+  assert.match(html, /Image omitted<\/span>/);
+  assert.match(html, /role="region" aria-label="Explanation table"/);
 });

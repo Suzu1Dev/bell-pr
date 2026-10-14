@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useT } from "../i18n";
 
 function safeLink(value: string) {
   try {
@@ -13,6 +14,7 @@ function safeLink(value: string) {
 }
 
 export function MarkdownContent({ children }: { children: string }) {
+  const t = useT("review");
   return (
     <div className="markdown-content">
       <ReactMarkdown
@@ -30,7 +32,9 @@ export function MarkdownContent({ children }: { children: string }) {
             ),
           img: ({ alt }) => (
             <span className="markdown-image-note">
-              圖片已省略{alt ? `：${alt}` : ""}
+              {alt
+                ? t.markdown.imageOmittedWithAlt({ alt })
+                : t.markdown.imageOmitted}
             </span>
           ),
           h1: ({ children }) => <h4>{children}</h4>,
@@ -44,7 +48,7 @@ export function MarkdownContent({ children }: { children: string }) {
               className="markdown-table-scroll"
               tabIndex={0}
               role="region"
-              aria-label="解說表格"
+              aria-label={t.markdown.tableLabel}
             >
               <table>{children}</table>
             </div>

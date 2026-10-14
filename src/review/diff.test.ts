@@ -7,7 +7,13 @@ import {
   selectionQuestion,
   splitDiff,
 } from "./diff";
-import { demoFiles } from "../demo";
+import { getDemo } from "../demo";
+import en from "../i18n/en";
+import zhTW from "../i18n/zh-TW";
+import { assertNoHan } from "../test-utils/render";
+
+// These tests pin zh-TW, the language their assertions were written in.
+const demoFiles = getDemo("zh-TW").files;
 
 test("unified diff preserves independent old and new line offsets across hunks", () => {
   const lines = parseDiff(
@@ -62,7 +68,11 @@ test("selection questions preserve old/new references and fit the chat API limit
   const lines = parseDiff(
     `@@ -8,2 +12,2 @@\n context\n-old\n+${"a".repeat(9000)}\n`,
   ).filter((line) => line.kind !== "hunk");
-  const question = selectionQuestion("src/example.ts", lines);
+  const question = selectionQuestion(
+    "src/example.ts",
+    lines,
+    zhTW.review.selection,
+  );
   assert.ok(question.length <= 8000);
   assert.match(question, /內容已節錄/);
   assert.match(question, /原有 舊 L8／新 L12: context/);
@@ -107,4 +117,28 @@ test("language badges stay within three characters and keep JSON apart from Java
   // server/git.ts returns the raw extension for languages it does not name.
   assert.equal(languageBadge("toml"), "TO");
   assert.equal(languageBadge(""), "");
+});
+
+test("selection questions are written in the UI language", () => {
+  const lines = parseDiff(
+    `@@ -8,2 +12,2 @@\n context\n-old\n+${"a".repeat(9000)}\n`,
+  ).filter((line) => line.kind !== "hunk");
+  const question = selectionQuestion("src/example.ts", lines, en.review.selection);
+  assertNoHan(question);
+  assert.ok(question.length <= 8000);
+  assert.match(
+    question,
+    /^Explain the 3 selected lines of code in src\/example\.ts in plain language/,
+  );
+  assert.match(question, /\[Excerpt\]/);
+  assert.match(question, /Unchanged, old L8 \/ new L12: context/);
+  assert.match(question, /Removed, old L9: old/);
+  assert.match(question, /Added, new L13: a/);
+  const single = selectionQuestion(
+    "src/example.ts",
+    lines.slice(0, 1),
+    en.review.selection,
+  );
+  assert.match(single, /^Explain the selected line of code in src\/example\.ts/);
+  assert.doesNotMatch(single, /\[Excerpt\]/);
 });
