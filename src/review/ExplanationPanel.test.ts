@@ -1,18 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { demoFiles, demoRun } from "../demo";
+import type { ChangeExplanation } from "../../shared/explanations";
+import { product } from "../../shared/product";
+import { getDemo } from "../demo";
+import en from "../i18n/en";
+import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { ChatMessage, DiffFile } from "../types";
 import {
   ExplanationPanel,
   ReviewReports,
   moduleFor,
   reportMentionCount,
+  type ExplanationPanelProps,
 } from "./ExplanationPanel";
 
+// These tests pin zh-TW, the language their assertions were written in.
+const { files: demoFiles, run: demoRun } = getDemo("zh-TW");
+
 const render = (file: DiffFile) =>
-  renderToStaticMarkup(
+  renderZh(
     createElement(ExplanationPanel, {
       file,
       messages: [],
@@ -48,7 +55,7 @@ test("test files get a reading hint and extra presets while source files keep th
   assert.match(html, /測試就是行為規格：先讀 it\/test 描述/);
   assert.doesNotMatch(render(demoFiles[0]), /測試就是行為規格/);
   const chat = (file: DiffFile) =>
-    renderToStaticMarkup(
+    renderZh(
       createElement(ExplanationPanel, {
         file,
         messages: [],
@@ -82,7 +89,7 @@ test("maintainer thread comments add the response preset and a read-only section
       createdAt: "2026-10-07T00:00:00Z",
     },
   ];
-  const chat = renderToStaticMarkup(
+  const chat = renderZh(
     createElement(ExplanationPanel, {
       file: demoFiles[0],
       messages: [],
@@ -95,7 +102,7 @@ test("maintainer thread comments add the response preset and a read-only section
   );
   assert.match(chat, /維護者這個意見對應 diff 哪幾行？有哪些回應方式與取捨？/);
   assert.doesNotMatch(
-    renderToStaticMarkup(
+    renderZh(
       createElement(ExplanationPanel, {
         file: demoFiles[0],
         messages: [],
@@ -108,7 +115,7 @@ test("maintainer thread comments add the response preset and a read-only section
     ),
     /維護者這個意見/,
   );
-  const reports = renderToStaticMarkup(
+  const reports = renderZh(
     createElement(ReviewReports, { file: demoFiles[0], reports: {}, demo: false, feedback }),
   );
   assert.match(reports, /維護者對此檔的留言/);
@@ -120,7 +127,7 @@ test("maintainer thread comments add the response preset and a read-only section
 });
 
 test("saved answers about an older diff are marked instead of dropped", () => {
-  const html = renderToStaticMarkup(
+  const html = renderZh(
     createElement(ExplanationPanel, {
       file: { ...demoFiles[0], fingerprint: "new" },
       messages: [
@@ -142,7 +149,7 @@ test("saved answers about an older diff are marked instead of dropped", () => {
 
 test("the reports tab renders demo reports with the static-review label and per-file mention counts", () => {
   assert.ok(demoRun.reports?.reviewer, "demo fixture must carry reports");
-  const html = renderToStaticMarkup(
+  const html = renderZh(
     createElement(ReviewReports, {
       file: demoFiles[0],
       reports: demoRun.reports,
@@ -168,7 +175,7 @@ test("the reports tab renders demo reports with the static-review label and per-
       html.indexOf("<code>tests/retry.test.ts</code>"),
   );
   assert.doesNotMatch(
-    renderToStaticMarkup(
+    renderZh(
       createElement(ReviewReports, {
         file: demoFiles[0],
         reports: { implementer: "No order section." },
@@ -178,7 +185,7 @@ test("the reports tab renders demo reports with the static-review label and per-
     /建議的閱讀順序/,
   );
   // Non-report keys stay hidden even when present.
-  const extra = renderToStaticMarkup(
+  const extra = renderZh(
     createElement(ReviewReports, {
       file: { ...demoFiles[0], path: "docs/none.md" },
       reports: { ...demoRun.reports, guide: "導師回答", alpha: "{}" },
@@ -187,7 +194,7 @@ test("the reports tab renders demo reports with the static-review label and per-
   );
   assert.doesNotMatch(extra, /導師回答/);
   assert.equal(extra.match(/此報告未直接提到本檔/g)?.length, 3);
-  const empty = renderToStaticMarkup(
+  const empty = renderZh(
     createElement(ReviewReports, { file: demoFiles[0], reports: {}, demo: false }),
   );
   assert.match(empty, /這次工作還沒有審查報告/);
@@ -238,7 +245,7 @@ test("the module line uses the longest matching module path and stays hidden wit
   // "src" must not match "srcfoo/x.ts": prefixes are whole path segments.
   assert.equal(moduleFor("srcfoo/x.ts", modules), undefined);
   assert.equal(moduleFor("README.md", modules), undefined);
-  const html = renderToStaticMarkup(
+  const html = renderZh(
     createElement(ExplanationPanel, {
       file: demoFiles[1],
       messages: [],
@@ -255,7 +262,7 @@ test("the module line uses the longest matching module path and stays hidden wit
 test("the note editor renders with the saved text and flags a note written for an older diff", () => {
   const file = { ...demoFiles[0], fingerprint: "b".repeat(64) };
   const withNote = (fingerprint: string) =>
-    renderToStaticMarkup(
+    renderZh(
       createElement(ExplanationPanel, {
         file,
         messages: [],
@@ -292,7 +299,7 @@ test("a blocked file explains why no explanation is available", () => {
 
 test("the reports tab offers a re-review button for real runs only and shows the busy state", () => {
   const render = (props: Record<string, unknown>) =>
-    renderToStaticMarkup(
+    renderZh(
       createElement(ReviewReports, {
         file: demoFiles[0],
         reports: demoRun.reports,
@@ -315,7 +322,7 @@ test("the reports tab offers a re-review button for real runs only and shows the
 
 test("a failed chat turn is recognised by its flag, not by its text", () => {
   const chat = (answer: ChatMessage) =>
-    renderToStaticMarkup(
+    renderZh(
       createElement(ExplanationPanel, {
         file: demoFiles[0],
         messages: [{ role: "user", content: "為什麼要這樣改？" }, answer],
@@ -342,3 +349,311 @@ test("a failed chat turn is recognised by its flag, not by its text", () => {
   assert.match(unflagged, /<\/span>學習助手<\/div>/);
   assert.match(unflagged, /這次未能取得回答：Agent 逾時/);
 });
+
+// English renders. The English demo is a copy of the zh-TW one until its own
+// words land (2F), so these tests keep its files and diffs but put neutral
+// English text where the demo's explanations and reports would go: what they
+// check is the panel's own text.
+const englishDemo = getDemo("en");
+const englishExplanation: ChangeExplanation = {
+  summary: "Failed requests now wait a little longer before each retry.",
+  reason: "Spreading retries out keeps a busy server from being flooded again.",
+  concept:
+    "Exponential backoff\nEach wait limit doubles, and full jitter picks a random time below it.",
+  tip: "Not every error is worth retrying; let the caller decide.",
+  example: {
+    scenario: "Many people refresh the timetable at the same moment.",
+    before: "Every client waits **1 second** and retries together.",
+    after: "Each client waits a random time, so the retries spread out.",
+  },
+  alternatives: "A fixed interval with jitter is simpler but less spread out.",
+  lookup: ["exponential backoff", "full jitter"],
+  selfCheck: {
+    question: "How long can the third retry wait at most?",
+    answer: "Up to 4 seconds, but jitter usually makes it shorter.",
+  },
+};
+const englishFile = (path: string): DiffFile => ({
+  ...(englishDemo.files.find((file) => file.path === path) ??
+    englishDemo.files[0]),
+  path,
+  explanation: englishExplanation,
+});
+const englishReports = {
+  implementer:
+    "Integrated the retry change in src/utils/retry.ts.\n\nSuggested review order:\n1. `src/types.ts`: the new options.\n2. src/utils/retry.ts: the backoff itself.",
+  reviewer: "**Correctness**: src/utils/retry.ts handles the last attempt.",
+  tester: "Run the retry tests with fake timers.",
+};
+const englishFeedback = [
+  {
+    kind: "thread" as const,
+    author: "maintainer",
+    authorAssociation: "MEMBER",
+    body: "Please use a named constant here.",
+    path: "src/utils/retry.ts",
+    line: 4,
+    isResolved: true,
+    url: "https://github.com/o/r/pull/1#discussion_r1",
+    createdAt: "2026-10-07T00:00:00Z",
+  },
+];
+const renderPanel = (props: Partial<ExplanationPanelProps> = {}) =>
+  renderEn(
+    createElement(ExplanationPanel, {
+      file: englishFile("src/utils/retry.ts"),
+      messages: [],
+      loading: false,
+      onAsk() {},
+      demo: false,
+      ...props,
+    }),
+  );
+
+test("an English render of the explanation tab has no Han in its own text", () => {
+  const modules = [{ path: "src/utils", purpose: "Shared helpers" }];
+  const note = {
+    text: "Retries now back off.",
+    fingerprint: "a".repeat(64),
+    updatedAt: "2026-01-02T12:00:00.000Z",
+  };
+  for (const demo of [false, true]) {
+    const html = renderPanel({ demo, modules, note, onSaveNote() {} });
+    assertNoHan(html);
+    for (const text of [
+      'aria-label="Code learning assistant"',
+      "Understand every change",
+      "A plain-language example",
+      "Picture this",
+      "What changed here?",
+      "Why was it changed this way?",
+      "A development idea to take with you",
+      "Think one step further while reviewing",
+      "What if it were done differently?",
+      "Look up:",
+      "Quiz yourself",
+      "Show answer",
+      "My understanding",
+      "Ask about this change",
+    ])
+      assert.ok(html.includes(text), text);
+    assert.match(html, /Module <code>src\/utils<\/code>: Shared helpers/);
+    assert.match(html, demo ? /Sample explanation/ : /from this diff/);
+  }
+  const saved = renderPanel({
+    file: { ...englishFile("src/utils/retry.ts"), fingerprint: "a".repeat(64) },
+    note,
+    onSaveNote() {},
+  });
+  // The saved time is formatted for English, not as a zh-TW date.
+  assert.match(saved, /Saved · Jan \d, 2026, \d{1,2}:\d{2}\s[AP]M/);
+  const stale = renderPanel({
+    file: { ...englishFile("src/utils/retry.ts"), fingerprint: "b".repeat(64) },
+    note,
+    onSaveNote() {},
+  });
+  assertNoHan(stale);
+  assert.match(stale, /Diff updated/);
+  assert.match(stale, /written for an earlier version of the diff/);
+  const testFile = renderPanel({ file: englishFile("tests/retry.test.ts") });
+  assertNoHan(testFile);
+  assert.match(testFile, /Tests are behavior specs/);
+});
+
+test("every explanation state renders English text without Han", () => {
+  const file = englishFile("src/utils/retry.ts");
+  const withoutExample = {
+    ...file,
+    explanation: { ...englishExplanation, example: undefined },
+  };
+  const states: [Partial<ExplanationPanelProps>, RegExp][] = [
+    [{ file: { ...file, blocked: "The file is too large." } }, /can&#x27;t be explained/],
+    [
+      { file: { ...file, explanation: undefined, explanationStatus: "unavailable" } },
+      /no text diff to explain/,
+    ],
+    [
+      {
+        file: { ...withoutExample, explanationStatus: "failed" },
+        onRetryExplanation() {},
+      },
+      /example isn&#x27;t ready yet[\s\S]*Prepare the example again/,
+    ],
+    [
+      {
+        file: { ...withoutExample, explanationStatus: "failed" },
+        onRetryExplanation() {},
+        explanationBusy: true,
+      },
+      /Preparing other explanations…/,
+    ],
+    [
+      { file: { ...withoutExample, explanationStatus: "generating" } },
+      /Adding a plain-language example/,
+    ],
+    [
+      {
+        file: { ...file, explanation: undefined, explanationStatus: "failed" },
+        onRetryExplanation() {},
+      },
+      /explanation isn&#x27;t ready yet[\s\S]*Prepare the explanation again/,
+    ],
+    [
+      { file: { ...file, explanation: undefined, explanationStatus: "generating" } },
+      /Turning the change into plain language/,
+    ],
+    [
+      { file: { ...file, explanation: undefined, explanationStatus: "pending" } },
+      /ready automatically[\s\S]*Quiz yourself/,
+    ],
+  ];
+  for (const [props, expected] of states) {
+    const html = renderPanel(props);
+    assertNoHan(html);
+    assert.match(html, expected);
+  }
+});
+
+test("an English render of the reports tab has no Han in its own text", () => {
+  const file = englishFile("src/utils/retry.ts");
+  for (const demo of [false, true]) {
+    const html = renderEn(
+      createElement(ReviewReports, {
+        file,
+        reports: englishReports,
+        demo,
+        feedback: englishFeedback,
+        onRerunReview() {},
+      }),
+    );
+    assertNoHan(html);
+    for (const text of [
+      "Maintainer comments on this file",
+      "1 comment",
+      "From GitHub, read-only",
+      `${product.name} never comments for you`,
+      "Line 4",
+      "Resolved",
+      "Lead&#x27;s integration summary",
+      "Atlas · Team lead",
+      "Code review",
+      "Test analysis",
+      "Independent static review, not an execution result",
+      "Mentions this file in 1 paragraph<",
+      "This report doesn&#x27;t mention this file directly",
+    ])
+      assert.ok(html.includes(text), text);
+    // The Lead's order is found through the untranslated anchor.
+    assert.match(html, /Reading order suggested by the Lead/);
+    assert.match(html, /<li aria-current="true"><code>src\/utils\/retry\.ts<\/code>/);
+    assert.match(html, demo ? /Sample reports/ : /The team&#x27;s full reports/);
+    assert.equal(html.includes("Run the review again"), !demo);
+  }
+  const busy = renderEn(
+    createElement(ReviewReports, {
+      file,
+      reports: {},
+      demo: false,
+      onRerunReview() {},
+      reviewBusy: true,
+    }),
+  );
+  assertNoHan(busy);
+  assert.match(busy, /No review reports for this run yet/);
+  assert.match(busy, /Running the review again…/);
+});
+
+test("an English render of the chat tab has no Han in its own text", () => {
+  const welcome = renderPanel({
+    file: englishFile("tests/retry.test.ts"),
+    chatRequestId: 1,
+    feedback: englishFeedback,
+  });
+  assertNoHan(welcome);
+  for (const preset of Object.values(en.review.presets))
+    assert.ok(welcome.includes(preset.replace(/'/g, "&#x27;")), preset);
+  assert.match(welcome, /Take your understanding further/);
+  assert.match(welcome, /aria-label="Question for the agent"/);
+  assert.match(welcome, /Enter to send · Shift \+ Enter for a new line/);
+  const file = { ...englishFile("src/utils/retry.ts"), fingerprint: "new" };
+  const messages: ChatMessage[] = [
+    { role: "user", content: "Why the jitter?", fingerprint: "old" },
+    { role: "assistant", content: "It spreads retries.", fingerprint: "old" },
+    { role: "user", content: "And the cap?" },
+    { role: "assistant", content: "This turn failed: timeout", failed: true },
+  ];
+  for (const demo of [false, true]) {
+    const html = renderPanel({ file, messages, loading: true, demo, chatRequestId: 1 });
+    assertNoHan(html);
+    assert.match(html, />You</);
+    assert.match(html, /<\/span>Learning assistant/);
+    assert.match(html, /<\/span>Answer failed/);
+    assert.equal(html.match(/About an earlier version/g)?.length, 2);
+    assert.match(html, /Reading the change…/);
+    assert.match(html, demo ? /no AI model is called/ : /Enter to send/);
+  }
+  const blocked = renderPanel({
+    file: { ...file, blocked: "The file is too large." },
+    chatRequestId: 1,
+  });
+  assertNoHan(blocked);
+  assert.match(blocked, /No explanation is available for this file right now/);
+  assert.match(blocked, /File context can&#x27;t be attached/);
+});
+
+test("every English review message is free of Han for any count", () => {
+  const texts: string[] = [];
+  const visit = (value: unknown) => {
+    if (typeof value === "string") texts.push(value);
+    else if (typeof value === "function")
+      for (const count of [1, 2])
+        texts.push(
+          (value as (params: unknown) => string)(
+            new Proxy({}, { get: () => count }),
+          ),
+        );
+    else if (value && typeof value === "object")
+      Object.values(value).forEach(visit);
+  };
+  visit(en.review);
+  assert.ok(texts.length > 100);
+  for (const text of texts) assertNoHan(text);
+});
+
+// The demo's own words are English once 2F replaces the placeholder; the
+// wave-2 merge runs this test with that demo.
+const englishDemoReady = englishDemo !== getDemo("zh-TW");
+
+test(
+  "an English render of the demo has no Han",
+  { skip: !englishDemoReady && "the English demo is still the zh-TW placeholder" },
+  () => {
+    for (const file of englishDemo.files) {
+      for (const chatRequestId of [0, 1])
+        assertNoHan(
+          renderEn(
+            createElement(ExplanationPanel, {
+              file,
+              messages: [],
+              loading: false,
+              onAsk() {},
+              demo: true,
+              chatRequestId,
+            }),
+          ),
+        );
+      assertNoHan(
+        renderEn(
+          createElement(ReviewReports, {
+            file,
+            reports: englishDemo.run.reports,
+            demo: true,
+            feedback: englishDemo.prFeedback?.items.filter(
+              (item) => item.path === file.path,
+            ),
+          }),
+        ),
+      );
+    }
+  },
+);
