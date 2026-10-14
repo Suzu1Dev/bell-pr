@@ -27,7 +27,8 @@ assistance only when the project's rules require a disclosure (the draft's
 checklist then quotes the rule) or when you turn the AI-assistance note on,
 for one draft or for all of them under **Settings → Agent safety**. Some
 projects do not accept AI-assisted contributions at all; read their rules
-before you start. Discovery leaves out projects that say so.
+before you start. Discovery tells its agent to leave out projects that say
+so.
 
 ## AI providers and costs
 
@@ -82,12 +83,13 @@ Agents run the imported project's code, its tests and build scripts, on
 your computer, so import only projects you are willing to run. BELL PR
 limits what they can do: agents that write code run in their CLI's
 operating-system sandbox, which keeps their writes in the run's working
-copy and closes the network; every agent is denied your SSH keys, the
-GitHub CLI's sign-in and BELL PR's own data; and the project's own agent
-instructions and settings are never loaded. Codex's sandbox does not limit
-reading. If you allow unsandboxed Claude Code agents, they have your full
-user rights, and those runs are marked. The [security model](security-model.md)
-explains every protection and its limits.
+copy and closes the network; Claude Code agents are also denied your SSH
+keys, the GitHub CLI's sign-in and BELL PR's own data, while Codex's
+sandbox does not limit reading; and the project's own agent instructions
+and settings are never loaded. If you allow unsandboxed Claude Code
+agents, they have your full user rights, and those runs are marked. The
+[security model](security-model.md) explains every protection and its
+limits.
 
 ### Why do I need a sign-in link for a program on my own computer?
 

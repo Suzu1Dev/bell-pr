@@ -228,8 +228,9 @@ policy in [PRIVACY.md](PRIVACY.md).
 
 - **Sandboxed agents.** Agents that write code run in their CLI's
   operating-system sandbox: writes stay in the run's own worktree and the
-  network is closed. Every agent is denied your SSH keys, the GitHub CLI's
-  sign-in and BELL PR's own data. Codex's sandbox does not limit reading.
+  network is closed. Claude Code agents are also denied your SSH keys, the
+  GitHub CLI's sign-in and BELL PR's own data; Codex's sandbox does not
+  limit reading.
 - **Imported projects are untrusted.** Their code, documents and agent
   instructions (`AGENTS.md`, `CLAUDE.md`, `.claude/`) are treated as data:
   the CLIs never load the project's own settings, hooks or instructions,
