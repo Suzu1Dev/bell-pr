@@ -1,6 +1,81 @@
 import type { Translation } from "../../../shared/i18n/locale";
+import plans from "../../../shared/i18n/plans.zh-TW";
+import { product } from "../../../shared/product";
 import type en from "../en/license";
 
-const m: Translation<typeof en> = {};
+const m: Translation<typeof en> = {
+  plans,
+  badge: { text: "PRO", label: "Pro 功能" },
+  chip: {
+    free: "免費",
+    pro: "PRO",
+    trial: ({ days }) => `試用 · ${days} 天`,
+    beta: "BETA",
+  },
+  chipLabel: {
+    free: "免費方案",
+    pro: "Pro 方案",
+    trial: ({ days }) => `Pro 試用，剩 ${days} 天`,
+    beta: "測試版",
+  },
+  upgrade: {
+    title: "升級到 Pro",
+    featureLocked: ({ feature }) => `「${feature}」屬於 Pro 功能。`,
+    general: "Pro 提供更大的平行 Agent 團隊、探索貢獻等更多功能。",
+    proList: "Pro 提供的功能",
+    thisFeature: "你剛才使用的功能",
+    startTrial: "開始 14 天試用",
+    trialHint: "試用免費，只在你選擇時開始；每個資料目錄可試用一次。",
+    enterKey: "輸入授權金鑰",
+    buy: "購買 Pro",
+    purchasingSoon: "即將開放購買。",
+    seePricing: "查看價格",
+    useFreeSettings: "改用免費方案的設定",
+    freeSettingsHint: "關閉網路存取，並把 xhigh、max 或 ultra 思考強度改回「模型預設」。",
+    freeSettingsApplied: "已儲存免費方案的設定，請再試一次；其他設定沒有變動。",
+    trialStarted: ({ days }) => `Pro 試用已開始，剩 ${days} 天。請再試一次。`,
+    activated: "Pro 已生效，請再試一次。",
+    notNow: "暫時不要",
+    close: "關閉",
+    envLocked: "授權金鑰由環境變數 BELLPR_LICENSE_KEY 設定，只能在那裡變更。",
+  },
+  key: {
+    label: "授權金鑰",
+    placeholder: "BELLPR1.…",
+    help: "請貼上購買信件中的完整金鑰，換行不影響。",
+    activate: "啟用",
+    activating: "啟用中…",
+  },
+  card: {
+    title: "授權",
+    checking: "正在確認授權…",
+    status: {
+      pro: "Pro 已生效。",
+      grace: ({ date }) => `授權已到期；Pro 會保留到 ${date}。請續購以繼續使用 Pro。`,
+      trial: ({ days }) => `Pro 試用：剩 ${days} 天。`,
+    },
+    reasons: {
+      no_license: "免費方案。目前沒有生效的授權金鑰。",
+      expired: "免費方案。授權金鑰已到期。",
+      trial_ended: "免費方案。14 天 Pro 試用已結束。",
+      updates_expired: `免費方案。授權金鑰不涵蓋這個版本的 ${product.name}：請使用較早的版本，或續購授權。`,
+      invalid: "免費方案。授權金鑰對這個版本無效。",
+    },
+    licenseId: "授權 ID",
+    licensee: "授權給",
+    expires: "到期",
+    never: "永久有效",
+    updatesUntil: "更新期限",
+    updatesHint: "在這個日期以前發布的版本都接受這組金鑰。",
+    setByEnvironment: "由環境變數設定",
+    envHint: `金鑰來自環境變數 BELLPR_LICENSE_KEY。請在那裡變更，再重新啟動 ${product.name}。`,
+    remove: "移除授權金鑰",
+    removeConfirm: "要從這個資料目錄移除金鑰嗎？之後可以再輸入。",
+    removeYes: "移除",
+    cancel: "取消",
+    startTrial: "開始 14 天試用",
+    buy: "購買 Pro",
+  },
+};
 
 export default m;
