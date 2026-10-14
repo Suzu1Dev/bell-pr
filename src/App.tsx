@@ -73,6 +73,7 @@ import {
 } from "../shared/followups";
 import { FollowUpRounds } from "./draft/FollowUpRounds";
 import { SyncPanel } from "./draft/SyncPanel";
+import { PremiseNotice } from "./team/PremiseNotice";
 
 /** The draft checks bring a Markdown parser, so they load beside the first screen. */
 type DraftChecks = typeof import("../shared/draft-checks");
@@ -2340,6 +2341,11 @@ export default function App() {
                 id="workspace-panel"
                 aria-labelledby={`workspace-tab-${tab}`}
               >
+                {tab === "overview" && !demo && (
+                  <div className="premise-overview">
+                    <PremiseNotice premise={run.team?.premise} />
+                  </div>
+                )}
                 {tab === "overview" && currentRepo && (
                   <ProjectOverview
                     repo={currentRepo}
@@ -2583,6 +2589,9 @@ export default function App() {
                           </div>
                         </div>
                       </div>
+                      {!demo && (
+                        <PremiseNotice premise={run.team?.premise} compact />
+                      )}
                       {editable && run.worktreePath && (
                         <div className="worktree-hint">
                           <FolderGit2 size={14} />

@@ -25,6 +25,7 @@ import {
 } from "../../shared/team";
 import type { Run } from "../types";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
+import { PremiseNotice } from "./PremiseNotice";
 import { ModelSummary } from "../models/ModelSummary";
 import { providerLabels } from "../../shared/models";
 import "./team.css";
@@ -184,6 +185,7 @@ export function TeamBoard({
               ? "Lead 正依你的意見重新規劃。"
               : "正在閱讀專案並建立有明確範圍與相依關係的計畫。")}
         </p>
+        <PremiseNotice premise={team.premise} />
         {revisions.length > 0 && (
           <ol className="team-plan-revisions" aria-label="計畫重擬紀錄">
             {revisions.map((revision, index) => (

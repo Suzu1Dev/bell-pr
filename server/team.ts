@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { AppError, type DiffFile } from "./types.js";
 import { safeRelativePath, sensitivePath } from "./git.js";
-import type { AgentTeam, TeamTask } from "../shared/team.js";
+import type { AgentTeam, PremiseCheck, TeamTask } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import type { ModelExecution } from "../shared/models.js";
 
@@ -59,7 +59,21 @@ const planSchema = z.object({
   tasks: z.array(taskSchema).min(1).max(8),
   /** Lead's explanation of what changed after the person sent a plan back; null/absent on a first plan. */
   revisionNotes: z.string().trim().max(4000).nullish(),
+  // Read by premiseCheck; a malformed check never costs the whole plan.
+  premise: z.unknown().optional(),
 });
+
+const premiseSchema = z.object({
+  verdict: z.enum(["holds", "refuted", "unclear"]),
+  statement: z.string().trim().min(1).max(1_000),
+  evidence: z.string().trim().max(3_000),
+});
+
+/** The lead's premise check, or undefined when there is none or it is malformed. */
+function premiseCheck(value: unknown): PremiseCheck | undefined {
+  const result = premiseSchema.safeParse(value);
+  return result.success ? result.data : undefined;
+}
 
 /**
  * Hand-written JSON Schemas for the CLIs' structured output (Codex
@@ -72,6 +86,21 @@ export const teamPlanJsonSchema = {
   properties: {
     summary: { type: "string" },
     revisionNotes: { type: ["string", "null"] },
+    premise: {
+      anyOf: [
+        {
+          type: "object",
+          properties: {
+            verdict: { type: "string", enum: ["holds", "refuted", "unclear"] },
+            statement: { type: "string" },
+            evidence: { type: "string" },
+          },
+          required: ["verdict", "statement", "evidence"],
+          additionalProperties: false,
+        },
+        { type: "null" },
+      ],
+    },
     tasks: {
       type: "array",
       items: {
@@ -88,7 +117,7 @@ export const teamPlanJsonSchema = {
       },
     },
   },
-  required: ["summary", "revisionNotes", "tasks"],
+  required: ["summary", "revisionNotes", "premise", "tasks"],
   additionalProperties: false,
 };
 
@@ -305,6 +334,7 @@ export function parseTeamPlan(answer: string, maxTeammates: number) {
   return {
     summary: parsed.summary,
     revisionNotes: parsed.revisionNotes || undefined,
+    premise: premiseCheck(parsed.premise),
     tasks: parsed.tasks.map((task, index): TeamTask => ({
       ...task,
       files: [...new Set(task.files)],

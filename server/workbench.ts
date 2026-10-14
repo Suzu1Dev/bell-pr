@@ -1578,6 +1578,7 @@ export class Workbench {
       run.agents = run.agents.filter((agent) => !/^member-/.test(agent.id));
       team.tasks = [];
       team.planSummary = "";
+      delete team.premise;
       team.phase = "planning";
       run.status = "queued";
       this.log(
@@ -1683,7 +1684,8 @@ export class Workbench {
   /** The request plus the five intent fields; runtime settings (provider, model, team size) stay out of prompts. */
   private contributionContext(run: Run) {
     const intent = contributionIntentText(run.contributionSettings);
-    return `User request:\n${run.prompt}${intent ? `\nContribution intent (user-defined; empty fields omitted):\n${intent}` : ""}`;
+    const premise = run.team?.premise;
+    return `User request:\n${run.prompt}${intent ? `\nContribution intent (user-defined; empty fields omitted):\n${intent}` : ""}${premise ? `\nPremise check by the lead, made by reading the repository before planning (an agent's finding with citations; treat a refuted or unclear assumption in the request accordingly instead of repeating it as open):\n${JSON.stringify(premise)}` : ""}`;
   }
 
   /**
@@ -1978,7 +1980,7 @@ export class Workbench {
         const plan = await this.runAgent(
           run,
           "lead",
-          `${boundaries}\nYou are the team lead with read-only access. Inspect this project's purpose, users, architecture and contribution guidance. Identify the user's motivation, desired user impact, and a small verifiable implementation plan. If the request already states the problem, impact, approach and acceptance criteria, do not reinvent the direction: plan how to deliver it. Create 1 to 8 tasks with concrete owned file paths or directory prefixes ending in '/'. No wildcards or root-wide scopes. Group tasks by disjoint files so independent work can run concurrently (maximum ${team.config.maxTeammates} teammates). Use dependencies for work requiring another task's output. Dependencies must form an acyclic graph. Shared files should be assigned to one task where possible. Do not modify files or execute project code. Return the plan object: summary states, in Traditional Chinese, the project purpose, the contribution problem, the expected user impact, the validation strategy and the overall design tradeoffs (alternatives considered and why this decomposition); revisionNotes is null unless a previous plan is being revised; each task has an id made of lowercase letters, digits and hyphens that starts with a letter, is at most 64 characters and unique across the plan (BELL normalises ids that deviate), a title, a description with implementation and validation requirements, its owned files and the ids it dependsOn.\n${this.contributionContext(run)}${revisionContext}`,
+          `${boundaries}\nYou are the team lead with read-only access. Inspect this project's purpose, users, architecture and contribution guidance. Identify the user's motivation, desired user impact, and a small verifiable implementation plan. If the request already states the problem, impact, approach and acceptance criteria, do not reinvent the direction: plan how to deliver it. Create 1 to 8 tasks with concrete owned file paths or directory prefixes ending in '/'. No wildcards or root-wide scopes. Group tasks by disjoint files so independent work can run concurrently (maximum ${team.config.maxTeammates} teammates). Use dependencies for work requiring another task's output. Dependencies must form an acyclic graph. Shared files should be assigned to one task where possible. Do not modify files or execute project code. Return the plan object: summary states, in Traditional Chinese, the project purpose, the contribution problem, the expected user impact, the validation strategy and the overall design tradeoffs (alternatives considered and why this decomposition); revisionNotes is null unless a previous plan is being revised; premise checks the assumption, hypothesis or unverified claim the request states (often marked 假設 or 未驗證) by reading the repository before you plan: verdict holds when the code confirms it, refuted when the code contradicts it, unclear when you could not decide; statement restates the assumption and evidence cites what you read as path:line, both in Traditional Chinese; premise is null when the request states no such assumption, and when it is refuted plan only the work still worth doing and say so in the summary; each task has an id made of lowercase letters, digits and hyphens that starts with a letter, is at most 64 characters and unique across the plan (BELL normalises ids that deviate), a title, a description with implementation and validation requirements, its owned files and the ids it dependsOn.\n${this.contributionContext(run)}${revisionContext}`,
           signal,
           true,
           { outputSchema: planSchema },
@@ -1986,6 +1988,8 @@ export class Workbench {
         const parsed = parseTeamPlan(plan, team.config.maxTeammates);
         team.planSummary = parsed.summary;
         team.tasks = parsed.tasks;
+        if (parsed.premise) team.premise = parsed.premise;
+        else delete team.premise;
         if (revisions.length && parsed.revisionNotes)
           revisions[revisions.length - 1].revisionNotes = parsed.revisionNotes;
         const members = [...new Set(team.tasks.map((task) => task.owner))];
