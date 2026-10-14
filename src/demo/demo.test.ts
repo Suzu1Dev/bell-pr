@@ -13,6 +13,7 @@ import {
   demoInsights as missionInsights,
 } from "../mission/demo";
 import { demoTeam as boardTeam } from "../team/TeamBoard";
+import { assertNoHan } from "../test-utils/render";
 import type { DiffFile } from "../types";
 import { getSampleDiscoveryJob } from "./discovery";
 import {
@@ -386,6 +387,98 @@ test("every locale fills the Pro and video samples with the same ids and lengths
     };
   });
   for (const other of others) assert.deepEqual(other, reference);
+});
+
+test("the English demo contains no Han characters or CJK punctuation", () => {
+  const demo = getDemo("en");
+  assertNoHan(JSON.stringify(demo));
+  // The answers and the discovery message are functions, which JSON drops.
+  const files = [
+    ...demo.files,
+    { ...demo.files[0], path: "src/other.ts", explanation: undefined },
+  ];
+  for (const file of files)
+    for (const answer of demo.answers) assertNoHan(answer.text({ file }));
+  assertNoHan(JSON.stringify(getSampleDiscoveryJob("en")));
+});
+
+test("demoAnswer reads English questions with the English keyword tables", () => {
+  const file = getDemo("en").files[0];
+  const cases: [string, DemoAnswerTopic][] = [
+    ["what are the risks?", "risk"],
+    // The jitter table comes before the why table.
+    ["why exponential?", "jitter"],
+    ["How do I test this?", "test"],
+    ["Can I verify the waits?", "test"],
+    ["How can I confirm it works?", "test"],
+    ["What does Math.random do here?", "jitter"],
+    ["Is the backoff capped?", "jitter"],
+    ["Is this backward compatible?", "risk"],
+    ["Any caveats?", "risk"],
+    ["How could this be better?", "risk"],
+    ["Why this change?", "why"],
+    ["What is the reason for HttpError?", "why"],
+    ["What does this file do?", "generic"],
+    // Keywords match at the start of a word, so "latest" is not "test".
+    ["Is this the latest version?", "generic"],
+  ];
+  for (const [question, topic] of cases)
+    assert.equal(
+      demoAnswer(file, question, "en"),
+      answerText(topic, file, "en"),
+      question,
+    );
+});
+
+test("every English answer is labelled as a prewritten sample", () => {
+  const demo = getDemo("en");
+  const files = [
+    ...demo.files,
+    { ...demo.files[0], path: "src/other.ts", explanation: undefined },
+  ];
+  for (const file of files)
+    for (const answer of demo.answers)
+      assert.match(
+        answer.text({ file }),
+        /^Sample · prewritten, no AI call\.\n\n\S/,
+        `${file.path} ${answer.topic}`,
+      );
+  const bare = files[files.length - 1];
+  assert.match(
+    demoAnswer(bare, "what are the risks?", "en"),
+    /Start by checking this change's inputs, outputs and error handling\./,
+  );
+  assert.match(
+    demoAnswer(bare, "tell me more", "en"),
+    /src\/other\.ts\n\nThis file holds code changes from this task\./,
+  );
+});
+
+test("the demo marks its prewritten reports, logs and samples as samples", () => {
+  const markers: Record<Locale, { starts: RegExp; mentions: RegExp }> = {
+    en: { starts: /^Sample · /, mentions: /\bsample\b/i },
+    "zh-TW": { starts: /^示範 · /, mentions: /示範|範例/ },
+  };
+  for (const locale of locales) {
+    const { starts, mentions } = markers[locale];
+    const demo = getDemo(locale);
+    const reports = [
+      ...Object.values(demo.run.reports ?? {}),
+      ...Object.values(demo.rerunReport ?? {}),
+    ];
+    assert.equal(reports.length, 5, locale);
+    for (const report of reports) assert.match(report, starts, locale);
+    const mentioning = [
+      ...demo.run.agents.map((agent) => agent.detail ?? ""),
+      ...demo.run.logs.map((log) => log.message),
+      ...demo.team.tasks.map((task) => task.report ?? ""),
+      ...(demo.draftPreparation.context?.warnings ?? []),
+      ...(demo.prFeedback?.warnings ?? []),
+      ...getSampleDiscoveryJob(locale).warnings,
+      demo.publishedCard?.note ?? "",
+    ];
+    for (const text of mentioning) assert.match(text, mentions, `${locale}: ${text}`);
+  }
 });
 
 test("the Lead's report keeps the machine-read review order in every locale", () => {
