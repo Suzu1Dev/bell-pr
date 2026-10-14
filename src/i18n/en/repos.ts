@@ -47,8 +47,11 @@ const repos = {
     /** `example` is a path under the home directory, such as ~/projects/repository. */
     localPathHint: ({ example }: { example: string }) =>
       `Local Git projects work too: paste the path, such as ${example}`,
-    /** Shown to Windows browsers under localPathHint. */
-    wslPathHint: `On Windows, ${product.name} runs inside WSL2: use the path in your Linux distribution. A Windows folder is under /mnt/c/, for example /mnt/c/projects/repository.`,
+    /**
+     * Shown to Windows browsers under localPathHint. Worded as a condition:
+     * the server may also run in Docker or on another computer.
+     */
+    wslPathHint: `If ${product.name} runs inside WSL2 on this computer, use the path in your Linux distribution: a Windows folder is under /mnt/c/, for example /mnt/c/projects/repository.`,
     callout:
       "GitHub projects are downloaded to this computer; development then uses separate worktrees and leaves the original checkout as it is.",
     later: "Not now",

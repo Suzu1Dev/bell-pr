@@ -20,8 +20,10 @@ import type { Repo } from "../types";
 export const localPathExample = "~/projects/repository";
 
 /**
- * Whether the browser runs on Windows, where BELL PR runs inside WSL2 and
- * a local path is one in the Linux distribution.
+ * Whether the browser runs on Windows, where BELL PR usually runs inside
+ * WSL2 and a local path is one in the Linux distribution. The browser
+ * cannot tell (BELL PR may run in Docker or on another computer), so the
+ * hint it adds is worded as a condition.
  */
 export function isWindowsPlatform(platform: string): boolean {
   return /^Win/i.test(platform);

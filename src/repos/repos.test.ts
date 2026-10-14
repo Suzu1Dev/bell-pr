@@ -116,12 +116,12 @@ test("one path example for every computer, and the WSL2 hint for Windows browser
   assert.match(windows, /aria-describedby="repo-source-hint repo-source-wsl"/);
   assert.match(
     windows,
-    /<p class="field-help" id="repo-source-wsl">On Windows, BELL PR runs inside WSL2: use the path in your Linux distribution\. A Windows folder is under \/mnt\/c\/, for example \/mnt\/c\/projects\/repository\.<\/p>/,
+    /<p class="field-help" id="repo-source-wsl">If BELL PR runs inside WSL2 on this computer, use the path in your Linux distribution: a Windows folder is under \/mnt\/c\/, for example \/mnt\/c\/projects\/repository\.<\/p>/,
   );
   assertNoHan(windows);
   const zh = renderZh(createElement(ImportRepoModal, { ...props, platform: "Win32" }));
   assert.match(zh, /也支援本機 Git 專案：貼上路徑，例如 ~\/projects\/repository/);
-  assert.match(zh, /在 Windows 上，BELL PR 在 WSL2 中執行/);
+  assert.match(zh, /若 BELL PR 在這台電腦的 WSL2 中執行，請使用 Linux 發行版中的路徑/);
 });
 
 test("the sample is recognized by its name or its GitHub address", () => {

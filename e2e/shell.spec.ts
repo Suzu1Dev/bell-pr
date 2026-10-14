@@ -494,7 +494,7 @@ test("the import dialog suggests ~/projects/repository, which imports, and adds 
       await close();
     }
 
-    // A browser on Windows, where BELL PR runs inside WSL2.
+    // A browser on Windows, where BELL PR may run inside WSL2.
     const context = await browser.newContext({
       baseURL: server.baseURL,
       storageState: server.storageState,
