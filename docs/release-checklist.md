@@ -21,7 +21,7 @@ All run on Linux with Node.js 22. The CI matrix on GitHub (macOS, Node.js
 | `npm run lint` | passed: 0 errors, 57 warnings (the same count as before the release-candidate changes) |
 | `npm run build` (type-checks `scripts/` and `tools/` too) | passed |
 | `npm test` | passed: 1036 tests |
-| `npm run test:e2e` (`BELLPR_E2E_PORT=4561`) | passed: 184 tests, the screenshot set included |
+| `npm run test:e2e` (`BELLPR_E2E_PORT=4561`) | passed: 185 tests, the screenshot set included |
 | `node scripts/check-i18n.mjs` | passed: 246 files, nothing to translate |
 | `node scripts/check-personal-info.mjs`, `--pack`, `--self-test` | passed |
 | `node scripts/generate-third-party-notices.mjs --check` | passed: 79 bundled, 123 server packages |
@@ -224,7 +224,8 @@ inside its sandbox. The macOS canary is **OWNER**.
 - The command palette, the learning page and the task and model dialogs
   load on demand (startup chunk 106.3 kB to 97.8 kB gzip); the welcome
   screen has its own error boundary; the document title is left to the app
-  shell.
+  shell, and the start and Welcome screens carry the app's title in the
+  reader's language.
 - The license CLI uses the locale's colon; log files stop when the
   Workbench shuts down; a flaky store test is deterministic.
 - The real sandbox canary can run against a decoy home, check web access,
