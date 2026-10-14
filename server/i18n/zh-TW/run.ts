@@ -1,4 +1,5 @@
 import { formatters, type Translation } from "../../../shared/i18n/locale.js";
+import { product } from "../../../shared/product.js";
 import type en from "../en/run.js";
 
 const list = (items: readonly string[]) =>
@@ -242,9 +243,9 @@ const m: Translation<typeof en> = {
     partlyPublished:
       "先前的發佈已建立提交，可能已推送到 GitHub，因此不能再同步或復原同步；請從最新版本建立新工作。",
     unmarkedRun: ({ files }) =>
-      `這些檔案的衝突無法用衝突標記表示（一邊刪除、另一邊修改，或兩邊都改了二進位檔），BELL 不會替你選邊：${list(files)}。工作沒有變動；可以先把這次對它們的修改或刪除還原，同步後再重做。`,
+      `這些檔案的衝突無法用衝突標記表示（一邊刪除、另一邊修改，或兩邊都改了二進位檔），${product.name} 不會替你選邊：${list(files)}。工作沒有變動；可以先把這次對它們的修改或刪除還原，同步後再重做。`,
     unmarkedPr: ({ files, branch }) =>
-      `這些檔案的衝突無法用衝突標記表示（一邊刪除、另一邊修改，或兩邊都改了二進位檔），BELL 不會替你選邊：${list(files)}。PR 沒有變動；請在本機用 git 把 ${branch} 合併進 PR 分支並推送，BELL 之後會接續這些提交。`,
+      `這些檔案的衝突無法用衝突標記表示（一邊刪除、另一邊修改，或兩邊都改了二進位檔），${product.name} 不會替你選邊：${list(files)}。PR 沒有變動；請在本機用 git 把 ${branch} 合併進 PR 分支並推送，${product.name} 之後會接續這些提交。`,
     notAllowed:
       "只有審閱中、已核准或等待計畫核准的工作可以同步到最新目標分支。",
     busy: "這個工作還有 Agent、審查或解說在進行；請等它完成再同步。",
@@ -311,18 +312,18 @@ const m: Translation<typeof en> = {
     keptEdits: ({ reason }) =>
       `${reason}；工作目錄保留了部分修改，可以審閱、寫好提交訊息後推送，或放棄這輪修正。`,
     nothingToDiscard: "目前沒有可以放棄的修正。",
-    alreadyPushed: "這輪修正已推送到 PR；請再按一次推送，讓 BELL 記錄完成。",
+    alreadyPushed: `這輪修正已推送到 PR；請再按一次推送，讓 ${product.name} 記錄完成。`,
     discarded: "已放棄這輪修正，工作目錄回到已推送的 PR 內容。",
     answerIncomplete: "Agent 回傳的修正結果格式不完整",
     pushUnknown: "無法確認這輪修正是否已推送到 PR。",
     remoteMoved: ({ branch }) =>
-      `GitHub 上的 PR 分支 ${branch} 已有 BELL 以外的提交（例如在 GitHub 上套用建議、維護者推送或更新分支），BELL 不會覆蓋，也無法接續修正；請在 GitHub 上處理，或放棄這輪修正。`,
+      `GitHub 上的 PR 分支 ${branch} 已有 ${product.name} 以外的提交（例如在 GitHub 上套用建議、維護者推送或更新分支），${product.name} 不會覆蓋，也無法接續修正；請在 GitHub 上處理，或放棄這輪修正。`,
     remoteMissing: ({ branch }) =>
       `GitHub 上找不到 PR 分支 ${branch}，無法推送修正。`,
     historyRewritten: ({ branch }) =>
-      `GitHub 上的 PR 分支 ${branch} 改寫了 BELL 推送過的歷史（例如 force push），BELL 無法接續；請在 GitHub 上處理。`,
+      `GitHub 上的 PR 分支 ${branch} 改寫了 ${product.name} 推送過的歷史（例如 force push），${product.name} 無法接續；請在 GitHub 上處理。`,
     adoptedReport: ({ commits }) =>
-      `接續了 GitHub 上 BELL 以外的 ${commits} 個提交；這些改動會在下一輪一起審閱。`,
+      `接續了 GitHub 上 ${product.name} 以外的 ${commits} 個提交；這些改動會在下一輪一起審閱。`,
     adopted: ({ branch, commits }) =>
       `已接續 GitHub 上 PR 分支 ${branch} 的 ${commits} 個提交（例如在 GitHub 上套用建議或 Update branch）；這些改動會在下一輪一起審閱。`,
   },
@@ -344,8 +345,8 @@ const m: Translation<typeof en> = {
     importSource: "請輸入 GitHub HTTPS URL 或本機 Repository 的絕對路徑。",
     bare: "請選擇有工作目錄的 Repository。",
     localNotUpdated:
-      "這是你本機的 repository，BELL 不會更動它；請在終端機自行 git pull 後再重新分析。",
-    cloneChanged: "BELL 的專案副本有未預期的修改，已停止更新；請檢查後再試。",
+      `這是你本機的 repository，${product.name} 不會更動它；請在終端機自行 git pull 後再重新分析。`,
+    cloneChanged: `${product.name} 的專案副本有未預期的修改，已停止更新；請檢查後再試。`,
   },
   publish: {
     commitMessageInvalid: "提交訊息只能包含文字與換行。",
@@ -393,7 +394,7 @@ const m: Translation<typeof en> = {
     failedAfterPush: ({ error }) =>
       `${error} 若推送已完成，分支會保留在 GitHub；重試前請確認遠端狀態。`,
     roundReverts: ({ files }) =>
-      `這輪修正把已推送的檔案改回原始版本或刪除：${list(files)}。這類修改無法在 BELL 逐檔審閱，因此不會推送；請還原這些檔案或放棄這輪修正。`,
+      `這輪修正把已推送的檔案改回原始版本或刪除：${list(files)}。這類修改無法在 ${product.name} 逐檔審閱，因此不會推送；請還原這些檔案或放棄這輪修正。`,
     roundMessageMissing: "請填寫這輪修正的提交訊息。",
     roundMessagePlaceholders: "提交訊息還有待填寫的內容，請改好再推送。",
     roundNoPushTarget: "找不到這個 PR 的推送位置，無法推送修正。",

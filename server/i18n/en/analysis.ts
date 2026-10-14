@@ -1,6 +1,7 @@
 /** Project analysis, discovery, draft and explanation messages. */
 import type { DiscoverySort } from "../../../shared/discovery.js";
 import { formatters } from "../../../shared/i18n/locale.js";
+import { product } from "../../../shared/product.js";
 
 const fmt = formatters("en");
 
@@ -217,7 +218,7 @@ export default {
           contributing: "CONTRIBUTING",
           template: "PR template",
         }[document]
-      } was found in the locations BELL reads; the project may still keep rules elsewhere.`,
+      } was found in the locations ${product.name} reads; the project may still keep rules elsewhere.`,
     documentFailed: ({ path }: { path: string }) =>
       `${path} could not be read or is over the text size limit; its full content was not checked.`,
     /**

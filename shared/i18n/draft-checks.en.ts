@@ -3,6 +3,7 @@
  * server, the draft tab and the publish dialog all show them.
  */
 import { formatters } from "./locale.js";
+import { product } from "../product.js";
 
 const fmt = formatters("en");
 
@@ -25,9 +26,9 @@ const messages = {
   ruleQuote: ({ label, quote }: { label: string; quote: string }) =>
     `${label}: "${quote}"`,
   brevityUnrevised:
-    "This description is still BELL's suggested text, unrevised, and the project asks for a short description in your own words.",
+    `This description is still ${product.name}'s suggested text, unrevised, and the project asks for a short description in your own words.`,
   brevityOver: ({ words, budget }: { words: number; budget: number }) =>
-    `This description is about ${words} words, more than the ${budget} BELL suggests, and the project asks for short descriptions.`,
+    `This description is about ${words} words, more than the ${budget} ${product.name} suggests, and the project asks for short descriptions.`,
 };
 
 export default messages;

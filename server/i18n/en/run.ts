@@ -1,4 +1,5 @@
 import { formatters } from "../../../shared/i18n/locale.js";
+import { product } from "../../../shared/product.js";
 
 const fmt = formatters("en");
 /** A number with its noun in the matching form: "1 file", "3 files". */
@@ -423,9 +424,9 @@ export default {
     partlyPublished:
       "An earlier publish already made a commit that may be on GitHub, so this run can no longer be synced or have a sync undone; start a new run from the latest version.",
     unmarkedRun: ({ files }: { files: string[] }) =>
-      `These files conflict in a way conflict markers cannot show (deleted on one side and changed on the other, or a binary file changed on both), and BELL does not pick a side for you: ${list(files)}. The run is unchanged; you can first undo this run's changes to them or deletions of them, sync, and then make those changes again.`,
+      `These files conflict in a way conflict markers cannot show (deleted on one side and changed on the other, or a binary file changed on both), and ${product.name} does not pick a side for you: ${list(files)}. The run is unchanged; you can first undo this run's changes to them or deletions of them, sync, and then make those changes again.`,
     unmarkedPr: ({ files, branch }: { files: string[]; branch: string }) =>
-      `These files conflict in a way conflict markers cannot show (deleted on one side and changed on the other, or a binary file changed on both), and BELL does not pick a side for you: ${list(files)}. The PR is unchanged; merge ${branch} into the PR branch with git on your machine and push, and BELL takes over those commits afterwards.`,
+      `These files conflict in a way conflict markers cannot show (deleted on one side and changed on the other, or a binary file changed on both), and ${product.name} does not pick a side for you: ${list(files)}. The PR is unchanged; merge ${branch} into the PR branch with git on your machine and push, and ${product.name} takes over those commits afterwards.`,
     notAllowed:
       "Only runs in review, approved or waiting for plan approval can sync to the latest target branch.",
     busy: "Agents, a review or explanations are still working on this run; wait for them to finish before you sync.",
@@ -543,19 +544,19 @@ export default {
       `${reason}; some edits are kept in the working directory, and you can review them, write a commit message and push, or discard the round.`,
     nothingToDiscard: "There is no follow-up round to discard.",
     alreadyPushed:
-      "This round is already on the PR; press Push again so BELL records it as done.",
+      `This round is already on the PR; press Push again so ${product.name} records it as done.`,
     discarded:
       "Discarded the follow-up round; the working directory is back to the pushed PR.",
     answerIncomplete: "The agent's answer about the round is incomplete",
     pushUnknown: "Cannot confirm whether this round was pushed to the PR.",
     remoteMoved: ({ branch }: { branch: string }) =>
-      `The PR branch ${branch} on GitHub has commits from outside BELL (for example a suggestion applied on GitHub, a maintainer's push or an updated branch). BELL does not overwrite them and cannot continue the round; handle it on GitHub or discard the round.`,
+      `The PR branch ${branch} on GitHub has commits from outside ${product.name} (for example a suggestion applied on GitHub, a maintainer's push or an updated branch). ${product.name} does not overwrite them and cannot continue the round; handle it on GitHub or discard the round.`,
     remoteMissing: ({ branch }: { branch: string }) =>
       `The PR branch ${branch} is not on GitHub, so the round cannot be pushed.`,
     historyRewritten: ({ branch }: { branch: string }) =>
-      `The PR branch ${branch} on GitHub rewrote history that BELL pushed (for example with a force push), so BELL cannot continue; handle it on GitHub.`,
+      `The PR branch ${branch} on GitHub rewrote history that ${product.name} pushed (for example with a force push), so ${product.name} cannot continue; handle it on GitHub.`,
     adoptedReport: ({ commits }: { commits: number }) =>
-      `Took over ${count(commits, "commit", "commits")} made on GitHub outside BELL; their changes are reviewed with the next round.`,
+      `Took over ${count(commits, "commit", "commits")} made on GitHub outside ${product.name}; their changes are reviewed with the next round.`,
     adopted: ({ branch, commits }: { branch: string; commits: number }) =>
       `Took over ${count(commits, "commit", "commits")} on the PR branch ${branch} on GitHub (for example an applied suggestion or Update branch); their changes are reviewed with the next round.`,
   },
@@ -584,9 +585,9 @@ export default {
       "Enter a GitHub HTTPS URL or the absolute path of a local repository.",
     bare: "Choose a repository that has a working directory.",
     localNotUpdated:
-      "This is your own local repository, and BELL never changes it; run git pull in a terminal yourself, then analyse the project again.",
+      `This is your own local repository, and ${product.name} never changes it; run git pull in a terminal yourself, then analyse the project again.`,
     cloneChanged:
-      "BELL's copy of the project has unexpected changes, so the update stopped; check it and try again.",
+      `${product.name}'s copy of the project has unexpected changes, so the update stopped; check it and try again.`,
   },
   /** The human review gate and publishing: draft, file reviews, approval and push. */
   publish: {
@@ -647,7 +648,7 @@ export default {
     failedAfterPush: ({ error }: { error: string }) =>
       `${error} If the push went through, the branch stays on GitHub; check the remote before you retry.`,
     roundReverts: ({ files }: { files: string[] }) =>
-      `This follow-up round puts pushed files back to their original version or deletes them: ${list(files)}. BELL cannot show such changes for file-by-file review, so they are not pushed; restore these files or discard the round.`,
+      `This follow-up round puts pushed files back to their original version or deletes them: ${list(files)}. ${product.name} cannot show such changes for file-by-file review, so they are not pushed; restore these files or discard the round.`,
     roundMessageMissing: "Write this follow-up round's commit message.",
     roundMessagePlaceholders:
       "The commit message still has placeholders; complete it before pushing.",

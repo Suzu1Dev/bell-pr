@@ -920,7 +920,7 @@ test("preflight messages default to English, keep their ids and quote the rules 
   assert.deepEqual(checks[2].details, [
     'CONTRIBUTING.md: "All PRs must reference an existing issue. Before opening a PR, open an issue."',
   ]);
-  assert.match(checks[3].message, /still BELL's suggested text, unrevised/);
+  assert.match(checks[3].message, /still BELL PR's suggested text, unrevised/);
   assert.deepEqual(checks[3].details, [
     'CONTRIBUTING.md: "No AI-Generated Walls of Text"',
   ]);
@@ -934,7 +934,7 @@ test("preflight messages default to English, keep their ids and quote the rules 
   ]);
   assert.match(
     long.find((check) => check.id === "brevity")?.message ?? "",
-    /^This description is about 200 words, more than the 150 BELL suggests/,
+    /^This description is about 200 words, more than the 150 BELL PR suggests/,
   );
   // The same checks in zh-TW differ only in their text.
   const zh = draftPreflight(

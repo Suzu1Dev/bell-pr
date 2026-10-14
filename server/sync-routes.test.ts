@@ -128,7 +128,7 @@ test("sync, follow-up and clone update routes validate input and answer refusals
     "x-bell-locale": "en",
   });
   assert.equal(englishUpdate.status, 409);
-  assert.match(String(englishUpdate.json.error), /^This is your own local repository, and BELL never changes it; run git pull/);
+  assert.match(String(englishUpdate.json.error), /^This is your own local repository, and BELL PR never changes it; run git pull/);
   const undo = await call(port, "POST", "/api/runs/review/sync/undo", {});
   assert.equal(undo.status, 409);
   assert.match(String(undo.json.error), /沒有可以復原的同步/);

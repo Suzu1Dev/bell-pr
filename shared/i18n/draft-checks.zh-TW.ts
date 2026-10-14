@@ -1,4 +1,5 @@
 /** PR text check messages (Traditional Chinese, Taiwan); typed against the English copy. */
+import { product } from "../product.js";
 import type { Translation } from "./locale.js";
 import type en from "./draft-checks.en.js";
 
@@ -13,9 +14,9 @@ const messages: Translation<typeof en> = {
   issue: "專案規範要求 PR 連結既有的 issue，這份說明沒有引用任何 issue。",
   ruleQuote: ({ label, quote }) => `${label}：「${quote}」`,
   brevityUnrevised:
-    "這份說明仍是未改寫的 BELL 建議原文，而專案要求用自己的話寫簡短的說明。",
+    `這份說明仍是未改寫的 ${product.name} 建議原文，而專案要求用自己的話寫簡短的說明。`,
   brevityOver: ({ words, budget }) =>
-    `這份說明約 ${words} 字，超過 BELL 建議的 ${budget} 字；專案要求簡短的說明。`,
+    `這份說明約 ${words} 字，超過 ${product.name} 建議的 ${budget} 字；專案要求簡短的說明。`,
 };
 
 export default messages;

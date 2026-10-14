@@ -676,7 +676,7 @@ test("commits pushed to the PR branch on GitHub are taken over before a round; r
     await git(f.repo.path, ["--git-dir", f.github.bare, "update-ref", "refs/heads/fix/sync0001", mainHead]);
     await assert.rejects(
       f.workbench.startFollowUp(f.run.id, { feedbackUrls: [feedbackUrl] }),
-      /改寫了 BELL 推送過的歷史/,
+      /改寫了 BELL PR 推送過的歷史/,
     );
     assert.equal(f.run.status, "published");
   } finally {
