@@ -30,6 +30,7 @@ import { ActivityTab } from "./ActivityTab";
 import { ChangesTab } from "./ChangesTab";
 import { DraftTab } from "./DraftTab";
 import { OverviewTab } from "./OverviewTab";
+import "./workspace.css";
 
 interface WorkspacePageProps {
   run: Run;

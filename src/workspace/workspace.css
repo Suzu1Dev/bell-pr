@@ -1,0 +1,37 @@
+/* The contribution workspace's own rules. Theme tokens only
+   (src/theme/tokens.css). Selectors name their container, so they win over
+   the general rules in styles.css whatever the bundle order. */
+
+/* The file list's filters stack on a wide screen and share one row that
+   scrolls sideways on a phone, so the two toggles never overlap. */
+.file-panel .file-filters {
+  display: flex;
+  flex-direction: column;
+}
+.file-panel .file-search-toggle {
+  display: none;
+}
+@media (max-width: 760px) {
+  .file-panel .file-filters {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-4);
+    overflow-x: auto;
+    padding: 0 14px var(--space-2);
+  }
+  .file-panel .file-filters .filter-toggle {
+    position: static;
+    flex-shrink: 0;
+    margin: 0;
+    padding: var(--space-1) 0;
+    white-space: nowrap;
+  }
+  /* The search hides behind an icon button until it is opened. */
+  .file-panel .file-panel-heading .file-search-toggle {
+    display: inline-flex;
+  }
+  .file-panel.is-search-open .file-search {
+    display: flex;
+    margin: 0 14px var(--space-2);
+  }
+}

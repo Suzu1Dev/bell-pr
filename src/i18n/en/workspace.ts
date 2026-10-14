@@ -54,6 +54,9 @@ const workspace = {
     files: "Changed files",
     searchPlaceholder: "Search files…",
     searchLabel: "Search changed files",
+    /** The icon button that shows the file search on a phone. */
+    openSearch: "Search the changed files",
+    closeSearch: "Close the file search",
     onlyUnreviewed: "Only unreviewed",
     suggestedOrderTitle:
       "Sort by the reading order in the Lead's integration summary; files it does not mention follow in git order",

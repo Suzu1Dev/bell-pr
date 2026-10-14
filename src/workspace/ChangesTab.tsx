@@ -1,7 +1,9 @@
 import {
   lazy,
   Suspense,
+  useEffect,
   useRef,
+  useState,
   type Dispatch,
   type SetStateAction,
 } from "react";
@@ -25,6 +27,7 @@ import {
   RefreshCw,
   Search,
   Sparkles,
+  X,
 } from "lucide-react";
 import { useT } from "../i18n";
 import type { DiffFile, Repo, Run } from "../types";
@@ -154,6 +157,13 @@ export function ChangesTab({
     ask,
   } = actions;
   const reviewGridRef = useRef<HTMLDivElement>(null);
+  // On a phone the file search hides behind an icon button; a query keeps it open.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const searchShown = searchOpen || fileSearch !== "";
+  useEffect(() => {
+    if (searchOpen) searchInput.current?.focus();
+  }, [searchOpen]);
   function changeCodeFont(delta: number) {
     const next = Math.max(12, Math.min(20, codeFont + delta));
     setCodeFont(next);
@@ -199,16 +209,35 @@ export function ChangesTab({
       className={`review-grid ${!showFiles ? "files-hidden" : ""} ${!showExplanation ? "explanation-hidden" : ""}`}
     >
       {showFiles && (
-        <aside className="file-panel">
+        <aside
+          className={`file-panel ${searchShown ? "is-search-open" : ""}`}
+        >
           <div className="file-panel-heading">
             <strong>
               {t.files} <span>{files.length}</span>
             </strong>
             <ListTree size={16} />
+            <button
+              type="button"
+              className="icon-button file-search-toggle"
+              aria-label={searchShown ? t.closeSearch : t.openSearch}
+              title={searchShown ? t.closeSearch : t.openSearch}
+              aria-expanded={searchShown}
+              aria-controls="workspace-file-search"
+              onClick={() => {
+                // Closing also clears the query, so no hidden filter stays on.
+                if (searchShown) setFileSearch("");
+                setSearchOpen(!searchShown);
+              }}
+            >
+              {searchShown ? <X size={15} /> : <Search size={15} />}
+            </button>
           </div>
           <label className="file-search">
             <Search size={14} />
             <input
+              id="workspace-file-search"
+              ref={searchInput}
               placeholder={t.searchPlaceholder}
               aria-label={t.searchLabel}
               value={fileSearch}
@@ -216,29 +245,31 @@ export function ChangesTab({
             />
             <kbd aria-hidden="true">⌕</kbd>
           </label>
-          <button
-            className={`filter-toggle ${onlyUnreviewed ? "is-on" : ""}`}
-            aria-pressed={onlyUnreviewed}
-            onClick={() => setOnlyUnreviewed(!onlyUnreviewed)}
-          >
-            <span className="toggle-track">
-              <span />
-            </span>
-            {t.onlyUnreviewed}
-          </button>
-          {reviewOrder.length > 0 && (
+          <div className="file-filters">
             <button
-              className={`filter-toggle ${suggestedOrder ? "is-on" : ""}`}
-              aria-pressed={suggestedOrder}
-              title={t.suggestedOrderTitle}
-              onClick={() => setSuggestedOrder(!suggestedOrder)}
+              className={`filter-toggle ${onlyUnreviewed ? "is-on" : ""}`}
+              aria-pressed={onlyUnreviewed}
+              onClick={() => setOnlyUnreviewed(!onlyUnreviewed)}
             >
               <span className="toggle-track">
                 <span />
               </span>
-              {t.suggestedOrder}
+              {t.onlyUnreviewed}
             </button>
-          )}
+            {reviewOrder.length > 0 && (
+              <button
+                className={`filter-toggle ${suggestedOrder ? "is-on" : ""}`}
+                aria-pressed={suggestedOrder}
+                title={t.suggestedOrderTitle}
+                onClick={() => setSuggestedOrder(!suggestedOrder)}
+              >
+                <span className="toggle-track">
+                  <span />
+                </span>
+                {t.suggestedOrder}
+              </button>
+            )}
+          </div>
           <div className="file-tree">
             <div className="tree-root">
               <ChevronDown size={13} />

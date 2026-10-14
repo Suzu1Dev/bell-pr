@@ -46,6 +46,8 @@ const m: Translation<typeof en> = {
     files: "變更的檔案",
     searchPlaceholder: "搜尋檔案…",
     searchLabel: "搜尋變更檔案",
+    openSearch: "搜尋變更的檔案",
+    closeSearch: "關閉檔案搜尋",
     onlyUnreviewed: "只看尚未審查",
     suggestedOrderTitle:
       "依 Lead 整合摘要建議的閱讀順序排列；未提到的檔案維持 git 順序排在後面",
