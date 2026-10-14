@@ -92,9 +92,11 @@ or incomplete against the shipped code and are corrected in the documents:
 - **The tools' own usage data (PRIV-12).** The texts said the tools' own
   settings decide. The agents get only the variables their CLI needs
   (`server/process.ts:50`), plus, since finding 7 was fixed, the usage-data
-  opt-outs the person set (`server/process.ts:108`); the Codex CLI starts
+  opt-outs the person set (`server/process.ts:108`); each Codex agent starts
   without its `config.toml` (`server/agent-cli.ts:191`), so an opt-out made
-  only there does not reach them.
+  only there does not reach them. Reading the Codex model list
+  (`codex app-server`, `server/models.ts:105`) still loads that file, so the
+  text names the agents, not every Codex call.
 - **Refunded seats (REFUND-14).** A revocation covers a whole key
   (`server/license-keys.ts:19`), so a key that also holds kept seats is
   replaced.
@@ -260,7 +262,7 @@ Commands run on the tree of this review, test files excluded:
 | PRIV-09 | The interface loads nothing from other sites; fonts and icons are bundled; the CSP blocks other sites | `server/http-guard.ts:83`, `server/http-guard.ts:216`, `src/theme/fonts.css:4`, `e2e/no-external-requests.spec.ts:21` |
 | PRIV-10 | BELL PR does not store the tools' passwords and tokens, and only asks the tools whether the person is signed in | `server/process.ts:125`, `server/agent-cli.ts:219`, `server/doctor.ts:299` |
 | PRIV-11 | Providers' own terms decide what they keep and train on | Owner decision: statement about third parties (G4, G5) |
-| PRIV-12 | The tools may send their own usage data; BELL PR neither adds nor removes it, passes only the variables each CLI needs plus the person's usage-data opt-outs (`DO_NOT_TRACK` to both, Claude Code's documented ones to Claude Code), and starts Codex without its `config.toml`, so an opt-out made only there does not reach the agents | `server/process.ts:50`, `server/process.ts:108`, `server/process.ts:109`, `server/process.ts:125` (only listed variables are passed; none is set or removed), `server/agent-cli.ts:191` (`--ignore-user-config`); see finding 7 |
+| PRIV-12 | The tools may send their own usage data; BELL PR neither adds nor removes it, passes only the variables each CLI needs plus the person's usage-data opt-outs (`DO_NOT_TRACK` to both, Claude Code's documented ones to Claude Code), and starts each Codex agent without its `config.toml`, so an opt-out made only there does not reach the agents | `server/process.ts:50`, `server/process.ts:108`, `server/process.ts:109`, `server/process.ts:125` (only listed variables are passed; none is set or removed), `server/agent-cli.ts:191` (`--ignore-user-config`); see finding 7 |
 | PRIV-13 | Which features use the AI CLI, and which providers Claude Code may use | `server/agent-cli.ts:149`, `server/sync-runs.ts:398` (conflict resolution), `server/process.ts:70`, `server/process.ts:76` |
 | PRIV-14 | BELL PR's instructions, the direction and the approved plan are sent | `server/run-executor.ts:695`, `server/run-executor.ts:753` |
 | PRIV-15 | Repository files, analysis excerpts, diffs, rules and templates are sent | `server/insights.ts:1220`, `server/drafts.ts:384`, `server/learning.ts:229` |

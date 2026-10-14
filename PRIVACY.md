@@ -65,9 +65,10 @@ usage-data opt-outs you set in its environment: `DO_NOT_TRACK` for both
 CLIs, and the variables Claude Code documents (`DISABLE_TELEMETRY`,
 `DISABLE_ERROR_REPORTING`, `DISABLE_BUG_COMMAND`,
 `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY` and
-`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`). It starts the Codex CLI without
-its `config.toml`, so a usage-data setting that you made only in that file
-does not reach the agents BELL PR runs. <!-- claim:PRIV-12 -->
+`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`). It starts each Codex agent
+with `codex exec --ignore-user-config`, without its `config.toml`, so a
+usage-data setting that you made only in that file does not reach the
+agents BELL PR runs. <!-- claim:PRIV-12 -->
 
 ### The AI coding CLI you choose
 
