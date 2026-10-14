@@ -267,7 +267,7 @@ export default {
     /** Label of a document from the account-wide .github repository. */
     accountDefault: ({ path }: { path: string }) => `Account default · ${path}`,
     notRegularFile: ({ label }: { label: string }) =>
-      `Skipped ${label}: it is not a regular file, and symbolic links and submodules are skipped.`,
+      `Skipped ${label}: only regular files are read, not symbolic links or submodules.`,
     tooLarge: ({ label }: { label: string }) =>
       `${label} is over the per-file read limit or its size is unknown; its content was not checked.`,
     documentLimit:
