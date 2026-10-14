@@ -340,18 +340,21 @@ export function requirePro(
 
 /**
  * `<dataDir>/license.json`, written with mode 0600. Times are ISO strings.
- * Reads are lenient (README §7): a file from a newer build loads with its
- * unknown fields dropped.
+ * Reads are lenient (README §7). This build rewrites the file on its own
+ * (lastSeenAt at every start and every hour), so fields from a newer build
+ * pass through and survive the rewrite, as in state.json.
  */
-export const licenseFileSchema = z.object({
-  version: z.literal(1),
-  /** The activated key, whitespace removed. */
-  key: z.string().max(maxKeyLength).optional(),
-  activatedAt: z.string().max(64).optional(),
-  /** The latest time this data directory has seen; always written. */
-  lastSeenAt: z.string().max(64).optional(),
-  trial: z.object({ startedAt: z.string().max(64) }).optional(),
-});
+export const licenseFileSchema = z
+  .object({
+    version: z.literal(1),
+    /** The activated key, whitespace removed. */
+    key: z.string().max(maxKeyLength).optional(),
+    activatedAt: z.string().max(64).optional(),
+    /** The latest time this data directory has seen; always written. */
+    lastSeenAt: z.string().max(64).optional(),
+    trial: z.object({ startedAt: z.string().max(64) }).passthrough().optional(),
+  })
+  .passthrough();
 export type LicenseFile = z.infer<typeof licenseFileSchema>;
 const persistedLicenseFileSchema = lenientRead(licenseFileSchema);
 

@@ -511,6 +511,17 @@ test("an unreadable license.json means Free, and newer fields load in this build
     const older = lenientRead(licenseFileSchema.omit({ [field]: true } as { activatedAt: true }));
     assert.ok(older.safeParse(JSON.parse(readFileSync(file, "utf8"))).success, field);
   }
+  // This build rewrites the file (a later start records the time, then the
+  // key is removed) and keeps the fields it does not know.
+  const later = offline(dataDir);
+  later.clock.now = now + day;
+  await later.service.initialize();
+  assert.equal((await later.service.deactivate()).plan, "trial");
+  const rewritten = JSON.parse(readFileSync(file, "utf8"));
+  assert.equal(rewritten.key, undefined);
+  assert.equal(rewritten.lastSeenAt, new Date(now + day).toISOString());
+  assert.equal(rewritten.machineId, "abc");
+  assert.equal(rewritten.trial.extendedBy, 7);
 });
 
 test("a running server picks up a license changed by another process", async (t) => {
