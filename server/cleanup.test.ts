@@ -330,6 +330,13 @@ test("retention frees only finished runs past the period and never touches activ
       ],
     }),
   ];
+  // A run cancelled before it started has no files, so nothing marks it
+  // removed and a retry can still create its worktree.
+  const neverStarted = run("0nofiles-0000-4000-8000-000000000000", repo, {
+    ...fields("cancelled"),
+    worktreePath: path.join(f.dataDir, "worktrees", "0nofiles-0000-4000-8000-000000000000"),
+  });
+  f.store.data.runs.push(neverStarted);
   // Older than the period by the configured source, not by the environment.
   process.env.BELLPR_RETENTION_DAYS = "60";
   assert.equal(retentionDays(), 60);
@@ -346,6 +353,8 @@ test("retention frees only finished runs past the period and never touches activ
     assert.equal(value.workspaceRemovedAt, undefined, value.id);
     assert.equal(await exists(value.worktreePath), true, value.id);
   }
+  assert.equal(neverStarted.workspaceRemovedAt, undefined);
+  assert.deepEqual(neverStarted.logs.map((entry) => entry.message), ["Last activity"]);
   // The log line is in the run's own language.
   assert.match(eligible[0].logs.at(-1)!.message, /^這個工作結束 30 天後已移除工作檔案/);
   // An invalid source falls back to the environment, then 14 days.

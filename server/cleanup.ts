@@ -146,6 +146,15 @@ async function ownsWorkspace(ctx: WorkbenchContext, run: Run) {
   );
 }
 
+/** Whether the run still has a worktree or a teammate checkout on disk. */
+async function hasWorkspaceFiles(ctx: WorkbenchContext, run: Run) {
+  const paths = runPaths(ctx, run);
+  return (
+    (!!paths.worktree && (await exists(paths.worktree))) ||
+    (await exists(paths.team))
+  );
+}
+
 const findRepository = (ctx: WorkbenchContext, id: string) =>
   ctx.store.data.repos.find((repo) => repo.id === id);
 
@@ -366,21 +375,25 @@ function lastActivity(run: Run) {
  * Frees the working files of published, cancelled and failed runs whose
  * last activity is older than the retention period. Runs that are queued,
  * running, awaiting their plan, in review, approved or publishing, and
- * published runs with an open round, are never touched. Each run's log
- * line is written in the run's own language.
+ * published runs with an open round, are never touched; nor are runs with
+ * no files on disk (one cancelled before it started can still be retried).
+ * Each run's log line is written in the run's own language. A shutdown
+ * stops the pass between runs.
  */
 export async function applyRetention(ctx: WorkbenchContext, now = Date.now()) {
   const days = retentionDays();
   const cutoff = now - days * dayMs;
   const archived: string[] = [];
   for (const run of [...ctx.store.data.runs]) {
+    if (ctx.stopping()) break;
     if (
       !finishedStatuses.includes(run.status) ||
       run.workspaceRemovedAt ||
       activeFollowUp(run.followUps) ||
       runActive(ctx, run) ||
       lastActivity(run) > cutoff ||
-      !(await ownsWorkspace(ctx, run))
+      !(await ownsWorkspace(ctx, run)) ||
+      !(await hasWorkspaceFiles(ctx, run))
     )
       continue;
     try {
