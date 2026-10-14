@@ -17,6 +17,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { baseUrl, resolveConfig, ConfigError, defaultStaticDir } from "./config.js";
 import { createApp } from "./app.js";
+import { version } from "./build-info.js";
 import { startServer, StartupError } from "./index.js";
 import { withLocale } from "./i18n/index.js";
 import { Store } from "./store.js";
@@ -298,12 +299,17 @@ test("startServer serves the app with an in-memory session token, takes the lock
       }),
     );
     try {
+      // Run from source, the version comes from package.json.
+      assert.equal(
+        version,
+        JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8")).version,
+      );
       assert.equal(running.url, `http://127.0.0.1:${port}`);
       const token = new URL(running.signInUrl).searchParams.get("t")!;
       assert.match(token, /^[A-Za-z0-9_-]{43}$/);
       assert.equal(new URL(running.signInUrl).pathname, "/auth");
       assert.ok(lines.some((line) => line.endsWith(`→ ${running.signInUrl}`)), lines.join("\n"));
-      assert.match(lines.join("\n"), /BELL PR 1\.0\.0-beta\.0 →/);
+      assert.ok(lines.some((line) => line.startsWith(`BELL PR ${version} → `)), lines.join("\n"));
       // The old ./.bellpr only gets a hint.
       assert.ok(lines.some((line) => line.includes("bell-pr start --data-dir ./.bellpr")));
       assert.deepEqual(opened, [running.signInUrl]);
@@ -316,14 +322,14 @@ test("startServer serves the app with an in-memory session token, takes the lock
       const lock = JSON.parse(readFileSync(path.join(box.data, "bellpr.lock"), "utf8"));
       assert.equal(lock.pid, process.pid);
       assert.equal(lock.port, port);
-      assert.equal(lock.version, "1.0.0-beta.0");
+      assert.equal(lock.version, version);
       assert.equal(statSync(path.join(box.data, "bellpr.lock")).mode & 0o777, 0o600);
       assert.equal(statSync(path.join(box.data, "state.json")).mode & 0o777, 0o600);
       assert.equal(statSync(box.data).mode & 0o777, 0o700);
 
       const health = await get(`http://127.0.0.1:${port}/api/health`);
       assert.equal(health.status, 200);
-      assert.deepEqual(JSON.parse(health.body), { name: "bell-pr", version: "1.0.0-beta.0" });
+      assert.deepEqual(JSON.parse(health.body), { name: "bell-pr", version });
       const page = await get(`http://127.0.0.1:${port}/`);
       assert.equal(page.status, 200);
       assert.match(String(page.headers["content-type"]), /text\/html/);
@@ -512,7 +518,10 @@ test("a symlinked bin entry starts the server", async () => {
   const server = launch(link, ["start", "--port", String(port), "--data-dir", box.data], box.env);
   try {
     await started(server);
-    assert.match(server.stdout(), new RegExp(`BELL PR 1\\.0\\.0-beta\\.0 → http://127\\.0\\.0\\.1:${port}/auth\\?t=`));
+    assert.ok(
+      server.stdout().includes(`BELL PR ${version} → http://127.0.0.1:${port}/auth?t=`),
+      server.stdout(),
+    );
     const health = await get(`http://127.0.0.1:${port}/api/health`);
     assert.equal(health.status, 200);
     assert.equal(JSON.parse(health.body).name, "bell-pr");

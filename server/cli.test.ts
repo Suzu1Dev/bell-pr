@@ -7,6 +7,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { version } from "./build-info.js";
 import { canOpenBrowser, main, type CliDeps } from "./cli.js";
 import { resolveConfig } from "./config.js";
 import { withLocale } from "./i18n/index.js";
@@ -218,7 +219,8 @@ test("bell-pr version prints the version, Node.js, the platform and the data dir
       const result = await cli([...argv, "--data-dir", dataDir]);
       assert.equal(result.code, 0);
       const lines = result.stdout.trimEnd().split("\n");
-      assert.match(lines[0], /^BELL PR 1\.0\.0-beta\.0 \(built \d{4}-\d{2}-\d{2}\)$/);
+      assert.ok(lines[0].startsWith(`BELL PR ${version} (built `), lines[0]);
+      assert.match(lines[0], /\(built \d{4}-\d{2}-\d{2}\)$/);
       assert.equal(lines[1], `Node.js ${process.version} on ${process.platform} ${process.arch}`);
       assert.equal(lines[2], `Data directory: ${dataDir}`);
     }
