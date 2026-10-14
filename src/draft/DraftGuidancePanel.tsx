@@ -124,17 +124,21 @@ export function DraftGuidancePanel({
   // The server adds the line to new suggestions while the setting is on.
   const settingOn =
     alwaysDiscloseAi ?? !!proposal?.body.includes(aiDisclosureLine);
-  // Without a saved choice: what the description holds, or, with no
-  // description to show, off unless the person's setting or the project's
-  // rules ask for it.
+  // Without a saved choice, off unless the person's setting or the
+  // project's rules ask for it.
+  const suggestedDisclosure =
+    aiDisclosure ?? (settingOn || !!disclosureRequirement);
+  // The switch shows what the description holds while no choice is saved.
   const savedDisclosure =
-    aiDisclosure ??
-    (draftBody !== undefined
+    aiDisclosure === undefined && draftBody !== undefined
       ? draftBody.includes(aiDisclosureLine)
-      : settingOn || !!disclosureRequirement);
+      : suggestedDisclosure;
   const disclose = onAiDisclosureChange
     ? savedDisclosure
     : (localDisclosure ?? savedDisclosure);
+  // The suggestion keeps the line the setting or the rules ask for, so
+  // "Apply" adds it even to a description that lacks it.
+  const proposalDisclosure = localDisclosure ?? suggestedDisclosure;
   const disclosureReason =
     aiDisclosure !== undefined || localDisclosure !== undefined || !disclose
       ? undefined
@@ -142,7 +146,7 @@ export function DraftGuidancePanel({
         ? t.disclosure.setting
         : undefined;
   const proposalBody = proposal
-    ? disclose
+    ? proposalDisclosure
       ? withAiDisclosure(proposal.body)
       : withoutAiDisclosure(proposal.body)
     : "";

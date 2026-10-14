@@ -349,6 +349,8 @@ test("without a saved choice the switch shows what the description holds, whatev
   assert.doesNotMatch(switchOf(lacking), /checked/);
   assert.match(lacking, /The description does not mention AI\./);
   assert.match(lacking, /This project asks for a disclosure/);
+  // The suggestion still carries the line the rule asks for, so Apply adds it.
+  assert.match(preview(lacking), new RegExp(line));
   const holding = renderEnglish(ruled, {
     onAiDisclosureChange() {},
     draftBody: withAiDisclosure(body),
@@ -362,11 +364,23 @@ test("without a saved choice the switch shows what the description holds, whatev
   });
   assert.doesNotMatch(switchOf(settingOff), /checked/);
   assert.doesNotMatch(settingOff, /On by default/);
-  // A saved choice still decides.
+  // The suggestion the server prepared with the line keeps it, and that
+  // preview is what Apply puts in the editor.
+  const suggested: DraftPreparation = {
+    ...english,
+    proposal: { ...english.proposal!, body: withAiDisclosure(body) },
+  };
+  const settingOn = { alwaysDiscloseAi: true, onAiDisclosureChange() {}, draftBody: body };
+  const kept = renderEnglish(suggested, settingOn);
+  assert.doesNotMatch(switchOf(kept), /checked/);
+  assert.match(preview(kept), new RegExp(`<p>${line}</p>`));
+  // A saved choice still decides, for the switch and the suggestion.
   assert.match(
     switchOf(renderEnglish(ruled, { aiDisclosure: true, onAiDisclosureChange() {}, draftBody: body })),
     /checked=""/,
   );
+  const declined = renderEnglish(suggested, { ...settingOn, aiDisclosure: false });
+  assert.doesNotMatch(preview(declined), new RegExp(line));
 });
 
 test("a saved choice is controlled by the draft PATCH callback; read-only panels lock it", () => {

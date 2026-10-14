@@ -213,7 +213,8 @@ inside its sandbox. The macOS canary is **OWNER**.
 - "Measure again" in Settings > Data & privacy measures again instead of
   showing the minute-old report.
 - The AI-disclosure switch shows what the description holds until a choice
-  is saved.
+  is saved; the suggestion keeps the line that the setting or the project's
+  rules ask for, so applying it adds the line.
 - The message for a local project that cannot be updated says what to do
   now that BELL PR clones local projects.
 - GitHub projects are cloned in full, so private repositories and
