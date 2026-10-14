@@ -84,6 +84,8 @@ export interface ReadinessNoticeProps {
   onReadyChange?: (ready: boolean) => void;
   /** Masks the e-mail addresses that check details and fixes may contain. */
   maskUser?: (value: string) => string;
+  /** Masks the absolute paths that check details may contain. */
+  maskPath?: (value: string) => string;
 }
 
 /**
@@ -97,6 +99,7 @@ export function ReadinessNotice({
   doctor,
   onReadyChange,
   maskUser = (value) => value,
+  maskPath = (value) => value,
 }: ReadinessNoticeProps) {
   const own = useDoctor({ enabled: !bypass && !doctor });
   const state = doctor ?? own;
@@ -111,6 +114,7 @@ export function ReadinessNotice({
       readiness={readiness}
       error={bypass ? "" : state.error}
       maskUser={maskUser}
+      maskPath={maskPath}
     />
   );
 }
@@ -120,10 +124,12 @@ export function ReadinessMessage({
   readiness,
   error = "",
   maskUser = (value) => value,
+  maskPath = (value) => value,
 }: {
   readiness: Readiness;
   error?: string;
   maskUser?: (value: string) => string;
+  maskPath?: (value: string) => string;
 }) {
   const t = useT("setup");
   if (readiness.ready) return null;
@@ -150,7 +156,7 @@ export function ReadinessMessage({
                 <p key={check.id} className="readiness-detail">
                   {t.readiness.detail({
                     check: t.checklist.labels[check.id],
-                    detail: maskedDetail(check, maskUser)!,
+                    detail: maskedDetail(check, maskUser, maskPath)!,
                   })}
                 </p>
               ))}

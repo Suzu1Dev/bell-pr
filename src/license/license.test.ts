@@ -169,7 +169,7 @@ const card = (summary: LicenseSummary | undefined, props: Partial<Parameters<typ
 test("the license card shows a Pro license and masks the licensee when asked", () => {
   const html = renderEn(card(pro));
   assertNoHan(html);
-  assert.match(html, /<h3 id="[^"]+">License<\/h3>/);
+  assert.match(html, /<h3 id="[^"]+">Your plan<\/h3>/);
   assert.match(html, />PRO</);
   assert.doesNotMatch(html, /BETA/);
   assert.match(html, /Pro is active\./);
