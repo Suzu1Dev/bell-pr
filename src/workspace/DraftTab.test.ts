@@ -208,3 +208,20 @@ test("maintainer feedback on a published PR can be picked for the next round, up
   // The demo has no target branch to sync with.
   assert.doesNotMatch(render({ demo: true }), /同步到最新目標分支/);
 });
+
+test("the target branch panel waits until the run has a checkout to sync", () => {
+  const unpublished: Run = {
+    ...published,
+    prUrl: undefined,
+    publishedBranch: undefined,
+    followUps: undefined,
+    prFeedback: undefined,
+  };
+  // Queued, or failed before its checkout: no base commit yet.
+  for (const status of ["queued", "failed"] as const) {
+    const html = render({ run: { ...unpublished, status, baseSha: "" } });
+    assert.doesNotMatch(html, /sync-panel/, status);
+    assert.doesNotMatch(html, /同步到最新目標分支/, status);
+  }
+  assert.match(render({ run: { ...unpublished, status: "review" } }), /同步到最新目標分支/);
+});

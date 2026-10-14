@@ -141,7 +141,8 @@ export function DraftTab({
   } = rounds;
   return (
     <div className="draft-workspace">
-      {!demo && (
+      {/* A run has a base only once its checkout exists; a queued run has nothing to sync. */}
+      {!demo && !!run.baseSha && (
         <SyncPanel
           run={run}
           busy={busy}

@@ -29,12 +29,18 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
   const open = holder?.unresolved ?? conflicts;
   // Only the conflict agent; a run's team can also be running after a sync.
   const running = !!holder?.resolving;
+  const syncable = ["review", "approved", "awaiting_plan"].includes(run.status);
   const canSync =
     !busy &&
     !run.publishing &&
     (published
       ? run.status === "published" && !round
-      : ["review", "approved", "awaiting_plan"].includes(run.status));
+      : syncable);
+  // Why an unpublished run cannot sync, unless the conflict agent is at work.
+  const waitNote =
+    published || running || syncable
+      ? ""
+      : "只有審閱中、已核准或等待計畫核准的工作可以同步到最新目標分支。";
   const canUndo =
     !published &&
     !!run.sync &&
@@ -61,6 +67,7 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
               {new Date(run.sync.at).toLocaleString("zh-TW")}
             </p>
           )}
+          {waitNote && <p className="sync-panel-meta">{waitNote}</p>}
           {published && round && !syncRound && (
             <p className="sync-panel-meta">
               這個 PR 有一輪修正在進行；完成或放棄後才能同步。

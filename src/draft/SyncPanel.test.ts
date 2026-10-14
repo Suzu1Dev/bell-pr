@@ -98,3 +98,12 @@ test("resolved conflicts drop the agent action, and a run awaiting plan approval
   assert.doesNotMatch(team, /正在解衝突/);
   assert.equal(button(team, "請 Agent 解決衝突"), "disabled");
 });
+
+test("an unpublished run that cannot sync says why", () => {
+  for (const status of ["running", "failed", "cancelled"] as const) {
+    const html = render({ ...base, status });
+    assert.equal(button(html, "同步到最新目標分支"), "disabled", status);
+    assert.match(html, /只有審閱中、已核准或等待計畫核准的工作可以同步/, status);
+  }
+  assert.doesNotMatch(render(base), /只有審閱中/);
+});
