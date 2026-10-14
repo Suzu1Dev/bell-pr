@@ -18,7 +18,7 @@ import { networkConfig } from "./repositories.js";
 import { assertRemoteHead, prHasCommit, remoteBranchHead } from "./pr-branch.js";
 import { assertConflictsResolved } from "./sync-runs.js";
 import type { WorkbenchContext } from "./workbench.js";
-import { sm } from "./i18n/index.js";
+import { currentLocale, sm } from "./i18n/index.js";
 
 const now = () => new Date().toISOString();
 
@@ -143,9 +143,12 @@ export async function approve(
       const unreviewable = await unreviewableRoundPaths(run, round, files);
       if (unreviewable.length) throw unreviewableError(unreviewable);
     } else {
-      const unfinished = draftPreflight({ body: run.draft.body }).find(
-        (check) => check.kind === "block",
-      );
+      // The checks explain themselves in the request's locale; the
+      // acknowledgements below match their ids, never their text.
+      const unfinished = draftPreflight(
+        { body: run.draft.body },
+        currentLocale(),
+      ).find((check) => check.kind === "block");
       if (unfinished)
         throw new AppError(
           [unfinished.message, ...unfinished.details].join("\n"),
@@ -219,11 +222,14 @@ export async function publish(
         409,
       );
     // Runs approved before these checks existed are held to them as well.
-    const checks = draftPreflight({
-      body: run.draft.body,
-      sources: run.draftPreparation?.context?.sources,
-      proposalBody: run.draftPreparation?.proposal?.body,
-    });
+    const checks = draftPreflight(
+      {
+        body: run.draft.body,
+        sources: run.draftPreparation?.context?.sources,
+        proposalBody: run.draftPreparation?.proposal?.body,
+      },
+      currentLocale(),
+    );
     const blocking = checks.find((check) => check.kind === "block");
     if (blocking)
       throw new AppError(
