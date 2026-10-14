@@ -1,7 +1,8 @@
 /**
  * Freeing disk space and deleting data: a run's working files (its Git
  * worktree, its teammates' checkouts, its branch in BELL's own clone and
- * its sync ref), whole runs, projects and all data.
+ * its sync ref), whole runs, projects and all data, plus the retention
+ * period that frees finished runs' files on its own.
  *
  * Nothing outside the data directory is deleted. In a repository the
  * person imported from their own disk, only Git's records of BELL's
@@ -12,15 +13,51 @@ import { lstat, readdir, rm, truncate } from "node:fs/promises";
 import type { Stats } from "node:fs";
 import path from "node:path";
 import { git } from "./process.js";
-import { AppError, type Repository, type Run } from "./types.js";
+import { AppError, withRunLocale, type Repository, type Run } from "./types.js";
+import { activeFollowUp } from "../shared/followups.js";
 import { managedClone } from "./repositories.js";
 import { runBusy } from "./sync-runs.js";
 import { log } from "./log.js";
 import { sm } from "./i18n/index.js";
 import type { WorkbenchContext } from "./workbench.js";
 
+const dayMs = 24 * 60 * 60 * 1000;
 /** Statuses whose files a cleanup must leave alone: the run is still working on them. */
 const activeStatuses: Run["status"][] = ["queued", "running", "awaiting_plan"];
+/** Statuses the retention period applies to; review, approved and the active ones never. */
+const finishedStatuses: Run["status"][] = ["published", "cancelled", "failed"];
+
+let retentionDaysSource: (() => number | undefined) | undefined;
+
+/**
+ * Sets where the retention period (in days) comes from, such as the app
+ * settings. Without a source, or when it returns nothing valid,
+ * BELLPR_RETENTION_DAYS applies, then 14 days. No argument removes it.
+ */
+export function setRetentionDaysSource(fn?: () => number | undefined): void {
+  retentionDaysSource = fn;
+}
+
+const validDays = (value: unknown) =>
+  typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 365
+    ? value
+    : undefined;
+
+/** Days after its last activity that a finished run keeps its working files. */
+export function retentionDays(): number {
+  let configured: number | undefined;
+  try {
+    configured = validDays(retentionDaysSource?.());
+  } catch {
+    // An unreadable setting must not stop cleanup; use the next source.
+  }
+  const fromEnvironment = process.env.BELLPR_RETENTION_DAYS?.trim();
+  return (
+    configured ??
+    validDays(fromEnvironment ? Number(fromEnvironment) : undefined) ??
+    14
+  );
+}
 
 /** True when `child` is strictly inside `parent` (both made absolute). */
 export function insideDirectory(parent: string, child: string) {
@@ -177,6 +214,7 @@ export async function archiveRunWorkspace(
   ctx: WorkbenchContext,
   run: Run,
   repo: Repository | undefined = findRepository(ctx, run.repoId),
+  options: { retentionDays?: number } = {},
 ) {
   return ctx.lock(run.id, async () => {
     if (run.workspaceRemovedAt) return run;
@@ -187,8 +225,18 @@ export async function archiveRunWorkspace(
     const bytes = await removeWorkspace(ctx, run, repo);
     run.workspaceRemovedAt = new Date().toISOString();
     run.workspaceBytes = bytes;
-    ctx.log(run, "system", sm().storage.workspace.removedLog({ bytes }));
-    log.info("run.workspace_removed", { runId: run.id, bytes });
+    ctx.log(
+      run,
+      "system",
+      options.retentionDays
+        ? sm().storage.workspace.retentionLog({ bytes, days: options.retentionDays })
+        : sm().storage.workspace.removedLog({ bytes }),
+    );
+    log.info("run.workspace_removed", {
+      runId: run.id,
+      bytes,
+      reason: options.retentionDays ? "retention" : "request",
+    });
     await ctx.store.save();
     return run;
   });
@@ -295,4 +343,52 @@ export async function eraseAll(ctx: WorkbenchContext, confirm: unknown) {
   await ctx.store.save();
   log.warn("data.erased", counts);
   return { erased: counts };
+}
+
+/** When the run last changed: its newest log line, round or sync. */
+function lastActivity(run: Run) {
+  const times = [
+    run.createdAt,
+    run.logs.at(-1)?.time,
+    run.sync?.at,
+    ...(run.followUps ?? []).flatMap((round) => [round.requestedAt, round.publishedAt]),
+  ]
+    .map((time) => (time ? Date.parse(time) : NaN))
+    .filter(Number.isFinite);
+  return times.length ? Math.max(...times) : 0;
+}
+
+/**
+ * Frees the working files of published, cancelled and failed runs whose
+ * last activity is older than the retention period. Runs that are queued,
+ * running, awaiting their plan, in review, approved or publishing, and
+ * published runs with an open round, are never touched. Each run's log
+ * line is written in the run's own language.
+ */
+export async function applyRetention(ctx: WorkbenchContext, now = Date.now()) {
+  const days = retentionDays();
+  const cutoff = now - days * dayMs;
+  const archived: string[] = [];
+  for (const run of [...ctx.store.data.runs]) {
+    if (
+      !finishedStatuses.includes(run.status) ||
+      run.workspaceRemovedAt ||
+      activeFollowUp(run.followUps) ||
+      runActive(ctx, run) ||
+      lastActivity(run) > cutoff ||
+      !(await ownsWorkspace(ctx, run))
+    )
+      continue;
+    try {
+      await withRunLocale(run, () =>
+        archiveRunWorkspace(ctx, run, undefined, { retentionDays: days }),
+      );
+      archived.push(run.id);
+    } catch (error) {
+      log.warn("retention.skipped", { runId: run.id, error });
+    }
+  }
+  if (archived.length)
+    log.info("retention.applied", { days, runs: archived.length });
+  return archived;
 }

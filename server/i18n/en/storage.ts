@@ -1,5 +1,7 @@
-import { intlLocale } from "../../../shared/i18n/locale.js";
+import { formatters, intlLocale } from "../../../shared/i18n/locale.js";
 import { product } from "../../../shared/product.js";
+
+const fmt = formatters("en");
 
 /** A disk size such as "12.3 MB"; anything under 1 kB still shows as kB. */
 const size = (bytes: number) => {
@@ -41,6 +43,9 @@ export default {
     /** A run log line after the person freed the space. */
     removedLog: ({ bytes }: { bytes: number }) =>
       `Removed this run's working files and freed ${size(bytes)}; reports, notes and explanations are kept.`,
+    /** A run log line after the retention period removed them. */
+    retentionLog: ({ bytes, days }: { bytes: number; days: number }) =>
+      `Removed this run's working files ${fmt.number(days)} ${fmt.plural(days) === "one" ? "day" : "days"} after it ended and freed ${size(bytes)}; reports, notes and explanations are kept.`,
     busy: "This run is still working. Stop it or wait until it finishes, then try again.",
     outsideData:
       `This run's working directory is outside ${product.name}'s data directory, so it is left as it is.`,

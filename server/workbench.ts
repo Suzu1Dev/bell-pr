@@ -42,6 +42,8 @@ import * as followUps from "./followup-runs.js";
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
+/** How often the retention period is applied while the server runs. */
+const retentionIntervalMs = 24 * 60 * 60 * 1000;
 
 /**
  * What the modules that do the Workbench's work receive instead of the
@@ -145,6 +147,9 @@ export class Workbench {
    */
   readonly entitlements: () => Entitlements;
   private readonly context: WorkbenchContext;
+  /** The first retention pass; never rejects. */
+  readonly maintenance: Promise<void>;
+  private retentionTimer?: NodeJS.Timeout;
   constructor(
     public store: Store,
     agentRunner?: TeamAgentRunner,
@@ -203,7 +208,21 @@ export class Workbench {
       explanations: (id) => this.explanations(id),
       prepareRunDraft: (id, options) => this.prepareRunDraft(id, options),
     };
+    this.maintenance = this.startMaintenance();
+    this.retentionTimer = setInterval(() => {
+      void this.applyRetention();
+    }, retentionIntervalMs);
+    this.retentionTimer.unref();
     this.resume();
+  }
+
+  /** Frees the files of runs past the retention period once at the start. */
+  private async startMaintenance() {
+    try {
+      await this.applyRetention();
+    } catch (error) {
+      log.warn("maintenance.failed", { error });
+    }
   }
 
   /**
@@ -239,6 +258,17 @@ export class Workbench {
     }
     if (failed) void this.store.save().catch(() => undefined);
     this.drain();
+  }
+
+  /** Frees the files of finished runs past the retention period (cleanup.ts). */
+  async applyRetention() {
+    if (this.stopping) return [];
+    try {
+      return await cleanup.applyRetention(this.context);
+    } catch (error) {
+      log.warn("retention.failed", { error });
+      return [];
+    }
   }
 
   /** Queued, running and paused runs together; grows with the active limit. */
@@ -728,6 +758,7 @@ export class Workbench {
 
   async shutdown() {
     this.stopping = true;
+    clearInterval(this.retentionTimer);
     // A run that never started stays queued and starts again on the next
     // start (resume); one that already has a worktree is cancelled.
     for (const id of this.queue) {
@@ -736,7 +767,7 @@ export class Workbench {
     }
     this.queue = [];
     for (const controller of this.controllers.values()) controller.abort();
-    await Promise.allSettled([...this.jobs]);
+    await Promise.allSettled([...this.jobs, this.maintenance]);
     await this.store.save();
   }
 }

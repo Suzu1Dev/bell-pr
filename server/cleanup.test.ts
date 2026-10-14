@@ -20,9 +20,14 @@ import { Workbench } from "./workbench.js";
 import { createApp } from "./app.js";
 import { log } from "./log.js";
 import { withLocale } from "./i18n/index.js";
-import { insightsCachePath } from "./cleanup.js";
+import {
+  insightsCachePath,
+  retentionDays,
+  setRetentionDaysSource,
+} from "./cleanup.js";
 import type { Repository, Run } from "./types.js";
 
+const dayMs = 24 * 60 * 60 * 1000;
 
 const exists = (target: string) =>
   lstat(target).then(
@@ -48,6 +53,7 @@ async function fixture(options: { login?: string } = {}) {
   const store = new Store(dataDir);
   await store.initialize();
   const workbench = new Workbench(store);
+  await workbench.maintenance;
   const app = createApp(workbench, { staticDirectory: path.join(directory, "missing") });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -270,6 +276,80 @@ test("a repository on the person's disk keeps the run's branch, and active or ou
     f.store.data.runs.map((entry) => entry.id),
     [value.id, busy.id],
   );
+});
+
+test("retention frees only finished runs past the period and never touches active ones", async (t) => {
+  const f = await fixture();
+  const previous = process.env.BELLPR_RETENTION_DAYS;
+  t.after(async () => {
+    setRetentionDaysSource();
+    if (previous === undefined) delete process.env.BELLPR_RETENTION_DAYS;
+    else process.env.BELLPR_RETENTION_DAYS = previous;
+    await f.cleanup();
+  });
+  const repoPath = path.join(f.directory, "repo");
+  const baseSha = await gitRepository(repoPath);
+  const repo = await f.workbench.importRepository(repoPath);
+  const old = new Date(Date.now() - 40 * dayMs).toISOString();
+  const recent = new Date(Date.now() - 2 * dayMs).toISOString();
+  const fields = (status: Run["status"], at = old): Partial<Run> => ({
+    status,
+    createdAt: at,
+    logs: [{ time: at, agent: "system", message: "Last activity" }],
+  });
+  const make = (id: string, extra: Partial<Run>) =>
+    runWithWorkspace(f, repo, baseSha, `${id}-0000-4000-8000-000000000000`.slice(0, 36), extra);
+  const eligible = [
+    await make("0000fail", { ...fields("failed"), locale: "zh-TW" }),
+    await make("00cancel", fields("cancelled")),
+    await make("0publish", fields("published")),
+  ];
+  const kept = [
+    await make("00queued", fields("queued")),
+    await make("0running", fields("running")),
+    await make("00paused", fields("awaiting_plan")),
+    await make("00review", fields("review")),
+    await make("approved", fields("approved")),
+    await make("pushing0", { ...fields("approved"), publishing: true }),
+    await make("00recent", fields("failed", recent)),
+    // A published PR with an open round keeps its checkout.
+    await make("00rounds", {
+      ...fields("published"),
+      followUps: [
+        { id: "r1", requestedAt: old, feedbackUrls: [], status: "review", parentCommit: baseSha },
+      ],
+    }),
+    // A follow-up round last week counts as activity.
+    await make("00active", {
+      ...fields("published"),
+      followUps: [
+        { id: "r1", requestedAt: recent, feedbackUrls: [], status: "published", parentCommit: baseSha },
+      ],
+    }),
+  ];
+  // Older than the period by the configured source, not by the environment.
+  process.env.BELLPR_RETENTION_DAYS = "60";
+  assert.equal(retentionDays(), 60);
+  assert.deepEqual(await f.workbench.applyRetention(), []);
+  setRetentionDaysSource(() => 30);
+  assert.equal(retentionDays(), 30);
+  const archived = await f.workbench.applyRetention();
+  assert.deepEqual(archived.sort(), eligible.map((value) => value.id).sort());
+  for (const value of eligible) {
+    assert.ok(value.workspaceRemovedAt);
+    assert.equal(await exists(value.worktreePath), false);
+  }
+  for (const value of kept) {
+    assert.equal(value.workspaceRemovedAt, undefined, value.id);
+    assert.equal(await exists(value.worktreePath), true, value.id);
+  }
+  // The log line is in the run's own language.
+  assert.match(eligible[0].logs.at(-1)!.message, /^這個工作結束 30 天後已移除工作檔案/);
+  // An invalid source falls back to the environment, then 14 days.
+  setRetentionDaysSource(() => 0);
+  assert.equal(retentionDays(), 60);
+  process.env.BELLPR_RETENTION_DAYS = "soon";
+  assert.equal(retentionDays(), 14);
 });
 
 test("deleting a project is refused while a run works, then removes its clone, runs and analysis", async (t) => {
