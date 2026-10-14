@@ -1,16 +1,84 @@
 import { readFileSync } from "node:fs";
-import { defineConfig } from "vite";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
 const { version } = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
 ) as { version: string };
+const root = path.dirname(fileURLToPath(import.meta.url));
+
+/** The node_modules package directory a module id belongs to, if any. */
+function packageDirectory(id: string): string | undefined {
+  const file = id.replace(/^\0/, "").replace(/\?.*$/, "").replace(/\\/g, "/");
+  const marker = "/node_modules/";
+  const start = file.lastIndexOf(marker);
+  if (start < 0) return undefined;
+  const parts = file.slice(start + marker.length).split("/");
+  const name = parts[0].startsWith("@") ? parts.slice(0, 2).join("/") : parts[0];
+  return path.posix.join(path.relative(root, file.slice(0, start)).replace(/\\/g, "/"), "node_modules", name);
+}
+
+/**
+ * Writes dist/.vite/bundled-modules.json: the npm packages whose code ends
+ * up in dist/assets, for scripts/generate-third-party-notices.mjs. Vite's
+ * own helpers (module preload, CommonJS interop) count as the vite package.
+ */
+function bundledModules(): Plugin {
+  return {
+    name: "bellpr-bundled-modules",
+    apply: "build",
+    generateBundle() {
+      const directories = new Set<string>();
+      for (const id of this.getModuleIds()) {
+        const directory = packageDirectory(id);
+        if (directory) directories.add(directory);
+        else if (/^\0(vite\/|commonjsHelpers)/.test(id))
+          directories.add("node_modules/vite");
+      }
+      const packages = [...directories].sort().map((directory) => ({
+        name: directory.slice(directory.lastIndexOf("node_modules/") + 13),
+        path: directory,
+      }));
+      this.emitFile({
+        type: "asset",
+        fileName: ".vite/bundled-modules.json",
+        source: `${JSON.stringify({ packages }, null, 2)}\n`,
+      });
+    },
+  };
+}
+
+/**
+ * Stable vendor code and the sample project get chunks of their own, which
+ * browsers keep cached across releases that only change the app. The
+ * Markdown stack is loaded on demand only.
+ */
+function manualChunks(id: string): string | undefined {
+  const file = id.replace(/\\/g, "/");
+  if (/\/node_modules\/(react|react-dom|scheduler)\//.test(file)) return "react";
+  if (
+    /\/node_modules\/(react-markdown|remark-[^/]+|micromark[^/]*|mdast-util-[^/]+|hast-util-[^/]+|unist-util-[^/]+|unified|vfile[^/]*)\//.test(
+      file,
+    )
+  )
+    return "markdown";
+  if (file.includes("/src/demo/")) return "demo";
+  return undefined;
+}
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), bundledModules()],
   // Worktrees that share node_modules must not share Vite's optimizer cache.
   cacheDir: ".vite-cache",
   define: { __APP_VERSION__: JSON.stringify(version) },
+  build: {
+    // The largest chunk's budget in kB (minified, before gzip); the gzip
+    // budgets live in scripts/check-pack.mjs.
+    chunkSizeWarningLimit: 450,
+    rollupOptions: { output: { manualChunks } },
+  },
   server: {
     proxy: { "/api": { target: "http://127.0.0.1:4311", changeOrigin: true } },
   },
