@@ -2304,7 +2304,8 @@ export class Workbench {
         }),
         controller.signal,
         true,
-        { outputSchema },
+        // Isolated keeps it offline and out of the team inbox; it still reads this checkout.
+        { outputSchema, isolated: true },
       );
       const content = parseWalkthrough(
         answer,
@@ -2343,9 +2344,17 @@ export class Workbench {
    * unchanged code around its hunks. The fingerprint ties the request to the
    * diff the person sees; added and deleted files are shown whole already.
    */
-  async contextLines(id: string, filePath: string, fingerprint: string) {
+  async contextLines(
+    id: string,
+    filePath: string,
+    fingerprint: string,
+    baseSha: string,
+  ) {
     return this.lock(id, async () => {
       const run = this.run(id);
+      // A sync can keep a patch, and so its fingerprint, while the base moves.
+      if (run.baseSha !== baseSha)
+        throw new AppError("工作的基準已更新，請重新整理差異。", 409);
       const file = (await readDiff(run)).find(
         (entry) => entry.path === filePath,
       );

@@ -174,15 +174,26 @@ export function WalkthroughCards({
               </h4>
               <ol>
                 {unit.steps.map((step, index) => (
-                  <li key={`${step.startLine}:${index}`}>
+                  <li
+                    key={`${step.startLine}:${index}`}
+                    className={
+                      selected(step.startLine, step.endLine)
+                        ? "walkthrough-step-selected"
+                        : undefined
+                    }
+                  >
+                    {/* The control is the line range; the explanation stays outside it, links and all. */}
                     <button
                       type="button"
+                      className="walkthrough-step-lines"
                       aria-pressed={selected(step.startLine, step.endLine)}
                       onClick={() => mark(step.startLine, step.endLine)}
+                      title="在程式碼中標示這幾行"
                     >
-                      <span className="walkthrough-step-lines">{lines(step.startLine, step.endLine)}</span>
-                      <MarkdownContent>{step.explanation}</MarkdownContent>
+                      <Locate size={11} />
+                      {lines(step.startLine, step.endLine)}
                     </button>
+                    <MarkdownContent>{step.explanation}</MarkdownContent>
                   </li>
                 ))}
               </ol>
