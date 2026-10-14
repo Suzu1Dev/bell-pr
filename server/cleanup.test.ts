@@ -310,6 +310,25 @@ test("a repository on the person's disk keeps the run's branch, and active or ou
   );
 });
 
+test("BELL's clone of a local-only checkout is its own: freeing a run deletes the run's branch there", async (t) => {
+  const f = await fixture();
+  t.after(f.cleanup);
+  const checkout = path.join(f.directory, "local-only");
+  await gitRepository(checkout);
+  const repo = await f.workbench.importRepository(checkout);
+  assert.equal(repo.url, "");
+  assert.equal(f.workbench.managedClone(repo), false);
+  const baseSha = (await git(repo.path, ["rev-parse", "HEAD"])).stdout.trim();
+  const value = await runWithWorkspace(f, repo, baseSha, "eeeeeeee-5555-4555-8555-555555555555");
+  const storage = (await f.call("GET", "/api/storage")).body;
+  assert.equal(storage.repos[0].managed, true);
+  assert.ok(storage.repos[0].bytes > 0);
+  assert.equal((await f.call("DELETE", `/api/runs/${value.id}/workspace`, {})).status, 200);
+  assert.equal((await git(repo.path, ["branch", "--list", value.branch])).stdout.trim(), "");
+  // The person's checkout never had the branch.
+  assert.equal((await git(checkout, ["branch", "--list", value.branch])).stdout.trim(), "");
+});
+
 test("retention frees only finished runs past the period and never touches active ones", async (t) => {
   const f = await fixture();
   const previous = process.env.BELLPR_RETENTION_DAYS;

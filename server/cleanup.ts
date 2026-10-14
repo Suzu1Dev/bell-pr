@@ -15,7 +15,6 @@ import path from "node:path";
 import { git } from "./process.js";
 import { AppError, withRunLocale, type Repository, type Run } from "./types.js";
 import { activeFollowUp } from "../shared/followups.js";
-import { managedClone } from "./repositories.js";
 import { runBusy } from "./sync-runs.js";
 import { log } from "./log.js";
 import { redact } from "./secrets.js";
@@ -68,6 +67,15 @@ export function insideDirectory(parent: string, child: string) {
     relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative)
   );
 }
+
+/**
+ * BELL's own clone under <data>/repositories, of a GitHub project or of a
+ * local-only checkout; false for a repository on the person's disk that an
+ * earlier build worked in. (managedClone also needs a GitHub URL: it says
+ * whether the clone can be updated.)
+ */
+const ownClone = (directory: string, repo: Repository) =>
+  insideDirectory(path.join(directory, "repositories"), repo.path);
 
 const exists = (target: string) =>
   lstat(target).then(
@@ -202,7 +210,7 @@ async function removeWorkspace(
     // Only BELL's own clone; a person's repository keeps every branch.
     if (
       repo &&
-      managedClone(ctx.store.directory, repo) &&
+      ownClone(ctx.store.directory, repo) &&
       run.branch &&
       run.branch !== repo.defaultBranch &&
       run.branch !== run.baseBranch
@@ -294,12 +302,12 @@ export async function removeRepository(ctx: WorkbenchContext, id: string) {
   await ctx.lock(`repository:${id}`, async () => {
     // A run started meanwhile keeps the project.
     if (runsOf().length) throw new AppError((m) => m.storage.repos.busy, 409);
-    if (insideDirectory(path.join(ctx.store.directory, "repositories"), repo.path))
+    if (ownClone(ctx.store.directory, repo))
       await rm(repo.path, { recursive: true, force: true });
     await rm(insightsCachePath(ctx.store.directory, id), { force: true });
     const index = ctx.store.data.repos.indexOf(repo);
     if (index >= 0) ctx.store.data.repos.splice(index, 1);
-    log.info("repo.removed", { repoId: id, clone: managedClone(ctx.store.directory, repo) });
+    log.info("repo.removed", { repoId: id, clone: ownClone(ctx.store.directory, repo) });
     invalidateStorageReport(ctx);
     await ctx.store.save();
   });
@@ -518,7 +526,6 @@ async function buildStorageReport(ctx: WorkbenchContext): Promise<StorageReport>
       };
     }),
   );
-  const clones = path.join(directory, "repositories");
   return {
     measuredAt: new Date().toISOString(),
     retentionDays: retentionDays(),
@@ -526,11 +533,11 @@ async function buildStorageReport(ctx: WorkbenchContext): Promise<StorageReport>
     logsBytes: sizes.get(path.join(directory, "logs")) ?? 0,
     insightsBytes: sizes.get(path.join(directory, "insights")) ?? 0,
     repos: data.repos.map((repo) => {
-      const inside = insideDirectory(clones, repo.path);
+      const inside = ownClone(directory, repo);
       return {
         id: repo.id,
         fullName: repo.fullName,
-        managed: managedClone(directory, repo),
+        managed: inside,
         // A clone is one directory directly under repositories/.
         bytes: inside ? (sizes.get(path.resolve(repo.path)) ?? 0) : null,
       };
