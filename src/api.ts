@@ -10,10 +10,35 @@ import { getCurrentLocale, getCurrentMessages } from "./i18n";
 /** Window event sent when the server answers 402 `pro_required`; `detail` is the error body. */
 export const proRequiredEvent = "bellpr:pro-required";
 
+/**
+ * Window event sent once per page when the server answers 401
+ * `auth_required`: the session ended, for example because BELL PR
+ * restarted. It is cancelable; unless a listener calls preventDefault(),
+ * the page reloads, and the server then shows its sign-in page with the
+ * steps to get a new link.
+ */
+export const authRequiredEvent = "bellpr:auth-required";
+
 declare global {
   interface WindowEventMap {
     "bellpr:pro-required": CustomEvent<ApiErrorBody>;
+    "bellpr:auth-required": CustomEvent<ApiErrorBody>;
   }
+}
+
+let sessionEndReported = false;
+
+/** Tells the page once that its session ended; see authRequiredEvent. */
+function reportSessionEnd(body: ApiErrorBody) {
+  if (sessionEndReported || typeof window === "undefined") return;
+  sessionEndReported = true;
+  const proceed = window.dispatchEvent(
+    new CustomEvent<ApiErrorBody>(authRequiredEvent, {
+      detail: body,
+      cancelable: true,
+    }),
+  );
+  if (proceed) window.location?.reload();
 }
 
 interface ApiErrorInit {
@@ -123,6 +148,8 @@ function errorFromBody(status: number, body: unknown) {
     fixes: readFixes(rawFixes),
     details,
   };
+  if (status === 401 && code === "auth_required")
+    reportSessionEnd({ ...raw, error: message } as ApiErrorBody);
   if (status !== 402 || code !== "pro_required")
     return new ApiError(message, init);
   const errorBody = { ...raw, error: message } as ApiErrorBody;
@@ -145,6 +172,9 @@ const plainTextType = /^text\/(?!html\b)/i;
  * - an error body from the server keeps its status, code, params and fixes;
  * - 402 `pro_required` throws `ProRequiredError` and sends the
  *   `bellpr:pro-required` window event;
+ * - 401 `auth_required` (the session ended) also sends the
+ *   `bellpr:auth-required` event once, which reloads the page into the
+ *   server's sign-in page unless a listener cancels it;
  * - no response, or a body that is not the API's JSON (for example a proxy
  *   page while the service is down), gives code `server_unreachable`.
  * Aborting through `options.signal` rejects with the abort error unchanged.
