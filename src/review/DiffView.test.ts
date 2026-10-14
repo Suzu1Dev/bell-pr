@@ -76,3 +76,43 @@ test("a blocked file shows the reason and disables review", () => {
   assert.match(html, /<input type="checkbox"[^>]*disabled/);
   assert.doesNotMatch(html, /rv-line-added/);
 });
+
+test("a modified file offers its unchanged code around the changes; the demo shows its files as they are", () => {
+  const file: DiffFile = {
+    path: "src/count.ts",
+    language: "TypeScript",
+    additions: 1,
+    deletions: 1,
+    status: "modified",
+    fingerprint: "f".repeat(64),
+    patch: [
+      "@@ -4,3 +4,3 @@ export function count() {",
+      " const a = 1;",
+      "-const b = 2;",
+      "+const b = 3;",
+      " const c = 4;",
+    ].join("\n"),
+  };
+  const html = renderToStaticMarkup(
+    createElement(DiffView, {
+      file,
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "unified",
+      onLoadBase: async () => [],
+    }),
+  );
+  assert.match(html, /aria-pressed="false"[^>]*>.*完整檔案/);
+  assert.match(html, /aria-label="顯示這段變更上方的 3 行"/);
+  assert.match(html, /3 行未變更/);
+  assert.match(html, /aria-label="顯示到檔案結尾"/);
+  assert.match(html, /aria-label="顯示上一段變更下方的 20 行"/);
+  // No loader: the plain hunk header, no arrows and no whole-file toggle.
+  for (const demo of demoFiles) {
+    const plain = render(demo);
+    assert.doesNotMatch(plain, /完整檔案|rv-gap/);
+  }
+  assert.doesNotMatch(render(file), /完整檔案|rv-gap/);
+  assert.match(render(file), /@@ -4,3 \+4,3 @@/);
+});

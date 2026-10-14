@@ -5,6 +5,7 @@ import path from "node:path";
 import { command, git, agentEnvironment, redact } from "./process.js";
 import {
   parseGitHubSource,
+  baseFileLines,
   readDiff,
   reviewFingerprint,
   synchronizeReview,
@@ -2227,6 +2228,28 @@ export class Workbench {
       );
     await this.store.save();
     return files;
+  }
+
+  /**
+   * The base version of a modified file in the current diff, for reading the
+   * unchanged code around its hunks. The fingerprint ties the request to the
+   * diff the person sees; added and deleted files are shown whole already.
+   */
+  async contextLines(id: string, filePath: string, fingerprint: string) {
+    return this.lock(id, async () => {
+      const run = this.run(id);
+      const file = (await readDiff(run)).find(
+        (entry) => entry.path === filePath,
+      );
+      if (!file) throw new AppError("找不到此差異檔案。", 404);
+      if (file.blocked)
+        throw new AppError("這個檔案目前無法審閱，也不會顯示周圍的程式碼。", 409);
+      if (file.fingerprint !== fingerprint)
+        throw new AppError("檔案差異已更新，請重新整理差異。", 409);
+      if (file.status !== "modified")
+        throw new AppError("新增或刪除的檔案已經完整顯示。", 409);
+      return { lines: await baseFileLines(run, filePath) };
+    });
   }
 
   async explanations(

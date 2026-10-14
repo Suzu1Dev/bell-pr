@@ -1240,6 +1240,17 @@ export default function App() {
       notify("無法使用剪貼簿，請直接選取路徑複製。", "error");
     }
   }
+  /** The file at the run's base commit, for the code around its changes. */
+  async function loadBaseLines(runId: string, target: DiffFile) {
+    const query = new URLSearchParams({
+      path: target.path,
+      fingerprint: target.fingerprint ?? "",
+    });
+    const { lines } = await api<{ lines: string[] }>(
+      `/runs/${runId}/context?${query}`,
+    );
+    return lines;
+  }
   async function rerunReview() {
     if (demo) {
       notify("目前是示範資料。匯入自己的 repository 後可重新執行審查。");
@@ -2535,6 +2546,11 @@ export default function App() {
                           onAsk={ask}
                           view={diffView}
                           hasNote={Boolean(run.notes?.[file.path]?.text)}
+                          onLoadBase={
+                            !demo && file.fingerprint
+                              ? () => loadBaseLines(run.id, file)
+                              : undefined
+                          }
                         />
                       ) : (
                         <div className="empty-state">

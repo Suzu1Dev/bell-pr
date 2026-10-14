@@ -306,6 +306,18 @@ export function createApp(
     );
     res.json({ files });
   });
+  app.get("/api/runs/:id/context", async (req, res) => {
+    const { path: filePath, fingerprint } = z
+      .object({
+        path: z.string().min(1).max(1024),
+        fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+      })
+      .strict()
+      .parse(req.query);
+    res.json(
+      await workbench.contextLines(req.params.id, filePath, fingerprint),
+    );
+  });
   app.post("/api/runs/:id/chat", async (req, res) => {
     const { filePath, question } = z
       .object({
