@@ -329,14 +329,16 @@ test("web tool use becomes a web event with the query or URL only, on both provi
   );
 });
 
-test("agent environment never forwards an Anthropic API key", (t) => {
+test("agent environment passes an Anthropic API key to Claude Code only", (t) => {
   const previous = process.env.ANTHROPIC_API_KEY;
   process.env.ANTHROPIC_API_KEY = "sk-ant-test";
   t.after(() => {
     if (previous === undefined) delete process.env.ANTHROPIC_API_KEY;
     else process.env.ANTHROPIC_API_KEY = previous;
   });
-  assert.equal(agentEnvironment().ANTHROPIC_API_KEY, undefined);
+  // Claude Code's built-in auth methods are never restricted (Anthropic's terms).
+  assert.equal(agentEnvironment("claude").ANTHROPIC_API_KEY, "sk-ant-test");
+  assert.equal(agentEnvironment("codex").ANTHROPIC_API_KEY, undefined);
 });
 
 test("Codex events keep their existing meaning", () => {

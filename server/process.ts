@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import type { AgentProvider } from "../shared/models.js";
 import { log } from "./log.js";
 import { redact } from "./secrets.js";
 import { AppError } from "./types.js";
@@ -43,24 +44,74 @@ export function observeChild(child: ChildProcess, executable: string): void {
   child.once("close", () => notify("exit", () => observer.onExit(pid)));
 }
 
-/** ANTHROPIC_API_KEY is deliberately excluded so Claude Code uses the signed-in subscription, not API billing. */
-export function agentEnvironment(): NodeJS.ProcessEnv {
+/** What every agent CLI needs to run: the shell basics and the locale. */
+const baseEnvironment = [
+  "PATH",
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "TMPDIR",
+  "LANG",
+  "LC_ALL",
+];
+
+/** The Codex CLI's home and the OpenAI keys it accepts. */
+const codexEnvironment = ["CODEX_HOME", "OPENAI_API_KEY", "CODEX_API_KEY"];
+
+/**
+ * Every way Claude Code signs in: an Anthropic API key or auth token (also
+ * through a gateway), Amazon Bedrock, Google Vertex AI, Microsoft Foundry,
+ * and the claude.ai login kept in its config directory or passed as a
+ * long-lived OAuth token.
+ */
+const claudeEnvironment = [
+  "ANTHROPIC_API_KEY",
+  "ANTHROPIC_AUTH_TOKEN",
+  "ANTHROPIC_BASE_URL",
+  "CLAUDE_CODE_USE_BEDROCK",
+  "CLAUDE_CODE_USE_VERTEX",
+  "CLAUDE_CODE_USE_FOUNDRY",
+  "CLAUDE_CODE_SKIP_BEDROCK_AUTH",
+  "CLAUDE_CODE_SKIP_VERTEX_AUTH",
+  "CLAUDE_CODE_SKIP_FOUNDRY_AUTH",
+  "ANTHROPIC_BEDROCK_BASE_URL",
+  "ANTHROPIC_VERTEX_BASE_URL",
+  "ANTHROPIC_FOUNDRY_BASE_URL",
+  "ANTHROPIC_FOUNDRY_RESOURCE",
+  "ANTHROPIC_FOUNDRY_API_KEY",
+  "AWS_ACCESS_KEY_ID",
+  "AWS_SECRET_ACCESS_KEY",
+  "AWS_SESSION_TOKEN",
+  "AWS_BEARER_TOKEN_BEDROCK",
+  "AWS_PROFILE",
+  "AWS_REGION",
+  "AWS_DEFAULT_REGION",
+  "AWS_CONFIG_FILE",
+  "AWS_SHARED_CREDENTIALS_FILE",
+  "GOOGLE_APPLICATION_CREDENTIALS",
+  "ANTHROPIC_VERTEX_PROJECT_ID",
+  "CLOUD_ML_REGION",
+  "CLAUDE_CONFIG_DIR",
+  "CLAUDE_CODE_OAUTH_TOKEN",
+];
+
+/**
+ * The environment an agent CLI runs with: nothing from the server's own
+ * environment except what that CLI needs. Claude Code receives every
+ * authentication method it supports; BELL never restricts or reads them.
+ * Codex gets only its own keys and Claude Code only its own. Without a
+ * provider the result holds both sets, for callers that have not said which
+ * CLI they start.
+ */
+export function agentEnvironment(provider?: AgentProvider): NodeJS.ProcessEnv {
+  const keys = [
+    ...baseEnvironment,
+    ...(provider === "claude" ? [] : codexEnvironment),
+    ...(provider === "codex" ? [] : claudeEnvironment),
+  ];
   const env: NodeJS.ProcessEnv = {};
-  for (const key of [
-    "PATH",
-    "HOME",
-    "USER",
-    "LOGNAME",
-    "SHELL",
-    "TMPDIR",
-    "LANG",
-    "LC_ALL",
-    "CODEX_HOME",
-    "OPENAI_API_KEY",
-    "CODEX_API_KEY",
-    "CLAUDE_CONFIG_DIR",
-    "CLAUDE_CODE_OAUTH_TOKEN",
-  ]) {
+  for (const key of keys) {
     if (process.env[key]) env[key] = process.env[key];
   }
   return { ...env, NO_COLOR: "1", GIT_TERMINAL_PROMPT: "0" };
