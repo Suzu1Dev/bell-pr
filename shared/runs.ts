@@ -1,7 +1,7 @@
 /**
  * Fields GET /api/runs leaves out. They are large (logs, reports, PR draft
  * preparation, file Q&A, PR feedback, review follow-up rounds, target-branch
- * syncs) and only the
+ * syncs, function walkthroughs) and only the
  * open run reads them; the lists only need id, title, repo, branch and status.
  */
 export const runDetailFields = [
@@ -12,6 +12,7 @@ export const runDetailFields = [
   "prFeedback",
   "followUps",
   "sync",
+  "walkthroughs",
 ] as const;
 export type RunDetailField = (typeof runDetailFields)[number];
 

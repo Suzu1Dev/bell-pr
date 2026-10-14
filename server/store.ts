@@ -40,6 +40,12 @@ export class Store {
           explanation.error = "服務重新啟動，解說產生已中斷；可重試產生解說。";
         }
       }
+      for (const walkthrough of Object.values(run.walkthroughs ?? {})) {
+        if (walkthrough.status === "generating") {
+          walkthrough.status = "failed";
+          walkthrough.error = "服務重新啟動，程式碼解說已中斷；可重試。";
+        }
+      }
       // A re-review interrupted by a crash leaves reviewer/tester agents "running" on a finished run.
       if (!["running", "queued"].includes(run.status) && !run.publishing) {
         for (const agent of run.agents)

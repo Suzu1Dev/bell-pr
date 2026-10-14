@@ -89,27 +89,22 @@ export type Reveal = Record<number, { below: number; above: number }>;
 
 const hunkHeader = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;
 
+type Hunk = {
+  header: DiffLine;
+  oldBegin: number;
+  oldCount: number;
+  newBegin: number;
+  newCount: number;
+  body: DiffLine[];
+};
+
 /**
- * The diff with unchanged lines of the base version shown around its hunks.
- * Lines outside the hunks are the same in both versions, so the base file
- * gives their text, and each gap's new line numbers are its old ones plus a
- * fixed offset. `base` is null until it is read; `readable` says whether it
- * can be (a modified file outside the demo). "all" shows the whole file.
+ * The hunks of a parsed diff and the gaps of unchanged lines around them, in
+ * old-file numbers. A gap's new numbers are its old ones plus offset; the
+ * last gap's end is null until the base version is known.
  */
-export function expandDiff(
-  lines: DiffLine[],
-  base: string[] | null,
-  reveal: Reveal | "all",
-  readable: boolean,
-): DiffLine[] {
-  const hunks: {
-    header: DiffLine;
-    oldBegin: number;
-    oldCount: number;
-    newBegin: number;
-    newCount: number;
-    body: DiffLine[];
-  }[] = [];
+function diffGaps(lines: DiffLine[], base: string[] | null) {
+  const hunks: Hunk[] = [];
   for (const line of lines) {
     const match = line.kind === "hunk" ? hunkHeader.exec(line.text) : null;
     if (match) {
@@ -126,7 +121,41 @@ export function expandDiff(
       });
     } else hunks.at(-1)?.body.push(line);
   }
-  if (!hunks.length) return lines;
+  const gaps = hunks.length
+    ? Array.from({ length: hunks.length + 1 }, (_, index) => {
+        const previous = hunks[index - 1];
+        const next = hunks[index];
+        const start = previous ? previous.oldBegin + previous.oldCount : 1;
+        return {
+          index,
+          previous,
+          next,
+          start,
+          end: next ? next.oldBegin - 1 : base ? base.length : null,
+          offset: next
+            ? next.newBegin - next.oldBegin
+            : previous.newBegin + previous.newCount - start,
+        };
+      })
+    : [];
+  return gaps;
+}
+
+/**
+ * The diff with unchanged lines of the base version shown around its hunks.
+ * Lines outside the hunks are the same in both versions, so the base file
+ * gives their text, and each gap's new line numbers are its old ones plus a
+ * fixed offset. `base` is null until it is read; `readable` says whether it
+ * can be (a modified file outside the demo). "all" shows the whole file.
+ */
+export function expandDiff(
+  lines: DiffLine[],
+  base: string[] | null,
+  reveal: Reveal | "all",
+  readable: boolean,
+): DiffLine[] {
+  const gaps = diffGaps(lines, base);
+  if (!gaps.length) return lines;
   const result: DiffLine[] = [];
   const push = (line: Omit<DiffLine, "id">) =>
     result.push({ ...line, id: result.length });
@@ -143,14 +172,7 @@ export function expandDiff(
       });
     }
   };
-  for (let index = 0; index <= hunks.length; index++) {
-    const previous = hunks[index - 1];
-    const next = hunks[index];
-    const start = previous ? previous.oldBegin + previous.oldCount : 1;
-    const offset = next
-      ? next.newBegin - next.oldBegin
-      : previous.newBegin + previous.newCount - start;
-    const end = next ? next.oldBegin - 1 : base ? base.length : null;
+  for (const { index, previous, next, start, end, offset } of gaps) {
     const size = end === null ? null : Math.max(0, end - start + 1);
     const gap = {
       index,
@@ -188,6 +210,45 @@ export function expandDiff(
     for (const line of next?.body ?? []) push({ ...line });
   }
   return result;
+}
+
+/**
+ * The reveal that also shows lines startLine to endLine of the current file.
+ * Lines already shown change nothing; otherwise a gap opens upward from the
+ * change below it when the range reaches that change or the lines already
+ * opened there (or is nearer to it), and downward from the change above
+ * otherwise. A function around a change so appears whole without
+ * unrolling the rest of the gap.
+ */
+export function revealLines(
+  lines: DiffLine[],
+  base: string[],
+  reveal: Reveal,
+  startLine: number,
+  endLine: number,
+): Reveal {
+  const next = { ...reveal };
+  for (const gap of diffGaps(lines, base)) {
+    if (gap.end === null) continue;
+    const first = Math.max(gap.start, startLine - gap.offset);
+    const last = Math.min(gap.end, endLine - gap.offset);
+    if (first > last) continue;
+    const shown = next[gap.index] ?? { below: 0, above: 0 };
+    const belowEnd = gap.start + shown.below - 1;
+    const aboveStart = gap.end - shown.above + 1;
+    let hidden = false;
+    for (let line = first; line <= last && !hidden; line++)
+      hidden = line > belowEnd && line < aboveStart;
+    if (!hidden) continue;
+    // Grow the side the range touches, or the nearer one.
+    const upward =
+      !!gap.next &&
+      (last >= aboveStart - 1 || gap.end - last < first - gap.start);
+    next[gap.index] = upward
+      ? { ...shown, above: Math.max(shown.above, gap.end - first + 1) }
+      : { ...shown, below: Math.max(shown.below, last - gap.start + 1) };
+  }
+  return next;
 }
 
 /**

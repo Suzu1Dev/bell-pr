@@ -1595,3 +1595,157 @@
   color: #985b3e;
   font-size: 11px;
 }
+.rv-line-highlighted {
+  box-shadow: inset 3px 0 0 #8ca780;
+}
+.rv-line-context.rv-line-highlighted {
+  background: #f1f7ea;
+}
+
+/* Walkthroughs of the functions around a change. */
+.explain-panel .walkthrough-title > span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.walkthrough-title strong {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.walkthrough-title small {
+  color: #8d9b80;
+  font-size: 11px;
+  font-weight: 500;
+}
+.walkthrough-locate,
+.walkthrough-steps li > button {
+  font: inherit;
+  cursor: pointer;
+}
+.walkthrough-locate {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: 1px solid #e1e7dc;
+  border-radius: 999px;
+  background: #fff;
+  color: #6f8360;
+  font-size: 11px;
+  font-weight: 500;
+}
+.walkthrough-locate[aria-pressed="true"] {
+  border-color: #b9cfa9;
+  background: #eef5e7;
+  color: #46603f;
+}
+.walkthrough-card h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 6px;
+  color: #5d7350;
+  font-size: 12px;
+  font-weight: 600;
+}
+.walkthrough-change,
+.walkthrough-analogy {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.walkthrough-change {
+  background: #f7faf2;
+  border: 1px solid #e4ecda;
+}
+.walkthrough-analogy {
+  background: #fffcf3;
+  border: 1px solid #eee7d1;
+}
+.walkthrough-change > span,
+.walkthrough-analogy > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 4px;
+  color: #70806a;
+  font-size: 11px;
+  font-weight: 600;
+}
+.walkthrough-steps ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.walkthrough-steps li > button {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #e8ece3;
+  border-radius: 7px;
+  background: #fff;
+  color: inherit;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.walkthrough-steps li > button:hover,
+.walkthrough-steps li > button:focus-visible {
+  border-color: #cbdcc3;
+}
+.walkthrough-steps li > button[aria-pressed="true"] {
+  border-color: #8ca780;
+  background: #f4f8ee;
+  box-shadow: inset 3px 0 0 #8ca780;
+}
+.walkthrough-step-lines {
+  display: block;
+  margin-bottom: 2px;
+  color: #73916a;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+}
+.walkthrough-references ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.walkthrough-references li strong {
+  margin-right: 6px;
+  font-weight: 600;
+}
+.walkthrough-references li code {
+  margin-right: 6px;
+  color: #46603f;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.walkthrough-references li span,
+.walkthrough-references > p {
+  color: #6f8360;
+}
+.walkthrough-references > p {
+  margin: 0;
+  font-size: 12px;
+}
+.walkthrough-check {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.walkthrough-check summary {
+  cursor: pointer;
+  color: #5d7350;
+  font-weight: 600;
+}

@@ -43,7 +43,8 @@ test("a demo file with an explanation renders every learning section", () => {
 test("test files get a reading hint and extra presets while source files keep the fixed three", () => {
   const testFile = demoFiles.find((file) => file.path === "tests/retry.test.ts")!;
   const html = render(testFile);
-  assert.equal(html.match(/role="tab"/g)?.length, 3);
+  assert.equal(html.match(/role="tab"/g)?.length, 4);
+  assert.match(html, /程式碼解說/);
   assert.match(html, /審查者怎麼看/);
   assert.match(html, /測試就是行為規格：先讀 it\/test 描述/);
   assert.doesNotMatch(render(demoFiles[0]), /測試就是行為規格/);

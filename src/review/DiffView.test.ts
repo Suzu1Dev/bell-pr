@@ -116,3 +116,21 @@ test("a modified file offers its unchanged code around the changes; the demo sho
   assert.doesNotMatch(render(file), /完整檔案|rv-gap/);
   assert.match(render(file), /@@ -4,3 \+4,3 @@/);
 });
+
+test("a highlighted range marks its lines in the changed version only", () => {
+  const client = demoFiles.find((entry) => entry.path === "src/client.ts")!;
+  const html = renderToStaticMarkup(
+    createElement(DiffView, {
+      file: client,
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "unified",
+      highlight: { startLine: 12, endLine: 16 },
+    }),
+  );
+  const marked = html.match(/rv-line-highlighted/g) ?? [];
+  // Lines 12 to 16 of the new file; the two removed lines in between are not marked.
+  assert.equal(marked.length, 5);
+  assert.doesNotMatch(html, /rv-line-removed rv-line-highlighted|rv-line-removed[^"]*rv-line-highlighted/);
+});

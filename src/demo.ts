@@ -1,3 +1,4 @@
+import type { FileWalkthrough } from "../shared/walkthroughs";
 import type { DiffFile, Repo, Run } from "./types";
 
 export const demoRepo: Repo = {
@@ -32,7 +33,7 @@ function diff(
   };
 }
 
-export const demoFiles: DiffFile[] = [
+const demoDiffs: DiffFile[] = [
   diff(
     "src/utils/retry.ts",
     [
@@ -296,6 +297,95 @@ export const demoFiles: DiffFile[] = [
     },
   ),
 ];
+
+/** Prepared walkthroughs; line numbers are in the changed version of each file. */
+const demoWalkthroughs: Record<string, FileWalkthrough> = {
+  "src/client.ts": {
+    functions: [
+      {
+        name: "createClient",
+        kind: "函式",
+        startLine: 10,
+        endLine: 25,
+        summary:
+          "收到設定（`baseURL` 與 `retry`）後，回傳一個帶有 `get` 方法的物件。`get` 用 `baseURL` 組出完整網址、送出請求，再把回覆讀成 JSON。改動前的 `get` 只送一次請求就讀 JSON，不看狀態碼，所以伺服器回 `503` 時也會被當成資料讀取。",
+        change:
+          "這次把 `get` 的本體包進 `withRetry`，並在讀 JSON 前檢查 `response.ok`。失敗時丟出 `HttpError`，讓 `shouldRetry` 依狀態碼決定要不要再試；`createClient` 本身的用法沒有變。",
+        steps: [
+          {
+            startLine: 10,
+            endLine: 11,
+            explanation:
+              "工廠函式：把 `options` 記在閉包裡，回傳的物件之後每次呼叫 `get` 都讀得到同一份設定。",
+          },
+          {
+            startLine: 12,
+            endLine: 16,
+            explanation:
+              "`get` 的核心：組網址、送請求、確認狀態碼成功，再解析 JSON。這幾行包在傳給 `withRetry` 的函式裡，所以每次重試都會重新送一次請求。",
+          },
+          {
+            startLine: 17,
+            endLine: 21,
+            explanation:
+              "重試設定：先沿用使用者給的 `retry`，再加上判斷哪些錯誤值得重試。暫時性的伺服器錯誤與網路錯誤會再試，`401`、`404` 這類需要修正的錯誤不會。",
+          },
+          {
+            startLine: 22,
+            endLine: 25,
+            explanation: "收尾：結束 `withRetry` 呼叫與回傳的物件。",
+          },
+        ],
+        callers: [
+          {
+            name: "README 的使用範例",
+            path: "README.md",
+            line: 11,
+            note: "示範用 `baseURL` 與 `retry` 建立 client。",
+          },
+        ],
+        callees: [
+          {
+            name: "withRetry",
+            path: "src/utils/retry.ts",
+            line: 6,
+            note: "負責重試次數與等待時間；`get` 只告訴它要做什麼、哪些錯誤可以再試。",
+          },
+          {
+            name: "HttpError",
+            path: "src/client.ts",
+            line: 4,
+            note: "把失敗的 Response 留下來，`shouldRetry` 才看得到狀態碼。",
+          },
+          {
+            name: "fetch",
+            path: "",
+            line: null,
+            note: "瀏覽器與 Node.js 內建的 HTTP 請求；遇到 `500` 仍會正常回傳 Response，不會自己丟錯。",
+          },
+        ],
+        analogy:
+          "像請助理幫你打電話訂位：你先交代餐廳名單（`baseURL`），之後每次只說想訂哪一家（`path`）。忙線時助理會照你的規則再撥（`withRetry`），但對方說「沒有這家店」就不必一直重撥。",
+        selfCheck: {
+          question:
+            "為什麼 `fetch` 那一行要放在傳給 `withRetry` 的函式裡，而不是先 `fetch` 一次再把結果交給 `withRetry`？",
+          answer:
+            "`withRetry` 每次重試都會重新呼叫傳進去的函式。把 `fetch` 放在裡面，每次重試才會真的重新送出請求；先 `fetch` 再交出去，重試只會重複讀同一個失敗的結果。",
+        },
+      },
+    ],
+  },
+};
+
+export const demoFiles: DiffFile[] = demoDiffs.map((file) =>
+  demoWalkthroughs[file.path]
+    ? {
+        ...file,
+        walkthroughStatus: "ready",
+        walkthrough: demoWalkthroughs[file.path],
+      }
+    : file,
+);
 
 export const demoRun: Run = {
   id: "demo-run",
