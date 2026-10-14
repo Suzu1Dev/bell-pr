@@ -50,11 +50,12 @@ import {
   type ServerMessages,
 } from "./i18n/index.js";
 import { respondIn } from "./prompt-language.js";
-import { AppError, type Repository } from "./types.js";
+import { AppError, type Repository, type Run } from "./types.js";
 import { lenientRead } from "./persisted-schema.js";
 import { locales, type Locale } from "../shared/i18n/locale.js";
 import { setupError, withCliSetupHint } from "./cli-errors.js";
 import { defaultProviderFrom, knownDoctorReport } from "./doctor.js";
+import { agentSpawn, parseAgentOutput } from "./run-events.js";
 import {
   defaultPonytailMode,
   ponytailModes,
@@ -597,6 +598,13 @@ function novelRecommendations(
   return added;
 }
 
+/**
+ * The run-events helpers name a run; an analysis has none, so its log
+ * lines carry `analysis:<repoId>` in that field.
+ */
+const analysisLogRun = (repoId: string) =>
+  ({ id: `analysis:${repoId}` }) as Run;
+
 /** Separate persistence keeps contribution preferences independent of run lifecycle writes. */
 export class ProjectInsightsService {
   private writes = new Map<string, Promise<unknown>>();
@@ -1118,7 +1126,7 @@ export class ProjectInsightsService {
         await this.execute(login.executable, login.args, {
           timeoutMs: 10_000,
           maxBytes: 20_000,
-          env: agentEnvironment(),
+          env: agentEnvironment(provider),
           signal,
         });
       } catch (error) {
@@ -1248,10 +1256,16 @@ export class ProjectInsightsService {
           efficiency = trackEfficiency(mode);
           const releaseSlot = await this.slots.acquire(signal);
           try {
+            const spawned = agentSpawn(
+              analysisLogRun(repoId),
+              more ? "recommendations" : "analysis",
+              cli.executable,
+              timeoutMs,
+            );
             await this.execute(cli.executable, cli.args, {
               input,
               cwd: temporary,
-              env: agentEnvironment(),
+              env: agentEnvironment(modelExecution.provider ?? "codex"),
               signal,
               timeoutMs,
               maxBytes: 1_000_000,
@@ -1274,7 +1288,8 @@ export class ProjectInsightsService {
                   /* Raw tool output is not trusted analysis. */
                 }
               },
-            }).catch((error: unknown) => {
+            }).then(spawned.exited, (error: unknown) => {
+              spawned.failed(error);
               // claude exits non-zero after losing the OAuth refresh race; its result event
               // (flushed before the rejection) already classified the attempt as retryable.
               if (!retryable)
@@ -1299,9 +1314,14 @@ export class ProjectInsightsService {
       this.assertActive(signal);
       if (failed || !answer || Buffer.byteLength(answer) > 120_000)
         throw new AppError((m) => m.analysis.insights.unfinished, 422);
-      const { value: analysis, verification } = more
-        ? validateAnalysis(answer, context.files, safePaths, recommendationsSchema, locale)
-        : validateAnalysis(answer, context.files, safePaths, analysisSchema, locale);
+      const { value: analysis, verification } = parseAgentOutput(
+        analysisLogRun(repoId),
+        more ? "recommendations" : "analysis",
+        () =>
+          more
+            ? validateAnalysis(answer, context.files, safePaths, recommendationsSchema, locale)
+            : validateAnalysis(answer, context.files, safePaths, analysisSchema, locale),
+      );
       if (
         (await this.version(repo, signal)).fingerprint !== version.fingerprint
       )

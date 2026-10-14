@@ -52,10 +52,11 @@ import {
   hasExtendedAgentTimeout,
   withAgentTimeoutHint,
 } from "./agent-timeouts.js";
-import { AppError } from "./types.js";
+import { AppError, type Run } from "./types.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
 import { setupError } from "./cli-errors.js";
 import { knownDoctorReport } from "./doctor.js";
+import { agentSpawn, parseAgentOutput } from "./run-events.js";
 import type { AgentProvider } from "../shared/models.js";
 import { lenientRead } from "./persisted-schema.js";
 import { respondIn } from "./prompt-language.js";
@@ -376,6 +377,12 @@ async function assertDiscoveryReady(dataDir: string, provider: AgentProvider) {
     throw setupError(`${provider}_unauthenticated`);
 }
 
+/**
+ * The run-events helpers name a run; a discovery search has none, so its
+ * log lines carry `discovery:<jobId>` in that field.
+ */
+const discoveryLogRun = (jobId: string) => ({ id: `discovery:${jobId}` }) as Run;
+
 export class DiscoveryService {
   private job: DiscoveryJob | null = null;
   private initialization?: Promise<void>;
@@ -658,11 +665,17 @@ export class DiscoveryService {
           efficiency = trackEfficiency(job.preferences.ponytailMode);
           const releaseSlot = await this.slots.acquire(signal);
           try {
+            const spawned = agentSpawn(
+              discoveryLogRun(job.id),
+              "discovery",
+              cli.executable,
+              timeoutMs,
+            );
             await this.execute(cli.executable, cli.args, {
               cwd: temporary,
               input,
               signal,
-              env: agentEnvironment(),
+              env: agentEnvironment(job.modelExecution?.provider ?? "codex"),
               timeoutMs,
               maxBytes: 1_000_000,
               onLine: (line, stream) => {
@@ -685,7 +698,8 @@ export class DiscoveryService {
                   /* Only structured agent messages are candidates for analysis output. */
                 }
               },
-            }).catch((error: unknown) => {
+            }).then(spawned.exited, (error: unknown) => {
+              spawned.failed(error);
               // claude exits non-zero after losing the OAuth refresh race; its result event
               // (flushed before the rejection) already classified the attempt as retryable.
               if (!retryable)
@@ -715,10 +729,8 @@ export class DiscoveryService {
         secretInPatch(answer)
       )
         throw new AppError((m) => m.analysis.discovery.unusableAnswer, 422);
-      const result = parseDiscoveryResult(
-        redact(answer),
-        eligible,
-        job.preferences,
+      const result = parseAgentOutput(discoveryLogRun(job.id), "discovery", () =>
+        parseDiscoveryResult(redact(answer), eligible, job.preferences),
       );
       job.opportunities = result.opportunities;
       job.warnings.push(...result.warnings);

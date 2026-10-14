@@ -231,7 +231,7 @@ export async function runAgent(
         signal,
         timeoutMs,
         maxBytes: 8_000_000,
-        env: agentEnvironment(),
+        env: agentEnvironment(modelExecution.provider ?? "codex"),
         onLine: (line, stream) => {
           if (stream !== "stdout") return;
           try {

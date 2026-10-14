@@ -13,6 +13,8 @@ import {
   type ModelSettings,
   type ReasoningEffort,
 } from "../shared/models.js";
+import { product } from "../shared/product.js";
+import { version } from "./build-info.js";
 import { sm } from "./i18n/index.js";
 import { agentEnvironment, observeChild } from "./process.js";
 import { AppError } from "./types.js";
@@ -105,7 +107,7 @@ export async function readModelCatalog(
       ["app-server", "--listen", "stdio://", "-c", 'model_provider="openai"'],
       {
         cwd,
-        env: agentEnvironment(),
+        env: agentEnvironment("codex"),
         shell: false,
         detached: process.platform !== "win32",
         stdio: ["pipe", "pipe", "pipe"],
@@ -236,7 +238,7 @@ export async function readModelCatalog(
         method: "initialize",
         id: 0,
         params: {
-          clientInfo: { name: "bell_pr", title: "BELL PR", version: "0.1.0" },
+          clientInfo: { name: "bell_pr", title: product.name, version },
         },
       });
     });

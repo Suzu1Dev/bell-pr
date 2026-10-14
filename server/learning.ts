@@ -28,6 +28,7 @@ import {
 import { parsePrFeedback, prFeedbackQuery, prNumberOf } from "./pr-feedback.js";
 import { contributionContext } from "./prompts/team.js";
 import { runAgent, runIndependentReview } from "./run-executor.js";
+import { parseAgentOutput } from "./run-events.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 const now = () => new Date().toISOString();
@@ -242,7 +243,9 @@ async function generateExplanations(
             timeout: "explanations",
           },
         );
-        const generated = parseExplanations(answer, batch);
+        const generated = parseAgentOutput(run, "explanations", () =>
+          parseExplanations(answer, batch),
+        );
         const current = new Map(
           (await readDiff(run)).map((file) => [file.path, file]),
         );
