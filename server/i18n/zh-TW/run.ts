@@ -7,6 +7,8 @@ const followUpAgentCommitted =
   "Agent 自行建立了 commit 或切換了分支；已還原到已推送的 PR，修改保留在工作目錄供你審閱。";
 
 const m: Translation<typeof en> = {
+  unsandboxedNotice:
+    "這個 Claude Agent 未在作業系統沙箱中執行，因為設定中允許不使用沙箱的 Agent。",
   agents: {
     lead: "分析專案與拆解需求",
     reviewer: "獨立審查正確性與維護性",

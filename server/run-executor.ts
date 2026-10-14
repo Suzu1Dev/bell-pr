@@ -208,6 +208,12 @@ export async function runAgent(
         skipGitRepoCheck: context.isolated,
         web,
       });
+      // Marks the run once when an agent runs without the OS sandbox
+      // because the person allowed it in Settings (agentCommand decides).
+      if (cli.unsandboxed && !run.unsandboxed) {
+        run.unsandboxed = true;
+        ctx.log(run, role, sm().run.unsandboxedNotice, { kind: "notice" });
+      }
       const read = agentEventReader(modelExecution.provider);
       await execute(cli.executable, cli.args, {
         input: fullPrompt,

@@ -11,6 +11,9 @@ const followUpAgentCommitted =
 
 /** Run pipeline messages: run logs, agent details and run errors. */
 export default {
+  /** Logged once on a run whose Claude agent ran without the OS sandbox. */
+  unsandboxedNotice:
+    "This Claude agent ran without the OS sandbox because unsandboxed agents are allowed in Settings.",
   /** What an agent card says the agent is doing (its `detail`). */
   agents: {
     lead: "Analysing the project and breaking down the request",

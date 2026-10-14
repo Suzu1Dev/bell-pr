@@ -62,11 +62,23 @@ function claudeAccess(access: AgentAccess, web: boolean): string[] {
   ];
 }
 
+/** How to start one agent CLI turn. */
+export interface AgentCommand {
+  executable: string;
+  args: string[];
+  /**
+   * 3B: true when a write-role Claude agent runs without the OS sandbox
+   * because the user opted in. Nothing sets it yet; runAgent records it on
+   * the run (run.unsandboxed) with one notice line.
+   */
+  unsandboxed?: boolean;
+}
+
 /** The prompt is always written to stdin; a shell is never used. */
 export async function agentCommand(
   execution: ModelExecution,
   options: AgentCommandOptions,
-): Promise<{ executable: string; args: string[] }> {
+): Promise<AgentCommand> {
   const web = options.web === true && options.access !== "none";
   if (execution.provider === "claude") {
     const value = modelExecutionSchema.parse(execution);
