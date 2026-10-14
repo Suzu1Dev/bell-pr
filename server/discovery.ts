@@ -54,6 +54,9 @@ import {
 } from "./agent-timeouts.js";
 import { AppError } from "./types.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
+import { setupError } from "./cli-errors.js";
+import { knownDoctorReport } from "./doctor.js";
+import type { AgentProvider } from "../shared/models.js";
 import { lenientRead } from "./persisted-schema.js";
 import { respondIn } from "./prompt-language.js";
 import { formatters, locales } from "../shared/i18n/locale.js";
@@ -354,6 +357,25 @@ export function discoveryPrompt(
   );
 }
 
+/**
+ * Refuses a search before it starts when the doctor already found that
+ * the GitHub CLI or the agent CLI it needs is missing or signed out. When
+ * the doctor has not run for this data directory, nothing is probed here:
+ * the search reports its own failure.
+ */
+async function assertDiscoveryReady(dataDir: string, provider: AgentProvider) {
+  const report = await knownDoctorReport(dataDir);
+  if (!report) return;
+  const reason = (id: string) =>
+    report.checks.find((check) => check.id === id)?.reason;
+  if (reason("gh") === "missing") throw setupError("gh_missing");
+  if (["signed-out", "rejected"].includes(reason("gh-auth") ?? ""))
+    throw setupError("gh_unauthenticated");
+  if (reason(provider) === "missing") throw setupError(`${provider}_missing`);
+  if (reason(`${provider}-auth`) === "signed-out")
+    throw setupError(`${provider}_unauthenticated`);
+}
+
 export class DiscoveryService {
   private job: DiscoveryJob | null = null;
   private initialization?: Promise<void>;
@@ -366,6 +388,7 @@ export class DiscoveryService {
   private slots: AgentSlots;
   private sleep?: TransientSleep;
   private scale: number | (() => number);
+  private preflight: (preferences: DiscoveryPreferences) => Promise<void>;
   private file: string;
   constructor(
     private store: Store,
@@ -381,6 +404,11 @@ export class DiscoveryService {
       agentTimeoutScale?: number | (() => number);
       /** Wait between retries of an analysis that lost the OAuth refresh race. */
       sleep?: TransientSleep;
+      /**
+       * Checks that the GitHub CLI and the provider are ready before a job
+       * is created; by default from the doctor's report.
+       */
+      preflight?: (preferences: DiscoveryPreferences) => Promise<void>;
     } = {},
   ) {
     this.file = path.join(store.directory, "discovery.json");
@@ -391,6 +419,10 @@ export class DiscoveryService {
     this.slots =
       dependencies.agentSlots ?? new AgentSlots(defaultAgentProcessLimit);
     this.scale = dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
+    this.preflight =
+      dependencies.preflight ??
+      ((preferences) =>
+        assertDiscoveryReady(store.directory, preferences.provider ?? "codex"));
   }
   private get timeoutScale() {
     return typeof this.scale === "function" ? this.scale() : this.scale;
@@ -443,6 +475,13 @@ export class DiscoveryService {
     await this.initialize();
     const completing = this.active;
     if (completing && this.job?.status !== "running") await completing.finished;
+    if (this.stopping)
+      throw new AppError((m) => m.analysis.discovery.shuttingDown, 503);
+    if (this.active)
+      throw new AppError((m) => m.analysis.discovery.alreadyRunning, 409);
+    // gh and the provider before a job exists: a refusal leaves the last
+    // result as it is.
+    await this.preflight(preferences);
     if (this.stopping)
       throw new AppError((m) => m.analysis.discovery.shuttingDown, 503);
     if (this.active)

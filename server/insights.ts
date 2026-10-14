@@ -22,7 +22,7 @@ import {
   type RecommendationPreferences,
   type RecommendationVerification,
 } from "../shared/insights.js";
-import type { ModelSettings } from "../shared/models.js";
+import type { AgentProvider, ModelSettings } from "../shared/models.js";
 import { quoteMatches } from "./evidence.js";
 import { contributionIntent } from "./team.js";
 import {
@@ -53,6 +53,8 @@ import { respondIn } from "./prompt-language.js";
 import { AppError, type Repository } from "./types.js";
 import { lenientRead } from "./persisted-schema.js";
 import { locales, type Locale } from "../shared/i18n/locale.js";
+import { setupError, withCliSetupHint } from "./cli-errors.js";
+import { defaultProviderFrom, knownDoctorReport } from "./doctor.js";
 import {
   defaultPonytailMode,
   ponytailModes,
@@ -608,6 +610,7 @@ export class ProjectInsightsService {
   private slots: AgentSlots;
   private sleep?: TransientSleep;
   private scale: number | (() => number);
+  private defaultProvider: () => Promise<AgentProvider | undefined>;
 
   constructor(
     public store: Store,
@@ -622,6 +625,12 @@ export class ProjectInsightsService {
       agentTimeoutScale?: number | (() => number);
       /** Wait between retries of an analysis that lost the OAuth refresh race. */
       sleep?: TransientSleep;
+      /**
+       * The provider to use while no model settings were saved. By default
+       * the doctor's report decides: Claude Code when it is the only CLI
+       * signed in, else Codex.
+       */
+      defaultProvider?: () => Promise<AgentProvider | undefined>;
     } = {},
   ) {
     this.execute = dependencies.command ?? command;
@@ -630,6 +639,9 @@ export class ProjectInsightsService {
     this.slots =
       dependencies.agentSlots ?? new AgentSlots(defaultAgentProcessLimit);
     this.scale = dependencies.agentTimeoutScale ?? defaultAgentTimeoutScale;
+    this.defaultProvider =
+      dependencies.defaultProvider ??
+      (async () => defaultProviderFrom(await knownDoctorReport(store.directory)));
   }
 
   private get timeoutScale() {
@@ -699,6 +711,11 @@ export class ProjectInsightsService {
     return path.join(this.store.directory, "model-settings.json");
   }
 
+  /**
+   * The shared model settings. Until some are saved, the provider is the
+   * one the environment has ready (Claude Code when it is the only CLI
+   * signed in, else Codex), and nothing is written.
+   */
   async getModelSettings(): Promise<ModelSettings> {
     await this.modelWrite.catch(() => undefined);
     try {
@@ -706,8 +723,10 @@ export class ProjectInsightsService {
         JSON.parse(await readFile(this.modelSettingsPath, "utf8")),
       );
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT")
-        return sharedModelSettingsSchema.parse({});
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        const provider = await this.defaultProvider().catch(() => undefined);
+        return sharedModelSettingsSchema.parse(provider ? { provider } : {});
+      }
       throw new AppError(
         (m) => m.analysis.insights.modelSettingsUnreadable,
         500,
@@ -1093,7 +1112,8 @@ export class ProjectInsightsService {
           )
         : projectRecommendationBatchSize;
       const settings = await this.getSettings(repoId);
-      const login = agentLoginCheck(settings.provider);
+      const provider = settings.provider ?? "codex";
+      const login = agentLoginCheck(provider);
       try {
         await this.execute(login.executable, login.args, {
           timeoutMs: 10_000,
@@ -1101,18 +1121,34 @@ export class ProjectInsightsService {
           env: agentEnvironment(),
           signal,
         });
-      } catch {
+      } catch (error) {
         this.assertActive(signal);
+        // A CLI that is missing says so; any other failure means signed out.
+        const hinted = withCliSetupHint(error, login.executable);
+        if (hinted instanceof AppError && hinted.code?.endsWith("_missing"))
+          throw hinted;
         throw new AppError(
           (m) =>
             m.analysis.insights.agentUnavailable({
-              agent: agentLabel(settings.provider),
+              agent: agentLabel(provider),
               login:
                 login.executable === "claude"
                   ? "claude auth login"
                   : "codex login",
             }),
           503,
+          {
+            code:
+              provider === "claude"
+                ? "claude_unauthenticated"
+                : "codex_unauthenticated",
+            fixes: setupError(
+              provider === "claude"
+                ? "claude_unauthenticated"
+                : "codex_unauthenticated",
+            ).fixes,
+            cause: error,
+          },
         );
       }
       this.assertActive(signal);
