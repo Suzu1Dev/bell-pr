@@ -97,9 +97,13 @@
   max-width: 72px;
   overflow: hidden;
 }
+/* In a pane too narrow for the whole row (the collapsed rail at 768 px),
+   the reviewed checkbox wraps instead of being cut off at the edge. */
 .rv-file-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 7px;
   margin-left: auto;
   font-family: var(--font-mono);
