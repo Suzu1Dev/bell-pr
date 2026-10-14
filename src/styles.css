@@ -1116,6 +1116,9 @@ button {
   min-width: 0;
   overflow: hidden;
   background: var(--color-surface);
+  /* The rules below follow the pane's width, which the file list, the
+     explanation and the sidebar share with it, not the window's. */
+  container: diff-panel / inline-size;
 }
 .diff-topbar {
   height: 45px;
@@ -1139,6 +1142,15 @@ button {
 }
 .diff-topbar-arrow {
   color: var(--color-text-muted);
+}
+/* A narrow pane drops what is said elsewhere, so the file name and the
+   toolbar keep their full width: the run's header names both branches,
+   and the file list shows each file's folder. */
+@container diff-panel (max-width: 640px) {
+  .diff-topbar > span,
+  .rv-breadcrumb {
+    display: none;
+  }
 }
 .worktree-hint {
   display: flex;
