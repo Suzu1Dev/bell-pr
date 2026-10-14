@@ -7,6 +7,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { doctorCheckIds, type DoctorReport } from "../shared/doctor.js";
 import { version } from "./build-info.js";
 import { canOpenBrowser, main, type CliDeps } from "./cli.js";
 import { resolveConfig } from "./config.js";
@@ -297,13 +298,98 @@ test("every command shows the help for --help, and argument mistakes read in the
   assert.equal(zhError, "沒有 --bogus 這個選項。\n執行 `bell-pr help` 查看用法。\n");
 });
 
-test("bell-pr doctor and license get the data directory and their own arguments", async () => {
+test("bell-pr license gets the data directory and its own arguments", async () => {
   await withDataDir(async (dataDir) => {
-    for (const command of ["doctor", "license"]) {
-      const result = await cli([command, "--data-dir", dataDir, "status", "--json"]);
-      assert.equal(result.code, 0);
-      assert.match(result.stdout, new RegExp(`bell-pr ${command}`));
+    const result = await cli(["license", "--data-dir", dataDir, "status", "--json"]);
+    assert.equal(result.code, 0);
+    assert.match(result.stdout, /bell-pr license/);
+  });
+});
+
+/**
+ * Runs `fn` with only stand-in CLIs on PATH, so the doctor never reaches a
+ * real git, gh, codex or claude. Each script answers its --version.
+ */
+async function withStandInClis<T>(
+  scripts: Record<string, string>,
+  fn: (directory: string) => Promise<T>,
+) {
+  return withDataDir(async (_dataDir, directory) => {
+    const bin = path.join(directory, "bin");
+    mkdirSync(bin);
+    for (const [name, body] of Object.entries(scripts))
+      writeFileSync(path.join(bin, name), `#!/bin/sh\n${body}\n`, { mode: 0o700 });
+    const previous = process.env.PATH;
+    process.env.PATH = bin;
+    try {
+      return await fn(directory);
+    } finally {
+      process.env.PATH = previous;
     }
+  });
+}
+
+const standInGit = `case "$1" in
+  --version) echo "git version 2.45.1" ;;
+  var) echo "Test User <test@example.com> 1760000000 +0000" ;;
+  config) echo "test@example.com" ;;
+  *) exit 1 ;;
+esac`;
+
+test("bell-pr doctor exits 1 when no provider is ready and prints the fix commands", async () => {
+  await withStandInClis({ git: standInGit }, async (directory) => {
+    const dataDir = path.join(directory, "data");
+    const result = await cli(["doctor", "--data-dir", dataDir]);
+    assert.equal(result.code, 1, result.stderr);
+    assert.match(result.stdout, /^BELL PR environment check\n/);
+    assert.match(result.stdout, /✓ Git +2\.45\.1/);
+    assert.match(result.stdout, /✗ AI provider +Install and sign in to the Codex CLI or Claude Code/);
+    for (const command of [
+      "npm install -g @openai/codex",
+      "codex login",
+      "npm install -g @anthropic-ai/claude-code",
+      "claude auth login",
+    ])
+      assert.ok(result.stdout.includes(`\n        ${command}\n`), command);
+    assert.match(result.stdout, new RegExp(`Data directory: ${dataDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+    assert.match(result.stdout, /Not ready/);
+    // Checking never creates the data directory.
+    assert.equal(existsSync(dataDir), false);
+  });
+});
+
+test("bell-pr doctor --json prints a DoctorReport, and a ready setup exits 0", async () => {
+  const codex = `case "$1" in
+  --version) echo "codex-cli 0.159.0" ;;
+  login) echo "Logged in using ChatGPT" ;;
+  *) exit 1 ;;
+esac`;
+  await withStandInClis({ git: standInGit, codex }, async (directory) => {
+    const result = await cli(["doctor", "--json", "--data-dir", path.join(directory, "data")]);
+    assert.equal(result.code, 0, result.stdout);
+    const report = JSON.parse(result.stdout) as DoctorReport;
+    assert.equal(report.ready, true);
+    assert.equal(typeof report.checkedAt, "string");
+    assert.equal(report.platform, process.platform);
+    assert.deepEqual(
+      report.checks.map((check) => check.id),
+      [...doctorCheckIds],
+    );
+    const provider = report.checks.find((check) => check.id === "provider-ready");
+    assert.deepEqual(
+      { status: provider?.status, required: provider?.required, detail: provider?.detail },
+      { status: "ok", required: true, detail: "Ready: Codex." },
+    );
+    assert.equal(
+      report.checks.find((check) => check.id === "app")?.version,
+      version,
+    );
+    const help = await cli(["doctor", "--help"]);
+    assert.equal(help.code, 0);
+    assert.match(help.stdout, /^Usage: bell-pr doctor \[--json\]/);
+    const wrong = await cli(["doctor", "status"]);
+    assert.equal(wrong.code, 2);
+    assert.match(wrong.stdout, /Unknown argument "status"/);
   });
 });
 
