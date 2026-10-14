@@ -10,19 +10,29 @@
  *   inside a generated product-link region, or is an open item in
  *   site/README.md: in backticks on a line that says TODO or [OWNER]. A
  *   link to another site must be named in site/README.md;
- * - every resource (stylesheet, script, image, video, poster, track, CSS
- *   url()) is a relative path to an existing file, or a gitignored media/
- *   file that is an open item in site/README.md. Nothing may come from
- *   another origin;
+ * - every resource (stylesheet, script, image and srcset, video, poster,
+ *   track, Open Graph image, CSS url()) is a relative path to an existing
+ *   file, or a media/ file that site/README.md lists as gitignored, in
+ *   backticks on a line that says so. Nothing may come from another origin;
  * - no inline <script>, style="" or on*="" attribute, so a strict Content
- *   Security Policy can apply, and every page declares one.
+ *   Security Policy can apply, and every page declares one;
+ * - every <video> plays media/bell-pr-promo.webm and .mp4 with the poster
+ *   media/poster.jpg (the files 7C renders);
+ * - every image in assets/screenshots/ is a byte-identical copy of the one
+ *   in docs/images/en/;
+ * - the site's files, media/ excluded, total at most 5 MB;
+ * - the legal pages are current, and the legal documents match
+ *   LEGAL-REVIEW.md (site/build-legal.mjs --check).
  *
  * Browser checks (--browser), with the pages served from a static server on
  * 127.0.0.1, at 1440 x 900 and 390 x 844:
- * - no horizontal scroll (scrollWidth === clientWidth);
+ * - no horizontal scroll (scrollWidth === clientWidth), and no text that is
+ *   cut off or runs out of its box, FAQ answers opened (the rules of
+ *   e2e/helpers/overflow.ts);
  * - no request outside the local server, no failed request except missing
  *   media/ files, and no console error;
- * - the self-hosted DM Sans font is loaded;
+ * - the self-hosted DM Sans font is loaded, and every image decodes (lazy
+ *   images are loaded first);
  * - a <video> is laid out 16:9 (width / height within 1.74-1.80).
  *
  * Options: --port <n> (default: a free port), --without-media (answer 404
@@ -37,9 +47,17 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkLegal } from "./build-legal.mjs";
 
 const siteDir = path.dirname(fileURLToPath(import.meta.url));
+const repoDir = path.dirname(siteDir);
 const readme = fs.readFileSync(path.join(siteDir, "README.md"), "utf8");
+/** The site's budget, media/ excluded. */
+const maxSiteBytes = 5 * 1024 * 1024;
+const video = {
+  poster: "media/poster.jpg",
+  sources: ["media/bell-pr-promo.webm", "media/bell-pr-promo.mp4"],
+};
 const widths = [
   { width: 1440, height: 900 },
   { width: 390, height: 844 },
@@ -71,6 +89,18 @@ const listedInReadme = (value) => readme.includes(value);
 // mentions, such as `install.html`, must exist.
 const openItems = readme.split("\n").filter((line) => /\bTODO\b|\[OWNER/.test(line));
 const isOpenItem = (value) => openItems.some((line) => line.includes(`\`${value}\``));
+// The media files are gitignored and deployed with the site (7C renders them).
+const mediaItems = readme.split("\n").filter((line) => /\bgitignored\b/.test(line));
+const isListedMedia = (value) => mediaItems.some((line) => line.includes(`\`${value}\``));
+
+/** Every file under site/, relative to it, media/ excluded. */
+function siteFiles(dir = siteDir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) return full === path.join(siteDir, "media") ? [] : siteFiles(full);
+    return [path.relative(siteDir, full)];
+  });
+}
 
 function checkStatic() {
   const problems = [];
@@ -126,9 +156,45 @@ function checkStatic() {
     const resources = [
       ...html.matchAll(/<(?:link|script|img|source|track)\b[^>]*\s(?:href|src)="([^"]*)"/g),
       ...html.matchAll(/<video\b[^>]*\sposter="([^"]*)"/g),
+      ...html.matchAll(/<meta\s+property="og:image"\s+content="(?![a-z][a-z0-9+.-]*:|\/\/)([^"]*)"/gi),
     ];
     for (const match of resources) checkResource(file, match[1], where(match.index));
+    for (const match of html.matchAll(/\ssrcset="([^"]*)"/g))
+      for (const candidate of match[1].split(","))
+        checkResource(file, candidate.trim().split(/\s+/)[0], where(match.index));
+
+    // The promo video, rendered by 7C into the gitignored media/.
+    for (const match of html.matchAll(/<video\b([^>]*)>([^]*?)<\/video>/g)) {
+      const poster = /\sposter="([^"]*)"/.exec(match[1])?.[1];
+      const sources = [...match[2].matchAll(/<source\b[^>]*\ssrc="([^"]*)"/g)].map((source) =>
+        path.posix.normalize(path.posix.join(path.posix.dirname(file), source[1])),
+      );
+      const posterPath = poster && path.posix.normalize(path.posix.join(path.posix.dirname(file), poster));
+      if (posterPath !== video.poster) problems.push(`${where(match.index)}: the video's poster is not ${video.poster}`);
+      for (const expected of video.sources)
+        if (!sources.includes(expected)) problems.push(`${where(match.index)}: the video has no <source> for ${expected}`);
+    }
   }
+
+  // Screenshots are copies of the app's documentation images.
+  const shots = path.join(siteDir, "assets", "screenshots");
+  for (const name of fs.existsSync(shots) ? fs.readdirSync(shots) : []) {
+    const original = path.join(repoDir, "docs", "images", "en", name);
+    if (!fs.existsSync(original))
+      problems.push(`assets/screenshots/${name}: docs/images/en/${name} does not exist`);
+    else if (!fs.readFileSync(original).equals(fs.readFileSync(path.join(shots, name))))
+      problems.push(
+        `assets/screenshots/${name}: differs from docs/images/en/${name}; copy it again: cp docs/images/en/${name} site/assets/screenshots/`,
+      );
+  }
+
+  // The size budget.
+  const bytes = siteFiles().reduce((total, name) => total + fs.statSync(path.join(siteDir, name)).size, 0);
+  if (bytes > maxSiteBytes) problems.push(`site/: ${bytes} bytes without media/, over the ${maxSiteBytes}-byte budget`);
+
+  // The legal pages and the claims behind them.
+  const legal = checkLegal(repoDir);
+  problems.push(...legal.problems);
 
   // Stylesheets may load fonts and images through url().
   for (const css of fs.readdirSync(siteDir).filter((name) => name.endsWith(".css"))) {
@@ -146,7 +212,7 @@ function checkStatic() {
     if (error) problems.push(`${where}: ${value} ${error}`);
     else if (!fs.existsSync(path.join(siteDir, resolved))) {
       // The video files are gitignored; 7C copies them in before deploying.
-      if (!(resolved.startsWith("media/") && isOpenItem(resolved)))
+      if (!(resolved.startsWith("media/") && (isListedMedia(resolved) || isOpenItem(resolved))))
         problems.push(`${where}: ${value} does not exist`);
     }
   }
@@ -154,7 +220,7 @@ function checkStatic() {
   for (const problem of problems) console.log(problem);
   console.error(
     problems.length === 0
-      ? `check-site: ${files.length} pages and ${links} links are fine.`
+      ? `check-site: ${files.length} pages and ${links} links are fine; ${(bytes / 1024 / 1024).toFixed(2)} MB without media/; ${legal.claims} legal claims match LEGAL-REVIEW.md.`
       : `check-site: ${problems.length} problem(s) in the static checks.`,
   );
   return { ok: problems.length === 0, files };
@@ -173,6 +239,61 @@ const types = {
   ".vtt": "text/vtt; charset=utf-8",
   ".txt": "text/plain; charset=utf-8",
 };
+
+/**
+ * Runs in the page: the text that is cut off or runs out of its box, by the
+ * rules of findOverflow() in e2e/helpers/overflow.ts. Every <details> is
+ * opened first, so the FAQ answers count. Text in a box that scrolls
+ * sideways (code) and visually hidden text do not count.
+ */
+function findTextOverflow() {
+  for (const details of document.querySelectorAll("details")) details.open = true;
+  const scrollsSideways = (style) => style.overflowX === "auto" || style.overflowX === "scroll";
+  const boxOf = (element) => {
+    for (let box = element; box; box = box.parentElement) {
+      const display = getComputedStyle(box).display;
+      if (display !== "inline" && display !== "contents") return box;
+    }
+    return null;
+  };
+  const inSidewaysScroller = (element) => {
+    for (let parent = element.parentElement; parent && parent !== document.body; parent = parent.parentElement)
+      if (scrollsSideways(getComputedStyle(parent)) && parent.scrollWidth > parent.clientWidth + 1) return true;
+    return false;
+  };
+  const textOutside = (box, texts) => {
+    const left = box.getBoundingClientRect().left + box.clientLeft;
+    const right = left + box.clientWidth;
+    const range = document.createRange();
+    for (const text of texts) {
+      range.selectNodeContents(text);
+      for (const rect of range.getClientRects())
+        if (rect.width > 0 && (rect.right > right + 1 || rect.left < left - 1)) return true;
+    }
+    return false;
+  };
+  const boxes = new Map();
+  for (const element of document.body.querySelectorAll("*")) {
+    const texts = [...element.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+    const box = texts.length ? boxOf(element) : null;
+    if (!box) continue;
+    if (!boxes.has(box)) boxes.set(box, []);
+    boxes.get(box).push(...texts);
+  }
+  const problems = [];
+  for (const [box, texts] of boxes) {
+    const style = getComputedStyle(box);
+    const rect = box.getBoundingClientRect();
+    if (!box.checkVisibility({ visibilityProperty: true }) || rect.width <= 1 || rect.height <= 1) continue;
+    if (scrollsSideways(style)) continue;
+    const ellipsis = style.textOverflow === "ellipsis" && style.overflowX !== "visible";
+    if (box.scrollWidth > box.clientWidth + 1 && !inSidewaysScroller(box) && (ellipsis || textOutside(box, texts))) {
+      const name = [box.tagName.toLowerCase(), box.id ? `#${box.id}` : "", ...[...box.classList].map((c) => `.${c}`)].join("");
+      problems.push(`${ellipsis ? "ellipsis" : "overflow"}: ${name} "${box.textContent.trim().replace(/\s+/g, " ").slice(0, 60)}"`);
+    }
+  }
+  return problems;
+}
 
 /** A static file server for site/ on 127.0.0.1. */
 function serve(port, withoutMedia) {
@@ -234,6 +355,19 @@ async function checkBrowser(files, { port, withoutMedia, screenshots }) {
             video: box ? { width: box.width, height: box.height } : null,
           };
         });
+        const brokenImages = await page.evaluate(async () => {
+          const broken = [];
+          for (const image of document.images) {
+            image.loading = "eager";
+            try {
+              await image.decode();
+            } catch {
+              broken.push(image.getAttribute("src"));
+            }
+          }
+          return broken;
+        });
+        const textProblems = await page.evaluate(findTextOverflow);
         if (screenshots) {
           fs.mkdirSync(screenshots, { recursive: true });
           const name = `${file.replace(/[\\/]/g, "_").replace(/\.html$/, "")}-${viewport.width}.png`;
@@ -244,6 +378,8 @@ async function checkBrowser(files, { port, withoutMedia, screenshots }) {
         const isMedia = (url) => url.startsWith(`${origin}/media/`);
         if (result.scrollWidth !== result.clientWidth)
           problems.push(`${label}: horizontal scroll (scrollWidth ${result.scrollWidth}, clientWidth ${result.clientWidth})`);
+        for (const problem of textProblems) problems.push(`${label}: text does not fit, ${problem}`);
+        for (const image of brokenImages) problems.push(`${label}: the image ${image} does not load`);
         for (const url of requests.filter((url) => !url.startsWith(`${origin}/`)))
           problems.push(`${label}: request outside the local server: ${url}`);
         for (const failure of failures.filter((line) => !isMedia(line.replace(/^\S+ /, ""))))
