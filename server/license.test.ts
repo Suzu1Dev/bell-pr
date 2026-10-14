@@ -1114,10 +1114,15 @@ test("keygen writes a 0600 private key outside the repository and never replaces
   assert.equal(await keygenMain(["--kid", "test-2026", "--dir", keys], deps), 0, stderr.text());
   const pem = path.join(keys, "test-2026.pem");
   assert.equal(statSync(pem).mode & 0o777, 0o600);
-  assert.match(readFileSync(pem, "utf8"), /^-----BEGIN PRIVATE KEY-----/);
+  // A PKCS8 PEM file holding an Ed25519 private key.
+  const written = readFileSync(pem, "utf8");
+  const privateKey = createPrivateKey(written);
+  assert.equal(privateKey.type, "private");
+  assert.equal(privateKey.asymmetricKeyType, "ed25519");
+  assert.equal(privateKey.export({ type: "pkcs8", format: "pem" }), written);
   const x = /Public key \(x\): ([A-Za-z0-9_-]{43})\n/.exec(stdout.text())![1];
   assert.match(stdout.text(), new RegExp(`"test-2026": "${x}",`));
-  assert.ok(!stdout.text().includes("PRIVATE KEY"));
+  assert.ok(!stdout.text().includes(written.split("\n")[1]), "the private key was printed");
 
   assert.equal(await keygenMain(["--kid", "test-2026", "--dir", keys], deps), 1);
   assert.match(stderr.text(), /already exists/);
