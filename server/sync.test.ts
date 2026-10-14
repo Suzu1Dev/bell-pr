@@ -108,6 +108,81 @@ test("BELL's clone of a GitHub repository updates to the latest default branch; 
   }
 });
 
+test("a partial clone made by a 1.0.0-beta.0 build gets every object once and reads its history offline", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-sync-test-"));
+  const github = await fakeGitHub(directory, {
+    files: { "hello.ts": 'export const hello = "first";\n' },
+  });
+  await github.upstreamCommit({ "hello.ts": 'export const hello = "second";\n' });
+  await git(directory, ["--git-dir", github.bare, "branch", "gone", "main"]);
+  await github.pushToBranch("gone", { "gone.ts": "export const gone = true;\n" });
+  await git(directory, ["--git-dir", github.bare, "config", "uploadpack.allowFilter", "true"]);
+  const store = new Store(path.join(directory, "state"));
+  await store.initialize();
+  const workbench = new Workbench(store);
+  // How a beta build cloned it; the file transport serves the filter here.
+  const partialClone = async (target: string) => {
+    await rm(target, { recursive: true, force: true });
+    await git(directory, [
+      "-c",
+      "protocol.file.allow=always",
+      "clone",
+      "-q",
+      "--filter=blob:none",
+      "--no-recurse-submodules",
+      `file://${github.bare}`,
+      target,
+    ]);
+  };
+  const missing = async (cwd: string, revision = "--all") =>
+    (await git(cwd, ["rev-list", "--objects", "--missing=print", revision])).stdout
+      .split("\n")
+      .filter((line) => line.startsWith("?")).length;
+  const settings = async (cwd: string) =>
+    (
+      await git(cwd, ["config", "--local", "--get-regexp", "promisor|partialclone"], {
+        allowedCodes: [0, 1],
+      })
+    ).stdout.trim();
+  const refetches = async () =>
+    (await github.calls()).filter((call) => call.includes("--refetch")).length;
+  try {
+    const repo = await workbench.importRepository(github.url);
+    await partialClone(repo.path);
+    assert.ok((await missing(repo.path)) > 0);
+    assert.match(await settings(repo.path), /remote\.origin\.promisor true/);
+    await workbench.updateRepository(repo.id);
+    assert.equal(await settings(repo.path), "");
+    assert.equal(await refetches(), 1);
+    // Nothing is fetched on demand any more: the old contents are local.
+    await git(repo.path, ["remote", "set-url", "origin", path.join(directory, "nowhere.git")]);
+    assert.match(
+      (await git(repo.path, ["log", "-p", "main"])).stdout,
+      /hello = "first"/,
+    );
+    await workbench.updateRepository(repo.id);
+    assert.equal(await refetches(), 1);
+
+    // A branch of BELL's whose commit GitHub no longer has stays fetchable
+    // on demand: the clone keeps its settings and gets everything else.
+    const second = path.join(path.dirname(repo.path), "example-second");
+    await partialClone(second);
+    await git(second, ["branch", "kept", "origin/gone"]);
+    await git(directory, ["--git-dir", github.bare, "branch", "-D", "gone"]);
+    repo.path = second;
+    await workbench.updateRepository(repo.id);
+    assert.equal(await refetches(), 2);
+    assert.match(await settings(second), /remote\.origin\.promisor true/);
+    assert.match(await settings(second), /remote\.origin\.partialclonefilter blob:none/);
+    assert.equal(await missing(second, "main"), 0);
+    assert.ok((await missing(second, "kept")) > 0);
+  } finally {
+    github.restore();
+    await workbench.shutdown();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 const identity = {
   GIT_AUTHOR_NAME: "Sync Test",
   GIT_AUTHOR_EMAIL: "sync@example.invalid",

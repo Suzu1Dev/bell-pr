@@ -51,7 +51,11 @@ import {
 import { draftFingerprint } from "./drafts.js";
 import { cancelled, currentLocale, sm } from "./i18n/index.js";
 import type { Locale } from "../shared/i18n/locale.js";
-import { adoptLegacyCheckout, createRunWorktree } from "./repositories.js";
+import {
+  adoptLegacyCheckout,
+  completePartialClone,
+  createRunWorktree,
+} from "./repositories.js";
 import {
   agentSpawn,
   enterPhase,
@@ -676,6 +680,7 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
       await ctx.lock(`repository:${repo.id}`, async () => {
         // A project an earlier build worked on in place moves to a clone.
         await adoptLegacyCheckout(ctx, repo, run);
+        await completePartialClone(ctx, repo, signal);
         await createRunWorktree(run, repo, signal);
       });
       await ctx.store.save();

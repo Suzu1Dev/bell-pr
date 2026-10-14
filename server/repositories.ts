@@ -130,6 +130,92 @@ export async function cloneGitHubRepository(
   }
 }
 
+/** The settings that make a clone partial; `--get-regexp` lower-cases keys. */
+const partialCloneSettings =
+  "^(remote\\..+\\.(promisor|partialclonefilter)|extensions\\.partialclone)$";
+/** Clones this process already tried to complete, so a failure is not retried on every run. */
+const completionTried = new Set<string>();
+
+/**
+ * 1.0.0-beta.0 builds cloned GitHub projects partially
+ * (`--filter=blob:none`), so Git fetched old file contents on demand
+ * through plain git: without gh's credentials, and not at all from a
+ * sandboxed agent. Such a clone fetches every object once, by URL through
+ * gh, and stops being partial. If something is still missing (a branch of
+ * BELL's that GitHub no longer has), the settings go back, so Git can still
+ * fetch it on demand. A failure leaves the clone as it was. The caller
+ * holds the repository lock.
+ */
+export async function completePartialClone(
+  ctx: WorkbenchContext,
+  repo: Repository,
+  signal?: AbortSignal,
+) {
+  if (!managedClone(ctx.store.directory, repo) || completionTried.has(repo.path))
+    return;
+  const listed = (
+    await git(repo.path, ["config", "--local", "--get-regexp", partialCloneSettings], {
+      allowedCodes: [0, 1],
+      signal,
+    })
+  ).stdout.trim();
+  if (!listed || !parseGitHubSource(repo.url)) return;
+  completionTried.add(repo.path);
+  const settings = listed.split("\n").map((line) => {
+    const space = line.indexOf(" ");
+    return space < 0 ? [line, ""] : [line.slice(0, space), line.slice(space + 1)];
+  });
+  const unsetAll = async () => {
+    for (const key of new Set(settings.map(([key]) => key)))
+      await git(repo.path, ["config", "--local", "--unset-all", key], {
+        allowedCodes: [0, 5],
+      });
+  };
+  let changed = false;
+  let partial = true;
+  try {
+    await gitNetwork(
+      repo.path,
+      [
+        "fetch",
+        "--refetch",
+        "--prune",
+        "--no-tags",
+        "--no-recurse-submodules",
+        `${repo.url}.git`,
+        "+refs/heads/*:refs/remotes/origin/*",
+      ],
+      { signal, timeoutMs: cloneTimeoutMs },
+    );
+    changed = true;
+    await unsetAll();
+    // Without the settings, a missing object fails here instead of being fetched.
+    partial =
+      (
+        await git(repo.path, ["rev-list", "--objects", "--all", "--quiet"], {
+          allowedCodes: [0, 128],
+          timeoutMs: cloneTimeoutMs,
+          signal,
+        })
+      ).code !== 0;
+    if (partial) log.warn("repo.clone_left_partial", { repoId: repo.id });
+    else log.info("repo.clone_completed", { repoId: repo.id });
+  } catch (error) {
+    if (signal?.aborted) {
+      completionTried.delete(repo.path);
+      throw error;
+    }
+    log.warn("repo.clone_completion_failed", { repoId: repo.id, error });
+  } finally {
+    // Unless every object is here, Git keeps fetching on demand.
+    if (changed && partial) {
+      await unsetAll();
+      for (const [key, value] of settings)
+        await git(repo.path, ["config", "--local", "--add", key, value]);
+    }
+  }
+}
+
 /** The branch origin's HEAD names, else the branch checked out. */
 async function defaultBranchOf(directory: string) {
   try {
@@ -345,6 +431,7 @@ export async function updateRepository(ctx: WorkbenchContext, id: string) {
       409,
     );
   return ctx.lock(`repository:${repo.id}`, async () => {
+    await completePartialClone(ctx, repo);
     const from = (
       await git(repo.path, ["rev-parse", "--verify", "HEAD"])
     ).stdout.trim();

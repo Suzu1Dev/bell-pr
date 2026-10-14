@@ -221,7 +221,9 @@ inside its sandbox. The macOS canary is **OWNER**.
 - The message for a local project that cannot be updated says what to do
   now that BELL PR clones local projects.
 - GitHub projects are cloned in full, so private repositories and
-  sandboxed agents can read old file contents.
+  sandboxed agents can read old file contents. A project that a
+  1.0.0-beta.0 build cloned partially gets every object, through gh, the
+  first time BELL PR updates it or starts a contribution on it.
 - The diff toolbar and the file name fit a narrow diff pane; the
   presentation badge sits in the top bar's row, covering neither the
   Approve button nor the page name; the sample run shows its efficiency
