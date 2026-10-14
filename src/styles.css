@@ -306,54 +306,6 @@ button {
   margin-top: auto;
   padding-top: 38px;
 }
-.learning-card {
-  margin: 0 4px 22px;
-  border: 1px solid #e0e7d8;
-  border-radius: 8px;
-  padding: 15px 13px;
-  background: linear-gradient(120deg, #eff3e9, #f7f9f2);
-  position: relative;
-  overflow: hidden;
-}
-.learning-card:after {
-  content: "";
-  position: absolute;
-  right: -26px;
-  top: -32px;
-  width: 94px;
-  height: 94px;
-  border: 1px solid #e0e8d7;
-  border-radius: 50%;
-  box-shadow:
-    0 0 0 13px #f0f4e8,
-    0 0 0 14px #e6eddc;
-  pointer-events: none;
-}
-.learning-card-icon {
-  color: #637b48;
-  margin-bottom: 13px;
-}
-.learning-card strong {
-  font-size: 11px;
-  font-weight: 550;
-  position: relative;
-  z-index: 1;
-}
-.learning-card p {
-  font-size: 10px;
-  color: #89907f;
-  line-height: 1.9;
-  margin-top: 7px;
-}
-.learning-card button {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-  padding: 0;
-  margin-top: 15px;
-  font-size: 10px;
-  color: #547240;
-}
 .shortcut {
   border: 1px solid #dce2d5;
   border-radius: 3px;
@@ -1746,6 +1698,18 @@ button {
   line-height: 1.9;
   overflow-wrap: anywhere;
 }
+/* One line that keeps the end of the path, where clones differ. */
+.repository-card p.repository-path {
+  direction: rtl;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.repository-path > span {
+  direction: ltr;
+  unicode-bidi: embed;
+}
 .repository-meta {
   display: flex;
   justify-content: space-between;
@@ -1902,7 +1866,7 @@ button {
   margin: 15px 0;
   min-height: 72px;
 }
-.note-card code {
+.note-card > code {
   display: block;
   background: #f7f9f3;
   border: 1px solid #e8eddf;
@@ -2271,6 +2235,27 @@ button {
   margin-top: 15px;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+/* FailureText: a CLI's raw output folded behind a one-line error. */
+.failure-toggle {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.failure-raw {
+  display: block;
+  margin-top: 8px;
+  max-height: 240px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .guide-list {
   padding-left: 25px;
@@ -3113,7 +3098,7 @@ button {
 .note-card p {
   font-size: 14px;
 }
-.note-card code {
+.note-card > code {
   font-size: 11px;
 }
 .section-heading p {
@@ -3132,12 +3117,6 @@ button {
   font-size: 12px;
 }
 .callout p {
-  font-size: 12px;
-}
-.learning-card p {
-  font-size: 11px;
-}
-.learning-card strong {
   font-size: 12px;
 }
 .draft-textarea {

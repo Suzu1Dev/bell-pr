@@ -1596,8 +1596,9 @@ test("Claude Code analysis retries once after losing the OAuth refresh lock and 
         terminal_reason: "api_error",
         result: "API Error: 500 Internal server error",
       });
+      // command() keeps the raw JSON tail; the error claude reported replaces it.
       throw new AppError(
-        "claude 執行失敗：API Error: 500 Internal server error",
+        `claude 執行失敗：${`{"type":"result","is_error":true,"result":"API Error: 500 Internal server error","session_id":"s"}`}`,
         422,
       );
     }),
