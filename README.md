@@ -1,244 +1,397 @@
 # BELL PR
 
-透過網頁操作的本機 PR 貢獻工作台：先理解專案用途、使用者與貢獻動機，再指定改善方向，讓 Agent team 分工開發。完成後將使用者影響對照 Git diff、用白話解說與問答學習，最後編輯並送出 PR 草稿。
+**Contribute to open source with an AI team, and understand every line you
+ship.**
 
-## 開始使用
+English · [繁體中文](README.zh-TW.md)
 
-需要 Node.js 22 以上與 npm。實際開發與 GitHub 操作另外需要 Git（同步到最新目標分支需要 2.40 以上）、GitHub CLI (`gh`)，以及 Codex CLI (`codex`) 或 Claude Code CLI (`claude`)；建立提交前需設定 Git 的 `user.name` 與 `user.email`。
+BELL PR is a self-hosted, local-first workbench for open-source
+contributions. It runs on your computer with the AI coding CLI you already
+use (the OpenAI Codex CLI or Claude Code) and the GitHub CLI. It analyzes a
+project, suggests where to contribute, lets a small agent team build the
+change in isolated Git worktrees, explains every changed file in plain
+language, and drafts a pull request that follows the project's own rules.
+
+**Learn while you contribute, not automatic PRs.** Nothing is published
+until you have reviewed every file and approved the pull request yourself.
+There is no BELL PR cloud, no telemetry and no account.
+
+![The Code changes tab: a diff with a plain-language explanation of the change beside it](docs/images/en/run-changes-1280.png)
+
+[Quickstart](#quickstart) · [Requirements](#requirements) ·
+[Features](#features) · [Free and Pro](#free-and-pro) ·
+[Privacy](#privacy) · [Security](#security-model) ·
+[Configuration](#configuration) · [Troubleshooting](#troubleshooting) ·
+[Documentation](#documentation)
+
+## Quickstart
+
+With the [requirements](#requirements) in place, this takes about 60
+seconds.
+
+1. Start BELL PR:
+
+   ```sh
+   npx bell-pr
+   ```
+
+2. It prints a sign-in link and opens it in your browser:
+
+   ```text
+   BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311/auth?t=…
+   ```
+
+3. Walk through Welcome: choose your **language**, accept the **license
+   agreement**, check your **environment** (every missing tool comes with
+   the command that fixes it) and pick the AI **provider** your agents use.
+4. Take the sample tour, import a repository, or find a project to
+   contribute to.
+
+**Lost the sign-in link? Run `bell-pr open`** (or `npx bell-pr open` if you
+started with `npx`). It opens a new one-time link.
+
+To keep BELL PR installed, run `npm install -g bell-pr`, then start it with
+`bell-pr`. The [getting started guide](docs/getting-started.md) walks
+through a whole contribution.
+
+## Requirements
+
+- **Node.js 22 or later.**
+- **Git.** Syncing a run onto the latest target branch needs Git 2.40 or
+  later, and commits need your name and e-mail address in Git.
+- **The GitHub CLI** (`gh`), signed in with `gh auth login`, to import
+  from GitHub, publish pull requests and find projects.
+- **The Codex CLI or Claude Code**, installed and signed in as the same
+  user that runs BELL PR. One of them is enough.
+  - Codex CLI: `npm install -g @openai/codex`, then `codex login`. BELL PR
+    uses the Codex CLI you installed and signed in to. Usage counts
+    against your own account.
+  - Claude Code: `npm install -g @anthropic-ai/claude-code`, then
+    `claude auth login`. BELL PR uses the Claude Code CLI you installed and
+    signed in to (Claude plan or Anthropic API key). Usage counts against
+    your own account.
+- **On Linux, bubblewrap and socat** for the sandbox that Claude Code
+  agents edit files in (`sudo apt-get install bubblewrap socat`).
+
+`bell-pr doctor` checks all of this and prints the command that fixes each
+problem.
+
+## Supported platforms
+
+- **macOS**
+- **Linux**
+- **Windows through WSL2**: install and run BELL PR, Git, the GitHub CLI
+  and your AI CLI inside your WSL distribution.
+
+The 1.0.0-rc.1 release candidate was verified on Linux; macOS and WSL2
+verification is pending (see the [changelog](CHANGELOG.md)). A Docker
+image is available in beta.
+
+## Features
+
+### Understand the project before you change it
+
+An agent reads the project, read-only, and explains what it does, who uses
+it, how its parts fit together and where to start reading. It suggests up
+to five contribution directions, each quoting the code or documents it is
+based on, and BELL PR checks that every quote really exists.
+
+![The project overview: what the project does and who uses it](docs/images/en/repo-overview-1280.png)
+
+### A small agent team, in isolated worktrees
+
+You describe the contribution: who benefits, what changes for them, what
+must not change and what counts as done. A **Lead** splits the work into
+tasks with clear file scopes, and you can approve or send back the plan.
+**Teammates** work in parallel, each in its own Git worktree, and share
+findings through a team inbox. A **Reviewer** and a **Test analyst** then
+check the integrated result. Failed subtasks can be retried.
+
+![Agent activity: the team's plan, progress and reports](docs/images/en/run-activity-1280.png)
+
+### Review that teaches
+
+Every changed file comes with a plain-language explanation: a concrete
+example of the behavior before and after, what changed and why, the
+concepts involved, what to check, another way to do it and a question to
+test yourself. Click a line to ask the agent about it, follow the
+suggested review order, write your own notes, and mark each file reviewed.
+You can also edit the code yourself and refresh the diff.
+
+### Pull requests that follow the project's rules
+
+BELL PR reads the project's contribution guides, pull request template,
+agent guides and PR-checking workflows, and suggests a title, a
+description and a commit message with the source of each rule. It checks
+the text before anything is sent: credentials and unfinished placeholders
+block it, and a local path, a CI change or a public commit e-mail address
+needs your confirmation. AI assistance is mentioned only if the project
+requires it or you choose to. Publishing pushes a branch (to your fork when
+needed) and opens a **Draft** PR through the GitHub CLI; nothing is ever
+force-pushed.
+
+![The PR draft tab: contribution rules, the template and the draft](docs/images/en/run-draft-1280.png)
+
+### After you publish
+
+Sync a run or its pull request onto the latest target branch, with an
+agent that can resolve conflicts for your review. With Pro, read the
+maintainers' reviews and CI results with coaching on how to respond, and
+let an agent address selected comments in a follow-up round that you
+review and push as one more commit.
+
+### Find your next contribution (Pro)
+
+Discovery searches GitHub for projects and issues that match your
+interests, language and the difficulty you want, reads their contribution
+rules, and explains the effort and the first step. Free shows labelled
+sample results.
+
+![Explore contributions: search GitHub for your next contribution](docs/images/en/discover-1280.png)
+
+### Learning notes
+
+Every explanation from every contribution is collected on one page, with a
+search, so you can come back to a concept later. Pro exports a
+contribution's learning record as Markdown.
+
+![Learning notes: explanations collected across contributions](docs/images/en/learning-1280.png)
+
+### Your tools, your accounts, your language
+
+Choose the Codex CLI or Claude Code, the model and the reasoning effort,
+and an efficiency mode (Lean, Full or Off). Each run shows the usage the
+provider reported. The interface and the agents' explanations are in
+English or Traditional Chinese (Taiwan); pull requests stay in English
+unless the project asks otherwise.
+
+### Try it with the sample project
+
+A finished sample contribution, with the plan, the changes, their
+explanations and the PR draft, needs no setup and makes no AI call. It
+also shows the Pro features with sample data.
+
+## Free and Pro
+
+<!-- generated:plan-table locale=en -->
+
+| Feature | Plan | Limits |
+| --- | --- | --- |
+| Repositories and contribution runs | Free | Unlimited repositories and runs |
+| Project analysis with verified recommendations | Free | Up to 5 recommendations per analysis; re-analysis is allowed. Recommendations you already generated (up to 30) stay visible after a downgrade. |
+| More recommendations ("Generate 5 more", up to 30 per project) | Pro | Free: 5. Pro: up to 30 per project. |
+| Agent team size | Free (limited) | Free: Lead, 2 teammates, Reviewer and Test analyst. Pro and trial: 3 or 4 teammates. |
+| Concurrent runs | Free (limited) | Free: one contribution at a time; other runs wait in the queue. Pro: up to your configured limit (2 by default, at most 8). |
+| Plan approval and revision, team inbox, retry of failed subtasks | Free | Up to 3 plan revisions |
+| Diff review, explanations, follow-up chat, notes, suggested review order | Free | No limit |
+| Re-run Reviewer and Test analyst | Free | No limit (part of the human review safety gate) |
+| Rule-aware PR draft, preflight checks, publishing a Draft PR | Free | Human approval is required on every plan |
+| Syncing a run onto the latest target branch, agent conflict resolution, updating a project's local clone | Free | No limit (unpublished runs and published PRs) |
+| Learning notes page | Free | No limit |
+| Learning record export (Markdown) | Pro | Free: not available (the notes page stays Free) |
+| Maintainer feedback, CI coaching and AI follow-up rounds | Pro | Free: not available; the sample project shows example feedback labelled PRO. Follow-up rounds already on a run stay readable after a downgrade, and an open round can still be reviewed, pushed, stopped or discarded. |
+| Discovery (GitHub-wide recommendations) | Pro | Free: labelled sample results only. Results you already have stay readable, and a running discovery can still be cancelled. |
+| Web access for agents | Pro | Free: off. Pro: on, limited to an allowlist of domains |
+| Deep reasoning efforts (xhigh, max, ultra) | Pro | Free: choose none to high. Leaving the effort on "Default" uses the model's own default effort on every plan. |
+| Providers, model choice, Efficiency modes | Free | Codex CLI and Claude Code, all models, all efficiency modes |
+| Sample project / demo (Pro features shown with sample data) | Free | Sample data in your browser only |
+| 14-day Pro trial | Free | One per data directory, started only when you choose (in the app or with bell-pr license trial) |
+| Pro license term and updates | Pro | Per named user; perpetual use of the builds released within 12 months of purchase |
+
+<!-- /generated:plan-table -->
+
+Every data directory can try Pro for 14 days: **Settings → License → Start
+14-day trial**, or `bell-pr license trial`. Moving back to Free never takes
+away runs, notes or results you already have. See
+[Licensing](docs/licensing.md).
+
+<!-- generated:product-link key=pricingUrl text="Pricing" -->
+<!-- /generated:product-link -->
+<!-- generated:product-link key=purchaseUrl text="Buy Pro" -->
+<!-- /generated:product-link -->
+
+## Privacy
+
+- BELL PR runs on your computer and keeps everything in one data
+  directory. There is no BELL PR cloud, account, telemetry, analytics or
+  license server.
+- Your code and your questions go only to the services you set up: the
+  provider of the AI CLI you chose, and GitHub, under your own accounts.
+- Web access for agents is off unless you turn it on (Pro).
+- In the app you can free a run's files, delete a run or a project, or
+  delete all data.
+
+Details: [Privacy and your data](docs/privacy-and-data.md) and the privacy
+policy in [PRIVACY.md](PRIVACY.md).
+
+## Security model
+
+- **Sandboxed agents.** Agents that write code run in their CLI's
+  operating-system sandbox: writes stay in the run's own worktree and the
+  network is closed. Claude Code agents are also denied your SSH keys, the
+  GitHub CLI's sign-in and BELL PR's own data; Codex's sandbox does not
+  limit reading.
+- **Imported projects are untrusted.** Their code, documents and agent
+  instructions (`AGENTS.md`, `CLAUDE.md`, `.claude/`) are treated as data:
+  the CLIs never load the project's own settings, hooks or instructions,
+  and a repository whose Git configuration could run programs is refused.
+  Agents still run the project's code, so import only projects you are
+  willing to run on this computer.
+- **Session sign-in.** BELL PR listens on `127.0.0.1` and accepts a browser
+  only after it opened a sign-in link. The session secret lives in memory,
+  so a restart signs everyone out. Requests from other sites are refused.
+- **Unsandboxed agents are an explicit opt-in.** Without the sandbox (for
+  example in Docker with default settings), a Claude Code agent that edits
+  files is refused. You can allow it under **Settings → Agent safety** or
+  with `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1`; such agents have your full user
+  rights, and every run that used one carries a **Ran without sandbox**
+  badge.
+- **You publish.** Nothing reaches GitHub before your file-by-file review
+  and approval, and the commit holds only the files you reviewed.
+
+Details and limits: [Security model](docs/security-model.md). To report a
+vulnerability, see [SECURITY.md](SECURITY.md).
+
+## Configuration
+
+BELL PR needs no configuration. Every setting below is an environment
+variable read at start; `bell-pr start` also takes `--port`, `--host`,
+`--data-dir`, `--no-open` and `--env-file <file>`. Values set in the app's
+Settings are used unless a variable sets them.
+
+| Variable | Default | What it sets |
+| --- | --- | --- |
+| `BELLPR_PORT` | `4311` | Port of the web interface and the API (1024 to 65535) |
+| `BELLPR_HOST` | `127.0.0.1` | Address to listen on; to reach BELL PR from other machines, keep it and add an HTTPS reverse proxy with `BELLPR_PUBLIC_URL` |
+| `BELLPR_PUBLIC_URL` | none | The address browsers use behind a reverse proxy or another published port |
+| `BELLPR_ALLOWED_ORIGINS` | none | Extra exact origins to accept, comma-separated |
+| `BELLPR_DATA_DIR` | `~/.bellpr` | The data directory |
+| `BELLPR_NO_OPEN` | not set | `1` never opens a browser |
+| `BELLPR_LOCALE` | `en` | Default language of server and CLI messages (`en` or `zh-TW`) |
+| `BELLPR_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
+| `BELLPR_LICENSE_KEY` | none | A Pro license key; wins over a saved key |
+| `BELLPR_MAX_AGENT_PROCESSES` | `3` | Agent CLI processes at the same time (1 to 32) |
+| `BELLPR_MAX_ACTIVE_RUNS` | `2` | Runs executing at the same time (1 to 8; Free runs one) |
+| `BELLPR_AGENT_TIMEOUT_SCALE` | `1` | Multiplier for agent time limits (0.5 to 10) |
+| `BELLPR_ALLOW_UNSANDBOXED_AGENTS` | not set | `1` lets Claude Code agents edit files without the sandbox |
+| `BELLPR_RETENTION_DAYS` | `14` | Days before the files of cancelled and failed runs are removed (1 to 365) |
+| `BELLPR_DEV` | not set | Development mode, for working on BELL PR itself |
+| `BELLPR_FRONTEND_PORT` | `4310` | Port of the dev server that development mode trusts |
+| `BELLPR_STATIC_DIR` | the package's `dist/` | The built web interface to serve |
+
+[Configuration](docs/configuration.md) explains each one, the commands and
+the app's settings; [.env.example](.env.example) is a commented template.
+Variables used only by BELL PR's own tests are in
+[Development](docs/development.md#test-and-tool-variables).
+
+## Docker (beta)
 
 ```sh
-npm install
-npm run dev
+docker build -t bell-pr .
+docker run -d --name bell-pr -p 127.0.0.1:4311:4311 \
+  -v bellpr-data:/data -v bellpr-home:/home/node bell-pr
+docker exec bell-pr bell-pr open --print
 ```
 
-開啟 <http://127.0.0.1:4310>。開發環境的網頁使用 4310 埠，API 使用 4311 埠；兩者都綁定本機介面。
+The image includes Git, the GitHub CLI and the Codex CLI; you can install
+Claude Code into the container yourself. Docker is **beta**: the agent
+sandbox needs three extra `--security-opt` options. Read
+[Docker](docs/docker.md) before you use it, and
+[Self-hosting](docs/self-hosting.md) for a systemd service or a reverse
+proxy.
 
-要操作真實 repository，請先在啟動本工具的同一個使用者環境完成登入：
+## Troubleshooting
 
 ```sh
-gh auth login
-codex login
-claude auth login   # 只在要改用 Claude Code 時需要
+bell-pr doctor
 ```
 
-本工具使用這些 CLI 既有的登入狀態，不需要在網頁輸入 GitHub token 或模型 API key。
-
-## 一次完整的貢獻
-
-1. **先體驗示範**：預設的「SDK 智慧重試機制」包含專案全貌、使用者流程、貢獻前後的體驗、共享任務板與範例 diff。示範分析與問答都預先寫好，不會啟動 Codex 或建立 GitHub PR；示範審閱狀態與草稿存於瀏覽器。
-2. **匯入並理解專案**：在「Repositories」貼上 GitHub 連結或本機 Git 專案完整路徑。匯入後先進入「專案全貌」，按「分析專案全貌」取得用途、主要模組與有來源依據的改善建議。這一步不會啟動開發。BELL 匯入的是當時的版本；之後要看最新內容，可在專案全貌按「更新到最新版本」，BELL 會把自己的專案副本更新到 GitHub 預設分支的最新 commit，舊的分析會標示過期，重新分析即可。新的貢獻本來就從最新版本開始；匯入的本機 repository 是你自己的工作目錄，BELL 不會更動，請自行 git pull。
-3. **指定貢獻方向**：選擇修復問題、新增功能、效能、使用體驗、測試、文件或維護，描述誰會受益、預期成果、開發界線與驗收方式。也可從 AI 建議帶入內容，再自行調整。方向設定依專案儲存；執行模型與思考強度則是所有專案共用的一組設定。
-4. **確認團隊計畫**：設定最多 2–4 位 teammates，預設會先由 Lead 產生計畫，等待你確認任務、檔案範圍與相依關係，再進入開發。「Agent 動態」提供共享任務板、工作報告、團隊訊息與停止操作。「查看全部貢獻」可切換所有工作。
-5. **理解與審查**：先看本次貢獻的動機與預期影響，再進入程式碼。Agents 完成後會自動整理每份 diff 的白話解說，直接呈現在「變更解說」，不必手動提問。先看「白話文舉例」的具體情境與修改前後差別，再讀技術細節。左側主選單不會因閱讀程式碼而自動收合，可用頁面左上角按鈕手動收合為圖示列，選擇會保留。閱讀區提供統一／並排 diff、12–20px 字級、專注模式、可收合的檔案清單與解說面板；解說面板寬度可拖曳，或以左右方向鍵調整。在桌面寬度（761px 以上）進入「程式碼變更」時，工作區標題列會壓縮成單行、工作流程列隱藏，程式碼區塊填滿剩餘的視窗高度而不捲動整頁；專注模式會再隱藏頁籤列，只保留 diff 與審閱頁尾，按 Esc 或「離開專注模式」即可恢復。點選行、按住 Shift 選多行，可在「追問 Agent」深入討論；自動解說與真實問答都會使用 Codex 用量。問答會隨任務保存在本機，重新整理網頁或切換任務後仍可讀回；差異更新後，針對舊版本的問答會標示「針對較舊版本」並保留閱讀，但不再作為後續追問的上下文。工作區標題列的「匯出學習紀錄（Markdown）」會下載包含任務描述、團隊計畫、各檔解說、問答、PR 連結與 Agent 用量的 Markdown 檔，頁首註明內容由 agent 產生、可能有誤；示範任務不提供匯出。「審查者怎麼看」頁籤完整呈現 Lead 整合摘要、Reviewer 與 Test analyst 的靜態審查報告，並標示每份報告提到目前檔案的段落數；Lead 會被要求在整合摘要結尾附「Suggested review order:」，說明這次該先讀哪個檔、為什麼（例如先定義再呼叫端、測試放最前或最後）；偵測到該區段時，頁籤會列成編號清單，檔案清單也可切換「依建議順序」排列，預設仍是 git 順序，未提到的檔案排在後面；追問時導師也會收到貢獻方向設定、該檔已產生的解說卡片與這兩份審查報告，所以可以直接問「這跟我的驗收條件有什麼關係」，但輸入內容會因此變長。看完一份 diff，可在「我的理解」用自己的話寫下筆記再勾選已審閱；筆記會和寫下時的 diff 版本一起保存，diff 更新後會標示「diff 已更新」但保留文字，未寫筆記只會在檔案標題旁出現柔性提示，不會阻擋審閱。
-6. **完成 PR 草稿**：新任務完成後會自動依專案規範準備草稿。在「PR 草稿」查看規範來源、維護者偏好與待確認事項，預覽或編輯 Markdown 說明。既有任務可按「依專案規範產生建議草稿」，確認後套用並儲存。「提交訊息」欄位是發佈時實際寫進 commit 的訊息：第一行主旨、空一行、說明，最後放 trailers；留空時以 PR 標題作為單行訊息。若專案要求 DCO，請在這裡自行輸入 `Signed-off-by`；模型只會依專案 commit 規範建議主旨與說明，「採用建議」只填入欄位。改動提交訊息會和改動標題或內容一樣，使先前的核准失效。「GitHub 分支」欄位是推送到 GitHub 時使用的分支名稱，留空時使用工作分支 `fix/<編號>`，所有新工作一律使用 `fix/` 前綴；專案規定分支命名時（例如不能有斜線或 `feat/` 前綴）可在這裡修改，本機工作分支不會改名，改動同樣會使核准失效。分支不能是目標分支本身，否則推送會直接進到目標分支而不經過 PR；推送成功後也不能再改，以免重試時重複建立 PR。PR 說明會原樣送到 GitHub，所以 `_TODO_`、`TODO:`、`(TBD)` 這類標記、「(results go here)」這類待填空格，以及 `Closes #`、`Fixes # (issue)` 這類沒填編號的 issue 欄位會擋下確認，請改成目前的事實或刪除，待辦事項留在核對清單；只是提到 TODO 註解或檔案的文字不受影響，必要時用反引號包起來。剛套用、尚未修改的模型原文會在編輯區上方標示。說明裡範本的勾選項目會列在「送出前，最後看一眼」，由你本人逐項勾選，勾選會直接改寫說明；BELL 與模型不會替你勾。逐一勾選已審閱檔案後，按「確認並準備 PR」。
-7. **明確送出**：最後的預覽視窗會顯示實際的 GitHub 分支與會送出的 PR 說明。若某段範本勾選項目全部沒勾、專案規範要求連結 issue 但說明沒有引用，或專案要求「用自己的話寫簡短說明」而說明仍是未改寫的建議原文或超過建議字數，需要逐項確認後才能送出；確認只代表你知道還沒處理，不會改動說明或寫進 PR。按「送出 Draft PR」才會推送分支與建立 GitHub 草稿 PR。示範模式只完成體驗。「PR 草稿」頁的「送出前，先和社群打個招呼」提醒你確認是否已在 issue 留言認領、專案是否要求先開 issue 討論，並說明社群為何在意這兩件事；勾選只是給自己的提醒，不會儲存，也不會阻擋送出。
-
-## 專案分析與 AI 建議
-
-按 **⌘K（macOS）／Ctrl+K（Windows、Linux）** 開啟中央快速切換面板。`↑`／`↓` 選擇貢獻，`{`／`}` 切換專案（也支援 `[`／`]`），Enter 開啟，Esc 關閉並回到原本焦點。可輸入名稱或分支搜尋目前專案的貢獻；沒有貢獻的專案仍可開啟專案全貌。方向鍵只選取，不會啟動 Agent 或送出 PR。
-
-工作台的「全貌與動機／程式碼變更／Agent 動態／PR 草稿」可用左右方向鍵與 Home／End 切換。在輸入框以外按 `?` 會開啟使用指南。Tab／Shift+Tab 移動焦點；頁首提供「跳至主要內容」。從快速切換面板開啟貢獻時，未儲存草稿仍需確認，取消或關閉面板會保留原畫面。
-
-### 在 GitHub 尋找下一個貢獻
-
-從左側「探索貢獻」或 Repositories 的「推薦貢獻項目」進入，設定興趣、程式語言、可接受的難度、搜尋排序與最低星數，再按「推薦貢獻項目」。搜尋會讀取 GitHub 公開專案的資料、開放 issues、貢獻文件與部分維護者留言，再交給唯讀 Codex 分析；不需先匯入 repository。介面會顯示搜尋、核對與分析進度，可停止工作，重新進入頁面後也能接續查看。
-
-每個項目會說明專案用途、使用者需求、貢獻規範、熱度、可行性、預估工作量、第一步與待執行的驗收方式，並附上可核對的來源和原文引用。星數與近期更新取自 GitHub；難度、時間與推薦理由是 AI 評估，不保證 maintainer 接受 PR。開放 issue 或 `good first issue` 標籤也不代表尚無人認領。開始前仍應查看 issue 最新狀態，以及 CLA、DCO、AI 協作或先討論的要求。
-
-這是有界限的搜尋取樣：依所選排序向 GitHub 取 12 個候選，驗證公開狀態與條件後最多整理 6 個，並非 GitHub 全站排名；提案的先後由模型分析整理，不是搜尋順序。排序預設「最近更新」，反映活躍度但結果會隨專案更新而變動；「相關度」是 GitHub best match，可能包含久未維護的專案（已排除封存專案，卡片會顯示最近更新時間）；「星數」偏向知名專案，競爭與審查門檻也較高。搜尋條件太窄、來源讀取失敗、API 限額或沒有充分證據時，會顯示空結果或限制說明，不會以預寫示範冒充即時推薦。引文對不上來源、缺 issue 引文或未引用已取得 CONTRIBUTING 的建議會逐項略過並列在「範圍與限制」警示中，其餘建議照常顯示；引文比對只容忍空白差異，其餘逐字。資料與最近的推薦保存在本機；按下重新推薦才會再次查詢和使用模型。進階設定可選擇模型、思考強度與 Ponytail 模式，完成後可查看已回報的用量。
-
-按「選擇此項目」會匯入對應專案，將需求、來源、規範與驗收方式帶入可編輯的任務設定；不會自動開始開發或送出 PR。此入口預設保留開發前計畫確認。提案引用的 GitHub issue 會一併填入方向設定的「相關 issue 連結」（選填，只接受 issue 頁面網址），PR 草稿的提示只允許在這個欄位有值時寫 Fixes／Refs #編號，草稿仍需人工確認。
-
-### 理解已匯入的專案
-
-分析使用本機 Codex 的唯讀模式，以已匯入 repository 的本機版本為來源。會優先取 README、套件設定、架構文件與主要程式碼，最多抽樣 60 個 Git 已追蹤文字檔、總計約 240 KB，每檔最多約 18 KB；略過未追蹤檔、二進位檔、敏感路徑與疑似憑證。同一優先層內會輪流讀取各頂層目錄的檔案，入口檔（index、main、app、server、cli）優先於一般程式碼，測試檔排在程式碼之後，並另附全部可分析的追蹤檔路徑清單（最多 1,500 筆或 40 KB，超出部分以目錄彙總），讓模型知道哪些檔案存在但內容未讀；因此模組說明可指向以 `/` 結尾的目錄，引文仍只能來自實際讀取的檔案，而 monorepo 全部集中在單一頂層目錄時，輪流取樣的廣度增益有限。這些是上限，實際讀到的檔數依檔案大小而異；專案全貌頁尾會顯示本次實際讀取的檔數、約略大小（KB）與被節錄的檔數（有節錄時），重新分析前的舊結果則標示「抽樣範圍未記錄」。這是有範圍的專案導讀，不能據此判定整個專案一定缺少某個功能或測試。
-
-分析除了用途、使用者、使用流程、模組分工與依據，也會給出「第一次讀這個專案，建議這樣讀」：Agent 從抽樣檔案中排出 3–8 個建議閱讀步驟（抽樣檔案更少時會更少），每一步說明為什麼先看它、要看什麼，並以散文描述一條主要資料流如何串接這些模組；抽樣看不到的連結會標示為推論。每一步可展開同一檔案在模組分工與依據裡的說明。後端逐項核對引用的路徑：模組分工可引用抽樣檔案、路徑清單中的檔案或目錄，閱讀順序可引用抽樣檔案或清單中的檔案（後者標示「未抽樣，內容未讀」），分析依據與建議只能引用抽樣檔案；不符合的模組、閱讀步驟與依據會逐項略過並列在建議區的「因引用未抽樣／不存在的檔案而略過」，引用未抽樣檔案的建議則照引文核對的方式略過，只有模組分工、閱讀順序或分析依據整段被略過時才拒絕整份分析並指出欄位與路徑。重新分析前的舊結果沒有這個區塊。
-
-新產生的推薦包含來源路徑、原文引用與推論理由；後端會確認引用確實存在於送進模型的節錄中。引文比對只容忍空白差異（連續空白視為一個），大小寫與標點仍須逐字相同；引文對不上的建議會被略過，建議區會列出其標題與原因，專案全貌與其餘建議照常儲存，之後可用「產出新建議」補足。匹配的引用只證明來源存在，問題嚴重性、使用者影響與改善方向仍需要確認，介面的驗收清單也不是已執行的測試結果。
-
-選定專案並完成分析後，可在「值得探索的貢獻方向」按「產出 5 個新建議」，讓 Agent 依這個專案的原始碼與已儲存的貢獻／模型設定，一次提出 5 個不同的改善方向。每次只呼叫一次模型，累積最多 30 項；剩餘額度不足 5 項時，按鈕會顯示本次可追加的數量。若來源或去重後的結果不足，會顯示實際新增與目標數量，不會為湊數虛構建議。新項目標示「本輪新增」，既有專案全貌、建議與引用保持不變；失敗時也會保留原有清單。
-
-建議卡片可以左右滑動，或用「上一個／下一個」按鈕切換；聚焦卡片清單後，也能使用鍵盤左右鍵瀏覽。「查看本輪新增」可直接移到新建議，追加完成時不會自動打斷目前閱讀的位置。這一步只產生建議；選擇「以此方向開始」後，才進入可編輯的貢獻設定，卡片上已核對的原文引文與理由會一併帶入任務需求，並標示為待核實的參考而非執行指令。
-
-每張卡片可隱藏，也可從「已隱藏」清單恢復顯示。拖曳卡片上的排序把手可調整順序；手機與鍵盤使用者也能使用卡片的向前／向後移動按鈕。顯示與排序設定按專案儲存在伺服器，重新整理後仍保留；儲存失敗會還原並顯示錯誤。隱藏不會刪除建議，也不會重複產生相同方向或釋出 30 項額度。追加的新建議排在最後；重新分析會移除已不存在的建議設定。示範專案的調整僅保留在目前工作台中。
-
-追加建議與原始專案分析的模型、時間及用量分開顯示。專案版本已改變時，需先「重新分析」建立最新的全貌與建議，再追加方向；重新分析會重建清單。示範專案只使用預寫內容，需匯入真實專案才能產出更多建議。
-
-分析結果與貢獻偏好保存在本機資料目錄。讀取快取時會比對本機 HEAD、追蹤檔案與未提交差異；版本不同會標示分析已過期，需手動重新分析。過期提示會以 `git diff --name-only` 比對工作樹與分析時的版本，說明至少有幾個已追蹤檔案變動、其中哪些是這份分析引用的檔案（最多列 12 個）；只有新 commit 但內容相同時會說明「分析引用的檔案內容相同」，分析時的版本已不存在或差異過大時則只標示過期並說明「無法列出變更明細」。未追蹤的新檔不計入數量。無論哪一種，追加建議前都仍需重新分析。這項比較發生於載入分析資料時，不會持續監看外部檔案變動。分析不會自動 fetch 遠端，也不等同於某次任務 worktree 的最新狀態；畫面會顯示來源版本。
-
-## Agent team 與工作目錄
-
-### 自動變更解說
-
-開發完成後，解說會在背景依實際 diff 整理「白話文舉例、改了什麼、為什麼改、開發觀念、審閱提醒」，產生期間仍可閱讀與審查程式碼。白話例子先交代情境與用途，再對照修改前、修改後的具體差別；測試或文件的例子會說明驗證或理解方式，不冒稱產品行為已改變。新產生或手動重試的解說另附兩張卡片：「如果換個做法？」列出至少一種其他可行做法、這次為何沒採用、何時應改採，並附最多 3 個可搜尋的關鍵字；「考考自己」提供一題檢驗核心意圖或邊界條件的問題，按「看答案」才展開只依 diff 可觀察內容寫成的答案。解說角色現在也會收到任務標題與貢獻方向設定作為判讀意圖的背景（不是 diff 已達成目標的證據），因此每批輸入內容會變長。解說面板上方若專案全貌分析仍為最新，會依最長路徑前綴標示檔案所在模組。解說與檔案差異的版本一起保存；重開任務可直接閱讀，相同版本的完整解說不會重複產生，差異更新後會重新整理。開啟尚未有解說或缺少例子的舊任務也會自動補上，補齊期間仍保留原解說供閱讀；只缺少新卡片的舊解說不會為此重新產生。
-
-每批最多 8 份完整 diff、100 KB，以唯讀方式處理；被阻擋或單檔超過上限的差異會標明原因。產生失敗不影響已完成的開發成果，可在該檔案解說頁重試。解說與追問分開保存，背景結果不會切換正在閱讀的頁籤。卡片和問答支援 Markdown 段落、清單、行內程式碼、程式碼區塊與表格。
-
-### 協作方式
-
-這是由 **Codex CLI 或 Claude Code CLI 逐回合驅動的 BELL 協作引擎**，並非 Claude Code 原生 Agent Teams。Lead 先產生 1–8 個子任務，指定各任務的檔案範圍與相依關係；排程器在依賴完成後認領任務，最多同時執行設定的 2–4 位 teammates。每位 teammate 在獨立 worktree 中取得自己的任務、依賴報告與團隊訊息，修改超出分配範圍的檔案會被拒絕整合。
-
-Lead 的計畫與每位 teammate 的工作報告都以輸出結構（Codex `--output-schema`、Claude Code `--json-schema`）回傳：Lead 的摘要需說明整體設計取捨，若需求已寫明問題、影響、做法與驗收，Lead 會以此為方向而非重新發想；teammate 報告固定有摘要、自述實際執行的檢查與結果、限制與未達成的驗收條件，以及「設計取捨」（考慮過但未採用的做法）；任務 ID 會先正規化為以字母開頭、最長 64 字的小寫字母、數字與連字號，計畫格式不符時錯誤訊息會標示出問題的欄位名稱。各角色的提示詞只帶需求、目標使用者、預期結果、限制與驗收條件，不再附上模型、思考強度等執行設定；Lead 規劃時仍會收到 teammate 人數上限以便分組。
-
-應用程式將通過範圍檢查的變更整合回本次工作的 worktree，交由 Lead 唯讀檢視，再由 Reviewer 與 Test analyst 平行審查。Lead 會區分團隊回報的實測、自己的靜態檢查與未完成事項。這三份報告會在審閱畫面的「審查者怎麼看」保留全文，並標示為獨立靜態審查而非執行結果。同時執行的貢獻工作數由 `BELLPR_MAX_ACTIVE_RUNS` 決定（預設 2，可設 1–8）；執行、排隊與等待計畫確認的工作合計上限為 8 與該值兩倍取大者，超過時建立工作會回應 429。不同 repository 或同一個 repository 的多個工作彼此獨立：每個工作有自己的 worktree 與分支，共用 clone 上的 fetch 與 worktree 建立／移除依 repository 鎖依序執行，commit 與 push 則在各自的 worktree 進行，因此可以分別發佈多個 PR。實際能同時進行多少仍受 `BELLPR_MAX_AGENT_PROCESSES` 與訂閱額度限制。
-
-啟用「開發前，先讓我確認計畫」時，規劃完成後停在等待確認狀態，不會啟動實作。覺得拆解不合理（範圍太大、少了測試任務、相依奇怪）時，可在計畫區塊用「退回並補充意見」寫下原因：Lead 會收到上一版計畫與你的意見重新規劃，並在「Lead 的調整說明」交代改了什麼；每個工作最多退回 3 次，畫面顯示「已重擬 n/3」，每次重擬是一次 Lead 唯讀規劃回合。退回重擬後，先前排給特定任務的訊息留在原任務 ID 下，不會自動轉送給新計畫的任務。取消這個選項則會自動依計畫開始開發；兩種模式都會在發佈前要求人工審閱。
-
-團隊訊息會排入收件匣，在接收者下一個工作回合開始時加入上下文；已在執行的回合不會立即中斷。每個子任務最多 3 個工作回合。未趕上成員回合的訊息會保留，供 Lead 後續整合檢視；Lead 的整合回合是唯讀的，需要改程式的追加要求可能必須另開工作。「全體成員」指當下可接收的 teammates 與 Lead；「已送達」只表示訊息已加入對應回合，不代表要求已實作。
-
-Lead 完成規劃後，下一個回合通常在整合階段。單獨傳給 Lead 的新要求不會自動重排計畫或分送給所有實作者；要改計畫請在等待確認時使用「退回並補充意見」。若要讓尚未開始的成員收到限制，請選擇對應任務或「全體成員」，並在審閱時確認實際結果。
-
-GitHub repository 會以該專案預設分支的最新遠端提交為起點。匯入本機 repository 時，會讀取它的 GitHub `origin`；若沒有 GitHub `origin`，則使用本機預設分支的提交，也可開發與審閱，但無法送出 GitHub PR。原工作目錄的未提交內容不會複製進新 worktree。
-
-審閱狀態會對應畫面上檔案的版本；內容變更後需要重新整理 diff 並重新審閱。修改已確認的 PR 草稿也需要再次確認。任務資料留在本機，停止或失敗後保留工作目錄，方便查看已產生的變更。
-
-Lead 整合、Reviewer 與 Test analyst 都是唯讀角色，Claude Code 的唯讀模式沒有 shell，無法自己執行 `git diff`，因此完整差異會直接放進提示：每個檔案附上路徑、狀態、增刪行數與 patch，依路徑順序累計到 100 KB 後，其餘檔案只列中繼資料並標示 `omitted`，請角色自行讀取檔案；被阻擋的檔案只列路徑與原因。差異在提示中標示為不可信資料，審查結果要求以 `路徑:行號` 引用。
-
-### 自己動手改
-
-「程式碼變更」分頁在審閱中或已核准的真實任務上，會顯示本次工作的 worktree 路徑並可一鍵複製。你可以用自己的編輯器直接修改該目錄裡的檔案（不要 commit，Git 由應用程式處理），再按「重新整理差異」：畫面會讀到新的 diff，內容變動的檔案會重新產生解說並取消已審閱勾選，已核准的任務會退回審閱中，PR 草稿建議也會標示過期。改完後可在「審查者怎麼看」按「重新執行審查」，Reviewer 與 Test analyst 會先重新整理差異，再依目前的 diff 連同原本的 Lead 整合摘要平行做一次唯讀靜態審查，兩份新報告覆蓋舊報告並由畫面輪詢帶回；這會使用 Codex 或 Claude Code CLI 用量。重新審查不會改變審閱狀態、核准或 PR 草稿，報告只是建議，發佈前仍需逐檔審閱；同一任務同時只能有一次重新審查，執行期間可在「Agent 動態」按「停止重新審查」，中斷時保留原有報告。目前沒有讓 Lead 把某個子任務指派給你實作、團隊等待你完成再整合的流程。
-
-工作用 worktree 提供 Git 工作區隔離，並不是容器或虛擬機。Agent 沿用本機 Codex 或 Claude Code CLI，請只導入你願意讓 agent 讀取與處理的專案。
-
-PR 會以匯入時的 GitHub repository 為目標。具有寫入權限時，分支推到該專案；沒有寫入權限時，送出流程會嘗試建立或使用你個人帳號下的同名 fork，再向目標開 Draft PR。若本機 `origin` 已經指向你自己的 fork，請改匯入上游 GitHub URL，才能把上游設為 PR 目標。
-
-發佈前會重新確認差異與審閱內容一致。若遠端預設分支已新增提交，本版本會要求從最新版本建立新工作，不會自動 rebase。遠端操作可能因權限、組織政策或網路而失敗；請以介面的錯誤訊息與 GitHub 實際分支／PR 狀態為準。
-
-### 發佈之後
-
-送出 Draft PR 後，「PR 草稿」分頁會出現「維護者回饋」區塊。按「讀取回饋」才會用 `gh api graphql` 讀取該 PR 最近 50 則 review、對話留言與程式碼討論串（含檔案、行號、是否已解決、作者與專案的關係），以及最新 commit 的 CI 檢查結果；最多保留 100 則、每則 4,000 字，內容套用與日誌相同的憑證遮罩後存入 `state.json`。這個讀取是唯讀且由按鈕觸發：BELL 不會自動輪詢，也不會替你回覆、留言或標記已解決。同時會讀取 PR 的標籤；專案機器人可能在 CI 顯示成功的情況下加上 `needs:` 開頭的標籤（例如 `needs:compliance`）表示不符規範，這時畫面會提示你查看機器人的留言。
-
-討論串會依檔案分組，可直接跳到「程式碼變更」對應的檔案；該檔的學習面板會在「審查者怎麼看」列出維護者留言，並新增追問「維護者這個意見對應 diff 哪幾行？有哪些回應方式與取捨？」，導師會把留言當作不可信資料解讀，說明可能的回應方式（修改、說明理由保留、或反問釐清）。要回覆維護者，請到 GitHub 的 PR 頁面自己留言。
-
-### 依 review 繼續修正
-
-讀取回饋後，可以勾選要處理的 review 意見，必要時補一句說明，再按「依選取的回饋修正」。一位 Agent 會在原本的工作目錄修改（使用者介面標示為「Mend」），把回饋與說明當作不可信的資料，只處理被選取的項目；做不到或需要維護者決定的項目會列在「沒有修改，需要你判斷」。完成後工作回到審閱中：這輪改到的檔案要重新逐檔審閱，PR 標題與說明維持原樣不能修改，提交訊息欄位放的是 Agent 依前一個 commit 風格建議的這輪訊息（不提 AI、不含署名欄位），可以自行改寫。按「確認並準備推送」後，送出視窗會顯示提交訊息，按「推送這輪修正」才會在 PR 分支加上一個新的 commit。
-
-每一輪就是 PR 上的一個 commit，方便追蹤歷程；初次送出仍是一個整理過的 commit。BELL 不會 force push。開始一輪修正或同步前，若 GitHub 上的 PR 分支有 BELL 以外、但接在 BELL 上次推送之後的提交（例如在 GitHub 上套用 review 建議、維護者推送或按「Update branch」），BELL 會接續這些提交，在修正紀錄記下「接續 GitHub 上的提交」，它們的改動會和下一輪一起逐檔審閱；改寫了 BELL 推送過的歷史（例如 force push）則會拒絕。推送時會再確認 GitHub 上的分支仍停在這輪的父 commit，PR 已合併或關閉也會在建立 commit 之前停止，這輪仍可以放棄。
-
-這輪若把已推送的檔案改回原始版本或刪除，這類變化無法在逐檔審閱裡呈現，因此不能核准或推送，需要還原這些檔案或放棄這輪。Agent 若違反指示自行 commit 或切換分支，BELL 會把分支還原到已推送的 commit，修改保留在工作目錄讓你審閱。開始一輪修正時會清空提交訊息，只有 Agent 這輪的建議或你自己寫的訊息會被推送；Agent 的建議若只有署名欄位，會被清空，改由你填寫。Agent 沒有修改任何檔案時這輪會結束、不產生 commit；執行中可以停止，已做的修改會保留給你審閱或放棄；按「放棄這輪修改」會把工作目錄還原到已推送的內容，並恢復這些檔案原本的審閱標記。服務重新啟動時，進行中的修正會保留修改並回到審閱中，PR 仍維持已送出。所有輪次記錄在 PR 草稿頁的「依 review 修正的紀錄」，包含選取的回饋、處理結果、實際執行的指令與 commit 連結。這個功能不會自動回覆 reviewer、標記討論串已解決或更新 PR 說明。
-
-### 同步到最新目標分支
-
-目標分支在工作期間往前走時，可以在 PR 草稿頁上方的「目標分支」按「同步到最新目標分支」，不必重開新工作。還沒送出時，若目標分支已有新提交，送出也會提醒你先同步。
-
-- **還沒送出的工作**：BELL 先把工作目錄存成本機備份 commit，再用三方合併把這次的修改移到目標分支的最新版本上，修改仍是未提交的狀態。目標分支沒改到的檔案保留原本的審閱標記，改到的要重新審閱；可以按「復原同步」回到同步前的內容、基準與審閱標記。等待計畫核准的工作也能同步；上一次同步的衝突解決前不能再同步。
-- **已送出的 PR**：BELL 把最新的目標分支合併進 PR，結果留在工作目錄成為一輪「同步目標分支」：逐檔審閱、確認提交訊息（預設為 `Merge branch '<目標分支>' into <PR 分支>`）後，推送一個合併 commit，不 force push、不改 PR 說明。放棄這輪會回到原本的 PR 與基準。
-- **衝突**：合併不了的檔案會留下衝突標記，兩邊分別標示 `latest <目標分支> (<commit>)` 與 `this contribution`（已送出時為 `this pull request`），並列在面板上，已移除標記的檔案標示「已解決」；標記全部移除前不能核准或推送。可以自己在工作目錄修改，或按「請 Agent 解決衝突」：一位 Agent 保留目標分支的新內容，再把這次的修改套回去，做不到的地方會說明，完成後仍由你逐檔審閱。是否還有標記由 BELL 讀取檔案判斷。Agent 若自行 commit 或切換分支會被還原；執行中可以停止，服務重新啟動也會保留已改的內容。
-- **無法標記的衝突**：一邊刪除、另一邊修改同一個檔案，或兩邊都改了二進位檔時，Git 寫不出衝突標記，只會留下其中一邊。BELL 不替你選邊，這次同步會被拒絕，不套用合併結果：還沒送出的工作可以先還原對這些檔案的修改或刪除，同步後再重做；已送出的 PR 請在本機用 Git 合併並推送，BELL 之後會接續這些提交（同步前若 PR 分支已有可接續的 GitHub 提交，BELL 仍會先接續它們）。若目標分支已包含 PR 的全部修改、合併後沒有差異，同步也會停止並說明，PR 不變。檔案設定了 `conflict-marker-size` 屬性時，BELL 依該長度辨識衝突標記。
-
-這裡採用合併而不是 rebase：rebase 需要 force push 並改寫已推送、已審閱的 commit。若專案規範要求 rebase，請依規範在 GitHub 或本機自行處理。
-
-## PR 草稿與投稿規範
-
-PR 草稿會優先採用目標專案的 `CONTRIBUTING`、PR 模板與相關投稿文件，再參考有明確原文的維護者偏好。規範從任務的基準 commit 讀取，避免 Agent 本次改動影響規範判斷；GitHub 來源提供可核對的 commit／留言連結。可展開引用原文，分辨專案文件、帳號共用規範、維護者留言與已合併 PR 範例。
-
-本機搜尋根目錄、`.github`、`docs`、`Documentation` 內的常見貢獻／投稿文件，以及根目錄的 `AGENTS.md`、`CLAUDE.md`（許多專案把分支與 commit 規則寫在這裡），最多 16 份、總計 80 KB，每份節錄最多 12 KB。讀完這些文件與帳號共用的 `.github` 預設文件後，再檢查 `.github/workflows` 內最多 40 個 workflow，收錄最多 3 份「在 pull request 觸發，並檢查 PR 標題或內容、加標籤或檢查 commit 格式」的流程，標示為「自動檢查」；這些是機器實際執行的規則，例如要求某段至少勾一項，模型會據此提醒你，但仍不會代勾。若專案沒有對應的指南或模板，會查詢 GitHub 帳號公開 `.github` repository 的預設文件；同類位置優先順序為 `.github`、根目錄、`docs`。另取樣最近更新的 3 個已合併 PR，各最多 5 則留言與 5 則 review，只將 `OWNER`、`MEMBER`、`COLLABORATOR` 的明確投稿要求視為偏好候選。已合併本身不表示某種格式獲維護者認可。
-
-來源取樣、超出上限、權限或網路失敗都會顯示警示，不會把「未能讀取」當成「沒有規定」。不會自動追蹤文件中的任意外部連結；找不到適用規定時，暫採 [Linux kernel 投稿指南](https://docs.kernel.org/process/submitting-patches.html) 的 PR 寫作原則：簡潔且具體的標題、問題與使用者影響、修改理由、驗證證據及限制。這是適合 GitHub PR 的寫作備援，不會把 Linux 的郵件投稿流程或授權要求套用到其他專案。草稿預設英文，明確專案語言規定優先；規範解說與待確認事項使用繁體中文。
-
-模型輸出必須附上可逐字對應來源的引用（只容忍空白差異），並保留所選模板的 Markdown 段落標題。PR 說明只寫給維護者看的完成文字：實際執行過的檢查與結果、沒有執行的項目。標題、說明與提交訊息建議都不提 AI 協作，是否揭露由你決定；專案規範要求揭露時，核對清單會引用該規範提醒你自行加上。成員回報、應用程式觀察到的指令與靜態分析之間的區分，以及你還要做的事，放在摘要與核對清單。說明裡含 TODO 或待填空格的建議會被拒絕並要求重新產生。專案要求簡短說明時，BELL 會請模型把敘述控制在約 150 字以內，否則約 300 字；這是 BELL 的寫作預設，不是量測得出的門檻，也不是專案規定。不代簽 `Signed-off-by`、不添加虛構審查背書、不自動勾選模板確認項目。DCO、CLA、AI 投稿限制等列為人工確認事項。當來源明確寫出 commit 規範（如 Conventional Commits 的 `type(scope)` 主旨、說明換行、issue 引用）時，草稿會另附一則提交訊息建議並註明依據來源；建議若含 `Signed-off-by` 或任何 `-by:` 署名欄位會被整份拒絕。發佈時的 commit 訊息來自「提交訊息」欄位，你本人輸入的 `Signed-off-by` 會原樣寫進 commit trailer；欄位留空則只用 PR 標題。引用檢查不等於規範遵循保證，送出前仍需閱讀來源及確認適用性；[Linux 的 AI 協作指南](https://docs.kernel.org/process/coding-assistants.html) 也將簽署責任留給人類。
-
-新任務在開發完成後自動準備草稿與變更解說；PR 說明一開始是空的，Agent 的完整報告留在「審查者怎麼看」，不再串接成說明；草稿產生使用當次任務的模型與 Ponytail 設定，額外呼叫計入實際用量。產生失敗不影響已完成的程式碼。只有草稿與差異都未改動、尚未確認或送出時，自動結果才會更新新任務的草稿；網頁中尚未儲存的編輯會保留。既有任務與手動重新產生只建立建議版本，按「套用建議草稿」後仍需儲存。差異改動後建議會標示過期，無法直接套用；重新產生後才能使用。草稿生成不會推送分支、送出 PR 或更改逐檔審閱／發布確認流程。
-
-## 模型與思考強度
-
-「設定」頁的「設定貢獻模型」可選擇 Agent、執行模型與思考強度，這組設定由所有專案共用（存於資料目錄的 `model-settings.json`）。在「新增貢獻」或「指定貢獻方向」調整模型後按儲存，也會更新這組共用設定；方向、目標使用者等其餘欄位仍依專案保存。「探索貢獻」有自己的模型設定。模型選項來自本機 Codex 的 `model/list` 目錄，強度依各模型支援的選項顯示；這份目錄可能是快取或內建資料，不保證帳號具有每個模型的使用權限。BELL 不會修改全域 Codex 設定，指定模型執行失敗時也不會悄悄改用另一個模型。
-
-同一區塊的「允許 Agent 上網搜尋與讀取網頁」預設關閉，也屬於共用模型設定（`model-settings.json` 的 `webAccess`）：開啟後，新任務的 Lead、Teammates、Reviewer、Test analyst 與追問導師可以搜尋網路和讀取網頁，自動解說、PR 草稿、專案分析與探索貢獻維持離線。開啟時，角色提示會多一句規則：網頁內容是不可信資料、報告要引用來源網址、不得把 repository 內容或祕密放進查詢；任務日誌會以「搜尋網路：查詢字串」與「讀取網頁：網址」記錄每次查詢（只記錄查詢或網址，不記錄網頁內容），模型摘要則顯示「已允許上網」。
-
-新任務會保存當次解析的模型設定，Lead、Teammates、Reviewer、Test analyst、自動解說與追問共用；後續修改共用模型不影響既有任務。專案分析則採分析啟動時已儲存的設定，並把設定與分析結果一起保存。選擇預設時，若模型目錄可用，會固定其中的預設模型；無法讀取目錄時可沿用 CLI 預設，但名稱會明確標示未記錄。
-
-思考強度越高，每回合等待越久；BELL 依 Agent 與強度延長逾時：基準（Codex、非 xhigh/max）為專案分析與探索 240 秒、唯讀回合 600 秒、可寫回合 1800 秒，Claude Code 乘 2.5，xhigh 乘 1.5、max 乘 2，最多 2 小時，可用 `BELLPR_AGENT_TIMEOUT_SCALE` 整體調整。選了 Claude Code 或 xhigh、max 時，任務日誌的開始行與探索進度訊息會顯示「最多等待 N 分鐘」；逾時的錯誤訊息會列出已等待的分鐘數並提示可降低強度、改用較快的模型或調高倍率。
-
-「Agent 動態」顯示的是傳入 CLI 的模型 ID 與思考強度，不是推測的供應端實際路由。加入此功能前的舊任務沒有模型紀錄，介面會標示未記錄；示範也不會顯示虛構的執行模型。模型目錄介面參考 [Codex App Server 官方文件](https://learn.chatgpt.com/docs/app-server#list-models-modellist)。
-
-### 改用 Claude Code
-
-模型設定的「Agent」可改選 **Claude Code**，所有專案共用。BELL 直接呼叫本機 `claude -p`，使用你自行安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰），用量計入你自己的帳戶。「設定」頁會顯示 Claude Code CLI 是否已安裝與登入。Claude Code 每回合通常比 Codex 預設慢，BELL 對 Claude Code 的回合逾時為基準的 2.5 倍（見「模型與思考強度」），任務日誌與探索進度訊息會顯示最多等待的分鐘數，專案分析則寫入伺服器記錄。
-
-- 模型清單為固定的別名 `opus`、`sonnet`、`fable`、`haiku`，各自指向該系列的最新模型；Claude Code 沒有列出模型的指令，實際可用模型依訂閱方案而定。選「Claude Code 預設」時不傳 `--model`。Haiku 不提供思考強度選項，其餘為 low–max。Claude Code 會在 `system/init` 事件回報解析後的實際模型 ID（例如別名 `haiku` 對應 `claude-haiku-4-5-20251001`）與 CLI 版本，BELL 記錄後在任務、專案分析與探索的模型摘要顯示為「傳入 → 回報」，若結果事件 `modelUsage` 出現了其他模型，會另列出本次執行呼叫過的模型；這些是 CLI 回報值，不是供應端帳單，費用欄位不會顯示。
-- 專案分析與探索不開放任何工具，只讀 BELL 提供的節錄並以 `--json-schema` 回傳結構化結果；Lead、Reviewer、Test analyst 與解說只能使用 Read、Grep、Glob；Teammates 可使用 Read、Grep、Glob、Edit、Write 與 Bash。檔案編輯以 `acceptEdits` 限制在工作目錄內，但 **Bash 不在沙箱中執行**；除下列拒絕規則外，其餘 Bash 指令可存取這台機器上服務帳號能存取的任何檔案與網路。
-- Teammates 的 Bash 以 `--disallowedTools` 拒絕 `git push`、`gh`、`curl`、`wget` 開頭的指令（拒絕規則優先於允許規則），推送與 PR 仍由 BELL 自己的流程處理。這是縱深防禦，不是沙箱：實測中 `git push --dry-run origin HEAD` 與 `curl https://example.com` 被 Claude Code 回絕為「Permission to use Bash with command … has been denied」，並列在結果事件的 `permission_denials`；`git status` 與 `git log` 照常執行並回傳輸出。被拒絕的工具（`system/permission_denied` 事件與結果的 `permission_denials`）會即時寫入任務日誌，讓你看得出 teammate 是因權限被拒才沒跑某個指令；這不會讓任務失敗。
-- 開啟「允許 Agent 上網搜尋與讀取網頁」時，唯讀與可寫角色的 `--tools` 與 `--allowedTools` 會加上 Claude Code 內建的 `WebSearch` 與 `WebFetch`；`curl`、`wget` 的拒絕規則不變，`WebFetch` 是讀取網頁的唯一途徑，專案分析與探索（不開放工具）不受影響。實測（Claude Code 2.1.292、`haiku`、唯讀加上網）：`system/init` 的工具清單列出 `WebFetch`、`WebSearch`，助理事件的 `tool_use` 帶 `{ name: "WebSearch", input: { query } }` 與 `{ name: "WebFetch", input: { url, prompt } }`，BELL 只把查詢字串或網址寫進日誌。
-- 執行時加上 `--strict-mcp-config`，不載入 claude.ai 連接器（Gmail、Drive 等）或其他 MCP 伺服器，避免 Agent 讀到不可信內容時被誘導使用你的帳號服務。
-- 執行時加上 `--setting-sources user`，只載入使用者層級的設定（依 Claude Code 對 `user` 來源的定義，包含 `~/.claude/settings.json`、使用者 hooks 與 `~/.claude/CLAUDE.md`）；匯入專案裡的 `.claude/settings.json`、`.claude/settings.local.json` 與專案 `CLAUDE.md` 則不載入。`claude -p` 不會顯示信任資料夾的確認對話，BELL 又是在匯入的第三方 repository 的 worktree 中執行 Agent，因此必須由 BELL 自己關掉這些來源。實測：匯入專案 `.claude/settings.json` 中的 SessionStart hook 在加上此旗標後沒有執行（拿掉旗標則會執行），專案 `CLAUDE.md` 的內容也不再出現在模型的回應中。
-- 用量以 Claude Code 回報的 tokens 計算：輸入 = 未快取輸入 + 快取寫入 + 快取讀取，快取欄位只計快取讀取。`total_cost_usd` 對訂閱帳戶沒有意義，不會顯示。訂閱有使用額度限制，多位 teammates 同時執行時較快達到上限，達到時任務會顯示 Claude Code 回報的錯誤。等待期間不再只能等逾時：Claude Code 的 `api_retry` 重試與狀態不是 `allowed` 的 `rate_limit_event`（接近或達到 5 小時／7 天視窗上限，含預計重置時間）會即時出現在任務日誌與成員卡片；實測每次 `claude -p` 執行都會送出一筆 `status: allowed` 的 `rate_limit_event`，這種正常狀態不顯示。用量另依角色（Lead、Teammates、Reviewer、Tester、PR 草稿、解說、追問）分項累計，在用量區塊展開「依角色分項」查看，同樣只列 CLI 回報的 tokens 與呼叫次數。`BELLPR_MAX_AGENT_PROCESSES`（預設 3）限制所有工作、專案分析與探索同時執行的 CLI 行程數，超過的呼叫排隊等待：工作中的 Agent 會顯示「等待其他 Agent 完成」，專案分析與探索則維持原本的進度訊息。
-- Claude Code 的登入憑證約每 8 小時更新一次；多個 `claude -p` 行程在同一時刻啟動時只有一個能更新憑證，其餘會回報暫時性錯誤「Failed to refresh OAuth token」，BELL 會把這種回合最多再重試兩次（先等 15 秒、再等 45 秒，等待期間不佔用行程名額），並在任務日誌與成員卡片記錄重試，探索則顯示在進度訊息；專案分析同樣重試但沒有進度訊息。只有這種錯誤會重試，其他 API 錯誤仍照原樣失敗，每次嘗試都計入用量的呼叫次數。
-
-## Ponytail 效率規則
-
-專案已導入 [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) **4.10.2** 的指令元件，固定於 commit `a17afe0712fc43b08f812d54391a0e5c35353b61`，保留 MIT 授權與檔案校驗資訊。根目錄 `AGENTS.md` 與 `.agents/skills/ponytail/` 提供開發 BELL 本身時的規範；背景執行則透過 BELL 的共用適配層，把規則明確加入 Lead、Teammates、審查、測試分析、程式碼追問與專案分析的 Codex 呼叫。
-
-新增貢獻的設定中可選擇 **輕量（預設）／完整／關閉**，並儲存為該 repository 的預設。輕量模式是 BELL 對上游原則的精簡改編，優先重用現有程式、標準函式庫與原生功能；完整模式載入固定版本的上游規則。關閉可供比較，不會省略原有驗證或任務需求。已建立的任務保留當時的模式；專案分析採用當下已保存的設定，切換模式後需重新分析才會產生新樣本。
-
-這是專案範圍的規則整合，沒有安裝使用者全域 lifecycle hooks，也不需要更改桌面插件信任設定。BELL 的背景呼叫會忽略使用者 `config.toml`，因此採明確注入，避免只安裝全域插件卻沒有套用到工作成員。規則只影響解法取捨，既有 JSON 格式、來源證據、隔離工作目錄、審核流程及使用者要求的白話教學仍保留。規則檔不會寫進貢獻對象的 worktree 或 PR。
-
-「Agent 動態」與專案分析會顯示實際呼叫次數、已回報用量的呼叫數、輸入／輸出 tokens 與 Agent 累計時間。快取輸入已包含在輸入 tokens 中，不再加總一次；平行 Agent 的累計時間不是使用者實際等待時間。沒有回報 usage 的呼叫顯示未回報，示範和模擬 Agent 不產生虛構用量。舊任務在新版本開始量測前的用量不會補估。
-
-Ponytail 減少的是不必要的實作與 Agent 工作；它不保證產出的程式執行更快，也不保證 Codex 用量一定下降。額外指令本身會佔用 tokens，因此不顯示推算的美元成本或未經量測的節省比例。若要比較，使用相同 repository 提交、需求、模型與驗收條件，分別執行關閉與啟用模式，並同時比較結果品質和已回報 tokens。專案分析摘要只保留最近一次成功結果的用量；失敗分析不會覆蓋先前成功快取，這些摘要也不代表帳戶帳單或全部失敗呼叫的成本。
-
-更新方式與來源清單見 [`vendor/ponytail/README.md`](vendor/ponytail/README.md)。
-
-## 正式建置
-
-```sh
-npm run build
-npm start
-```
-
-`npm run build` 執行 TypeScript 檢查並建立前端資產。`npm test` 以 Node.js 內建的 test runner（透過 `tsx`）執行 `server/*.test.ts` 與 `src/**/*.test.ts`，新增到 `src/` 任一子目錄的 `*.test.ts` 都會被納入。測試只需要 Node.js、Git 與基本的系統工具，不會呼叫 `codex`、`claude` 或 `gh`。
-
-前端除了 diff 解析的純函式測試與 Markdown 渲染測試外，另有 `DiffView`、`ExplanationPanel`、`TeamBoard` 與 `EfficiencySummary` 的 smoke tests：用 `react-dom/server` 的 `renderToStaticMarkup` 把示範資料渲染成 HTML，再檢查畫面文字是否存在。這些元件在模組層級匯入 `.css`，應用程式中由 Vite 處理樣式匯入，但 Node.js 不認得 `.css` 副檔名；因此 `npm test` 會先載入 `test/css-stub.mjs`，以 `node:module` 的 `register()` 將所有 `*.css` 匯入解析為空模組。這只影響測試，不影響建置。
-
-`.github/workflows/ci.yml` 會在 push 與 pull request 時於 `ubuntu-latest`、Node.js 22 執行 `npm ci`、`npm run build` 與 `npm test`。`package.json` 的 `engines.node` 設為 `>=22`；專案沒有啟用 `engine-strict`，較舊的 Node.js 在 `npm install` 時只會收到警告而不會被阻擋，實際執行仍需要 Node.js 22 以上。本輪未加入 Prettier 或 ESLint。
-
-建置完成後，正式模式由同一個 Node.js 服務提供網頁與 API，開啟 <http://127.0.0.1:4311>。
-
-## 資料目錄與維護
-
-發生未預期的錯誤（API 回傳 500 的「操作未完成」）時，伺服器會在標準錯誤輸出（stderr）寫入請求方法、路徑與錯誤堆疊；背景工作失敗則顯示在該工作的錯誤與系統訊息中。更新前確認沒有執行中的 Agent，再停止服務、備份整份 `.bellpr`、更新程式與依賴、建置後啟動。
-
-`.bellpr` 內有三類 Git 目錄：`repositories/<repo-id>` 是匯入專案的 clone（所有 worktree 的 Git objects 都在這裡）；`worktrees/<run-id>` 是每次工作用來審閱與發佈的 worktree，保存整合後的差異；`team-worktrees/<run-id>/<task-id>` 是 teammate 的隔離 checkout。子任務的差異整合後，它的隔離 checkout 會自動以 `git worktree remove --force` 移除（任務板顯示「獨立 worktree 已清理」）；失敗、被阻擋或取消的子任務會保留，方便查看未整合的差異，重試時才會丟棄。沒有清理 worktree 的 API；要手動清理時，先停止服務或確認該工作沒有在執行，用 `git -C .bellpr/repositories/<repo-id> worktree list` 查看登記，刪除不再需要的 `.bellpr/worktrees/<run-id>` 與 `.bellpr/team-worktrees/<run-id>`，再執行 `git -C .bellpr/repositories/<repo-id> worktree prune` 清掉失效登記；`state.json` 仍會保留該工作的紀錄與報告，只是不能再開啟差異或重試。磁碟空間通常不是 worktree 本身，而是 clone 或 worktree 裡被 Git 忽略的建置輸出（例如 `target/`、`node_modules/`），這些目錄可直接刪除再重新建置。
-
-資料搬移必須包含完整 `.bellpr`，其中有尚未提交的檔案、Git objects/index/refs、worktree、解說與草稿。更改安裝位置時，需一併修正 `state.json` 的 repository/worktree 路徑及 Git worktree 的雙向連結，並比對檔案與 Git 差異；不能只複製 `state.json` 或重新 clone。CLI 登入狀態由目的機器提供，不隨工作資料搬移。瀏覽器示範資料與閱讀偏好保存在各網址的 localStorage，不包含在服務端備份中。
-
-## 本機設定
-
-不需要 `.env` 即可啟動。可設定的變數列在 [`.env.example`](.env.example)；程式只讀取程序的環境變數，不會自動載入 `.env`。若需要自訂，可在 macOS / Linux 的 shell 執行：
-
-```sh
-cp .env.example .env
-# 編輯 .env 後，載入同一個 shell
-set -a
-source .env
-set +a
-npm run dev
-```
-
-| 變數                   | 預設值    | 用途                                                                       |
-| ---------------------- | --------- | -------------------------------------------------------------------------- |
-| `BELLPR_PORT`          | `4311`    | API 與正式模式網頁的埠。開發模式若修改，需同步 `vite.config.ts` 的 proxy。 |
-| `BELLPR_FRONTEND_PORT` | `4310`    | API 允許的開發網頁來源埠。修改時需同步 `package.json` 的 `dev:web`。       |
-| `BELLPR_DATA_DIR`      | `.bellpr` | 本機工作資料位置，可使用絕對路徑。                                         |
-| `BELLPR_ALLOWED_ORIGINS` | 空值 | 額外允許的精確 HTTP(S) origin，以逗號分隔；僅供已有存取控制、保留 Host 的私網代理使用。 |
-| `BELLPR_MAX_AGENT_PROCESSES` | `3` | 同時執行的 Agent CLI 行程上限（1–32），涵蓋所有工作、專案分析與探索；超過時後續 Agent 排隊等待。 |
-| `BELLPR_MAX_ACTIVE_RUNS` | `2` | 同時執行的貢獻工作上限（1–8）；排隊上限為 8 與此值兩倍取大者。每個工作的 teammates、Reviewer 與 Test analyst 各需要一個 CLI 行程，實際並行程度仍受 `BELLPR_MAX_AGENT_PROCESSES` 與訂閱額度限制。目前值顯示在「連線與設定」頁；systemd 部署修改 `~/.config/bell-pr/environment` 後需重新啟動服務。 |
-| `BELLPR_AGENT_TIMEOUT_SCALE` | `1` | Agent 單一回合逾時的倍率（0.5–10）。基準為專案分析與探索 240 秒、唯讀回合（Lead、Reviewer、Test analyst、解說、PR 草稿、追問）600 秒、可寫回合（Teammates）1800 秒；Claude Code 再乘 2.5，思考強度 xhigh 乘 1.5、max 乘 2，結果取整秒且最多 2 小時。逾時訊息會列出已等待的分鐘數。 |
-
-`.bellpr` 與 `.env` 已排除於 Git 追蹤外。請妥善保留工作資料；刪除資料目錄會移除其中的 repository、工作目錄與紀錄。
-
-## 使用範圍
-
-這是設計給單一使用者操作的 local-first 工具。請透過 `127.0.0.1` 或上述具備存取控制的私網代理使用，不要直接公開 API 至網際網路或作為多人服務部署。工具會讀寫服務所在機器的專案，並使用該使用者的 CLI 登入狀態。
-
-目前版本以 GitHub 為目標平台。程式碼與 PR 內容仍需要使用者審閱；白話解說與 agent 的判斷可能出錯。Lead、Reviewer 與 Test analyst 的整合／審查回合只做靜態檢視，真正執行過的檢查應以各 teammate 報告的命令與結果為準。應用程式另外會記下每個子任務執行期間 CLI 回報的指令（只保留指令第一行、套用憑證遮罩、最多 300 字與結束碼，不擷取輸出，每個任務最多 40 筆）以及實際整合進 worktree 的檔案路徑，顯示在任務卡與執行紀錄中，並以「未受信任的資料」交給 Lead 整合、Test analyst 與 PR 草稿回合，供對照 teammate 自述的檢查；這份紀錄只能證明某個指令被執行過與其結束碼，不能證明測試內容是否正確。
-
-服務重新啟動後，中斷的工作會標記失敗，不會自動恢復；Lead 已建立計畫的團隊工作可在任務板按「重試失敗的子任務」接續：已整合的子任務不重跑，失敗或被阻擋的子任務會丟棄舊的隔離目錄、從新的快照重新開始，並在第一回合得知上次失敗的原因；若所有子任務都已整合（整合或審查階段失敗），重試只重跑 Lead 整合與獨立審查。尚未核准計畫就取消的工作，重試會先回到等待核准。可選填一段說明，會排入重試成員的第一回合；已結束的工作不能再用團隊訊息。目前沒有合併 PR 或清理 worktree 的介面（手動清理見「資料目錄與維護」）。檔案問答與任務一起保存在 `state.json`，每個檔案只保留最近 20 則、每則最多 8,000 字，更早的訊息會被捨棄；提問內容在保存前會套用與日誌相同的憑證遮罩。學習筆記頁彙整各任務已產生的解說，可依關鍵字與任務篩選。
-
-審閱介面適合聚焦的文字程式碼變更：單次最多 150 個檔案、整體 diff 最多 2 MB，新檔案最多 512 KB。二進位檔、新增符號連結、敏感檔案與疑似憑證會阻擋發佈，需要先移除或改以人工流程處理。這些檢查不代表完整的秘密資訊掃描。
-
-## 實作參考
-
-Agent 執行使用 [Codex 非互動模式](https://learn.chatgpt.com/docs/non-interactive-mode)，沿用 read-only / workspace-write 沙箱與 JSONL 事件；開啟上網時以 `-c web_search="live"` 啟用 Codex 的即時搜尋（Codex CLI 0.159 的 `exec` 不接受 `--search`），實測會送出 `item.type` 為 `web_search` 的 `item.started`／`item.completed` 事件，第一個事件的 `query` 可能為空，完成事件在 `query` 與 `action` 帶查詢字串，BELL 只記錄查詢字串，不記錄 `results`。選擇 Claude Code 時使用 [Claude Code 非互動模式](https://code.claude.com/docs/en/headless) 的 `stream-json` 事件。前端開發服務使用 [Vite proxy](https://vite.dev/config/server-options#server-proxy) 將同源 `/api` 請求轉送至本機後端。
+checks Node.js, Git, the GitHub CLI and its permissions, the agent CLIs and
+their sign-ins, the Claude Code sandbox and the data directory, and prints
+the command that fixes each problem. `bell-pr doctor --json` gives the same
+report as JSON. It exits with 0 when every required check passes.
+
+[Troubleshooting](docs/troubleshooting.md) lists every error code with its
+fix, what to do when BELL PR does not start, and how to collect details
+for a support request.
+
+## Data directory and backups
+
+BELL PR keeps everything in `~/.bellpr` (or `--data-dir` /
+`BELLPR_DATA_DIR`): your projects and runs in `state.json`, its own clones
+of the projects, a Git worktree per run, analyses, settings, the license
+and logs. It is readable by your user only.
+
+- **Back up** by stopping BELL PR and copying the whole directory. Restore
+  it to the same path: its records contain absolute paths.
+- BELL PR keeps the last three versions of `state.json` and recovers from a
+  damaged file by itself.
+- One BELL PR runs per data directory at a time.
+- **Upgrading** never moves your data, and from 1.0.0 on an older version
+  can still read what a newer one wrote. See [Upgrading](docs/upgrading.md),
+  including data from versions before 1.0.
+
+## Licensing and activation
+
+Pro is unlocked by a license key that BELL PR checks offline. Activate it
+in any of three ways:
+
+- **In the app:** **Settings → License**, paste the key, **Activate**.
+- **On the command line:** `bell-pr license activate <key>`, or
+  `bell-pr license activate -` to read it from standard input.
+  `bell-pr license status` shows the plan; `deactivate` removes the key;
+  `trial` starts the 14-day trial.
+- **With the environment:** `BELLPR_LICENSE_KEY=<key>`; it wins over a
+  saved key.
+
+A key covers the builds released within its update period (12 months from
+purchase by default) and keeps working with them forever. In this release
+candidate no license key can unlock Pro yet; the trial works. See
+[Licensing](docs/licensing.md).
+
+## Documentation
+
+- [Getting started](docs/getting-started.md)
+- [Configuration](docs/configuration.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Licensing](docs/licensing.md)
+- [Privacy and your data](docs/privacy-and-data.md)
+- [Upgrading](docs/upgrading.md)
+- [FAQ](docs/faq.md)
+- [Self-hosting](docs/self-hosting.md) and [Docker](docs/docker.md)
+- [Security model](docs/security-model.md)
+- [Development](docs/development.md): building and checking BELL PR from
+  its source
+- [Changelog](CHANGELOG.md)
+
+<!-- generated:product-link key=docsUrl text="Online documentation" -->
+<!-- /generated:product-link -->
+
+## Support and contact
+
+Start with `bell-pr doctor` and [Troubleshooting](docs/troubleshooting.md).
+The About dialog (**Settings → About → About BELL PR**) can copy a
+diagnostics report with secrets, paths and your GitHub login removed, ready
+for a support request.
+
+<!-- generated:product-link key=homepageUrl text="Website" -->
+<!-- /generated:product-link -->
+<!-- generated:product-link key=supportEmail text="Contact support by e-mail" -->
+<!-- /generated:product-link -->
+<!-- generated:product-link key=publicRepoUrl path=issues text="Report an issue" -->
+<!-- /generated:product-link -->
+<!-- generated:product-link key=securityEmail text="Report a security issue privately" -->
+<!-- /generated:product-link -->
+
+## License and trademarks
+
+BELL PR is licensed under the End User License Agreement in
+[LICENSE.md](LICENSE.md). The third-party software it includes is listed
+in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The legal documents of
+this release candidate are drafts pending counsel review.
+
+BELL PR is an independent product and is not affiliated with, endorsed by,
+or sponsored by GitHub, Inc., OpenAI, or Anthropic PBC. GitHub, OpenAI,
+Codex, Anthropic, Claude and Claude Code are trademarks of their
+respective owners; BELL PR names them only to say which tools it works
+with.

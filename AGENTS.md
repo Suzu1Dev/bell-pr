@@ -29,7 +29,9 @@ Persisted data must stay readable by older builds. Every new field written to
 type, the server zod schema, and the frontend type change in the same commit.
 Agent-output, request-input and write schemas stay strict; persisted reads go
 through `lenientRead` (`server/persisted-schema.ts`), so files written by newer
-builds still load in older builds. `Database.version` stays 1, and the fixtures
+builds still load in older builds. The `state.json` read schema also passes
+unknown fields through (`.passthrough()`), so a field a newer build wrote
+survives a load and save. `Database.version` stays 1, and the fixtures
 in `server/store.test.ts` must keep loading without migration.
 
 The BELL runtime adds its own versioned Ponytail policy to each Agent invocation.
@@ -65,6 +67,15 @@ BELL PR is sold as a product. Every change also follows these rules:
    without the owner's sign-off.
 8. Product identity, URLs and e-mail addresses come only from
    `shared/product.ts`. An empty value means hide the link or degrade
-   gracefully; never invent one.
+   gracefully; never invent one. In Markdown and HTML, product links and the
+   Free/Pro table are generated regions: change their sources, then run
+   `npx tsx scripts/render-generated-regions.ts --write`; never edit them by
+   hand.
 9. No repo-wide reformatting. Keep diffs minimal so that cherry-picks from the
    upstream repository stay feasible.
+10. The READMEs and `docs/` describe shipped behavior; update them with the
+    change. Describe Claude Code neutrally ("Uses the Claude Code CLI you
+    installed and signed in to (Claude plan or Anthropic API key). Usage
+    counts against your own account."), and never claim that it bills a
+    subscription instead of the API. A new `ErrorCode` needs its section in
+    `docs/troubleshooting.md`. Run `node scripts/npm-readme.mjs --check-docs`.
