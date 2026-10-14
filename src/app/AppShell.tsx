@@ -810,7 +810,9 @@ function AppShell({
   );
   useEffect(() => {
     // The i18n runtime writes the app's title when the language changes, in
-    // an effect that runs after this one; a microtask runs after both.
+    // an effect that runs after this one; a microtask runs after both. The
+    // locale is a dependency because a page's name can read the same in
+    // both languages.
     let current = true;
     queueMicrotask(() => {
       if (current) document.title = documentTitle;
@@ -818,7 +820,7 @@ function AppShell({
     return () => {
       current = false;
     };
-  }, [documentTitle]);
+  }, [documentTitle, locale]);
 
   // The sample run is listed while it is all there is, while the workbench
   // shows it, after the person imported it, or when the settings ask for it.
