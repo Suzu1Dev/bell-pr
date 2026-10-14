@@ -15,6 +15,8 @@ import { DirectionSettings } from "../mission";
 import { providerLabels } from "../../shared/models";
 import type { ModalName, Page } from "../app/AppShell";
 import type { TaskSetup } from "../app/hooks/useTaskSetup";
+import { readinessOf, ReadinessNotice } from "../setup/ReadinessNotice";
+import type { DoctorState } from "../setup/useDoctor";
 import { Modal } from "./Modal";
 
 interface NewTaskModalProps {
@@ -40,6 +42,10 @@ interface NewTaskModalProps {
   openModal: (value: ModalName) => void;
   navigate: (value: Page) => void;
   setExploreRepoId: Dispatch<SetStateAction<string>>;
+  /** The environment report the shell shares: a run needs a ready provider. */
+  doctor: DoctorState;
+  /** Masks e-mail addresses in the readiness notice while presenting. */
+  maskUser?: (value: string) => string;
 }
 
 /** Sets up a contribution task for a repository and starts its agent team. */
@@ -53,6 +59,8 @@ export function NewTaskModal({
   openModal,
   navigate,
   setExploreRepoId,
+  doctor,
+  maskUser,
 }: NewTaskModalProps) {
   const t = useT("modals").newTask;
   const common = useT("common");
@@ -71,6 +79,12 @@ export function NewTaskModal({
     changeContributionSettings,
     saveDirection,
   } = setup;
+  const demo = taskRepoId === demoRepo.id;
+  // The sample needs no tools. Otherwise a run waits for a ready provider;
+  // when the check itself cannot answer, the server decides on submit.
+  const readiness = readinessOf(doctor.report, ["provider"]);
+  const unready =
+    !demo && !readiness.ready && !(readiness.checking && doctor.error);
   return (
     <Modal
       wide
@@ -118,9 +132,7 @@ export function NewTaskModal({
             {t.recommendations}
           </button>
         </div>
-        {taskRepoId === demoRepo.id && (
-          <p className="task-demo-note">{t.demoNote}</p>
-        )}
+        {demo && <p className="task-demo-note">{t.demoNote}</p>}
         {settingsLoading && (
           <p className="field-help" role="status">
             {t.loadingSettings}
@@ -188,11 +200,18 @@ export function NewTaskModal({
           <ChevronRight size={12} />
           <span>{t.reviewers}</span>
         </div>
+        <p className="field-help task-team-limit">{t.teamLimit}</p>
         <p className="field-help">
           {t.usage({
             provider: providerLabels[contributionSettings.provider ?? "codex"],
           })}
         </p>
+        <ReadinessNotice
+          requires={["provider"]}
+          bypass={demo}
+          doctor={doctor}
+          maskUser={maskUser}
+        />
         {formError && (
           <p role="alert" className="inline-error">
             {formError}
@@ -214,7 +233,8 @@ export function NewTaskModal({
               settingsLoading ||
               !settingsReady ||
               !taskRepoId ||
-              prompt.trim().length < 10
+              prompt.trim().length < 10 ||
+              unready
             }
           >
             {busy ? (
@@ -222,7 +242,7 @@ export function NewTaskModal({
             ) : (
               <Play size={16} />
             )}
-            {taskRepoId === demoRepo.id
+            {demo
               ? t.saveDemo
               : contributionSettings.requirePlanApproval
                 ? t.planFirst

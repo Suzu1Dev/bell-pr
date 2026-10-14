@@ -55,6 +55,7 @@ const m: Translation<typeof en> = {
     lead: "Team lead",
     teammates: ({ count }) => `${count} 位 Teammates`,
     reviewers: "Reviewer + Test analyst",
+    teamLimit: "Free：2 位 Teammates · Pro：最多 4 位",
     usage: ({ provider }) =>
       `會使用本機 ${provider} 帳號執行任務，消耗對應用量。完成後等待你審查。`,
     saveDemo: "儲存示範方向",

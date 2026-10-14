@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
+import type { DoctorReport } from "../../shared/doctor";
 import { defaultContributionSettings } from "../../shared/insights";
+import type { DoctorState } from "../setup/useDoctor";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Repo } from "../types";
 import { NewTaskModal } from "./NewTaskModal";
@@ -17,6 +19,32 @@ const repo: Repo = {
   defaultBranch: "main",
   url: "https://github.com/octo/widgets",
 };
+
+const report = (provider: "ok" | "fail"): DoctorReport => ({
+  checks: [
+    { id: "git", status: "ok", required: true },
+    {
+      id: "provider-ready",
+      status: provider,
+      required: true,
+      ...(provider === "fail"
+        ? {
+            detail: "No AI provider is installed and signed in.",
+            fixes: [{ label: "Sign in to the Codex CLI", command: "codex login" }],
+          }
+        : {}),
+    },
+  ],
+  ready: provider === "ok",
+  checkedAt: "2026-10-14T09:00:00.000Z",
+  platform: "linux",
+});
+const doctor = (value: DoctorReport | null, error = ""): DoctorState => ({
+  report: value,
+  checking: false,
+  error,
+  refresh: async () => undefined,
+});
 
 const element = (
   setup: Partial<Props["setup"]> = {},
@@ -45,6 +73,7 @@ const element = (
       openModal() {},
       navigate() {},
       setExploreRepoId() {},
+      doctor: doctor(report("ok")),
       ...props,
     });
 
@@ -145,4 +174,41 @@ test("the new-task dialog reads in English with no Chinese left", () => {
   assert.match(solo, /<span>2 teammates<\/span>/);
   assert.match(solo, /the Claude Code CLI signed in/);
   assert.match(solo, />Start the agent team<\/button>/);
+});
+
+test("a run waits for a ready AI provider and shows the fix; the sample does not", () => {
+  const prompt = "Add timeout retries and tests to widgets";
+  const ready = renderEn(element({ prompt }));
+  assert.doesNotMatch(ready, /readiness-notice/);
+  assert.doesNotMatch(submit(ready), /disabled=""/);
+
+  const unready = renderEn(element({ prompt }, { doctor: doctor(report("fail")) }));
+  assert.match(unready, /<div class="readiness-notice" role="status">/);
+  assert.match(unready, /This needs an AI provider: install and sign in to the Codex CLI or Claude Code\./);
+  assert.match(unready, /<code>codex login<\/code>/);
+  assert.match(submit(unready), /disabled=""/);
+  assertNoHan(unready);
+
+  // The sample project skips the readiness gate.
+  const sample = renderEn(
+    element({ prompt, taskRepoId: "demo-repo" }, { doctor: doctor(report("fail")) }),
+  );
+  assert.doesNotMatch(sample, /readiness-notice/);
+  assert.doesNotMatch(submit(sample), /disabled=""/);
+
+  // While the check runs the button waits; a check that cannot answer
+  // leaves the decision to the server.
+  const checking = renderEn(element({ prompt }, { doctor: doctor(null) }));
+  assert.match(checking, /readiness-checking/);
+  assert.match(submit(checking), /disabled=""/);
+  const failed = renderEn(element({ prompt }, { doctor: doctor(null, "offline") }));
+  assert.doesNotMatch(submit(failed), /disabled=""/);
+});
+
+test("the dialog states the team size each plan allows", () => {
+  assert.match(
+    renderEn(element()),
+    /<p class="field-help task-team-limit">Free: 2 teammates · Pro: up to 4<\/p>/,
+  );
+  assert.match(renderZh(element()), /Free：2 位 Teammates · Pro：最多 4 位/);
 });

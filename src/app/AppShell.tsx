@@ -1053,6 +1053,8 @@ function AppShell({
           openModal={openModal}
           navigate={navigate}
           setExploreRepoId={setExploreRepoId}
+          doctor={doctor}
+          maskUser={presentation.maskUser}
         />
       )}
       {modal === "publish" && (

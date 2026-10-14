@@ -61,6 +61,8 @@ const modals = {
     teammates: ({ count }: { count: number }) =>
       plural(count) === "one" ? `${count} teammate` : `${count} teammates`,
     reviewers: "Reviewer + Test analyst",
+    /** The team size each plan allows. */
+    teamLimit: "Free: 2 teammates · Pro: up to 4",
     usage: ({ provider }: { provider: string }) =>
       `The task runs with the ${provider} CLI signed in on this computer and counts against that account's usage. When it finishes, it waits for your review.`,
     saveDemo: "Save demo direction",
