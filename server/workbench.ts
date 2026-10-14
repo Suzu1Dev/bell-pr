@@ -204,12 +204,13 @@ export class Workbench {
     this.entitlements =
       dependencies.entitlements ?? (() => proEntitlements(this.maxActiveRuns));
     // Callbacks go through `this` so a replaced method (as tests do) applies.
-    const workbench = this;
+    const timeoutScale = () => this.agentTimeoutScale;
     this.context = {
       store: this.store,
       agentSlots: this.agentSlots,
+      // Read for each turn, so a changed app setting applies.
       get agentTimeoutScale() {
-        return workbench.agentTimeoutScale;
+        return timeoutScale();
       },
       controllers: this.controllers,
       jobs: this.jobs,

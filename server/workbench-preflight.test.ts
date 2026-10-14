@@ -154,6 +154,7 @@ async function serve(
     await app.locals.discovery.shutdown();
   });
   const call = (method: string, pathname: string, body?: unknown) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the JSON of several routes
     new Promise<{ status: number; body: any }>((resolve, reject) => {
       const req = request(
         `http://127.0.0.1:${address.port}${pathname}`,
