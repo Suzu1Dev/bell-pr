@@ -292,7 +292,14 @@ const workspace = {
         ? `${count} file reviewed`
         : `${count} files reviewed`,
     demoCallout:
-      "This is an interactive demo: finishing it does not open a GitHub PR. Import your own project to make a real contribution.",
+      "This is an interactive demo: nothing is pushed and no PR opens on GitHub. Import your own project to make a real contribution.",
+    /** Who the publish acts as, from the environment check. */
+    identity: {
+      both: ({ author, login }: { author: string; login: string }) =>
+        `Commit author: ${author} · Pushing as @${login}`,
+      author: ({ author }: { author: string }) => `Commit author: ${author}`,
+      login: ({ login }: { login: string }) => `Pushing as @${login}`,
+    },
     commitPreview: "This round's commit message",
     bodyPreview: "PR description sent to GitHub",
     bodyPreviewWords: ({ count }: { count: number }) =>
@@ -302,7 +309,7 @@ const workspace = {
     confirmLegend: "Confirm each item before submitting",
     confirmNote: `Ticking only means you know these items are still open and want to submit the description as it is. ${product.name} never changes the description or ticks anything for you, and these confirmations are not written into the PR. To change something first, choose “Back to the draft”.`,
     back: "Back to the draft",
-    finishDemo: "Finish the demo review",
+    finishDemo: "Open the sample Draft PR",
     sending: "Submitting…",
     pushRound: "Push this round",
     submit: "Submit Draft PR",

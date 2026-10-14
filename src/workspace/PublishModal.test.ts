@@ -3,12 +3,48 @@ import test from "node:test";
 import { createElement } from "react";
 import * as draftChecks from "../../shared/draft-checks";
 import type { DraftCheck } from "../../shared/draft-checks";
+import type { DoctorCheck, DoctorReport } from "../../shared/doctor";
+import { maskPath } from "../app/presentation";
+import type { DoctorState } from "../setup/useDoctor";
 import { demoFiles, demoRepo, demoRun } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Run } from "../types";
-import { PublishModal } from "./PublishModal";
+import {
+  maskPersonalText,
+  PublishIdentity,
+  PublishModal,
+  publishIdentity,
+} from "./PublishModal";
 
 type Props = Parameters<typeof PublishModal>[0];
+
+const check = (id: DoctorCheck["id"], fields: Partial<DoctorCheck> = {}): DoctorCheck => ({
+  id,
+  status: "ok",
+  required: false,
+  ...fields,
+});
+const report = (checks: DoctorCheck[]): DoctorReport => ({
+  checks,
+  ready: true,
+  checkedAt: "2026-10-12T00:00:00Z",
+  platform: "linux",
+});
+const doctorWith = (value: DoctorReport | null): DoctorState => ({
+  report: value,
+  checking: false,
+  error: "",
+  async refresh() {},
+});
+/** Git knows who commits and the GitHub CLI is signed in. */
+const readyDoctor = doctorWith(
+  report([
+    check("git-identity", { detail: "Ada Lovelace <ada@example.com>" }),
+    check("gh"),
+    check("gh-auth", { detail: "ada", params: { login: "ada" } }),
+    check("gh-scopes"),
+  ]),
+);
 
 const run: Run = {
   ...demoRun,
@@ -41,6 +77,7 @@ const element = (props: Partial<Props> = {}, draft: Partial<Props["draft"]> = {}
       publish() {},
       closeModal() {},
       setTab() {},
+      doctor: readyDoctor,
       ...props,
     });
 
@@ -116,14 +153,109 @@ test("a publish error stays in the dialog", () => {
   );
 });
 
-test("the demo shows a preview and a completion button instead of sending", () => {
-  const html = render({ demo: true });
+test("the demo previews its PR body and opens the sample PR without any check", () => {
+  // No environment report at all: the sample needs neither Git nor the GitHub CLI.
+  const html = render({ demo: true, doctor: doctorWith(null) });
   assert.match(html, /你的示範貢獻，準備好了。/);
   assert.match(html, /你已完成所有檔案的審查。以下是 PR 的送出預覽。/);
-  assert.match(html, /這是互動示範，按下完成不會建立 GitHub/);
-  assert.match(html, /完成示範審查/);
-  assert.doesNotMatch(html, /會送到 GitHub 的 PR 說明/);
+  assert.match(html, /這是互動示範，不會推送任何內容，也不會在 GitHub 建立 PR/);
+  assert.match(html, /開啟範例 Draft PR/);
+  assert.match(html, /會送到 GitHub 的 PR 說明（約 \d+ 字）/);
+  assert.doesNotMatch(html, /readiness-notice/);
+  assert.doesNotMatch(html, /Commit 作者/);
   assert.doesNotMatch(html, /disabled=""/);
+});
+
+test("publishing waits for Git's identity and the GitHub CLI, and says how to fix them", () => {
+  const missing = renderEn(
+    element({
+      doctor: doctorWith(
+        report([
+          check("git-identity", { detail: "Ada Lovelace <ada@example.com>" }),
+          check("gh", {
+            status: "warn",
+            detail: "Not installed",
+            fixes: [{ label: "Install", command: "brew install gh" }],
+          }),
+        ]),
+      ),
+    }),
+  );
+  assert.match(missing, /class="readiness-notice"/);
+  assert.match(missing, /brew install gh/);
+  assert.match(missing, /<button class="button primary" disabled="">.*Submit Draft PR<\/button>/);
+  assertNoHan(missing);
+  // Still checking: nothing can be sent yet.
+  const checking = renderEn(element({ doctor: doctorWith(null) }));
+  assert.match(checking, /readiness-checking/);
+  assert.match(checking, /<button class="button primary" disabled="">/);
+  // Ready: no notice, and the dialog says who commits and pushes.
+  const ready = renderEn(element());
+  assert.doesNotMatch(ready, /readiness-notice/);
+  assert.match(
+    ready,
+    /Commit author: Ada Lovelace &lt;ada@example\.com&gt; · Pushing as @ada/,
+  );
+  assert.doesNotMatch(ready, /<button class="button primary" disabled="">/);
+});
+
+test("who commits and pushes reads from the checks and is masked while presenting", () => {
+  assert.deepEqual(publishIdentity(readyDoctor.report), {
+    author: "Ada Lovelace <ada@example.com>",
+    login: "ada",
+  });
+  // A guessed address is what the commit carries; a signed-out CLI pushes as nobody.
+  assert.deepEqual(
+    publishIdentity(
+      report([
+        check("git-identity", { status: "warn", params: { email: "ada@laptop.local" } }),
+        check("gh-auth", { status: "fail" }),
+      ]),
+    ),
+    { author: "ada@laptop.local" },
+  );
+  assert.deepEqual(publishIdentity(null), {});
+  const masked = renderEn(
+    createElement(PublishIdentity, {
+      author: "Ada Lovelace <ada@example.com>",
+      login: "ada",
+      maskUser: () => "you",
+    }),
+  );
+  assert.match(masked, /Commit author: you · Pushing as @you/);
+  assert.doesNotMatch(masked, /Ada|ada@/);
+  assert.match(
+    renderEn(createElement(PublishIdentity, { login: "ada", maskUser: (value: string) => value })),
+    /Pushing as @ada/,
+  );
+  assert.equal(
+    renderEn(createElement(PublishIdentity, { maskUser: (value: string) => value })),
+    "",
+  );
+  assert.match(
+    renderZh(createElement(PublishIdentity, { author: "Ada <a@b.c>", login: "ada", maskUser: (value: string) => value })),
+    /Commit 作者：Ada &lt;a@b\.c&gt; · 以 @ada 推送/,
+  );
+});
+
+test("preflight results lose e-mail addresses and home paths while presenting", () => {
+  const presenting = {
+    present: true,
+    maskUser: () => "you",
+    maskPath: (value: string) => maskPath(value, undefined, true),
+  };
+  assert.equal(
+    maskPersonalText("Found: /home/ada/work/notes.md and ada@example.com", presenting),
+    "Found: …/notes.md and you",
+  );
+  assert.equal(
+    maskPersonalText("Found: C:\\Users\\ada\\notes.md", presenting),
+    "Found: …/notes.md",
+  );
+  assert.equal(
+    maskPersonalText("Found: /home/ada/notes.md", { ...presenting, present: false }),
+    "Found: /home/ada/notes.md",
+  );
 });
 
 test("a follow-up round previews its commit and pushes to the PR branch instead of opening a PR", () => {
@@ -207,7 +339,8 @@ test("the publish dialog reads in English with no Chinese left", () => {
 
   const demo = renderEn(element({ demo: true }));
   assert.match(demo, /Your demo contribution is ready\./);
-  assert.match(demo, /Finish the demo review/);
+  assert.match(demo, /Open the sample Draft PR/);
+  assert.match(demo, /PR description sent to GitHub/);
   assertNoHan(demo);
 });
 
