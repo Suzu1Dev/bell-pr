@@ -73,6 +73,42 @@ export function parseDiff(patch: string): DiffLine[] {
 
 export type SplitRow = { left?: DiffLine; right?: DiffLine; hunk?: DiffLine };
 
+/** Lines of code a reader can select and ask about (not hunk headers or notes). */
+export function isCodeLine(line: DiffLine): boolean {
+  return (
+    line.kind === "context" || line.kind === "added" || line.kind === "removed"
+  );
+}
+
+/** One hunk: its header line and the lines below it, notes included. */
+export type Hunk = { header?: DiffLine; lines: DiffLine[] };
+
+/** The hunks of a parsed diff in order; lines before any header form a hunk without one. */
+export function groupHunks(lines: DiffLine[]): Hunk[] {
+  const hunks: Hunk[] = [];
+  for (const line of lines) {
+    if (line.kind === "hunk") hunks.push({ header: line, lines: [] });
+    else {
+      if (!hunks.length) hunks.push({ lines: [] });
+      hunks[hunks.length - 1].lines.push(line);
+    }
+  }
+  return hunks;
+}
+
+/** Where a hunk header says its lines start, and the code it names after the second @@. */
+export function hunkStart(
+  header: string,
+): { oldLine: number; newLine: number; context: string } | undefined {
+  const match = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@ ?(.*)$/.exec(header);
+  if (!match) return undefined;
+  return {
+    oldLine: Number(match[1]),
+    newLine: Number(match[2]),
+    context: match[3].trim(),
+  };
+}
+
 /**
  * Short badges keyed by the language names server/git.ts languageFor emits.
  * JSON gets its own badge so it never collides with JavaScript's "JS".

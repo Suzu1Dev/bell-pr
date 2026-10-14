@@ -12,6 +12,13 @@ const m: Translation<typeof en> = {
       context: ({ line, text }) => `未變更，第 ${line} 行：${text}`,
     },
     blankLine: "空白行",
+    listLabel: "差異的各行",
+    keyboardHint:
+      "用方向鍵在各行之間移動，按住 Shift 再按方向鍵可選取多行；按 Enter 針對選取範圍提問，按 Esc 清除選取。",
+    hunkLabel: ({ oldLine, newLine }) =>
+      `從舊版第 ${oldLine} 行、新版第 ${newLine} 行起的變更`,
+    hunkLabelIn: ({ oldLine, newLine, context }) =>
+      `${context} 中，從舊版第 ${oldLine} 行、新版第 ${newLine} 行起的變更`,
     lineTitle: "點選行以追問，按住 Shift 可選取多行",
     noteHint: "還沒寫下你的理解",
     reviewed: "已審閱",

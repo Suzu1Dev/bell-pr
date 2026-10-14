@@ -30,6 +30,24 @@ const review = {
     },
     /** Stands in for an empty line's text in its accessible name. */
     blankLine: "blank line",
+    /** The accessible name of the list of diff lines, one tab stop. */
+    listLabel: "Diff lines",
+    /** Read out with the list of lines: how to use it from the keyboard. */
+    keyboardHint:
+      "Use the arrow keys to move between lines and Shift with an arrow key to select several. Press Enter to ask about the selection and Escape to clear it.",
+    /** The accessible name of one hunk: where its lines start in each version. */
+    hunkLabel: ({ oldLine, newLine }: { oldLine: number; newLine: number }) =>
+      `Changes from old line ${oldLine}, new line ${newLine}`,
+    /** The same, when the hunk header names the code around it; `context` is code. */
+    hunkLabelIn: ({
+      oldLine,
+      newLine,
+      context,
+    }: {
+      oldLine: number;
+      newLine: number;
+      context: string;
+    }) => `Changes from old line ${oldLine}, new line ${newLine}, in ${context}`,
     lineTitle: "Click a line to ask about it. Hold Shift to select several lines.",
     noteHint: "No note yet",
     reviewed: "Reviewed",
