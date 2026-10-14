@@ -308,6 +308,17 @@ test("Re-check probes the environment again", async ({ page }) => {
   await expect(recheck).toBeEnabled();
 });
 
+test("the privacy link opens the privacy policy that ships with the app", async ({ page }) => {
+  await page.goto("/#/settings/data");
+  const link = panel(page).getByRole("link", { name: settings.data.privacy.link });
+  const href = await link.getAttribute("href");
+  expect(href).toBe("/legal/PRIVACY.txt");
+  const response = await page.request.get(href!);
+  expect(response.ok()).toBe(true);
+  expect(response.headers()["content-type"]).toMatch(/^text\/plain/);
+  expect(await response.text()).toMatch(/privacy/i);
+});
+
 test("the storage lists a published run apart and frees it after a confirmation; Delete all data needs ERASE", async ({ browser }) => {
   const runId = "e2e-published-run";
   const seed = async (dataDir: string) => {
