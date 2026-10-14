@@ -4,9 +4,9 @@
  *
  * A screen whose parent passes the plan in (entitlements or the license
  * summary) asks for nothing; otherwise it reads GET /api/license once when
- * it mounts and follows every change made through `src/license`. The server
- * still decides: locking a control only saves a request that would answer
- * 402.
+ * it mounts. Either way it follows every change made through `src/license`.
+ * The server still decides: locking a control only saves a request that
+ * would answer 402.
  */
 import { useEffect, useState } from "react";
 import type {
@@ -73,13 +73,17 @@ export function usePlan({
       live = false;
     };
   }, [fetches, refresh]);
+  // What this hook read, or a license change it heard of (such as the
+  // trial started from a locked control), is newer than the parent's.
   const known =
-    entitlements ?? (license ? entitlementsOf(license) : own.entitlements);
+    own.entitlements ??
+    entitlements ??
+    (license ? entitlementsOf(license) : undefined);
   const locked = (feature: ProFeature) =>
     !demo && known !== undefined && !known.features[feature];
   return {
     entitlements: known,
-    summary: license ?? own.summary,
+    summary: own.summary ?? license,
     checking: fetches && checking && !known,
     demo,
     locked,

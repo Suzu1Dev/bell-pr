@@ -56,6 +56,24 @@ const m: Translation<typeof en> = {
     relevance: "相關度",
     stars: "星數",
   },
+  locked: {
+    body: "即時探索會搜尋 GitHub，並請你的 AI provider 評估每個專案，屬於 Pro 功能；你已有的結果仍可閱讀。",
+    startTrial: ({ days }) => `開始 ${fmt.number(days)} 天試用`,
+    upgrade: "升級到 Pro",
+  },
+  sample: {
+    title: "示範結果，非即時資料",
+    body: "這些虛構專案用來示範探索會找到什麼；內容並非來自 GitHub 或 AI，也無法匯入。",
+  },
+  languages: {
+    en: "英文",
+    "zh-TW": "繁體中文",
+  },
+  localeNotice: {
+    writtenIn: ({ language }) => `這些結果以${language}撰寫。`,
+    searchAgain: ({ language, current }) =>
+      `這些結果以${language}撰寫。重新搜尋即可取得${current}的結果。`,
+  },
   reload: "重新讀取狀態",
   loading: "正在讀取探索紀錄…",
   progress: {
@@ -127,6 +145,7 @@ const m: Translation<typeof en> = {
     risks: "投入之前，再確認",
     evidence: ({ count }) => `推薦依據與原文 · ${fmt.number(count)} 則`,
     chooseHint: "選擇後匯入專案，帶入可編輯的任務設定。",
+    sampleHint: "示範專案無法選擇；即時探索會找到可匯入的真實專案。",
     choose: "選擇此項目",
     importing: "正在匯入專案…",
   },
