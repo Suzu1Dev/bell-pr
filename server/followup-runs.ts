@@ -24,6 +24,7 @@ import {
   worktreeDirty,
 } from "./pr-branch.js";
 import { runAgent } from "./run-executor.js";
+import { feedbackForAgent } from "./explanations.js";
 import { contributionContext } from "./prompts/team.js";
 import { followUpPrompt } from "./prompts/followups.js";
 import { log } from "./log.js";
@@ -179,6 +180,15 @@ async function runFollowUp(
         round.parentCommit,
       ])
     ).stdout.trim();
+    const feedback = (run.prFeedback?.items ?? []).filter((item) =>
+      round.feedbackUrls.includes(item.url),
+    );
+    // A comment by someone outside the project could carry instructions
+    // that lead the agent to the web: with such a comment selected, this
+    // writable turn stays offline instead of dropping what the person chose.
+    const offline =
+      run.modelExecution?.webAccess === true &&
+      feedbackForAgent(feedback, true).length < feedback.length;
     const answer = await runAgent(
       ctx,
       run,
@@ -193,15 +203,13 @@ async function runFollowUp(
           body: run.draft.body,
         },
         previousCommitMessage,
-        feedback: (run.prFeedback?.items ?? []).filter((item) =>
-          round.feedbackUrls.includes(item.url),
-        ),
+        feedback,
         note: round.note,
         changedFiles: files.map((file) => file.path),
       }),
       controller.signal,
       false,
-      { outputSchema, checks },
+      { outputSchema, checks, offline },
     );
     const result = parseAgentOutput(run, "follow-up", () =>
       parseFollowUpResult(answer, round.feedbackUrls),
