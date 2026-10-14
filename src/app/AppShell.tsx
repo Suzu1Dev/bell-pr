@@ -1143,6 +1143,7 @@ function AppShell({
             configureContributionModels={configureContributionModels}
             setTab={setTab}
             navigate={navigate}
+            onAppSettingsSaved={(view) => setAppSettings(view.settings)}
           />
         )}
       </main>
