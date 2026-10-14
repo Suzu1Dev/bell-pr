@@ -3,10 +3,11 @@
  * without a session.
  *
  * The server keeps one session secret in memory (AppOptions.sessionToken)
- * and prints `/auth?t=<secret>` at startup. `bell-pr open` asks the running
- * server for a one-time link instead, so the secret itself is never written
- * to disk. Either link sets the session cookie; localhostGuard then lets
- * the browser through.
+ * and prints `/auth?t=<secret>` at startup. The browser it opens at start
+ * gets a one-time link instead, so the secret never reaches an opener's
+ * command line, and `bell-pr open` asks the running server for one, so the
+ * secret itself is never written to disk. Either link sets the session
+ * cookie; localhostGuard then lets the browser through.
  */
 import { createHash, randomBytes } from "node:crypto";
 import type { Express, Request } from "express";
@@ -117,11 +118,12 @@ export function registerAuthRoutes(app: Express, deps: RouteDeps) {
 }
 
 /**
- * Mints a one-time sign-in token for `bell-pr open`: 32 random bytes in
- * base64url, accepted once by GET /auth within two minutes. At most five
- * are outstanding; a sixth replaces the oldest. Only a digest is kept, in
- * memory. Returns undefined when the server has no session secret (sign-in
- * is off) or the auth routes are not registered on `app`.
+ * Mints a one-time sign-in token for `bell-pr open` and the browser opened
+ * at start: 32 random bytes in base64url, accepted once by GET /auth within
+ * two minutes. At most five are outstanding; a sixth replaces the oldest.
+ * Only a digest is kept, in memory. Returns undefined when the server has
+ * no session secret (sign-in is off) or the auth routes are not registered
+ * on `app`.
  */
 export function mintOneTimeToken(app: Express): string | undefined {
   const state = signInState(app);

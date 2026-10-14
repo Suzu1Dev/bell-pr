@@ -43,9 +43,13 @@ what BELL PR trusts, what it does not, and the limits of each protection.
   variable or a command line. The server prints a sign-in link once
   (`/auth?t=…`). That link carries the session secret itself, so it works
   until the server restarts: keep it, and any log that holds it (terminal
-  scrollback, `docker logs`, the journal), as private as a password.
-  Opening it sets the cookie `bellpr_session_<port>`, named after the port
-  in the address the browser uses, for example `bellpr_session_4311`
+  scrollback, `docker logs`, the journal), as private as a password. The
+  browser BELL PR opens at start gets a one-time link instead (see below):
+  the opener (`open`, `xdg-open`) takes the link on its command line, which
+  other users of the computer may see in the process list, so the session
+  secret never goes there.
+  Opening either link sets the cookie `bellpr_session_<port>`, named after
+  the port in the address the browser uses, for example `bellpr_session_4311`
   (`HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000`, that is 30 days).
   Browsers keep cookies per host, not per port, so the port in the name
   keeps two servers on one machine (say `npx` on 4311 and Docker published
@@ -59,9 +63,11 @@ what BELL PR trusts, what it does not, and the limits of each protection.
   not be sent with a redirected request. Restarting the server ends every
   session.
 - **One-time sign-in links.** `bell-pr open` asks the running server for a
-  new link (the CLI sends `SIGUSR2`). The server mints a random 32-byte token
-  that works once, for 120 seconds; at most five are open at a time, and only
-  a digest is kept, in memory. The link is handed over through
+  new link (the CLI sends `SIGUSR2`), and the server makes one for the
+  browser it opens at start. It mints a random 32-byte token that works
+  once, for 120 seconds; at most five are open at a time, and only a digest
+  is kept, in memory. The startup link goes straight to the opener; the
+  link for `bell-pr open` is handed over through
   `<dataDir>/run/open-link.json` (folder `0700`, file `0600`), which the CLI
   deletes as soon as it has read it. In Docker:
   `docker exec <container> bell-pr open --print`.

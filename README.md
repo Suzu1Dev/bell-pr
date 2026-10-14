@@ -35,7 +35,7 @@ seconds.
    npx bell-pr
    ```
 
-2. It prints a sign-in link and opens it in your browser:
+2. It prints a sign-in link and opens BELL PR in your browser, signed in:
 
    ```text
    BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311/auth?t=…

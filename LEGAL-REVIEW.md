@@ -63,10 +63,11 @@ or incomplete against the shipped code and are corrected in the documents:
   (`server/store.ts:393`), the AI-assistance note setting, and the temporary
   index files with their cleanup (PRIV-35).
 - **Session token (SEC-14, SEC-16).** The drafts said the token is never on a
-  command line. It is never on BELL PR's own, but the startup link that
-  holds it is passed to `open`/`xdg-open` when BELL PR opens the browser
-  (`server/index.ts:547`, `server/cli.ts:173`). SECURITY.md now says so and
-  gives the `--no-open` workaround; see finding 1.
+  command line. It was never on BELL PR's own, but the startup link that
+  holds it was passed to `open`/`xdg-open` when BELL PR opened the browser.
+  Since finding 1 was fixed, the browser gets a one-time link instead
+  (`server/index.ts:555`, `server/cli.ts:173`), so the token is on no
+  command line, and SEC-14 and SEC-16 say so.
 - **Web access (PRIV-28, PRIV-29, SEC-32).** Named which agents get it
   (`server/run-executor.ts:134`), the Claude Code WebFetch domain list
   (`server/agent-cli.ts:38`) and Codex's live web search
@@ -102,12 +103,13 @@ or incomplete against the shipped code and are corrected in the documents:
 These are differences between the code and other files that 7B does not
 own. The legal texts already describe the shipped behavior.
 
-1. **Startup sign-in link on a command line.** `server/index.ts:547` opens
-   the startup link, which carries the session secret itself, through
-   `open`/`xdg-open` (`server/cli.ts:173`), so it can appear in a process
-   list that other local users can read. `docs/security-model.md` says the
-   secret is never on a command line. Suggested fix: open a one-time link
-   (`mintOneTimeToken`) instead of the session link.
+1. **Startup sign-in link on a command line.** Fixed after the merge: BELL
+   PR opened the startup link, which carries the session secret itself,
+   through `open`/`xdg-open` (`server/cli.ts:173`), so it could appear in a
+   process list that other local users can read. It now opens a one-time
+   link (`mintOneTimeToken`, `server/index.ts:555`) instead,
+   `server/cli.test.ts` checks the opener's arguments, and SECURITY.md
+   (SEC-14, SEC-16) and `docs/security-model.md` say so.
 2. **Update period of pool keys.** `tools/license/issue.ts:154` sets `upd`
    12 months from the day a key is issued, which for a pre-signed pool is
    the day the pool was made. The plan copy ("perpetual use of the builds
@@ -374,9 +376,9 @@ Commands run on the tree of this review, test files excluded:
 | SEC-11 | Another address needs `--host`/`BELLPR_HOST` and, unless it is loopback or all interfaces, `BELLPR_PUBLIC_URL`; non-local origins need HTTPS | `server/config.ts:242`, `server/config.ts:258`, `server/config.ts:203`, `server/http-guard.ts:38` |
 | SEC-12 | Only its own hosts and allowed origins, no cross-site requests, JSON for changes, a strict CSP | `server/http-guard.ts:221`, `server/http-guard.ts:232`, `server/http-guard.ts:247`, `server/http-guard.ts:216` |
 | SEC-13 | Listening on all interfaces exposes the sign-in page; publish on 127.0.0.1 | `Dockerfile:80`, `server/config.ts:258`, `server/http-guard.ts:237` |
-| SEC-14 | A random 32-byte token in memory, never in a file, environment or BELL PR's command line; a restart signs out | `server/index.ts:524`, `server/index.ts:527` |
-| SEC-15 | The printed link holds the token and works until restart | `server/index.ts:543` |
-| SEC-16 | The startup link goes to `open`/`xdg-open`; use `--no-open` or `bell-pr open --print` on shared computers | `server/index.ts:547`, `server/cli.ts:173`, `server/cli.ts:179`, `server/config.ts:298`; finding 1 |
+| SEC-14 | A random 32-byte token in memory, never in a file, environment or command line; a restart signs out | `server/index.ts:529`, `server/index.ts:532`, `server/index.ts:556` |
+| SEC-15 | The printed link holds the token and works until restart | `server/index.ts:548` |
+| SEC-16 | The browser opened at start gets a one-time link, which goes to `open`/`xdg-open`; the token never does | `server/index.ts:556`, `server/routes/auth.ts:128`, `server/cli.ts:173`, `server/cli.ts:179`; `server/cli.test.ts` checks the opener's arguments; finding 1 |
 | SEC-17 | HttpOnly, SameSite=Strict cookie for 30 days; all but the health check and sign-in page need it | `server/routes/auth.ts:64`, `server/routes/auth.ts:65`, `server/http-guard.ts:80`, `server/app.ts:163`, `server/http-guard.ts:237` |
 | SEC-18 | One-time links: once, 120 seconds, at most 5, digests only | `server/routes/auth.ts:26`, `server/routes/auth.ts:27`, `server/routes/auth.ts:136` |
 | SEC-19 | The link file is private and deleted once read | `server/index.ts:353`, `server/index.ts:354`, `server/cli.ts:241` |
