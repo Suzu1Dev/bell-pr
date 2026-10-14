@@ -2911,12 +2911,18 @@ export default function App() {
                         {run.team ? (
                           <div>
                             <h2>執行過程</h2>
-                            <p>任務板在上方；完整紀錄、錯誤訊息與停止操作保留在這裡。</p>
+                            <p>
+                              任務板在上方；完整紀錄、錯誤訊息與停止操作保留在這裡。開發在獨立的
+                              Git worktree 中執行，審查完成後由你決定何時送出。
+                            </p>
                           </div>
                         ) : (
                           <div>
                             <h2>你的 Agent team</h2>
-                            <p>每個角色各司其職，所有過程都在這裡。</p>
+                            <p>
+                              每個角色各司其職，所有過程都在這裡。開發在獨立的 Git
+                              worktree 中執行，審查完成後由你決定何時送出。
+                            </p>
                           </div>
                         )}
                         {(active || reviewRerunning) && (
@@ -3028,22 +3034,6 @@ export default function App() {
                         </p>
                       )}
                     </div>
-                    <aside className="task-brief">
-                      <span className="eyebrow">MISSION BRIEF</span>
-                      <h3>這次的貢獻目標</h3>
-                      <p>{run.prompt}</p>
-                      <div className="brief-meta">
-                        <GitBranch size={16} />
-                        <span>{run.branch}</span>
-                      </div>
-                      <div className="callout">
-                        <ShieldCheck size={18} />
-                        <p>
-                          開發在獨立的 Git worktree
-                          中執行。審查完成後，由你決定何時送出。
-                        </p>
-                      </div>
-                    </aside>
                   </div>
                 )}
                 {tab === "draft" && (
