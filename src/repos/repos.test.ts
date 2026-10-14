@@ -3,7 +3,7 @@ import test from "node:test";
 import { createElement } from "react";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Repo } from "../types";
-import { ImportRepoModal } from "./ImportRepoModal";
+import { examplePath, ImportRepoModal, namesSample } from "./ImportRepoModal";
 import { ReposPage } from "./ReposPage";
 
 const repo: Repo = {
@@ -48,11 +48,36 @@ test("the import dialog reads in English with no Chinese left", () => {
   const html = renderEn(createElement(ImportRepoModal, props));
   assert.match(html, /<h2 id="modal-title">Bring in your next contribution\.<\/h2>/);
   assert.match(html, /<label class="field-label" for="repo-source">Repository source<\/label>/);
+  assert.match(html, /placeholder="owner\/repository or https:\/\/github\.com\/owner\/repository"/);
+  assert.match(html, /Local Git projects work too: paste the full path, such as /);
   assert.match(html, />Not now<\/button>/);
+  assert.doesNotMatch(html, /lucide-github|Cloning/);
   assertNoHan(html);
+  const busy = renderEn(createElement(ImportRepoModal, { ...props, source: "x", busy: true }));
+  assert.match(busy, /Importing…/);
   assert.match(
-    renderEn(createElement(ImportRepoModal, { ...props, source: "x", busy: true })),
-    /Importing…/,
+    busy,
+    /<p class="field-help import-cloning" role="status">Cloning… large repositories can take a few minutes\.<\/p>/,
   );
   assert.match(renderZh(createElement(ImportRepoModal, props)), />稍後再說<\/button>/);
+});
+
+test("the path example follows the computer's platform", () => {
+  assert.equal(examplePath("MacIntel"), "/Users/you/projects/repository");
+  assert.equal(examplePath("Win32"), "C:\\Users\\you\\projects\\repository");
+  assert.equal(examplePath("Linux x86_64"), "/home/you/projects/repository");
+});
+
+test("the sample is recognized by its name or its GitHub address", () => {
+  const sample = "openfetch-sample/open-fetch";
+  for (const input of [
+    sample,
+    "  OpenFetch-Sample/Open-Fetch ",
+    "https://github.com/openfetch-sample/open-fetch",
+    "https://github.com/openfetch-sample/open-fetch.git",
+    "github.com/openfetch-sample/open-fetch/",
+  ])
+    assert.equal(namesSample(input, sample), true, input);
+  for (const input of ["openfetch-sample/open-fetch-2", "octo/open-fetch", "/home/you/open-fetch", ""])
+    assert.equal(namesSample(input, sample), false, input);
 });

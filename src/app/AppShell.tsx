@@ -30,7 +30,7 @@ import { HomePage } from "../home/HomePage";
 import { useLocale, useT } from "../i18n";
 import { UpgradeDialog } from "../license/UpgradeDialog";
 import { useEntitlements } from "../license/useEntitlements";
-import type { Run, DiffFile } from "../types";
+import type { Run, DiffFile, Repo } from "../types";
 import { CommandPalette } from "../navigation/CommandPalette";
 import {
   currentRoute,
@@ -320,6 +320,7 @@ function AppShell({
 }) {
   const t = useT("app");
   const workspaceMessages = useT("workspace");
+  const repoMessages = useT("repos");
   const [locale] = useLocale();
   // The sample project in the UI language; its ids are the same in every locale.
   const sample = getDemo(locale);
@@ -791,11 +792,23 @@ function AppShell({
   }, [documentTitle]);
 
   // The sample run is listed while it is all there is, while the workbench
-  // shows it, or when the app settings ask for it.
+  // shows it, after the person imported it, or when the settings ask for it.
+  const [sampleImported, setSampleImported] = useState(false);
   const showSample =
     runs.length === 0 ||
     appSettings?.showSampleProject === true ||
+    sampleImported ||
     (page === "workspace" && demo);
+
+  /** The sample's import played in the browser: list it and open it. */
+  function openImportedSample(repo: Repo) {
+    closeModal();
+    setSource("");
+    setSampleImported(true);
+    setExploreRepoId(repo.id);
+    navigate("explore");
+    notify(repoMessages.import.sampleImported({ name: repo.fullName }));
+  }
 
   function focusDestination() {
     window.requestAnimationFrame(() => {
@@ -1031,6 +1044,9 @@ function AppShell({
           formError={formError}
           importRepo={importRepo}
           closeModal={closeModal}
+          playDemo={presentation.play}
+          speed={presentation.speed}
+          onSampleImported={openImportedSample}
         />
       )}
       {modal === "models" && (
