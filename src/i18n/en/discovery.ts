@@ -57,7 +57,8 @@ const discovery = {
     /** A saved effort that the selected model's catalog entry does not list. */
     effortNotInCatalog: ({ effort }: { effort: string }) =>
       `${effort} (saved, not in the catalog)`,
-    ponytailMode: "Ponytail mode",
+    ponytailMode: "Efficiency mode",
+    ponytailCredit: "Efficiency mode is based on Ponytail by DietrichGebert (MIT).",
     ponytailModes: {
       lite: "Lite · default",
       full: "Full",

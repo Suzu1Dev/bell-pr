@@ -506,7 +506,7 @@ export default function DiscoveryPanel({
                 ))}
               </select>
             </label>
-            <label>
+            <label title={t.form.ponytailCredit}>
               {t.form.ponytailMode}
               <select
                 value={preferences.ponytailMode}

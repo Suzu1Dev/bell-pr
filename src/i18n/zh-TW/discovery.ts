@@ -40,7 +40,8 @@ const m: Translation<typeof en> = {
     reasoningEffort: "思考強度",
     modelDefault: "模型預設",
     effortNotInCatalog: ({ effort }) => `${effort}（已儲存，目錄未提供）`,
-    ponytailMode: "Ponytail 模式",
+    ponytailMode: "效率模式",
+    ponytailCredit: "效率模式以 DietrichGebert 的 Ponytail（MIT）為基礎。",
     ponytailModes: {
       lite: "輕量 · 預設",
       full: "完整",
