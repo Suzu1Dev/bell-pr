@@ -393,4 +393,7 @@ test("the sandbox canary's fake mode checks the harness without a model call", (
   );
   // Never a real model call by accident: one mode must be chosen.
   assert.equal(run([]).status, 2);
+  // The decoy home is for real runs only.
+  assert.equal(run(["--fake", "--decoy-home"]).status, 2);
+  assert.equal(report.home, "real");
 });
