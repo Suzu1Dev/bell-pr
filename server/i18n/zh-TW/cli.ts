@@ -63,7 +63,7 @@ const m: Translation<typeof en> = {
     legacyDataDir: ({ dataDir }) =>
       `在 ./.bellpr 找到 ${name} 資料。${name} 現在使用 ${dataDir}，沒有搬移任何資料。若要繼續使用舊資料夾，請以此方式啟動：${bin} start --data-dir ./.bellpr`,
     alreadyRunning: ({ url }) =>
-      `${name} 已在 ${url} 執行。執行 \`${bin} open\` 取得登入連結。`,
+      `${name} 已在 ${url} 執行。執行 \`${bin} open\` 取得登入連結；若那個 ${name} 用其他資料目錄啟動，請加上 --data-dir <dir>。`,
     portInUse: ({ port }) =>
       `埠 ${port} 已被其他程式使用。請用 \`${bin} start --port <埠>\` 在可用的埠啟動 ${name}。`,
     dataDirInUse: ({ dataDir, pid }) =>
@@ -78,7 +78,8 @@ const m: Translation<typeof en> = {
       `${name} 的網頁介面尚未建置。請在 ${name} 原始碼資料夾執行 npm run build，再重新啟動 ${name}。`,
   },
   open: {
-    notRunning: `${name} 沒有在執行。請用 \`${bin}\` 啟動。`,
+    notRunning: ({ dataDir }) =>
+      `沒有使用資料目錄 ${dataDir} 的 ${name} 在執行。請用 \`${bin}\` 啟動；若 ${name} 用其他資料目錄啟動，請執行 \`${bin} open --data-dir <dir>\`。`,
     noAnswer:
       `${name} 在 5 秒內沒有回應。請確認它仍在執行，或重新啟動後使用它印出的登入連結。`,
     unavailable:

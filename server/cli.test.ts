@@ -81,7 +81,10 @@ test("bell-pr open without a running instance exits 1 and says how to start", as
     const result = await cli(["open", "--data-dir", dataDir]);
     assert.equal(result.code, 1);
     assert.equal(result.stdout, "");
-    assert.equal(result.stderr, "BELL PR is not running. Start it with `bell-pr`.\n");
+    assert.equal(
+      result.stderr,
+      `No BELL PR is running with the data directory ${dataDir}. Start it with \`bell-pr\`, or, for a BELL PR started with another data directory, run \`bell-pr open --data-dir <dir>\`.\n`,
+    );
 
     // A lock left by a process that is gone, or one whose pid now runs
     // something that is not BELL PR, never gets the signal.
@@ -98,7 +101,7 @@ test("bell-pr open without a running instance exits 1 and says how to start", as
         kill: (target) => signalled.push(target),
       });
       assert.equal(stale.code, 1);
-      assert.match(stale.stderr, /not running/);
+      assert.match(stale.stderr, /No BELL PR is running with the data directory/);
     }
     assert.deepEqual(signalled, []);
   });
@@ -122,7 +125,7 @@ test("bell-pr open never signals a reused pid, even where BELL PR answers on the
         kill: (target) => signalled.push(target),
       });
       assert.equal(result.code, 1);
-      assert.match(result.stderr, /not running/);
+      assert.match(result.stderr, /No BELL PR is running with the data directory/);
       assert.deepEqual(signalled, []);
     } finally {
       stranger.kill("SIGKILL");

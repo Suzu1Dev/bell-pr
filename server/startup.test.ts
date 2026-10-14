@@ -602,7 +602,7 @@ test("an occupied port exits non-zero and points to bell-pr open, never to a bar
     const { code } = await second.exited;
     assert.notEqual(code, 0);
     const output = second.stdout() + second.stderr();
-    assert.match(output, /BELL PR is already running at http:\/\/127\.0\.0\.1:\d+\. Run `bell-pr open` to get a sign-in link\./);
+    assert.match(output, /BELL PR is already running at http:\/\/127\.0\.0\.1:\d+\. Run `bell-pr open` to get a sign-in link; add --data-dir <dir> if that BELL PR was started with another data directory\./);
     assert.doesNotMatch(output, /auth\?t=/);
     assert.ok(
       !output.split("\n").some((line) => /^\s*https?:\/\/\S+\s*$/.test(line)),

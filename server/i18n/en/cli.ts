@@ -81,7 +81,7 @@ export default {
     legacyDataDir: ({ dataDir }: { dataDir: string }) =>
       `Found ${name} data in ./.bellpr. ${name} now uses ${dataDir} and moved nothing. To keep using the old folder, start it with: ${bin} start --data-dir ./.bellpr`,
     alreadyRunning: ({ url }: { url: string }) =>
-      `${name} is already running at ${url}. Run \`${bin} open\` to get a sign-in link.`,
+      `${name} is already running at ${url}. Run \`${bin} open\` to get a sign-in link; add --data-dir <dir> if that ${name} was started with another data directory.`,
     portInUse: ({ port }: { port: number }) =>
       `Port ${port} is already in use by another program. Start ${name} on a free port with \`${bin} start --port <port>\`.`,
     dataDirInUse: ({ dataDir, pid }: { dataDir: string; pid: number }) =>
@@ -99,7 +99,8 @@ export default {
   },
   /** `bell-pr open`. */
   open: {
-    notRunning: `${name} is not running. Start it with \`${bin}\`.`,
+    notRunning: ({ dataDir }: { dataDir: string }) =>
+      `No ${name} is running with the data directory ${dataDir}. Start it with \`${bin}\`, or, for a ${name} started with another data directory, run \`${bin} open --data-dir <dir>\`.`,
     noAnswer:
       `${name} did not answer within 5 seconds. Check that it is still running, or restart it and use the sign-in link it prints.`,
     unavailable:

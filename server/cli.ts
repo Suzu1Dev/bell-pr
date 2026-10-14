@@ -223,7 +223,7 @@ async function open(args: string[], ctx: Context): Promise<number> {
     !lockHolderRunning(dataDir, lock) ||
     !(await probeHealth(lock.host ?? "127.0.0.1", lock.port))
   ) {
-    ctx.stderr.write(`${m.notRunning}\n`);
+    ctx.stderr.write(`${m.notRunning({ dataDir })}\n`);
     return 1;
   }
   const { openLink } = dataPaths(dataDir);
