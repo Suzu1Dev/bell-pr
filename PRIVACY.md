@@ -147,7 +147,7 @@ account only. <!-- claim:PRIV-33 -->
 | `author-emails.json` | SHA-256 fingerprints of the commit e-mail addresses you confirmed when publishing, so the app asks only once per address. |
 | `children.json` | Process IDs of the agent tools that are running, so that BELL PR can stop leftovers after a crash. |
 | `logs/` | Daily log files, at most 7 files and 50 MB in total. Secret-shaped text is masked, and BELL PR does not write prompts or page contents to them. |
-| `bellpr.lock` and `run/` | The running instance's process ID, port and version, and the one-time sign-in link for `bell-pr open`, which that command deletes as soon as it has read it. |
+| `bellpr.lock` and `run/` | The running instance's process ID, address, port, version and start time, and the one-time sign-in link for `bell-pr open`, which that command deletes as soon as it has read it. |
 
 <!-- claim:PRIV-34 -->
 

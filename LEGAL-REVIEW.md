@@ -345,7 +345,7 @@ Commands run on the tree of this review, test files excluded:
 | SEC-08 | 90-day disclosure window | Owner decision: support policy |
 | SEC-09 | No legal action against good-faith research | Owner decision: counsel review (G4) |
 | SEC-10 | Listens on 127.0.0.1 by default | `server/config.ts:72` |
-| SEC-11 | Another address needs `--host`/`BELLPR_HOST` and, except for all interfaces, `BELLPR_PUBLIC_URL`; non-local origins need HTTPS | `server/config.ts:242`, `server/config.ts:258`, `server/config.ts:203`, `server/http-guard.ts:38` |
+| SEC-11 | Another address needs `--host`/`BELLPR_HOST` and, unless it is loopback or all interfaces, `BELLPR_PUBLIC_URL`; non-local origins need HTTPS | `server/config.ts:242`, `server/config.ts:258`, `server/config.ts:203`, `server/http-guard.ts:38` |
 | SEC-12 | Only its own hosts and allowed origins, no cross-site requests, JSON for changes, a strict CSP | `server/http-guard.ts:221`, `server/http-guard.ts:232`, `server/http-guard.ts:247`, `server/http-guard.ts:216` |
 | SEC-13 | Listening on all interfaces exposes the sign-in page; publish on 127.0.0.1 | `Dockerfile:80`, `server/config.ts:258`, `server/http-guard.ts:237` |
 | SEC-14 | A random 32-byte token in memory, never in a file, environment or BELL PR's command line; a restart signs out | `server/index.ts:524`, `server/index.ts:527` |

@@ -95,7 +95,7 @@
             <h3 id="the-local-server">The local server</h3>
             <ul>
               <li>BELL PR listens on the loopback interface (127.0.0.1) by default.</li>
-              <li>To listen on another address you set <code>--host</code> or <code>BELLPR_HOST</code>, and unless that address covers every interface you also set <code>BELLPR_PUBLIC_URL</code>. A public URL or allowed origin other than this computer must use HTTPS, through a reverse proxy that you secure yourself.</li>
+              <li>To listen on another address you set <code>--host</code> or <code>BELLPR_HOST</code>. Unless that address is another loopback address or covers every interface, you also set <code>BELLPR_PUBLIC_URL</code>. A public URL or allowed origin other than this computer must use HTTPS, through a reverse proxy that you secure yourself.</li>
               <li>The server answers only requests for its own host names and allowed origins, refuses cross-site requests, accepts changes only as JSON, and sends a strict content security policy with every page.</li>
               <li>Listening on every interface (<code>0.0.0.0</code>, as the Docker image does inside its container) lets anyone who can reach the port reach the sign-in page. Publish such a port on 127.0.0.1 only.</li>
             </ul>

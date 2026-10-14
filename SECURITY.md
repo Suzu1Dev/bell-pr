@@ -65,9 +65,9 @@ repositories. These are the safeguards it relies on, and their limits.
 ### The local server
 
 - BELL PR listens on the loopback interface (127.0.0.1) by default. <!-- claim:SEC-10 -->
-- To listen on another address you set `--host` or `BELLPR_HOST`, and
-  unless that address covers every interface you also set
-  `BELLPR_PUBLIC_URL`. A public URL or
+- To listen on another address you set `--host` or `BELLPR_HOST`. Unless
+  that address is another loopback address or covers every interface, you
+  also set `BELLPR_PUBLIC_URL`. A public URL or
   allowed origin other than this computer must use HTTPS, through a reverse
   proxy that you secure yourself. <!-- claim:SEC-11 -->
 - The server answers only requests for its own host names and allowed

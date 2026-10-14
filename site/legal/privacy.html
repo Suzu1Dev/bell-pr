@@ -123,7 +123,7 @@
                 <tr><th scope="row"><code>author-emails.json</code></th><td data-label="What it holds">SHA-256 fingerprints of the commit e-mail addresses you confirmed when publishing, so the app asks only once per address.</td></tr>
                 <tr><th scope="row"><code>children.json</code></th><td data-label="What it holds">Process IDs of the agent tools that are running, so that BELL PR can stop leftovers after a crash.</td></tr>
                 <tr><th scope="row"><code>logs/</code></th><td data-label="What it holds">Daily log files, at most 7 files and 50 MB in total. Secret-shaped text is masked, and BELL PR does not write prompts or page contents to them.</td></tr>
-                <tr><th scope="row"><code>bellpr.lock</code> and <code>run/</code></th><td data-label="What it holds">The running instance&#39;s process ID, port and version, and the one-time sign-in link for <code>bell-pr open</code>, which that command deletes as soon as it has read it.</td></tr>
+                <tr><th scope="row"><code>bellpr.lock</code> and <code>run/</code></th><td data-label="What it holds">The running instance&#39;s process ID, address, port, version and start time, and the one-time sign-in link for <code>bell-pr open</code>, which that command deletes as soon as it has read it.</td></tr>
               </tbody>
             </table>
             </div>
