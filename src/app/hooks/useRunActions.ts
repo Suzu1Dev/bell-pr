@@ -26,6 +26,23 @@ function savedMessages(run: Run): Record<string, ChatMessage[]> {
   );
 }
 
+/**
+ * What stopping a run reports, from the run as it was when the person pressed
+ * stop and the run the server returned.
+ */
+export function stopNotice(before: Run, updated: Run, reviewRerunning: boolean) {
+  const round = activeFollowUp(before.followUps);
+  if (round?.status === "running" && !reviewRerunning)
+    return activeFollowUp(updated.followUps)
+      ? "這輪修正已停止；工作目錄保留了部分修改，請審閱、寫好提交訊息後推送，或放棄這輪修正。"
+      : "這輪修正已停止，沒有修改任何檔案；PR 維持原狀。";
+  if (["review", "approved"].includes(updated.status))
+    return "已停止重新審查；原有報告與審閱狀態保留。";
+  return updated.team?.tasks.length
+    ? "任務已停止；本次工作的目錄與失敗任務的隔離目錄保留，可重試失敗的子任務。"
+    : "任務已停止，工作目錄已保留。";
+}
+
 /** The demo run with the review progress and draft this browser kept. */
 export function loadDemo(): Run {
   try {
@@ -577,7 +594,6 @@ export function useRunActions({
     }
   }
   async function cancel() {
-    const stoppingRound = followUp?.status === "running" && !reviewRerunning;
     try {
       const { run: updated } = await api<{ run: Run }>(
         `/runs/${run.id}/cancel`,
@@ -593,17 +609,7 @@ export function useRunActions({
           setSelectedPath(result.files[0]?.path || "");
         }
       }
-      notify(
-        stoppingRound
-          ? activeFollowUp(updated.followUps)
-            ? "這輪修正已停止；工作目錄保留了部分修改，請審閱、寫好提交訊息後推送，或放棄這輪修正。"
-            : "這輪修正已停止，沒有修改任何檔案；PR 維持原狀。"
-          : ["review", "approved"].includes(updated.status)
-          ? "已停止重新審查；原有報告與審閱狀態保留。"
-          : updated.team?.tasks.length
-            ? "任務已停止；本次工作的目錄與失敗任務的隔離目錄保留，可重試失敗的子任務。"
-            : "任務已停止，工作目錄已保留。",
-      );
+      notify(stopNotice(run, updated, reviewRerunning));
     } catch (error) {
       notify((error as Error).message, "error");
     }
