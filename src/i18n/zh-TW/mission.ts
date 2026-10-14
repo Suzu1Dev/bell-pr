@@ -258,6 +258,7 @@ const m: Translation<typeof en> = {
       defaultModelHelp: ({ provider }) => `沿用本機 ${provider} 的預設模型。`,
       effort: "思考強度",
       proOption: ({ label }) => `${label} · Pro`,
+      defaultEffortNote: "「模型預設」會使用模型本身的預設強度。",
       modelDefault: ({ effort }) => `模型預設${effort ? ` · ${effort}` : ""}`,
       unknownEffort: "已儲存的強度未在此模型的清單中，請重新選擇。",
       effortHelp: `只列出所選模型支援的強度；較高的強度每回合需要更久、用量也較多，${product.name} 會為 Claude Code 以及 xhigh、max 強度延長等待時間。`,
@@ -269,7 +270,8 @@ const m: Translation<typeof en> = {
       reload: "重新載入",
     },
     ponytail: {
-      label: "Ponytail 開發方式",
+      label: "效率模式",
+      credit: "效率模式以 DietrichGebert 的 Ponytail（MIT）為基礎。",
       modes: {
         lite: "輕量 · 預設",
         full: "完整",

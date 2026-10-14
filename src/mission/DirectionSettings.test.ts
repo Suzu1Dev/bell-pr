@@ -205,6 +205,8 @@ test("on Free the larger teams, the deep efforts and web access are locked with 
   assert.match(html, /Let Agents search the web and read pages<span class="pro-badge"/);
   // Two team sizes and web access; the efforts say "· Pro" instead.
   assert.equal(proChips(html), 3);
+  assert.match(html, /aria-describedby="([^"]*)-reasoning-default \1-reasoning-help"/);
+  assert.match(html, /<p id="[^"]*-reasoning-default" class="mission-field-note">Default uses the model&#x27;s own default effort\.<\/p>/);
   // A choice saved under Pro can still be turned off.
   assert.doesNotMatch(webAccess(gated({ maxTeammates: 2, webAccess: true }, { entitlements: freeEntitlements })), /disabled/);
 });
@@ -395,4 +397,15 @@ test("each provider says whether it is ready, and a selected provider that is no
     renderZh(props({ provider: "codex" }, { doctor: environment, demo: false })),
     /<option value="claude">Claude Code（已就緒）<\/option>/,
   );
+});
+
+test("the efficiency setting is named Efficiency mode, with the Ponytail credit as its tooltip", () => {
+  const html = renderEn(props());
+  assert.match(
+    html,
+    /<label for="[^"]*-ponytail" title="Efficiency mode is based on Ponytail by DietrichGebert \(MIT\)\.">Efficiency mode<\/label>/,
+  );
+  assert.doesNotMatch(html, /development mode/);
+  assert.match(renderZh(props()), />效率模式<\/label>/);
+  assert.match(renderZh(props()), /「模型預設」會使用模型本身的預設強度。/);
 });

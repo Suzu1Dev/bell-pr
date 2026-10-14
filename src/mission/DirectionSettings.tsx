@@ -431,7 +431,7 @@ export function DirectionSettings({
                 loadingModels ||
                 (!availableEfforts.length && !value.reasoningEffort)
               }
-              aria-describedby={`${id}-reasoning-help`}
+              aria-describedby={`${id}-reasoning-default ${id}-reasoning-help`}
               onChange={(event) =>
                 update(
                   "reasoningEffort",
@@ -467,6 +467,9 @@ export function DirectionSettings({
                 );
               })}
             </select>
+            <p id={`${id}-reasoning-default`} className="mission-field-note">
+              {t.model.defaultEffortNote}
+            </p>
             <p id={`${id}-reasoning-help`} className="mission-field-note">
               {unknownEffort && !loadingModels
                 ? t.model.unknownEffort
@@ -511,7 +514,9 @@ export function DirectionSettings({
       {!modelsOnly && (
         <>
           <div className="mission-form-field mission-ponytail-setting">
-            <label htmlFor={`${id}-ponytail`}>{t.ponytail.label}</label>
+            <label htmlFor={`${id}-ponytail`} title={t.ponytail.credit}>
+              {t.ponytail.label}
+            </label>
             <select
               id={`${id}-ponytail`}
               value={value.ponytailMode ?? defaultPonytailMode}

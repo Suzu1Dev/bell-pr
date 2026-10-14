@@ -360,6 +360,7 @@ const mission = {
       effort: "Reasoning effort",
       /** An effort that needs Pro; `label` is the effort's own label. */
       proOption: ({ label }: { label: string }) => `${label} · Pro`,
+      defaultEffortNote: "Default uses the model's own default effort.",
       /** `effort` is the model's default effort, already labelled. */
       modelDefault: ({ effort }: { effort?: string }) =>
         `Model default${effort ? ` · ${effort}` : ""}`,
@@ -377,7 +378,8 @@ const mission = {
       reload: "Reload",
     },
     ponytail: {
-      label: "Ponytail development mode",
+      label: "Efficiency mode",
+      credit: "Efficiency mode is based on Ponytail by DietrichGebert (MIT).",
       modes: {
         lite: "Lite · default",
         full: "Full",
