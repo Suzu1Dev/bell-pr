@@ -27,6 +27,7 @@ import {
 } from "./discovery.js";
 import { Store } from "./store.js";
 import { withLocale } from "./i18n/index.js";
+import { respondIn } from "./prompt-language.js";
 import { assertNoHan } from "../src/test-utils/render.js";
 
 const candidate: DiscoveryCandidate = {
@@ -306,6 +307,26 @@ async function finished(service: DiscoveryService) {
   }
   throw new Error("Discovery did not finish");
 }
+
+test("the discovery prompt asks for the locale's language", () => {
+  const english = withLocale("en", () =>
+    discoveryPrompt([candidate], defaultDiscoveryPreferences),
+  );
+  assert.ok(
+    english.includes(
+      `return JSON matching the provided schema. ${respondIn("en")}`,
+    ),
+  );
+  assert.doesNotMatch(english, /Traditional Chinese/);
+  const chinese = withLocale("zh-TW", () =>
+    discoveryPrompt([candidate], defaultDiscoveryPreferences),
+  );
+  assert.ok(chinese.includes(respondIn("zh-TW")));
+  assert.equal(
+    english.replace(respondIn("en"), ""),
+    chinese.replace(respondIn("zh-TW"), ""),
+  );
+});
 
 test("in English, the actual popularity and the skipped opportunities are reported without Han", () => {
   const english = { ...opportunity, title: "Clarify the keyboard instructions" };

@@ -39,6 +39,7 @@ import { createApp } from "./index.js";
 import { git } from "./process.js";
 import { assertNoHan } from "../src/test-utils/render.js";
 import { withLocale } from "./i18n/index.js";
+import { respondIn } from "./prompt-language.js";
 
 const context: DraftContext = {
   sources: [],
@@ -1029,6 +1030,40 @@ test("in English, draft rejections and the provisional-policy note carry no Han"
     /^Looking up the project's sources was limited or incomplete, so the Linux contribution writing principles are used for now\./,
   );
   assertNoHan(provisional.summary.split("\n")[0]);
+});
+
+test("draft prompt writes the person's fields in the locale's language and keeps the PR text English", () => {
+  const prompt = () =>
+    draftPrompt(
+      { title: "Update", prompt: "Update value", reports: {}, branch: "bellpr-abc12345" },
+      [diff],
+      context,
+    );
+  const english = withLocale("en", prompt);
+  const chinese = withLocale("zh-TW", prompt);
+  assert.ok(
+    english.includes(
+      `for those fields: ${respondIn("en")}`,
+    ),
+  );
+  assert.doesNotMatch(english, /Traditional Chinese/);
+  assert.ok(chinese.includes(`for those fields: ${respondIn("zh-TW")}`));
+  assert.match(chinese, /Traditional Chinese/);
+  for (const text of [english, chinese]) {
+    // The PR title and body follow the project, not the UI language.
+    assert.match(
+      text,
+      /Use English for PR title\/body unless explicit project instructions require another language\./,
+    );
+    assert.match(text, /summary, the rules text, checklist and the commit message rationale are read by the person/);
+    assert.match(text, /Do not mention AI assistance/);
+    assert.match(text, /requires disclosing AI assistance, add a checklist item/);
+  }
+  // Only the language directive differs.
+  assert.equal(
+    english.replace(respondIn("en"), ""),
+    chinese.replace(respondIn("zh-TW"), ""),
+  );
 });
 
 test("draft prompt routes the person's to-dos to the checklist and passes the branch and word budget", () => {

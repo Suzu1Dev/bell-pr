@@ -23,6 +23,7 @@ import { Store } from "./store.js";
 import { Workbench } from "./workbench.js";
 import { git } from "./process.js";
 import { withLocale } from "./i18n/index.js";
+import { respondIn } from "./prompt-language.js";
 
 const diff = (name: string, patch = "+example"): DiffFile => ({
   path: name,
@@ -141,6 +142,34 @@ test("explanations retain bounded complete diffs, exclude blocked content, and r
       ),
     /完整對應/,
   );
+});
+
+test("explanation and mentor prompts ask for the locale's language and length units", () => {
+  const files = [diff("a.ts")];
+  const run = { reports: {} } as unknown as Run;
+  const guide = () =>
+    guidePrompt({
+      contributionContext: "Task: Improve a",
+      run,
+      file: files[0],
+      messages: [],
+      question: "Why?",
+    });
+  const english = withLocale("en", () => explanationPrompt(files, context));
+  assert.ok(english.includes(respondIn("en")));
+  assert.match(english, /a short concept title \(at most 8 words\)/);
+  assert.doesNotMatch(english, /Chinese/);
+  const englishGuide = withLocale("en", guide);
+  assert.ok(englishGuide.includes(`You are a patient programming mentor. ${respondIn("en")} Answer with concrete examples`));
+  assert.match(englishGuide, /1–3 searchable keywords\. Cite the diff/);
+  assert.doesNotMatch(englishGuide, /Chinese|English terms in parentheses/);
+  const chinese = withLocale("zh-TW", () => explanationPrompt(files, context));
+  assert.ok(chinese.includes(respondIn("zh-TW")));
+  assert.match(chinese, /Traditional Chinese/);
+  assert.match(chinese, /a short concept title \(at most 25 Chinese characters\)/);
+  const chineseGuide = withLocale("zh-TW", guide);
+  assert.ok(chineseGuide.includes(respondIn("zh-TW")));
+  assert.match(chineseGuide, /1–3 searchable keywords \(English terms in parentheses\)\. Cite/);
 });
 
 test("in English, oversized diffs and malformed explanations are reported in English", () => {

@@ -42,7 +42,8 @@ import {
   hasExtendedAgentTimeout,
   withAgentTimeoutHint,
 } from "./agent-timeouts.js";
-import { sm } from "./i18n/index.js";
+import { currentLocale, sm } from "./i18n/index.js";
+import { respondIn } from "./prompt-language.js";
 import { AppError, type Repository } from "./types.js";
 import { lenientRead } from "./persisted-schema.js";
 import {
@@ -1101,7 +1102,7 @@ export class ProjectInsightsService {
       const mode = settings.ponytailMode ?? defaultPonytailMode;
       const input = applyPonytail(
         [
-          "You are BELL PR's read-only project analyst. Return a single JSON object matching the provided output schema, in Traditional Chinese.",
+          `You are BELL PR's read-only project analyst. Return a single JSON object matching the provided output schema. ${respondIn(currentLocale())}`,
           more
             ? `Extend the existing contribution recommendations in this one response. Return exactly ${requestedCount} genuinely different, source-backed NEW recommendations. Consider all relevant contribution directions (${contributionDirections.join(", ")}) and materially different problems before selecting the strongest proposals. Do not repeat a previous title, problem or proposed change in different words, or split one idea to fill the batch. Return fewer only when the supplied evidence cannot support ${requestedCount} distinct useful new ideas; never invent facts to reach the target. An empty recommendations array is valid only when no additional useful idea is supported.`
             : "Explain the project's purpose, intended users, ordinary user journey and architecture before suggesting contributions. readingPath lists 3–8 supplied files in the order a newcomer should read them (fewer only when fewer files were supplied), each with why it comes at that point and what to look for in it. howItFitsTogether traces one main data flow in prose using the import and call relationships visible in the supplied excerpts; where the excerpts do not show a link, say so instead of guessing.",

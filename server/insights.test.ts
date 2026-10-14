@@ -24,6 +24,8 @@ import { fileTree, ProjectInsightsService } from "./insights.js";
 import { command, git } from "./process.js";
 import { AppError } from "./types.js";
 import { Store } from "./store.js";
+import { withLocale } from "./i18n/index.js";
+import { respondIn } from "./prompt-language.js";
 
 /** The JSON data object sent after the prompt sentences and before the Ponytail guidance. */
 function payload(input: string) {
@@ -326,6 +328,38 @@ test("analysis uses bounded read-only structured Codex context and excludes secr
         file.startsWith("analysis-"),
       ),
       [],
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("the analysis prompt asks for the request's language", async () => {
+  const f = await fixture();
+  try {
+    const stub = fakeCodex();
+    const service = new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: stub.execute,
+    });
+    const prompts = () =>
+      stub.calls
+        .filter((call) => call.args[0] === "exec")
+        .map((call) => call.options!.input!);
+    await withLocale("en", () => service.generate(f.repo.id));
+    const [english] = prompts();
+    assert.ok(
+      english.startsWith(
+        `You are BELL PR's read-only project analyst. Return a single JSON object matching the provided output schema. ${respondIn("en")}`,
+      ),
+    );
+    assert.doesNotMatch(english, /Traditional Chinese/);
+    await withLocale("zh-TW", () => service.generate(f.repo.id));
+    const chinese = prompts()[1];
+    assert.ok(chinese.includes(respondIn("zh-TW")));
+    assert.equal(
+      english.replace(respondIn("en"), ""),
+      chinese.replace(respondIn("zh-TW"), ""),
     );
   } finally {
     await f.cleanup();
