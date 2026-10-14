@@ -30,6 +30,32 @@ const m: Translation<typeof en> = {
     resolving: "Agent 正在解衝突…",
     resolve: "請 Agent 解決衝突",
   },
+  followUps: {
+    title: "依 review 修正的紀錄",
+    intro:
+      "每一輪經你審閱、核准後，會成為 PR 分支上的一個新 commit；PR 標題與說明維持原樣，回覆 reviewer 仍由你在 GitHub 上處理。",
+    status: {
+      running: "修正中",
+      review: "等待審閱與推送",
+      published: "已推送",
+      failed: "沒有完成",
+      cancelled: "已停止",
+      discarded: "已放棄",
+    },
+    round: ({ number }) => `第 ${number} 輪`,
+    adopted: "接續 GitHub 上的提交",
+    syncRound: "同步目標分支",
+    yourNote: "你的補充說明",
+    feedback: "回饋",
+    note: ({ note }) => `補充說明：${note}`,
+    conflicts: "合併衝突",
+    addressed: "已處理",
+    notAddressed: "沒有修改，需要你判斷",
+    checks: "實際執行的指令",
+    pushed: ({ commit, date }) => `${commit} 已推送 ${date}`,
+    notPushed: ({ commit }) => `${commit} 已建立，尚未確認推送`,
+    discard: "放棄這輪修改",
+  },
 };
 
 export default m;

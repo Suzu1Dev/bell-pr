@@ -1,8 +1,11 @@
 /**
- * The PR draft tab's panels (English): syncing with the target branch.
- * Messages whose parameters are elements (a `<code>` branch name, a link)
- * are rendered with `rich()` from src/draft/rich.tsx.
+ * The PR draft tab's panels (English): syncing with the target branch and
+ * the rounds of changes made after maintainer review. Messages whose
+ * parameters are elements (a `<code>` branch name, a link) are rendered with
+ * `rich()` from src/draft/rich.tsx.
  */
+import type { FollowUpRound } from "../../../shared/followups";
+
 const draft = {
   /** SyncPanel: where the contribution stands against its target branch. */
   sync: {
@@ -35,6 +38,39 @@ const draft = {
       "All conflict markers are removed; changed files still need a file-by-file review.",
     resolving: "The agent is resolving the conflicts…",
     resolve: "Ask the agent to resolve the conflicts",
+  },
+  /** FollowUpRounds: the rounds of changes after maintainer review. */
+  followUps: {
+    title: "Changes made after review",
+    intro:
+      "Each round you review and approve becomes a new commit on the PR branch. The PR title and description stay as they are, and you still reply to reviewers on GitHub yourself.",
+    status: {
+      running: "Making changes",
+      review: "Waiting for review and push",
+      published: "Pushed",
+      failed: "Not completed",
+      cancelled: "Stopped",
+      discarded: "Discarded",
+    } satisfies Record<FollowUpRound["status"], string>,
+    round: ({ number }: { number: number }) => `Round ${number}`,
+    /** Follows the round number for commits made on GitHub that the app took over. */
+    adopted: "Picked up from GitHub",
+    /** Follows the round number for a round that merged the target branch. */
+    syncRound: "Target branch sync",
+    /** Names an item that came from the person's own note rather than a review. */
+    yourNote: "Your note",
+    /** Names a review item that is no longer in the latest feedback. */
+    feedback: "Feedback",
+    note: ({ note }: { note: string }) => `Your note: ${note}`,
+    conflicts: "Merge conflicts",
+    addressed: "Addressed",
+    notAddressed: "Not changed; needs your judgement",
+    checks: "Commands that actually ran",
+    pushed: ({ commit, date }: { commit: string; date: string }) =>
+      `${commit} pushed ${date}`,
+    notPushed: ({ commit }: { commit: string }) =>
+      `${commit} created; the push is not confirmed yet`,
+    discard: "Discard this round",
   },
 };
 
