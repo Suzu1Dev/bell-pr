@@ -99,7 +99,7 @@
   margin-top: var(--space-4);
 }
 .settings-card > .settings-field:first-child,
-.settings-card > form > .settings-field:first-child {
+.settings-card > form:first-child > .settings-field:first-child {
   margin-top: 0;
 }
 
