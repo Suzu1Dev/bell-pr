@@ -42,11 +42,16 @@ import {
   hasExtendedAgentTimeout,
   withAgentTimeoutHint,
 } from "./agent-timeouts.js";
-import { currentLocale, sm, withLocale } from "./i18n/index.js";
+import {
+  currentLocale,
+  sm,
+  withLocale,
+  type ServerMessages,
+} from "./i18n/index.js";
 import { respondIn } from "./prompt-language.js";
 import { AppError, type Repository } from "./types.js";
 import { lenientRead } from "./persisted-schema.js";
-import { locales } from "../shared/i18n/locale.js";
+import { locales, type Locale } from "../shared/i18n/locale.js";
 import {
   defaultPonytailMode,
   ponytailModes,
@@ -366,8 +371,14 @@ function classifyCitation(
   return tree.has(file) ? "known" : "unknown";
 }
 
-function citationReason(citation: Citation, file: string): string {
-  const m = sm().analysis.insights;
+/** The messages BELL saves with an analysis, in the analysis's locale. */
+type InsightsMessages = ServerMessages["analysis"]["insights"];
+
+function citationReason(
+  m: InsightsMessages,
+  citation: Citation,
+  file: string,
+): string {
   return citation === "known"
     ? m.citesUnsampledFile({ path: file })
     : m.citesUnsuppliedFile({ path: file });
@@ -380,18 +391,18 @@ function citationReason(citation: Citation, file: string): string {
  * claimed without storing the unverified proposal.
  */
 function unverifiedReason(
+  m: InsightsMessages,
   recommendation: z.infer<typeof recommendationSchema>,
   source: Map<string, string>,
   cite: (file: string) => Citation,
 ): string | null {
   for (const file of recommendation.evidence) {
     const citation = cite(file);
-    if (citation !== "sampled") return citationReason(citation, file);
+    if (citation !== "sampled") return citationReason(m, citation, file);
   }
   const details = recommendation.evidenceDetails ?? [];
   const excerpt = (quote: string) =>
     quote.length > 120 ? `${quote.slice(0, 120)}…` : quote;
-  const m = sm().analysis.insights;
   for (const detail of details) {
     if (!recommendation.evidence.includes(detail.path))
       return m.quotePathNotInEvidence({
@@ -414,7 +425,9 @@ function unverifiedReason(
  * reading step may cite a tracked file (marked `sampled: false`); evidence
  * notes and recommendation quotes still need sampled content. Entries that
  * fail are dropped and recorded, and the answer is rejected only when a
- * required section has nothing left.
+ * required section has nothing left. The recorded reasons are saved with the
+ * analysis, so they are written in its `locale`; a rejection answers the
+ * request in the request's locale.
  */
 function validateAnalysis<
   S extends typeof analysisSchema | typeof recommendationsSchema,
@@ -423,7 +436,9 @@ function validateAnalysis<
   sourceFiles: { path: string; content: string }[],
   tree: string[],
   schema: S,
+  locale: Locale,
 ): { value: z.infer<S>; verification: RecommendationVerification } {
+  const reasons = withLocale(locale, () => sm().analysis.insights);
   let value: z.infer<S>;
   try {
     value = schema.parse(JSON.parse(raw)) as z.infer<S>;
@@ -449,7 +464,7 @@ function validateAnalysis<
       droppedPaths.push({
         field,
         path: entry.path,
-        reason: citationReason(citation, entry.path),
+        reason: citationReason(reasons, citation, entry.path),
       });
       return false;
     });
@@ -488,7 +503,7 @@ function validateAnalysis<
   };
   if (droppedPaths.length) verification.droppedPaths = droppedPaths;
   value.recommendations = value.recommendations.filter((recommendation) => {
-    const reason = unverifiedReason(recommendation, source, cite);
+    const reason = unverifiedReason(reasons, recommendation, source, cite);
     if (reason)
       verification.droppedRecommendations.push({
         id: recommendation.id,
@@ -1011,18 +1026,12 @@ export class ProjectInsightsService {
   }
 
   /**
-   * Runs the analysis in the locale it is written in: the request's for a
-   * new analysis; for more recommendations, the saved analysis's own locale
-   * (the request's when the cache predates it), so one analysis keeps one
-   * language. The locale is not part of the fingerprint.
+   * Runs the analysis in the request's locale, held for its whole run: its
+   * errors answer the request in that locale, and a new analysis is written
+   * in it. The locale is not part of the fingerprint.
    */
   private async analyze(repoId: string, more: boolean) {
-    let locale = currentLocale();
-    if (more) {
-      await this.writes.get(repoId);
-      locale = (await this.read(repoId)).insights?.locale ?? locale;
-    }
-    return withLocale(locale, () => this.analyzeInLocale(repoId, more));
+    return withLocale(currentLocale(), () => this.analyzeInLocale(repoId, more));
   }
 
   private async analyzeInLocale(
@@ -1073,6 +1082,9 @@ export class ProjectInsightsService {
             }),
           409,
         );
+      // One analysis keeps one language: more recommendations are written in
+      // the saved analysis's locale, or the request's when the cache predates it.
+      const locale = (more && previous.insights?.locale) || currentLocale();
       const requestedCount = more
         ? Math.min(
             projectRecommendationBatchSize,
@@ -1123,7 +1135,7 @@ export class ProjectInsightsService {
       const mode = settings.ponytailMode ?? defaultPonytailMode;
       const input = applyPonytail(
         [
-          `You are BELL PR's read-only project analyst. Return a single JSON object matching the provided output schema. ${respondIn(currentLocale())}`,
+          `You are BELL PR's read-only project analyst. Return a single JSON object matching the provided output schema. ${respondIn(locale)}`,
           more
             ? `Extend the existing contribution recommendations in this one response. Return exactly ${requestedCount} genuinely different, source-backed NEW recommendations. Consider all relevant contribution directions (${contributionDirections.join(", ")}) and materially different problems before selecting the strongest proposals. Do not repeat a previous title, problem or proposed change in different words, or split one idea to fill the batch. Return fewer only when the supplied evidence cannot support ${requestedCount} distinct useful new ideas; never invent facts to reach the target. An empty recommendations array is valid only when no additional useful idea is supported.`
             : "Explain the project's purpose, intended users, ordinary user journey and architecture before suggesting contributions. readingPath lists 3–8 supplied files in the order a newcomer should read them (fewer only when fewer files were supplied), each with why it comes at that point and what to look for in it. howItFitsTogether traces one main data flow in prose using the import and call relationships visible in the supplied excerpts; where the excerpts do not show a link, say so instead of guessing.",
@@ -1251,8 +1263,8 @@ export class ProjectInsightsService {
       if (failed || !answer || Buffer.byteLength(answer) > 120_000)
         throw new AppError((m) => m.analysis.insights.unfinished, 422);
       const { value: analysis, verification } = more
-        ? validateAnalysis(answer, context.files, safePaths, recommendationsSchema)
-        : validateAnalysis(answer, context.files, safePaths, analysisSchema);
+        ? validateAnalysis(answer, context.files, safePaths, recommendationsSchema, locale)
+        : validateAnalysis(answer, context.files, safePaths, analysisSchema, locale);
       if (
         (await this.version(repo, signal)).fingerprint !== version.fingerprint
       )
@@ -1290,7 +1302,7 @@ export class ProjectInsightsService {
           generatedAt,
           source: "ai",
           baseSha: version.baseSha,
-          locale: currentLocale(),
+          locale,
           // Recorded outside the strict analysis schema: the model never reports its own coverage.
           sample: {
             trackedFiles: context.trackedFileCount,

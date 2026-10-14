@@ -449,6 +449,54 @@ test("an analysis records its locale outside the fingerprint, and more recommend
   }
 });
 
+test("more recommendations answer the request in its locale and save their notes in the analysis's", async () => {
+  const f = await fixture();
+  const service = (answer: () => unknown) =>
+    new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: fakeCodex(answer).execute,
+    });
+  try {
+    await withLocale("en", () => service(validAnalysis).generate(f.repo.id));
+    const proposal = validAnalysis().recommendations[0];
+    const expanded = await withLocale("zh-TW", () =>
+      service(() => ({
+        recommendations: [
+          { ...proposal, id: "examples", title: "Add greeting examples", problem: "Examples may help." },
+          {
+            ...proposal,
+            id: "unquoted",
+            evidenceDetails: [
+              { path: "hello.ts", quote: "a quote that is not there", reason: "Guess" },
+            ],
+          },
+        ],
+      })).generateMore(f.repo.id, {}),
+    );
+    assert.equal(expanded.insights.locale, "en");
+    // Saved with the English analysis, so written in English.
+    assert.deepEqual(
+      expanded.insights.recommendationExpansion?.verification?.droppedRecommendations,
+      [
+        {
+          id: "unquoted",
+          title: proposal.title,
+          reason: 'The quote was not found in hello.ts: "a quote that is not there"',
+        },
+      ],
+    );
+    // A rejected answer is the zh-TW request's error, so it is worded in zh-TW.
+    await assert.rejects(
+      withLocale("zh-TW", () =>
+        service(() => ({ recommendations: [{ id: "BAD" }] })).generateMore(f.repo.id, {}),
+      ),
+      { message: "AI 分析格式不完整，請重新分析；原有結果已保留。" },
+    );
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test("an insights cache with a locale and a newer field still loads in a build that predates the locale", async () => {
   const f = await fixture();
   try {
