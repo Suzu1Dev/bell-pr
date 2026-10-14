@@ -724,14 +724,17 @@ export class Workbench {
 
   /** Moves a run onto the latest commit of its target branch (see sync-runs.ts). */
   async syncRun(id: string) {
+    cleanup.assertWorkspacePresent(this.run(id));
     return syncing.syncRun(this.context, id);
   }
 
   async undoSync(id: string) {
+    cleanup.assertWorkspacePresent(this.run(id));
     return syncing.undoSync(this.context, id);
   }
 
   async resolveConflicts(id: string) {
+    cleanup.assertWorkspacePresent(this.run(id));
     return syncing.resolveConflicts(this.context, id);
   }
 
@@ -740,6 +743,7 @@ export class Workbench {
     id: string,
     input: { feedbackUrls: string[]; note?: string },
   ) {
+    cleanup.assertWorkspacePresent(this.run(id));
     return followUps.startFollowUp(this.context, id, input);
   }
 

@@ -215,6 +215,12 @@ test("freeing a run's workspace removes its directories, Git records, branch and
     "Files for this run were cleaned up to free disk space. Reports and notes are kept.",
   );
   assert.equal((await f.call("GET", `/api/runs/${value.id}`)).status, 200);
+  // Work in the checkout answers the same instead of a Git error.
+  for (const action of ["sync", "sync/undo", "sync/resolve"]) {
+    const refused = await f.call("POST", `/api/runs/${value.id}/${action}`, {});
+    assert.equal(refused.status, 410, action);
+    assert.equal(refused.body.code, "workspace_removed", action);
+  }
   // Freeing it again changes nothing.
   const again = await f.call("DELETE", `/api/runs/${value.id}/workspace`, {});
   assert.equal(again.status, 200);
