@@ -58,6 +58,24 @@ const stepIcons = {
   start: CirclePlay,
 } satisfies Record<WelcomeStep, unknown>;
 
+/**
+ * What to save so the model settings use `provider`, or undefined when
+ * they already do with choices of their own (a model, an effort or web
+ * access, which only saved settings have). Another provider starts with
+ * its own defaults, since models and efforts belong to one provider.
+ */
+export function providerUpdate(
+  settings: ModelSettings,
+  provider: AgentProvider,
+): ModelSettings | undefined {
+  const same = (settings.provider ?? "codex") === provider;
+  const chosen =
+    !!settings.model ||
+    !!settings.reasoningEffort ||
+    settings.webAccess !== undefined;
+  return same && chosen ? undefined : { provider };
+}
+
 /** The providers that are installed and signed in, from the report. */
 export function readyProviders(report: DoctorReport | null): AgentProvider[] {
   if (!report) return [];
@@ -329,7 +347,7 @@ function ProviderStep({
   const [error, setError] = useState("");
   const onlyOne = ready.length === 1 ? ready[0] : undefined;
 
-  /** Saves the provider unless the model settings already use it. */
+  /** Saves the provider in the model settings (see providerUpdate). */
   const choose = useCallback(
     async (provider: AgentProvider) => {
       setChosen(provider);
@@ -339,9 +357,8 @@ function ProviderStep({
         const { settings } = await api<{ settings: ModelSettings }>(
           "/model-settings",
         );
-        if ((settings.provider ?? "codex") !== provider)
-          // Models and efforts belong to one provider, so they start over.
-          await api("/model-settings", send("PUT", { provider }));
+        const update = providerUpdate(settings, provider);
+        if (update) await api("/model-settings", send("PUT", update));
         setState("saved");
       } catch (cause) {
         setState("idle");

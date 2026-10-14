@@ -8,6 +8,7 @@ import type { DoctorState } from "../setup/useDoctor";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import {
   needsEulaAcceptance,
+  providerUpdate,
   readyProviders,
   Welcome,
   welcomeSteps,
@@ -157,4 +158,20 @@ test("the last step offers the tour, an import and discovery, which waits for th
   const github = renderEn(welcome("start", { doctor: doctor(both) }));
   assert.equal(github.match(/<button type="button" class="welcome-choice">/g)?.length, 3);
   assert.doesNotMatch(github, /welcome-choice-reason/);
+});
+
+test("the provider is saved without losing a model chosen for it", () => {
+  // Nothing saved yet (the doctor's default shows): save the choice.
+  assert.deepEqual(providerUpdate({ provider: "claude", model: "", reasoningEffort: "" }, "claude"), {
+    provider: "claude",
+  });
+  assert.deepEqual(providerUpdate({ model: "", reasoningEffort: "" }, "codex"), { provider: "codex" });
+  // Saved choices for the same provider stay as they are.
+  assert.equal(providerUpdate({ provider: "claude", model: "opus", reasoningEffort: "" }, "claude"), undefined);
+  assert.equal(providerUpdate({ model: "", reasoningEffort: "high" }, "codex"), undefined);
+  // Another provider starts with its own defaults.
+  assert.deepEqual(
+    providerUpdate({ provider: "codex", model: "gpt-x", reasoningEffort: "high", webAccess: true }, "claude"),
+    { provider: "claude" },
+  );
 });
