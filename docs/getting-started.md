@@ -50,7 +50,7 @@ bell-pr
 ```
 
 BELL PR starts on your computer, prints your plan and a sign-in link, and
-opens the link in your browser:
+opens BELL PR in your browser, signed in with a one-time link:
 
 ```text
 Plan: Free. Start the 14-day Pro trial in Settings or with `bell-pr license trial`.
@@ -58,7 +58,8 @@ BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311/auth?t=…
 ```
 
 Keep the terminal open: BELL PR runs until you stop it with Ctrl+C. The
-link signs your browser in; treat it like a password.
+printed link signs a browser in until BELL PR restarts; treat it like a
+password.
 
 > **Lost the sign-in link?** Run `bell-pr open` (or `npx bell-pr open`) on
 > the same computer. It opens a new one-time link. More in
@@ -104,7 +105,10 @@ On **Repositories**, import a project in any of these forms:
 
 - `owner/repo`, for a project on GitHub;
 - a GitHub link, such as `https://github.com/owner/repo`;
-- the path of a Git folder on your computer.
+- the path of a Git folder on your computer, such as
+  `~/projects/repository` (`~/` is your home directory). On Windows, use
+  the path inside WSL2, where BELL PR runs; a Windows folder is under
+  `/mnt/c/`, for example `/mnt/c/projects/repository`.
 
 BELL PR makes its own full clone in its data directory. Your own folder is
 never changed: runs never add branches or worktrees to it. A clone that

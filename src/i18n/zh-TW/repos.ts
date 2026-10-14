@@ -39,7 +39,8 @@ const m: Translation<typeof en> = {
     subtitle: "貼上 GitHub 連結或 owner/repository，或本機 Git 專案的完整路徑。",
     source: "Repository 來源",
     placeholder: "owner/repository 或 https://github.com/owner/repository",
-    localPathHint: ({ example }) => `也支援本機 Git 專案：貼上完整路徑，例如 ${example}`,
+    localPathHint: ({ example }) => `也支援本機 Git 專案：貼上路徑，例如 ${example}`,
+    wslPathHint: `在 Windows 上，${product.name} 在 WSL2 中執行：請使用 Linux 發行版中的路徑。Windows 的資料夾位於 /mnt/c/ 底下，例如 /mnt/c/projects/repository。`,
     callout:
       "GitHub 專案會下載至本機；後續開發使用獨立 worktree，保留原專案狀態。",
     later: "稍後再說",

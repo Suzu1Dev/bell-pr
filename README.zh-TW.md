@@ -22,7 +22,7 @@ BELL PR 是自架、以本機為主的開源貢獻工作台。它在你的電腦
    npx bell-pr
    ```
 
-2. 它會印出登入連結，並在瀏覽器中開啟：
+2. 它會印出登入連結，並在瀏覽器中開啟已登入的 BELL PR：
 
    ```text
    BELL PR 1.0.0-rc.1 → http://127.0.0.1:4311/auth?t=…
@@ -128,7 +128,7 @@ BELL PR 會閱讀專案的貢獻指南、PR 範本、Agent 指南與檢查 PR �
 | Provider、模型選擇、效率模式 | 免費 | Codex CLI 與 Claude Code、所有模型、所有效率模式 |
 | 範例專案／示範（以範例資料展示 Pro 功能） | 免費 | 僅在瀏覽器中使用範例資料 |
 | 14 天 Pro 試用 | 免費 | 每個資料目錄一次，只在你選擇時開始（在 App 中或使用 bell-pr license trial） |
-| Pro 授權期限與更新 | Pro | 授權給指定使用者；購買後 12 個月內發布的版本可永久使用 |
+| Pro 授權期限與更新 | Pro | 授權給指定使用者；永久授權，自金鑰核發日起享有 12 個月的更新 |
 
 <!-- /generated:plan-table -->
 
@@ -222,7 +222,7 @@ Pro 以授權金鑰解鎖，BELL PR 會在本機離線檢查金鑰。啟用方�
 - **在命令列：** `bell-pr license activate <key>`，或 `bell-pr license activate -` 從標準輸入讀取。`bell-pr license status` 顯示方案；`deactivate` 移除金鑰；`trial` 開始 14 天試用。
 - **使用環境變數：** `BELLPR_LICENSE_KEY=<key>`；優先於已儲存的金鑰。
 
-金鑰涵蓋在更新期限內（預設為購買後 12 個月）發佈的版本，並可永久用於這些版本。這個候選版本中還沒有任何授權金鑰能解鎖 Pro；試用可以使用。請見[授權說明](docs/licensing.md)（英文）。
+金鑰涵蓋在更新期限內（預設為自金鑰核發日起 12 個月）發佈的版本，並可永久用於這些版本。這個候選版本中還沒有任何授權金鑰能解鎖 Pro；試用可以使用。請見[授權說明](docs/licensing.md)（英文）。
 
 ## 文件
 

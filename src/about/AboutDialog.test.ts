@@ -51,6 +51,7 @@ test("About links the local legal documents and the third-party licenses", () =>
     ["/legal/EULA.txt", "End User License Agreement"],
     ["/legal/PRIVACY.txt", "Privacy policy"],
     ["/legal/TERMS.txt", "Terms of sale and responsible use"],
+    ["/legal/REFUND.txt", "Refund and delivery policy"],
     ["/legal/SECURITY.txt", "Security policy"],
     ["/THIRD_PARTY_NOTICES.txt", "Third-party licenses"],
   ])
@@ -58,6 +59,12 @@ test("About links the local legal documents and the third-party licenses", () =>
       html.includes(`<a href="${href}" target="_blank" rel="noreferrer">${name}`),
       href,
     );
+  // The refund policy that the EULA and the terms refer to, in zh-TW too.
+  assert.ok(
+    renderZh(element()).includes(
+      '<a href="/legal/REFUND.txt" target="_blank" rel="noreferrer">退款與交付政策',
+    ),
+  );
 });
 
 test("with every product URL and address empty, About offers no help link and no empty href", () => {

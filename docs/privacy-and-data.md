@@ -49,6 +49,28 @@ them. The run log records the queries and addresses, never the page
 contents. Project analysis and discovery never get web access. Leave it
 off for confidential code.
 
+### The AI CLIs' own usage data
+
+The Codex CLI and Claude Code may send their own usage data, such as
+telemetry and error reports, to their providers. BELL PR neither adds to it
+nor turns it off. It starts each agent with only the environment variables
+that CLI needs, plus these opt-outs when they are set in the environment
+BELL PR runs in:
+
+- `DO_NOT_TRACK`, passed to both CLIs;
+- for Claude Code, the variables it documents: `DISABLE_TELEMETRY`,
+  `DISABLE_ERROR_REPORTING`, `DISABLE_BUG_COMMAND`,
+  `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY`, and
+  `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, which turns off all of its
+  non-essential traffic.
+
+BELL PR starts each Codex agent with `codex exec --ignore-user-config`, which
+does not load `$CODEX_HOME/config.toml` (sign-in still uses `CODEX_HOME`). This
+keeps your personal Codex settings out of the agents' work, but it also
+means that a setting you made only in that file, such as
+`[analytics] enabled = false`, does not apply to the agents BELL PR runs:
+Codex's built-in defaults apply instead.
+
 ## What BELL PR stores
 
 Everything lives in one data directory: `~/.bellpr` by default, or the
@@ -72,10 +94,11 @@ with mode 0600.
 | `children.json`, `bellpr.lock`, `run/` | The agent processes that are running (so a crash leaves none behind), the running instance's process id and port, and a one-time sign-in link that is deleted as soon as `bell-pr open` reads it. |
 
 The session secret lives only in the memory of the running server and is
-never written to disk. A one-time sign-in link from `bell-pr open` does
-reach the disk briefly: the server writes it to a `0600` file under `run/`,
-the command deletes that file as soon as it has read it, and the link
-expires after two minutes.
+never written to disk. The browser BELL PR opens at start gets a one-time
+sign-in link, which goes straight to the browser. A one-time sign-in link
+from `bell-pr open` does reach the disk briefly: the server writes it to a
+`0600` file under `run/`, the command deletes that file as soon as it has
+read it, and the link expires after two minutes.
 
 Your browser keeps, for this local site only: the language you chose,
 layout preferences such as the code font size and the collapsed sidebar,

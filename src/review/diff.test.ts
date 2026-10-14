@@ -6,11 +6,12 @@ import {
   isCodeLine,
   languageBadge,
   languageBadges,
+  markdownCode,
   parseDiff,
   selectionQuestion,
   splitDiff,
 } from "./diff";
-import { getDemo } from "../demo";
+import { demoAnswer, getDemo } from "../demo";
 import en from "../i18n/en";
 import zhTW from "../i18n/zh-TW";
 import { assertNoHan } from "../test-utils/render";
@@ -67,7 +68,14 @@ test("non-text diffs do not create selectable code lines", () => {
   );
 });
 
-test("selection questions preserve old/new references and fit the chat API limit", () => {
+/** The fenced block of a question: its fence, info string and code lines. */
+function fencedBlock(question: string) {
+  const match = /\n(`{3,})diff\n([^]*)\n\1$/.exec(question);
+  assert.ok(match, question);
+  return { fence: match[1], lines: match[2].split("\n") };
+}
+
+test("selection questions send the lines as a diff block with old/new references, within the chat API limit", () => {
   const lines = parseDiff(
     `@@ -8,2 +12,2 @@\n context\n-old\n+${"a".repeat(9000)}\n`,
   ).filter((line) => line.kind !== "hunk");
@@ -76,11 +84,57 @@ test("selection questions preserve old/new references and fit the chat API limit
     lines,
     zhTW.review.selection,
   );
-  assert.ok(question.length <= 8000);
-  assert.match(question, /內容已節錄/);
-  assert.match(question, /原有 舊 L8／新 L12: context/);
-  assert.match(question, /刪除 舊 L9: old/);
-  assert.match(question, /新增 新 L13: a/);
+  assert.ok(question.length <= 8000, String(question.length));
+  // The request, the excerpt note, the file and line numbers, then the code.
+  assert.ok(
+    question.startsWith(
+      "請用白話解釋 `src/example.ts` 中選取的 3 行程式碼，說明它們的用途、變更原因與需要注意的地方。\n\n[內容已節錄]",
+    ),
+    question.slice(0, 200),
+  );
+  assert.ok(question.includes("\n\n`src/example.ts`，舊版第 8–9 行，新版第 12–13 行：\n\n```diff\n"));
+  // Cut inside the block, which still closes.
+  const block = fencedBlock(question);
+  assert.equal(block.fence, "```");
+  assert.deepEqual(block.lines.slice(0, 2), [" context", "-old"]);
+  assert.match(block.lines[2], /^\+a{1000,}$/);
+  assert.ok(block.lines[2].length < 9001);
+});
+
+test("a selection question keeps each line's indentation and prefix, and a fence the code cannot close", () => {
+  const lines = parseDiff(
+    "@@ -10,3 +10,4 @@\n   if (retry) {\n-\t\treturn delay;\n+\t\treturn delay * 2;\n+    // ```js\n }\r\n",
+  ).filter((line) => line.kind !== "hunk");
+  const question = selectionQuestion("src/utils/retry.ts", lines, en.review.selection);
+  assertNoHan(question);
+  assert.equal(
+    question,
+    [
+      "Explain the 5 selected lines of code in `src/utils/retry.ts` in plain language: what they do, why they changed and what to watch out for.",
+      "",
+      "`src/utils/retry.ts`, old lines 10–12, new lines 10–13:",
+      "",
+      "````diff",
+      "   if (retry) {",
+      "-\t\treturn delay;",
+      "+\t\treturn delay * 2;",
+      "+    // ```js",
+      " }",
+      "````",
+    ].join("\n"),
+  );
+  // Only added lines, or only removed lines, name one version; one line says "line".
+  const added = parseDiff("@@ -3,0 +4,2 @@\n+one\n+two\n").filter((line) => line.kind !== "hunk");
+  assert.match(selectionQuestion("a.ts", added, en.review.selection), /\n\n`a\.ts`, new lines 4–5:\n\n/);
+  const removed = parseDiff("@@ -7 +6,0 @@\n-gone\n").filter((line) => line.kind !== "hunk");
+  assert.match(selectionQuestion("a.ts", removed, en.review.selection), /\n\n`a\.ts`, old line 7:\n\n```diff\n-gone\n```$/);
+  assert.match(selectionQuestion("a.ts", removed, zhTW.review.selection), /`a\.ts`，舊版第 7 行：/);
+});
+
+test("a path is Markdown code, so underscores and backticks in it stay literal", () => {
+  assert.equal(markdownCode("pkg/__init__.py"), "`pkg/__init__.py`");
+  assert.equal(markdownCode("odd`name.ts"), "``odd`name.ts``");
+  assert.equal(markdownCode("`edge"), "`` `edge ``");
 });
 
 test("demo diff counts match their displayed patches and hunk line counts", () => {
@@ -131,19 +185,41 @@ test("selection questions are written in the UI language", () => {
   assert.ok(question.length <= 8000);
   assert.match(
     question,
-    /^Explain the 3 selected lines of code in src\/example\.ts in plain language/,
+    /^Explain the 3 selected lines of code in `src\/example\.ts` in plain language/,
   );
-  assert.match(question, /\[Excerpt\]/);
-  assert.match(question, /Unchanged, old L8 \/ new L12: context/);
-  assert.match(question, /Removed, old L9: old/);
-  assert.match(question, /Added, new L13: a/);
+  assert.match(question, /\n\n\[Excerpt\]/);
+  assert.match(question, /\n\n`src\/example\.ts`, old lines 8–9, new lines 12–13:\n\n```diff\n context\n-old\n\+a+\n```$/);
   const single = selectionQuestion(
     "src/example.ts",
     lines.slice(0, 1),
     en.review.selection,
   );
-  assert.match(single, /^Explain the selected line of code in src\/example\.ts/);
-  assert.doesNotMatch(single, /\[Excerpt\]/);
+  assert.equal(
+    single,
+    "Explain the selected line of code in `src/example.ts` in plain language: what it does, why it changed and what to watch out for.\n\n`src/example.ts`, old line 8, new line 12:\n\n```diff\n context\n```",
+  );
+});
+
+test("the sample's canned answers match a selection question as they matched its request and code", () => {
+  for (const locale of ["en", "zh-TW"] as const) {
+    const messages = (locale === "en" ? en : zhTW).review.selection;
+    for (const file of getDemo(locale).files) {
+      const code = parseDiff(file.patch).filter(isCodeLine);
+      for (let start = 0; start < code.length; start++) {
+        const lines = code.slice(start, start + 3);
+        // What the matching saw before: the request and the code's text.
+        const words = [
+          messages.question({ path: file.path, count: lines.length }),
+          ...lines.map((line) => line.text),
+        ].join("\n");
+        assert.equal(
+          demoAnswer(file, selectionQuestion(file.path, lines, messages), locale),
+          demoAnswer(file, words, locale),
+          `${locale} ${file.path} from line ${start}`,
+        );
+      }
+    }
+  }
 });
 
 test("hunks group the lines under each header, notes included, and only code lines are selectable", () => {

@@ -169,6 +169,67 @@ test("bell-pr open prints a fresh one-time link from the running server and dele
   });
 });
 
+test(
+  "bell-pr start opens a one-time link: the opener's command line never holds the session token",
+  {
+    skip:
+      process.platform === "win32" ||
+      existsSync("/.dockerenv") ||
+      existsSync("/run/.containerenv"),
+  },
+  async () => {
+    await withDataDir(async (dataDir, directory) => {
+      // Stand-ins for open (macOS) and xdg-open that record their arguments,
+      // as another user would read them in the process list. The file
+      // appears whole, through a rename, so the wait below never reads it
+      // half written.
+      const bin = path.join(directory, "bin");
+      const argvFile = path.join(directory, "opener-argv");
+      mkdirSync(bin);
+      for (const name of ["open", "xdg-open"])
+        writeFileSync(
+          path.join(bin, name),
+          `#!/bin/sh\nprintf '%s\\n' "$@" > '${argvFile}.tmp' && mv '${argvFile}.tmp' '${argvFile}'\n`,
+          { mode: 0o755 },
+        );
+      const previousPath = process.env.PATH;
+      process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
+      const port = await freePort();
+      let running: RunningServer | undefined;
+      let printed = "";
+      try {
+        const code = await withLocale("en", () =>
+          main(["start", "--port", String(port), "--data-dir", dataDir], {
+            env: { BELLPR_STATIC_DIR: path.join(directory, "ui") },
+            stdout: { write: (text: string) => (printed += text), isTTY: true },
+            startOptions: { handleExit: false },
+            onStarted: (server) => (running = server),
+          }),
+        );
+        assert.equal(code, undefined);
+        assert.ok(running);
+        const deadline = Date.now() + 5000;
+        while (!existsSync(argvFile) && Date.now() < deadline)
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        const argv = readFileSync(argvFile, "utf8").trimEnd().split("\n");
+        const sessionToken = new URL(running.signInUrl).searchParams.get("t")!;
+        assert.match(sessionToken, /^[A-Za-z0-9_-]{43}$/);
+        assert.equal(argv.length, 1, argv.join(" "));
+        assert.ok(!argv.join(" ").includes(sessionToken));
+        const opened = new URL(argv[0]);
+        assert.equal(opened.origin, running.url);
+        assert.equal(opened.pathname, "/auth");
+        assert.match(opened.searchParams.get("t")!, /^[A-Za-z0-9_-]{43}$/);
+        // The session link is only printed, on the person's own terminal.
+        assert.ok(printed.includes(`→ ${running.signInUrl}\n`), printed);
+      } finally {
+        process.env.PATH = previousPath;
+        await running?.shutdown();
+      }
+    });
+  },
+);
+
 test("bell-pr open reaches a server that listens on ::1 only", async (t) => {
   const probe = createServer();
   try {
@@ -390,6 +451,38 @@ esac`;
     const wrong = await cli(["doctor", "status"]);
     assert.equal(wrong.code, 2);
     assert.match(wrong.stdout, /Unknown argument "status"/);
+  });
+});
+
+test("bell-pr doctor reports the port of the BELL PR running on the data directory, else the configured one", async () => {
+  await withStandInClis({ git: standInGit }, async (directory) => {
+    const dataDir = path.join(directory, "data");
+    const appCheck = async (env: NodeJS.ProcessEnv = {}, json = true) => {
+      const result = await cli(["doctor", ...(json ? ["--json"] : []), "--data-dir", dataDir], {
+        env: { BELLPR_NO_OPEN: "1", ...env },
+      });
+      return json
+        ? (JSON.parse(result.stdout) as DoctorReport).checks.find((check) => check.id === "app")
+        : result.stdout;
+    };
+    const port = async (env?: NodeJS.ProcessEnv) =>
+      ((await appCheck(env)) as DoctorReport["checks"][number]).params?.port;
+    // Nothing runs: the port a start would take.
+    assert.equal(await port(), 4311);
+    assert.equal(await port({ BELLPR_PORT: "4400" }), 4400);
+    assert.equal(await port({ BELLPR_PORT: "80" }), undefined);
+    // Started with --port, which neither BELLPR_PORT nor the default names.
+    const server = await inProcessServer(dataDir);
+    try {
+      const running = Number(new URL(server.url).port);
+      assert.notEqual(running, 4311);
+      assert.equal(await port(), running);
+      assert.equal(await port({ BELLPR_PORT: "4400" }), running);
+      assert.match((await appCheck({}, false)) as string, new RegExp(`Port ${running}, `));
+    } finally {
+      await server.shutdown();
+    }
+    assert.equal(await port(), 4311);
   });
 });
 

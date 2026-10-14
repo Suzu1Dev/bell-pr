@@ -13,6 +13,29 @@ function safeLink(value: string) {
   }
 }
 
+/**
+ * The code of a fenced `diff` block, each line marked by its first
+ * character as added (`+`) or removed (`-`); the line breaks stay in the
+ * text, so copying the block copies the diff.
+ */
+function DiffLines({ text }: { text: string }) {
+  const lines = text.replace(/\n$/, "").split("\n");
+  return lines.map((line, index) => (
+    <span
+      key={index}
+      className={
+        line.startsWith("+")
+          ? "markdown-diff-added"
+          : line.startsWith("-")
+            ? "markdown-diff-removed"
+            : undefined
+      }
+    >
+      {index < lines.length - 1 ? `${line}\n` : line}
+    </span>
+  ));
+}
+
 export function MarkdownContent({ children }: { children: string }) {
   const t = useT("review");
   return (
@@ -37,6 +60,15 @@ export function MarkdownContent({ children }: { children: string }) {
                 : t.markdown.imageOmitted}
             </span>
           ),
+          code: ({ className, children }) =>
+            /(?:^|\s)language-diff(?:\s|$)/.test(className ?? "") &&
+            typeof children === "string" ? (
+              <code className={className}>
+                <DiffLines text={children} />
+              </code>
+            ) : (
+              <code className={className}>{children}</code>
+            ),
           h1: ({ children }) => <h4>{children}</h4>,
           h2: ({ children }) => <h4>{children}</h4>,
           h3: ({ children }) => <h4>{children}</h4>,

@@ -3,6 +3,10 @@ import type { Translation } from "../../../shared/i18n/locale";
 import { product } from "../../../shared/product";
 import type en from "../en/review";
 
+/** 「第 9 行」或「第 8–9 行」。 */
+const lineSpan = ({ first, last }: { first: number; last: number }) =>
+  first === last ? `第 ${first} 行` : `第 ${first}–${last} 行`;
+
 const m: Translation<typeof en> = {
   diff: {
     regionLabel: ({ path }) => `${path} 的程式碼差異`,
@@ -37,10 +41,12 @@ const m: Translation<typeof en> = {
   selection: {
     question: ({ path, count }) =>
       `請用白話解釋 ${path} 中選取的 ${count} 行程式碼，說明它們的用途、變更原因與需要注意的地方。`,
-    addedLine: ({ newLine, text }) => `新增 新 L${newLine}: ${text}`,
-    removedLine: ({ oldLine, text }) => `刪除 舊 L${oldLine}: ${text}`,
-    contextLine: ({ oldLine, newLine, text }) =>
-      `原有 舊 L${oldLine}／新 L${newLine}: ${text}`,
+    lines: ({ path, oldLines, newLines }) =>
+      oldLines && newLines
+        ? `${path}，舊版${lineSpan(oldLines)}，新版${lineSpan(newLines)}：`
+        : oldLines
+          ? `${path}，舊版${lineSpan(oldLines)}：`
+          : `${path}，新版${lineSpan(newLines!)}：`,
     truncated:
       "[內容已節錄] 選取範圍較長，下方僅附部分內容，請優先解釋這段節錄。",
   },

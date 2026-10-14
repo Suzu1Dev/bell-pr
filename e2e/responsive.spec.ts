@@ -10,10 +10,11 @@
 // The pages show the sample project in presentation mode (`present=1`,
 // `capture=1`) with the same ready setup as e2e/screenshots.spec.ts, so
 // these are the views the screenshots show, between and below the captured
-// widths. Each view is loaded at its own width, as a phone or a tablet
-// opens it. Home is also checked on the 14-day trial, whose plan chip in
-// the sidebar is the widest, and the run's tabs with the sidebar collapsed
-// to its rail, which gives their panes another layout from 761 px up.
+// widths, and the pages with the sample badge also at 320 px. Each view is
+// loaded at its own width, as a phone or a tablet opens it. Home is also
+// checked on the 14-day trial, whose plan chip in the sidebar is the
+// widest, and the run's tabs with the sidebar collapsed to its rail, which
+// gives their panes another layout from 761 px up.
 //
 //   BELLPR_E2E_PORT=<port> npx playwright test e2e/responsive.spec.ts
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -21,31 +22,9 @@ import os from "node:os";
 import path from "node:path";
 import { expect, request, test, type Browser, type Page } from "@playwright/test";
 import { htmlLang, locales, type Locale } from "../shared/i18n/locale";
-import { settingsSections } from "../src/settings/sections";
 import { findOverflow } from "./helpers/overflow";
+import { routes, sampleRoutes } from "./helpers/routes";
 import { launchServer, type LaunchedServer } from "./start-server.mjs";
-
-/**
- * The routes of e2e/screenshots.spec.ts. A spec cannot import another
- * spec, so the list is repeated here: keep the two in step.
- */
-const routes: { name: string; hash: string }[] = [
-  { name: "home", hash: "#/home" },
-  { name: "run-overview", hash: "#/runs/demo-run/overview" },
-  { name: "run-changes", hash: "#/runs/demo-run/changes" },
-  { name: "run-activity", hash: "#/runs/demo-run/activity" },
-  { name: "run-draft", hash: "#/runs/demo-run/draft" },
-  { name: "repos", hash: "#/repos" },
-  { name: "repo-overview", hash: "#/repos/demo-repo" },
-  { name: "discover", hash: "#/discover" },
-  { name: "team", hash: "#/team" },
-  { name: "learning", hash: "#/learning" },
-  ...settingsSections.map((section) => ({
-    name: `settings-${section}`,
-    hash: `#/settings/${section}`,
-  })),
-  { name: "about", hash: "#/about" },
-];
 
 /**
  * A small and a common phone, a tablet, a small laptop, the widest view
@@ -59,8 +38,6 @@ const viewports = [
   { width: 1100, height: 800 },
   { width: 1280, height: 800 },
 ];
-/** The routes that show the sample project, so present=1 shows its badge. */
-const sampleRoutes = /^(run-.+|repo-overview)$/;
 /** The run's tabs, whose panes take another layout beside the rail. */
 const runRoutes = routes.filter((route) => route.name.startsWith("run-"));
 /** The widths at which the sidebar collapses to a rail (above 760 px). */
@@ -378,6 +355,24 @@ test.describe("every page", () => {
             collapsed: true,
           });
         });
+});
+
+// The narrowest common phone: the sample badge shares the top bar with the
+// page name, the quick switch and the profile button.
+test.describe("at 320 px with the sample badge", () => {
+  let server: LaunchedServer | undefined;
+  test.beforeAll(async () => {
+    server = await startServer();
+  });
+  test.afterAll(async () => {
+    await server?.stop();
+  });
+
+  for (const locale of locales)
+    for (const route of routes.filter((entry) => sampleRoutes.test(entry.name)))
+      test(`${route.name} in ${locale} fits at 320 px`, async ({ browser }) => {
+        await expectFits(browser, server!, locale, route.hash, { width: 320, height: 640 }, true);
+      });
 });
 
 // The trial's chip ("TRIAL · 14d") is the widest plan chip in the sidebar.

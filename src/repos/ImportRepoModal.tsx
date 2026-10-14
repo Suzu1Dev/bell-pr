@@ -13,11 +13,18 @@ import { useLocale, useT } from "../i18n";
 import { Modal } from "../modals/Modal";
 import type { Repo } from "../types";
 
-/** An example path to a Git project on this kind of computer. */
-export function examplePath(platform: string): string {
-  if (/^Mac|iPhone|iPad|iPod/i.test(platform)) return "/Users/you/projects/repository";
-  if (/^Win/i.test(platform)) return "C:\\Users\\you\\projects\\repository";
-  return "/home/you/projects/repository";
+/**
+ * The example path of a local Git project, the same on every computer: the
+ * server reads `~/` as the home directory of the user BELL PR runs as.
+ */
+export const localPathExample = "~/projects/repository";
+
+/**
+ * Whether the browser runs on Windows, where BELL PR runs inside WSL2 and
+ * a local path is one in the Linux distribution.
+ */
+export function isWindowsPlatform(platform: string): boolean {
+  return /^Win/i.test(platform);
 }
 
 /**
@@ -46,6 +53,8 @@ interface ImportRepoModalProps {
   speed?: number;
   /** The sample was imported in the browser; the caller lists and opens it. */
   onSampleImported?: (repo: Repo) => void;
+  /** The browser's platform (navigator.platform); Windows adds the WSL2 hint. */
+  platform?: string;
 }
 
 /**
@@ -64,6 +73,7 @@ export function ImportRepoModal({
   playDemo = false,
   speed,
   onSampleImported,
+  platform = navigator.platform,
 }: ImportRepoModalProps) {
   const t = useT("repos").import;
   const [locale] = useLocale();
@@ -73,6 +83,7 @@ export function ImportRepoModal({
   const playback = useRef<DemoPlayback | undefined>(undefined);
   useEffect(() => () => playback.current?.stop(), []);
   const working = busy || playing;
+  const windows = isWindowsPlatform(platform);
 
   const submit = (event: FormEvent) => {
     if (!onSampleImported || !(playDemo || namesSample(source, demo.repo.fullName))) {
@@ -115,15 +126,20 @@ export function ImportRepoModal({
             value={source}
             onChange={(e) => setSource(e.target.value)}
             placeholder={t.placeholder}
-            aria-describedby="repo-source-hint"
+            aria-describedby={windows ? "repo-source-hint repo-source-wsl" : "repo-source-hint"}
             readOnly={playing}
             required
             autoComplete="off"
           />
         </div>
         <p className="field-help" id="repo-source-hint">
-          {t.localPathHint({ example: examplePath(navigator.platform) })}
+          {t.localPathHint({ example: localPathExample })}
         </p>
+        {windows && (
+          <p className="field-help" id="repo-source-wsl">
+            {t.wslPathHint}
+          </p>
+        )}
         <div className="callout">
           <FolderGit2 size={18} aria-hidden="true" />
           <p>{t.callout}</p>

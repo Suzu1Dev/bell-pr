@@ -29,9 +29,10 @@ PR asks you to accept it before you continue.
 
 ## Before you update: your license's update period
 
-A Pro license covers the builds released within its update period, 12
-months from purchase by default. `bell-pr license status` shows the end
-("Updates: builds released until …"). A build released after that date
+A Pro license covers the builds released within its update period: 12
+months of updates from the date your key is issued, by default.
+`bell-pr license status` shows the end ("Updates: builds released until
+…"). A build released after that date
 runs on Free; the build you have keeps working with Pro. See
 [Licensing](licensing.md#the-update-period).
 

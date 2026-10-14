@@ -1,7 +1,9 @@
 // The app shell: the first start and the license agreement, Home, pages
 // and runs in the address, titles, the plan, presentation masking, About,
 // and the e2e servers starting the way the specs need them.
-import { writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { locales } from "../shared/i18n/locale";
@@ -407,6 +409,7 @@ test("About shows the versions and the local documents, and no link for an empty
     [about.documentNames.eula, "/legal/EULA.txt"],
     [about.documentNames.privacy, "/legal/PRIVACY.txt"],
     [about.documentNames.terms, "/legal/TERMS.txt"],
+    [about.documentNames.refund, "/legal/REFUND.txt"],
     [about.documentNames.security, "/legal/SECURITY.txt"],
     [about.documentNames.notices, "/THIRD_PARTY_NOTICES.txt"],
   ] as const) {
@@ -453,6 +456,72 @@ test("the sample project imports in the browser, without the server", async ({ p
     repos.import.sampleImported({ name: demo.repo.fullName }),
   );
   expect(posted).toEqual([]);
+});
+
+test("the import dialog suggests ~/projects/repository, which imports, and adds the WSL2 hint on Windows", async ({ browser }) => {
+  // A Git project in the home directory of the user the server runs as.
+  const home = await mkdtemp(path.join(os.tmpdir(), "bellpr-e2e-home-"));
+  const checkout = path.join(home, "projects", "repository");
+  await mkdir(checkout, { recursive: true });
+  const git = (...args: string[]) =>
+    execFileSync("git", ["-C", checkout, ...args], {
+      stdio: "ignore",
+      env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" },
+    });
+  git("init", "-b", "main");
+  git("-c", "user.name=E2E", "-c", "user.email=e2e@example.invalid", "commit", "--allow-empty", "-m", "initial");
+  const server = await launchServer({ env: { HOME: home } });
+  const openImport = async (page: Page) => {
+    await page.goto("/#/repos");
+    await page.locator(".page-title .button.primary").click();
+    return page.getByRole("dialog", { name: repos.import.title });
+  };
+  try {
+    const { page, close } = await openOn(browser, server);
+    try {
+      const dialog = await openImport(page);
+      await expect(dialog.locator("#repo-source-hint")).toHaveText(
+        repos.import.localPathHint({ example: "~/projects/repository" }),
+      );
+      await expect(dialog.getByText(repos.import.wslPathHint)).toHaveCount(0);
+      await dialog.getByLabel(repos.import.source).fill("~/projects/repository");
+      await dialog.locator('button[type="submit"]').click();
+      await expect(page.locator(".toast")).toContainText(
+        workspace.notices.imported({ name: "local/repository" }),
+      );
+      await expect(page).toHaveURL(/#\/repos\/[\w-]+$/);
+    } finally {
+      await close();
+    }
+
+    // A browser on Windows, where BELL PR runs inside WSL2.
+    const context = await browser.newContext({
+      baseURL: server.baseURL,
+      storageState: server.storageState,
+      locale: "en-US",
+    });
+    try {
+      await context.addInitScript(() =>
+        Object.defineProperty(Navigator.prototype, "platform", { get: () => "Win32" }),
+      );
+      const page = await context.newPage();
+      const dialog = await openImport(page);
+      await expect(dialog.locator("#repo-source-hint")).toHaveText(
+        repos.import.localPathHint({ example: "~/projects/repository" }),
+      );
+      await expect(dialog.locator("#repo-source-wsl")).toHaveText(repos.import.wslPathHint);
+      await expect(dialog.getByLabel(repos.import.source)).toHaveAttribute(
+        "aria-describedby",
+        "repo-source-hint repo-source-wsl",
+      );
+      await expectNoOverflow(page, [".modal"]);
+    } finally {
+      await context.close();
+    }
+  } finally {
+    await server.stop();
+    await rm(home, { recursive: true, force: true });
+  }
 });
 
 test("a run and a repository can be freed and deleted, and the workbench reopens the last run", async ({ browser }) => {

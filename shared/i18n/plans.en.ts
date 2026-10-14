@@ -102,7 +102,7 @@ const plans = {
     licenseTerm: {
       label: "Pro license term and updates",
       limit:
-        "Per named user; perpetual use of the builds released within 12 months of purchase",
+        "Per named user; perpetual, with 12 months of updates from the date your key is issued",
     },
   } satisfies Record<PlanFeatureId, { label: string; limit: string }>,
 };

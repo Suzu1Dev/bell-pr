@@ -47,3 +47,24 @@ test("the renderer's own text follows the UI language", () => {
   assert.match(html, /Image omitted<\/span>/);
   assert.match(html, /role="region" aria-label="Explanation table"/);
 });
+
+test("a diff block marks its added and removed lines and keeps the text as it was", () => {
+  const html = renderEn(
+    createElement(MarkdownContent, {
+      children: "Explain this.\n\n```diff\n context\n-\told\n+\tnew\n```\n\nAnd `inline` code.",
+    }),
+  );
+  assert.ok(
+    html.includes(
+      '<pre><code class="language-diff"><span> context\n</span><span class="markdown-diff-removed">-\told\n</span><span class="markdown-diff-added">+\tnew</span></code></pre>',
+    ),
+    html,
+  );
+  // Other code is left as it is.
+  assert.match(html, /<code>inline<\/code>/);
+  assert.match(
+    render("```ts\n+1\n```"),
+    /<pre><code class="language-ts">\+1\n<\/code><\/pre>/,
+  );
+  assertNoHan(html);
+});

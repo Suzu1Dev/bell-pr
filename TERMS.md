@@ -187,6 +187,6 @@ with web access may use. <!-- claim:TERMS-34 -->
 | Providers, model choice, Efficiency modes | Free | Codex CLI and Claude Code, all models, all efficiency modes |
 | Sample project / demo (Pro features shown with sample data) | Free | Sample data in your browser only |
 | 14-day Pro trial | Free | One per data directory, started only when you choose (in the app or with bell-pr license trial) |
-| Pro license term and updates | Pro | Per named user; perpetual use of the builds released within 12 months of purchase |
+| Pro license term and updates | Pro | Per named user; perpetual, with 12 months of updates from the date your key is issued |
 
 <!-- /generated:plan-table -->

@@ -39,7 +39,7 @@ starting the trial sends nothing anywhere.
 | Providers, model choice, Efficiency modes | Free | Codex CLI and Claude Code, all models, all efficiency modes |
 | Sample project / demo (Pro features shown with sample data) | Free | Sample data in your browser only |
 | 14-day Pro trial | Free | One per data directory, started only when you choose (in the app or with bell-pr license trial) |
-| Pro license term and updates | Pro | Per named user; perpetual use of the builds released within 12 months of purchase |
+| Pro license term and updates | Pro | Per named user; perpetual, with 12 months of updates from the date your key is issued |
 
 <!-- /generated:plan-table -->
 
@@ -126,8 +126,9 @@ in `<data dir>/license.json`, readable by your user only (mode 0600).
 ## The update period
 
 A Pro license is per named user and covers, by default, **perpetual use of
-the builds released within 12 months of purchase**. `bell-pr license status`
-shows the end as "Updates: builds released until …".
+the builds released in its 12 months of updates from the date your key is
+issued**. The end date is in the key itself: `bell-pr license status` shows
+it as "Updates: builds released until …".
 
 - A build released within the period accepts the key forever.
 - A build released after the period does not accept it: the plan is Free

@@ -74,9 +74,12 @@ export interface StartServerOptions {
   env?: NodeJS.ProcessEnv;
   /** Where the startup line and hints go; console.log by default. */
   print?: (line: string) => void;
-  /** Opens the sign-in link when the configuration says to open it. */
+  /** Opens a one-time sign-in link when the configuration says to open a browser. */
   openBrowser?: (url: string) => void;
-  /** Mints one-time sign-in links for `bell-pr open`; routes/auth by default. */
+  /**
+   * Mints one-time sign-in links for `bell-pr open` and the browser opened
+   * at start; routes/auth by default.
+   */
   mintOneTimeToken?: (app: Express) => string | undefined;
   /**
    * Shut down and exit the process on SIGINT, SIGTERM, SIGHUP and fatal
@@ -338,17 +341,19 @@ export async function startServer(
 
   let app: Express | undefined;
   let linkRequested = false;
+  /** A sign-in link that works once, within two minutes; undefined when none can be minted. */
+  const oneTimeLink = () => {
+    const token = mint(app!);
+    return token
+      ? {
+          url: `${url}/auth?t=${token}`,
+          expiresAt: new Date(Date.now() + oneTimeTokenLifetimeMs).toISOString(),
+        }
+      : undefined;
+  };
   const writeOpenLink = () => {
     try {
-      const token = config.dev ? undefined : mint(app!);
-      const link = config.dev
-        ? { url }
-        : token
-          ? {
-              url: `${url}/auth?t=${token}`,
-              expiresAt: new Date(Date.now() + oneTimeTokenLifetimeMs).toISOString(),
-            }
-          : { error: "unavailable" };
+      const link = config.dev ? { url } : (oneTimeLink() ?? { error: "unavailable" });
       mkdirSync(paths.run, { recursive: true, mode: 0o700 });
       chmodSync(paths.run, 0o700);
       writePrivateAtomically(paths.openLink, `${JSON.stringify(link)}\n`);
@@ -544,7 +549,13 @@ export async function startServer(
     // The plan goes on its own line, before the line with the link.
     print(startupPlanLine(license.summary()));
     print(messages.startup({ version, url: signInUrl }));
-    if (config.open) options.openBrowser?.(signInUrl);
+    // The browser gets a one-time link, never the session link: the opener
+    // (open, xdg-open) takes it on its command line, which other users of
+    // this computer may see in the process list.
+    if (config.open && options.openBrowser) {
+      const link = sessionToken ? oneTimeLink() : { url };
+      if (link) options.openBrowser(link.url);
+    }
     return { server, app, url, signInUrl, shutdown };
   } catch (error) {
     if (workbench) await shutdown();

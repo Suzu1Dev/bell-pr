@@ -96,7 +96,7 @@ const plans: Translation<typeof en> = {
     },
     licenseTerm: {
       label: "Pro 授權期限與更新",
-      limit: "授權給指定使用者；購買後 12 個月內發布的版本可永久使用",
+      limit: "授權給指定使用者；永久授權，自金鑰核發日起享有 12 個月的更新",
     },
   },
 };

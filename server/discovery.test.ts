@@ -844,6 +844,7 @@ test("terminal jobs wait for persistence before reads and concurrent restarts pr
     const rejected = results.find((result) => result.status === "rejected");
     assert.ok(rejected && rejected.status === "rejected");
     assert.equal(rejected.reason.statusCode, 409);
+    assert.equal(rejected.reason.code, "already_running");
     assert.match(rejected.reason.message, /已有探索/);
     assert.equal((await finished(f.service)).status, "ready");
   } finally {

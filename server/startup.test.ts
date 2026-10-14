@@ -333,7 +333,13 @@ test("startServer serves the app with an in-memory session token, takes the lock
       assert.ok(lines.some((line) => line.startsWith(`BELL PR ${version} → `)), lines.join("\n"));
       // The old ./.bellpr only gets a hint.
       assert.ok(lines.some((line) => line.includes("bell-pr start --data-dir ./.bellpr")));
-      assert.deepEqual(opened, [running.signInUrl]);
+      // The browser gets a one-time link of its own, never the session link.
+      assert.equal(opened.length, 1);
+      const openedUrl = new URL(opened[0]);
+      assert.equal(openedUrl.origin, running.url);
+      assert.equal(openedUrl.pathname, "/auth");
+      assert.match(openedUrl.searchParams.get("t")!, /^[A-Za-z0-9_-]{43}$/);
+      assert.ok(!opened[0].includes(token));
       // The token exists in memory only.
       assert.ok(!JSON.stringify(process.env).includes(token));
       assert.ok(!process.argv.join(" ").includes(token));
@@ -359,6 +365,13 @@ test("startServer serves the app with an in-memory session token, takes the lock
       const page = await get(`http://127.0.0.1:${port}/`, { cookie });
       assert.equal(page.status, 200);
       assert.match(String(page.headers["content-type"]), /text\/html/);
+      // The opened link sets the same session cookie, once.
+      const openedSignIn = await get(opened[0]);
+      assert.equal(openedSignIn.status, 200);
+      assert.equal((openedSignIn.headers["set-cookie"] as string[])[0].split(";")[0], cookie);
+      const reused = await get(opened[0]);
+      assert.equal(reused.status, 401);
+      assert.equal(reused.headers["set-cookie"], undefined);
 
       // A second start in this process sees the lock it holds.
       const otherPort = await freePort();

@@ -13,7 +13,9 @@ scripts and support requests. The command exits with 0 when every required
 check passes (Node.js, Git, an AI provider and the data directory) and with
 1 otherwise. Add `--data-dir <dir>` if your BELL PR uses a data directory
 other than `~/.bellpr`; when you started it with `npx`, run
-`npx bell-pr doctor`.
+`npx bell-pr doctor`. Its BELL PR line shows the port of the BELL PR that
+runs with that data directory, even one started with `--port`, or, while
+none runs, the port that a start would use.
 
 Contents:
 

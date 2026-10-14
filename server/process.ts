@@ -99,18 +99,35 @@ const claudeEnvironment = [
 ];
 
 /**
+ * Usage-data opt-outs the person set, passed through unchanged so their
+ * choice reaches the agents: the cross-tool DO_NOT_TRACK for both CLIs, and
+ * the variables Claude Code documents for its telemetry, error reports, bug
+ * reports, feedback surveys and all non-essential traffic. BELL PR never
+ * sets them itself.
+ */
+const optOutEnvironment = ["DO_NOT_TRACK"];
+const claudeOptOutEnvironment = [
+  "DISABLE_TELEMETRY",
+  "DISABLE_ERROR_REPORTING",
+  "DISABLE_BUG_COMMAND",
+  "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY",
+  "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+];
+
+/**
  * The environment an agent CLI runs with: nothing from the server's own
- * environment except what that CLI needs. Claude Code receives every
- * authentication method it supports; BELL never restricts or reads them.
- * Codex gets only its own keys and Claude Code only its own. Without a
- * provider the result holds both sets, for callers that have not said which
- * CLI they start.
+ * environment except what that CLI needs and the usage-data opt-outs the
+ * person set. Claude Code receives every authentication method it supports;
+ * BELL never restricts or reads them. Codex gets only its own keys and
+ * Claude Code only its own. Without a provider the result holds both sets,
+ * for callers that have not said which CLI they start.
  */
 export function agentEnvironment(provider?: AgentProvider): NodeJS.ProcessEnv {
   const keys = [
     ...baseEnvironment,
+    ...optOutEnvironment,
     ...(provider === "claude" ? [] : codexEnvironment),
-    ...(provider === "codex" ? [] : claudeEnvironment),
+    ...(provider === "codex" ? [] : [...claudeEnvironment, ...claudeOptOutEnvironment]),
   ];
   const env: NodeJS.ProcessEnv = {};
   for (const key of keys) {

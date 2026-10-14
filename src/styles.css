@@ -508,6 +508,19 @@ button {
     padding: 5px;
   }
 }
+/* Below 360 px, such as on a 320 px phone, present=1's sample badge
+   shrinks and the actions move closer together, so the quick switch and
+   the profile button stay on screen beside the page name. */
+@media (max-width: 359px) {
+  .topbar .presentation-sample-badge {
+    margin: 0 6px;
+    padding: 4px 8px;
+    font-size: var(--text-2xs);
+  }
+  .topbar .topbar-right {
+    gap: 10px;
+  }
+}
 /* Environment readiness: a link to Settings → Environment. */
 .readiness-pill {
   display: inline-flex;

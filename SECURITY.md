@@ -81,16 +81,18 @@ repositories. These are the safeguards it relies on, and their limits.
 
 - At every start, BELL PR creates a random 32-byte session token. It is kept
   in the server's memory and never written to a file, an environment
-  variable or BELL PR's own command line. A restart signs every browser out. <!-- claim:SEC-14 -->
+  variable or a command line. A restart signs every browser out. <!-- claim:SEC-14 -->
 - BELL PR prints a sign-in link that holds this token, and works until the
   next restart. Keep that link, and any terminal scrollback or service log
   that shows it, as private as a password. <!-- claim:SEC-15 -->
-- When BELL PR opens that link in your browser for you at start, it passes
-  the link to your system's `open` or `xdg-open` command, whose command line
-  other user accounts on the same computer may be able to see. On a computer
-  that you share with other users, start BELL PR with `--no-open` and open
-  the printed link yourself, or get a one-time link with
-  `bell-pr open --print`. <!-- claim:SEC-16 -->
+- When BELL PR opens your browser for you at start, it opens a one-time
+  sign-in link, not the printed one. That link goes to your system's `open`
+  or `xdg-open` command, whose command line other user accounts on the same
+  computer may be able to see, so the token itself never appears there.
+  Someone who reads the one-time link there could still use it before your
+  browser does, which would leave your browser on the sign-in page. On a
+  computer that you share with other users, start BELL PR with `--no-open`
+  and open the printed link yourself. <!-- claim:SEC-16 -->
 - Opening a sign-in link stores the token in an HttpOnly, SameSite=Strict
   cookie that lasts 30 days. Every request except the health check and the
   sign-in page itself needs that cookie. <!-- claim:SEC-17 -->

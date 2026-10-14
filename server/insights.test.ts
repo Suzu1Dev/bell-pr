@@ -1608,8 +1608,8 @@ test("expansion shares the analysis lock and shutdown preserves the saved result
     const pending = service.generateMore(f.repo.id, {});
     const rejected = assert.rejects(pending, (error: any) => error.statusCode === 409);
     await started;
-    await assert.rejects(service.generateMore(f.repo.id, {}), (error: any) => error.statusCode === 409);
-    await assert.rejects(service.generate(f.repo.id), (error: any) => error.statusCode === 409);
+    for (const again of [() => service.generateMore(f.repo.id, {}), () => service.generate(f.repo.id)])
+      await assert.rejects(again(), (error: any) => error.statusCode === 409 && error.code === "already_running");
     await service.shutdown();
     await rejected;
     assert.deepEqual(await service.get(f.repo.id), original);
@@ -1704,6 +1704,62 @@ test("analysis merges the latest display preferences, retains hidden ideas for d
     assert.deepEqual(await new ProjectInsightsService(f.store).get(f.repo.id), refreshed);
     assert.equal(stub.calls.filter((call) => call.args[0] === "exec").length, 3);
   } finally {
+    await f.cleanup();
+  }
+});
+
+test("analyzing a project that is being analyzed answers 409 with the code already_running", async () => {
+  const f = await fixture();
+  const { createApp } = await import("./index.js");
+  const { Workbench } = await import("./workbench.js");
+  const app = createApp(new Workbench(f.store), { staticDirectory: path.join(f.directory, "missing") });
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => { entered = resolve; });
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => { release = resolve; });
+  const service = new ProjectInsightsService(f.store, {
+    command: fakeCodex(validAnalysis, async () => {
+      entered();
+      await released;
+    }).execute,
+    getModelCatalog: async () => ({ source: "codex", models: [] }),
+  });
+  app.locals.insights.generate = service.generate.bind(service);
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const analyze = () => new Promise<{ status: number; body: unknown }>((resolve, reject) => {
+    const req = request(`http://127.0.0.1:${address.port}/api/repos/${f.repo.id}/insights`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Host: "127.0.0.1:4311", "X-Bell-Locale": "en" },
+    }, (res) => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => { body += chunk; });
+      res.on("end", () => resolve({ status: res.statusCode!, body: JSON.parse(body) }));
+    });
+    req.on("error", reject);
+    req.end("{}");
+  });
+  try {
+    const first = analyze();
+    await started;
+    assert.deepEqual(await analyze(), {
+      status: 409,
+      body: {
+        error: "This project is already being analyzed. Wait for the current analysis to finish.",
+        code: "already_running",
+      },
+    });
+    release();
+    assert.equal((await first).status, 200);
+  } finally {
+    release();
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    await service.shutdown();
+    await app.locals.insights.shutdown();
+    await app.locals.discovery.shutdown();
     await f.cleanup();
   }
 });
