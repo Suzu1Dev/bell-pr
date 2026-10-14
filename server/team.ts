@@ -4,6 +4,8 @@ import { safeRelativePath, sensitivePath } from "./git.js";
 import type { AgentTeam, PremiseCheck, TeamTask } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import type { ModelExecution } from "../shared/models.js";
+import type { SetupNeed } from "../shared/setup.js";
+import { parseSetupNeeds, setupJsonSchema } from "./setup.js";
 
 /**
  * The five settings that describe what the person wants. Provider, model,
@@ -142,8 +144,9 @@ export const memberReportJsonSchema = {
         },
         tradeoffs: { type: "string" },
         limitations: { type: "string" },
+        setup: setupJsonSchema,
       },
-      required: ["summary", "checks", "tradeoffs", "limitations"],
+      required: ["summary", "checks", "tradeoffs", "limitations", "setup"],
       additionalProperties: false,
     },
     messages: {
@@ -475,6 +478,8 @@ const structuredReportSchema = z.object({
     .max(40),
   tradeoffs: z.string().trim().max(6000),
   limitations: z.string().trim().max(6000),
+  // Read by parseSetupNeeds; reports from before the field existed have none.
+  setup: z.unknown().optional(),
 });
 
 const memberResultSchema = z.object({
@@ -526,6 +531,7 @@ export function formatMemberReport(
 export function parseMemberResult(answer: string): {
   report: string;
   messages: { to: string; content: string }[];
+  setup: SetupNeed[];
 } {
   try {
     const value = memberResultSchema.parse(JSON.parse(jsonText(answer)));
@@ -535,8 +541,12 @@ export function parseMemberResult(answer: string): {
           ? value.report
           : formatMemberReport(value.report),
       messages: value.messages,
+      setup:
+        typeof value.report === "string"
+          ? []
+          : parseSetupNeeds(value.report.setup),
     };
   } catch {
-    return { report: answer.slice(0, memberReportLimit), messages: [] };
+    return { report: answer.slice(0, memberReportLimit), messages: [], setup: [] };
   }
 }
