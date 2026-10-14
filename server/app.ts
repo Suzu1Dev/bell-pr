@@ -1,4 +1,4 @@
-import express, { type ErrorRequestHandler } from "express";
+import express, { type ErrorRequestHandler, type Response } from "express";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
@@ -11,8 +11,10 @@ import type { AgentSlots } from "./agent-slots.js";
 import { localhostGuard, parseAllowedOrigins } from "./http-guard.js";
 import type { LicenseService } from "./license.js";
 import type { ApiErrorBody } from "../shared/errors.js";
-import { formatters, parseLocale } from "../shared/i18n/locale.js";
+import { formatters, htmlLang, parseLocale } from "../shared/i18n/locale.js";
+import { defaultStaticDir } from "./config.js";
 import { currentLocale, sm, withLocale } from "./i18n/index.js";
+import { log } from "./log.js";
 import { registerAppSettingsRoutes } from "./routes/app-settings.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerDiscoveryRoutes } from "./routes/discovery.js";
@@ -62,7 +64,10 @@ function appErrorBody(error: AppError): ApiErrorBody {
  * point and tests set what they need, and later work only fills in values.
  */
 export interface AppOptions {
-  /** The built UI; `dist` under the working directory by default. */
+  /**
+   * The built UI: the dist/ folder next to the server code by default, not
+   * the working directory.
+   */
   staticDirectory?: string;
   /**
    * Extra trusted origins, such as a TLS proxy in front of BELL PR: the
@@ -72,7 +77,7 @@ export interface AppOptions {
   allowedOrigins?: string | string[];
   /** The API port, 4311 by default; its local hosts are trusted. */
   port?: number;
-  /** The UI dev server port, 4310 by default; also trusted. */
+  /** The UI dev server port, 4310 by default; trusted only in `dev`. */
   frontendPort?: number;
   /** CLI slots for analysis and discovery; the Workbench's by default. */
   agentSlots?: AgentSlots;
@@ -84,9 +89,12 @@ export interface AppOptions {
   license?: LicenseService;
   /** The app version the API reports. */
   version?: string;
-  /** Development mode, with the UI dev server in front. */
+  /** Development mode, with the UI dev server in front. Off by default. */
   dev?: boolean;
-  /** The public URL when BELL PR is served through a proxy. */
+  /**
+   * The public URL when BELL PR is served through a proxy; its origin is
+   * trusted like an allowed origin.
+   */
   publicUrl?: string;
 }
 
@@ -94,7 +102,8 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   const {
     port = 4311,
     frontendPort = 4310,
-    staticDirectory = path.resolve("dist"),
+    dev = false,
+    staticDirectory = defaultStaticDir(),
     allowedOrigins = "",
     agentSlots = workbench.agentSlots,
     agentTimeoutScale = workbench.agentTimeoutScale,
@@ -113,6 +122,9 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   app.locals.insights = insights;
   app.locals.discovery = discovery;
   app.disable("x-powered-by");
+  // req.secure and req.ip follow X-Forwarded-* only from a proxy on this
+  // machine, such as a TLS terminator in front of BELL PR.
+  app.set("trust proxy", "loopback");
   // Each request runs in its own locale: X-Bell-Locale, then ?locale=, then
   // the server default. Everything the request starts inherits it.
   app.use((req, _res, next) => {
@@ -123,13 +135,22 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
       next,
     );
   });
+  const configuredOrigins =
+    typeof allowedOrigins === "string"
+      ? parseAllowedOrigins(allowedOrigins)
+      : allowedOrigins;
   app.use(
     localhostGuard({
-      ports: [port, frontendPort],
-      allowedOrigins:
-        typeof allowedOrigins === "string"
-          ? parseAllowedOrigins(allowedOrigins)
-          : allowedOrigins,
+      // The Vite dev server's port is trusted in development only.
+      ports: dev ? [port, frontendPort] : [port],
+      // An empty entry throws, so the public origin is added only when set.
+      allowedOrigins: [
+        ...new Set(
+          options.publicUrl
+            ? [...configuredOrigins, new URL(options.publicUrl).origin]
+            : configuredOrigins,
+        ),
+      ],
       sessionToken: options.sessionToken,
       publicPaths: ["/api/health", "/auth"],
     }),
@@ -165,10 +186,42 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: sm().common.notFound });
   });
-  if (existsSync(staticDirectory)) {
-    app.use(express.static(staticDirectory, { index: false }));
+  const indexFile = path.join(staticDirectory, "index.html");
+  if (existsSync(indexFile)) {
+    // Hashed bundles never change; a missing one is a 404, not the app page.
+    app.use(
+      "/assets",
+      express.static(path.join(staticDirectory, "assets"), {
+        index: false,
+        immutable: true,
+        maxAge: "1y",
+      }),
+      (_req, res) => {
+        res.status(404).end();
+      },
+    );
+    // The page itself is revalidated, so an update reaches every browser.
+    const noCache = (res: Response, file: string) => {
+      if (file.endsWith(".html")) res.setHeader("Cache-Control", "no-cache");
+    };
+    app.use(
+      express.static(staticDirectory, { index: false, setHeaders: noCache }),
+    );
     app.get("/{*splat}", (_req, res) => {
-      res.sendFile(path.join(staticDirectory, "index.html"));
+      res.setHeader("Cache-Control", "no-cache");
+      res.sendFile(indexFile, { cacheControl: false });
+    });
+  } else {
+    // Started from source without `npm run build`: say so instead of a 404.
+    app.get("/{*splat}", (_req, res) => {
+      const messages = sm().cli.start;
+      res
+        .status(503)
+        .setHeader("Cache-Control", "no-store")
+        .type("html")
+        .send(
+          `<!doctype html><html lang="${htmlLang(currentLocale())}"><head><meta charset="utf-8"><title>${messages.uiMissingTitle}</title></head><body><p>${messages.uiMissingPage}</p></body></html>`,
+        );
     });
   }
   const errors: ErrorRequestHandler = (error, req, res, _next) => {
@@ -184,6 +237,13 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
       return;
     }
     if (error instanceof AppError) {
+      if (error.statusCode >= 500)
+        log.error("Request failed", {
+          method: req.method,
+          path: req.path,
+          status: error.statusCode,
+          error: redact(error.message),
+        });
       res.status(error.statusCode).json(appErrorBody(error));
       return;
     }
@@ -195,15 +255,15 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
       res.status(413).json({ error: sm().common.payloadTooLarge });
       return;
     }
-    // The stack only reaches the local journal; the client gets a generic message.
-    console.error(
-      "[BELL-PR]",
-      req.method,
-      req.path,
-      redact(
+    // The stack only reaches the local log; the client gets a generic message.
+    log.error("Request failed", {
+      method: req.method,
+      path: req.path,
+      status: 500,
+      error: redact(
         error instanceof Error ? (error.stack ?? error.message) : String(error),
       ),
-    );
+    });
     res.status(500).json({ error: sm().common.internalError });
   };
   app.use(errors);

@@ -1,11 +1,15 @@
 /**
  * GET /api/health: the product name and version, reachable without
- * signing in, for the command line and container health checks.
- *
- * Owned by 3A-packaging-runtime, which adds the routes. createApp already
- * registers this module in its fixed place, before the /api 404 handler.
+ * signing in (a public path of the guard), for `bell-pr open`, the
+ * "already running" check of a second start and container health checks.
  */
 import type { Express } from "express";
+import { product } from "../../shared/product.js";
+import { version } from "../build-info.js";
 import type { RouteDeps } from "./types.js";
 
-export function registerHealthRoutes(_app: Express, _deps: RouteDeps) {}
+export function registerHealthRoutes(app: Express, { options }: RouteDeps) {
+  app.get("/api/health", (_req, res) => {
+    res.json({ name: product.npmPackage, version: options.version ?? version });
+  });
+}

@@ -12,6 +12,9 @@ output/
 # Build output
 build/
 
+# Package tarballs from `npm pack`
+/bell-pr-*.tgz
+
 # Keys and certificates never enter the repository
 *.pem
 *.key
