@@ -12,6 +12,7 @@ import {
   childSchema,
   isAgentCommand,
   isAgentExecutable,
+  parsePsLine,
   readChildren,
   reapOrphanedAgents,
   writeChildren,
@@ -242,6 +243,56 @@ test("reapOrphanedAgents stops recorded agent groups, escalates to SIGKILL and l
       }
     await temp.cleanup();
   }
+});
+
+test("reapOrphanedAgents leaves a group alone whose first process started after the record", { skip: !posix }, async () => {
+  const temp = await tempDir();
+  const file = path.join(temp.directory, "children.json");
+  // An agent CLI the person started themselves, under a pid that a crashed
+  // BELL PR had recorded for its own agent earlier in this boot.
+  const theirs = orphan(script(path.join(temp.bin, "codex"), "#!/bin/sh\nsleep 300\n"));
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    writeChildren(file, [
+      {
+        pgid: theirs.pid!,
+        executable: "codex",
+        startedAt: new Date(Date.now() - 45_000).toISOString(),
+      },
+    ]);
+    const result = await reapOrphanedAgents(file, { graceMs: 0 });
+    assert.deepEqual(result.terminated, []);
+    assert.deepEqual(result.skipped.map((child) => child.pgid), [theirs.pid]);
+    assert.equal(theirs.exitCode, null);
+    assert.equal(theirs.signalCode, null);
+  } finally {
+    try {
+      process.kill(-theirs.pid!, "SIGKILL");
+    } catch {
+      // Already gone.
+    }
+    await temp.cleanup();
+  }
+});
+
+test("ps lines give the group, the command line and the start time", () => {
+  assert.deepEqual(
+    parsePsLine("  412   410 Sun Oct  4 06:29:36 2026     /usr/local/bin/node /opt/codex/bin/codex.js exec"),
+    {
+      pgid: 410,
+      member: {
+        pid: 412,
+        argv: ["/usr/local/bin/node", "/opt/codex/bin/codex.js", "exec"],
+        startedAt: new Date(2026, 9, 4, 6, 29, 36).getTime(),
+      },
+    },
+  );
+  assert.deepEqual(parsePsLine("   7     7 Tue Jan 13 23:05:01 2026"), {
+    pgid: 7,
+    member: { pid: 7, argv: [], startedAt: new Date(2026, 0, 13, 23, 5, 1).getTime() },
+  });
+  assert.equal(parsePsLine(""), undefined);
+  assert.equal(parsePsLine("PID PGID STARTED COMMAND"), undefined);
 });
 
 test("a fake long-running agent recorded in children.json is stopped at the next startup", { skip: !posix }, async () => {

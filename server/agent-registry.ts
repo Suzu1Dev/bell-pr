@@ -140,6 +140,45 @@ export class AgentRegistry implements SpawnObserver {
 interface GroupProcess {
   pid: number;
   argv: string[];
+  /** When the process started (ms since the epoch), where known. */
+  startedAt?: number;
+}
+
+/**
+ * Clock ticks per second in /proc/<pid>/stat: USER_HZ, which is 100 on
+ * every architecture Node.js supports.
+ */
+const clockTicksPerSecond = 100;
+
+/** The boot time in ms from /proc/stat, which start times count from. */
+function linuxBootTime(): number | undefined {
+  try {
+    const match = /^btime (\d+)$/m.exec(readFileSync("/proc/stat", "utf8"));
+    return match ? Number(match[1]) * 1000 : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** One line of `ps -A -o pid=,pgid=,lstart=,command=` run with LC_ALL=C. */
+export function parsePsLine(
+  line: string,
+): { pgid: number; member: GroupProcess } | undefined {
+  const match =
+    /^\s*(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d{1,2}\s+\d{1,2}:\d{2}:\d{2}\s+\d{4})\s*(.*)$/.exec(
+      line,
+    );
+  if (!match) return undefined;
+  // lstart is local time, as Date.parse reads a date without a zone.
+  const startedAt = Date.parse(match[3].replace(/\s+/g, " "));
+  return {
+    pgid: Number(match[2]),
+    member: {
+      pid: Number(match[1]),
+      argv: match[4].trim().split(/\s+/).filter(Boolean),
+      ...(Number.isFinite(startedAt) ? { startedAt } : {}),
+    },
+  };
 }
 
 /** Every process by process group, from /proc on Linux and `ps` elsewhere. */
@@ -148,6 +187,7 @@ function processGroups(): Map<number, GroupProcess[]> {
   const add = (pgid: number, member: GroupProcess) =>
     groups.set(pgid, [...(groups.get(pgid) ?? []), member]);
   if (process.platform === "linux") {
+    const bootTime = linuxBootTime();
     for (const entry of readdirSync("/proc")) {
       if (!/^\d+$/.test(entry)) continue;
       try {
@@ -157,24 +197,28 @@ function processGroups(): Map<number, GroupProcess[]> {
         const argv = readFileSync(`/proc/${entry}/cmdline`, "utf8")
           .split("\0")
           .filter(Boolean);
-        add(Number(fields[2]), { pid: Number(entry), argv });
+        // Field 22, starttime, in clock ticks after boot.
+        const ticks = Number(fields[19]);
+        add(Number(fields[2]), {
+          pid: Number(entry),
+          argv,
+          ...(bootTime !== undefined && Number.isFinite(ticks)
+            ? { startedAt: bootTime + (ticks * 1000) / clockTicksPerSecond }
+            : {}),
+        });
       } catch {
         // The process exited while we looked.
       }
     }
     return groups;
   }
-  const ps = spawnSync("ps", ["-A", "-o", "pid=,pgid=,command="], {
+  const ps = spawnSync("ps", ["-A", "-o", "pid=,pgid=,lstart=,command="], {
     encoding: "utf8",
     env: { ...process.env, LC_ALL: "C" },
   });
   for (const line of ps.stdout?.split("\n") ?? []) {
-    const match = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line);
-    if (match)
-      add(Number(match[2]), {
-        pid: Number(match[1]),
-        argv: match[3].trim().split(/\s+/),
-      });
+    const parsed = parsePsLine(line);
+    if (parsed) add(parsed.pgid, parsed.member);
   }
   return groups;
 }
@@ -198,14 +242,21 @@ function signalGroup(pgid: number, signal: NodeJS.Signals): boolean {
   }
 }
 
+/**
+ * How much later than its record a group's first process may have started
+ * and still be the agent: the record is written right after the start, so
+ * this only absorbs clock rounding.
+ */
+const reusedAfterMs = 30_000;
+
 export interface ReapResult {
   /** Groups sent SIGTERM. */
   terminated: RecordedChild[];
   /** Groups that were still alive after the grace period and got SIGKILL. */
   killed: RecordedChild[];
   /**
-   * Recorded groups left alone: from an earlier boot (or no start time), or
-   * no longer running an agent CLI.
+   * Recorded groups left alone: from an earlier boot (or no start time),
+   * started again under a reused pid, or no longer running an agent CLI.
    */
   skipped: RecordedChild[];
 }
@@ -215,8 +266,9 @@ export interface ReapResult {
  * children.json and that are still alive: SIGTERM, then SIGKILL after
  * `graceMs` (1.5 s) for the groups that did not exit. A group is only
  * signalled when one of its processes runs codex or claude, none of them is
- * this process, and it was recorded during the current boot, so a reused
- * pid is never hit. Clears the file afterwards.
+ * this process, it was recorded during the current boot, and its first
+ * process did not start after it was recorded, so a reused pid is not hit.
+ * Clears the file afterwards.
  */
 export async function reapOrphanedAgents(
   file: string,
@@ -235,11 +287,15 @@ export async function reapOrphanedAgents(
     );
     if (!members.length) continue;
     const startedAt = Date.parse(child.startedAt ?? "");
+    const leader = members.find((member) => member.pid === child.pgid);
     if (
       child.pgid <= 1 ||
       !Number.isFinite(startedAt) ||
       // Recorded before this boot: that group is long gone, the pid reused.
       startedAt < bootTime - 120_000 ||
+      // The group's first process started after BELL PR recorded the
+      // group, so its pid was reused for a new group.
+      (leader?.startedAt !== undefined && leader.startedAt > startedAt + reusedAfterMs) ||
       members.some((member) => member.pid === process.pid) ||
       !members.some((member) => isAgentCommand(member.argv))
     ) {
