@@ -204,3 +204,33 @@
     margin: var(--space-4) 14px 0;
   }
 }
+
+/* Agent activity: the model and usage cards in a "Run details" disclosure
+   under the team board. The board's own copies stay hidden here, so each
+   card shows once. */
+#workspace-panel > .team-board .model-summary,
+#workspace-panel > .team-board .efficiency-summary {
+  display: none;
+}
+#workspace-panel > .run-details {
+  padding: 0 28px var(--space-4);
+  background: var(--color-bg);
+}
+#workspace-panel > .run-details > summary {
+  width: fit-content;
+  padding: var(--space-1) 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+#workspace-panel > .run-details .run-details-cards {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+@media (max-width: 760px) {
+  #workspace-panel > .run-details {
+    padding: 0 15px var(--space-3);
+  }
+}

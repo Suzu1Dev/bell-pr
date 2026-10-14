@@ -109,6 +109,8 @@ const workspace = {
     emptyText: "Select a changed file to ask about its design and trade-offs.",
   },
   activity: {
+    /** The disclosure that holds the model and agent usage cards. */
+    runDetails: "Run details",
     runTitle: "How it ran",
     runText:
       "The task board is above; the full log, error messages and the stop button stay here.",

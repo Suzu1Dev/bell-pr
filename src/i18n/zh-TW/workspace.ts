@@ -97,6 +97,7 @@ const m: Translation<typeof en> = {
     emptyText: "選取變更的檔案，就能詢問背後的設計與取捨。",
   },
   activity: {
+    runDetails: "執行細節",
     runTitle: "執行過程",
     runText: "任務板在上方；完整紀錄、錯誤訊息與停止操作保留在這裡。",
     teamTitle: "你的 Agent team",
