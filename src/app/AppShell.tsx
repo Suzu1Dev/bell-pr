@@ -6,6 +6,7 @@ import {
   type CSSProperties,
   type SetStateAction,
 } from "react";
+import { createPortal } from "react-dom";
 import { Terminal, X } from "lucide-react";
 // Stylesheets enter the bundle in import order and later rules win ties.
 // These keep the order the single App component produced, before the
@@ -17,7 +18,10 @@ import "../efficiency/efficiency.css";
 import "../models/models.css";
 import "../mission/mission.css";
 import "../team/team.css";
-import { ApiError } from "../api";
+import type { AppSettingsView } from "../../shared/app-settings";
+import { eulaVersion } from "../../shared/product";
+import { api, ApiError } from "../api";
+import { Logo } from "../brand/Logo";
 import { getDemo } from "../demo";
 import { HomePage } from "../home/HomePage";
 import { useLocale, useT } from "../i18n";
@@ -33,6 +37,9 @@ import {
 } from "../navigation/route";
 import { useProjectInsights } from "../mission/useProjectInsights";
 import { HelpModal } from "../modals/HelpModal";
+import { EulaPrompt } from "../onboarding/EulaPrompt";
+import { needsEulaPrompt, startView, type StartView } from "../onboarding/startView";
+import { Welcome, type WelcomeChoice } from "../onboarding/Welcome";
 import { NewTaskModal } from "../modals/NewTaskModal";
 import { RunsModal } from "../modals/RunsModal";
 import { DiscoveryPage } from "../pages/DiscoveryPage";
@@ -113,18 +120,66 @@ function rememberLastRun(id: string) {
 }
 
 /**
- * Loads the app's data and the environment report once for every page, and
+ * Loads the app's data and the environment report once for every page,
  * sends an address that names no route (an empty hash, an unknown path) to
- * Home, keeping its flags.
+ * Home, keeping its flags, and shows the welcome flow on a first start.
  */
 function AppRoot() {
   const data = useAppData();
   const doctor = useDoctor();
+  const presentation = usePresentation();
   const route = useHashRoute();
   useEffect(() => {
     if (!route) navigateTo({ name: "home" }, { replace: true });
   }, [route]);
-  return <AppShell data={data} doctor={doctor} />;
+  // Decided once: settings that change later never bring Welcome back.
+  const [view, setView] = useState<StartView>("pending");
+  const next = startView(data);
+  if (view === "pending" && next !== "pending") setView(next);
+  const [initialModal, setInitialModal] = useState<ModalName>(null);
+  const { setAppSettings } = data;
+
+  const finishWelcome = (choice: WelcomeChoice) => {
+    // Welcome saved both; the settings are read again to be sure.
+    setAppSettings((settings) => ({
+      ...settings,
+      eulaAcceptedVersion: eulaVersion,
+      onboardingCompletedAt: new Date().toISOString(),
+    }));
+    api<AppSettingsView>("/app-settings").then(
+      (saved) => setAppSettings(saved.settings),
+      () => {
+        // The values set above stand.
+      },
+    );
+    if (choice === "tour") navigateTo({ name: "demo" });
+    else if (choice === "discover") navigateTo({ name: "discover" });
+    else {
+      navigateTo({ name: "home" });
+      setInitialModal("import");
+    }
+    setView("shell");
+  };
+
+  if (view === "pending")
+    return <div className="app-starting" aria-busy="true" />;
+  if (view === "welcome")
+    return (
+      <main className="welcome-screen" id="main-content">
+        <div className="welcome-screen-logo">
+          <Logo variant="wordmark" size={34} title="" />
+        </div>
+        <Welcome
+          onFinish={finishWelcome}
+          settings={data.appSettings}
+          doctor={doctor}
+          status={data.status}
+          maskUser={presentation.maskUser}
+          maskPath={presentation.maskPath}
+        />
+      </main>
+    );
+  return <AppShell data={data} doctor={doctor} initialModal={initialModal} />;
 }
 
 // The address (src/navigation/route.ts) is the source of the page, the open
@@ -190,7 +245,16 @@ interface WorkspaceView {
   file?: string;
 }
 
-function AppShell({ data, doctor }: { data: AppData; doctor: DoctorState }) {
+function AppShell({
+  data,
+  doctor,
+  initialModal = null,
+}: {
+  data: AppData;
+  doctor: DoctorState;
+  /** A dialog to open at once, such as the import the welcome flow chose. */
+  initialModal?: ModalName;
+}) {
   const t = useT("app");
   const workspaceMessages = useT("workspace");
   const [locale] = useLocale();
@@ -206,9 +270,13 @@ function AppShell({ data, doctor }: { data: AppData; doctor: DoctorState }) {
     status,
     setStatus,
     appSettings,
+    setAppSettings,
+    loaded,
     apiError,
     setApiError,
   } = data;
+  // The app stays unusable until this build's license agreement is accepted.
+  const blocked = needsEulaPrompt(appSettings, loaded.appSettings);
   const entitlements = useEntitlements(status);
   const discoveryLocked = entitlements.locked("discovery");
   const [lastRunId, setLastRunId] = useState(readLastRun);
@@ -293,7 +361,7 @@ function AppShell({ data, doctor }: { data: AppData; doctor: DoctorState }) {
   const [toast, setToast] = useState<Toast | null>(null);
   const [commandOpen, setCommandOpen] = useState(false);
   const mainContent = useRef<HTMLElement>(null);
-  const [modal, setModal] = useState<ModalName>(null);
+  const [modal, setModal] = useState<ModalName>(initialModal);
   const exploreRepoId = route?.name === "repo" ? route.repoId : undefined;
   const settingsRequest = useRef(0);
   const [showFiles, setShowFiles] = useState(true);
@@ -401,7 +469,7 @@ function AppShell({ data, doctor }: { data: AppData; doctor: DoctorState }) {
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.isComposing || event.repeat) return;
+      if (event.defaultPrevented || event.isComposing || event.repeat || blocked) return;
       if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k") {
         event.preventDefault();
         toggleCommandPalette();
@@ -409,7 +477,7 @@ function AppShell({ data, doctor }: { data: AppData; doctor: DoctorState }) {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [toggleCommandPalette]);
+  }, [toggleCommandPalette, blocked]);
 
   useEffect(() => {
     if (reading) window.scrollTo({ top: 0, behavior: "instant" });
@@ -426,7 +494,7 @@ function AppShell({ data, doctor }: { data: AppData; doctor: DoctorState }) {
   }, [sidebarCollapsed]);
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.isComposing || modal || commandOpen) return;
+      if (event.defaultPrevented || event.isComposing || modal || commandOpen || blocked) return;
       if (event.key === "Escape") setFocusMode(false);
       // "?" opens the guide unless the reader is typing in a field.
       const typing = (event.target as Element | null)?.closest(
@@ -440,7 +508,7 @@ function AppShell({ data, doctor }: { data: AppData; doctor: DoctorState }) {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [modal, commandOpen]);
+  }, [modal, commandOpen, blocked]);
   useEffect(() => {
     // Errors stay until the reader closes them; success notices fade out.
     if (!toast || toast.tone === "error") return;
@@ -698,6 +766,7 @@ function AppShell({ data, doctor }: { data: AppData; doctor: DoctorState }) {
           "--explanation-width": `${explanationWidth}px`,
         } as CSSProperties
       }
+      inert={blocked}
     >
       <a className="skip-to-content" href="#main-content" onClick={(event) => {
         event.preventDefault();
@@ -934,6 +1003,12 @@ function AppShell({ data, doctor }: { data: AppData; doctor: DoctorState }) {
         />
       )}
       {modal === "help" && <HelpModal closeModal={closeModal} />}
+      {/* Outside the inert shell in the page, so it alone stays usable. */}
+      {blocked &&
+        createPortal(
+          <EulaPrompt onAccepted={(saved) => setAppSettings(saved.settings)} />,
+          document.body,
+        )}
     </div>
   );
 }

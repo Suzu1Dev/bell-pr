@@ -40,6 +40,14 @@ const m: Translation<typeof en> = {
     accepted: ({ version }) => `你已接受第 ${version} 版合約。`,
     saveFailed: ({ message }) => `無法儲存你的接受紀錄：${message}`,
   },
+  eulaPrompt: {
+    title: "接受授權合約以繼續使用",
+    text: ({ version }) =>
+      `這個版本的 ${product.name} 適用終端使用者授權合約版本 ${version}。請閱讀並接受後，即可繼續使用 ${product.name}。重點如下：`,
+    accept: "接受並繼續",
+    accepting: "正在儲存…",
+    docs: "閱讀說明文件",
+  },
   environment: {
     title: "檢查工作環境",
     text: `${product.name} 需要 Git 與至少一個 AI 服務。發佈 Pull Request 與尋找專案需要 GitHub CLI。`,

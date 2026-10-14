@@ -243,7 +243,46 @@
   gap: var(--space-2);
 }
 
+/* The first start: Welcome takes the whole window, under the logo. */
+.welcome-screen {
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+.welcome-screen-logo {
+  display: flex;
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-4) 0;
+}
+
+/* The agreement prompt that blocks the app until it is accepted. */
+.eula-prompt-backdrop {
+  z-index: 300;
+}
+.eula-prompt {
+  display: grid;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+.eula-prompt h2:focus {
+  outline: none;
+}
+.eula-prompt h2:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.eula-prompt .modal-mark,
+.eula-prompt .modal-subtitle {
+  margin: 0;
+}
+.eula-prompt .welcome-note {
+  margin: 0;
+}
+
 @media (max-width: 600px) {
+  .welcome-screen-logo {
+    padding: var(--space-5) var(--space-4) 0;
+  }
   .welcome {
     padding: var(--space-5) var(--space-4);
   }
