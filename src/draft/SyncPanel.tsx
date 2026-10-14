@@ -125,7 +125,7 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
               ? t.openCount({ open: open.length, total: conflicts.length })
               : t.allResolved}
           </p>
-          <ul>
+          <ul className="sync-conflict-files">
             {conflicts.map((file) => {
               const unresolved = open.includes(file);
               return (
