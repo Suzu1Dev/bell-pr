@@ -31,6 +31,40 @@ export function parseGitHubSource(
   };
 }
 
+/** Pages inside a GitHub repository whose address names the repository. */
+const repositoryPages = new Set(["tree", "blob", "issues", "pull", "pulls"]);
+
+/**
+ * What a person may type to import a project, made into what the import
+ * reads: `owner/repo` and `github.com/owner/repo` (with or without
+ * `https://` or `www.`) become `https://github.com/owner/repo`, a
+ * repository page (`/tree/…`, `/blob/…`, `/issues/…`, `/pull/…`) becomes
+ * the repository, and `~/` is the home directory. Anything else is
+ * returned trimmed and unchanged, for the import to accept or refuse.
+ */
+export function normalizeRepositorySource(input: string, home: string): string {
+  const source = input.trim();
+  if (source === "~") return home;
+  if (source.startsWith("~/")) return path.join(home, source.slice(2));
+  const web = /^(?:https?:\/\/)?(?:www\.)?github\.com\/([^?#]*)(?:[?#].*)?$/i.exec(
+    source,
+  );
+  if (web) {
+    const [owner, name, page, ...rest] = web[1].split("/");
+    const trailing = page === undefined || (page === "" && !rest.length);
+    if (owner && name && (trailing || repositoryPages.has(page))) {
+      const parsed = parseGitHubSource(`https://github.com/${owner}/${name}`);
+      if (parsed) return parsed.url;
+    }
+    return source;
+  }
+  const shorthand =
+    /^([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))\/([A-Za-z0-9_.-]+?)(?:\.git)?$/.exec(source);
+  if (shorthand && shorthand[2] !== "." && shorthand[2] !== "..")
+    return `https://github.com/${shorthand[1]}/${shorthand[2]}`;
+  return source;
+}
+
 /** A GitHub issue page URL; pull requests, API URLs and other hosts are rejected. */
 export function parseGitHubIssueUrl(
   source: string,

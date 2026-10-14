@@ -825,7 +825,7 @@ test("HTTP errors follow X-Bell-Locale: validation, the guard, the error handler
       error: "The approved version changed or expired; reload, review and approve again before you send the PR.",
     });
     assert.deepEqual(await errorOf("en", "/api/repos", {
-      body: JSON.stringify({ source: "relative/path" }),
+      body: JSON.stringify({ source: "./relative/path" }),
     }), {
       status: 400,
       error: "Enter a GitHub HTTPS URL or the absolute path of a local repository.",
