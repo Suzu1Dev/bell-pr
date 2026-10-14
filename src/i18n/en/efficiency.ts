@@ -1,6 +1,6 @@
 /**
- * The Ponytail efficiency mode and the provider-reported AI usage of a run,
- * an analysis or a discovery (English).
+ * The efficiency mode (built on Ponytail) and the provider-reported AI usage
+ * of a run, an analysis or a discovery (English).
  */
 import type { PonytailMode } from "../../../shared/efficiency";
 import { formatters } from "../../../shared/i18n/locale";
@@ -10,11 +10,15 @@ const fmt = formatters("en");
 const efficiency = {
   /** The default heading: the AI usage of a contribution's agent team. */
   title: "Team AI usage",
+  /** The efficiency mode a call ran with; the stored id "lite" reads "Lean". */
   modes: {
-    lite: "Lite",
+    lite: "Lean",
     full: "Full",
     off: "Off",
   } satisfies Record<PonytailMode, string>,
+  modeLabel: ({ mode }: { mode: string }) => `Efficiency mode: ${mode}`,
+  /** Marks the summary of the built-in sample. */
+  sample: "Sample",
   /** One row per calling role; the member-N teammates share one row. */
   roles: {
     lead: "Lead (planning and integration)",
@@ -27,9 +31,12 @@ const efficiency = {
     followup: "Review fixes",
     sync: "Conflict resolution",
   },
-  /** Tooltip of the link to the upstream Ponytail project. */
-  sourceTitle: ({ version }: { version: string }) =>
-    `Ponytail ${version} upstream project`,
+  /** The credit behind the mode chip: its tooltip and the panel it opens. */
+  credit: {
+    text: ({ version }: { version: string }) =>
+      `The efficiency modes build on Ponytail ${version} by DietrichGebert (MIT license). Lean gives the agents a short adaptation of its principles, Full gives them its complete rules, and Off adds neither.`,
+    link: "Ponytail upstream project",
+  },
   inputTokens: "Input tokens",
   cachedInputTokens: "Of which cached",
   outputTokens: "Output tokens",

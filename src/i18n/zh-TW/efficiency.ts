@@ -6,6 +6,8 @@ const fmt = formatters("zh-TW");
 const m: Translation<typeof en> = {
   title: "團隊 AI 用量",
   modes: { lite: "輕量", full: "完整", off: "關閉" },
+  modeLabel: ({ mode }) => `效率模式：${mode}`,
+  sample: "示範",
   roles: {
     lead: "Lead（規劃與整合）",
     member: "Teammates",
@@ -17,7 +19,11 @@ const m: Translation<typeof en> = {
     followup: "Review 修正",
     sync: "解衝突",
   },
-  sourceTitle: ({ version }) => `Ponytail ${version} 原始專案`,
+  credit: {
+    text: ({ version }) =>
+      `效率模式以 DietrichGebert 的 Ponytail ${version}（MIT 授權）為基礎：輕量模式提供 Agent 其原則的精簡改寫，完整模式提供完整規則，關閉則兩者都不加入。`,
+    link: "Ponytail 原始專案",
+  },
   inputTokens: "輸入 tokens",
   cachedInputTokens: "其中快取命中",
   outputTokens: "輸出 tokens",
