@@ -58,10 +58,31 @@ earlier render had and how it was fixed before this one.
 | S10 Publish | 1922, 1992, 1996, 2010, 2049, 2098 | ok: the PR preview scrolls to the description, "Open the sample Draft PR", the top of the page with the Sample project badge, "Draft PR opened · Sample: not created on GitHub". Fixed: the clip scrolled through the whole draft to reach the card (it now cuts as the dialog closes); a sliver of the top bar and a cut-off "Smart GET retries". |
 | S11 End | 2099, 2102, 2104, 2179 | ok: the logo drops in on the measured hit (frame 2099) and settles at 2104; `npx bell-pr`, "Free · Pro · 14-day trial" and the non-affiliation line arrive on the next beats; no homepage while `shared/product.ts` has none. Balanced on the card. |
 
+A second pass (the review) checked the frame edges: in every held view the
+top and bottom edges were measured against the captured frames, so that no
+line of text or element is cut in half there. Fixed in that pass, all by
+camera keys in `src/timeline.json` (no new capture):
+
+- S3: after the import, the toast showed as a dark sliver at the bottom
+  edge. The view now runs from the top bar to the main users row.
+- S4 and S5: a half line of text sat at the top edge during the analysis,
+  and the "Showing 1-3 of 3 visible recommendations" line was half cut at
+  the end of S4 and the start of S5.
+- S5: a line of the task dialog was half cut at the top of its last still.
+- S7: the top edge cut the toolbar and the panel title, and a sliver of the
+  green approve button showed at the bottom. The camera now holds one
+  steady view at 1.5x from the panel tabs to the footers.
+- S8: the active tab's underline showed as a green sliver at the top edge.
+- S9: the stepper was still half cut at the top of the guidance still (the
+  earlier fix covered the checklist only). The guidance now shows the
+  whole stepper.
+- S10: a half line of text sat at the bottom edge under the published card.
+
 Every frame: no blank, white or loading frame; no scrollbar or caret; no
 real login, e-mail address, token, host name or home path (the import
 dialog's hint shows the product's fictional `/home/you/projects/repository`);
-text readable at 1080p (UI at 1.2-1.46x of its 1440 px layout).
+text readable at 1080p (most views show the UI at 1.19-1.5x of its 1440 px
+layout).
 
 ## Human: before publishing (OWNER SIGN-OFF)
 
