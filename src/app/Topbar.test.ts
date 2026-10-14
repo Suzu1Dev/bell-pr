@@ -98,6 +98,20 @@ test("the top bar links the open repository on GitHub with text, never a bare ic
     assert.equal(gitHubUrl(url), undefined, String(url));
 });
 
+test("the sample badge sits in the bar's row between the page name and the actions", () => {
+  assert.doesNotMatch(renderEn(element({ presenting: true })), /presentation-sample-badge/);
+  const html = renderEn(element({ presenting: true, sampleBadge: true }));
+  assert.match(
+    html,
+    /<span class="breadcrumb-page">Workbench<\/span><\/div><p class="presentation-sample-badge">Sample project<\/p><div class="topbar-right">/,
+  );
+  assertNoHan(html);
+  assert.match(
+    renderZh(element({ presenting: true, sampleBadge: true })),
+    /<p class="presentation-sample-badge">示範專案<\/p>/,
+  );
+});
+
 test("the avatar shows the GitHub user's initials, and an icon otherwise or while presenting", () => {
   assert.match(renderEn(element({ githubUser: "octo-cat" })), /aria-label="Profile settings">OC<\/button>/);
   assert.match(renderEn(element()), /aria-label="Profile settings"><svg/);

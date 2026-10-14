@@ -1033,6 +1033,7 @@ function AppShell({
           presenting={presentation.present}
           repoUrl={titleRepo && titleRepo !== sample.repo ? titleRepo.url : undefined}
           githubUser={status?.githubUser ?? ""}
+          sampleBadge={presentation.present && showingSample}
         />
         {sessionNotice}
         {apiError && !sessionNotice && (
@@ -1286,9 +1287,6 @@ function AppShell({
       )}
       {/* Mounted once: every 402 and locked control opens it. */}
       <UpgradeDialog summary={entitlements.summary} demo={presentation.play} />
-      {presentation.present && showingSample && (
-        <p className="presentation-sample-badge">{t.presentation.sampleBadge}</p>
-      )}
       {presentation.cursor && <PresentationCursor />}
       {/* Outside the inert shell in the page, so it alone stays usable. */}
       {blocked &&

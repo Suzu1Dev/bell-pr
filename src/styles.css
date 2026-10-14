@@ -412,17 +412,16 @@ button {
   font: inherit;
   color: var(--color-text-muted);
 }
-/* Presentation mode (src/app/presentation.ts). present=1 keeps a badge on
-   screen while the sample shows; cursor=1 draws a ring around the pointer;
-   capture=1 (data-capture on <html>) hides scrollbars and the caret. */
-/* Top center, in the top bar's empty middle: in a corner it covered the
-   review footer's Approve button. */
+/* Presentation mode (src/app/presentation.ts). present=1 shows a badge in
+   the top bar while the sample shows; cursor=1 draws a ring around the
+   pointer; capture=1 (data-capture on <html>) hides scrollbars and the
+   caret. */
+/* In the top bar's own row (Topbar.tsx), between the page name and the
+   actions: fixed in a corner it covered the review footer's Approve button,
+   and fixed at the top center the page name at narrow widths. */
 .presentation-sample-badge {
-  position: fixed;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 150;
+  flex: none;
+  margin: 0 12px;
   padding: 6px 12px;
   border: 1px solid var(--color-brand-200);
   border-radius: var(--radius-pill);

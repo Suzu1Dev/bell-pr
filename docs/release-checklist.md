@@ -165,10 +165,13 @@ inside its sandbox. The macOS canary is **OWNER**.
   zh-TW at 1280, 1440 and 390 px: 114 images in
   [`docs/images/en/`](images/en/) and [`docs/images/zh-TW/`](images/zh-TW/),
   with the sample project in presentation mode and a frozen clock.
-  `expectNoOverflow` passed on every view.
+  `expectNoOverflow` passed on every view, and the "Sample project" badge
+  covers nothing in the top bar there and at 768 and 1024 px.
 - Found and fixed: at 1280 px the diff toolbar's branch label and the file
   name were cut off in the narrow diff pane; the presentation "Sample
-  project" badge covered the Approve button.
+  project" badge covered the Approve button, and once moved to the top
+  center, the page name at phone and tablet widths. It now sits in the top
+  bar's own row.
 - [ ] Visual review of the set by the product lead: **OWNER SIGN-OFF**.
 
 ### Manual QA
@@ -220,8 +223,9 @@ inside its sandbox. The macOS canary is **OWNER**.
 - GitHub projects are cloned in full, so private repositories and
   sandboxed agents can read old file contents.
 - The diff toolbar and the file name fit a narrow diff pane; the
-  presentation badge no longer covers the Approve button; the sample run
-  shows its efficiency mode.
+  presentation badge sits in the top bar's row, covering neither the
+  Approve button nor the page name; the sample run shows its efficiency
+  mode.
 - The command palette, the learning page and the task and model dialogs
   load on demand (startup chunk 106.3 kB to 97.8 kB gzip); the welcome
   screen has its own error boundary; the document title is left to the app

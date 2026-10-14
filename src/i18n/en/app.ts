@@ -84,7 +84,7 @@ const app = {
   },
   /** Presentation mode (present=1). */
   presentation: {
-    /** The badge that stays on screen while the sample project is shown. */
+    /** The top bar's badge while the sample project is shown. */
     sampleBadge: "Sample project",
   },
   errorBoundary: {

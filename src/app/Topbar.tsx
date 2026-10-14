@@ -60,6 +60,11 @@ interface TopbarProps {
   repoUrl?: string;
   /** The signed-in GitHub login; "" when there is none. */
   githubUser: string;
+  /**
+   * present=1 while the sample project shows: a "Sample project" badge in
+   * the bar's own row, so it never covers the page name or the actions.
+   */
+  sampleBadge?: boolean;
 }
 
 /** The top bar: menu toggles, breadcrumb, quick switch, readiness and profile. */
@@ -76,6 +81,7 @@ export function Topbar({
   presenting,
   repoUrl,
   githubUser,
+  sampleBadge = false,
 }: TopbarProps) {
   const t = useT("app");
   const commandShortcut = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? "⌘ K" : "Ctrl K";
@@ -125,6 +131,9 @@ export function Topbar({
         <ChevronRight size={13} className="breadcrumb-separator" aria-hidden="true" />
         <span className="breadcrumb-page">{t.pages[page]}</span>
       </div>
+      {sampleBadge && (
+        <p className="presentation-sample-badge">{t.presentation.sampleBadge}</p>
+      )}
       <div className="topbar-right">
         <button
           className="workspace-command"
