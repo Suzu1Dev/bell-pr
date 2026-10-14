@@ -188,6 +188,12 @@ function AppRoot() {
   useEffect(() => {
     if (!route) navigateTo({ name: "home" }, { replace: true });
   }, [route]);
+  const appTitle = useT("app").title;
+  // AppShell names each page; until it shows (the start, Welcome), the
+  // document carries the app's title in the active language.
+  useEffect(() => {
+    if (view !== "shell") document.title = appTitle;
+  }, [view, appTitle]);
   const next = startView(data);
   if (view === "pending" && next !== "pending") setView(next);
   const [initialModal, setInitialModal] = useState<ModalName>(null);

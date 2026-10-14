@@ -201,6 +201,20 @@ test("#/home?locale=en reads English over a saved zh-TW and leaves it saved", as
   expect(await page.evaluate((key) => localStorage.getItem(key), localeStorageKey)).toBe("zh-TW");
 });
 
+test("Welcome carries the app's title in the reader's language", async ({ browser }) => {
+  const server = await launchServer({ settingsPut: false });
+  const { page, close } = await openOn(browser, server);
+  try {
+    await page.goto("/#/home?locale=zh-TW");
+    await expect(page.locator(".welcome-screen")).toBeVisible();
+    await expect(page.locator(".app-shell")).toHaveCount(0);
+    await expect(page).toHaveTitle(appZh.title);
+  } finally {
+    await close();
+    await server.stop();
+  }
+});
+
 test("a fresh data dir shows Welcome with the license step, and finishing lands on Home", async ({ browser }) => {
   const server = await launchServer({ settingsPut: false });
   const { page, close } = await openOn(browser, server);
