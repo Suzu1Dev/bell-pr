@@ -197,7 +197,7 @@ export function AboutDialog({
           </dd>
         </div>
       </dl>
-      <p className="visually-hidden" role="status">
+      <p className="about-status about-path-status" role="status">
         {pathCopy === "copied" ? t.copied : pathCopy === "failed" ? t.copyFailed : ""}
       </p>
       {mismatch && (
