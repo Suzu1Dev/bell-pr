@@ -1,5 +1,8 @@
 /** Project analysis, discovery, draft and explanation messages. */
 import type { DiscoverySort } from "../../../shared/discovery.js";
+import { formatters } from "../../../shared/i18n/locale.js";
+
+const fmt = formatters("en");
 
 /** README, CONTRIBUTING or PR template: the documents discovery reads. */
 type DiscoveryDocument = "readme" | "contributing" | "template";
@@ -119,7 +122,7 @@ export default {
     popularityWithoutPush: ({ stars, forks }: { stars: string; forks: string }) =>
       `GitHub snapshot: ${stars} stars, ${forks} forks, no last push date provided. Popularity does not guarantee that a proposal will be accepted.`,
     skippedDifficulty: ({ count }: { count: number }) =>
-      count === 1
+      fmt.plural(count) === "one"
         ? "Skipped 1 suggestion above the chosen difficulty."
         : `Skipped ${count} suggestions above the chosen difficulty.`,
     fileTooLarge: "The saved discovery results file is too large to load safely.",
@@ -153,7 +156,7 @@ export default {
     unusableAnswer:
       "The AI discovery analysis did not finish, or its response cannot be used safely. Try again; the previous result is kept.",
     found: ({ count }: { count: number }) =>
-      count === 1
+      fmt.plural(count) === "one"
         ? "Found 1 contribution opportunity backed by sources. Check the maintainers' interest and the scope of the work before you start."
         : `Found ${count} contribution opportunities backed by sources. Check the maintainers' interest and the scope of the work before you start.`,
     noneFound:
@@ -277,7 +280,7 @@ export default {
     searchScope:
       "The local rule search covers the common contribution guides, READMEs, maintainer documents and PR templates in the base commit's root, .github, docs and documentation folders, AGENTS.md and CLAUDE.md in the root, and the .github/workflows files that check pull requests automatically. Links to other places in those documents are not followed.",
     automationLimit: ({ max, remaining }: { max: number; remaining: number }) =>
-      remaining === 1
+      fmt.plural(remaining) === "one"
         ? `At most ${max} pull request check workflows are included; 1 more workflow was not checked.`
         : `At most ${max} pull request check workflows are included; ${remaining} more workflows were not checked.`,
     workflowScanLimit: ({ total, max }: { total: number; max: number }) =>
@@ -340,7 +343,7 @@ export default {
     certifiesForPerson:
       "A PR draft cannot sign off, endorse or tick confirmation items on your behalf.",
     placeholdersInBody: ({ count, lines }: { count: number; lines: string }) =>
-      `The PR draft put to-dos or unfilled template fields into the description that is sent to GitHub (${count === 1 ? "line" : "lines"} ${lines}). Generate it again.`,
+      `The PR draft put to-dos or unfilled template fields into the description that is sent to GitHub (${fmt.plural(count) === "one" ? "line" : "lines"} ${lines}). Generate it again.`,
     /** Put above the summary when the Linux defaults stand in for rules not found. */
     provisionalLinuxPolicy:
       "Looking up the project's sources was limited or incomplete, so the Linux contribution writing principles are used for now. Check the project's own rules before you publish.",
@@ -393,7 +396,7 @@ export default {
     partialChecks: ({ shown, total }: { shown: number; total: number }) =>
       `Only the first ${shown} of ${total} CI checks were read.`,
     dropped: ({ count, limit }: { count: number; limit: number }) =>
-      count === 1
+      fmt.plural(count) === "one"
         ? `1 comment was left out: it is over the limit of ${limit}, or its link does not belong to this PR.`
         : `${count} comments were left out: they are over the limit of ${limit}, or their links do not belong to this PR.`,
     partialLabels: ({ shown, total }: { shown: number; total: number }) =>

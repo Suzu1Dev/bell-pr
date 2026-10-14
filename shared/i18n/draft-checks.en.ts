@@ -2,15 +2,19 @@
  * Messages of the PR text checks in shared/draft-checks.ts (English). The
  * server, the draft tab and the publish dialog all show them.
  */
+import { formatters } from "./locale.js";
+
+const fmt = formatters("en");
+
 const messages = {
   placeholder: ({ count }: { count: number }) =>
-    `The PR description still has ${count === 1 ? "1 unfinished spot" : `${count} unfinished spots`}. This text is sent to GitHub exactly as written: replace it with the current facts or delete it, and keep to-dos in the checklist. If you are describing a TODO comment or file itself, wrap it in backticks, for example \`TODO\`.`,
+    `The PR description still has ${fmt.plural(count) === "one" ? "1 unfinished spot" : `${count} unfinished spots`}. This text is sent to GitHub exactly as written: replace it with the current facts or delete it, and keep to-dos in the checklist. If you are describing a TODO comment or file itself, wrap it in backticks, for example \`TODO\`.`,
   placeholderLine: ({ line, text }: { line: number; text: string }) =>
     `Line ${line}: "${text}"`,
   unchecked:
     "Every checkbox in these sections is unticked and will be sent as it is. The project's template or automated checks may require ticking them; tick only what you actually did or confirmed.",
   uncheckedSection: ({ heading, count }: { heading: string; count: number }) =>
-    count === 1
+    fmt.plural(count) === "one"
       ? `${heading}: its 1 item is unticked`
       : `${heading}: all ${count} items are unticked`,
   /** Stands in for the heading of task items above the first heading. */
