@@ -835,7 +835,10 @@ button {
   border: 1px solid var(--color-border-strong);
   border-radius: 8px;
   background: var(--color-surface);
-  overflow: hidden;
+  /* clip, not hidden: the corners stay clipped without making the card a
+     scroll container, so sticky content inside (the project overview's
+     section nav) sticks to the page. */
+  overflow: clip;
   box-shadow: var(--shadow-2);
 }
 .review-toolbar {
