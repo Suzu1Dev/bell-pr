@@ -2958,8 +2958,14 @@ button {
   }
   .review-footer > div:last-child {
     width: 100%;
+    flex-wrap: wrap;
     justify-content: space-between;
     gap: 8px;
+  }
+  /* When it does not fit beside the reviewed count, the button moves below
+     it and stays at the end. */
+  .review-footer > div:last-child > .button {
+    margin-left: auto;
   }
   .footer-reviewed {
     font-size: var(--text-2xs);
