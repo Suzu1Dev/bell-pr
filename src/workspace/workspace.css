@@ -85,6 +85,14 @@
   visibility: visible;
   opacity: 1;
 }
+.title-row .unsandboxed-badge.opens-left .unsandboxed-help {
+  right: 0;
+  left: auto;
+}
+.title-row .unsandboxed-badge.is-dismissed .unsandboxed-help {
+  visibility: hidden;
+  opacity: 0;
+}
 
 /* Notes under the heading: queued on Free, files cleaned up. */
 .run-notices {
