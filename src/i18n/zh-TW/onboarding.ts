@@ -67,6 +67,7 @@ const m: Translation<typeof en> = {
     importText: "從 GitHub 或這台電腦帶入專案，開始貢獻。",
     discover: "尋找可以貢獻的專案",
     discoverText: "在 GitHub 上搜尋歡迎你提供這類協助的專案。",
+    discoverTextFree: "免費方案可查看範例結果；在 GitHub 上搜尋專案需要 Pro 或 14 天試用。",
     discoverDisabled: "請先安裝並登入 GitHub CLI。",
     finishFailed: ({ message }) => `無法完成設定：${message}`,
   },

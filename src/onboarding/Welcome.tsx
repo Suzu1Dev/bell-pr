@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { AppSettings } from "../../shared/app-settings";
 import type { DoctorReport } from "../../shared/doctor";
+import type { LicenseSummary } from "../../shared/plans";
 import {
   agentProviders,
   providerLabels,
@@ -23,6 +24,8 @@ import { eulaVersion } from "../../shared/product";
 import { api, send } from "../api";
 import { useLocale, useT } from "../i18n";
 import { LanguageSwitcher, saveLocale } from "../i18n/LanguageSwitcher";
+import { ProBadge } from "../license/ProBadge";
+import { useEntitlements } from "../license/useEntitlements";
 import { readinessOf } from "../setup/ReadinessNotice";
 import { SetupChecklist } from "../setup/SetupChecklist";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
@@ -84,6 +87,9 @@ export function readyProviders(report: DoctorReport | null): AgentProvider[] {
   return agentProviders.filter((provider) => ok(provider) && ok(`${provider}-auth`));
 }
 
+/** No status given: useEntitlements then fetches the license. */
+const noStatus = {};
+
 export interface WelcomeProps {
   /** Called once setup is finished (onboardingCompletedAt is saved). */
   onFinish: (choice: WelcomeChoice) => void;
@@ -91,6 +97,11 @@ export interface WelcomeProps {
   settings?: AppSettings | null;
   /** A useDoctor() state to share; Welcome loads its own otherwise. */
   doctor?: DoctorState;
+  /**
+   * GET /api/status, for the plan: on Free, discovery shows sample results
+   * and is marked PRO. Without it Welcome fetches the license.
+   */
+  status?: { license?: LicenseSummary } | null;
   maskUser?: (value: string) => string;
   maskPath?: (value: string) => string;
   /** The step to open on; the first one by default. */
@@ -107,6 +118,7 @@ export function Welcome({
   onFinish,
   settings,
   doctor,
+  status,
   maskUser,
   maskPath,
   initialStep = "language",
@@ -115,6 +127,7 @@ export function Welcome({
   const [locale] = useLocale();
   const own = useDoctor({ enabled: !doctor });
   const environment = doctor ?? own;
+  const plan = useEntitlements(status ?? noStatus);
   const [step, setStep] = useState<WelcomeStep>(initialStep);
   const [acceptedVersion, setAcceptedVersion] = useState(
     settings?.eulaAcceptedVersion,
@@ -275,6 +288,7 @@ export function Welcome({
         {step === "start" && (
           <StartStep
             report={environment.report}
+            discoveryLocked={plan.locked("discovery")}
             busy={busy}
             onChoose={(choice) => void finish(choice)}
           />
@@ -446,10 +460,13 @@ function ProviderStep({
 /** Where to start; finding a project needs the GitHub CLI. */
 function StartStep({
   report,
+  discoveryLocked,
   busy,
   onChoose,
 }: {
   report: DoctorReport | null;
+  /** Free: discovery shows sample results; searching GitHub needs Pro. */
+  discoveryLocked: boolean;
   busy: boolean;
   onChoose: (choice: WelcomeChoice) => void;
 }) {
@@ -458,7 +475,12 @@ function StartStep({
   const choices = [
     { id: "tour", icon: CirclePlay, title: t.tour, text: t.tourText },
     { id: "import", icon: FolderGit2, title: t.import, text: t.importText },
-    { id: "discover", icon: Compass, title: t.discover, text: t.discoverText },
+    {
+      id: "discover",
+      icon: Compass,
+      title: t.discover,
+      text: discoveryLocked ? t.discoverTextFree : t.discoverText,
+    },
   ] as const;
   return (
     <div className="welcome-body welcome-choices">
@@ -476,7 +498,14 @@ function StartStep({
           >
             <Icon size={22} aria-hidden="true" />
             <span className="welcome-choice-text">
-              <strong>{title}</strong>
+              {id === "discover" && discoveryLocked ? (
+                <span className="welcome-choice-title">
+                  <strong>{title}</strong>
+                  <ProBadge />
+                </span>
+              ) : (
+                <strong>{title}</strong>
+              )}
               <span>{text}</span>
               {blocked && (
                 <span id={reason} className="welcome-choice-reason">

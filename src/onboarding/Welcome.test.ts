@@ -160,6 +160,25 @@ test("the last step offers the tour, an import and discovery, which waits for th
   assert.doesNotMatch(github, /welcome-choice-reason/);
 });
 
+test("on Free, discovery is marked PRO and says Free shows sample results", () => {
+  const free = { license: { plan: "free" as const, source: "none" as const, status: "none" as const } };
+  const html = renderEn(welcome("start", { doctor: doctor(both), status: free }));
+  assertNoHan(html);
+  assert.match(
+    html,
+    /<span class="welcome-choice-title"><strong>Find a project to contribute to<\/strong><span class="pro-badge" role="img" aria-label="Pro feature"[^>]*>PRO<\/span><\/span><span>See sample results on Free\. Searching GitHub for projects needs Pro or the 14-day trial\.<\/span>/,
+  );
+  // Still a choice: Free gets the sample results.
+  assert.equal(html.match(/<button type="button" class="welcome-choice">/g)?.length, 3);
+  const zh = renderZh(welcome("start", { doctor: doctor(both), status: free }));
+  assert.match(zh, /免費方案可查看範例結果；在 GitHub 上搜尋專案需要 Pro 或 14 天試用。/);
+  const trial = renderEn(
+    welcome("start", { doctor: doctor(both), status: { license: { ...free.license, plan: "trial", source: "trial", status: "active" } } }),
+  );
+  assert.doesNotMatch(trial, /pro-badge|sample results/);
+  assert.match(trial, /Search GitHub for projects that welcome the kind of help you want to give\./);
+});
+
 test("the provider is saved without losing a model chosen for it", () => {
   // Nothing saved yet (the doctor's default shows): save the choice.
   assert.deepEqual(providerUpdate({ provider: "claude", model: "", reasoningEffort: "" }, "claude"), {

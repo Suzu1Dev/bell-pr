@@ -73,6 +73,9 @@ export default {
     importText: "Bring a project from GitHub or from this computer and start contributing.",
     discover: "Find a project to contribute to",
     discoverText: "Search GitHub for projects that welcome the kind of help you want to give.",
+    /** On Free: discovery shows sample results only. */
+    discoverTextFree:
+      "See sample results on Free. Searching GitHub for projects needs Pro or the 14-day trial.",
     discoverDisabled: "Install and sign in to the GitHub CLI first.",
     finishFailed: ({ message }: { message: string }) =>
       `Setup could not be finished: ${message}`,
