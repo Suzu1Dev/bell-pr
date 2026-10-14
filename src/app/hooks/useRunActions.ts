@@ -7,7 +7,7 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
-import { api, send } from "../../api";
+import { api, ApiError, send } from "../../api";
 import { demoAnswer, getDemo } from "../../demo";
 import { useLocale, useT, type Messages } from "../../i18n";
 import type { Repo, Run, RunSummary, DiffFile, ChatMessage } from "../../types";
@@ -23,6 +23,21 @@ import {
 } from "./demoStorage";
 import type { DraftEditor } from "./useDraftEditor";
 import type { TaskSetup } from "./useTaskSetup";
+
+/**
+ * The run's changed files. A run whose working files were cleaned up
+ * (410 `workspace_removed`) has none to show, but its reports, notes and
+ * explanations stay readable, so it still opens.
+ */
+export async function readRunFiles(id: string): Promise<DiffFile[]> {
+  try {
+    return (await api<{ files: DiffFile[] }>(`/runs/${id}/diff`)).files;
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "workspace_removed")
+      return [];
+    throw error;
+  }
+}
 
 /** Persisted Q&A keyed the way the chat state is (`${runId}:${path}`). */
 function savedMessages(run: Run): Record<string, ChatMessage[]> {
@@ -183,12 +198,12 @@ export function useRunActions({
   async function reloadRun(id: string) {
     const epoch = draft.draftMutationEpoch.current;
     try {
-      const [current, diff] = await Promise.all([
+      const [current, files] = await Promise.all([
         api<{ run: Run }>(`/runs/${id}`),
-        api<{ files: DiffFile[] }>(`/runs/${id}/diff`),
+        readRunFiles(id),
       ]);
       if (runIdRef.current !== id) return;
-      setFiles(diff.files);
+      setFiles(files);
       // A draft saved meanwhile is newer than this read.
       if (epoch === draft.draftMutationEpoch.current) setRun(current.run);
     } catch {
@@ -282,9 +297,9 @@ export function useRunActions({
         setFiles(demoContent.files);
         setSelectedPath(demoContent.files[0]?.path || "");
       } else {
-        const [r, f] = await Promise.all([
+        const [r, files] = await Promise.all([
           api<{ run: Run }>(`/runs/${id}`),
-          api<{ files: DiffFile[] }>(`/runs/${id}/diff`),
+          readRunFiles(id),
         ]);
         if (sequence !== selectionSequence.current || intent !== navigationIntent.current) return false;
         if (
@@ -297,8 +312,8 @@ export function useRunActions({
           return false;
         }
         setRun(r.run);
-        setFiles(f.files);
-        setSelectedPath(f.files[0]?.path || "");
+        setFiles(files);
+        setSelectedPath(files[0]?.path || "");
         saved = savedMessages(r.run);
       }
       setTab("overview");
@@ -320,10 +335,10 @@ export function useRunActions({
     }
     const id = run.id;
     try {
-      const result = await api<{ files: DiffFile[] }>(`/runs/${id}/diff`);
+      const files = await readRunFiles(id);
       const current = await api<{ run: Run }>(`/runs/${id}`);
       if (runIdRef.current !== id) return;
-      setFiles(result.files);
+      setFiles(files);
       setRun(current.run);
       notify(t.refreshed);
     } catch (error) {

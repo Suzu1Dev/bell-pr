@@ -3,7 +3,7 @@ import test from "node:test";
 import { assertNoHan } from "../../test-utils/render";
 import en from "../../i18n/en";
 import zhTW from "../../i18n/zh-TW";
-import { stopNotice } from "./useRunActions";
+import { readRunFiles, stopNotice } from "./useRunActions";
 import type { Run } from "../../types";
 
 const zh = zhTW.workspace.notices;
@@ -88,4 +88,25 @@ test("each stop notice reads in the UI language", () => {
     assert.equal(notice, expected);
     assertNoHan(notice);
   }
+});
+
+test("a run whose working files were cleaned up still opens, with no files to show", async (t) => {
+  const realFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = realFetch;
+  });
+  let answer: Response;
+  globalThis.fetch = (async () => answer) as typeof fetch;
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+  answer = json(410, { error: "Files were cleaned up.", code: "workspace_removed" });
+  assert.deepEqual(await readRunFiles("r"), []);
+  answer = json(200, { files: [{ path: "a.ts" }] });
+  assert.deepEqual(await readRunFiles("r"), [{ path: "a.ts" }]);
+  // Any other failure is still reported.
+  answer = json(404, { error: "Run not found." });
+  await assert.rejects(readRunFiles("r"), { status: 404, message: "Run not found." });
 });
