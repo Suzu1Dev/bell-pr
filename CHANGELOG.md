@@ -76,9 +76,9 @@ There is no BELL PR cloud, no telemetry and no account.
 
 - Sign-in: the server keeps a random session secret in memory only and
   prints a sign-in link at start; `bell-pr open` asks the running server
-  for a one-time link. The session cookie is named after the port
-  (`bellpr_session_<port>`), so two servers on one computer keep their
-  sessions apart.
+  for a one-time link. The session cookie is named after the port in
+  the browser's address (`bellpr_session_<port>`), so two servers on one
+  computer keep their sessions apart.
 - Only this computer's addresses (or a configured HTTPS proxy origin) are
   accepted, cross-site requests are refused, and a strict Content Security
   Policy applies.

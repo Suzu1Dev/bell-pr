@@ -390,7 +390,9 @@ test("invalid origin configuration fails startup before creating application dat
 });
 
 /** A BELL server that requires sign-in, and a request helper that keeps headers and body. */
-async function signInServer(options: { sessionToken?: string; port?: number } = {}) {
+async function signInServer(
+  options: { sessionToken?: string; port?: number; publicUrl?: string } = {},
+) {
   const directory = await mkdtemp(path.join(tmpdir(), "bell-pr-auth-"));
   const workbench = new Workbench(new Store(directory));
   workbench.importRepository = async () => ({
@@ -402,11 +404,15 @@ async function signInServer(options: { sessionToken?: string; port?: number } = 
     defaultBranch: "main",
     url: "",
   });
-  const appPort = options.port ?? 4311;
+  // The address the browser uses: the public URL's when there is one.
+  const host = options.publicUrl
+    ? new URL(options.publicUrl).host
+    : `127.0.0.1:${options.port ?? 4311}`;
   const app = createApp(workbench, {
     staticDirectory: path.join(directory, "missing"),
     sessionToken: options.sessionToken,
     ...(options.port ? { port: options.port } : {}),
+    ...(options.publicUrl ? { publicUrl: options.publicUrl } : {}),
   });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -426,7 +432,7 @@ async function signInServer(options: { sessionToken?: string; port?: number } = 
           {
             method,
             headers: {
-              host: `127.0.0.1:${appPort}`,
+              host,
               ...(body ? { "content-type": "application/json" } : {}),
               ...headers,
             },
@@ -567,9 +573,13 @@ test("GET /auth signs the browser in with the session secret and moves on with a
   }
 });
 
-test("two servers on one host keep their sessions apart: the cookie is named after the port", async () => {
+test("two servers on one host keep their sessions apart: the cookie is named after the browser's port", async () => {
   const npx = await signInServer({ sessionToken });
-  const docker = await signInServer({ sessionToken: "D".repeat(43), port: 4535 });
+  // Docker listens on 4311 inside its container and is published on 4535.
+  const docker = await signInServer({
+    sessionToken: "D".repeat(43),
+    publicUrl: "http://localhost:4535",
+  });
   try {
     const npxCookie = (await npx.send(`/auth?t=${sessionToken}`)).headers["set-cookie"]![0].split(";")[0];
     const dockerCookie = (await docker.send(`/auth?t=${"D".repeat(43)}`)).headers["set-cookie"]![0].split(";")[0];

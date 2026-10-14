@@ -60,19 +60,20 @@ export interface GuardOptions {
    * (development mode).
    */
   sessionToken?: string;
-  /** The session cookie's name: `sessionCookieName(ports[0])` by default. */
-  sessionCookie?: string;
   /** Paths reachable without a session, with everything below them. */
   publicPaths: string[];
 }
 
 /**
- * The cookie that carries the session secret, named after the server's
- * port. Browsers keep cookies per host, not per port, so two servers on one
- * host (npx on 4311 and Docker on 4535) would otherwise overwrite each
- * other's cookie and sign each other out.
+ * The cookie that carries the session secret, named after the port in the
+ * address the browser uses (the Host header; 80 or 443 when it names
+ * none). Browsers keep cookies per host, not per port, so two servers on
+ * one host (npx on 4311 and Docker published on 4535, which listens on
+ * 4311 inside its container) would otherwise overwrite each other's cookie
+ * and sign each other out.
  */
-export function sessionCookieName(port: number) {
+export function sessionCookieName(req: Request) {
+  const port = /:(\d+)$/.exec(req.headers.host ?? "")?.[1] ?? (req.secure ? "443" : "80");
   return `bellpr_session_${port}`;
 }
 /** How long a browser stays signed in: 30 days. */
@@ -99,9 +100,9 @@ export function requestCookie(req: Request, name: string) {
   return undefined;
 }
 
-/** True when the request carries the cookie `name` holding `sessionToken`. */
-export function hasSession(req: Request, sessionToken: string, name: string) {
-  const value = requestCookie(req, name);
+/** True when the request carries the session cookie for `sessionToken`. */
+export function hasSession(req: Request, sessionToken: string) {
+  const value = requestCookie(req, sessionCookieName(req));
   return !!value && sameSecret(value, sessionToken);
 }
 
@@ -204,7 +205,6 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
     ...[...allowedOrigins].map((origin) => new URL(origin).host),
   ]);
   const sessionToken = opts.sessionToken;
-  const cookieName = opts.sessionCookie ?? sessionCookieName(opts.ports[0]);
   const publicPath = (requestPath: string) =>
     opts.publicPaths.some(
       (entry) => requestPath === entry || requestPath.startsWith(`${entry}/`),
@@ -234,7 +234,7 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
       res.status(403).json({ error: sm().common.crossOriginNotAllowed });
       return;
     }
-    if (sessionToken && !publicPath(req.path) && !hasSession(req, sessionToken, cookieName)) {
+    if (sessionToken && !publicPath(req.path) && !hasSession(req, sessionToken)) {
       if (api)
         res
           .status(401)
