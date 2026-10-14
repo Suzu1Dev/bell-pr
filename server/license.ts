@@ -877,11 +877,15 @@ export async function runLicenseCli(
   };
   const { tokens = [] } = parseArgs({
     args: argv,
-    options: { json: { type: "boolean" } },
+    options: { json: { type: "boolean" }, help: { type: "boolean", short: "h" } },
     strict: false,
     allowPositionals: true,
     tokens: true,
   });
+  if (tokens.some((token) => token.kind === "option" && token.name === "help")) {
+    stdout.write(`${m.license.cli.usage}\n`);
+    return 0;
+  }
   let json = false;
   const positionals: string[] = [];
   for (const token of tokens) {

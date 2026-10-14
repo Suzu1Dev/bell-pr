@@ -1087,6 +1087,11 @@ test("bell-pr license refuses mistakes, invalid keys and keys set in the environ
     assert.match(result.stderr, /Usage: bell-pr license/);
     assert.equal(result.stdout, "");
   }
+  for (const argv of [["--help"], ["activate", "-h"]]) {
+    const help = await cli(dataDir, argv);
+    assert.equal(help.code, 0);
+    assert.match(help.stdout, /^Usage: bell-pr license \[status \[--json\] \| activate <key> \| deactivate \| trial\]/);
+  }
   const invalid = await cli(dataDir, ["activate", issue({ kid: "other" })]);
   assert.equal(invalid.code, 1);
   assert.match(invalid.stderr, /cannot check this license key/);
