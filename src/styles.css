@@ -121,12 +121,15 @@ button {
 .sidebar > * {
   flex-shrink: 0;
 }
-/* The logo with the plan chip beside it; the collapsed rail keeps the mark. */
+/* The logo with the plan chip beside it; the collapsed rail keeps the mark.
+   The chips move below the logo when the narrower sidebar (1250 px and
+   below) or a longer chip leaves no room beside it. */
 .brand-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-1) 8px;
   min-height: 35px;
   margin-bottom: 32px;
   padding: 0 2px 0 12px;
