@@ -97,6 +97,9 @@ test("the explanation panel is reached in 5 or fewer Tab presses from the file l
   // role="toolbar" with a roving tabindex, for example through
   // src/a11y/useRovingList), the route cannot fit in 5 presses.
   const toolbarStops = stops.filter((stop) => stop.part === "toolbar").length;
+  // Everything else on the route already fits: counted with the toolbar as
+  // one stop, it is within the budget.
+  expect(stops.length - Math.max(toolbarStops - 1, 0), route).toBeLessThanOrEqual(5);
   test.fixme(
     toolbarStops > 1,
     `The diff toolbar in ChangesTab is ${toolbarStops} tab stops, so the route takes ${stops.length} presses:\n${route}`,
