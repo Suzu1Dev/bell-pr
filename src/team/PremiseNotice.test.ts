@@ -19,7 +19,7 @@ test("a premise check names its verdict, the assumption and the evidence, and sa
   assert.match(html, /前提查核：假設不成立/);
   assert.match(html, /呼叫端把自己產生的 id 交給瀏覽器。/);
   assert.match(html, /src\/web\/interviews\.rs:195/);
-  assert.match(html, /由 Lead 在規劃前閱讀程式碼得出/);
+  assert.match(html, /由 Lead 閱讀程式碼得出/);
   assert.match(render({ ...premise, verdict: "holds" }), /假設成立/);
   assert.match(render({ ...premise, verdict: "unclear" }), /無法確認假設/);
   // Compact keeps the evidence folded under a one-line summary.

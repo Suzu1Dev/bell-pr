@@ -676,14 +676,3 @@
   border-width: 0 0 1px;
   border-radius: 0;
 }
-.premise-overview:empty {
-  display: none;
-}
-.premise-overview {
-  margin: 0 28px 4px;
-}
-@media (max-width: 760px) {
-  .premise-overview {
-    margin: 0 16px 4px;
-  }
-}

@@ -377,6 +377,10 @@ export function createApp(
       .parse(req.body);
     res.json({ run: await workbench.saveNote(req.params.id, filePath, text) });
   });
+  app.post("/api/runs/:id/premise", async (req, res) => {
+    z.object({}).strict().parse(req.body ?? {});
+    res.json(await workbench.checkPremise(req.params.id));
+  });
   app.post("/api/runs/:id/review/rerun", async (req, res) => {
     res.json({ run: await workbench.rerunReview(req.params.id) });
   });

@@ -3,6 +3,7 @@ import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ProjectInsights } from "../../shared/insights";
+import type { AgentTeam } from "../../shared/team";
 import { demoInsights } from "./demo";
 import { ProjectOverview, type ProjectOverviewProps } from "./ProjectOverview";
 
@@ -117,4 +118,60 @@ test("unsampled reading steps are marked and dropped citations are listed; old c
   const legacy = render({ insights: analyzed });
   assert.doesNotMatch(legacy, /未抽樣，內容未讀/);
   assert.doesNotMatch(legacy, /因引用未抽樣／不存在的檔案而略過/);
+});
+
+test("the contribution brief shows the premise verdict and labels what still states the assumption", () => {
+  const base = {
+    id: "r",
+    repoId: "demo-repo",
+    title: "確認呼叫端使用回傳的 id",
+    prompt: "假設（未驗證）：呼叫端把自己產生的 id 交給瀏覽器。",
+    status: "review",
+    branch: "fix/abc",
+    baseBranch: "main",
+    createdAt: "2026-10-14T00:00:00Z",
+    agents: [],
+    logs: [],
+    draft: { title: "t", body: "b" },
+    reviewedFiles: [],
+  } as unknown as NonNullable<ProjectOverviewProps["run"]>;
+  const team: AgentTeam = {
+    config: { maxTeammates: 2, requirePlanApproval: false, provider: "claude", protocol: "bell-shared-tasks", messageDelivery: "between-turns" },
+    phase: "complete",
+    planSummary: "",
+    tasks: [],
+    messages: [],
+  };
+  const brief = {
+    problem: base.prompt,
+    motivation: "若此假設成立，候選人重新整理後就無法開始面試。",
+    beneficiaries: [],
+    before: "目前存在任務描述中的問題。",
+    after: "若此假設成立，候選人重新整理後就無法開始面試。",
+    validation: [],
+    risks: [],
+  };
+  const refuted = render({
+    run: {
+      ...base,
+      team: {
+        ...team,
+        premise: { verdict: "refuted", statement: "呼叫端交出自己產生的 id。", evidence: "src/web/interviews.rs:195 用的是回傳值。" },
+      },
+    },
+    brief,
+  });
+  assert.match(refuted, /前提查核：假設不成立/);
+  assert.match(refuted, /src\/web\/interviews\.rs:195/);
+  // The request's wording is kept but labelled on both cards that copy it.
+  assert.equal(refuted.match(/依你的假設，查證後不成立/g)?.length, 2);
+  assert.match(refuted, /若此假設成立，候選人重新整理後就無法開始面試。/);
+  assert.match(refuted, /上面依假設描述的問題與影響實際上不會發生/);
+
+  // A run made before premise checks offers one; without the action, nothing is offered.
+  const missing = render({ run: { ...base, team }, brief, onCheckPremise() {} });
+  assert.match(missing, /這個貢獻建立時還沒有前提查核/);
+  assert.match(missing, /依審查結果查核前提/);
+  assert.doesNotMatch(missing, /依你的假設/);
+  assert.doesNotMatch(render({ run: { ...base, team }, brief }), /依審查結果查核前提/);
 });

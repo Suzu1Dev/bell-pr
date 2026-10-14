@@ -1355,6 +1355,30 @@ export default function App() {
     );
     return lines;
   }
+  const [checkingPremise, setCheckingPremise] = useState(false);
+  async function checkPremise() {
+    const id = run.id;
+    setCheckingPremise(true);
+    try {
+      const result = await api<{
+        run: Run;
+        premise: { verdict: "holds" | "refuted" | "unclear" } | null;
+        files: DiffFile[];
+      }>(`/runs/${id}/premise`, send("POST", {}));
+      if (runIdRef.current !== id) return;
+      setRun(result.run);
+      setFiles(result.files);
+      notify(
+        result.premise
+          ? `前提查核完成：${{ holds: "假設成立", refuted: "假設不成立", unclear: "無法確認假設" }[result.premise.verdict]}。變更解說與程式碼解說會依結論重新產生。`
+          : "需求裡沒有需要查核的假設。",
+      );
+    } catch (error) {
+      notify((error as Error).message, "error");
+    } finally {
+      setCheckingPremise(false);
+    }
+  }
   async function copySetupCommand(command: string) {
     try {
       await navigator.clipboard.writeText(command);
@@ -2390,9 +2414,6 @@ export default function App() {
               >
                 {tab === "overview" && !demo && (
                   <>
-                    <div className="premise-overview">
-                      <PremiseNotice premise={run.team?.premise} />
-                    </div>
                     <SetupChecklist
                       needs={mergeSetupNeeds([
                         ...(run.team?.tasks ?? []).map((task) => ({
@@ -2436,6 +2457,18 @@ export default function App() {
                         : undefined
                     }
                     updatingRepo={updatingRepo}
+                    onCheckPremise={
+                      !demo &&
+                      run.team &&
+                      !run.team.premise &&
+                      !active &&
+                      ["review", "approved", "published", "failed", "cancelled"].includes(run.status) &&
+                      // Only a request that states an assumption has one to check.
+                      /假設|未驗證|hypothes|assum/i.test(run.prompt)
+                        ? () => void checkPremise()
+                        : undefined
+                    }
+                    checkingPremise={checkingPremise}
                   />
                 )}
                 {tab === "changes" && (

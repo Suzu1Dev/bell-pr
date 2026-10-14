@@ -72,10 +72,27 @@ const premiseSchema = z.object({
 });
 
 /** The lead's premise check, or undefined when there is none or it is malformed. */
-function premiseCheck(value: unknown): PremiseCheck | undefined {
+export function premiseCheck(value: unknown): PremiseCheck | undefined {
   const result = premiseSchema.safeParse(value);
   return result.success ? result.data : undefined;
 }
+
+/** A premise check in structured output: the check, or null when the request states no assumption. */
+export const premiseJsonSchema = {
+  anyOf: [
+    {
+      type: "object",
+      properties: {
+        verdict: { type: "string", enum: ["holds", "refuted", "unclear"] },
+        statement: { type: "string" },
+        evidence: { type: "string" },
+      },
+      required: ["verdict", "statement", "evidence"],
+      additionalProperties: false,
+    },
+    { type: "null" },
+  ],
+};
 
 /**
  * Hand-written JSON Schemas for the CLIs' structured output (Codex
@@ -88,21 +105,7 @@ export const teamPlanJsonSchema = {
   properties: {
     summary: { type: "string" },
     revisionNotes: { type: ["string", "null"] },
-    premise: {
-      anyOf: [
-        {
-          type: "object",
-          properties: {
-            verdict: { type: "string", enum: ["holds", "refuted", "unclear"] },
-            statement: { type: "string" },
-            evidence: { type: "string" },
-          },
-          required: ["verdict", "statement", "evidence"],
-          additionalProperties: false,
-        },
-        { type: "null" },
-      ],
-    },
+    premise: premiseJsonSchema,
     tasks: {
       type: "array",
       items: {
