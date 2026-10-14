@@ -14,6 +14,7 @@ import type {
 } from "../../../shared/insights";
 import type { AgentProvider } from "../../../shared/models";
 import { product } from "../../../shared/product";
+import type { ProviderState } from "../../mission/readiness";
 
 const fmt = formatters("en");
 const n = (value: number) => fmt.number(value);
@@ -335,6 +336,15 @@ const mission = {
         claude:
           "Uses the Claude Code CLI you installed and signed in to (Claude plan or Anthropic API key). Usage counts against your own account. Available models depend on your plan.",
       } satisfies Record<AgentProvider, string>,
+      /** A provider in the list with its state, for example "Codex — not signed in". */
+      providerOption: ({ provider, state }: { provider: string; state: string }) =>
+        `${provider} — ${state}`,
+      providerStates: {
+        ready: "ready",
+        missing: "not installed",
+        broken: "not working",
+        "signed-out": "not signed in",
+      } satisfies Record<ProviderState, string>,
       model: "Model",
       providerDefault: ({ provider, model }: { provider: string; model?: string }) =>
         `${provider} default${model ? ` · ${model}` : ""}`,

@@ -5,10 +5,12 @@ import {
   defaultContributionSettings,
   type ContributionSettings,
 } from "../../shared/insights";
+import type { DoctorCheck, DoctorReport } from "../../shared/doctor";
 import type { ModelCatalog } from "../../shared/models";
 import { freeEntitlements, proEntitlements } from "../../shared/plans";
 import { ApiError } from "../api";
 import { setLocale } from "../i18n";
+import type { DoctorState } from "../setup/useDoctor";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import {
   DirectionSettings,
@@ -311,8 +313,9 @@ test("no team size is reported back on Pro, in the demo or in the models-only fo
     try {
       assert.deepEqual(calls, [], JSON.stringify(options));
       assert.ok(!view.text().includes("Free runs up to"));
-      // Given the plan, the form reads no license.
+      // Given the plan, the form reads no license; the demo checks no environment.
       assert.ok(!urls.some((url) => url.startsWith("/api/license")), urls.join());
+      assert.equal(urls.some((url) => url.startsWith("/api/doctor")), !options.demo);
     } finally {
       await view.unmount();
     }
@@ -332,4 +335,64 @@ test("without a plan from its parent, the form reads the license once and then l
   } finally {
     await view.unmount();
   }
+});
+
+const check = (
+  id: DoctorCheck["id"],
+  status: DoctorCheck["status"],
+  extra: Partial<DoctorCheck> = {},
+): DoctorCheck => ({ id, status, required: false, ...extra });
+
+const doctor = (checks: DoctorCheck[]): DoctorState => ({
+  report: { checks, ready: true, checkedAt: "2026-10-14T00:00:00.000Z", platform: "linux" } satisfies DoctorReport,
+  checking: false,
+  error: "",
+  refresh: async () => {},
+});
+
+const environment = doctor([
+  check("codex", "ok", { version: "0.159.0" }),
+  check("codex-auth", "warn", {
+    reason: "signed-out",
+    detail: "Not signed in.",
+    fixes: [{ label: "Sign in to Codex", command: "codex login" }],
+  }),
+  check("claude", "ok"),
+  check("claude-auth", "ok", { detail: "Signed in." }),
+]);
+
+test("each provider says whether it is ready, and a selected provider that is not explains the fix", () => {
+  const codex = renderEn(props({ provider: "codex" }, { doctor: environment, demo: false }));
+  assertNoHan(codex);
+  assert.match(codex, /<option value="codex" selected="">Codex — not signed in<\/option>/);
+  assert.match(codex, /<option value="claude">Claude Code — ready<\/option>/);
+  assert.match(codex, /class="readiness-notice" role="status"/);
+  assert.match(codex, /Codex sign-in: Not signed in\./);
+  assert.match(codex, /codex login/);
+
+  const claude = renderEn(props({ provider: "claude" }, { doctor: environment, demo: false }));
+  assert.match(claude, /<option value="claude" selected="">Claude Code — ready<\/option>/);
+  assert.doesNotMatch(claude, /readiness-notice/);
+
+  const missing = renderEn(
+    props({ provider: "claude" }, {
+      doctor: doctor([check("codex", "warn", { reason: "broken" }), check("claude", "skip", { reason: "missing", detail: "Not installed." })]),
+      demo: false,
+    }),
+  );
+  assert.match(missing, /Codex — not working<\/option>/);
+  assert.match(missing, /Claude Code — not installed<\/option>/);
+  assert.match(missing, /Claude Code: Not installed\./);
+
+  // The demo needs no tools: plain names and no notice.
+  const demo = renderEn(props({ provider: "codex" }, { doctor: environment, demo: true }));
+  assert.match(demo, /<option value="codex" selected="">Codex<\/option>/);
+  assert.doesNotMatch(demo, /readiness-notice/);
+  // Before the report arrives the names stand alone.
+  assert.match(renderEn(props({}, { demo: false })), /<option value="codex" selected="">Codex<\/option>/);
+
+  assert.match(
+    renderZh(props({ provider: "codex" }, { doctor: environment, demo: false })),
+    /<option value="claude">Claude Code（已就緒）<\/option>/,
+  );
 });

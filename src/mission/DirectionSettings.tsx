@@ -41,7 +41,10 @@ import { api } from "../api";
 import { usePresentation } from "../app/presentation";
 import { useT } from "../i18n";
 import { ProBadge } from "../license/ProBadge";
+import { ReadinessMessage } from "../setup/ReadinessNotice";
+import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import { usePlan } from "./plan";
+import { providerReadiness, withProvider } from "./readiness";
 import "./mission.css";
 
 /** The efforts only Pro offers; "Default" is on every plan. */
@@ -86,10 +89,12 @@ export interface DirectionSettingsProps {
   /** What the plan unlocks, when the parent knows it; read otherwise. */
   entitlements?: Entitlements;
   /**
-   * The sample project: every Pro control is unlocked and marked PRO.
-   * Default: the `demo=play` flag.
+   * The sample project: every Pro control is unlocked and marked PRO, and
+   * provider readiness is not checked. Default: the `demo=play` flag.
    */
   demo?: boolean;
+  /** A useDoctor() state to share; the form loads its own otherwise. */
+  doctor?: DoctorState;
   /**
    * The model catalog to show before the request for it answers, such as a
    * fixture in tests. The form still loads the catalog when it mounts.
@@ -104,6 +109,7 @@ export function DirectionSettings({
   modelsOnly = false,
   entitlements,
   demo: demoProp,
+  doctor,
   initialCatalog,
 }: DirectionSettingsProps) {
   const { directions, settings: t } = useT("mission");
@@ -112,6 +118,8 @@ export function DirectionSettings({
   const presentation = usePresentation();
   const demo = demoProp ?? presentation.play;
   const plan = usePlan({ entitlements, demo });
+  const ownDoctor = useDoctor({ enabled: !demo && !doctor });
+  const report = demo ? null : (doctor ?? ownDoctor).report;
   const [catalog, setCatalog] = useState<ModelCatalog | null>(
     initialCatalog ?? null,
   );
@@ -161,6 +169,12 @@ export function DirectionSettings({
   ) {
     onChange({ ...value, [key]: next });
   }
+  const readiness = (option: AgentProvider) =>
+    providerReadiness(report, option);
+  const selectedReadiness = withProvider(
+    { ready: true, checking: false, missing: [] },
+    readiness(provider),
+  );
   const effortLocked = plan.locked("deepReasoning");
   const effortMarked = plan.marked("deepReasoning");
   const webLocked = plan.locked("webAccess");
@@ -339,15 +353,27 @@ export function DirectionSettings({
               })
             }
           >
-            {agentProviders.map((option) => (
-              <option key={option} value={option}>
-                {providerLabels[option]}
-              </option>
-            ))}
+            {agentProviders.map((option) => {
+              const state = readiness(option)?.state;
+              return (
+                <option key={option} value={option}>
+                  {state
+                    ? t.model.providerOption({
+                        provider: providerLabels[option],
+                        state: t.model.providerStates[state],
+                      })
+                    : providerLabels[option]}
+                </option>
+              );
+            })}
           </select>
           <p id={`${id}-provider-help`} className="mission-field-note">
             {t.model.providerHelp[provider]}
           </p>
+          <ReadinessMessage
+            readiness={selectedReadiness}
+            maskUser={presentation.maskUser}
+          />
         </div>
         <div className="mission-form-columns">
           <div className="mission-form-field">

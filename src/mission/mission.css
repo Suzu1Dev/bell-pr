@@ -1450,6 +1450,9 @@
 .mission-plan-copy strong .pro-badge {
   margin-top: 3px;
 }
+.mission-form-field > .readiness-notice {
+  margin-top: 8px;
+}
 .mission-plan-option {
   display: flex;
   gap: 10px;

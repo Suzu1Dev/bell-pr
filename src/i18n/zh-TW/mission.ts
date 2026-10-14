@@ -242,6 +242,13 @@ const m: Translation<typeof en> = {
         claude:
           "使用你已安裝並登入的 Claude Code CLI（Claude 方案或 Anthropic API 金鑰皆可）。用量計入你自己的帳號，可用模型依你的方案而定。",
       },
+      providerOption: ({ provider, state }) => `${provider}（${state}）`,
+      providerStates: {
+        ready: "已就緒",
+        missing: "未安裝",
+        broken: "無法執行",
+        "signed-out": "未登入",
+      },
       model: "執行模型",
       providerDefault: ({ provider, model }) =>
         `${provider} 預設${model ? ` · ${model}` : ""}`,
