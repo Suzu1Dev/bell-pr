@@ -4,6 +4,7 @@ import { demoFiles } from "../demo";
 import type { Repo, RunSummary } from "../types";
 import { LearningNotes } from "../learning/LearningNotes";
 import type { Tab } from "../app/AppShell";
+import { ErrorBoundary } from "../app/ErrorBoundary";
 
 interface LearningPageProps {
   runs: RunSummary[];
@@ -23,18 +24,20 @@ export function LearningPage({
 }: LearningPageProps) {
   return (
     <section className="page-content">
-      <LearningNotes
-        runs={runs}
-        repos={repos}
-        demoFiles={demoFiles}
-        onOpen={(id, path) => {
-          chooseRun(id).then((opened) => {
-            if (!opened) return;
-            setSelectedPath(path);
-            setTab("changes");
-          });
-        }}
-      />
+      <ErrorBoundary>
+        <LearningNotes
+          runs={runs}
+          repos={repos}
+          demoFiles={demoFiles}
+          onOpen={(id, path) => {
+            chooseRun(id).then((opened) => {
+              if (!opened) return;
+              setSelectedPath(path);
+              setTab("changes");
+            });
+          }}
+        />
+      </ErrorBoundary>
       <div className="team-note">
         <MessageSquare size={25} />
         <div>
