@@ -197,6 +197,11 @@ const discovery = {
       "A sample cannot be chosen. Live discovery finds real projects you can import.",
     choose: "Choose this opportunity",
     importing: "Importing the project…",
+    /** An opportunity whose issue is labelled for newcomers: practice for the person, not work for the agent team. */
+    learnByHand: "Learn by hand: write this one yourself",
+    learnByHandHint:
+      "The issue is labelled for newcomers. Writing the fix yourself is how you learn the project, so the agent team does not take it. Read the plan and the sources, then open the issue.",
+    openIssue: "Open the issue",
   },
   runtime: {
     summary: "Model and usage for this discovery",

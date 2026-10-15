@@ -6,6 +6,7 @@ import {
   ExternalLink,
   FolderGit2,
   GitFork,
+  Hand,
   Languages,
   Loader2,
   Lock,
@@ -60,6 +61,16 @@ const sortOptions: DiscoveryPreferences["sort"][] = [
 const phaseSteps = ["searching", "screening", "analyzing"] as const;
 /** The four angles every opportunity is weighed from, in display order. */
 const angles = ["rules", "activity", "needs", "barrier"] as const;
+
+/** An http(s) link, or undefined for anything else (a sample's empty URL). */
+function webLink(value?: string) {
+  try {
+    const url = new URL(value ?? "");
+    return ["https:", "http:"].includes(url.protocol) ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** Whether a saved job has results to read, or is still running. */
 function hasResults(job: DiscoveryJob | null) {
@@ -731,6 +742,16 @@ export default function DiscoveryPanel({
               (value) => value.fullName === item.repository,
             );
             if (!candidate) return null;
+            // A newcomer issue is practice for the person, not work for the
+            // agent team: no "Choose", and the issue it cites to read.
+            const issues = candidate.sources.filter((source) => source.kind === "issue");
+            const issueLink = item.learnByHand
+              ? webLink(
+                  (issues.find((source) =>
+                    item.evidence.some((evidence) => evidence.sourceId === source.id),
+                  ) ?? issues[0])?.url,
+                )
+              : undefined;
             return (
               <article
                 className="discovery-opportunity"
@@ -784,6 +805,12 @@ export default function DiscoveryPanel({
                   </span>
                 </div>
                 <div className="discovery-opportunity-main">
+                  {item.learnByHand && (
+                    <span className="discovery-learn-tag">
+                      <Hand size={14} aria-hidden="true" />
+                      {t.card.learnByHand}
+                    </span>
+                  )}
                   <h3>{item.title}</h3>
                   <MarkdownContent>{item.summary}</MarkdownContent>
                   <div className="discovery-need">
@@ -901,6 +928,17 @@ export default function DiscoveryPanel({
                     })}
                   </div>
                 </details>
+                {item.learnByHand ? (
+                <footer>
+                  <p>{t.card.learnByHandHint}</p>
+                  {issueLink && (
+                    <a className="button secondary" href={issueLink} target="_blank" rel="noreferrer">
+                      {t.card.openIssue}
+                      <ArrowUpRight size={16} aria-hidden="true" />
+                    </a>
+                  )}
+                </footer>
+                ) : (
                 <footer>
                   <p>{sample ? t.card.sampleHint : t.card.chooseHint}</p>
                   <button
@@ -917,6 +955,7 @@ export default function DiscoveryPanel({
                     {choosing === item.id ? t.card.importing : t.card.choose}
                   </button>
                 </footer>
+                )}
               </article>
             );
           })}
