@@ -1,6 +1,9 @@
 /** The PR draft tab's panels (Traditional Chinese, Taiwan). */
-import type { Translation } from "../../../shared/i18n/locale";
+import { formatters, type Translation } from "../../../shared/i18n/locale";
+import { product } from "../../../shared/product";
 import type en from "../en/draft";
+
+const fmt = formatters("zh-TW");
 
 const m: Translation<typeof en> = {
   guidance: {
@@ -151,6 +154,44 @@ const m: Translation<typeof en> = {
     copy: "複製",
     copied: "已複製",
     copyFailed: "無法複製，請自行選取文字複製。",
+  },
+  reviewability: {
+    title: "這份變更好審查嗎？",
+    bands: {
+      small: "小",
+      medium: "中",
+      large: "大",
+      "very-large": "非常大",
+    },
+    band: ({ band }) => `${band} · ${product.name} 預設`,
+    bandHelp: `${product.name} 的規模分級是參考 Google 小型變更指引的預設值，不是這個專案的規範：小為 100 行以內，中為 400 行以內，大為 1,000 行以內，超過 1,000 行或 20 個檔案為非常大。專案自己最近合併的 Pull Request 才是真正的參考。`,
+    lines: "變更行數",
+    files: "檔案",
+    tests: "有變更的測試檔",
+    dependencies: "新增的相依套件",
+    outsidePlan: "不在計畫範圍內",
+    whitespace: "只改空白",
+    linesNote: "不計入 lockfile 與自動產生的檔案。",
+    merged: "專案最近合併的 Pull Request",
+    mergedSize: ({ number, additions, deletions, files }) =>
+      `#${number}：${fmt.number(files)} 個檔案 +${fmt.number(additions)} −${fmt.number(deletions)}`,
+    mergedNone: "沒有讀到專案最近合併的 Pull Request 規模。",
+    split: "這是一個合乎邏輯的單一變更嗎？",
+    splitLead: "維護者能一次看完的變更，會比較快得到審查。如果這份變更做了好幾件事，可以問 agent 怎麼拆開。",
+    askSplit: "問問怎麼拆開",
+    weakened: "被削弱的測試",
+    weakenedLead: "每一個被跳過、刪除或放寬的測試，發布前都需要一行理由：為什麼這樣改是對的？",
+    weakenedCount: ({ count }) => `有 ${fmt.number(count)} 處被削弱的測試需要理由。`,
+    deleted: ({ path }) => `${path}：刪除了測試檔`,
+    added: ({ path, line }) => `${path}:${line}，新增`,
+    removed: ({ path, line }) => `${path}:${line}，刪除`,
+    reason: "你的理由",
+    reasonHint: "至少 3 個字。",
+    save: "儲存理由",
+    saving: "正在儲存…",
+    saved: "可以放進你的 Testing 段落",
+    copy: "複製到 Testing 段落",
+    saveFailed: ({ reason }) => `理由沒有儲存：${reason}`,
   },
   sync: {
     title: "目標分支",

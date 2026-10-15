@@ -992,3 +992,157 @@
   background: var(--color-info-bg);
   color: var(--color-info);
 }
+
+.reviewability-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+}
+.reviewability-band {
+  padding: 2px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.reviewability-band.is-ok {
+  border-color: var(--color-brand-200);
+  background: var(--color-brand-50);
+  color: var(--color-brand-700);
+}
+.reviewability-band.is-warn {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+.reviewability-band.is-alert {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.reviewability-numbers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.reviewability-numbers > div {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+}
+.reviewability-numbers dt {
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
+}
+.reviewability-numbers dd {
+  font: 600 var(--text-md) / 1.4 var(--font-mono);
+  color: var(--color-text);
+}
+.reviewability.is-compact {
+  padding: 12px 14px;
+}
+.reviewability.is-compact .reviewability-numbers {
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  margin-top: 8px;
+}
+.reviewability-note {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
+}
+.reviewability-note svg {
+  margin-top: 4px;
+}
+.reviewability-list {
+  margin-top: 6px;
+}
+.reviewability-list strong {
+  margin-right: 6px;
+  color: var(--color-text);
+  font-weight: 550;
+}
+:is(.reviewability-merged, .reviewability-split, .reviewability-weakened) {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.reviewability-merged ul {
+  padding-left: 18px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+}
+.reviewability-weakened ol {
+  justify-self: stretch;
+  display: grid;
+  gap: 12px;
+  padding-left: 20px;
+}
+.reviewability-weakened li {
+  display: grid;
+  gap: 4px;
+}
+.reviewability-weakened-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.reviewability-weakened-line code {
+  font-size: var(--text-2xs);
+}
+.reviewability-weakened-text {
+  color: var(--color-danger);
+}
+.reviewability-weakened label {
+  font-weight: 550;
+  color: var(--color-text);
+}
+.reviewability-weakened input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+.reviewability-weakened input[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+.reviewability-weakened small,
+.reviewability-missing {
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
+}
+.reviewability.is-compact .reviewability-missing {
+  margin-top: 8px;
+  color: var(--color-danger);
+}
+.reviewability-error {
+  color: var(--color-danger);
+}
+.reviewability-saved {
+  justify-self: stretch;
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.reviewability-saved pre {
+  justify-self: stretch;
+  margin: 0;
+  white-space: pre-wrap;
+  font: var(--text-2xs) / 1.7 var(--font-mono);
+  color: var(--color-text);
+}

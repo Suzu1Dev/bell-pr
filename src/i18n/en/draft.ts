@@ -6,6 +6,11 @@
  */
 import type { DraftSource } from "../../../shared/drafts";
 import type { FollowUpRound } from "../../../shared/followups";
+import { formatters } from "../../../shared/i18n/locale";
+import { product } from "../../../shared/product";
+import type { ReviewabilityBand } from "../../../shared/reviewability";
+
+const fmt = formatters("en");
 
 const draft = {
   /** DraftGuidancePanel: the project's rules, the suggested draft and its sources. */
@@ -193,6 +198,66 @@ const draft = {
     copy: "Copy",
     copied: "Copied",
     copyFailed: "Couldn't copy. Select the text and copy it yourself.",
+  },
+  /**
+   * ReviewabilitySnapshot: how reviewable the change is. The bands are
+   * BELL defaults; the project's own merged pull requests are the
+   * reference.
+   */
+  reviewability: {
+    title: "How reviewable is this change?",
+    bands: {
+      small: "Small",
+      medium: "Medium",
+      large: "Large",
+      "very-large": "Very large",
+    } satisfies Record<ReviewabilityBand, string>,
+    /** The band chip; `band` is one of `bands`. */
+    band: ({ band }: { band: string }) => `${band} · ${product.name} default`,
+    bandHelp: `${product.name}'s size bands are defaults after Google's guidance on small changes, not this project's rule: small up to 100 changed lines, medium up to 400, large up to 1,000, very large above 1,000 lines or 20 files. The project's own merged pull requests are the real reference.`,
+    lines: "Changed lines",
+    files: "Files",
+    tests: "Test files changed",
+    dependencies: "New dependencies",
+    outsidePlan: "Outside the plan",
+    whitespace: "Whitespace-only changes",
+    linesNote: "Lockfiles and generated files are not counted.",
+    merged: "The project's last merged pull requests",
+    mergedSize: ({
+      number,
+      additions,
+      deletions,
+      files,
+    }: {
+      number: number;
+      additions: number;
+      deletions: number;
+      files: number;
+    }) =>
+      `#${number}: +${fmt.number(additions)} −${fmt.number(deletions)} in ${fmt.plural(files) === "one" ? "1 file" : `${fmt.number(files)} files`}`,
+    mergedNone: "The sizes of the project's recent merged pull requests were not read.",
+    split: "Is this one logical change?",
+    splitLead:
+      "A change that a maintainer can review in one sitting gets reviewed sooner. If this one does several things, ask the agent how it could be split.",
+    askSplit: "Ask how to split it",
+    weakened: "Weakened tests",
+    weakenedLead:
+      "Each skipped, deleted or loosened test needs a one-line reason before you publish: why is the change right?",
+    weakenedCount: ({ count }: { count: number }) =>
+      fmt.plural(count) === "one"
+        ? "1 weakened test needs a reason."
+        : `${fmt.number(count)} weakened tests need a reason.`,
+    deleted: ({ path }: { path: string }) => `${path}: test file deleted`,
+    added: ({ path, line }: { path: string; line: number }) => `${path}:${line}, added`,
+    removed: ({ path, line }: { path: string; line: number }) => `${path}:${line}, removed`,
+    reason: "Your reason",
+    reasonHint: "3 words or more.",
+    save: "Save reasons",
+    saving: "Saving…",
+    saved: "Offered for your Testing section",
+    copy: "Copy for the Testing section",
+    saveFailed: ({ reason }: { reason: string }) =>
+      `The reasons were not saved: ${reason}`,
   },
   /** SyncPanel: where the contribution stands against its target branch. */
   sync: {
