@@ -1,6 +1,8 @@
 /** Learning record export copy (Traditional Chinese, Taiwan); typed against the English copy. */
-import type { Translation } from "./locale.js";
+import { formatters, type Translation } from "./locale.js";
 import type en from "./learning-export.en.js";
+
+const fmt = formatters("zh-TW");
 
 const messages: Translation<typeof en> = {
   title: ({ title }) => `# 學習紀錄：${title}`,
@@ -17,6 +19,12 @@ const messages: Translation<typeof en> = {
     conversations: "問答紀錄",
     pullRequest: "Pull Request",
     usage: "Agent 用量",
+    notes: "你的筆記",
+    explainBack: "用自己的話講一遍",
+    roads: "做法選擇",
+    forecast: "你的預測",
+    feedbackTags: "你標記的維護者回饋",
+    overrides: "你略過的檢查與理由",
   },
   noPullRequest: "尚未送出 PR。",
   noExplanations: "尚未產生解說。",
@@ -51,6 +59,39 @@ const messages: Translation<typeof en> = {
   mode: ({ mode, policyVersion }) => `- Ponytail 模式：${mode}（${policyVersion}）`,
   unmeasured:
     "- 注意：有呼叫未回報用量，上述 tokens 只加總已回報部分；未回報的用量為未知，不是 0。",
+  checkOff: "在理解檢查關閉時核准。",
+  summary: ({ summary }) => `**你的說明**\n\n${summary}`,
+  question: ({ question }) => `**問題：**${question}`,
+  answer: ({ answer, confidence }) => `**你的答案**（${confidence}）：${answer}`,
+  dontKnow: ({ confidence }) => `**你的答案**（${confidence}）：我不知道`,
+  grade: ({ grade }) => `**你的評分：**${grade}`,
+  correction: ({ correction }) => `**你哪裡想錯了：**${correction}`,
+  passed: ({ passedAt, questions, misses }) =>
+    `- ${passedAt} 通過：${questions} 題，沒答到 ${misses} 題`,
+  roadGuess: ({ guess }) => `**其他做法（你的猜想）：**${guess}`,
+  roadChoice: ({ choice }) => `**你的選擇：**${choice}`,
+  roadWhy: ({ why }) => `**理由：**${why}`,
+  forecastDimension: ({ dimension }) => `**維護者可能質疑的地方：**${dimension}`,
+  tag: ({ url, facts }) =>
+    facts.length ? `- ${url}：${fmt.list(facts, { type: "unit" })}` : `- ${url}`,
+  sawItComing: "早就料到",
+  surprised: "出乎意料",
+  lesson: ({ lesson }) => `下次的心得：${lesson}`,
+  override: ({ check, reason, at }) => `- ${check}（${at}）：${reason}`,
+  confidences: { sure: "確定", think: "大概", guess: "用猜的" },
+  grades: { got: "答對", partly: "部分對", missed: "沒答到" },
+  roadChoices: { keep: "維持這個做法", switch: "偏好另一種", depends: "看情況" },
+  dimensions: {
+    scope: "範圍",
+    simplicity: "簡潔",
+    naming: "命名",
+    conventions: "專案慣例",
+    tests: "測試",
+    risk: "風險",
+    description: "說明",
+    worth: "值得花審查時間",
+  },
+  overrideChecks: { "issue-has-pr": "別人的 Pull Request 已經會關閉這個 issue" },
 };
 
 export default messages;

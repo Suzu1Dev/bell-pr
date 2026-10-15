@@ -2,17 +2,22 @@ import type { Locale } from "./i18n/locale.js";
 import en from "./i18n/learning-export.en.js";
 import zhTW from "./i18n/learning-export.zh-TW.js";
 import type { Repository, RunCore } from "./types.js";
+// Types only: the builder loads nothing but plain modules of shared/.
+import type { UnderstandingItem } from "./understanding.js";
 
 type Messages = typeof en;
 const dictionaries: Record<Locale, Messages> = { en, "zh-TW": zhTW };
 
 /**
  * Markdown learning record for one run: what was asked, how the team planned
- * it, what each file's explanation taught, the follow-up Q&A, the PR and the
- * provider-reported usage. Pure: it only reads the run and repository, so
- * the server export and the client-side demo export share it. `locale`
- * chooses the record's own headings and labels; the run's text is copied as
- * it was written.
+ * it, what each file's explanation taught, the follow-up Q&A, the person's
+ * own notes, their Explain-it-back check, road choices and forecast, their
+ * tags on maintainer feedback, the blocks they lifted with a reason, the PR
+ * and the provider-reported usage. The person's own sections are left out
+ * when empty. Pure: it only reads the run and repository, so the server
+ * export and the client-side demo export share it. `locale` chooses the
+ * record's own headings and labels; the run's text is copied as it was
+ * written.
  */
 export function buildLearningExport(
   run: RunCore,
@@ -26,6 +31,12 @@ export function buildLearningExport(
     section(m.sections.plan, run.team?.planSummary),
     section(m.sections.explanations, explanationSection(m, run)),
     section(m.sections.conversations, conversationSection(m, run)),
+    section(m.sections.notes, notesSection(run)),
+    section(m.sections.explainBack, explainBackSection(m, run)),
+    section(m.sections.roads, roadsSection(m, run)),
+    section(m.sections.forecast, forecastSection(m, run)),
+    section(m.sections.feedbackTags, feedbackTagsSection(m, run)),
+    section(m.sections.overrides, overridesSection(m, run)),
     section(
       m.sections.pullRequest,
       run.prUrl ? `[${run.prUrl}](${run.prUrl})` : m.noPullRequest,
@@ -133,4 +144,96 @@ function efficiencySection(m: Messages, run: RunCore) {
   ];
   if (usage.measuredCalls < usage.calls) lines.push(m.unmeasured);
   return lines.join("\n");
+}
+
+/** A vocabulary value's label; a value from a later build is shown as written. */
+function label(labels: Record<string, string>, value: string | undefined) {
+  return value ? (labels[value] ?? value) : "";
+}
+
+function notesSection(run: RunCore) {
+  return Object.entries(run.notes ?? {})
+    .filter(([, note]) => note.text?.trim())
+    .map(([filePath, note]) => `### \`${filePath}\`\n\n${note.text.trim()}`)
+    .join("\n\n");
+}
+
+function itemLines(m: Messages, item: UnderstandingItem) {
+  const lines = [m.question({ question: item.question })];
+  lines.push(
+    item.dontKnow
+      ? m.dontKnow({ confidence: label(m.confidences, item.confidence) })
+      : m.answer({ answer: item.answer, confidence: label(m.confidences, item.confidence) }),
+  );
+  const grade = item.dontKnow ? "missed" : item.grade;
+  if (grade) lines.push(m.grade({ grade: label(m.grades, grade) }));
+  if (item.correction?.trim()) lines.push(m.correction({ correction: item.correction.trim() }));
+  return lines.join("\n\n");
+}
+
+function explainBackSection(m: Messages, run: RunCore) {
+  const record = run.understanding;
+  const parts: string[] = [];
+  if (run.understandingCheckOff) parts.push(m.checkOff);
+  if (record?.summary?.text.trim())
+    parts.push(m.summary({ summary: record.summary.text.trim() }));
+  for (const item of record?.items ?? []) parts.push(itemLines(m, item));
+  const passes = record?.history ?? [];
+  if (passes.length)
+    parts.push(
+      passes
+        .map((entry) => m.passed({ passedAt: entry.passedAt, questions: entry.questions, misses: entry.misses }))
+        .join("\n"),
+    );
+  return parts.join("\n\n");
+}
+
+function roadsSection(m: Messages, run: RunCore) {
+  return Object.entries(run.attempts ?? {})
+    .filter(([, attempt]) => attempt.road && (attempt.road.guess || attempt.road.choice || attempt.road.why))
+    .map(([filePath, attempt]) => {
+      const road = attempt.road!;
+      const lines = [`### \`${filePath}\``];
+      if (road.guess?.trim()) lines.push(m.roadGuess({ guess: road.guess.trim() }));
+      if (road.choice) lines.push(m.roadChoice({ choice: label(m.roadChoices, road.choice) }));
+      if (road.why?.trim()) lines.push(m.roadWhy({ why: road.why.trim() }));
+      return lines.join("\n\n");
+    })
+    .join("\n\n");
+}
+
+function forecastSection(m: Messages, run: RunCore) {
+  const forecast = run.understanding?.forecast;
+  if (!forecast || (!forecast.dimension && !forecast.question?.trim())) return "";
+  return [
+    ...(forecast.dimension ? [m.forecastDimension({ dimension: label(m.dimensions, forecast.dimension) })] : []),
+    ...(forecast.question?.trim() ? [forecast.question.trim()] : []),
+  ].join("\n\n");
+}
+
+function feedbackTagsSection(m: Messages, run: RunCore) {
+  return Object.entries(run.feedbackTags ?? {})
+    .filter(([, tag]) => tag.dimension || tag.predicted !== undefined || tag.lesson?.trim())
+    .map(([url, tag]) => {
+      const facts = [
+        ...(tag.dimension ? [label(m.dimensions, tag.dimension)] : []),
+        ...(tag.predicted === undefined ? [] : [tag.predicted ? m.sawItComing : m.surprised]),
+      ];
+      const line = m.tag({ url, facts });
+      return tag.lesson?.trim() ? `${line}\n  ${m.lesson({ lesson: tag.lesson.trim() })}` : line;
+    })
+    .join("\n");
+}
+
+function overridesSection(m: Messages, run: RunCore) {
+  return (run.guardOverrides ?? [])
+    .filter((override) => override.reason.trim())
+    .map((override) =>
+      m.override({
+        check: label(m.overrideChecks, override.id),
+        reason: override.reason.trim(),
+        at: override.at,
+      }),
+    )
+    .join("\n");
 }
