@@ -42,7 +42,8 @@
   position: relative;
   display: inline-flex;
 }
-.title-row .unsandboxed-badge > a {
+.title-row .unsandboxed-badge > a,
+.title-row .unsandboxed-badge > .badge-label {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
@@ -58,6 +59,13 @@
 }
 .title-row .unsandboxed-badge > a:hover {
   text-decoration: underline;
+}
+/* Approved without the understanding check, or the check is off. */
+.title-row .check-off-badge > a,
+.title-row .check-off-badge > .badge-label {
+  border-color: var(--color-violet-border);
+  background: var(--color-violet-bg);
+  color: var(--color-violet);
 }
 .title-row .unsandboxed-help {
   position: absolute;

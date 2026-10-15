@@ -8,6 +8,7 @@ import {
 } from "../../shared/plans";
 import { getDemo } from "../demo";
 import type { EntitlementsState } from "../license/useEntitlements";
+import { setCheckSettingsForTests } from "../app/hooks/useUnderstanding";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Run } from "../types";
 import { WorkspacePage } from "./WorkspacePage";
@@ -204,4 +205,50 @@ test("a published sample keeps its approve button off and links to no PR", () =>
   );
   assert.match(real, /href="https:\/\/github\.com\/acme\/widgets\/pull\/3"/);
   assert.match(real, /View pull request/);
+});
+
+/** The footer's primary button, from its opening tag to its end. */
+const primary = (html: string) =>
+  html.match(/<footer class="review-footer">.*<button class="button primary"[^>]*>.*?<\/button>/)?.[0]?.replace(/^.*(<button class="button primary")/, "$1") ?? "";
+
+test("once every file is ticked, the footer asks to explain the change back first", () => {
+  const files = demo.files.map((file) => ({ ...file, fingerprint: file.path }));
+  const ticked = { ...realRun, reviewedFiles: files.map((file) => file.path) };
+  const html = renderEn(element({ run: ticked, files }));
+  const button = primary(html);
+  assert.match(button, /Explain it back/);
+  assert.doesNotMatch(button, /disabled=""/);
+  assert.match(button, /title="Explain the change back in your own words: a short, closed-book check next to the code"/);
+  assert.match(html, /<span>Every file reviewed\.<\/span>/);
+  assert.match(html, /Read it, then explain it back/);
+  assertNoHan(html);
+  // Before every file is ticked, the tooltip names both remaining steps.
+  const partial = primary(renderEn(element({ run: realRun, files })));
+  assert.match(partial, /disabled=""/);
+  assert.match(partial, /title="Mark every file as reviewed, then explain the change back in your own words"/);
+  assert.match(partial, /Approve and prepare the PR/);
+  assert.match(renderZh(element({ run: ticked, files })), /<span>每一個檔案都已審閱。<\/span>/);
+});
+
+test("with the check turned off, approval needs the ticks only, and the run says so", () => {
+  const files = demo.files.map((file) => ({ ...file, fingerprint: file.path }));
+  const ticked = { ...realRun, reviewedFiles: files.map((file) => file.path) };
+  try {
+    setCheckSettingsForTests({ settings: { skipUnderstandingCheck: true }, lockedBy: {} });
+    const html = renderEn(element({ run: ticked, files }));
+    assert.match(primary(html), /Approve and prepare the PR/);
+    assert.match(
+      html,
+      /<span>Every file reviewed · Understanding check off\. Approval needs your reviewed ticks only\.<\/span>/,
+    );
+    assert.match(html, /class="unsandboxed-badge check-off-badge"/);
+    assert.match(html, /The understanding check is off, so you can approve without explaining the change back\./);
+    assertNoHan(html);
+  } finally {
+    setCheckSettingsForTests(undefined);
+  }
+  // A run approved without the check keeps its badge, whatever the setting says now.
+  const marked = renderEn(element({ run: { ...ticked, status: "approved", understandingCheckOff: true }, files }));
+  assert.match(marked, /This run was approved without explaining the change back first\./);
+  assert.doesNotMatch(renderEn(element({ run: ticked, files })), /check-off-badge/);
 });
