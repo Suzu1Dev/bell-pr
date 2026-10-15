@@ -157,6 +157,27 @@ test("AI features, game AI and code blocks are not policies", () => {
   assert.deepEqual(kinds("CONTRIBUTING.md", "Run `lint --no-ai-generated-code-allowed` first."), []);
 });
 
+test("a refusal and an AI term in different sentences are not a ban", () => {
+  for (const text of [
+    "We do not accept pull requests that only fix typos. AI tools can help you find real bugs.",
+    "We use Copilot code review on every pull request. Do not merge your own PR.",
+    "This library wraps LLM APIs. We will not merge PRs that add new providers without tests.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [], text);
+});
+
+test("a refusal in a sentence that lets contributors use AI is ambiguous, never a block", () => {
+  assert.deepEqual(
+    kinds("CONTRIBUTING.md", "You may use AI tools, but do not submit code you do not understand."),
+    [["ban", false]],
+  );
+  // Refusing the AI use itself stays a ban.
+  assert.deepEqual(
+    kinds("CONTRIBUTING.md", "You may not use AI tools to write pull requests."),
+    [["ban", true]],
+  );
+});
+
 test("understanding, own-words and issue-first rules need no AI term", () => {
   assert.deepEqual(
     kinds("CONTRIBUTING.md", "You must be able to explain your change in review."),

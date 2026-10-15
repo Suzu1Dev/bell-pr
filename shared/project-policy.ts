@@ -97,6 +97,16 @@ const prohibition = new RegExp(
   flags,
 );
 
+/**
+ * Words that let contributors use AI ("You may use AI tools, but do not
+ * submit code you do not understand"): a refusal in the same sentence is
+ * about something else, so it is never a clear ban.
+ */
+const aiPermission = new RegExp(
+  String.raw`\b(?:may|can|are\s+(?:welcome|free|allowed)\s+to|feel\s+free\s+to)\s+use\s+`,
+  flags,
+);
+
 /** Issues set aside for people who are learning. */
 const learningIssues = new RegExp(
   String.raw`\bgood[- ]first[- ]issues?\b|\bfirst[- ]timers?(?:[- ]only)?\b|\b(?:beginner(?:[- ]friendly)?|newcomer|starter|easy)\s+issues?\b`,
@@ -278,14 +288,26 @@ const gap = (a: Span, b: Span) => Math.max(0, b.start - a.end, a.start - b.end);
 
 /**
  * Each rule phrase with the nearest AI-assistance term, when one is close
- * enough to make them one rule; the span covers both.
+ * enough and in the same sentence to make them one rule; the span covers
+ * both. A refusal in one sentence and an AI term in the next ("We do not
+ * accept typo-only PRs. AI tools can help you find bugs.") are two things.
  */
-function nearAssistance(text: string, rule: RegExp) {
+function nearAssistance(
+  text: string,
+  rule: RegExp,
+  sentenceOf: (span: Span) => Span,
+) {
   const terms = assistanceTerms.flatMap((term) => allMatches(term, text));
   const pairs: { phrase: Span; span: Span; term: Span }[] = [];
   for (const phrase of allMatches(rule, text)) {
+    const sentence = sentenceOf(phrase);
     const term = terms
-      .filter((candidate) => gap(candidate, phrase) <= proximity)
+      .filter(
+        (candidate) =>
+          candidate.start >= sentence.start &&
+          candidate.end <= sentence.end &&
+          gap(candidate, phrase) <= proximity,
+      )
       .sort((a, b) => gap(a, phrase) - gap(b, phrase))[0];
     if (term)
       pairs.push({
@@ -316,13 +338,21 @@ function nearAssistance(text: string, rule: RegExp) {
  * - `issue-first`: an issue before the work.
  *
  * The AI kinds need an AI term in an assistance sense within about 120
- * characters of the rule's words; the others are contribution rules that
- * need no AI term.
+ * characters of the rule's words, in the same sentence; the others are
+ * contribution rules that need no AI term. A refusal in a sentence that
+ * lets contributors use AI ("You may use AI tools, but …") is ambiguous:
+ * a ban without contribution context, which never blocks.
  */
 export function classifyPolicy(path: string, text: string): PolicyFinding[] {
   const findings: PolicyFinding[] = [];
   const seen = new Set<string>();
-  const add = (kind: PolicyKind, block: Block, search: string, match: Span) => {
+  const add = (
+    kind: PolicyKind,
+    block: Block,
+    search: string,
+    match: Span,
+    ambiguous = false,
+  ) => {
     const sentence = sentenceAround(block.text, match);
     const { quote, offset } = quoteOf(block.text, sentence, match);
     if (!quote.trim()) return;
@@ -334,9 +364,9 @@ export function classifyPolicy(path: string, text: string): PolicyFinding[] {
       path,
       line: lineAt(block, offset),
       quote,
-      contribution: contributionContext.test(
-        search.slice(sentence.start, sentence.end),
-      ),
+      contribution:
+        !ambiguous &&
+        contributionContext.test(search.slice(sentence.start, sentence.end)),
     });
   };
   for (const block of blocks(rawProse(text))) {
@@ -344,7 +374,7 @@ export function classifyPolicy(path: string, text: string): PolicyFinding[] {
     // One AI finding per sentence: a reserved learning area wins over a ban.
     const decided = new Set<number>();
     const sentenceOf = (span: Span) => sentenceAround(block.text, span);
-    for (const { phrase, span } of nearAssistance(search, learningIssues)) {
+    for (const { phrase, span } of nearAssistance(search, learningIssues, sentenceOf)) {
       const sentence = sentenceOf(phrase);
       const words = search.slice(sentence.start, sentence.end);
       if (decided.has(sentence.start)) continue;
@@ -353,17 +383,24 @@ export function classifyPolicy(path: string, text: string): PolicyFinding[] {
         decided.add(sentence.start);
       }
     }
-    for (const { phrase, span, term } of nearAssistance(search, prohibition)) {
+    for (const { phrase, span, term } of nearAssistance(search, prohibition, sentenceOf)) {
       const sentence = sentenceOf(phrase);
       if (decided.has(sentence.start)) continue;
       decided.add(sentence.start);
       const words = search.slice(sentence.start, sentence.end);
       const agentTerm = /agent|bot/i.test(search.slice(term.start, term.end));
+      // "You may use AI tools, but …": the AI use itself is allowed.
+      const permitted = allMatches(aiPermission, words).some(
+        (match) =>
+          sentence.start + match.end <= term.start &&
+          term.start - (sentence.start + match.end) <= 20,
+      );
       add(
         agentTerm && autonomousAction.test(words) ? "agent" : "ban",
         block,
         search,
         span,
+        permitted,
       );
     }
     for (const match of allMatches(addressedToAgents, search))
