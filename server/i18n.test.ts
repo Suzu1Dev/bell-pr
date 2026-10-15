@@ -211,6 +211,7 @@ test("every server namespace is registered for both locales", () => {
     "security",
     "setup",
     "storage",
+    "understanding",
   ];
   assert.deepEqual(Object.keys(en).sort(), namespaces);
   assert.deepEqual(Object.keys(zhTW).sort(), namespaces);

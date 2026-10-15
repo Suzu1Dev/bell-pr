@@ -27,6 +27,7 @@ export const errorCodes = [
   "license_env_locked",
   "trial_unavailable",
   "git_config_unsafe",
+  "understanding_check_required",
 ] as const;
 export type ErrorCode = (typeof errorCodes)[number];
 

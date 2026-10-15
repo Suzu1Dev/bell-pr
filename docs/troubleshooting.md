@@ -354,6 +354,30 @@ gone.
 Your global and system Git configuration are not checked. See the
 [security model](security-model.md#repositories-and-git).
 
+### `understanding_check_required`
+
+"Explain the change back before you approve or publish …" (HTTP 409).
+BELL PR asks you to explain each change back before you approve it: the
+understanding check. It is on by default, and the server holds approval
+and publishing until it is done for the latest version of the changes. It
+is a check you grade yourself; no AI model grades your answers.
+
+- Open the check from the Changes tab once every file is marked Reviewed:
+  explain the change in a few sentences, answer the questions about the
+  riskiest files and what you did not test, compare each answer with the
+  reference, grade it, and correct what you missed.
+- If the changes moved since you took it (a follow-up round, a sync or an
+  edit), confirm that your explanation still fits and answer the questions
+  about the files that changed.
+- To turn the check off, use **Settings → Learning**. Every file must
+  still be reviewed and you still approve the pull request yourself, and
+  runs approved without the check are marked "Check off". Turning it back
+  on holds runs that are already approved to it before they are published.
+- When `BELLPR_REQUIRE_UNDERSTANDING_CHECK=1` is set (for example on a
+  classroom or shared computer), the setting is locked on. The variable can
+  only keep the check on; no variable turns it off. See
+  [Configuration](configuration.md#environment-variables).
+
 ## BELL PR does not start
 
 - **"BELL PR needs Node.js 22 or later"**: install the current Node.js LTS

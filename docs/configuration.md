@@ -65,6 +65,7 @@ Options of `bell-pr start`:
 | `BELLPR_MAX_ACTIVE_RUNS` | `2` | Contribution runs executing at the same time, 1 to 8; Free runs one. Running, queued and plan-approval runs together are capped at 8 or twice this value, whichever is larger. Locks **Settings → Performance**. |
 | `BELLPR_AGENT_TIMEOUT_SCALE` | `1` | Multiplier for the time limit of one agent turn, 0.5 to 10 (see below). Locks **Settings → Performance**. |
 | `BELLPR_ALLOW_UNSANDBOXED_AGENTS` | not set | `1` lets Claude Code agents that edit files run without the operating-system sandbox when it is unavailable. They then have your full user rights, and their runs are marked "Ran without sandbox". Locks **Settings → Agent safety**. |
+| `BELLPR_REQUIRE_UNDERSTANDING_CHECK` | not set | `1` keeps the understanding check on (you explain each change back before you approve it) and locks **Settings → Learning**. Any other value locks nothing and is reported as a warning at start; no value turns the check off. |
 | `BELLPR_RETENTION_DAYS` | `14` | Days after which the working files of a cancelled or failed run are removed, 1 to 365. Records, reports and notes stay; published runs are never removed automatically. Locks **Settings → Data & privacy**. |
 | `BELLPR_DEV` | not set | Development mode, for working on BELL PR itself: sign-in is off and the API trusts the Vite dev server. `npm run dev` sets it; it only works on `127.0.0.1`. |
 | `BELLPR_FRONTEND_PORT` | `4310` | Port of the Vite dev server that the API trusts, in development mode only. |

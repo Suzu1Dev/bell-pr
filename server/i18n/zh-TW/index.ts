@@ -8,6 +8,7 @@ import run from "./run.js";
 import security from "./security.js";
 import setup from "./setup.js";
 import storage from "./storage.js";
+import understanding from "./understanding.js";
 
 const m: Translation<typeof en> = {
   common,
@@ -18,5 +19,6 @@ const m: Translation<typeof en> = {
   storage,
   security,
   cli,
+  understanding,
 };
 export default m;

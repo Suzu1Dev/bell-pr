@@ -32,6 +32,18 @@ export const appSettingsSchema = z.object({
    * false: drafts mention AI only when the project's own rules ask for it.
    */
   alwaysDiscloseAi: z.boolean().optional(),
+  /**
+   * Turns the Explain-it-back check off, so approval and publishing need
+   * the Reviewed ticks and the final approval only. Absent means false:
+   * the check is required. BELLPR_REQUIRE_UNDERSTANDING_CHECK=1 locks it
+   * on; no variable turns it off.
+   */
+  skipUnderstandingCheck: z.boolean().optional(),
+  /**
+   * Hides the per-file "try first" prompts during review and brings back
+   * the plain reveal. Absent means false: the prompts are shown.
+   */
+  hideTryFirst: z.boolean().optional(),
 });
 
 export type AppSettings = z.infer<typeof appSettingsSchema>;
