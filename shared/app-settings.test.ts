@@ -12,6 +12,8 @@ const full: AppSettings = {
   showSampleProject: false,
   allowUnsandboxedAgents: false,
   retentionDays: 30,
+  skipUnderstandingCheck: false,
+  hideTryFirst: true,
 };
 
 test("every app setting is optional and a full file round-trips", () => {
@@ -64,6 +66,8 @@ test("out-of-range and mistyped values are rejected", () => {
     { showSampleProject: "yes" },
     { allowUnsandboxedAgents: 1 },
     { maxActiveRuns: "2" },
+    { skipUnderstandingCheck: "true" },
+    { hideTryFirst: 0 },
   ])
     assert.equal(
       appSettingsSchema.safeParse(invalid).success,

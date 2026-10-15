@@ -23,13 +23,17 @@ import { parseAgentTimeoutScale } from "./agent-timeouts.js";
 import { setRetentionDaysSource } from "./cleanup.js";
 import { setAlwaysDiscloseAiSource } from "./drafts.js";
 import { writeDurable } from "./fs-atomic.js";
-import { setDefaultLocaleSource } from "./i18n/index.js";
+import { setDefaultLocaleSource, type ServerMessages } from "./i18n/index.js";
 import { log } from "./log.js";
 import { lenientRead } from "./persisted-schema.js";
 import { setAllowUnsandboxedAgentsSource } from "./sandbox.js";
 import { AppError } from "./types.js";
+import { setSkipUnderstandingCheckSource } from "./understanding.js";
 
 type SettingKey = keyof AppSettings;
+
+/** Keeps the understanding check on when set to 1; it can never turn the check off. */
+export const requireUnderstandingVariable = "BELLPR_REQUIRE_UNDERSTANDING_CHECK";
 
 /**
  * The environment variables that fix a setting, with how each value is
@@ -37,6 +41,10 @@ type SettingKey = keyof AppSettings;
  * server refuses to start with an invalid limit, see config.ts).
  * BELLPR_LOCALE is not here: it is only the default when no language was
  * chosen.
+ *
+ * BELLPR_REQUIRE_UNDERSTANDING_CHECK can only keep the understanding check
+ * on: "1" locks `skipUnderstandingCheck` to false, and any other value
+ * locks nothing (a warning says so at start). No variable turns it off.
  */
 const environmentLocks = {
   maxActiveRuns: {
@@ -60,6 +68,14 @@ const environmentLocks = {
     variable: "BELLPR_RETENTION_DAYS",
     parse: (value: string) =>
       appSettingsSchema.shape.retentionDays.unwrap().parse(Number(value)),
+  },
+  skipUnderstandingCheck: {
+    variable: requireUnderstandingVariable,
+    parse: (value: string) => {
+      if (value !== "1")
+        throw new RangeError(`${requireUnderstandingVariable} only accepts 1.`);
+      return false;
+    },
   },
 } satisfies Partial<
   Record<SettingKey, { variable: string; parse: (value: string) => unknown }>
@@ -134,6 +150,13 @@ export class AppSettingsService {
     this.file = path.join(dataDir, "app-settings.json");
     this.env = options.env ?? process.env;
     this.saved = this.read();
+    // Nothing is silent: a value that cannot lock the check says so.
+    const requireCheck = this.env[requireUnderstandingVariable]?.trim();
+    if (requireCheck && requireCheck !== "1")
+      log.warn("app_settings.lock_ignored", {
+        variable: requireUnderstandingVariable,
+        reason: "only 1 keeps the understanding check on; nothing is locked",
+      });
   }
 
   private read(): AppSettings {
@@ -164,7 +187,8 @@ export class AppSettingsService {
       try {
         locks[key as SettingKey] = { variable, value: parse(raw) };
       } catch {
-        // Invalid: config.ts refuses to start with it; nothing is locked.
+        // Invalid: nothing is locked. config.ts refuses to start with an
+        // invalid limit; the constructor warns about the understanding lock.
       }
     }
     return locks;
@@ -210,7 +234,7 @@ export class AppSettingsService {
         (m) =>
           m.setup.settings.locked({
             // Only environmentLocks' settings can be locked.
-            setting: m.setup.settings.names[refused as keyof typeof environmentLocks],
+            setting: lockedSettingName(m, refused as keyof typeof environmentLocks),
             variable: lockedBy[refused]!,
           }),
         409,
@@ -238,13 +262,24 @@ export class AppSettingsService {
   }
 }
 
+/** The name of a setting an environment variable can lock, as the settings page shows it. */
+function lockedSettingName(
+  m: ServerMessages,
+  key: keyof typeof environmentLocks,
+) {
+  return key === "skipUnderstandingCheck"
+    ? m.understanding.settingName
+    : m.setup.settings.names[key];
+}
+
 let active: AppSettingsService | undefined;
 
 /**
  * Makes `service` the source of the server-wide defaults: the language of
  * work no request asked for (store recovery, resumed runs, retention, the
- * CLI), the unsandboxed-agents opt-in, the retention period and the AI
- * disclosure choice. The last service activated wins.
+ * CLI), the unsandboxed-agents opt-in, the retention period, the AI
+ * disclosure choice and the understanding-check switch. The last service
+ * activated wins.
  */
 export function activateAppSettings(service: AppSettingsService) {
   active = service;
@@ -252,6 +287,7 @@ export function activateAppSettings(service: AppSettingsService) {
   setAllowUnsandboxedAgentsSource(() => service.get().allowUnsandboxedAgents);
   setRetentionDaysSource(() => service.get().retentionDays);
   setAlwaysDiscloseAiSource(() => service.get().alwaysDiscloseAi);
+  setSkipUnderstandingCheckSource(() => service.get().skipUnderstandingCheck);
 }
 
 /** Removes the sources again, unless another service replaced them since. */
@@ -262,6 +298,7 @@ export function deactivateAppSettings(service: AppSettingsService) {
   setAllowUnsandboxedAgentsSource();
   setRetentionDaysSource();
   setAlwaysDiscloseAiSource();
+  setSkipUnderstandingCheckSource();
 }
 
 /**

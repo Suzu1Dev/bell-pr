@@ -6,6 +6,7 @@
  */
 import type { Express } from "express";
 import type { LearnerNote, StoredExplanation } from "../../shared/explanations.js";
+import type { RunUnderstanding } from "../../shared/understanding.js";
 import { AppError, type Run } from "../types.js";
 import type { RouteDeps } from "./types.js";
 
@@ -23,6 +24,10 @@ export interface LearningRun {
   prUrl?: string;
   explanations: Record<string, StoredExplanation>;
   notes: Record<string, LearnerNote>;
+  /** The run's understanding check, for the learning record's check marks. */
+  understanding?: RunUnderstanding;
+  /** Approved with the understanding check off. */
+  understandingCheckOff?: boolean;
 }
 
 /** Newest first; the id breaks ties so the order is total. */
@@ -52,6 +57,8 @@ function learningRun(run: Run): LearningRun | undefined {
     ...(run.prUrl ? { prUrl: run.prUrl } : {}),
     explanations,
     notes,
+    ...(run.understanding ? { understanding: run.understanding } : {}),
+    ...(run.understandingCheckOff ? { understandingCheckOff: true } : {}),
   };
 }
 

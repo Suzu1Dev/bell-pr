@@ -7,9 +7,25 @@ import type {
 import type { PrFeedback } from "../../shared/pr-feedback";
 import type { AgentTeam } from "../../shared/team";
 import type { DraftPreparation } from "../../shared/drafts";
+import type { CoachDebrief, CoachDrill } from "../../shared/coach";
+import type {
+  ContributionFacts,
+  MergedPrSize,
+} from "../../shared/contribution";
+import type { FollowUpRestatement } from "../../shared/followups";
+import type { PracticeItem } from "../../shared/practice";
+import type {
+  Confidence,
+  FeedbackTag,
+  RoadChoice,
+  SelfGrade,
+  TasteDimension,
+} from "../../shared/understanding";
+import type { Locale } from "../../shared/i18n/locale";
 import type { DiffFile, Repo, Run } from "../types";
 import type {
   DemoAgentId,
+  DemoCheckItemId,
   DemoDraftSourceId,
   DemoEvidencePath,
   DemoExtraRecommendationId,
@@ -19,6 +35,7 @@ import type {
   DemoMessageId,
   DemoModulePath,
   DemoOpportunityId,
+  DemoPracticeId,
   DemoReadingPath,
   DemoRecommendationId,
   DemoTaskId,
@@ -110,6 +127,51 @@ export interface DemoContent {
   analysisSteps?: string[];
   /** The card shown once the sample Draft PR is published. */
   publishedCard?: DemoPublishedCard;
+  /**
+   * A finished Explain-it-back check for the sample run, for the demo's
+   * "Fill with the sample answer" buttons: the summary, one answer per
+   * planned question (keyed by item id; the not-tested question has no
+   * grade), the not-tested answer again for the PR's Testing section, and
+   * the forecast. One answer is at Think so, graded Partly, with a
+   * correction.
+   */
+  understandingSample?: {
+    summary: string;
+    answers: Record<
+      string,
+      { answer: string; confidence: Confidence; grade?: SelfGrade; correction?: string }
+    >;
+    untested: string;
+    forecast: { dimension: TasteDimension; question: string };
+  };
+  /** A try-first answer to each file's selfCheck question. */
+  quizSamples?: Record<
+    DemoFilePath,
+    { answer: string; confidence: Confidence; grade: SelfGrade }
+  >;
+  /** A road choice for each file's alternatives card. */
+  roadSamples?: Record<
+    DemoFilePath,
+    { guess: string; choice: RoadChoice; why: string }
+  >;
+  /**
+   * The fictional project's CONTRIBUTING.md, the same file the
+   * `demo-contributing` draft source holds. The demo classifies it with the
+   * real classifier (demoContributionRules in rules.ts).
+   */
+  contributingText?: string;
+  /** The sample's GitHub facts: PRs open, issue #42 open and free, no PR of yours here yet. */
+  contributionFacts?: ContributionFacts;
+  /** The sample project's last three merged pull requests, as the size reference. */
+  mergedSizes?: MergedPrSize[];
+  /** The person's tags on the sample maintainer feedback, keyed by item URL. */
+  feedbackTags?: Record<string, FeedbackTag>;
+  /** Three due practice items from the sample run. */
+  practiceSample?: PracticeItem[];
+  /** A sample coach debrief (Pro), labelled as such in the UI. */
+  debriefSample?: CoachDebrief;
+  /** The person's restatement of the sample review before an AI round. */
+  restatementSample?: FollowUpRestatement[];
 }
 
 /**
@@ -118,6 +180,8 @@ export interface DemoContent {
  * paths defined there, so the compiler finds missing or stray entries.
  */
 export interface DemoCopy {
+  /** The locale the copy is written in (the sample debrief records it). */
+  locale: Locale;
   explanations: Record<DemoFilePath, ChangeExplanation>;
   run: {
     title: string;
@@ -149,7 +213,11 @@ export interface DemoCopy {
   };
   draftPreparation: {
     warnings: string[];
-    sources: Record<DemoDraftSourceId, { label: string; content: string }>;
+    /** The CONTRIBUTING.md content is the same in every locale (shared.ts). */
+    sources: {
+      "demo-contributing": { label: string };
+      "demo-template": { label: string; content: string };
+    };
     proposal: {
       title: string;
       summary: string;
@@ -178,4 +246,26 @@ export interface DemoCopy {
   importSteps: [string, string, string, string];
   analysisSteps: [string, string, string, string, string];
   publishedCard: DemoPublishedCard;
+  /** The sample check's words; its ids, confidences and grades are in shared.ts. */
+  understanding: {
+    summary: string;
+    answers: Record<DemoCheckItemId, { answer: string; correction?: string }>;
+    forecastQuestion: string;
+  };
+  /** The try-first answer to each file's selfCheck question. */
+  quizzes: Record<DemoFilePath, string>;
+  /** The guess before the alternatives card, and why the choice fits. */
+  roads: Record<DemoFilePath, { guess: string; why: string }>;
+  /** The lesson the person wrote for a maintainer comment that surprised them. */
+  feedbackLessons: { "retry-after": string };
+  /**
+   * The question and reference of each practice item that is not a file's
+   * selfCheck; the others take theirs from the file's explanation, and the
+   * earlier correction or lesson from the check and the feedback tags.
+   */
+  practice: Record<DemoPracticeId, { question?: string; reference?: string }>;
+  /** The sample debrief's words; each quote is taken from the review's body. */
+  debrief: { quotes: string[]; drills: CoachDrill[]; nextStep: string };
+  /** The person's restatement of the review comment. */
+  restatement: string;
 }

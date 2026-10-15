@@ -24,6 +24,12 @@ const messages = {
     conversations: "Questions and answers",
     pullRequest: "Pull request",
     usage: "Agent usage",
+    notes: "Your notes",
+    explainBack: "Explain it back",
+    roads: "Road choices",
+    forecast: "Your forecast",
+    feedbackTags: "Maintainer feedback you tagged",
+    overrides: "Checks you overrode, with your reasons",
   },
   noPullRequest: "No pull request has been opened yet.",
   noExplanations: "No explanations have been generated yet.",
@@ -87,6 +93,53 @@ const messages = {
     `- Ponytail mode: ${mode} (${policyVersion})`,
   unmeasured:
     "- Note: some calls did not report their usage. The token counts above add up only the reported calls; unreported usage is unknown, not zero.",
+  checkOff: "Approved with the understanding check off.",
+  summary: ({ summary }: { summary: string }) =>
+    `**Your explanation**\n\n${summary}`,
+  question: ({ question }: { question: string }) => `**Question:** ${question}`,
+  answer: ({ answer, confidence }: { answer: string; confidence: string }) =>
+    `**Your answer** (${confidence}): ${answer}`,
+  dontKnow: ({ confidence }: { confidence: string }) =>
+    `**Your answer** (${confidence}): I don't know`,
+  grade: ({ grade }: { grade: string }) => `**Your grade:** ${grade}`,
+  correction: ({ correction }: { correction: string }) =>
+    `**What you had wrong:** ${correction}`,
+  passed: ({ passedAt, questions, misses }: { passedAt: string; questions: number; misses: number }) =>
+    `- Passed ${passedAt}: ${fmt.number(questions)} ${fmt.plural(questions) === "one" ? "question" : "questions"}, ${fmt.number(misses)} missed`,
+  roadGuess: ({ guess }: { guess: string }) =>
+    `**How else it could be done (your guess):** ${guess}`,
+  roadChoice: ({ choice }: { choice: string }) => `**Your choice:** ${choice}`,
+  roadWhy: ({ why }: { why: string }) => `**Why:** ${why}`,
+  forecastDimension: ({ dimension }: { dimension: string }) =>
+    `**What the maintainer would question:** ${dimension}`,
+  /** One tagged feedback item: its URL, then the tags. */
+  tag: ({ url, facts }: { url: string; facts: string[] }) =>
+    facts.length ? `- ${url}: ${fmt.list(facts, { type: "unit" })}` : `- ${url}`,
+  sawItComing: "saw it coming",
+  surprised: "surprised me",
+  lesson: ({ lesson }: { lesson: string }) => `Lesson: ${lesson}`,
+  override: ({ check, reason, at }: { check: string; reason: string; at: string }) =>
+    `- ${check} (${at}): ${reason}`,
+  confidences: { sure: "Sure", think: "Think so", guess: "Guessing" } as Record<string, string>,
+  grades: { got: "Got it", partly: "Partly", missed: "Missed" } as Record<string, string>,
+  roadChoices: {
+    keep: "Keep this approach",
+    switch: "Prefer the other",
+    depends: "It depends",
+  } as Record<string, string>,
+  dimensions: {
+    scope: "Scope",
+    simplicity: "Simplicity",
+    naming: "Naming",
+    conventions: "Project conventions",
+    tests: "Tests",
+    risk: "Risk",
+    description: "Description",
+    worth: "Worth the review time",
+  } as Record<string, string>,
+  overrideChecks: {
+    "issue-has-pr": "Someone else's pull request already closes the issue",
+  } as Record<string, string>,
 };
 
 export default messages;

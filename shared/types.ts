@@ -9,6 +9,18 @@ import type { PrFeedback } from "./pr-feedback.js";
 import type { Locale } from "./i18n/locale.js";
 import type { FollowUpRound } from "./followups.js";
 import type { BaseSync } from "./sync.js";
+import type {
+  FeedbackTag,
+  FileAttempt,
+  RunUnderstanding,
+} from "./understanding.js";
+import type { PracticeState } from "./practice.js";
+import type {
+  ContributionFacts,
+  ContributionRules,
+  GuardOverride,
+} from "./contribution.js";
+import type { CoachDebrief } from "./coach.js";
 
 export type RunStatus =
   | "queued"
@@ -32,6 +44,14 @@ export interface Repository {
   language?: string;
   /** When the person last updated BELL's clone to the latest default branch. */
   updatedAt?: string;
+  /**
+   * The project's own rules and whether its pull requests are open to the
+   * person ("Before you contribute"), read at import, at Update project and
+   * on "Check again". Absent until first read.
+   */
+  contributionRules?: ContributionRules;
+  /** Pro coach debriefs for this project, newest last, at most 5; readable on every plan. GET /api/repos leaves them out. */
+  debriefs?: CoachDebrief[];
 }
 
 export interface Agent {
@@ -131,4 +151,26 @@ export interface RunCore {
   workspaceRemovedAt?: string;
   /** Disk use of the run's worktree in bytes at the last measurement; absent when not measured. */
   workspaceBytes?: number;
+  /** The Explain-it-back check; absent until the person opens it. */
+  understanding?: RunUnderstanding;
+  /**
+   * True when the run was approved while the person had turned the
+   * understanding check off and had not passed it. Set only by a
+   * successful approval and removed when the run is approved again with
+   * the check passed; absent on every other run, including runs approved
+   * before the check existed.
+   */
+  understandingCheckOff?: boolean;
+  /** Per-file "try first" attempts keyed by diff path, for the run's current files. */
+  attempts?: Record<string, FileAttempt>;
+  /** The person's tags on maintainer feedback, keyed by the feedback item's URL; at most 100. */
+  feedbackTags?: Record<string, FeedbackTag>;
+  /** Practice-deck schedules of this run's items, keyed by practiceKey(); at most 40. */
+  practice?: Record<string, PracticeState>;
+  /** The GitHub facts last read for publishing (display only; publishing reads them again). */
+  contributionFacts?: ContributionFacts;
+  /** Blocks the person lifted with a reason, newest last, at most 8. */
+  guardOverrides?: GuardOverride[];
+  /** The person's one-line reason for each weakened-test item, keyed by its id. */
+  reviewability?: { testReasons?: Record<string, string> };
 }

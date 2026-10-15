@@ -16,6 +16,12 @@ import { AppError, type Run } from "./types.js";
 import type { TeamAgentRunner } from "./team.js";
 import { outputLanguage, respondIn } from "./prompt-language.js";
 import { withLocale } from "./i18n/index.js";
+import { after, before } from "node:test";
+import { skipUnderstandingCheckInTests } from "./understanding.js";
+
+// This file tests other behaviour; server/understanding.test.ts covers the gate.
+before(() => skipUnderstandingCheckInTests(true));
+after(() => skipUnderstandingCheckInTests());
 
 async function getJson(url: string) {
   return new Promise<any>((resolve, reject) => {

@@ -48,6 +48,12 @@ import { git } from "./process.js";
 import { assertNoHan } from "../src/test-utils/render.js";
 import { withLocale } from "./i18n/index.js";
 import { respondIn } from "./prompt-language.js";
+import { after, before } from "node:test";
+import { skipUnderstandingCheckInTests } from "./understanding.js";
+
+// This file tests other behaviour; server/understanding.test.ts covers the gate.
+before(() => skipUnderstandingCheckInTests(true));
+after(() => skipUnderstandingCheckInTests());
 
 const context: DraftContext = {
   sources: [],

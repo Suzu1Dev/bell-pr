@@ -32,9 +32,9 @@ const plans = {
         "Free: Lead, 2 teammates, Reviewer and Test analyst. Pro and trial: 3 or 4 teammates.",
     },
     parallelRuns: {
-      label: "Concurrent runs",
+      label: "Work on more than one contribution at a time",
       limit:
-        "Free: one contribution at a time; other runs wait in the queue. Pro: up to your configured limit (2 by default, at most 8).",
+        "Free: one contribution at a time; others wait in the queue. Pro: up to your configured limit (2 by default, at most 8). Publishing is paced the same on every plan.",
     },
     planApproval: {
       label: "Plan approval and revision, team inbox, retry of failed subtasks",
@@ -45,6 +45,11 @@ const plans = {
         "Diff review, explanations, follow-up chat, notes, suggested review order",
       limit: "No limit",
     },
+    understandingCheck: {
+      label: "Explain it back before approval",
+      limit:
+        "On by default; you can turn it off in Settings, and runs approved without it are marked",
+    },
     reviewRerun: {
       label: "Re-run Reviewer and Test analyst",
       limit: "No limit (part of the human review safety gate)",
@@ -52,6 +57,10 @@ const plans = {
     publish: {
       label: "Rule-aware PR draft, preflight checks, publishing a Draft PR",
       limit: "Human approval is required on every plan",
+    },
+    respectChecks: {
+      label: "Project-rule, issue, reviewability and pacing checks",
+      limit: "On every plan; no plan can skip them",
     },
     sync: {
       label:
@@ -62,14 +71,27 @@ const plans = {
       label: "Learning notes page",
       limit: "No limit",
     },
+    practice: {
+      label: "Practice deck and learning counts",
+      limit: "No limit",
+    },
     learningExport: {
-      label: "Learning record export (Markdown)",
-      limit: "Free: not available (the notes page stays Free)",
+      label: "Complete learning record export (Markdown)",
+      limit: "Free: not available (the learning page stays Free)",
+    },
+    coachDebrief: {
+      label: "Coach debrief from your own records",
+      limit:
+        "Free: not available; the sample project shows an example labelled PRO. Debriefs you already have stay readable after a downgrade.",
+    },
+    maintainerFeedback: {
+      label: "Read maintainer feedback and compare it with your forecast",
+      limit: "No limit",
     },
     prFeedback: {
-      label: "Maintainer feedback, CI coaching and AI follow-up rounds",
+      label: "AI follow-up rounds on maintainer feedback",
       limit:
-        "Free: not available; the sample project shows example feedback labelled PRO. Follow-up rounds already on a run stay readable after a downgrade, and an open round can still be reviewed, pushed, stopped or discarded.",
+        "Free: not available. Follow-up rounds already on a run stay readable after a downgrade, and an open round can still be reviewed, pushed, stopped or discarded.",
     },
     discovery: {
       label: "Discovery (GitHub-wide recommendations)",

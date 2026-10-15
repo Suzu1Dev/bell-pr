@@ -30,7 +30,12 @@ import {
 } from "../shared/draft-checks.js";
 import type { Locale } from "../shared/i18n/locale.js";
 import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
-import { AppError, type DiffFile, type Run } from "./types.js";
+import {
+  AppError,
+  type DiffFile,
+  type Repository,
+  type Run,
+} from "./types.js";
 import { assertRemoteHead, prHasCommit, remoteBranchHead } from "./pr-branch.js";
 import { assertConflictsResolved } from "./sync-runs.js";
 import { applyAiDisclosure } from "./drafts.js";
@@ -39,6 +44,13 @@ import { setupError } from "./cli-errors.js";
 import type { WorkbenchContext } from "./workbench.js";
 import { currentLocale, sm } from "./i18n/index.js";
 import { secretInPatch } from "./secrets.js";
+import { assertUnderstood, understandingRequired } from "./understanding.js";
+import { reviewabilitySnapshot } from "../shared/reviewability.js";
+import type {
+  ContributionFacts,
+  GuardOverride,
+} from "../shared/contribution.js";
+import { explainPrCreateFailure, refreshRunFacts } from "./contribution-facts.js";
 
 const now = () => new Date().toISOString();
 
@@ -100,18 +112,36 @@ async function commitEmails(run: Run) {
   return emails;
 }
 
+/** The reviewability snapshot of the run's files, with the project's own references. */
+function changesOf(run: Run, files: DiffFile[], repo?: Repository) {
+  return reviewabilitySnapshot({
+    files,
+    planScopes: run.team?.tasks.map((task) => task.files),
+    generated: repo?.contributionRules?.generated,
+    mergedSizes: repo?.contributionRules?.mergedSizes,
+  });
+}
+
 /**
  * Every check on what a first publish sends to GitHub: the PR text checks,
  * credentials and local paths in the title, description and commit
- * message, CI configuration among the changed files, and, once per
- * address, a commit e-mail that is not GitHub's no-reply one. The publish
- * dialog shows the same list (GET /api/runs/:id/preflight).
+ * message, CI configuration among the changed files, once per address a
+ * commit e-mail that is not GitHub's no-reply one, and the respect checks
+ * (the project's rules, the stored GitHub facts, reviewability, pacing).
+ * The publish dialog shows the same list (GET /api/runs/:id/preflight),
+ * which never calls GitHub: it uses the facts stored on the run unless
+ * `extra.facts` passes fresher ones.
  */
 export async function publishChecks(
   run: Run,
   files: DiffFile[],
   dataDirectory: string,
   locale: Locale = currentLocale(),
+  extra: {
+    repo?: Repository;
+    facts?: ContributionFacts;
+    overrides?: GuardOverride[];
+  } = {},
 ): Promise<DraftCheck[]> {
   const confirmed = await confirmedEmails(dataDirectory);
   const emails = (await commitEmails(run)).filter(
@@ -133,6 +163,13 @@ export async function publishChecks(
       localDirectories: directories,
       changedPaths: files.map((file) => file.path),
       commitEmails: emails,
+      changes: changesOf(run, files, extra.repo),
+      rules: extra.repo?.contributionRules,
+      facts: extra.facts ?? run.contributionFacts,
+      overrides: extra.overrides ?? run.guardOverrides,
+      testReasons: run.reviewability?.testReasons,
+      understandingOff: !understandingRequired(),
+      issueUrl: run.contributionSettings?.issueUrl,
     },
     locale,
   );
@@ -268,6 +305,9 @@ export async function approve(
     ) {
       throw new AppError((m) => m.run.publish.reviewAllFirst, 409);
     }
+    const repo = ctx.store.data.repos.find((value) => value.id === run.repoId);
+    // The Explain-it-back check, unless the person turned it off.
+    const understood = assertUnderstood(run, files, repo);
     if (!run.draft.title.trim() || !run.draft.body.trim())
       throw new AppError((m) => m.run.publish.prTextRequired, 422);
     await assertConflictsResolved(run);
@@ -284,11 +324,18 @@ export async function approve(
     } else {
       // The checks explain themselves in the request's locale; the
       // acknowledgements below match their ids, never their text.
+      // The project's rules and the change's tests stop approval early;
+      // the GitHub facts wait for publishing, which reads them again.
       const unfinished = draftPreflight(
         {
           title: run.draft.title,
           body: run.draft.body,
           commitMessage: run.draft.commitMessage,
+          sources: run.draftPreparation?.context?.sources,
+          proposalBody: run.draftPreparation?.proposal?.body,
+          rules: repo?.contributionRules,
+          changes: changesOf(run, files, repo),
+          testReasons: run.reviewability?.testReasons,
         },
         currentLocale(),
       ).find((check) => check.kind === "block");
@@ -303,6 +350,10 @@ export async function approve(
     await assertGitIdentity(run.worktreePath);
     run.approvedFingerprint = reviewFingerprint(files, run.draft);
     run.status = "approved";
+    // Recorded only once approval succeeds: "Check off" for good, until a
+    // later approval with the check passed.
+    if (understood.passed) delete run.understandingCheckOff;
+    else if (!understood.required) run.understandingCheckOff = true;
     await ctx.store.save();
     return run;
   });
@@ -318,6 +369,7 @@ export async function publish(
   id: string,
   displayedFingerprint: string,
   acknowledged: string[] = [],
+  overrides: Pick<GuardOverride, "id" | "reason">[] = [],
 ) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
@@ -350,6 +402,9 @@ export async function publish(
       )
     )
       throw new AppError((m) => m.run.publish.notAllReviewed, 409);
+    // The current setting applies, also to runs approved while it was off
+    // and to runs approved by builds before the check existed.
+    assertUnderstood(run, files, repo);
     const round = activeFollowUp(run.followUps);
     if (round) return publishFollowUp(ctx, run, round, files);
     if (run.prUrl)
@@ -372,12 +427,31 @@ export async function publish(
         409,
       );
     assertRefName(headBranch);
+    // A block the person lifted with a reason counts for this publish, and
+    // is recorded on the run once publishing goes ahead (below); a reason
+    // already recorded, as on a retry, is not added again.
+    const at = now();
+    const same = (a: Pick<GuardOverride, "id" | "reason">, b: typeof a) =>
+      a.id === b.id && a.reason === b.reason;
+    const lifted = overrides
+      .map((override) => ({ id: override.id, reason: override.reason.trim(), at }))
+      .filter(
+        (override, index, all) =>
+          all.findIndex((other) => same(other, override)) === index &&
+          !(run.guardOverrides ?? []).some((recorded) => same(recorded, override)),
+      );
+    const guardOverrides = [...(run.guardOverrides ?? []), ...lifted].slice(-8);
+    // The GitHub facts are read again; a failed read is never a pass.
+    run.contributionFacts =
+      (await refreshRunFacts(ctx, run, { timeoutMs: 10_000 })) ??
+      run.contributionFacts;
     // Runs approved before these checks existed are held to them as well.
     const checks = await publishChecks(
       run,
       files,
       ctx.store.directory,
       currentLocale(),
+      { repo, overrides: guardOverrides },
     );
     const blocking = checks.find((check) => check.kind === "block");
     if (blocking)
@@ -400,6 +474,7 @@ export async function publish(
     // The commit e-mail is asked about once per address.
     if (checks.some((check) => check.id === "author-email"))
       await confirmEmails(ctx.store.directory, await commitEmails(run));
+    if (lifted.length) run.guardOverrides = guardOverrides;
     run.publishing = true;
     delete run.error;
     await ctx.store.save();
@@ -586,7 +661,11 @@ export async function publish(
       run.prUrl = prUrl;
       run.status = "published";
       ctx.log(run, "system", sm().run.publish.prCreated);
-    } catch (error) {
+    } catch (caught) {
+      let error = caught;
+      // GitHub's own limits (such as on open pull requests) in plain words.
+      const explained = explainPrCreateFailure(error);
+      if (explained) error = explained;
       run.error = redact(
         error instanceof Error ? error.message : sm().run.publish.failed,
       );

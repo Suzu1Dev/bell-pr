@@ -4,6 +4,7 @@ import type { DemoContent } from "./types";
 const answerPrefix = "示範回覆 · 本機預寫內容，未呼叫 AI 模型。\n\n";
 
 const zhTW: DemoContent = buildDemoContent({
+  locale: "zh-TW",
   explanations: {
     "src/utils/retry.ts": {
       example: {
@@ -73,6 +74,15 @@ const zhTW: DemoContent = buildDemoContent({
       concept:
         "unknown 與型別縮小\n錯誤不一定是 Error 物件。使用 unknown 會要求程式先檢查型別，再讀取屬性，避免不安全的假設。",
       tip: "將 delay 改成 baseDelay 是相容性變更。正式 PR 應提供遷移說明，或先保留舊名稱並標記 deprecated，讓使用者有時間升級。",
+      alternatives:
+        "另一條路是保留 `delay`，把它標成 `baseDelay` 的 deprecated 別名：既有設定能再撐一個版本，代價是同一個設定有兩個名字。這次直接改名，是因為示範專案小又新；被廣泛使用的 SDK 通常應該先保留別名一個版本。",
+      lookup: ["TypeScript Omit", "deprecation"],
+      selfCheck: {
+        question:
+          "為什麼 ClientOptions.retry 不包含 shouldRetry？如果呼叫端能在這裡設定它，會出什麼問題？",
+        answer:
+          "哪些 HTTP 狀態碼值得重試，是由用戶端自己的 shouldRetry 決定。呼叫端給的版本會被蓋掉、悄悄失效，所以型別乾脆不提供這個欄位。",
+      },
     },
     "tests/retry.test.ts": {
       example: {
@@ -90,6 +100,15 @@ const zhTW: DemoContent = buildDemoContent({
       concept:
         "Fake timers 與 test doubles\nvi.useFakeTimers 接管計時器；mockReturnValue(0.5) 固定隨機結果。第一輪上限 1 秒，所以推進 500 毫秒就能觸發第二次請求。",
       tip: "這是示範測試，尚未代表完整驗證。還需要補上重試次數上限、最大等待時間、連續失敗、參數驗證與呼叫端的狀態碼測試。",
+      alternatives:
+        "也可以不用 fake timers，而是把假的 `sleep` 傳進 withRetry，記錄每次要求的等待時間：不必模擬計時器就能直接檢查等待，但會為了測試改動工具函式的公開參數。fake timers 能讓 API 維持原樣。",
+      lookup: ["fake timers", "dependency injection"],
+      selfCheck: {
+        question:
+          "為什麼第一個測試剛好把時間推進 500 毫秒？如果沒有固定 Math.random，可能會發生什麼事？",
+        answer:
+          "Math.random 固定為 0.5、第一輪上限是 1 秒，所以等待時間是 500 毫秒。若不固定，等待時間是隨機的，測試可能失敗，也可能碰巧通過。",
+      },
     },
     "README.md": {
       example: {
@@ -107,6 +126,14 @@ const zhTW: DemoContent = buildDemoContent({
       concept:
         "以使用者觀點寫文件\n先說功能會做什麼，再給一個可以照著修改的設定範例，最後列出限制與遷移方法。",
       tip: "審閱文件時，將每個預設值和實作逐一核對。範例應說明匯入方式，也需要指出重試無法取代應用程式自己的錯誤處理。",
+      alternatives:
+        "重試設定也可以寫在另一個指南頁面，再從 README 連過去：README 會比較短，但升級的人常常只讀 README，可能錯過遷移說明。對小型 SDK 來說，在 README 放一個段落比較容易找到。",
+      lookup: ["migration guide", "semantic versioning"],
+      selfCheck: {
+        question: "在預設設定下，一次 GET 最多會送出幾個請求？哪些狀態碼會直接失敗？",
+        answer:
+          "最多 4 個：第一次請求加上 3 次重試。408、429、500、502、503、504 以外的狀態碼（例如 404）不會重試，直接失敗。",
+      },
     },
   },
   run: {
@@ -284,8 +311,6 @@ const zhTW: DemoContent = buildDemoContent({
     sources: {
       "demo-contributing": {
         label: "貢獻規範（示範）",
-        content:
-          "# 示範貢獻規範\n\n標題應直接描述使用者會得到的改善。\n\n測試段落應區分已執行的檢查與仍需驗證的項目。\n\n提交訊息主旨使用 type(scope): 說明 的格式，空一行後說明原因。",
       },
       "demo-template": {
         label: "PR 範本（示範）",
@@ -302,7 +327,7 @@ const zhTW: DemoContent = buildDemoContent({
         {
           sourceId: "demo-contributing",
           text: "標題直接說明這次貢獻帶來的改善。",
-          quote: "標題應直接描述使用者會得到的改善。",
+          quote: "Titles should describe the improvement users get.",
         },
         {
           sourceId: "demo-template",
@@ -563,6 +588,77 @@ const zhTW: DemoContent = buildDemoContent({
     title: "已開啟 Draft PR",
     note: "示範：未在 GitHub 上建立",
   },
+  understanding: {
+    summary:
+      "這份變更讓失敗的 GET 請求改用逐步拉長、帶隨機性的等待時間重試，不再固定停 1 秒。只有 503 或網路錯誤這類暫時性失敗會重試，等待也不會超過 maxDelay。把 delay 改名成 baseDelay，可能讓既有設定失效。",
+    answers: {
+      "selfCheck:src/utils/retry.ts": {
+        answer: "上限是 2 秒，實際等待時間是低於上限的隨機值。",
+        correction: "上限從 1 秒開始每次加倍，所以 attempt 2 的上限是 4 秒。",
+      },
+      untested: {
+        answer: "我沒有測試會送出 Retry-After 的伺服器，因為用戶端目前會忽略它。",
+      },
+    },
+    forecastQuestion: "他們會問重試次數上限有沒有測試。",
+  },
+  quizzes: {
+    "src/utils/retry.ts": "最多 4 秒；jitter 讓每次實際等待都是隨機的，通常更短。",
+    "src/client.ts": "不會。404 不在重試清單裡，所以 HttpError 會直接拋出。",
+    "src/types.ts": "這樣呼叫端就不能換掉用戶端自己判斷哪些狀態碼要重試的邏輯。",
+    "tests/retry.test.ts": "固定的隨機值讓第一輪 1 秒的上限減半，變成 500 毫秒。",
+    "README.md": "三個請求，404 會直接失敗。",
+  },
+  roads: {
+    "src/utils/retry.ts": {
+      guess: "每次重試前固定等一小段時間，再加一點隨機。",
+      why: "伺服器忙不過來時，固定等待還是會引來一波同時的重試。",
+    },
+    "src/client.ts": {
+      guess: "在 shouldRetry 裡直接檢查 error.status，不另外定義錯誤類別。",
+      why: "HttpError 保留完整的回應，除錯時比較方便。",
+    },
+    "src/types.ts": {
+      guess: "把 delay 保留成 deprecated 別名一個版本。",
+      why: "使用者升級期間，既有設定還能繼續運作。",
+    },
+    "tests/retry.test.ts": {
+      guess: "把假的 sleep 函式傳進 withRetry。",
+      why: "比較好讀，但會只為了測試改動公開參數。",
+    },
+    "README.md": {
+      guess: "把重試設定寫在另一個指南頁面。",
+      why: "要升級的人會先讀 README。",
+    },
+  },
+  feedbackLessons: {
+    "retry-after": "決定等待時間前，先看伺服器要求什麼，例如 Retry-After。",
+  },
+  practice: {
+    "retry-check": {},
+    "retry-after-feedback": {
+      question:
+        "維護者在 src/client.ts 問到 429 與 503 回應。伺服器送出這類回應時，等待時間應該參考什麼？",
+      reference:
+        "Retry-After 標頭：伺服器會說明要等多久，用戶端至少要等那麼久，但仍受 maxDelay 限制。",
+    },
+    "types-self-check": {},
+  },
+  debrief: {
+    quotes: ["希望補一個重試用盡的測試：超過 `maxRetries` 後，應拋出最後一次的錯誤。"],
+    drills: [
+      {
+        context: "決定 withRetry 每次重試之間要等多久。",
+        optionA: "固定等 1 秒，前後浮動 0.3 秒。",
+        optionB: "在每次加倍的上限內隨機等待，並以 maxDelay 封頂。",
+        question: "哪一種比較適合這個專案？為什麼？",
+        reveal:
+          "B：許多畫面共用這個用戶端，失敗常常同時發生，逐步拉長的隨機等待能把重試錯開。A 比較簡單，只有少數用戶端會重試時就夠用。",
+      },
+    ],
+    nextStep: "下次在這裡開 Pull Request 前，先寫最後一次允許重試的測試。",
+  },
+  restatement: "讓舊的 delay 選項再支援一個版本，並補上會拋出最後一次錯誤的測試。",
 });
 
 export default zhTW;

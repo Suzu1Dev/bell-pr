@@ -40,6 +40,12 @@ import { AppError, type Run } from "./types.js";
 import { Workbench, type WorkbenchContext } from "./workbench.js";
 import { withLocale } from "./i18n/index.js";
 import type { TeamTask } from "../shared/team.js";
+import { after, before } from "node:test";
+import { skipUnderstandingCheckInTests } from "./understanding.js";
+
+// This file tests other behaviour; server/understanding.test.ts covers the gate.
+before(() => skipUnderstandingCheckInTests(true));
+after(() => skipUnderstandingCheckInTests());
 
 const identity = {
   GIT_AUTHOR_NAME: "Security Test",

@@ -7,10 +7,23 @@ import {
   locales,
   type Locale,
 } from "../../shared/i18n/locale";
+import { draftPreflight } from "../../shared/draft-checks";
+import { aiDisclosureLine } from "../../shared/drafts";
+import { disclosureRule } from "../../shared/project-policy";
 import { parseReviewOrder } from "../../shared/review-order";
+import { reviewabilitySnapshot } from "../../shared/reviewability";
+import {
+  changedLines,
+  changeFingerprint,
+  creditedAttempt,
+  planCheck,
+  understandingStatus,
+} from "../../shared/understanding";
 import { assertNoHan } from "../test-utils/render";
 import type { DiffFile } from "../types";
 import { getSampleDiscoveryJob } from "./discovery";
+import { demoContributionRules } from "./rules";
+import type { DemoFilePath } from "./shared";
 import {
   demoAnswer,
   getDemo,
@@ -26,6 +39,18 @@ const demoFiles = getDemo("zh-TW").files;
 // only: getSampleDiscoveryJob() takes its structure from shared.ts.
 const structuralKeys = new Set([
   "agent",
+  "association",
+  "choice",
+  "dimension",
+  "grade",
+  "issueUrl",
+  "key",
+  "login",
+  "pullRequestCreationPolicy",
+  "reviewDecision",
+  "runId",
+  "runIds",
+  "viewerPermission",
   "author",
   "authorAssociation",
   "baseBranch",
@@ -354,6 +379,17 @@ test("every locale fills the Pro and video samples with the same ids and lengths
     assert.ok(Object.values(rerunReport).every(filled), locale);
     assert.ok([...importSteps, ...analysisSteps].every(filled), locale);
     assert.ok(filled(publishedCard.title) && filled(publishedCard.note), locale);
+    const { understandingSample, quizSamples, roadSamples, practiceSample, debriefSample, restatementSample } = demo;
+    assert.ok(understandingSample && quizSamples && roadSamples, `${locale} check samples`);
+    assert.ok(demo.contributingText && demo.contributionFacts && demo.mergedSizes, `${locale} respect samples`);
+    assert.ok(demo.feedbackTags && practiceSample && debriefSample && restatementSample, `${locale} loop samples`);
+    assert.ok(filled(understandingSample.summary) && filled(understandingSample.untested), locale);
+    assert.ok(Object.values(understandingSample.answers).every((answer) => filled(answer.answer)), locale);
+    assert.ok(Object.values(quizSamples).every((quiz) => filled(quiz.answer)), locale);
+    assert.ok(Object.values(roadSamples).every((road) => filled(road.guess) && filled(road.why)), locale);
+    assert.ok(practiceSample.every((item) => filled(item.question)), locale);
+    assert.ok(debriefSample.recurring?.quotes.every(filled) && filled(debriefSample.nextStep), locale);
+    assert.equal(debriefSample.locale, locale);
     return {
       feedback: prFeedback.items.map((item) => item.url),
       checks: prFeedback.checks?.map((check) => check.name),
@@ -362,9 +398,187 @@ test("every locale fills the Pro and video samples with the same ids and lengths
       rerun: Object.keys(rerunReport),
       importSteps: importSteps.length,
       analysisSteps: analysisSteps.length,
+      checkAnswers: Object.keys(understandingSample.answers),
+      quizzes: Object.keys(quizSamples),
+      roads: Object.keys(roadSamples),
+      tags: Object.keys(demo.feedbackTags),
+      practice: practiceSample.map((item) => item.key),
+      drills: debriefSample.drills?.length,
+      restatements: restatementSample.map((item) => item.url),
     };
   });
   for (const other of others) assert.deepEqual(other, reference);
+});
+
+test("every demo file has a selfCheck question and alternatives in both locales", () => {
+  for (const locale of locales)
+    for (const file of getDemo(locale).files) {
+      assert.ok(file.explanation?.selfCheck?.question.trim(), `${locale} ${file.path}`);
+      assert.ok(file.explanation?.selfCheck?.answer.trim(), `${locale} ${file.path}`);
+      assert.ok(file.explanation?.alternatives?.trim(), `${locale} ${file.path}`);
+    }
+});
+
+test("the sample CONTRIBUTING.md yields exactly the issue-first, understand and disclose rules", () => {
+  for (const locale of locales) {
+    const demo = getDemo(locale);
+    const rules = demoContributionRules(demo);
+    assert.deepEqual(
+      rules.findings.map((finding) => [finding.kind, finding.line, finding.quote]),
+      [
+        ["issue-first", 5, "Open an issue before changing behavior."],
+        ["understand", 7, "You must be able to explain your change in review."],
+        ["disclose", 9, "If you used AI tools, say so in the PR description."],
+      ],
+      locale,
+    );
+    // One CONTRIBUTING.md: the draft guide quotes the same file, and its
+    // disclosure rule is the one the switch suggests.
+    const sources = demo.draftPreparation.context?.sources ?? [];
+    assert.equal(sources.find((source) => source.id === "demo-contributing")?.content, demo.contributingText);
+    assert.equal(disclosureRule(sources)?.quote, "If you used AI tools, say so in the PR description.");
+    assert.equal(rules.door?.hasPullRequests, true);
+    assert.equal(rules.mergedSizes?.length, 3);
+  }
+});
+
+/** The demo files as the check reads them; the demo diff has no fingerprints. */
+const checkFiles = (files: DiffFile[]) =>
+  files.map((file) => ({ ...file, fingerprint: file.fingerprint ?? file.path }));
+
+test("the sample check asks about retry.ts and what was not tested, and the sample answers pass it", () => {
+  for (const locale of locales) {
+    const demo = getDemo(locale);
+    const files = checkFiles(demo.files);
+    assert.equal(changedLines(files), 97);
+    const plan = planCheck({
+      files,
+      explanations: Object.fromEntries(
+        demo.files.map((file) => [file.path, { status: "ready", content: file.explanation }]),
+      ),
+      reports: demo.run.reports,
+      questions: { fallback: (path) => path, untested: "untested" },
+    });
+    assert.deepEqual(plan.map((item) => item.id), ["selfCheck:src/utils/retry.ts", "untested"], locale);
+    const sample = demo.understandingSample!;
+    assert.deepEqual(Object.keys(sample.answers), plan.map((item) => item.id));
+    assert.equal(sample.answers.untested.answer, sample.untested);
+    const partly = sample.answers["selfCheck:src/utils/retry.ts"];
+    assert.deepEqual([partly.confidence, partly.grade], ["think", "partly"]);
+    assert.ok(partly.correction?.trim());
+    // Filled in as the demo's buttons do, the record passes the same rule as the server's.
+    const at = "2026-10-03T02:00:00.000Z";
+    const record = {
+      summary: { text: sample.summary, changeFingerprint: changeFingerprint(files), at },
+      items: plan.map((item) => ({
+        id: item.id,
+        source: item.source,
+        ...(item.path ? { path: item.path, fingerprint: item.fingerprint } : {}),
+        question: item.question,
+        ...sample.answers[item.id],
+        lockedAt: at,
+      })),
+    };
+    const status = understandingStatus({
+      record,
+      plan,
+      files,
+      required: true,
+      cards: demo.files.flatMap((file) => (file.explanation ? [file.explanation] : [])),
+    });
+    assert.deepEqual(status.missing, [], locale);
+    // A try-first answer on src/client.ts is not credited toward this check (VIDEO S6).
+    const credited = planCheck({
+      files,
+      explanations: Object.fromEntries(
+        demo.files.map((file) => [file.path, { status: "ready", content: file.explanation }]),
+      ),
+      attempts: {
+        "src/client.ts": {
+          fingerprint: "src/client.ts",
+          quiz: { ...demo.quizSamples!["src/client.ts"], at },
+        },
+      },
+      reports: demo.run.reports,
+      questions: { fallback: (path) => path, untested: "untested" },
+    });
+    assert.deepEqual(credited.map((item) => item.id), plan.map((item) => item.id));
+    // Every file's try-first sample would count on a picked file.
+    for (const file of files)
+      assert.ok(
+        creditedAttempt(
+          { fingerprint: file.fingerprint, quiz: { ...demo.quizSamples![file.path as DemoFilePath], at } },
+          file,
+          file.explanation?.selfCheck?.answer,
+        ),
+        `${locale} ${file.path}`,
+      );
+  }
+});
+
+test("the sample publishes with no block and no confirm: rules, facts, size and the issue link all pass", () => {
+  for (const locale of locales) {
+    const demo = getDemo(locale);
+    assert.equal(demo.run.contributionSettings?.issueUrl, "#sample-issue-42");
+    assert.ok(demo.run.draft.body.endsWith(aiDisclosureLine));
+    // The proposal never carries the line: only the person's draft does.
+    assert.ok(!demo.draftPreparation.proposal?.body.includes(aiDisclosureLine));
+    const checks = draftPreflight(
+      {
+        title: demo.run.draft.title,
+        body: demo.run.draft.body,
+        sources: demo.draftPreparation.context?.sources,
+        proposalBody: demo.draftPreparation.proposal?.body,
+        changedPaths: demo.files.map((file) => file.path),
+        rules: demoContributionRules(demo),
+        facts: demo.contributionFacts,
+        changes: reviewabilitySnapshot({
+          files: demo.files,
+          planScopes: demo.team.tasks.map((task) => task.files),
+          mergedSizes: demo.mergedSizes,
+        }),
+        issueUrl: demo.run.contributionSettings?.issueUrl,
+      },
+      locale,
+    );
+    assert.deepEqual(checks, [], locale);
+  }
+});
+
+test("the loop samples point at the sample feedback and run", () => {
+  for (const locale of locales) {
+    const demo = getDemo(locale);
+    const urls = demo.prFeedback!.items.map((item) => item.url);
+    assert.equal(demo.prFeedback?.reviewDecision, "CHANGES_REQUESTED");
+    assert.deepEqual(Object.keys(demo.feedbackTags!), urls);
+    const tags = Object.values(demo.feedbackTags!);
+    assert.ok(tags.some((tag) => tag.dimension === "tests" && tag.predicted === true));
+    assert.ok(tags.some((tag) => tag.predicted === false && tag.lesson?.trim()));
+    // The forecast names what the review then asked about.
+    assert.equal(demo.understandingSample?.forecast.dimension, "tests");
+    const review = demo.prFeedback!.items.find((item) => item.kind === "review")!;
+    for (const quote of demo.debriefSample!.recurring!.quotes)
+      assert.ok(review.body.includes(quote), `${locale}: ${quote}`);
+    assert.deepEqual(demo.debriefSample!.runIds, [demo.run.id]);
+    assert.deepEqual(demo.restatementSample!.map((item) => item.url), [review.url]);
+    assert.equal(demo.practiceSample!.length, 3);
+    for (const item of demo.practiceSample!) {
+      assert.equal(item.runId, demo.run.id);
+      assert.ok(Date.parse(item.dueAt) < Date.parse("2026-10-15T00:00:00.000Z"), "due");
+      assert.ok(item.question.trim() && item.reference?.trim(), item.key);
+      const selfCheck = demo.files.find((file) => file.path === item.path)?.explanation?.selfCheck;
+      if (item.kind !== "feedback") assert.equal(item.question, selfCheck?.question, item.key);
+    }
+    const [miss, surprise, untried] = demo.practiceSample!;
+    assert.equal(miss.earlier, demo.understandingSample?.answers["selfCheck:src/utils/retry.ts"].correction);
+    assert.equal(surprise.earlier, demo.feedbackTags?.["#demo-pr-thread-1"].lesson);
+    assert.equal(untried.earlier, undefined);
+    // A starter issue in the sample discovery is practice by hand.
+    assert.deepEqual(
+      getSampleDiscoveryJob(locale).opportunities.filter((item) => item.learnByHand).map((item) => item.id),
+      ["markwell-link-positions"],
+    );
+  }
 });
 
 test("the English demo contains no Han characters or CJK punctuation", () => {
@@ -724,7 +938,6 @@ const budgets: {
     values: (d) =>
       d.files.flatMap(({ explanation }) => [
         explanation?.summary,
-        // Only some files have a self-check.
         ...(explanation?.selfCheck ? [explanation.selfCheck.question] : []),
       ]),
   },

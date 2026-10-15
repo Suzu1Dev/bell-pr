@@ -19,6 +19,7 @@ import { currentLocale, withLocale } from "./i18n/index.js";
 import { lenientRead } from "./persisted-schema.js";
 import { allowUnsandboxedAgents } from "./sandbox.js";
 import { AppError } from "./types.js";
+import { understandingRequired } from "./understanding.js";
 
 async function dataDir(t: { after: (fn: () => Promise<void>) => void }) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-app-settings-"));
@@ -232,4 +233,89 @@ test("withAppSettings gives the sources back to the service that was active befo
     /failed/,
   );
   assert.equal(currentLocale(), "zh-TW");
+});
+
+for (const field of ["skipUnderstandingCheck", "hideTryFirst"] as const)
+  test(`a file written by a newer build with ${field} still loads in an older build`, () => {
+    // The older build's schema has no such field; its lenient read drops it.
+    const older = lenientRead(
+      field === "skipUnderstandingCheck"
+        ? appSettingsSchema.omit({ skipUnderstandingCheck: true })
+        : appSettingsSchema.omit({ hideTryFirst: true }),
+    );
+    const written = { locale: "en", [field]: true };
+    assert.deepEqual(older.parse(written), { locale: "en" });
+    assert.deepEqual(appSettingsSchema.parse(written), written);
+  });
+
+test("BELLPR_REQUIRE_UNDERSTANDING_CHECK=1 keeps the check on and locks the setting; no value turns it off", async (t) => {
+  const directory = await dataDir(t);
+  await writeFile(
+    path.join(directory, "app-settings.json"),
+    JSON.stringify({ skipUnderstandingCheck: true }),
+  );
+  const locked = new AppSettingsService(directory, {
+    env: { BELLPR_REQUIRE_UNDERSTANDING_CHECK: "1" },
+  });
+  assert.deepEqual(locked.lockedBy(), {
+    skipUnderstandingCheck: "BELLPR_REQUIRE_UNDERSTANDING_CHECK",
+  });
+  assert.equal(locked.get().skipUnderstandingCheck, false);
+  await assert.rejects(
+    withLocale("en", () => locked.update({ skipUnderstandingCheck: true })),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 409);
+      assert.deepEqual(error.params, {
+        setting: "skipUnderstandingCheck",
+        variable: "BELLPR_REQUIRE_UNDERSTANDING_CHECK",
+      });
+      assert.equal(
+        error.message,
+        'The setting "Ask me to explain each change back before approval" comes from the BELLPR_REQUIRE_UNDERSTANDING_CHECK environment variable. Change or remove the variable, then restart BELL PR.',
+      );
+      return true;
+    },
+  );
+  // Any other value locks nothing, and says so once at start.
+  const original = process.stderr.write.bind(process.stderr);
+  const written: string[] = [];
+  process.stderr.write = ((chunk: string | Uint8Array) => {
+    written.push(String(chunk));
+    return true;
+  }) as typeof process.stderr.write;
+  let services: AppSettingsService[];
+  try {
+    services = ["0", "true", "yes", "off"].map(
+      (value) => new AppSettingsService(directory, { env: { BELLPR_REQUIRE_UNDERSTANDING_CHECK: value } }),
+    );
+  } finally {
+    process.stderr.write = original;
+  }
+  for (const service of services) {
+    assert.deepEqual(service.lockedBy(), {});
+    assert.equal(service.get().skipUnderstandingCheck, true);
+  }
+  assert.equal(written.filter((line) => line.includes("app_settings.lock_ignored")).length, 4);
+  assert.ok(written.every((line) => line.includes("BELLPR_REQUIRE_UNDERSTANDING_CHECK")));
+  // Unset or empty: nothing locked and nothing to warn about.
+  assert.deepEqual(new AppSettingsService(directory, { env: { BELLPR_REQUIRE_UNDERSTANDING_CHECK: " " } }).lockedBy(), {});
+});
+
+test("the active settings decide whether the understanding check is required", async (t) => {
+  const directory = await dataDir(t);
+  const service = new AppSettingsService(directory, { env: {} });
+  activateAppSettings(service);
+  try {
+    assert.equal(understandingRequired(), true);
+    await service.update({ skipUnderstandingCheck: true });
+    assert.equal(understandingRequired(), false);
+    await service.update({ skipUnderstandingCheck: null });
+    assert.equal(understandingRequired(), true);
+    await service.update({ skipUnderstandingCheck: true });
+  } finally {
+    deactivateAppSettings(service);
+  }
+  // Without a source the check is required again.
+  assert.equal(understandingRequired(), true);
 });

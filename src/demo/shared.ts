@@ -6,7 +6,15 @@
  * the same ids, paths and times.
  */
 import { ponytailPolicyVersion, type EfficiencyMetrics } from "../../shared/efficiency";
+import type { ContributionFacts } from "../../shared/contribution";
+import { aiDisclosureLine } from "../../shared/drafts";
 import type { ContributionRecommendation } from "../../shared/insights";
+import type { PracticeItem } from "../../shared/practice";
+import type {
+  Confidence,
+  RoadChoice,
+  SelfGrade,
+} from "../../shared/understanding";
 import type { DiffFile, Repo } from "../types";
 import type {
   DemoContent,
@@ -214,6 +222,13 @@ function diff(
   };
 }
 
+/**
+ * The issue the sample run is for. It is a fragment, shown as "#42
+ * (sample)" and never as a link, and it meets the sample project's
+ * "issue first" rule.
+ */
+export const sampleIssueUrl = "#sample-issue-42";
+
 export const run = {
   id: "demo-run",
   status: "review",
@@ -265,7 +280,21 @@ export const run = {
   } satisfies EfficiencyMetrics,
   draft: {
     title: "feat(client): add exponential backoff and jitter to GET retries",
-    body: "## Summary\n\n- Add configurable exponential backoff with full jitter.\n- Retry temporary GET failures and preserve HTTP error details.\n- Add example retry tests and document the new configuration.\n\n## Compatibility\n\n`retry.delay` is renamed to `retry.baseDelay`; callers must update their configuration.\n\n## Validation\n\nThis is demonstration content. Tests have not been executed against a real repository.\n\n## Review notes\n\nConfirm parameter validation, maximum retry coverage, cancellation behavior and Retry-After handling before production use.",
+    // The sample project asks for an AI-assistance disclosure, so the
+    // draft ends with the line the draft guide suggests for it, as if the
+    // person had applied it; the proposal itself never carries it.
+    body: `## Summary\n\n- Add configurable exponential backoff with full jitter.\n- Retry temporary GET failures and preserve HTTP error details.\n- Add example retry tests and document the new configuration.\n\n## Compatibility\n\n\`retry.delay\` is renamed to \`retry.baseDelay\`; callers must update their configuration.\n\n## Validation\n\nThis is demonstration content. Tests have not been executed against a real repository.\n\n## Review notes\n\nConfirm parameter validation, maximum retry coverage, cancellation behavior and Retry-After handling before production use.\n\n${aiDisclosureLine}`,
+  },
+  /** The task's settings; the issue link is the sample issue. */
+  contributionSettings: {
+    direction: "bugfix",
+    targetUser: "",
+    outcome: "",
+    constraints: "",
+    acceptance: "",
+    maxTeammates: 3,
+    requirePlanApproval: true,
+    issueUrl: sampleIssueUrl,
   },
 } as const;
 export type DemoAgentId = (typeof run.agents)[number]["id"];
@@ -427,6 +456,31 @@ export const team = {
 export type DemoTaskId = (typeof team.tasks)[number]["id"];
 export type DemoMessageId = (typeof team.messages)[number]["id"];
 
+/**
+ * The fictional project's CONTRIBUTING.md, written for the sample (no real
+ * project's text). It states the three rules the "Before you contribute"
+ * card quotes: an issue first, explaining the change in review, and saying
+ * so when AI tools helped. Like a real project's rules it is quoted word
+ * for word, in English, whatever the interface language.
+ */
+export const contributingText = [
+  "# Contributing to Open Fetch",
+  "",
+  "Thanks for helping. A few rules keep reviews quick.",
+  "",
+  "Open an issue before changing behavior.",
+  "",
+  "You must be able to explain your change in review.",
+  "",
+  "If you used AI tools, say so in the PR description.",
+  "",
+  "Titles should describe the improvement users get.",
+  "",
+  "The testing section should separate the checks you ran from the items still to verify.",
+  "",
+  "Commit subjects use the format type(scope): summary, followed by a blank line and the reason.",
+].join("\n");
+
 /** Synthetic content for the local demo; none of these rules are attributed to a real repository. */
 export const draftPreparation = {
   status: "ready",
@@ -462,6 +516,7 @@ export const prFeedback = {
   prNumber: 128,
   fetchedAt: "2026-10-05T02:15:00.000Z",
   checksState: "SUCCESS",
+  reviewDecision: "CHANGES_REQUESTED",
   checks: [{ name: "ci / test (node 22)", state: "SUCCESS" }],
   items: [
     {
@@ -487,6 +542,132 @@ export const prFeedback = {
   ],
 } as const;
 export type DemoFeedbackItemId = (typeof prFeedback.items)[number]["id"];
+
+/**
+ * The sample's GitHub facts at publish: pull requests are open to the
+ * person, issue #42 is open, unassigned and has no other pull request, a
+ * maintainer welcomed a fix, and the person has no pull request here yet
+ * (a budget of 1). The logins have an underscore, which GitHub accounts
+ * cannot use; nothing here was read from GitHub.
+ */
+export const contributionFacts = {
+  checkedAt: "2026-10-03T01:35:00.000Z",
+  door: {
+    hasPullRequests: true,
+    pullRequestCreationPolicy: "all",
+    viewerPermission: "READ",
+    login: "sample_contributor",
+  },
+  issue: {
+    url: sampleIssueUrl,
+    number: 42,
+    title: "GET requests give up on the first temporary error",
+    state: "OPEN",
+    labels: ["enhancement"],
+    assignees: [],
+    claims: [],
+    otherPrs: [],
+    maintainerQuote: {
+      author: "sample_maintainer",
+      association: "MEMBER",
+      quote: "PRs welcome for the retry cap.",
+      at: "2026-10-02T09:00:00.000Z",
+    },
+    viewerCommented: true,
+  },
+  pacing: { openPrs: 0, mergedPrs: 0, waitingPrs: 0, viewerPermission: "READ" },
+} satisfies ContributionFacts;
+
+/** The sample project's last three merged pull requests (the real size reference). */
+export const mergedSizes = [
+  { number: 118, additions: 64, deletions: 12, changedFiles: 4 },
+  { number: 121, additions: 23, deletions: 5, changedFiles: 2 },
+  { number: 125, additions: 140, deletions: 31, changedFiles: 6 },
+];
+
+/**
+ * The structure of the sample check: the questions the check plans for the
+ * demo diff (97 changed lines: one file question, `retry.ts`, plus the
+ * not-tested question), with the confidence and grade of each answer.
+ */
+export const understanding = {
+  answers: {
+    "selfCheck:src/utils/retry.ts": { confidence: "think", grade: "partly" },
+    untested: { confidence: "sure" },
+  },
+  forecastDimension: "tests",
+} as const satisfies {
+  answers: Record<string, { confidence: Confidence; grade?: SelfGrade }>;
+  forecastDimension: string;
+};
+export type DemoCheckItemId = keyof typeof understanding.answers;
+
+/** The confidence and grade of each file's try-first answer. */
+export const quizzes = {
+  "src/utils/retry.ts": { confidence: "think", grade: "got" },
+  "src/client.ts": { confidence: "think", grade: "got" },
+  "src/types.ts": { confidence: "sure", grade: "got" },
+  "tests/retry.test.ts": { confidence: "think", grade: "got" },
+  "README.md": { confidence: "guess", grade: "partly" },
+} as const satisfies Record<DemoFilePath, { confidence: Confidence; grade: SelfGrade }>;
+
+/** The road the person chose for each file's alternative. */
+export const roads = {
+  "src/utils/retry.ts": "keep",
+  "src/client.ts": "keep",
+  "src/types.ts": "switch",
+  "tests/retry.test.ts": "depends",
+  "README.md": "keep",
+} as const satisfies Record<DemoFilePath, RoadChoice>;
+
+/**
+ * The person's tags on the sample feedback: the review asks for a test
+ * (Tests, which the forecast predicted), and the Retry-After comment
+ * surprised them (with a lesson in the copy).
+ */
+export const feedbackTags = {
+  review: { dimension: "tests", predicted: true, at: "2026-10-05T02:20:00.000Z" },
+  "retry-after": { dimension: "risk", predicted: false, at: "2026-10-05T02:21:00.000Z" },
+} as const satisfies Record<DemoFeedbackItemId, { dimension: string; predicted: boolean; at: string }>;
+
+/** Three due practice items from the sample run; their words are copy. */
+export const practice = [
+  {
+    id: "retry-check",
+    kind: "check",
+    key: "check:selfCheck:src/utils/retry.ts",
+    path: "src/utils/retry.ts",
+    dueAt: "2026-10-06T01:00:00.000Z",
+    lastGrade: "partly",
+    lastConfidence: "think",
+  },
+  {
+    id: "retry-after-feedback",
+    kind: "feedback",
+    key: "feedback:#demo-pr-thread-1",
+    feedbackItem: "retry-after",
+    path: "src/client.ts",
+    dimension: "risk",
+    dueAt: "2026-10-06T02:00:00.000Z",
+  },
+  {
+    id: "types-self-check",
+    kind: "selfCheck",
+    key: "selfCheck:src/types.ts",
+    path: "src/types.ts",
+    dueAt: "2026-10-06T03:00:00.000Z",
+  },
+] as const satisfies readonly (Pick<
+  PracticeItem,
+  "kind" | "key" | "path" | "dueAt" | "dimension" | "lastGrade" | "lastConfidence"
+> & { id: string; feedbackItem?: "retry-after" })[];
+export type DemoPracticeId = (typeof practice)[number]["id"];
+
+/** The sample coach debrief (Pro): written after the feedback was read. */
+export const debrief = {
+  at: "2026-10-06T00:00:00.000Z",
+  dimension: "tests",
+} as const;
 
 /**
  * The sample discovery job: fictional repositories, issues and quotes that
@@ -607,6 +788,8 @@ export const sampleDiscovery = {
       id: "markwell-link-positions",
       repository: "markwell-sample/markwell",
       difficulty: "beginner",
+      // A starter issue: practice to write by hand, not work for the agent team.
+      learnByHand: true,
       evidence: [
         {
           sourceId: "markwell-sample/markwell:issue:57",
@@ -720,6 +903,7 @@ export function buildDemoContent(copy: DemoCopy): DemoContent {
       reviewedFiles: [],
       reports: { ...copy.run.reports },
       efficiency: { ...run.efficiency },
+      contributionSettings: { ...run.contributionSettings },
     },
     insights: {
       summary: copy.insights.summary,
@@ -790,7 +974,12 @@ export function buildDemoContent(copy: DemoCopy): DemoContent {
         warnings: copy.draftPreparation.warnings,
         sources: draftPreparation.sources.map((source) => ({
           ...source,
-          ...copy.draftPreparation.sources[source.id],
+          label: copy.draftPreparation.sources[source.id].label,
+          // One CONTRIBUTING.md: the rules card and the draft guide quote the same file.
+          content:
+            source.id === "demo-contributing"
+              ? contributingText
+              : copy.draftPreparation.sources["demo-template"].content,
         })),
       },
       proposal: {
@@ -822,6 +1011,7 @@ export function buildDemoContent(copy: DemoCopy): DemoContent {
         body: copy.prFeedback.bodies[id],
       })),
       checksState: prFeedback.checksState,
+      reviewDecision: prFeedback.reviewDecision,
       checks: prFeedback.checks.map((check) => ({ ...check })),
       warnings: [...copy.prFeedback.warnings],
     },
@@ -832,5 +1022,71 @@ export function buildDemoContent(copy: DemoCopy): DemoContent {
     importSteps: [...copy.importSteps],
     analysisSteps: [...copy.analysisSteps],
     publishedCard: { ...copy.publishedCard },
+    understandingSample: {
+      summary: copy.understanding.summary,
+      answers: Object.fromEntries(
+        (Object.keys(understanding.answers) as DemoCheckItemId[]).map((id) => [
+          id,
+          { ...understanding.answers[id], ...copy.understanding.answers[id] },
+        ]),
+      ),
+      untested: copy.understanding.answers.untested.answer,
+      forecast: {
+        dimension: understanding.forecastDimension,
+        question: copy.understanding.forecastQuestion,
+      },
+    },
+    quizSamples: Object.fromEntries(
+      diffs.map(({ path }) => [path, { answer: copy.quizzes[path], ...quizzes[path] }]),
+    ) as NonNullable<DemoContent["quizSamples"]>,
+    roadSamples: Object.fromEntries(
+      diffs.map(({ path }) => [path, { ...copy.roads[path], choice: roads[path] }]),
+    ) as NonNullable<DemoContent["roadSamples"]>,
+    contributingText,
+    contributionFacts: structuredClone(contributionFacts) as ContributionFacts,
+    mergedSizes: mergedSizes.map((size) => ({ ...size })),
+    feedbackTags: Object.fromEntries(
+      prFeedback.items.map(({ id, url }) => [
+        url,
+        {
+          ...feedbackTags[id],
+          ...(id === "retry-after" ? { lesson: copy.feedbackLessons[id] } : {}),
+        },
+      ]),
+    ),
+    // A file's selfCheck item takes its words from the explanation, a
+    // missed check answer its correction, a feedback item its lesson.
+    practiceSample: practice.map(({ id, ...structure }) => {
+      const { feedbackItem, ...item } = { feedbackItem: undefined, ...structure };
+      const text = copy.practice[id];
+      const check = copy.explanations[item.path].selfCheck;
+      const earlier =
+        item.kind === "check"
+          ? copy.understanding.answers[`selfCheck:${item.path}` as DemoCheckItemId]?.correction
+          : feedbackItem
+            ? copy.feedbackLessons[feedbackItem]
+            : undefined;
+      const reference = text.reference ?? check?.answer;
+      return {
+        ...item,
+        runId: run.id,
+        repoId: repo.id,
+        question: text.question ?? check?.question ?? "",
+        ...(reference ? { reference } : {}),
+        ...(earlier ? { earlier } : {}),
+        codeAvailable: true,
+      };
+    }),
+    debriefSample: {
+      at: debrief.at,
+      locale: copy.locale,
+      runIds: [run.id],
+      recurring: { dimension: debrief.dimension, quotes: [...copy.debrief.quotes] },
+      drills: copy.debrief.drills.map((drill) => ({ ...drill })),
+      nextStep: copy.debrief.nextStep,
+    },
+    restatementSample: [
+      { url: prFeedback.items[0].url, text: copy.restatement },
+    ],
   };
 }

@@ -24,6 +24,11 @@ import type { LearnerNote } from "../../shared/explanations";
 import { parseLocale, type Locale } from "../../shared/i18n/locale";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
 import { parseReviewOrder } from "../../shared/review-order";
+import {
+  reportMentionCount,
+  type FileAttempt,
+  type FileAttemptInput,
+} from "../../shared/understanding";
 import { useTablistKeys } from "../a11y/useTablistKeys";
 import { useFormat, useLocale, useT } from "../i18n";
 import type { ChatMessage, DiffFile, Run } from "../types";
@@ -58,6 +63,15 @@ export interface ExplanationPanelProps {
    * the UI language, the explanation tab says which language it is in.
    */
   runLocale?: Locale;
+  /** The person's try-first attempt on this file (`run.attempts[path]`). */
+  attempt?: FileAttempt;
+  /** Saves the quiz answer before the reveal, its grade, or the road choice (PATCH /api/runs/:id/attempts). */
+  onAttempt?(input: {
+    quiz?: FileAttemptInput["quiz"];
+    road?: FileAttemptInput["road"];
+  }): Promise<void>;
+  /** Shows the try-first prompts; false brings back the plain reveal (Settings → Learning). */
+  tryFirst?: boolean;
 }
 
 /**
@@ -99,15 +113,7 @@ const testFilePattern =
 const reportKeys = ["implementer", "reviewer", "tester"] as const;
 
 /** Paragraphs (split on blank lines) that mention the path or its basename. */
-export function reportMentionCount(report: string, filePath: string) {
-  const basename = filePath.split("/").pop() || filePath;
-  return report
-    .split(/\n\s*\n/)
-    .filter(
-      (paragraph) =>
-        paragraph.includes(filePath) || paragraph.includes(basename),
-    ).length;
-}
+export { reportMentionCount };
 
 /** Thread comments on the current file, shown as plain text: other people's words, not Markdown to trust. */
 export function MaintainerFeedback({ items }: { items: PrFeedbackItem[] }) {

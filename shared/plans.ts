@@ -9,7 +9,10 @@ import type { ReasoningEffort } from "./models.js";
 /**
  * Features only Pro (or the trial) unlocks. Re-running the Reviewer and Test
  * analyst is deliberately not here: it is part of the human review gate and
- * stays Free.
+ * stays Free. So are the understanding check, the project-rule, issue,
+ * reviewability and pacing checks, reading maintainer feedback and the
+ * practice deck: no plan buys a way past a check. Pro goes deeper, never
+ * to more pull requests.
  */
 export const proFeatures = [
   "teamSize",
@@ -17,9 +20,12 @@ export const proFeatures = [
   "discovery",
   "moreRecommendations",
   "learningExport",
+  /** AI follow-up rounds on maintainer feedback; reading the feedback is Free. */
   "prFeedback",
   "webAccess",
   "deepReasoning",
+  /** The model-written coach debrief from the person's own records. */
+  "coachDebrief",
 ] as const;
 export type ProFeature = (typeof proFeatures)[number];
 
@@ -141,11 +147,16 @@ export const planFeatureIds = [
   "parallelRuns",
   "planApproval",
   "review",
+  "understandingCheck",
   "reviewRerun",
   "publish",
+  "respectChecks",
   "sync",
   "learningNotes",
+  "practice",
   "learningExport",
+  "coachDebrief",
+  "maintainerFeedback",
   "prFeedback",
   "discovery",
   "webAccess",
@@ -179,11 +190,16 @@ export const planFeatureTable: readonly PlanFeatureRow[] = [
   { id: "parallelRuns", tier: "free-limited", feature: "parallelRuns" },
   { id: "planApproval", tier: "free" },
   { id: "review", tier: "free" },
+  { id: "understandingCheck", tier: "free" },
   { id: "reviewRerun", tier: "free" },
   { id: "publish", tier: "free" },
+  { id: "respectChecks", tier: "free" },
   { id: "sync", tier: "free" },
   { id: "learningNotes", tier: "free" },
+  { id: "practice", tier: "free" },
   { id: "learningExport", tier: "pro", feature: "learningExport" },
+  { id: "coachDebrief", tier: "pro", feature: "coachDebrief" },
+  { id: "maintainerFeedback", tier: "free" },
   { id: "prFeedback", tier: "pro", feature: "prFeedback" },
   { id: "discovery", tier: "pro", feature: "discovery" },
   { id: "webAccess", tier: "pro", feature: "webAccess" },

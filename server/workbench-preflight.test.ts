@@ -24,6 +24,12 @@ import { Store } from "./store.js";
 import type { TeamAgentRunner } from "./team.js";
 import { AppError, type Run } from "./types.js";
 import { Workbench } from "./workbench.js";
+import { after, before } from "node:test";
+import { skipUnderstandingCheckInTests } from "./understanding.js";
+
+// This file tests other behaviour; server/understanding.test.ts covers the gate.
+before(() => skipUnderstandingCheckInTests(true));
+after(() => skipUnderstandingCheckInTests());
 
 /**
  * Runs `fn` at the end of the test, before what was deferred earlier (the

@@ -723,11 +723,11 @@ test("Free gates only what creates Pro work and never a read", async (t) => {
   assert.equal((await call("POST", "/discovery/cancel")).status, 200);
   assert.deepEqual((await call("POST", `/repos/${repo.id}/insights/recommendations`, {})).body, proRequiredBody("moreRecommendations"));
   assert.deepEqual((await call("GET", "/runs/any/export.md")).body, proRequiredBody("learningExport"));
-  assert.deepEqual((await call("POST", "/runs/any/pr/feedback")).body, proRequiredBody("prFeedback"));
   assert.deepEqual((await call("POST", "/runs/any/follow-ups", { feedbackUrls: [] })).body, proRequiredBody("prFeedback"));
   // Discarding a round, syncing and updating the clone are never gated:
   // they reach the Workbench, which answers that the run does not exist.
   for (const endpoint of [
+    "/runs/any/pr/feedback",
     "/runs/any/follow-ups/discard",
     "/runs/any/sync",
     "/runs/any/sync/resolve",

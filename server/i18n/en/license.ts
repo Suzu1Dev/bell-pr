@@ -24,6 +24,7 @@ export default {
       "Web access for agents needs a Pro license. Turn web access off to continue on Free.",
     deepReasoning:
       'The xhigh, max and ultra reasoning efforts need a Pro license. Choose another effort, or "Default", to continue on Free.',
+    coachDebrief: "The coach debrief needs a Pro license.",
   } satisfies Record<ProFeature, string>,
   /** A key that cannot unlock Pro (400 license_invalid), by what is wrong. */
   invalidKey: {

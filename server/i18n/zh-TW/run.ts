@@ -375,6 +375,8 @@ const m: Translation<typeof en> = {
     noGithubOrigin: "此 Repository 尚未連結 GitHub origin，無法發佈。",
     diffChanged: "差異已變更，請重新審閱與核准。",
     notAllReviewed: "最新差異尚未全部審閱。",
+    understandingRequired:
+      "核准或發布前，請先用自己的話講一遍：完成最新版本變更的理解檢查。你可以在「設定 → 學習」關閉這項檢查；未經檢查就核准的工作會被標記。",
     prAlreadySent:
       "這個 PR 已經送出；要推送新的修改，請從維護者回饋開始一輪修正。",
     branchIsTargetReapprove: ({ branch }) =>

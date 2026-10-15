@@ -16,6 +16,12 @@ export interface FollowUpRound {
   /** The person's own instruction for this round. */
   note?: string;
   /**
+   * The person's one-line restatement of each selected comment, in their
+   * own words: the agent's task, with the maintainer's words as data.
+   * Absent on rounds started before restatements existed.
+   */
+  restatements?: FollowUpRestatement[];
+  /**
    * running: the agent is editing. review: waiting for review and approval
    * (the run status says which). published: pushed as `commit`. failed,
    * cancelled and discarded rounds pushed nothing.
@@ -48,8 +54,24 @@ export interface FollowUpRound {
   adopted?: boolean;
 }
 
+export interface FollowUpRestatement {
+  /** The feedback item's URL. */
+  url: string;
+  /** At most `followUpRestatementLimit` characters. */
+  text: string;
+}
+
+/** POST /api/runs/:id/follow-ups */
+export interface FollowUpStartInput {
+  feedbackUrls: string[];
+  note?: string;
+  /** One per selected comment; the server requires them once restatements are enforced. */
+  restatements?: FollowUpRestatement[];
+}
+
 export const followUpFeedbackLimit = 20;
 export const followUpNoteLimit = 2_000;
+export const followUpRestatementLimit = 300;
 
 /** The round still being edited or reviewed; undefined once it was pushed or ended. */
 export function activeFollowUp(rounds: FollowUpRound[] | undefined) {
