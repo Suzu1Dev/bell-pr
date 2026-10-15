@@ -12,6 +12,7 @@ import { api } from "../api";
 import { getDemo } from "../demo";
 import { useFormat, useLocale, useT } from "../i18n";
 import type { DiffFile, Repo } from "../types";
+import { LearningCounts } from "./LearningCounts";
 import { LearningHeading } from "./LearningHeading";
 import "./learning.css";
 
@@ -335,6 +336,7 @@ export function LearningNotes({
   return (
     <>
       <LearningHeading />
+      <LearningCounts />
       <div className="learning-filters">
         <label>
           <span>{t.keyword}</span>

@@ -40,6 +40,30 @@ const m: Translation<typeof en> = {
   sampleContent: "示範內容",
   notRecorded: "未記錄",
   openInCode: "回到程式碼理解它",
+  dimensions: {
+    scope: "範圍",
+    simplicity: "簡潔",
+    naming: "命名",
+    conventions: "專案慣例",
+    tests: "測試",
+    risk: "風險",
+    description: "說明",
+    worth: "值得花審查時間",
+  },
+  counts: {
+    title: "來自你自己的紀錄",
+    calibration: ({ hits, of }) =>
+      `你回答「確定」的 ${fmt.number(of)} 次中，有 ${fmt.number(hits)} 次是對的。`,
+    explained: ({ explained, of, checkOff }) =>
+      `用自己的話講一遍的任務：${fmt.number(explained)} / ${fmt.number(of)} · 理解檢查關閉時核准：${fmt.number(checkOff)}`,
+    forecasts: ({ hits, of }) =>
+      `${fmt.number(of)} 次中，有 ${fmt.number(hits)} 次你早就料到。`,
+    recurring: ({ dimension, count, of }) =>
+      of === 1
+        ? `維護者在你最近的 PR 中提到「${dimension}」。`
+        : `你最近的 ${fmt.number(of)} 個 PR 中，維護者在 ${fmt.number(count)} 個提到「${dimension}」。`,
+    note: "只在這台電腦上，根據你自己的紀錄計算。",
+  },
 };
 
 export default m;

@@ -1,5 +1,6 @@
 /** The learning notes page: explanations kept from every review (English). */
 import { formatters } from "../../../shared/i18n/locale";
+import type { TasteDimension } from "../../../shared/understanding";
 
 const fmt = formatters("en");
 
@@ -51,6 +52,54 @@ const learning = {
   sampleContent: "Sample content",
   notRecorded: "Not recorded",
   openInCode: "Study it in the code",
+  /** What maintainers may question, in the same words as the check. */
+  dimensions: {
+    scope: "Scope",
+    simplicity: "Simplicity",
+    naming: "Naming",
+    conventions: "Project conventions",
+    tests: "Tests",
+    risk: "Risk",
+    description: "Description",
+    worth: "Worth the review time",
+  } satisfies Record<TasteDimension, string>,
+  /**
+   * Plain counts over all of the person's runs, each shown only past its
+   * threshold. They state facts about the records and are never a target.
+   */
+  counts: {
+    title: "From your own records",
+    /** After 20 graded check answers. */
+    calibration: ({ hits, of }: { hits: number; of: number }) =>
+      `When you said Sure, you were right ${fmt.number(hits)} of ${fmt.number(of)} ${fmt.plural(of) === "one" ? "time" : "times"}.`,
+    explained: ({
+      explained,
+      of,
+      checkOff,
+    }: {
+      explained: number;
+      of: number;
+      checkOff: number;
+    }) =>
+      `Runs you explained back: ${fmt.number(explained)} of ${fmt.number(of)} · approved with the check off: ${fmt.number(checkOff)}`,
+    /** After 5 maintainer comments tagged "Saw it coming" or "Surprised me". */
+    forecasts: ({ hits, of }: { hits: number; of: number }) =>
+      `You saw it coming ${fmt.number(hits)} of ${fmt.number(of)} ${fmt.plural(of) === "one" ? "time" : "times"}.`,
+    /** After 5 tagged maintainer comments: the dimension raised in the most PRs. */
+    recurring: ({
+      dimension,
+      count,
+      of,
+    }: {
+      dimension: string;
+      count: number;
+      of: number;
+    }) =>
+      of === 1
+        ? `Maintainers raised ${dimension} in your last PR.`
+        : `Maintainers raised ${dimension} in ${fmt.number(count)} of your last ${fmt.number(of)} PRs.`,
+    note: "Counted on this computer from your own records.",
+  },
 };
 
 export default learning;
