@@ -19,7 +19,10 @@ import {
   type IssuePr,
 } from "../shared/contribution.js";
 
-/** Why a GitHub fact could not be read; server/i18n contribution.unknown words each one. */
+/**
+ * Why a GitHub fact could not be read: one of the stored codes that
+ * shared/contribution.ts unknownReasonText words in the reader's language.
+ */
 export type UnknownReason =
   | "gh-missing"
   | "signed-out"

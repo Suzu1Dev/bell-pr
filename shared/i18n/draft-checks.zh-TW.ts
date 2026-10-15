@@ -109,6 +109,19 @@ const messages: Translation<typeof en> = {
       return reason ? `無法確認${what}：${reason}` : `無法確認${what}。`;
     },
     rulesUnread: `無法確認專案的規則：${product.name} 還沒讀過它們。`,
+    reasons: {
+      "gh-missing": "沒有安裝 GitHub CLI（gh）。",
+      "signed-out": "GitHub CLI 還沒登入。請執行 gh auth login，再檢查一次。",
+      timeout: "GitHub 沒有及時回應。",
+      "rate-limited": "已達 GitHub 的速率上限。請等幾分鐘，再檢查一次。",
+      "not-found": "GitHub 找不到它，或你的帳號看不到它。",
+      forbidden: "GitHub 拒絕了你的帳號的這個請求。",
+      "github-error": "GitHub 回應了錯誤。",
+      "invalid-answer": "無法讀取 GitHub 的回應。",
+      "no-github-origin": "這個專案沒有 GitHub 來源，所以沒有可以在 GitHub 上檢查的事。",
+      "not-an-issue": "這個連結不是 GitHub issue。",
+      "files-unreadable": "無法在專案目前的 commit 讀取它的檔案。",
+    },
   },
 };
 

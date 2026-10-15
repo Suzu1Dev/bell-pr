@@ -239,7 +239,7 @@ export default function BeforeYouStart({
       });
     }
   }
-  for (const [index, part] of unknownParts(facts?.unknown).entries())
+  for (const [index, part] of unknownParts(facts?.unknown, locale).entries())
     chips.push({ key: `unknown-${index}`, tone: "unknown", text: t.unknown(part) });
 
   const issueLabel = sample

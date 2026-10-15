@@ -219,11 +219,9 @@ test("an import whose GitHub reads fail still imports and records why", async ()
   });
   try {
     assert.equal(f.store.data.repos.length, 1);
-    assert.deepEqual(f.repo.contributionRules?.unknown, [
-      "door: 無法讀取 GitHub 的回應。",
-      "orgDefaults: 已達 GitHub 的速率上限。請等幾分鐘，再檢查一次。",
-    ]);
-    // "Check again" reads it again, in the request's language.
+    // Stored as codes: each reader words them in their own language.
+    assert.deepEqual(f.repo.contributionRules?.unknown, ["door: invalid-answer", "orgDefaults: rate-limited"]);
+    // "Check again" reads it again.
     await f.github.setFacts({});
     const rules = await withLocale("en", () => f.workbench.contribution.refreshRules(f.repo.id));
     assert.equal(rules?.unknown, undefined);
@@ -231,7 +229,7 @@ test("an import whose GitHub reads fail still imports and records why", async ()
     assert.equal(f.repo.contributionRules, rules);
     await f.github.setFacts({ fail: { door: "exit", doorGraph: "exit" } });
     const failed = await withLocale("en", () => f.workbench.contribution.refreshRules(f.repo.id));
-    assert.deepEqual(failed?.unknown, ["door: GitHub answered with an error."]);
+    assert.deepEqual(failed?.unknown, ["door: github-error"]);
   } finally {
     await f.cleanup();
   }
@@ -315,7 +313,7 @@ test("when only the door's GraphQL read fails, the person's own closing pull req
     const facts = (await withLocale("en", () => refreshRunFacts({ store: f.store } as never, f.run)))!;
     assert.equal(facts.door?.hasPullRequests, true);
     assert.equal(facts.door?.login, "test-owner");
-    assert.deepEqual(facts.unknown, ["door: GitHub answered with an error."]);
+    assert.deepEqual(facts.unknown, ["door: github-error"]);
     assert.deepEqual(ids(facts), ["facts-unknown:confirm"]);
   } finally {
     await f.cleanup();
@@ -355,11 +353,11 @@ test("a GitHub failure gives facts-unknown with its reason, never a pass", async
   const all = { door: true, doorGraph: true, issue: true, pacing: true, viewer: true };
   try {
     for (const [mode, reason] of [
-      ["exit", "GitHub answered with an error."],
-      ["invalid", "GitHub's answer could not be read."],
-      ["rate-limited", "GitHub's rate limit was reached. Wait a few minutes, then check again."],
-      ["not-found", "GitHub did not find it, or it is not visible to your account."],
-      ["timeout", "GitHub did not answer in time."],
+      ["exit", "github-error"],
+      ["invalid", "invalid-answer"],
+      ["rate-limited", "rate-limited"],
+      ["not-found", "not-found"],
+      ["timeout", "timeout"],
     ] as const) {
       await f.github.setFacts({
         // Facts that would block, were they read.
@@ -383,7 +381,7 @@ test("a GitHub failure gives facts-unknown with its reason, never a pass", async
     process.env.PATH = path.join(f.directory, "no-binaries");
     try {
       const facts = (await withLocale("en", () => refreshRunFacts({ store: f.store } as never, f.run)))!;
-      assert.equal(facts.unknown?.[0], "door: The GitHub CLI (gh) is not installed.");
+      assert.equal(facts.unknown?.[0], "door: gh-missing");
       assert.deepEqual(ids(facts), ["facts-unknown:confirm"]);
     } finally {
       process.env.PATH = previous;

@@ -202,3 +202,22 @@ test("rule files or default files that could not be read are named in words, nev
   assert.match(zh, /無法讀取帳號預設的貢獻檔案：GitHub answered with an error\./);
   assert.doesNotMatch(zh, /orgDefaults/);
 });
+
+test("a stored reason code is worded in the language the card is read in", () => {
+  const coded: ContributionRules = {
+    ...stored,
+    door: undefined,
+    unknown: ["door: github-error", "orgDefaults: rate-limited", "rules: files-unreadable"],
+  };
+  const html = english({ rules: coded });
+  assertNoHan(html);
+  assert.match(html, /Couldn&#x27;t check whether pull requests are open to you: GitHub answered with an error\./);
+  assert.match(html, /Couldn&#x27;t read the account&#x27;s default contribution files: GitHub&#x27;s rate limit was reached\./);
+  assert.match(html, /Couldn&#x27;t read the project&#x27;s rule files: The project&#x27;s files could not be read at its current commit\./);
+  assert.doesNotMatch(html, /github-error|rate-limited|files-unreadable/);
+  const zh = renderZh(card({ rules: coded }));
+  assert.match(zh, /GitHub 回應了錯誤。/);
+  assert.match(zh, /無法讀取帳號預設的貢獻檔案：已達 GitHub 的速率上限。/);
+  assert.match(zh, /無法在專案目前的 commit 讀取它的檔案。/);
+  assert.doesNotMatch(zh, /github-error|rate-limited|files-unreadable|GitHub answered/);
+});

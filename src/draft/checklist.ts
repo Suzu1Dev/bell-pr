@@ -12,7 +12,7 @@ import {
   type ContributionRules,
 } from "../../shared/contribution";
 import type { DraftCheck, DraftRuleQuote } from "../../shared/draft-checks";
-import type { Formatters } from "../../shared/i18n/locale";
+import type { Formatters, Locale } from "../../shared/i18n/locale";
 import type { ReviewabilitySnapshot } from "../../shared/reviewability";
 import type { Messages } from "../i18n";
 import { doorClosed, unknownParts } from "../mission/respect";
@@ -127,10 +127,10 @@ export interface ChecklistInput {
   suggestion?: boolean;
 }
 
-/** The reason each part of the facts could not be read, by part. */
-function unknownReasons(entries?: readonly string[]) {
+/** The reason each part of the facts could not be read, by part, in `locale`. */
+function unknownReasons(entries: readonly string[] | undefined, locale: Locale) {
   const reasons: Partial<Record<"door" | "issue" | "pacing", string>> = {};
-  for (const { part, reason } of unknownParts(entries))
+  for (const { part, reason } of unknownParts(entries, locale))
     // A fact without a known part shows on the door row, the first one read.
     reasons[part === "other" ? "door" : part] ??= reason ?? "";
   return reasons;
@@ -143,6 +143,7 @@ export function checklistRows(
   m: Messages["draft"]["guidance"]["checklist"],
   fmt: Formatters,
   bands: Messages["draft"]["reviewability"]["bands"],
+  locale: Locale,
 ): ChecklistRow[] {
   const { checks, rules, facts, changes, understanding } = input;
   const byRow = new Map<ChecklistRowId, DraftCheck[]>();
@@ -150,7 +151,7 @@ export function checklistRows(
     const row = rowOfCheck[check.id];
     if (row) byRow.set(row, [...(byRow.get(row) ?? []), check]);
   }
-  const unknown = unknownReasons(facts?.unknown);
+  const unknown = unknownReasons(facts?.unknown, locale);
   const door = facts?.door ?? rules?.door;
   const issue = facts?.issue;
   const pacing = facts?.pacing;

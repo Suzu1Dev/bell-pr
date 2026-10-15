@@ -92,7 +92,10 @@ export interface ContributionRules {
   mergedSizes?: MergedPrSize[];
   /** The organization repository (`<owner>/.github`) whose default files were read. */
   orgDefaults?: string;
-  /** What could not be read, as `<part>` or `<part>: <reason>`. */
+  /**
+   * What could not be read, as `<part>` or `<part>: <reason>`; the reason
+   * is one of `unknownReasonCodes`, or the words an older build stored.
+   */
   unknown?: string[];
 }
 
@@ -155,7 +158,10 @@ export interface ContributionFacts {
   door?: DoorFacts;
   issue?: IssueFacts;
   pacing?: PacingFacts;
-  /** The facts that could not be read, as `<part>` or `<part>: <reason>` (part: door, issue or pacing). */
+  /**
+   * The facts that could not be read, as `<part>` or `<part>: <reason>`
+   * (part: door, issue or pacing; reason as in ContributionRules.unknown).
+   */
   unknown?: string[];
 }
 
@@ -264,14 +270,43 @@ export function validOverride(
 const unknownPartIds = ["door", "issue", "pacing", "rules", "orgDefaults"] as const;
 type UnknownPartId = (typeof unknownPartIds)[number];
 
+/**
+ * Why a GitHub fact could not be read. ContributionFacts.unknown and
+ * ContributionRules.unknown store "<part>: <code>", never the words, so a
+ * reader sees the reason in the language they use now.
+ */
+export const unknownReasonCodes = [
+  "gh-missing",
+  "signed-out",
+  "timeout",
+  "rate-limited",
+  "not-found",
+  "forbidden",
+  "github-error",
+  "invalid-answer",
+  "no-github-origin",
+  "not-an-issue",
+  "files-unreadable",
+] as const;
+export type UnknownReasonCode = (typeof unknownReasonCodes)[number];
+
+/**
+ * A stored reason in `locale`'s words. Entries saved before the codes hold
+ * the words of the language they were read in, and stay as they are.
+ */
+export function unknownReasonText(reason: string | undefined, locale: Locale) {
+  const code = unknownReasonCodes.find((known) => known === reason?.trim());
+  return code ? dictionaries[locale].respect.reasons[code] : reason;
+}
+
 /** Splits "<part>: <reason>" from ContributionFacts.unknown or ContributionRules.unknown. */
-function unknownParts(entries: readonly string[]) {
+function unknownParts(entries: readonly string[], locale: Locale) {
   return entries.map((entry) => {
     const [part, ...rest] = entry.split(":");
     const id = unknownPartIds.find((known) => known === part.trim());
     const known: UnknownPartId | "other" = id ?? "other";
     const reason = (known === "other" ? entry : rest.join(":")).trim();
-    return { part: known, reason: reason || undefined };
+    return { part: known, reason: unknownReasonText(reason, locale) || undefined };
   });
 }
 
@@ -552,13 +587,13 @@ export function respectChecks(
   // are unknown too: an AI ban or a required disclosure may be in them.
   const rulesUnknown = facts
     ? input.rules
-      ? unknownParts(input.rules.unknown ?? []).filter(
+      ? unknownParts(input.rules.unknown ?? [], locale).filter(
           ({ part }) => part === "rules" || part === "orgDefaults",
         )
       : undefined
     : [];
   const unknown = [
-    ...unknownParts(facts?.unknown ?? []).map((part) => m.unknownPart(part)),
+    ...unknownParts(facts?.unknown ?? [], locale).map((part) => m.unknownPart(part)),
     ...(rulesUnknown ? rulesUnknown.map((part) => m.unknownPart(part)) : [m.rulesUnread]),
   ];
   if (unknown.length)

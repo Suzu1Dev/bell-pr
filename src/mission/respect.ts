@@ -10,10 +10,12 @@ import {
   learningLabel,
   openPrBudget,
   pacingExempt,
+  unknownReasonText,
   type ContributionFacts,
   type ContributionRules,
   type DoorFacts,
 } from "../../shared/contribution";
+import type { Locale } from "../../shared/i18n/locale";
 import { classifyPolicy } from "../../shared/project-policy";
 import type { DemoContent } from "../demo/types";
 
@@ -77,15 +79,18 @@ export type FactPart = "door" | "issue" | "pacing" | "other";
 
 /**
  * Splits `unknown` entries ("<part>" or "<part>: <reason>") into their
- * part and reason. A part BELL does not know keeps the whole entry as
- * its reason.
+ * part and reason, a stored reason code worded in `locale`. A part BELL
+ * does not know keeps the whole entry as its reason.
  */
-export function unknownParts(entries: readonly string[] = []) {
-  return entries.map((entry) => {
+export function unknownParts(entries: readonly string[] | undefined, locale: Locale) {
+  return (entries ?? []).map((entry) => {
     const [head, ...rest] = entry.split(":");
     const part = head.trim();
     if (part === "door" || part === "issue" || part === "pacing")
-      return { part: part as FactPart, reason: rest.join(":").trim() || undefined };
+      return {
+        part: part as FactPart,
+        reason: unknownReasonText(rest.join(":").trim(), locale) || undefined,
+      };
     return { part: "other" as FactPart, reason: entry.trim() || undefined };
   });
 }

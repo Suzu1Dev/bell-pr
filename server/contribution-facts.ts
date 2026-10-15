@@ -19,6 +19,7 @@ import {
   type ContributionRules,
   type DoorFacts,
   type MergedPrSize,
+  type UnknownReasonCode,
 } from "../shared/contribution.js";
 import { draftProseWords } from "../shared/draft-checks.js";
 import { weakenedTests } from "../shared/reviewability.js";
@@ -31,7 +32,6 @@ import {
 } from "./contribution-policy.js";
 import type { DocumentKind } from "./draft-sources.js";
 import { parseGitHubIssueUrl, parseGitHubSource } from "./git.js";
-import { sm, type ServerMessages } from "./i18n/index.js";
 import {
   FactError,
   githubReader,
@@ -54,25 +54,13 @@ const runFactsTimeoutMs = 10_000;
 /** How long reading a project's door and account defaults may take in all. */
 const rulesTimeoutMs = 30_000;
 
-const reasonKeys = {
-  "gh-missing": "ghMissing",
-  "signed-out": "signedOut",
-  timeout: "timeout",
-  "rate-limited": "rateLimited",
-  "not-found": "notFound",
-  forbidden: "forbidden",
-  "github-error": "githubError",
-  "invalid-answer": "invalidAnswer",
-  "no-github-origin": "noGithubOrigin",
-  "not-an-issue": "notAnIssue",
-} as const satisfies Record<
-  UnknownReason,
-  keyof ServerMessages["contribution"]["unknown"]
->;
-
-/** `<part>: <reason>` in the request's language, as ContributionFacts.unknown stores it. */
-const unknownEntry = (part: string, reason: UnknownReason) =>
-  `${part}: ${sm().contribution.unknown[reasonKeys[reason]]}`;
+/**
+ * `<part>: <code>`, as ContributionFacts.unknown and ContributionRules.unknown
+ * store it: the reader words the code in its own language
+ * (shared/contribution.ts unknownReasonText).
+ */
+const unknownEntry = (part: string, reason: UnknownReasonCode) =>
+  `${part}: ${reason}`;
 
 const reader = (timeoutMs: number) => githubReader({ timeoutMs });
 
@@ -308,7 +296,7 @@ export async function refreshRepositoryRules(
     own = local.kinds;
     if (local.generated.length) rules.generated = local.generated;
   } catch (error) {
-    unknown.push(`rules: ${sm().contribution.unknown.filesUnreadable}`);
+    unknown.push(unknownEntry("rules", "files-unreadable"));
     log.warn("contribution.rules_unreadable", { repoId: repo.id, error });
   }
   if (!remote || options.network === false) unknown.push("door");

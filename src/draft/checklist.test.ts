@@ -38,7 +38,7 @@ const preflight = (overrides: Partial<Parameters<typeof draftPreflight>[0]> = {}
     "en",
   );
 const rows = (input: ChecklistInput) =>
-  checklistRows(input, en.draft.guidance.checklist, formatters("en"), en.draft.reviewability.bands);
+  checklistRows(input, en.draft.guidance.checklist, formatters("en"), en.draft.reviewability.bands, "en");
 const statuses = (input: ChecklistInput) =>
   Object.fromEntries(rows(input).map((row) => [row.id, row.status]));
 const full: ChecklistInput = {

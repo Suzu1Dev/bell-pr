@@ -270,6 +270,7 @@ export function DraftGuidancePanel({
     t.checklist,
     fmt,
     draftMessages.reviewability.bands,
+    locale,
   );
   const readAt = (value?: string) => {
     const date = value ? new Date(value) : undefined;

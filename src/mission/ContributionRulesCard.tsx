@@ -12,9 +12,11 @@ import {
 } from "lucide-react";
 import {
   policyKinds,
+  unknownReasonText,
   type ContributionRules,
   type PolicyFinding,
 } from "../../shared/contribution";
+import type { Locale } from "../../shared/i18n/locale";
 import { api, send } from "../api";
 import { getDemo } from "../demo";
 import { useFormat, useLocale, useT, type Messages } from "../i18n";
@@ -57,10 +59,13 @@ const effectIcons = { block: OctagonX, confirm: CircleHelp, info: CircleCheck };
  * `ContributionRules.unknown`, besides the door) by what it is, never by
  * its id: the rule files, or the account's default files.
  */
-function unreadPart(entry: string): { part: "rules" | "orgDefaults" | "other"; reason?: string } {
+function unreadPart(
+  entry: string,
+  locale: Locale,
+): { part: "rules" | "orgDefaults" | "other"; reason?: string } {
   const [head, ...rest] = entry.split(":");
   const id = head.trim();
-  const reason = rest.join(":").trim();
+  const reason = unknownReasonText(rest.join(":").trim(), locale);
   return {
     part: id === "rules" || id === "orgDefaults" ? id : "other",
     ...(reason ? { reason } : {}),
@@ -137,10 +142,10 @@ export default function ContributionRulesCard({
     }
   };
 
-  const doorReason = unknownParts(rules?.unknown).find((entry) => entry.part === "door");
+  const doorReason = unknownParts(rules?.unknown, locale).find((entry) => entry.part === "door");
   const unread = (rules?.unknown ?? [])
-    .filter((entry) => unknownParts([entry])[0].part !== "door")
-    .map(unreadPart);
+    .filter((entry) => unknownParts([entry], locale)[0].part !== "door")
+    .map((entry) => unreadPart(entry, locale));
   const door = rules?.door ? doorState(rules.door) : undefined;
   const findings = rules?.findings ?? [];
   const groups = policyKinds

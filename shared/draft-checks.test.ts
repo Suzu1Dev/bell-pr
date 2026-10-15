@@ -330,6 +330,26 @@ test("with facts, rules never read or files that could not be read are unknown t
   assert.match(zh?.details[1] ?? "", /無法確認專案的規則/);
 });
 
+test("a stored reason code is worded in the reader's language; older stored words stay as they are", () => {
+  const stored = {
+    rules: { ...rules(), unknown: ["rules: files-unreadable", "orgDefaults: GitHub answered with an error."] },
+    facts: facts({ unknown: ["door: github-error", "pacing: rate-limited"] }),
+  };
+  assert.deepEqual(check(stored, "facts-unknown")?.details.slice(1), [
+    "Couldn't check whether pull requests are open to you: GitHub answered with an error.",
+    "Couldn't check your open pull requests here: GitHub's rate limit was reached. Wait a few minutes, then check again.",
+    "Couldn't check the project's rules: The project's files could not be read at its current commit.",
+    "Couldn't check the account's default contribution files: GitHub answered with an error.",
+  ]);
+  const zh = draftPreflight({ body, ...stored }, "zh-TW").find((value) => value.id === "facts-unknown");
+  assert.deepEqual(zh?.details.slice(1), [
+    "無法確認是否接受你開的 Pull Request：GitHub 回應了錯誤。",
+    "無法確認你在這裡開著的 Pull Request：已達 GitHub 的速率上限。請等幾分鐘，再檢查一次。",
+    "無法確認專案的規則：無法在專案目前的 commit 讀取它的檔案。",
+    "無法確認帳號預設的貢獻檔案：GitHub answered with an error.",
+  ]);
+});
+
 /** One input per confirm draftPreflight can emit, with every confirm it can raise at once. */
 function everyConfirm(): DraftPreflightInput[] {
   const sources: DraftSource[] = [

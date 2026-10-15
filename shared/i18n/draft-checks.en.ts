@@ -170,6 +170,24 @@ const messages = {
       return reason ? `Couldn't check ${what}: ${reason}` : `Couldn't check ${what}.`;
     },
     rulesUnread: `Couldn't check the project's rules: ${product.name} hasn't read them yet.`,
+    /**
+     * Why a GitHub fact could not be read, by the code stored with the
+     * facts (shared/contribution.ts unknownReasonText). Each follows
+     * "Couldn't check <what>:" in the language of whoever reads it.
+     */
+    reasons: {
+      "gh-missing": "The GitHub CLI (gh) is not installed.",
+      "signed-out": "The GitHub CLI is not signed in. Run gh auth login, then check again.",
+      timeout: "GitHub did not answer in time.",
+      "rate-limited": "GitHub's rate limit was reached. Wait a few minutes, then check again.",
+      "not-found": "GitHub did not find it, or it is not visible to your account.",
+      forbidden: "GitHub refused the request for your account.",
+      "github-error": "GitHub answered with an error.",
+      "invalid-answer": "GitHub's answer could not be read.",
+      "no-github-origin": "This project has no GitHub origin, so there is nothing to check on GitHub.",
+      "not-an-issue": "The link is not a GitHub issue.",
+      "files-unreadable": "The project's files could not be read at its current commit.",
+    },
   },
 };
 

@@ -33,13 +33,24 @@ test("the door is open, for collaborators only, turned off or archived", () => {
 });
 
 test("unknown facts split into their part and reason", () => {
-  assert.deepEqual(unknownParts(["door: gh failed: exit 1", "issue", "pacing:", "rate limited"]), [
+  assert.deepEqual(unknownParts(["door: gh failed: exit 1", "issue", "pacing:", "rate limited"], "en"), [
     { part: "door", reason: "gh failed: exit 1" },
     { part: "issue", reason: undefined },
     { part: "pacing", reason: undefined },
     { part: "other", reason: "rate limited" },
   ]);
-  assert.deepEqual(unknownParts(), []);
+  assert.deepEqual(unknownParts(undefined, "en"), []);
+  // A stored reason code is worded in the reader's language whenever they
+  // look; words an older build stored stay as they are.
+  const stored = ["door: github-error", "issue: GitHub answered with an error."];
+  assert.deepEqual(unknownParts(stored, "en").map((entry) => entry.reason), [
+    "GitHub answered with an error.",
+    "GitHub answered with an error.",
+  ]);
+  assert.deepEqual(unknownParts(stored, "zh-TW").map((entry) => entry.reason), [
+    "GitHub 回應了錯誤。",
+    "GitHub answered with an error.",
+  ]);
 });
 
 test("only GitHub issue page URLs have an issue number, as the server accepts them", () => {

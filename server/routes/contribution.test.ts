@@ -172,10 +172,7 @@ test("the task dialog's check reads the issue and the pace, and validates the li
   await f.github.setFacts({ fail: { issue: "exit", viewer: "exit", pacing: "exit" } });
   const failed = await f.call("GET", `/repos/${f.repo.id}/contribution-check?issue=${encodeURIComponent(issueUrl)}`);
   assert.equal(failed.status, 200);
-  assert.deepEqual(failed.body.facts.unknown, [
-    "issue: GitHub answered with an error.",
-    "pacing: GitHub answered with an error.",
-  ]);
+  assert.deepEqual(failed.body.facts.unknown, ["issue: github-error", "pacing: github-error"]);
 });
 
 test("the publish dialog refreshes the run's facts on its own call; the preflight never calls GitHub", async (t) => {
