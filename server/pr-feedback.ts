@@ -16,7 +16,7 @@ const pageSize = 50;
 export const prFeedbackQuery = `query BellPrFeedback($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
-      url
+      url state merged reviewDecision
       labels(first: 100) { totalCount nodes { name } }
       reviews(last: ${pageSize}) {
         totalCount
@@ -70,6 +70,11 @@ export function prNumberOf(prUrl: unknown, repositoryUrl: string) {
 }
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
+/** An enum value as GitHub writes one (OPEN, CHANGES_REQUESTED); anything else is left out. */
+const enumValue = (value: unknown) =>
+  typeof value === "string" && /^[A-Z][A-Z_]{0,39}$/.test(value)
+    ? value
+    : undefined;
 const nodes = (connection: any): any[] =>
   Array.isArray(connection?.nodes) ? connection.nodes : [];
 
@@ -236,5 +241,13 @@ export function parsePrFeedback(
     ...(text(rollup?.state) ? { checksState: rollup.state } : {}),
     ...(rollup ? { checks } : {}),
     ...(warnings.length ? { warnings } : {}),
+    // The PR's own state, read in the same request: whether it is still
+    // open, merged or closed, and the review decision. Absent when GitHub
+    // reports none (reviewDecision is null without required reviews).
+    ...(enumValue(pr.state) ? { prState: enumValue(pr.state) } : {}),
+    ...(typeof pr.merged === "boolean" ? { merged: pr.merged } : {}),
+    ...(enumValue(pr.reviewDecision)
+      ? { reviewDecision: enumValue(pr.reviewDecision) }
+      : {}),
   };
 }
