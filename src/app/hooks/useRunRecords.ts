@@ -12,6 +12,43 @@ import type { DiffFile, Run } from "../../types";
 import type { Notify, Tab } from "../AppShell";
 import { closeCheckPanel } from "./useUnderstanding";
 
+type TagChoice = Omit<FeedbackTag, "at">;
+
+/**
+ * The PATCH body for one comment's tags. The route merges field by field
+ * and keeps a field the body leaves out, so every chip and the lesson are
+ * sent, an unset one as null; a tag with nothing left is removed.
+ */
+export function feedbackTagPatch(url: string, tag: TagChoice) {
+  return {
+    url,
+    dimension: tag.dimension ?? null,
+    predicted: tag.predicted ?? null,
+    lesson: tag.lesson?.trim() || null,
+  };
+}
+
+/** The sample's tags after one change, removed once nothing is left, as the server does. */
+export function withFeedbackTag(
+  tags: Run["feedbackTags"],
+  url: string,
+  tag: TagChoice,
+  at: string,
+): NonNullable<Run["feedbackTags"]> {
+  const rest = { ...tags };
+  delete rest[url];
+  const lesson = tag.lesson?.trim();
+  const next: FeedbackTag = {
+    ...(tag.dimension ? { dimension: tag.dimension } : {}),
+    ...(tag.predicted !== undefined ? { predicted: tag.predicted } : {}),
+    ...(lesson ? { lesson } : {}),
+    at,
+  };
+  return next.dimension || next.predicted !== undefined || next.lesson
+    ? { ...rest, [url]: next }
+    : rest;
+}
+
 interface RunRecordsOptions {
   demo: boolean;
   setRun: Dispatch<SetStateAction<Run>>;
@@ -66,15 +103,15 @@ export function useRunRecords(
 
   return {
     /** Tags one piece of maintainer feedback (PATCH /api/runs/:id/feedback-tags). */
-    saveFeedbackTag(url: string, tag: Omit<FeedbackTag, "at">) {
+    saveFeedbackTag(url: string, tag: TagChoice) {
       if (demo) {
         const at = new Date().toISOString();
         keep((previous) => ({
-          feedbackTags: { ...previous.feedbackTags, [url]: { ...tag, at } },
+          feedbackTags: withFeedbackTag(previous.feedbackTags, url, tag, at),
         }));
         return;
       }
-      void save("/feedback-tags", "PATCH", { url, ...tag });
+      void save("/feedback-tags", "PATCH", feedbackTagPatch(url, tag));
     },
     /** One line per weakened-test item (PUT /api/runs/:id/test-reasons). */
     saveTestReasons(reasons: Record<string, string>) {
