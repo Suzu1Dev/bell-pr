@@ -6,8 +6,10 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page, type Request } from "@playwright/test";
 import { splitConceptHeading } from "../shared/explanations";
 import { getDemo } from "../src/demo";
+import app from "../src/i18n/en/app";
 import learning from "../src/i18n/en/learning";
 import license from "../src/i18n/en/license";
+import settings from "../src/i18n/en/settings";
 import { launchServer, type LaunchedServer } from "./start-server.mjs";
 
 const demo = getDemo("en");
@@ -337,6 +339,163 @@ test("the notes show each contribution's own explanation and mark runs approved 
       // The file notes still follow.
       await expect(page.locator(".learning-grid").first().locator(".note-card")).toHaveCount(2);
       expect(await axeProblems(page)).toEqual([]);
+    },
+  );
+});
+
+// MERGE-STEP: the next two tests run against the learning-loop routes
+// (GET /api/learning/practice, POST /api/runs/:id/practice,
+// GET /api/learning/counts, GET /api/learning/debriefs and
+// POST /api/learning/debrief). Before those routes exist they answer 404,
+// and the tests skip themselves; after the L2 merge they run.
+
+/** A run approved after its check, with a confident miss, and one approved with the check off. */
+function checkedState(dataDir: string) {
+  const at = "2026-10-01T09:00:00.000Z";
+  const base = (id: string, title: string) => ({
+    id,
+    repoId: debriefRepo.id,
+    title,
+    prompt: "A run written into state.json before the start.",
+    status: "approved",
+    branch: `fix/${id}`,
+    baseBranch: "main",
+    baseSha: "",
+    worktreePath: path.join(dataDir, "worktrees", id),
+    createdAt: at,
+    workspaceRemovedAt: at,
+    agents: [],
+    logs: [],
+    draft: { title, body: "" },
+    reviewedFiles: [],
+    reviewedFingerprints: {},
+    reports: {},
+  });
+  return JSON.stringify({
+    version: 1,
+    repos: [{ ...debriefRepo, path: path.join(dataDir, "repos", "debrief") }],
+    runs: [
+      {
+        ...base(checkedRun.id, "Explained contribution"),
+        understanding: {
+          summary: {
+            text: "Writes used to clear the whole cache. Now a write drops only its own key, so other reads stay fast and none of them sees stale data.",
+            changeFingerprint: "c1",
+            at,
+          },
+          items: [
+            {
+              id: checkedRun.itemId,
+              path: "src/cache.ts",
+              fingerprint: "f1",
+              source: "selfCheck",
+              question: checkedRun.question,
+              answer: "It clears the whole cache to be safe.",
+              confidence: "sure",
+              lockedAt: at,
+              grade: "missed",
+              correction: checkedRun.correction,
+              gradedAt: at,
+            },
+          ],
+          passedAt: at,
+          passedFingerprint: "c1",
+          history: [{ passedAt: at, questions: 1, misses: 1, confidentMisses: 1, seconds: 200 }],
+        },
+      },
+      { ...base("e2e-check-off-run", "Approved with the check off"), understandingCheckOff: true },
+    ],
+  });
+}
+const checkedRun = {
+  id: "e2e-checked-run",
+  itemId: "selfCheck:src/cache.ts",
+  question: "What does the cache drop after a write, and why?",
+  correction: "Only the written key's entry is dropped, not the whole cache.",
+};
+
+test("MERGE-STEP: the deck grades a seeded confident miss through the learning-loop routes, and the counts read every run", async ({ browser }) => {
+  await onServer(
+    browser,
+    { seed: (dataDir) => writeFile(path.join(dataDir, "state.json"), checkedState(dataDir)) },
+    async (page) => {
+      const probe = await page.request.get("/api/learning/practice");
+      test.skip(probe.status() === 404, "needs the learning-loop routes (L2A); runs after the L2 merge");
+      expect(probe.status()).toBe(200);
+
+      await page.goto("/#/learning?view=practice&locale=en");
+      const p = learning.practice;
+      const card = page.locator(".practice > .practice-card");
+      await expect(card.getByRole("heading", { level: 3, name: checkedRun.question })).toBeVisible();
+      await expect(page.locator("section.practice-sample")).toHaveCount(0);
+      await expect(page.locator(".sidebar .learning-ready")).toHaveText(app.sidebar.practiceReady({ count: 1 }));
+      const answer = "Only the entry of the key that was written, so reads stay correct.";
+      await card.getByLabel(p.answer).fill(answer);
+      await card.getByRole("radio", { name: p.confidences.sure }).check();
+      await card.getByRole("button", { name: p.show }).click();
+      await expect(card.locator(".learning-own-note")).toContainText(checkedRun.correction);
+      await expect(card).toContainText(p.cleanedUp);
+      const graded = page.waitForResponse(
+        (response) => response.request().method() === "POST" && new URL(response.url()).pathname === `/api/runs/${checkedRun.id}/practice`,
+      );
+      await card.getByRole("button", { name: new RegExp(`^${p.grades.got}`) }).click();
+      expect((await graded).status()).toBe(200);
+      // A new item graded Got it comes back in 3 days.
+      await expect(card.locator(".practice-next")).toHaveText(p.nextReview({ days: 3 }));
+      await expect(page.locator(".sidebar .learning-ready")).toHaveCount(0);
+      // Only the grade is stored, never the answer.
+      const { run } = await (await page.request.get(`/api/runs/${checkedRun.id}`)).json();
+      expect(run.practice[`check:${checkedRun.itemId}`]).toMatchObject({ box: 1, lastGrade: "got", lastConfidence: "sure" });
+      expect(JSON.stringify(run.practice)).not.toContain(answer);
+      await card.getByRole("button", { name: p.finish }).click();
+      await expect(page.locator(".practice-empty-title")).toHaveText(p.empty);
+      await expect(page.locator(".practice-empty")).toContainText(p.nextReview({ days: 3 }));
+
+      // The counts come from every run, notes or not.
+      await page.goto("/#/learning?locale=en");
+      await expect(page.locator(".learning-counts")).toContainText(
+        learning.counts.explained({ explained: 1, of: 2, checkOff: 1 }),
+      );
+      await page.goto("/#/settings/learning?locale=en");
+      await expect(page.locator(".settings-learning-counts")).toContainText(
+        settings.learning.counts.checkOff({ count: 1 }),
+      );
+      // One timed check is too few for a median.
+      await expect(page.locator(".settings-learning-counts")).not.toContainText("Median");
+    },
+  );
+});
+
+test("MERGE-STEP: the debrief is Pro on Free, and stored debriefs read on every plan", async ({ browser }) => {
+  const stored = {
+    at: "2026-10-06T12:00:00.000Z",
+    locale: "en",
+    runIds: ["e2e-debrief-run"],
+    recurring: { dimension: "tests", quotes: ["Please add a test for the exhausted case."] },
+    drills: [],
+    nextStep: "Before your next pull request here, write the test for the last attempt first.",
+  };
+  await onServer(
+    browser,
+    {
+      seed: (dataDir) =>
+        writeFile(path.join(dataDir, "state.json"), publishedState(dataDir, { debriefs: [stored] })),
+    },
+    async (page) => {
+      const read = await page.request.get(`/api/learning/debriefs?repoId=${debriefRepo.id}`);
+      test.skip(read.status() === 404, "needs the learning-loop routes (L2A); runs after the L2 merge");
+      expect(read.status()).toBe(200);
+      expect((await read.json()).debriefs).toMatchObject([{ nextStep: stored.nextStep }]);
+      const post = await page.request.post("/api/learning/debrief", { data: { repoId: debriefRepo.id } });
+      expect(post.status()).toBe(402);
+      expect(await post.json()).toMatchObject({ code: "pro_required", feature: "coachDebrief" });
+
+      await page.goto("/#/learning?view=debrief&locale=en");
+      const list = page.locator("section.debrief .debrief-list");
+      await expect(list.locator(".debrief-card")).toHaveCount(1);
+      await expect(list).toContainText(stored.nextStep);
+      await expect(list).toContainText(learning.debrief.recurring({ dimension: learning.dimensions.tests }));
+      await expect(page.locator("section.debrief-sample")).toHaveCount(0);
     },
   );
 });
