@@ -243,7 +243,7 @@ debrief** reads your records for one project, names what its maintainers
 raise most and builds practice drills from your own contributions, and you
 can export a contribution's complete learning record as Markdown.
 
-![The learning page: notes collected across contributions, beside the Practice and Coach debrief views](docs/images/en/learning-1280.png)
+![The learning page: notes collected across contributions, with the Practice and Coach debrief tabs](docs/images/en/learning-1280.png)
 
 ### Your tools, your accounts, your language
 
