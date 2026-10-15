@@ -70,7 +70,9 @@ test("stored rules are grouped by kind, each with the effect publishing has", ()
   assert.match(html, /Files BELL PR read · 3/);
   assert.match(html, /<li><code>\.github\/PULL_REQUEST_TEMPLATE\.md<\/code><\/li>/);
   assert.match(html, /Includes the default files of acme\/\.github\./);
-  assert.match(html, /Couldn&#x27;t read: mergedSizes: gh is not signed in/);
+  // A part BELL PR does not name keeps its reason, never its id.
+  assert.match(html, /Couldn&#x27;t read part of the project&#x27;s rules: gh is not signed in</);
+  assert.doesNotMatch(html, /mergedSizes/);
   assert.match(html, /Checked [^<]*2026/);
   assert.match(html, /Check again<\/button>/);
   assert.equal(findingEffect(finding("ban")), "block");
@@ -181,4 +183,22 @@ test("the sample reads nothing from the server", async () => {
   } finally {
     await view.unmount();
   }
+});
+
+test("rule files or default files that could not be read are named in words, never by their ids", () => {
+  const unread: ContributionRules = {
+    ...stored,
+    unknown: [
+      "door: GitHub answered with an error.",
+      "orgDefaults: GitHub answered with an error.",
+      "rules: The project's files could not be read.",
+    ],
+  };
+  const html = english({ rules: unread });
+  assert.match(html, /Couldn&#x27;t read the account&#x27;s default contribution files: GitHub answered with an error\./);
+  assert.match(html, /Couldn&#x27;t read the project&#x27;s rule files: The project&#x27;s files could not be read\./);
+  assert.doesNotMatch(html, /orgDefaults|rules:/);
+  const zh = renderZh(card({ rules: unread }));
+  assert.match(zh, /無法讀取帳號預設的貢獻檔案：GitHub answered with an error\./);
+  assert.doesNotMatch(zh, /orgDefaults/);
 });

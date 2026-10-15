@@ -513,7 +513,14 @@ const mission = {
       `Files ${product.name} read · ${n(count)}`,
     orgDefaults: ({ repository }: { repository: string }) =>
       `Includes the default files of ${repository}.`,
-    unread: ({ what }: { what: string }) => `Couldn't read: ${what}`,
+    unread: ({ part, reason }: { part: "rules" | "orgDefaults" | "other"; reason?: string }) => {
+      const what = {
+        rules: "the project's rule files",
+        orgDefaults: "the account's default contribution files",
+        other: "part of the project's rules",
+      }[part];
+      return reason ? `Couldn't read ${what}: ${reason}` : `Couldn't read ${what}.`;
+    },
     checkedAt: ({ date }: { date: string }) => `Checked ${date}`,
     checkAgain: "Check again",
     checking: "Checking…",

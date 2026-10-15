@@ -378,7 +378,14 @@ const m: Translation<typeof en> = {
     notRead: `${product.name} 還沒讀取專案規範。匯入或更新專案時會讀取，你也可以按「再確認一次」。`,
     filesRead: ({ count }) => `${product.name} 讀過的檔案 · ${n(count)}`,
     orgDefaults: ({ repository }) => `包含 ${repository} 的預設檔案。`,
-    unread: ({ what }) => `無法讀取：${what}`,
+    unread: ({ part, reason }) => {
+      const what = {
+        rules: "專案的規範檔案",
+        orgDefaults: "帳號預設的貢獻檔案",
+        other: "專案的部分規範",
+      }[part];
+      return reason ? `無法讀取${what}：${reason}` : `無法讀取${what}。`;
+    },
     checkedAt: ({ date }) => `確認於 ${date}`,
     checkAgain: "再確認一次",
     checking: "正在確認…",

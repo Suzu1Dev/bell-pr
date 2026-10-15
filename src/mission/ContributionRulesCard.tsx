@@ -52,6 +52,21 @@ export function findingEffect(finding: PolicyFinding): Effect {
 
 const effectIcons = { block: OctagonX, confirm: CircleHelp, info: CircleCheck };
 
+/**
+ * A part of the rules that could not be read ("<part>: <reason>" in
+ * `ContributionRules.unknown`, besides the door) by what it is, never by
+ * its id: the rule files, or the account's default files.
+ */
+function unreadPart(entry: string): { part: "rules" | "orgDefaults" | "other"; reason?: string } {
+  const [head, ...rest] = entry.split(":");
+  const id = head.trim();
+  const reason = rest.join(":").trim();
+  return {
+    part: id === "rules" || id === "orgDefaults" ? id : "other",
+    ...(reason ? { reason } : {}),
+  };
+}
+
 function effectText(t: Messages["mission"]["rules"], finding: PolicyFinding) {
   return finding.kind === "ban" && !finding.contribution
     ? t.effect.banAmbiguous
@@ -123,9 +138,9 @@ export default function ContributionRulesCard({
   };
 
   const doorReason = unknownParts(rules?.unknown).find((entry) => entry.part === "door");
-  const unread = (rules?.unknown ?? []).filter(
-    (entry) => unknownParts([entry])[0].part !== "door",
-  );
+  const unread = (rules?.unknown ?? [])
+    .filter((entry) => unknownParts([entry])[0].part !== "door")
+    .map(unreadPart);
   const door = rules?.door ? doorState(rules.door) : undefined;
   const findings = rules?.findings ?? [];
   const groups = policyKinds
@@ -243,7 +258,7 @@ export default function ContributionRulesCard({
           )}
           {rules.orgDefaults && <p>{t.orgDefaults({ repository: rules.orgDefaults })}</p>}
           {unread.map((entry, index) => (
-            <p key={index}>{t.unread({ what: entry })}</p>
+            <p key={index}>{t.unread(entry)}</p>
           ))}
           {!demo && checkedAt && !Number.isNaN(checkedAt.getTime()) && (
             <p>
