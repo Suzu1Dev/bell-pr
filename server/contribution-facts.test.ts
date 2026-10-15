@@ -322,6 +322,33 @@ test("when only the door's GraphQL read fails, the person's own closing pull req
   }
 });
 
+test("the task dialog's check reads no door but still names the person", async () => {
+  const f = await githubProject();
+  try {
+    await f.github.setFacts({
+      login: "sample-contributor",
+      door: { viewerPermission: "READ" },
+      issues: {
+        5: issueNode({
+          closedByPullRequestsReferences: {
+            nodes: [{ number: 8, state: "OPEN", isDraft: true, merged: false, url: "https://github.com/test-owner/example/pull/8", author: { login: "sample-contributor" } }],
+          },
+        }),
+      },
+    });
+    const before = (await ghCalls(f)).length;
+    const facts = await withLocale("en", () => f.workbench.contribution.check(f.repo.id, issueUrl));
+    // Only the login: the door itself was not read, so it is no pass either.
+    assert.deepEqual(facts.door, { login: "sample-contributor" });
+    assert.deepEqual(facts.issue?.otherPrs?.map((pr) => pr.author), ["sample-contributor"]);
+    const calls = (await ghCalls(f)).slice(before);
+    assert.ok(!calls.some((call) => call.includes("repos/test-owner/example")), JSON.stringify(calls));
+    assert.ok(!calls.some((call) => call.some((arg) => arg.includes("BellDoor"))), JSON.stringify(calls));
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test("a GitHub failure gives facts-unknown with its reason, never a pass", async () => {
   const f = await githubProject();
   f.run.contributionSettings = withIssue;

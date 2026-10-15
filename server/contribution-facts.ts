@@ -238,6 +238,10 @@ async function readFacts(
   // A door read only through REST still names the person, so their own
   // pull request or assignment on the issue never reads as someone else's.
   if (facts.door && !facts.door.login && login) facts.door.login = login;
+  // The task dialog reads no door, and a project imported from a local
+  // folder has none stored: the person's login alone still tells their own
+  // pull request, assignment or claim from someone else's.
+  else if (!facts.door && !options.door && login) facts.door = { login };
   if (unknown.length) {
     facts.unknown = unknown;
     log.info("contribution.facts_unknown", {

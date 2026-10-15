@@ -55,6 +55,24 @@ export function doorClosed(door: DoorFacts) {
   return doorState(door) !== "open";
 }
 
+/**
+ * The door the task dialog knows. A door read now wins over the one stored
+ * at import. The issue check reads no door of its own, only the person's
+ * login, which a project imported from a local folder keeps nowhere else:
+ * it joins the stored door, so the person's own pull request or
+ * assignment on the issue never reads as someone else's.
+ */
+export function knownDoor(
+  facts?: ContributionFacts,
+  rules?: ContributionRules,
+): DoorFacts | undefined {
+  const read = facts?.door;
+  const loginOnly = !!read && Object.keys(read).every((key) => key === "login");
+  if (read && !loginOnly) return read;
+  if (!rules?.door) return read;
+  return read?.login ? { ...rules.door, login: read.login } : rules.door;
+}
+
 export type FactPart = "door" | "issue" | "pacing" | "other";
 
 /**
@@ -120,7 +138,7 @@ export function startReasons(
   rules?: ContributionRules,
 ): StartReason[] {
   const reasons: StartReason[] = [];
-  const door = facts?.door ?? rules?.door;
+  const door = knownDoor(facts, rules);
   const issue = facts?.issue;
   const login = door?.login;
   if (issue?.state?.toUpperCase() === "CLOSED") reasons.push({ id: "issue-closed" });

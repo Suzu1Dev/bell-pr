@@ -7,6 +7,7 @@ import {
   doorState,
   factsFrom,
   issueNumber,
+  knownDoor,
   rulesFrom,
   sampleRules,
   startReasons,
@@ -65,6 +66,21 @@ test("route answers are read bare or wrapped, and anything else is no answer", (
   assert.equal(factsFrom("text"), undefined);
 });
 
+test("the issue check's login tells the person's own pull request from someone else's", () => {
+  const issue = { ...facts.issue!, otherPrs: [{ number: 3, author: "Me", state: "OPEN", willClose: true }] };
+  // A project imported from a local folder has no stored door, so no login.
+  const local: ContributionRules = { ...rules, door: undefined };
+  assert.deepEqual(startReasons({ checkedAt: "x", issue }, local), [{ id: "other-pr", author: "Me", number: 3 }]);
+  assert.deepEqual(startReasons({ checkedAt: "x", issue, door: { login: "me" } }, local), []);
+  assert.deepEqual(knownDoor({ checkedAt: "x", door: { login: "me" } }, local), { login: "me" });
+  // With a stored door, the login read now joins it.
+  assert.deepEqual(knownDoor({ checkedAt: "x", door: { login: "me" } }, { ...rules, door: { viewerPermission: "READ", login: "old" } }), {
+    viewerPermission: "READ",
+    login: "me",
+  });
+  assert.equal(knownDoor(undefined, local), undefined);
+});
+
 test("the sample's facts give Start nothing to ask", () => {
   assert.deepEqual(startReasons(facts, rules), []);
   assert.deepEqual(startReasons(), []);
@@ -98,6 +114,8 @@ test("Start asks once for a closed issue, someone else's PR, a closed door, a ba
   assert.deepEqual(startReasons(undefined, closedDoor), [{ id: "door" }]);
   // Facts read now win over the door stored at import.
   assert.deepEqual(startReasons({ checkedAt: "x", door: { hasPullRequests: true } }, closedDoor), []);
+  // The issue check reads only the person's login: the stored door stays.
+  assert.deepEqual(startReasons({ checkedAt: "x", door: { login: "me" } }, closedDoor), [{ id: "door" }]);
   const ban = { kind: "ban" as const, path: "AI_POLICY.md", line: 3, quote: "We do not accept AI-generated pull requests.", contribution: true };
   assert.deepEqual(startReasons(undefined, { ...rules, findings: [ban] }), [{ id: "ban" }]);
   // An ambiguous ban only asks at publish.
