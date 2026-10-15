@@ -78,8 +78,8 @@ test("a run approved without the understanding check keeps a badge that says wha
     approved,
     /<span id="check-off-help" class="unsandboxed-help" role="tooltip">This run was approved without explaining the change back first\./,
   );
-  // Until Settings has a Learning section, the badge is a focusable label.
-  assert.match(approved, /<span class="badge-label" tabindex="0" aria-describedby="check-off-help">/);
+  // Settings has a Learning section, so the badge links to it.
+  assert.match(approved, /<a href="#\/settings\/learning" aria-describedby="check-off-help">/);
   assertNoHan(approved);
   const setting = renderEn(createElement(UnderstandingOffBadge, { approved: false }));
   assert.match(setting, /The understanding check is off, so you can approve without explaining the change back\./);
