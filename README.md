@@ -1,20 +1,30 @@
 # BELL PR
 
-**Contribute to open source with an AI team, and understand every line you
-ship.**
+**From vibe coding to knowing why.**
+
+Your AI agent team does the legwork. You understand every change, explain
+it back, and send only what a maintainer is glad to review.
 
 English · [繁體中文](README.zh-TW.md)
 
 BELL PR is a self-hosted, local-first workbench for open-source
 contributions. It runs on your computer with the AI coding CLI you already
 use (the OpenAI Codex CLI or Claude Code) and the GitHub CLI. It analyzes a
-project, suggests where to contribute, lets a small agent team build the
-change in isolated Git worktrees, explains every changed file in plain
-language, and drafts a pull request that follows the project's own rules.
+project, suggests where to contribute and lets a small agent team build the
+change in isolated Git worktrees. Then it has you do the part that makes
+you better: understand every line you send, train your taste on real code,
+and respect the maintainers' time. It explains every changed file in plain
+language, asks you to explain the change back before you approve it, and
+drafts a pull request that follows the project's own rules. Before the
+pull request goes out, it checks that the project takes pull requests from
+you, that the issue is still open and yours, and that the change is
+reviewable and honest about its tests.
 
-**Learn while you contribute, not automatic PRs.** Nothing is published
-until you have reviewed every file and approved the pull request yourself.
-There is no BELL PR cloud, no telemetry and no account.
+**Learn while you contribute, never automatic PRs.** Nothing is published
+until you have reviewed every file, explained the change back (on by
+default; you can turn it off, and the run says so) and approved the pull
+request yourself. Publishing checks that the project welcomes it. There is
+no BELL PR cloud, no telemetry and no account.
 
 ![The Code changes tab: a diff with a plain-language explanation of the change beside it](docs/images/en/run-changes-1280.png)
 
@@ -94,9 +104,12 @@ image is available in beta.
 An agent reads the project, read-only, and explains what it does, who uses
 it, how its parts fit together and where to start reading. It suggests up
 to five contribution directions, each quoting the code or documents it is
-based on, and BELL PR checks that every quote really exists.
+based on, and BELL PR checks that every quote really exists. On the same
+page, the **Before you contribute** card quotes the project's own
+contribution rules (see [Respect the maintainer's
+time](#respect-the-maintainers-time)).
 
-![The project overview: what the project does and who uses it](docs/images/en/repo-overview-1280.png)
+![The project overview: the project context and the Before you contribute card with the project's quoted rules](docs/images/en/repo-overview-1280.png)
 
 ### A small agent team, in isolated worktrees
 
@@ -104,58 +117,133 @@ You describe the contribution: who benefits, what changes for them, what
 must not change and what counts as done. A **Lead** splits the work into
 tasks with clear file scopes, and you can approve or send back the plan.
 **Teammates** work in parallel, each in its own Git worktree, and share
-findings through a team inbox. A **Reviewer** and a **Test analyst** then
-check the integrated result. Failed subtasks can be retried.
+findings through a team inbox. They are told to stay inside their file
+scopes, to make no formatting-only changes and never to weaken, skip or
+delete a test. A **Reviewer** and a **Test analyst** then check the
+integrated result. Failed subtasks can be retried.
 
 ![Agent activity: the team's plan, progress and reports](docs/images/en/run-activity-1280.png)
 
-### Review that teaches
+### Review that teaches, and checks you learned
 
 Every changed file comes with a plain-language explanation: a concrete
 example of the behavior before and after, what changed and why, the
 concepts involved, what to check, another way to do it and a question to
-test yourself. Click a line to ask the agent about it, follow the
-suggested review order, write your own notes, and mark each file reviewed.
-You can also edit the code yourself and refresh the diff.
+test yourself. **Try first**: you answer that question and say how sure
+you are before the answer shows, then grade yourself; and you can guess
+how else the change could be done before the other way shows, then choose
+which one you would take for this project, and why. Click a line to ask
+the agent about it, follow the suggested review order, write your own
+notes, mark each file reviewed, then explain the change back before you
+approve. You can also edit the code yourself and refresh the diff.
+
+**Ship only what you can explain.** Before approval, a short closed-book
+check opens next to the diff: explain the change in a few sentences of
+your own, answer up to three questions about its riskiest files (none for
+a very small change) and, when source code changed, say what you did not
+test. Then put each answer beside its AI-written reference, grade it
+yourself and correct what you missed. No AI model grades you, and the
+check makes no AI call. It is on by default and Free. You can turn it off
+under **Settings → Learning**: every file still has to be reviewed, you
+still approve the pull request, and runs approved without the check are
+marked "Check off" for good.
+
+![The understanding check next to the diff: your explanation, your answers and your grades](docs/images/en/run-check-1280.png)
 
 ### Pull requests that follow the project's rules
 
-BELL PR reads the project's contribution guides, pull request template,
-agent guides and PR-checking workflows, and suggests a title, a
-description and a commit message with the source of each rule. It checks
-the text before anything is sent: credentials and unfinished placeholders
-block it, and a local path, a CI change or a public commit e-mail address
-needs your confirmation. AI assistance is mentioned only if the project
-requires it or you choose to. Publishing pushes a branch (to your fork when
-needed) and opens a **Draft** PR through the GitHub CLI; nothing is ever
-force-pushed.
+BELL PR reads the project's contribution guides, AI policies, pull request
+template, agent guides and PR-checking workflows, and suggests a title, a
+description and a commit message with the source of each rule. Your own
+explanation can open the description: **Use my explanation** puts it in
+with one click, and **Add my not-tested answer to Testing** adds what you
+did not test. While the description is still BELL PR's suggested wording,
+publishing asks you to confirm it, and waits if the project asks for
+descriptions in the contributor's own words. A snapshot shows how
+reviewable the change is, next to the sizes of the project's last merged
+pull requests, and a skipped, deleted or loosened test needs a one-line
+reason before you publish.
 
-![The PR draft tab: contribution rules, the template and the draft](docs/images/en/run-draft-1280.png)
+It checks the text before anything is sent: credentials and unfinished
+placeholders block it, and a local path, a CI change or a public commit
+e-mail address needs your confirmation. AI assistance is mentioned only if
+the project requires it or you choose to, and publishing waits until a
+disclosure the project requires is there. Publishing pushes a branch (to
+your fork when needed) and opens a **Draft** PR through the GitHub CLI;
+nothing is ever force-pushed.
+
+![The PR draft tab: the contribution guide, the AI-assistance disclosure and the maintainer checklist](docs/images/en/run-draft-1280.png)
+
+### Respect the maintainer's time
+
+Practise anything locally; publish only what is welcome.
+
+- **Before you contribute.** The project overview quotes the project's own
+  rules from its files, each with its file and line: what it says about
+  AI-assisted contributions, disclosing AI help, descriptions in your own
+  words, explaining your change, issues kept for newcomers, notes to AI
+  agents and opening an issue first. It also says whether the project
+  takes pull requests from you. BELL PR never says that a project has no
+  rules, only which files it read.
+- **Still open, still yours.** When you link an issue, the task dialog
+  shows whether it is still open, whether someone is assigned to it or has
+  claimed it, whether someone else's pull request would already close it,
+  and what a maintainer last said there. Nothing stops you from starting
+  and practising; publishing checks again.
+- **Close the loop before the next one.** BELL PR counts your open pull
+  requests in the repository. The budget is 1 before your first pull
+  request there is merged and 2 after: at the budget, publishing asks you
+  to confirm, and so it does when a maintainer has waited more than 7 days
+  for you to answer a review there; at twice the budget, it waits until
+  you finish or close one. These numbers are BELL PR defaults, the same on
+  every plan. Repositories you can write to are not paced, and local runs
+  never are.
+- **Checked again at publish.** Publishing reads these facts from GitHub
+  again. A project that does not take pull requests from you, rules that
+  do not accept AI-assisted contributions, a closed issue, an issue the
+  project keeps for newcomers, and twice your budget each block it, with
+  no override; someone else's open pull request for the same issue blocks
+  it until you give your reason. A fact BELL PR could not read shows as
+  "Couldn't check", never as a pass.
+
+[Contributing responsibly](docs/contributing-responsibly.md) shows what
+maintainers ask for, in their own words, and how each check maps to it.
 
 ### After you publish
 
 Sync a run or its pull request onto the latest target branch, with an
-agent that can resolve conflicts for your review. With Pro, read the
-maintainers' reviews and CI results with coaching on how to respond, and
-let an agent address selected comments in a follow-up round that you
-review and push as one more commit.
+agent that can resolve conflicts for your review. **Read feedback** reads
+the maintainers' reviews, comments and CI results once, when you ask, on
+every plan: compare them with what you predicted, and tag what each
+comment raised and whether you saw it coming. With Pro, let an agent
+address selected comments in a follow-up round, after you restate each one
+in your own words; you review the round and push it as one more commit.
 
 ### Find your next contribution (Pro)
 
 Discovery searches GitHub for projects and issues that match your
 interests, language and the difficulty you want, reads their contribution
-rules, and explains the effort and the first step. Free shows labelled
-sample results.
+rules, and explains the effort and the first step. It looks for
+help-wanted issues for the agent team: an issue labelled for newcomers is
+marked "Learn by hand", because writing that fix yourself is how a
+newcomer learns the project. Free shows labelled sample results.
 
 ![Explore contributions: search GitHub for your next contribution](docs/images/en/discover-1280.png)
 
-### Learning notes
+### Learning page and practice
 
-Every explanation from every contribution is collected on one page, with a
-search, so you can come back to a concept later. Pro exports a
-contribution's learning record as Markdown.
+Every explanation and note from every contribution is collected on one
+page, with a search, so you can come back to a concept later.
+**Practice** brings your own questions back after 1, 3, 7 and 21 days:
+answers you missed while you were sure, maintainer comments that surprised
+you and questions you never tried. Plain counts from your records, such as
+how often you were right when you said "Sure", appear once there is enough
+to count, and none of them is a score or a goal. With Pro, a **coach
+debrief** reads your records for one project, names what its maintainers
+raise most and builds practice drills from your own contributions, and you
+can export a contribution's complete learning record as Markdown.
 
-![Learning notes: explanations collected across contributions](docs/images/en/learning-1280.png)
+![The learning page: notes collected across contributions, beside the Practice and Coach debrief views](docs/images/en/learning-1280.png)
 
 ### Your tools, your accounts, your language
 
@@ -167,9 +255,10 @@ unless the project asks otherwise.
 
 ### Try it with the sample project
 
-A finished sample contribution, with the plan, the changes, their
-explanations and the PR draft, needs no setup and makes no AI call. It
-also shows the Pro features with sample data.
+A finished sample contribution, with the project's rules, the plan, the
+changes, their explanations, the understanding check and the PR draft,
+needs no setup and makes no AI call. It also shows the Pro features with
+sample data.
 
 ## Free and Pro
 
@@ -204,6 +293,11 @@ also shows the Pro features with sample data.
 | Pro license term and updates | Pro | Per named user; perpetual, with 12 months of updates from the date your key is issued |
 
 <!-- /generated:plan-table -->
+
+Free covers the whole responsible loop. Pro goes deeper: a coach debrief,
+the complete learning record, AI follow-up rounds, bigger teams, more than
+one contribution at a time, discovery, web access and deep reasoning. No
+plan buys more pull requests or a way past a check.
 
 Every data directory can try Pro for 14 days: **Settings → License → Start
 14-day trial**, or `bell-pr license trial`. Moving back to Free never takes
@@ -279,6 +373,7 @@ Settings are used unless a variable sets them.
 | `BELLPR_MAX_ACTIVE_RUNS` | `2` | Runs executing at the same time (1 to 8; Free runs one) |
 | `BELLPR_AGENT_TIMEOUT_SCALE` | `1` | Multiplier for agent time limits (0.5 to 10) |
 | `BELLPR_ALLOW_UNSANDBOXED_AGENTS` | not set | `1` lets Claude Code agents edit files without the sandbox |
+| `BELLPR_REQUIRE_UNDERSTANDING_CHECK` | not set | `1` keeps the understanding check on and locks the setting; no value turns it off |
 | `BELLPR_RETENTION_DAYS` | `14` | Days before the files of cancelled and failed runs are removed (1 to 365) |
 | `BELLPR_DEV` | not set | Development mode, for working on BELL PR itself |
 | `BELLPR_FRONTEND_PORT` | `4310` | Port of the dev server that development mode trusts |
@@ -316,8 +411,11 @@ their sign-ins, the Claude Code sandbox and the data directory, and prints
 the command that fixes each problem. `bell-pr doctor --json` gives the same
 report as JSON. It exits with 0 when every required check passes.
 
-[Troubleshooting](docs/troubleshooting.md) lists every error code with its
-fix, what to do when BELL PR does not start, and how to collect details
+[Troubleshooting](docs/troubleshooting.md) lists [every error
+code](docs/troubleshooting.md#error-codes) with its fix, explains
+[why BELL PR blocked
+publishing](docs/troubleshooting.md#publishing-was-blocked-by-a-project-rule-an-issue-or-pacing),
+and says what to do when BELL PR does not start and how to collect details
 for a support request.
 
 ## Data directory and backups
@@ -360,6 +458,7 @@ yet; the trial works. See [Licensing](docs/licensing.md).
 - [Configuration](docs/configuration.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Licensing](docs/licensing.md)
+- [Contributing responsibly](docs/contributing-responsibly.md)
 - [Privacy and your data](docs/privacy-and-data.md)
 - [Upgrading](docs/upgrading.md)
 - [FAQ](docs/faq.md)
