@@ -478,7 +478,9 @@ help-wanted issue instead.
 "This change weakens a test." The change deletes a test file, skips a test
 (`.skip(`, `.only`, `xit`, `pytest.mark.skip`, `xfail`, `@Ignore`,
 `#[ignore]`, `t.Skip(` and similar) or removes an `assert` or `expect(`
-line in a test file. In **How reviewable is this change?** on the Draft
+line in a test file that no assertion in the same hunk replaces (a loose
+one, such as `toBeDefined()` or `assert True`, replaces only another
+loose one). In **How reviewable is this change?** on the Draft
 tab, give each flagged item a one-line reason of at least 3 words and save
 the reasons; the block clears when every item has one. The reasons are
 offered for the description's Testing section, so the maintainers can
