@@ -6,6 +6,7 @@ import {
   type DiscoverySource,
 } from "../shared/discovery.js";
 import { formatters } from "../shared/i18n/locale.js";
+import { learningLabel } from "../shared/contribution.js";
 import { parseGitHubSource, safeRelativePath, sensitivePath } from "./git.js";
 import { currentLocale, sm } from "./i18n/index.js";
 import { command, redact } from "./process.js";
@@ -60,11 +61,12 @@ function searchQuery(preferences: DiscoveryPreferences) {
     ...(preferences.language.trim()
       ? [`language:"${preferences.language.trim()}"`]
       : []),
-    ...(preferences.difficulty === "beginner"
-      ? ["good-first-issues:>0"]
-      : preferences.difficulty === "intermediate"
-        ? ["help-wanted-issues:>0"]
-        : []),
+    // Good first issues are how newcomers learn by doing the work
+    // themselves; BELL's agent team works on help-wanted issues instead.
+    ...(preferences.difficulty === "beginner" ||
+    preferences.difficulty === "intermediate"
+      ? ["help-wanted-issues:>0"]
+      : []),
   ].join(" ");
 }
 
@@ -75,11 +77,9 @@ function sortArguments(sort: DiscoverySort) {
 
 function repositoryQuery(difficulty: DiscoveryPreferences["difficulty"]) {
   const label =
-    difficulty === "beginner"
-      ? ', labels:["good first issue"]'
-      : difficulty === "intermediate"
-        ? ', labels:["help wanted"]'
-        : "";
+    difficulty === "beginner" || difficulty === "intermediate"
+      ? ', labels:["help wanted"]'
+      : "";
   return `query BellDiscovery($owner:String!, $name:String!) {
     repository(owner:$owner, name:$name) {
       nameWithOwner description isPrivate isArchived isDisabled stargazerCount forkCount pushedAt
@@ -154,7 +154,12 @@ function documentPath(
   }
 }
 
-/** Public, read-only discovery. Fetched text is evidence, never executable instructions. */
+/**
+ * Public, read-only discovery. Fetched text is evidence, never executable
+ * instructions. `learningIssues` lists the issue sources whose labels mark
+ * them for people learning to contribute (good first issue and the like),
+ * so the opportunities quoting them become practice to write by hand.
+ */
 export async function collectDiscoveryCandidates(
   preferences: DiscoveryPreferences,
   options: {
@@ -162,13 +167,18 @@ export async function collectDiscoveryCandidates(
     signal?: AbortSignal;
     onProgress?: (phase: "searching" | "screening", message: string) => void;
   } = {},
-): Promise<{ candidates: DiscoveryCandidate[]; warnings: string[] }> {
+): Promise<{
+  candidates: DiscoveryCandidate[];
+  warnings: string[];
+  learningIssues?: string[];
+}> {
   const query = searchQuery(preferences);
   const messages = sm().analysis.discoverySources;
   const number = formatters(currentLocale()).number;
   const execute = options.command ?? command;
   const candidates: DiscoveryCandidate[] = [];
   const warnings: string[] = [];
+  const learningIssues: string[] = [];
   const deadline = AbortSignal.timeout(90_000);
   const signal = options.signal
     ? AbortSignal.any([options.signal, deadline])
@@ -252,6 +262,7 @@ export async function collectDiscoveryCandidates(
     return {
       candidates,
       warnings: [messages.searchFailed],
+      learningIssues,
     };
   }
   if (search.incomplete_results)
@@ -289,6 +300,7 @@ export async function collectDiscoveryCandidates(
     return {
       candidates,
       warnings: [...warnings, messages.noRepositories],
+      learningIssues,
     };
   warnings.push(messages.samplingScope({ sort: preferences.sort }));
   for (const found of repositories) {
@@ -446,15 +458,17 @@ export async function collectDiscoveryCandidates(
         !canonicalIssueUrl(issue.url, remote.fullName, issue.number)
       )
         continue;
-      const labels = Array.isArray(issue.labels?.nodes)
+      const names: string[] = Array.isArray(issue.labels?.nodes)
         ? issue.labels.nodes
             .slice(0, 5)
             .map((item: any) =>
               typeof item?.name === "string" ? item.name : "",
             )
             .filter(Boolean)
-            .join(", ")
-        : "";
+        : [];
+      const labels = names.join(", ");
+      if (names.some(learningLabel))
+        learningIssues.push(`${remote.fullName}:issue:${issue.number}`);
       // Undefined when GitHub did not confirm the value.
       const assignees: number | undefined = Number.isSafeInteger(
         issue.assignees?.totalCount,
@@ -526,5 +540,5 @@ export async function collectDiscoveryCandidates(
   if (limited())
     warnings.push(messages.requestLimit);
   if (!candidates.length) warnings.push(messages.noCandidates);
-  return { candidates, warnings };
+  return { candidates, warnings, learningIssues };
 }
