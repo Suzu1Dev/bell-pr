@@ -1110,7 +1110,7 @@ else if (args[0] === 'pr' && args[1] === 'create') {
     process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
     const displayedFingerprint = f.run.approvedFingerprint!;
     await assert.rejects(
-      f.workbench.publish(f.run.id, displayedFingerprint),
+      f.workbench.publish(f.run.id, displayedFingerprint, ["facts-unknown"]),
       /simulated PR creation failure/,
     );
     const firstCommit = f.run.publishCommit;
@@ -1130,7 +1130,7 @@ else if (args[0] === 'pr' && args[1] === 'create') {
     });
     await f.workbench.approve(f.run.id, { ...f.run.draft });
     await assert.rejects(
-      f.workbench.publish(f.run.id, f.run.approvedFingerprint!),
+      f.workbench.publish(f.run.id, f.run.approvedFingerprint!, ["facts-unknown"]),
       /提交訊息/,
     );
     assert.equal(f.run.publishCommit, firstCommit);
@@ -1139,6 +1139,7 @@ else if (args[0] === 'pr' && args[1] === 'create') {
     const published = await f.workbench.publish(
       f.run.id,
       f.run.approvedFingerprint!,
+      ["facts-unknown"],
     );
     assert.equal(published.status, "published");
     assert.equal(published.publishCommit, firstCommit);
@@ -1873,6 +1874,7 @@ else if (args[0] === 'pr' && args[1] === 'create') {
     const published = await f.workbench.publish(f.run.id, fingerprint, [
       "unchecked",
       "issue",
+      "facts-unknown",
     ]);
     assert.equal(published.status, "published");
     assert.equal(published.publishedBranch, "update-greeting");

@@ -499,7 +499,7 @@ test("a run interrupted while publishing is approved again after a restart and t
     await workbench.review(run.id, file.path, true, file.fingerprint);
   await workbench.approve(run.id, { ...run.draft });
   const approved = run.approvedFingerprint!;
-  await assert.rejects(workbench.publish(run.id, approved));
+  await assert.rejects(workbench.publish(run.id, approved, ["facts-unknown"]));
   await workbench.shutdown();
 
   // Restart from the disk as the crash left it: pushed, PR not yet created.
@@ -522,7 +522,7 @@ test("a run interrupted while publishing is approved again after a restart and t
 
   const second = new Workbench(restarted);
   f.defer(() => second.shutdown());
-  await second.publish(recovered.id, approved);
+  await second.publish(recovered.id, approved, ["facts-unknown"]);
   assert.equal(recovered.status, "published");
   assert.equal(recovered.prUrl, prUrl);
   assert.equal(recovered.error, undefined);
@@ -725,7 +725,7 @@ test("a restart during a round's push reopens the round for review with the PR i
   await writeFile(path.join(f.repository, "hello.ts"), 'export const hello = "after";\n');
   await reviewAll(workbench, run);
   await workbench.approve(run.id, { ...run.draft });
-  await workbench.publish(run.id, run.approvedFingerprint!);
+  await workbench.publish(run.id, run.approvedFingerprint!, ["facts-unknown"]);
   assert.equal(run.status, "published");
   const firstCommit = run.publishCommit!;
   await workbench.startFollowUp(run.id, { feedbackUrls: [], note: "Greet the world." });

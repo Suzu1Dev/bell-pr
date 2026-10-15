@@ -12,7 +12,6 @@ import os from "node:os";
 import path from "node:path";
 import type { ChangeExplanation } from "../shared/explanations.js";
 import type { PlannedItem } from "../shared/understanding.js";
-import { explainPrCreateFailure, refreshRepositoryRules, refreshRunFacts } from "./contribution-facts.js";
 import { createApp } from "./index.js";
 import { git } from "./process.js";
 import { readDiff } from "./git.js";
@@ -671,7 +670,7 @@ test("publish accepts overrides only for someone else's PR, with a 20 to 200 cha
     at: "2026-10-01T00:00:00.000Z",
   }));
   await assert.rejects(
-    f.workbench.publish(f.run.id, f.run.approvedFingerprint!, [], [
+    f.workbench.publish(f.run.id, f.run.approvedFingerprint!, ["facts-unknown"], [
       { id: "issue-has-pr", reason: "  Their PR was abandoned in June.  " },
     ]),
   );
@@ -680,7 +679,7 @@ test("publish accepts overrides only for someone else's PR, with a 20 to 200 cha
   assert.equal(f.run.guardOverrides?.[0].reason, "An older reason number 1 for the record.");
   // A retry with the same reason records it once.
   await assert.rejects(
-    f.workbench.publish(f.run.id, f.run.approvedFingerprint!, [], [
+    f.workbench.publish(f.run.id, f.run.approvedFingerprint!, ["facts-unknown"], [
       { id: "issue-has-pr", reason: "Their PR was abandoned in June." },
     ]),
   );
@@ -695,7 +694,7 @@ test("publish accepts overrides only for someone else's PR, with a 20 to 200 cha
     filesRead: ["AI_POLICY.md"],
   };
   await assert.rejects(
-    f.workbench.publish(f.run.id, f.run.approvedFingerprint!, [], [
+    f.workbench.publish(f.run.id, f.run.approvedFingerprint!, ["facts-unknown"], [
       { id: "issue-has-pr", reason: "Another reason that is long enough." },
     ]),
     (error: AppError) => error.statusCode === 422,
@@ -706,11 +705,6 @@ test("publish accepts overrides only for someone else's PR, with a 20 to 200 cha
 test("until the respect and learning-loop work fills them, their facades answer 501", async (t) => {
   const f = await fixture(t);
   for (const pending of [
-    f.workbench.contribution.rules(f.repo.id),
-    f.workbench.contribution.refreshRules(f.repo.id),
-    f.workbench.contribution.check(f.repo.id, "https://github.com/acme/widgets/issues/1"),
-    f.workbench.contribution.refreshRun(f.run.id),
-    f.workbench.contribution.saveTestReasons(f.run.id, {}),
     f.workbench.learningLoop.saveFeedbackTag(f.run.id, { url: "#x" }),
     f.workbench.learningLoop.practice(),
     f.workbench.learningLoop.recordPractice(f.run.id, { key: "check:x", confidence: "sure", grade: "got" }),
@@ -719,11 +713,4 @@ test("until the respect and learning-loop work fills them, their facades answer 
     f.workbench.learningLoop.debriefs(f.repo.id),
   ])
     await assert.rejects(pending, (error: AppError) => error.statusCode === 501);
-});
-
-test("the refresh helpers read nothing yet and leave a failed PR creation as it is", async (t) => {
-  const f = await fixture(t);
-  assert.equal(await refreshRunFacts({} as never, f.run, { timeoutMs: 10 }), undefined);
-  assert.equal(await refreshRepositoryRules({} as never, f.repo), undefined);
-  assert.equal(explainPrCreateFailure(new Error("rate limited")), undefined);
 });

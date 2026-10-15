@@ -715,7 +715,7 @@ esac`,
   await workbench.approve(run.id, { ...run.draft });
   await assert.rejects(
     withLocale("en", () =>
-      workbench.publish(run.id, run.approvedFingerprint!, ["workflows", "author-email"]),
+      workbench.publish(run.id, run.approvedFingerprint!, ["workflows", "author-email", "facts-unknown"]),
     ),
     (error: unknown) => {
       assert.ok(error instanceof AppError);
@@ -727,9 +727,13 @@ esac`,
     },
   );
   assert.notEqual(run.publishing, true);
-  // Only the token check ran: nothing was pushed or created.
+  // Only the token check ran: nothing was pushed or created. The live
+  // GitHub facts read before it (gh api --hostname, whose multi-line query
+  // spans several log lines) is not a write.
   assert.deepEqual(
-    (await calls()).map((line) => line.split(" ").slice(0, 3).join(" ")),
+    (await calls())
+      .filter((line) => line.startsWith("gh ") && !line.startsWith("gh api --hostname"))
+      .map((line) => line.split(" ").slice(0, 3).join(" ")),
     ["gh auth token", "gh api --include"],
   );
 });
