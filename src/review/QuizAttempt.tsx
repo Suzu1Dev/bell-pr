@@ -69,7 +69,9 @@ export function QuizAttempt({
 
   // The saved attempt changed under the card: the run reloaded after a
   // save, a 409 or a diff refresh. Show what is on record now; an answer
-  // that was never saved stays in the field.
+  // that was never saved stays in the field. None for this version of the
+  // file means the diff moved on: the card starts over with an empty field,
+  // since the answer on record was written for the earlier version.
   const savedKey = JSON.stringify(saved ?? null);
   const [shownKey, setShownKey] = useState(savedKey);
   if (shownKey !== savedKey) {
@@ -78,6 +80,9 @@ export function QuizAttempt({
     if (saved) {
       setAnswer(saved.answer ?? "");
       setConfidence(saved.confidence);
+    } else if (record) {
+      setAnswer("");
+      setConfidence(undefined);
     }
   }
 

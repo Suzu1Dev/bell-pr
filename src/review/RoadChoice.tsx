@@ -65,12 +65,14 @@ export function RoadChoice({
   // that arrives before the reveal is shown; once revealed, the card's own
   // saves keep the record up to date, so a reload never overwrites the
   // why being typed. None for this version of the file means the diff
-  // moved on: the card starts over, and a typed guess stays in the field.
+  // moved on: the card starts over with an empty field, since the guess on
+  // record was made for the earlier version.
   const savedKey = JSON.stringify(saved ?? null);
   const [shownKey, setShownKey] = useState(savedKey);
   if (shownKey !== savedKey) {
     setShownKey(savedKey);
     if (!saved) {
+      setGuess("");
       setRevealed(false);
       setChoice(undefined);
       setWhy("");
