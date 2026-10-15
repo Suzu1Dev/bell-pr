@@ -1850,3 +1850,147 @@
     text-align: left;
   }
 }
+
+/* "Before you contribute": the project's own rules, at the top of the overview. */
+.rules-card {
+  display: grid;
+  gap: 12px;
+  padding: 20px 22px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  background: var(--color-surface);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rules-card * {
+  min-width: 0;
+}
+.rules-card :is(h2, h3, p, figure, blockquote, ul) {
+  margin: 0;
+}
+.rules-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 20px;
+}
+.rules-card-head > div {
+  flex: 1 1 320px;
+}
+.rules-card-head h2 {
+  font-size: 19px;
+  line-height: 1.5;
+  margin: 6px 0 4px;
+}
+.rules-card-head p,
+.rules-card-sample,
+.rules-card-state,
+.rules-card-meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+}
+.rules-card-sample {
+  font-size: var(--text-xs);
+}
+.rules-card-door {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: var(--text-sm);
+  font-weight: 550;
+}
+.rules-card-door.is-ok {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.rules-card-door.is-bad {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.rules-card-door.is-unknown,
+.rules-card-state.is-unknown {
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+}
+.rules-card-state.is-unknown {
+  padding: 9px 12px;
+  border-radius: 8px;
+}
+.rules-card-group {
+  display: grid;
+  gap: 8px;
+}
+.rules-card-group h3 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.rules-card-group figure {
+  display: grid;
+  gap: 6px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--color-brand-300);
+  border-radius: 0 8px 8px 0;
+  background: var(--color-surface-sunken);
+}
+.rules-card-group blockquote {
+  color: var(--color-text);
+  font-size: var(--text-md);
+  line-height: 1.7;
+}
+.rules-card-group figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+.rules-card-effect {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rules-card-effect.is-block {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.rules-card-effect.is-confirm {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+.rules-card-effect.is-info {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+}
+.rules-card-meta {
+  display: grid;
+  gap: 4px;
+  font-size: var(--text-xs);
+}
+.rules-card-meta summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--color-accent-600);
+}
+.rules-card-meta ul {
+  margin-top: 6px;
+  padding-left: 20px;
+}
+
+@media (max-width: 560px) {
+  .rules-card {
+    padding: 16px 14px;
+  }
+}

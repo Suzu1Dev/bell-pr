@@ -330,6 +330,60 @@ const m: Translation<typeof en> = {
     moreFailed: "尚未產出更多建議，原有清單已保留。請重試。",
     analysisFailed: "專案分析未完成，請重試。",
   },
+  rules: {
+    kicker: "THE PROJECT'S OWN RULES",
+    title: "貢獻之前",
+    lead: `這個專案對貢獻者的要求，原文引自專案自己的檔案，並說明發布時 ${product.name} 會怎麼處理每一條規範。`,
+    door: {
+      open: "Pull Request：對你開放",
+      collaborators: "Pull Request：只限協作者（你可以在這裡練習，但不能發布）",
+      off: "Pull Request：已關閉（你可以在這裡練習，但不能發布）",
+      archived: "已封存：專案不再接受變更（你可以在這裡練習，但不能發布）",
+      unknown: ({ reason }) =>
+        reason
+          ? `無法確認 Pull Request 是否對你開放：${reason}`
+          : "無法確認 Pull Request 是否對你開放。",
+    },
+    kinds: {
+      ban: "AI 協助的貢獻",
+      disclose: "說明 AI 有協助",
+      understand: "能說明自己的變更",
+      area: "留給新手的 issue",
+      agent: "寫給 AI agent 的話",
+      "own-words": "用自己的話寫說明",
+      "issue-first": "先有 issue 再動工",
+    },
+    effects: {
+      block: "會阻擋發布",
+      confirm: "會請你確認",
+      info: "僅供參考",
+    },
+    effect: {
+      ban: `${product.name} 的每一份變更都由 agent 撰寫，所以不會在這裡發布。你仍可以在本機練習。`,
+      banAmbiguous: "發布時會請你判斷，這條規範是否涵蓋 AI 協助的貢獻。",
+      disclose: "說明裡提到 AI 有協助之前，發布會先等著。",
+      understand: "你的理解檢查涵蓋這一條。如果關閉了理解檢查，發布時會請你確認。",
+      area: "連結的 issue 有新手標籤時，會阻擋發布。",
+      agent: "這是寫給 AI agent 的話。作者是你，所以發布時會請你判斷是否適用。",
+      "own-words": `說明仍是 ${product.name} 的建議文字時，發布會先等著。`,
+      "issue-first": "沒有連結 issue 時，發布前會請你確認。",
+    },
+    found: ({ count, files }) =>
+      `從 ${product.name} 讀過的 ${n(files)} 個檔案中，引用了 ${n(count)} 條規範。`,
+    notFound: ({ files }) =>
+      `在 ${product.name} 讀過的 ${n(files)} 個檔案中沒有找到。有些專案把規範放在網站或 wiki 上，發布前請自行確認。`,
+    noFiles:
+      "沒有可讀的貢獻指南、政策或 Pull Request 範本。有些專案把規範放在網站或 wiki 上，發布前請自行確認。",
+    couldntCheck: ({ reason }) => `無法確認：${reason}`,
+    notRead: `${product.name} 還沒讀取專案規範。匯入或更新專案時會讀取，你也可以按「再確認一次」。`,
+    filesRead: ({ count }) => `${product.name} 讀過的檔案 · ${n(count)}`,
+    orgDefaults: ({ repository }) => `包含 ${repository} 的預設檔案。`,
+    unread: ({ what }) => `無法讀取：${what}`,
+    checkedAt: ({ date }) => `確認於 ${date}`,
+    checkAgain: "再確認一次",
+    checking: "正在確認…",
+    sample: "示範：這個專案與它的 CONTRIBUTING.md 都是虛構的，沒有讀取 GitHub。",
+  },
 };
 
 export default m;
