@@ -238,6 +238,18 @@ test("every file ticked: the hint points at the check, unless it is off or passe
   assert.match(ticked({}), /Every file reviewed\. Next: explain it back\./);
   assert.match(ticked({ required: false, off: true }), /<small>Every file reviewed\.<\/small>/);
   assert.match(ticked({ passed: true }), /<small>Every file reviewed\.<\/small>/);
+  // A published run takes no check any more, so nothing comes next.
+  assert.match(
+    renderEn(
+      element({
+        run: { ...run, status: "published" },
+        allReviewed: true,
+        reviewedCount: 2,
+        understanding: understanding(),
+      }),
+    ),
+    /<small>Every file reviewed\.<\/small>/,
+  );
   assert.match(
     renderEn(element()),
     /Once you have read a file and its explanation, mark it as reviewed\./,

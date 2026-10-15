@@ -177,6 +177,8 @@ export function ChangesTab({
   // and questions to the agent wait until it closes.
   const checkMode = useCheckPanel(run.id);
   const checking = !!understanding && !!checkMode;
+  // The check is taken while the run waits for review or approval.
+  const checkOpen = ["review", "approved"].includes(run.status) && !run.publishing;
   const [askWaiting, setAskWaiting] = useState(false);
   useEffect(() => {
     if (!checking) {
@@ -280,7 +282,7 @@ export function ChangesTab({
             </button>
           </div>
           {/* Test out: the check before every file is ticked (the ticks stay required). */}
-          {understanding && !checking && ["review", "approved"].includes(run.status) && !run.publishing && (
+          {understanding && !checking && checkOpen && (
             <button type="button" className="check-link" onClick={() => openCheckPanel(run.id)}>
               <SquarePen size={14} aria-hidden="true" />
               {understanding.passed ? t.openCheck : t.takeCheck}
@@ -396,7 +398,7 @@ export function ChangesTab({
             <small>
               {!allReviewed
                 ? t.reviewHint
-                : understanding?.required && !understanding.passed
+                : checkOpen && understanding?.required && !understanding.passed
                   ? t.allReviewed
                   : t.allReviewedDone}
             </small>
