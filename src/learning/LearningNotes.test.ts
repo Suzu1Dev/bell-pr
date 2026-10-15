@@ -394,3 +394,52 @@ test(
     renderEnglish({ demoFiles: getDemo("en").files });
   },
 );
+
+/** The English runs with the understanding check recorded on them. */
+const checkedRuns: LearningRun[] = [
+  {
+    ...englishRuns[0],
+    understanding: {
+      summary: {
+        text: "The cache dropped entries before the write finished.\nNow the entry is cleared only after the write succeeds.",
+        changeFingerprint: "c1",
+        at: "2026-10-06T10:00:00.000Z",
+      },
+    },
+  },
+  { ...englishRuns[1], status: "approved", understandingCheckOff: true },
+];
+
+test("the notes view links the page's views, notes first", () => {
+  const html = renderEnglish();
+  assert.match(
+    html,
+    /<\/div><\/div><nav class="learning-views" aria-label="Learning views"><a href="#\/learning" aria-current="page" data-view="notes">Notes<\/a><a href="#\/learning\?view=practice" data-view="practice">Practice<\/a><a href="#\/learning\?view=debrief" data-view="debrief">Coach debrief<\/a><\/nav>/,
+  );
+});
+
+test("each contribution shows the person's own explanation, and runs approved without the check are marked", () => {
+  const html = renderEnglish({ initial: { runs: checkedRuns } });
+  const section = html.match(/<section class="learning-runs".*?<\/section>/s)?.[0] ?? "";
+  assert.match(section, /<h2 id="learning-runs-title">Your explanations<\/h2>/);
+  const cards = [...section.matchAll(/<article class="learning-run-card">.*?<\/article>/gs)].map(([card]) => card);
+  assert.equal(cards.length, 2);
+  assert.match(cards[0], /<span class="note-number">openfetch-sample\/open-fetch<\/span><h3>Fix the token cache<\/h3><div class="learning-own-note"><strong>Your explanation<\/strong><p>The cache dropped entries before the write finished\.\nNow the entry/);
+  assert.doesNotMatch(cards[0], /check off/i);
+  assert.match(cards[1], /<h3>Add retries with backoff<\/h3><span class="learning-check-off">Understanding check off<\/span><p class="learning-run-text">Approved without explaining the change back\.<\/p>/);
+  // The cards come before the file notes, which stay as they were.
+  assert.ok(html.indexOf("learning-runs") < html.indexOf("learning-grid"));
+  assert.match(html, /Showing 3 of 3 notes/);
+
+  // Without a summary or the mark, a run has no card, and no section shows.
+  assert.doesNotMatch(renderEnglish(), /learning-runs/);
+  // The filters apply: the chosen contribution and the keyword.
+  assert.doesNotMatch(renderEnglish({ initial: { runs: checkedRuns }, defaultRunId: "run-old" }), /Fix the token cache<\/h3>/);
+  const keyword = renderEnglish({ initial: { runs: checkedRuns }, defaultKeyword: "WRITE SUCCEEDS" });
+  assert.match(keyword, /<h3>Fix the token cache<\/h3>/);
+  assert.doesNotMatch(keyword, /<h3>Add retries with backoff<\/h3>/);
+
+  const zh = renderZh(createElement(LearningNotes, { repos, demoFiles: [], onOpen() {}, initial: { runs: checkedRuns } }));
+  assert.match(zh, /<span class="learning-check-off">理解檢查已關閉<\/span>/);
+  assert.match(zh, /<strong>你的說明<\/strong>/);
+});

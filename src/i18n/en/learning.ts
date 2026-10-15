@@ -178,6 +178,17 @@ const learning = {
     sampleIntro:
       "A debrief of the built-in sample contribution, so you can see what one looks like.",
   },
+  /**
+   * Above the file notes: what the person wrote when they explained each
+   * change back, and the permanent mark on runs approved without it.
+   */
+  runs: {
+    title: "Your explanations",
+    summary: "Your explanation",
+    /** The mark on a run approved with the understanding check off. */
+    checkOff: "Understanding check off",
+    checkOffText: "Approved without explaining the change back.",
+  },
   /** What maintainers may question, in the same words as the check. */
   dimensions: {
     scope: "Scope",

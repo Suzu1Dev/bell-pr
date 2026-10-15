@@ -133,6 +133,12 @@ const m: Translation<typeof en> = {
     sampleTitle: "示範回顧",
     sampleIntro: "針對內建示範任務的回顧，讓你看看回顧長什麼樣子。",
   },
+  runs: {
+    title: "你自己講的說明",
+    summary: "你的說明",
+    checkOff: "理解檢查已關閉",
+    checkOffText: "沒有用自己的話講一遍就核准了。",
+  },
   dimensions: {
     scope: "範圍",
     simplicity: "簡潔",

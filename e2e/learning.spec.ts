@@ -283,3 +283,60 @@ test("on Free the coach debrief opens the upgrade dialog without a request, and 
     },
   );
 });
+
+test("the notes show each contribution's own explanation and mark runs approved without the check", async ({ browser }) => {
+  const summary =
+    "The retry waited the same time after every failure. Now each wait doubles up to a cap, so a busy server can recover before the next attempt.";
+  await onServer(
+    browser,
+    {
+      seed: (dataDir) => {
+        const [checked, unchecked] = [0, 1].map((index) => ({
+          ...seededRun(index, dataDir),
+          status: "approved",
+          title: index ? "Approved with the check off" : "Explained back",
+        }));
+        return writeFile(
+          path.join(dataDir, "state.json"),
+          JSON.stringify({
+            version: 1,
+            repos: [
+              {
+                id: repoId,
+                name: "learning",
+                owner: "e2e-sample",
+                fullName: "e2e-sample/learning",
+                path: path.join(dataDir, "repos", "learning"),
+                defaultBranch: "main",
+                url: "",
+              },
+            ],
+            runs: [
+              {
+                ...checked,
+                understanding: {
+                  summary: { text: summary, changeFingerprint: "c1", at: "2026-09-01T09:00:00.000Z" },
+                },
+              },
+              { ...unchecked, understandingCheckOff: true },
+            ],
+          }),
+        );
+      },
+    },
+    async (page) => {
+      await page.goto("/#/learning?locale=en");
+      const runs = page.locator("section.learning-runs");
+      await expect(runs.getByRole("heading", { level: 2, name: learning.runs.title })).toBeVisible();
+      const explained = runs.locator(".learning-run-card").filter({ hasText: "Explained back" });
+      await expect(explained.locator(".learning-own-note")).toContainText(summary);
+      await expect(explained.locator(".learning-check-off")).toHaveCount(0);
+      const off = runs.locator(".learning-run-card").filter({ hasText: "Approved with the check off" });
+      await expect(off.locator(".learning-check-off")).toHaveText(learning.runs.checkOff);
+      await expect(off).toContainText(learning.runs.checkOffText);
+      // The file notes still follow.
+      await expect(page.locator(".learning-grid").first().locator(".note-card")).toHaveCount(2);
+      expect(await axeProblems(page)).toEqual([]);
+    },
+  );
+});

@@ -14,6 +14,7 @@ import { useFormat, useLocale, useT } from "../i18n";
 import type { DiffFile, Repo } from "../types";
 import { LearningCounts } from "./LearningCounts";
 import { LearningHeading } from "./LearningHeading";
+import { LearningRunCards } from "./LearningRunCards";
 import { LearningViewContent, LearningViewNav, useLearningView } from "./LearningViews";
 import "./learning.css";
 
@@ -393,6 +394,9 @@ export function LearningNotes({
                 : t.noRealNotes}
         </span>
       </div>
+      {status === "ready" && (
+        <LearningRunCards runs={record} repos={repos} runId={runId} keyword={needle} />
+      )}
       {status === "loading" ? (
         <div className="learning-empty" role="status">
           <LoaderCircle className="spin" size={24} aria-hidden="true" />
