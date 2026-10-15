@@ -2,6 +2,7 @@ import {
   Suspense,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type Dispatch,
   type ReactNode,
@@ -241,8 +242,14 @@ export function PublishModal({
     };
   }, []);
   // The GitHub facts are read once as the dialog opens, then the server's
-  // checks again; a fact that could not be read is never a pass.
+  // checks again; a fact that could not be read is never a pass. A project
+  // whose rules BELL never read (imported by an earlier build) has them
+  // read too, so an AI ban or a required disclosure in them applies.
   const reads = !demo && !followUp;
+  // Read once per opening, not again when the repository list reloads.
+  const unreadRules = useRef<string>(undefined);
+  unreadRules.current =
+    reads && currentRepo && !currentRepo.contributionRules ? currentRepo.id : undefined;
   const [facts, setFacts] = useState<{ loading: boolean; facts?: ContributionFacts; error?: string }>(
     { loading: reads },
   );
@@ -250,6 +257,14 @@ export function PublishModal({
     setOverrides([]);
     if (!reads) return;
     let cancelled = false;
+    // A failed read is recorded in the rules' `unknown`, never thrown; the
+    // checks below say what stayed unknown.
+    const rules = unreadRules.current
+      ? api(
+          `/repos/${encodeURIComponent(unreadRules.current)}/contribution-rules/refresh`,
+          send("POST"),
+        ).catch(() => undefined)
+      : undefined;
     api<{ run?: Run }>(`/runs/${encodeURIComponent(run.id)}/contribution-facts/refresh`, send("POST"))
       .then(
         ({ run: updated }) => {
@@ -261,7 +276,8 @@ export function PublishModal({
           setFacts({ loading: false, error: missing ? t.factsMissing : error.message });
         },
       )
-      .finally(() => {
+      .finally(async () => {
+        await rules;
         if (!cancelled) void loadPublishChecks(run.id, run.approvedFingerprint);
       });
     return () => {
