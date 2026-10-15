@@ -303,7 +303,15 @@ export interface RealProjectOptions {
   run?: Record<string, unknown>;
   /** Starts the 14-day trial. */
   trial?: boolean;
+  /**
+   * Every file already ticked Reviewed at its current version, and the
+   * loosened test's reason written, so the run can be approved at once.
+   */
+  reviewed?: boolean;
 }
+
+/** The loosened assertion's weakened-test item (the removed line 5). */
+export const weakenedItem = `${testFile}#-5`;
 
 /** Starts a server with the project and its run in review; stop() removes everything. */
 export async function startRealProject(options: RealProjectOptions = {}): Promise<RealProject> {
@@ -403,7 +411,20 @@ esac
                 url: repoUrl,
               },
             ],
-            runs: [reviewRun(worktreePath, baseSha, prints, options.run ?? {})],
+            runs: [
+              reviewRun(worktreePath, baseSha, prints, {
+                ...(options.reviewed
+                  ? {
+                      reviewedFiles: Object.keys(prints),
+                      reviewedFingerprints: prints,
+                      reviewability: {
+                        testReasons: { [weakenedItem]: "The greeting text now depends on the language table." },
+                      },
+                    }
+                  : {}),
+                ...options.run,
+              }),
+            ],
           }),
         );
         if (options.appSettings)
