@@ -788,11 +788,12 @@ export function hasAiDisclosure(body: string, commitMessage = "") {
     .filter((_, index) => fields[index] === undefined || !deniedField.test(fields[index]!))
     .join(" ");
   // Each clause on its own: "Codex wrote the parser; the tests were not
-  // AI-generated" still discloses, "No AI tools were used." does not.
+  // AI-generated" and "Not reviewed by AI, but written with Copilot" still
+  // disclose, "No AI tools were used." and "Disclosure: no AI was used" do not.
   return splitSentences(visible).some(({ start, end }) =>
     visible
       .slice(start, end)
-      .split(";")
+      .split(/;|:\s|\bbut\b/i)
       .some(
         (clause) =>
           disclosureVerb.test(clause) &&

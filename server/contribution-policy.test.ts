@@ -141,11 +141,15 @@ test("a description that says no AI was used is not an AI disclosure", () => {
     "This change was written without AI assistance.",
     "AI was not used.",
     "None of this was AI-generated.",
+    "Disclosure: no AI was used.",
   ])
     assert.ok(!hasAiDisclosure(`Fixes the cap.\n\n${body}`), body);
+  // A denial in one clause leaves a disclosure in the next one standing.
   for (const body of [
     "Codex wrote the parser; the tests were not AI-generated.",
     "I used Claude Code to draft it; I did not change the tests.",
+    "This PR was not reviewed by AI but was written with Copilot.",
+    "None of the logic is mine: Claude Code wrote it.",
   ])
     assert.ok(hasAiDisclosure(`Fixes the cap.\n\n${body}`), body);
 });
