@@ -42,10 +42,16 @@ test("one aliased call counts open, merged and waiting pull requests by the pers
   );
   for (const alias of ["open: search(", "merged: search(", "waiting: search(", "viewerPermission"])
     assert.ok(pacingQuery.includes(alias), alias);
-  assert.deepEqual(read.facts, { openPrs: 1, mergedPrs: 0, waitingPrs: 2, viewerPermission: "READ" });
+  // Only this repository's pull requests are linked, on the run's facts too.
+  assert.deepEqual(read.facts, {
+    openPrs: 1,
+    mergedPrs: 0,
+    waitingPrs: 2,
+    waitingUrls: ["https://github.com/acme/widgets/pull/7"],
+    viewerPermission: "READ",
+  });
   assert.equal(read.budget, 1);
   assert.equal(read.writeAccess, false);
-  // Only this repository's pull requests are linked.
   assert.deepEqual(read.waiting, ["https://github.com/acme/widgets/pull/7"]);
 });
 

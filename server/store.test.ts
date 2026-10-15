@@ -713,7 +713,12 @@ function runWithV11Fields(): Run {
       checkedAt: "2026-10-15T00:04:00.000Z",
       door: { hasPullRequests: true, pullRequestCreationPolicy: "all", viewerPermission: "READ" },
       issue: { url: "https://github.com/acme/widgets/issues/7", state: "OPEN", labels: ["bug"] },
-      pacing: { openPrs: 0, mergedPrs: 0 },
+      pacing: {
+        openPrs: 1,
+        mergedPrs: 0,
+        waitingPrs: 1,
+        waitingUrls: ["https://github.com/acme/widgets/pull/2"],
+      },
       unknown: ["pacing: rate limited"],
     },
     guardOverrides: [
@@ -785,6 +790,15 @@ const olderRunSchemas = {
   reviewability: runReadSchema.omit({ reviewability: true }),
   // Before v1.1 the run schema did not read prFeedback at all.
   "prFeedback.prState, merged and reviewDecision": runReadSchema.omit({ prFeedback: true }),
+  "contributionFacts.pacing.waitingUrls": runReadSchema.extend({
+    contributionFacts: (() => {
+      const facts = runReadSchema.shape.contributionFacts.removeCatch().unwrap();
+      return facts
+        .extend({ pacing: facts.shape.pacing.unwrap().omit({ waitingUrls: true }).optional() })
+        .optional()
+        .catch(undefined);
+    })(),
+  }),
   "followUps[].restatements": runReadSchema.extend({
     followUps: z
       .array(runReadSchema.shape.followUps.unwrap().element.omit({ restatements: true }))

@@ -138,6 +138,11 @@ export interface PacingFacts {
   mergedPrs?: number;
   /** Open pull requests where a maintainer asked for changes more than 7 days ago. */
   waitingPrs?: number;
+  /**
+   * Links to those pull requests (up to 10 of them, on github.com in this
+   * repository), so "close the loop first" can point at each one.
+   */
+  waitingUrls?: string[];
   viewerPermission?: string;
 }
 

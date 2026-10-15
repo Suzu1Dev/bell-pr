@@ -119,6 +119,7 @@ export async function readPacing(
       openPrs,
       mergedPrs,
       waitingPrs,
+      ...(waiting.length ? { waitingUrls: waiting } : {}),
       ...(viewerPermission ? { viewerPermission } : {}),
     },
     budget: openPrBudget(mergedPrs),

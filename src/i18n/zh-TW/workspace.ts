@@ -377,6 +377,7 @@ const m: Translation<typeof en> = {
     overrideLabel: "為什麼仍要送出？會記錄在這次任務上，20 到 200 個字元",
     overrideCount: ({ count }) => `${count} 個字元，需 20 到 200 個`,
     closeLoop: ({ title }) => `先完成上一份：讀取「${title}」的回饋`,
+    waitingPr: ({ number }) => `先完成上一份：閱讀 PR #${number} 的審查意見（開啟 GitHub）`,
     confirmNote: `勾選只代表你知道這些項目還沒處理、願意照目前的說明送出。${product.name} 不會因此改動說明或替你勾選任何項目，這些確認也不會寫進 PR。想先修改，請按「返回編輯草稿」。`,
     back: "返回編輯草稿",
     finishDemo: "開啟範例 Draft PR",

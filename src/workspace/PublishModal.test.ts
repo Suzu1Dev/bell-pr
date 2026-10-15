@@ -12,6 +12,7 @@ import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Run } from "../types";
 import {
   groupChecks,
+  LoopRuns,
   maskPersonalText,
   PublishChecks,
   PublishIdentity,
@@ -516,6 +517,23 @@ test("a passed check wins over the setting being off in the dialog, and the Chec
     setCheckSettingsForTests(undefined);
   }
   assert.doesNotMatch(renderEn(element()), /Understanding check: off/);
+});
+
+test("close the loop first links each pull request a maintainer is waiting on", () => {
+  const waiting = [
+    "https://github.com/openfetch-sample/open-fetch/pull/2",
+    "https://github.com/openfetch-sample/open-fetch/pull/5",
+  ];
+  const html = renderEn(createElement(LoopRuns, { run, waiting, closeModal() {} }));
+  for (const [index, url] of waiting.entries())
+    assert.match(
+      html,
+      new RegExp(`<a class="run-notice-link" href="${url}" target="_blank" rel="noreferrer">Close the loop first: read the review on pull request #${[2, 5][index]} \\(opens GitHub\\)</a>`),
+    );
+  assertNoHan(html);
+  assert.match(renderZh(createElement(LoopRuns, { run, waiting, closeModal() {} })), /閱讀 PR #2 的審查意見/);
+  // Without the list, the person's other published runs are offered (read after the dialog opens).
+  assert.equal(renderEn(createElement(LoopRuns, { run, closeModal() {} })), "");
 });
 
 test("the sample's checks all pass, with its pace shown, in English", () => {
