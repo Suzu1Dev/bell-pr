@@ -240,8 +240,12 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
     if (error instanceof z.ZodError) {
       res.status(400).json({
         error: formatters(currentLocale()).list(
-          error.issues.map(
-            (issue) => `${issue.path.join(".")}: ${issue.message}`,
+          // An issue with the whole body (a wrong type, an unknown key of a
+          // strict object) has no path to name.
+          error.issues.map((issue) =>
+            issue.path.length
+              ? `${issue.path.join(".")}: ${issue.message}`
+              : issue.message,
           ),
           { type: "unit" },
         ),

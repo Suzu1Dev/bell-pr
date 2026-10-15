@@ -23,6 +23,7 @@ import {
   doorClosed,
   factsFrom,
   issueNumber,
+  knownDoor,
   rulesFrom,
   sampleRules,
   startReasons,
@@ -159,7 +160,7 @@ export default function BeforeYouStart({
   useEffect(() => () => report.current?.({ reasons: [] }), []);
 
   const chips: { key: string; tone: Tone; text: string; title?: string }[] = [];
-  const door = facts?.door ?? rules?.door;
+  const door = knownDoor(facts, rules);
   if (door && doorClosed(door)) chips.push({ key: "door", tone: "bad", text: t.doorClosed });
   if (rules?.findings.some((finding) => finding.kind === "ban" && finding.contribution))
     chips.push({ key: "ban", tone: "bad", text: t.ban });

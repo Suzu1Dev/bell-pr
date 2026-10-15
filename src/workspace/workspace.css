@@ -84,22 +84,20 @@
   font-weight: 400;
   line-height: 1.5;
   white-space: normal;
-  visibility: hidden;
-  opacity: 0;
-  transition: opacity 0.15s;
+  /* Hidden, it takes no room: a laid-out tooltip past a phone's edge made the page scroll sideways. */
+  display: none;
 }
 .title-row .unsandboxed-badge:hover .unsandboxed-help,
 .title-row .unsandboxed-badge:focus-within .unsandboxed-help {
-  visibility: visible;
-  opacity: 1;
+  display: block;
+  animation: fade-in 0.15s ease;
 }
 .title-row .unsandboxed-badge.opens-left .unsandboxed-help {
   right: 0;
   left: auto;
 }
 .title-row .unsandboxed-badge.is-dismissed .unsandboxed-help {
-  visibility: hidden;
-  opacity: 0;
+  display: none;
 }
 
 /* Notes under the heading: queued on Free, files cleaned up. */

@@ -157,7 +157,7 @@ export interface DemoContent {
   /**
    * The fictional project's CONTRIBUTING.md, the same file the
    * `demo-contributing` draft source holds. The demo classifies it with the
-   * real classifier (demoContributionRules in rules.ts).
+   * real classifier (sampleRules in src/mission/respect.ts).
    */
   contributingText?: string;
   /** The sample's GitHub facts: PRs open, issue #42 open and free, no PR of yours here yet. */

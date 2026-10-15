@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { locales } from "../../shared/i18n/locale";
 import { getDemo } from "../demo";
-import { demoContributionRules } from "../demo/rules";
+import { sampleRules as missionSampleRules } from "../mission/respect";
 import { assertNoHan } from "../test-utils/render";
 import {
   changesOf,
@@ -16,7 +16,7 @@ import {
 test("the sample's rules are the ones its own rules card shows", () => {
   for (const locale of locales) {
     const demo = getDemo(locale);
-    assert.deepEqual(sampleRules(demo), demoContributionRules(demo), locale);
+    assert.equal(sampleRules, missionSampleRules, "one implementation");
     assert.deepEqual(rulesOf(undefined, demo), sampleRules(demo));
   }
   // A real repository brings what BELL read from it.

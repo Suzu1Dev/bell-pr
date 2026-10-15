@@ -10,7 +10,8 @@
  * Any route may carry query flags after `?`, for example
  * `#/runs/demo-run/activity?demo=play&speed=4&locale=en`; `src/app/presentation.ts`
  * reads them. `navigate()` keeps the current flags unless the new route
- * names its own, so presentation mode survives clicks inside the app.
+ * names its own, so presentation mode survives clicks inside the app; the
+ * flags of one page's view (`pageFlags`) stay behind.
  *
  * A hash that is not a route (empty, or an unknown path) parses to null.
  * An in-page anchor such as `#overview-directions` is not an address change:
@@ -74,6 +75,14 @@ function decode(text: string): string {
 function encodeValue(text: string): string {
   return encodeURIComponent(text).replace(/%2F/gi, "/");
 }
+
+/**
+ * Query flags that belong to the page they were written for: the open file,
+ * the learning page's view (`view=practice`) and the workspace's check panel
+ * (`panel=check`). navigate() never carries them to the next address; a
+ * route that wants one names it.
+ */
+export const pageFlags: readonly string[] = ["file", "view", "panel"];
 
 /** `a=1&b=x%20y` as `{a: "1", b: "x y"}`; a repeated name keeps its last value. */
 export function parseQuery(query: string): Record<string, string> {
@@ -299,14 +308,17 @@ export function useHashRoute(): Route | null {
  * a history entry unless `replace` is set; several navigations in one task
  * (one click handler, one server answer) make a single entry, so Back
  * returns to where the reader was before it. A route without `flags` keeps
- * the current flags; pass `flags: {}` to drop them. Navigating to the
- * address that is already shown does nothing.
+ * the current flags except the page's own (`pageFlags`); pass `flags: {}`
+ * to drop them all. Navigating to the address that is already shown does
+ * nothing.
  */
 export function navigate(next: Route, options: { replace?: boolean } = {}) {
   const win = browserWindow();
   if (!win) return;
   sync();
-  const { file: _file, ...kept } = hashQuery(routeHash);
+  const kept = Object.fromEntries(
+    Object.entries(hashQuery(routeHash)).filter(([key]) => !pageFlags.includes(key)),
+  );
   const flags = next.flags ?? kept;
   const hash = serializeRoute({
     ...next,

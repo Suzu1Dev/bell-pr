@@ -7,6 +7,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { z } from "zod";
 import type { Locale } from "../shared/i18n/locale.js";
 import { reasoningEfforts, type ModelSettings } from "../shared/models.js";
 import { proFeatures, type ProFeature } from "../shared/plans.js";
@@ -253,6 +254,32 @@ test("AppError keeps its cause for callers but never sends it", async () => {
     });
   } finally {
     await close();
+  }
+});
+
+test("a request body that fails as a whole is named without a stray separator", async () => {
+  const strict = z.object({ name: z.string() }).strict();
+  const failure = (value: unknown) => {
+    const parsed = strict.safeParse(value);
+    assert.equal(parsed.success, false);
+    return parsed.error;
+  };
+  const cases: [z.ZodError, string][] = [
+    // An unknown key of a strict object and a body of the wrong type have no path.
+    [failure({ name: "x", extra: 1 }), "Unrecognized key(s) in object: 'extra'"],
+    [failure([]), "Expected object, received array"],
+    // A field keeps its path in front of the message.
+    [failure({ name: 1 }), "name: Expected string, received number"],
+  ];
+  for (const [error, message] of cases) {
+    const { call, close } = await startApp(failingRun(error));
+    try {
+      const response = await call("/api/runs/any", { headers: { "x-bell-locale": "en" } });
+      assert.equal(response.status, 400);
+      assert.deepEqual(response.body, { error: message });
+    } finally {
+      await close();
+    }
   }
 });
 

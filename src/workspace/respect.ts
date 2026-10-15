@@ -9,33 +9,15 @@ import {
   openPrBudget,
   pacingExempt,
   type ContributionFacts,
-  type ContributionRules,
 } from "../../shared/contribution";
 import { draftPreflight, type DraftCheck } from "../../shared/draft-checks";
 import type { Locale } from "../../shared/i18n/locale";
-import { classifyPolicy } from "../../shared/project-policy";
 import { reviewabilitySnapshot } from "../../shared/reviewability";
 import type { DemoContent } from "../demo";
+import { sampleRules } from "../mission/respect";
 import type { DiffFile, Repo, Run } from "../types";
 
-/**
- * The sample project's "Before you contribute" facts from its fictional
- * CONTRIBUTING.md, classified by the real classifier. The same as
- * demoContributionRules (src/demo/rules.ts), which this module cannot
- * import: everything under src/demo/ joins the demo chunk the first screen
- * loads, and the classifier would bring the Markdown parser into it.
- */
-export function sampleRules(demo: DemoContent): ContributionRules {
-  return {
-    checkedAt: demo.draftPreparation.context?.checkedAt ?? demo.run.createdAt,
-    ...(demo.contributionFacts?.door ? { door: { ...demo.contributionFacts.door } } : {}),
-    findings: classifyPolicy("CONTRIBUTING.md", demo.contributingText ?? ""),
-    filesRead: (demo.draftPreparation.context?.sources ?? []).flatMap((source) =>
-      source.path ? [source.path] : [],
-    ),
-    ...(demo.mergedSizes ? { mergedSizes: demo.mergedSizes.map((size) => ({ ...size })) } : {}),
-  };
-}
+export { sampleRules };
 
 /** The project's rules: the sample's, or what BELL read from the real repository. */
 export function rulesOf(repo: Repo | undefined, sample?: DemoContent) {

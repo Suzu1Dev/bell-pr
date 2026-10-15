@@ -6,7 +6,7 @@ import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { DraftGuidancePanel, whyShownTimes } from "./DraftGuidancePanel";
 import { draftPreflight, type DraftCheck } from "../../shared/draft-checks";
 import { reviewabilitySnapshot } from "../../shared/reviewability";
-import { demoContributionRules } from "../demo/rules";
+import { sampleRules as buildSampleRules } from "../mission/respect";
 import type { ContributionFacts, ContributionRules } from "../../shared/contribution";
 import {
   aiDisclosureLine,
@@ -484,7 +484,7 @@ test("a published run shows the guidance read-only", () => {
 
 // The live maintainer checklist.
 const sampleEn = getDemo("en");
-const sampleRules = demoContributionRules(sampleEn);
+const sampleRules = buildSampleRules(sampleEn);
 const sampleChanges = reviewabilitySnapshot({ files: sampleEn.files, mergedSizes: sampleEn.mergedSizes });
 const rowStatuses = (html: string) =>
   Object.fromEntries(

@@ -482,6 +482,9 @@ const workspace = {
     overrideLabel: "Why publish anyway? Saved on this run, 20 to 200 characters",
     overrideCount: ({ count }: { count: number }) => `${count} of 20 to 200 characters`,
     closeLoop: ({ title }: { title: string }) => `Close the loop first: read the feedback on “${title}”`,
+    /** A pull request a maintainer has waited on, which BELL has no run for: it opens on GitHub. */
+    waitingPr: ({ number }: { number: string }) =>
+      `Close the loop first: read the review on pull request #${number} (opens GitHub)`,
     confirmNote: `Ticking only means you know these items are still open and want to submit the description as it is. ${product.name} never changes the description or ticks anything for you, and these confirmations are not written into the PR. To change something first, choose “Back to the draft”.`,
     back: "Back to the draft",
     finishDemo: "Open the sample Draft PR",

@@ -153,7 +153,8 @@ test("the task dialog's check reads the issue and the pace, and validates the li
   assert.equal(checked.body.facts.issue.state, "OPEN");
   assert.deepEqual(checked.body.facts.issue.labels, ["good first issue"]);
   assert.deepEqual(checked.body.facts.pacing, { openPrs: 1, mergedPrs: 0, waitingPrs: 0, viewerPermission: "READ" });
-  assert.equal(checked.body.facts.door, undefined);
+  // No door is read here; only the person's login comes back with the facts.
+  assert.deepEqual(checked.body.facts.door, { login: "test-owner" });
   // Not stored on any run.
   assert.equal(f.run.contributionFacts, undefined);
   const noIssue = await f.call("GET", `/repos/${f.repo.id}/contribution-check`);

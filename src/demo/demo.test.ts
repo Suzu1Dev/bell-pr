@@ -22,7 +22,7 @@ import {
 import { assertNoHan } from "../test-utils/render";
 import type { DiffFile } from "../types";
 import { getSampleDiscoveryJob } from "./discovery";
-import { demoContributionRules } from "./rules";
+import { sampleRules } from "../mission/respect";
 import type { DemoFilePath } from "./shared";
 import {
   demoAnswer,
@@ -422,7 +422,7 @@ test("every demo file has a selfCheck question and alternatives in both locales"
 test("the sample CONTRIBUTING.md yields exactly the issue-first, understand and disclose rules", () => {
   for (const locale of locales) {
     const demo = getDemo(locale);
-    const rules = demoContributionRules(demo);
+    const rules = sampleRules(demo);
     assert.deepEqual(
       rules.findings.map((finding) => [finding.kind, finding.line, finding.quote]),
       [
@@ -530,7 +530,7 @@ test("the sample publishes with no block and no confirm: rules, facts, size and 
         sources: demo.draftPreparation.context?.sources,
         proposalBody: demo.draftPreparation.proposal?.body,
         changedPaths: demo.files.map((file) => file.path),
-        rules: demoContributionRules(demo),
+        rules: sampleRules(demo),
         facts: demo.contributionFacts,
         changes: reviewabilitySnapshot({
           files: demo.files,

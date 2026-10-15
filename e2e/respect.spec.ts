@@ -108,25 +108,15 @@ test.describe("the sample project", () => {
     await expect(rows).toHaveCount(8);
     await expect(rows.locator("strong")).toHaveText(Object.values(draft.guidance.checklist.rows));
     await expect(checklist.locator(".draft-checklist-why")).toHaveCount(8);
-    await settled(page);
-    // MERGE-STEP: once L2D mounts ReviewabilitySnapshot and passes the
-    // facts, the next test checks the green rows. Until then the rows
-    // know nothing and say so.
-    test.skip((await page.locator(".reviewability").count()) > 0, "L2D passes the facts: see the next test");
-    for (const row of await rows.all()) {
-      await expect(row).toHaveClass(/is-unknown/);
-      await expect(row.locator(".draft-checklist-status")).toHaveText(draft.guidance.checklist.status.unknown);
-    }
+    // Every row says where it stands; the next test checks which.
+    await expect(rows.locator(".draft-checklist-status")).toHaveCount(8);
   });
 
   test("MERGE-STEP: with L2D's props the snapshot shows and the respect rows are green", async ({ page }) => {
     await page.goto("/#/runs/demo-run/draft?locale=en");
     await expect(page.locator(".draft-checklist")).toBeVisible();
     await settled(page);
-    test.skip(
-      (await page.locator(".reviewability").count()) === 0,
-      "MERGE-STEP: L2D mounts ReviewabilitySnapshot and passes the checklist props",
-    );
+    await expect(page.locator(".reviewability")).toBeVisible();
     await expect(page.locator(".reviewability-band").first()).toHaveText(
       draft.reviewability.band({ band: draft.reviewability.bands.small }),
     );

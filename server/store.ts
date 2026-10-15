@@ -199,16 +199,19 @@ const attemptSchema = loose({
   }).optional(),
 });
 
+const pacingSchema = loose({
+  openPrs: count.optional(),
+  mergedPrs: count.optional(),
+  waitingPrs: count.optional(),
+  waitingUrls: list.max(10).optional(),
+  viewerPermission: text.optional(),
+});
+
 const contributionFactsSchema = loose({
   checkedAt: text,
   door: doorSchema.optional(),
   issue: loose({ url: text }).optional(),
-  pacing: loose({
-    openPrs: count.optional(),
-    mergedPrs: count.optional(),
-    waitingPrs: count.optional(),
-    viewerPermission: text.optional(),
-  }).optional(),
+  pacing: pacingSchema.optional(),
   unknown: list.optional(),
 });
 

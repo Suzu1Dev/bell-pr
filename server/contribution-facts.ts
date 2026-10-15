@@ -14,6 +14,7 @@
  */
 import {
   pacingExempt,
+  testReasonLimits,
   type ContributionFacts,
   type ContributionRules,
   type DoorFacts,
@@ -52,9 +53,6 @@ const now = () => new Date().toISOString();
 const runFactsTimeoutMs = 10_000;
 /** How long reading a project's door and account defaults may take in all. */
 const rulesTimeoutMs = 30_000;
-
-/** The limits of a weakened-test reason (DESIGN F9): a line a maintainer can check. */
-export const testReasonLimits = { words: 3, chars: 300 } as const;
 
 const reasonKeys = {
   "gh-missing": "ghMissing",
@@ -240,6 +238,10 @@ async function readFacts(
   // A door read only through REST still names the person, so their own
   // pull request or assignment on the issue never reads as someone else's.
   if (facts.door && !facts.door.login && login) facts.door.login = login;
+  // The task dialog reads no door, and a project imported from a local
+  // folder has none stored: the person's login alone still tells their own
+  // pull request, assignment or claim from someone else's.
+  else if (!facts.door && !options.door && login) facts.door = { login };
   if (unknown.length) {
     facts.unknown = unknown;
     log.info("contribution.facts_unknown", {

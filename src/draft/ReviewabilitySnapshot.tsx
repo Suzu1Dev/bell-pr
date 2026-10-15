@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import { Info, LoaderCircle, Ruler, Split } from "lucide-react";
+import { testReasonLimits } from "../../shared/contribution";
 import { draftProseWords } from "../../shared/draft-checks";
 import type {
   ReviewabilityBand,
@@ -38,9 +39,9 @@ export const bandTone: Record<ReviewabilityBand, "ok" | "warn" | "alert"> = {
 };
 
 /** A reason the publish check accepts: 3 words or more (CJK characters count one each). */
-export const reasonMinWords = 3;
+export const reasonMinWords = testReasonLimits.words;
 /** The longest reason the server stores (DESIGN §8, `reviewability.testReasons`). */
-export const reasonMaxChars = 300;
+export const reasonMaxChars = testReasonLimits.chars;
 
 export function validReason(text = "") {
   return draftProseWords(text.trim()) >= reasonMinWords;

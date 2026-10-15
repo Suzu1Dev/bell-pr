@@ -155,6 +155,20 @@ const respectIds = new Set<string>([
   "tests-weakened",
 ]);
 
+/**
+ * Whether the dialog says "Understanding check: off" for `run`: the run
+ * was approved without the check (its mark stays for good), or the person
+ * turned the check off and this run has not passed it. A passed check wins
+ * over the setting, as in the maintainer checklist and the review footer:
+ * approving it marked nothing.
+ */
+export function showsCheckOffLine(
+  run: Pick<Run, "understandingCheckOff" | "understanding">,
+  settingOff: boolean,
+) {
+  return run.understandingCheckOff === true || (settingOff && !run.understanding?.passedAt);
+}
+
 /** A typed reason that lifts "someone else's PR fixes this issue": 20 to 200 characters. */
 const validReason = (reason = "") => {
   const length = reason.trim().length;
@@ -288,7 +302,7 @@ export function PublishModal({
   useEffect(() => {
     if (formError && reads) void loadPublishChecks(run.id, run.approvedFingerprint);
   }, [formError, reads, loadPublishChecks, run.id, run.approvedFingerprint]);
-  const checkOff = settings.off || run.understandingCheckOff === true;
+  const checkOff = showsCheckOffLine(run, settings.off);
   // The sample's checks come from its fixtures, as the server's would.
   const sampleChecks = useMemo(
     () => sample && respect?.samplePublishChecks(sample, run, files, locale, settings.off),
@@ -411,7 +425,15 @@ export function PublishModal({
             setOverrides(value ? [{ id: "issue-has-pr", reason: value }] : [])
           }
           mask={mask}
-          loop={demo ? undefined : <LoopRuns run={run} closeModal={closeModal} />}
+          loop={
+            demo ? undefined : (
+              <LoopRuns
+                run={run}
+                waiting={(facts.facts ?? run.contributionFacts)?.pacing?.waitingUrls}
+                closeModal={closeModal}
+              />
+            )
+          }
         />
       )}
       {formError && (
@@ -574,12 +596,26 @@ export function PublishChecks({
   );
 }
 
+/** The number in a pull request link such as https://github.com/o/r/pull/12. */
+const pullNumber = (url: string) => /\/pull\/(\d+)/.exec(url)?.[1] ?? "?";
+
 /**
- * "Close the loop first": the person's other published runs of this
- * repository, whose feedback BELL reads (Free), shown when the pacing
- * check says a maintainer is waiting.
+ * "Close the loop first", shown when the pacing check says a maintainer is
+ * waiting: each pull request GitHub names as waiting on the person (up to
+ * 3), as its BELL run whose feedback BELL reads (Free) or else as a link to
+ * the review on GitHub; without that list, the person's other published
+ * runs of this repository.
  */
-function LoopRuns({ run, closeModal }: { run: Run; closeModal: () => void }) {
+export function LoopRuns({
+  run,
+  waiting,
+  closeModal,
+}: {
+  run: Run;
+  /** PacingFacts.waitingUrls: the pull requests a maintainer has waited on for more than 7 days. */
+  waiting?: readonly string[];
+  closeModal: () => void;
+}) {
   const t = useT("workspace").publish;
   const [others, setOthers] = useState<RunSummary[]>([]);
   useEffect(() => {
@@ -603,7 +639,7 @@ function LoopRuns({ run, closeModal }: { run: Run; closeModal: () => void }) {
       cancelled = true;
     };
   }, [run.id, run.repoId]);
-  return others.slice(0, 3).map((other) => (
+  const open = (other: RunSummary) => (
     <button
       key={other.id}
       type="button"
@@ -615,5 +651,16 @@ function LoopRuns({ run, closeModal }: { run: Run; closeModal: () => void }) {
     >
       {t.closeLoop({ title: other.title })}
     </button>
-  ));
+  );
+  if (!waiting?.length) return others.slice(0, 3).map(open);
+  return waiting.slice(0, 3).map((url) => {
+    const own = others.find((other) => other.prUrl === url);
+    return own ? (
+      open(own)
+    ) : (
+      <a key={url} className="run-notice-link" href={url} target="_blank" rel="noreferrer">
+        {t.waitingPr({ number: pullNumber(url) })}
+      </a>
+    );
+  });
 }
