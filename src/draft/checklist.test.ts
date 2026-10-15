@@ -168,3 +168,24 @@ test("rules not found name the files read, and never say there are none", () => 
   const choice = rows({ ...full, rules: { ...rules, findings: [] }, checks: [] }).find((row) => row.id === "disclosure")!;
   assert.deepEqual(choice.lines, ["The files BELL PR read don't ask for a disclosure; adding one is your choice."]);
 });
+
+test("the issue-link and brevity text checks show on the issue and words rows, with their rules", () => {
+  const ruled = [
+    {
+      id: "contributing",
+      kind: "contributing" as const,
+      label: "CONTRIBUTING.md",
+      content: "Every PR must reference an existing issue.\n\nKeep descriptions short and in your own words.",
+    },
+  ];
+  const proposal = "## Summary\n\nAdds retries.";
+  const checks = draftPreflight({ body: proposal, proposalBody: proposal, sources: ruled }, "en");
+  assert.deepEqual(checks.map((check) => check.id), ["issue", "brevity"]);
+  assert.ok(checks.every(checklistCheck));
+  const byId = Object.fromEntries(rows({ ...full, checks }).map((row) => [row.id, row]));
+  assert.equal(byId.issue.status, "confirm");
+  assert.deepEqual(byId.issue.sources, ['CONTRIBUTING.md: "Every PR must reference an existing issue."']);
+  assert.equal(byId.words.status, "confirm");
+  assert.match(byId.words.lines[0], /suggested text, unrevised/);
+  assert.deepEqual(byId.words.sources, ['CONTRIBUTING.md: "Keep descriptions short and in your own words."']);
+});

@@ -602,3 +602,15 @@ test("the zh-TW checklist uses its own words", () => {
   assert.match(html, /無法確認/);
   assert.match(html, /維護者為什麼在意|維護者把規範寫下來/);
 });
+
+test("an unlinked description under an issue rule asks to confirm in the issue row, quoting the rule once", () => {
+  const checks = draftPreflight({ body: "Adds retries.", sources: english.context!.sources }, "en");
+  assert.deepEqual(checks.map((check) => check.id), ["issue"]);
+  const html = renderEnglish(english, { checks });
+  assert.equal(rowStatuses(html).issue, "confirm");
+  assert.match(checklistRow(html, "issue"), /does not reference one\./);
+  assert.equal(html.match(/Every PR must reference an existing issue\./g)?.length, 2);
+  // Once in the row's sources, once in the source document's own text.
+  assert.doesNotMatch(checklistRow(html, "issue"), /draft-guidance-issue-rule/);
+  assert.match(html, /The checks on the text are clear\. The maintainer checklist below shows the rest\./);
+});

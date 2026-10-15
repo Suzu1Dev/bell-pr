@@ -83,8 +83,8 @@ interface Props {
    * The publish preflight for the saved draft (draftPreflight plus the
    * server's GET /api/runs/:id/preflight). Not shown when absent. The
    * respect checks among them (computed with the same rules, facts and
-   * changes as the props below) set the maintainer checklist's rows; the
-   * list shows the others.
+   * changes as the props below) and the issue-link and brevity checks set
+   * the maintainer checklist's rows; the list shows the others.
    */
   checks?: DraftCheck[];
   /** The run is published: the guidance stays for reference, without actions. */
@@ -213,8 +213,8 @@ export function DraftGuidancePanel({
       ? withAiDisclosure(proposal.body)
       : withoutAiDisclosure(proposal.body)
     : "";
-  // The respect checks go to the maintainer checklist; the list keeps the
-  // checks on the text.
+  // The maintainer checklist shows the respect checks; the list keeps the
+  // other checks on the text.
   const textChecks = checks?.filter((check) => !checklistCheck(check)) ?? [];
   const blocking = textChecks.filter((check) => check.kind === "block");
   const confirming = textChecks.filter((check) => check.kind === "confirm");
@@ -238,7 +238,15 @@ export function DraftGuidancePanel({
         )
       : undefined);
   const rows = checklistRows(
-    { checks: respect, rules, facts, changes, understanding, issueUrl, disclosureRule: disclosureRequirement },
+    {
+      checks: respect,
+      rules,
+      facts,
+      changes,
+      understanding,
+      issueUrl,
+      disclosureRule: disclosureRequirement,
+    },
     t.checklist,
     fmt,
     draftMessages.reviewability.bands,
@@ -751,7 +759,10 @@ export function DraftGuidancePanel({
                       ))}
                     </ul>
                   )}
-                  {row.id === "issue" && issueRequirement && (
+                  {/* The issue-link check, when it fires, quotes the same rule. */}
+                  {row.id === "issue" &&
+                    issueRequirement &&
+                    !respect?.some((check) => check.id === "issue") && (
                     <p className="draft-guidance-issue-rule" role="note">
                       <strong>{t.checklist.rule}</strong>
                       {t.checklist.ruleQuote({ quote: issueRequirement.quote })}

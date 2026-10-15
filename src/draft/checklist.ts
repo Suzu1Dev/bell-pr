@@ -39,8 +39,15 @@ export interface ChecklistRow {
   sources: string[];
 }
 
-/** Which row shows each respect check (shared/contribution.ts respectChecks). */
+/**
+ * Which row shows each check: the respect checks (shared/contribution.ts
+ * respectChecks), and the two text checks that quote the project's rules
+ * about the same things, `issue` (the description links no issue) and
+ * `brevity` (short descriptions in the contributor's own words).
+ */
 const rowOfCheck: Partial<Record<DraftCheck["id"], ChecklistRowId>> = {
+  issue: "issue",
+  brevity: "words",
   "ai-ban": "rules",
   "project-rules": "rules",
   "pr-closed": "door",
@@ -56,10 +63,13 @@ const rowOfCheck: Partial<Record<DraftCheck["id"], ChecklistRowId>> = {
   "ai-disclosure": "disclosure",
 };
 
+/** The text checks above: their details are all sources, with no "why" first. */
+const textChecks = new Set<DraftCheck["id"]>(["issue", "brevity"]);
+
 /**
- * The checks the checklist shows instead of the preflight list: every
- * respect check, `facts-unknown` included (its parts go to the door,
- * issue and pacing rows).
+ * The checks the checklist shows instead of the preflight list: the ones
+ * above and `facts-unknown` (its parts go to the door, issue and pacing
+ * rows).
  */
 export function checklistCheck(check: DraftCheck) {
   return check.id in rowOfCheck || check.id === "facts-unknown";
@@ -129,7 +139,9 @@ export function checklistRows(
       ],
       // A respect check's first detail says why maintainers care; the row
       // has its own sentence, so only the sources stay.
-      sources: fired.flatMap((check) => check.details.slice(1)),
+      sources: fired.flatMap((check) =>
+        textChecks.has(check.id) ? check.details : check.details.slice(1),
+      ),
     };
   };
   const quote = (finding: ContributionRules["findings"][number]) =>
