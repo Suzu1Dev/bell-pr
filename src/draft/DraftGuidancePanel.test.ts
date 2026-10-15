@@ -3,8 +3,11 @@ import test from "node:test";
 import { createElement } from "react";
 import { getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
-import { DraftGuidancePanel } from "./DraftGuidancePanel";
+import { DraftGuidancePanel, whyShownTimes } from "./DraftGuidancePanel";
 import { draftPreflight, type DraftCheck } from "../../shared/draft-checks";
+import { reviewabilitySnapshot } from "../../shared/reviewability";
+import { demoContributionRules } from "../demo/rules";
+import type { ContributionFacts, ContributionRules } from "../../shared/contribution";
 import {
   aiDisclosureLine,
   withAiDisclosure,
@@ -25,6 +28,10 @@ type PanelOptions = {
   onAiDisclosureChange?: (on: boolean) => void;
   checks?: DraftCheck[];
   readOnly?: boolean;
+  rules?: ContributionRules;
+  facts?: ContributionFacts;
+  changes?: ReturnType<typeof reviewabilitySnapshot>;
+  understanding?: { required: boolean; passed: boolean; off: boolean };
 };
 
 const panel = (
@@ -40,6 +47,10 @@ const panel = (
   });
 const render = (preparation: DraftPreparation, applied?: boolean) =>
   renderZh(panel(preparation, { applied }));
+/** One row of the maintainer checklist. */
+const checklistRow = (html: string, id: string) =>
+  new RegExp(`<li class="draft-checklist-row is-\\w+" data-row="${id}">[\\s\\S]*?</div></li>`).exec(html)?.[0] ?? "";
+const issueRow = (html: string) => checklistRow(html, "issue");
 
 test("an applied proposal says the editor holds its unrevised text and cannot be applied again", () => {
   const pending = render(demoDraftPreparation);
@@ -50,7 +61,7 @@ test("an applied proposal says the editor holds its unrevised text and cannot be
   assert.match(applied, /<button[^>]*disabled=""[^>]*>[\s\S]*?已套用/);
 });
 
-test("a project's issue rule is quoted next to the issue reminders with its source", () => {
+test("a project's issue rule is quoted in the checklist's issue row with its source", () => {
   const preparation: DraftPreparation = {
     ...demoDraftPreparation,
     context: {
@@ -76,6 +87,10 @@ test("a project's issue rule is quoted next to the issue reminders with its sour
   assert.match(html, /這個專案的規範/);
   assert.match(html, /All PRs must reference an existing issue\./);
   assert.match(html, /來源：CONTRIBUTING\.md/);
+  assert.match(
+    issueRow(html),
+    /<p class="draft-guidance-issue-rule" role="note"><strong>這個專案的規範：<\/strong>「All PRs must reference an existing issue\.」<small>來源：CONTRIBUTING\.md。/,
+  );
   assert.match(html, /自動檢查/);
   // The demo sources carry no issue rule, so no quote is invented.
   assert.doesNotMatch(render(demoDraftPreparation), /這個專案的規範/);
@@ -193,10 +208,11 @@ test("the English panel renders every state, label and source kind without Han",
   ])
     assert.match(html, new RegExp(kind), kind);
   assert.match(html, /aria-label="CONTRIBUTING.md, original text"/);
-  assert.match(html, /Before you publish, say hello to the community/);
-  assert.match(html, /<strong>This project&#x27;s rule: <\/strong>“Every PR must reference an existing issue\.”/);
-  assert.match(html, /Source: CONTRIBUTING.md\. Without a linked issue/);
-  assert.match(html, /Open the issue you linked/);
+  assert.match(html, /<h3 id="draft-checklist-[^"]+"><svg[\s\S]*?<\/svg> The maintainer checklist<\/h3>/);
+  // The issue rule and the linked issue moved from the unsaved reminders to the issue row.
+  assert.match(issueRow(html), /<strong>This project&#x27;s rule: <\/strong>“Every PR must reference an existing issue\.”/);
+  assert.match(issueRow(html), /Source: CONTRIBUTING.md\. Without a linked issue/);
+  assert.match(issueRow(html), /<a href="https:\/\/github\.com\/acme\/widgets\/issues\/7" target="_blank" rel="noopener noreferrer">Open the issue you linked/);
   assert.match(
     renderEn(panel({ ...english, proposal: { ...english.proposal!, rules: [] } })),
     /Sections follow the template “<strong>PR template<\/strong>”\./,
@@ -456,10 +472,133 @@ test("a published run shows the guidance read-only", () => {
   assert.doesNotMatch(html, /Apply the suggested draft|draft-guidance-apply/);
   assert.match(switchOf(html), /checked=""/);
   assert.match(switchOf(html), /disabled=""/);
-  assert.equal(html.match(/<input id="draft-etiquette-[^"]+" type="checkbox" disabled=""/g)?.length, 2);
+  // The checklist is facts, not boxes to tick: nothing in it can be changed.
+  assert.equal(html.match(/<li class="draft-checklist-row/g)?.length, 8);
+  assert.doesNotMatch(html, /<input(?![^>]*role="switch")[^>]*type="checkbox"/);
   // The suggestion, its sources and the saved draft's checks stay readable.
   assert.match(preview(html), new RegExp(line));
   assert.match(html, /Source documents/);
   assert.match(html, /Checks before publishing/);
   assert.doesNotMatch(renderEnglish(undefined, { readOnly: true }), /draft-guidance-empty/);
+});
+
+// The live maintainer checklist.
+const sampleEn = getDemo("en");
+const sampleRules = demoContributionRules(sampleEn);
+const sampleChanges = reviewabilitySnapshot({ files: sampleEn.files, mergedSizes: sampleEn.mergedSizes });
+const rowStatuses = (html: string) =>
+  Object.fromEntries(
+    [...html.matchAll(/<li class="draft-checklist-row is-(\w+)" data-row="(\w+)">/g)].map((match) => [match[2], match[1]]),
+  );
+
+test("without facts the checklist rows say Couldn't check, never OK", () => {
+  const html = renderEnglish(english, { issueUrl: "https://github.com/acme/widgets/issues/7" });
+  assert.deepEqual(rowStatuses(html), {
+    rules: "unknown",
+    door: "unknown",
+    issue: "unknown",
+    pacing: "unknown",
+    words: "unknown",
+    reviewability: "unknown",
+    disclosure: "unknown",
+    understanding: "unknown",
+  });
+  assert.equal(html.match(/<span class="draft-checklist-status"><svg[^>]*lucide-circle-help[\s\S]*?<\/svg>Couldn&#x27;t check<\/span>/g)?.length, 8);
+  assert.match(checklistRow(html, "rules"), /<strong>The project&#x27;s rules<\/strong><p>BELL PR hasn&#x27;t read this project&#x27;s rules yet\.<\/p>/);
+  // Each row says why maintainers care, in one whole sentence.
+  assert.match(checklistRow(html, "pacing"), /<p class="draft-checklist-why">Every open pull request waits on a maintainer&#x27;s time/);
+  assert.equal(html.match(/<p class="draft-checklist-why">/g)?.length, 8);
+});
+
+test("with the sample's rules, facts and changes every row is green", () => {
+  const html = renderEnglish(sampleEn.draftPreparation, {
+    demo: true,
+    draftBody: sampleEn.run.draft.body,
+    issueUrl: sampleEn.run.contributionSettings?.issueUrl,
+    rules: sampleRules,
+    facts: sampleEn.contributionFacts,
+    changes: sampleChanges,
+    understanding: { required: true, passed: true, off: false },
+  });
+  assert.deepEqual(new Set(Object.values(rowStatuses(html))), new Set(["ok"]));
+  assert.match(checklistRow(html, "door"), /<p>Pull requests: open to you\.<\/p><ul class="draft-checklist-sources"><li>GitHub pull_request_creation_policy: all<\/li><\/ul>/);
+  assert.match(checklistRow(html, "pacing"), /Your open PRs here: 0 of 1/);
+  assert.match(checklistRow(html, "understanding"), /You explained the change back\./);
+  assert.match(html, /Rules read [^<]+2026/);
+  assert.match(html, /GitHub read [^<]+2026/);
+  // The editor's text without the disclosure the rules ask for blocks that row at once.
+  const withoutLine = renderEnglish(sampleEn.draftPreparation, {
+    demo: true,
+    draftBody: sampleEn.run.draft.body.replace(aiDisclosureLine, ""),
+    issueUrl: sampleEn.run.contributionSettings?.issueUrl,
+    rules: sampleRules,
+    facts: sampleEn.contributionFacts,
+    changes: sampleChanges,
+  });
+  assert.equal(rowStatuses(withoutLine).disclosure, "block");
+  assert.match(checklistRow(withoutLine, "disclosure"), /The project requires a disclosure, and publishing waits for it\./);
+});
+
+test("the respect checks move from the preflight list to the checklist rows", () => {
+  const facts = {
+    ...sampleEn.contributionFacts!,
+    issue: { ...sampleEn.contributionFacts!.issue!, state: "CLOSED", stateReason: "COMPLETED" },
+  };
+  const checks = draftPreflight(
+    { body: `${sampleEn.run.draft.body}\n\nToken: ${token}`, rules: sampleRules, facts, changes: sampleChanges, issueUrl: "#sample-issue-42" },
+    "en",
+  );
+  assert.deepEqual(checks.map((check) => check.id), ["secret", "issue-closed"]);
+  const html = renderEnglish(english, { checks, rules: sampleRules, facts, changes: sampleChanges, issueUrl: "#sample-issue-42" });
+  const list = /<section class="draft-guidance-preflight"[\s\S]*?<\/section>/.exec(html)?.[0] ?? "";
+  assert.match(list, /<li class="is-block">[\s\S]*Blocks publishing/);
+  assert.doesNotMatch(list, /linked issue is closed/);
+  assert.equal(rowStatuses(html).issue, "block");
+  assert.match(checklistRow(html, "issue"), /The linked issue is closed\. Link an open issue/);
+  assert.match(checklistRow(html, "issue"), /GitHub state: CLOSED \(COMPLETED\)/);
+  // Only respect checks left: the list says the text is clear and points below.
+  const respectOnly = renderEnglish(english, { checks: checks.slice(1), rules: sampleRules, facts, issueUrl: "#sample-issue-42" });
+  assert.match(respectOnly, /The checks on the text are clear\. The maintainer checklist below shows the rest\./);
+  assert.doesNotMatch(respectOnly, /No check needs your attention/);
+});
+
+test("a why sentence folds away after it has been shown 3 times", () => {
+  const storage = new Map<string, string>([
+    ["bellpr-checklist-why-seen", JSON.stringify({ rules: 3, door: 2 })],
+  ]);
+  const globals = globalThis as { localStorage?: unknown };
+  const saved = globals.localStorage;
+  globals.localStorage = {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => storage.set(key, value),
+  };
+  try {
+    const html = renderEnglish(english);
+    assert.match(
+      checklistRow(html, "rules"),
+      /<details class="draft-checklist-why"><summary>Why maintainers care<\/summary><p>Maintainers write their rules down/,
+    );
+    assert.match(checklistRow(html, "door"), /<p class="draft-checklist-why">Maintainers decide who may open pull requests/);
+  } finally {
+    globals.localStorage = saved;
+  }
+  // Blocked storage keeps every sentence open.
+  globals.localStorage = {
+    getItem() {
+      throw new Error("blocked");
+    },
+  };
+  try {
+    assert.equal(renderEnglish(english).match(/<p class="draft-checklist-why">/g)?.length, 8);
+  } finally {
+    globals.localStorage = saved;
+  }
+  assert.equal(whyShownTimes, 3);
+});
+
+test("the zh-TW checklist uses its own words", () => {
+  const html = renderZh(panel(english));
+  assert.match(html, /維護者檢查清單/);
+  assert.match(html, /無法確認/);
+  assert.match(html, /維護者為什麼在意|維護者把規範寫下來/);
 });

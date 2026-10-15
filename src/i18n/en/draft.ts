@@ -118,23 +118,101 @@ const draft = {
       open: "Open the source document",
       textLabel: ({ label }: { label: string }) => `${label}, original text`,
     },
-    etiquette: {
-      title: "Before you publish, say hello to the community",
+    /**
+     * The live maintainer checklist: one row per thing maintainers check,
+     * with its state, its source and why maintainers care. It replaces
+     * the unsaved etiquette checkboxes.
+     */
+    checklist: {
+      title: "The maintainer checklist",
       intro:
-        "Open-source communities care about these two things because maintainers' time is limited: commenting first keeps two people from fixing the same problem, and lets the maintainers say “this direction works” or “we don't take this kind of change” before you put in the work. These checkboxes are reminders for you only; they are not saved and do not block publishing.",
-      reminders: {
-        claimed: {
-          text: "Did you comment on the issue to say you are working on it?",
-          why: "It avoids duplicate work and lets the maintainers know someone has picked it up.",
-        },
-        discussed: {
-          text: "Does the project ask you to open an issue for discussion first?",
-          why: "Some projects want to agree on the direction, and on whether AI-assisted work is welcome, before they take a PR. Asking first can save both sides from reviewing a PR that will not be accepted.",
-        },
+        "What maintainers check before they spend time on a pull request, read from the project's rules, GitHub and this change. Publishing runs the same checks on every plan.",
+      rulesRead: ({ date }: { date: string }) => `Rules read ${date}`,
+      factsRead: ({ date }: { date: string }) => `GitHub read ${date}`,
+      status: {
+        ok: "OK",
+        confirm: "Asks to confirm",
+        block: "Blocks publishing",
+        unknown: "Couldn't check",
       },
+      rows: {
+        rules: "The project's rules",
+        door: "Pull requests open to you",
+        issue: "The linked issue",
+        pacing: "Your pace here",
+        words: "Your own words",
+        reviewability: "A reviewable change",
+        disclosure: "Disclosing AI help",
+        understanding: "Understanding check",
+      },
+      /** One sentence per row; it folds away after the person has seen it 3 times. */
+      why: {
+        rules:
+          "Maintainers write their rules down so that they do not have to repeat them in every review.",
+        door: "Maintainers decide who may open pull requests, and GitHub refuses one from anybody else.",
+        issue:
+          "Maintainers coordinate work on the issue, so a fix for a closed or taken issue repeats work or goes against a decision.",
+        pacing:
+          "Every open pull request waits on a maintainer's time, so answering the reviews you have comes before opening more.",
+        words:
+          "A description in your own words shows maintainers what you understood, which suggested text cannot.",
+        reviewability:
+          "Small, focused changes with honest tests get reviewed sooner, because a maintainer can hold the whole change in mind.",
+        disclosure:
+          "Maintainers who ask for a disclosure use it to decide how closely to review a change.",
+        understanding:
+          "Maintainers expect contributors to answer questions about their own change during review.",
+      },
+      whySummary: "Why maintainers care",
+      rulesFound: ({ count }: { count: number }) =>
+        fmt.plural(count) === "one"
+          ? "1 rule quoted from the project's files; nothing in it stops this change."
+          : `${fmt.number(count)} rules quoted from the project's files; nothing in them stops this change.`,
+      rulesNotFound: ({ files }: { files: number }) =>
+        `Not found in the ${fmt.plural(files) === "one" ? "1 file" : `${fmt.number(files)} files`} ${product.name} read. Some projects publish their rules on a website or wiki; check before you publish.`,
+      doorOpen: "Pull requests: open to you.",
+      doorClosed: "This repository doesn't take pull requests from you, so publishing is blocked.",
+      noIssue: "No issue is linked to this run.",
+      issueClosed: "The linked issue is closed, so publishing is blocked.",
+      issueOpen: ({ number }: { number?: number }) =>
+        number === undefined
+          ? "The linked issue is open, and nobody else is on it."
+          : `Issue #${number} is open, and nobody else is on it.`,
+      pacing: ({ open, budget }: { open: number; budget: number }) =>
+        `Your open PRs here: ${fmt.number(open)} of ${fmt.number(budget)} (${product.name} default, the same on every plan).`,
+      pacingExempt: "You can write to this repository, so publishing isn't paced here.",
+      wordsOk: `The description is no longer ${product.name}'s suggested wording.`,
+      reviewable: ({ band, lines, files }: { band: string; lines: number; files: number }) =>
+        `${band} by ${product.name}'s default bands: ${fmt.number(lines)} changed lines in ${fmt.plural(files) === "one" ? "1 file" : `${fmt.number(files)} files`}.`,
+      disclosureRequired:
+        "The project asks for a disclosure, and the description has one.",
+      disclosureWaits:
+        "The project requires a disclosure, and publishing waits for it.",
+      disclosureChoice: `The files ${product.name} read don't ask for a disclosure; adding one is your choice.`,
+      understandingPassed: "You explained the change back.",
+      understandingRequired: "Explain the change back before you approve it.",
+      understandingOff:
+        "Turned off in Settings. Runs approved without the check are marked.",
+      notChecked: "Not checked yet.",
+      rulesUnknown: `${product.name} hasn't read this project's rules yet.`,
+      factsUnknown: "Not read from GitHub for this run yet; the publish dialog reads it.",
+      draftUnknown: "The saved draft hasn't been checked yet.",
+      changesUnknown: "The change hasn't been measured yet.",
+      couldntCheckAny: "Couldn't check this on GitHub.",
+      couldntCheck: ({ reason }: { reason: string }) => `Couldn't check: ${reason}`,
+      /** The same form as the publish checks' quotes (shared/i18n/draft-checks). */
+      quote: ({ path, line, quote }: { path: string; line: number; quote: string }) =>
+        `${path}:${line}: "${quote}"`,
+      githubField: ({ field, value }: { field: string; value: string }) =>
+        `GitHub ${field}: ${value}`,
+      maintainerSaid: ({ quote, date }: { quote: string; date: string }) =>
+        `A maintainer said: “${quote}” (${date})`,
       /** Bold label in front of the quoted rule; it ends with its own separator. */
       rule: "This project's rule: ",
-      quote: ({ quote }: { quote: string }) => `“${quote}”`,
+      ruleQuote: ({ quote }: { quote: string }) => `“${quote}”`,
+      /** A rule quoted from a draft source, after the source's label. */
+      ruleFrom: ({ label, quote }: { label: string; quote: string }) =>
+        `${label}: “${quote}”`,
       ruleSource: ({ source }: { source: string }) =>
         `Source: ${source}. Without a linked issue, you are asked to confirm once more before publishing.`,
       openIssue: "Open the issue you linked",
@@ -180,6 +258,9 @@ const draft = {
       block: "Blocks publishing",
       confirm: "Confirm before publishing",
       clear: "No check needs your attention in the saved draft.",
+      /** The text checks are clear, and the maintainer checklist holds the rest. */
+      textClear:
+        "The checks on the text are clear. The maintainer checklist below shows the rest.",
     },
   },
   /**

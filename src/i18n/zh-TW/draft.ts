@@ -94,22 +94,75 @@ const m: Translation<typeof en> = {
       open: "開啟來源文件",
       textLabel: ({ label }) => `${label}原文`,
     },
-    etiquette: {
-      title: "送出前，先和社群打個招呼",
-      intro:
-        "開源社群重視這兩件事，是因為 maintainer 的時間有限：事先留言能避免兩個人改同一個問題，也讓對方在你投入前就能說「這個方向可以」或「我們不收這類變更」。這裡的勾選只是給自己的提醒，不會儲存，也不會阻擋送出。",
-      reminders: {
-        claimed: {
-          text: "是否已在 issue 留言表明要處理？",
-          why: "避免和別人做重複的工作，也讓 maintainer 知道有人接手。",
-        },
-        discussed: {
-          text: "專案是否要求先開 issue 討論？",
-          why: "有些專案希望先確認方向與 AI 協作是否可接受，再收 PR；先問一句，可以省下雙方審閱一份不會被接受的 PR 的時間。",
-        },
+    checklist: {
+      title: "維護者檢查清單",
+      intro: "維護者花時間看一個 Pull Request 之前會確認的事，依專案規範、GitHub 與這次的變更即時整理。所有方案發布時都會執行相同的檢查。",
+      rulesRead: ({ date }) => `規範讀取於 ${date}`,
+      factsRead: ({ date }) => `GitHub 讀取於 ${date}`,
+      status: {
+        ok: "沒問題",
+        confirm: "需要確認",
+        block: "阻擋發布",
+        unknown: "無法確認",
       },
+      rows: {
+        rules: "專案規範",
+        door: "Pull Request 是否對你開放",
+        issue: "連結的 issue",
+        pacing: "你在這裡的節奏",
+        words: "用自己的話",
+        reviewability: "容易審查的變更",
+        disclosure: "揭露 AI 協助",
+        understanding: "理解檢查",
+      },
+      why: {
+        rules: "維護者把規範寫下來，就不必在每次審查時重複說明。",
+        door: "誰能開 Pull Request 由維護者決定，其他人開的 GitHub 會直接拒絕。",
+        issue: "維護者在 issue 上協調工作，替已關閉或已有人做的 issue 送修正，會重複別人的工作或違背已做的決定。",
+        pacing: "每個開著的 Pull Request 都在等維護者的時間，先回應手上的審查，再開新的。",
+        words: "用自己的話寫的說明，能讓維護者看出你理解了什麼；建議文字做不到這點。",
+        reviewability: "小而聚焦、測試誠實的變更比較快得到審查，因為維護者能一次看懂整份變更。",
+        disclosure: "要求揭露的維護者，會依此決定審查這份變更要多仔細。",
+        understanding: "維護者期待貢獻者在審查時，能回答關於自己變更的問題。",
+      },
+      whySummary: "維護者為什麼在意",
+      rulesFound: ({ count }) =>
+        `從專案檔案中引用了 ${fmt.number(count)} 條規範，沒有一條會擋下這次的變更。`,
+      rulesNotFound: ({ files }) =>
+        `在 ${product.name} 讀過的 ${fmt.number(files)} 個檔案中沒有找到。有些專案把規範放在網站或 wiki 上，發布前請自行確認。`,
+      doorOpen: "Pull Request：對你開放。",
+      doorClosed: "這個 repository 不接受你開的 Pull Request，所以會阻擋發布。",
+      noIssue: "這次的工作沒有連結 issue。",
+      issueClosed: "連結的 issue 已關閉，所以會阻擋發布。",
+      issueOpen: ({ number }) =>
+        number === undefined
+          ? "連結的 issue 仍開著，也沒有別人在做。"
+          : `Issue #${number} 仍開著，也沒有別人在做。`,
+      pacing: ({ open, budget }) =>
+        `你在這裡開著的 PR：${fmt.number(open)} / ${fmt.number(budget)}（${product.name} 預設值，所有方案都一樣）。`,
+      pacingExempt: "你可以寫入這個 repository，所以在這裡發布不受節奏限制。",
+      wordsOk: `說明已經不是 ${product.name} 建議的文字。`,
+      reviewable: ({ band, lines, files }) =>
+        `依 ${product.name} 的預設分級為「${band}」：${fmt.number(files)} 個檔案共 ${fmt.number(lines)} 行變更。`,
+      disclosureRequired: "專案要求揭露，而說明裡已經寫了。",
+      disclosureWaits: "專案要求揭露，寫上之前發布會先等著。",
+      disclosureChoice: `${product.name} 讀過的檔案沒有要求揭露；要不要加上由你決定。`,
+      understandingPassed: "你已經用自己的話講過一遍。",
+      understandingRequired: "核准前，請先用自己的話把這次的變更講一遍。",
+      understandingOff: "已在設定中關閉。沒有經過理解檢查就核准的工作會被標示。",
+      notChecked: "尚未確認。",
+      rulesUnknown: `${product.name} 還沒讀取專案規範。`,
+      factsUnknown: "這次的工作還沒讀取 GitHub；發布對話框會讀取。",
+      draftUnknown: "已儲存的草稿還沒檢查。",
+      changesUnknown: "還沒計算這次的變更規模。",
+      couldntCheckAny: "無法在 GitHub 上確認這一項。",
+      couldntCheck: ({ reason }) => `無法確認：${reason}`,
+      quote: ({ path, line, quote }) => `${path}:${line}：「${quote}」`,
+      githubField: ({ field, value }) => `GitHub ${field}：${value}`,
+      maintainerSaid: ({ quote, date }) => `維護者說：「${quote}」（${date}）`,
       rule: "這個專案的規範：",
-      quote: ({ quote }) => `「${quote}」`,
+      ruleQuote: ({ quote }) => `「${quote}」`,
+      ruleFrom: ({ label, quote }) => `${label}：「${quote}」`,
       ruleSource: ({ source }) =>
         `來源：${source}。沒有連結 issue 時，送出前會請你再確認一次。`,
       openIssue: "開啟你填寫的 issue",
@@ -140,6 +193,7 @@ const m: Translation<typeof en> = {
       block: "阻擋發布",
       confirm: "發布前需確認",
       clear: "已儲存的草稿沒有需要處理的檢查項目。",
+      textClear: "文字的檢查都沒問題，其餘項目請看下方的維護者檢查清單。",
     },
   },
   yourWords: {
