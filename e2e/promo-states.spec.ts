@@ -15,6 +15,11 @@
 // (gitignored), so two runs of the suite can be compared too. The five
 // main states are also opened in zh-TW, for the optional zh-TW cut.
 //
+// Below them, what the promo's sample cannot show: the same loop on a
+// seeded real run against a stand-in GitHub (e2e/helpers/real-project.ts),
+// from the rules card to the published Draft PR and what follows it, and
+// the understanding check's off path.
+//
 //   BELLPR_E2E_PORT=<port> npx playwright test e2e/promo-states.spec.ts
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -72,8 +77,6 @@ import {
 import type { LaunchedServer } from "./start-server.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-/** The Draft PR the fake gh opens first. */
-const prUrl = `${repoUrl}/pull/1`;
 const outputRoot = path.join(root, "e2e", "output", "promo-states");
 
 /** Routes a Pro plan gates (requirePro); the demo never calls them. */
@@ -540,6 +543,9 @@ test("v-check-off is filmable: the modal and the run's badge", async ({ browser 
     await server.stop();
   }
 });
+
+/** The Draft PR the stand-in gh opens first. */
+const prUrl = `${repoUrl}/pull/1`;
 
 // The v1.1 journey across the workstreams, on a seeded real run with a
 // fake gh (e2e/helpers/real-project.ts): what L2B reads from GitHub, shown
