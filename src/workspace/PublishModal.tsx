@@ -155,6 +155,20 @@ const respectIds = new Set<string>([
   "tests-weakened",
 ]);
 
+/**
+ * Whether the dialog says "Understanding check: off" for `run`: the run
+ * was approved without the check (its mark stays for good), or the person
+ * turned the check off and this run has not passed it. A passed check wins
+ * over the setting, as in the maintainer checklist and the review footer:
+ * approving it marked nothing.
+ */
+export function showsCheckOffLine(
+  run: Pick<Run, "understandingCheckOff" | "understanding">,
+  settingOff: boolean,
+) {
+  return run.understandingCheckOff === true || (settingOff && !run.understanding?.passedAt);
+}
+
 /** A typed reason that lifts "someone else's PR fixes this issue": 20 to 200 characters. */
 const validReason = (reason = "") => {
   const length = reason.trim().length;
@@ -288,7 +302,7 @@ export function PublishModal({
   useEffect(() => {
     if (formError && reads) void loadPublishChecks(run.id, run.approvedFingerprint);
   }, [formError, reads, loadPublishChecks, run.id, run.approvedFingerprint]);
-  const checkOff = settings.off || run.understandingCheckOff === true;
+  const checkOff = showsCheckOffLine(run, settings.off);
   // The sample's checks come from its fixtures, as the server's would.
   const sampleChecks = useMemo(
     () => sample && respect?.samplePublishChecks(sample, run, files, locale, settings.off),

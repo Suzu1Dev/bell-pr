@@ -4,6 +4,7 @@ import { createElement } from "react";
 import * as draftChecks from "../../shared/draft-checks";
 import type { DraftCheck } from "../../shared/draft-checks";
 import type { DoctorCheck, DoctorReport } from "../../shared/doctor";
+import { setCheckSettingsForTests } from "../app/hooks/useUnderstanding";
 import { maskPath } from "../app/presentation";
 import type { DoctorState } from "../setup/useDoctor";
 import { getDemo } from "../demo";
@@ -16,6 +17,7 @@ import {
   PublishIdentity,
   PublishModal,
   publishIdentity,
+  showsCheckOffLine,
 } from "./PublishModal";
 import { pacingOf, samplePublishChecks } from "./respect";
 
@@ -497,6 +499,23 @@ test("the facts line: reading, couldn't check, the pace here, and the check off"
   assert.match(renderEn(checksElement({ pacing: "exempt" })), /not paced, since you can write to this repository/);
   assert.match(renderEn(checksElement({ checkOff: true })), /Understanding check: off/);
   assert.match(renderZh(checksElement({ checkOff: true, pacing: { open: 1, budget: 2, first: false } })), /你在這裡開著的 PR：1 \/ 2.*理解檢查：已關閉/);
+});
+
+test("a passed check wins over the setting being off in the dialog, and the Check off mark stays", () => {
+  const passed = { passedAt: "2026-10-15T09:00:00.000Z", passedFingerprint: "c1" };
+  assert.equal(showsCheckOffLine({ understanding: passed }, true), false);
+  assert.equal(showsCheckOffLine({}, true), true);
+  assert.equal(showsCheckOffLine({}, false), false);
+  // Approved without the check: marked for good, whatever happened since.
+  assert.equal(showsCheckOffLine({ understandingCheckOff: true, understanding: passed }, false), true);
+  setCheckSettingsForTests({ settings: { skipUnderstandingCheck: true }, lockedBy: {} });
+  try {
+    assert.doesNotMatch(renderEn(element({ run: { ...run, understanding: passed } })), /Understanding check: off/);
+    assert.match(renderEn(element()), /Understanding check: off/);
+  } finally {
+    setCheckSettingsForTests(undefined);
+  }
+  assert.doesNotMatch(renderEn(element()), /Understanding check: off/);
 });
 
 test("the sample's checks all pass, with its pace shown, in English", () => {
