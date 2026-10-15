@@ -818,12 +818,18 @@
   background: var(--color-surface);
   border-radius: 0 6px 6px 0;
 }
-/* Try first (QuizAttempt): an answer before the reference, then a
-   self-grade. The card keeps its hue: violet for the quiz. */
+/* Try first (QuizAttempt, RoadChoice): an answer before the reference,
+   then a self-grade; a guess before the alternative, then a choice. Each
+   card keeps its own hue: violet for the quiz, blue for the road. */
 .tf-card {
   --tf-ink: var(--color-violet);
   --tf-line: var(--color-violet-border);
   --tf-tint: var(--color-violet-bg);
+}
+.explain-card-alternatives.tf-card {
+  --tf-ink: var(--color-info);
+  --tf-line: var(--color-info-border);
+  --tf-tint: var(--color-info-bg);
 }
 .tf-badge {
   flex-shrink: 0;
