@@ -319,4 +319,27 @@ test("a description discloses AI help with BELL's line, a tool trailer or a visi
   assert.ok(!hasAiDisclosure("Fixes the cap.\n\n<!-- I used Copilot for this. -->"));
   assert.ok(!hasAiDisclosure("Fixes the cap.\n\n```\nAssisted-by: Copilot\n```"));
   assert.ok(!hasAiDisclosure("Fixes the cap."));
+  // Tool names count as the product writes them.
+  assert.ok(!hasAiDisclosure("Use the cursor keys to move between results."));
+});
+
+test("a disclosure in the person's own words or a filled-in template field counts", () => {
+  for (const body of [
+    "AI disclosure: Claude Code wrote the first draft; I reviewed and edited every line.",
+    "This PR was written with help from an AI coding agent (Codex CLI).",
+    "Claude helped me find the bug; I wrote the fix.",
+    "AI-assisted: yes",
+    "- **AI usage disclosure:** Copilot",
+  ])
+    assert.ok(hasAiDisclosure(`Fixes the cap.\n\n${body}`), body);
+  // A template that asks in a comment, modelled on a real one, filled in or not.
+  const template = (answer: string) =>
+    `## Summary\n\nFixes the cap.\n\nAI usage disclosure: ${answer}<!-- mention: YES / NO - if yes, describe how AI was used -->\n`;
+  assert.ok(hasAiDisclosure(template("YES - Codex CLI wrote the patch; I reviewed and tested every line. ")));
+  assert.ok(hasAiDisclosure(template("YES ")));
+  assert.ok(!hasAiDisclosure(template("")));
+  assert.ok(!hasAiDisclosure(template("NO ")));
+  assert.ok(!hasAiDisclosure(template("NO - I did not use Copilot. ")));
+  assert.ok(!hasAiDisclosure("Fixes the cap.\n\nUse of AI: none"));
+  assert.ok(!hasAiDisclosure("This helps the enemy AI agents find paths."));
 });

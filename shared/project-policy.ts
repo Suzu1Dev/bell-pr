@@ -593,7 +593,6 @@ export function disclosureRule(
 /** A trailer naming the tool that helped, as kernel, LLVM and ASF policies ask. */
 const toolTrailer = /^\s*(?:Assisted|Generated)-by:\s*\S/im;
 const disclosureTool = [
-  ...assistanceTerms,
   // In the person's own description, a model or tool named with a verb of
   // help is a disclosure, whatever else it is next to.
   writtenToolName,
@@ -603,26 +602,50 @@ const disclosureTool = [
     flags,
   ),
 ];
-const disclosureVerb = /\b(?:us(?:e|ed|es|ing)|assist\w*|generat\w*)\b/i;
+const disclosureVerb =
+  /\b(?:us(?:e|ed|es|ing)|assist\w*|generat\w*|wr(?:ote|itten)|drafted|helped|help\s+(?:from|of))\b/i;
+const namesAssistance = (text: string) =>
+  assistanceSpans(text).length > 0 || disclosureTool.some((term) => term.test(text));
+
+/**
+ * A disclosure field of a PR template, "AI usage disclosure: …",
+ * "AI-assisted: …", "AI used: …" or "Use of AI: …", with what follows it.
+ */
+const disclosureField =
+  /^\s*(?:[-*+]\s+)?(?:\*\*|__)?(?:(?:AI|LLM)[- ]?(?:(?:usage|use|assistance|tools?)\s+disclosure|disclosure|usage|use|used|assistance|assisted)|use\s+of\s+(?:AI|LLMs?))(?:\*\*|__)?\s*:\s*(?:\*\*|__)?\s*(.*)$/i;
+/** "NO", "none" or "n/a" in a disclosure field. */
+const deniedField = /^(?:no|none|n\/?a|nothing)\b/i;
 
 /**
  * Whether the PR text says that AI helped: BELL's own disclosure line, an
  * `Assisted-by:` or `Generated-by:` trailer in the description or the
- * commit message, or a visible sentence of the description that names an
- * AI tool together with used, assisted or generated. Text in comments or
- * code does not count: maintainers would not see it.
+ * commit message, a template's disclosure field filled in with yes or a
+ * tool ("AI usage disclosure: YES - Codex CLI wrote the patch"), or a
+ * visible sentence of the description that names an AI tool together with
+ * used, assisted, generated, wrote, drafted or helped. A field answered
+ * "NO" is not a disclosure, and text in comments or code does not count:
+ * maintainers would not see it.
  */
 export function hasAiDisclosure(body: string, commitMessage = "") {
   if (body.includes(aiDisclosureLine)) return true;
   if (toolTrailer.test(commitMessage)) return true;
   const lines = markdownProse(body);
   if (lines.some((line) => toolTrailer.test(line))) return true;
-  const visible = lines.join(" ");
+  const fields = lines.map((line) => disclosureField.exec(line)?.[1].trim());
+  if (
+    fields.some(
+      (value) =>
+        !!value &&
+        !deniedField.test(value) &&
+        (/^(?:yes|y)\b/i.test(value) || namesAssistance(value)),
+    )
+  )
+    return true;
+  const visible = lines
+    .filter((_, index) => fields[index] === undefined || !deniedField.test(fields[index]!))
+    .join(" ");
   return splitSentences(visible).some(({ start, end }) => {
     const sentence = visible.slice(start, end);
-    return (
-      disclosureVerb.test(sentence) &&
-      disclosureTool.some((term) => term.test(sentence))
-    );
+    return disclosureVerb.test(sentence) && namesAssistance(sentence);
   });
 }
