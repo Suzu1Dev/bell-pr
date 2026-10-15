@@ -610,23 +610,37 @@ function normalized(text: string) {
     .trim();
 }
 
+/** Scripts written without spaces, where `normalized` makes each character a word. */
+const unspaced = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+
+/**
+ * How long a stretch of a reference must be to count as copied: shorter
+ * ones are what a person who remembers the change writes anyway ("the
+ * HttpError is thrown right away", or six Chinese characters for "is
+ * thrown at once"). One CJK character is one word, so its bar is higher.
+ */
+const copyMinWords = { spaced: 8, unspaced: 12 } as const;
+
 /**
  * A near-copy of an AI-written text: after normalising case, whitespace
  * and punctuation, the text appears word for word in a reference (texts of
- * 5 or more words, so a short answer that happens to share the wording is
- * not called a copy), or a reference of 8 or more words appears word for
- * word in the text. A CJK character counts as one word, so a copied part
- * of a Chinese sentence is found as well.
+ * 8 or more words, 12 or more CJK characters, so a short answer that
+ * recalls the reference's wording is not called a copy), or a reference of
+ * 8 or more words appears word for word in the text. A CJK character
+ * counts as one word, so a copied part of a Chinese sentence is found as
+ * well.
  */
 export function looksCopied(text: string, references: readonly string[]) {
   const own = normalized(text);
   if (!own) return false;
-  const ownWords = words(own);
+  const long =
+    words(own) >=
+    (unspaced.test(own) ? copyMinWords.unspaced : copyMinWords.spaced);
   return references.some((reference) => {
     const other = normalized(reference);
     if (!other) return false;
     return (
-      (ownWords >= 5 && ` ${other} `.includes(` ${own} `)) ||
+      (long && ` ${other} `.includes(` ${own} `)) ||
       (words(other) >= 8 && ` ${own} `.includes(` ${other} `))
     );
   });

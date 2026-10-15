@@ -232,9 +232,9 @@ test("a credited attempt fills its file's slot at the current fingerprint only",
     assert.ok(!creditedAttempt({ fingerprint: "f", quiz: variant }, { fingerprint: "f" }), JSON.stringify(variant));
   assert.ok(
     !creditedAttempt(
-      { fingerprint: "f", quiz: { ...quiz, answer: "Four seconds at most, really." } },
+      { fingerprint: "f", quiz: { ...quiz, answer: "The ceiling is four seconds at most, really." } },
       { fingerprint: "f" },
-      "four seconds at most really",
+      "the ceiling is four seconds at most really",
     ),
   );
 });
@@ -330,7 +330,7 @@ test("the status names every missing part and passes once the rule holds", () =>
   older.items![0].fingerprint = "src/a.ts@0";
   assert.deepEqual(status(older).missing, [{ part: "answer", itemId: "selfCheck:src/a.ts" }]);
   const copied = structuredClone(record);
-  copied.items![0].answer = "The ceiling is four seconds at most!";
+  copied.items![0].answer = "The ceiling is four seconds at most on that retry!";
   assert.deepEqual(status(copied).missing, [{ part: "answer", itemId: "selfCheck:src/a.ts" }]);
 });
 
@@ -358,11 +358,18 @@ test("a summary needs 15 words, CJK characters counting one each, and must not c
 
 test("copy detection ignores case, whitespace and punctuation, in both directions", () => {
   const reference = "The ceiling is min(30, 1 × 2²) = 4 seconds. Full jitter picks a random wait.";
-  assert.ok(looksCopied("full JITTER picks a random   wait", [reference]));
+  assert.ok(looksCopied("4 seconds. Full JITTER picks a random   wait", [reference]));
   // A reference of 8 or more words inside a longer text.
   assert.ok(looksCopied(`I think ${reference} That is my answer.`, [reference]));
-  // A short answer that shares a few words is not a copy.
+  // A short answer that shares a few words, or recalls a short stretch of
+  // the wording, is not a copy.
   assert.ok(!looksCopied("a random wait", [reference]));
+  assert.ok(!looksCopied("full jitter picks a random wait", [reference]));
+  assert.ok(
+    !looksCopied("the HttpError is thrown right away", [
+      "No. shouldRetry returns true only for 408, 429, 500, 502, 503 and 504. 404 is not on the list, so the HttpError is thrown right away.",
+    ]),
+  );
   assert.ok(!looksCopied("The wait is random and capped by maxDelay.", [reference]));
   // Words must match whole: "wait" is not "waiting".
   assert.ok(!looksCopied("jitter picks a random waiting time", [reference]));
@@ -376,11 +383,22 @@ test("copy detection finds a copied part of a Chinese sentence, one character pe
   const reference = "每次重試前的等待上限會加倍，實際等待時間是零到上限之間的隨機值。";
   // A copy that starts and ends inside a clause, without any punctuation.
   assert.ok(looksCopied("等待時間是零到上限之間的隨機值", [reference]));
-  assert.ok(looksCopied("重試前的等待上限會加倍", [reference]));
+  assert.ok(looksCopied("每次重試前的等待上限會加倍", [reference]));
   // A Chinese reference of 8 or more characters inside a longer answer.
   assert.ok(looksCopied(`我認為${reference}大概是這樣`, [reference]));
-  // Shorter than 5 characters, or not in the reference: not a copy.
+  // Shorter than 12 characters, or not in the reference: not a copy.
   assert.ok(!looksCopied("上限加倍", [reference]));
+  assert.ok(!looksCopied("重試前的等待上限會加倍", [reference]));
+  assert.ok(
+    !looksCopied("會直接被拋出", [
+      "不會。shouldRetry 只對 408、429、500、502、503、504 回傳 true，404 不在清單中，所以 HttpError 會直接被拋出。",
+    ]),
+  );
+  assert.ok(
+    !looksCopied("不會重試，直接失敗", [
+      "最多 4 個：第一次請求加上 3 次重試。408、429、500、502、503、504 以外的狀態碼（例如 404）不會重試，直接失敗。",
+    ]),
+  );
   assert.ok(!looksCopied("等待會越來越長，而且有隨機性", [reference]));
   // As a summary, a copied clause of 15 characters does not pass.
   const files = [file("src/a.ts", 2)];
