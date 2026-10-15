@@ -286,6 +286,83 @@ test("on Free the coach debrief opens the upgrade dialog without a request, and 
   );
 });
 
+test("on the trial the debrief is asked for with the project only, and the new debrief replaces the sample", async ({ browser }) => {
+  // POST /api/learning/debrief is stubbed: writing a real one needs an
+  // agent. The server side (402 on Free, stored on the trial) is tested
+  // with the learning-loop routes.
+  const written = {
+    at: "2026-10-12T09:00:00.000Z",
+    locale: "en",
+    runIds: ["e2e-debrief-run"],
+    recurring: { dimension: "naming", quotes: ["Please call it retryDelay, as the rest of the client does."] },
+    drills: [
+      {
+        context: "How the client names its wait setting.",
+        optionA: "delay",
+        optionB: "retryDelay",
+        question: "Which fits this project, and why?",
+        reveal: "retryDelay matches the client's other retry options; delay is shorter but vague.",
+      },
+    ],
+    nextStep: "Before your next pull request here, read how the client names its options.",
+  };
+  await onServer(
+    browser,
+    { seed: (dataDir) => writeFile(path.join(dataDir, "state.json"), publishedState(dataDir)) },
+    async (page) => {
+      const trial = await page.request.post("/api/license/trial", { data: {} });
+      expect(trial.status()).toBe(200);
+      const posts: unknown[] = [];
+      let practiceReads = 0;
+      let answer: () => void = () => undefined;
+      const answered = new Promise<void>((resolve) => {
+        answer = resolve;
+      });
+      page.on("request", (request) => {
+        if (new URL(request.url()).pathname === "/api/learning/practice") practiceReads++;
+      });
+      await page.route("**/api/learning/debrief", async (route) => {
+        posts.push(route.request().postDataJSON());
+        await answered;
+        await route.fulfill({ json: { debrief: written } });
+      });
+      await page.goto("/#/learning?view=debrief&locale=en");
+      const view = page.locator("section.debrief");
+      const request = view.getByRole("button", { name: learning.debrief.request, exact: true });
+      await expect(view.getByLabel(learning.debrief.project)).toHaveValue(debriefRepo.id);
+      // Nothing is locked on the trial; the sample shows while the project has no debrief.
+      await expect(view.locator("section.debrief-sample")).toBeVisible();
+      await expect(request.locator(".pro-badge")).toHaveCount(0);
+      await expect(view).not.toContainText(learning.debrief.locked);
+
+      const readsBefore = practiceReads;
+      await request.click();
+      await expect(view.getByRole("status").filter({ hasText: learning.debrief.working })).toBeVisible();
+      await expect(request).toBeDisabled();
+      answer();
+      await expect(view.getByRole("status").filter({ hasText: learning.debrief.ready })).toBeVisible();
+      expect(posts).toEqual([{ repoId: debriefRepo.id }]);
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+
+      const card = view.locator(".debrief-list .debrief-card");
+      await expect(card).toHaveCount(1);
+      await expect(card).toContainText(learning.debrief.recurring({ dimension: learning.dimensions.naming }));
+      await expect(card.locator("blockquote")).toHaveText(written.recurring.quotes[0]);
+      await expect(card).toContainText(written.nextStep);
+      // The trade-off waits until the person asks for it.
+      const tradeOff = card.locator(".debrief-trade-off");
+      await expect(tradeOff).toBeHidden();
+      await card.getByRole("button", { name: learning.debrief.showTradeOff }).click();
+      await expect(tradeOff).toBeVisible();
+      await expect(tradeOff).toContainText(written.drills[0].reveal);
+      await expect(view.locator("section.debrief-sample")).toHaveCount(0);
+      // Its drills join the practice deck, so the sidebar counts again.
+      await expect.poll(() => practiceReads).toBeGreaterThan(readsBefore);
+      expect(await axeProblems(page)).toEqual([]);
+    },
+  );
+});
+
 test("the notes show each contribution's own explanation and mark runs approved without the check", async ({ browser }) => {
   const summary =
     "The retry waited the same time after every failure. Now each wait doubles up to a cap, so a busy server can recover before the next attempt.";
