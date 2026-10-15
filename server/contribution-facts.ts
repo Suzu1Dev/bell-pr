@@ -12,11 +12,12 @@
  * and live inside publish(). `GET /api/runs/:id/preflight` uses what is
  * stored and never calls GitHub.
  */
-import type {
-  ContributionFacts,
-  ContributionRules,
-  DoorFacts,
-  MergedPrSize,
+import {
+  pacingExempt,
+  type ContributionFacts,
+  type ContributionRules,
+  type DoorFacts,
+  type MergedPrSize,
 } from "../shared/contribution.js";
 import { draftProseWords } from "../shared/draft-checks.js";
 import { weakenedTests } from "../shared/reviewability.js";
@@ -228,8 +229,7 @@ async function readFacts(
       unknown.push(unknownEntry("issue", unknownReason(linked.reason)));
   }
   const permission = facts.door?.viewerPermission;
-  if (["WRITE", "MAINTAIN", "ADMIN"].includes(permission ?? ""))
-    facts.pacing = { viewerPermission: permission };
+  if (pacingExempt(permission)) facts.pacing = { viewerPermission: permission };
   else
     try {
       login ??= await readViewerLogin(read);
@@ -237,6 +237,9 @@ async function readFacts(
     } catch (error) {
       unknown.push(unknownEntry("pacing", unknownReason(error)));
     }
+  // A door read only through REST still names the person, so their own
+  // pull request or assignment on the issue never reads as someone else's.
+  if (facts.door && !facts.door.login && login) facts.door.login = login;
   if (unknown.length) {
     facts.unknown = unknown;
     log.info("contribution.facts_unknown", {

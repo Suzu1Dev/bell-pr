@@ -297,6 +297,31 @@ test("the linked issue and the person's pace come from the live facts", async ()
   }
 });
 
+test("when only the door's GraphQL read fails, the person's own closing pull request is still theirs", async () => {
+  const f = await githubProject();
+  f.run.contributionSettings = withIssue;
+  try {
+    await f.github.setFacts({
+      fail: { doorGraph: "exit" },
+      issues: {
+        5: issueNode({
+          assignees: { nodes: [{ login: "test-owner" }] },
+          closedByPullRequestsReferences: {
+            nodes: [{ number: 8, state: "OPEN", isDraft: true, merged: false, url: "https://github.com/test-owner/example/pull/8", author: { login: "test-owner" } }],
+          },
+        }),
+      },
+    });
+    const facts = (await withLocale("en", () => refreshRunFacts({ store: f.store } as never, f.run)))!;
+    assert.equal(facts.door?.hasPullRequests, true);
+    assert.equal(facts.door?.login, "test-owner");
+    assert.deepEqual(facts.unknown, ["door: GitHub answered with an error."]);
+    assert.deepEqual(ids(facts), ["facts-unknown:confirm"]);
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test("a GitHub failure gives facts-unknown with its reason, never a pass", async () => {
   const f = await githubProject();
   f.run.contributionSettings = withIssue;
