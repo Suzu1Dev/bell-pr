@@ -3845,5 +3845,12 @@ button {
   }
   .sync-panel-actions {
     justify-content: flex-start;
+    max-width: 100%;
+  }
+  /* On the narrowest phones a long label wraps instead of running past the panel. */
+  .sync-panel-actions .button {
+    max-width: 100%;
+    white-space: normal;
+    text-align: left;
   }
 }
