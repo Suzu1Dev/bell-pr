@@ -441,8 +441,12 @@ export default function UnderstandingCheck({
     questions: items.length,
     misses: items.filter((item) => ["partly", "missed"].includes(effectiveGrade(item) ?? "")).length,
   };
-  // The question count follows the changed lines of what this check asks about.
-  const lines = changedLines(checkScope(demoCheckFiles(files), record));
+  // The question count follows the changed lines of what this check asks
+  // about, without the project's generated files, as the server counts them.
+  const lines = changedLines(
+    checkScope(demoCheckFiles(files), record),
+    repo?.contributionRules?.generated,
+  );
 
   return (
     <div className="understanding-check">
