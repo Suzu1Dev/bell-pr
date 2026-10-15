@@ -1,14 +1,25 @@
-// The policy classifier on verbatim excerpts of real projects' policies
-// (server/fixtures/policy/real, sources in its SOURCES.md): what each one
-// yields, quoted verbatim, and which of them block an agent-written change.
-// No network.
+// The project's own rules for the "Before you contribute" card: the policy
+// files read locally at the clone's commit, one hop of links from
+// CONTRIBUTING, the generated-file patterns, and the classifier on short
+// fixtures written for the test (server/fixtures/policy/<case>) and on
+// verbatim excerpts of real projects' policies
+// (server/fixtures/policy/real, sources in its SOURCES.md). No network.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
+import { cp, mkdtemp, readFile, readdir, rename, rm } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import type { PolicyFinding } from "../shared/contribution.js";
 import { classifyPolicy, hasAiDisclosure } from "../shared/project-policy.js";
 import { draftPreflight } from "../shared/draft-checks.js";
+import {
+  generatedPatterns,
+  linkedPaths,
+  policyFile,
+  policyFindings,
+  readLocalPolicy,
+} from "./contribution-policy.js";
+import { git } from "./process.js";
 
 const fixtures = path.join(import.meta.dirname, "fixtures", "policy");
 
@@ -137,4 +148,177 @@ test("a description that says no AI was used is not an AI disclosure", () => {
     "I used Claude Code to draft it; I did not change the tests.",
   ])
     assert.ok(hasAiDisclosure(`Fixes the cap.\n\n${body}`), body);
+});
+
+/** A Git repository holding the files of one fixture case, `dot-<name>` as `.<name>`. */
+async function caseRepository(name: string) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-policy-"));
+  await cp(path.join(fixtures, name), directory, { recursive: true });
+  for (const entry of await readdir(directory, { recursive: true }))
+    if (path.basename(entry).startsWith("dot-"))
+      await rename(
+        path.join(directory, entry),
+        path.join(directory, path.dirname(entry), `.${path.basename(entry).slice(4)}`),
+      );
+  await git(directory, ["init", "-q", "-b", "main"]);
+  await git(directory, ["config", "user.name", "BELL Test"]);
+  await git(directory, ["config", "user.email", "test@example.invalid"]);
+  await git(directory, ["add", "-A"]);
+  await git(directory, ["commit", "-qm", "fixture"]);
+  return {
+    directory,
+    cleanup: () => rm(directory, { recursive: true, force: true }),
+  };
+}
+
+test("each policy fixture yields exactly its findings, read locally at the commit", async () => {
+  const expected: Record<string, (readonly [string, string, number, boolean])[]> = {
+    // A root AI_POLICY.md that refuses AI-generated code; the README is not a rules file.
+    "ai-policy-ban": [["ban", "AI_POLICY.md", 5, true]],
+    // CONTRIBUTE.md, reached by name and by the link from CONTRIBUTING, and
+    // a linked page that no name rule would find.
+    "contribute-link": [
+      ["disclose", "docs/CONTRIBUTE.md", 3, true],
+      ["understand", "docs/handbook/reviews.md", 3, false],
+    ],
+    // Rules inside a pull request template's HTML comment.
+    "template-comment": [
+      ["own-words", ".github/pull_request_template.md", 4, false],
+      ["disclose", ".github/pull_request_template.md", 5, false],
+      ["disclose", ".github/pull_request_template.md", 8, false],
+    ],
+    // Game AI and AI features are not about AI help: no ban.
+    "game-ai": [],
+    "ai-features": [],
+    // A note to agents in a comment.
+    "agent-note": [["agent", "CONTRIBUTING.md", 4, true]],
+  };
+  for (const [name, findings] of Object.entries(expected)) {
+    const repo = await caseRepository(name);
+    try {
+      const local = await readLocalPolicy(repo.directory);
+      assert.equal(local.baseSha, (await git(repo.directory, ["rev-parse", "HEAD"])).stdout.trim());
+      const found = policyFindings(local.documents);
+      assert.deepEqual(found.map(brief), findings, name);
+      for (const document of local.documents)
+        assertVerbatim(
+          document.content,
+          found.filter((finding) => finding.path === document.path),
+        );
+    } finally {
+      await repo.cleanup();
+    }
+  }
+});
+
+test("the rules card reads the files it can name, one hop of links, and the generated patterns", async () => {
+  const linked = await caseRepository("contribute-link");
+  try {
+    const local = await readLocalPolicy(linked.directory, { repository: "acme/widgets" });
+    assert.deepEqual(
+      local.documents.map((document) => [document.path, document.kind]),
+      [
+        [".github/CONTRIBUTING.md", "contributing"],
+        ["docs/CONTRIBUTE.md", "contributing"],
+        ["docs/handbook/reviews.md", "documentation"],
+      ],
+    );
+    // GitHub's own fallback stands in only for a missing CONTRIBUTING or template.
+    assert.deepEqual([...local.kinds], ["contributing"]);
+    assert.deepEqual(local.generated, []);
+  } finally {
+    await linked.cleanup();
+  }
+  const banned = await caseRepository("ai-policy-ban");
+  try {
+    const local = await readLocalPolicy(banned.directory);
+    assert.deepEqual(local.documents.map((document) => document.path), ["AI_POLICY.md"]);
+    // An AI policy is guidance, but GitHub does not fall back for it.
+    assert.deepEqual([...local.kinds], []);
+    assert.deepEqual(local.generated, ["dist/**", "*.pb.go"]);
+  } finally {
+    await banned.cleanup();
+  }
+});
+
+test("links from CONTRIBUTING stay inside the repository and lead to text documents", () => {
+  const content = [
+    "See [CONTRIBUTE](/docs/CONTRIBUTE.md#ai) and [style](./style.md \"Style\").",
+    "Also [review](../docs/review.rst), [up](../../escape.md), [site](https://example.org/x.md),",
+    "[mail](mailto:team@example.invalid), [secrets](../.env.md), [image](../logo.png),",
+    "[ours](https://github.com/acme/widgets/blob/main/docs/ai-policy.md) and [theirs](https://github.com/other/repo/blob/main/x.md).",
+    "",
+    "[ref]: docs/reference.md",
+    "Read `the guide <docs/guide.rst>`_ too.",
+  ].join("\n");
+  assert.deepEqual(linkedPaths(".github/CONTRIBUTING.md", content, "acme/widgets"), [
+    "docs/CONTRIBUTE.md",
+    ".github/style.md",
+    "docs/review.rst",
+    "docs/ai-policy.md",
+    ".github/docs/reference.md",
+    ".github/docs/guide.rst",
+  ]);
+});
+
+test("generated patterns come from linguist-generated attributes only", () => {
+  assert.deepEqual(
+    generatedPatterns(
+      "# comment\n*.min.js linguist-generated\nproto/** linguist-generated=true\nsrc/** -linguist-generated\nlib/** linguist-generated=false\nvendor/** linguist-vendored\n\n",
+    ),
+    ["*.min.js", "proto/**"],
+  );
+  const many = Array.from({ length: 40 }, (_, index) => `gen${index}/** linguist-generated`).join("\n");
+  assert.equal(generatedPatterns(many).length, 30);
+});
+
+test("the rules card reads policy files by name and depth, never the README", () => {
+  for (const [file, kind] of [
+    ["AI_POLICY.md", "contributing"],
+    ["AI-POLICY.md", "contributing"],
+    [".github/AI_USAGE.md", "contributing"],
+    ["llvm/docs/AIToolPolicy.md", "contributing"],
+    ["docs/LLM_POLICY.md", "contributing"],
+    ["docs/CONTRIBUTE.md", "contributing"],
+    ["doc/devel/contribute.rst", "contributing"],
+    ["CONTRIBUTING.md", "contributing"],
+    ["CODE_OF_CONDUCT.md", "documentation"],
+    [".github/copilot-instructions.md", "documentation"],
+    ["AGENTS.md", "documentation"],
+    [".github/CLAUDE.md", "documentation"],
+    ["Documentation/process/generated-content.rst", "documentation"],
+    ["Documentation/process/coding-assistants.rst", "documentation"],
+    ["docs/devel/code-provenance.rst", "documentation"],
+    ["docs/ai-usage-guide.md", "contributing"],
+    ["doc/policies/ai.md", "documentation"],
+    [".github/PULL_REQUEST_TEMPLATE/feature.md", "template"],
+  ] as const)
+    assert.equal(policyFile(file), kind, file);
+  for (const file of [
+    "README.md",
+    "docs/README.md",
+    "src/AI_POLICY.md",
+    "third_party/lib/docs/AI_POLICY.md",
+    "docs/openai-integration.md",
+    "docs/a/b/c/ai-notes.md",
+    "docs/agents.md",
+    "docs/ai-logo.png",
+    "packages/app/CONTRIBUTING.md",
+  ])
+    assert.equal(policyFile(file), undefined, file);
+});
+
+test("more than 30 rules keep the ones that block publishing", () => {
+  const filler = Array.from(
+    { length: 40 },
+    (_, index) => `${index + 1}. You must be able to explain your change number ${index}.`,
+  ).join("\n");
+  const findings = policyFindings([
+    { path: "CONTRIBUTING.md", kind: "contributing", content: filler },
+    { path: "AI_POLICY.md", kind: "contributing", content: "We do not accept AI-generated pull requests." },
+  ]);
+  assert.equal(findings.length, 30);
+  assert.ok(findings.some((finding) => finding.kind === "ban" && finding.contribution));
+  // Still in reading order.
+  assert.equal(findings.at(-1)?.path, "AI_POLICY.md");
 });
