@@ -321,9 +321,13 @@ const review = {
     /** Demo only: types the sample text into the field. */
     fill: "Fill with the sample answer",
     saving: "Saving…",
-    /** A save answered 409: the diff moved on, or the attempt is already final. */
+    /**
+     * A save answered 409: the diff moved on, the attempt is already final,
+     * or the run no longer takes attempts (only a run waiting for review or
+     * approval does, and not while it publishes).
+     */
     fileChanged:
-      "This file or your saved attempt changed since you opened it, so this wasn't saved. The latest version is shown here.",
+      "This wasn't saved: the file, your saved attempt or the run changed since you opened it. The latest version is shown here.",
     quiz: {
       answerLabel: "Your answer",
       answerPlaceholder: "A sentence or two, in your own words",

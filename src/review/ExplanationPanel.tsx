@@ -73,7 +73,10 @@ export interface ExplanationPanelProps {
    * Saves the quiz answer before the reveal, its grade, or the road choice
    * (PATCH /api/runs/:id/attempts). It rejects when the save failed (on a
    * 409 after reloading the run): the reference stays hidden until it
-   * resolves. Without it, attempts last for the session.
+   * resolves. Pass it only while the run takes attempts (review or
+   * approved, not publishing): every other save answers 409, so no
+   * reference would show. Without it, an attempt lasts while its card is
+   * on screen.
    */
   onAttempt?(input: {
     quiz?: FileAttemptInput["quiz"];

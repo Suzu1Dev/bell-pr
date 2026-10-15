@@ -62,7 +62,7 @@ export function dontKnowInput(answer: string): QuizInput {
  * Saves `input` and resolves with it only once the save has resolved, so
  * the caller reveals the reference after the answer is on record. A failed
  * save rejects and reveals nothing. Without `save` (no onAttempt), the
- * attempt stays in the card for the session and resolves at once.
+ * attempt stays in the card while it is on screen and resolves at once.
  */
 export async function saveFirst<T>(
   input: T,
@@ -73,9 +73,10 @@ export async function saveFirst<T>(
 }
 
 /**
- * The message for a failed save: a 409 means the diff moved on or the
- * attempt is already final (the caller reloads the run); anything else
- * carries its own message.
+ * The message for a failed save: a 409 means the diff moved on, the
+ * attempt is already final or the run no longer takes attempts (the
+ * caller reloads the run; the server sends no code to tell them apart);
+ * anything else carries its own message.
  */
 export function attemptError(error: unknown, fileChanged: string): string {
   if (error instanceof ApiError && error.status === 409) return fileChanged;

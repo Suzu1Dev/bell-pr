@@ -202,7 +202,7 @@ const m: Translation<typeof en> = {
     fill: "填入示範答案",
     saving: "儲存中…",
     fileChanged:
-      "這個檔案或你已存的作答在你開啟後有了變動，所以這次沒有存下。這裡顯示的是最新版本。",
+      "這次沒有存下：在你開啟後，這個檔案、你已存的作答或這次工作有了變動。這裡顯示的是最新版本。",
     quiz: {
       answerLabel: "你的答案",
       answerPlaceholder: "用自己的話寫一兩句",
