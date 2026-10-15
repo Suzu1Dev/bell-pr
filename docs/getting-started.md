@@ -122,8 +122,8 @@ default branch.
 
 ### Before you contribute
 
-At the top of the project overview, the **Before you contribute** card
-shows what the project asks of contributors, quoted from its own files
+On the project overview, the **Before you contribute** card shows what
+the project asks of contributors, quoted from its own files
 with the file and line: its rules on AI-assisted contributions, on
 disclosing AI help, on explaining your change, on descriptions in your
 own words, on issues kept for newcomers and on opening an issue first,
