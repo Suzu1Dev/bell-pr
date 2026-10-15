@@ -1,6 +1,11 @@
 /** The learning notes page: explanations kept from every review (English). */
 import { formatters } from "../../../shared/i18n/locale";
-import type { TasteDimension } from "../../../shared/understanding";
+import type { PracticeKind } from "../../../shared/practice";
+import type {
+  Confidence,
+  SelfGrade,
+  TasteDimension,
+} from "../../../shared/understanding";
 
 const fmt = formatters("en");
 
@@ -52,6 +57,82 @@ const learning = {
   sampleContent: "Sample content",
   notRecorded: "Not recorded",
   openInCode: "Study it in the code",
+  /** The page's views, each at its own address (`#/learning?view=practice`). */
+  views: {
+    label: "Learning views",
+    notes: "Notes",
+    practice: "Practice",
+    /** While a view's code loads. */
+    loading: "Loading…",
+  },
+  /**
+   * The practice deck: due items from the person's own records, one at a
+   * time. It counts nothing toward anything and sends no reminders.
+   */
+  practice: {
+    title: "Practice",
+    intro:
+      "Questions from your own contributions come back after 1, 3, 7 and 21 days, mixed across projects: answers you missed while sure of them, maintainer comments that surprised you, and questions you never tried. Answer from memory, then compare and grade yourself.",
+    loading: "Loading your practice items…",
+    loadFailed: ({ error }: { error: string }) =>
+      `Your practice items could not be loaded: ${error}`,
+    retry: "Try again",
+    empty: "Nothing to practise right now.",
+    /** Where an item comes from. */
+    kinds: {
+      check: "From your understanding check",
+      quiz: "From a try-first question",
+      feedback: "From maintainer feedback",
+      selfCheck: "A question you have not tried",
+      drill: "A coach debrief drill",
+    } satisfies Record<PracticeKind, string>,
+    answer: "Your answer",
+    answerHelp: "From memory. Your answer stays on this page and is never saved.",
+    confidence: "How sure are you?",
+    confidences: {
+      sure: "Sure",
+      think: "Think so",
+      guess: "Guessing",
+    } satisfies Record<Confidence, string>,
+    chooseConfidence: "Choose how sure you are before you look.",
+    show: "Show answer",
+    reference: "Reference",
+    /** Next to a reference an AI agent wrote. */
+    aiWritten: "AI-written; the code is the authority",
+    noReference: "No reference: compare with the code yourself.",
+    /** The person's own earlier words on the item. */
+    earlier: {
+      correction: "What you had wrong last time",
+      lesson: "Your lesson for next time",
+    },
+    study: "Study it in the code",
+    cleanedUp: "The code for this run was cleaned up; the card text stays.",
+    grade: "How did you do?",
+    grades: {
+      got: "Got it",
+      partly: "Partly",
+      missed: "Missed",
+    } satisfies Record<SelfGrade, string>,
+    gradeHelp: {
+      got: "You named the same cause and effect.",
+      partly: "You had part of it.",
+      missed: "It was something else.",
+    } satisfies Record<SelfGrade, string>,
+    saving: "Saving your grade…",
+    saveFailed: ({ error }: { error: string }) =>
+      `Your grade was not saved: ${error}`,
+    /** After a grade: when the item comes back (1, 3, 7 or 21 days). */
+    nextReview: ({ days }: { days: number }) =>
+      `Next review in ${fmt.number(days)} ${fmt.plural(days) === "one" ? "day" : "days"}`,
+    /** After a grade, when the server did not say when the item is due. */
+    saved: "Grade saved.",
+    next: "Next item",
+    finish: "Done",
+    sampleTitle: "Sample practice",
+    sampleIntro:
+      "Items from the built-in sample contribution, so you can try the deck. Grading them saves nothing.",
+    sampleDone: "That was the last sample item.",
+  },
   /** What maintainers may question, in the same words as the check. */
   dimensions: {
     scope: "Scope",

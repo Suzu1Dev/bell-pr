@@ -14,6 +14,7 @@ import { useFormat, useLocale, useT } from "../i18n";
 import type { DiffFile, Repo } from "../types";
 import { LearningCounts } from "./LearningCounts";
 import { LearningHeading } from "./LearningHeading";
+import { LearningViewContent, LearningViewNav, useLearningView } from "./LearningViews";
 import "./learning.css";
 
 // Stored concepts use inline backticks and line breaks like the review panel; share its renderer and chunk.
@@ -222,6 +223,7 @@ export function LearningNotes({
 }: LearningNotesProps) {
   const t = useT("learning");
   const [locale] = useLocale();
+  const { view, flags } = useLearningView();
   const [keyword, setKeyword] = useState(defaultKeyword);
   const [runId, setRunId] = useState(defaultRunId);
   const [record, setRecord] = useState<LearningRun[]>(initial?.runs ?? []);
@@ -333,9 +335,18 @@ export function LearningNotes({
     }
   }
 
+  if (view !== "notes")
+    return (
+      <>
+        <LearningHeading notes={false} />
+        <LearningViewNav view={view} flags={flags} />
+        <LearningViewContent view={view} repos={repos} onOpen={onOpen} />
+      </>
+    );
   return (
     <>
       <LearningHeading />
+      <LearningViewNav view={view} flags={flags} />
       <LearningCounts />
       <div className="learning-filters">
         <label>
