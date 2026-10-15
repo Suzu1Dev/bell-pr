@@ -2,14 +2,15 @@
 // sample's items while the person has nothing scheduled, one at a time,
 // asked first, then revealed and graded, with the next review date. The
 // person's own items are graded through POST /api/runs/:id/practice, which
-// carries the grade and the confidence only. GET /api/learning/practice is
-// stubbed, so the deck reads the same before and after the learning-loop
-// routes exist.
+// carries the grade and the confidence only. The sidebar's "N ready" counts
+// the due items. GET /api/learning/practice is stubbed, so the deck reads
+// the same before and after the learning-loop routes exist.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { htmlLang, locales } from "../shared/i18n/locale";
 import type { PracticeItem } from "../shared/practice";
 import { getDemo } from "../src/demo";
+import app from "../src/i18n/en/app";
 import learning from "../src/i18n/en/learning";
 import { assertNoHan } from "../src/test-utils/render";
 import { expectNoOverflow } from "./helpers/overflow";
@@ -137,4 +138,73 @@ test("an item of your own is graded on its run, with no answer sent, and the dec
   await expect(page.locator(".practice-empty-title")).toHaveText(p.empty);
   await expect(page.locator(".practice-empty")).toContainText(p.nextReview({ days: 1 }));
   await expect(page.locator("section.practice-sample")).toHaveCount(0);
+});
+
+/** A due item of the person's own on run `runId`. */
+const ownItem = (runId: string, question: string): PracticeItem => ({
+  key: `selfCheck:src/${runId}.ts`,
+  runId,
+  repoId: "e2e-practice-repo",
+  kind: "selfCheck",
+  question,
+  reference: "A reference answer.",
+  path: `src/${runId}.ts`,
+  dueAt: "2026-10-01T00:00:00.000Z",
+  codeAvailable: false,
+});
+
+test("the sidebar says how many practice items are ready, and counts again after a grade", async ({ page }) => {
+  let items = [ownItem("run-a", "What does run A change?"), ownItem("run-b", "What does run B change?")];
+  await stubDeck(page, () => ({ items }));
+  await page.route("**/api/runs/*/practice", async (route) => {
+    items = items.slice(1);
+    await route.fulfill({ json: { run: { id: "run-a", practice: {} } } });
+  });
+  await page.goto("/#/learning?view=practice&locale=en");
+  const chip = page.locator(".sidebar .nav-item .learning-ready");
+  await expect(chip).toHaveText(app.sidebar.practiceReady({ count: 2 }));
+  await expect(chip).toHaveAttribute("aria-label", app.sidebar.practiceReadyLabel({ count: 2 }));
+  // The Learning item's name says what is ready.
+  await expect(
+    page.getByRole("button", {
+      name: `${app.pages.learning} ${app.sidebar.practiceReadyLabel({ count: 2 })}`,
+      exact: true,
+    }),
+  ).toBeVisible();
+
+  const card = page.locator(".practice > .practice-card");
+  await card.getByRole("radio", { name: p.confidences.guess }).check();
+  await card.getByRole("button", { name: p.show }).click();
+  await card.getByRole("button", { name: new RegExp(`^${p.grades.partly}`) }).click();
+  await expect(card.locator(".practice-next")).toHaveText(p.saved);
+  await expect(chip).toHaveText(app.sidebar.practiceReady({ count: 1 }));
+});
+
+test("the sidebar shows no count when nothing is due or the deck cannot be read", async ({ page }) => {
+  let fail = false;
+  await page.route("**/api/learning/practice", (route) =>
+    fail ? route.fulfill({ status: 500, json: { error: "Broken" } }) : route.fulfill({ json: { items: [] } }),
+  );
+  await page.goto("/#/learning?locale=en");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(learning.title);
+  await page.waitForLoadState("networkidle");
+  await expect(page.locator(".learning-ready")).toHaveCount(0);
+  fail = true;
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+  await expect(page.locator(".learning-ready")).toHaveCount(0);
+});
+
+test("in the demo the sidebar shows the sample's count without asking the server", async ({ page }) => {
+  const asked: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/api/learning/practice")) asked.push(request.url());
+  });
+  await page.goto("/#/learning?view=practice&demo=play&locale=en");
+  await expect(page.locator(".sidebar .nav-item .learning-ready")).toHaveText(
+    app.sidebar.practiceReady({ count: sample.length }),
+  );
+  await expect(page.locator("section.practice-sample")).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  expect(asked).toEqual([]);
 });

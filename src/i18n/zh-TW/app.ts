@@ -34,6 +34,8 @@ const m: Translation<typeof en> = {
     learningTitle: "每一次貢獻，都有所收穫。",
     learningText: "理解改動背後的思考，\n累積屬於你的開發經驗。",
     learningAction: "探索學習筆記",
+    practiceReady: ({ count }) => `${count} 則可練習`,
+    practiceReadyLabel: ({ count }) => `有 ${count} 則練習可以做了`,
     help: "使用指南",
     about: `關於 ${product.name}`,
     profileFallback: "My workspace",

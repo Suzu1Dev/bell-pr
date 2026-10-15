@@ -650,3 +650,9 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* The sidebar's "N ready" on the Learning item (styled as .nav-count). */
+.learning-ready {
+  flex: none;
+  white-space: nowrap;
+}
