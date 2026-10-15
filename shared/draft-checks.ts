@@ -11,6 +11,13 @@ import { withoutAiDisclosure, type DraftSource } from "./drafts.js";
 import en from "./i18n/draft-checks.en.js";
 import zhTW from "./i18n/draft-checks.zh-TW.js";
 import type { Locale } from "./i18n/locale.js";
+import {
+  respectChecks,
+  type ContributionFacts,
+  type ContributionRules,
+  type GuardOverride,
+} from "./contribution.js";
+import type { ReviewabilitySnapshot } from "./reviewability.js";
 // The secret shapes and the safety-check messages have one source each,
 // kept with the server; both modules are plain data and load in the browser.
 import { secretInPatch } from "../server/secrets.js";
@@ -256,6 +263,14 @@ export function draftWordBudget(sources: DraftSource[]) {
 }
 
 export interface DraftCheck {
+  /**
+   * Not persisted, so the union can grow. The respect checks (DESIGN §5.4)
+   * come from respectChecks() in shared/contribution.ts. Unrevised
+   * suggested text is `own-words`: a block when the project's quoted rules
+   * ask for the contributor's own words, a confirm on every other project,
+   * except that a project with a brevity rule keeps its `brevity` confirm
+   * for it, which quotes that rule.
+   */
   id:
     | "placeholder"
     | "unchecked"
@@ -264,7 +279,23 @@ export interface DraftCheck {
     | "secret"
     | "local-paths"
     | "workflows"
-    | "author-email";
+    | "author-email"
+    // Blocks
+    | "pr-closed"
+    | "ai-ban"
+    | "ai-disclosure"
+    | "own-words"
+    | "issue-closed"
+    | "issue-has-pr"
+    | "area-reserved"
+    | "tests-weakened"
+    | "pacing-max"
+    // Confirms (own-words above is one too)
+    | "project-rules"
+    | "issue-state"
+    | "reviewability"
+    | "pacing"
+    | "facts-unknown";
   /** block stops approval and publishing; confirm needs the person's acknowledgement before publishing. */
   kind: "block" | "confirm";
   message: string;
@@ -345,6 +376,20 @@ export interface DraftPreflightInput {
    * server leaves out an address the person already confirmed once.
    */
   commitEmails?: string[];
+  /** The change's reviewability snapshot (shared/reviewability.ts). */
+  changes?: ReviewabilitySnapshot;
+  /** The project's quoted rules (`Repository.contributionRules`). */
+  rules?: ContributionRules;
+  /** The GitHub facts; absent means none were read, and no fact-based check runs. */
+  facts?: ContributionFacts;
+  /** Blocks the person lifted with a reason (`run.guardOverrides`). */
+  overrides?: GuardOverride[];
+  /** The person's reason for each weakened-test item, by its id. */
+  testReasons?: Record<string, string>;
+  /** The person turned the understanding check off. */
+  understandingOff?: boolean;
+  /** The issue the run is for (`contributionSettings.issueUrl`); empty or absent means none. */
+  issueUrl?: string;
 }
 
 /**
@@ -353,7 +398,9 @@ export interface DraftPreflightInput {
  * open; it never ticks a box or edits the text. `locale` chooses the language
  * of the messages; the ids and kinds are the same in every locale. Checks
  * that need facts only the server has (local directories, changed paths,
- * the commit e-mail) run when those facts are passed in.
+ * the commit e-mail) run when those facts are passed in, and so do the
+ * respect checks (project rules, GitHub facts, reviewability, pacing),
+ * which come last.
  */
 export function draftPreflight(
   input: DraftPreflightInput,
@@ -418,7 +465,12 @@ export function draftPreflight(
     const unrevised =
       !!input.proposalBody?.trim() &&
       sameDraftProse(input.body, input.proposalBody);
-    if (unrevised || words > budget)
+    // Where the project's quoted rules ask for the contributor's own words,
+    // unrevised text is the own-words block instead (respectChecks).
+    const ownWordsRule = input.rules?.findings.some(
+      (finding) => finding.kind === "own-words",
+    );
+    if ((unrevised && !ownWordsRule) || (!unrevised && words > budget))
       checks.push({
         id: "brevity",
         kind: "confirm",
@@ -475,5 +527,6 @@ export function draftPreflight(
       message: safety.authorEmail({ emails }),
       details: [],
     });
+  checks.push(...respectChecks(input, locale));
   return checks;
 }
