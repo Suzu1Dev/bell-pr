@@ -245,7 +245,7 @@ else process.exit(97);
   await writeFile(path.join(repository, "notes.md"), "Greeting notes.\n");
   await reviewAll();
   await workbench.approve(run.id, { ...run.draft });
-  await workbench.publish(run.id, run.approvedFingerprint!);
+  await workbench.publish(run.id, run.approvedFingerprint!, ["facts-unknown"]);
   assert.equal(run.status, "published");
   run.prFeedback = {
     fetchedAt: new Date().toISOString(),

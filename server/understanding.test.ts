@@ -701,16 +701,3 @@ test("publish accepts overrides only for someone else's PR, with a 20 to 200 cha
   );
   assert.ok(!f.run.guardOverrides?.some((override) => override.reason === "Another reason that is long enough."));
 });
-
-test("until the respect and learning-loop work fills them, their facades answer 501", async (t) => {
-  const f = await fixture(t);
-  for (const pending of [
-    f.workbench.learningLoop.saveFeedbackTag(f.run.id, { url: "#x" }),
-    f.workbench.learningLoop.practice(),
-    f.workbench.learningLoop.recordPractice(f.run.id, { key: "check:x", confidence: "sure", grade: "got" }),
-    f.workbench.learningLoop.counts(),
-    f.workbench.learningLoop.debrief(f.repo.id),
-    f.workbench.learningLoop.debriefs(f.repo.id),
-  ])
-    await assert.rejects(pending, (error: AppError) => error.statusCode === 501);
-});
