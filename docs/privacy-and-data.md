@@ -27,7 +27,17 @@ provider you set it up for). It receives:
   builds and tests;
 - your follow-up questions about a change, with the code and notes they
   refer to;
+- for a follow-up round (Pro), the review comments you selected, with your
+  restatement of each one;
+- for a coach debrief (Pro, only when you ask for one), your own records
+  for that project: your explanations and answers from the understanding
+  check with your grades and corrections, the approaches you chose and
+  why, your forecasts, and the maintainers' comments with your tags;
 - for discovery, summaries of the GitHub projects the search found.
+
+Your understanding checks, try-first answers, practice grades and
+forecasts are never sent to the AI provider except in a coach debrief you
+ask for. The check itself makes no AI call: you grade your own answers.
 
 Do not import a project if your AI provider must not see its code.
 
@@ -40,6 +50,26 @@ when needed, pushes a branch and opens a Draft PR with the title,
 description and commit you approved. Commits carry the Git name and e-mail
 address you configured and become public; BELL PR asks once before it
 publishes an address that is not a GitHub no-reply address.
+
+### What BELL PR reads from GitHub before you publish
+
+To check that a pull request is welcome, BELL PR makes these read-only
+calls through `gh api`, on your computer and under your GitHub account.
+It never posts anything with them, nothing polls GitHub, and the answers
+are not sent to your AI provider; they feed the checks and are stored with
+the project or the run. A project without a GitHub origin never runs `gh`.
+
+| What it reads | When |
+| --- | --- |
+| The repository's pull request settings (`has_pull_requests`, `pull_request_creation_policy`, `archived`, `disabled`), your permission level in it and your GitHub login, and the sizes of its last 3 merged pull requests | When you import a project from GitHub, update it or choose **Check again** on its **Before you contribute** card, when the publish dialog opens, and when you publish |
+| The linked issue: its state and why it was closed, whether it is locked, its labels and assignees, its latest 50 comments (to find claims, the latest maintainer comment and whether you commented) and the pull requests that would close it | Once per issue link in the task dialog, when the publish dialog opens, and when you publish |
+| Three counts of your own pull requests in that repository: open (drafts included), merged, and open with changes requested more than 7 days ago | When you link an issue in the task dialog, when the publish dialog opens, and when you publish |
+| Your pull request's reviews, comments, review threads, CI results, labels, state, whether it was merged and its review decision | When you choose **Read feedback** |
+
+The project's own rule files are read from BELL PR's clone, without the
+network, except the default contribution files of the project's account
+(its `.github` repository), which BELL PR reads through `gh api` as it
+does for pull request drafts.
 
 **Web access for agents** (Pro, off by default). While you have it on,
 agents in contribution runs and follow-up chat can search the web and read
@@ -80,7 +110,7 @@ with mode 0600.
 
 | Item | What it holds |
 | --- | --- |
-| `state.json` | Your projects and runs: contribution directions, plans, agent logs and reports, review progress, explanations, follow-up questions and answers, notes and PR drafts. Token-shaped strings are masked in logs and questions before they are saved. |
+| `state.json` | Your projects and runs: contribution directions, plans, agent logs and reports, review progress, explanations, follow-up questions and answers, notes and PR drafts. Also your learning records: your understanding checks (explanation, answers, confidence, grades, corrections, forecast and how long each check took), try-first answers and the approaches you chose, your tags and lessons on maintainer comments, your restatements for follow-up rounds, your practice schedule (grades and due dates only; practice answers are never saved), the reasons you gave for weakened tests or for publishing past someone else's pull request, and coach debriefs. And the GitHub facts BELL PR read: the rules quoted from each project's files, its pull request settings and recent merged pull request sizes, and for each run the linked issue's facts (including the GitHub logins of people assigned to it, claiming it or with a pull request for it, and the latest maintainer comment) and your pull request counts there. Token-shaped strings are masked in logs and questions before they are saved. |
 | `state.json.bak.1` to `.bak.3`, `state.quarantine.json` | The last three versions of `state.json`, and records a damaged file could not load, so a crash or a bad write loses nothing. |
 | `repositories/` | BELL PR's own clones of the projects you imported. A project imported from a folder on your computer is cloned too; your folder is never changed. |
 | `worktrees/`, `team-worktrees/` | A working copy for each run and each teammate, with the changes the agents made. |
@@ -102,8 +132,9 @@ read it, and the link expires after two minutes.
 
 Your browser keeps, for this local site only: the language you chose,
 layout preferences such as the code font size and the collapsed sidebar,
-the sample project's review progress and drafts, and the sign-in cookie
-(30 days). None of this reaches the server's data directory.
+the sample project's review progress, check answers and drafts, and the
+sign-in cookie (30 days). None of this reaches the server's data
+directory.
 
 ## How long it is kept
 
