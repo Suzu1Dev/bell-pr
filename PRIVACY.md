@@ -107,14 +107,15 @@ Under your GitHub account, BELL PR:
 - clones and fetches the repositories you import, and reads their details,
   issues, contribution guidelines and templates. To check that a pull
   request is welcome, it also reads, when you import or update a
-  repository, link an issue to a contribution, open the publish dialog or
-  publish: whether the repository takes pull requests (its pull request
-  settings, your permission level in it and your GitHub login), the sizes
-  of its last 3 merged pull requests, the linked issue's state, labels,
-  assignees and recent comments and the pull requests that would close it,
-  and how many of your own pull requests in that repository are open,
-  merged, or waiting on your answer to a review. These reads only read,
-  and their results are not sent to the AI provider; <!-- claim:PRIV-21 -->
+  repository or check its rules again, link an issue to a contribution,
+  open the publish dialog or publish: whether the repository takes pull
+  requests (its pull request settings, your permission level in it and
+  your GitHub login), the sizes of its last 3 merged pull requests, the
+  linked issue's state, labels, assignees and recent comments and the pull
+  requests that would close it or refer to it, and how many of your own
+  pull requests in that repository are open, merged, or waiting on your
+  answer to a review. These reads only read, and their results are not
+  sent to the AI provider; <!-- claim:PRIV-21 -->
 - searches GitHub for projects, when you run discovery; <!-- claim:PRIV-22 -->
 - reads the reviews, comments, check results and state of your pull
   requests, when you choose "Read feedback"; <!-- claim:PRIV-23 -->
