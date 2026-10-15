@@ -73,7 +73,7 @@ agents BELL PR runs. <!-- claim:PRIV-12 -->
 ### The AI coding CLI you choose
 
 Contribution runs, project analysis, discovery, explanations, follow-up
-questions, pull request drafts, maintainer-feedback coaching, conflict
+questions, pull request drafts, coach debriefs, conflict
 resolution and follow-up rounds use the OpenAI Codex CLI or Claude Code. The CLI sends data to its
 provider: OpenAI for the Codex CLI, and Anthropic for Claude Code, or the
 cloud platform you set Claude Code up to use, such as Amazon Bedrock,
@@ -90,7 +90,14 @@ It sends:
 - the questions you ask about a change, with the diff, explanation and
   review reports they refer to; <!-- claim:PRIV-17 -->
 - the review comments and check results of your pull request, when you ask
-  for maintainer-feedback coaching or start a follow-up round; <!-- claim:PRIV-18 -->
+  a question about a file they comment on or start a follow-up round, and
+  for a round the restatement you wrote of each comment you selected; <!-- claim:PRIV-18 -->
+- when you ask for a coach debrief, your own records for that project: the
+  titles of your runs and how their pull requests ended, your explanations
+  of your changes, your understanding-check answers with their confidence,
+  your grades and corrections, the approaches you chose and why, your
+  forecasts, and the maintainers' comments and the comments you tagged,
+  with their authors' GitHub logins and your tags and lessons; <!-- claim:PRIV-58 -->
 - for discovery, your search interests and the public details, documents,
   open issues and comments of the GitHub repositories that the search
   found. <!-- claim:PRIV-19 -->

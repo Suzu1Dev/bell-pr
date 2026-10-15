@@ -15,7 +15,7 @@ any payment is taken (owner gate G4). Both are pending.
 | Document | Claims | Owner placeholders | EULA version |
 | --- | --- | --- | --- |
 | LICENSE.md (EULA) | EULA-01 to EULA-66 | 5 | `1.0-draft-2026-10-14` (`shared/product.ts` `eulaVersion`) |
-| PRIVACY.md | PRIV-01 to PRIV-57 | 4 | |
+| PRIVACY.md | PRIV-01 to PRIV-58 | 4 | |
 | TERMS.md | TERMS-01 to TERMS-34 | 4 | |
 | REFUND.md | REFUND-01 to REFUND-19 | 5 | |
 | SECURITY.md | SEC-01 to SEC-37 | 1 | |
@@ -263,12 +263,12 @@ Commands run on the tree of this review, test files excluded:
 | PRIV-10 | BELL PR does not store the tools' passwords and tokens, and only asks the tools whether the person is signed in | `server/process.ts:125`, `server/agent-cli.ts:219`, `server/doctor.ts:299` |
 | PRIV-11 | Providers' own terms decide what they keep and train on | Owner decision: statement about third parties (G4, G5) |
 | PRIV-12 | The tools may send their own usage data; BELL PR neither adds nor removes it, passes only the variables each CLI needs plus the person's usage-data opt-outs (`DO_NOT_TRACK` to both, Claude Code's documented ones to Claude Code), and starts each Codex agent without its `config.toml`, so an opt-out made only there does not reach the agents | `server/process.ts:50`, `server/process.ts:108`, `server/process.ts:109`, `server/process.ts:125` (only listed variables are passed; none is set or removed), `server/agent-cli.ts:191` (`--ignore-user-config`); see finding 7 |
-| PRIV-13 | Which features use the AI CLI, and which providers Claude Code may use | `server/agent-cli.ts:149`, `server/sync-runs.ts:398` (conflict resolution), `server/process.ts:70`, `server/process.ts:76` |
+| PRIV-13 | Which features use the AI CLI, and which providers Claude Code may use | `server/agent-cli.ts:149`, `server/sync-runs.ts:398` (conflict resolution), `server/coach.ts:404` (coach debrief), `server/process.ts:70`, `server/process.ts:76` |
 | PRIV-14 | BELL PR's instructions, the direction and the approved plan are sent | `server/run-executor.ts:695`, `server/run-executor.ts:753` |
 | PRIV-15 | Repository files, analysis excerpts, diffs, rules and templates are sent | `server/insights.ts:1220`, `server/drafts.ts:384`, `server/learning.ts:229` |
 | PRIV-16 | Output of the agents' commands is sent | `server/agent-cli.ts:54` (write roles run commands through the CLI, which returns the output to its model) |
 | PRIV-17 | Questions are sent with the diff, explanation and reports | `server/explanations.ts:271`, `server/learning.ts:358` |
-| PRIV-18 | Review comments and check results are sent for coaching and follow-up rounds | `server/pr-feedback.ts:42`, `server/explanations.ts:216`, `server/followup-runs.ts:94` |
+| PRIV-18 | Review comments and check results are sent with questions about the files they comment on and for follow-up rounds, with the person's restatement of each selected comment | `server/pr-feedback.ts:42`, `server/learning.ts:345`, `server/explanations.ts:216`, `server/followup-runs.ts:94`, `server/followup-runs.ts:238`, `server/followup-runs.ts:262` |
 | PRIV-19 | Discovery sends the interests and the found repositories' details, documents, issues and comments | `server/discovery.ts:710`, `server/discovery-sources.ts:88`, `server/discovery-sources.ts:249` |
 | PRIV-20 | Credential-shaped text is masked before logs, answers, questions and team messages are saved, and in draft context | `server/secrets.ts:17`, `server/run-executor.ts:91`, `server/run-executor.ts:204`, `server/run-executor.ts:427`, `server/learning.ts:373`, `server/drafts.ts:384` |
 | PRIV-21 | Imported repositories are cloned and fetched; details, issues, guidelines and templates are read; v1.1 reads, read-only and kept out of every prompt, whether the repository takes pull requests (its settings, the person's permission and login) with its last 3 merged pull request sizes, the linked issue's facts (with the pull requests that close or refer to it) and the person's own pull request counts with links to up to 10 waiting on their answer, at import or update, on "Check again", in the task dialog, when the publish dialog opens and at publish | `server/repositories.ts:54`, `server/repositories.ts:306`, `server/draft-sources.ts:53`, `server/contribution-facts.ts:110`, `server/issue-check.ts:155`, `server/issue-check.ts:170`, `server/pacing.ts:29`, `server/pacing.ts:122`, `server/repositories.ts:394`, `server/routes/contribution.ts:50`, `server/routes/contribution.ts:56`, `src/workspace/PublishModal.tsx:282`, `server/publish.ts:446`, `server/prompts/team.ts:34` |
@@ -308,6 +308,7 @@ Commands run on the tree of this review, test files excluded:
 | PRIV-55 | Data subject rights and the privacy contact [OWNER] | Owner decision: privacy contact (G4, G6) |
 | PRIV-56 | Not directed at children | Owner decision: counsel review (G4) |
 | PRIV-57 | Each release ships its policy version | Owner decision: release process; `scripts/generate-third-party-notices.mjs:52` copies the policy into each build |
+| PRIV-58 | A coach debrief, asked for by the person, sends their own records for one project: run titles and PR outcomes, explanations, check answers with confidence, grades and corrections, approaches chosen and why, forecasts, and maintainers' and tagged comments with their authors and the person's tags and lessons | `server/routes/learning.ts:193`, `server/coach.ts:67`, `server/coach.ts:101`, `server/coach.ts:404`, `server/prompts/coach.ts:11` |
 
 ## TERMS.md
 

@@ -26,7 +26,8 @@ provider you set it up for). It receives:
 - the output of the commands agents run in the working copy, such as
   builds and tests;
 - your follow-up questions about a change, with the code and notes they
-  refer to;
+  refer to, and the review comments on that file once you have read your
+  pull request's feedback;
 - for a follow-up round (Pro), the review comments you selected, with your
   restatement of each one;
 - for a coach debrief (Pro, only when you ask for one), your own records
@@ -58,8 +59,9 @@ calls through `gh api`, on your computer and under your GitHub account.
 It never posts anything with them, nothing polls GitHub, and the answers
 feed the checks and are stored with the project or the run. The first
 three are never sent to your AI provider. Feedback you read reaches it
-only as listed above: the comments you select for a follow-up round, and
-the comments in a coach debrief you ask for. A project without a GitHub
+only as listed above: the comments on a file you ask a question about,
+the comments you select for a follow-up round, and the comments in a
+coach debrief you ask for. A project without a GitHub
 origin never runs `gh`.
 
 | What it reads | When |
