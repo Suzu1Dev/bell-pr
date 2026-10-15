@@ -19,7 +19,7 @@ const workspace = {
   steps: {
     define: { title: "Define the task", description: "Set your contribution goal" },
     build: { title: "Build together", description: "The agent team splits the work" },
-    review: { title: "Understand and review", description: "Read every line of code" },
+    review: { title: "Understand and review", description: "Read it, then explain it back" },
     submit: { title: "Submit", description: "Your next pull request" },
   },
   tabsLabel: "Task content",
@@ -35,7 +35,21 @@ const workspace = {
     tooltip:
       "You allowed Claude agents to run without the operating system's sandbox, so an agent of this run could read or change files outside its working folder. Check its changes with extra care. The safety settings turn this off for new runs.",
   },
+  /**
+   * The badge of a run approved without the understanding check, or one
+   * that may be while the person keeps the check off.
+   */
+  checkOff: {
+    label: "Understanding check off",
+    tooltip:
+      "This run was approved without explaining the change back first. It stays marked here, in your learning record and in the export.",
+    tooltipSetting:
+      "The understanding check is off, so you can approve without explaining the change back. Runs approved this way stay marked. Turn it back on in Settings → Learning.",
+  },
   runNotices: {
+    /** After a feedback read whose review decision asks for changes; never polled. */
+    waiting: ({ date }: { date: string }) =>
+      `A maintainer asked for changes on ${date}. Answer on GitHub in your own words, or start a follow-up round.`,
     queuedFree: "Queued: Free runs one contribution at a time",
     queuedUpgrade: "Run several at once with Pro",
     workspaceRemoved:
@@ -44,13 +58,21 @@ const workspace = {
   sampleReview: "Sample review",
   humanReview: "Human review",
   footer: {
-    allReviewed: "You understood every change.",
+    allReviewed: "Every file reviewed.",
+    passed: "You explained it back. Ready to approve.",
+    checkOff:
+      "Every file reviewed · Understanding check off. Approval needs your reviewed ticks only.",
     learning: "Not just a review: a lesson in code, too.",
     hint: "Select code to ask the agent about it.",
     reviewed: ({ reviewed, total }: { reviewed: number; total: number }) =>
       `${reviewed} / ${total} reviewed`,
     viewPullRequest: "View pull request",
     needsReview: "Mark every file as reviewed first",
+    needsReviewAndCheck:
+      "Mark every file as reviewed, then explain the change back in your own words",
+    explainBack: "Explain it back",
+    needsCheck:
+      "Explain the change back in your own words: a short, closed-book check next to the code",
     needsSave: "Save the PR draft first",
     needsCommitMessage: "Write this round's commit message first",
     needsFacts:
@@ -77,8 +99,14 @@ const workspace = {
     waitingForChanges: "Waiting for the agents' changes",
     noMatches: "No matching files",
     progress: "Review progress",
-    allReviewed: "You have looked at every change. Ready to submit!",
-    reviewHint: "Once you understand a file, mark it as reviewed.",
+    allReviewed: "Every file reviewed. Next: explain it back.",
+    allReviewedDone: "Every file reviewed.",
+    reviewHint: "Once you have read a file and its explanation, mark it as reviewed.",
+    /** Opens the check before every file is ticked; the ticks stay required. */
+    takeCheck: "Take the check now",
+    openCheck: "Open your check",
+    closedBookAsk:
+      "Closed book: questions to the agent wait until you close the check.",
     hideFiles: "Hide the file list",
     showFiles: "Show the file list",
     toggleFiles: "Toggle the file list",
@@ -109,6 +137,108 @@ const workspace = {
     loadingPanel: "Preparing the reading panel…",
     emptyTitle: "Understanding starts with the changes.",
     emptyText: "Select a changed file to ask about its design and trade-offs.",
+  },
+  /**
+   * The Explain-it-back check next to the diff (UnderstandingCheck). The
+   * chip words match the try-first prompts of the review namespace.
+   */
+  check: {
+    title: "Explain it back",
+    intro:
+      "Closed book: the explanations, notes and questions to the agent stay hidden while you answer; the diff and the file list stay. You grade yourself against the AI-written references. It is a commitment, not a test.",
+    off: "The understanding check is off, so approval does not wait for it. You can still take it.",
+    close: "Close the check",
+    loading: "Loading the check…",
+    notOpen:
+      "The check opens once the agents are done and the run waits for your review.",
+    loadFailed: ({ message }: { message: string }) =>
+      `Could not load the check: ${message}`,
+    retry: "Try again",
+    plan: ({ questions, lines }: { questions: number; lines: number }) =>
+      `${plural(questions) === "one" ? `${questions} file question` : `${questions} file questions`} for ${plural(lines) === "one" ? `${lines} changed line` : `${lines} changed lines`}. BELL defaults: none up to 15 lines, 1 up to 100, 2 up to 400, 3 above.`,
+    fill: "Fill with the sample answer",
+    explainTitle: "1. Explain",
+    explainPrompt:
+      "In 2 to 4 sentences: what problem does this solve, what does the change do, and what could break?",
+    roundPrompt:
+      "What does this round change, and which review comment does it answer?",
+    summaryLabel: "Your explanation",
+    words: ({ count, min }: { count: number; min: number }) =>
+      `${count} of at least ${min} words`,
+    moved:
+      "The change moved on since you explained it. Is your explanation still accurate?",
+    stillAccurate: "Still accurate",
+    edit: "Edit it",
+    saveSummary: "Save my explanation",
+    answerTitle: "2. Answer",
+    answerIntro:
+      "Answer from what you know and what the diff shows: at least 3 words each, or “I don't know”.",
+    dontKnow: "I don't know",
+    confidence: "How sure are you?",
+    confidenceWas: ({ confidence }: { confidence: string }) => `Confidence: ${confidence}`,
+    confidences: { sure: "Sure", think: "Think so", guess: "Guessing" },
+    credited: "Answered during review",
+    lock: "Lock my answers",
+    lockNote: "Locked answers cannot be edited; Start over clears the check.",
+    gradeTitle: "3. Compare and grade",
+    gradeIntro: "Put each answer beside its reference and grade yourself.",
+    yourAnswer: "Your answer",
+    reference: "Reference, AI-written: the diff is the authority",
+    testerReference: "The Test analyst's report, AI-written: the diff is the authority",
+    noReference: "No reference: compare with the diff yourself.",
+    notGraded: "Not graded: what you did not test is yours to say.",
+    dontKnowAnswer: "You said you don't know, which counts as Missed.",
+    grade: "Your grade",
+    gradedAs: ({ grade }: { grade: string }) => `Your grade: ${grade}`,
+    grades: { got: "Got it", partly: "Partly", missed: "Missed" },
+    gradeHints: {
+      got: "You named the same cause and effect.",
+      partly: "You had part of it.",
+      missed: "It was something else.",
+    },
+    correctTitle: "4. Correct",
+    correction: "What I had wrong",
+    openExplanation: ({ path }: { path: string }) => `Open the explanation of ${path}`,
+    saveGrades: "Save my grades",
+    forecastTitle: "5. Predict the maintainer (optional)",
+    forecastPrompt: "What will the maintainer most likely question?",
+    forecastLine: "One line, if you like",
+    dimensions: {
+      scope: "Scope",
+      simplicity: "Simplicity",
+      naming: "Naming",
+      conventions: "Project conventions",
+      tests: "Tests",
+      risk: "Risk",
+      description: "Description",
+      worth: "Worth the review time",
+    },
+    forecastNote:
+      "It stays on this computer, beside the maintainers' review once you read it.",
+    saveForecast: "Save my prediction",
+    skip: "Skip",
+    forecast: ({ dimension }: { dimension: string }) => `Your prediction: ${dimension}`,
+    resultTitle: "Your check",
+    result: ({ questions, misses }: { questions: number; misses: number }) =>
+      `You explained the change and answered ${plural(questions) === "one" ? `${questions} question` : `${questions} questions`}.${misses ? ` You missed ${misses} and corrected ${misses === 1 ? "it" : "them"}.` : ""}`,
+    startOver: "Start over",
+    startOverConfirm:
+      "Start over? Your explanation and answers are cleared; checks you passed stay in your history.",
+    keep: "Keep my answers",
+    summaryShort: ({ min }: { min: number }) =>
+      `Explain the change in at least ${min} words.`,
+    copied:
+      "This repeats the AI-written text word for word. Write it in your own words.",
+    answerShort: ({ min }: { min: number }) =>
+      `Each answer needs at least ${min} words, or “I don't know”.`,
+    confidenceMissing: "Pick how sure you are for each answer.",
+    gradeMissing: "Grade every answer.",
+    correctionShort: ({ min }: { min: number }) =>
+      `Write what you had wrong in at least ${min} words.`,
+    /** The same questions the server asks, for the sample. */
+    fallbackQuestion: ({ path }: { path: string }) =>
+      `In one sentence, what does the change to ${path} do, and why?`,
+    untestedQuestion: "What did you not test, and why?",
   },
   activity: {
     runTitle: "How it ran",
@@ -203,6 +333,12 @@ const workspace = {
     draftPr: "Submit as a Draft PR",
     draftPrHelp:
       "You can keep editing on GitHub afterwards; the project's automated checks run on Draft PRs too.",
+    understanding: "Understanding check",
+    understandingPassed: "Passed: you explained the change back",
+    understandingRequired: "Required: explain the change back before approval",
+    understandingOff: "Off: approval needs your reviewed ticks only",
+    /** Opens the forecast step alone while the check is off. */
+    predict: "Predict the maintainer",
   },
   /** The sample's Draft PR; its card's words come from the demo content. */
   published: {
@@ -263,6 +399,8 @@ const workspace = {
     openOnGitHub: "Open on GitHub",
     notFetched:
       "Not read yet. “Read feedback” asks GitHub once and never updates on its own.",
+    cantContinue:
+      "Can't continue? Close the pull request yourself on GitHub, with a short note in your own words.",
   },
   followUp: {
     title: "Keep fixing from feedback",
@@ -280,6 +418,10 @@ const workspace = {
     startNote: "Fix from the note",
     demoNote:
       "The sample starts no round. Import your own project to fix a real PR from its feedback.",
+    restatement: ({ author }: { author: string }) =>
+      `In your words: what is ${author} asking for?`,
+    restatementHelp:
+      "At least 3 words. The agent gets your words as its task and the maintainer's comment only as context.",
   },
   publish: {
     titleDemo: "Your demo contribution is ready.",
@@ -319,6 +461,27 @@ const workspace = {
         ? `PR description preview (about ${count} word)`
         : `PR description preview (about ${count} words)`,
     confirmLegend: "Confirm each item before submitting",
+    checksTitle: "Before it reaches the maintainers",
+    allClear: "Every check passes.",
+    groups: {
+      unknown: "Couldn't check",
+      rules: "The project's rules",
+      issue: "The issue",
+      pacing: "Your pace here",
+      words: "Your words and reviewability",
+      safety: "Safety",
+    },
+    blocked: ({ message }: { message: string }) => `Blocks publishing: ${message}`,
+    checkOff: "Understanding check: off",
+    pacing: ({ open, budget, first }: { open: number; budget: number; first: boolean }) =>
+      `Your open PRs here: ${open} of ${budget}${first ? " (first contribution here)" : ""}`,
+    pacingExempt: "Your open PRs here: not paced, since you can write to this repository",
+    factsLoading: "Reading the GitHub facts…",
+    couldntCheck: ({ reason }: { reason: string }) => `Couldn't check: ${reason}`,
+    factsMissing: "this build cannot read the GitHub facts yet",
+    overrideLabel: "Why publish anyway? Saved on this run, 20 to 200 characters",
+    overrideCount: ({ count }: { count: number }) => `${count} of 20 to 200 characters`,
+    closeLoop: ({ title }: { title: string }) => `Close the loop first: read the feedback on “${title}”`,
     confirmNote: `Ticking only means you know these items are still open and want to submit the description as it is. ${product.name} never changes the description or ticks anything for you, and these confirmations are not written into the PR. To change something first, choose “Back to the draft”.`,
     back: "Back to the draft",
     finishDemo: "Open the sample Draft PR",
@@ -406,6 +569,9 @@ const workspace = {
     proposalLoaded: ({ name }: { name: string }) =>
       `Loaded the contribution proposal for ${name}. Check the settings, then start planning.`,
     demoSettingsSaved: "Demo settings saved in this browser.",
+    checkFirst: "Explain the change back before you approve: the check is open next to the code.",
+    /** The Ask preset of the reviewability snapshot. */
+    askSplit: "How could this be split into separate changes?",
     directionSaved:
       "Saved this project's direction settings; the model settings apply to every project.",
   },
