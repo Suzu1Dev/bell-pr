@@ -18,8 +18,8 @@ const maximumWorkflowScans = 40;
 const maximumAutomationSources = 3;
 const allowedAssociations = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 const shaPattern = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/;
-type DocumentKind = "contributing" | "template" | "documentation";
-type Entry = {
+export type DocumentKind = "contributing" | "template" | "documentation";
+export type Entry = {
   path: string;
   mode: string;
   type: string;
@@ -27,7 +27,7 @@ type Entry = {
   size: number;
 };
 
-function documentKind(file: string): DocumentKind | undefined {
+export function documentKind(file: string): DocumentKind | undefined {
   if (!safeRelativePath(file) || sensitivePath(file)) return;
   const parts = file.toLowerCase().split("/");
   if (
@@ -104,7 +104,7 @@ export function pullRequestGate(content: string) {
   );
 }
 
-const priority = (file: Entry) => {
+export const priority = (file: Entry) => {
   const kind = documentKind(file.path);
   const parts = file.path.toLowerCase().split("/");
   const location =
@@ -122,7 +122,7 @@ const priority = (file: Entry) => {
   );
 };
 
-function parseTree(output: string): Entry[] {
+export function parseTree(output: string): Entry[] {
   return output
     .split("\0")
     .filter(Boolean)
@@ -171,6 +171,104 @@ export function validPrUrl(
   } catch {
     return false;
   }
+}
+
+/** An answer of `gh api`, as JSON.parse returns it. */
+type GitHubJson = ReturnType<typeof JSON.parse>;
+
+/** An account's public default community files (`<owner>/.github`). */
+export type AccountDefaults =
+  | { status: "missing" | "private" | "no-branch" }
+  | {
+      status: "found";
+      /** The default branch's commit the files are read at. */
+      commitSha: string;
+      /** GitHub listed only part of the tree. */
+      truncated: boolean;
+      /** The wanted files, in reading order. */
+      entries: Entry[];
+      read(entry: Entry): Promise<string>;
+      url(entry: Entry): string;
+    };
+
+/**
+ * The default community files of the account's public `<owner>/.github`
+ * repository whose kind `wanted` accepts, pinned to its default branch's
+ * commit, or why there are none: "missing" when the account has no such
+ * repository (GitHub's 404), "private" or "no-branch". Other failures
+ * reject. `github` runs `gh api --hostname github.com` and parses JSON.
+ */
+export async function accountDefaults(
+  owner: string,
+  wanted: (kind: DocumentKind) => boolean,
+  github: (args: string[], maxBytes?: number) => Promise<GitHubJson>,
+): Promise<AccountDefaults> {
+  let defaults: GitHubJson;
+  try {
+    defaults = await github(
+      ["--method", "GET", `repos/${owner}/.github`],
+      80_000,
+    );
+  } catch (error) {
+    if (error instanceof Error && /(?:HTTP\s+404|\(404\))/.test(error.message))
+      return { status: "missing" };
+    throw error;
+  }
+  if (defaults.private !== false) return { status: "private" };
+  if (typeof defaults.default_branch !== "string")
+    return { status: "no-branch" };
+  const ref = await github(
+    [
+      "--method",
+      "GET",
+      `repos/${owner}/.github/git/ref/heads/${encodeURIComponent(defaults.default_branch)}`,
+    ],
+    40_000,
+  );
+  if (ref.object?.type !== "commit" || !shaPattern.test(ref.object.sha))
+    throw new Error("Invalid default ref");
+  const commitSha: string = ref.object.sha;
+  const tree = await github(
+    [
+      "--method",
+      "GET",
+      `repos/${owner}/.github/git/trees/${commitSha}?recursive=1`,
+    ],
+    2_000_000,
+  );
+  if (!shaPattern.test(tree.sha) || !Array.isArray(tree.tree))
+    throw new Error("Invalid default tree");
+  const entries: Entry[] = tree.tree
+    .filter((entry: Entry) => {
+      const kind =
+        typeof entry.path === "string" ? documentKind(entry.path) : undefined;
+      return !!kind && wanted(kind) && shaPattern.test(entry.sha);
+    })
+    .sort(
+      (a: Entry, b: Entry) =>
+        priority(a) - priority(b) || a.path.localeCompare(b.path),
+    );
+  return {
+    status: "found",
+    commitSha,
+    truncated: !!tree.truncated,
+    entries,
+    read: async (entry) => {
+      const blob = await github(
+        ["--method", "GET", `repos/${owner}/.github/git/blobs/${entry.sha}`],
+        180_000,
+      );
+      if (
+        blob.encoding !== "base64" ||
+        typeof blob.content !== "string" ||
+        !/^[A-Za-z0-9+/=\s]*$/.test(blob.content)
+      )
+        throw new Error("Invalid blob");
+      return Buffer.from(blob.content, "base64").toString("utf8");
+    },
+    url: (entry) =>
+      `https://github.com/${owner}/.github/blob/${commitSha}/${entry.path.split("/").map(encodeURIComponent).join("/")}`,
+  };
 }
 
 const metadataQuery = `query BellDraftContext($owner: String!, $name: String!) {
@@ -449,94 +547,31 @@ export async function collectDraftContext(
     localChecked &&
     (!localKinds.has("contributing") || !localKinds.has("template"))
   ) {
-    let foundDefaults = false;
     try {
-      const defaults = await github(
-        ["--method", "GET", `repos/${remote.owner}/.github`],
-        80_000,
+      const defaults = await accountDefaults(
+        remote.owner,
+        (kind) =>
+          (kind === "contributing" || kind === "template") &&
+          !localKinds.has(kind),
+        github,
       );
-      foundDefaults = true;
-      if (
-        defaults.private === false &&
-        typeof defaults.default_branch === "string"
-      ) {
-        const ref = await github(
-          [
-            "--method",
-            "GET",
-            `repos/${remote.owner}/.github/git/ref/heads/${encodeURIComponent(defaults.default_branch)}`,
-          ],
-          40_000,
-        );
-        if (ref.object?.type !== "commit" || !shaPattern.test(ref.object.sha))
-          throw new Error("Invalid default ref");
-        const commitSha = ref.object.sha;
-        const tree = await github(
-          [
-            "--method",
-            "GET",
-            `repos/${remote.owner}/.github/git/trees/${commitSha}?recursive=1`,
-          ],
-          2_000_000,
-        );
-        if (!shaPattern.test(tree.sha) || !Array.isArray(tree.tree))
-          throw new Error("Invalid default tree");
-        if (tree.truncated)
-          warn(messages.defaultsTruncated);
-        const candidates: Entry[] = tree.tree
-          .filter((entry: Entry) => {
-            const kind =
-              typeof entry.path === "string"
-                ? documentKind(entry.path)
-                : undefined;
-            return (
-              (kind === "contributing" || kind === "template") &&
-              !localKinds.has(kind)
-            );
-          })
-          .sort(
-            (a: Entry, b: Entry) =>
-              priority(a) - priority(b) || a.path.localeCompare(b.path),
-          );
-        for (const entry of candidates) {
-          if (!shaPattern.test(entry.sha)) continue;
+      if (defaults.status === "found") {
+        if (defaults.truncated) warn(messages.defaultsTruncated);
+        for (const entry of defaults.entries)
           await readDocument(
             entry,
             "org",
-            async () => {
-              const blob = await github(
-                [
-                  "--method",
-                  "GET",
-                  `repos/${remote.owner}/.github/git/blobs/${entry.sha}`,
-                ],
-                180_000,
-              );
-              if (
-                blob.encoding !== "base64" ||
-                typeof blob.content !== "string" ||
-                !/^[A-Za-z0-9+/=\s]*$/.test(blob.content)
-              )
-                throw new Error("Invalid blob");
-              return Buffer.from(blob.content, "base64").toString("utf8");
-            },
-            `https://github.com/${remote.owner}/.github/blob/${commitSha}/${entry.path.split("/").map(encodeURIComponent).join("/")}`,
+            () => defaults.read(entry),
+            defaults.url(entry),
           );
-        }
-      } else if (defaults.private !== false) {
+      } else if (defaults.status === "private") {
         warn(messages.defaultsNotPublic);
-      } else {
+      } else if (defaults.status === "no-branch") {
         warn(messages.defaultsNoBranch);
       }
-    } catch (error) {
+    } catch {
       active();
-      if (
-        foundDefaults ||
-        !(
-          error instanceof Error && /(?:HTTP\s+404|\(404\))/.test(error.message)
-        )
-      )
-        warn(messages.defaultsFailed);
+      warn(messages.defaultsFailed);
     }
   }
 
