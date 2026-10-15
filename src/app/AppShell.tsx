@@ -52,7 +52,6 @@ import { ImportRepoModal } from "../repos/ImportRepoModal";
 import { ReposPage } from "../repos/ReposPage";
 import { CopyCommand } from "../setup/CopyCommand";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
-import { PublishModal } from "../workspace/PublishModal";
 import { WorkspacePage } from "../workspace/WorkspacePage";
 import { ErrorBoundary, listenForPreloadErrors } from "./ErrorBoundary";
 import { Sidebar } from "./Sidebar";
@@ -126,6 +125,10 @@ const ModelSettingsModal = lazy(() =>
   import("../settings/ModelSettingsModal").then((module) => ({
     default: module.ModelSettingsModal,
   })),
+);
+// The publish dialog opens once per contribution, at the end.
+const PublishModal = lazy(() =>
+  import("../workspace/PublishModal").then((module) => ({ default: module.PublishModal })),
 );
 
 export default function App() {
@@ -1241,20 +1244,24 @@ function AppShell({
         </ErrorBoundary>
       )}
       {modal === "publish" && (
-        <PublishModal
-          run={run}
-          files={files}
-          demo={demo}
-          currentRepo={currentRepo}
-          additions={additions}
-          deletions={deletions}
-          busy={busy}
-          formError={formError}
-          draft={draft}
-          publish={publish}
-          closeModal={closeModal}
-          setTab={setTab}
-        />
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <PublishModal
+              run={run}
+              files={files}
+              demo={demo}
+              currentRepo={currentRepo}
+              additions={additions}
+              deletions={deletions}
+              busy={busy}
+              formError={formError}
+              draft={draft}
+              publish={publish}
+              closeModal={closeModal}
+              setTab={setTab}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
       {modal === "runs" && (
         <RunsModal
