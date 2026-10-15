@@ -898,6 +898,13 @@
   color: var(--color-text-inverse);
   font-weight: 600;
 }
+/* Forced colors drop the fill, so the chosen chip gets an outline. */
+@media (forced-colors: active) {
+  .tf-chip:has(input:checked) {
+    outline: 2px solid;
+    outline-offset: 1px;
+  }
+}
 .tf-chip:has(input:focus-visible),
 .tf-chips:focus-visible,
 .tf-grades:focus-visible,

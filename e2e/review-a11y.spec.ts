@@ -356,6 +356,20 @@ for (const locale of locales)
     expect(await axeProblems(page), "road chosen").toEqual([]);
   });
 
+test("a chosen try-first chip keeps an outline when forced colors drop its fill", async ({ page }) => {
+  const t = review.tryFirst;
+  await page.emulateMedia({ forcedColors: "active" });
+  await openChanges(page, "en", "src/utils/retry.ts");
+  const quiz = page.locator(".explain-card-selfcheck");
+  const outline = (radio: Locator) =>
+    radio.evaluate((input) => getComputedStyle(input.closest(".tf-chip")!).outlineStyle);
+  const think = quiz.getByRole("radio", { name: t.confidences.think });
+  expect(await outline(think)).toBe("none");
+  await think.check();
+  expect(await outline(think)).toBe("solid");
+  expect(await outline(quiz.getByRole("radio", { name: t.confidences.sure }))).toBe("none");
+});
+
 for (const locale of locales)
   for (const width of [1440, 390])
     test(`the diff and the explanation panel fit their text (${locale}, ${width} px)`, async ({ page }) => {
