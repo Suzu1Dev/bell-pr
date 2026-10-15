@@ -8,7 +8,7 @@ import {
   type SetStateAction,
 } from "react";
 import { api, ApiError, ProRequiredError, send } from "../../api";
-import { demoAnswer, getDemo } from "../../demo";
+import { demoAnswer, getDemo, type DemoContent } from "../../demo";
 import { demoLearningExport } from "../../demo/export";
 import {
   createDemoPlayback,
@@ -137,6 +137,25 @@ export function stopSampleRun(run: Run): Run {
 
 const wait = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * The sample run after "Read feedback": its fictional maintainer feedback,
+ * with the sample's own tags on it (Tests, which its forecast predicted,
+ * and a comment that surprised the person) unless the reader tagged it
+ * already. Nothing is read from GitHub.
+ */
+export function withSampleFeedback(
+  previous: Run,
+  sample: Pick<DemoContent, "prFeedback" | "feedbackTags">,
+): Run {
+  return {
+    ...previous,
+    ...(sample.prFeedback ? { prFeedback: structuredClone(sample.prFeedback) } : {}),
+    ...(!previous.feedbackTags && sample.feedbackTags
+      ? { feedbackTags: structuredClone(sample.feedbackTags) }
+      : {}),
+  };
+}
 
 /**
  * How a playback answer types out: a pause of 300-900 ms first, then the
@@ -979,10 +998,7 @@ export function useRunActions({
     // The sample shows its fictional feedback; nothing asks GitHub.
     if (demo) {
       if (demoContent.prFeedback)
-        setRun((previous) => ({
-          ...previous,
-          prFeedback: structuredClone(demoContent.prFeedback),
-        }));
+        setRun((previous) => withSampleFeedback(previous, demoContent));
       return;
     }
     // Reading feedback is Free on every plan; only AI rounds on it are Pro.

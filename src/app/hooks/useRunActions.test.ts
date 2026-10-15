@@ -10,7 +10,9 @@ import {
   runPath,
   stopNotice,
   stopSampleRun,
+  withSampleFeedback,
 } from "./useRunActions";
+import { getDemo } from "../../demo";
 import type { Run } from "../../types";
 
 const zh = zhTW.workspace.notices;
@@ -288,4 +290,19 @@ test("a playback step keeps the reader's own records: the check, attempts, tags 
   assert.deepEqual(merged.reviewability, previous.reviewability);
   // Nothing the reader did not write appears.
   assert.equal("understanding" in mergePlaybackRun(base, { ...base, status: "review" }), false);
+});
+
+test("the sample's feedback comes with its own tags, unless the reader tagged it", () => {
+  const sample = getDemo("en");
+  const read = withSampleFeedback({ ...sample.run }, sample);
+  assert.deepEqual(read.prFeedback, sample.prFeedback);
+  assert.deepEqual(read.feedbackTags, sample.feedbackTags);
+  // The review asked for a test, which the sample's forecast (Tests) predicted.
+  const review = sample.prFeedback!.items[0];
+  assert.deepEqual(
+    { dimension: read.feedbackTags![review.url].dimension, predicted: read.feedbackTags![review.url].predicted },
+    { dimension: "tests", predicted: true },
+  );
+  const own = { [review.url]: { dimension: "naming" as const, at: "2026-10-13T00:00:00Z" } };
+  assert.deepEqual(withSampleFeedback({ ...sample.run, feedbackTags: own }, sample).feedbackTags, own);
 });
