@@ -372,6 +372,28 @@ test("copy detection ignores case, whitespace and punctuation, in both direction
   assert.ok(!looksCopied("anything at all here goes", []));
 });
 
+test("copy detection finds a copied part of a Chinese sentence, one character per word", () => {
+  const reference = "每次重試前的等待上限會加倍，實際等待時間是零到上限之間的隨機值。";
+  // A copy that starts and ends inside a clause, without any punctuation.
+  assert.ok(looksCopied("等待時間是零到上限之間的隨機值", [reference]));
+  assert.ok(looksCopied("重試前的等待上限會加倍", [reference]));
+  // A Chinese reference of 8 or more characters inside a longer answer.
+  assert.ok(looksCopied(`我認為${reference}大概是這樣`, [reference]));
+  // Shorter than 5 characters, or not in the reference: not a copy.
+  assert.ok(!looksCopied("上限加倍", [reference]));
+  assert.ok(!looksCopied("等待會越來越長，而且有隨機性", [reference]));
+  // As a summary, a copied clause of 15 characters does not pass.
+  const files = [file("src/a.ts", 2)];
+  const status = understandingStatus({
+    record: { summary: { text: "等待時間是零到上限之間的隨機值", changeFingerprint: changeFingerprint(files), at: "t" } },
+    plan: [],
+    files,
+    required: true,
+    cards: [{ ...card("Q?", "A."), reason: reference }],
+  });
+  assert.deepEqual(status.missing, [{ part: "summary" }]);
+});
+
 test("a summary written for an older version of the change is stale and needs confirming", () => {
   const before = [file("src/a.ts", 10)];
   const after = [file("src/a.ts", 10, { fingerprint: "src/a.ts@2" })];

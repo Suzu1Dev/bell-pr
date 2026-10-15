@@ -592,12 +592,20 @@ export function planCheck({
   return plan;
 }
 
-/** Lower case, punctuation and symbols as spaces, whitespace collapsed. */
+/**
+ * Lower case, punctuation and symbols as spaces, whitespace collapsed. A
+ * CJK character stands apart as a word of its own, as `draftProseWords`
+ * counts it, so text without spaces is compared character by character.
+ */
 function normalized(text: string) {
   return text
     .normalize("NFKC")
     .toLowerCase()
     .replace(/[\p{P}\p{S}]+/gu, " ")
+    .replace(
+      /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu,
+      " $& ",
+    )
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -607,7 +615,8 @@ function normalized(text: string) {
  * and punctuation, the text appears word for word in a reference (texts of
  * 5 or more words, so a short answer that happens to share the wording is
  * not called a copy), or a reference of 8 or more words appears word for
- * word in the text.
+ * word in the text. A CJK character counts as one word, so a copied part
+ * of a Chinese sentence is found as well.
  */
 export function looksCopied(text: string, references: readonly string[]) {
   const own = normalized(text);
