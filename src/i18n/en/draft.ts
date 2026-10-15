@@ -9,6 +9,7 @@ import type { FollowUpRound } from "../../../shared/followups";
 import { formatters } from "../../../shared/i18n/locale";
 import { product } from "../../../shared/product";
 import type { ReviewabilityBand } from "../../../shared/reviewability";
+import type { TasteDimension } from "../../../shared/understanding";
 
 const fmt = formatters("en");
 
@@ -258,6 +259,54 @@ const draft = {
     copy: "Copy for the Testing section",
     saveFailed: ({ reason }: { reason: string }) =>
       `The reasons were not saved: ${reason}`,
+  },
+  /**
+   * ForecastCompare: the person's forecast beside what the maintainers
+   * said, with their own tags. The outcome line states facts only.
+   */
+  forecast: {
+    title: "Your forecast and what the maintainers said",
+    yours: "Your forecast",
+    none: "No forecast",
+    theirs: "What the maintainers said",
+    noFeedback: "Nothing from the maintainers yet.",
+    readFirst: "Read the feedback to compare it with your forecast.",
+    dimensions: {
+      scope: "Scope",
+      simplicity: "Simplicity",
+      naming: "Naming",
+      conventions: "Project conventions",
+      tests: "Tests",
+      risk: "Risk",
+      description: "Description",
+      worth: "Worth the review time",
+    } satisfies Record<TasteDimension, string>,
+    /** Labels the group of dimension chips of one comment. */
+    dimension: ({ author }: { author: string }) => `What @${author} raised`,
+    /** Labels the "Saw it coming / Surprised me" pair of one comment. */
+    predicted: ({ author }: { author: string }) => `Did you see @${author}'s point coming?`,
+    sawIt: "Saw it coming",
+    surprised: "Surprised me",
+    lesson: "Lesson for next time",
+    lessonHint: ({ max }: { max: number }) => `${fmt.number(max)} characters or fewer.`,
+    saveLesson: "Save the lesson",
+    line: ({ path, line }: { path: string; line?: number }) =>
+      line === undefined ? path : `${path}:${line}`,
+    open: "Open on GitHub",
+    outcome: "Outcome",
+    outcomes: {
+      merged: "Merged",
+      changes: "Changes requested",
+      closed: "Closed without merging",
+      approved: "Approved, not merged yet",
+      commented: "The maintainers commented; no decision yet",
+    },
+    waiting: ({ days }: { days?: number }) =>
+      days === undefined
+        ? "No response yet"
+        : `No response yet (${fmt.plural(days) === "one" ? "1 day" : `${fmt.number(days)} days`})`,
+    locked: "Comparing your forecast with what the maintainers said is part of Pro.",
+    seePro: "See what Pro adds",
   },
   /** SyncPanel: where the contribution stands against its target branch. */
   sync: {
