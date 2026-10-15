@@ -9,12 +9,13 @@ const number = (value: number) => fmt.number(value);
 const m: Translation<typeof en> = {
   eyebrow: "設定",
   title: "讓工作環境準備就緒。",
-  intro: "語言、AI 服務、Agent 安全、上限、資料與授權。這裡的設定都只保留在這台電腦上。",
+  intro: "語言、AI 服務、Agent 安全、學習、上限、資料與授權。這裡的設定都只保留在這台電腦上。",
   nav: { label: "設定分類" },
   sections: {
     general: "一般",
     provider: "AI 服務",
     safety: "Agent 安全",
+    learning: "學習",
     performance: "效能",
     environment: "工作環境",
     data: "資料與隱私",
@@ -109,6 +110,38 @@ const m: Translation<typeof en> = {
       help: "預設關閉：只有專案自己的規則要求時，pull request 草稿才會提到 AI。",
     },
   },
+  learning: {
+    title: "學習",
+    intro: `${product.name} 如何在你核准之前請你確認自己理解變更，以及審查時如何請你先想一想。`,
+    check: {
+      title: "理解檢查",
+      text: "核准 pull request 之前，你要用自己的話講一遍這個變更、回答幾個相關問題，並自己對照參考答案評分。不會有 AI 模型替你評分。",
+      label: "核准前，請我用自己的話講一遍每個變更",
+      help: "預設開啟。開啟時，要等你用自己的話講完最新版本的變更，才能核准與發佈。",
+      lockedBy: ({ variable }) =>
+        `由 ${variable} 保持開啟。移除這個變數並重新啟動 ${product.name} 才能修改。`,
+      confirmTitle: "不用自己的話講一遍就核准？",
+      confirmLost: "你將可以核准一個自己沒有講解過的 pull request。",
+      confirmKept:
+        "每個檔案仍須審閱，pull request 仍由你親自核准，專案規則、issue 與發佈節奏的檢查也都照常進行。",
+      confirmRecorded:
+        "沒有經過檢查就核准的任務會永久標記為「檢查已關閉」：在工作區、你的學習紀錄與匯出檔中都看得到。",
+      confirmBack: "你隨時可以重新開啟；屆時已核准的任務在發佈前也必須先通過檢查。",
+      keep: "保留檢查",
+      turnOff: "關閉檢查",
+    },
+    counts: {
+      checkOff: ({ count }) => `未經檢查就核准的任務：${number(count)}`,
+      median: ({ count, minutes }) =>
+        `最近 ${number(count)} 次檢查花費時間的中位數：${fmt.number(minutes, { maximumFractionDigits: 1 })} 分鐘`,
+      local: "只在這台電腦上計算。",
+    },
+    tryFirst: {
+      title: "先試著答",
+      label: "審查時先試著答",
+      help: "預設開啟：每個檔案的解說會先請你回答它的問題、猜猜另一種改法，再顯示答案與其他做法。關閉後，它們會收在單純的顯示按鈕後面，不需要填寫。",
+    },
+  },
   performance: {
     title: "效能",
     intro: "同時進行多少工作，以及單次 Agent 回合最多能花多久。",
@@ -153,6 +186,7 @@ const m: Translation<typeof en> = {
         BELLPR_MAX_AGENT_PROCESSES: "同時執行的 Agent CLI 行程數：1 到 32，預設 3。",
         BELLPR_AGENT_TIMEOUT_SCALE: "Agent 逾時倍數：0.5 到 10，預設 1。",
         BELLPR_ALLOW_UNSANDBOXED_AGENTS: "設為 1 允許 Claude Code Agent 在沙箱外執行。",
+        BELLPR_REQUIRE_UNDERSTANDING_CHECK: "設為 1 會保持理解檢查開啟並鎖定這項設定。沒有任何值能關閉它。",
         BELLPR_RETENTION_DAYS: "保留已停止與失敗工作檔案的天數：1 到 365，預設 14。",
         BELLPR_LOG_LEVEL: "伺服器紀錄的詳細程度：debug、info（預設）、warn 或 error。",
         BELLPR_LICENSE_KEY: "Pro 授權金鑰，優先於在 App 中儲存的金鑰。",

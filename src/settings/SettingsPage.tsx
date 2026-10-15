@@ -2,6 +2,7 @@ import { useCallback, type Dispatch, type SetStateAction } from "react";
 import {
   Cpu,
   Gauge,
+  GraduationCap,
   HardDrive,
   Info,
   KeyRound,
@@ -24,6 +25,7 @@ import { AboutSection } from "./AboutSection";
 import { DataSection } from "./DataSection";
 import { EnvironmentSection } from "./EnvironmentSection";
 import { GeneralSection } from "./GeneralSection";
+import { LearningSection } from "./LearningSection";
 import { LicenseSection } from "./LicenseSection";
 import { PerformanceSection, type StatusLimits } from "./PerformanceSection";
 import { ProviderSection } from "./ProviderSection";
@@ -58,6 +60,7 @@ const icons: Record<SettingsSection, LucideIcon> = {
   general: Languages,
   provider: Cpu,
   safety: ShieldCheck,
+  learning: GraduationCap,
   performance: Gauge,
   environment: Wrench,
   data: HardDrive,
@@ -137,6 +140,9 @@ export function SettingsPage({
           providerHref={sectionHref("provider", flags)}
         />
       );
+      break;
+    case "learning":
+      content = <LearningSection settings={settings} />;
       break;
     case "performance":
       content = (

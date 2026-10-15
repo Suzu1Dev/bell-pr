@@ -14,12 +14,13 @@ const settings = {
   eyebrow: "SETTINGS",
   title: "Get your workspace ready.",
   intro:
-    "Language, AI provider, agent safety, limits, data and license. Everything you set here stays on this computer.",
+    "Language, AI provider, agent safety, learning, limits, data and license. Everything you set here stays on this computer.",
   nav: { label: "Settings sections" },
   sections: {
     general: "General",
     provider: "AI provider",
     safety: "Agent safety",
+    learning: "Learning",
     performance: "Performance",
     environment: "Environment",
     data: "Data & privacy",
@@ -128,6 +129,48 @@ const settings = {
       help: "Off by default: pull request drafts mention AI only when the project's own rules ask for it.",
     },
   },
+  /** The understanding check with its explicit off-switch, and the try-first prompts. */
+  learning: {
+    title: "Learning",
+    intro: `How ${product.name} asks you to understand a change before you approve it, and how it prompts you while you review.`,
+    check: {
+      title: "Understanding check",
+      text: "Before you approve a pull request, you explain the change back in your own words, answer a few questions about it and grade your answers against the reference yourself. No AI model grades you.",
+      label: "Ask me to explain each change back before approval",
+      help: "On by default. While it is on, approving and publishing wait until you have explained the latest version of the change back.",
+      /** BELLPR_REQUIRE_UNDERSTANDING_CHECK=1 locks it on; no variable turns it off. */
+      lockedBy: ({ variable }: { variable: string }) =>
+        `Kept on by ${variable}. Remove the variable and restart ${product.name} to change this.`,
+      confirmTitle: "Approve without explaining the change back?",
+      /** What is lost. */
+      confirmLost: "You will be able to approve a pull request you have not explained.",
+      /** What stays mandatory. */
+      confirmKept:
+        "Every file still has to be reviewed, you still approve the pull request yourself, and every project-rule, issue and pacing check still applies.",
+      /** What is recorded. */
+      confirmRecorded:
+        "Runs approved without the check are marked “Check off” for good: in the workspace, your learning record and the export.",
+      confirmBack:
+        "You can turn it back on any time; runs already approved are then held to it before they are published.",
+      /** The first button of the dialog, so it has the focus. */
+      keep: "Keep the check",
+      turnOff: "Turn it off",
+    },
+    /** Counted on this computer from GET /api/learning/counts; hidden when it fails. */
+    counts: {
+      checkOff: ({ count }: { count: number }) =>
+        `Runs approved without the check: ${number(count)}`,
+      /** Shown from 3 timed checks on. */
+      median: ({ count, minutes }: { count: number; minutes: number }) =>
+        `Median time of your last ${number(count)} ${fmt.plural(count) === "one" ? "check" : "checks"}: ${fmt.number(minutes, { maximumFractionDigits: 1 })} min`,
+      local: "Measured on this computer only.",
+    },
+    tryFirst: {
+      title: "Try first",
+      label: "Try-first prompts during review",
+      help: "On by default: in each file's explanation, you answer its question and guess another way to make the change before the answer and the alternatives show. When this is off, they show behind a plain reveal button, with nothing to fill in.",
+    },
+  },
   performance: {
     title: "Performance",
     intro: "How much work runs at once, and how long an agent turn may take.",
@@ -182,6 +225,8 @@ const settings = {
           "Agent timeout multiplier: 0.5 to 10, default 1.",
         BELLPR_ALLOW_UNSANDBOXED_AGENTS:
           "1 allows unsandboxed Claude Code agents.",
+        BELLPR_REQUIRE_UNDERSTANDING_CHECK:
+          "1 keeps the understanding check on and locks the setting. No value turns it off.",
         BELLPR_RETENTION_DAYS:
           "Days to keep the files of stopped and failed runs: 1 to 365, default 14.",
         BELLPR_LOG_LEVEL:

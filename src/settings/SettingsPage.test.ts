@@ -14,6 +14,7 @@ import { AboutSection } from "./AboutSection";
 import { DataSection } from "./DataSection";
 import { EnvironmentSection } from "./EnvironmentSection";
 import { GeneralSection } from "./GeneralSection";
+import { LearningSection } from "./LearningSection";
 import { LicenseSection } from "./LicenseSection";
 import { PerformanceSection } from "./PerformanceSection";
 import { ProviderSection } from "./ProviderSection";
@@ -155,6 +156,7 @@ test("the settings page lists its sections, each at its own address, and opens o
     ["#/settings/general", "general"],
     ["#/settings/provider", "provider"],
     ["#/settings/safety", "safety"],
+    ["#/settings/learning", "learning"],
     ["#/settings/performance", "performance"],
     ["#/settings/environment", "environment"],
     ["#/settings/data", "data"],
@@ -378,9 +380,12 @@ test("Environment shows the GitHub connection without the brand icon, the checkl
     "BELLPR_MAX_AGENT_PROCESSES",
     "BELLPR_AGENT_TIMEOUT_SCALE",
     "BELLPR_ALLOW_UNSANDBOXED_AGENTS",
+    "BELLPR_REQUIRE_UNDERSTANDING_CHECK",
     "BELLPR_LOG_LEVEL",
   ])
     assert.match(advanced, new RegExp(`<code>${variable}</code>`));
+  // The lock can only keep the understanding check on.
+  assert.match(advanced, /<code>BELLPR_REQUIRE_UNDERSTANDING_CHECK<\/code><\/dt><dd>1 keeps the understanding check on and locks the setting\. No value turns it off\.<\/dd>/);
   assert.match(advanced, /<code>BELLPR_RETENTION_DAYS<\/code><\/dt><dd>Days to keep the files of stopped and failed runs: 1 to 365, default 14\.<\/dd>/);
   // No documentation link, and no sentence pointing to one, while the
   // product has no docs URL.
@@ -537,6 +542,7 @@ test("every section reads in English with no Chinese left, and in zh-TW", () => 
       webAccessLocked: false,
       providerHref: "#/settings/provider",
     }),
+    createElement(LearningSection, { settings: appSettings(view) }),
     createElement(PerformanceSection, {
       settings: appSettings(view),
       limits: status.limits,

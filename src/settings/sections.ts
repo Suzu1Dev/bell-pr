@@ -6,6 +6,7 @@ export const settingsSections = [
   "general",
   "provider",
   "safety",
+  "learning",
   "performance",
   "environment",
   "data",

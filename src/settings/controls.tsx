@@ -65,9 +65,18 @@ export function SettingsGroup({
 
 /**
  * Says that an environment variable sets this value, so the control is
- * read-only. Renders nothing without a variable.
+ * read-only. Renders nothing without a variable. `hint` replaces the
+ * general sentence for a variable that can only lock one value.
  */
-export function LockedNote({ variable, id }: { variable?: string; id: string }) {
+export function LockedNote({
+  variable,
+  id,
+  hint,
+}: {
+  variable?: string;
+  id: string;
+  hint?: string;
+}) {
   const t = useT("settings").lock;
   if (!variable) return null;
   return (
@@ -76,7 +85,7 @@ export function LockedNote({ variable, id }: { variable?: string; id: string }) 
         <Lock size={12} aria-hidden="true" />
         {t.badge}
       </span>
-      <span>{t.hint({ variable })}</span>
+      <span>{hint ?? t.hint({ variable })}</span>
     </p>
   );
 }
@@ -97,6 +106,7 @@ export function SettingSwitch({
   loading = false,
   saving = false,
   lockedBy,
+  lockedHint,
   onChange,
 }: {
   label: string;
@@ -111,6 +121,8 @@ export function SettingSwitch({
   saving?: boolean;
   /** The environment variable that sets this, when one does. */
   lockedBy?: string;
+  /** What the lock note says instead of the general sentence. */
+  lockedHint?: string;
   onChange: (checked: boolean) => void;
 }) {
   const id = useId();
@@ -134,7 +146,7 @@ export function SettingSwitch({
             {help}
           </p>
         )}
-        <LockedNote variable={lockedBy} id={`${id}-lock`} />
+        <LockedNote variable={lockedBy} id={`${id}-lock`} hint={lockedHint} />
       </div>
     </div>
   );
