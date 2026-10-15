@@ -108,15 +108,27 @@ test("every detail field is left out", () => {
   assert.deepEqual(
     [...runDetailFields].sort(),
     [
+      "attempts",
+      "contributionFacts",
       "conversations",
       "draftPreparation",
       "explanations",
+      "feedbackTags",
       "followUps",
+      "guardOverrides",
       "logs",
       "notes",
       "prFeedback",
+      "practice",
       "reports",
+      "reviewability",
       "sync",
+      "understanding",
     ],
   );
+});
+
+test("the list keeps the understanding-check-off mark, which its badge needs", () => {
+  const summary = summarizeRun({ ...run, understandingCheckOff: true });
+  assert.equal(summary.understandingCheckOff, true);
 });

@@ -18,7 +18,8 @@ export function registerReposRoutes(
   { workbench, insights, license = fixedLicense("free") }: RouteDeps,
 ) {
   // `updatable` tells the UI whether BELL owns the clone; it is not stored.
-  const presentRepo = (repo: Repository) => ({
+  // Coach debriefs stay out of the list: the learning page reads them.
+  const presentRepo = ({ debriefs: _debriefs, ...repo }: Repository) => ({
     ...repo,
     updatable: workbench.managedClone(repo),
   });

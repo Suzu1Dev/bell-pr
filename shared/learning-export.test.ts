@@ -13,14 +13,18 @@ import type { Repository, RunCore } from "./types.js";
 
 const sharedDirectory = path.dirname(fileURLToPath(import.meta.url));
 
-/** Every module shared/learning-export.ts loads, followed through relative imports. */
+/**
+ * Every module shared/learning-export.ts loads, followed through relative
+ * imports. Type-only imports load nothing at run time, so they are not
+ * followed.
+ */
 function importGraph(entry: string) {
   const seen = new Map<string, string[]>();
   const visit = (file: string) => {
     if (seen.has(file)) return;
     const source = readFileSync(file, "utf8");
     const specifiers = [
-      ...source.matchAll(/^\s*(?:import|export)\b[^;]*?\bfrom\s+"([^"]+)"/gms),
+      ...source.matchAll(/^\s*(?:import|export)\b(?!\s+type\b)[^;]*?\bfrom\s+"([^"]+)"/gms),
       ...source.matchAll(/^\s*import\s+"([^"]+)"/gm),
     ].map((match) => match[1]);
     seen.set(file, specifiers);

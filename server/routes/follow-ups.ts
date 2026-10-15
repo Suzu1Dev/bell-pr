@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   followUpFeedbackLimit,
   followUpNoteLimit,
+  followUpRestatementLimit,
 } from "../../shared/followups.js";
 import { fixedLicense, requirePro } from "../license.js";
 import type { RouteDeps } from "./types.js";
@@ -25,6 +26,20 @@ export function registerFollowUpsRoutes(
           .array(z.string().url().max(1024))
           .max(followUpFeedbackLimit),
         note: z.string().max(followUpNoteLimit).optional(),
+        // One line per selected comment in the person's own words; accepted
+        // here so clients can send it, and required once restatements are
+        // enforced (L2A).
+        restatements: z
+          .array(
+            z
+              .object({
+                url: z.string().url().max(1024),
+                text: z.string().max(followUpRestatementLimit),
+              })
+              .strict(),
+          )
+          .max(followUpFeedbackLimit)
+          .optional(),
       })
       .strict()
       .parse(req.body);

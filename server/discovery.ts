@@ -170,6 +170,8 @@ const opportunitySchema = z
       )
       .min(1)
       .max(12),
+    // Practice for the person, not work for the agent team (shared/discovery.ts).
+    learnByHand: z.boolean().optional(),
   })
   .strict();
 const resultSchema = z

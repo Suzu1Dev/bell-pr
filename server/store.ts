@@ -59,9 +59,161 @@ const loose = <T extends z.ZodRawShape>(shape: T) =>
   z.object(shape).passthrough();
 const text = z.string();
 const list = z.array(text);
+const count = z.number();
+/**
+ * The fields added in v1.1 (all optional). Their caps are the write caps;
+ * lenientRead allows four times as much, so a later build may raise them
+ * within that margin. Vocabularies (confidences, grades, dimensions, policy
+ * kinds) are plain text, so a value from a later build still loads. A
+ * value of one of these fields that this build cannot read is left out
+ * (`catch`) instead of moving the whole run or repository to quarantine.
+ */
+const later = <T extends z.ZodTypeAny>(schema: T) =>
+  schema.optional().catch(undefined);
 
-const repositorySchema = lenientRead(
-  loose({
+const doorSchema = loose({
+  hasPullRequests: z.boolean().optional(),
+  pullRequestCreationPolicy: text.optional(),
+  archived: z.boolean().optional(),
+  disabled: z.boolean().optional(),
+  viewerPermission: text.optional(),
+  login: text.optional(),
+});
+
+const contributionRulesSchema = loose({
+  baseSha: text.optional(),
+  checkedAt: text,
+  door: doorSchema.optional(),
+  findings: z
+    .array(
+      loose({
+        kind: text,
+        path: text,
+        line: count,
+        quote: text.max(300),
+        contribution: z.boolean(),
+      }),
+    )
+    .max(30),
+  filesRead: list.max(60),
+  generated: list.max(30).optional(),
+  mergedSizes: z
+    .array(
+      loose({
+        number: count,
+        additions: count,
+        deletions: count,
+        changedFiles: count,
+      }),
+    )
+    .max(3)
+    .optional(),
+  orgDefaults: text.optional(),
+  unknown: list.optional(),
+});
+
+const debriefSchema = loose({
+  at: text,
+  locale: text,
+  runIds: list.max(20),
+  recurring: loose({ dimension: text, quotes: z.array(text.max(300)).max(3) }).optional(),
+  drills: z
+    .array(
+      loose({
+        context: text.max(600),
+        optionA: text.max(1200),
+        optionB: text.max(1200),
+        question: text.max(300),
+        reveal: text.max(1200),
+      }),
+    )
+    .max(3)
+    .optional(),
+  nextStep: text.max(300),
+});
+
+const understandingSchema = loose({
+  summary: loose({
+    text: text.max(1200),
+    changeFingerprint: text,
+    at: text,
+    confirmedAt: text.optional(),
+  }).optional(),
+  items: z
+    .array(
+      loose({
+        id: text,
+        path: text.optional(),
+        fingerprint: text.optional(),
+        source: text,
+        question: text.max(1800),
+        answer: text.max(1000),
+        dontKnow: z.boolean().optional(),
+        confidence: text,
+        lockedAt: text,
+        grade: text.optional(),
+        correction: text.max(300).optional(),
+        gradedAt: text.optional(),
+      }),
+    )
+    .max(6)
+    .optional(),
+  passedAt: text.optional(),
+  passedFingerprint: text.optional(),
+  passedFiles: z.record(text).optional(),
+  startedAt: text.optional(),
+  forecast: loose({
+    dimension: text.optional(),
+    question: text.max(200).optional(),
+    at: text,
+  }).optional(),
+  history: z
+    .array(
+      loose({
+        passedAt: text,
+        questions: count,
+        misses: count,
+        confidentMisses: count,
+        seconds: count.optional(),
+        round: text.optional(),
+      }),
+    )
+    .max(20)
+    .optional(),
+});
+
+const attemptSchema = loose({
+  fingerprint: text,
+  quiz: loose({
+    answer: text.max(1000).optional(),
+    confidence: text.optional(),
+    grade: text.optional(),
+    skipped: z.boolean().optional(),
+    at: text,
+  }).optional(),
+  road: loose({
+    guess: text.max(300).optional(),
+    choice: text.optional(),
+    why: text.max(300).optional(),
+    at: text,
+  }).optional(),
+});
+
+const contributionFactsSchema = loose({
+  checkedAt: text,
+  door: doorSchema.optional(),
+  issue: loose({ url: text }).optional(),
+  pacing: loose({
+    openPrs: count.optional(),
+    mergedPrs: count.optional(),
+    waitingPrs: count.optional(),
+    viewerPermission: text.optional(),
+  }).optional(),
+  unknown: list.optional(),
+});
+
+/** Read schema of a repository in state.json (lenientRead wraps it below). */
+export const repositoryReadSchema = loose({
     id: text.min(1),
     name: text,
     owner: text,
@@ -71,11 +223,14 @@ const repositorySchema = lenientRead(
     url: text,
     language: text.optional(),
     updatedAt: text.optional(),
-  }),
-);
+    contributionRules: later(contributionRulesSchema),
+    debriefs: later(z.array(debriefSchema).max(5)),
+});
 
-const runSchema = lenientRead(
-  loose({
+const repositorySchema = lenientRead(repositoryReadSchema);
+
+/** Read schema of a run in state.json (lenientRead wraps it below). */
+export const runReadSchema = loose({
     id: text.min(1),
     repoId: text,
     title: text,
@@ -150,6 +305,9 @@ const runSchema = lenientRead(
           ]),
           parentCommit: text,
           feedbackUrls: list,
+          restatements: later(
+            z.array(loose({ url: text, text: text.max(300) })).max(20),
+          ),
         }),
       )
       .optional(),
@@ -164,8 +322,44 @@ const runSchema = lenientRead(
     unsandboxed: z.boolean().optional(),
     workspaceRemovedAt: text.optional(),
     workspaceBytes: z.number().optional(),
-  }),
-);
+    // Only the fields added in v1.1; the rest of the feedback passes through.
+    prFeedback: loose({
+      prState: later(text),
+      merged: later(z.boolean()),
+      reviewDecision: later(text),
+    }).optional(),
+    understanding: later(understandingSchema),
+    understandingCheckOff: later(z.boolean()),
+    attempts: later(z.record(attemptSchema)),
+    feedbackTags: later(
+      z.record(
+        loose({
+          dimension: text.optional(),
+          predicted: z.boolean().optional(),
+          lesson: text.max(200).optional(),
+          at: text,
+        }),
+      ),
+    ),
+    practice: later(
+      z.record(
+        loose({
+          box: count,
+          dueAt: text,
+          lastAt: text.optional(),
+          lastGrade: text.optional(),
+          lastConfidence: text.optional(),
+        }),
+      ),
+    ),
+    contributionFacts: later(contributionFactsSchema),
+    guardOverrides: later(
+      z.array(loose({ id: text.max(40), reason: text.max(200), at: text })).max(8),
+    ),
+    reviewability: later(loose({ testReasons: z.record(text.max(300)).optional() })),
+});
+
+const runSchema = lenientRead(runReadSchema);
 
 /** state.json as this build reads it; each repository and run is checked on its own. */
 export const persistedDatabaseSchema = z

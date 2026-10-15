@@ -69,6 +69,12 @@ export interface ContributionOpportunity {
   acceptanceChecks: string[];
   risks: string[];
   evidence: DiscoveryEvidence[];
+  /**
+   * The issue carries a learning label (good first issue and the like):
+   * practice for the person to write by hand, not work for the agent team.
+   * Absent means false.
+   */
+  learnByHand?: boolean;
 }
 
 export interface DiscoveryJob {

@@ -40,6 +40,11 @@ export interface PrFeedback {
   labels?: string[];
   checks?: PrCheck[];
   warnings?: string[];
+  /** The PR's state when read: OPEN, CLOSED or MERGED. Absent on older reads. */
+  prState?: string;
+  merged?: boolean;
+  /** GitHub's reviewDecision: APPROVED, CHANGES_REQUESTED or REVIEW_REQUIRED. Absent on older reads or when GitHub reports none. */
+  reviewDecision?: string;
 }
 
 export const prFeedbackItemLimit = 100;

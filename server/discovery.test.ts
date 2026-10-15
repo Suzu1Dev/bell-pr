@@ -1114,3 +1114,53 @@ test("discovery passes the Codex baseline timeout and a longer, announced wait f
     await claude.cleanup();
   }
 });
+
+test("a build that predates learnByHand still reads an opportunity that has it", () => {
+  const opportunity = {
+    id: "widgets-good-first",
+    repository: "acme/widgets",
+    title: "Fix the greeting comma",
+    summary: "The greeting prints a dangling comma for an empty name.",
+    userNeed: "People with no display name see a broken greeting.",
+    contributionRules: "Open an issue before changing behavior.",
+    popularity: "Sample snapshot.",
+    feasibility: "One function and its test.",
+    difficulty: "beginner",
+    effort: "An hour.",
+    firstSteps: ["Read the greeting helper."],
+    acceptanceChecks: ["An empty name prints no comma."],
+    risks: ["None known."],
+    evidence: [{ sourceId: "acme/widgets:issue:7", quote: "The greeting shows a comma", reason: "The issue." }],
+    learnByHand: true,
+  };
+  const job = {
+    id: "00000000-0000-4000-8000-000000000001",
+    status: "ready",
+    phase: "complete",
+    message: "Done.",
+    preferences: { ...defaultDiscoveryPreferences },
+    createdAt: "2026-10-15T00:00:00.000Z",
+    candidates: [],
+    opportunities: [opportunity],
+    warnings: [],
+  };
+  // An older build: the same job schema with opportunities that lack the field.
+  const olderOpportunity = discoveryJobSchema.shape.opportunities.element.omit({
+    learnByHand: true,
+  });
+  const older = lenientRead(
+    discoveryJobSchema.extend({ opportunities: olderOpportunity.array().max(6) }),
+  ).parse(job);
+  assert.equal(older.opportunities.length, 1);
+  assert.equal("learnByHand" in older.opportunities[0], false);
+  assert.equal(older.opportunities[0].title, opportunity.title);
+  // This build keeps it, on read and in the agent-output schema alike.
+  assert.equal(lenientRead(discoveryJobSchema).parse(job).opportunities[0].learnByHand, true);
+  assert.equal(discoveryJobSchema.parse(job).opportunities[0].learnByHand, true);
+  // Absent stays absent.
+  const { learnByHand: _learnByHand, ...plain } = opportunity;
+  assert.equal(
+    "learnByHand" in discoveryJobSchema.parse({ ...job, opportunities: [plain] }).opportunities[0],
+    false,
+  );
+});

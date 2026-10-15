@@ -20,6 +20,9 @@ import { git } from "./process.js";
 import { Store } from "./store.js";
 import type { Database, Repository, Run } from "./types.js";
 import { withLocale } from "./i18n/index.js";
+import { z } from "zod";
+import { lenientRead } from "./persisted-schema.js";
+import { repositoryReadSchema, runReadSchema } from "./store.js";
 
 async function dataDirectory() {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-store-test-"));
@@ -648,4 +651,206 @@ test("a state.json from a newer format is never replaced by a backup", async (t)
   await writeFile(statePath, newer);
   await assert.rejects(new Store(directory).initialize(), /version 1/);
   assert.equal(await readFile(statePath, "utf8"), newer);
+});
+
+// v1.1 fields (plan README §7): every field is optional, and an older build
+// that lacks it in its read schema still reads data that carries it. The
+// older build is simulated by leaving the field out of the schema.
+
+/** A finished run in review that carries every field v1.1 adds. */
+function runWithV11Fields(): Run {
+  const run: Run = {
+    ...interruptedRun(),
+    id: "run-v11",
+    status: "review",
+    locale: "en",
+    understanding: {
+      summary: {
+        text: "The greeting test now covers the empty name, so a missing name cannot print a dangling comma again.",
+        changeFingerprint: "0123456789abcdef",
+        at: "2026-10-15T00:01:00.000Z",
+      },
+      items: [
+        {
+          id: "selfCheck:hello.ts",
+          path: "hello.ts",
+          fingerprint: "e".repeat(64),
+          source: "selfCheck",
+          question: "What does the greeting print for an empty name?",
+          answer: "It prints Hello without a comma",
+          confidence: "think",
+          lockedAt: "2026-10-15T00:02:00.000Z",
+          grade: "partly",
+          correction: "it prints Hello, world as the fallback",
+          gradedAt: "2026-10-15T00:03:00.000Z",
+        },
+      ],
+      passedAt: "2026-10-15T00:03:00.000Z",
+      passedFingerprint: "0123456789abcdef",
+      passedFiles: { "hello.ts": "e".repeat(64) },
+      forecast: { dimension: "tests", question: "Is the empty name tested?", at: "2026-10-15T00:03:00.000Z" },
+      history: [{ passedAt: "2026-10-15T00:03:00.000Z", questions: 1, misses: 1, confidentMisses: 1, seconds: 120 }],
+    },
+    understandingCheckOff: true,
+    attempts: {
+      "hello.ts": {
+        fingerprint: "e".repeat(64),
+        quiz: { answer: "it prints Hello alone", confidence: "sure", grade: "missed", at: "2026-10-15T00:00:30.000Z" },
+        road: { guess: "a default parameter", choice: "keep", why: "it reads clearly", at: "2026-10-15T00:00:40.000Z" },
+      },
+    },
+    feedbackTags: {
+      "https://github.com/acme/widgets/pull/3#discussion_r1": {
+        dimension: "tests",
+        predicted: true,
+        at: "2026-10-16T00:00:00.000Z",
+      },
+    },
+    practice: {
+      "check:selfCheck:hello.ts": { box: 1, dueAt: "2026-10-18T00:00:00.000Z", lastGrade: "got", lastConfidence: "sure" },
+    },
+    contributionFacts: {
+      checkedAt: "2026-10-15T00:04:00.000Z",
+      door: { hasPullRequests: true, pullRequestCreationPolicy: "all", viewerPermission: "READ" },
+      issue: { url: "https://github.com/acme/widgets/issues/7", state: "OPEN", labels: ["bug"] },
+      pacing: { openPrs: 0, mergedPrs: 0 },
+      unknown: ["pacing: rate limited"],
+    },
+    guardOverrides: [
+      { id: "issue-has-pr", reason: "Their PR was abandoned two months ago.", at: "2026-10-15T00:05:00.000Z" },
+    ],
+    reviewability: { testReasons: { "hello.test.ts#-4": "The assertion moved to the new test case." } },
+    prFeedback: {
+      fetchedAt: "2026-10-16T00:00:00.000Z",
+      prNumber: 3,
+      items: [],
+      prState: "OPEN",
+      merged: false,
+      reviewDecision: "CHANGES_REQUESTED",
+    },
+    followUps: [
+      {
+        id: "round-1",
+        requestedAt: "2026-10-16T00:00:00.000Z",
+        feedbackUrls: ["https://github.com/acme/widgets/pull/3#discussion_r1"],
+        restatements: [
+          { url: "https://github.com/acme/widgets/pull/3#discussion_r1", text: "They want a test for the empty name." },
+        ],
+        status: "discarded",
+        parentCommit: "b".repeat(40),
+      },
+    ],
+  };
+  for (const agent of run.agents) agent.status = "complete";
+  run.team!.tasks[0].status = "complete";
+  delete run.draftPreparation;
+  delete run.explanations;
+  return run;
+}
+
+/** A repository that carries both repository fields v1.1 adds. */
+const repositoryWithV11Fields: Repository = {
+  ...repository,
+  contributionRules: {
+    checkedAt: "2026-10-15T00:00:00.000Z",
+    door: { hasPullRequests: true },
+    findings: [
+      { kind: "disclose", path: "CONTRIBUTING.md", line: 12, quote: "If you used AI tools, say so in the PR description.", contribution: true },
+    ],
+    filesRead: ["CONTRIBUTING.md", ".github/pull_request_template.md"],
+    generated: ["dist/**"],
+    mergedSizes: [{ number: 2, additions: 30, deletions: 4, changedFiles: 2 }],
+    orgDefaults: "local/.github",
+  },
+  debriefs: [
+    {
+      at: "2026-10-20T00:00:00.000Z",
+      locale: "en",
+      runIds: ["run-v11"],
+      recurring: { dimension: "tests", quotes: ["Is the empty name tested?"] },
+      drills: [{ context: "A greeting helper.", optionA: "A default parameter.", optionB: "An explicit check.", question: "Which fits this project, and why?", reveal: "The project prefers explicit checks." }],
+      nextStep: "Write the empty-name test before you change the greeting again.",
+    },
+  ],
+};
+
+const olderRunSchemas = {
+  understanding: runReadSchema.omit({ understanding: true }),
+  understandingCheckOff: runReadSchema.omit({ understandingCheckOff: true }),
+  attempts: runReadSchema.omit({ attempts: true }),
+  feedbackTags: runReadSchema.omit({ feedbackTags: true }),
+  practice: runReadSchema.omit({ practice: true }),
+  contributionFacts: runReadSchema.omit({ contributionFacts: true }),
+  guardOverrides: runReadSchema.omit({ guardOverrides: true }),
+  reviewability: runReadSchema.omit({ reviewability: true }),
+  // Before v1.1 the run schema did not read prFeedback at all.
+  "prFeedback.prState, merged and reviewDecision": runReadSchema.omit({ prFeedback: true }),
+  "followUps[].restatements": runReadSchema.extend({
+    followUps: z
+      .array(runReadSchema.shape.followUps.unwrap().element.omit({ restatements: true }))
+      .optional(),
+  }),
+};
+
+for (const [field, older] of Object.entries(olderRunSchemas))
+  test(`a build that predates the run's ${field} still reads a run that has it`, () => {
+    const written = JSON.parse(JSON.stringify(runWithV11Fields()));
+    const read = lenientRead(older).safeParse(written);
+    assert.ok(read.success, read.success ? "" : read.error.message);
+    // state.json passes unknown fields through, so the field survives a save.
+    assert.deepEqual(read.data, written);
+  });
+
+for (const [field, older] of Object.entries({
+  contributionRules: repositoryReadSchema.omit({ contributionRules: true }),
+  debriefs: repositoryReadSchema.omit({ debriefs: true }),
+}))
+  test(`a build that predates the repository's ${field} still reads a repository that has it`, () => {
+    const written = JSON.parse(JSON.stringify(repositoryWithV11Fields));
+    const read = lenientRead(older).safeParse(written);
+    assert.ok(read.success, read.success ? "" : read.error.message);
+    assert.deepEqual(read.data, written);
+  });
+
+test("runs and repositories with every v1.1 field load and save unchanged", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const fixture: Database = {
+    version: 1,
+    repos: [repositoryWithV11Fields],
+    runs: [runWithV11Fields()],
+  };
+  await writeFile(path.join(directory, "state.json"), JSON.stringify(fixture));
+  const store = new Store(directory);
+  await store.initialize();
+  assert.equal(store.recovery, undefined);
+  assert.deepEqual(store.data, fixture);
+  await store.save();
+  assert.deepEqual(JSON.parse(await readFile(path.join(directory, "state.json"), "utf8")), fixture);
+});
+
+test("a v1.1 field this build cannot read is left out instead of quarantining the run", async (t) => {
+  const run = {
+    ...runWithV11Fields(),
+    // A later build wrote shapes this build does not accept.
+    understanding: { items: "not a list" },
+    guardOverrides: Array.from({ length: 40 }, () => ({ id: "x", reason: "y", at: "z" })),
+  } as unknown as Run;
+  const { directory, cleanup } = await stateWith([run]);
+  t.after(cleanup);
+  const store = new Store(directory);
+  await store.initialize();
+  assert.equal(store.recovery, undefined);
+  assert.equal(store.data.runs.length, 1);
+  assert.equal(store.data.runs[0].understanding, undefined);
+  assert.equal(store.data.runs[0].guardOverrides, undefined);
+  // Caps are four times the write caps: 8 overrides become 32 on read.
+  assert.equal(
+    lenientRead(runReadSchema).safeParse({
+      ...JSON.parse(JSON.stringify(runWithV11Fields())),
+      guardOverrides: Array.from({ length: 32 }, () => ({ id: "x", reason: "y", at: "z" })),
+    }).data?.guardOverrides?.length,
+    32,
+  );
+  assert.equal(store.data.runs[0].understandingCheckOff, true);
 });

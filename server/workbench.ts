@@ -43,7 +43,10 @@ import { currentLocale, sm, withLocale } from "./i18n/index.js";
 import { parseLocale } from "../shared/i18n/locale.js";
 import { closeLog, initLog, log } from "./log.js";
 import { logged, logRunQueued } from "./run-events.js";
-import { activeFollowUp } from "../shared/followups.js";
+import {
+  activeFollowUp,
+  type FollowUpStartInput,
+} from "../shared/followups.js";
 import * as cleanup from "./cleanup.js";
 import { runJanitor } from "./janitor.js";
 
@@ -860,10 +863,7 @@ export class Workbench {
   }
 
   /** Starts a round of changes on a published PR from maintainer feedback. */
-  async startFollowUp(
-    id: string,
-    input: { feedbackUrls: string[]; note?: string },
-  ) {
+  async startFollowUp(id: string, input: FollowUpStartInput) {
     cleanup.assertWorkspacePresent(this.run(id), { update: true });
     return followUps.startFollowUp(this.context, id, input);
   }

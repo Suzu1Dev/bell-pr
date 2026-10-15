@@ -7,6 +7,7 @@ import {
   type StoredExplanation,
 } from "../../shared/explanations";
 import type { RunStatus } from "../../shared/types";
+import type { RunUnderstanding } from "../../shared/understanding";
 import { api } from "../api";
 import { getDemo } from "../demo";
 import { useFormat, useLocale, useT } from "../i18n";
@@ -34,6 +35,10 @@ export interface LearningRun {
   prUrl?: string;
   explanations: Record<string, StoredExplanation>;
   notes: Record<string, LearnerNote>;
+  /** The run's understanding check, for the learning record's check marks. */
+  understanding?: RunUnderstanding;
+  /** Approved with the understanding check off. */
+  understandingCheckOff?: boolean;
 }
 
 /** One page of the learning record: 20 runs, newest first. */
