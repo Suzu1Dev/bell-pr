@@ -53,6 +53,11 @@ const understanding = {
     "This comment is not in the latest feedback read. Read the feedback again, then tag it.",
   practiceKeyUnknown:
     "This practice item is no longer part of this run. Reload the practice deck.",
+  debriefNoRecords:
+    "There is nothing to debrief yet. Take the understanding check, or read and tag maintainer feedback, on a run of this project first.",
+  debriefInvalid:
+    "The coach's answer was incomplete or not in the expected form, so nothing was saved. Try again.",
+  debriefRunning: "A coach debrief of this project is already being written.",
   /** A practice question about a maintainer comment on a file that surprised the person. */
   practiceFeedbackFileQuestion: ({ path, title }: { path: string; title: string }) =>
     `A maintainer commented on ${path} in "${title}". What did they ask for, and what will you do differently next time?`,

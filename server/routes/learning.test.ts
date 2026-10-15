@@ -11,7 +11,7 @@ import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { createApp } from "../index.js";
-import { fixedLicense, type LicenseService } from "../license.js";
+import { fixedLicense, OfflineLicenseService, type LicenseService } from "../license.js";
 import { Store } from "../store.js";
 import type { Repository, Run } from "../types.js";
 import { Workbench } from "../workbench.js";
@@ -389,18 +389,107 @@ test("the counts read every run, beyond the first learning page, and answer on F
   assert.deepEqual(counts.body.checkSeconds, { timed: 25, median: 80 });
 });
 
+/** The coach's answer: one quote from the records and one made up. */
+const coachAnswer = JSON.stringify({
+  recurring: {
+    dimension: "tests",
+    quotes: ["Please add a test for the exhausted case.", "Tests are always required in this project."],
+  },
+  drills: [
+    {
+      context: "How the client waits between retries.",
+      optionA: "Wait a fixed second.",
+      optionB: "Wait the time Retry-After asks for, capped by maxDelay.",
+      question: "Which fits this project, and why?",
+      reveal: "B respects the server's own pacing; A is simpler but can retry too early.",
+    },
+  ],
+  nextStep: "Write the test for the last allowed attempt before the next pull request.",
+});
+
+test("the coach debrief: 402 on Free, stored on the trial with checked quotes, and still readable after the trial", async (t) => {
+  const licenseDirectory = await mkdtemp(path.join(os.tmpdir(), "bell-learning-license-"));
+  t.after(() => rm(licenseDirectory, { recursive: true, force: true }));
+  const clock = { now: Date.parse("2026-10-15T00:00:00.000Z") };
+  const license = new OfflineLicenseService(licenseDirectory, {
+    publicKeys: {},
+    revoked: [],
+    now: () => clock.now,
+    quiet: true,
+  });
+  await license.initialize();
+  const roles: string[] = [];
+  const { call, store } = await serveLearning(t, {
+    license,
+    workbench: (state) =>
+      new Workbench(
+        state,
+        async (input) => {
+          roles.push(`${input.role}:${input.readonly}`);
+          return coachAnswer;
+        },
+        { getModelCatalog: async () => ({ models: [], source: "codex" }) },
+      ),
+  });
+  const repoId = "repo-learning";
+  // Free: writing a debrief needs Pro, and no agent runs.
+  const free = await call("POST", "/learning/debrief", { repoId });
+  assert.equal(free.status, 402);
+  assert.equal(free.body.code, "pro_required");
+  assert.equal(free.body.feature, "coachDebrief");
+  assert.equal(free.body.error, "The coach debrief needs a Pro license.");
+  assert.deepEqual(roles, []);
+  // Reading stays open: none stored yet.
+  assert.deepEqual((await call("GET", `/learning/debriefs?repoId=${repoId}`)).body, { debriefs: [] });
+
+  await license.startTrial();
+  for (const body of [{}, { repoId: "" }, { repoId, extra: true }])
+    assert.equal((await call("POST", "/learning/debrief", body)).status, 400, JSON.stringify(body));
+  assert.equal((await call("POST", "/learning/debrief", { repoId: "repo-missing" })).status, 404);
+  const written = await call("POST", "/learning/debrief", { repoId });
+  assert.equal(written.status, 200);
+  assert.deepEqual(roles, ["coach:true"]);
+  const { debrief } = written.body;
+  assert.equal(debrief.locale, "en");
+  assert.deepEqual(debrief.runIds, ["published"]);
+  // The made-up quote is gone; the one from the maintainer's review stays.
+  assert.deepEqual(debrief.recurring, { dimension: "tests", quotes: ["Please add a test for the exhausted case."] });
+  assert.equal(debrief.drills.length, 1);
+  assert.deepEqual(store.data.repos[0].debriefs, [debrief]);
+  // GET /api/repos still leaves the debriefs out.
+  const repos = await call("GET", "/repos");
+  assert.equal("debriefs" in repos.body.repos[0], false);
+
+  // The trial ends: writing is Pro again, and the stored debrief stays readable.
+  clock.now += 15 * 24 * 60 * 60 * 1000;
+  assert.equal(license.summary().plan, "free");
+  const after = await call("POST", "/learning/debrief", { repoId });
+  assert.equal(after.status, 402);
+  assert.equal(after.body.feature, "coachDebrief");
+  const read = await call("GET", `/learning/debriefs?repoId=${repoId}`);
+  assert.equal(read.status, 200);
+  assert.deepEqual(read.body, { debriefs: [debrief] });
+  assert.equal((await call("GET", "/learning/debriefs")).status, 400);
+  assert.equal((await call("GET", "/learning/debriefs?repoId=repo-missing")).status, 404);
+  // The drill is on the deck, on Free too.
+  const deck = await call("GET", "/learning/practice");
+  assert.ok(deck.body.items.some((item: { kind: string; runId: string }) => item.kind === "drill" && item.runId === "published"));
+});
+
 test("every learning-loop read and write answers on Free; none is gated", async (t) => {
   const { call } = await serveLearning(t);
   for (const [method, endpoint, body] of [
     ["GET", "/learning/counts"],
     ["GET", "/learning/practice"],
+    ["GET", "/learning/debriefs?repoId=repo-learning"],
     ["PATCH", "/runs/published/feedback-tags", { url: commentUrl, dimension: "risk" }],
   ] as const) {
     const response = await call(method, endpoint, body);
     assert.equal(response.status, 200, endpoint);
   }
   const routes = await readFile(path.join(import.meta.dirname, "learning.ts"), "utf8");
-  // Only the debrief's POST may be gated.
-  for (const line of routes.split("\n").filter((entry) => entry.includes("requirePro(")))
-    assert.match(line, /app\.post\("\/api\/learning\/debrief"/);
+  // Only the debrief's POST is gated.
+  const gated = routes.split("\n").filter((entry) => entry.includes("requirePro("));
+  assert.equal(gated.length, 1);
+  assert.match(gated[0], /app\.post\("\/api\/learning\/debrief", licensing\.requirePro\(license, "coachDebrief"\)/);
 });

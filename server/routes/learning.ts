@@ -1,9 +1,10 @@
 /**
  * The learning record across runs (GET /api/learning?cursor=) and the
- * learning loop after review: feedback tags, the practice deck and the
- * plain counts. Every route here is open on every plan (product rule 3):
- * reading is never gated, and tags and practice grades are the person's
- * own notes on existing data. Request schemas are strict.
+ * learning loop after review: feedback tags, the practice deck, the plain
+ * counts and the coach debrief. Every route here is open on every plan
+ * (product rule 3) except writing a debrief (Pro, coachDebrief): reading is
+ * never gated, and tags and practice grades are the person's own notes on
+ * existing data. Request schemas are strict.
  *
  * createApp registers this module in its fixed place, before the /api 404
  * handler.
@@ -19,6 +20,9 @@ import {
   type RunUnderstanding,
 } from "../../shared/understanding.js";
 import { sm } from "../i18n/index.js";
+// One namespace, so the debrief's POST is the only line here that names the Pro gate.
+import * as licensing from "../license.js";
+import { resolveModelExecution } from "../models.js";
 import { AppError, type Run } from "../types.js";
 import type { RouteDeps } from "./types.js";
 
@@ -145,7 +149,15 @@ const practiceQuerySchema = z.object({
   now: z.string().datetime({ offset: true }).optional(),
 });
 
-export function registerLearningRoutes(app: Express, { workbench }: RouteDeps) {
+/** POST /api/learning/debrief */
+export const debriefRequestSchema = z
+  .object({ repoId: z.string().min(1).max(200) })
+  .strict();
+
+export function registerLearningRoutes(
+  app: Express,
+  { workbench, insights, license = licensing.fixedLicense("free") }: RouteDeps,
+) {
   app.get("/api/learning", (req, res) => {
     const cursor = req.query.cursor;
     if (cursor !== undefined && (typeof cursor !== "string" || cursor.length > 1024))
@@ -175,5 +187,29 @@ export function registerLearningRoutes(app: Express, { workbench }: RouteDeps) {
         feedbackTagSchema.parse(req.body),
       ),
     );
+  });
+  // The coach debrief writes a new document, so writing one is Pro; the
+  // stored ones stay readable on every plan.
+  app.post("/api/learning/debrief", licensing.requirePro(license, "coachDebrief"), async (req, res) => {
+    const { repoId } = debriefRequestSchema.parse(req.body);
+    // The debrief runs with the project's saved settings, as selected.
+    const selected = await insights.getSettings(repoId);
+    license.assertModelEntitlement(selected);
+    const debrief = await workbench.learningLoop.debrief(repoId, {
+      model: async () => ({
+        modelExecution: resolveModelExecution(
+          selected,
+          await workbench.models(selected.provider),
+        ),
+        ponytailMode: selected.ponytailMode,
+      }),
+    });
+    res.json({ debrief });
+  });
+  app.get("/api/learning/debriefs", async (req, res) => {
+    const { repoId } = z
+      .object({ repoId: z.string().min(1).max(200) })
+      .parse({ repoId: req.query.repoId });
+    res.json({ debriefs: await workbench.learningLoop.debriefs(repoId) });
   });
 }

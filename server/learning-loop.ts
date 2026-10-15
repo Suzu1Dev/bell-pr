@@ -17,6 +17,7 @@ import {
   type PracticeAnswerInput,
 } from "../shared/practice.js";
 import type { FeedbackTag } from "../shared/understanding.js";
+import { readableDebriefs, writeDebrief, type DebriefOptions } from "./coach.js";
 import {
   capPractice,
   dueItems,
@@ -50,16 +51,13 @@ export interface LearningLoopFacade {
   recordPractice(runId: string, input: PracticeAnswerInput): Promise<{ run: Run }>;
   /** GET /api/learning/counts: over all runs, never gated. */
   counts(): Promise<LearningCounts>;
-  /** POST /api/learning/debrief (Pro, coachDebrief). */
-  debrief(repoId: string): Promise<CoachDebrief>;
-  /** GET /api/learning/debriefs?repoId=: stored debriefs, never gated. */
+  /** POST /api/learning/debrief (Pro, coachDebrief): writes and stores one. */
+  debrief(repoId: string, options?: DebriefOptions): Promise<CoachDebrief>;
+  /** GET /api/learning/debriefs?repoId=: stored debriefs, newest first, never gated. */
   debriefs(repoId: string): Promise<CoachDebrief[]>;
 }
 
 const now = () => new Date().toISOString();
-
-const notImplemented = () =>
-  Promise.reject(new AppError((m) => m.understanding.notImplemented, 501));
 
 /**
  * Merges the person's tag into `run.feedbackTags[url]`. A comment marked
@@ -107,6 +105,8 @@ export function applyFeedbackTag(run: Run, input: FeedbackTagPatch, at: string) 
 }
 
 export function learningLoopFacade(ctx: WorkbenchContext): LearningLoopFacade {
+  /** Projects whose debrief is being written; one at a time each. */
+  const debriefsRunning = new Set<string>();
   return {
     saveFeedbackTag(runId, input) {
       return ctx.lock(runId, async () => {
@@ -151,7 +151,12 @@ export function learningLoopFacade(ctx: WorkbenchContext): LearningLoopFacade {
       return learningCounts(ctx.store.data.runs);
     },
 
-    debrief: notImplemented,
-    debriefs: notImplemented,
+    debrief(repoId, options = {}) {
+      return writeDebrief(ctx, repoId, options, debriefsRunning);
+    },
+
+    async debriefs(repoId) {
+      return readableDebriefs(ctx.repo(repoId));
+    },
   };
 }
