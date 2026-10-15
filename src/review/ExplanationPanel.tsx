@@ -25,6 +25,7 @@ import { parseLocale, type Locale } from "../../shared/i18n/locale";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
 import { parseReviewOrder } from "../../shared/review-order";
 import {
+  isTrivialFile,
   reportMentionCount,
   type FileAttempt,
   type FileAttemptInput,
@@ -33,6 +34,9 @@ import { useTablistKeys } from "../a11y/useTablistKeys";
 import { useFormat, useLocale, useT } from "../i18n";
 import type { ChatMessage, DiffFile, Run } from "../types";
 import { MarkdownContent } from "./MarkdownContent";
+import { QuizAttempt } from "./QuizAttempt";
+import { RoadChoice } from "./RoadChoice";
+import { currentAttempt, demoSamples } from "./try-first";
 import { withNodes } from "./withNodes";
 import "./review.css";
 
@@ -65,13 +69,23 @@ export interface ExplanationPanelProps {
   runLocale?: Locale;
   /** The person's try-first attempt on this file (`run.attempts[path]`). */
   attempt?: FileAttempt;
-  /** Saves the quiz answer before the reveal, its grade, or the road choice (PATCH /api/runs/:id/attempts). */
+  /**
+   * Saves the quiz answer before the reveal, its grade, or the road choice
+   * (PATCH /api/runs/:id/attempts). It rejects when the save failed (on a
+   * 409 after reloading the run): the reference stays hidden until it
+   * resolves. Pass it only while the run takes attempts (review or
+   * approved, not publishing): every other save answers 409, so no
+   * reference would show. Without it, an attempt lasts while its card is
+   * on screen.
+   */
   onAttempt?(input: {
     quiz?: FileAttemptInput["quiz"];
     road?: FileAttemptInput["road"];
   }): Promise<void>;
   /** Shows the try-first prompts; false brings back the plain reveal (Settings → Learning). */
   tryFirst?: boolean;
+  /** The project's `linguist-generated` patterns (`contributionRules.generated`); those files get no prompts, as in the check. */
+  generated?: readonly string[];
 }
 
 /**
@@ -281,6 +295,10 @@ export function ExplanationPanel({
   onRerunReview,
   reviewBusy,
   runLocale,
+  attempt,
+  onAttempt,
+  tryFirst = true,
+  generated,
 }: ExplanationPanelProps) {
   const t = useT("review");
   const fmt = useFormat();
@@ -368,6 +386,12 @@ export function ExplanationPanel({
   ).length;
   const isTestFile = testFilePattern.test(file.path);
   const fileModule = moduleFor(file.path, modules);
+  // Try first: the quiz and road-choice prompts, except on trivial files.
+  const prompts =
+    tryFirst &&
+    !isTrivialFile({ ...file, fingerprint: file.fingerprint ?? "" }, generated);
+  const fileAttempt = currentAttempt(attempt, file.fingerprint);
+  const samples = demo ? demoSamples(locale, file.path) : undefined;
   // A saved note keeps its text when the diff moves on; the badge says so.
   const noteStale = Boolean(
     note && file.fingerprint && note.fingerprint !== file.fingerprint,
@@ -613,7 +637,18 @@ export function ExplanationPanel({
                   </h3>
                   <MarkdownContent>{explanation.tip}</MarkdownContent>
                 </section>
-                {explanation.alternatives && (
+                {explanation.alternatives && prompts && (
+                  <RoadChoice
+                    key={`road:${file.path}`}
+                    alternatives={explanation.alternatives}
+                    lookup={explanation.lookup}
+                    saved={fileAttempt?.road}
+                    onSave={onAttempt && ((road) => onAttempt({ road }))}
+                    sample={samples?.road}
+                    demo={demo}
+                  />
+                )}
+                {explanation.alternatives && !prompts && (
                   <section className="explain-card explain-card-alternatives">
                     <h3>
                       <Shuffle size={15} />
@@ -630,7 +665,18 @@ export function ExplanationPanel({
                     )}
                   </section>
                 )}
-                {explanation.selfCheck && (
+                {explanation.selfCheck && prompts && (
+                  <QuizAttempt
+                    key={`quiz:${file.path}`}
+                    question={explanation.selfCheck.question}
+                    reference={explanation.selfCheck.answer}
+                    saved={fileAttempt?.quiz}
+                    onSave={onAttempt && ((quiz) => onAttempt({ quiz }))}
+                    sample={samples?.quiz}
+                    demo={demo}
+                  />
+                )}
+                {explanation.selfCheck && !prompts && (
                   <section className="explain-card explain-card-selfcheck">
                     <h3>
                       <HelpCircle size={15} />

@@ -18,7 +18,7 @@ import {
 // These tests pin zh-TW, the language their assertions were written in.
 const { files: demoFiles, run: demoRun } = getDemo("zh-TW");
 
-const render = (file: DiffFile) =>
+const render = (file: DiffFile, props: Partial<ExplanationPanelProps> = {}) =>
   renderZh(
     createElement(ExplanationPanel, {
       file,
@@ -26,6 +26,7 @@ const render = (file: DiffFile) =>
       loading: false,
       onAsk() {},
       demo: true,
+      ...props,
     }),
   );
 
@@ -205,7 +206,8 @@ test("the reports tab renders demo reports with the static-review label and per-
 test("alternatives and self-check cards render only when the explanation carries them, with the answer folded", () => {
   const file = demoFiles[0];
   assert.ok(file.explanation?.alternatives && file.explanation.selfCheck);
-  const html = render(file);
+  // With the try-first prompts off (Settings → Learning), the cards are today's.
+  const html = render(file, { tryFirst: false });
   assert.match(html, /如果換個做法？/);
   assert.match(html, /可以查：/);
   assert.match(html, /<code>exponential backoff<\/code>/);
@@ -226,6 +228,25 @@ test("alternatives and self-check cards render only when the explanation carries
   });
   assert.doesNotMatch(legacy, /如果換個做法？|考考自己/);
   assert.match(legacy, /審閱時，多想一步/);
+});
+
+test("with try first on, the quiz asks before it reveals and the alternative waits for a guess", () => {
+  const file = demoFiles[0];
+  const html = render(file);
+  assert.equal(html.match(/<span class="tf-badge">先試著答<\/span>/g)?.length, 2);
+  assert.match(html, /考考自己/);
+  assert.match(html, /第三次重試/);
+  assert.match(html, /<label class="tf-label" for="[^"]+">你的答案<\/label><textarea/);
+  assert.match(html, /<label class="tf-label" for="[^"]+">先別看：這件事還能怎麼做？<\/label>/);
+  // Neither the folded toggle nor anything it would reveal.
+  assert.doesNotMatch(html, /aria-expanded="false"[^>]*>看答案</);
+  assert.doesNotMatch(html, /full jitter 會在 0 到 4 秒之間/);
+  assert.ok(!html.includes(file.explanation!.alternatives!.slice(0, 20)));
+  // The lookup chips stay where they were.
+  assert.match(html, /可以查：/);
+  assert.match(html, /<code>exponential backoff<\/code>/);
+  // The sample can type its answers.
+  assert.match(html, />填入示範答案<\/button>/);
 });
 
 test("the module line uses the longest matching module path and stays hidden without modules", () => {
@@ -781,4 +802,84 @@ test("an English render of the demo has no Han and labels its text as a sample",
     assertNoHan(reports);
     assert.ok(reports.includes("Sample · prewritten, no AI call"), file.path);
   }
+});
+
+test("try first is on by default; the off switch and trivial files keep today's cards", () => {
+  const file = englishFile("src/utils/retry.ts");
+  const on = renderPanel({ file });
+  assertNoHan(on);
+  assert.equal(on.match(/<span class="tf-badge">Try first<\/span>/g)?.length, 2);
+  assert.ok(on.includes(">Your answer</label>"));
+  assert.ok(on.includes(">Before you look: how else could this be done?</label>"));
+  assert.ok(!on.includes("explain-answer-toggle"));
+  assert.ok(!on.includes(englishExplanation.selfCheck!.answer));
+  assert.ok(!on.includes(englishExplanation.alternatives!));
+  assert.ok(on.includes("Look up:"));
+
+  const off = renderPanel({ file, tryFirst: false });
+  assertNoHan(off);
+  assert.match(off, /aria-expanded="false"[^>]*>Show answer</);
+  assert.ok(off.includes(englishExplanation.alternatives!));
+  assert.ok(!off.includes("Try first"));
+  assert.ok(!off.includes("tf-card"));
+
+  // Lockfiles, generated files and docs changes of 3 lines or fewer get no prompts.
+  for (const trivial of [
+    { ...file, path: "package-lock.json" },
+    { ...file, path: "dist/app.min.js" },
+    { ...file, path: "docs/usage.md", additions: 2, deletions: 1 },
+  ]) {
+    const html = renderPanel({ file: trivial });
+    assertNoHan(html);
+    assert.ok(!html.includes("tf-card"), trivial.path);
+    assert.match(html, /aria-expanded="false"[^>]*>Show answer</, trivial.path);
+  }
+  assert.ok(
+    renderPanel({ file: { ...file, path: "docs/usage.md", additions: 3, deletions: 1 } }).includes("tf-card"),
+  );
+  // The project's own linguist-generated patterns count too, as in the check.
+  const generatedFile = { ...file, path: "src/gen/client.ts" };
+  assert.ok(renderPanel({ file: generatedFile }).includes("tf-card"));
+  const generated = renderPanel({ file: generatedFile, generated: ["src/gen/**"] });
+  assertNoHan(generated);
+  assert.ok(!generated.includes("tf-card"));
+  assert.match(generated, /aria-expanded="false"[^>]*>Show answer</);
+});
+
+test("a saved attempt on this version of the file comes back revealed; one on an older version does not", () => {
+  const at = "2026-10-15T00:00:00.000Z";
+  const file = { ...englishFile("src/utils/retry.ts"), fingerprint: "a".repeat(64) };
+  const attempt = {
+    fingerprint: "a".repeat(64),
+    quiz: { answer: "At most four seconds.", confidence: "think" as const, at },
+    road: { guess: "A fixed wait.", choice: "keep" as const, at },
+  };
+  const current = renderPanel({ file, attempt, async onAttempt() {} });
+  assertNoHan(current);
+  assert.ok(current.includes(englishExplanation.selfCheck!.answer));
+  assert.ok(current.includes("AI-written; the diff is the authority"));
+  assert.ok(current.includes("How did your answer compare?"));
+  assert.ok(current.includes(englishExplanation.alternatives!));
+  assert.match(current, /<input type="radio"[^>]*checked="" value="keep"\/>/);
+  const older = renderPanel({ file: { ...file, fingerprint: "b".repeat(64) }, attempt });
+  assertNoHan(older);
+  assert.ok(!older.includes(englishExplanation.selfCheck!.answer));
+  assert.ok(!older.includes(englishExplanation.alternatives!));
+  assert.ok(older.includes(">Your answer</label>"));
+});
+
+test("the demo's try-first cards offer its sample answers, and a real run's do not", () => {
+  const retry = englishDemo.files.find((file) => file.path === "src/utils/retry.ts")!;
+  const demo = renderEn(
+    createElement(ExplanationPanel, {
+      file: retry,
+      messages: [],
+      loading: false,
+      onAsk() {},
+      demo: true,
+    }),
+  );
+  assertNoHan(demo);
+  assert.equal(demo.match(/>Fill with the sample answer<\/button>/g)?.length, 2);
+  assert.ok(!renderPanel({ demo: false }).includes("Fill with the sample answer"));
 });

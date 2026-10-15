@@ -3,7 +3,7 @@
 // explanation panel's tabs use arrow keys, AI output is labelled, and axe
 // finds no serious or critical issue on the changes tab in any state.
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { locales, type Locale } from "../shared/i18n/locale";
 import { getDemo } from "../src/demo";
 import en from "../src/i18n/en";
@@ -295,6 +295,80 @@ for (const locale of locales)
     await expect(page.locator(".explain-message-assistant").first()).toBeVisible();
     expect(await axeProblems(page), "chat tab").toEqual([]);
   });
+
+/** The box-shadow of the chip around a radio: the focus ring when the radio has keyboard focus. */
+const chipRing = (radio: Locator) =>
+  radio.evaluate((input) => getComputedStyle(input.closest(".tf-chip")!).boxShadow);
+
+for (const locale of locales)
+  test(`the try-first cards work from the keyboard, and axe finds no serious or critical issue in any of their states (${locale})`, async ({ page }) => {
+    const t = messages[locale].review.tryFirst;
+    const sample = getDemo(locale);
+    const path = "src/utils/retry.ts";
+    await openChanges(page, locale, path);
+    const quiz = page.locator(".explain-card-selfcheck");
+    const road = page.locator(".explain-card-alternatives");
+    expect(await axeProblems(page), "unanswered").toEqual([]);
+
+    // Answer, then Tab into the confidence chips: arrows choose, the chip shows the focus.
+    await quiz.getByRole("textbox", { name: t.quiz.answerLabel }).fill(sample.quizSamples![path].answer);
+    await page.keyboard.press("Tab");
+    const sure = quiz.getByRole("radio", { name: t.confidences.sure });
+    await expect(sure).toBeFocused();
+    expect(await chipRing(sure)).not.toBe("none");
+    await page.keyboard.press("ArrowRight");
+    const think = quiz.getByRole("radio", { name: t.confidences.think });
+    await expect(think).toBeFocused();
+    await expect(think).toBeChecked();
+    expect(await chipRing(think)).not.toBe("none");
+    expect(await chipRing(sure)).toBe("none");
+    expect(await axeProblems(page), "answered").toEqual([]);
+
+    // Show answer from the keyboard; focus lands on the grade group.
+    await page.keyboard.press("Tab");
+    await expect(quiz.getByRole("button", { name: t.quiz.reveal })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(quiz.getByRole("group", { name: t.quiz.gradeLabel })).toBeFocused();
+    await expect(quiz.locator('.tf-reference[aria-live="polite"]')).toContainText(t.quiz.referenceLabelDemo);
+    expect(await axeProblems(page), "revealed").toEqual([]);
+    await page.keyboard.press("Tab");
+    await expect(quiz.getByRole("button", { name: t.grades.got })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(quiz.locator(".tf-graded p").first()).toBeFocused();
+    await expect(quiz.locator(".tf-graded")).toHaveText(t.quiz.graded.got);
+    expect(await axeProblems(page), "graded").toEqual([]);
+
+    // The road choice: a guess, the reveal, then a choice from the keyboard.
+    await road.getByRole("textbox", { name: t.road.guessLabel }).fill(sample.roadSamples![path].guess);
+    await page.keyboard.press("Tab");
+    await expect(road.getByRole("button", { name: t.road.reveal })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(road.getByRole("radiogroup", { name: t.road.choiceLabel })).toBeFocused();
+    expect(await axeProblems(page), "alternative revealed").toEqual([]);
+    await page.keyboard.press("Tab");
+    const keep = road.getByRole("radio", { name: t.road.choices.keep });
+    await expect(keep).toBeFocused();
+    await page.keyboard.press("Space");
+    await expect(keep).toBeChecked();
+    expect(await chipRing(keep)).not.toBe("none");
+    await road.getByRole("textbox", { name: t.road.whyLabel }).fill(sample.roadSamples![path].why);
+    await road.getByRole("button", { name: t.road.saveWhy, exact: true }).click();
+    expect(await axeProblems(page), "road chosen").toEqual([]);
+  });
+
+test("a chosen try-first chip keeps an outline when forced colors drop its fill", async ({ page }) => {
+  const t = review.tryFirst;
+  await page.emulateMedia({ forcedColors: "active" });
+  await openChanges(page, "en", "src/utils/retry.ts");
+  const quiz = page.locator(".explain-card-selfcheck");
+  const outline = (radio: Locator) =>
+    radio.evaluate((input) => getComputedStyle(input.closest(".tf-chip")!).outlineStyle);
+  const think = quiz.getByRole("radio", { name: t.confidences.think });
+  expect(await outline(think)).toBe("none");
+  await think.check();
+  expect(await outline(think)).toBe("solid");
+  expect(await outline(quiz.getByRole("radio", { name: t.confidences.sure }))).toBe("none");
+});
 
 for (const locale of locales)
   for (const width of [1440, 390])

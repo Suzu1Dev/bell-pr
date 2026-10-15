@@ -190,6 +190,52 @@ const m: Translation<typeof en> = {
     disclaimerDemo: "示範回覆為預寫內容，未呼叫 AI 模型",
     disclaimerLive: "Enter 送出 · Shift + Enter 換行",
   },
+  tryFirst: {
+    badge: "先試著答",
+    confidences: { sure: "確定", think: "大概", guess: "用猜的" },
+    grades: { got: "答對", partly: "部分對", missed: "沒答到" },
+    gradeHints: {
+      got: "你說出了一樣的原因和結果。",
+      partly: "你答對了一部分。",
+      missed: "答案是別的。",
+    },
+    fill: "填入示範答案",
+    saving: "儲存中…",
+    fileChanged:
+      "這次沒有存下：在你開啟後，這個檔案、你已存的作答或這次工作有了變動。這裡顯示的是最新版本。",
+    quiz: {
+      answerLabel: "你的答案",
+      answerPlaceholder: "用自己的話寫一兩句",
+      confidenceLabel: "你有多確定？",
+      confidenceHint: "選一下你有多確定，這個答案才能算進理解檢查。",
+      reveal: "看答案",
+      dontKnow: "我不知道",
+      yourAnswer: "你的答案",
+      skipped: "你跳過了這一題，所以沒有要評分的答案。",
+      dontKnowAnswer: "你選了「我不知道」。",
+      reference: "參考答案",
+      referenceLabel: "AI 撰寫；以 diff 為準",
+      referenceLabelDemo: "AI 撰寫答案的示範；以 diff 為準",
+      gradeLabel: "和參考答案比起來，你答得如何？",
+      graded: {
+        got: "你的評分：答對。",
+        partly: "你的評分：部分對。",
+        missed: "你的評分：沒答到。",
+      },
+      confidentMiss: "這是最有價值的一種答錯：它會回到你的練習卡組。",
+    },
+    road: {
+      guessLabel: "先別看：這件事還能怎麼做？",
+      guessPlaceholder: "選填，一行即可",
+      reveal: "看另一種做法",
+      yourGuess: "你的猜想",
+      choiceLabel: "以這個專案來說，你會選哪一種？",
+      choices: { keep: "維持這個做法", switch: "偏好另一種", depends: "看情況" },
+      whyLabel: "為什麼？（選填，一行）",
+      saveWhy: "儲存",
+      saved: "已儲存",
+    },
+  },
 };
 
 export default m;
