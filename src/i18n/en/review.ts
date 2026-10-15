@@ -9,6 +9,11 @@
  */
 import { formatters, type Locale } from "../../../shared/i18n/locale";
 import { product } from "../../../shared/product";
+import type {
+  Confidence,
+  RoadChoice,
+  SelfGrade,
+} from "../../../shared/understanding";
 
 const { plural } = formatters("en");
 
@@ -285,6 +290,82 @@ const review = {
     send: "Send question",
     disclaimerDemo: "Demo replies are prewritten; no AI model is called",
     disclaimerLive: "Enter to send · Shift + Enter for a new line",
+  },
+  /**
+   * Try first, on the explanation tab: the "Quiz yourself" card asks for an
+   * answer and a confidence before it shows the reference, then a
+   * self-grade; the "What if it were done differently?" card asks for a
+   * guess before it shows the alternative, then a choice. The confidence,
+   * grade and choice words are the shared vocabulary: the understanding
+   * check in the workspace uses the same ones.
+   */
+  tryFirst: {
+    /** The badge on both cards. */
+    badge: "Try first",
+    confidences: {
+      sure: "Sure",
+      think: "Think so",
+      guess: "Guessing",
+    } satisfies Record<Confidence, string>,
+    grades: {
+      got: "Got it",
+      partly: "Partly",
+      missed: "Missed",
+    } satisfies Record<SelfGrade, string>,
+    /** One line under each grade: what it means. */
+    gradeHints: {
+      got: "You named the same cause and effect.",
+      partly: "You had part of it.",
+      missed: "It was something else.",
+    } satisfies Record<SelfGrade, string>,
+    /** Demo only: types the sample text into the field. */
+    fill: "Fill with the sample answer",
+    saving: "Saving…",
+    /** A save answered 409: the diff moved on, or the attempt is already final. */
+    fileChanged:
+      "This file or your saved attempt changed since you opened it, so this wasn't saved. The latest version is shown here.",
+    quiz: {
+      answerLabel: "Your answer",
+      answerPlaceholder: "A sentence or two, in your own words",
+      confidenceLabel: "How sure are you?",
+      /** Shown while an answer has no confidence yet. */
+      confidenceHint:
+        "Pick how sure you are, so this answer can count toward the understanding check.",
+      /** With the field empty, it skips the question. */
+      reveal: "Show answer",
+      dontKnow: "I don't know",
+      yourAnswer: "Your answer",
+      skipped: "You skipped this one, so there is nothing to grade.",
+      dontKnowAnswer: "You said you didn't know.",
+      reference: "Reference answer",
+      referenceLabel: "AI-written; the diff is the authority",
+      referenceLabelDemo:
+        "A sample of an AI-written answer; the diff is the authority",
+      gradeLabel: "How did your answer compare?",
+      graded: {
+        got: "Your grade: Got it.",
+        partly: "Your grade: Partly.",
+        missed: "Your grade: Missed.",
+      } satisfies Record<SelfGrade, string>,
+      /** Partly or Missed at Sure or Think so. */
+      confidentMiss:
+        "This is the most useful kind of miss: it comes back in your practice deck.",
+    },
+    road: {
+      guessLabel: "Before you look: how else could this be done?",
+      guessPlaceholder: "Optional, one line",
+      reveal: "Show the alternative",
+      yourGuess: "Your guess",
+      choiceLabel: "For this project, which would you choose?",
+      choices: {
+        keep: "Keep this approach",
+        switch: "Prefer the other",
+        depends: "It depends",
+      } satisfies Record<RoadChoice, string>,
+      whyLabel: "Why? (optional, one line)",
+      saveWhy: "Save",
+      saved: "Saved",
+    },
   },
 };
 
