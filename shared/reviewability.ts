@@ -4,6 +4,7 @@
  * changed lines of each unified-diff patch. Pure and synchronous, so the
  * server, the draft tab and the demo agree.
  */
+import type { MergedPrSize } from "./contribution.js";
 
 const lockfileNames = new Set([
   "package-lock.json",
@@ -211,4 +212,248 @@ export function whitespaceOnlyHunks(patch?: string) {
   for (const line of patchLines(patch))
     hunks.set(line.hunk, [...(hunks.get(line.hunk) ?? []), line]);
   return [...hunks.values()].filter(sameIgnoringWhitespace).length;
+}
+
+/** One flagged change to a test file: a deleted test file, an added skip or a removed assertion. */
+export interface WeakenedTest {
+  /**
+   * `<path>#<line>`: the new file's line for an added skip, `-<line>` (the
+   * old file's line) for a removed assertion, 0 for a deleted file. Stable
+   * while the diff is, so a saved reason stays attached to its item.
+   */
+  id: string;
+  path: string;
+  /** The line in the new file (added skips) or the old file (removed assertions); 0 for a deleted file. */
+  line: number;
+  /** The line's text, trimmed to 200 characters; empty for a deleted file. */
+  text: string;
+}
+
+/** Added lines that skip or focus tests in common frameworks. */
+const skipPattern =
+  /\.only\s*\(|\.skip\s*\(|\b(?:it|test|describe)\.(?:skip|only)\b|\bx(?:it|test|describe)\s*\(|pytest\.mark\.(?:skip|skipif|xfail)\b|\bxfail\b|@(?:Ignore|Disabled)\b|#\[ignore\]|\bt\.Skip(?:Now|f)?\(|\bunittest\.skip\w*\b|\bself\.skipTest\(/;
+/** Removed lines that asserted something. */
+const assertionPattern = /\bassert\w*\b|\bexpect\s*\(|\bshould\.|\.should\b|\bt\.(?:Error|Fatal)f?\(/;
+
+/**
+ * Changes that weaken a project's tests (DESIGN F9): deleted test files,
+ * added skips (`.only`, `.skip(`, `it.skip`, `xit`, `pytest.mark.skip`,
+ * `xfail`, `@Ignore`, `#[ignore]`, `t.Skip(`) and removed `assert` or
+ * `expect(` lines in test files. Publishing waits until each has a reason.
+ */
+export function weakenedTests(
+  files: readonly { path: string; status?: string; patch?: string }[],
+): WeakenedTest[] {
+  const found = new Map<string, WeakenedTest>();
+  const add = (path: string, line: number, text: string, removed = false) => {
+    const id = `${path}#${removed ? "-" : ""}${line}`;
+    if (!found.has(id))
+      found.set(id, { id, path, line, text: text.trim().slice(0, 200) });
+  };
+  for (const file of files) {
+    if (!isTestPath(file.path)) continue;
+    if (file.status === "deleted") {
+      add(file.path, 0, "");
+      continue;
+    }
+    for (const line of patchLines(file.patch)) {
+      if (line.kind === "+" && skipPattern.test(line.text))
+        add(file.path, line.newLine ?? 0, line.text);
+      else if (line.kind === "-" && assertionPattern.test(line.text))
+        add(file.path, line.oldLine ?? 0, line.text, true);
+    }
+  }
+  return [...found.values()];
+}
+
+/** A dependency a manifest gains. */
+export interface NewDependency {
+  path: string;
+  name: string;
+}
+
+/** Keys of package.json-like files that are not dependencies. */
+const notDependencies = new Set([
+  "name",
+  "version",
+  "description",
+  "main",
+  "module",
+  "types",
+  "typings",
+  "license",
+  "author",
+  "homepage",
+  "type",
+  "node",
+  "npm",
+  "edition",
+  "readme",
+  "repository",
+  "requires-python",
+  "python",
+]);
+
+/** The package a manifest line names, when it looks like a dependency entry. */
+function dependencyName(manifest: string, text: string) {
+  const name = basename(manifest);
+  const patterns =
+    name === "go.mod"
+      ? [/^\s*(?:require\s+)?([\w.-]+\.[\w.-]+\/\S+)\s+v\d/]
+      : /^requirements/.test(name)
+        ? [/^\s*([A-Za-z0-9][\w.-]*)\s*(?:\[[^\]]*\])?\s*(?:[=<>!~]=?|;|$)/]
+        : name === "Gemfile" || name.endsWith(".gemspec")
+          ? [/^\s*(?:gem|\w+\.add_(?:\w+_)?dependency)\s*\(?\s*['"]([^'"]+)['"]/]
+          : name === "pom.xml"
+            ? [/<artifactId>\s*([^<\s]+)\s*<\/artifactId>/]
+            : /\.gradle(?:\.kts)?$/.test(name)
+              ? [/^\s*(?:implementation|api|compileOnly|runtimeOnly|testImplementation)\s*\(?\s*['"][^:'"]+:([^:'"]+)/]
+              : /\.(?:csproj|fsproj|vbproj)$/.test(name)
+                ? [/<PackageReference\s+Include="([^"]+)"/]
+                : [
+                    // "name": "^1.2.3" in package.json, composer.json, deno.json
+                    /^\s*"(@?[\w./-]+)"\s*:\s*"(?:[~^<>=*]|\d|v\d|npm:|workspace:|file:|git|github:|link:|latest\b)/,
+                    // name = "1.2" or name = { … } in TOML manifests
+                    /^\s*([A-Za-z0-9][\w.-]*)\s*=\s*["{]/,
+                    // "requests>=2" in a pyproject dependency list
+                    /^\s*"([A-Za-z0-9][\w.-]*)\s*(?:\[[^\]]*\])?\s*(?:[=<>!~]=?[^"]*)?"\s*,?\s*$/,
+                  ];
+  for (const pattern of patterns) {
+    const match = pattern.exec(text);
+    if (match && !notDependencies.has(match[1])) return match[1];
+  }
+  return undefined;
+}
+
+/** Dependencies that manifests gain: added entries whose name no removed line had. */
+export function newDependencies(
+  files: readonly { path: string; patch?: string }[],
+): NewDependency[] {
+  const result: NewDependency[] = [];
+  for (const file of files) {
+    if (!isManifest(file.path)) continue;
+    const lines = patchLines(file.patch);
+    const removed = new Set(
+      lines
+        .filter((line) => line.kind === "-")
+        .map((line) => dependencyName(file.path, line.text))
+        .filter(Boolean),
+    );
+    for (const line of lines) {
+      if (line.kind !== "+") continue;
+      const name = dependencyName(file.path, line.text);
+      if (name && !removed.has(name) && !result.some((entry) => entry.path === file.path && entry.name === name))
+        result.push({ path: file.path, name });
+    }
+  }
+  return result.slice(0, 20);
+}
+
+/** BELL's size bands: green up to 100 changed lines, amber up to 400, red above 1,000 lines or 20 files. */
+export type ReviewabilityBand = "small" | "medium" | "large" | "very-large";
+
+export const reviewabilityBands = {
+  small: 100,
+  medium: 400,
+  large: 1000,
+  files: 20,
+} as const;
+
+export interface ReviewabilitySnapshot {
+  /** Added plus removed lines, lockfiles and generated paths left out. */
+  changedLines: number;
+  /** Files changed, lockfiles and generated paths left out. */
+  files: number;
+  /** Test files among them. */
+  testFilesChanged: number;
+  /** A source file (not docs, not a test) changed. */
+  sourceChanged: boolean;
+  /** Only documentation changed. */
+  docsOnly: boolean;
+  newDependencies: NewDependency[];
+  /** Changed files outside every plan task's scope; empty without a plan. */
+  outsidePlan: string[];
+  /** Files with hunks that change nothing but whitespace. */
+  whitespaceOnly: string[];
+  /** Changes to tests that need a reason before publishing. */
+  weakened: WeakenedTest[];
+  /** Not persisted: recomputed from the diff. */
+  band: ReviewabilityBand;
+  /** The project's last merged pull requests, as the real size reference. */
+  mergedSizes?: MergedPrSize[];
+}
+
+/** Whether a path is inside one of a task's scopes: exact file names or directory prefixes ending with "/". */
+function inScope(filePath: string, scopes: readonly (readonly string[])[]) {
+  return scopes.some((scope) =>
+    scope.some((entry) =>
+      entry.endsWith("/") ? filePath.startsWith(entry) : filePath === entry,
+    ),
+  );
+}
+
+/**
+ * How reviewable the change is, from its files alone: size and band,
+ * tests, new dependencies, files outside the plan and whitespace-only
+ * hunks. The bands are BELL defaults after Google's small-CL guidance;
+ * the project's own merged sizes are the real reference.
+ */
+export function reviewabilitySnapshot({
+  files,
+  planScopes,
+  generated,
+  mergedSizes,
+}: {
+  files: readonly {
+    path: string;
+    additions: number;
+    deletions: number;
+    status?: string;
+    patch?: string;
+  }[];
+  /** Each plan task's files (`run.team.tasks[].files`). */
+  planScopes?: readonly (readonly string[])[];
+  generated?: readonly string[];
+  mergedSizes?: ReviewabilitySnapshot["mergedSizes"];
+}): ReviewabilitySnapshot {
+  const reviewable = files.filter(
+    (file) => !isLockfile(file.path) && !isGeneratedPath(file.path, generated),
+  );
+  const changedLines = reviewable.reduce(
+    (total, file) => total + file.additions + file.deletions,
+    0,
+  );
+  const tests = reviewable.filter((file) => isTestPath(file.path));
+  const docs = reviewable.filter((file) => isDocsPath(file.path));
+  const scopes = (planScopes ?? []).filter((scope) => scope.length);
+  const band: ReviewabilityBand =
+    changedLines > reviewabilityBands.large ||
+    reviewable.length > reviewabilityBands.files
+      ? "very-large"
+      : changedLines > reviewabilityBands.medium
+        ? "large"
+        : changedLines > reviewabilityBands.small
+          ? "medium"
+          : "small";
+  return {
+    changedLines,
+    files: reviewable.length,
+    testFilesChanged: tests.length,
+    sourceChanged: reviewable.some(
+      (file) => !isTestPath(file.path) && !isDocsPath(file.path),
+    ),
+    docsOnly: reviewable.length > 0 && docs.length === reviewable.length,
+    newDependencies: newDependencies(files),
+    outsidePlan: scopes.length
+      ? reviewable
+          .filter((file) => !inScope(file.path, scopes))
+          .map((file) => file.path)
+      : [],
+    whitespaceOnly: reviewable
+      .filter((file) => whitespaceOnlyHunks(file.patch) > 0)
+      .map((file) => file.path),
+    weakened: weakenedTests(files),
+    band,
+    ...(mergedSizes?.length ? { mergedSizes: mergedSizes.slice(0, 3) } : {}),
+  };
 }
