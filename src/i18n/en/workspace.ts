@@ -155,7 +155,7 @@ const workspace = {
       `Could not load the check: ${message}`,
     retry: "Try again",
     plan: ({ questions, lines }: { questions: number; lines: number }) =>
-      `${plural(questions) === "one" ? `${questions} file question` : `${questions} file questions`} for ${plural(lines) === "one" ? `${lines} changed line` : `${lines} changed lines`}. BELL defaults: none up to 15 lines, 1 up to 100, 2 up to 400, 3 above.`,
+      `${plural(questions) === "one" ? `${questions} file question` : `${questions} file questions`} for ${plural(lines) === "one" ? `${lines} changed line` : `${lines} changed lines`}. ${product.name} defaults: none up to 15 lines, 1 up to 100, 2 up to 400, 3 above.`,
     fill: "Fill with the sample answer",
     explainTitle: "1. Explain",
     explainPrompt:

@@ -126,7 +126,7 @@ const m: Translation<typeof en> = {
     loadFailed: ({ message }) => `無法載入檢查：${message}`,
     retry: "重試",
     plan: ({ questions, lines }) =>
-      `${lines} 行變更，問 ${questions} 個檔案問題。BELL 預設：15 行以內不問，100 行以內 1 題，400 行以內 2 題，更多 3 題。`,
+      `${lines} 行變更，問 ${questions} 個檔案問題。${product.name} 預設：15 行以內不問，100 行以內 1 題，400 行以內 2 題，更多 3 題。`,
     fill: "填入範例答案",
     explainTitle: "1. 講一遍",
     explainPrompt: "用 2 到 4 句話說明：這解決什麼問題、改了什麼、可能弄壞什麼？",
