@@ -26,6 +26,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
+import checkMessages from "../shared/i18n/draft-checks.en";
 import type { Locale } from "../shared/i18n/locale";
 import { getDemo } from "../src/demo";
 import { assertNoHan } from "../src/test-utils/render";
@@ -795,12 +796,14 @@ test.describe("the v1.1 journey on a seeded real run with a fake gh", () => {
       await expect(dialog.getByRole("group", { name: en.workspace.publish.groups.issue })).toBeVisible();
       const reason = block.getByRole("textbox", { name: /Why publish anyway/ });
       await expect(submitOf(dialog)).toBeDisabled();
-      // The server refuses it too, without the reason.
+      // The server refuses it too, without the reason, with the same block.
       const { approvedFingerprint } = await storedRun(page);
       const refused = await page.request.post(`/api/runs/${runId}/publish`, {
+        headers: { "x-bell-locale": "en" },
         data: { fingerprint: approvedFingerprint, acknowledged: [] },
       });
-      expect(refused.status()).toBeGreaterThanOrEqual(400);
+      expect(refused.status()).toBe(422);
+      expect(((await refused.json()) as { error: string }).error).toContain(checkMessages.respect.issueHasPr);
       expect((await storedRun(page)).status).toBe("approved");
       await reason.fill("Their pull request has been idle for two months; its author asked me to take over.");
       for (const box of await dialog.getByRole("checkbox").all()) await box.check();
@@ -828,8 +831,15 @@ test.describe("the v1.1 journey on a seeded real run with a fake gh", () => {
       await expect(block.getByRole("textbox")).toHaveCount(0);
       for (const box of await dialog.getByRole("checkbox").all()) await box.check();
       await expect(submitOf(dialog)).toBeDisabled();
-      // Only someone else's pull request on the issue can be overridden.
+      // The server refuses it with the same block, and the run stays approved.
       const { approvedFingerprint } = await storedRun(page);
+      const blocked = await page.request.post(`/api/runs/${runId}/publish`, {
+        headers: { "x-bell-locale": "en" },
+        data: { fingerprint: approvedFingerprint, acknowledged: [] },
+      });
+      expect(blocked.status()).toBe(422);
+      expect(((await blocked.json()) as { error: string }).error).toContain(checkMessages.respect.prClosed);
+      // Only someone else's pull request on the issue can be overridden.
       const refused = await page.request.post(`/api/runs/${runId}/publish`, {
         data: {
           fingerprint: approvedFingerprint,
@@ -1062,10 +1072,22 @@ test.describe("the v1.1 journey on a seeded real run with a fake gh", () => {
     }
   });
 
-  test("16. an AI follow-up round needs my restatement of each comment: 422 without it, then it starts (trial)", async ({ browser }) => {
+  test("16. an AI follow-up round is Pro and needs my restatement of each comment: 402 on Free, 422 without it, then it starts (trial)", async ({ browser }) => {
     const { page, close } = await openPage(browser);
     try {
       const w = en.workspace;
+      // On Free, AI rounds and the coach debrief are Pro: 402, and nothing starts.
+      const round = { feedbackUrls: [review.url], restatements: [{ url: review.url, text: "They want a test for an empty name." }] };
+      for (const [route, data] of [
+        [`/api/runs/${runId}/follow-ups`, round],
+        ["/api/learning/debrief", { repoId }],
+      ] as const) {
+        const locked = await page.request.post(route, { data });
+        expect(locked.status(), route).toBe(402);
+        expect(((await locked.json()) as { code?: string }).code, route).toBe("pro_required");
+      }
+      expect((await storedRun(page)).followUps ?? []).toEqual([]);
+      expect((await storedRun(page)).status).toBe("published");
       expect((await page.request.post("/api/license/trial", { data: {} })).status()).toBe(200);
       // The server refuses a restatement under 3 words with 422.
       const short = await page.request.post(`/api/runs/${runId}/follow-ups`, {
