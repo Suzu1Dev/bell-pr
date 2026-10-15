@@ -20,10 +20,10 @@ export function checkFooter(
       ? "learning"
       : run.status === "published"
         ? "allReviewed"
-        : !check.required
-          ? "checkOff"
-          : check.passed
-            ? "passed"
+        : check.passed
+          ? "passed"
+          : !check.required
+            ? "checkOff"
             : "allReviewed",
     needsReview: pending ? "needsReviewAndCheck" : "needsReview",
   } as const;

@@ -229,7 +229,8 @@ export function WorkspacePage({
             {statusLabels[run.status]}
           </span>
           {run.unsandboxed === true && <UnsandboxedBadge />}
-          {showsCheckOff(run, understanding.off) && (
+          {/* The setting's badge leaves a run whose check passed: approving it marks nothing. */}
+          {showsCheckOff(run, understanding.off && !understanding.passed) && (
             <UnderstandingOffBadge approved={run.understandingCheckOff === true} />
           )}
         </div>

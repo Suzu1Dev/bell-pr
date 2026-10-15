@@ -32,6 +32,8 @@ test("a passed or switched-off check leaves approval as it was", () => {
     status: "checkOff",
     needsReview: "needsReview",
   });
+  // Taken and passed while the setting is off: the pass is what the footer says.
+  assert.equal(checkFooter(review, true, { required: false, passed: true }).status, "passed");
 });
 
 test("runs that take no check now never ask for one", () => {

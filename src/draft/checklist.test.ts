@@ -210,9 +210,12 @@ test("another person's pull request on the issue is never shown as nobody else o
 
 test("the understanding row is passed, required or off", () => {
   assert.equal(statuses({ ...full, understanding: { required: true, passed: false, off: false } }).understanding, "block");
-  assert.equal(statuses({ ...full, understanding: { required: false, passed: false, off: true } }).understanding, "confirm");
+  // Off asks nothing at publish: a neutral row, not a confirm.
+  assert.equal(statuses({ ...full, understanding: { required: false, passed: false, off: true } }).understanding, "off");
   // The check is not required only while it is turned off.
-  assert.equal(statuses({ ...full, understanding: { required: false, passed: false, off: false } }).understanding, "confirm");
+  assert.equal(statuses({ ...full, understanding: { required: false, passed: false, off: false } }).understanding, "off");
+  // A check taken and passed while the setting is off counts as passed.
+  assert.equal(statuses({ ...full, understanding: { required: false, passed: true, off: true } }).understanding, "ok");
   assert.equal(statuses({ ...full, understanding: undefined }).understanding, "unknown");
 });
 

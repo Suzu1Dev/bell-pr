@@ -9,6 +9,7 @@ import {
   CircleAlert,
   CircleCheck,
   CircleHelp,
+  CircleMinus,
   ClipboardList,
   FileText,
   GitCommitHorizontal,
@@ -105,6 +106,7 @@ const statusIcons: Record<ChecklistStatus, typeof CircleCheck> = {
   confirm: CircleAlert,
   block: OctagonX,
   unknown: CircleHelp,
+  off: CircleMinus,
 };
 
 /**

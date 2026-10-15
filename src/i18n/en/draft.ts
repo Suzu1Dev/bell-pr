@@ -134,6 +134,7 @@ const draft = {
         confirm: "Asks to confirm",
         block: "Blocks publishing",
         unknown: "Couldn't check",
+        off: "Off",
       },
       rows: {
         rules: "The project's rules",

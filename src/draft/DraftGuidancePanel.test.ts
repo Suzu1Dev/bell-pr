@@ -573,9 +573,11 @@ test("checks made without the facts still leave no row OK against the facts pass
   const html = renderEnglish(english, { checks, rules: sampleRules, facts, changes: sampleChanges, issueUrl: "#sample-issue-42" });
   assert.equal(rowStatuses(html).pacing, "block");
   assert.match(checklistRow(html, "pacing"), /Blocks publishing/);
-  // The not-required check is the switched-off one, never a block.
+  // The not-required check is the switched-off one, never a block, and
+  // publishing asks nothing about it.
   const off = renderEnglish(english, { checks, understanding: { required: false, passed: false, off: false } });
-  assert.equal(rowStatuses(off).understanding, "confirm");
+  assert.equal(rowStatuses(off).understanding, "off");
+  assert.match(checklistRow(off, "understanding"), /Off/);
 });
 
 test("a why sentence folds away after it has been shown 3 times", () => {

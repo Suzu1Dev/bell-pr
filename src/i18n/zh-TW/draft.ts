@@ -104,6 +104,7 @@ const m: Translation<typeof en> = {
         confirm: "需要確認",
         block: "阻擋發布",
         unknown: "無法確認",
+        off: "已關閉",
       },
       rows: {
         rules: "專案規範",

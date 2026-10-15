@@ -28,7 +28,8 @@ export const checklistRowIds = [
   "understanding",
 ] as const;
 export type ChecklistRowId = (typeof checklistRowIds)[number];
-export type ChecklistStatus = "ok" | "confirm" | "block" | "unknown";
+/** `off`: a check the person turned off; publishing asks nothing about it. */
+export type ChecklistStatus = "ok" | "confirm" | "block" | "unknown" | "off";
 
 export interface ChecklistRow {
   id: ChecklistRowId;
@@ -130,7 +131,7 @@ function unknownReasons(entries?: readonly string[]) {
   return reasons;
 }
 
-const worse: Record<ChecklistStatus, number> = { ok: 0, unknown: 1, confirm: 2, block: 3 };
+const worse: Record<ChecklistStatus, number> = { ok: 0, off: 0, unknown: 1, confirm: 2, block: 3 };
 
 export function checklistRows(
   input: ChecklistInput,
@@ -300,13 +301,15 @@ export function checklistRows(
     }),
     {
       id: "understanding",
-      // The check is not required only while the person turned it off.
+      // A pass counts whatever the setting says (approval then marks
+      // nothing). The check is not required only while the person turned
+      // it off, and publishing asks nothing about it then.
       ...(!understanding
         ? { status: "unknown" as const, lines: [m.notChecked], sources: [] }
-        : understanding.off || (!understanding.required && !understanding.passed)
-          ? { status: "confirm" as const, lines: [m.understandingOff], sources: [] }
-          : understanding.passed
-            ? { status: "ok" as const, lines: [m.understandingPassed], sources: [] }
+        : understanding.passed
+          ? { status: "ok" as const, lines: [m.understandingPassed], sources: [] }
+          : understanding.off || !understanding.required
+            ? { status: "off" as const, lines: [m.understandingOff], sources: [] }
             : { status: "block" as const, lines: [m.understandingRequired], sources: [] }),
     },
   ];
