@@ -12,6 +12,7 @@ import { api } from "../api";
 import { getDemo } from "../demo";
 import { useFormat, useLocale, useT } from "../i18n";
 import type { DiffFile, Repo } from "../types";
+import { LearningHeading } from "./LearningHeading";
 import "./learning.css";
 
 // Stored concepts use inline backticks and line breaks like the review panel; share its renderer and chunk.
@@ -333,14 +334,7 @@ export function LearningNotes({
 
   return (
     <>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">{t.eyebrow}</span>
-          <h1 tabIndex={-1}>{t.title}</h1>
-          <p>{t.intro}</p>
-          <p className="learning-ai-note">{t.aiNote}</p>
-        </div>
-      </div>
+      <LearningHeading />
       <div className="learning-filters">
         <label>
           <span>{t.keyword}</span>
