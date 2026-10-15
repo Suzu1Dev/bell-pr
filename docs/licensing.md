@@ -26,8 +26,8 @@ starting the trial sends nothing anywhere.
 | Agent team size | Free (limited) | Free: Lead, 2 teammates, Reviewer and Test analyst. Pro and trial: 3 or 4 teammates. |
 | Work on more than one contribution at a time | Free (limited) | Free: one contribution at a time; others wait in the queue. Pro: up to your configured limit (2 by default, at most 8). Publishing is paced the same on every plan. |
 | Plan approval and revision, team inbox, retry of failed subtasks | Free | Up to 3 plan revisions |
-| Diff review, explanations, follow-up chat, notes, suggested review order | Free | No limit |
-| Explain it back before approval | Free | On by default; you can turn it off in Settings, and runs approved without it are marked |
+| Diff review, explanations, try-first questions, follow-up chat, notes, suggested review order | Free | No limit |
+| Explain it back before approval | Free | On by default; you can turn it off in Settings → Learning, and runs approved without it are marked |
 | Re-run Reviewer and Test analyst | Free | No limit (part of the human review safety gate) |
 | Rule-aware PR draft, preflight checks, publishing a Draft PR | Free | Human approval is required on every plan |
 | Project-rule, issue, reviewability and pacing checks | Free | On every plan; no plan can skip them |

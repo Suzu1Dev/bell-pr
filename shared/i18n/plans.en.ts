@@ -42,13 +42,13 @@ const plans = {
     },
     review: {
       label:
-        "Diff review, explanations, follow-up chat, notes, suggested review order",
+        "Diff review, explanations, try-first questions, follow-up chat, notes, suggested review order",
       limit: "No limit",
     },
     understandingCheck: {
       label: "Explain it back before approval",
       limit:
-        "On by default; you can turn it off in Settings, and runs approved without it are marked",
+        "On by default; you can turn it off in Settings → Learning, and runs approved without it are marked",
     },
     reviewRerun: {
       label: "Re-run Reviewer and Test analyst",

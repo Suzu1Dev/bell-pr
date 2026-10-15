@@ -38,12 +38,12 @@ const plans: Translation<typeof en> = {
       limit: "計畫最多修訂 3 次",
     },
     review: {
-      label: "差異審查、解說、追問對話、筆記與建議審查順序",
+      label: "差異審查、解說、先試著答的提問、追問對話、筆記與建議審查順序",
       limit: "不限",
     },
     understandingCheck: {
       label: "核准前用自己的話講一遍",
-      limit: "預設開啟；可在設定中關閉，未經檢查就核准的工作會被標記",
+      limit: "預設開啟；可在「設定 → 學習」關閉，未經檢查就核准的工作會被標記",
     },
     reviewRerun: {
       label: "重新執行 Reviewer 與 Test analyst",
