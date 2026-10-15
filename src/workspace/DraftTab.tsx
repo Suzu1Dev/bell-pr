@@ -22,7 +22,7 @@ import { getDemo } from "../demo";
 import { useFormat, useLocale, useT } from "../i18n";
 import { ProBadge } from "../license/ProBadge";
 import { requestUpgrade } from "../license/useEntitlements";
-import type { DiffFile, Run } from "../types";
+import type { DiffFile, Repo, Run } from "../types";
 import { groupPrFeedback, summarizeChecks } from "../../shared/pr-feedback";
 import {
   followUpFeedbackLimit,
@@ -32,15 +32,21 @@ import type { Tab } from "../app/AppShell";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
 import type { RunActions } from "../app/hooks/useRunActions";
+import type { RunRecords } from "../app/hooks/useRunRecords";
 import type { RunRounds } from "../app/hooks/useRunRounds";
+import type { Understanding } from "../app/hooks/useUnderstanding";
 import { FollowUpRounds } from "../draft/FollowUpRounds";
 import { SyncPanel } from "../draft/SyncPanel";
+import {
+  Deferred,
+  DraftGuide,
+  ForecastCompare,
+  Restatements,
+  Reviewability,
+  UnderstandingRow,
+  YourWords,
+} from "./draftMounts";
 
-const DraftGuidancePanel = lazy(() =>
-  import("../draft/DraftGuidancePanel").then((module) => ({
-    default: module.DraftGuidancePanel,
-  })),
-);
 /** Shared with the publish dialog, so the Markdown renderer loads once. */
 export const MarkdownContent = lazy(() =>
   import("../review/MarkdownContent").then((module) => ({
@@ -94,11 +100,15 @@ interface DraftTabProps {
   actions: Pick<RunActions, "feedbackLoading" | "fetchPrFeedback">;
   rounds: RunRounds;
   /**
-   * Reading maintainer feedback and starting a round from it need Pro and
-   * the plan is Free: those controls open the upgrade dialog instead. The
+   * AI rounds on maintainer feedback need Pro and the plan is Free: the
+   * round's controls open the upgrade dialog instead. Reading feedback, the
    * round history, an open round's review and push, and syncing stay.
    */
   feedbackLocked?: boolean;
+  currentRepo?: Repo;
+  /** The Explain-it-back check and the person's other records (useUnderstanding, useRunRecords). */
+  understanding?: Pick<Understanding, "view" | "required" | "passed" | "off">;
+  records?: RunRecords;
 }
 
 /**
@@ -161,6 +171,9 @@ export function DraftTab({
   actions,
   rounds,
   feedbackLocked = false,
+  currentRepo,
+  understanding,
+  records,
 }: DraftTabProps) {
   const t = useT("workspace");
   const optional = useT("common").optional;
@@ -220,12 +233,18 @@ export function DraftTab({
     setFollowUpSelection,
     followUpNote,
     setFollowUpNote,
+    restatements,
+    setRestatement,
     syncToLatest,
     resolveSyncConflicts,
     undoSync,
     startFollowUp,
     discardFollowUp,
   } = rounds;
+  const record = understanding?.view?.record ?? run.understanding;
+  const [locale] = useLocale();
+  const sampleRestatements = demo ? (getDemo(locale).restatementSample ?? []) : [];
+  const selected = run.prFeedback?.items.filter((item) => followUpSelection.includes(item.url)) ?? [];
   return (
     <div className="draft-workspace">
       {demo && <SamplePublishedCard run={run} />}
@@ -257,7 +276,11 @@ export function DraftTab({
         <Suspense
           fallback={<p className="muted">{t.draft.loadingGuide}</p>}
         >
-          <DraftGuidancePanel
+          <DraftGuide
+            run={run}
+            files={files}
+            repo={currentRepo}
+            check={understanding ?? { required: true, passed: false, off: false }}
             preparation={run.draftPreparation}
             busy={draftRequests.has(run.id)}
             disabled={
@@ -287,6 +310,11 @@ export function DraftTab({
           />
         </Suspense>
       </ErrorBoundary>
+      )}
+      {!followUp && files.length > 0 && (
+        <Deferred resetKey={run.id}>
+          <Reviewability run={run} files={files} repo={currentRepo} demo={demo} onSaveReasons={records?.saveTestReasons} onAskSplit={records?.askSplit} />
+        </Deferred>
       )}
       <div className="draft-layout">
         <div className="draft-editor">
@@ -323,6 +351,11 @@ export function DraftTab({
                 <p>{t.draft.emptyNotice}</p>
               </div>
             )}
+          {!followUp && (
+            <Deferred resetKey={run.id}>
+              <YourWords run={run} record={record} body={draftBody} onInsert={setDraftBody} disabled={run.status === "published"} />
+            </Deferred>
+          )}
           <label className="field-label" htmlFor="pr-title">
             {t.draft.titleLabel}
           </label>
@@ -494,6 +527,7 @@ export function DraftTab({
               </small>
             </span>
           </div>
+          {understanding && <UnderstandingRow run={run} check={understanding} />}
           <div
             className={
               !draftDirty
@@ -637,27 +671,16 @@ export function DraftTab({
                   <ExternalLink size={13} />
                 </a>
               )}
-              <button
-                className="button primary"
-                disabled={feedbackLoading}
-                onClick={
-                  feedbackLocked
-                    ? () => requestUpgrade("prFeedback")
-                    : fetchPrFeedback
-                }
-              >
-                {feedbackLoading ? (
-                  <Loader2 className="spin" size={15} />
-                ) : feedbackLocked ? (
-                  <Lock size={15} aria-hidden="true" />
-                ) : (
-                  <RefreshCw size={15} />
-                )}
+              {/* Reading feedback is Free on every plan. */}
+              <button className="button primary" disabled={feedbackLoading} onClick={fetchPrFeedback}>
+                {feedbackLoading ? <Loader2 className="spin" size={15} /> : <RefreshCw size={15} />}
                 {run.prFeedback ? t.feedback.fetchAgain : t.feedback.fetch}
-                {(feedbackLocked || demo) && <ProBadge />}
               </button>
             </div>
           </div>
+          <Deferred resetKey={run.id}>
+            <ForecastCompare forecast={record?.forecast} feedback={run.prFeedback} tags={run.feedbackTags} onTag={records?.saveFeedbackTag} locked={false} demo={demo} />
+          </Deferred>
           {run.prFeedback ? (
             <>
               <p className="pr-feedback-meta">
@@ -850,6 +873,12 @@ export function DraftTab({
                     onChange={(event) => setFollowUpNote(event.target.value)}
                     disabled={busy || demo || feedbackLocked}
                   />
+                  <Restatements
+                    items={demo ? (run.prFeedback?.items ?? []).filter((item) => sampleRestatements.some((entry) => entry.url === item.url)) : selected}
+                    values={demo ? sampleRestatements : restatements}
+                    onChange={setRestatement}
+                    disabled={busy || demo || feedbackLocked}
+                  />
                   <button
                     className="button primary"
                     aria-describedby="follow-up-limit"
@@ -859,7 +888,8 @@ export function DraftTab({
                       (!feedbackLocked &&
                         (feedbackLoading ||
                           followUpSelection.length > followUpFeedbackLimit ||
-                          (!followUpSelection.length && !followUpNote.trim())))
+                          (!followUpSelection.length && !followUpNote.trim()) ||
+                          selected.some((item) => (draftChecks?.draftProseWords(restatements[item.url] ?? "") ?? 0) < 3)))
                     }
                     onClick={
                       feedbackLocked
@@ -883,6 +913,14 @@ export function DraftTab({
             </>
           ) : (
             <p className="muted">{t.feedback.notFetched}</p>
+          )}
+          {/* The sample's PR exists nowhere to close. */}
+          {!demo && (
+            <p className="pr-feedback-cant">
+              <a href={run.prUrl} target="_blank" rel="noreferrer">
+                {t.feedback.cantContinue}
+              </a>
+            </p>
           )}
         </section>
       )}

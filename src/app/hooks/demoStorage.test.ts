@@ -177,3 +177,26 @@ test("a stopped sample shows the finished sample in the new language, as a reloa
   assert.equal(stopped.status, "review");
   assert.deepEqual(stopped.team, getDemo("zh-TW").team);
 });
+
+test("the reader's check, attempts, tags and Check off mark stay through a reload and a language switch", () => {
+  const storage = memoryStorage();
+  installStorage(storage);
+  const run = loadDemo("en");
+  const understanding = { summary: { text: "My explanation.", changeFingerprint: "0".repeat(16), at: "2026-10-13T00:00:00Z" }, passedAt: "2026-10-13T00:05:00Z" };
+  const attempts = { "src/client.ts": { fingerprint: "src/client.ts", road: { choice: "keep" as const, at: "2026-10-13T00:00:00Z" } } };
+  saveDemo("en", { ...run, status: "approved", understanding, understandingCheckOff: true, attempts });
+  const kept = loadDemo("en");
+  assert.deepEqual(kept.understanding, understanding);
+  assert.equal(kept.understandingCheckOff, true);
+  assert.deepEqual(kept.attempts, attempts);
+  // The reader's own words keep their language in the other locale's fixtures.
+  const switched = demoRunInLocale(kept, "zh-TW");
+  assert.deepEqual(switched.understanding, understanding);
+  assert.deepEqual(switched.attempts, attempts);
+  // A record that is not one is dropped, not trusted.
+  storage.items.set(demoRunKey("en"), JSON.stringify({ ...run, understanding: "nope", understandingCheckOff: "yes", attempts: [] }));
+  const cleaned = loadDemo("en");
+  assert.equal(cleaned.understanding, undefined);
+  assert.equal(cleaned.understandingCheckOff, undefined);
+  assert.equal(cleaned.attempts, undefined);
+});

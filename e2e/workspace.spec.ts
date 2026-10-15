@@ -39,6 +39,8 @@ const seededRun = {
   unsandboxed: true,
   // Its working files were cleaned up, so it opens without a diff.
   workspaceRemovedAt: "2026-10-02T08:00:00.000Z",
+  // It was approved without the understanding check, which marks it for good.
+  understandingCheckOff: true,
 };
 
 const repoOf = (dataDir: string, directory = path.join(dataDir, "repos", "widgets")) => ({
@@ -168,7 +170,7 @@ test("on the trial, Export saves the learning record as a Markdown file", async 
   }
 });
 
-test("an unsandboxed run shows its badge, and a cleaned-up run says its files are gone", async ({ browser }) => {
+test("an unsandboxed run shows its badge, a run approved without the check its own, and a cleaned-up run says its files are gone", async ({ browser }) => {
   const server = await launchSeeded();
   const { page, close } = await openOn(browser, server);
   try {
@@ -184,6 +186,10 @@ test("an unsandboxed run shows its badge, and a cleaned-up run says its files ar
     await page.keyboard.press("Escape");
     await expect(tooltip).toBeHidden();
     await expect(page.getByText(workspace.runNotices.workspaceRemoved)).toBeVisible();
+    // Approved without explaining the change back: the mark stays, and says so.
+    const checkOff = page.locator(".title-row .check-off-badge");
+    await expect(checkOff).toContainText(workspace.checkOff.label);
+    await expect(page.locator("#check-off-help")).toHaveText(workspace.checkOff.tooltip);
     await expectNoOverflow(page);
     // The badge leads to the safety settings and keeps the presentation flags.
     await badge.click();
@@ -228,6 +234,7 @@ async function seedRound(dataDir: string) {
         id: "e2e-round-run",
         unsandboxed: undefined,
         workspaceRemovedAt: undefined,
+        understandingCheckOff: undefined,
         baseSha,
         worktreePath: checkout,
         createdAt: now(),
@@ -278,35 +285,29 @@ test("an open follow-up round asks for its commit message and pushes through its
     // The server records the review; the box ticks with its answer.
     await reviewed.click();
     await expect(reviewed).toBeChecked();
-    // Explain it back through the API: approval waits for the understanding
-    // check. The workspace's own check panel replaces this step (L2D).
-    const runApi = "/api/runs/e2e-round-run/understanding";
-    const { understanding: check } = await (await page.request.get(runApi)).json();
-    const plan = check.plan as { id: string; source: string }[];
-    const answered = await page.request.put(`${runApi}/answers`, {
-      data: {
-        summary:
-          "This round adds an exclamation mark to the greeting, which answers the review comment about the plain greeting.",
-        items: plan.map((item) => ({
-          id: item.id,
-          answer:
-            item.source === "untested"
-              ? "I did not run the greeting in a terminal."
-              : "It changes the greeting text in hello.ts.",
-          confidence: "sure",
-        })),
-        changeFingerprint: check.changeFingerprint,
-      },
-    });
-    expect(answered.status()).toBe(200);
-    const graded = await page.request.put(`${runApi}/grades`, {
-      data: {
-        items: plan
-          .filter((item) => item.source !== "untested")
-          .map((item) => ({ id: item.id, grade: "got" })),
-      },
-    });
-    expect((await graded.json()).understanding.passed).toBe(true);
+    // Approval waits for the understanding check: explain the round back in
+    // the closed-book panel next to the diff.
+    const check = workspace.check;
+    await page.getByRole("button", { name: workspace.footer.explainBack }).click();
+    const panel = page.locator(".understanding-check");
+    await expect(page.locator(".explain-panel")).toHaveCount(0);
+    // A round asks what it changes and which review comment it answers.
+    const summary = panel.getByRole("textbox", { name: check.roundPrompt });
+    await summary.fill(
+      "This round adds an exclamation mark to the greeting, which answers the review comment about the plain greeting.",
+    );
+    // Two changed lines ask no file question; what was not tested is still
+    // asked, in the run's own language (a run from before runs recorded
+    // one is in Traditional Chinese).
+    const answers = panel.getByRole("region", { name: check.answerTitle }).getByRole("listitem");
+    await expect(answers).toHaveCount(1);
+    await answers.getByRole("textbox").fill("I did not run the greeting in a terminal.");
+    await panel.getByRole("radio", { name: check.confidences.sure }).check();
+    await panel.getByRole("button", { name: check.lock }).click();
+    await expect(panel.getByRole("region", { name: check.resultTitle })).toContainText(
+      check.result({ questions: 1, misses: 0 }),
+    );
+    await expect(page.locator(".review-footer")).toContainText(workspace.footer.passed);
     await page.getByRole("button", { name: workspace.footer.approvePush }).click();
     const dialog = page.getByRole("dialog", { name: workspace.publish.titleRound });
     await expect(dialog).toBeVisible();

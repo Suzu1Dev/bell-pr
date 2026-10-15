@@ -11,12 +11,44 @@ import { runTabs, type RunTab } from "../src/navigation/route";
 import { expectNoOverflow } from "./helpers/overflow";
 
 const demo = getDemo("en");
+const check = workspace.check;
+const sample = demo.understandingSample!;
 const tab = (page: Page, name: RunTab) => page.locator(`#workspace-tab-${name}`);
 const selectedFile = (page: Page) => page.locator(".file-item.selected");
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 async function expectTab(page: Page, name: RunTab) {
   await expect(tab(page, name)).toHaveAttribute("aria-selected", "true");
+}
+
+/**
+ * Explains the sample back with its own answers, typed by the "Fill with
+ * the sample answer" buttons: retry.ts at Think so, graded Partly with a
+ * correction, then what was not tested, and the forecast skipped.
+ */
+async function passCheck(page: Page) {
+  const panel = page.locator(".understanding-check");
+  const step = (name: string) => panel.getByRole("region", { name });
+  await step(check.explainTitle).getByRole("button", { name: check.fill }).click();
+  await expect(step(check.explainTitle).getByRole("textbox")).toHaveValue(sample.summary);
+  const answers = step(check.answerTitle).getByRole("listitem");
+  for (const [index, id] of ["selfCheck:src/utils/retry.ts", "untested"].entries()) {
+    const entry = answers.nth(index);
+    await entry.getByRole("button", { name: check.fill }).click();
+    await expect(entry.getByRole("textbox")).toHaveValue(sample.answers[id].answer);
+    await entry.getByRole("radio", { name: check.confidences[sample.answers[id].confidence] }).check();
+  }
+  await panel.getByRole("button", { name: check.lock }).click();
+  await step(check.gradeTitle).getByRole("radio", { name: check.grades.partly }).check();
+  await step(check.correctTitle).getByRole("button", { name: check.fill }).click();
+  await expect(step(check.correctTitle).getByRole("textbox")).toHaveValue(
+    sample.answers["selfCheck:src/utils/retry.ts"].correction!,
+  );
+  await panel.getByRole("button", { name: check.saveGrades }).click();
+  await step(check.forecastTitle).getByRole("button", { name: check.skip }).click();
+  await expect(panel.getByRole("region", { name: check.resultTitle })).toContainText(
+    check.result({ questions: 2, misses: 1 }),
+  );
 }
 
 test("the sample goes from reviewing every file to its published sample PR", async ({ page }) => {
@@ -42,15 +74,24 @@ test("the sample goes from reviewing every file to its published sample PR", asy
   }
   await expect(page.locator(".file-item .file-reviewed")).toHaveCount(demo.files.length);
 
+  // Every file is ticked: approval waits for the understanding check.
   await tab(page, "draft").click();
   await expectTab(page, "draft");
+  await page.getByRole("button", { name: workspace.footer.explainBack }).click();
+  await expectTab(page, "changes");
+  await passCheck(page);
+  await expect(page.locator(".review-footer")).toContainText(workspace.footer.passed);
+  await tab(page, "draft").click();
   const approve = page.getByRole("button", { name: workspace.footer.approvePr });
   await approve.click();
   const dialog = page.getByRole("dialog", { name: workspace.publish.titleDemo });
   await expect(dialog).toBeVisible();
-  // The demo previews the description and opens its PR without any check.
+  // The demo previews the description and needs neither Git nor the GitHub
+  // CLI; its respect checks come from the sample, and all pass.
   await expect(dialog.locator(".publish-body-preview")).toBeVisible();
   await expect(dialog.locator(".readiness-notice")).toHaveCount(0);
+  await expect(dialog).toContainText(workspace.publish.allClear);
+  await expect(dialog).toContainText(workspace.publish.pacing({ open: 0, budget: 1, first: true }));
   await dialog.getByRole("button", { name: workspace.publish.finishDemo }).click();
   await expect(dialog).toBeHidden();
   await expect(page.locator(".sample-published")).toContainText(demo.publishedCard!.title);

@@ -34,6 +34,34 @@ function write(key: string, value: unknown) {
   }
 }
 
+/**
+ * The reader's own records on the sample: the Explain-it-back check, the
+ * try-first answers, feedback tags and test reasons, and the "Check off"
+ * mark. They are the reader's words, so they keep the language they were
+ * written in.
+ */
+export const readerRecords = [
+  "understanding",
+  "understandingCheckOff",
+  "attempts",
+  "feedbackTags",
+  "reviewability",
+] as const;
+
+function recordsOf(run: Partial<Run>): Partial<Run> {
+  return Object.fromEntries(
+    readerRecords.flatMap((key) => {
+      const value = run[key];
+      // A record that is not one (written by hand, or damaged) is dropped.
+      const valid =
+        key === "understandingCheckOff"
+          ? value === true
+          : !!value && typeof value === "object" && !Array.isArray(value);
+      return valid ? [[key, value]] : [];
+    }),
+  );
+}
+
 /** The sample's Draft PR, "opened" from `run`'s draft; nothing is on GitHub. */
 function samplePr(run: Run): Partial<Run> {
   return {
@@ -53,6 +81,7 @@ export function loadDemo(locale: Locale): Run {
   if (saved?.id !== run.id) return fresh;
   const kept: Run = {
     ...fresh,
+    ...recordsOf(saved),
     reviewedFiles: Array.isArray(saved.reviewedFiles) ? saved.reviewedFiles : [],
     draft: saved.draft || run.draft,
     status:
@@ -86,6 +115,7 @@ export function demoRunInLocale(previous: Run, locale: Locale): Run {
         ? "approved"
         : "review",
     notes: previous.notes,
+    ...recordsOf(previous),
     draftPreparation:
       previous.draftPreparation && structuredClone(draftPreparation),
     ...(previous.prFeedback && prFeedback

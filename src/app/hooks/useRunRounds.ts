@@ -40,9 +40,12 @@ export function useRunRounds({
   // Feedback picked for the next review follow-up round, and the person's note.
   const [followUpSelection, setFollowUpSelection] = useState<string[]>([]);
   const [followUpNote, setFollowUpNote] = useState("");
+  // The person's own words for each selected comment (the round's task).
+  const [restatements, setRestatements] = useState<Record<string, string>>({});
   useEffect(() => {
     setFollowUpSelection([]);
     setFollowUpNote("");
+    setRestatements({});
   }, [run.id]);
   useEffect(() => {
     const current = new Set(run.prFeedback?.items.map((item) => item.url) ?? []);
@@ -125,12 +128,21 @@ export function useRunRounds({
         send("POST", {
           feedbackUrls: followUpSelection,
           ...(followUpNote.trim() ? { note: followUpNote.trim() } : {}),
+          ...(followUpSelection.length
+            ? {
+                restatements: followUpSelection.map((url) => ({
+                  url,
+                  text: (restatements[url] ?? "").trim(),
+                })),
+              }
+            : {}),
         }),
       );
       if (runIdRef.current !== updated.id) return;
       setRun(updated);
       setFollowUpSelection([]);
       setFollowUpNote("");
+      setRestatements({});
       setTab("activity");
       notify(t.followUpStarted);
     } catch (error) {
@@ -164,6 +176,11 @@ export function useRunRounds({
     setFollowUpSelection,
     followUpNote,
     setFollowUpNote,
+    restatements,
+    /** Sets the person's restatement of the comment at `url`. */
+    setRestatement(url: string, text: string) {
+      setRestatements((previous) => ({ ...previous, [url]: text }));
+    },
     syncToLatest,
     resolveSyncConflicts,
     undoSync,

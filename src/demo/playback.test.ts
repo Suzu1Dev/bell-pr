@@ -3,6 +3,12 @@ import { performance } from "node:perf_hooks";
 import test from "node:test";
 import { defaultContributionSettings } from "../../shared/insights";
 import { locales } from "../../shared/i18n/locale";
+import {
+  demoGate,
+  demoLockAnswers,
+  demoSaveGrades,
+} from "../app/hooks/understandingDemo";
+import type { DiffFile, Run } from "../types";
 import { getDemo } from "./index";
 import {
   createDemoPlayback,
@@ -74,6 +80,44 @@ function record(playback: ReturnType<typeof createDemoPlayback>, time: () => num
   };
 }
 
+/** The workspace's gate: the sample's understanding check, with the check on. */
+const checkOn = (run: Run, files: DiffFile[]) => demoGate(run, files, true).passed;
+/** The check turned off in Settings → Learning: approval needs the ticks only. */
+const checkOff = () => true;
+
+/** The sample's own answers, locked (and graded, unless `graded` is false) as its "Fill" buttons would. */
+function passedCheck(demo: DemoContent, run: Run, files: DiffFile[], graded = true) {
+  const sample = demo.understandingSample!;
+  const questions = { fallback: (path: string) => path, untested: "untested" };
+  const at = "2026-10-03T02:00:00.000Z";
+  const locked = demoLockAnswers(
+    run,
+    files,
+    {
+      summary: sample.summary,
+      items: Object.entries(sample.answers).map(([id, answer]) => ({
+        id,
+        answer: answer.answer,
+        confidence: answer.confidence,
+      })),
+    },
+    questions,
+    at,
+  );
+  if (!graded) return locked;
+  return demoSaveGrades(
+    { ...run, understanding: locked },
+    files,
+    {
+      items: Object.entries(sample.answers)
+        .filter(([, answer]) => answer.grade)
+        .map(([id, answer]) => ({ id, grade: answer.grade!, correction: answer.correction })),
+    },
+    questions,
+    at,
+  );
+}
+
 /** `values` without consecutive repeats. */
 const steps = <T>(values: T[]) =>
   values.filter((value, index) => index === 0 || value !== values[index - 1]);
@@ -98,7 +142,7 @@ for (const locale of locales)
     const demo = getDemo(locale);
     const before = snapshot(demo);
     const time = fakeClock();
-    const playback = createDemoPlayback({ demo, clock: time.clock });
+    const playback = createDemoPlayback({ demo, clock: time.clock, checkUnderstanding: checkOn });
     const { runs } = record(playback, time.now);
     assert.equal(playback.current(), undefined);
 
@@ -238,6 +282,11 @@ for (const locale of locales)
     for (const message of last.run.team!.messages)
       assert.ok(!Number.isNaN(Date.parse(message.createdAt)));
 
+    // Approval waits for the understanding check, and so does publishing.
+    assert.equal(playback.approve(), false);
+    assert.equal(playback.publish(), false);
+    assert.equal(playback.current()!.run.status, "review");
+    playback.setUnderstanding(passedCheck(demo, last.run, last.files));
     // Approve, then publish the sample PR.
     assert.equal(playback.approve(), true);
     assert.equal(playback.current()!.run.status, "approved");
@@ -296,7 +345,8 @@ test("the contribution settings shape the run, and plan approval can be off", ()
   time.runAll();
   const { run } = playback.current()!;
   assert.equal(run.status, "review");
-  assert.deepEqual(run.contributionSettings, settings);
+  // The sample task keeps the sample issue its rules ask for.
+  assert.deepEqual(run.contributionSettings, { ...settings, issueUrl: "#sample-issue-42" });
   assert.equal(run.team?.config.provider, "claude");
   assert.equal(run.team?.config.requirePlanApproval, false);
   assert.ok(run.team?.approvedAt);
@@ -368,7 +418,7 @@ test("analyzeSample plays the analysis lines, then the insights", async () => {
 
 test("stop cancels every timer and settles what was pending", async () => {
   const time = fakeClock();
-  const playback = createDemoPlayback({ demo: getDemo("en"), clock: time.clock });
+  const playback = createDemoPlayback({ demo: getDemo("en"), clock: time.clock, checkUnderstanding: checkOff });
   const { events } = record(playback, time.now);
   playback.start();
   time.advance(playbackTiming.queued);
@@ -454,4 +504,42 @@ test("each event is a copy the view may keep or change", () => {
   assert.ok(run.logs.every((entry) => entry.message !== "changed by a view"));
   assert.equal(run.team!.tasks[0].title, demo.team.tasks[0].title);
   assert.notEqual(seen[0].run, seen[1].run);
+});
+
+test("approval waits for the understanding check unless it is off, and publish inherits the guard", () => {
+  const demo = getDemo("en");
+  const reviewed = (checkUnderstanding?: (run: Run, files: DiffFile[]) => boolean) => {
+    const time = fakeClock();
+    const playback = createDemoPlayback({ demo, speed: 4, clock: time.clock, checkUnderstanding });
+    playback.start();
+    time.runAll();
+    playback.approvePlan();
+    time.runAll();
+    assert.equal(playback.current()!.run.status, "review");
+    return { playback, time };
+  };
+  // Without the workspace's rules the playback approves nothing.
+  assert.equal(reviewed().playback.approve(), false);
+
+  const { playback, time } = reviewed(checkOn);
+  const { run, files } = playback.current()!;
+  // The sample issue is the task's own, so the project's issue-first rule holds.
+  assert.equal(run.contributionSettings?.issueUrl, "#sample-issue-42");
+  assert.equal(playback.publish(), false);
+  // A half-done check (answers locked, nothing graded yet) does not pass.
+  playback.setUnderstanding(passedCheck(demo, run, files, false));
+  assert.equal(playback.approve(), false);
+  const locked = passedCheck(demo, run, files);
+  playback.setUnderstanding(locked);
+  assert.ok(locked.passedAt, "the sample answers pass the check");
+  assert.equal(playback.publish(), true);
+  time.runAll();
+  assert.equal(playback.current()!.run.status, "published");
+  // The reader's record stays on the played run.
+  assert.equal(playback.current()!.run.understanding?.passedAt, locked.passedAt);
+
+  // With the check off, the reviewed sample is approved without one.
+  const off = reviewed(checkOff).playback;
+  assert.equal(off.approve(), true);
+  assert.equal(off.current()!.run.status, "approved");
 });

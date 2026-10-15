@@ -27,11 +27,14 @@ import type { Tab } from "../app/AppShell";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
 import type { RunActions } from "../app/hooks/useRunActions";
 import type { RunRounds } from "../app/hooks/useRunRounds";
+import { useRunRecords } from "../app/hooks/useRunRecords";
+import { openCheckPanel, useUnderstanding } from "../app/hooks/useUnderstanding";
 import { ActivityTab } from "./ActivityTab";
 import { ChangesTab } from "./ChangesTab";
+import { checkFooter } from "./checkFooter";
 import { DraftTab } from "./DraftTab";
 import { OverviewTab } from "./OverviewTab";
-import { RunNotices, UnsandboxedBadge } from "./RunNotices";
+import { RunNotices, showsCheckOff, UnderstandingOffBadge, UnsandboxedBadge } from "./RunNotices";
 import "./workspace.css";
 
 interface WorkspacePageProps {
@@ -153,6 +156,9 @@ export function WorkspacePage({
   const { draftDirty, draftUnfinished, followUp, commitMessageUnfinished } =
     draft;
   const { approve, plan, exporting, exportLearning } = actions;
+  // The Explain-it-back check and the person's other records on this run.
+  const understanding = useUnderstanding(run, files, { demo, setRun: actions.setRun });
+  const records = useRunRecords(run, files, { demo, setRun: actions.setRun, notify: actions.notify, file, ask: actions.ask, setSelectedPath, setTab });
   // The sample's playback queues for a moment behind nothing.
   const queuedOnFree =
     !demo &&
@@ -182,6 +188,7 @@ export function WorkspacePage({
     run.reviewedFiles.includes(f.path),
   ).length;
   const allReviewed = files.length > 0 && reviewedCount === files.length;
+  const footer = checkFooter(run, allReviewed, understanding);
   // Progress strip index: 0 define, 1 build, 2 review, 3 submit;
   // 4 marks every step done. Failed and cancelled runs stay on step 02.
   const currentStep: number = (
@@ -222,6 +229,9 @@ export function WorkspacePage({
             {statusLabels[run.status]}
           </span>
           {run.unsandboxed === true && <UnsandboxedBadge />}
+          {showsCheckOff(run, understanding.off) && (
+            <UnderstandingOffBadge approved={run.understandingCheckOff === true} />
+          )}
         </div>
         <div className="repo-meta">
           <span>
@@ -412,6 +422,7 @@ export function WorkspacePage({
               explanationRequests={explanationRequests}
               prepareExplanations={prepareExplanations}
               actions={actions}
+              understanding={understanding}
             />
           )}
           {tab === "activity" && (
@@ -441,6 +452,9 @@ export function WorkspacePage({
               draft={draft}
               actions={actions}
               rounds={rounds}
+              currentRepo={currentRepo}
+              understanding={understanding}
+              records={records}
               feedbackLocked={plan.locked("prFeedback", { demo })}
             />
           )}
@@ -450,9 +464,7 @@ export function WorkspacePage({
             <span className="footer-spark">
               <Sparkles size={15} />
             </span>
-            <span>
-              {allReviewed ? t.footer.allReviewed : t.footer.learning}
-            </span>
+            <span>{t.footer[footer.status]}</span>
             <span className="footer-hint">{t.footer.hint}</span>
           </div>
           <div>
@@ -479,19 +491,21 @@ export function WorkspacePage({
               <button
                 className="button primary"
                 disabled={
-                  !allReviewed ||
+                  !footer.explainFirst && (!allReviewed ||
                   active ||
                   busy ||
                   !!run.publishing ||
                   draftDirty ||
                   (!demo &&
                     (followUp ? commitMessageUnfinished : !!draftUnfinished)) ||
-                  !["review", "approved"].includes(run.status)
+                  !["review", "approved"].includes(run.status))
                 }
                 title={
                   !allReviewed
-                    ? t.footer.needsReview
-                    : draftDirty
+                    ? t.footer[footer.needsReview]
+                    : footer.explainFirst
+                      ? t.footer.needsCheck
+                      : draftDirty
                       ? t.footer.needsSave
                       : followUp && commitMessageUnfinished
                         ? t.footer.needsCommitMessage
@@ -501,10 +515,12 @@ export function WorkspacePage({
                             ? t.footer.previewPush
                             : t.footer.previewSubmit
                 }
-                onClick={approve}
+                onClick={footer.explainFirst ? () => openCheckPanel(run.id) : approve}
               >
                 <Check size={16} />
-                {followUp ? t.footer.approvePush : t.footer.approvePr}
+                {footer.explainFirst
+                  ? t.footer.explainBack
+                  : followUp ? t.footer.approvePush : t.footer.approvePr}
                 <ChevronRight size={15} />
               </button>
             )}

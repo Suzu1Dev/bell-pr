@@ -18,6 +18,7 @@ import {
   type DraftProposal,
 } from "../../../shared/drafts";
 import type { DraftCheck, DraftTaskItem } from "../../../shared/draft-checks";
+import type { OverridableCheckId } from "../../../shared/contribution";
 import { activeFollowUp } from "../../../shared/followups";
 import type { Notify } from "../AppShell";
 
@@ -82,6 +83,11 @@ export function useDraftEditor({
   );
   // Preflight items confirmed in the publish dialog; never saved.
   const [acknowledged, setAcknowledged] = useState<string[]>([]);
+  // Blocks lifted in the publish dialog with the person's reason; the
+  // server records them on the run once publishing goes ahead.
+  const [overrides, setOverrides] = useState<
+    { id: OverridableCheckId; reason: string }[]
+  >([]);
   // The server's publish checks for one approval (GET /runs/:id/preflight).
   const [serverChecks, setServerChecks] = useState<{
     runId: string;
@@ -353,6 +359,8 @@ export function useDraftEditor({
     setDraftPublishBranch,
     acknowledged,
     setAcknowledged,
+    overrides,
+    setOverrides,
     draftChecks,
     draftPreview,
     setDraftPreview,

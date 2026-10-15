@@ -130,6 +130,8 @@ const element = (
         setFollowUpSelection() {},
         followUpNote: "",
         setFollowUpNote() {},
+        restatements: {},
+        setRestatement() {},
         async syncToLatest() {},
         async resolveSyncConflicts() {},
         async undoSync() {},
@@ -188,7 +190,11 @@ test("an open follow-up round keeps the PR text as published and asks for this r
 });
 
 test("maintainer feedback on a published PR can be picked for the next round, up to the limit", () => {
-  const picked = render({}, {}, { followUpSelection: [items[0].url] });
+  const picked = render(
+    {},
+    {},
+    { followUpSelection: [items[0].url], restatements: { [items[0].url]: "改一個更清楚的名字" } },
+  );
   assert.match(picked, /依回饋繼續修正/);
   const first = tag(picked, /aria-label="把 maintainer 在 hello\.ts 第 1 行 的回饋納入下一輪修正"/);
   assert.match(first, /checked=""/);
@@ -197,6 +203,17 @@ test("maintainer feedback on a published PR can be picked for the next round, up
   assert.match(picked, /一輪最多 20 則回饋，已選 1 則。/);
   assert.doesNotMatch(tag(picked, /aria-describedby="follow-up-limit"/), /disabled=""/);
   assert.match(picked, /依選取的 1 則回饋修正/);
+  // Each picked comment needs the person's own words, 3 or more, first.
+  assert.match(picked, /用你的話說：maintainer 要求的是什麼？/);
+  assert.match(tag(picked, /id="follow-up-restatement-0"/), /value="改一個更清楚的名字"/);
+  for (const words of [undefined, "改名"]) {
+    const unstated = render(
+      {},
+      {},
+      { followUpSelection: [items[0].url], restatements: words ? { [items[0].url]: words } : {} },
+    );
+    assert.match(tag(unstated, /aria-describedby="follow-up-limit"/), /disabled=""/, String(words));
+  }
   // Nothing picked and no note: the start button waits.
   const empty = render();
   assert.match(tag(empty, /aria-describedby="follow-up-limit"/), /disabled=""/);
@@ -344,14 +361,14 @@ test("the description's Edit and Preview buttons say which one is on", () => {
   assertNoHan(html);
 });
 
-test("on Free, reading feedback and starting a round are locked with the PRO badge", () => {
+test("on Free, reading feedback stays open and only starting an AI round is locked with the PRO badge", () => {
   const html = renderEn(element({ feedbackLocked: true }, {}, { followUpSelection: [items[0].url] }));
-  // The button stays enabled: it opens the upgrade dialog instead of asking GitHub.
+  // Reading feedback is Free: the button asks GitHub, with no lock and no PRO mark.
   const read = html.match(/<button class="button primary"[^>]*>(?:(?!<\/button>).)*Read feedback again(?:(?!<\/button>).)*<\/button>/)?.[0] ?? "";
   assert.ok(read, "the read button is there");
   assert.doesNotMatch(read, /disabled=""/);
-  assert.match(read, /lucide-lock/);
-  assert.match(read, /aria-label="Pro feature"/);
+  assert.doesNotMatch(read, /lucide-lock/);
+  assert.doesNotMatch(read, /aria-label="Pro feature"/);
   // Every feedback checkbox and the note are locked; the start button opens the dialog.
   for (const box of html.match(/<input type="checkbox"[^>]*aria-label="Include[^>]*>/g) ?? [])
     assert.match(box, /disabled=""/);
@@ -377,8 +394,15 @@ test("the sample shows its fictional feedback with a PRO chip and links to nothi
       },
     }),
   );
-  assert.match(html, /Read feedback again/);
-  assert.match(html, /aria-label="Pro feature"/);
+  assert.match(html, /Read feedback again<\/button>/);
+  // Only the AI round is Pro, and the sample shows its PRO chip on it.
+  assert.match(html, /Keep fixing from feedback<span class="pro-badge"/);
+  // The sample's restatement shows on its disabled form.
+  const restated = demo.restatementSample![0];
+  assert.ok(html.includes(`value="${restated.text.replace(/'/g, "&#x27;")}"`));
+  assert.match(tag(html, /id="follow-up-restatement-0"/), /disabled=""/);
+  // Its PR exists nowhere, so there is nothing to close on GitHub.
+  assert.doesNotMatch(html, /Can&#x27;t continue\?/);
   assert.match(html, /sample_maintainer/);
   // No sample link looks like a page on GitHub.
   assert.doesNotMatch(html, /View pull request/);
@@ -421,4 +445,39 @@ test("the published sample shows its own card, which says nothing reached GitHub
     renderZh(createElement(SamplePublishedCard, { run: { ...published, ...getDemo("zh-TW").run, status: "published" } })),
     new RegExp(getDemo("zh-TW").publishedCard!.title),
   );
+});
+
+test("the checklist says where the understanding check stands, and offers the forecast while it is off", () => {
+  const draftRun: Run = { ...published, status: "review", prUrl: undefined, prFeedback: undefined, followUps: undefined };
+  const row = (understanding: Props["understanding"]) =>
+    renderEn(element({ run: draftRun, understanding }));
+  const required = row({ view: undefined, required: true, passed: false, off: false });
+  assert.match(required, /Understanding check<small>Required: explain the change back before approval<\/small>/);
+  assert.doesNotMatch(required, /Predict the maintainer/);
+  assertNoHan(required);
+  assert.match(
+    row({ view: undefined, required: true, passed: true, off: false }),
+    /<div class="checklist-item checked">.*?Understanding check<small>Passed: you explained the change back<\/small>/,
+  );
+  const off = row({ view: undefined, required: false, passed: false, off: true });
+  assert.match(off, /Understanding check<small>Off: approval needs your reviewed ticks only<\/small>/);
+  assert.match(off, /<button type="button" class="run-notice-link">Predict the maintainer<\/button>/);
+  assertNoHan(off);
+  assert.match(renderZh(element({ run: draftRun, understanding: { view: undefined, required: true, passed: false, off: false } })), /理解檢查/);
+  // A published PR keeps the row only for a pass or its "Check off" mark.
+  const after = (run: Run) =>
+    renderEn(element({ run, understanding: { view: undefined, required: true, passed: false, off: false } }));
+  assert.doesNotMatch(after(published), /Understanding check/);
+  const marked = after({ ...published, understandingCheckOff: true });
+  assert.match(marked, /Understanding check<small>Off: approval needs your reviewed ticks only<\/small>/);
+  assert.doesNotMatch(marked, /Predict the maintainer/);
+});
+
+test("a real published PR offers to close it yourself; the sample, which has none, does not", () => {
+  const html = renderEn(element());
+  assert.match(
+    html,
+    /<p class="pr-feedback-cant"><a href="https:\/\/github\.com\/acme\/widgets\/pull\/3" target="_blank" rel="noreferrer">Can&#x27;t continue\? Close the pull request yourself on GitHub, with a short note in your own words\.<\/a><\/p>/,
+  );
+  assertNoHan(html);
 });
