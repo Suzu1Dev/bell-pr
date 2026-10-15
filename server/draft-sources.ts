@@ -27,20 +27,59 @@ export type Entry = {
   size: number;
 };
 
+/** Folders whose guidance is read besides the root. */
+const documentFolders = [".github", "docs", "doc", "documentation"];
+/** AI policies by name: AI_POLICY*, AI-POLICY*, AI_USAGE*, *AIToolPolicy*, LLM*POLICY*, GENERATIVE*AI*. */
+const aiPolicyName = /^(?:ai[-_](?:policy|usage)|.*aitoolpolicy|llm.*policy|generative.*ai)/;
+/**
+ * Policy-named documents in the docs folders: "ai-", "llm",
+ * "generated-content", "code-provenance", "coding-assistant", "contribut".
+ */
+const policyName =
+  /(?:^|[-_.])(?:ai|llms?|genai)(?:[-_.]|$)|generated[-_]content|code[-_]provenance|coding[-_]assistants?|contribut/;
+
+/**
+ * The kind of guidance a repository file is, by its name and place, or
+ * undefined for files neither the PR draft nor the rules card reads:
+ * - contributing: CONTRIBUTING and CONTRIBUTE files, and AI policies (also
+ *   in a sub-project's docs folder, such as `llvm/docs/AIToolPolicy.md`);
+ * - template: pull request templates, including the folder of them;
+ * - documentation: README, agent guides (AGENTS.md, CLAUDE.md,
+ *   `.github/copilot-instructions.md`), codes of conduct, other submission
+ *   guides, and policy-named documents three folders deep or less.
+ * Only the root, `.github/`, `docs/`, `doc/` and `Documentation/` count.
+ * The kinds are those `DraftSource.kind` already has.
+ */
 export function documentKind(file: string): DocumentKind | undefined {
   if (!safeRelativePath(file) || sensitivePath(file)) return;
   const parts = file.toLowerCase().split("/");
-  if (
-    parts.length > 5 ||
-    (parts.length > 1 &&
-      ![".github", "docs", "documentation"].includes(parts[0]))
-  )
-    return;
   const name = parts.at(-1)!;
   const stem = name.replace(/\.(?:md|markdown|rst|txt|adoc|org)$/i, "");
-  if (stem === "contributing") return "contributing";
+  // A text document: a known extension, or none.
+  const text = stem !== name || !name.includes(".");
+  if (
+    text &&
+    aiPolicyName.test(stem) &&
+    (parts.length === 1 ||
+      (parts.length <= 5 && documentFolders.includes(parts[0])) ||
+      (parts.length <= 3 &&
+        parts.slice(0, -1).some((part) => documentFolders.includes(part))))
+  )
+    return "contributing";
+  if (
+    parts.length > 5 ||
+    (parts.length > 1 && !documentFolders.includes(parts[0]))
+  )
+    return;
+  if (stem === "contributing" || /^contribute(?:$|[-_.])/.test(stem))
+    return "contributing";
   // Agent guides such as AGENTS.md often hold the branch and commit rules CONTRIBUTING links to.
-  if (parts.length === 1 && (stem === "agents" || stem === "claude"))
+  if (
+    (parts.length === 1 || (parts.length === 2 && parts[0] === ".github")) &&
+    (stem === "agents" || stem === "claude")
+  )
+    return "documentation";
+  if (parts.join("/") === ".github/copilot-instructions.md")
     return "documentation";
   if (
     stem === "pull_request_template" ||
@@ -49,12 +88,37 @@ export function documentKind(file: string): DocumentKind | undefined {
   )
     return "template";
   if (
-    /^(?:readme|contribution(?:s|-guide)?|contributing[-_]guide|submitting(?:[-_](?:patches|pull[-_]requests))?|maintainer(?:s|[-_]guide)?)$/.test(
+    /^(?:readme|contribution(?:s|-guide)?|contributing[-_]guide|submitting(?:[-_](?:patches|pull[-_]requests))?|maintainer(?:s|[-_]guide)?|code[-_]of[-_]conduct)$/.test(
       stem,
     )
   )
     return "documentation";
+  if (
+    text &&
+    parts.length > 1 &&
+    parts.length <= 3 &&
+    parts[0] !== ".github" &&
+    policyName.test(stem)
+  )
+    return "documentation";
   return undefined;
+}
+
+/**
+ * The kind of community file an account's `<owner>/.github` defaults stand
+ * in for when the repository has none of its own: CONTRIBUTING and pull
+ * request templates. An AI policy or CONTRIBUTE file is guidance too, but
+ * GitHub does not fall back for it.
+ */
+export function defaultsKind(file: string): DocumentKind | undefined {
+  const kind = documentKind(file);
+  if (kind === "template") return kind;
+  const stem = file
+    .split("/")
+    .at(-1)!
+    .toLowerCase()
+    .replace(/\.(?:md|markdown|rst|txt|adoc|org)$/, "");
+  return kind === "contributing" && stem === "contributing" ? kind : undefined;
 }
 
 /**
@@ -450,7 +514,8 @@ export async function collectDraftContext(
         ? `${remote.url}/blob/${run.baseSha}/${file.split("/").map(encodeURIComponent).join("/")}`
         : undefined;
     for (const entry of candidates) {
-      localKinds.add(documentKind(entry.path)!);
+      const own = defaultsKind(entry.path);
+      if (own) localKinds.add(own);
       await readDocument(
         entry,
         "base",
