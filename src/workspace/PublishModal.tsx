@@ -494,7 +494,8 @@ export function PublishChecks({
         <p className="publish-fact">{pacing === "exempt" ? t.pacingExempt : t.pacing(pacing)}</p>
       )}
       {checkOff && <p className="publish-fact">{t.checkOff}</p>}
-      {checks && !checks.length && (
+      {/* Facts still being read, or that could not be read, are never a pass. */}
+      {checks && !checks.length && !facts.loading && !facts.error && (
         <p className="publish-fact is-clear">
           <CircleCheck size={14} aria-hidden="true" /> {t.allClear}
         </p>

@@ -484,8 +484,12 @@ test("the facts line: reading, couldn't check, the pace here, and the check off"
   assert.match(renderEn(checksElement({ facts: { loading: true } })), /role="status">.*Reading the GitHub facts…/);
   const unknown = renderEn(checksElement({ facts: { loading: false, error: "this build cannot read the GitHub facts yet" } }));
   assert.match(unknown, /Couldn&#x27;t check: this build cannot read the GitHub facts yet/);
-  // Unknown is never a pass: no "all clear" claim without checks.
+  // Unknown is never a pass: no "all clear" claim without checks, or while
+  // the facts are read or could not be read.
   assert.doesNotMatch(renderEn(checksElement({ checks: undefined })), /Every check passes/);
+  assert.doesNotMatch(unknown, /Every check passes/);
+  assert.doesNotMatch(renderEn(checksElement({ facts: { loading: true } })), /Every check passes/);
+  assert.match(renderEn(checksElement()), /Every check passes/);
   assert.match(
     renderEn(checksElement({ pacing: { open: 0, budget: 1, first: true } })),
     /Your open PRs here: 0 of 1 \(first contribution here\)/,
