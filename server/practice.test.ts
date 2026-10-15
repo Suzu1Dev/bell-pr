@@ -225,6 +225,48 @@ test("the deck holds misses, surprising comments with a lesson, unattempted self
   );
 });
 
+test("a quiz miss the check credited stays on the deck after a later round changed the file", () => {
+  const { runs, repos } = records();
+  const target = runs[0];
+  target.understanding!.items!.push(
+    item("src/d.ts", {
+      id: "attempt:src/d.ts",
+      source: "attempt",
+      confidence: "sure",
+      grade: "missed",
+      correction: "It retries GET requests only.",
+    }),
+  );
+  const quiz = () =>
+    withLocale("en", () => practiceCandidates(runs, repos, now)).find(
+      (candidate) => candidate.item.key === "quiz:src/d.ts",
+    )?.item;
+  assert.deepEqual(
+    [quiz()?.question, quiz()?.reference, quiz()?.earlier, quiz()?.lastConfidence],
+    ["What does src/d.ts change?", "The answer for src/d.ts.", "It retries GET requests only.", "sure"],
+  );
+  // A follow-up round changed src/d.ts: its card now explains the new version.
+  target.explanations!["src/d.ts"] = {
+    ...explanation("src/d.ts"),
+    fingerprint: "src/d.ts@2",
+    content: {
+      ...explanation("src/d.ts").content!,
+      selfCheck: { question: "What does the new src/d.ts change?", answer: "Something new." },
+    },
+  };
+  // The check stored the question it asked; the old card's answer is gone.
+  assert.deepEqual(
+    [quiz()?.question, quiz()?.reference, quiz()?.earlier],
+    ["What does src/d.ts change?", undefined, "It retries GET requests only."],
+  );
+  // A quiz the check did not credit has no question of its own left.
+  const inReview = runs[1];
+  inReview.explanations!["lib/x.py"] = { ...explanation("lib/x.py"), fingerprint: "lib/x.py@2" };
+  assert.ok(
+    !practiceCandidates(runs, repos, now).some((candidate) => candidate.item.key === "quiz:lib/x.py"),
+  );
+});
+
 test("a session takes the most useful due items first, interleaved across projects and dimensions, at most 5", () => {
   const { runs, repos } = records();
   const session = withLocale("en", () => dueItems(runs, repos, now));

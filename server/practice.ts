@@ -204,7 +204,9 @@ export function practiceCandidates(
 
     // Per-file quizzes graded Partly or Missed, asked again with the
     // self-check they answered. A quiz the check credited counts with the
-    // grade and correction it has there.
+    // grade and correction it has there, and keeps the question the check
+    // stored once the file's explanation moved on (a later round changed
+    // the file).
     for (const [path, attempt] of Object.entries(run.attempts ?? {})) {
       const quiz = attempt.quiz;
       if (!quiz || quiz.skipped) continue;
@@ -214,7 +216,8 @@ export function practiceCandidates(
       const grade = credited ? effectiveGrade(credited) : quiz.grade;
       const confidence = credited?.confidence ?? quiz.confidence;
       const check = readyCard(run, path, attempt.fingerprint)?.selfCheck;
-      if (!missed(grade) || !check) continue;
+      const question = check?.question ?? credited?.question;
+      if (!missed(grade) || !question) continue;
       add(
         run,
         confidence && isConfidentMiss({ grade, confidence })
@@ -223,8 +226,8 @@ export function practiceCandidates(
         "quiz",
         path,
         {
-          question: check.question,
-          reference: check.answer,
+          question,
+          reference: check?.answer,
           earlier: credited?.correction,
           path,
         },
