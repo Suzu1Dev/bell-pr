@@ -217,7 +217,15 @@ test("pacing confirms at the budget, blocks at twice it, and spares people with 
   // An unknown count is not a pass or a block: facts-unknown says so.
   assert.deepEqual(ids({ facts: facts({ pacing: {}, unknown: ["pacing: rate limited"] }) }), ["facts-unknown:confirm"]);
   const max = check({ facts: facts({ pacing: { openPrs: 2, mergedPrs: 0 } }) }, "pacing-max");
-  assert.match(max!.details[1], /^GitHub search: 2 open and 0 merged pull requests by you here\. Budget: 1 open/);
+  assert.match(max!.details[1], /^GitHub search: your pull requests here, 2 open and 0 merged\. Budget: 1 open/);
+  // The counts are stated as they are: three is not "twice" one, three is over two.
+  const three = check({ facts: facts({ pacing: { openPrs: 3, mergedPrs: 0 } }) }, "pacing-max");
+  assert.match(three!.message, /^You already have 3 open pull requests in this repository, at least twice BELL PR's budget of 1 /);
+  assert.match(three!.details[1], /your pull requests here, 3 open and 0 merged\./);
+  const over = check({ facts: facts({ pacing: { openPrs: 3, mergedPrs: 1 } }) }, "pacing");
+  assert.equal(over!.details[1], "You have 3 open pull requests here, over your budget of 2.");
+  const at = check({ facts: facts({ pacing: { openPrs: 2, mergedPrs: 1 } }) }, "pacing");
+  assert.equal(at!.details[1], "You have 2 open pull requests here, your budget of 2.");
 });
 
 test("project-rules groups ambiguous bans, understand rules while the check is off, agent notes and issue-first without an issue", () => {

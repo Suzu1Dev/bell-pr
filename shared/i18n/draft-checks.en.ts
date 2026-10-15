@@ -79,7 +79,7 @@ const messages = {
         ? "This change weakens a test. Give a one-line reason for it before you publish."
         : `This change weakens tests in ${count} places. Give a one-line reason for each before you publish.`,
     pacingMax: ({ open, budget }: { open: number; budget: number }) =>
-      `You already have ${open} open pull requests in this repository, twice ${product.name}'s budget of ${budget} for you here. Finish or close one before you open another.`,
+      `You already have ${open} open pull requests in this repository, at least twice ${product.name}'s budget of ${budget} for you here. Finish or close one before you open another.`,
     projectRules: "The project's rules say something to read before you publish.",
     issueState: "The linked issue may not be ready for a pull request from you.",
     reviewability: "This change may be hard to review.",
@@ -109,11 +109,13 @@ const messages = {
       removed: boolean;
     }) => `${path}:${line} ${removed ? "removed" : "added"}: ${text}`,
     pacingCounts: ({ open, merged, budget }: { open: number; merged: number; budget: number }) =>
-      `GitHub search: ${open} open and ${merged} merged pull requests by you here. Budget: ${budget} open (${product.name} default: 1 before your first merged pull request in a repository, 2 after; the same on every plan).`,
+      `GitHub search: your pull requests here, ${open} open and ${merged} merged. Budget: ${budget} open (${product.name} default: 1 before your first merged pull request in a repository, 2 after; the same on every plan).`,
     atBudget: ({ open, budget }: { open: number; budget: number }) =>
-      fmt.plural(open) === "one"
-        ? `You have 1 open pull request here, your budget of ${budget}.`
-        : `You have ${open} open pull requests here, your budget of ${budget}.`,
+      open > budget
+        ? `You have ${open} open pull requests here, over your budget of ${budget}.`
+        : fmt.plural(open) === "one"
+          ? `You have 1 open pull request here, your budget of ${budget}.`
+          : `You have ${open} open pull requests here, your budget of ${budget}.`,
     waiting: ({ count }: { count: number }) =>
       fmt.plural(count) === "one"
         ? "A maintainer asked for changes on 1 of your pull requests here more than 7 days ago. Answer that review first."

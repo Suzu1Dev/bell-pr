@@ -47,7 +47,7 @@ const messages: Translation<typeof en> = {
     testsWeakened: ({ count }) =>
       `這份變更在 ${count} 處削弱了測試。發布前請為每一處寫一行理由。`,
     pacingMax: ({ open, budget }) =>
-      `你在這個 repository 已經有 ${open} 個開著的 Pull Request，是 ${product.name} 為你在這裡設定的上限 ${budget} 的兩倍。請先完成或關閉一個，再開新的。`,
+      `你在這個 repository 已經有 ${open} 個開著的 Pull Request，至少是 ${product.name} 為你在這裡設定的上限 ${budget} 的兩倍。請先完成或關閉一個，再開新的。`,
     projectRules: "專案規範中有發布前應該讀的內容。",
     issueState: "連結的 issue 可能還不適合由你送出 Pull Request。",
     reviewability: "這份變更可能不容易審查。",
@@ -64,7 +64,9 @@ const messages: Translation<typeof en> = {
     pacingCounts: ({ open, merged, budget }) =>
       `GitHub 搜尋：你在這裡有 ${open} 個開著、${merged} 個已合併的 Pull Request。上限：同時開著 ${budget} 個（${product.name} 預設：在一個 repository 第一次被合併前為 1，之後為 2；所有方案都一樣）。`,
     atBudget: ({ open, budget }) =>
-      `你在這裡有 ${open} 個開著的 Pull Request，已達上限 ${budget}。`,
+      open > budget
+        ? `你在這裡有 ${open} 個開著的 Pull Request，超過上限 ${budget}。`
+        : `你在這裡有 ${open} 個開著的 Pull Request，已達上限 ${budget}。`,
     waiting: ({ count }) =>
       `維護者在 7 天多前要求修改你在這裡的 ${count} 個 Pull Request，請先回應那些審查。`,
     ambiguousBan: ({ path, line, quote }) =>
