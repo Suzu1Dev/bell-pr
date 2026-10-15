@@ -22,6 +22,7 @@ import {
 } from "../../shared/models";
 import { eulaVersion } from "../../shared/product";
 import { api, send } from "../api";
+import { useCheckSettings } from "../app/hooks/useUnderstanding";
 import { useLocale, useT } from "../i18n";
 import { LanguageSwitcher, saveLocale } from "../i18n/LanguageSwitcher";
 import { ProBadge } from "../license/ProBadge";
@@ -465,9 +466,16 @@ function StartStep({
 }) {
   const t = useT("onboarding").start;
   const github = readinessOf(report, ["gh"]);
+  // The variable that keeps the check on also locks its switch in Settings.
+  const checkLocked = !!useCheckSettings().lockedBy;
   const choices = [
     { id: "tour", icon: CirclePlay, title: t.tour, text: t.tourText },
-    { id: "import", icon: FolderGit2, title: t.import, text: t.importText },
+    {
+      id: "import",
+      icon: FolderGit2,
+      title: t.import,
+      text: checkLocked ? t.importTextLocked : t.importText,
+    },
     {
       id: "discover",
       icon: Compass,

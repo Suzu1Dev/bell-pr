@@ -4,6 +4,7 @@ import { createElement } from "react";
 import type { DoctorCheck, DoctorCheckId, DoctorReport } from "../../shared/doctor";
 import { eulaVersion } from "../../shared/product";
 import { withoutOtherLanguages } from "../app/test-markup";
+import { setCheckSettingsForTests } from "../app/hooks/useUnderstanding";
 import type { DoctorState } from "../setup/useDoctor";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import {
@@ -155,6 +156,17 @@ test("the last step offers the tour, an import and discovery, which waits for th
     /Every contribution ends with you explaining the change back; you can change that in Settings → Learning\./,
   );
   assert.match(renderZh(welcome("start")), /每一份貢獻最後都由你用自己的話講一遍；可在「設定 → 學習」調整。/);
+  // While the variable keeps the check on, Settings can't change it, so Welcome doesn't say so.
+  setCheckSettingsForTests({ settings: {}, lockedBy: { skipUnderstandingCheck: "BELLPR_REQUIRE_UNDERSTANDING_CHECK" } });
+  try {
+    const locked = renderEn(welcome("start"));
+    assertNoHan(locked);
+    assert.match(locked, /Every contribution ends with you explaining the change back\.</);
+    assert.doesNotMatch(locked, /Settings → Learning/);
+    assert.doesNotMatch(renderZh(welcome("start")), /設定 → 學習/);
+  } finally {
+    setCheckSettingsForTests(undefined);
+  }
   assert.match(
     html,
     /<button type="button" class="welcome-choice" disabled="" aria-describedby="welcome-reason-discover">.*?Find a project to contribute to.*?<span id="welcome-reason-discover" class="welcome-choice-reason">Install and sign in to the GitHub CLI first\.<\/span>/,

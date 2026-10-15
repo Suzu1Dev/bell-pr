@@ -88,6 +88,9 @@ export default {
      */
     importText:
       "Bring a project from GitHub or from this computer and start contributing. Every contribution ends with you explaining the change back; you can change that in Settings → Learning.",
+    /** While BELLPR_REQUIRE_UNDERSTANDING_CHECK keeps the check on: Settings can't change it. */
+    importTextLocked:
+      "Bring a project from GitHub or from this computer and start contributing. Every contribution ends with you explaining the change back.",
     discover: "Find a project to contribute to",
     discoverText: "Search GitHub for projects that welcome the kind of help you want to give.",
     /** On Free: discovery shows sample results only. */
