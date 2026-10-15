@@ -562,6 +562,22 @@ test("the respect checks move from the preflight list to the checklist rows", ()
   assert.doesNotMatch(respectOnly, /No check needs your attention/);
 });
 
+test("checks made without the facts still leave no row OK against the facts passed in", () => {
+  // The editor's checks on the text, before the server's arrive.
+  const checks = draftPreflight({ body: sampleEn.run.draft.body, sources: english.context!.sources }, "en");
+  assert.ok(!checks.some((check) => check.id === "pacing-max"));
+  const facts = {
+    ...sampleEn.contributionFacts!,
+    pacing: { openPrs: 2, mergedPrs: 0, viewerPermission: "READ" },
+  };
+  const html = renderEnglish(english, { checks, rules: sampleRules, facts, changes: sampleChanges, issueUrl: "#sample-issue-42" });
+  assert.equal(rowStatuses(html).pacing, "block");
+  assert.match(checklistRow(html, "pacing"), /Blocks publishing/);
+  // The not-required check is the switched-off one, never a block.
+  const off = renderEnglish(english, { checks, understanding: { required: false, passed: false, off: false } });
+  assert.equal(rowStatuses(off).understanding, "confirm");
+});
+
 test("a why sentence folds away after it has been shown 3 times", () => {
   const storage = new Map<string, string>([
     ["bellpr-checklist-why-seen", JSON.stringify({ rules: 3, door: 2 })],

@@ -127,7 +127,7 @@ const m: Translation<typeof en> = {
       },
       whySummary: "維護者為什麼在意",
       rulesFound: ({ count }) =>
-        `從專案檔案中引用了 ${fmt.number(count)} 條規範，沒有一條會擋下這次的變更。`,
+        `從專案檔案中引用了 ${fmt.number(count)} 條規範，下方各項會拿這次的變更逐一對照。`,
       rulesNotFound: ({ files }) =>
         `在 ${product.name} 讀過的 ${fmt.number(files)} 個檔案中沒有找到。有些專案把規範放在網站或 wiki 上，發布前請自行確認。`,
       doorOpen: "Pull Request：對你開放。",
@@ -138,6 +138,7 @@ const m: Translation<typeof en> = {
         number === undefined
           ? "連結的 issue 仍開著，也沒有別人在做。"
           : `Issue #${number} 仍開著，也沒有別人在做。`,
+      otherPr: ({ author, number }) => `@${author} 的 Pull Request #${number} 也會關閉這個 issue。`,
       pacing: ({ open, budget }) =>
         `你在這裡開著的 PR：${fmt.number(open)} / ${fmt.number(budget)}（${product.name} 預設值，所有方案都一樣）。`,
       pacingExempt: "你可以寫入這個 repository，所以在這裡發布不受節奏限制。",

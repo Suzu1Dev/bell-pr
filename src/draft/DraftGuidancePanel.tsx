@@ -42,6 +42,7 @@ import {
   checklistCheck,
   checklistRowIds,
   checklistRows,
+  withFactChecks,
   type ChecklistStatus,
 } from "./checklist";
 import { disclosureRule } from "./disclosure";
@@ -84,7 +85,8 @@ interface Props {
    * server's GET /api/runs/:id/preflight). Not shown when absent. The
    * respect checks among them (computed with the same rules, facts and
    * changes as the props below) and the issue-link and brevity checks set
-   * the maintainer checklist's rows; the list shows the others.
+   * the maintainer checklist's rows, which add the fact checks they lack
+   * from those props; the list shows the others.
    */
   checks?: DraftCheck[];
   /** The run is published: the guidance stays for reference, without actions. */
@@ -219,10 +221,11 @@ export function DraftGuidancePanel({
   const blocking = textChecks.filter((check) => check.kind === "block");
   const confirming = textChecks.filter((check) => check.kind === "confirm");
   // Without the saved draft's checks (the sample, a published run), the
-  // rows follow the editor's text and the facts passed in.
-  const respect =
-    checks ??
-    (rules || facts || changes
+  // rows follow the editor's text and the facts passed in. With them, the
+  // facts passed in still fill the fact checks they lack (checks computed
+  // without those facts, such as the editor's before the server's arrive).
+  const local =
+    rules || facts || changes
       ? respectChecks(
           {
             body: draftBody ?? "",
@@ -232,11 +235,22 @@ export function DraftGuidancePanel({
             facts,
             changes,
             issueUrl,
-            understandingOff: understanding?.off,
+            // The check is not required only while the person turned it off.
+            understandingOff:
+              understanding && (understanding.off || !understanding.required),
           },
           locale,
         )
-      : undefined);
+      : undefined;
+  const respect = checks
+    ? withFactChecks(
+        checks,
+        // Without the editor's text, the disclosure is the saved draft's to say.
+        draftBody === undefined
+          ? local?.filter((check) => check.id !== "ai-disclosure")
+          : local,
+      )
+    : local;
   const rows = checklistRows(
     {
       checks: respect,

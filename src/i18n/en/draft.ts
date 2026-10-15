@@ -166,8 +166,8 @@ const draft = {
       whySummary: "Why maintainers care",
       rulesFound: ({ count }: { count: number }) =>
         fmt.plural(count) === "one"
-          ? "1 rule quoted from the project's files; nothing in it stops this change."
-          : `${fmt.number(count)} rules quoted from the project's files; nothing in them stops this change.`,
+          ? "1 rule quoted from the project's files. The rows below check this change against it."
+          : `${fmt.number(count)} rules quoted from the project's files. The rows below check this change against them.`,
       rulesNotFound: ({ files }: { files: number }) =>
         `Not found in the ${fmt.plural(files) === "one" ? "1 file" : `${fmt.number(files)} files`} ${product.name} read. Some projects publish their rules on a website or wiki; check before you publish.`,
       doorOpen: "Pull requests: open to you.",
@@ -178,6 +178,9 @@ const draft = {
         number === undefined
           ? "The linked issue is open, and nobody else is on it."
           : `Issue #${number} is open, and nobody else is on it.`,
+      /** Another person's open pull request would close the linked issue. */
+      otherPr: ({ author, number }: { author: string; number: number }) =>
+        `@${author}'s pull request #${number} would also close this issue.`,
       pacing: ({ open, budget }: { open: number; budget: number }) =>
         `Your open PRs here: ${fmt.number(open)} of ${fmt.number(budget)} (${product.name} default, the same on every plan).`,
       pacingExempt: "You can write to this repository, so publishing isn't paced here.",

@@ -11,6 +11,7 @@ import {
   checklistCheck,
   checklistRowIds,
   checklistRows,
+  withFactChecks,
   type ChecklistInput,
 } from "./checklist";
 
@@ -53,7 +54,7 @@ test("the sample's checks are all clear, so every row is green", () => {
   assert.deepEqual(full.checks?.filter(checklistCheck), []);
   assert.deepEqual(statuses(full), Object.fromEntries(checklistRowIds.map((id) => [id, "ok"])));
   const byId = Object.fromEntries(rows(full).map((row) => [row.id, row]));
-  assert.deepEqual(byId.rules.lines, ["3 rules quoted from the project's files; nothing in them stops this change."]);
+  assert.deepEqual(byId.rules.lines, ["3 rules quoted from the project's files. The rows below check this change against them."]);
   assert.equal(byId.rules.sources.length, 3);
   assert.match(byId.rules.sources[0], /^CONTRIBUTING\.md:\d+: "Open an issue before changing behavior\."$/);
   assert.deepEqual(byId.door.lines, ["Pull requests: open to you."]);
@@ -151,9 +152,67 @@ test("facts that close the door or the issue are never shown as OK, even without
   assert.equal(closedIssue.issue, "block");
 });
 
+test("checks computed without the facts get the fact checks they lack, so no row is OK against its facts", () => {
+  const banned = {
+    ...rules,
+    findings: [
+      ...rules.findings,
+      { kind: "ban" as const, path: "AI_POLICY.md", line: 3, quote: "We do not accept AI-generated pull requests.", contribution: true },
+    ],
+  };
+  const busy: ContributionFacts = {
+    ...facts,
+    issue: { ...facts.issue!, assignees: ["someone_else"] },
+    pacing: { openPrs: 2, mergedPrs: 0, viewerPermission: "READ" },
+  };
+  // The editor's own checks: the text only, before the server's arrive.
+  const textOnly = draftPreflight({ body, sources, proposalBody: demo.draftPreparation.proposal!.body }, "en");
+  const local = draftPreflight({ body, sources, rules: banned, facts: busy, changes, issueUrl }, "en");
+  const merged = withFactChecks(textOnly, local);
+  assert.deepEqual(
+    merged.filter((check) => !textOnly.includes(check)).map((check) => check.id),
+    ["ai-ban", "pacing-max", "issue-state"],
+  );
+  const byId = statuses({ checks: merged, rules: banned, facts: busy, changes, issueUrl, understanding: { required: true, passed: true, off: false } });
+  assert.equal(byId.rules, "block");
+  assert.equal(byId.pacing, "block");
+  assert.equal(byId.issue, "confirm");
+  // A check the checks already have is not doubled, and the ones a saved
+  // override or test reason lifts come only from the checks.
+  const weak = draftPreflight(
+    { body, sources, changes: { ...changes, weakened: [{ id: "tests/a.test.ts#0", path: "tests/a.test.ts", line: 0, text: "" }] },
+      facts: { ...busy, issue: { ...busy.issue!, otherPrs: [{ number: 7, author: "other_dev", state: "OPEN", willClose: true }] } } },
+    "en",
+  );
+  assert.ok(["tests-weakened", "issue-has-pr"].every((id) => weak.some((check) => check.id === id)));
+  const lifted = withFactChecks(textOnly, weak).map((check) => check.id);
+  assert.ok(!lifted.includes("tests-weakened"));
+  assert.ok(!lifted.includes("issue-has-pr"));
+  assert.equal(withFactChecks(local, local).length, local.length);
+});
+
+test("another person's pull request on the issue is never shown as nobody else on it", () => {
+  const competing: ContributionFacts = {
+    ...facts,
+    issue: { ...facts.issue!, otherPrs: [{ number: 7, author: "other_dev", state: "OPEN", willClose: true }] },
+  };
+  const issue = rows({ ...full, facts: competing, checks: [] }).find((row) => row.id === "issue")!;
+  assert.equal(issue.status, "confirm");
+  assert.deepEqual(issue.lines, ["@other_dev's pull request #7 would also close this issue."]);
+  // The person's own pull request is not someone else's.
+  const own = rows({
+    ...full,
+    checks: [],
+    facts: { ...competing, door: { ...facts.door!, login: "Other_Dev" } },
+  }).find((row) => row.id === "issue")!;
+  assert.equal(own.status, "ok");
+});
+
 test("the understanding row is passed, required or off", () => {
   assert.equal(statuses({ ...full, understanding: { required: true, passed: false, off: false } }).understanding, "block");
   assert.equal(statuses({ ...full, understanding: { required: false, passed: false, off: true } }).understanding, "confirm");
+  // The check is not required only while it is turned off.
+  assert.equal(statuses({ ...full, understanding: { required: false, passed: false, off: false } }).understanding, "confirm");
   assert.equal(statuses({ ...full, understanding: undefined }).understanding, "unknown");
 });
 

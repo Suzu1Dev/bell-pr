@@ -75,6 +75,39 @@ export function checklistCheck(check: DraftCheck) {
   return check.id in rowOfCheck || check.id === "facts-unknown";
 }
 
+/**
+ * Respect checks that follow from the project's rules, the GitHub facts,
+ * the issue link, the change and the description alone. Checks computed
+ * with the same facts have them too; a saved override or test reason,
+ * which only the server knows, never lifts them.
+ */
+const factCheckIds = new Set<DraftCheck["id"]>([
+  "pr-closed",
+  "ai-ban",
+  "ai-disclosure",
+  "issue-closed",
+  "area-reserved",
+  "pacing-max",
+  "pacing",
+  "project-rules",
+  "issue-state",
+  "reviewability",
+]);
+
+/**
+ * `checks` with the fact checks of `local` (computed here from the facts
+ * the checklist shows) that it lacks: checks computed without those facts,
+ * such as the editor's before the server's arrive, never leave a row OK
+ * while its facts say otherwise.
+ */
+export function withFactChecks(checks: DraftCheck[], local: readonly DraftCheck[] = []) {
+  const present = new Set(checks.map((check) => check.id));
+  return [
+    ...checks,
+    ...local.filter((check) => factCheckIds.has(check.id) && !present.has(check.id)),
+  ];
+}
+
 export interface ChecklistInput {
   /** The publish checks for the saved draft; absent until they ran. */
   checks?: DraftCheck[];
@@ -188,6 +221,21 @@ export function checklistRows(
       // The facts say closed although no check ran on them: publishing will.
       if (issue.state?.toUpperCase() === "CLOSED")
         return { status: "block", lines: [m.issueClosed], sources: [field("state", "CLOSED")] };
+      // Another person's pull request would close the issue, and no check
+      // says so: never "nobody else is on it".
+      const login = door?.login?.toLowerCase();
+      const competing = (issue.otherPrs ?? []).filter(
+        (pr) =>
+          pr.state.toUpperCase() === "OPEN" &&
+          pr.willClose !== false &&
+          (!login || pr.author?.toLowerCase() !== login),
+      );
+      if (competing.length)
+        return {
+          status: "confirm",
+          lines: competing.map((pr) => m.otherPr({ author: pr.author ?? "?", number: pr.number })),
+          sources: [...(issue.state ? [field("state", issue.state)] : [])],
+        };
       return {
         status: "ok",
         lines: [m.issueOpen({ number: issue.number })],
@@ -252,9 +300,10 @@ export function checklistRows(
     }),
     {
       id: "understanding",
+      // The check is not required only while the person turned it off.
       ...(!understanding
         ? { status: "unknown" as const, lines: [m.notChecked], sources: [] }
-        : understanding.off
+        : understanding.off || (!understanding.required && !understanding.passed)
           ? { status: "confirm" as const, lines: [m.understandingOff], sources: [] }
           : understanding.passed
             ? { status: "ok" as const, lines: [m.understandingPassed], sources: [] }
