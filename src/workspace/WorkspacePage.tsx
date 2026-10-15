@@ -27,6 +27,7 @@ import type { Tab } from "../app/AppShell";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
 import type { RunActions } from "../app/hooks/useRunActions";
 import type { RunRounds } from "../app/hooks/useRunRounds";
+import { useRunRecords } from "../app/hooks/useRunRecords";
 import { openCheckPanel, useUnderstanding } from "../app/hooks/useUnderstanding";
 import { ActivityTab } from "./ActivityTab";
 import { ChangesTab } from "./ChangesTab";
@@ -155,8 +156,9 @@ export function WorkspacePage({
   const { draftDirty, draftUnfinished, followUp, commitMessageUnfinished } =
     draft;
   const { approve, plan, exporting, exportLearning } = actions;
-  // The Explain-it-back check of this run.
+  // The Explain-it-back check and the person's other records on this run.
   const understanding = useUnderstanding(run, files, { demo, setRun: actions.setRun });
+  const records = useRunRecords(run, files, { demo, setRun: actions.setRun, notify: actions.notify, file, ask: actions.ask, setSelectedPath, setTab });
   // The sample's playback queues for a moment behind nothing.
   const queuedOnFree =
     !demo &&
@@ -450,6 +452,9 @@ export function WorkspacePage({
               draft={draft}
               actions={actions}
               rounds={rounds}
+              currentRepo={currentRepo}
+              understanding={understanding}
+              records={records}
               feedbackLocked={plan.locked("prFeedback", { demo })}
             />
           )}

@@ -379,6 +379,8 @@ test("the sample shows its fictional feedback with a PRO chip and links to nothi
   );
   assert.match(html, /Read feedback again/);
   assert.match(html, /aria-label="Pro feature"/);
+  // Its PR exists nowhere, so there is nothing to close on GitHub.
+  assert.doesNotMatch(html, /Can&#x27;t continue\?/);
   assert.match(html, /sample_maintainer/);
   // No sample link looks like a page on GitHub.
   assert.doesNotMatch(html, /View pull request/);
@@ -421,4 +423,39 @@ test("the published sample shows its own card, which says nothing reached GitHub
     renderZh(createElement(SamplePublishedCard, { run: { ...published, ...getDemo("zh-TW").run, status: "published" } })),
     new RegExp(getDemo("zh-TW").publishedCard!.title),
   );
+});
+
+test("the checklist says where the understanding check stands, and offers the forecast while it is off", () => {
+  const draftRun: Run = { ...published, status: "review", prUrl: undefined, prFeedback: undefined, followUps: undefined };
+  const row = (understanding: Props["understanding"]) =>
+    renderEn(element({ run: draftRun, understanding }));
+  const required = row({ view: undefined, required: true, passed: false, off: false });
+  assert.match(required, /Understanding check<small>Required: explain the change back before approval<\/small>/);
+  assert.doesNotMatch(required, /Predict the maintainer/);
+  assertNoHan(required);
+  assert.match(
+    row({ view: undefined, required: true, passed: true, off: false }),
+    /<div class="checklist-item checked">.*?Understanding check<small>Passed: you explained the change back<\/small>/,
+  );
+  const off = row({ view: undefined, required: false, passed: false, off: true });
+  assert.match(off, /Understanding check<small>Off: approval needs your reviewed ticks only<\/small>/);
+  assert.match(off, /<button type="button" class="run-notice-link">Predict the maintainer<\/button>/);
+  assertNoHan(off);
+  assert.match(renderZh(element({ run: draftRun, understanding: { view: undefined, required: true, passed: false, off: false } })), /理解檢查/);
+  // A published PR keeps the row only for a pass or its "Check off" mark.
+  const after = (run: Run) =>
+    renderEn(element({ run, understanding: { view: undefined, required: true, passed: false, off: false } }));
+  assert.doesNotMatch(after(published), /Understanding check/);
+  const marked = after({ ...published, understandingCheckOff: true });
+  assert.match(marked, /Understanding check<small>Off: approval needs your reviewed ticks only<\/small>/);
+  assert.doesNotMatch(marked, /Predict the maintainer/);
+});
+
+test("a real published PR offers to close it yourself; the sample, which has none, does not", () => {
+  const html = renderEn(element());
+  assert.match(
+    html,
+    /<p class="pr-feedback-cant"><a href="https:\/\/github\.com\/acme\/widgets\/pull\/3" target="_blank" rel="noreferrer">Can&#x27;t continue\? Close the pull request yourself on GitHub, with a short note in your own words\.<\/a><\/p>/,
+  );
+  assertNoHan(html);
 });

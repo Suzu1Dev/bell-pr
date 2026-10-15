@@ -255,3 +255,22 @@
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
 }
+
+/* The Draft checklist's understanding row, and the forecast link in it. */
+.publish-checklist .checklist-item .run-notice-link {
+  display: block;
+  margin-top: var(--space-1);
+  padding: 0;
+  color: var(--color-accent-600);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+}
+
+/* "Can't continue?" under a published PR's feedback. */
+.pr-feedback .pr-feedback-cant {
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+}
+.pr-feedback .pr-feedback-cant a {
+  color: var(--color-accent-600);
+}
