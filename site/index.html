@@ -5,16 +5,16 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; base-uri 'none'; form-action 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="referrer" content="no-referrer">
-    <title>BELL PR: a local-first AI workbench for open-source contributions</title>
-    <meta name="description" content="BELL PR runs an AI agent team on your own machine, explains every changed file in plain language, and drafts a pull request that follows the project's rules. Nothing is published until you approve it.">
+    <title>BELL PR: from vibe coding to knowing why</title>
+    <meta name="description" content="BELL PR is a learning workbench for AI-assisted open-source contributions. An AI agent team does the legwork on your own machine; you understand every change, explain it back, and send one Draft PR that follows the project's rules. Nothing is published until you approve it.">
     <meta name="theme-color" content="#1f6d50">
     <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
     <link rel="icon" href="assets/brand/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="BELL PR">
-    <meta property="og:title" content="BELL PR: a local-first AI workbench for open-source contributions">
-    <meta property="og:description" content="An AI agent team on your own machine, a plain-language explanation of every changed file, and a pull request you approved line by line.">
+    <meta property="og:title" content="BELL PR: from vibe coding to knowing why">
+    <meta property="og:description" content="Your AI agent team does the legwork. You understand every change, explain it back, and send only what a maintainer is glad to review.">
     <!-- generated:product-meta key=homepageUrl property="og:url" -->
     <!-- /generated:product-meta -->
     <!-- generated:product-meta key=homepageUrl property="og:image" path="assets/brand/og-image.png" -->
@@ -42,10 +42,9 @@
     <main id="main">
       <section class="hero">
         <div class="wrap">
-          <p class="eyebrow">Local-first · No BELL cloud · No telemetry</p>
-          <!-- TODO [OWNER] tagline: pick one of the candidates in site/README.md. -->
-          <h1>Contribute to open source with an AI team, and understand every line you ship.</h1>
-          <p class="lead">BELL PR is a workbench that runs on your own machine. It analyses a project, proposes contribution directions, runs a small agent team in isolated git worktrees, explains every changed file in plain language, and drafts a pull request that follows the project's own rules. Nothing is published until you have reviewed and approved every file.</p>
+          <p class="eyebrow">Local-first · You explain it back · No telemetry</p>
+          <h1>From vibe coding to knowing why.</h1>
+          <p class="lead">Your AI agent team does the legwork. You understand every change, explain it back, and send only what a maintainer is glad to review. BELL PR runs on your own machine with the AI coding CLI and the GitHub CLI you already use, and it only ever opens Draft pull requests that you approved.</p>
           <div class="hero-actions">
             <div class="command"><code id="start-command">npx bell-pr</code><button class="copy-button" type="button" data-copy="start-command" hidden>Copy</button></div>
             <a class="button" href="install.html">Install guide</a>
@@ -57,8 +56,8 @@
       <section class="section" id="watch" aria-labelledby="watch-title">
         <div class="wrap">
           <div class="section-head">
-            <h2 id="watch-title">From an unfamiliar repository to a reviewed Draft PR</h2>
-            <p>A short tour of the sample project, from analysis to the published draft.</p>
+            <h2 id="watch-title">One contribution, start to finish</h2>
+            <p>A short tour of the sample project, from the project's rules to one Draft PR you can explain.</p>
           </div>
           <figure class="video">
             <video controls preload="none" poster="media/poster.jpg" width="1920" height="1080">
@@ -76,25 +75,25 @@
         <div class="wrap">
           <div class="section-head">
             <p class="eyebrow">How it works</p>
-            <h2 id="how-title">Learn while you contribute</h2>
-            <p>The agents do the legwork. You stay in charge of every decision, and you finish knowing the code you changed.</p>
+            <h2 id="how-title">Let AI do the legwork. Keep the understanding.</h2>
+            <p>Learn while you contribute: the agents write the code, you make every decision, and you finish able to explain the change you send.</p>
           </div>
           <ol class="steps">
             <li>
-              <h3>Point it at a project</h3>
-              <p>BELL PR reads the repository and its contribution guidelines, then proposes contribution directions with verified recommendations.</p>
+              <h3>Read the rules first</h3>
+              <p>BELL PR quotes the project's own contribution rules, checks that it takes pull requests from you, and shows whether the issue you pick is still open and nobody else's.</p>
             </li>
             <li>
-              <h3>Approve the plan</h3>
-              <p>Pick a direction. The Lead plans the work and you approve or revise the plan before any code is written.</p>
+              <h3>Approve the plan, let the team work</h3>
+              <p>The Lead plans the work and you approve it. Teammates, a Reviewer and a Test analyst then work in isolated git worktrees, with the AI coding CLI you already use.</p>
             </li>
             <li>
-              <h3>Let the team work</h3>
-              <p>A Lead, teammates, a Reviewer and a Test analyst work in isolated git worktrees, with the AI coding CLI you already use.</p>
+              <h3>Try first, then explain it back</h3>
+              <p>Answer each file's question before the explanation shows you, then explain the whole change back in your own words before you approve it.</p>
             </li>
             <li>
-              <h3>Review, understand, publish</h3>
-              <p>Read a plain-language explanation of every changed file and ask follow-up questions. Then publish a Draft PR that follows the project's rules.</p>
+              <h3>Send one Draft PR, then learn from the review</h3>
+              <p>Publish a Draft PR in your own words once the project's checks pass, then compare the maintainers' review with what you predicted and practise what you missed.</p>
             </li>
           </ol>
         </div>
@@ -110,26 +109,26 @@
           <ul class="shots">
             <li>
               <figure class="shot">
-                <a href="assets/screenshots/repo-overview-1440.png"><img src="assets/screenshots/repo-overview-1440.png" alt="The project overview of the sample project: what the project does, who uses it, and tabs for directions and where to start reading." width="1440" height="900" loading="lazy" decoding="async"></a>
-                <figcaption><strong>Understand the project first</strong>The analysis explains what the project does, who uses it and where to start reading, before you choose a contribution direction.</figcaption>
-              </figure>
-            </li>
-            <li>
-              <figure class="shot">
-                <a href="assets/screenshots/team-1440.png"><img src="assets/screenshots/team-1440.png" alt="The agent team page: a team lead, teammates, a team inbox, and review and tests." width="1440" height="900" loading="lazy" decoding="async"></a>
-                <figcaption><strong>One goal, one agent team</strong>A Lead plans the work, teammates build it in their own worktrees, and a Reviewer and a Test analyst check the result.</figcaption>
+                <a href="assets/screenshots/repo-overview-1440.png"><img src="assets/screenshots/repo-overview-1440.png" alt="The project overview of the sample project: the project context, and the Before you contribute card, which says that pull requests are open to you and quotes the project's rules with their file and line." width="1440" height="900" loading="lazy" decoding="async"></a>
+                <figcaption><strong>Read the rules first</strong>Before you choose a contribution direction, BELL PR quotes the project&#39;s own rules with their file and line, says what publishing does about each, and checks that pull requests are open to you.</figcaption>
               </figure>
             </li>
             <li>
               <figure class="shot">
                 <a href="assets/screenshots/run-changes-1440.png"><img src="assets/screenshots/run-changes-1440.png" alt="The code changes of a sample contribution: the changed files, a diff, and a plain-language explanation of the selected file beside it." width="1440" height="900" loading="lazy" decoding="async"></a>
-                <figcaption><strong>Every change, explained</strong>Read each changed file next to a plain-language explanation with examples, mark it reviewed, and ask about any line.</figcaption>
+                <figcaption><strong>Every change, explained</strong>Read each changed file next to a plain-language explanation with examples, answer its question before the answer shows, and ask about any line.</figcaption>
               </figure>
             </li>
             <li>
               <figure class="shot">
-                <a href="assets/screenshots/run-draft-1440.png"><img src="assets/screenshots/run-draft-1440.png" alt="The pull request draft of a sample contribution: a contribution guide, the AI-assistance disclosure switch, and reminders before publishing." width="1440" height="900" loading="lazy" decoding="async"></a>
-                <figcaption><strong>A pull request that fits the project</strong>The draft follows the project&#39;s rules and template, and whether to mention AI help is your decision.</figcaption>
+                <a href="assets/screenshots/run-check-1440.png"><img src="assets/screenshots/run-check-1440.png" alt="The understanding check next to the diff of a sample contribution: the person's own explanation, their answers with their own grades and a correction, and the footer saying they explained it back and can approve." width="1440" height="900" loading="lazy" decoding="async"></a>
+                <figcaption><strong>Explain it back before you approve</strong>A short closed-book check next to the diff: your explanation, your answers and your own grades. No AI model grades you.</figcaption>
+              </figure>
+            </li>
+            <li>
+              <figure class="shot">
+                <a href="assets/screenshots/run-draft-1440.png"><img src="assets/screenshots/run-draft-1440.png" alt="The pull request draft of a sample contribution: the contribution guide, the AI-assistance disclosure switch, and the maintainer checklist with the project's quoted rules." width="1440" height="900" loading="lazy" decoding="async"></a>
+                <figcaption><strong>A pull request that fits the project</strong>The maintainer checklist checks the change against the project&#39;s rules, the issue and your pace there. AI help is mentioned only if the project requires it or you choose to.</figcaption>
               </figure>
             </li>
           </ul>
@@ -140,31 +139,32 @@
         <div class="wrap">
           <div class="section-head">
             <h2 id="features-title">Built for contributions you can stand behind</h2>
+            <p>Understand what you send, train your taste on real code, and respect the maintainer's time.</p>
           </div>
           <ul class="grid">
             <li class="card">
-              <h3>Plain-language explanations</h3>
-              <p>Each changed file comes with what changed and why, examples and trade-offs, and a suggested review order. Ask follow-up questions right next to the diff.</p>
+              <h3>Explanations you test yourself on</h3>
+              <p>Every changed file comes with what changed and why, an example, trade-offs and another way to do it. You answer its question before the answer shows, and you choose which approach you would take.</p>
             </li>
             <li class="card">
-              <h3>You approve every change</h3>
-              <p>Nothing is published until you have reviewed every file and approved the draft. Re-run the Reviewer and the Test analyst whenever you want a second look.</p>
+              <h3>Explain it back before you approve</h3>
+              <p>Ship only what you can explain: a short closed-book check of your own summary and answers, which you grade yourself. It is on by default; turning it off is visible on every run.</p>
             </li>
             <li class="card">
-              <h3>Rule-aware pull requests</h3>
-              <p>Drafts follow the target project's own contribution rules and pull request template, and preflight checks run before you publish a Draft PR.</p>
+              <h3>Practice what you missed</h3>
+              <p>Answers you got wrong while you were sure, and maintainer comments that surprised you, come back days later in your practice deck. No streaks, no scores.</p>
             </li>
             <li class="card">
-              <h3>Isolated agent team</h3>
-              <p>Agents work in separate git worktrees on your machine. You see the plan, the team inbox and every subtask as it happens.</p>
+              <h3>The project's rules, quoted</h3>
+              <p>Rules on AI use, disclosure and descriptions in your own words are quoted from the project's own files, with the file and line, and checked again when you publish.</p>
             </li>
             <li class="card">
-              <h3>Learning notes</h3>
-              <p>Keep what you learned from each contribution on a notes page. Pro exports a learning record as Markdown.</p>
+              <h3>Still open, still yours</h3>
+              <p>Before you start and again before you publish, BELL PR checks that the issue is open, that nobody has claimed it, and that no one else's pull request already fixes it.</p>
             </li>
             <li class="card">
-              <h3>Your tools, your accounts</h3>
-              <p>Works with the OpenAI Codex CLI or the Claude Code CLI you installed and signed in to, and with the GitHub CLI. Usage counts against your own account.</p>
+              <h3>Close the loop before the next PR</h3>
+              <p>Publishing is paced in each project, the same on every plan: answer the review on your open pull requests before you open more there.</p>
             </li>
           </ul>
         </div>
@@ -173,8 +173,8 @@
       <section class="section" id="plans" aria-labelledby="plans-title">
         <div class="wrap">
           <div class="section-head">
-            <h2 id="plans-title">Free covers the whole loop. Pro adds scale.</h2>
-            <p>Free runs one contribution at a time, from analysis to Draft PR. Pro adds bigger and parallel agent teams, GitHub-wide discovery and coaching on maintainer feedback. Every plan keeps the human review gate.</p>
+            <h2 id="plans-title">Free covers the whole responsible loop. Pro goes deeper.</h2>
+            <p>Free includes the understanding check, every project-rule, issue and pacing check, and reading your maintainers' feedback. Pro adds a coach debrief, the complete learning record, AI follow-up rounds, bigger teams, discovery and web access. No plan buys more pull requests or a way past a check.</p>
           </div>
           <div class="table-frame">
             <!-- generated:plan-table locale=en -->
@@ -189,8 +189,8 @@
                 <tr class="tier-free-limited"><th scope="row">Agent team size</th><td data-label="Plan">Free (limited)</td><td data-label="Limits">Free: Lead, 2 teammates, Reviewer and Test analyst. Pro and trial: 3 or 4 teammates.</td></tr>
                 <tr class="tier-free-limited"><th scope="row">Work on more than one contribution at a time</th><td data-label="Plan">Free (limited)</td><td data-label="Limits">Free: one contribution at a time; others wait in the queue. Pro: up to your configured limit (2 by default, at most 8). Publishing is paced the same on every plan.</td></tr>
                 <tr class="tier-free"><th scope="row">Plan approval and revision, team inbox, retry of failed subtasks</th><td data-label="Plan">Free</td><td data-label="Limits">Up to 3 plan revisions</td></tr>
-                <tr class="tier-free"><th scope="row">Diff review, explanations, follow-up chat, notes, suggested review order</th><td data-label="Plan">Free</td><td data-label="Limits">No limit</td></tr>
-                <tr class="tier-free"><th scope="row">Explain it back before approval</th><td data-label="Plan">Free</td><td data-label="Limits">On by default; you can turn it off in Settings, and runs approved without it are marked</td></tr>
+                <tr class="tier-free"><th scope="row">Diff review, explanations, try-first questions, follow-up chat, notes, suggested review order</th><td data-label="Plan">Free</td><td data-label="Limits">No limit</td></tr>
+                <tr class="tier-free"><th scope="row">Explain it back before approval</th><td data-label="Plan">Free</td><td data-label="Limits">On by default; you can turn it off in Settings → Learning, and runs approved without it are marked</td></tr>
                 <tr class="tier-free"><th scope="row">Re-run Reviewer and Test analyst</th><td data-label="Plan">Free</td><td data-label="Limits">No limit (part of the human review safety gate)</td></tr>
                 <tr class="tier-free"><th scope="row">Rule-aware PR draft, preflight checks, publishing a Draft PR</th><td data-label="Plan">Free</td><td data-label="Limits">Human approval is required on every plan</td></tr>
                 <tr class="tier-free"><th scope="row">Project-rule, issue, reviewability and pacing checks</th><td data-label="Plan">Free</td><td data-label="Limits">On every plan; no plan can skip them</td></tr>
@@ -229,7 +229,7 @@
             </li>
             <li>
               <h3>No BELL cloud</h3>
-              <p>There is no BELL PR server and no account. Your code goes only where your own AI coding CLI and the GitHub CLI send it.</p>
+              <p>There is no BELL PR server and no account. BELL PR works with the OpenAI Codex CLI or the Claude Code CLI you installed and signed in to, and with the GitHub CLI: your code goes only where they send it, and usage counts against your own account.</p>
             </li>
             <li>
               <h3>No telemetry</h3>
@@ -257,7 +257,7 @@
             </details>
             <details>
               <summary>Does it open pull requests on its own?</summary>
-              <p>No. BELL PR publishes a Draft PR only after you have reviewed every changed file and approved the draft, on every plan.</p>
+              <p>No. BELL PR publishes a Draft PR only after you have reviewed every changed file, explained the change back (unless you turned that check off) and approved the draft, on every plan. Before it publishes, it checks again that the project takes pull requests from you and that the issue is still yours.</p>
             </details>
             <details>
               <summary>Does my code go to BELL PR?</summary>
@@ -265,11 +265,15 @@
             </details>
             <details>
               <summary>What is free?</summary>
-              <p>The whole contribution loop, one contribution at a time, with a Lead, two teammates, a Reviewer and a Test analyst. A 14-day Pro trial starts only when you choose. See <a href="pricing.html">pricing</a> for the full comparison.</p>
+              <p>The whole responsible loop, one contribution at a time: a Lead, two teammates, a Reviewer and a Test analyst, explanations with try-first questions, the understanding check, every project-rule, issue and pacing check, reading your maintainers' feedback, and the practice deck. A 14-day Pro trial starts only when you choose. See <a href="pricing.html">pricing</a> for the full comparison.</p>
             </details>
             <details>
               <summary>Does the pull request say that AI helped?</summary>
-              <p>Only if you choose. The draft can end with an editable line saying that AI coding agents helped prepare the change and that you reviewed it. The line is off unless you turn it on, or the project&#39;s own rules ask for a disclosure. Follow each project&#39;s rules on AI-assisted contributions; the <a href="legal/terms.html#4-responsible-contribution">terms</a> explain what responsible use means.</p>
+              <p>Only if you choose, or if the project requires it. The draft can end with an editable line saying that AI coding agents helped prepare the change and that you reviewed it. The line is off unless you turn it on, or the project&#39;s own rules ask for a disclosure. When they require one, BELL PR does not publish until the description has it. Follow each project&#39;s rules on AI-assisted contributions; the <a href="legal/terms.html#4-responsible-contribution">terms</a> explain what responsible use means.</p>
+            </details>
+            <details>
+              <summary>Can I turn the understanding check off?</summary>
+              <p>Yes, in Settings → Learning, after a confirmation that says what changes. Every file still has to be reviewed and you still approve the pull request; every project-rule, issue and pacing check still applies, and runs approved without the check are marked for good.</p>
             </details>
             <details>
               <summary>Is BELL PR made by GitHub, OpenAI or Anthropic?</summary>

@@ -14,7 +14,7 @@ header. Light theme only; the layout works from 390 to 1440 px.
 | `site.css`, `site.js` | Styles, and the copy buttons (the pages work without the script) |
 | `assets/brand/` | Logo, favicons and the social preview image, copied from `public/` |
 | `assets/fonts/` | Self-hosted DM Sans and IBM Plex Mono (SIL Open Font License 1.1, licenses included) |
-| `assets/screenshots/` | Four screens of the sample project, copied from `docs/images/en/` |
+| `assets/screenshots/` | Screens of the sample project, copied from `docs/images/en/`; the landing page shows four of them |
 | `media/` | The promo video, gitignored; see [Media](#media) |
 | `README.md`, `check-site.mjs`, `build-legal.mjs` | This file, the site checks and the legal page builder; they are not part of the site |
 
@@ -38,7 +38,7 @@ header. Light theme only; the layout works from 390 to 1440 px.
   `LEGAL-REVIEW.md` and each document's owner placeholder list;
   `--self-test` tests the builder.
 - **Screenshots.** `assets/screenshots/` holds byte-identical copies of
-  four images in `docs/images/en/`. After the documentation images are
+  images in `docs/images/en/`. After the documentation images are
   captured again, copy them again, for example
   `cp docs/images/en/run-changes-1440.png site/assets/screenshots/`; the
   site check fails while a copy differs.
@@ -65,15 +65,22 @@ header. Light theme only; the layout works from 390 to 1440 px.
 Each one is marked on the page, as a visible `[OWNER: …]` placeholder or as
 an HTML comment.
 
-1. **Tagline** (`index.html`, the hero heading; an HTML comment marks it).
-   The page uses candidate 1 until the owner chooses:
-   1. "Contribute to open source with an AI team, and understand every line
-      you ship."
-   2. "Your AI contribution team. Your review. Your pull request."
-   3. "From unfamiliar repo to reviewed Draft PR, on your own machine."
-   4. "Learn the codebase while the agents do the legwork."
-   5. "Local-first AI pair-contributing: no BELL cloud, no telemetry, you
-      approve every change."
+1. **Tagline: decided.** The owner chose the headline on 2026-10-15, so the
+   hero heading of `index.html` no longer carries an HTML comment. The v1.1
+   lines, with where each one is used:
+   - **"From vibe coding to knowing why."** (zh-TW: 從「憑感覺寫」到「知道為什麼」。)
+     The headline: the hero heading, the READMEs' tagline, the app's Home
+     and the npm description, and the promo's end card once the video is
+     cut again. Chosen by the owner.
+   - "Ship only what you can explain." (只送出你講得清楚的程式碼。) Introduces
+     the Explain-it-back feature (the features grid), never as the
+     headline.
+   - "Let AI do the legwork. Keep the understanding." (讓 AI 跑腿，理解留給自己。)
+     The "How it works" heading.
+   - "Train your taste on real code." (在真實的程式碼裡，練出品味。) The
+     second pillar; not on the site yet.
+   - "Be the PR a maintainer is glad to open." (成為維護者樂意打開的那個 PR。)
+     The third pillar and the heading of `docs/contributing-responsibly.md`.
 2. **Pro price** (`pricing.html`, `[OWNER: price]`).
 3. **Billing period, currency and taxes** (`pricing.html`).
 4. **License key delivery**, instant from a key pool or by hand within N

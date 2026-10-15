@@ -90,11 +90,12 @@ The first time you open BELL PR, a short Welcome takes you through:
 ## Try the sample project
 
 The sample project is a finished contribution to a small HTTP client, with
-the agent team's plan, the code changes, their explanations and the PR
+the project's (fictional) contribution rules, the agent team's plan, the
+code changes, their explanations, the understanding check and the PR
 draft. It needs no tools and no account, makes no AI call and sends nothing
-to GitHub. Its review progress and draft stay in your browser. The sample
-also shows the Pro features with sample data, so you can see them before
-you decide on a trial.
+to GitHub. Its review progress, your check answers and the draft stay in
+your browser. The sample also shows the Pro features with sample data, so
+you can see them before you decide on a trial.
 
 Open it from Home (**Try the sample project**) or from **Sample** in the
 sidebar.
@@ -119,6 +120,30 @@ default branch.
 
 ## 2. Understand the project
 
+### Before you contribute
+
+On the project overview, the **Before you contribute** card shows what
+the project asks of contributors, quoted from its own files
+with the file and line: its rules on AI-assisted contributions, on
+disclosing AI help, on explaining your change, on descriptions in your
+own words, on issues kept for newcomers and on opening an issue first,
+and notes addressed to AI agents. Each rule says what publishing does
+about it: blocks, asks you to confirm, or only informs. The card also says
+whether the project takes pull requests from you ("Pull requests: open to
+you", or collaborators only, turned off or archived, where you can
+practise but not publish).
+
+BELL PR reads these files from its own clone, at import and when you
+update the project, and asks GitHub for the pull request facts; **Check
+again** reads them anew. When it finds no rule, it says which files it
+read: some projects publish their rules on a website or wiki, so check
+there before you publish. A GitHub fact it could not read shows as
+"Couldn't check" with the reason, and a rule file it could not read (or
+the account's default files) as "Couldn't read", in words; neither is
+ever counted as a pass.
+
+### The analysis
+
 Open the project and choose **Analyze the project**. An agent reads a
 sample of the source code, read-only, and writes what the project does,
 who uses it, how its parts fit together and where to start reading. It
@@ -142,6 +167,21 @@ experience, add tests, improve docs or maintenance) and describe:
 - the boundaries: what must not change;
 - what counts as done, one observable result or test per line;
 - optionally, the related GitHub issue.
+
+When you link a GitHub issue, **Before you start** under the issue field
+reads it once from GitHub and shows whether it is open or closed, who is
+assigned to it or has claimed it, whether someone else's pull request
+would already close it, the latest maintainer comment, labels for
+newcomers, and your open pull requests in that repository against BELL
+PR's budget (see [Contributing
+responsibly](contributing-responsibly.md#the-numbers-bell-pr-uses)).
+Nothing here stops you from starting: when a fact means BELL PR will not
+publish the change (a closed issue, a project that does not take pull
+requests from you, rules that do not accept AI-assisted contributions,
+an issue the project keeps for newcomers, someone else's pull request, or
+twice your budget), the start button asks once, and you can start and
+practise locally. For an issue labelled for newcomers, the dialog also
+explains why such issues are best written by hand.
 
 The same form sets the team size (Free: 2 teammates; Pro: up to 4), whether
 you approve the plan before development, and the efficiency mode. The
@@ -186,6 +226,21 @@ When the team is done, the run waits for your review in **Code changes**:
 - **My understanding**: write a note in your own words, then mark the file
   as **Reviewed**.
 
+**Try first.** On a file's explanation, the "Quiz yourself" question asks
+for your answer before it shows one: write a sentence or two, choose how
+sure you are (**Sure**, **Think so** or **Guessing**), then **Show
+answer** and grade yourself (**Got it**, **Partly** or **Missed**).
+Showing the answer with an empty field skips the question. In the same
+way you can guess how else the change could be done before the
+alternative shows, then choose **Keep this approach**, **Prefer the
+other** or **It depends** for this project, with an optional why. An
+answer you gave before the reveal, on the current version of the file,
+counts toward the understanding check, so you are not asked it twice.
+Very small files (lockfiles, generated files, whitespace-only changes and
+tiny docs edits) get no prompts. **Settings → Learning → Try-first prompts
+during review** turns the prompts off; the answers then sit behind a plain
+reveal button.
+
 You can also change the code yourself: copy the worktree path, edit the
 files in your editor, then **Refresh the diff**. Changed files get new
 explanations and need another review.
@@ -193,7 +248,62 @@ explanations and need another review.
 Explanations and answers come from an AI and can be wrong. Check them
 against the code.
 
-## 6. Prepare and publish the pull request
+## 6. Explain it back
+
+When every file is marked Reviewed, the footer's button reads **Explain it
+back**. It opens a short check next to the diff; **Take the check now** in
+the Changes header opens it earlier if you want to test yourself first
+(the Reviewed ticks are still required). While it is open the check is
+closed book: the explanations, notes and questions to the agent are
+hidden, and the diff and the file list stay. A maintainer will ask you
+about your change without your AI in the room.
+
+1. **Explain.** In 2 to 4 sentences: what problem does this solve, what
+   does the change do, and what could break? At least 15 words.
+2. **Answer.** Up to three questions about the riskiest files, scaled to
+   the size of the change: none up to 15 changed lines, 1 up to 100, 2 up
+   to 400, 3 above (lockfiles, generated files and tiny docs edits are not
+   counted). When source code changed, one more question: "What did you
+   not test, and why?" Each answer needs at least 3 words, or **I don't
+   know**, which counts as missed, and how sure you are. **Lock my
+   answers** saves them; they cannot be edited afterwards.
+3. **Compare and grade.** Each answer appears beside its reference: the
+   file's AI-written answer, the Test analyst's report for what you did
+   not test, or, without a reference, the diff itself. Grade each answer
+   **Got it**, **Partly** or **Missed**. What you did not test is not
+   graded.
+4. **Correct.** For each answer graded Partly or Missed, write what you
+   had wrong, in at least 3 words.
+5. **Predict the maintainer** (optional). Pick what the maintainer will
+   most likely question (scope, simplicity, naming, project conventions,
+   tests, risk, the description, or whether it is worth the review time)
+   and add a line if you like. It stays on your computer, and you compare
+   it with the maintainers' real review later.
+
+The result is a receipt, not a score, for example "You explained the
+change and answered 2 questions. You missed 1 and corrected it." The
+footer then reads "You explained it back. Ready to approve." No AI model
+grades you and the check makes no AI call; an answer that copies the
+AI-written text word for word does not count. **Start over** clears the
+check; checks you passed stay in the run's history.
+
+If the change moves after you passed (you edit a file, sync the run or
+start a follow-up round), the check asks again only about the files that
+changed, and asks you to confirm that your explanation is **Still
+accurate** or to edit it.
+
+**What is mandatory.** The check is on by default and Free, and the
+server holds approval and publishing until you have done it for the
+latest version of the change (error code
+[`understanding_check_required`](troubleshooting.md#understanding_check_required)).
+You can turn it off in **Settings → Learning**, after a confirmation that
+says what changes; runs approved without it are then marked "Check off"
+for good, in the workspace, on the learning page and in the learning
+record. Whatever the switch says, every file must be marked Reviewed, you
+approve the pull request yourself, the pull request is a Draft, and every
+project-rule, issue and pacing check applies.
+
+## 7. Prepare and publish the pull request
 
 The **PR draft** tab reads the project's contribution rules, its pull
 request template, its agent guides (`AGENTS.md`, `CLAUDE.md`) and the
@@ -208,42 +318,123 @@ apply, and you edit everything:
 - The GitHub branch name, if the project has naming rules.
 - The template's checkboxes: you tick them yourself.
 
+**Your words in the PR.** **Use my explanation** puts the explanation from
+your understanding check at the start of the description's first section,
+and **Add my not-tested answer to Testing** adds your answer about what
+you did not test under the description's testing heading (or as a "Not
+tested" paragraph at the end). Nothing goes in until you click, and you
+edit it from there. When your words contain Chinese, Japanese or Korean
+characters and the project does not ask for another language, the card
+shows them beside the editor with a copy button instead, so that you write
+the English description yourself.
+
+**How reviewable is this change?** The snapshot shows the changed lines
+(without lockfiles and generated files), the files, whether a test file
+changed, new dependencies, files outside every task of the plan,
+whitespace-only changes, and the sizes of the project's last 3 merged pull
+requests for comparison. The size bands are BELL PR defaults. If the
+change does several things, **Ask how to split it** asks the agent how it
+could be split. A skipped, deleted or loosened test is listed here; give
+each one a one-line reason of at least 3 words, which is offered for your
+Testing section.
+
+**The maintainer checklist** shows, row by row, the project's rules,
+whether pull requests are open to you, the linked issue, your pace in this
+repository, your own words, reviewability, disclosing AI help and the
+understanding check, each with its source and one sentence on why
+maintainers care.
+
 Before you can approve, BELL PR checks what will be sent: a credential in
 the text, or placeholders such as `TODO:` or an empty `Fixes #`, block it;
 a path from your computer, a change to CI workflows and a commit e-mail
 address that is not your GitHub no-reply address need your confirmation.
 The description mentions AI assistance only if the project's rules require
-it or you turn the note on.
+it or you turn the note on; when the project requires a disclosure,
+publishing waits until the description has one.
 
-Once every file is reviewed, choose **Approve and prepare the PR**. The
-last dialog shows the branch and the exact description GitHub will
-receive. **Submit Draft PR** pushes the branch (to a fork under your
-account when you cannot push to the project) and opens a Draft PR. Nothing
-is ever force-pushed.
+Once every file is reviewed and you explained the change back, choose
+**Approve and prepare the PR**. The last dialog shows the branch and the
+exact description GitHub will receive, and under **Before it reaches the
+maintainers** it lists the checks grouped by topic: Couldn't check, the
+project's rules, the issue, your pace here, your words and reviewability,
+and safety. When the dialog opens, BELL PR reads the GitHub facts once.
 
-## 7. After publishing
+- A **block** stops publishing until its cause is gone: the project does
+  not take pull requests from you, its rules do not accept AI-assisted
+  contributions, a required disclosure or your own words are missing, the
+  linked issue is closed or kept for newcomers, a weakened test has no
+  reason, or you have twice your budget of open pull requests here.
+  [Troubleshooting](troubleshooting.md#publishing-was-blocked-by-a-project-rule-an-issue-or-pacing)
+  explains each.
+- **One block can be lifted:** when someone else's open pull request would
+  already close the linked issue, you can review or test theirs instead, or
+  give your reason to publish anyway (20 to 200 characters). The reason is
+  saved on the run.
+- A **confirm** asks you to tick it: a rule for you to decide on, an issue
+  that someone else is assigned to or has claimed, a change that may be
+  hard to review, your pace in this repository, or a fact BELL PR
+  **couldn't check**. An unknown fact is never counted as a pass.
+
+**Submit Draft PR** reads the GitHub facts again, then pushes the branch
+(to a fork under your account when you cannot push to the project) and
+opens a Draft PR. Nothing is ever force-pushed.
+
+## 8. After publishing
 
 - **Sync to the latest target branch** when the project moved on: BELL PR
   merges the latest target branch into your work (for a published PR, as
   one merge commit). Files the target branch changed need another review.
   Conflicts can be resolved by hand or with **Ask the agent to resolve the
   conflicts**; an unpublished run's sync can be undone.
-- **Maintainer feedback** (Pro): **Read feedback** reads the reviews,
-  comments and CI results of your PR once, and explains them file by file.
-  BELL PR never replies for you; you answer on GitHub.
-- **Follow-up rounds** (Pro): tick the comments you want handled and an
-  agent changes the code. You review each file and push the round as one
-  new commit to the same PR.
+- **Maintainer feedback**: **Read feedback** reads the reviews, comments
+  and CI results of your PR once, when you press it, on every plan, and
+  shows them file by file with the PR's state. Nothing polls GitHub. BELL
+  PR never replies for you; you answer on GitHub, in your own words. When
+  a maintainer asked for changes, the run says so.
+- **Your forecast and what the maintainers said**: your prediction from
+  the understanding check sits beside the maintainers' own comments. Tag
+  each comment with what it raised and whether you **Saw it coming** or it
+  **Surprised me**; a surprise asks for one "Lesson for next time" and goes
+  to your practice deck. The outcome line states facts only, such as
+  "Merged" or "No response yet".
+- **Follow-up rounds** (Pro): tick the comments you want handled and, for
+  each one, write in your own words what the maintainer is asking for (at
+  least 3 words). The agent gets your words as its task and the
+  maintainer's comment only as context, then changes the code. You review
+  each file, explain the round back (while the understanding check is on),
+  and push the round as one new commit to the same PR.
+- **Can't continue?** Close the pull request yourself on GitHub, with a
+  short note in your own words.
 
 ## Keep learning
 
-- **Learning notes** collects the explanations of every contribution, with
-  a search, so you can come back to a concept later.
+- **Learning notes** in the sidebar collects the explanations and your
+  notes from every contribution, with a search, so you can come back to a
+  concept later.
+- **Practice** brings questions from your own contributions back after 1,
+  3, 7 and 21 days, up to 5 at a time and mixed across projects: answers
+  you missed while you were sure of them, maintainer comments that
+  surprised you, and questions you never tried. Answer from memory, show
+  the answer and grade yourself. It never sends reminders.
+- **Plain counts** from your own records appear once there is enough to
+  count, for example "When you said Sure, you were right 14 of 18 times."
+  They are facts about your records, never a score or a goal, and they are
+  counted on your computer.
+- With Pro, **Coach debrief** reads your records for one project (your
+  explanations, misses and corrections, the approaches you chose, your
+  forecasts and the maintainers' comments) and names what its maintainers
+  raised most, quoting your records, with up to 3 practice drills and one
+  next step. It describes the work, never you. Debriefs you already have
+  stay readable on every plan.
 - With Pro, **Export learning record (Markdown)** saves a contribution's
-  task, plan, file explanations, questions and answers, pull request link
-  and usage as one document.
+  complete record as one document: the task, plan, file explanations,
+  questions and answers, your notes, your understanding check, the
+  approaches you chose, your forecast and feedback tags, any check you
+  lifted with its reason, the pull request link and usage.
 - **Explore contributions** (Pro) searches GitHub for projects and issues
-  that match what you want to work on.
+  that match what you want to work on. For the agent team it looks for
+  help-wanted issues; an issue labelled for newcomers is marked "Learn by
+  hand: write this one yourself".
 
 ## Shortcuts
 

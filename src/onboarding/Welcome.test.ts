@@ -146,8 +146,15 @@ test("the provider step picks the only ready provider and lets the person choose
 
 test("the last step offers the tour, an import and discovery, which waits for the GitHub CLI", () => {
   const html = renderEn(welcome("start"));
+  assertNoHan(html);
   assert.match(html, /Take the 2-minute sample tour/);
   assert.match(html, /Import a repository/);
+  // Every contribution ends with the understanding check, and the setting can change it.
+  assert.match(
+    html,
+    /Every contribution ends with you explaining the change back; you can change that in Settings → Learning\./,
+  );
+  assert.match(renderZh(welcome("start")), /每一份貢獻最後都由你用自己的話講一遍；可在「設定 → 學習」調整。/);
   assert.match(
     html,
     /<button type="button" class="welcome-choice" disabled="" aria-describedby="welcome-reason-discover">.*?Find a project to contribute to.*?<span id="welcome-reason-discover" class="welcome-choice-reason">Install and sign in to the GitHub CLI first\.<\/span>/,

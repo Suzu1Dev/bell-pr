@@ -3,7 +3,7 @@ import type { Translation } from "../../../shared/i18n/locale";
 import type en from "../en/home";
 
 const m: Translation<typeof en> = {
-  tagline: "和 AI 團隊一起貢獻開源，並理解你送出的每一行程式碼。",
+  tagline: "從「憑感覺寫」到「知道為什麼」。",
   plan: {
     label: "你的方案",
     upgrade: "升級至 Pro",
@@ -12,7 +12,7 @@ const m: Translation<typeof en> = {
     heading: "從這裡開始",
     sample: {
       title: "試試示範專案",
-      text: "從 Agent team 的計畫到 PR 草稿，完整走一遍已完成的貢獻，不需任何設定。",
+      text: "完整走一遍已完成的貢獻：專案的規範、Agent 團隊的計畫、用自己的話把改動講一遍，以及 PR 草稿。不需任何設定。",
     },
     import: {
       title: "匯入 Repository",

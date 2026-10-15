@@ -14,12 +14,22 @@
 // BELLPR_SCREENSHOTS=docs the images go to e2e/output/screenshots/
 // (gitignored), so a normal e2e run checks every view without changing
 // tracked files.
+//
+// Besides the shared route list, `run-check` is the sample's Explain-it-back
+// check after it passed: opened from `#/runs/demo-run/changes?panel=check`,
+// every file ticked Reviewed and the check answered, graded and corrected
+// with the sample's own words, as a person who just passed it sees it.
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
 import { htmlLang, locales, type Locale } from "../shared/i18n/locale";
+import { getDemo } from "../src/demo";
+import reviewEn from "../src/i18n/en/review";
+import workspaceEn from "../src/i18n/en/workspace";
+import reviewZh from "../src/i18n/zh-TW/review";
+import workspaceZh from "../src/i18n/zh-TW/workspace";
 import { expectNoOverflow } from "./helpers/overflow";
 import { routes, sampleRoutes } from "./helpers/routes";
 import { launchServer, type LaunchedServer } from "./start-server.mjs";
@@ -112,6 +122,78 @@ esac`,
 esac`,
 };
 
+/** The words the run-check capture clicks, in each locale. */
+const copy = {
+  en: { review: reviewEn, workspace: workspaceEn },
+  "zh-TW": { review: reviewZh, workspace: workspaceZh },
+} satisfies Record<Locale, unknown>;
+
+/**
+ * Ticks every sample file Reviewed and passes the open check with the
+ * sample's own answers (one file question graded Partly and corrected,
+ * what was not tested, and the forecast), the way e2e/explain-back.spec.ts
+ * passes it.
+ */
+async function passCheck(page: Page, locale: Locale) {
+  const demo = getDemo(locale);
+  const sample = demo.understandingSample!;
+  const t = copy[locale].workspace.check;
+  const panel = page.locator(".understanding-check");
+  const step = (name: string) => panel.getByRole("region", { name });
+  const item = (question: string) =>
+    step(t.answerTitle).getByRole("listitem").filter({ hasText: question });
+  await expect(panel.getByRole("heading", { name: t.title })).toBeVisible();
+
+  for (const file of demo.files) {
+    await page.locator(`.file-item[title="${file.path}"]`).click();
+    await page.getByRole("checkbox", { name: copy[locale].review.diff.reviewed }).check();
+  }
+  await expect(page.locator(".file-item .file-reviewed")).toHaveCount(demo.files.length);
+
+  await step(t.explainTitle).getByRole("button", { name: t.fill }).click();
+  await expect(step(t.explainTitle).getByRole("textbox")).toHaveValue(sample.summary);
+  const retry = demo.files.find((file) => file.path === "src/utils/retry.ts")!;
+  const partly = sample.answers["selfCheck:src/utils/retry.ts"];
+  for (const [question, text, confidence] of [
+    [retry.explanation!.selfCheck!.question, partly.answer, t.confidences.think],
+    [t.untestedQuestion, sample.untested, t.confidences.sure],
+  ] as const) {
+    await item(question).getByRole("button", { name: t.fill }).click();
+    await expect(item(question).getByRole("textbox")).toHaveValue(text);
+    await item(question).getByRole("radio", { name: confidence }).check();
+  }
+  await panel.getByRole("button", { name: t.lock }).click();
+
+  await step(t.gradeTitle).getByRole("radio", { name: t.grades.partly }).check();
+  await step(t.correctTitle).getByRole("button", { name: t.fill }).click();
+  await expect(step(t.correctTitle).getByRole("textbox")).toHaveValue(partly.correction!);
+  await panel.getByRole("button", { name: t.saveGrades }).click();
+
+  const forecast = step(t.forecastTitle);
+  await forecast.getByRole("radio", { name: t.dimensions.tests }).check();
+  await forecast.getByRole("button", { name: t.fill }).click();
+  await expect(forecast.getByRole("textbox")).toHaveValue(sample.forecast.question);
+  await forecast.getByRole("button", { name: t.saveForecast }).click();
+
+  await expect(panel.getByRole("region", { name: t.resultTitle })).toContainText(
+    t.result({ questions: 2, misses: 1 }),
+  );
+  await expect(page.locator(".review-footer")).toContainText(copy[locale].workspace.footer.passed);
+}
+
+/**
+ * Brings the passed check's record to the top of the view at the current
+ * width: the person's explanation, then "Your check" with the result line,
+ * the prediction, each answer with its grade and the correction.
+ */
+async function showRecord(page: Page, locale: Locale) {
+  const t = copy[locale].workspace.check;
+  await page
+    .locator(".understanding-check")
+    .getByRole("heading", { name: t.explainTitle })
+    .evaluate((heading) => heading.scrollIntoView({ block: "start" }));
+}
+
 let server: LaunchedServer | undefined;
 let tools: string | undefined;
 
@@ -172,3 +254,41 @@ for (const locale of locales)
         await context.close();
       }
     });
+
+for (const locale of locales)
+  test(`run-check in ${locale} fits and is captured at every width once the check passed`, async ({ browser }) => {
+    const context = await browser.newContext({
+      baseURL: server!.baseURL,
+      storageState: server!.storageState,
+      locale: "en-US",
+      timezoneId: "UTC",
+    });
+    try {
+      const page = await context.newPage();
+      const directory = path.join(outputRoot, locale);
+      await mkdir(directory, { recursive: true });
+      await page.clock.setFixedTime(frozenAt);
+      await page.setViewportSize({ width: screenshotWidths[0], height: heights[screenshotWidths[0]] });
+      await page.goto(`/#/runs/demo-run/changes?panel=check&present=1&capture=1&locale=${locale}`);
+      await settled(page, locale);
+      await passCheck(page, locale);
+      await settled(page, locale);
+      for (const width of [...screenshotWidths, ...checkedWidths]) {
+        await page.setViewportSize({ width, height: heights[width] });
+        await showRecord(page, locale);
+        await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+        const captured = (screenshotWidths as readonly number[]).includes(width);
+        if (captured) await expectNoOverflow(page);
+        await expect(page.locator(".presentation-sample-badge")).toBeVisible();
+        await expectBadgeClear(page);
+        if (!captured) continue;
+        await page.screenshot({
+          path: path.join(directory, `run-check-${width}.png`),
+          animations: "disabled",
+          caret: "hide",
+        });
+      }
+    } finally {
+      await context.close();
+    }
+  });

@@ -21,6 +21,7 @@ Contents:
 
 - [I lost the sign-in link](#i-lost-the-sign-in-link)
 - [Error codes](#error-codes), one section per code
+- [Publishing was blocked by a project rule, an issue or pacing](#publishing-was-blocked-by-a-project-rule-an-issue-or-pacing)
 - [BELL PR does not start](#bell-pr-does-not-start)
 - [Runs that wait, stop or cannot be reviewed](#runs-that-wait-stop-or-cannot-be-reviewed)
 - [Collecting details for a support request](#collecting-details-for-a-support-request)
@@ -377,6 +378,130 @@ is a check you grade yourself; no AI model grades your answers.
   classroom or shared computer), the setting is locked on. The variable can
   only keep the check on; no variable turns it off. See
   [Configuration](configuration.md#environment-variables).
+
+## Publishing was blocked by a project rule, an issue or pacing
+
+Before a pull request reaches the maintainers, BELL PR checks it against
+the project's own rules, the linked issue and your pace in that
+repository. The Draft tab's maintainer checklist shows these checks while
+you work, and the publish dialog lists them again under **Before it
+reaches the maintainers**, grouped by topic. When the dialog opens, BELL
+PR reads the GitHub facts once, and **Submit Draft PR** reads them again
+live, so a publish never relies on old facts. The checks are the same on
+every plan, and the understanding-check switch in **Settings → Learning**
+never turns one of them off.
+
+A **block** stops publishing until its cause is gone. A **confirm** asks
+you to tick it before you publish: it lists what BELL PR found, with the
+file and line of a quoted rule or the GitHub field it read. Each check
+also says in one sentence why maintainers care. Nothing here ever stops
+you from starting a run or practising on a change locally.
+
+**"Couldn't check".** When BELL PR cannot read a fact from GitHub (the
+GitHub CLI is signed out, GitHub did not answer in time, the rate limit
+was reached, or the project has no GitHub origin), the dialog says which
+fact and why. An unknown fact is never counted as a pass: it is a confirm,
+and you check the fact on GitHub yourself before you publish. The same
+goes for the project's rules when BELL PR has not read them yet, or could
+not read one of its rule files or the account's default files: an AI ban
+or a required disclosure may be in them. Fix the cause (for example
+`gh auth login`) and open the dialog again, or use **Check again** on the
+project's **Before you contribute** card.
+
+Each block has an id, which the dialog does not show; the headings below
+use it.
+
+### `pr-closed`
+
+"This repository does not take pull requests from you right now." GitHub
+reports that pull requests are turned off, that the repository is archived
+or disabled, or that only collaborators may open pull requests and you are
+not one. GitHub would refuse the pull request anyway, so there is no
+override. Keep practising on the change locally, or ask the maintainers on
+an issue how they accept contributions.
+
+### `ai-ban`
+
+"The project's rules do not accept AI-assisted contributions." A rule
+quoted from the project's files says that it does not accept AI-generated
+or AI-assisted contributions, and the same sentence is about pull
+requests, patches or contributions. AI agents wrote this change, so BELL
+PR will not publish it, with no override. You can keep practising on it
+locally. A rule that mentions AI without that context is only a confirm:
+you read the quote and decide whether it applies.
+
+### `ai-disclosure`
+
+"The project asks contributors to disclose AI assistance, and the
+description does not say so yet." Write the disclosure in your own words
+where the project's rule asks for it, or turn on the AI-assistance line on
+the Draft tab, then save the draft. BELL PR never adds a disclosure that
+you did not choose; it only waits for one that the project requires.
+
+### `own-words`
+
+"The project asks for descriptions in the contributor's own words, and
+this one is still BELL PR's suggested text." Rewrite the description
+before you publish; **Use my explanation** on the Draft tab puts your
+explanation from the understanding check at its start, as a beginning. On
+a project without such a rule, a description that is still the suggested
+wording only asks you to confirm.
+
+### `issue-closed`
+
+"The linked issue is closed." Work on a closed issue usually repeats a fix
+or goes against a decision the maintainers made. Link an open issue, or
+remove the link if your work is about something else. There is no
+override.
+
+### `issue-has-pr`
+
+"Someone else's open pull request would already close the linked issue."
+Review or test their pull request instead: that often helps the
+maintainers more than a second one. If you still have a good reason to
+publish yours (for example, a maintainer asked for an alternative), type
+it in the dialog, 20 to 200 characters. The reason is saved on the run and
+appears in its complete learning record. This is the only block you can
+lift.
+
+### `area-reserved`
+
+"The project keeps issues like this one for people learning to contribute
+without AI." The linked issue carries a label for newcomers (such as
+"good first issue"), and a rule quoted from the project's files reserves
+those issues. BELL PR will not publish an agent-written change for it,
+with no override. Practise on it locally, write the fix by hand, or pick a
+help-wanted issue instead.
+
+### `tests-weakened`
+
+"This change weakens a test." The change deletes a test file, skips a test
+(`.skip(`, `.only`, `xit`, `pytest.mark.skip`, `xfail`, `@Ignore`,
+`#[ignore]`, `t.Skip(` and similar) or removes an `assert` or `expect(`
+line in a test file that no assertion in the same hunk replaces (a loose
+one, such as `toBeDefined()` or `assert True`, replaces only another
+loose one). In **How reviewable is this change?** on the Draft
+tab, give each flagged item a one-line reason of at least 3 words and save
+the reasons; the block clears when every item has one. The reasons are
+offered for the description's Testing section, so the maintainers can
+check them.
+
+### `pacing-max`
+
+"You already have N open pull requests in this repository, at least twice
+BELL PR's budget for you here." The budget is 1 open pull request before
+your first one is merged in that repository and 2 after (BELL PR defaults,
+the same on every plan; draft pull requests count). Finish or close one of
+your open pull requests there, then publish again. There is no override.
+At the budget itself, and when a maintainer has waited more than 7 days
+for your answer to a review there, publishing only asks you to confirm.
+Repositories you can write to are not paced.
+
+**GitHub's own limit.** Some repositories also limit how many pull
+requests one person may have open. BELL PR cannot read that limit
+beforehand; when GitHub refuses a pull request because of it, BELL PR
+says so in plain words. Finish or close one of your open pull requests
+there, then publish again.
 
 ## BELL PR does not start
 

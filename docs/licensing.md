@@ -1,10 +1,15 @@
 # Licensing
 
-BELL PR has two plans. **Free** covers the whole contribution loop, one
-contribution at a time. **Pro** adds bigger and parallel agent teams,
-GitHub-wide discovery, more recommendations, maintainer-feedback coaching
-and follow-up rounds, learning-record export, web access for agents and
-deep reasoning efforts. Every data directory can try Pro for 14 days.
+BELL PR has two plans. **Free** covers the whole responsible loop, one
+contribution at a time: the agent team, review with explanations and
+try-first questions, the understanding check, every project-rule, issue,
+reviewability and pacing check, publishing a Draft PR, reading your
+maintainers' feedback, and the learning page with its practice deck.
+**Pro goes deeper**: a coach debrief from your own records, the complete
+learning record export, AI follow-up rounds on maintainer feedback, bigger
+agent teams, more than one contribution at a time, GitHub-wide discovery,
+more recommendations, web access for agents and deep reasoning efforts.
+Every data directory can try Pro for 14 days.
 
 A license key unlocks Pro. BELL PR checks it on your computer, offline:
 there is no account and no license server, and activating a key or
@@ -26,8 +31,8 @@ starting the trial sends nothing anywhere.
 | Agent team size | Free (limited) | Free: Lead, 2 teammates, Reviewer and Test analyst. Pro and trial: 3 or 4 teammates. |
 | Work on more than one contribution at a time | Free (limited) | Free: one contribution at a time; others wait in the queue. Pro: up to your configured limit (2 by default, at most 8). Publishing is paced the same on every plan. |
 | Plan approval and revision, team inbox, retry of failed subtasks | Free | Up to 3 plan revisions |
-| Diff review, explanations, follow-up chat, notes, suggested review order | Free | No limit |
-| Explain it back before approval | Free | On by default; you can turn it off in Settings, and runs approved without it are marked |
+| Diff review, explanations, try-first questions, follow-up chat, notes, suggested review order | Free | No limit |
+| Explain it back before approval | Free | On by default; you can turn it off in Settings → Learning, and runs approved without it are marked |
 | Re-run Reviewer and Test analyst | Free | No limit (part of the human review safety gate) |
 | Rule-aware PR draft, preflight checks, publishing a Draft PR | Free | Human approval is required on every plan |
 | Project-rule, issue, reviewability and pacing checks | Free | On every plan; no plan can skip them |
@@ -48,10 +53,15 @@ starting the trial sends nothing anywhere.
 
 <!-- /generated:plan-table -->
 
+Pro sells depth, not volume. No plan buys more pull requests or a way past
+a check: the understanding check and every project-rule, issue,
+reviewability and pacing check work the same on Free and Pro, and
+publishing is paced the same on every plan.
+
 Moving to Free never takes anything away that you already have: runs,
-diffs, analyses, discovery results, notes and the learning page stay
-readable, and a run that already started can always be continued or
-cancelled. Existing runs keep the team size they started with.
+diffs, analyses, discovery results, notes, coach debriefs and the learning
+page stay readable, and a run that already started can always be continued
+or cancelled. Existing runs keep the team size they started with.
 
 <!-- generated:product-link key=pricingUrl text="Pricing" -->
 <!-- /generated:product-link -->

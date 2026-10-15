@@ -1,8 +1,7 @@
 /** The Home page (English): where the app opens. */
 const home = {
-  /** The one-line value proposition under the logo. */
-  tagline:
-    "Contribute to open source with an AI team, and understand every line you ship.",
+  /** The one-line value proposition under the logo: the product's headline. */
+  tagline: "From vibe coding to knowing why.",
   plan: {
     /** Names the plan chip for screen readers. */
     label: "Your plan",
@@ -12,7 +11,7 @@ const home = {
     heading: "Start here",
     sample: {
       title: "Try the sample project",
-      text: "Walk through a finished contribution, from the agent team's plan to the pull request draft. No setup needed.",
+      text: "Walk through a finished contribution: the project's rules, the agent team's plan, explaining the change back and the pull request draft. No setup needed.",
     },
     import: {
       title: "Import a repository",

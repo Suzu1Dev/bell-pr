@@ -82,7 +82,12 @@ export default {
     tour: "Take the 2-minute sample tour",
     tourText: "See a finished contribution on a sample project, with no setup.",
     import: "Import a repository",
-    importText: "Bring a project from GitHub or from this computer and start contributing.",
+    /**
+     * Also says that every contribution ends with the understanding check:
+     * the step has no line of its own under its title.
+     */
+    importText:
+      "Bring a project from GitHub or from this computer and start contributing. Every contribution ends with you explaining the change back; you can change that in Settings → Learning.",
     discover: "Find a project to contribute to",
     discoverText: "Search GitHub for projects that welcome the kind of help you want to give.",
     /** On Free: discovery shows sample results only. */

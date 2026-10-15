@@ -79,8 +79,11 @@ const command = "node scripts/npm-readme.mjs";
 
 /**
  * Absolute URLs the READMEs and docs may link to: the public pages of the
- * tools BELL PR works with. Add a prefix only for pages that exist; never
- * a product URL (those live in shared/product.ts).
+ * tools BELL PR works with, and the primary sources that
+ * docs/contributing-responsibly.md and docs/faq.md quote (projects' own
+ * published contribution rules, GitHub's changelog and Google's code
+ * review guide). Add a prefix only for pages that exist; never a product
+ * URL (those live in shared/product.ts).
  */
 export const publicUrls = [
   "https://nodejs.org/",
@@ -90,6 +93,14 @@ export const publicUrls = [
   "https://docs.github.com/",
   "https://code.claude.com/docs/",
   "https://learn.microsoft.com/",
+  "https://llvm.org/docs/AIToolPolicy.html",
+  "https://github.com/torvalds/linux/blob/master/Documentation/process/",
+  "https://github.com/ghostty-org/ghostty/blob/main/",
+  "https://github.com/curl/curl/blob/master/",
+  "https://github.com/matplotlib/matplotlib/blob/main/doc/devel/contribute.rst",
+  "https://devguide.python.org/getting-started/ai-tools/",
+  "https://github.blog/changelog/",
+  "https://google.github.io/eng-practices/",
 ];
 
 /** A problem with the setup rather than with the documents. */
