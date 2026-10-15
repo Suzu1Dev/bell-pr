@@ -12,6 +12,10 @@ import { api } from "../api";
 import { getDemo } from "../demo";
 import { useFormat, useLocale, useT } from "../i18n";
 import type { DiffFile, Repo } from "../types";
+import { LearningCounts } from "./LearningCounts";
+import { LearningHeading } from "./LearningHeading";
+import { LearningRunCards } from "./LearningRunCards";
+import { LearningViewContent, LearningViewNav, useLearningView } from "./LearningViews";
 import "./learning.css";
 
 // Stored concepts use inline backticks and line breaks like the review panel; share its renderer and chunk.
@@ -220,6 +224,7 @@ export function LearningNotes({
 }: LearningNotesProps) {
   const t = useT("learning");
   const [locale] = useLocale();
+  const { view, flags } = useLearningView();
   const [keyword, setKeyword] = useState(defaultKeyword);
   const [runId, setRunId] = useState(defaultRunId);
   const [record, setRecord] = useState<LearningRun[]>(initial?.runs ?? []);
@@ -331,16 +336,19 @@ export function LearningNotes({
     }
   }
 
+  if (view !== "notes")
+    return (
+      <>
+        <LearningHeading notes={false} />
+        <LearningViewNav view={view} flags={flags} />
+        <LearningViewContent view={view} repos={repos} onOpen={onOpen} />
+      </>
+    );
   return (
     <>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">{t.eyebrow}</span>
-          <h1 tabIndex={-1}>{t.title}</h1>
-          <p>{t.intro}</p>
-          <p className="learning-ai-note">{t.aiNote}</p>
-        </div>
-      </div>
+      <LearningHeading />
+      <LearningViewNav view={view} flags={flags} />
+      <LearningCounts />
       <div className="learning-filters">
         <label>
           <span>{t.keyword}</span>
@@ -386,6 +394,9 @@ export function LearningNotes({
                 : t.noRealNotes}
         </span>
       </div>
+      {status === "ready" && (
+        <LearningRunCards runs={record} repos={repos} runId={runId} keyword={needle} />
+      )}
       {status === "loading" ? (
         <div className="learning-empty" role="status">
           <LoaderCircle className="spin" size={24} aria-hidden="true" />

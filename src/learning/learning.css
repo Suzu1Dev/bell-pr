@@ -155,3 +155,504 @@
   gap: 8px;
   margin-top: 24px;
 }
+/* The plain counts: a short list of facts about the person's records. */
+.learning-counts {
+  margin-bottom: var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+}
+.learning-counts h2 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.learning-counts ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.learning-counts-note {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+/* The views: links that read as tabs, each at its own address. */
+.learning-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+.learning-views a {
+  margin-bottom: -1px;
+  padding: 9px var(--space-3);
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+}
+.learning-views a:hover {
+  color: var(--color-brand-700);
+}
+.learning-views a[aria-current="page"] {
+  border-bottom-color: var(--color-brand-600);
+  color: var(--color-brand-700);
+  font-weight: 600;
+}
+
+/* The practice deck: one card at a time. */
+.practice-head {
+  margin-bottom: var(--space-5);
+}
+.practice-head h2 {
+  font-size: 17px;
+  font-weight: 550;
+}
+.practice-head p {
+  max-width: 760px;
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: var(--color-text-muted);
+}
+.practice-card {
+  max-width: 760px;
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+}
+.practice-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--space-2);
+}
+.practice-card-meta .note-tag {
+  margin: 0;
+}
+.practice-dimension {
+  padding: 3px 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  font-size: var(--text-2xs);
+  color: var(--color-text-secondary);
+}
+.practice-card h3 {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-lg);
+  font-weight: 550;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.practice-card h3:focus-visible,
+.practice-reveal:focus-visible {
+  outline: 2px solid var(--color-accent-500);
+  outline-offset: 3px;
+}
+.practice-path {
+  display: inline-block;
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
+  overflow-wrap: anywhere;
+}
+.practice-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: var(--space-4);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+.practice-answer textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 7px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  line-height: 1.6;
+  resize: vertical;
+}
+.practice-answer textarea[readonly] {
+  background: var(--color-surface-sunken);
+}
+.practice-help {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+.practice-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  border: 0;
+}
+.practice-choice legend {
+  float: left;
+  margin-right: var(--space-2);
+  padding: 0;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+.practice-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font-size: var(--text-xs);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.practice-chip input {
+  margin: 0;
+  accent-color: var(--color-brand-600);
+}
+.practice-chip:has(input:checked) {
+  border-color: var(--color-brand-600);
+  background: var(--color-brand-50);
+  color: var(--color-brand-700);
+  font-weight: 600;
+}
+.practice-choice:disabled .practice-chip {
+  cursor: default;
+}
+.practice-hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-warning);
+}
+.practice-actions {
+  margin-top: var(--space-4);
+}
+.practice-reveal {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+.practice-reference {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--space-2);
+}
+.practice-reference strong {
+  font-size: var(--text-2xs);
+  letter-spacing: 1px;
+  color: var(--color-accent-600);
+}
+.practice-reference p {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: var(--color-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.practice-reveal .learning-own-note p {
+  margin: 4px 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.practice-study {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: var(--space-2);
+  padding: 0;
+  font-size: var(--text-xs);
+  color: var(--color-accent-600);
+}
+.practice-grades {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.practice-grade-label,
+.practice-grades > .practice-help,
+.practice-grades > .inline-error {
+  grid-column: 1 / -1;
+}
+.practice-grade-label {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+.practice-grade {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 7px;
+  background: var(--color-surface);
+  text-align: left;
+  color: var(--color-text);
+}
+.practice-grade:hover:not(:disabled) {
+  border-color: var(--color-accent-300);
+  background: var(--color-accent-50);
+}
+.practice-grade strong {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.practice-grade small {
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+.practice-after {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.practice-next {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-brand-700);
+}
+.practice-empty-title {
+  font-weight: 550;
+  color: var(--color-text-secondary);
+}
+.practice-done {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+@media (max-width: 760px) {
+  .practice-card {
+    padding: var(--space-4);
+  }
+  .practice-grades {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The coach debrief: the request, the stored debriefs and the sample. */
+.debrief-request {
+  max-width: 760px;
+  margin-bottom: var(--space-5);
+}
+.debrief-request-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+.debrief-project {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+.debrief-project select {
+  max-width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 7px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 400;
+}
+.debrief-request .button .pro-badge {
+  margin-left: var(--space-1);
+}
+.debrief-request .practice-help:empty {
+  display: none;
+}
+.debrief-list {
+  display: grid;
+  gap: var(--space-4);
+}
+.debrief-card {
+  max-width: 760px;
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+}
+.debrief-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.debrief-card h3 {
+  margin: var(--space-5) 0 var(--space-2);
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+.debrief-card h4 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.debrief-card p {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.debrief-label {
+  font-size: var(--text-xs);
+}
+.debrief-card blockquote {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-accent-300);
+  background: var(--color-surface-sunken);
+  border-radius: 0 6px 6px 0;
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+.debrief-drill {
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 7px;
+}
+.debrief-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+.debrief-options > div {
+  padding: var(--space-3);
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+}
+.debrief-options strong,
+.debrief-trade-off strong {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: var(--text-2xs);
+  letter-spacing: 1px;
+  color: var(--color-accent-600);
+}
+.debrief-card .debrief-question {
+  margin-bottom: var(--space-3);
+  font-weight: 500;
+  color: var(--color-text);
+}
+.debrief-trade-off {
+  margin-top: var(--space-3);
+}
+@media (max-width: 760px) {
+  .debrief-card {
+    padding: var(--space-4);
+  }
+  .debrief-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The person's own explanations, one card per contribution. */
+.learning-runs {
+  margin-bottom: var(--space-8);
+}
+.learning-runs > h2 {
+  margin-bottom: var(--space-4);
+  font-size: 17px;
+  font-weight: 550;
+}
+.learning-run-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 19px;
+}
+.learning-run-card {
+  min-width: 0;
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+}
+.learning-run-card h3 {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-lg);
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+.learning-check-off {
+  display: inline-flex;
+  margin-top: var(--space-2);
+  padding: 3px var(--space-2);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+}
+.learning-run-card .learning-own-note p {
+  margin: 4px 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: var(--color-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.learning-run-text {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+@media (max-width: 900px) {
+  .learning-run-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The sidebar's "N ready" on the Learning item (styled as .nav-count). */
+.learning-ready {
+  flex: none;
+  white-space: nowrap;
+}

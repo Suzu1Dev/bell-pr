@@ -190,6 +190,112 @@ test("turning on unsandboxed agents needs a confirmation that explains the risk"
   });
 });
 
+test("turning the understanding check off needs a confirmation that keeps the check by default", async ({ browser }) => {
+  await onServer(browser, {}, async (page) => {
+    const t = settings.learning.check;
+    await page.goto("/#/settings/learning");
+    await expect(sectionTitle(page)).toHaveText(settings.sections.learning);
+    const toggle = page.getByRole("checkbox", { name: t.label });
+    const dialog = page.getByRole("dialog", { name: t.confirmTitle });
+    await expect(toggle).toBeEnabled();
+    await expect(toggle).toBeChecked();
+    await expect(panel(page).locator(".settings-lock-badge")).toHaveCount(0);
+
+    await toggle.click();
+    await expect(dialog).toBeVisible();
+    for (const sentence of [t.confirmLost, t.confirmKept, t.confirmRecorded, t.confirmBack])
+      await expect(dialog).toContainText(sentence);
+    // Keeping the check is the default: its button has the focus.
+    const keep = dialog.getByRole("button", { name: t.keep });
+    await expect(keep).toBeFocused();
+    expect(await page.evaluate(() => document.activeElement?.textContent)).toBe(t.keep);
+    const results = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
+    expect(
+      results.violations.filter((violation) => ["serious", "critical"].includes(violation.impact ?? "")),
+    ).toEqual([]);
+
+    // Escape keeps the check and saves nothing.
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(toggle).toBeChecked();
+    await expect(toggle).toBeFocused();
+    expect((await appSettings(page)).settings.skipUnderstandingCheck).toBeUndefined();
+
+    // So does Keep the check.
+    await toggle.click();
+    await keep.click();
+    await expect(dialog).toHaveCount(0);
+    await expect(toggle).toBeChecked();
+    expect((await appSettings(page)).settings.skipUnderstandingCheck).toBeUndefined();
+
+    // Turn it off saves it.
+    await toggle.click();
+    await dialog.getByRole("button", { name: t.turnOff }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(toggle).not.toBeChecked();
+    expect((await appSettings(page)).settings.skipUnderstandingCheck).toBe(true);
+    await page.reload();
+    await expect(toggle).not.toBeChecked();
+
+    // Turning it back on needs no confirmation.
+    await toggle.click();
+    await expect(toggle).toBeChecked();
+    await expect(dialog).toHaveCount(0);
+    expect((await appSettings(page)).settings.skipUnderstandingCheck).toBe(false);
+
+    // The try-first prompts are a plain switch, on by default.
+    const tryFirst = page.getByRole("checkbox", { name: settings.learning.tryFirst.label });
+    await expect(tryFirst).toBeChecked();
+    await tryFirst.click();
+    await expect(tryFirst).not.toBeChecked();
+    await expect(dialog).toHaveCount(0);
+    expect((await appSettings(page)).settings.hideTryFirst).toBe(true);
+    await tryFirst.click();
+    await expect(tryFirst).toBeChecked();
+    expect((await appSettings(page)).settings.hideTryFirst).toBe(false);
+  });
+});
+
+test("BELLPR_REQUIRE_UNDERSTANDING_CHECK=1 keeps the check on and read-only, and names the variable", async ({ browser }) => {
+  const variable = "BELLPR_REQUIRE_UNDERSTANDING_CHECK";
+  await onServer(browser, { env: { [variable]: "1" } }, async (page) => {
+    await page.goto("/#/settings/learning");
+    const toggle = page.getByRole("checkbox", { name: settings.learning.check.label });
+    await expect(toggle).toBeDisabled();
+    await expect(toggle).toBeChecked();
+    const field = panel(page).locator(".settings-switch").filter({ has: toggle });
+    await expect(field.locator(".settings-lock-badge")).toHaveText(settings.lock.badge);
+    await expect(field).toContainText(settings.learning.check.lockedBy({ variable }));
+    await toggle.click({ force: true });
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(toggle).toBeChecked();
+    const saved = await appSettings(page);
+    expect(saved.lockedBy.skipUnderstandingCheck).toBe(variable);
+    expect(saved.settings.skipUnderstandingCheck).not.toBe(true);
+    // The try-first prompts stay the person's choice.
+    await expect(page.getByRole("checkbox", { name: settings.learning.tryFirst.label })).toBeEnabled();
+  });
+});
+
+test("BELLPR_REQUIRE_UNDERSTANDING_CHECK=0 locks nothing", async ({ browser }) => {
+  await onServer(browser, { env: { BELLPR_REQUIRE_UNDERSTANDING_CHECK: "0" } }, async (page) => {
+    await page.goto("/#/settings/learning");
+    const toggle = page.getByRole("checkbox", { name: settings.learning.check.label });
+    await expect(toggle).toBeEnabled();
+    await expect(toggle).toBeChecked();
+    await expect(panel(page).locator(".settings-lock-badge")).toHaveCount(0);
+    expect((await appSettings(page)).lockedBy.skipUnderstandingCheck).toBeUndefined();
+    // The off-switch works as without the variable.
+    await toggle.click();
+    await page
+      .getByRole("dialog", { name: settings.learning.check.confirmTitle })
+      .getByRole("button", { name: settings.learning.check.turnOff })
+      .click();
+    await expect(toggle).not.toBeChecked();
+    expect((await appSettings(page)).settings.skipUnderstandingCheck).toBe(true);
+  });
+});
+
 test("General shows the sample project and resets its progress", async ({ page }) => {
   await page.goto("/#/settings/general");
   // Progress in the sample: every file reviewed and the draft approved.

@@ -27,12 +27,15 @@ import { Logo } from "../brand/Logo";
 import { getDemo } from "../demo";
 import { useLocale, useT } from "../i18n";
 import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
+import { PracticeReadyChip } from "../learning/PracticeReadyChip";
+import { usePracticeReady } from "../learning/practiceReady";
 import { PlanChip } from "../license/PlanChip";
 import { ProBadge } from "../license/ProBadge";
 import type { Run, RunSummary } from "../types";
 import type { ModalName, Page } from "./AppShell";
 import type { Status } from "./hooks/useAppData";
 import { initialsOf } from "./labels";
+import { usePresentation } from "./presentation";
 import "./sidebar.css";
 
 interface SidebarProps {
@@ -88,6 +91,12 @@ export function Sidebar({
   const [locale] = useLocale();
   const demoRun = getDemo(locale).run;
   const login = status?.githubUser ?? "";
+  const { play } = usePresentation();
+  // Practice items due now; counted again when a run changes state.
+  const practiceReady = usePracticeReady({
+    demo: play,
+    refreshKey: runs.map((item) => `${item.id}:${item.status}`).join(),
+  });
   // A repository's overview belongs to the Repositories section.
   const section: Page = page === "explore" ? "repos" : page;
   const navItem = (
@@ -162,7 +171,7 @@ export function Sidebar({
           {navItem("repos", FolderGit2)}
           {navItem("discovery", Search, discoveryLocked && <ProBadge />)}
           {navItem("team", Workflow)}
-          {navItem("learning", BookOpen)}
+          {navItem("learning", BookOpen, <PracticeReadyChip count={practiceReady} />)}
         </nav>
         <div className="nav-label recent-label">
           {t.sidebar.recent}{" "}
