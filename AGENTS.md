@@ -79,3 +79,6 @@ BELL PR is sold as a product. Every change also follows these rules:
     counts against your own account."), and never claim that it bills a
     subscription instead of the API. A new `ErrorCode` needs its section in
     `docs/troubleshooting.md`. Run `node scripts/npm-readme.mjs --check-docs`.
+11. Understanding and maintainer-respect checks are never gated by plan,
+    and the understanding-check switch never turns off a project's own
+    rules, the Reviewed ticks or the final approval.
