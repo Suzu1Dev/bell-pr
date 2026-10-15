@@ -39,7 +39,7 @@ export default {
       moreRecommendations: "Generating more recommendations needs a Pro license.",
       learningExport: "Exporting the learning record needs a Pro license.",
       prFeedback:
-        "Maintainer feedback coaching and follow-up rounds need a Pro license.",
+        "AI follow-up rounds on maintainer feedback need a Pro license.",
       webAccess: "Web access for agents needs a Pro license.",
       deepReasoning:
         "The xhigh, max and ultra reasoning efforts need a Pro license.",

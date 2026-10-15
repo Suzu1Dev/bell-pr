@@ -26,7 +26,7 @@ const m: Translation<typeof en> = {
       discovery: "在整個 GitHub 探索可貢獻的專案需要 Pro 授權。",
       moreRecommendations: "產出更多建議需要 Pro 授權。",
       learningExport: "匯出學習紀錄需要 Pro 授權。",
-      prFeedback: "維護者回饋指導與後續修改回合需要 Pro 授權。",
+      prFeedback: "針對維護者回饋的 AI 後續修改回合需要 Pro 授權。",
       webAccess: "Agent 網路存取需要 Pro 授權。",
       deepReasoning: "xhigh、max 與 ultra 思考強度需要 Pro 授權。",
       coachDebrief: "教練回顧需要 Pro 授權。",
