@@ -29,6 +29,22 @@ const understanding: Translation<typeof en> = {
   attemptSkipped: "略過的作答沒有答案。",
   attemptEmpty: "請送出測驗答案或做法選擇。",
   notImplemented: "這個版本的 BELL PR 還沒有這項功能。",
+  feedbackTagUnpublished: "送出 PR 並讀取維護者回饋後，才能標記回饋。",
+  feedbackTagEmpty: "請送出一個品味面向、「早就料到」或「出乎意料」，或一句教訓。",
+  feedbackTagUnknown: "這則留言不在最近一次讀取的回饋裡。請重新讀取回饋後再標記。",
+  practiceKeyUnknown: "這個練習項目已經不屬於這份工作。請重新載入練習。",
+  restatementRequired: ({ min, max }) =>
+    `請用自己的話，替每則選取的留言寫一行維護者要求的內容：每則至少 ${min} 個字、最多 ${max} 個字元。`,
+  debriefNoRecords:
+    "還沒有可以回顧的內容。請先在這個專案的工作上完成理解檢查，或讀取並標記維護者回饋。",
+  debriefInvalid: "教練的回覆不完整或格式不符，所以沒有儲存。請再試一次。",
+  debriefRunning: "這個專案的教練回顧正在撰寫中。",
+  practiceFeedbackFileQuestion: ({ path, title }) =>
+    `維護者在「${title}」對 ${path} 留了言。他們要求什麼？下次你會怎麼做？`,
+  practiceFeedbackQuestion: ({ title }) =>
+    `維護者對「${title}」留了言。他們要求什麼？下次你會怎麼做？`,
+  practiceDrillQuestion: ({ context, optionA, optionB, question }) =>
+    `${context}\n\nA：${optionA}\n\nB：${optionB}\n\n${question}`,
 };
 
 export default understanding;

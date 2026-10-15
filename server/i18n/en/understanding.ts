@@ -45,6 +45,39 @@ const understanding = {
   attemptEmpty: "Send a quiz answer or a road choice.",
   /** A learning-loop feature this build does not have yet. */
   notImplemented: "This part of BELL PR is not available in this build yet.",
+  feedbackTagUnpublished:
+    "Maintainer feedback can be tagged once the pull request is sent and its feedback is read.",
+  feedbackTagEmpty:
+    "Send a taste dimension, Saw it coming or Surprised me, or a lesson.",
+  feedbackTagUnknown:
+    "This comment is not in the latest feedback read. Read the feedback again, then tag it.",
+  practiceKeyUnknown:
+    "This practice item is no longer part of this run. Reload the practice deck.",
+  restatementRequired: ({ min, max }: { min: number; max: number }) =>
+    `In your own words, restate what the maintainer asks for in each selected comment: one line of at least ${min} words and at most ${max} characters per comment.`,
+  debriefNoRecords:
+    "There is nothing to debrief yet. Take the understanding check, or read and tag maintainer feedback, on a run of this project first.",
+  debriefInvalid:
+    "The coach's answer was incomplete or not in the expected form, so nothing was saved. Try again.",
+  debriefRunning: "A coach debrief of this project is already being written.",
+  /** A practice question about a maintainer comment on a file that surprised the person. */
+  practiceFeedbackFileQuestion: ({ path, title }: { path: string; title: string }) =>
+    `A maintainer commented on ${path} in "${title}". What did they ask for, and what will you do differently next time?`,
+  /** A practice question about a maintainer comment on the whole pull request. */
+  practiceFeedbackQuestion: ({ title }: { title: string }) =>
+    `A maintainer commented on "${title}". What did they ask for, and what will you do differently next time?`,
+  /** A coach debrief drill as a practice question: the two versions, then the question. */
+  practiceDrillQuestion: ({
+    context,
+    optionA,
+    optionB,
+    question,
+  }: {
+    context: string;
+    optionA: string;
+    optionB: string;
+    question: string;
+  }) => `${context}\n\nA: ${optionA}\n\nB: ${optionB}\n\n${question}`,
 };
 
 export default understanding;

@@ -32,6 +32,9 @@ export function graphqlPayload() {
       repository: {
         pullRequest: {
           url: prUrl,
+          state: "OPEN" as string | null,
+          merged: false as boolean | null,
+          reviewDecision: "CHANGES_REQUESTED" as string | null,
           reviews: {
             totalCount: 3,
             nodes: [
@@ -150,6 +153,8 @@ test("the query asks for reviews, comments, threads with path/line/resolution an
   assert.match(prFeedbackQuery, /\.\.\. on CheckRun \{ name status conclusion detailsUrl \}/);
   assert.match(prFeedbackQuery, /\.\.\. on StatusContext \{ context state targetUrl \}/);
   assert.match(prFeedbackQuery, /statusCheckRollup/);
+  // The PR's own state comes with the same request; nothing polls it.
+  assert.match(prFeedbackQuery, /pullRequest\(number: \$number\) \{\s*url state merged reviewDecision\s/);
 });
 
 test("prNumberOf accepts only this repository's PR URL", () => {
@@ -338,4 +343,51 @@ test("PR labels are kept, so a compliance label shows even when its check run su
   );
   // Reads without labels keep the earlier shape.
   assert.equal("labels" in parsePrFeedback(graphqlPayload(), options), false);
+});
+
+test("the PR's state, merge and review decision are read with the feedback, and reads without them keep the earlier shape", () => {
+  const open = parsePrFeedback(graphqlPayload(), options);
+  assert.deepEqual(
+    [open.prState, open.merged, open.reviewDecision],
+    ["OPEN", false, "CHANGES_REQUESTED"],
+  );
+  const mergedPayload = graphqlPayload();
+  Object.assign(mergedPayload.data.repository.pullRequest, {
+    state: "MERGED",
+    merged: true,
+    reviewDecision: "APPROVED",
+  });
+  const merged = parsePrFeedback(mergedPayload, options);
+  assert.deepEqual(
+    [merged.prState, merged.merged, merged.reviewDecision],
+    ["MERGED", true, "APPROVED"],
+  );
+  // A closed PR without required reviews has no review decision (null on GitHub).
+  const closedPayload = graphqlPayload();
+  Object.assign(closedPayload.data.repository.pullRequest, {
+    state: "CLOSED",
+    merged: false,
+    reviewDecision: null,
+  });
+  const closed = parsePrFeedback(closedPayload, options);
+  assert.deepEqual([closed.prState, closed.merged], ["CLOSED", false]);
+  assert.equal("reviewDecision" in closed, false);
+  // Values that are not GitHub enum values are left out rather than shown.
+  const oddPayload = graphqlPayload();
+  Object.assign(oddPayload.data.repository.pullRequest, {
+    state: "<b>open</b>",
+    merged: "yes",
+    reviewDecision: "X".repeat(41),
+  });
+  const odd = parsePrFeedback(oddPayload as never, options);
+  for (const key of ["prState", "merged", "reviewDecision"])
+    assert.equal(key in odd, false, key);
+  // The answer of a build that did not ask for them still parses, without them.
+  const older = graphqlPayload() as { data: { repository: { pullRequest: Record<string, unknown> } } };
+  for (const key of ["state", "merged", "reviewDecision"])
+    delete older.data.repository.pullRequest[key];
+  const previous = parsePrFeedback(older, options);
+  assert.equal(previous.items.length, open.items.length);
+  for (const key of ["prState", "merged", "reviewDecision"])
+    assert.equal(key in previous, false, key);
 });

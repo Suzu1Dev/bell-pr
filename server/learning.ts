@@ -389,9 +389,10 @@ export async function chat(
 }
 
 /**
- * Reads the published PR's reviews, comments, threads and CI once, on the
- * learner's request. Read-only: BELL never replies or resolves anything on
- * GitHub, and nothing polls this. The run status is unchanged.
+ * Reads the published PR's reviews, comments, threads, CI and state (open,
+ * merged or closed, and the review decision) once, on the learner's
+ * request. Read-only: BELL never replies or resolves anything on GitHub,
+ * and nothing polls this. The run status is unchanged.
  */
 export async function fetchPrFeedback(ctx: WorkbenchContext, id: string) {
   return ctx.lock(id, async () => {
