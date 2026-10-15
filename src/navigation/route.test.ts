@@ -316,6 +316,26 @@ test("navigate adds one history entry per task and keeps the flags", async () =>
   });
 });
 
+test("navigate leaves a page's own flags behind and keeps the presentation flags", async () => {
+  const win = fakeWindow("#/learning?view=practice&present=1&locale=en");
+  await withWindow(win, async () => {
+    const unsubscribe = subscribeToRoute(() => undefined);
+    // The practice view belongs to the learning page.
+    navigate({ name: "run", runId: "demo-run", tab: "changes" });
+    assert.equal(win.entries.at(-1), "#/runs/demo-run/changes?present=1&locale=en");
+    await nextTask();
+    // The check panel belongs to the workspace's changes tab.
+    win.follow("#/runs/demo-run/changes?panel=check&demo=play&locale=en");
+    navigate({ name: "learning" });
+    assert.equal(win.entries.at(-1), "#/learning?demo=play&locale=en");
+    await nextTask();
+    // A route that names its own flags keeps them.
+    navigate({ name: "learning", flags: { view: "practice", locale: "en" } });
+    assert.equal(win.entries.at(-1), "#/learning?view=practice&locale=en");
+    unsubscribe();
+  });
+});
+
 test("an in-page anchor keeps the route and its flags", async () => {
   const win = fakeWindow("#/runs/demo-run/overview?demo=play");
   await withWindow(win, () => {
