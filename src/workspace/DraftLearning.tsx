@@ -89,7 +89,7 @@ export function Reviewability({
   onSaveReasons,
   onAskSplit,
 }: RunFacts & {
-  onSaveReasons?(reasons: Record<string, string>): void;
+  onSaveReasons?(reasons: Record<string, string>): void | Promise<void>;
   onAskSplit?(): void;
 }) {
   const snapshot = changesOf(run, files, repo, useSample(demo));

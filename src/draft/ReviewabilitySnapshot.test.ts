@@ -12,6 +12,7 @@ import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import ReviewabilitySnapshot, {
   bandTone,
   reasonLines,
+  reasonsToSave,
   validReason,
   type ReviewabilitySnapshotProps,
 } from "./ReviewabilitySnapshot";
@@ -160,4 +161,23 @@ test("the zh-TW snapshot keeps the numbers and names the band in its own words",
   assert.match(html, /#118：4 個檔案 \+64 −12/);
   assert.match(html, /被削弱的測試/);
   assert.match(html, /儲存理由/);
+});
+
+test("saving sends every weakened item, an emptied field as \"\" so the server removes its reason", () => {
+  const [first, second, third] = weakened;
+  assert.ok(first && second && third);
+  assert.deepEqual(
+    reasonsToSave(weakened, {
+      [first.id]: "  The flaky test waits on a real network.  ",
+      [second.id]: "",
+      // Too short: Save is off while it is, and it is never sent.
+      [third.id]: "too short",
+    }),
+    { [first.id]: "The flaky test waits on a real network.", [second.id]: "" },
+  );
+  // A field never typed in is sent empty too: nothing is saved for it.
+  assert.deepEqual(
+    reasonsToSave(weakened, {}),
+    Object.fromEntries(weakened.map((item) => [item.id, ""])),
+  );
 });

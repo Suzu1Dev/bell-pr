@@ -21,7 +21,8 @@ export interface ReviewabilitySnapshotProps {
   weakened: Pick<WeakenedTest, "id" | "path" | "line" | "text">[];
   /** The saved reason of each weakened-test item, by its id. */
   reasons: Record<string, string>;
-  onSaveReasons?(reasons: Record<string, string>): void;
+  /** Saves the reasons; a promise it returns keeps the card busy and shows its failure. */
+  onSaveReasons?(reasons: Record<string, string>): void | Promise<void>;
   /** Opens the Ask-the-agent preset "How could this be split into separate changes?". */
   onAskSplit?(): void;
   /** The short form at the top of the check panel. */
@@ -60,6 +61,23 @@ export function reasonLines(
         `- \`${item.line ? `${item.path}:${item.line}` : item.path}\`: ${reasons[item.id].trim()}`,
     )
     .join("\n");
+}
+
+/**
+ * The reasons to save from the fields: every weakened item's trimmed text,
+ * and "" for one the person emptied, which the server reads as "remove the
+ * saved reason". A field that is too short is not sent (Save is off then).
+ */
+export function reasonsToSave(
+  weakened: ReviewabilitySnapshotProps["weakened"],
+  drafts: Record<string, string>,
+) {
+  return Object.fromEntries(
+    weakened.flatMap((item) => {
+      const text = (drafts[item.id] ?? "").trim();
+      return !text || validReason(text) ? [[item.id, text]] : [];
+    }),
+  );
 }
 
 export default function ReviewabilitySnapshot({
@@ -101,16 +119,12 @@ export default function ReviewabilitySnapshot({
   const saved = reasonLines(weakened, reasons);
   const save = async () => {
     if (!onSaveReasons) return;
-    const next = Object.fromEntries(
-      weakened
-        .filter((item) => validReason(drafts[item.id]))
-        .map((item) => [item.id, drafts[item.id].trim()]),
-    );
+    const next = reasonsToSave(weakened, drafts);
     setSaving(true);
     setError("");
     try {
       // The parent may answer with a promise (the PUT); a failure stays here.
-      await Promise.resolve(onSaveReasons(next) as unknown);
+      await onSaveReasons(next);
     } catch (cause) {
       setError(t.saveFailed({ reason: (cause as Error).message }));
     } finally {

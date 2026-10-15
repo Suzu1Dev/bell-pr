@@ -84,14 +84,16 @@ export function useRunRecords(
     latestAsk.current(t.askSplit);
   }, [pending, run.id, file?.path, t.askSplit]);
 
+  async function request(path: string, method: string, body: unknown) {
+    const { run: updated } = await api<{ run: Run }>(
+      `/runs/${encodeURIComponent(run.id)}${path}`,
+      send(method, body),
+    );
+    if (openRun.current === updated.id) setRun(updated);
+  }
   async function save(path: string, method: string, body: unknown) {
-    const id = run.id;
     try {
-      const { run: updated } = await api<{ run: Run }>(
-        `/runs/${encodeURIComponent(id)}${path}`,
-        send(method, body),
-      );
-      if (openRun.current === updated.id) setRun(updated);
+      await request(path, method, body);
     } catch (error) {
       notify((error as Error).message, "error");
     }
@@ -113,15 +115,21 @@ export function useRunRecords(
       }
       void save("/feedback-tags", "PATCH", feedbackTagPatch(url, tag));
     },
-    /** One line per weakened-test item (PUT /api/runs/:id/test-reasons). */
-    saveTestReasons(reasons: Record<string, string>) {
+    /**
+     * One line per weakened-test item (PUT /api/runs/:id/test-reasons); ""
+     * removes an item's reason. The card shows a failure itself.
+     */
+    saveTestReasons(reasons: Record<string, string>): Promise<void> {
       if (demo) {
+        const kept = Object.fromEntries(
+          Object.entries(reasons).filter(([, reason]) => reason.trim()),
+        );
         keep((previous) => ({
-          reviewability: { ...previous.reviewability, testReasons: reasons },
+          reviewability: { ...previous.reviewability, testReasons: kept },
         }));
-        return;
+        return Promise.resolve();
       }
-      void save("/test-reasons", "PUT", { reasons });
+      return request("/test-reasons", "PUT", { reasons });
     },
     /**
      * "How could this be split into separate changes?", asked about the
