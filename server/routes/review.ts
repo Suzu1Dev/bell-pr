@@ -1,5 +1,9 @@
 import type { Express } from "express";
 import { z } from "zod";
+import {
+  overridableCheckIds,
+  overrideReasonLimits,
+} from "../../shared/contribution.js";
 import { runDraftSchema } from "../drafts.js";
 import { learningExport } from "../learning-export.js";
 import { publishChecks } from "../publish.js";
@@ -82,12 +86,17 @@ export function registerReviewRoutes(
     const files = await workbench.lock(req.params.id, () =>
       workbench.diff(req.params.id),
     );
+    // The stored GitHub facts only: the dialog never waits on GitHub.
+    const repo = workbench.store.data.repos.find(
+      (value) => value.id === run.repoId,
+    );
     res.json({
       checks: await publishChecks(
         run,
         files,
         workbench.store.directory,
         currentLocale(),
+        { repo },
       ),
     });
   });
@@ -140,15 +149,37 @@ export function registerReviewRoutes(
     res.json({ run: await workbench.fetchPrFeedback(req.params.id) });
   });
   app.post("/api/runs/:id/publish", async (req, res) => {
-    const { fingerprint, acknowledged } = z
+    const { fingerprint, acknowledged, overrides } = z
       .object({
         fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
         // Preflight item ids the person confirmed in the publish dialog.
         acknowledged: z.array(z.string().max(40)).max(16).optional(),
+        // Blocks lifted with the person's own reason; only someone else's
+        // pull request for the same issue can be lifted.
+        overrides: z
+          .array(
+            z
+              .object({
+                id: z.enum(overridableCheckIds),
+                reason: z
+                  .string()
+                  .trim()
+                  .min(overrideReasonLimits.min)
+                  .max(overrideReasonLimits.max),
+              })
+              .strict(),
+          )
+          .max(4)
+          .optional(),
       })
       .parse(req.body);
     res.json({
-      run: await workbench.publish(req.params.id, fingerprint, acknowledged),
+      run: await workbench.publish(
+        req.params.id,
+        fingerprint,
+        acknowledged,
+        overrides,
+      ),
     });
   });
 }

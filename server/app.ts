@@ -32,6 +32,7 @@ import { registerStatusRoutes } from "./routes/status.js";
 import { registerSyncRoutes } from "./routes/sync.js";
 import type { RouteDeps } from "./routes/types.js";
 import { registerUnderstandingRoutes } from "./routes/understanding.js";
+import { registerContributionRoutes } from "./routes/contribution.js";
 
 /** Masks secrets in string values, which may quote command output. */
 function redactValues<T extends Record<string, unknown>>(values?: T) {
@@ -193,6 +194,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   registerAppSettingsRoutes(app, deps);
   registerLicenseRoutes(app, deps);
   registerUnderstandingRoutes(app, deps);
+  registerContributionRoutes(app, deps);
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: sm().common.notFound });
   });

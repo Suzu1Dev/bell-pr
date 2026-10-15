@@ -3,6 +3,7 @@ import type en from "../en/index.js";
 import analysis from "./analysis.js";
 import cli from "./cli.js";
 import common from "./common.js";
+import contribution from "./contribution.js";
 import license from "./license.js";
 import run from "./run.js";
 import security from "./security.js";
@@ -20,5 +21,6 @@ const m: Translation<typeof en> = {
   security,
   cli,
   understanding,
+  contribution,
 };
 export default m;

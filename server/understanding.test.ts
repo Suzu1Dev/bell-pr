@@ -12,6 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import type { ChangeExplanation } from "../shared/explanations.js";
 import type { PlannedItem } from "../shared/understanding.js";
+import { explainPrCreateFailure, refreshRepositoryRules, refreshRunFacts } from "./contribution-facts.js";
 import { createApp } from "./index.js";
 import { git } from "./process.js";
 import { readDiff } from "./git.js";
@@ -577,4 +578,129 @@ test("only test files call skipUnderstandingCheckInTests", async () => {
   assert.equal(definition.match(/skipUnderstandingCheckInTests/g)?.length, 1);
   // Every other server test file that calls it uses the before/after pair.
   assert.ok(found.length >= 9, found.join(", "));
+});
+
+// The respect checks reach approval, the publish dialog and publishing
+// (task 7 of the L1 contracts); the rules themselves are tested in
+// shared/draft-checks.test.ts.
+
+test("approve refuses weakened tests until each has a reason", async (t) => {
+  const f = await fixture(t);
+  await mkdir(path.join(f.repository, "tests"), { recursive: true });
+  await f.write("tests/a.test.ts", "it('a', () => {\n  expect(1).toBe(1);\n});\n");
+  await git(f.repository, ["add", "--", "tests/a.test.ts"]);
+  await git(f.repository, ["commit", "-m", "test"]);
+  f.run.baseSha = (await git(f.repository, ["rev-parse", "HEAD"])).stdout.trim();
+  await f.write("tests/a.test.ts", "it.skip('a', () => {\n});\n");
+  await f.reviewAll();
+  await f.workbench.updateAppSettings({ skipUnderstandingCheck: true });
+  await assert.rejects(
+    withLocale("en", () => f.workbench.approve(f.run.id, { ...f.run.draft })),
+    (error: AppError) =>
+      error.statusCode === 422 &&
+      /^This change weakens tests in 2 places\./.test(error.message) &&
+      error.message.includes("tests/a.test.ts:1 added: it.skip('a', () => {") &&
+      error.message.includes("tests/a.test.ts:2 removed: expect(1).toBe(1);"),
+  );
+  f.run.reviewability = {
+    testReasons: {
+      "tests/a.test.ts#1": "The case is flaky upstream, tracked in issue 12.",
+      "tests/a.test.ts#-2": "The case is skipped, so its assertion goes with it.",
+    },
+  };
+  assert.equal((await f.workbench.approve(f.run.id, { ...f.run.draft })).status, "approved");
+});
+
+test("the publish dialog shows the project's rules from the stored facts, without calling GitHub", async (t) => {
+  const f = await fixture(t);
+  await f.write("src/a.ts", lines("a", 40));
+  const calls = path.join(f.directory, "gh-calls");
+  await writeFile(path.join(fakeBin, "gh"), `#!/bin/sh\necho "$@" >> ${JSON.stringify(calls)}\nexit 1\n`, { mode: 0o755 });
+  t.after(() => writeFile(path.join(fakeBin, "gh"), "#!/bin/sh\nexit 1\n", { mode: 0o755 }));
+  f.repo.contributionRules = {
+    checkedAt: "2026-10-15T00:00:00.000Z",
+    findings: [
+      { kind: "ban", path: "AI_POLICY.md", line: 4, quote: "Pull requests made with AI tools are not accepted.", contribution: true },
+    ],
+    filesRead: ["AI_POLICY.md"],
+  };
+  f.run.contributionFacts = {
+    checkedAt: "2026-10-15T00:00:00.000Z",
+    unknown: ["door: HTTP 502"],
+  };
+  const call = await serve(t, f);
+  const preflight = await call("GET", `/runs/${f.run.id}/preflight`);
+  assert.equal(preflight.status, 200);
+  const checks = preflight.body.checks as { id: string; kind: string; details: string[] }[];
+  assert.deepEqual(
+    checks.filter((check) => !["author-email"].includes(check.id)).map((check) => [check.id, check.kind]),
+    [
+      ["ai-ban", "block"],
+      ["reviewability", "confirm"],
+      ["facts-unknown", "confirm"],
+    ],
+  );
+  assert.equal(checks[0].details[1], 'AI_POLICY.md:4: "Pull requests made with AI tools are not accepted."');
+  await assert.rejects(readFile(calls, "utf8"), /ENOENT/);
+});
+
+test("publish accepts overrides only for someone else's PR, with a 20 to 200 character reason, and records them", async (t) => {
+  const f = await fixture(t);
+  await f.write("src/a.ts", lines("a", 10));
+  await f.reviewAll();
+  const call = await serve(t, f);
+  const publish = (overrides: unknown) =>
+    call("POST", `/runs/${f.run.id}/publish`, { fingerprint: "a".repeat(64), overrides });
+  for (const overrides of [
+    [{ id: "ai-ban", reason: "This ban does not apply to this change at all." }],
+    [{ id: "issue-has-pr", reason: "too short" }],
+    [{ id: "issue-has-pr", reason: "x".repeat(201) }],
+    [{ id: "issue-has-pr", reason: "Their PR was abandoned in June.", at: "now" }],
+    Array.from({ length: 5 }, () => ({ id: "issue-has-pr", reason: "Their PR was abandoned in June." })),
+  ])
+    assert.equal((await publish(overrides)).status, 400, JSON.stringify(overrides));
+  // A valid override reaches publishing, which first checks the approval.
+  assert.equal((await publish([{ id: "issue-has-pr", reason: "  Their PR was abandoned in June.  " }])).status, 409);
+  // Approved and published through a GitHub origin, the reason is kept on the run.
+  await f.workbench.updateAppSettings({ skipUnderstandingCheck: true });
+  await f.workbench.approve(f.run.id, { ...f.run.draft });
+  Object.assign(f.repo, { url: "https://github.com/test-owner/example", fullName: "test-owner/example", owner: "test-owner", name: "example" });
+  f.run.guardOverrides = Array.from({ length: 8 }, (_, index) => ({
+    id: "issue-has-pr",
+    reason: `An older reason number ${index} for the record.`,
+    at: "2026-10-01T00:00:00.000Z",
+  }));
+  await assert.rejects(
+    f.workbench.publish(f.run.id, f.run.approvedFingerprint!, [], [
+      { id: "issue-has-pr", reason: "  Their PR was abandoned in June.  " },
+    ]),
+  );
+  assert.equal(f.run.guardOverrides?.length, 8);
+  assert.equal(f.run.guardOverrides?.at(-1)?.reason, "Their PR was abandoned in June.");
+  assert.equal(f.run.guardOverrides?.[0].reason, "An older reason number 1 for the record.");
+});
+
+test("until the respect and learning-loop work fills them, their facades answer 501", async (t) => {
+  const f = await fixture(t);
+  for (const pending of [
+    f.workbench.contribution.rules(f.repo.id),
+    f.workbench.contribution.refreshRules(f.repo.id),
+    f.workbench.contribution.check(f.repo.id, "https://github.com/acme/widgets/issues/1"),
+    f.workbench.contribution.refreshRun(f.run.id),
+    f.workbench.contribution.saveTestReasons(f.run.id, {}),
+    f.workbench.learningLoop.saveFeedbackTag(f.run.id, { url: "#x" }),
+    f.workbench.learningLoop.practice(),
+    f.workbench.learningLoop.recordPractice(f.run.id, { key: "check:x", confidence: "sure", grade: "got" }),
+    f.workbench.learningLoop.counts(),
+    f.workbench.learningLoop.debrief(f.repo.id),
+    f.workbench.learningLoop.debriefs(f.repo.id),
+  ])
+    await assert.rejects(pending, (error: AppError) => error.statusCode === 501);
+});
+
+test("the refresh helpers read nothing yet and leave a failed PR creation as it is", async (t) => {
+  const f = await fixture(t);
+  assert.equal(await refreshRunFacts({} as never, f.run, { timeoutMs: 10 }), undefined);
+  assert.equal(await refreshRepositoryRules({} as never, f.repo), undefined);
+  assert.equal(explainPrCreateFailure(new Error("rate limited")), undefined);
 });

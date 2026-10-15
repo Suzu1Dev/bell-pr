@@ -65,6 +65,12 @@ import {
   understandingFacade,
   type UnderstandingFacade,
 } from "./understanding.js";
+import {
+  contributionFacade,
+  type ContributionFacade,
+} from "./contribution-facts.js";
+import { learningLoopFacade, type LearningLoopFacade } from "./learning-loop.js";
+import type { GuardOverride } from "../shared/contribution.js";
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
@@ -171,6 +177,10 @@ export class Workbench {
   readonly entitlements: () => Entitlements;
   /** The Explain-it-back check and the per-file attempts (understanding.ts). */
   readonly understanding: UnderstandingFacade;
+  /** The project's rules, GitHub facts and test reasons (contribution-facts.ts). */
+  readonly contribution: ContributionFacade;
+  /** Feedback tags, the practice deck, the counts and the coach debrief (learning-loop.ts). */
+  readonly learningLoop: LearningLoopFacade;
   private readonly context: WorkbenchContext;
   /** The startup janitor, then the first retention pass; never rejects. */
   readonly maintenance: Promise<void>;
@@ -257,6 +267,8 @@ export class Workbench {
     this.understanding = understandingFacade(this.context, {
       lockedBy: () => this.appSettings.lockedBy().skipUnderstandingCheck,
     });
+    this.contribution = contributionFacade(this.context);
+    this.learningLoop = learningLoopFacade(this.context);
     this.applySettings();
     // Server logs go to the data directory from here on (see log.ts).
     initLog(store.directory);
@@ -885,11 +897,16 @@ export class Workbench {
     );
   }
 
-  /** Publishes the first commit and PR, or pushes an open round (publish.ts). */
+  /**
+   * Publishes the first commit and PR, or pushes an open round
+   * (publish.ts). `overrides` lift a block with the person's reason
+   * (only `issue-has-pr`), recorded on the run.
+   */
   async publish(
     id: string,
     displayedFingerprint: string,
     acknowledged: string[] = [],
+    overrides: Pick<GuardOverride, "id" | "reason">[] = [],
   ) {
     const round = activeFollowUp(this.run(id).followUps);
     return logged(
@@ -901,6 +918,7 @@ export class Workbench {
           id,
           displayedFingerprint,
           acknowledged,
+          overrides,
         ),
     );
   }

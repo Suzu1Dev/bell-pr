@@ -30,7 +30,12 @@ import {
 } from "../shared/draft-checks.js";
 import type { Locale } from "../shared/i18n/locale.js";
 import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
-import { AppError, type DiffFile, type Run } from "./types.js";
+import {
+  AppError,
+  type DiffFile,
+  type Repository,
+  type Run,
+} from "./types.js";
 import { assertRemoteHead, prHasCommit, remoteBranchHead } from "./pr-branch.js";
 import { assertConflictsResolved } from "./sync-runs.js";
 import { applyAiDisclosure } from "./drafts.js";
@@ -39,7 +44,13 @@ import { setupError } from "./cli-errors.js";
 import type { WorkbenchContext } from "./workbench.js";
 import { currentLocale, sm } from "./i18n/index.js";
 import { secretInPatch } from "./secrets.js";
-import { assertUnderstood } from "./understanding.js";
+import { assertUnderstood, understandingRequired } from "./understanding.js";
+import { reviewabilitySnapshot } from "../shared/reviewability.js";
+import type {
+  ContributionFacts,
+  GuardOverride,
+} from "../shared/contribution.js";
+import { explainPrCreateFailure, refreshRunFacts } from "./contribution-facts.js";
 
 const now = () => new Date().toISOString();
 
@@ -101,18 +112,36 @@ async function commitEmails(run: Run) {
   return emails;
 }
 
+/** The reviewability snapshot of the run's files, with the project's own references. */
+function changesOf(run: Run, files: DiffFile[], repo?: Repository) {
+  return reviewabilitySnapshot({
+    files,
+    planScopes: run.team?.tasks.map((task) => task.files),
+    generated: repo?.contributionRules?.generated,
+    mergedSizes: repo?.contributionRules?.mergedSizes,
+  });
+}
+
 /**
  * Every check on what a first publish sends to GitHub: the PR text checks,
  * credentials and local paths in the title, description and commit
- * message, CI configuration among the changed files, and, once per
- * address, a commit e-mail that is not GitHub's no-reply one. The publish
- * dialog shows the same list (GET /api/runs/:id/preflight).
+ * message, CI configuration among the changed files, once per address a
+ * commit e-mail that is not GitHub's no-reply one, and the respect checks
+ * (the project's rules, the stored GitHub facts, reviewability, pacing).
+ * The publish dialog shows the same list (GET /api/runs/:id/preflight),
+ * which never calls GitHub: it uses the facts stored on the run unless
+ * `extra.facts` passes fresher ones.
  */
 export async function publishChecks(
   run: Run,
   files: DiffFile[],
   dataDirectory: string,
   locale: Locale = currentLocale(),
+  extra: {
+    repo?: Repository;
+    facts?: ContributionFacts;
+    overrides?: GuardOverride[];
+  } = {},
 ): Promise<DraftCheck[]> {
   const confirmed = await confirmedEmails(dataDirectory);
   const emails = (await commitEmails(run)).filter(
@@ -134,6 +163,13 @@ export async function publishChecks(
       localDirectories: directories,
       changedPaths: files.map((file) => file.path),
       commitEmails: emails,
+      changes: changesOf(run, files, extra.repo),
+      rules: extra.repo?.contributionRules,
+      facts: extra.facts ?? run.contributionFacts,
+      overrides: extra.overrides ?? run.guardOverrides,
+      testReasons: run.reviewability?.testReasons,
+      understandingOff: !understandingRequired(),
+      issueUrl: run.contributionSettings?.issueUrl,
     },
     locale,
   );
@@ -288,11 +324,18 @@ export async function approve(
     } else {
       // The checks explain themselves in the request's locale; the
       // acknowledgements below match their ids, never their text.
+      // The project's rules and the change's tests stop approval early;
+      // the GitHub facts wait for publishing, which reads them again.
       const unfinished = draftPreflight(
         {
           title: run.draft.title,
           body: run.draft.body,
           commitMessage: run.draft.commitMessage,
+          sources: run.draftPreparation?.context?.sources,
+          proposalBody: run.draftPreparation?.proposal?.body,
+          rules: repo?.contributionRules,
+          changes: changesOf(run, files, repo),
+          testReasons: run.reviewability?.testReasons,
         },
         currentLocale(),
       ).find((check) => check.kind === "block");
@@ -326,6 +369,7 @@ export async function publish(
   id: string,
   displayedFingerprint: string,
   acknowledged: string[] = [],
+  overrides: Pick<GuardOverride, "id" | "reason">[] = [],
 ) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
@@ -383,12 +427,27 @@ export async function publish(
         409,
       );
     assertRefName(headBranch);
+    // A block the person lifted with a reason is recorded on the run.
+    if (overrides.length)
+      run.guardOverrides = [
+        ...(run.guardOverrides ?? []),
+        ...overrides.map((override) => ({
+          id: override.id,
+          reason: override.reason.trim(),
+          at: now(),
+        })),
+      ].slice(-8);
+    // The GitHub facts are read again; a failed read is never a pass.
+    run.contributionFacts =
+      (await refreshRunFacts(ctx, run, { timeoutMs: 10_000 })) ??
+      run.contributionFacts;
     // Runs approved before these checks existed are held to them as well.
     const checks = await publishChecks(
       run,
       files,
       ctx.store.directory,
       currentLocale(),
+      { repo },
     );
     const blocking = checks.find((check) => check.kind === "block");
     if (blocking)
@@ -597,7 +656,11 @@ export async function publish(
       run.prUrl = prUrl;
       run.status = "published";
       ctx.log(run, "system", sm().run.publish.prCreated);
-    } catch (error) {
+    } catch (caught) {
+      let error = caught;
+      // GitHub's own limits (such as on open pull requests) in plain words.
+      const explained = explainPrCreateFailure(error);
+      if (explained) error = explained;
       run.error = redact(
         error instanceof Error ? error.message : sm().run.publish.failed,
       );

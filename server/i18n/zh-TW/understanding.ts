@@ -28,6 +28,7 @@ const understanding: Translation<typeof en> = {
   attemptLocked: "這次作答已經評分或略過，會維持你當時的回答。",
   attemptSkipped: "略過的作答沒有答案。",
   attemptEmpty: "請送出測驗答案或做法選擇。",
+  notImplemented: "這個版本的 BELL PR 還沒有這項功能。",
 };
 
 export default understanding;

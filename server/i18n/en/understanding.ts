@@ -43,6 +43,8 @@ const understanding = {
     "This attempt is already graded or skipped, and it stays as you answered it.",
   attemptSkipped: "A skipped attempt has no answer.",
   attemptEmpty: "Send a quiz answer or a road choice.",
+  /** A learning-loop feature this build does not have yet. */
+  notImplemented: "This part of BELL PR is not available in this build yet.",
 };
 
 export default understanding;

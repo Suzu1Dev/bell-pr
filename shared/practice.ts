@@ -115,6 +115,22 @@ export function interleave<T extends Pick<PracticeItem, "repoId" | "dimension">>
   return result;
 }
 
+/** PATCH /api/runs/:id/feedback-tags */
+export interface FeedbackTagInput {
+  /** The feedback item's URL. */
+  url: string;
+  dimension?: TasteDimension;
+  predicted?: boolean;
+  lesson?: string;
+}
+
+/** POST /api/runs/:id/practice: one answered practice item. */
+export interface PracticeAnswerInput {
+  key: string;
+  confidence: Confidence;
+  grade: SelfGrade;
+}
+
 /** What learningCounts reads of a run. */
 export interface CountedRun {
   status: string;
