@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { DiffFile, Run } from "../types";
 import { maskPath } from "../app/presentation";
+import { closeCheckPanel, openCheckPanel, type Understanding } from "../app/hooks/useUnderstanding";
 import { ChangesTab, WorktreeHint } from "./ChangesTab";
 
 type Props = Parameters<typeof ChangesTab>[0];
@@ -193,4 +194,70 @@ test("a run whose files were cleaned up says so instead of offering its folder",
   assert.match(html, /Reports and notes are kept\./);
   assert.doesNotMatch(html, /worktree-hint/);
   assertNoHan(html);
+});
+
+/** The check as useUnderstanding reports it. */
+const understanding = (fields: Partial<Understanding> = {}) =>
+  ({
+    view: undefined,
+    required: true,
+    passed: false,
+    off: false,
+    tryFirst: true,
+    error: undefined,
+    refresh() {},
+    async saveAnswers() {},
+    async saveGrades() {},
+    async confirmSummary() {},
+    async restart() {},
+    async saveForecast() {},
+    async saveAttempt() {},
+    ...fields,
+  }) as Understanding;
+
+test("the Changes header offers the check before every file is ticked", () => {
+  const html = renderEn(element({ understanding: understanding() }));
+  // Under the file list's heading, before the files: it adds no stop between
+  // the file list and the explanation.
+  assert.match(html, /<\/div><button type="button" class="check-link">.*Take the check now<\/button><label class="file-search">/);
+  assert.match(
+    renderEn(element({ understanding: understanding({ passed: true }) })),
+    /class="check-link">.*Open your check<\/button>/,
+  );
+  // Only a run waiting for review or approval takes the check.
+  assert.doesNotMatch(
+    renderEn(element({ run: { ...run, status: "published" }, understanding: understanding() })),
+    /check-link/,
+  );
+  assertNoHan(html);
+});
+
+test("every file ticked: the hint points at the check, unless it is off or passed", () => {
+  const ticked = (fields: Partial<Understanding>) =>
+    renderEn(element({ allReviewed: true, reviewedCount: 2, understanding: understanding(fields) }));
+  assert.match(ticked({}), /Every file reviewed\. Next: explain it back\./);
+  assert.match(ticked({ required: false, off: true }), /<small>Every file reviewed\.<\/small>/);
+  assert.match(ticked({ passed: true }), /<small>Every file reviewed\.<\/small>/);
+  assert.match(
+    renderEn(element()),
+    /Once you have read a file and its explanation, mark it as reviewed\./,
+  );
+});
+
+test("while the check is open it takes the explanation's place: closed book", () => {
+  try {
+    openCheckPanel(run.id);
+    const html = renderEn(element({ understanding: understanding() }));
+    assert.match(html, /<div class="check-wrap">/);
+    assert.doesNotMatch(html, /check-link/);
+    // The explanation panel is not mounted at all, so no note or reference can show.
+    assert.doesNotMatch(html, /explain-panel/);
+    // Another run's workspace keeps its explanation.
+    assert.doesNotMatch(
+      renderEn(element({ run: { ...run, id: "run-2" }, understanding: understanding() })),
+      /check-wrap/,
+    );
+  } finally {
+    closeCheckPanel();
+  }
 });

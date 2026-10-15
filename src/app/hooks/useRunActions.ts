@@ -1029,6 +1029,8 @@ export function useRunActions({
     }
   }
   return {
+    setRun,
+    notify,
     plan,
     exporting,
     exportLearning,

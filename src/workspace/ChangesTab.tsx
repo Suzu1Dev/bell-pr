@@ -27,6 +27,7 @@ import {
   RefreshCw,
   Search,
   Sparkles,
+  SquarePen,
   X,
 } from "lucide-react";
 import { useT } from "../i18n";
@@ -41,12 +42,20 @@ import { useRovingList } from "../a11y/useRovingList";
 import { fileStatusLabel } from "../app/labels";
 import { usePresentation } from "../app/presentation";
 import type { RunActions } from "../app/hooks/useRunActions";
+import {
+  closeCheckPanel,
+  openCheckPanel,
+  useCheckPanel,
+  type Understanding,
+} from "../app/hooks/useUnderstanding";
 
 const ExplanationPanel = lazy(() =>
   import("../review/ExplanationPanel").then((module) => ({
     default: module.ExplanationPanel,
   })),
 );
+/** The Explain-it-back check, loaded the same way. */
+const UnderstandingCheck = lazy(() => import("./UnderstandingCheck"));
 
 interface ChangesTabProps {
   run: Run;
@@ -103,6 +112,8 @@ interface ChangesTabProps {
     | "saveNote"
     | "ask"
   >;
+  /** The Explain-it-back check of the run (useUnderstanding). */
+  understanding?: Understanding;
 }
 
 /** The code review tab: changed files, the diff and the explanation panel. */
@@ -142,6 +153,7 @@ export function ChangesTab({
   explanationRequests,
   prepareExplanations,
   actions,
+  understanding,
 }: ChangesTabProps) {
   const workspace = useT("workspace");
   const t = workspace.changes;
@@ -161,6 +173,19 @@ export function ChangesTab({
     ask,
   } = actions;
   const { present, maskPath } = usePresentation();
+  // Closed book: while the check is open it takes the explanation's place,
+  // and questions to the agent wait until it closes.
+  const checkMode = useCheckPanel(run.id);
+  const checking = !!understanding && !!checkMode;
+  const [askWaiting, setAskWaiting] = useState(false);
+  useEffect(() => {
+    if (!checking) {
+      setAskWaiting(false);
+      return;
+    }
+    setShowExplanation(true);
+    setFocusMode(false);
+  }, [checking, setShowExplanation, setFocusMode]);
   const reviewGridRef = useRef<HTMLDivElement>(null);
   // On a phone the file search hides behind an icon button; a query keeps it open.
   const [searchOpen, setSearchOpen] = useState(false);
@@ -254,6 +279,13 @@ export function ChangesTab({
               {searchShown ? <X size={15} /> : <Search size={15} />}
             </button>
           </div>
+          {/* Test out: the check before every file is ticked (the ticks stay required). */}
+          {understanding && !checking && ["review", "approved"].includes(run.status) && !run.publishing && (
+            <button type="button" className="check-link" onClick={() => openCheckPanel(run.id)}>
+              <SquarePen size={14} aria-hidden="true" />
+              {understanding.passed ? t.openCheck : t.takeCheck}
+            </button>
+          )}
           <label className="file-search">
             <Search size={14} />
             <input
@@ -362,7 +394,11 @@ export function ChangesTab({
               />
             </div>
             <small>
-              {allReviewed ? t.allReviewed : t.reviewHint}
+              {!allReviewed
+                ? t.reviewHint
+                : understanding?.required && !understanding.passed
+                  ? t.allReviewed
+                  : t.allReviewedDone}
             </small>
           </div>
         </aside>
@@ -484,7 +520,7 @@ export function ChangesTab({
             file={file}
             reviewed={run.reviewedFiles.includes(file.path)}
             onReview={reviewFile}
-            onAsk={ask}
+            onAsk={checking ? () => setAskWaiting(true) : ask}
             view={diffView}
             hasNote={Boolean(run.notes?.[file.path]?.text)}
           />
@@ -515,7 +551,7 @@ export function ChangesTab({
           </div>
         )}
       </section>
-      {showExplanation && (
+      {(showExplanation || checking) && (
         <>
           <div
             className="pane-resizer"
@@ -543,7 +579,39 @@ export function ChangesTab({
             }}
           />
           <aside className="explanation-wrap">
-            {file ? (
+            {checking && understanding ? (
+              <div className="check-wrap">
+                {askWaiting && <p className="check-ask-waiting" role="status">{t.closedBookAsk}</p>}
+                <ErrorBoundary resetKey={`${run.id}:check`}>
+                  <Suspense
+                    fallback={
+                      <div className="empty-state" role="status">
+                        <Loader2 className="spin" />
+                        <p>{t.loadingPanel}</p>
+                      </div>
+                    }
+                  >
+                    <UnderstandingCheck
+                      run={run}
+                      files={files}
+                      view={understanding.view}
+                      demo={demo}
+                      check={understanding}
+                      mode={checkMode}
+                      repo={currentRepo}
+                      onClose={closeCheckPanel}
+                      onPassed={() => {
+                        if (checkMode === "forecast") closeCheckPanel();
+                      }}
+                      onOpenFile={(path) => {
+                        closeCheckPanel();
+                        setSelectedPath(path);
+                      }}
+                    />
+                  </Suspense>
+                </ErrorBoundary>
+              </div>
+            ) : file ? (
               <ErrorBoundary resetKey={`${run.id}:${file.path}`}>
                 <Suspense
                   fallback={
@@ -591,6 +659,13 @@ export function ChangesTab({
                       reviewRerunning || rerunRequests.has(run.id)
                     }
                     runLocale={run.locale}
+                    attempt={run.attempts?.[file.path]}
+                    onAttempt={
+                      understanding && (editable || (demo && ["review", "approved"].includes(run.status)))
+                        ? (input) => understanding.saveAttempt(file, input)
+                        : undefined
+                    }
+                    tryFirst={understanding?.tryFirst ?? true}
                   />
                 </Suspense>
               </ErrorBoundary>

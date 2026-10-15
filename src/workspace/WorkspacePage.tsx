@@ -27,6 +27,7 @@ import type { Tab } from "../app/AppShell";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
 import type { RunActions } from "../app/hooks/useRunActions";
 import type { RunRounds } from "../app/hooks/useRunRounds";
+import { useUnderstanding } from "../app/hooks/useUnderstanding";
 import { ActivityTab } from "./ActivityTab";
 import { ChangesTab } from "./ChangesTab";
 import { DraftTab } from "./DraftTab";
@@ -153,6 +154,8 @@ export function WorkspacePage({
   const { draftDirty, draftUnfinished, followUp, commitMessageUnfinished } =
     draft;
   const { approve, plan, exporting, exportLearning } = actions;
+  // The Explain-it-back check of this run.
+  const understanding = useUnderstanding(run, files, { demo, setRun: actions.setRun });
   // The sample's playback queues for a moment behind nothing.
   const queuedOnFree =
     !demo &&
@@ -412,6 +415,7 @@ export function WorkspacePage({
               explanationRequests={explanationRequests}
               prepareExplanations={prepareExplanations}
               actions={actions}
+              understanding={understanding}
             />
           )}
           {tab === "activity" && (
