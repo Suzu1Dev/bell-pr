@@ -130,8 +130,13 @@ test.describe("the sample project", () => {
     await expect(page.locator(".reviewability-band").first()).toHaveText(
       draft.reviewability.band({ band: draft.reviewability.bands.small }),
     );
-    for (const id of ["rules", "door", "issue", "pacing", "words", "reviewability", "disclosure"])
+    for (const id of ["rules", "door", "issue", "pacing", "reviewability", "disclosure"])
       await expect(page.locator(`.draft-checklist-row[data-row="${id}"]`)).toHaveClass(/is-ok/);
+    // The untouched sample has no suggested description yet: BELL PR has
+    // nothing to compare its words with, and never says whose they are.
+    const words = page.locator('.draft-checklist-row[data-row="words"]');
+    await expect(words).toHaveClass(/is-unknown/);
+    await expect(words).toContainText(draft.guidance.checklist.wordsUnknown);
   });
 
   for (const width of widths)

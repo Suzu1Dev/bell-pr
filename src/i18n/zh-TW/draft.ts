@@ -143,7 +143,8 @@ const m: Translation<typeof en> = {
       pacing: ({ open, budget }) =>
         `你在這裡開著的 PR：${fmt.number(open)} / ${fmt.number(budget)}（${product.name} 預設值，所有方案都一樣）。`,
       pacingExempt: "你可以寫入這個 repository，所以在這裡發布不受節奏限制。",
-      wordsOk: `說明已經不是 ${product.name} 建議的文字。`,
+      wordsOk: `說明不是 ${product.name} 建議的文字。它是不是用你自己的話寫出你理解的內容，只有你能判斷。`,
+      wordsUnknown: `${product.name} 沒有建議的說明可以比對。請確認它是用你自己的話寫出你理解的內容。`,
       reviewable: ({ band, lines, files }) =>
         `依 ${product.name} 的預設分級為「${band}」：${fmt.number(files)} 個檔案共 ${fmt.number(lines)} 行變更。`,
       disclosureRequired: "專案要求揭露，而說明裡已經寫了。",

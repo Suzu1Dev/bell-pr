@@ -120,6 +120,11 @@ export interface ChecklistInput {
   issueUrl?: string;
   /** The project's disclosure rule from the draft's sources, when it has one. */
   disclosureRule?: DraftRuleQuote;
+  /**
+   * BELL PR's suggested description exists, so the checks compared the
+   * description with it. Without one, nothing says whose words it is.
+   */
+  suggestion?: boolean;
 }
 
 /** The reason each part of the facts could not be read, by part. */
@@ -266,10 +271,13 @@ export function checklistRows(
         sources: [],
       };
     }),
+    // BELL PR can tell its suggested wording apart, never who wrote the rest.
     row("words", () =>
-      checks
-        ? { status: "ok", lines: [m.wordsOk], sources: [] }
-        : { status: "unknown", lines: [m.draftUnknown], sources: [] },
+      !checks
+        ? { status: "unknown", lines: [m.draftUnknown], sources: [] }
+        : input.suggestion
+          ? { status: "ok", lines: [m.wordsOk], sources: [] }
+          : { status: "unknown", lines: [m.wordsUnknown], sources: [] },
     ),
     row("reviewability", () =>
       changes

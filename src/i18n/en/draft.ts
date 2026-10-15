@@ -185,7 +185,8 @@ const draft = {
       pacing: ({ open, budget }: { open: number; budget: number }) =>
         `Your open PRs here: ${fmt.number(open)} of ${fmt.number(budget)} (${product.name} default, the same on every plan).`,
       pacingExempt: "You can write to this repository, so publishing isn't paced here.",
-      wordsOk: `The description is no longer ${product.name}'s suggested wording.`,
+      wordsOk: `The description isn't ${product.name}'s suggested wording. Only you can tell whether it says what you understood, in your own words.`,
+      wordsUnknown: `${product.name} has no suggested description to compare with. Check that it says what you understood, in your own words.`,
       reviewable: ({ band, lines, files }: { band: string; lines: number; files: number }) =>
         `${band} by ${product.name}'s default bands: ${fmt.number(lines)} changed lines in ${fmt.plural(files) === "one" ? "1 file" : `${fmt.number(files)} files`}.`,
       disclosureRequired:

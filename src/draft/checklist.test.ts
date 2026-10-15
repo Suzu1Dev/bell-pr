@@ -48,6 +48,7 @@ const full: ChecklistInput = {
   changes,
   issueUrl,
   understanding: { required: true, passed: true, off: false },
+  suggestion: true,
 };
 
 test("the sample's checks are all clear, so every row is green", () => {
@@ -66,6 +67,18 @@ test("the sample's checks are all clear, so every row is green", () => {
   assert.match(byId.reviewability.lines[0], /^Small by BELL PR's default bands: \d+ changed lines in \d+ files\.$/);
   assert.deepEqual(byId.disclosure.lines, ["The project asks for a disclosure, and the description has one."]);
   assert.deepEqual(byId.understanding.lines, ["You explained the change back."]);
+  // The sample's description was never edited: the row says what was compared, not who wrote it.
+  assert.deepEqual(byId.words.lines, [
+    "The description isn't BELL PR's suggested wording. Only you can tell whether it says what you understood, in your own words.",
+  ]);
+});
+
+test("without a suggested description to compare with, the words row couldn't check", () => {
+  const words = rows({ ...full, suggestion: false }).find((row) => row.id === "words")!;
+  assert.equal(words.status, "unknown");
+  assert.deepEqual(words.lines, [
+    "BELL PR has no suggested description to compare with. Check that it says what you understood, in your own words.",
+  ]);
 });
 
 test("without checks or facts every row says it couldn't check, never OK", () => {

@@ -262,6 +262,7 @@ export function DraftGuidancePanel({
       understanding,
       issueUrl,
       disclosureRule: disclosureRequirement,
+      suggestion: !!proposal?.body.trim(),
     },
     t.checklist,
     fmt,
