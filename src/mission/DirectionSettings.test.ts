@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
-import { createElement } from "react";
+import { act, createElement } from "react";
 import {
   defaultContributionSettings,
   type ContributionSettings,
@@ -17,6 +17,7 @@ import {
   loadModelCatalog,
   type DirectionSettingsProps,
 } from "./DirectionSettings";
+import type { StartCheck } from "./StartConfirm";
 import { mount } from "./test-dom";
 
 const props = (
@@ -408,4 +409,35 @@ test("the efficiency setting is named Efficiency mode, with the Ponytail credit 
   assert.doesNotMatch(html, /development mode/);
   assert.match(renderZh(props()), />效率模式<\/label>/);
   assert.match(renderZh(props()), /「模型預設」會使用模型本身的預設強度。/);
+});
+
+test("the task dialog's form shows the Before-you-start facts under the issue field; the settings defaults do not", async () => {
+  const urls = stubApi();
+  const reports: StartCheck[] = [];
+  const view = await mount(
+    props({}, { demo: true, repoId: "demo-repo", onStartCheck: (check) => reports.push(check) }),
+  );
+  try {
+    // The facts load with their own chunk.
+    for (let tries = 0; tries < 60 && !view.text().includes("Before you start"); tries++)
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+    assert.ok(view.text().includes("Before you start#42 (sample)"), view.text());
+    assert.ok(view.text().includes("Your open PRs here: 0 of 1"));
+    assert.deepEqual(reports.at(-1)?.reasons, []);
+    assert.ok(!urls.some((url) => url.includes("contribution")), urls.join());
+  } finally {
+    await view.unmount();
+  }
+  stubApi();
+  const defaults = await mount(props({}, { demo: true }));
+  try {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+    assert.ok(!defaults.text().includes("Before you start"));
+  } finally {
+    await defaults.unmount();
+  }
 });

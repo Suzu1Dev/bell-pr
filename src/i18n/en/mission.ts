@@ -520,6 +520,82 @@ const mission = {
     sample:
       "Sample: the project and its CONTRIBUTING.md are fictional, and nothing was read from GitHub.",
   },
+  /**
+   * BeforeYouStart, under the task dialog's issue field: the issue's state,
+   * who is on it and the person's open pull requests here, read once per
+   * issue link. Nothing here stops a run from starting.
+   */
+  start: {
+    title: "Before you start",
+    lead: "Read once for this issue link. Nothing here stops you from practising; publishing checks again.",
+    noIssue: `Link the issue you will work on, and ${product.name} checks that it is still open and that nobody else is on it.`,
+    notGitHub:
+      "Issue facts are read for GitHub issue links, such as https://github.com/owner/repo/issues/123.",
+    checking: "Checking the issue on GitHub…",
+    issue: ({ number }: { number: number }) => `Issue #${number}`,
+    sampleIssue: ({ number }: { number: number }) => `#${number} (sample)`,
+    open: "Open",
+    closed: ({ reason }: { reason?: string }) =>
+      reason ? `Closed (${reason})` : "Closed",
+    closedReasons: {
+      COMPLETED: "completed",
+      NOT_PLANNED: "not planned",
+      DUPLICATE: "duplicate",
+    } as Record<string, string>,
+    unassigned: "Unassigned",
+    assigned: ({ names }: { names: string[] }) =>
+      `Assigned to ${fmt.list(names.map((name) => `@${name}`))}`,
+    claimed: ({ author, date, bot }: { author: string; date: string; bot: boolean }) =>
+      bot
+        ? `Claimed by @${author} (a bot) on ${date}`
+        : `Claimed by @${author} on ${date}`,
+    noOtherPr: "No other open PR",
+    otherPr: ({ author, number }: { author: string; number: number }) =>
+      `@${author}'s PR #${number} would close this`,
+    closedPr: ({ author, number }: { author: string; number: number }) =>
+      `@${author}'s PR #${number} was closed without merging`,
+    maintainer: ({ quote, date }: { quote: string; date: string }) =>
+      `A maintainer said: “${quote}” (${date})`,
+    learning: ({ labels }: { labels: string[] }) =>
+      `Labelled for newcomers: ${fmt.list(labels)}`,
+    pacing: ({ open, budget }: { open: number; budget: number }) =>
+      `Your open PRs here: ${n(open)} of ${n(budget)}`,
+    pacingHelp: `The budget is a ${product.name} default, the same on every plan: 1 open pull request before your first one is merged in a repository, 2 after.`,
+    pacingExempt: "You can write to this repository, so publishing isn't paced here",
+    doorClosed: "This repository doesn't take pull requests from you",
+    ban: "The project's rules don't accept AI-assisted contributions",
+    unknown: ({ part, reason }: { part: "door" | "issue" | "pacing" | "other"; reason?: string }) => {
+      const what = {
+        door: "whether pull requests are open to you",
+        issue: "the issue",
+        pacing: "your open pull requests here",
+        other: "a GitHub fact",
+      }[part];
+      return reason ? `Couldn't check ${what}: ${reason}` : `Couldn't check ${what}`;
+    },
+    couldntCheck: ({ reason }: { reason: string }) => `Couldn't check: ${reason}`,
+    checkAgain: "Check again",
+    sample: "Sample facts; nothing was read from GitHub.",
+  },
+  /** The task dialog asks once before Start when the facts say publishing will wait. */
+  startConfirm: {
+    title: "Before the team starts",
+    practise: {
+      "issue-closed": `You can practise this locally; ${product.name} won't publish it while the linked issue is closed.`,
+      door: `You can practise this locally; ${product.name} won't publish it while this repository doesn't take pull requests from you.`,
+      ban: `You can practise this locally; ${product.name} won't publish it while the project's rules don't accept AI-assisted contributions.`,
+      area: `You can practise this locally; ${product.name} won't publish it while the project keeps issues labelled for newcomers for people who write the fix by hand.`,
+    },
+    otherPr: ({ author, number }: { author: string; number: number }) =>
+      `You can practise this locally; ${product.name} won't publish it while @${author}'s pull request #${n(number)} would close the same issue, unless you give your reason when you publish.`,
+    pacing: ({ open, budget }: { open: number; budget: number }) =>
+      `You can practise this locally; ${product.name} won't publish it while you have ${n(open)} open pull requests here, at least twice your budget of ${n(budget)}.`,
+    lesson:
+      "Issues labelled for newcomers are how people learn a project by writing the fix themselves. When an agent team takes one, the next newcomer loses that chance. Consider a help-wanted issue instead.",
+    practiseLocally: "Start and practise locally",
+    startAnyway: "Start anyway",
+    back: "Back",
+  },
 };
 
 export default mission;

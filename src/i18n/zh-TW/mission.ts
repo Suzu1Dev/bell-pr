@@ -384,6 +384,69 @@ const m: Translation<typeof en> = {
     checking: "正在確認…",
     sample: "示範：這個專案與它的 CONTRIBUTING.md 都是虛構的，沒有讀取 GitHub。",
   },
+  start: {
+    title: "開始之前",
+    lead: "每個 issue 連結只讀取一次。這裡的內容不會阻止你練習；發布時會再確認一次。",
+    noIssue: `連結你要處理的 issue，${product.name} 會確認它仍開著，而且沒有別人在做。`,
+    notGitHub:
+      "只有 GitHub issue 連結會讀取 issue 資訊，例如 https://github.com/owner/repo/issues/123。",
+    checking: "正在到 GitHub 確認這個 issue…",
+    issue: ({ number }) => `Issue #${number}`,
+    sampleIssue: ({ number }) => `#${number}（示範）`,
+    open: "開著",
+    closed: ({ reason }) => (reason ? `已關閉（${reason}）` : "已關閉"),
+    closedReasons: {
+      COMPLETED: "已完成",
+      NOT_PLANNED: "不打算處理",
+      DUPLICATE: "重複",
+    },
+    unassigned: "尚未指派",
+    assigned: ({ names }) => `已指派給 ${fmt.list(names.map((name) => `@${name}`))}`,
+    claimed: ({ author, date, bot }) =>
+      bot
+        ? `@${author}（機器人）在 ${date} 認領`
+        : `@${author} 在 ${date} 認領`,
+    noOtherPr: "沒有其他開著的 PR",
+    otherPr: ({ author, number }) => `@${author} 的 PR #${number} 會關閉這個 issue`,
+    closedPr: ({ author, number }) => `@${author} 的 PR #${number} 未合併就被關閉`,
+    maintainer: ({ quote, date }) => `維護者說：「${quote}」（${date}）`,
+    learning: ({ labels }) => `新手標籤：${fmt.list(labels)}`,
+    pacing: ({ open, budget }) => `你在這裡開著的 PR：${n(open)} / ${n(budget)}`,
+    pacingHelp: `這個上限是 ${product.name} 的預設值，所有方案都一樣：在一個 repository 第一次被合併前為 1 個，之後為 2 個。`,
+    pacingExempt: "你可以寫入這個 repository，所以在這裡發布不受節奏限制",
+    doorClosed: "這個 repository 不接受你開的 Pull Request",
+    ban: "專案規範不接受 AI 協助的貢獻",
+    unknown: ({ part, reason }) => {
+      const what = {
+        door: "Pull Request 是否對你開放",
+        issue: "這個 issue",
+        pacing: "你在這裡開著的 Pull Request",
+        other: "一項 GitHub 資訊",
+      }[part];
+      return reason ? `無法確認${what}：${reason}` : `無法確認${what}`;
+    },
+    couldntCheck: ({ reason }) => `無法確認：${reason}`,
+    checkAgain: "再確認一次",
+    sample: "示範資料，沒有讀取 GitHub。",
+  },
+  startConfirm: {
+    title: "團隊開始之前",
+    practise: {
+      "issue-closed": `你可以在本機練習；只要連結的 issue 仍是關閉的，${product.name} 就不會發布它。`,
+      door: `你可以在本機練習；只要這個 repository 不接受你開的 Pull Request，${product.name} 就不會發布它。`,
+      ban: `你可以在本機練習；只要專案規範不接受 AI 協助的貢獻，${product.name} 就不會發布它。`,
+      area: `你可以在本機練習；專案把有新手標籤的 issue 留給親手寫修正的人，所以 ${product.name} 不會發布它。`,
+    },
+    otherPr: ({ author, number }) =>
+      `你可以在本機練習；只要 @${author} 的 Pull Request #${n(number)} 會關閉同一個 issue，${product.name} 就不會發布它，除非你在發布時寫下理由。`,
+    pacing: ({ open, budget }) =>
+      `你可以在本機練習；你在這裡有 ${n(open)} 個開著的 Pull Request，至少是上限 ${n(budget)} 的兩倍，在這之前 ${product.name} 不會發布它。`,
+    lesson:
+      "有新手標籤的 issue，是新手親手寫修正、認識專案的入口。交給 agent 團隊做，下一位新手就少了這個機會。可以考慮改做標有 help wanted 的 issue。",
+    practiseLocally: "開始，在本機練習",
+    startAnyway: "仍要開始",
+    back: "返回",
+  },
 };
 
 export default m;
