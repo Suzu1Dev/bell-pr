@@ -108,7 +108,7 @@ export function PracticeCard({
   item: PracticeItem;
   repoName: string;
   record: RecordPractice;
-  /** Opens the run at the file; absent for the sample's items in tests. */
+  /** Opens the run at the file, for "Study it in the code". */
   onOpen: (runId: string, path: string) => void;
   onNext: () => void;
   /** The session's last item: its button reads Done. */
