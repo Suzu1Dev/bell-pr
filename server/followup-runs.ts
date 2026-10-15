@@ -13,7 +13,14 @@ import { git, redact } from "./process.js";
 import { readDiff } from "./git.js";
 import { AppError, withRunLocale, type Run } from "./types.js";
 import type { TeamCheck } from "../shared/team.js";
-import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
+import {
+  activeFollowUp,
+  followUpRestatementLimit,
+  type FollowUpRestatement,
+  type FollowUpRound,
+  type FollowUpStartInput,
+} from "../shared/followups.js";
+import { understandingWords } from "../shared/understanding.js";
 import { followUpJsonSchema, parseFollowUpResult } from "./followups.js";
 import {
   adoptRemoteCommits,
@@ -35,16 +42,59 @@ import type { WorkbenchContext } from "./workbench.js";
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
 
+/** A restatement holds at least this many words, counted as the check counts them (DESIGN §5.5). */
+const restatementMinWords = 3;
+
+/**
+ * The person's restatement of each selected comment, in the order of the
+ * selection: exactly one per comment, at least 3 words and at most 300
+ * characters each. Anything else is refused with 422.
+ */
+function checkRestatements(
+  feedbackUrls: string[],
+  given: FollowUpRestatement[],
+): FollowUpRestatement[] {
+  const refused = () =>
+    new AppError(
+      (m) =>
+        m.understanding.restatementRequired({
+          min: restatementMinWords,
+          max: followUpRestatementLimit,
+        }),
+      422,
+    );
+  const texts = new Map<string, string>();
+  for (const entry of given) {
+    const text = entry.text.trim();
+    if (
+      !feedbackUrls.includes(entry.url) ||
+      texts.has(entry.url) ||
+      understandingWords(text) < restatementMinWords ||
+      text.length > followUpRestatementLimit
+    )
+      throw refused();
+    texts.set(entry.url, text);
+  }
+  if (feedbackUrls.some((url) => !texts.has(url))) throw refused();
+  return feedbackUrls.map((url) => ({ url, text: texts.get(url)! }));
+}
+
 /**
  * Starts a round of changes on a published PR from the maintainer feedback
  * the person selected. One writable agent edits the run's checkout, which
  * still holds the pushed PR head; the person then reviews, approves and
  * pushes the result as one more commit on the same branch.
+ *
+ * Each selected comment needs the person's restatement in their own words,
+ * which becomes the agent's task. The route always passes `restatements`
+ * (an empty list when the request had none); a caller that leaves the
+ * field out entirely is code written before restatements existed, and its
+ * round is started as before.
  */
 export async function startFollowUp(
   ctx: WorkbenchContext,
   id: string,
-  input: { feedbackUrls: string[]; note?: string },
+  input: FollowUpStartInput,
 ) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   return ctx.lock(id, async () => {
@@ -70,6 +120,10 @@ export async function startFollowUp(
     const note = input.note?.trim();
     if (!feedbackUrls.length && !note)
       throw new AppError((m) => m.run.followUp.inputRequired, 422);
+    const restatements =
+      input.restatements === undefined
+        ? undefined
+        : checkRestatements(feedbackUrls, input.restatements);
     // The checkout must still be exactly the pushed PR head.
     const head = (
       await git(run.worktreePath, ["rev-parse", "HEAD"])
@@ -85,6 +139,7 @@ export async function startFollowUp(
       requestedAt: now(),
       feedbackUrls,
       ...(note ? { note } : {}),
+      ...(restatements?.length ? { restatements } : {}),
       status: "running",
       parentCommit: run.publishCommit,
     };
@@ -204,6 +259,7 @@ async function runFollowUp(
         },
         previousCommitMessage,
         feedback,
+        restatements: round.restatements,
         note: round.note,
         changedFiles: files.map((file) => file.path),
       }),

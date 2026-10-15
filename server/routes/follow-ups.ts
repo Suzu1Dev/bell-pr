@@ -12,8 +12,9 @@ import type { RouteDeps } from "./types.js";
  * Review follow-up rounds on a published PR: starting one from the selected
  * maintainer feedback and discarding the one waiting for review. Pushing a
  * round goes through POST /api/runs/:id/publish like a first publish.
- * Starting a round is Pro (prFeedback); a round that is already open can
- * still be discarded, reviewed and pushed on every plan.
+ * Starting a round is Pro (prFeedback) and needs the person's restatement
+ * of each selected comment; a round that is already open can still be
+ * discarded, reviewed and pushed on every plan.
  */
 export function registerFollowUpsRoutes(
   app: Express,
@@ -26,9 +27,9 @@ export function registerFollowUpsRoutes(
           .array(z.string().url().max(1024))
           .max(followUpFeedbackLimit),
         note: z.string().max(followUpNoteLimit).optional(),
-        // One line per selected comment in the person's own words; accepted
-        // here so clients can send it, and required once restatements are
-        // enforced (L2A).
+        // One line per selected comment in the person's own words. Optional
+        // here, so a request without selected comments needs none;
+        // startFollowUp requires one per selected comment.
         restatements: z
           .array(
             z
@@ -43,7 +44,13 @@ export function registerFollowUpsRoutes(
       })
       .strict()
       .parse(req.body);
-    res.json({ run: await workbench.startFollowUp(req.params.id, input) });
+    res.json({
+      run: await workbench.startFollowUp(req.params.id, {
+        ...input,
+        // A request without the field restated nothing (see startFollowUp).
+        restatements: input.restatements ?? [],
+      }),
+    });
   });
   app.post("/api/runs/:id/follow-ups/discard", async (req, res) => {
     res.json({ run: await workbench.discardFollowUp(req.params.id) });

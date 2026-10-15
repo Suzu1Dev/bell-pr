@@ -33,6 +33,8 @@ const understanding: Translation<typeof en> = {
   feedbackTagEmpty: "請送出一個品味面向、「早就料到」或「出乎意料」，或一句教訓。",
   feedbackTagUnknown: "這則留言不在最近一次讀取的回饋裡。請重新讀取回饋後再標記。",
   practiceKeyUnknown: "這個練習項目已經不屬於這份工作。請重新載入練習。",
+  restatementRequired: ({ min, max }) =>
+    `請用自己的話，替每則選取的留言寫一行維護者要求的內容：每則至少 ${min} 個字、最多 ${max} 個字元。`,
   debriefNoRecords:
     "還沒有可以回顧的內容。請先在這個專案的工作上完成理解檢查，或讀取並標記維護者回饋。",
   debriefInvalid: "教練的回覆不完整或格式不符，所以沒有儲存。請再試一次。",
