@@ -89,6 +89,32 @@ test("weakened tests: a deleted test file, added skips and removed assertions", 
   );
 });
 
+test("weakened tests: an edited assertion is not a removed one, a loosened one is", () => {
+  const ids = (lines: string[]) =>
+    weakenedTests([changed("tests/retry.test.ts", lines)]).map((item) => [item.id, item.text]);
+  // A new expected value: one assertion out, one in.
+  assert.deepEqual(ids(["-  expect(result.attempts).toBe(3);", "+  expect(result.attempts).toBe(4);"]), []);
+  assert.deepEqual(ids(["-    assert result == 2", "+    assert result == 3"]), []);
+  // Two out and one in: one assertion is gone.
+  assert.deepEqual(
+    ids(["-  expect(a).toBe(1);", "-  expect(b).toBe(2);", "+  expect(a).toBe(3);"]),
+    [["tests/retry.test.ts#-2", "expect(b).toBe(2);"]],
+  );
+  // A strict check replaced by one that checks almost nothing.
+  assert.deepEqual(
+    ids(["-  expect(result.attempts).toBe(3);", "+  expect(result.attempts).toBeDefined();"]),
+    [["tests/retry.test.ts#-1", "expect(result.attempts).toBe(3);"]],
+  );
+  // An assertion added in another hunk does not replace this one.
+  const twoHunks = weakenedTests([
+    {
+      path: "tests/retry.test.ts",
+      patch: "--- a/f\n+++ b/f\n@@ -5,1 +5,0 @@\n-  expect(a).toBe(1);\n@@ -40,0 +39,1 @@\n+  expect(b).toBe(2);\n",
+    },
+  ]);
+  assert.deepEqual(twoHunks.map((item) => item.id), ["tests/retry.test.ts#-5"]);
+});
+
 test("new dependencies are added manifest entries, not version bumps", () => {
   const deps = newDependencies([
     changed("package.json", [

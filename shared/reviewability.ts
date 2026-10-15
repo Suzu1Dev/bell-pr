@@ -234,12 +234,47 @@ const skipPattern =
   /\.only\s*\(|\.skip\s*\(|\b(?:it|test|describe)\.(?:skip|only)\b|\bx(?:it|test|describe)\s*\(|pytest\.mark\.(?:skip|skipif|xfail)\b|\bxfail\b|@(?:Ignore|Disabled)\b|#\[ignore\]|\bt\.Skip(?:Now|f)?\(|\bunittest\.skip\w*\b|\bself\.skipTest\(/;
 /** Removed lines that asserted something. */
 const assertionPattern = /\bassert\w*\b|\bexpect\s*\(|\bshould\.|\.should\b|\bt\.(?:Error|Fatal)f?\(/;
+/** Assertions that check almost nothing, so they do not replace a stricter one. */
+const looseAssertion =
+  /\.(?:toBeDefined|toBeTruthy)\s*\(\s*\)|\.not\.toThrow\s*\(\s*\)|\bexpect\s*\(\s*true\s*\)|\bassert(?:\.ok)?\s*\(\s*true\s*\)|\bassert\s+True\b/;
+
+/**
+ * The removed assertions of one hunk that no added assertion replaces.
+ * Editing an assertion (a new expected value) removes and adds a line, so
+ * each added assertion stands for one removed line; a loose one
+ * (`toBeDefined()`, `assert True`) stands only for a removed loose one.
+ */
+function unreplacedAssertions(lines: readonly PatchLine[]) {
+  const removed = lines.filter(
+    (line) => line.kind === "-" && assertionPattern.test(line.text),
+  );
+  const added = lines.filter(
+    (line) => line.kind === "+" && assertionPattern.test(line.text),
+  );
+  let strict = added.filter((line) => !looseAssertion.test(line.text)).length;
+  let loose = added.length - strict;
+  const unreplaced = new Set<PatchLine>();
+  for (const line of removed) {
+    if (!looseAssertion.test(line.text)) continue;
+    if (loose) loose--;
+    else if (strict) strict--;
+    else unreplaced.add(line);
+  }
+  for (const line of removed) {
+    if (looseAssertion.test(line.text)) continue;
+    if (strict) strict--;
+    else unreplaced.add(line);
+  }
+  return unreplaced;
+}
 
 /**
  * Changes that weaken a project's tests (DESIGN F9): deleted test files,
  * added skips (`.only`, `.skip(`, `it.skip`, `xit`, `pytest.mark.skip`,
  * `xfail`, `@Ignore`, `#[ignore]`, `t.Skip(`) and removed `assert` or
- * `expect(` lines in test files. Publishing waits until each has a reason.
+ * `expect(` lines in test files that no assertion of the same hunk
+ * replaces, or that a loose one replaces. Publishing waits until each has
+ * a reason.
  */
 export function weakenedTests(
   files: readonly { path: string; status?: string; patch?: string }[],
@@ -256,10 +291,15 @@ export function weakenedTests(
       add(file.path, 0, "");
       continue;
     }
-    for (const line of patchLines(file.patch)) {
+    const lines = patchLines(file.patch);
+    const unreplaced = new Set<PatchLine>();
+    for (const hunk of new Set(lines.map((line) => line.hunk)))
+      for (const line of unreplacedAssertions(lines.filter((line) => line.hunk === hunk)))
+        unreplaced.add(line);
+    for (const line of lines) {
       if (line.kind === "+" && skipPattern.test(line.text))
         add(file.path, line.newLine ?? 0, line.text);
-      else if (line.kind === "-" && assertionPattern.test(line.text))
+      else if (unreplaced.has(line))
         add(file.path, line.oldLine ?? 0, line.text, true);
     }
   }
