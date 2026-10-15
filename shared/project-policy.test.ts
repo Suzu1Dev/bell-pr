@@ -110,6 +110,19 @@ test("a request to disclose AI assistance is a disclosure rule", () => {
   );
 });
 
+test("\"say so\" asks for a disclosure too, unless it says there is no need", () => {
+  const text = "If you used AI tools, say so in the PR description.";
+  assert.deepEqual(kinds("CONTRIBUTING.md", text), [["disclose", true]]);
+  assert.equal(
+    disclosureRule([{ id: "c", kind: "contributing", label: "CONTRIBUTING.md", content: text }])?.quote,
+    text,
+  );
+  assert.deepEqual(
+    kinds("CONTRIBUTING.md", "If you used AI tools, you don't need to say so."),
+    [],
+  );
+});
+
 test("a note addressed to AI agents, or about agents acting alone, is an agent finding", () => {
   const note = [
     "# Contributing",

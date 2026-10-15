@@ -412,6 +412,8 @@ const disclosurePattern = new RegExp(
     // "AI-assisted contributions must be disclosed", "LLM use should be noted",
     // "if you use AI tools, you must disclose it".
     `\\b${aiTerm}[^.\\n]{0,80}\\b(?:must|should|please|needs? to|has to|have to|is required to|are required to|shall)\\b(?:[^.\\n]{0,40}\\b${disclosedPassive}\\b|\\s+(?:\\w+\\s+)?${discloseVerb}\\b)`,
+    // "If you used AI tools, say so in the PR description."
+    `\\b${aiTerm}[^.\\n]{0,80}\\bsay so\\b`,
   ].join("|"),
   "i",
 );
@@ -431,7 +433,7 @@ const disclosureHeading =
 
 /** "Do not mention AI" and the like are not disclosure rules. */
 const negated =
-  /\b(?:do not|don't|never|no need to|not required to)\s+(?:\w+\s+){0,2}(?:disclos|declar|mention|state|indicate)/i;
+  /\b(?:do not|don't|never|no need to|not required to)\s+(?:\w+\s+){0,2}(?:disclos|declar|mention|state|indicate|say so)/i;
 
 /** Whether one line of prose asks contributors to disclose AI assistance. */
 const asksForDisclosure = (prose: string) =>
