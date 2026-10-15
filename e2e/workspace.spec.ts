@@ -278,6 +278,35 @@ test("an open follow-up round asks for its commit message and pushes through its
     // The server records the review; the box ticks with its answer.
     await reviewed.click();
     await expect(reviewed).toBeChecked();
+    // Explain it back through the API: approval waits for the understanding
+    // check. The workspace's own check panel replaces this step (L2D).
+    const runApi = "/api/runs/e2e-round-run/understanding";
+    const { understanding: check } = await (await page.request.get(runApi)).json();
+    const plan = check.plan as { id: string; source: string }[];
+    const answered = await page.request.put(`${runApi}/answers`, {
+      data: {
+        summary:
+          "This round adds an exclamation mark to the greeting, which answers the review comment about the plain greeting.",
+        items: plan.map((item) => ({
+          id: item.id,
+          answer:
+            item.source === "untested"
+              ? "I did not run the greeting in a terminal."
+              : "It changes the greeting text in hello.ts.",
+          confidence: "sure",
+        })),
+        changeFingerprint: check.changeFingerprint,
+      },
+    });
+    expect(answered.status()).toBe(200);
+    const graded = await page.request.put(`${runApi}/grades`, {
+      data: {
+        items: plan
+          .filter((item) => item.source !== "untested")
+          .map((item) => ({ id: item.id, grade: "got" })),
+      },
+    });
+    expect((await graded.json()).understanding.passed).toBe(true);
     await page.getByRole("button", { name: workspace.footer.approvePush }).click();
     const dialog = page.getByRole("dialog", { name: workspace.publish.titleRound });
     await expect(dialog).toBeVisible();
