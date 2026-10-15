@@ -76,17 +76,20 @@ const element = (props: Partial<Props> = {}) =>
 test("Home reads in English with no Chinese left", () => {
   const html = renderEn(element({ runs, lastRunId: "run-1" }));
   assert.match(html, /<svg class="home-logo"[^>]*role="img" aria-label="BELL PR"/);
+  assert.match(html, /<h1 tabindex="-1">From vibe coding to knowing why\.<\/h1>/);
+  assert.match(html, /<strong>Try the sample project<\/strong>/);
   assert.match(
     html,
-    /<h1 tabindex="-1">Contribute to open source with an AI team, and understand every line you ship\.<\/h1>/,
+    /Walk through a finished contribution: the project&#x27;s rules, the agent team&#x27;s plan, explaining the change back and the pull request draft\. No setup needed\./,
   );
-  assert.match(html, /<strong>Try the sample project<\/strong>/);
   assert.match(html, /<strong>Import a repository<\/strong>/);
   assert.match(html, /<strong>Find a project to contribute to<\/strong>/);
   assert.match(html, /<h2 id="home-continue-heading">Continue where you left off<\/h2>/);
   assert.match(html, /<small>octo\/widgets · Ready for your review<\/small>/);
   assertNoHan(html);
-  assert.match(renderZh(element()), /<strong>試試示範專案<\/strong>/);
+  const zh = renderZh(element());
+  assert.match(zh, /<strong>試試示範專案<\/strong>/);
+  assert.match(zh, /<h1 tabindex="-1">從「憑感覺寫」到「知道為什麼」。<\/h1>/);
 });
 
 test("Home shows the plan, and on Free the PRO badge and an upgrade that opens the dialog", () => {
