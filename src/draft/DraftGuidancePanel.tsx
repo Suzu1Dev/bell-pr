@@ -21,6 +21,11 @@ import {
   Sparkles,
 } from "lucide-react";
 import { issueRule, type DraftCheck } from "../../shared/draft-checks";
+import type {
+  ContributionFacts,
+  ContributionRules,
+} from "../../shared/contribution";
+import type { ReviewabilitySnapshot } from "../../shared/reviewability";
 import {
   aiDisclosureLine,
   linuxContributionUrl,
@@ -73,6 +78,13 @@ interface Props {
   checks?: DraftCheck[];
   /** The run is published: the guidance stays for reference, without actions. */
   readOnly?: boolean;
+  /** The project's quoted rules, for the live maintainer checklist. */
+  rules?: ContributionRules;
+  /** The GitHub facts last read for this run. */
+  facts?: ContributionFacts;
+  /** The understanding check's state: required, passed, or turned off. */
+  understanding?: { required: boolean; passed: boolean; off: boolean };
+  changes?: ReviewabilitySnapshot;
 }
 
 /**

@@ -24,7 +24,11 @@ import type { LearnerNote } from "../../shared/explanations";
 import { parseLocale, type Locale } from "../../shared/i18n/locale";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
 import { parseReviewOrder } from "../../shared/review-order";
-import { reportMentionCount } from "../../shared/understanding";
+import {
+  reportMentionCount,
+  type FileAttempt,
+  type FileAttemptInput,
+} from "../../shared/understanding";
 import { useTablistKeys } from "../a11y/useTablistKeys";
 import { useFormat, useLocale, useT } from "../i18n";
 import type { ChatMessage, DiffFile, Run } from "../types";
@@ -59,6 +63,15 @@ export interface ExplanationPanelProps {
    * the UI language, the explanation tab says which language it is in.
    */
   runLocale?: Locale;
+  /** The person's try-first attempt on this file (`run.attempts[path]`). */
+  attempt?: FileAttempt;
+  /** Saves the quiz answer before the reveal, its grade, or the road choice (PATCH /api/runs/:id/attempts). */
+  onAttempt?(input: {
+    quiz?: FileAttemptInput["quiz"];
+    road?: FileAttemptInput["road"];
+  }): Promise<void>;
+  /** Shows the try-first prompts; false brings back the plain reveal (Settings → Learning). */
+  tryFirst?: boolean;
 }
 
 /**
