@@ -1,0 +1,48 @@
+# On AI use in curl
+
+Guidelines for AI use when contributing to curl.
+
+## For security reports and other issues
+
+If you asked an AI tool to find problems in curl, you **must** make sure to
+reveal this fact in your report.
+
+You must also double-check the findings carefully before reporting them to us
+to validate that the issues are indeed existing and working exactly as the AI
+says. AI-based tools frequently generate inaccurate or fabricated results.
+
+Further: it is *rarely* a good idea to copy and paste an AI generated report
+to the project. Those generated reports typically are too wordy and rarely to
+the point (in addition to the common fabricated details). If you actually find
+a problem with an AI and you have verified it yourself to be true: write the
+report yourself and explain the problem as you have learned it. This makes
+sure the AI-generated inaccuracies and invented issues are filtered out early
+before they waste more people's time.
+
+As we take security reports seriously, we investigate each report with
+priority. This work is both time and energy consuming and pulls us away from
+doing other meaningful work. Fake and otherwise made up security problems
+effectively prevent us from doing real project work and make us waste time and
+resources.
+
+We ban users immediately who submit made up fake reports to the project.
+
+## For pull requests
+
+When contributing content to the curl project, you give us permission to use
+it as-is and you must make sure you are allowed to distribute it to us. By
+submitting a change to us, you agree that the changes can and should be
+adopted by curl and get redistributed under the curl license. Authors should
+be explicitly aware that the burden is on them to ensure no unlicensed code is
+submitted to the project.
+
+This is independent if AI is used or not.
+
+When contributing a pull request you should of course always make sure that
+the proposal is good quality and a best effort that follows our guidelines. A
+basic rule of thumb is that if someone can spot that the contribution was made
+with the help of AI, you have more work to do.
+
+We can accept code written with the help of AI into the project, but the code
+must still follow coding standards, be written clearly, be documented, feature
+test cases and adhere to all the normal requirements we have.

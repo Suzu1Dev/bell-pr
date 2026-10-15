@@ -49,6 +49,42 @@ export function rawProse(text: string): ProseLine[] {
   return lines;
 }
 
+/** A reStructuredText section adornment: one punctuation character, repeated. */
+const restAdornment = /^([=\-~^"'`#*+<>:._])\1{2,}\s*$/;
+/** Directives whose indented content is code, not prose. */
+const restCodeDirective =
+  /^\s*\.\.\s+(?:code(?:-block)?|sourcecode|literalinclude|highlight|doctest|testcode|testoutput)::/;
+
+/**
+ * rawProse for reStructuredText: there are no fences there, so a `~~~` or
+ * `===` line is a section adornment (a paragraph break), and what is left
+ * out are code directives and literal blocks (after a paragraph that ends
+ * with `::`), as far as they are indented.
+ */
+function restProse(text: string): ProseLine[] {
+  const lines: ProseLine[] = [];
+  let literal: number | undefined;
+  text.split(/\r?\n/).forEach((raw, index) => {
+    const indent = raw.length - raw.trimStart().length;
+    if (literal !== undefined) {
+      if (!raw.trim() || indent > literal) return;
+      literal = undefined;
+    }
+    if (restAdornment.test(raw)) {
+      lines.push({ line: index + 1, text: "" });
+      return;
+    }
+    // Other directives (notes, grids) hold prose; a paragraph ending in "::" does not.
+    if (
+      restCodeDirective.test(raw) ||
+      (/::\s*$/.test(raw) && !/^\s*\.\.\s/.test(raw))
+    )
+      literal = indent;
+    lines.push({ line: index + 1, text: raw });
+  });
+  return lines;
+}
+
 const flags = "i";
 
 /** Models and chatbots by kind. */
@@ -90,6 +126,11 @@ const assistanceTerms = [
     flags,
   ),
   new RegExp(String.raw`\b${madeWith}(?:${modelWords}|${toolNames})\b${featureNoun}`, flags),
+  // "use AI to generate code", "using AI to write it": bare AI with what it is used to make.
+  new RegExp(
+    String.raw`\b(?:us(?:e|es|ed|ing)(?:\s+of)?|rel(?:y|ies|ied|ying)\s+on)\s+(?:an?\s+|the\s+)?(?:generative\s+)?AI\s+(?:(?:tools?|models?|assistants?)\s+)?to\s+(?:generat|writ|wrot|creat|produc|draft|author|fix|solv|implement|cod)\w*`,
+    flags,
+  ),
   new RegExp(String.raw`\b(?:${modelWords}|${toolNames})${madeBy}`, flags),
   // "a large language model or similar technology, such as GitHub's Copilot"
   new RegExp(
@@ -123,8 +164,20 @@ const prohibition = new RegExp(
     String.raw`\b(?:prohibited|forbidden|banned|disallowed|unacceptable|declined?)\b`,
     String.raw`\bno\s+(?:AI|LLM|machine)[\w-]*`,
     String.raw`\b(?:will|shall|may)\s+be\s+(?:closed|rejected|refused|declined)\b`,
+    // "we will flag and reject …"
+    String.raw`\b(?:will|shall|must|we)\s+(?:\w+\s+){0,2}?(?:reject|refuse)\w*`,
     String.raw`\bzero[- ]tolerance\b`,
   ].join("|"),
+  flags,
+);
+
+/**
+ * A refusal of AI help for "substantial pieces of code" or "large changes"
+ * depends on the size of what the agents wrote, which only the person can
+ * weigh: never a clear ban.
+ */
+const sizeQualifier = new RegExp(
+  String.raw`\b(?:substantial|significant|large|major|non[- ]?trivial)\s+(?:\w+\s+){0,2}?(?:pieces?|parts?|portions?|amounts?|chunks?|sections?|blocks?|bod(?:y|ies)|code|changes?|contributions?|features?|patch(?:es)?)\b`,
   flags,
 );
 
@@ -153,7 +206,7 @@ const conductCondition = new RegExp(
     String.raw`\b(?:you|they|he|she|the\s+(?:author|contributor|submitter|person)s?|authors?|contributors?|submitters?)\s+(?:do|does|did|ca|can|could|have|has|had|are|is|were|was)(?:\s*not|n't)\s+(?:\w+\s+){0,2}?(?:understand|explain|review|read|test|verif|check|edit|write|wr[io]te|know|able|own|have\s+the\s+(?:knowledge|abilit|skill))\w*`,
     String.raw`\b(?:has|have|had|was|were)(?:\s+not|n't)\s+(?:been\s+)?(?:\w+\s+)?(?:understood|reviewed|tested|verified|checked|edited|explained|read|disclosed|declared|labell?ed)\b`,
     String.raw`\bun(?:reviewed|tested|edited|verified|checked|disclosed|declared|attributed|labell?ed|curated|modified)\b`,
-    String.raw`\blow[- ](?:effort|quality)\b`,
+    String.raw`\blow[- ](?:effort|quality|value)\b`,
     String.raw`\bblind(?:ly)?\b`,
   ].join("|"),
   flags,
@@ -201,10 +254,26 @@ const autonomousAction = new RegExp(
   String.raw`\b(?:on\s+(?:your|their|someone's)\s+behalf|autonomous\w*|directly\s+interact\w*|without\s+(?:a\s+)?human|take\s+action|acting\s+on)\b`,
   flags,
 );
+/**
+ * A rule about agents acting by themselves, with or without a refusal word:
+ * "bans agents that take action … without human approval", "External AI
+ * tooling (e.g. bots, agents) directly interacting with the project".
+ */
+const agentsActingAlone = new RegExp(
+  [
+    String.raw`\bagents?\b[^.!?]{0,80}?\b(?:tak(?:e|es|ing)\s+action|without\s+(?:a\s+)?human|on\s+(?:your|their|someone's|a\s+user's)\s+behalf|directly\s+interact\w*|act(?:s|ing)?\s+(?:alone|autonomously|on\s+their\s+own))\b`,
+    String.raw`\b(?:autonomous|unattended)\s+(?:AI\s+)?(?:coding\s+)?agents?\b`,
+  ].join("|"),
+  flags,
+);
 
 /** Contributors must be able to explain their changes. */
 const understandingRule = new RegExp(
-  String.raw`\b(?:must|should|need(?:s)?\s+to|ha(?:ve|s)\s+to|(?:are|is)\s+expected\s+to|(?:are|is)\s+required\s+to|be\s+able\s+to)\s+(?:\w+\s+){0,3}?(?:explain|understand|answer\s+questions?\s+about|defend|justify)\s+(?:\w+\s+){0,2}?(?:changes?|code|work|contributions?|patch(?:es)?|pull\s+requests?|PRs?|submissions?|diffs?)\b(?!\s+(?:of\s+conduct|style|base|review\s+guidelines))`,
+  [
+    String.raw`\b(?:must|should|need(?:s)?\s+to|ha(?:ve|s)\s+to|(?:are|is)\s+expected\s+to|(?:are|is)\s+required\s+to|be\s+able\s+to)\s+(?:\w+\s+){0,3}?(?:explain|understand|answer\s+questions?\s+about|defend|justify)\s+(?:\w+\s+){0,2}?(?:changes?|code|work|contributions?|patch(?:es)?|pull\s+requests?|PRs?|submissions?|diffs?)\b(?!\s+(?:of\s+conduct|style|base|review\s+guidelines))`,
+    // "If you cannot understand or explain your work …, do not file here."
+    String.raw`\b(?:cannot|can't|can\s+not|unable\s+to|(?:are|is)\s+not\s+able\s+to)\s+(?:fully\s+)?(?:explain|understand)(?:\s+(?:or|and)\s+(?:explain|understand))?\s+(?:\w+\s+){0,3}?(?:changes?|code|work|contributions?|patch(?:es)?|pull\s+requests?|PRs?|submissions?|diffs?)\b(?!\s+(?:of\s+conduct|style|base|review\s+guidelines))`,
+  ].join("|"),
   flags,
 );
 
@@ -292,12 +361,45 @@ function lineAt(block: Block, offset: number) {
   return line;
 }
 
-/** Text to search: inline code and comment delimiters blanked, positions kept. */
+const blank = (text: string) => " ".repeat(text.length);
+
+/** `text` at `offset` inside `whole`, everything else in `whole` blanked. */
+const keepOnly = (whole: string, offset: number, text: string) =>
+  blank(whole.slice(0, offset)) + text + blank(whole.slice(offset + text.length));
+
+/**
+ * Inline code a policy writes a label or a trailer in ("`good first
+ * issue`", "``Assisted-by:``"): words the reader is meant to read, not code.
+ */
+const quotedWords = /^\s*(?:(?:Assisted|Generated)-by:?|[\w\s'’-]*\bgood[- ]first[- ]issues?\b[\w\s'’-]*)\s*$/i;
+
+/**
+ * Text to search, positions kept: inline code and comment delimiters
+ * blanked, emphasis markers too; what a reStructuredText role or link shows
+ * (":ref:`AI generated <target>`", "`text <url>`_") stays readable.
+ */
 function searchable(text: string) {
   return text
-    .replace(/`[^`]*`/g, (code) => " ".repeat(code.length))
-    .replace(/<!--|-->/g, (marker) => " ".repeat(marker.length));
+    .replace(
+      /:[\w.+-]+:`([^`]*)`|`([^`<]*?)\s*<[^`>]*>`_{1,2}/g,
+      (whole: string, role: string | undefined, link: string | undefined) => {
+        const shown = (role ?? link ?? "").replace(/\s*<[^>]*>\s*$/, "");
+        return keepOnly(whole, whole.indexOf("`") + 1, shown);
+      },
+    )
+    .replace(/`([^`]*)`/g, (code, inside: string) =>
+      quotedWords.test(inside) ? keepOnly(code, 1, inside) : blank(code),
+    )
+    .replace(/<!--|-->/g, blank)
+    .replace(/\*\*|__|(?<![\w*])\*(?=\w)|(?<=\w)\*(?![\w*])|(?<![\w_])_(?=\w)|(?<=\w)_(?![\w_])/g, blank);
 }
+
+/**
+ * Where sentences end: after . ! or ? (and any closing bracket, quote or
+ * emphasis marker) before a space or the end, never inside "e.g.", "i.e."
+ * or "etc." ("(Copilot, ChatGPT, etc.) are not allowed").
+ */
+const sentenceEnd = /(?<!\b(?:e\.g|i\.e|etc))[.!?](["'’”)\]*_]*)(?=\s|$)/gi;
 
 /**
  * The sentence around a span: from the end of the sentence before it to
@@ -306,7 +408,10 @@ function searchable(text: string) {
  */
 function sentenceAround(text: string, span: Span): Span {
   const boundaries = [
-    ...[...text.matchAll(/[.!?](?=\s|$)/g)].map((match) => [match.index + 1, match.index + 1]),
+    ...[...text.matchAll(sentenceEnd)].map((match) => [
+      match.index + 1,
+      match.index + match[0].length,
+    ]),
     ...[...text.matchAll(/<!--|-->/g)].map((match) => [
       match.index,
       match.index + match[0].length,
@@ -445,7 +550,9 @@ export function classifyPolicy(path: string, text: string): PolicyFinding[] {
         contributionContext.test(search.slice(sentence.start, sentence.end)),
     });
   };
-  for (const block of blocks(rawProse(text))) {
+  // reStructuredText has no fences: its "~~~" lines are section adornments.
+  const prose = /\.rst$/i.test(path) ? restProse(text) : rawProse(text);
+  for (const block of blocks(prose)) {
     const search = searchable(block.text);
     // One AI finding per sentence: a reserved learning area wins over a ban.
     const decided = new Set<number>();
@@ -479,14 +586,28 @@ export function classifyPolicy(path: string, text: string): PolicyFinding[] {
       // project's own-words rule.
       const aboutConversation =
         conversation.test(words) && !changeObject.test(words);
-      if (agentTerm && autonomousAction.test(words))
+      // "Do not use AI to generate substantial pieces of code": how much is
+      // too much is the person's call.
+      const sized = sizeQualifier.test(words);
+      // A long sentence about good first issues that refuses AI-generated
+      // pull requests at its end still reserves the learning issues.
+      if (learningIssues.test(words)) add("area", block, search, span);
+      else if (agentTerm && autonomousAction.test(words))
         add("agent", block, search, span);
       else if (aboutConversation && /\bdescriptions?\b/i.test(words))
         add("own-words", block, search, span);
       else
-        add("ban", block, search, span, permitted || conditional || aboutConversation);
+        add(
+          "ban",
+          block,
+          search,
+          span,
+          permitted || conditional || aboutConversation || sized,
+        );
     }
     for (const match of allMatches(addressedToAgents, search))
+      add("agent", block, search, match);
+    for (const match of allMatches(agentsActingAlone, search))
       add("agent", block, search, match);
     for (const sentence of splitSentences(block.text))
       if (asksForDisclosure(search.slice(sentence.start, sentence.end)))
@@ -531,7 +652,7 @@ const disclosurePattern = new RegExp(
     `\\b${discloseVerb}\\b[^.\\n]{0,80}\\b${aiTerm}`,
     // "AI-assisted contributions must be disclosed", "LLM use should be noted",
     // "if you use AI tools, you must disclose it".
-    `\\b${aiTerm}[^.\\n]{0,80}\\b(?:must|should|please|needs? to|has to|have to|is required to|are required to|shall)\\b(?:[^.\\n]{0,40}\\b${disclosedPassive}\\b|\\s+(?:\\w+\\s+)?${discloseVerb}\\b)`,
+    `\\b${aiTerm}[^.\\n]{0,80}\\b(?:must|should|please|needs? to|has to|have to|is required to|are required to|shall)\\b(?!\\s*(?:not|n't)\\b)(?:[^.\\n]{0,40}\\b${disclosedPassive}\\b|\\s+(?:\\w+\\s+)?${discloseVerb}\\b)`,
     // "If you used AI tools, say so in the PR description."
     `\\b${aiTerm}[^.\\n]{0,80}\\bsay so\\b`,
     // "We will not accept AI-generated contributions without disclosure."
@@ -557,10 +678,18 @@ const disclosureHeading =
 const negated =
   /\b(?:do not|don't|never|no need to|not required to)\s+(?:\w+\s+){0,2}(?:disclos|declar|mention|state|indicate|say so)/i;
 
+/**
+ * A request to name the tool in a trailer: "use a commit message trailer
+ * like Assisted-by: <name of code assistant>".
+ */
+const trailerRequest =
+  /\b(?:use|add|include|append|with|like|such as|via)\b[^.\n]{0,60}\b(?:Assisted|Generated)-by\b/i;
+
 /** Whether one line of prose asks contributors to disclose AI assistance. */
 const asksForDisclosure = (prose: string) =>
   !negated.test(prose) &&
   (disclosureHeading.test(prose) ||
+    trailerRequest.test(prose) ||
     (disclosurePattern.test(prose) && aiUse.test(prose)));
 
 /**
@@ -613,6 +742,20 @@ const namesAssistance = (text: string) =>
  */
 const disclosureField =
   /^\s*(?:[-*+]\s+)?(?:\*\*|__)?(?:(?:AI|LLM)[- ]?(?:(?:usage|use|assistance|tools?)\s+disclosure|disclosure|usage|use|used|assistance|assisted)|use\s+of\s+(?:AI|LLMs?))(?:\*\*|__)?\s*:\s*(?:\*\*|__)?\s*(.*)$/i;
+/**
+ * A sentence that says no AI helped: "No AI tools were used.", "I did not
+ * use AI", "written without AI assistance", "not AI-generated".
+ */
+const deniesAssistance = new RegExp(
+  [
+    String.raw`^\W*(?:no|none|zero)\b`,
+    String.raw`\b(?:did|do|does|was|were|is|are|have|has|had)(?:\s*not|n't)\s+(?:\w+\s+){0,2}?(?:use|used|using|involve|involved|need|needed|rel(?:y|ied)|assisted|generated|written|AI|any)\b`,
+    String.raw`\bwithout\s+(?:the\s+)?(?:any\s+)?(?:use\s+of\s+|help\s+(?:of|from)\s+|using\s+)?(?:an?\s+)?(?:AI|LLMs?|generative|ChatGPT|Copilot|Claude|Codex|Gemini|Cursor|assistance|tools?)\b`,
+    String.raw`\bnot\s+(?:\w+\s+)?(?:AI|LLM)[- ]?(?:generated|assisted|written)\b`,
+    String.raw`\bnever\s+(?:used?|using)\b`,
+  ].join("|"),
+  "i",
+);
 /** "NO", "none" or "n/a" in a disclosure field. */
 const deniedField = /^(?:no|none|n\/?a|nothing)\b/i;
 
@@ -644,8 +787,18 @@ export function hasAiDisclosure(body: string, commitMessage = "") {
   const visible = lines
     .filter((_, index) => fields[index] === undefined || !deniedField.test(fields[index]!))
     .join(" ");
-  return splitSentences(visible).some(({ start, end }) => {
-    const sentence = visible.slice(start, end);
-    return disclosureVerb.test(sentence) && namesAssistance(sentence);
-  });
+  // Each clause on its own: "Codex wrote the parser; the tests were not
+  // AI-generated" and "Not reviewed by AI, but written with Copilot" still
+  // disclose, "No AI tools were used." and "Disclosure: no AI was used" do not.
+  return splitSentences(visible).some(({ start, end }) =>
+    visible
+      .slice(start, end)
+      .split(/;|:\s|\bbut\b/i)
+      .some(
+        (clause) =>
+          disclosureVerb.test(clause) &&
+          namesAssistance(clause) &&
+          !deniesAssistance.test(clause),
+      ),
+  );
 }

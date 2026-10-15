@@ -535,6 +535,22 @@ test("every team prompt builder answers in the locale it is given", () => {
   assert.equal(english.contributionContext, chinese.contributionContext);
 });
 
+test("the lead and teammates keep to their scopes and the tests, and the reviewer names what weakens them", () => {
+  const prompts: Record<string, string> = builderPrompts();
+  const scope =
+    "Stay within the plan's file scopes; no formatting-only changes; never weaken, skip or delete a test; list any new dependency with its reason.";
+  for (const role of ["leadPlan", "leadPlan:revised", "member:beta", "member:gamma"])
+    assert.ok(prompts[role].includes(scope), role);
+  assert.ok(
+    prompts.reviewer.includes("Name changes unrelated to the task and any weakened test explicitly."),
+  );
+  // The shared boundaries, which follow-up rounds and conflict resolutions
+  // import, stay as they were.
+  assert.ok(!prompts.teamBoundaries.includes("weaken"));
+  for (const role of ["tester", "integration", "coordination"])
+    assert.ok(!prompts[role].includes(scope), role);
+});
+
 test("a team run with a revised plan and a retried task sends exactly the recorded prompts", async () => {
   assert.deepEqual(
     await recordPlanAndRetryPrompts(),

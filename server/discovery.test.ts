@@ -23,6 +23,7 @@ import {
   DiscoveryService,
   discoveryFileSchema,
   discoveryJobSchema,
+  discoveryJsonSchema,
   discoveryPreferencesSchema,
   discoveryPrompt,
   parseDiscoveryResult,
@@ -1163,4 +1164,75 @@ test("a build that predates learnByHand still reads an opportunity that has it",
     "learnByHand" in discoveryJobSchema.parse({ ...job, opportunities: [plain] }).opportunities[0],
     false,
   );
+});
+
+test("the discovery prompt keeps good first issues away from the agent team and offers them as practice", () => {
+  const prompt = discoveryPrompt([candidate], defaultDiscoveryPreferences);
+  assert.match(
+    prompt,
+    /Never propose a good-first-issue or other newcomer-labelled issue as work for the agent team; you may list it with learnByHand: true as practice for the person\./,
+  );
+  // The line sits with the rule about AI-assisted contributions.
+  assert.match(prompt, /for this automated tool\. Never propose a good-first-issue/);
+  assert.match(prompt, /evidence:\[\{sourceId,quote,reason\}\],learnByHand\}\]\}/);
+  assert.match(prompt, /learnByHand is true only for practice the person should write by hand, false otherwise\./);
+  // The agent's output schema has the field, so a strict schema accepts it.
+  const item = (discoveryJsonSchema.properties.opportunities as { items: { properties: Record<string, unknown>; required: string[] } }).items;
+  assert.deepEqual(item.properties.learnByHand, { type: "boolean" });
+  assert.ok(item.required.includes("learnByHand"));
+});
+
+test("an opportunity on a learning-labelled issue is practice by hand, whatever the agent said", () => {
+  const plain = parseDiscoveryResult(answer(), [candidate], defaultDiscoveryPreferences);
+  assert.equal("learnByHand" in plain.opportunities[0], false);
+  // The issue it quotes carries a learning label.
+  const labelled = parseDiscoveryResult(
+    answer([{ ...opportunity, learnByHand: false }]),
+    [candidate],
+    defaultDiscoveryPreferences,
+    new Set(["owner/project:issue:1"]),
+  );
+  assert.equal(labelled.opportunities[0].learnByHand, true);
+  // The agent may mark one as practice itself; false is left out.
+  assert.equal(
+    parseDiscoveryResult(answer([{ ...opportunity, learnByHand: true }]), [candidate], defaultDiscoveryPreferences)
+      .opportunities[0].learnByHand,
+    true,
+  );
+  assert.equal(
+    "learnByHand" in
+      parseDiscoveryResult(answer([{ ...opportunity, learnByHand: false }]), [candidate], defaultDiscoveryPreferences)
+        .opportunities[0],
+    false,
+  );
+  // A learning label on another issue changes nothing.
+  assert.equal(
+    "learnByHand" in
+      parseDiscoveryResult(answer(), [candidate], defaultDiscoveryPreferences, new Set(["owner/project:issue:2"]))
+        .opportunities[0],
+    false,
+  );
+});
+
+test("a discovery job marks the opportunities on learning-labelled issues it collected", async () => {
+  const f = await fixture({
+    collectCandidates: async () => ({
+      candidates: [copy(candidate)],
+      warnings: [],
+      learningIssues: ["owner/project:issue:1"],
+    }),
+  });
+  try {
+    await f.service.start(defaultDiscoveryPreferences);
+    const job = await finished(f.service);
+    assert.equal(job.status, "ready");
+    assert.equal(job.opportunities[0].learnByHand, true);
+    // Stored with the job, for the client's "Learn by hand" line.
+    const saved = discoveryFileSchema.parse(
+      JSON.parse(await readFile(path.join(f.directory, "discovery.json"), "utf8")),
+    );
+    assert.equal(saved.job?.opportunities[0].learnByHand, true);
+  } finally {
+    await f.cleanup();
+  }
 });

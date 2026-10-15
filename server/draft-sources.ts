@@ -18,8 +18,8 @@ const maximumWorkflowScans = 40;
 const maximumAutomationSources = 3;
 const allowedAssociations = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 const shaPattern = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/;
-type DocumentKind = "contributing" | "template" | "documentation";
-type Entry = {
+export type DocumentKind = "contributing" | "template" | "documentation";
+export type Entry = {
   path: string;
   mode: string;
   type: string;
@@ -27,20 +27,59 @@ type Entry = {
   size: number;
 };
 
-function documentKind(file: string): DocumentKind | undefined {
+/** Folders whose guidance is read besides the root. */
+const documentFolders = [".github", "docs", "doc", "documentation"];
+/** AI policies by name: AI_POLICY*, AI-POLICY*, AI_USAGE*, *AIToolPolicy*, LLM*POLICY*, GENERATIVE_AI*. */
+const aiPolicyName = /^(?:ai[-_](?:policy|usage)|.*aitoolpolicy|llm.*policy|generative[-_]?ai(?![a-z0-9]))/;
+/**
+ * Policy-named documents in the docs folders: "ai-", "llm",
+ * "generated-content", "code-provenance", "coding-assistant", "contribut".
+ */
+const policyName =
+  /(?:^|[-_.])(?:ai|llms?|genai)(?:[-_.]|$)|generated[-_]content|code[-_]provenance|coding[-_]assistants?|contribut/;
+
+/**
+ * The kind of guidance a repository file is, by its name and place, or
+ * undefined for files neither the PR draft nor the rules card reads:
+ * - contributing: CONTRIBUTING and CONTRIBUTE files, and AI policies (also
+ *   in a sub-project's docs folder, such as `llvm/docs/AIToolPolicy.md`);
+ * - template: pull request templates, including the folder of them;
+ * - documentation: README, agent guides (AGENTS.md, CLAUDE.md,
+ *   `.github/copilot-instructions.md`), codes of conduct, other submission
+ *   guides, and policy-named documents three folders deep or less.
+ * Only the root, `.github/`, `docs/`, `doc/` and `Documentation/` count.
+ * The kinds are those `DraftSource.kind` already has.
+ */
+export function documentKind(file: string): DocumentKind | undefined {
   if (!safeRelativePath(file) || sensitivePath(file)) return;
   const parts = file.toLowerCase().split("/");
-  if (
-    parts.length > 5 ||
-    (parts.length > 1 &&
-      ![".github", "docs", "documentation"].includes(parts[0]))
-  )
-    return;
   const name = parts.at(-1)!;
   const stem = name.replace(/\.(?:md|markdown|rst|txt|adoc|org)$/i, "");
-  if (stem === "contributing") return "contributing";
+  // A text document: a known extension, or none.
+  const text = stem !== name || !name.includes(".");
+  if (
+    text &&
+    aiPolicyName.test(stem) &&
+    (parts.length === 1 ||
+      (parts.length <= 5 && documentFolders.includes(parts[0])) ||
+      (parts.length <= 3 &&
+        parts.slice(0, -1).some((part) => documentFolders.includes(part))))
+  )
+    return "contributing";
+  if (
+    parts.length > 5 ||
+    (parts.length > 1 && !documentFolders.includes(parts[0]))
+  )
+    return;
+  if (stem === "contributing" || (text && /^contribute(?:$|[-_.])/.test(stem)))
+    return "contributing";
   // Agent guides such as AGENTS.md often hold the branch and commit rules CONTRIBUTING links to.
-  if (parts.length === 1 && (stem === "agents" || stem === "claude"))
+  if (
+    (parts.length === 1 || (parts.length === 2 && parts[0] === ".github")) &&
+    (stem === "agents" || stem === "claude")
+  )
+    return "documentation";
+  if (parts.join("/") === ".github/copilot-instructions.md")
     return "documentation";
   if (
     stem === "pull_request_template" ||
@@ -49,12 +88,37 @@ function documentKind(file: string): DocumentKind | undefined {
   )
     return "template";
   if (
-    /^(?:readme|contribution(?:s|-guide)?|contributing[-_]guide|submitting(?:[-_](?:patches|pull[-_]requests))?|maintainer(?:s|[-_]guide)?)$/.test(
+    /^(?:readme|contribution(?:s|-guide)?|contributing[-_]guide|submitting(?:[-_](?:patches|pull[-_]requests))?|maintainer(?:s|[-_]guide)?|code[-_]of[-_]conduct)$/.test(
       stem,
     )
   )
     return "documentation";
+  if (
+    text &&
+    parts.length > 1 &&
+    parts.length <= 3 &&
+    parts[0] !== ".github" &&
+    policyName.test(stem)
+  )
+    return "documentation";
   return undefined;
+}
+
+/**
+ * The kind of community file an account's `<owner>/.github` defaults stand
+ * in for when the repository has none of its own: CONTRIBUTING and pull
+ * request templates. An AI policy or CONTRIBUTE file is guidance too, but
+ * GitHub does not fall back for it.
+ */
+export function defaultsKind(file: string): DocumentKind | undefined {
+  const kind = documentKind(file);
+  if (kind === "template") return kind;
+  const stem = file
+    .split("/")
+    .at(-1)!
+    .toLowerCase()
+    .replace(/\.(?:md|markdown|rst|txt|adoc|org)$/, "");
+  return kind === "contributing" && stem === "contributing" ? kind : undefined;
 }
 
 /**
@@ -104,7 +168,7 @@ export function pullRequestGate(content: string) {
   );
 }
 
-const priority = (file: Entry) => {
+export const priority = (file: Entry) => {
   const kind = documentKind(file.path);
   const parts = file.path.toLowerCase().split("/");
   const location =
@@ -122,7 +186,7 @@ const priority = (file: Entry) => {
   );
 };
 
-function parseTree(output: string): Entry[] {
+export function parseTree(output: string): Entry[] {
   return output
     .split("\0")
     .filter(Boolean)
@@ -171,6 +235,104 @@ export function validPrUrl(
   } catch {
     return false;
   }
+}
+
+/** An answer of `gh api`, as JSON.parse returns it. */
+type GitHubJson = ReturnType<typeof JSON.parse>;
+
+/** An account's public default community files (`<owner>/.github`). */
+export type AccountDefaults =
+  | { status: "missing" | "private" | "no-branch" }
+  | {
+      status: "found";
+      /** The default branch's commit the files are read at. */
+      commitSha: string;
+      /** GitHub listed only part of the tree. */
+      truncated: boolean;
+      /** The wanted files, in reading order. */
+      entries: Entry[];
+      read(entry: Entry): Promise<string>;
+      url(entry: Entry): string;
+    };
+
+/**
+ * The default community files of the account's public `<owner>/.github`
+ * repository whose kind `wanted` accepts, pinned to its default branch's
+ * commit, or why there are none: "missing" when the account has no such
+ * repository (GitHub's 404), "private" or "no-branch". Other failures
+ * reject. `github` runs `gh api --hostname github.com` and parses JSON.
+ */
+export async function accountDefaults(
+  owner: string,
+  wanted: (kind: DocumentKind) => boolean,
+  github: (args: string[], maxBytes?: number) => Promise<GitHubJson>,
+): Promise<AccountDefaults> {
+  let defaults: GitHubJson;
+  try {
+    defaults = await github(
+      ["--method", "GET", `repos/${owner}/.github`],
+      80_000,
+    );
+  } catch (error) {
+    if (error instanceof Error && /(?:HTTP\s+404|\(404\))/.test(error.message))
+      return { status: "missing" };
+    throw error;
+  }
+  if (defaults.private !== false) return { status: "private" };
+  if (typeof defaults.default_branch !== "string")
+    return { status: "no-branch" };
+  const ref = await github(
+    [
+      "--method",
+      "GET",
+      `repos/${owner}/.github/git/ref/heads/${encodeURIComponent(defaults.default_branch)}`,
+    ],
+    40_000,
+  );
+  if (ref.object?.type !== "commit" || !shaPattern.test(ref.object.sha))
+    throw new Error("Invalid default ref");
+  const commitSha: string = ref.object.sha;
+  const tree = await github(
+    [
+      "--method",
+      "GET",
+      `repos/${owner}/.github/git/trees/${commitSha}?recursive=1`,
+    ],
+    2_000_000,
+  );
+  if (!shaPattern.test(tree.sha) || !Array.isArray(tree.tree))
+    throw new Error("Invalid default tree");
+  const entries: Entry[] = tree.tree
+    .filter((entry: Entry) => {
+      const kind =
+        typeof entry.path === "string" ? documentKind(entry.path) : undefined;
+      return !!kind && wanted(kind) && shaPattern.test(entry.sha);
+    })
+    .sort(
+      (a: Entry, b: Entry) =>
+        priority(a) - priority(b) || a.path.localeCompare(b.path),
+    );
+  return {
+    status: "found",
+    commitSha,
+    truncated: !!tree.truncated,
+    entries,
+    read: async (entry) => {
+      const blob = await github(
+        ["--method", "GET", `repos/${owner}/.github/git/blobs/${entry.sha}`],
+        180_000,
+      );
+      if (
+        blob.encoding !== "base64" ||
+        typeof blob.content !== "string" ||
+        !/^[A-Za-z0-9+/=\s]*$/.test(blob.content)
+      )
+        throw new Error("Invalid blob");
+      return Buffer.from(blob.content, "base64").toString("utf8");
+    },
+    url: (entry) =>
+      `https://github.com/${owner}/.github/blob/${commitSha}/${entry.path.split("/").map(encodeURIComponent).join("/")}`,
+  };
 }
 
 const metadataQuery = `query BellDraftContext($owner: String!, $name: String!) {
@@ -352,7 +514,8 @@ export async function collectDraftContext(
         ? `${remote.url}/blob/${run.baseSha}/${file.split("/").map(encodeURIComponent).join("/")}`
         : undefined;
     for (const entry of candidates) {
-      localKinds.add(documentKind(entry.path)!);
+      const own = defaultsKind(entry.path);
+      if (own) localKinds.add(own);
       await readDocument(
         entry,
         "base",
@@ -449,94 +612,31 @@ export async function collectDraftContext(
     localChecked &&
     (!localKinds.has("contributing") || !localKinds.has("template"))
   ) {
-    let foundDefaults = false;
     try {
-      const defaults = await github(
-        ["--method", "GET", `repos/${remote.owner}/.github`],
-        80_000,
+      const defaults = await accountDefaults(
+        remote.owner,
+        (kind) =>
+          (kind === "contributing" || kind === "template") &&
+          !localKinds.has(kind),
+        github,
       );
-      foundDefaults = true;
-      if (
-        defaults.private === false &&
-        typeof defaults.default_branch === "string"
-      ) {
-        const ref = await github(
-          [
-            "--method",
-            "GET",
-            `repos/${remote.owner}/.github/git/ref/heads/${encodeURIComponent(defaults.default_branch)}`,
-          ],
-          40_000,
-        );
-        if (ref.object?.type !== "commit" || !shaPattern.test(ref.object.sha))
-          throw new Error("Invalid default ref");
-        const commitSha = ref.object.sha;
-        const tree = await github(
-          [
-            "--method",
-            "GET",
-            `repos/${remote.owner}/.github/git/trees/${commitSha}?recursive=1`,
-          ],
-          2_000_000,
-        );
-        if (!shaPattern.test(tree.sha) || !Array.isArray(tree.tree))
-          throw new Error("Invalid default tree");
-        if (tree.truncated)
-          warn(messages.defaultsTruncated);
-        const candidates: Entry[] = tree.tree
-          .filter((entry: Entry) => {
-            const kind =
-              typeof entry.path === "string"
-                ? documentKind(entry.path)
-                : undefined;
-            return (
-              (kind === "contributing" || kind === "template") &&
-              !localKinds.has(kind)
-            );
-          })
-          .sort(
-            (a: Entry, b: Entry) =>
-              priority(a) - priority(b) || a.path.localeCompare(b.path),
-          );
-        for (const entry of candidates) {
-          if (!shaPattern.test(entry.sha)) continue;
+      if (defaults.status === "found") {
+        if (defaults.truncated) warn(messages.defaultsTruncated);
+        for (const entry of defaults.entries)
           await readDocument(
             entry,
             "org",
-            async () => {
-              const blob = await github(
-                [
-                  "--method",
-                  "GET",
-                  `repos/${remote.owner}/.github/git/blobs/${entry.sha}`,
-                ],
-                180_000,
-              );
-              if (
-                blob.encoding !== "base64" ||
-                typeof blob.content !== "string" ||
-                !/^[A-Za-z0-9+/=\s]*$/.test(blob.content)
-              )
-                throw new Error("Invalid blob");
-              return Buffer.from(blob.content, "base64").toString("utf8");
-            },
-            `https://github.com/${remote.owner}/.github/blob/${commitSha}/${entry.path.split("/").map(encodeURIComponent).join("/")}`,
+            () => defaults.read(entry),
+            defaults.url(entry),
           );
-        }
-      } else if (defaults.private !== false) {
+      } else if (defaults.status === "private") {
         warn(messages.defaultsNotPublic);
-      } else {
+      } else if (defaults.status === "no-branch") {
         warn(messages.defaultsNoBranch);
       }
-    } catch (error) {
+    } catch {
       active();
-      if (
-        foundDefaults ||
-        !(
-          error instanceof Error && /(?:HTTP\s+404|\(404\))/.test(error.message)
-        )
-      )
-        warn(messages.defaultsFailed);
+      warn(messages.defaultsFailed);
     }
   }
 

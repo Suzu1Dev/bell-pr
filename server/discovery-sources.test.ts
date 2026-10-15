@@ -189,13 +189,18 @@ test("discovery filters public repositories and returns verified metrics, immuta
       .filter((call) => call.args.some((arg) => arg.includes("/contents/")))
       .every((call) => call.args.includes(`ref=${sha}`)),
   );
+  // Beginner mode searches help-wanted issues: good first issues are for
+  // people learning by hand, not for the agent team.
   assert.ok(
     stub.calls[0].args.some(
       (arg) =>
-        arg.includes("good-first-issues:>0") &&
+        arg.includes("help-wanted-issues:>0") &&
+        !arg.includes("good-first-issues") &&
         arg.includes('language:"TypeScript"'),
     ),
   );
+  // The fixture issue carries "good first issue": it is practice to write by hand.
+  assert.deepEqual(result.learningIssues, ["owner/one:issue:1"]);
   assert.ok(
     result.warnings.some((warning) => warning.includes("部分搜尋結果")),
   );
@@ -542,4 +547,39 @@ test("abort stops discovery rather than returning a misleading no-results respon
     /取消/,
   );
   assert.equal(stub.calls.length, 1);
+});
+
+test("beginner discovery searches help-wanted issues and asks GitHub for help-wanted ones, never good first issues", async () => {
+  const stub = fakeGithub((endpoint) =>
+    endpoint === "graphql"
+      ? metadata("one", {
+          issues: {
+            nodes: [
+              {
+                ...issue("one", 2),
+                labels: { nodes: [{ name: "help wanted" }, { name: "bug" }] },
+              },
+            ],
+          },
+        })
+      : undefined,
+  );
+  const result = await collectDiscoveryCandidates(
+    { ...preferences, difficulty: "beginner" },
+    { command: stub.execute },
+  );
+  const query = stub.calls[0].args.find((arg) => arg.startsWith("q="))!;
+  assert.match(query, /help-wanted-issues:>0/);
+  assert.doesNotMatch(query, /good-first-issues/);
+  const graphql = stub.calls.find((call) => call.args[3] === "graphql")!;
+  const repositoryQuery = graphql.args.find((arg) => arg.startsWith("query="))!;
+  assert.match(repositoryQuery, /labels:\["help wanted"\]/);
+  assert.doesNotMatch(repositoryQuery, /good first issue/);
+  // Only a learning label makes an issue practice by hand.
+  assert.deepEqual(result.learningIssues, []);
+  // "Any" difficulty filters on neither label.
+  const any = fakeGithub(() => ({ items: [] }));
+  await collectDiscoveryCandidates({ ...preferences, difficulty: "any" }, { command: any.execute });
+  const anyQuery = any.calls[0].args.find((arg) => arg.startsWith("q="))!;
+  assert.doesNotMatch(anyQuery, /good-first-issues|help-wanted-issues/);
 });

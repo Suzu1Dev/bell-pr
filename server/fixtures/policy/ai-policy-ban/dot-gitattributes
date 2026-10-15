@@ -1,0 +1,5 @@
+# Build output
+dist/** linguist-generated
+*.pb.go linguist-generated=true
+docs/** -linguist-generated
+vendor/** linguist-vendored

@@ -4,7 +4,12 @@ import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { assertNoHan } from "../src/test-utils/render.js";
-import { collectDraftContext, pullRequestGate } from "./draft-sources.js";
+import {
+  collectDraftContext,
+  defaultsKind,
+  documentKind,
+  pullRequestGate,
+} from "./draft-sources.js";
 import { withLocale } from "./i18n/index.js";
 import { command, git } from "./process.js";
 
@@ -673,4 +678,56 @@ test("only the workflow's top-level on decides whether it runs on pull requests"
     assert.ok(!pullRequestGate(on + checks), on);
   // A pull request trigger alone is ordinary CI, not a submission check.
   assert.ok(!pullRequestGate("on: pull_request\njobs:\n  test:\n    steps:\n      - run: npm test\n"));
+});
+
+test("AI policies and CONTRIBUTE files are contributing guidance; GitHub's account defaults still fill a missing CONTRIBUTING", async () => {
+  for (const [file, kind] of [
+    ["AI_POLICY.md", "contributing"],
+    ["docs/CONTRIBUTE.md", "contributing"],
+    ["doc/devel/contribute.rst", "contributing"],
+    ["llvm/docs/AIToolPolicy.md", "contributing"],
+    ["CODE_OF_CONDUCT.md", "documentation"],
+    [".github/copilot-instructions.md", "documentation"],
+    ["Documentation/process/generated-content.rst", "documentation"],
+    ["README.md", "documentation"],
+    ["docs/agents.md", undefined],
+    ["src/AI_POLICY.md", undefined],
+    ["docs/GENERATIVE_AI_POLICY.md", "contributing"],
+    // Code and documents that only start like a policy name are not guidance.
+    ["contribute.py", undefined],
+    ["docs/contribute.sh", undefined],
+    ["generative-models-explained.md", undefined],
+  ] as const)
+    assert.equal(documentKind(file), kind, file);
+  // Only CONTRIBUTING and templates stand for GitHub's community files.
+  assert.equal(defaultsKind("AI_POLICY.md"), undefined);
+  assert.equal(defaultsKind("docs/CONTRIBUTE.md"), undefined);
+  assert.equal(defaultsKind(".github/CONTRIBUTING.md"), "contributing");
+  assert.equal(defaultsKind(".github/pull_request_template.md"), "template");
+
+  const f = await fixture({
+    "AI_POLICY.md": "All AI usage must be disclosed in the pull request.",
+    ".github/pull_request_template.md": "## Summary",
+  });
+  try {
+    const stub = stubGithub((args) => {
+      if (args.includes("graphql")) return metadata("Organization");
+      const endpoint = args.at(-1)!;
+      if (endpoint === "repos/owner/.github") return { private: false, default_branch: "main" };
+      if (endpoint.includes("/git/ref/")) return { object: { type: "commit", sha: defaultSha } };
+      if (endpoint.includes("/git/trees/"))
+        return {
+          sha: treeSha,
+          tree: [{ path: "CONTRIBUTING.md", type: "blob", mode: "100644", sha: blobSha, size: 20 }],
+        };
+      return { encoding: "base64", content: Buffer.from("Shared rule.").toString("base64") };
+    });
+    const context = await collectDraftContext(f.repo, f.run, { execute: stub.execute });
+    assert.deepEqual(
+      context.sources.filter((source) => source.kind === "contributing").map((source) => source.id),
+      ["base:AI_POLICY.md", "org:CONTRIBUTING.md"],
+    );
+  } finally {
+    await f.cleanup();
+  }
 });
