@@ -587,7 +587,7 @@ const mission = {
       area: `You can practise this locally; ${product.name} won't publish it while the project keeps issues labelled for newcomers for people who write the fix by hand.`,
     },
     otherPr: ({ author, number }: { author: string; number: number }) =>
-      `You can practise this locally; ${product.name} won't publish it while @${author}'s pull request #${n(number)} would close the same issue, unless you give your reason when you publish.`,
+      `You can practise this locally; ${product.name} won't publish it while @${author}'s pull request #${number} would close the same issue, unless you give your reason when you publish.`,
     pacing: ({ open, budget }: { open: number; budget: number }) =>
       `You can practise this locally; ${product.name} won't publish it while you have ${n(open)} open pull requests here, at least twice your budget of ${n(budget)}.`,
     lesson:

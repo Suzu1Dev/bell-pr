@@ -438,7 +438,7 @@ const m: Translation<typeof en> = {
       area: `你可以在本機練習；專案把有新手標籤的 issue 留給親手寫修正的人，所以 ${product.name} 不會發布它。`,
     },
     otherPr: ({ author, number }) =>
-      `你可以在本機練習；只要 @${author} 的 Pull Request #${n(number)} 會關閉同一個 issue，${product.name} 就不會發布它，除非你在發布時寫下理由。`,
+      `你可以在本機練習；只要 @${author} 的 Pull Request #${number} 會關閉同一個 issue，${product.name} 就不會發布它，除非你在發布時寫下理由。`,
     pacing: ({ open, budget }) =>
       `你可以在本機練習；你在這裡有 ${n(open)} 個開著的 Pull Request，至少是上限 ${n(budget)} 的兩倍，在這之前 ${product.name} 不會發布它。`,
     lesson:

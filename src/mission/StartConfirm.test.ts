@@ -32,6 +32,12 @@ test("each reason is one whole sentence: practise locally, BELL won't publish it
   assert.match(html, /<button type="button" class="button secondary">Back<\/button><button type="button" class="button primary"><svg[\s\S]*?<\/svg>Start and practise locally<\/button>/);
 });
 
+test("a pull request number reads as GitHub writes it, without digit grouping", () => {
+  const reasons: StartReason[] = [{ id: "other-pr", author: "other_dev", number: 12345 }];
+  assert.match(renderEn(confirm(reasons)), /pull request #12345 would close/);
+  assert.match(renderZh(confirm(reasons)), /Pull Request #12345 會關閉/);
+});
+
 test("the good-first-issue lesson is two sentences and a pointer to help-wanted issues", () => {
   const html = renderEn(confirm([{ id: "learning" }]));
   assertNoHan(html);
