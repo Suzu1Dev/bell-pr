@@ -186,6 +186,8 @@ const recorded: RunCore = {
 test("the export adds the person's own records in order, in English", () => {
   const markdown = buildLearningExport(recorded, demoLikeRepo, "en");
   assertNoHan(markdown);
+  // The person's own words are not called agent output.
+  assert.match(markdown, /^# .*\n\n> The explanations, chat answers and reviews .* may be wrong; the parts marked as yours are your own words\./);
   const order = [
     "## Questions and answers",
     "## Your notes",
@@ -236,6 +238,7 @@ test("the person's sections are left out when empty, and render in zh-TW", () =>
   assert.match(later, /- #x: security/);
   const chinese = buildLearningExport(recorded, demoLikeRepo, "zh-TW");
   for (const text of [
+    "標示為「你的」的部分是你自己寫的。",
     "## 你的筆記",
     "## 用自己的話講一遍\n\n在理解檢查關閉時核准。",
     "**你的答案**（大概）：the base delay",

@@ -7,7 +7,7 @@ const fmt = formatters("zh-TW");
 const messages: Translation<typeof en> = {
   title: ({ title }) => `# 學習紀錄：${title}`,
   disclaimer:
-    "> 本紀錄的解說、問答與審查內容由 agent 產生，可能有誤；程式碼與結論仍需自行驗證。",
+    "> 本紀錄的解說、問答中的回答與審查內容由 agent 產生，可能有誤；標示為「你的」的部分是你自己寫的。程式碼與結論仍需自行驗證。",
   repository: ({ fullName }) => `- Repository：${fullName}`,
   branch: ({ branch, baseBranch }) => `- 分支：${branch} → ${baseBranch}`,
   createdAt: ({ createdAt }) => `- 建立時間：${createdAt}`,
