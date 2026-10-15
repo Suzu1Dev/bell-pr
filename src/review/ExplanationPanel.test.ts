@@ -837,6 +837,13 @@ test("try first is on by default; the off switch and trivial files keep today's 
   assert.ok(
     renderPanel({ file: { ...file, path: "docs/usage.md", additions: 3, deletions: 1 } }).includes("tf-card"),
   );
+  // The project's own linguist-generated patterns count too, as in the check.
+  const generatedFile = { ...file, path: "src/gen/client.ts" };
+  assert.ok(renderPanel({ file: generatedFile }).includes("tf-card"));
+  const generated = renderPanel({ file: generatedFile, generated: ["src/gen/**"] });
+  assertNoHan(generated);
+  assert.ok(!generated.includes("tf-card"));
+  assert.match(generated, /aria-expanded="false"[^>]*>Show answer</);
 });
 
 test("a saved attempt on this version of the file comes back revealed; one on an older version does not", () => {

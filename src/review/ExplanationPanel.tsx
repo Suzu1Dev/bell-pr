@@ -84,6 +84,8 @@ export interface ExplanationPanelProps {
   }): Promise<void>;
   /** Shows the try-first prompts; false brings back the plain reveal (Settings → Learning). */
   tryFirst?: boolean;
+  /** The project's `linguist-generated` patterns (`contributionRules.generated`); those files get no prompts, as in the check. */
+  generated?: readonly string[];
 }
 
 /**
@@ -296,6 +298,7 @@ export function ExplanationPanel({
   attempt,
   onAttempt,
   tryFirst = true,
+  generated,
 }: ExplanationPanelProps) {
   const t = useT("review");
   const fmt = useFormat();
@@ -385,7 +388,8 @@ export function ExplanationPanel({
   const fileModule = moduleFor(file.path, modules);
   // Try first: the quiz and road-choice prompts, except on trivial files.
   const prompts =
-    tryFirst && !isTrivialFile({ ...file, fingerprint: file.fingerprint ?? "" });
+    tryFirst &&
+    !isTrivialFile({ ...file, fingerprint: file.fingerprint ?? "" }, generated);
   const fileAttempt = currentAttempt(attempt, file.fingerprint);
   const samples = demo ? demoSamples(locale, file.path) : undefined;
   // A saved note keeps its text when the diff moves on; the badge says so.
