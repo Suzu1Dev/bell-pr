@@ -105,10 +105,19 @@ pull request draft before an agent sees it. <!-- claim:PRIV-20 -->
 Under your GitHub account, BELL PR:
 
 - clones and fetches the repositories you import, and reads their details,
-  issues, contribution guidelines and templates; <!-- claim:PRIV-21 -->
+  issues, contribution guidelines and templates. To check that a pull
+  request is welcome, it also reads, when you import or update a
+  repository, link an issue to a contribution, open the publish dialog or
+  publish: whether the repository takes pull requests (its pull request
+  settings, your permission level in it and your GitHub login), the sizes
+  of its last 3 merged pull requests, the linked issue's state, labels,
+  assignees and recent comments and the pull requests that would close it,
+  and how many of your own pull requests in that repository are open,
+  merged, or waiting on your answer to a review. These reads only read,
+  and their results are not sent to the AI provider; <!-- claim:PRIV-21 -->
 - searches GitHub for projects, when you run discovery; <!-- claim:PRIV-22 -->
-- reads the review comments and check results of your pull requests, when
-  you ask for maintainer-feedback coaching; <!-- claim:PRIV-23 -->
+- reads the reviews, comments, check results and state of your pull
+  requests, when you choose "Read feedback"; <!-- claim:PRIV-23 -->
 - writes only after you approve: it creates a fork when needed, pushes a
   branch and opens a draft pull request with the title, description and
   commits you approved, and later pushes only the follow-up commits you
@@ -145,7 +154,7 @@ account only. <!-- claim:PRIV-33 -->
 
 | Item | What it holds |
 | --- | --- |
-| `state.json`, with `state.json.bak.1` to `.bak.3`, `state.quarantine.json` and `state.json.corrupt-<time>` | The repositories you imported and your runs: contribution directions, plans, agent logs and reports, review progress, explanations, follow-up questions and answers, notes and pull request drafts. A damaged file is kept aside, never silently dropped. |
+| `state.json`, with `state.json.bak.1` to `.bak.3`, `state.quarantine.json` and `state.json.corrupt-<time>` | The repositories you imported and your runs: contribution directions, plans, agent logs and reports, review progress, explanations, follow-up questions and answers, notes and pull request drafts. Your learning records: your understanding checks (your explanation, answers, confidence, grades, corrections, forecast and how long each check took), your try-first answers and the approaches you chose, your tags and lessons on maintainer comments, your restatements for follow-up rounds, your practice schedule (grades and dates, never your practice answers), the reasons you gave for a weakened test or for publishing next to another person's pull request, and coach debriefs. The GitHub facts described above, including the rules quoted from each repository's files and, for a linked issue, the GitHub logins of the people assigned to it, claiming it or with a pull request for it, and its latest maintainer comment. A damaged file is kept aside, never silently dropped. |
 | `repositories/` | BELL PR's own clones of the repositories you imported, from GitHub or from a folder on your computer. |
 | `worktrees/` and `team-worktrees/` | A working copy for each run and each teammate, with the changes the agents made. |
 | `insights/` | Each project's cached analysis, recommendations and contribution preferences. |
