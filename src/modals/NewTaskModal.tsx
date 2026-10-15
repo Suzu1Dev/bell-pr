@@ -105,6 +105,13 @@ export function NewTaskModal({
     !demo &&
     (providerReadiness(doctor.report, contributionSettings.provider ?? "codex")
       ?.state ?? "ready") !== "ready";
+  const startDisabled =
+    busy ||
+    settingsLoading ||
+    !settingsReady ||
+    !taskRepoId ||
+    prompt.trim().length < 10 ||
+    unready;
   return (
     <Modal
       wide
@@ -243,7 +250,7 @@ export function NewTaskModal({
             {formError}
           </p>
         )}
-        {asking && startCheck.reasons.length > 0 && (
+        {asking && startCheck.reasons.length > 0 && !startDisabled && (
           <StartConfirm
             reasons={startCheck.reasons}
             onCancel={() => setAsking(false)}
@@ -265,14 +272,7 @@ export function NewTaskModal({
           <button
             className="button primary"
             type="submit"
-            disabled={
-              busy ||
-              settingsLoading ||
-              !settingsReady ||
-              !taskRepoId ||
-              prompt.trim().length < 10 ||
-              unready
-            }
+            disabled={startDisabled}
           >
             {busy ? (
               <Loader2 size={16} className="spin" />
