@@ -102,10 +102,13 @@ const messages: Translation<typeof en> = {
         door: "是否接受你開的 Pull Request",
         issue: "連結的 issue",
         pacing: "你在這裡開著的 Pull Request",
+        rules: "專案的規則",
+        orgDefaults: "帳號預設的貢獻檔案",
         other: "一項 GitHub 資料",
       }[part];
       return reason ? `無法確認${what}：${reason}` : `無法確認${what}。`;
     },
+    rulesUnread: `無法確認專案的規則：${product.name} 還沒讀過它們。`,
   },
 };
 

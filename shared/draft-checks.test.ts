@@ -204,7 +204,7 @@ test("tests-weakened blocks until each item has a one-line reason", () => {
 
 test("pacing confirms at the budget, blocks at twice it, and spares people with write access", () => {
   const pacing = (openPrs: number, mergedPrs = 0, extra = {}) =>
-    ids({ facts: facts({ pacing: { openPrs, mergedPrs, ...extra } }) });
+    ids({ rules: rules(), facts: facts({ pacing: { openPrs, mergedPrs, ...extra } }) });
   assert.deepEqual(pacing(0), []);
   assert.deepEqual(pacing(1), ["pacing:confirm"]);
   assert.deepEqual(pacing(2), ["pacing-max:block"]);
@@ -299,12 +299,35 @@ test("reviewability confirms a very large change, missing tests, files outside t
 });
 
 test("facts-unknown names what could not be read, and why", () => {
-  const found = check({ facts: facts({ unknown: ["door: HTTP 502", "issue", "something else"] }) }, "facts-unknown");
+  const found = check({ rules: rules(), facts: facts({ unknown: ["door: HTTP 502", "issue", "something else"] }) }, "facts-unknown");
   assert.deepEqual(found?.details.slice(1), [
     "Couldn't check whether pull requests are open to you: HTTP 502",
     "Couldn't check the linked issue.",
     "Couldn't check a GitHub fact: something else",
   ]);
+});
+
+test("with facts, rules never read or files that could not be read are unknown too, never a pass", () => {
+  // A project imported by an earlier build has no rules yet: an AI ban or a
+  // required disclosure may be in them.
+  assert.deepEqual(check({ facts: facts({}) }, "facts-unknown")?.details.slice(1), [
+    "Couldn't check the project's rules: BELL PR hasn't read them yet.",
+  ]);
+  const unread = {
+    ...rules(),
+    unknown: ["rules: The project's files could not be read.", "orgDefaults: GitHub answered with an error.", "door"],
+  };
+  // The door is a GitHub fact, read again for the run; the rule files are not.
+  assert.deepEqual(check({ rules: unread, facts: facts({}) }, "facts-unknown")?.details.slice(1), [
+    "Couldn't check the project's rules: The project's files could not be read.",
+    "Couldn't check the account's default contribution files: GitHub answered with an error.",
+  ]);
+  assert.equal(check({ rules: rules(), facts: facts({}) }, "facts-unknown"), undefined);
+  // Without facts (approval, the Draft tab's text checks) it waits for publishing.
+  assert.equal(check({ rules: unread }, "facts-unknown"), undefined);
+  assert.equal(check({}, "facts-unknown"), undefined);
+  const zh = draftPreflight({ body, facts: facts({}) }, "zh-TW").find((value) => value.id === "facts-unknown");
+  assert.match(zh?.details[1] ?? "", /無法確認專案的規則/);
 });
 
 /** One input per confirm draftPreflight can emit, with every confirm it can raise at once. */

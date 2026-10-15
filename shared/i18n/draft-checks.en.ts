@@ -152,15 +152,24 @@ const messages = {
       `New dependencies: ${fmt.list(names)}.`,
     mergedSizes: ({ sizes }: { sizes: number[] }) =>
       `For comparison, the project's last merged pull requests changed ${fmt.list(sizes.map((size) => fmt.number(size)))} lines.`,
-    unknownPart: ({ part, reason }: { part: "door" | "issue" | "pacing" | "other"; reason?: string }) => {
+    unknownPart: ({
+      part,
+      reason,
+    }: {
+      part: "door" | "issue" | "pacing" | "rules" | "orgDefaults" | "other";
+      reason?: string;
+    }) => {
       const what = {
         door: "whether pull requests are open to you",
         issue: "the linked issue",
         pacing: "your open pull requests here",
+        rules: "the project's rules",
+        orgDefaults: "the account's default contribution files",
         other: "a GitHub fact",
       }[part];
       return reason ? `Couldn't check ${what}: ${reason}` : `Couldn't check ${what}.`;
     },
+    rulesUnread: `Couldn't check the project's rules: ${product.name} hasn't read them yet.`,
   },
 };
 

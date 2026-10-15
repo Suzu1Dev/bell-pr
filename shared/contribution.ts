@@ -248,14 +248,15 @@ export function validOverride(
   );
 }
 
-/** Splits "<part>: <reason>" from ContributionFacts.unknown. */
+const unknownPartIds = ["door", "issue", "pacing", "rules", "orgDefaults"] as const;
+type UnknownPartId = (typeof unknownPartIds)[number];
+
+/** Splits "<part>: <reason>" from ContributionFacts.unknown or ContributionRules.unknown. */
 function unknownParts(entries: readonly string[]) {
   return entries.map((entry) => {
     const [part, ...rest] = entry.split(":");
-    const known: "door" | "issue" | "pacing" | "other" =
-      part.trim() === "door" || part.trim() === "issue" || part.trim() === "pacing"
-        ? part.trim() as "door" | "issue" | "pacing"
-        : "other";
+    const id = unknownPartIds.find((known) => known === part.trim());
+    const known: UnknownPartId | "other" = id ?? "other";
     const reason = (known === "other" ? entry : rest.join(":")).trim();
     return { part: known, reason: reason || undefined };
   });
@@ -533,13 +534,26 @@ export function respectChecks(
     }
   }
 
-  // Facts that could not be read.
-  if (facts?.unknown?.length)
+  // Facts that could not be read. With facts (the publish dialog and
+  // publish itself), rules BELL never read, or files it could not read,
+  // are unknown too: an AI ban or a required disclosure may be in them.
+  const rulesUnknown = facts
+    ? input.rules
+      ? unknownParts(input.rules.unknown ?? []).filter(
+          ({ part }) => part === "rules" || part === "orgDefaults",
+        )
+      : undefined
+    : [];
+  const unknown = [
+    ...unknownParts(facts?.unknown ?? []).map((part) => m.unknownPart(part)),
+    ...(rulesUnknown ? rulesUnknown.map((part) => m.unknownPart(part)) : [m.rulesUnread]),
+  ];
+  if (unknown.length)
     confirms.push({
       id: "facts-unknown",
       kind: "confirm",
       message: m.factsUnknown,
-      details: [m.why.factsUnknown, ...unknownParts(facts.unknown).map((part) => m.unknownPart(part))],
+      details: [m.why.factsUnknown, ...unknown],
     });
 
   return [...blocks, ...confirms];
