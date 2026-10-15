@@ -7,6 +7,8 @@
 //   hides its overflow;
 // - no control or text sticks out of the box it sits in;
 // - the sample badge covers nothing in the top bar.
+// The v1.1 views that take steps to reach (e2e/helpers/views.ts) are
+// checked the same way on a common and the narrowest phone.
 // The pages show the sample project in presentation mode (`present=1`,
 // `capture=1`) with the same ready setup as e2e/screenshots.spec.ts, so
 // these are the views the screenshots show, between and below the captured
@@ -21,6 +23,8 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { htmlLang, locales, type Locale } from "../shared/i18n/locale";
 import { findOverflow } from "./helpers/overflow";
 import { startReadyServer } from "./helpers/ready-server";
+import { startRealProject } from "./helpers/real-project";
+import { stateViews } from "./helpers/views";
 import { routes, sampleRoutes } from "./helpers/routes";
 import type { LaunchedServer } from "./start-server.mjs";
 
@@ -215,7 +219,14 @@ async function expectFits(
   hash: string,
   viewport: { width: number; height: number },
   sample: boolean,
-  { collapsed = false } = {},
+  {
+    collapsed = false,
+    drive,
+  }: {
+    collapsed?: boolean;
+    /** Takes the opened page to a view that needs steps (e2e/helpers/views.ts). */
+    drive?: (page: Page, locale: Locale) => Promise<void>;
+  } = {},
 ) {
   const context = await browser.newContext({
     baseURL: server.baseURL,
@@ -231,8 +242,13 @@ async function expectFits(
       );
     const page = await context.newPage();
     await page.clock.setFixedTime(frozenAt);
-    await page.goto(`/${hash}?present=1&capture=1&locale=${locale}`);
+    const [path, query] = hash.split("?");
+    await page.goto(`/${path}?${query ? `${query}&` : ""}present=1&capture=1&locale=${locale}`);
     await settled(page, locale);
+    if (drive) {
+      await drive(page, locale);
+      await page.evaluate(() => document.fonts.ready);
+    }
     if (collapsed) await expect(page.locator(".app-shell")).toHaveClass(/is-sidebar-collapsed/);
     if (sample) await expect(page.locator(".presentation-sample-badge")).toBeVisible();
     const problems = [
@@ -305,6 +321,48 @@ test.describe("at 320 px with the sample badge", () => {
         await expectFits(browser, server!, locale, route.hash, { width: 320, height: 640 }, true);
       });
 });
+
+// The v1.1 views that take steps to reach (e2e/helpers/views.ts), on a
+// common and the narrowest phone.
+const phones = [
+  { width: 390, height: 844 },
+  { width: 320, height: 640 },
+];
+
+test.describe("the v1.1 views on phones", () => {
+  let server: LaunchedServer | undefined;
+  test.beforeAll(async () => {
+    server = await startServer();
+  });
+  test.afterAll(async () => {
+    await server?.stop();
+  });
+
+  for (const locale of locales)
+    for (const view of stateViews.filter((entry) => !entry.real))
+      for (const viewport of phones)
+        test(`${view.name} in ${locale} fits at ${viewport.width} px`, async ({ browser }) => {
+          await expectFits(browser, server!, locale, view.route, viewport, view.route.startsWith("#/runs/"), {
+            drive: view.drive,
+          });
+        });
+});
+
+for (const view of stateViews.filter((entry) => entry.real))
+  test.describe(`${view.name} on a real run, on phones`, () => {
+    let project: LaunchedServer | undefined;
+    test.beforeAll(async () => {
+      project = await startRealProject(view.real);
+    });
+    test.afterAll(async () => {
+      await project?.stop();
+    });
+    for (const locale of locales)
+      for (const viewport of phones)
+        test(`${view.name} in ${locale} fits at ${viewport.width} px`, async ({ browser }) => {
+          await expectFits(browser, project!, locale, view.route, viewport, false, { drive: view.drive });
+        });
+  });
 
 // The trial's chip ("TRIAL · 14d") is the widest plan chip in the sidebar.
 test.describe("on the 14-day trial", () => {
