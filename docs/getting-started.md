@@ -178,9 +178,10 @@ responsibly](contributing-responsibly.md#the-numbers-bell-pr-uses)).
 Nothing here stops you from starting: when a fact means BELL PR will not
 publish the change (a closed issue, a project that does not take pull
 requests from you, rules that do not accept AI-assisted contributions,
-someone else's pull request, or twice your budget), the start button asks
-once, and you can start and practise locally. For an issue labelled for
-newcomers, the dialog explains why such issues are best written by hand.
+an issue the project keeps for newcomers, someone else's pull request, or
+twice your budget), the start button asks once, and you can start and
+practise locally. For an issue labelled for newcomers, the dialog also
+explains why such issues are best written by hand.
 
 The same form sets the team size (Free: 2 teammates; Pro: up to 4), whether
 you approve the plan before development, and the efficiency mode. The
