@@ -155,10 +155,12 @@ export function startReasons(
 
 /**
  * The sample project's "Before you contribute" facts: its fictional
- * CONTRIBUTING.md through the real classifier, and its door. The same as
- * `demoContributionRules` (src/demo/rules.ts), built here because every
- * module under src/demo/ joins the demo chunk that loads at startup, and
- * the classifier would bring the PR-check tooling into it.
+ * CONTRIBUTING.md through the real classifier, its door and its merged
+ * sizes. The one source for the rules card, the task dialog, the Draft tab
+ * and the publish dialog (src/workspace/respect.ts uses it too). It lives
+ * here, in a module only lazy views load, because every module under
+ * src/demo/ joins the demo chunk that loads at startup, and the classifier
+ * would bring the PR-check tooling into it.
  */
 export function sampleRules(demo: DemoContent): ContributionRules {
   const context = demo.draftPreparation.context;

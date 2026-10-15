@@ -3,7 +3,7 @@ import test, { afterEach } from "node:test";
 import { createElement } from "react";
 import type { ContributionRules, PolicyFinding } from "../../shared/contribution";
 import { getDemo } from "../demo";
-import { demoContributionRules } from "../demo/rules";
+import { sampleRules as buildSampleRules } from "./respect";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import ContributionRulesCard, {
   findingEffect,
@@ -12,7 +12,7 @@ import ContributionRulesCard, {
 import { mount } from "./test-dom";
 
 const demo = getDemo("en");
-const sampleRules = demoContributionRules(demo);
+const sampleRules = buildSampleRules(demo);
 
 const card = (props: Partial<ContributionRulesCardProps> = {}) =>
   createElement(ContributionRulesCard, { repoId: "repo-1", demo: false, ...props });

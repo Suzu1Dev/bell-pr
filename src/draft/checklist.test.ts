@@ -5,7 +5,7 @@ import { draftPreflight } from "../../shared/draft-checks";
 import { formatters } from "../../shared/i18n/locale";
 import { reviewabilitySnapshot } from "../../shared/reviewability";
 import { getDemo } from "../demo";
-import { demoContributionRules } from "../demo/rules";
+import { sampleRules } from "../mission/respect";
 import en from "../i18n/en";
 import {
   checklistCheck,
@@ -16,7 +16,7 @@ import {
 } from "./checklist";
 
 const demo = getDemo("en");
-const rules = demoContributionRules(demo);
+const rules = sampleRules(demo);
 const facts = demo.contributionFacts!;
 const changes = reviewabilitySnapshot({ files: demo.files, mergedSizes: demo.mergedSizes });
 const body = demo.run.draft.body;

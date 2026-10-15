@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { ContributionFacts, ContributionRules } from "../../shared/contribution";
 import { getDemo } from "../demo";
-import { demoContributionRules } from "../demo/rules";
 import {
   doorClosed,
   doorState,
@@ -15,7 +14,7 @@ import {
 } from "./respect";
 
 const demo = getDemo("en");
-const rules = demoContributionRules(demo);
+const rules = sampleRules(demo);
 const facts = demo.contributionFacts!;
 
 test("the door is open, for collaborators only, turned off or archived", () => {
@@ -115,7 +114,14 @@ test("Start asks once for a closed issue, someone else's PR, a closed door, a ba
   assert.deepEqual(startReasons({ ...facts, pacing: { openPrs: 9, viewerPermission: "WRITE" } }, rules), []);
 });
 
-test("the sample's rules are the ones src/demo/rules.ts builds, in both locales", () => {
-  for (const locale of ["en", "zh-TW"] as const)
-    assert.deepEqual(sampleRules(getDemo(locale)), demoContributionRules(getDemo(locale)), locale);
+test("the sample's rules come from its CONTRIBUTING.md, its door and its merged sizes, in both locales", () => {
+  for (const locale of ["en", "zh-TW"] as const) {
+    const demo = getDemo(locale);
+    const built = sampleRules(demo);
+    assert.deepEqual(built.door, demo.contributionFacts?.door, locale);
+    assert.deepEqual(built.mergedSizes, demo.mergedSizes, locale);
+    assert.equal(built.checkedAt, demo.draftPreparation.context?.checkedAt, locale);
+    assert.deepEqual(built.filesRead, ["CONTRIBUTING.md", ".github/PULL_REQUEST_TEMPLATE.md"], locale);
+    assert.deepEqual(built.findings.map((finding) => finding.kind), ["issue-first", "understand", "disclose"], locale);
+  }
 });
