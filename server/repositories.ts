@@ -17,6 +17,7 @@ import { setupError } from "./cli-errors.js";
 import { AppError, type Repository, type Run } from "./types.js";
 import type { WorkbenchContext } from "./workbench.js";
 import { log } from "./log.js";
+import { refreshRepositoryRules } from "./contribution-facts.js";
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
@@ -388,10 +389,31 @@ export async function importRepository(
       url: remote?.url ?? "",
       language: metadata?.primaryLanguage?.name,
     };
+    // The project's own rules from its files; GitHub's facts (the door)
+    // only for a GitHub import: a local folder runs no gh at import.
+    const rules = await projectRules(ctx, repo, { network: !!github });
+    if (rules) repo.contributionRules = rules;
     ctx.store.data.repos.unshift(repo);
     await ctx.store.save();
     return repo;
   });
+}
+
+/**
+ * The "Before you contribute" facts of a project (contribution-facts.ts),
+ * read at import and at Update project. They never fail either one.
+ */
+async function projectRules(
+  ctx: WorkbenchContext,
+  repo: Repository,
+  options: { network?: boolean } = {},
+) {
+  try {
+    return await refreshRepositoryRules(ctx, repo, options);
+  } catch (error) {
+    log.warn("repo.rules_failed", { repoId: repo.id, error });
+    return undefined;
+  }
 }
 
 /**
@@ -463,7 +485,7 @@ export async function updateRepository(ctx: WorkbenchContext, id: string) {
           : m.run.repos.checkoutNotUpdated,
       409,
     );
-  return ctx.lock(`repository:${repo.id}`, async () => {
+  const result = await ctx.lock(`repository:${repo.id}`, async () => {
     await completePartialClone(ctx, repo);
     const from = (
       await git(repo.path, ["rev-parse", "--verify", "HEAD"])
@@ -493,6 +515,16 @@ export async function updateRepository(ctx: WorkbenchContext, id: string) {
     await ctx.store.save();
     return { repo, from, to, updated: from !== to };
   });
+  // Read again for the updated project, outside the repository lock so
+  // GitHub's answers never hold up its runs.
+  await ctx.lock(`contribution-rules:${repo.id}`, async () => {
+    const rules = await projectRules(ctx, repo);
+    if (rules && ctx.store.data.repos.includes(repo)) {
+      repo.contributionRules = rules;
+      await ctx.store.save();
+    }
+  });
+  return result;
 }
 
 /** True when `child` lies strictly inside `parent`. */
