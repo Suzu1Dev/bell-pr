@@ -276,8 +276,9 @@ export async function refreshRunFacts(
  * "Check again". The rule files are read locally for every repository;
  * GitHub (the door, the size reference and the account's default files)
  * only for a GitHub origin and unless `network` is false, as for a project
- * imported from a local folder, which records `unknown: ["door"]` and runs
- * no gh. A failure never rejects: it is recorded in `unknown` and logged.
+ * imported from a local folder, which records `door: folder-import` and
+ * runs no gh. A failure never rejects: it is recorded in `unknown` and
+ * logged.
  */
 export async function refreshRepositoryRules(
   _ctx: WorkbenchContext,
@@ -299,7 +300,9 @@ export async function refreshRepositoryRules(
     unknown.push(unknownEntry("rules", "files-unreadable"));
     log.warn("contribution.rules_unreadable", { repoId: repo.id, error });
   }
-  if (!remote || options.network === false) unknown.push("door");
+  // Not read, and the card says why: "Check again" reads a folder's GitHub origin.
+  const unread = !remote || options.network === false;
+  if (unread) unknown.push(unknownEntry("door", remote ? "folder-import" : "no-github-origin"));
   else {
     const read = reader(rulesTimeoutMs);
     const lacking = !own.has("contributing") || !own.has("template");
@@ -328,7 +331,7 @@ export async function refreshRepositoryRules(
   rules.findings = policyFindings(documents);
   rules.filesRead = documents.map((document) => document.path).slice(0, policyLimits.filesRead);
   if (unknown.length) rules.unknown = unknown;
-  if (rules.unknown?.some((entry) => entry !== "door"))
+  if (rules.unknown?.some((entry) => !unread || entry.split(":")[0] !== "door"))
     log.info("contribution.rules_unknown", {
       repoId: repo.id,
       parts: rules.unknown.map((entry) => entry.split(":")[0]),

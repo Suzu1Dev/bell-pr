@@ -4,7 +4,7 @@
 // PATH; nothing reaches the network.
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { draftPreflight } from "../shared/draft-checks.js";
@@ -198,9 +198,16 @@ test("a local-folder import reads the project's files and runs no gh at all", as
       await writeFile(path.join(local, "CONTRIBUTING.md"), "Open an issue before you send a pull request.\n");
       await git(local, ["add", "."]);
       await git(local, ["commit", "-qm", "local"]);
-      if (origin) await git(local, ["remote", "add", "origin", origin]);
+      // Written as it is: the stand-in git would map a github.com argument
+      // to its local remote.
+      if (origin) await appendFile(path.join(local, ".git", "config"), `[remote "origin"]\n\turl = ${origin}\n`);
       const repo = await workbench.importRepository(local);
-      assert.deepEqual(repo.contributionRules?.unknown, ["door"], name);
+      // The door is not read, and the card says why.
+      assert.deepEqual(
+        repo.contributionRules?.unknown,
+        [origin ? "door: folder-import" : "door: no-github-origin"],
+        name,
+      );
       assert.deepEqual(repo.contributionRules?.filesRead, ["CONTRIBUTING.md"]);
       assert.deepEqual(repo.contributionRules?.findings.map((finding) => finding.kind), ["issue-first"]);
       assert.equal(repo.contributionRules?.door, undefined);

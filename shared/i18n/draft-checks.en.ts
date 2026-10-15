@@ -187,6 +187,7 @@ const messages = {
       "no-github-origin": "This project has no GitHub origin, so there is nothing to check on GitHub.",
       "not-an-issue": "The link is not a GitHub issue.",
       "files-unreadable": "The project's files could not be read at its current commit.",
+      "folder-import": "It isn't read when a project is imported from a folder. Choose Check again to read it from GitHub.",
     },
   },
 };

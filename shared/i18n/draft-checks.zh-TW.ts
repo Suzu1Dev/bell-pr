@@ -121,6 +121,7 @@ const messages: Translation<typeof en> = {
       "no-github-origin": "這個專案沒有 GitHub 來源，所以沒有可以在 GitHub 上檢查的事。",
       "not-an-issue": "這個連結不是 GitHub issue。",
       "files-unreadable": "無法在專案目前的 commit 讀取它的檔案。",
+      "folder-import": "從資料夾匯入專案時不會讀取這項資料。按「再確認一次」即可從 GitHub 讀取。",
     },
   },
 };

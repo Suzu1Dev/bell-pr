@@ -220,4 +220,10 @@ test("a stored reason code is worded in the language the card is read in", () =>
   assert.match(zh, /無法讀取帳號預設的貢獻檔案：已達 GitHub 的速率上限。/);
   assert.match(zh, /無法在專案目前的 commit 讀取它的檔案。/);
   assert.doesNotMatch(zh, /github-error|rate-limited|files-unreadable|GitHub answered/);
+  // A project imported from a folder says why its door was not read.
+  const folder = english({ rules: { ...coded, unknown: ["door: folder-import"] } });
+  assert.match(
+    folder,
+    /Couldn&#x27;t check whether pull requests are open to you: It isn&#x27;t read when a project is imported from a folder\. Choose Check again to read it from GitHub\./,
+  );
 });

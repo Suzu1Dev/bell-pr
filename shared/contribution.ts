@@ -287,6 +287,7 @@ export const unknownReasonCodes = [
   "no-github-origin",
   "not-an-issue",
   "files-unreadable",
+  "folder-import",
 ] as const;
 export type UnknownReasonCode = (typeof unknownReasonCodes)[number];
 
