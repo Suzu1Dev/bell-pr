@@ -1,7 +1,7 @@
 {
   "name": "bell-pr",
   "version": "1.0.0-rc.1",
-  "description": "A self-hosted, local-first workbench for open-source contributions: an AI agent team works in isolated git worktrees, explains every change in plain language, and drafts a pull request that you review and approve.",
+  "description": "From vibe coding to knowing why. A local workbench for AI-assisted open-source contributions: an agent team builds the change in isolated git worktrees, you learn every change, explain it back and send one Draft PR that follows the project's rules.",
   "keywords": [
     "open-source",
     "contributions",
