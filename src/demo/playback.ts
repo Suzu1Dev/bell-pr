@@ -16,7 +16,10 @@
  *      log lines appear;
  *   5. integrating and reviewing, then status "review": every file's
  *      explanation goes from "generating" to "ready", then the PR guidance;
- *   6. approved, through approve() (publish() approves first when needed);
+ *   6. approved, through approve() (publish() approves first when needed),
+ *      once the Explain-it-back check passed for the played files or the
+ *      person turned it off (checkUnderstanding; setUnderstanding() keeps
+ *      the reader's record on the played run);
  *   7. published, with prUrl "#demo-pr" and the published card.
  *
  * importSample() and analyzeSample() play the import of the sample
@@ -27,6 +30,7 @@ import type {
   ProjectInsights,
 } from "../../shared/insights";
 import type { TeamMessage, TeamTask } from "../../shared/team";
+import type { RunUnderstanding } from "../../shared/understanding";
 import type { Agent, DiffFile, Repo, Run } from "../types";
 import type { DemoContent, DemoPublishedCard } from "./types";
 
@@ -127,6 +131,13 @@ export interface DemoPlaybackOptions {
   /** 1 is real time; 4 runs four times as fast. Default 1. */
   speed?: number;
   clock?: PlaybackClock;
+  /**
+   * Whether the played run may be approved: its understanding check passed
+   * for its files (understandingStatus), or the person turned the check
+   * off. The rules load lazily, so the workspace passes them in; without
+   * this, approve() refuses.
+   */
+  checkUnderstanding?: (run: Run, files: DiffFile[]) => boolean;
 }
 
 export interface DemoPlayback {
@@ -134,8 +145,13 @@ export interface DemoPlayback {
   start(settings?: ContributionSettings): void;
   /** Approves the plan while the run awaits it; false otherwise. */
   approvePlan(): boolean;
-  /** Approves the reviewed run ("review" → "approved"); false otherwise. */
+  /**
+   * Approves the reviewed run ("review" → "approved") once
+   * checkUnderstanding allows it; false otherwise.
+   */
   approve(): boolean;
+  /** Keeps the reader's Explain-it-back record on the played run, for approve(). */
+  setUnderstanding(record: RunUnderstanding | undefined): void;
   /**
    * Publishes the sample Draft PR from "review" or "approved"; false
    * otherwise. Nothing is sent anywhere.
@@ -176,6 +192,7 @@ export function createDemoPlayback({
   demo,
   speed = 1,
   clock = systemClock,
+  checkUnderstanding,
 }: DemoPlaybackOptions): DemoPlayback {
   const rate = Number.isFinite(speed) && speed > 0 ? speed : 1;
   const lanes: Lane[] = [];
@@ -319,7 +336,17 @@ export function createDemoPlayback({
       draft: { ...base.draft },
       reviewedFiles: [],
       reports: {},
-      ...(settings ? { contributionSettings: copy(settings) } : {}),
+      // The sample task is for the sample issue, which its rules ask for.
+      ...(base.contributionSettings || settings
+        ? {
+            contributionSettings: {
+              ...copy(base.contributionSettings ?? settings!),
+              ...(settings ? copy(settings) : {}),
+              issueUrl:
+                settings?.issueUrl?.trim() || base.contributionSettings?.issueUrl,
+            },
+          }
+        : {}),
       team: {
         config,
         phase: "planning",
@@ -499,7 +526,7 @@ export function createDemoPlayback({
   }
 
   function approve(): boolean {
-    if (run?.status !== "review") return false;
+    if (run?.status !== "review" || !checkUnderstanding?.(run, files)) return false;
     run.status = "approved";
     emitRun();
     return true;
@@ -592,6 +619,11 @@ export function createDemoPlayback({
     start,
     approvePlan,
     approve,
+    setUnderstanding(record) {
+      if (!run) return;
+      if (record) run.understanding = copy(record);
+      else delete run.understanding;
+    },
     publish,
     importSample,
     analyzeSample,

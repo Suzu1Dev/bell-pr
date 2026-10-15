@@ -267,3 +267,25 @@ test("stopping the sample's team stops it where it was, and a finished sample st
   assert.equal(zh.demoStopped, "範例團隊已停止。可從「新增貢獻」重新開始。");
   assertNoHan(en.workspace.notices.demoStopped);
 });
+
+test("a playback step keeps the reader's own records: the check, attempts, tags and reasons", () => {
+  const understanding = { summary: { text: "Mine", changeFingerprint: "0".repeat(16), at: "2026-10-13T00:00:00Z" } };
+  const previous: Run = {
+    ...base,
+    id: "demo-run",
+    understanding,
+    understandingCheckOff: true,
+    attempts: { "a.ts": { fingerprint: "a.ts", quiz: { answer: "It retries", at: "2026-10-13T00:00:00Z" } } },
+    feedbackTags: { "#c1": { predicted: true, at: "2026-10-13T00:00:00Z" } },
+    reviewability: { testReasons: { "a.test.ts#-3": "The assertion moved below." } },
+  };
+  const merged = mergePlaybackRun(previous, { ...base, id: "demo-run", status: "approved" });
+  assert.equal(merged.status, "approved");
+  assert.deepEqual(merged.understanding, understanding);
+  assert.equal(merged.understandingCheckOff, true);
+  assert.deepEqual(merged.attempts, previous.attempts);
+  assert.deepEqual(merged.feedbackTags, previous.feedbackTags);
+  assert.deepEqual(merged.reviewability, previous.reviewability);
+  // Nothing the reader did not write appears.
+  assert.equal("understanding" in mergePlaybackRun(base, { ...base, status: "review" }), false);
+});

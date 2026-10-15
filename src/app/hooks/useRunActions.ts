@@ -30,11 +30,13 @@ import { usePresentation } from "../presentation";
 import {
   demoRunInLocale,
   loadDemo,
+  readerRecords,
   saveDemo,
   saveDemoSettings,
 } from "./demoStorage";
 import { saveTextFile } from "./saveTextFile";
 import type { DraftEditor } from "./useDraftEditor";
+import { markCheckOff, openCheckPanel, useSampleGate } from "./useUnderstanding";
 import type { TaskSetup } from "./useTaskSetup";
 
 /**
@@ -92,6 +94,10 @@ export function mergePlaybackRun(previous: Run, step: Run): Run {
     draft: previous.draft,
     ...(previous.notes ? { notes: previous.notes } : {}),
     ...(previous.prFeedback ? { prFeedback: previous.prFeedback } : {}),
+    // The reader's own records: the check, try-first answers, tags, reasons.
+    ...Object.fromEntries(
+      readerRecords.flatMap((key) => (previous[key] === undefined ? [] : [[key, previous[key]]])),
+    ),
     // The sample PR goes out under the branch name the reader chose.
     ...(step.publishedBranch
       ? { publishedBranch: previous.draft.publishBranch || step.publishedBranch }
@@ -288,6 +294,9 @@ export function useRunActions({
     stop: () => void;
   } | null>(null);
   const [playing, setPlaying] = useState(false);
+  // The sample's Explain-it-back gate; the playback holds the reader's record too.
+  const sampleGate = useSampleGate(demo);
+  useEffect(() => playback.current?.player.setUnderstanding(run.understanding), [run.understanding, playing]);
   // The locale the open demo run's text is in; its progress is kept under it.
   const demoLocale = useRef(locale);
   useEffect(() => {
@@ -348,6 +357,10 @@ export function useRunActions({
     const player = createDemoPlayback({
       demo: getDemo(locale),
       speed: presentation.speed,
+      checkUnderstanding: (played, files) => {
+        const gate = sampleGate(played, files);
+        return gate.passed || !gate.required;
+      },
     });
     let first = true;
     const unsubscribe = player.subscribe((event) => {
@@ -815,10 +828,27 @@ export function useRunActions({
       });
     }
   }
+  /** Opens the Explain-it-back check instead of approving. */
+  function checkFirst() {
+    openCheckPanel(run.id);
+    notify(t.checkFirst);
+  }
+  /**
+   * The sample's gate for its current files, when it lets the sample
+   * through; otherwise it opens the check and gives nothing.
+   */
+  function sampleApproval() {
+    const gate = sampleGate(run, playback.current?.player.current()?.files ?? demoContent.files);
+    if (!gate.required || gate.passed) return gate;
+    checkFirst();
+    return undefined;
+  }
   async function approve() {
     setBusy(true);
     try {
       if (demo) {
+        const gate = sampleApproval();
+        if (!gate) return;
         // The playback approves its own run; the finished sample, here.
         if (!playback.current?.player.approve())
           setRun((previous) =>
@@ -826,6 +856,7 @@ export function useRunActions({
               ? { ...previous, status: "approved" }
               : previous,
           );
+        setRun((previous) => markCheckOff(previous, gate));
       } else {
         const { run: updated } = await api<{ run: Run }>(
           `/runs/${run.id}/approve`,
@@ -848,7 +879,8 @@ export function useRunActions({
       setAcknowledged([]);
       openModal("publish");
     } catch (error) {
-      notify((error as Error).message, "error");
+      if (error instanceof ApiError && error.code === "understanding_check_required") checkFirst();
+      else notify((error as Error).message, "error");
     } finally {
       setBusy(false);
     }
@@ -858,6 +890,7 @@ export function useRunActions({
       // The sample "opens" its Draft PR without a request: the draft tab
       // shows it as published, with the sample card.
       closeModal();
+      if (!sampleApproval()) return;
       setTab("draft");
       if (!playback.current?.player.publish())
         setRun((previous) =>
