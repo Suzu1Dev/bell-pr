@@ -195,6 +195,9 @@ test("a missing issue or an unreadable answer is a failure, never facts", async 
 
 test("maintainer quotes read as on GitHub and stay within 300 characters", () => {
   assert.equal(quoteComment("Go ahead.  <!-- hidden -->\n\n\nThanks!"), "Go ahead. Thanks!");
+  // A pasted credential is masked before it is stored.
+  const token = `ghp_${"a".repeat(36)}`;
+  assert.ok(!quoteComment(`Use ${token} to test it.`).includes(token));
   const long = quoteComment(`${"word ".repeat(100)}end`);
   assert.ok(long.length <= 300);
   assert.ok(long.endsWith("…"));

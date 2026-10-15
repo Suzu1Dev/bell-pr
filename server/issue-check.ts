@@ -11,7 +11,7 @@
  * A failed read is never a pass: the caller records it as unknown.
  */
 import { AppError } from "./types.js";
-import { command } from "./process.js";
+import { command, redact } from "./process.js";
 import {
   claimComment,
   maintainerAssociation,
@@ -195,10 +195,13 @@ const isBot = (author: Record<string, unknown> | undefined) =>
 
 /**
  * A comment as it reads on GitHub, for a short quote: hidden HTML comments
- * out, runs of white space as one, 300 characters or fewer.
+ * out, credentials masked, runs of white space as one, 300 characters or
+ * fewer.
  */
 export function quoteComment(body: string) {
-  const plain = body.replace(/<!--[\s\S]*?-->/g, " ").replace(/\s+/g, " ").trim();
+  const plain = redact(body.replace(/<!--[\s\S]*?-->/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
   if (plain.length <= maxQuote) return plain;
   const cut = plain.slice(0, maxQuote - 1);
   return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), maxQuote / 2)).trimEnd()}…`;
