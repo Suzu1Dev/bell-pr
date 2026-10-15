@@ -29,9 +29,9 @@ const plans: Translation<typeof en> = {
         "免費：Lead、2 位隊友、Reviewer 與 Test analyst。Pro 與試用：3 或 4 位隊友。",
     },
     parallelRuns: {
-      label: "同時執行的工作",
+      label: "同時進行多項貢獻",
       limit:
-        "免費：一次進行一項貢獻，其餘工作依序排隊。Pro：依你的設定同時執行（預設 2 項，最多 8 項）。",
+        "免費：一次進行一項貢獻，其餘依序排隊。Pro：依你的設定同時進行（預設 2 項，最多 8 項）。所有方案的發布節奏都相同。",
     },
     planApproval: {
       label: "計畫核准與修訂、團隊收件匣、重試失敗的子任務",
@@ -41,6 +41,10 @@ const plans: Translation<typeof en> = {
       label: "差異審查、解說、追問對話、筆記與建議審查順序",
       limit: "不限",
     },
+    understandingCheck: {
+      label: "核准前用自己的話講一遍",
+      limit: "預設開啟；可在設定中關閉，未經檢查就核准的工作會被標記",
+    },
     reviewRerun: {
       label: "重新執行 Reviewer 與 Test analyst",
       limit: "不限（屬於人工審查的安全關卡）",
@@ -48,6 +52,10 @@ const plans: Translation<typeof en> = {
     publish: {
       label: "依專案規範撰寫 PR 草稿、送出前檢查、發布 Draft PR",
       limit: "所有方案都必須經過人工核准",
+    },
+    respectChecks: {
+      label: "專案規範、issue、可審查性與發布節奏檢查",
+      limit: "所有方案都有；任何方案都無法略過",
     },
     sync: {
       label: "將工作同步到目標分支的最新版本、由 Agent 解決衝突、更新專案的本機 clone",
@@ -57,14 +65,26 @@ const plans: Translation<typeof en> = {
       label: "學習筆記頁面",
       limit: "不限",
     },
+    practice: {
+      label: "練習卡組與學習統計",
+      limit: "不限",
+    },
     learningExport: {
-      label: "匯出學習紀錄（Markdown）",
-      limit: "免費：不提供（學習筆記頁面仍免費）",
+      label: "匯出完整學習紀錄（Markdown）",
+      limit: "免費：不提供（學習頁面仍免費）",
+    },
+    coachDebrief: {
+      label: "依你自己的紀錄產生教練回顧",
+      limit: "免費：不提供；範例專案會顯示標示 PRO 的範例。降級後，已有的回顧仍可查看。",
+    },
+    maintainerFeedback: {
+      label: "讀取維護者回饋，並與你的預測對照",
+      limit: "不限",
     },
     prFeedback: {
-      label: "維護者回饋、CI 指導與 AI 後續修改回合",
+      label: "針對維護者回饋的 AI 後續修改回合",
       limit:
-        "免費：不提供；範例專案會顯示標示 PRO 的範例回饋。降級後，工作上已有的後續修改回合仍可查看，進行中的回合仍可審查、推送、停止或捨棄。",
+        "免費：不提供。降級後，工作上已有的後續修改回合仍可查看，進行中的回合仍可審查、推送、停止或捨棄。",
     },
     discovery: {
       label: "探索貢獻（全 GitHub 推薦）",

@@ -16,6 +16,7 @@ const m: Translation<typeof en> = {
     webAccess: "Agent 網路存取需要 Pro 授權。關閉網路存取即可繼續使用免費方案。",
     deepReasoning:
       "xhigh、max 與 ultra 思考強度需要 Pro 授權。改選其他強度或「模型預設」即可繼續使用免費方案。",
+    coachDebrief: "教練回顧需要 Pro 授權。",
   },
   invalidKey: {
     malformed: `這不是 ${name} 授權金鑰。請貼上完整的金鑰，開頭是 BELLPR1。`,

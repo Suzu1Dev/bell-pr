@@ -24,15 +24,20 @@ starting the trial sends nothing anywhere.
 | Project analysis with verified recommendations | Free | Up to 5 recommendations per analysis; re-analysis is allowed. Recommendations you already generated (up to 30) stay visible after a downgrade. |
 | More recommendations ("Generate 5 more", up to 30 per project) | Pro | Free: 5. Pro: up to 30 per project. |
 | Agent team size | Free (limited) | Free: Lead, 2 teammates, Reviewer and Test analyst. Pro and trial: 3 or 4 teammates. |
-| Concurrent runs | Free (limited) | Free: one contribution at a time; other runs wait in the queue. Pro: up to your configured limit (2 by default, at most 8). |
+| Work on more than one contribution at a time | Free (limited) | Free: one contribution at a time; others wait in the queue. Pro: up to your configured limit (2 by default, at most 8). Publishing is paced the same on every plan. |
 | Plan approval and revision, team inbox, retry of failed subtasks | Free | Up to 3 plan revisions |
 | Diff review, explanations, follow-up chat, notes, suggested review order | Free | No limit |
+| Explain it back before approval | Free | On by default; you can turn it off in Settings, and runs approved without it are marked |
 | Re-run Reviewer and Test analyst | Free | No limit (part of the human review safety gate) |
 | Rule-aware PR draft, preflight checks, publishing a Draft PR | Free | Human approval is required on every plan |
+| Project-rule, issue, reviewability and pacing checks | Free | On every plan; no plan can skip them |
 | Syncing a run onto the latest target branch, agent conflict resolution, updating a project's local clone | Free | No limit (unpublished runs and published PRs) |
 | Learning notes page | Free | No limit |
-| Learning record export (Markdown) | Pro | Free: not available (the notes page stays Free) |
-| Maintainer feedback, CI coaching and AI follow-up rounds | Pro | Free: not available; the sample project shows example feedback labelled PRO. Follow-up rounds already on a run stay readable after a downgrade, and an open round can still be reviewed, pushed, stopped or discarded. |
+| Practice deck and learning counts | Free | No limit |
+| Complete learning record export (Markdown) | Pro | Free: not available (the learning page stays Free) |
+| Coach debrief from your own records | Pro | Free: not available; the sample project shows an example labelled PRO. Debriefs you already have stay readable after a downgrade. |
+| Read maintainer feedback and compare it with your forecast | Free | No limit |
+| AI follow-up rounds on maintainer feedback | Pro | Free: not available. Follow-up rounds already on a run stay readable after a downgrade, and an open round can still be reviewed, pushed, stopped or discarded. |
 | Discovery (GitHub-wide recommendations) | Pro | Free: labelled sample results only. Results you already have stay readable, and a running discovery can still be cancelled. |
 | Web access for agents | Pro | Free: off. Pro: off until you turn it on. Claude Code may then open pages on GitHub's own sites only; the Codex CLI uses OpenAI's web search. |
 | Deep reasoning efforts (xhigh, max, ultra) | Pro | Free: choose none to high. Leaving the effort on "Default" uses the model's own default effort on every plan. |

@@ -78,8 +78,8 @@ test("re-running the review is Free and Pro-only efforts are real efforts", () =
   for (const effort of proOnlyEfforts) assert.ok(reasoningEfforts.includes(effort));
 });
 
-test("the plan table has the 20 rows in order, and every Pro feature gates one row", () => {
-  assert.equal(planFeatureIds.length, 20);
+test("the plan table has the 25 rows in order, and every Pro feature gates one row", () => {
+  assert.equal(planFeatureIds.length, 25);
   assert.deepEqual(planFeatureTable.map((row) => row.id), [...planFeatureIds]);
   for (const feature of proFeatures) {
     const rows = planFeatureTable.filter((row) => row.feature === feature);
@@ -94,7 +94,7 @@ test("the plan table has the 20 rows in order, and every Pro feature gates one r
   assert.equal(tier("licenseTerm"), "pro");
   // Syncing, conflict resolution and updating the clone are Free (README §10 row 20).
   assert.equal(tier("sync"), "free");
-  assert.equal(planFeatureIds.indexOf("sync"), planFeatureIds.indexOf("publish") + 1);
+  assert.equal(planFeatureIds.indexOf("sync"), planFeatureIds.indexOf("respectChecks") + 1);
 });
 
 test("the purchase link is not part of the plans module", () => {
@@ -123,4 +123,27 @@ test("the English copy uses the amended Free/Pro wording", () => {
   // AI follow-up rounds are Pro under prFeedback (1U).
   assert.match(en.features.prFeedback.label, /follow-up rounds/);
   assert.match(zh.features.prFeedback.label, /後續修改回合/);
+});
+
+test("the understanding check, the respect checks, feedback reading and practice are Free, never gated", () => {
+  const row = (id: string) => planFeatureTable.find((entry) => entry.id === id);
+  for (const id of ["understandingCheck", "respectChecks", "practice", "maintainerFeedback"]) {
+    assert.equal(row(id)?.tier, "free", id);
+    assert.equal(row(id)?.feature, undefined, id);
+    assert.equal((proFeatures as readonly string[]).includes(id), false, id);
+  }
+  // Pro goes deeper: the coach debrief and AI follow-up rounds.
+  assert.deepEqual(row("coachDebrief"), { id: "coachDebrief", tier: "pro", feature: "coachDebrief" });
+  assert.deepEqual(row("prFeedback"), { id: "prFeedback", tier: "pro", feature: "prFeedback" });
+  // The new rows sit where the table reads them.
+  const after = (id: string) => planFeatureIds[planFeatureIds.indexOf(id as never) + 1];
+  assert.equal(after("review"), "understandingCheck");
+  assert.equal(after("publish"), "respectChecks");
+  assert.equal(after("learningNotes"), "practice");
+  assert.equal(after("learningExport"), "coachDebrief");
+  assert.equal(after("maintainerFeedback"), "prFeedback");
+  assert.equal(en.features.parallelRuns.label, "Work on more than one contribution at a time");
+  assert.match(en.features.parallelRuns.limit, /Publishing is paced the same on every plan\.$/);
+  assert.equal(en.features.prFeedback.label, "AI follow-up rounds on maintainer feedback");
+  assert.equal(en.features.learningExport.label, "Complete learning record export (Markdown)");
 });

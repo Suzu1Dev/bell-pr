@@ -29,6 +29,7 @@ const m: Translation<typeof en> = {
       prFeedback: "維護者回饋指導與後續修改回合需要 Pro 授權。",
       webAccess: "Agent 網路存取需要 Pro 授權。",
       deepReasoning: "xhigh、max 與 ultra 思考強度需要 Pro 授權。",
+      coachDebrief: "教練回顧需要 Pro 授權。",
     },
     proLimits: {
       teamSize: "Pro：3 或 4 位隊友",

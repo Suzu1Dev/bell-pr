@@ -43,6 +43,7 @@ export default {
       webAccess: "Web access for agents needs a Pro license.",
       deepReasoning:
         "The xhigh, max and ultra reasoning efforts need a Pro license.",
+      coachDebrief: "The coach debrief needs a Pro license.",
     } satisfies Record<ProFeature, string>,
     /** What Pro allows on the rows that Free has with a smaller limit. */
     proLimits: {
