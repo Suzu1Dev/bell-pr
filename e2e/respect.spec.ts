@@ -93,7 +93,9 @@ test.describe("the sample project", () => {
       /^A maintainer said: “PRs welcome for the retry cap\.”/,
       mission.start.pacing({ open: 0, budget: 1 }),
     ]);
-    await expect(facts.locator(".before-start-chip.is-ok")).toHaveCount(5);
+    await expect(facts.locator(".before-start-chip.is-ok")).toHaveCount(4);
+    // The maintainer's words are quoted, not judged.
+    await expect(facts.locator(".before-start-chip.is-info")).toHaveText(/^A maintainer said/);
     expect(requests.filter((request) => request.includes("contribution"))).toEqual([]);
     await expectAccessible(page, ".modal");
   });

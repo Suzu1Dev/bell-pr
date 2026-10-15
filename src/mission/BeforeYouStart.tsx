@@ -5,6 +5,7 @@ import {
   CircleHelp,
   LoaderCircle,
   OctagonX,
+  Quote,
   RefreshCw,
   type LucideIcon,
 } from "lucide-react";
@@ -43,12 +44,14 @@ export interface BeforeYouStartProps {
 /** How long the issue link must stay unchanged before GitHub is read. */
 export const issueCheckDelayMs = 600;
 
-type Tone = "ok" | "warn" | "bad" | "unknown";
+/** `info` is a quote: BELL does not judge whether it says go ahead or wait. */
+type Tone = "ok" | "warn" | "bad" | "unknown" | "info";
 const toneIcons: Record<Tone, LucideIcon> = {
   ok: CircleCheck,
   warn: CircleAlert,
   bad: OctagonX,
   unknown: CircleHelp,
+  info: Quote,
 };
 
 const sameLogin = (a?: string, b?: string) =>
@@ -211,7 +214,7 @@ export default function BeforeYouStart({
     if (issue.maintainerQuote)
       chips.push({
         key: "maintainer",
-        tone: "ok",
+        tone: "info",
         text: t.maintainer({
           quote: issue.maintainerQuote.quote,
           date: fmt.date(issue.maintainerQuote.at),

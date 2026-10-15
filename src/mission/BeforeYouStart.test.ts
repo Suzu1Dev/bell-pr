@@ -18,7 +18,7 @@ const chips = (html: string) =>
     (match) => [match[1], match[2]],
   );
 
-test("the sample shows issue #42 without a link and green chips", () => {
+test("the sample shows issue #42 without a link, green chips and the maintainer's quote", () => {
   const html = renderEn(view({ demo: true }));
   assertNoHan(html);
   assert.match(html, /<h4 id="before-start-[^"]+">Before you start<span class="before-start-issue">#42 \(sample\)<\/span><\/h4>/);
@@ -28,7 +28,8 @@ test("the sample shows issue #42 without a link and green chips", () => {
     ["ok", "Open"],
     ["ok", "Unassigned"],
     ["ok", "No other open PR"],
-    ["ok", "A maintainer said: “PRs welcome for the retry cap.” (Oct 2, 2026)"],
+    // A quote, not a verdict: it may as well ask to wait.
+    ["info", "A maintainer said: “PRs welcome for the retry cap.” (Oct 2, 2026)"],
     ["ok", "Your open PRs here: 0 of 1"],
   ]);
   assert.match(html, /title="The budget is a BELL PR default, the same on every plan/);
