@@ -29,8 +29,8 @@ export type Entry = {
 
 /** Folders whose guidance is read besides the root. */
 const documentFolders = [".github", "docs", "doc", "documentation"];
-/** AI policies by name: AI_POLICY*, AI-POLICY*, AI_USAGE*, *AIToolPolicy*, LLM*POLICY*, GENERATIVE*AI*. */
-const aiPolicyName = /^(?:ai[-_](?:policy|usage)|.*aitoolpolicy|llm.*policy|generative.*ai)/;
+/** AI policies by name: AI_POLICY*, AI-POLICY*, AI_USAGE*, *AIToolPolicy*, LLM*POLICY*, GENERATIVE_AI*. */
+const aiPolicyName = /^(?:ai[-_](?:policy|usage)|.*aitoolpolicy|llm.*policy|generative[-_]?ai(?![a-z0-9]))/;
 /**
  * Policy-named documents in the docs folders: "ai-", "llm",
  * "generated-content", "code-provenance", "coding-assistant", "contribut".
@@ -71,7 +71,7 @@ export function documentKind(file: string): DocumentKind | undefined {
     (parts.length > 1 && !documentFolders.includes(parts[0]))
   )
     return;
-  if (stem === "contributing" || /^contribute(?:$|[-_.])/.test(stem))
+  if (stem === "contributing" || (text && /^contribute(?:$|[-_.])/.test(stem)))
     return "contributing";
   // Agent guides such as AGENTS.md often hold the branch and commit rules CONTRIBUTING links to.
   if (

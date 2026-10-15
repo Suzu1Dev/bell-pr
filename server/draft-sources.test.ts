@@ -692,6 +692,11 @@ test("AI policies and CONTRIBUTE files are contributing guidance; GitHub's accou
     ["README.md", "documentation"],
     ["docs/agents.md", undefined],
     ["src/AI_POLICY.md", undefined],
+    ["docs/GENERATIVE_AI_POLICY.md", "contributing"],
+    // Code and documents that only start like a policy name are not guidance.
+    ["contribute.py", undefined],
+    ["docs/contribute.sh", undefined],
+    ["generative-models-explained.md", undefined],
   ] as const)
     assert.equal(documentKind(file), kind, file);
   // Only CONTRIBUTING and templates stand for GitHub's community files.
