@@ -678,6 +678,29 @@ test("publish accepts overrides only for someone else's PR, with a 20 to 200 cha
   assert.equal(f.run.guardOverrides?.length, 8);
   assert.equal(f.run.guardOverrides?.at(-1)?.reason, "Their PR was abandoned in June.");
   assert.equal(f.run.guardOverrides?.[0].reason, "An older reason number 1 for the record.");
+  // A retry with the same reason records it once.
+  await assert.rejects(
+    f.workbench.publish(f.run.id, f.run.approvedFingerprint!, [], [
+      { id: "issue-has-pr", reason: "Their PR was abandoned in June." },
+    ]),
+  );
+  assert.equal(f.run.guardOverrides?.filter((override) => override.reason === "Their PR was abandoned in June.").length, 1);
+  assert.equal(f.run.guardOverrides?.[0].reason, "An older reason number 1 for the record.");
+  // A publish that a check refuses records nothing.
+  f.repo.contributionRules = {
+    checkedAt: "2026-10-15T00:00:00.000Z",
+    findings: [
+      { kind: "ban", path: "AI_POLICY.md", line: 4, quote: "Pull requests made with AI tools are not accepted.", contribution: true },
+    ],
+    filesRead: ["AI_POLICY.md"],
+  };
+  await assert.rejects(
+    f.workbench.publish(f.run.id, f.run.approvedFingerprint!, [], [
+      { id: "issue-has-pr", reason: "Another reason that is long enough." },
+    ]),
+    (error: AppError) => error.statusCode === 422,
+  );
+  assert.ok(!f.run.guardOverrides?.some((override) => override.reason === "Another reason that is long enough."));
 });
 
 test("until the respect and learning-loop work fills them, their facades answer 501", async (t) => {

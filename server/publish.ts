@@ -427,16 +427,20 @@ export async function publish(
         409,
       );
     assertRefName(headBranch);
-    // A block the person lifted with a reason is recorded on the run.
-    if (overrides.length)
-      run.guardOverrides = [
-        ...(run.guardOverrides ?? []),
-        ...overrides.map((override) => ({
-          id: override.id,
-          reason: override.reason.trim(),
-          at: now(),
-        })),
-      ].slice(-8);
+    // A block the person lifted with a reason counts for this publish, and
+    // is recorded on the run once publishing goes ahead (below); a reason
+    // already recorded, as on a retry, is not added again.
+    const at = now();
+    const same = (a: Pick<GuardOverride, "id" | "reason">, b: typeof a) =>
+      a.id === b.id && a.reason === b.reason;
+    const lifted = overrides
+      .map((override) => ({ id: override.id, reason: override.reason.trim(), at }))
+      .filter(
+        (override, index, all) =>
+          all.findIndex((other) => same(other, override)) === index &&
+          !(run.guardOverrides ?? []).some((recorded) => same(recorded, override)),
+      );
+    const guardOverrides = [...(run.guardOverrides ?? []), ...lifted].slice(-8);
     // The GitHub facts are read again; a failed read is never a pass.
     run.contributionFacts =
       (await refreshRunFacts(ctx, run, { timeoutMs: 10_000 })) ??
@@ -447,7 +451,7 @@ export async function publish(
       files,
       ctx.store.directory,
       currentLocale(),
-      { repo },
+      { repo, overrides: guardOverrides },
     );
     const blocking = checks.find((check) => check.kind === "block");
     if (blocking)
@@ -470,6 +474,7 @@ export async function publish(
     // The commit e-mail is asked about once per address.
     if (checks.some((check) => check.id === "author-email"))
       await confirmEmails(ctx.store.directory, await commitEmails(run));
+    if (lifted.length) run.guardOverrides = guardOverrides;
     run.publishing = true;
     delete run.error;
     await ctx.store.save();
