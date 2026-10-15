@@ -829,8 +829,9 @@ export function useRunActions({
       });
     }
   }
-  /** Opens the Explain-it-back check instead of approving. */
+  /** Opens the Explain-it-back check instead of approving or publishing. */
   function checkFirst() {
+    closeModal();
     openCheckPanel(run.id);
     notify(t.checkFirst);
   }
@@ -922,7 +923,8 @@ export function useRunActions({
       closeModal();
       notify(pushingRound ? t.roundPushed : t.prCreated);
     } catch (error) {
-      setFormError((error as Error).message);
+      if (error instanceof ApiError && error.code === "understanding_check_required") checkFirst();
+      else setFormError((error as Error).message);
       // A refused push may have saved the round's state; show it next to the error.
       if (pushingRound)
         void api<{ run: Run }>(`/runs/${run.id}`)
