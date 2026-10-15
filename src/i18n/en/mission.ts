@@ -5,6 +5,7 @@
  * Messages that take a count get the raw number and format it themselves, so
  * they can pick the singular or plural noun.
  */
+import type { PolicyKind } from "../../../shared/contribution";
 import type { PonytailMode } from "../../../shared/efficiency";
 import { formatters, type Locale } from "../../../shared/i18n/locale";
 import type {
@@ -449,6 +450,151 @@ const mission = {
     moreFailed:
       "No more recommendations were generated; the existing list is kept. Try again.",
     analysisFailed: "The project analysis did not finish. Try again.",
+  },
+  /**
+   * ContributionRulesCard, "Before you contribute": the project's own rules
+   * quoted from its files, whether its pull requests are open to the
+   * person, and what publishing does about each rule. It never says that a
+   * project has no rules, only where it looked.
+   */
+  rules: {
+    kicker: "THE PROJECT'S OWN RULES",
+    title: "Before you contribute",
+    lead: `What this project asks of contributors, quoted from its own files, and what ${product.name} does about each rule when you publish.`,
+    door: {
+      open: "Pull requests: open to you",
+      collaborators:
+        "Pull requests: collaborators only (you can practise here, not publish)",
+      off: "Pull requests: turned off (you can practise here, not publish)",
+      archived:
+        "Archived: the project takes no changes (you can practise here, not publish)",
+      unknown: ({ reason }: { reason?: string }) =>
+        reason
+          ? `Couldn't check whether pull requests are open to you: ${reason}`
+          : "Couldn't check whether pull requests are open to you.",
+    },
+    kinds: {
+      ban: "AI-assisted contributions",
+      disclose: "Saying that AI helped",
+      understand: "Explaining your change",
+      area: "Issues kept for newcomers",
+      agent: "Notes addressed to AI agents",
+      "own-words": "Descriptions in your own words",
+      "issue-first": "An issue before the work",
+    } satisfies Record<PolicyKind, string>,
+    /** What publishing does about a rule, shown as a chip before `effect`. */
+    effects: {
+      block: "Blocks publishing",
+      confirm: "Asks you to confirm",
+      info: "For your information",
+    },
+    effect: {
+      ban: `${product.name}'s agents write every change, so it won't publish one here. You can still practise locally.`,
+      banAmbiguous:
+        "Publishing asks you to decide whether it covers AI-assisted contributions.",
+      disclose: "Publishing waits until the description says that AI helped.",
+      understand:
+        "Your understanding check covers it. With the check turned off, publishing asks you to confirm.",
+      area: "Publishing is blocked when the linked issue carries a label for newcomers.",
+      agent:
+        "It is addressed to AI agents. You are the author, so publishing asks you to decide whether it applies.",
+      "own-words": `Publishing waits while the description is still ${product.name}'s suggested text.`,
+      "issue-first": "Publishing asks you to confirm when no issue is linked.",
+    } satisfies Record<PolicyKind | "banAmbiguous", string>,
+    found: ({ count, files }: { count: number; files: number }) =>
+      `${amount(count, "rule", "rules")} quoted from the ${amount(files, "file", "files")} ${product.name} read.`,
+    notFound: ({ files }: { files: number }) =>
+      `Not found in the ${amount(files, "file", "files")} ${product.name} read. Some projects publish their rules on a website or wiki; check before you publish.`,
+    noFiles:
+      "No contributing guide, policy or pull request template was there to read. Some projects publish their rules on a website or wiki; check before you publish.",
+    couldntCheck: ({ reason }: { reason: string }) => `Couldn't check: ${reason}`,
+    notRead: `${product.name} hasn't read this project's rules yet. It reads them when the project is imported or updated, and when you check again.`,
+    filesRead: ({ count }: { count: number }) =>
+      `Files ${product.name} read · ${n(count)}`,
+    orgDefaults: ({ repository }: { repository: string }) =>
+      `Includes the default files of ${repository}.`,
+    unread: ({ what }: { what: string }) => `Couldn't read: ${what}`,
+    checkedAt: ({ date }: { date: string }) => `Checked ${date}`,
+    checkAgain: "Check again",
+    checking: "Checking…",
+    sample:
+      "Sample: the project and its CONTRIBUTING.md are fictional, and nothing was read from GitHub.",
+  },
+  /**
+   * BeforeYouStart, under the task dialog's issue field: the issue's state,
+   * who is on it and the person's open pull requests here, read once per
+   * issue link. Nothing here stops a run from starting.
+   */
+  start: {
+    title: "Before you start",
+    lead: "Read once for this issue link. Nothing here stops you from practising; publishing checks again.",
+    noIssue: `Link the issue you will work on, and ${product.name} checks that it is still open and that nobody else is on it.`,
+    notGitHub:
+      "Issue facts are read for GitHub issue links, such as https://github.com/owner/repo/issues/123.",
+    checking: "Checking the issue on GitHub…",
+    issue: ({ number }: { number: number }) => `Issue #${number}`,
+    sampleIssue: ({ number }: { number: number }) => `#${number} (sample)`,
+    open: "Open",
+    closed: ({ reason }: { reason?: string }) =>
+      reason ? `Closed (${reason})` : "Closed",
+    closedReasons: {
+      COMPLETED: "completed",
+      NOT_PLANNED: "not planned",
+      DUPLICATE: "duplicate",
+    } as Record<string, string>,
+    unassigned: "Unassigned",
+    assigned: ({ names }: { names: string[] }) =>
+      `Assigned to ${fmt.list(names.map((name) => `@${name}`))}`,
+    claimed: ({ author, date, bot }: { author: string; date: string; bot: boolean }) =>
+      bot
+        ? `Claimed by @${author} (a bot) on ${date}`
+        : `Claimed by @${author} on ${date}`,
+    noOtherPr: "No other open PR",
+    otherPr: ({ author, number }: { author: string; number: number }) =>
+      `@${author}'s PR #${number} would close this`,
+    closedPr: ({ author, number }: { author: string; number: number }) =>
+      `@${author}'s PR #${number} was closed without merging`,
+    maintainer: ({ quote, date }: { quote: string; date: string }) =>
+      `A maintainer said: “${quote}” (${date})`,
+    learning: ({ labels }: { labels: string[] }) =>
+      `Labelled for newcomers: ${fmt.list(labels)}`,
+    pacing: ({ open, budget }: { open: number; budget: number }) =>
+      `Your open PRs here: ${n(open)} of ${n(budget)}`,
+    pacingHelp: `The budget is a ${product.name} default, the same on every plan: 1 open pull request before your first one is merged in a repository, 2 after.`,
+    pacingExempt: "You can write to this repository, so publishing isn't paced here",
+    doorClosed: "This repository doesn't take pull requests from you",
+    ban: "The project's rules don't accept AI-assisted contributions",
+    unknown: ({ part, reason }: { part: "door" | "issue" | "pacing" | "other"; reason?: string }) => {
+      const what = {
+        door: "whether pull requests are open to you",
+        issue: "the issue",
+        pacing: "your open pull requests here",
+        other: "a GitHub fact",
+      }[part];
+      return reason ? `Couldn't check ${what}: ${reason}` : `Couldn't check ${what}`;
+    },
+    couldntCheck: ({ reason }: { reason: string }) => `Couldn't check: ${reason}`,
+    checkAgain: "Check again",
+    sample: "Sample facts; nothing was read from GitHub.",
+  },
+  /** The task dialog asks once before Start when the facts say publishing will wait. */
+  startConfirm: {
+    title: "Before the team starts",
+    practise: {
+      "issue-closed": `You can practise this locally; ${product.name} won't publish it while the linked issue is closed.`,
+      door: `You can practise this locally; ${product.name} won't publish it while this repository doesn't take pull requests from you.`,
+      ban: `You can practise this locally; ${product.name} won't publish it while the project's rules don't accept AI-assisted contributions.`,
+      area: `You can practise this locally; ${product.name} won't publish it while the project keeps issues labelled for newcomers for people who write the fix by hand.`,
+    },
+    otherPr: ({ author, number }: { author: string; number: number }) =>
+      `You can practise this locally; ${product.name} won't publish it while @${author}'s pull request #${number} would close the same issue, unless you give your reason when you publish.`,
+    pacing: ({ open, budget }: { open: number; budget: number }) =>
+      `You can practise this locally; ${product.name} won't publish it while you have ${n(open)} open pull requests here, at least twice your budget of ${n(budget)}.`,
+    lesson:
+      "Issues labelled for newcomers are how people learn a project by writing the fix themselves. When an agent team takes one, the next newcomer loses that chance. Consider a help-wanted issue instead.",
+    practiseLocally: "Start and practise locally",
+    startAnyway: "Start anyway",
+    back: "Back",
   },
 };
 

@@ -107,6 +107,34 @@ test.describe("Discovery's Free sample state", () => {
     await server?.stop();
   });
 
+  test("a newcomer issue in the sample is tagged Learn by hand and offers no agent team", async ({ browser }) => {
+    const { page, close } = await openOn(browser, server);
+    try {
+      await page.goto("/#/discover?locale=en");
+      const sample = getSampleDiscoveryJob("en").opportunities;
+      const byHand = sample.filter((item) => item.learnByHand);
+      expect(byHand.length).toBeGreaterThan(0);
+      const cards = page.locator(".discovery-opportunity");
+      await expect(cards).toHaveCount(sample.length);
+      for (const [index, item] of sample.entries()) {
+        const card = cards.nth(index);
+        await expect(card.locator("h3")).toHaveText(item.title);
+        if (item.learnByHand) {
+          await expect(card.locator(".discovery-learn-tag")).toHaveText(discovery.card.learnByHand);
+          await expect(card.getByRole("button", { name: discovery.card.choose })).toHaveCount(0);
+          await expect(card.locator("footer")).toContainText(discovery.card.learnByHandHint);
+          // The overview and the reading stay.
+          await expect(card.locator(".discovery-card-details")).toHaveCount(3);
+        } else {
+          await expect(card.locator(".discovery-learn-tag")).toHaveCount(0);
+          await expect(card.getByRole("button", { name: discovery.card.choose })).toBeDisabled();
+        }
+      }
+    } finally {
+      await close();
+    }
+  });
+
   for (const width of widths)
     test(`fits and has no serious accessibility issue at ${width} px`, async ({ browser }) => {
       const { page, close } = await openOn(browser, server);

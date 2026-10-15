@@ -641,6 +641,27 @@
   font-size: var(--text-2xs);
   line-height: 1.7;
 }
+/* A newcomer issue: practice for the person, not work for the agent team. */
+.discovery-learn-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 3px 10px;
+  border: 1px solid var(--color-accent-300);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-50);
+  color: var(--color-accent-700);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.discovery-opportunity > footer > a.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  text-decoration: none;
+}
 .discovery-runtime {
   margin: 28px 0;
 }

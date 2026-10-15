@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowUpRight,
@@ -8,12 +8,13 @@ import {
   Circle,
   CircleAlert,
   CircleCheck,
+  CircleHelp,
   ClipboardList,
   FileText,
   GitCommitHorizontal,
   Info,
+  ListChecks,
   LoaderCircle,
-  MessagesSquare,
   OctagonX,
   Quote,
   RefreshCw,
@@ -21,9 +22,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import { issueRule, type DraftCheck } from "../../shared/draft-checks";
-import type {
-  ContributionFacts,
-  ContributionRules,
+import {
+  respectChecks,
+  type ContributionFacts,
+  type ContributionRules,
 } from "../../shared/contribution";
 import type { ReviewabilitySnapshot } from "../../shared/reviewability";
 import {
@@ -34,8 +36,15 @@ import {
   type DraftPreparation,
   type DraftProposal,
 } from "../../shared/drafts";
-import { useFormat, useT } from "../i18n";
+import { useFormat, useLocale, useT } from "../i18n";
 import { MarkdownContent } from "../review/MarkdownContent";
+import {
+  checklistCheck,
+  checklistRowIds,
+  checklistRows,
+  withFactChecks,
+  type ChecklistStatus,
+} from "./checklist";
 import { disclosureRule } from "./disclosure";
 import { rich } from "./rich";
 import "./drafts.css";
@@ -73,7 +82,11 @@ interface Props {
   onAiDisclosureChange?: (on: boolean) => void;
   /**
    * The publish preflight for the saved draft (draftPreflight plus the
-   * server's GET /api/runs/:id/preflight). Not shown when absent.
+   * server's GET /api/runs/:id/preflight). Not shown when absent. The
+   * respect checks among them (computed with the same rules, facts and
+   * changes as the props below) and the issue-link and brevity checks set
+   * the maintainer checklist's rows, which add the fact checks they lack
+   * from those props; the list shows the others.
    */
   checks?: DraftCheck[];
   /** The run is published: the guidance stays for reference, without actions. */
@@ -87,12 +100,44 @@ interface Props {
   changes?: ReviewabilitySnapshot;
 }
 
+const statusIcons: Record<ChecklistStatus, typeof CircleCheck> = {
+  ok: CircleCheck,
+  confirm: CircleAlert,
+  block: OctagonX,
+  unknown: CircleHelp,
+};
+
 /**
- * Community etiquette the person confirms for themselves, in display order;
- * the text is in `draft.guidance.etiquette.reminders`. The checkboxes are
- * local UI state only: nothing is saved and publishing is never blocked.
+ * How many times this browser showed each checklist row's "why
+ * maintainers care" sentence. After `whyShownTimes` it folds away. Storage
+ * can be blocked or full: the sentence then simply stays open.
  */
-const etiquetteReminders = ["claimed", "discussed"] as const;
+const whySeenKey = "bellpr-checklist-why-seen";
+export const whyShownTimes = 3;
+
+function readWhySeen(): Record<string, number> {
+  try {
+    const value: unknown = JSON.parse(
+      globalThis.localStorage?.getItem(whySeenKey) || "{}",
+    );
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, number>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function countWhySeen() {
+  try {
+    const seen = readWhySeen();
+    for (const id of checklistRowIds)
+      seen[id] = Math.min(99, (Number(seen[id]) || 0) + 1);
+    globalThis.localStorage?.setItem(whySeenKey, JSON.stringify(seen));
+  } catch {
+    // Not remembered; the sentences stay open next time.
+  }
+}
 
 function webLink(value?: string) {
   try {
@@ -118,11 +163,19 @@ export function DraftGuidancePanel({
   onAiDisclosureChange,
   checks,
   readOnly = false,
+  rules,
+  facts,
+  understanding,
+  changes,
 }: Props) {
-  const t = useT("draft").guidance;
+  const draftMessages = useT("draft");
+  const t = draftMessages.guidance;
   const fmt = useFormat();
+  const [locale] = useLocale();
   const prefix = useId().replaceAll(":", "");
-  const [confirmed, setConfirmed] = useState<string[]>([]);
+  // Read once per visit, then counted, so the sentences fold on a later one.
+  const [whySeen] = useState(readWhySeen);
+  useEffect(countWhySeen, []);
   // The choice made here while nothing saves it (no onAiDisclosureChange).
   const [localDisclosure, setLocalDisclosure] = useState<boolean>();
   const issueLink = webLink(issueUrl);
@@ -162,8 +215,62 @@ export function DraftGuidancePanel({
       ? withAiDisclosure(proposal.body)
       : withoutAiDisclosure(proposal.body)
     : "";
-  const blocking = checks?.filter((check) => check.kind === "block") ?? [];
-  const confirming = checks?.filter((check) => check.kind === "confirm") ?? [];
+  // The maintainer checklist shows the respect checks; the list keeps the
+  // other checks on the text.
+  const textChecks = checks?.filter((check) => !checklistCheck(check)) ?? [];
+  const blocking = textChecks.filter((check) => check.kind === "block");
+  const confirming = textChecks.filter((check) => check.kind === "confirm");
+  // Without the saved draft's checks (the sample, a published run), the
+  // rows follow the editor's text and the facts passed in. With them, the
+  // facts passed in still fill the fact checks they lack (checks computed
+  // without those facts, such as the editor's before the server's arrive).
+  const local =
+    rules || facts || changes
+      ? respectChecks(
+          {
+            body: draftBody ?? "",
+            proposalBody: proposal?.body,
+            sources,
+            rules,
+            facts,
+            changes,
+            issueUrl,
+            // The check is not required only while the person turned it off.
+            understandingOff:
+              understanding && (understanding.off || !understanding.required),
+          },
+          locale,
+        )
+      : undefined;
+  const respect = checks
+    ? withFactChecks(
+        checks,
+        // Without the editor's text, the disclosure is the saved draft's to say.
+        draftBody === undefined
+          ? local?.filter((check) => check.id !== "ai-disclosure")
+          : local,
+      )
+    : local;
+  const rows = checklistRows(
+    {
+      checks: respect,
+      rules,
+      facts,
+      changes,
+      understanding,
+      issueUrl,
+      disclosureRule: disclosureRequirement,
+    },
+    t.checklist,
+    fmt,
+    draftMessages.reviewability.bands,
+  );
+  const readAt = (value?: string) => {
+    const date = value ? new Date(value) : undefined;
+    return date && !Number.isNaN(date.getTime()) ? fmt.dateTime(date) : undefined;
+  };
+  const rulesRead = readAt(rules?.checkedAt);
+  const factsRead = readAt(facts?.checkedAt);
   const checkedAt = preparation?.context?.checkedAt;
   const checkedDate = checkedAt ? new Date(checkedAt) : undefined;
   const generating = busy || preparation?.status === "generating";
@@ -526,7 +633,7 @@ export function DraftGuidancePanel({
             <ShieldCheck size={16} aria-hidden="true" /> {t.preflight.title}
           </h3>
           <p>{t.preflight.intro}</p>
-          {checks.length ? (
+          {textChecks.length ? (
             <ul>
               {[...blocking, ...confirming].map((check) => (
                 <li key={check.id} className={`is-${check.kind}`}>
@@ -553,7 +660,8 @@ export function DraftGuidancePanel({
             </ul>
           ) : (
             <p className="draft-guidance-preflight-clear">
-              <CircleCheck size={15} aria-hidden="true" /> {t.preflight.clear}
+              <CircleCheck size={15} aria-hidden="true" />{" "}
+              {checks.length ? t.preflight.textClear : t.preflight.clear}
             </p>
           )}
         </section>
@@ -626,54 +734,75 @@ export function DraftGuidancePanel({
       )}
 
       <section
-        className="draft-guidance-etiquette"
-        aria-labelledby={`draft-etiquette-${prefix}`}
+        className="draft-checklist"
+        aria-labelledby={`draft-checklist-${prefix}`}
       >
-        <h3 id={`draft-etiquette-${prefix}`}>
-          <MessagesSquare size={16} /> {t.etiquette.title}
+        <h3 id={`draft-checklist-${prefix}`}>
+          <ListChecks size={16} aria-hidden="true" /> {t.checklist.title}
         </h3>
-        <p>{t.etiquette.intro}</p>
+        <p>{t.checklist.intro}</p>
+        {(rulesRead || factsRead) && (
+          <p className="draft-checklist-meta">
+            {rulesRead && <span>{t.checklist.rulesRead({ date: rulesRead })}</span>}
+            {factsRead && <span>{t.checklist.factsRead({ date: factsRead })}</span>}
+          </p>
+        )}
         <ul>
-          {etiquetteReminders.map((id) => {
-            const inputId = `draft-etiquette-${prefix}-${id}`;
-            const reminder = t.etiquette.reminders[id];
+          {rows.map((row) => {
+            const Icon = statusIcons[row.status];
+            const why = t.checklist.why[row.id];
             return (
-              <li key={id}>
-                <input
-                  id={inputId}
-                  type="checkbox"
-                  disabled={readOnly}
-                  checked={confirmed.includes(id)}
-                  onChange={(event) =>
-                    setConfirmed((previous) =>
-                      event.target.checked
-                        ? [...previous, id]
-                        : previous.filter((entry) => entry !== id),
-                    )
-                  }
-                />
-                <label htmlFor={inputId}>
-                  <strong>{reminder.text}</strong>
-                  <small>{reminder.why}</small>
-                </label>
+              <li
+                key={row.id}
+                className={`draft-checklist-row is-${row.status}`}
+                data-row={row.id}
+              >
+                <span className="draft-checklist-status">
+                  <Icon size={14} aria-hidden="true" />
+                  {t.checklist.status[row.status]}
+                </span>
+                <div className="draft-checklist-body">
+                  <strong>{t.checklist.rows[row.id]}</strong>
+                  {row.lines.map((line, index) => (
+                    <p key={index}>{line}</p>
+                  ))}
+                  {row.sources.length > 0 && (
+                    <ul className="draft-checklist-sources">
+                      {row.sources.map((source, index) => (
+                        <li key={index}>{source}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {/* The issue-link check, when it fires, quotes the same rule. */}
+                  {row.id === "issue" &&
+                    issueRequirement &&
+                    !respect?.some((check) => check.id === "issue") && (
+                    <p className="draft-guidance-issue-rule" role="note">
+                      <strong>{t.checklist.rule}</strong>
+                      {t.checklist.ruleQuote({ quote: issueRequirement.quote })}
+                      <small>
+                        {t.checklist.ruleSource({ source: issueRequirement.label })}
+                      </small>
+                    </p>
+                  )}
+                  {row.id === "issue" && issueLink && (
+                    <a href={issueLink} target="_blank" rel="noopener noreferrer">
+                      {t.checklist.openIssue} <ArrowUpRight size={12} aria-hidden="true" />
+                    </a>
+                  )}
+                  {(whySeen[row.id] ?? 0) >= whyShownTimes ? (
+                    <details className="draft-checklist-why">
+                      <summary>{t.checklist.whySummary}</summary>
+                      <p>{why}</p>
+                    </details>
+                  ) : (
+                    <p className="draft-checklist-why">{why}</p>
+                  )}
+                </div>
               </li>
             );
           })}
         </ul>
-        {issueRequirement && (
-          <p className="draft-guidance-issue-rule" role="note">
-            <strong>{t.etiquette.rule}</strong>
-            {t.etiquette.quote({ quote: issueRequirement.quote })}
-            <small>
-              {t.etiquette.ruleSource({ source: issueRequirement.label })}
-            </small>
-          </p>
-        )}
-        {issueLink && (
-          <a href={issueLink} target="_blank" rel="noopener noreferrer">
-            {t.etiquette.openIssue} <ArrowUpRight size={12} />
-          </a>
-        )}
       </section>
 
       {proposal?.policy === "linux" && (

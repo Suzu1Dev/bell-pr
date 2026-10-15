@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
 import {
   Bug,
   Cpu,
@@ -45,7 +45,11 @@ import { ReadinessMessage } from "../setup/ReadinessNotice";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import { usePlan } from "./plan";
 import { providerReadiness, withProvider } from "./readiness";
+import type { StartCheck } from "./StartConfirm";
 import "./mission.css";
+
+// The task dialog's facts: their own chunk, with the respect rules.
+const BeforeYouStart = lazy(() => import("./BeforeYouStart"));
 
 /** The efforts only Pro offers; "Default" is on every plan. */
 const proEfforts: readonly string[] = proOnlyEfforts;
@@ -100,6 +104,13 @@ export interface DirectionSettingsProps {
    * render in tests. A mounted form loads the catalog and shows that one.
    */
   initialCatalog?: ModelCatalog;
+  /**
+   * The task's repository, in the task dialog only: the issue field then
+   * shows its Before-you-start facts. The settings defaults have none.
+   */
+  repoId?: string;
+  /** Tells the task dialog the facts read and whether Start asks once. */
+  onStartCheck?: (check: StartCheck) => void;
 }
 
 export function DirectionSettings({
@@ -111,6 +122,8 @@ export function DirectionSettings({
   demo: demoProp,
   doctor,
   initialCatalog,
+  repoId,
+  onStartCheck,
 }: DirectionSettingsProps) {
   const { directions, settings: t } = useT("mission");
   const { reasoningEffort: efforts, reasoningEffortWithId } = useT("common");
@@ -321,6 +334,16 @@ export function DirectionSettings({
               <p id={`${id}-issue-help`} className="mission-field-note">
                 {t.issue.help}
               </p>
+              {repoId && (
+                <Suspense fallback={null}>
+                  <BeforeYouStart
+                    repoId={repoId}
+                    issueUrl={value.issueUrl}
+                    demo={demo}
+                    onFacts={onStartCheck}
+                  />
+                </Suspense>
+              )}
             </div>
           </div>
 

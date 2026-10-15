@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -49,6 +49,9 @@ import {
   orderedRecommendations,
 } from "./recommendation-preferences";
 import "./mission.css";
+
+// "Before you contribute": its own chunk, with the rule classifier.
+const ContributionRulesCard = lazy(() => import("./ContributionRulesCard"));
 
 export interface ProjectOverviewProps {
   repo: Repo;
@@ -955,6 +958,10 @@ export function ProjectOverview({
           </button>
         </div>
       )}
+
+      <Suspense fallback={null}>
+        <ContributionRulesCard repoId={repo.id} rules={repo.contributionRules} demo={sampleRepo} />
+      </Suspense>
 
       {!insights ? (
         <section className="mission-overview-empty" aria-busy={loading}>

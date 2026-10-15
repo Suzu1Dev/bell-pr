@@ -1,4 +1,4 @@
-import type { Dispatch, FormEvent, SetStateAction } from "react";
+import { useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import {
   Bot,
   Check,
@@ -13,6 +13,7 @@ import { useLocale, useT } from "../i18n";
 import type { Repo } from "../types";
 import { DirectionSettings } from "../mission/DirectionSettings";
 import { providerReadiness } from "../mission/readiness";
+import { StartConfirm, startReasonsKey, type StartCheck } from "../mission/StartConfirm";
 import { providerLabels } from "../../shared/models";
 import type { ModalName, Page } from "../app/AppShell";
 import type { TaskSetup } from "../app/hooks/useTaskSetup";
@@ -81,6 +82,18 @@ export function NewTaskModal({
     saveDirection,
   } = setup;
   const demo = taskRepoId === demoRepo.id;
+  // When the facts say publishing will wait, Start asks once per set of reasons.
+  const form = useRef<HTMLFormElement>(null);
+  const [startCheck, setStartCheck] = useState<StartCheck>({ reasons: [] });
+  const [asking, setAsking] = useState(false);
+  const accepted = useRef("");
+  const reasonsKey = startReasonsKey(startCheck.reasons);
+  const submit = (event: FormEvent) => {
+    if (startCheck.reasons.length && accepted.current !== reasonsKey) {
+      event.preventDefault();
+      setAsking(true);
+    } else startTask(event);
+  };
   // The sample needs no tools. Otherwise a run waits for a ready provider;
   // when the check itself cannot answer, the server decides on submit.
   const readiness = readinessOf(doctor.report, ["provider"]);
@@ -92,6 +105,13 @@ export function NewTaskModal({
     !demo &&
     (providerReadiness(doctor.report, contributionSettings.provider ?? "codex")
       ?.state ?? "ready") !== "ready";
+  const startDisabled =
+    busy ||
+    settingsLoading ||
+    !settingsReady ||
+    !taskRepoId ||
+    prompt.trim().length < 10 ||
+    unready;
   return (
     <Modal
       wide
@@ -99,7 +119,7 @@ export function NewTaskModal({
       subtitle={t.subtitle}
       onClose={closeModal}
     >
-      <form onSubmit={startTask}>
+      <form ref={form} onSubmit={submit}>
         <label className="field-label" htmlFor="task-repo">
           {t.repo}
         </label>
@@ -164,6 +184,8 @@ export function NewTaskModal({
             compact
             demo={demo}
             doctor={doctor}
+            repoId={taskRepoId || undefined}
+            onStartCheck={setStartCheck}
           />
         </fieldset>
         <button
@@ -228,6 +250,17 @@ export function NewTaskModal({
             {formError}
           </p>
         )}
+        {asking && startCheck.reasons.length > 0 && !startDisabled && (
+          <StartConfirm
+            reasons={startCheck.reasons}
+            onCancel={() => setAsking(false)}
+            onConfirm={() => {
+              accepted.current = reasonsKey;
+              setAsking(false);
+              form.current?.requestSubmit();
+            }}
+          />
+        )}
         <div className="modal-actions">
           <button
             type="button"
@@ -239,14 +272,7 @@ export function NewTaskModal({
           <button
             className="button primary"
             type="submit"
-            disabled={
-              busy ||
-              settingsLoading ||
-              !settingsReady ||
-              !taskRepoId ||
-              prompt.trim().length < 10 ||
-              unready
-            }
+            disabled={startDisabled}
           >
             {busy ? (
               <Loader2 size={16} className="spin" />

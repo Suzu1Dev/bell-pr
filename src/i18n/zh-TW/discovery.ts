@@ -150,6 +150,10 @@ const m: Translation<typeof en> = {
     sampleHint: "示範專案無法選擇；即時探索會找到可匯入的真實專案。",
     choose: "選擇此項目",
     importing: "正在匯入專案…",
+    learnByHand: "親手學：這一個請自己寫",
+    learnByHandHint:
+      "這個 issue 有新手標籤。親手寫修正才是認識專案的方式，所以 agent 團隊不會接手。先讀計畫與來源，再開啟 issue。",
+    openIssue: "開啟 issue",
   },
   runtime: {
     summary: "這次探索使用的模型與用量",

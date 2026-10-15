@@ -196,6 +196,53 @@ test("English renders of the other discovery states have no Han", () => {
   assert.match(previous, /These results are from [^<]*2026[^<]* and do not reflect/);
 });
 
+test("a learn-by-hand opportunity is tagged, has no agent-team choice, and keeps its reading", () => {
+  const byHand: DiscoveryJob = {
+    ...job,
+    opportunities: [{ ...job.opportunities[0], learnByHand: true }],
+  };
+  const html = renderEnglish(byHand);
+  assert.match(
+    html,
+    /<span class="discovery-learn-tag"><svg[^>]*lucide-hand[\s\S]*?<\/svg>Learn by hand: write this one yourself<\/span><h3>Return focus when the dialog closes<\/h3>/,
+  );
+  assert.doesNotMatch(html, /Choose this opportunity/);
+  assert.match(html, /The issue is labelled for newcomers\. Writing the fix yourself is how you learn the project/);
+  // The issue it cites opens on GitHub; the overview and the sources stay.
+  assert.match(
+    html,
+    /<a class="button secondary" href="https:\/\/github\.com\/example\/widgets\/issues\/1" target="_blank" rel="noreferrer">Open the issue<svg/,
+  );
+  assert.match(html, /<h4>Who does this contribution help\?<\/h4>/);
+  assert.match(html, /Contribution rules and activity/);
+  assert.match(html, /First steps, acceptance checks and open questions/);
+  assert.match(html, /Evidence and quoted sources · 1/);
+  // Without an issue link (a sample), there is nothing to open.
+  const noLink: DiscoveryJob = {
+    ...byHand,
+    candidates: [{ ...job.candidates[0], sources: [{ ...job.candidates[0].sources[0], url: "" }] }],
+  };
+  assert.doesNotMatch(renderEnglish(noLink), /Open the issue/);
+  // Opportunities without the flag keep their choice.
+  assert.match(renderEnglish(job), /Choose this opportunity<\/button>/);
+  assert.doesNotMatch(renderEnglish(job), /discovery-learn-tag/);
+  const zh = renderZh(createElement(DiscoveryPanel, props(byHand, live)));
+  assert.match(zh, /親手學：這一個請自己寫/);
+  assert.doesNotMatch(zh, /選擇此項目/);
+});
+
+test("the sample's learn-by-hand opportunity shows its tag in place of the choice", () => {
+  const sampleJob = getSampleDiscoveryJob("en");
+  const html = renderEn(createElement(DiscoveryPanel, props(undefined, { demo: true })));
+  assertNoHan(html);
+  const cards = html.split('<article class="discovery-opportunity"').slice(1);
+  assert.equal(cards.length, sampleJob.opportunities.length);
+  sampleJob.opportunities.forEach((item, index) => {
+    assert.equal(cards[index].includes("Learn by hand: write this one yourself"), !!item.learnByHand, item.id);
+    assert.equal(cards[index].includes("Choose this opportunity"), !item.learnByHand, item.id);
+  });
+});
+
 test("saved settings missing from the catalog are labelled in English", () => {
   const html = renderEnglish({
     ...job,
@@ -267,10 +314,12 @@ test("on Free the panel shows labelled sample results, a locked form and the way
   assert.doesNotMatch(html, /<a [^>]*href="(?!#)/);
   assert.doesNotMatch(html, /lucide-github/);
   assert.match(html, /<span class="discovery-source-title">/);
-  // A sample cannot be chosen.
+  // A sample cannot be chosen, and a newcomer issue offers no choice at all.
+  const byHand = sample.opportunities.filter((item) => item.learnByHand).length;
+  assert.ok(byHand > 0, "the sample has a learn-by-hand opportunity");
   assert.equal(
     html.match(/<button class="button primary" disabled="">.*?Choose this opportunity<\/button>/g)?.length,
-    sample.opportunities.length,
+    sample.opportunities.length - byHand,
   );
   assert.match(html, /A sample cannot be chosen\. Live discovery finds real projects you can import\./);
   // The heading's note describes a live search, not one the reader ran.
