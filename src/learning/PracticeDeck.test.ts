@@ -128,6 +128,9 @@ test("the reveal shows the reference, your earlier correction and the way to the
   assertNoHan(html);
   assert.match(html, /<textarea rows="3" readonly=""/i);
   assert.match(html, /<fieldset class="practice-choice" disabled="">/);
+  // The focus moves to the reveal, a group named by its Reference heading.
+  const named = html.match(/<div class="practice-reveal" role="group" tabindex="-1" aria-labelledby="([^"]+)">/)?.[1];
+  assert.ok(named && html.includes(`<strong id="${named}">Reference</strong>`), "the reveal is a named group");
   assert.match(html, /<strong id="[^"]+-reference">Reference<\/strong><span class="note-ai-label">AI-written; the code is the authority<\/span><p>Each wait doubles/);
   assert.match(html, /<strong>What you had wrong last time<\/strong><p>I thought the wait stayed the same\.<\/p>/);
   assert.match(html, /<button type="button" class="practice-study">Study it in the code/);

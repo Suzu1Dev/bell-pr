@@ -233,6 +233,7 @@ export function PracticeCard({
       ) : (
         <div
           className="practice-reveal"
+          role="group"
           tabIndex={-1}
           ref={reveal}
           aria-labelledby={`${id}-reference`}
