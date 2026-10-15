@@ -983,10 +983,7 @@ export function useRunActions({
         }));
       return;
     }
-    if (plan.locked("prFeedback")) {
-      requestUpgrade("prFeedback");
-      return;
-    }
+    // Reading feedback is Free on every plan; only AI rounds on it are Pro.
     setFeedbackLoading(true);
     try {
       const { run: updated } = await api<{ run: Run }>(

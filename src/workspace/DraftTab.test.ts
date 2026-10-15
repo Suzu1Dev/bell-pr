@@ -361,14 +361,14 @@ test("the description's Edit and Preview buttons say which one is on", () => {
   assertNoHan(html);
 });
 
-test("on Free, reading feedback and starting a round are locked with the PRO badge", () => {
+test("on Free, reading feedback stays open and only starting an AI round is locked with the PRO badge", () => {
   const html = renderEn(element({ feedbackLocked: true }, {}, { followUpSelection: [items[0].url] }));
-  // The button stays enabled: it opens the upgrade dialog instead of asking GitHub.
+  // Reading feedback is Free: the button asks GitHub, with no lock and no PRO mark.
   const read = html.match(/<button class="button primary"[^>]*>(?:(?!<\/button>).)*Read feedback again(?:(?!<\/button>).)*<\/button>/)?.[0] ?? "";
   assert.ok(read, "the read button is there");
   assert.doesNotMatch(read, /disabled=""/);
-  assert.match(read, /lucide-lock/);
-  assert.match(read, /aria-label="Pro feature"/);
+  assert.doesNotMatch(read, /lucide-lock/);
+  assert.doesNotMatch(read, /aria-label="Pro feature"/);
   // Every feedback checkbox and the note are locked; the start button opens the dialog.
   for (const box of html.match(/<input type="checkbox"[^>]*aria-label="Include[^>]*>/g) ?? [])
     assert.match(box, /disabled=""/);
@@ -394,8 +394,9 @@ test("the sample shows its fictional feedback with a PRO chip and links to nothi
       },
     }),
   );
-  assert.match(html, /Read feedback again/);
-  assert.match(html, /aria-label="Pro feature"/);
+  assert.match(html, /Read feedback again<\/button>/);
+  // Only the AI round is Pro, and the sample shows its PRO chip on it.
+  assert.match(html, /Keep fixing from feedback<span class="pro-badge"/);
   // The sample's restatement shows on its disabled form.
   const restated = demo.restatementSample![0];
   assert.ok(html.includes(`value="${restated.text.replace(/'/g, "&#x27;")}"`));

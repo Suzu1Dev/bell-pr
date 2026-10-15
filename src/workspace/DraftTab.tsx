@@ -100,8 +100,8 @@ interface DraftTabProps {
   actions: Pick<RunActions, "feedbackLoading" | "fetchPrFeedback">;
   rounds: RunRounds;
   /**
-   * Reading maintainer feedback and starting a round from it need Pro and
-   * the plan is Free: those controls open the upgrade dialog instead. The
+   * AI rounds on maintainer feedback need Pro and the plan is Free: the
+   * round's controls open the upgrade dialog instead. Reading feedback, the
    * round history, an open round's review and push, and syncing stay.
    */
   feedbackLocked?: boolean;
@@ -671,24 +671,10 @@ export function DraftTab({
                   <ExternalLink size={13} />
                 </a>
               )}
-              <button
-                className="button primary"
-                disabled={feedbackLoading}
-                onClick={
-                  feedbackLocked
-                    ? () => requestUpgrade("prFeedback")
-                    : fetchPrFeedback
-                }
-              >
-                {feedbackLoading ? (
-                  <Loader2 className="spin" size={15} />
-                ) : feedbackLocked ? (
-                  <Lock size={15} aria-hidden="true" />
-                ) : (
-                  <RefreshCw size={15} />
-                )}
+              {/* Reading feedback is Free on every plan. */}
+              <button className="button primary" disabled={feedbackLoading} onClick={fetchPrFeedback}>
+                {feedbackLoading ? <Loader2 className="spin" size={15} /> : <RefreshCw size={15} />}
                 {run.prFeedback ? t.feedback.fetchAgain : t.feedback.fetch}
-                {(feedbackLocked || demo) && <ProBadge />}
               </button>
             </div>
           </div>
