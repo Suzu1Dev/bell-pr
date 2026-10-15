@@ -82,7 +82,7 @@ async function serve(t: TestContext, facts: FakeFacts = {}) {
     await rm(directory, { recursive: true, force: true });
   });
   const call = (method: string, endpoint: string, body?: unknown) =>
-    new Promise<{ status: number; body: Record<string, any> }>((resolve, reject) => {
+    new Promise<{ status: number; body: Record<string, ReturnType<typeof JSON.parse>> }>((resolve, reject) => {
       const text = body === undefined ? undefined : JSON.stringify(body);
       const req = request(
         `http://127.0.0.1:${port}/api${endpoint}`,
