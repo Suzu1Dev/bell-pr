@@ -41,6 +41,7 @@ import {
   Deferred,
   DraftGuide,
   ForecastCompare,
+  Restatements,
   Reviewability,
   UnderstandingRow,
   YourWords,
@@ -232,6 +233,8 @@ export function DraftTab({
     setFollowUpSelection,
     followUpNote,
     setFollowUpNote,
+    restatements,
+    setRestatement,
     syncToLatest,
     resolveSyncConflicts,
     undoSync,
@@ -239,6 +242,9 @@ export function DraftTab({
     discardFollowUp,
   } = rounds;
   const record = understanding?.view?.record ?? run.understanding;
+  const [locale] = useLocale();
+  const sampleRestatements = demo ? (getDemo(locale).restatementSample ?? []) : [];
+  const selected = run.prFeedback?.items.filter((item) => followUpSelection.includes(item.url)) ?? [];
   return (
     <div className="draft-workspace">
       {demo && <SamplePublishedCard run={run} />}
@@ -881,6 +887,12 @@ export function DraftTab({
                     onChange={(event) => setFollowUpNote(event.target.value)}
                     disabled={busy || demo || feedbackLocked}
                   />
+                  <Restatements
+                    items={demo ? (run.prFeedback?.items ?? []).filter((item) => sampleRestatements.some((entry) => entry.url === item.url)) : selected}
+                    values={demo ? sampleRestatements : restatements}
+                    onChange={setRestatement}
+                    disabled={busy || demo || feedbackLocked}
+                  />
                   <button
                     className="button primary"
                     aria-describedby="follow-up-limit"
@@ -890,7 +902,8 @@ export function DraftTab({
                       (!feedbackLocked &&
                         (feedbackLoading ||
                           followUpSelection.length > followUpFeedbackLimit ||
-                          (!followUpSelection.length && !followUpNote.trim())))
+                          (!followUpSelection.length && !followUpNote.trim()) ||
+                          selected.some((item) => (draftChecks?.draftProseWords(restatements[item.url] ?? "") ?? 0) < 3)))
                     }
                     onClick={
                       feedbackLocked

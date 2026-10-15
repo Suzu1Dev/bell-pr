@@ -1,5 +1,10 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { Circle, CircleCheck, CircleMinus } from "lucide-react";
+import {
+  followUpRestatementLimit,
+  type FollowUpRestatement,
+} from "../../shared/followups";
+import type { PrFeedbackItem } from "../../shared/pr-feedback";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import { openCheckPanel } from "../app/hooks/useUnderstanding";
 import { useT } from "../i18n";
@@ -81,6 +86,54 @@ export function UnderstandingRow({
           </button>
         )}
       </span>
+    </div>
+  );
+}
+
+/**
+ * Before an AI round: one line per selected comment, in the person's own
+ * words. The agent gets these as its task and the comments only as data.
+ * The sample shows its own restatement on the disabled form.
+ */
+export function Restatements({
+  items,
+  values,
+  onChange,
+  disabled,
+}: {
+  items: PrFeedbackItem[];
+  values: Record<string, string> | FollowUpRestatement[];
+  onChange?(url: string, text: string): void;
+  disabled?: boolean;
+}) {
+  const t = useT("workspace").followUp;
+  const value = (url: string) =>
+    Array.isArray(values)
+      ? (values.find((entry) => entry.url === url)?.text ?? "")
+      : (values[url] ?? "");
+  if (!items.length) return null;
+  return (
+    <div className="follow-up-restatements">
+      <p className="field-help" id="follow-up-restatement-help">
+        {t.restatementHelp}
+      </p>
+      {items.map((item, index) => (
+        <div key={item.url}>
+          <label className="field-label" htmlFor={`follow-up-restatement-${index}`}>
+            {t.restatement({ author: item.author })}
+          </label>
+          <blockquote>{item.body.length > 160 ? `${item.body.slice(0, 160)}…` : item.body}</blockquote>
+          <input
+            id={`follow-up-restatement-${index}`}
+            className="text-input"
+            aria-describedby="follow-up-restatement-help"
+            maxLength={followUpRestatementLimit}
+            value={value(item.url)}
+            disabled={disabled}
+            onChange={(event) => onChange?.(item.url, event.target.value)}
+          />
+        </div>
+      ))}
     </div>
   );
 }

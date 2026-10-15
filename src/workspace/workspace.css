@@ -274,3 +274,13 @@
 .pr-feedback .pr-feedback-cant a {
   color: var(--color-accent-600);
 }
+
+/* Before an AI round: the person's words for each selected comment. */
+.follow-up-start .follow-up-restatements blockquote {
+  margin: 0 0 var(--space-1);
+  padding-left: var(--space-2);
+  border-left: 3px solid var(--color-border-strong);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}

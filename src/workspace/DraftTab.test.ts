@@ -130,6 +130,8 @@ const element = (
         setFollowUpSelection() {},
         followUpNote: "",
         setFollowUpNote() {},
+        restatements: {},
+        setRestatement() {},
         async syncToLatest() {},
         async resolveSyncConflicts() {},
         async undoSync() {},
@@ -188,7 +190,11 @@ test("an open follow-up round keeps the PR text as published and asks for this r
 });
 
 test("maintainer feedback on a published PR can be picked for the next round, up to the limit", () => {
-  const picked = render({}, {}, { followUpSelection: [items[0].url] });
+  const picked = render(
+    {},
+    {},
+    { followUpSelection: [items[0].url], restatements: { [items[0].url]: "改一個更清楚的名字" } },
+  );
   assert.match(picked, /依回饋繼續修正/);
   const first = tag(picked, /aria-label="把 maintainer 在 hello\.ts 第 1 行 的回饋納入下一輪修正"/);
   assert.match(first, /checked=""/);
@@ -197,6 +203,17 @@ test("maintainer feedback on a published PR can be picked for the next round, up
   assert.match(picked, /一輪最多 20 則回饋，已選 1 則。/);
   assert.doesNotMatch(tag(picked, /aria-describedby="follow-up-limit"/), /disabled=""/);
   assert.match(picked, /依選取的 1 則回饋修正/);
+  // Each picked comment needs the person's own words, 3 or more, first.
+  assert.match(picked, /用你的話說：maintainer 要求的是什麼？/);
+  assert.match(tag(picked, /id="follow-up-restatement-0"/), /value="改一個更清楚的名字"/);
+  for (const words of [undefined, "改名"]) {
+    const unstated = render(
+      {},
+      {},
+      { followUpSelection: [items[0].url], restatements: words ? { [items[0].url]: words } : {} },
+    );
+    assert.match(tag(unstated, /aria-describedby="follow-up-limit"/), /disabled=""/, String(words));
+  }
   // Nothing picked and no note: the start button waits.
   const empty = render();
   assert.match(tag(empty, /aria-describedby="follow-up-limit"/), /disabled=""/);
@@ -379,6 +396,10 @@ test("the sample shows its fictional feedback with a PRO chip and links to nothi
   );
   assert.match(html, /Read feedback again/);
   assert.match(html, /aria-label="Pro feature"/);
+  // The sample's restatement shows on its disabled form.
+  const restated = demo.restatementSample![0];
+  assert.ok(html.includes(`value="${restated.text.replace(/'/g, "&#x27;")}"`));
+  assert.match(tag(html, /id="follow-up-restatement-0"/), /disabled=""/);
   // Its PR exists nowhere, so there is nothing to close on GitHub.
   assert.doesNotMatch(html, /Can&#x27;t continue\?/);
   assert.match(html, /sample_maintainer/);
