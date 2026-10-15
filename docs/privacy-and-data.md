@@ -56,13 +56,16 @@ publishes an address that is not a GitHub no-reply address.
 To check that a pull request is welcome, BELL PR makes these read-only
 calls through `gh api`, on your computer and under your GitHub account.
 It never posts anything with them, nothing polls GitHub, and the answers
-are not sent to your AI provider; they feed the checks and are stored with
-the project or the run. A project without a GitHub origin never runs `gh`.
+feed the checks and are stored with the project or the run. The first
+three are never sent to your AI provider. Feedback you read reaches it
+only as listed above: the comments you select for a follow-up round, and
+the comments in a coach debrief you ask for. A project without a GitHub
+origin never runs `gh`.
 
 | What it reads | When |
 | --- | --- |
 | The repository's pull request settings (`has_pull_requests`, `pull_request_creation_policy`, `archived`, `disabled`), your permission level in it and your GitHub login, and the sizes of its last 3 merged pull requests | When you import a project from GitHub, update it or choose **Check again** on its **Before you contribute** card, when the publish dialog opens, and when you publish |
-| The linked issue: its state and why it was closed, whether it is locked, its labels and assignees, its latest 50 comments (to find claims, the latest maintainer comment and whether you commented) and the pull requests that would close it | Once per issue link in the task dialog, when the publish dialog opens, and when you publish |
+| The linked issue: its state and why it was closed, whether it is locked, its labels and assignees, its latest 50 comments (to find claims, the latest maintainer comment and whether you commented) and the pull requests that would close it or refer to it | Once per issue link in the task dialog, when the publish dialog opens, and when you publish |
 | Three counts of your own pull requests in that repository: open (drafts included), merged, and open with changes requested more than 7 days ago | When you link an issue in the task dialog, when the publish dialog opens, and when you publish |
 | Your pull request's reviews, comments, review threads, CI results, labels, state, whether it was merged and its review decision | When you choose **Read feedback** |
 
