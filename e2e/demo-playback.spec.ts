@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtemp, rm, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { getDemo } from "../src/demo";
 import common from "../src/i18n/en/common";
 import review from "../src/i18n/en/review";
@@ -16,6 +16,42 @@ import { launchServer, type LaunchedServer } from "./start-server.mjs";
 
 const demo = getDemo("en");
 const status = common.runStatus;
+const check = workspace.check;
+
+/**
+ * Explains the played sample back with its own answers (the "Fill with the
+ * sample answer" buttons type them out), graded as the sample grades them,
+ * and predicts the maintainer.
+ */
+async function passCheck(page: Page) {
+  const sample = demo.understandingSample!;
+  const panel = page.locator(".understanding-check");
+  const step = (name: string) => panel.getByRole("region", { name });
+  await step(check.explainTitle).getByRole("button", { name: check.fill }).click();
+  await expect(step(check.explainTitle).getByRole("textbox")).toHaveValue(sample.summary);
+  const answers = step(check.answerTitle).getByRole("listitem");
+  for (const [index, id] of ["selfCheck:src/utils/retry.ts", "untested"].entries()) {
+    const entry = answers.nth(index);
+    await entry.getByRole("button", { name: check.fill }).click();
+    await expect(entry.getByRole("textbox")).toHaveValue(sample.answers[id].answer);
+    await entry.getByRole("radio", { name: check.confidences[sample.answers[id].confidence] }).check();
+  }
+  await panel.getByRole("button", { name: check.lock }).click();
+  await step(check.gradeTitle).getByRole("radio", { name: check.grades.partly }).check();
+  await step(check.correctTitle).getByRole("button", { name: check.fill }).click();
+  await expect(step(check.correctTitle).getByRole("textbox")).toHaveValue(
+    sample.answers["selfCheck:src/utils/retry.ts"].correction!,
+  );
+  await panel.getByRole("button", { name: check.saveGrades }).click();
+  const forecast = step(check.forecastTitle);
+  await forecast.getByRole("radio", { name: check.dimensions[sample.forecast.dimension] }).check();
+  await forecast.getByRole("button", { name: check.fill }).click();
+  await expect(forecast.getByRole("textbox")).toHaveValue(sample.forecast.question);
+  await forecast.getByRole("button", { name: check.saveForecast }).click();
+  await expect(panel.getByRole("region", { name: check.resultTitle })).toContainText(
+    check.result({ questions: 2, misses: 1 }),
+  );
+}
 
 let server: LaunchedServer;
 let bin: string;
@@ -117,12 +153,18 @@ test("demo=play plays the sample from queued to a published sample PR, with no t
       await reviewed.check();
       await expect(reviewed).toBeChecked();
     }
+    // Approval waits for the understanding check, as on a real run.
+    await page.getByRole("button", { name: workspace.footer.explainBack }).click();
+    await expect(page.locator(".explain-panel")).toHaveCount(0);
+    await passCheck(page);
     await page.getByRole("button", { name: workspace.footer.approvePr }).click();
     await expect(badge).toHaveText(status.approved);
     const dialog = page.getByRole("dialog", { name: workspace.publish.titleDemo });
     await expect(dialog).toBeVisible();
-    // The demo previews the PR body it would send.
+    // The demo previews the PR body it would send, and its checks all pass.
     await expect(dialog.locator(".publish-body-preview")).toBeVisible();
+    await expect(dialog).toContainText(workspace.publish.allClear);
+    await expect(dialog).toContainText(workspace.publish.pacing({ open: 0, budget: 1, first: true }));
     await dialog.getByRole("button", { name: workspace.publish.finishDemo }).click();
 
     const card = page.locator(".sample-published");
