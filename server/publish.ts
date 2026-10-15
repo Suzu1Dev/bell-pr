@@ -39,6 +39,7 @@ import { setupError } from "./cli-errors.js";
 import type { WorkbenchContext } from "./workbench.js";
 import { currentLocale, sm } from "./i18n/index.js";
 import { secretInPatch } from "./secrets.js";
+import { assertUnderstood } from "./understanding.js";
 
 const now = () => new Date().toISOString();
 
@@ -268,6 +269,9 @@ export async function approve(
     ) {
       throw new AppError((m) => m.run.publish.reviewAllFirst, 409);
     }
+    const repo = ctx.store.data.repos.find((value) => value.id === run.repoId);
+    // The Explain-it-back check, unless the person turned it off.
+    const understood = assertUnderstood(run, files, repo);
     if (!run.draft.title.trim() || !run.draft.body.trim())
       throw new AppError((m) => m.run.publish.prTextRequired, 422);
     await assertConflictsResolved(run);
@@ -303,6 +307,10 @@ export async function approve(
     await assertGitIdentity(run.worktreePath);
     run.approvedFingerprint = reviewFingerprint(files, run.draft);
     run.status = "approved";
+    // Recorded only once approval succeeds: "Check off" for good, until a
+    // later approval with the check passed.
+    if (understood.passed) delete run.understandingCheckOff;
+    else if (!understood.required) run.understandingCheckOff = true;
     await ctx.store.save();
     return run;
   });
@@ -350,6 +358,9 @@ export async function publish(
       )
     )
       throw new AppError((m) => m.run.publish.notAllReviewed, 409);
+    // The current setting applies, also to runs approved while it was off
+    // and to runs approved by builds before the check existed.
+    assertUnderstood(run, files, repo);
     const round = activeFollowUp(run.followUps);
     if (round) return publishFollowUp(ctx, run, round, files);
     if (run.prUrl)

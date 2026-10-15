@@ -60,6 +60,11 @@ import * as learning from "./learning.js";
 import * as drafting from "./draft-jobs.js";
 import * as syncing from "./sync-runs.js";
 import * as followUps from "./followup-runs.js";
+import {
+  synchronizeUnderstanding,
+  understandingFacade,
+  type UnderstandingFacade,
+} from "./understanding.js";
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
@@ -164,6 +169,8 @@ export class Workbench {
    * (effectiveMaxActiveRuns) and how many teammates a new run gets.
    */
   readonly entitlements: () => Entitlements;
+  /** The Explain-it-back check and the per-file attempts (understanding.ts). */
+  readonly understanding: UnderstandingFacade;
   private readonly context: WorkbenchContext;
   /** The startup janitor, then the first retention pass; never rejects. */
   readonly maintenance: Promise<void>;
@@ -247,6 +254,9 @@ export class Workbench {
       explanations: (id) => this.explanations(id),
       prepareRunDraft: (id, options) => this.prepareRunDraft(id, options),
     };
+    this.understanding = understandingFacade(this.context, {
+      lockedBy: () => this.appSettings.lockedBy().skipUnderstandingCheck,
+    });
     this.applySettings();
     // Server logs go to the data directory from here on (see log.ts).
     initLog(store.directory);
@@ -783,6 +793,7 @@ export class Workbench {
     });
     if (run.status !== "published") {
       synchronizeReview(run, files);
+      synchronizeUnderstanding(run, files);
     }
     await syncing.refreshConflicts(run);
     await this.store.save();

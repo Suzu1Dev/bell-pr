@@ -29,6 +29,12 @@ import { AppError, type Run } from "./types.js";
 import { defaultContributionSettings } from "../shared/insights.js";
 import { draftFingerprint } from "./drafts.js";
 import { withLocale } from "./i18n/index.js";
+import { after, before } from "node:test";
+import { skipUnderstandingCheckInTests } from "./understanding.js";
+
+// This file tests other behaviour; server/understanding.test.ts covers the gate.
+before(() => skipUnderstandingCheckInTests(true));
+after(() => skipUnderstandingCheckInTests());
 
 async function http(
   url: string,

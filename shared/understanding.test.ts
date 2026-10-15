@@ -409,7 +409,7 @@ function fnv(text: string) {
   return hash.toString(16).padStart(16, "0");
 }
 
-test("after the change moves, only changed files' answers drop and a passed check re-asks the not-tested question", () => {
+test("after the change moves, only changed files' answers drop and the re-check asks only about them", () => {
   const files = [file("src/a.ts", 60), file("src/b.ts", 60)];
   const record: RunUnderstanding = {
     summary: { text: summary, changeFingerprint: changeFingerprint(files), at: "t" },
@@ -433,15 +433,18 @@ test("after the change moves, only changed files' answers drop and a passed chec
   assert.deepEqual(planCheck({ files, record, questions }), []);
   const moved = [files[0], file("src/b.ts", 60, { fingerprint: "src/b.ts@2" })];
   assert.equal(synchronizeUnderstandingRecord(record, moved), true);
-  assert.deepEqual(record.items?.map((value) => value.id), ["fallback:src/a.ts"]);
+  assert.deepEqual(record.items?.map((value) => value.id), ["fallback:src/a.ts", "untested"]);
   assert.equal(record.passedAt, undefined);
   assert.equal(record.history?.length, 1);
   // The re-check asks only about the file that changed since the pass.
   assert.deepEqual(checkScope(moved, record).map((value) => value.path), ["src/b.ts"]);
-  assert.deepEqual(planCheck({ files: moved, record, questions }).map((value) => value.id), [
-    "fallback:src/b.ts",
-    "untested",
-  ]);
+  // The not-tested answer stays recorded, so only the file question is new.
+  const replan = planCheck({ files: moved, record, questions });
+  assert.deepEqual(replan.map((value) => value.id), ["fallback:src/b.ts", "untested"]);
+  assert.deepEqual(
+    understandingStatus({ record, plan: replan, files: moved, required: true }).missing,
+    [{ part: "summary-confirm" }, { part: "answer", itemId: "fallback:src/b.ts" }],
+  );
   // Without a pass, a moved file only drops its own answer.
   const open: RunUnderstanding = {
     items: [item("selfCheck:src/a.ts", "src/a.ts", "src/a.ts@1"), item("untested")],

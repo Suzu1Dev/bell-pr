@@ -628,6 +628,8 @@ export default {
     diffChanged:
       "The changes differ from what you approved; review and approve them again.",
     notAllReviewed: "Not every latest change has been reviewed.",
+    understandingRequired:
+      "Explain the change back before you approve or publish: finish the understanding check for the latest version of the changes. You can turn the check off in Settings → Learning; runs approved without it are marked.",
     prAlreadySent:
       "This PR was already sent; to push new changes, start a follow-up round from the maintainer feedback.",
     branchIsTargetReapprove: ({ branch }: { branch: string }) =>

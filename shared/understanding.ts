@@ -453,7 +453,11 @@ function readyCard(
   return stored.content;
 }
 
-const words = (text = "") => (text.trim() ? draftProseWords(text) : 0);
+/** Words as the check counts them (`draftProseWords`: one CJK character is one word). */
+export function understandingWords(text = "") {
+  return text.trim() ? draftProseWords(text) : 0;
+}
+const words = understandingWords;
 
 /**
  * True when a per-file quiz counts toward the check: answered before the
@@ -638,7 +642,7 @@ export function effectiveGrade(
 }
 
 /** Every text field of an explanation card, for the near-copy test of the summary. */
-function cardTexts(card: ChangeExplanation) {
+export function cardTexts(card: ChangeExplanation) {
   return [
     card.summary,
     card.reason,
@@ -735,10 +739,10 @@ export function understandingStatus({
 /**
  * Brings a record up to date with the current files: answers about a file
  * whose fingerprint changed (or that left the diff) are dropped, and once
- * the change moves past the version the check passed on, the pass ends and
- * the not-tested answer goes with it, so the re-check asks again. The
- * summary is kept; it then needs confirming. Returns whether anything
- * changed.
+ * the change moves past the version the check passed on, the pass ends.
+ * The summary and the not-tested answer are kept; the summary then needs
+ * confirming, and the re-check asks only about the files that changed.
+ * Returns whether anything changed.
  */
 export function synchronizeUnderstandingRecord(
   record: RunUnderstanding | undefined,
@@ -749,10 +753,8 @@ export function synchronizeUnderstandingRecord(
   const current = new Map(files.map((file) => [file.path, file.fingerprint]));
   const passedOn = record.passedFingerprint;
   const moved = !!passedOn && passedOn !== changeFingerprint(files);
-  const items = (record.items ?? []).filter((item) =>
-    item.path
-      ? current.get(item.path) === item.fingerprint
-      : !(moved && item.id === "untested"),
+  const items = (record.items ?? []).filter(
+    (item) => !item.path || current.get(item.path) === item.fingerprint,
   );
   if (record.items && items.length !== record.items.length) {
     record.items = items;

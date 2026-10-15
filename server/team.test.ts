@@ -29,6 +29,12 @@ import { ProjectInsightsService } from "./insights.js";
 import { AgentSlots } from "./agent-slots.js";
 import { withLocale } from "./i18n/index.js";
 import { outputLanguage, respondIn } from "./prompt-language.js";
+import { after, before } from "node:test";
+import { skipUnderstandingCheckInTests } from "./understanding.js";
+
+// This file tests other behaviour; server/understanding.test.ts covers the gate.
+before(() => skipUnderstandingCheckInTests(true));
+after(() => skipUnderstandingCheckInTests());
 
 const settings: ContributionSettings = {
   direction: "feature",

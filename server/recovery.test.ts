@@ -22,6 +22,12 @@ import { createApp } from "./app.js";
 import { withLocale } from "./i18n/index.js";
 import type { TeamAgentRunner } from "./team.js";
 import type { Database, Repository, Run } from "./types.js";
+import { after, before } from "node:test";
+import { skipUnderstandingCheckInTests } from "./understanding.js";
+
+// This file tests other behaviour; server/understanding.test.ts covers the gate.
+before(() => skipUnderstandingCheckInTests(true));
+after(() => skipUnderstandingCheckInTests());
 
 const prUrl = "https://github.com/test-owner/example/pull/1";
 
