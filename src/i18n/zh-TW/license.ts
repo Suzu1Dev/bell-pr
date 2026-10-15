@@ -35,7 +35,7 @@ const m: Translation<typeof en> = {
       teamSize: "Pro：3 或 4 位隊友",
       parallelRuns: "Pro：最多同時執行 8 項工作",
     },
-    general: "Pro 提供更大的平行 Agent 團隊、探索貢獻等更多功能。",
+    general: "Pro 讓你學得更深：教練回顧、完整學習紀錄、AI follow-up 回合、更大的團隊與探索貢獻。",
     proList: "Pro 提供的功能",
     thisFeature: "你剛才使用的功能",
     startTrial: "開始 14 天試用",

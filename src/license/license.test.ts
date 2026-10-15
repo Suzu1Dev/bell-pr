@@ -126,7 +126,7 @@ test("the upgrade dialog names the feature, lists Pro and offers the trial and a
     renderEn(dialog("discovery", { initialRequest: { error: "Finding projects needs a Pro license.", feature: "discovery" } })),
     /<p class="modal-subtitle">Finding projects needs a Pro license\.<\/p>/,
   );
-  assert.match(renderEn(dialog(undefined)), /Pro adds bigger and parallel agent teams/);
+  assert.match(renderEn(dialog(undefined)), /Pro goes deeper: a coach debrief/);
   assert.match(renderZh(dialog("discovery")), /升級到 Pro/);
   // Closed until an event or a request opens it.
   assert.equal(renderEn(createElement(UpgradeDialog, { summary: free })), "");

@@ -50,7 +50,7 @@ export default {
       teamSize: "Pro: 3 or 4 teammates",
       parallelRuns: "Pro: up to 8 runs at once",
     } satisfies Partial<Record<ProFeature, string>>,
-    general: "Pro adds bigger and parallel agent teams, discovery and more.",
+    general: "Pro goes deeper: a coach debrief, the complete learning record, AI follow-up rounds, bigger teams and discovery.",
     proList: "What Pro adds",
     thisFeature: "The feature you tried",
     startTrial: "Start 14-day trial",
