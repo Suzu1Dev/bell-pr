@@ -17,6 +17,10 @@ import { launchServer } from "./start-server.mjs";
 const runId = "e2e-real-approve-run";
 const repoId = "e2e-real-approve-repo";
 const source = "src/greeting.ts";
+const savedDraft = {
+  title: "Greet the whole world",
+  body: "## Summary\n\nThe greeting now says hello to the whole world.\n\n## Testing\n\nRan the greeting test.",
+};
 const testFile = "test/greeting.test.ts";
 const testBody = (assertion: string) =>
   [
@@ -85,10 +89,7 @@ async function seed(dataDir: string) {
           createdAt: now,
           agents: [],
           logs: [],
-          draft: {
-            title: "Greet the whole world",
-            body: "## Summary\n\nThe greeting now says hello to the whole world.\n\n## Testing\n\nRan the greeting test.",
-          },
+          draft: savedDraft,
           reviewedFiles: [],
           reviewedFingerprints: {},
           reports: {},
@@ -120,6 +121,11 @@ test("a seeded real run is approved through the UI and the publish dialog opens 
       await expect(reviewed).toBeChecked();
     }
     await expect(page.locator(".file-item .file-reviewed")).toHaveCount(2);
+    // Every file is reviewed, yet the server refuses approval until the
+    // change is explained back.
+    const early = await page.request.post(`/api/runs/${runId}/approve`, { data: { draft: savedDraft } });
+    expect(early.status()).toBe(409);
+    expect(((await early.json()) as { code?: string }).code).toBe("understanding_check_required");
 
     // 2. The loosened assertion is a weakened test, which blocks publishing
     // until its reason is written in the Draft tab's reviewability snapshot
