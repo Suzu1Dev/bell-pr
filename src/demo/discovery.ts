@@ -62,6 +62,7 @@ export function getSampleDiscoveryJob(locale: Locale): DiscoveryJob {
           quote: evidence.quote,
           reason: text.reasons[index],
         })),
+        ...("learnByHand" in opportunity ? { learnByHand: opportunity.learnByHand } : {}),
       };
     }),
     warnings: [...copy.warnings],

@@ -6,6 +6,7 @@ const { plural } = formatters("en");
 const answerPrefix = "Sample · prewritten, no AI call.\n\n";
 
 const en: DemoContent = buildDemoContent({
+  locale: "en",
   explanations: {
     "src/utils/retry.ts": {
       example: {
@@ -75,6 +76,15 @@ const en: DemoContent = buildDemoContent({
       concept:
         "unknown and type narrowing\nAn error is not always an Error object. Typing it as unknown makes the code check the type before it reads a property, instead of assuming one.",
       tip: "Renaming delay to baseDelay is a breaking change. A real PR should include migration notes, or keep the old name for a while, marked deprecated, so users have time to upgrade.",
+      alternatives:
+        "Another option is to keep `delay` as a deprecated alias next to `baseDelay`. Existing configs would keep working for a release, at the cost of two names for one setting. This change renames it outright because the sample is small and young; a widely used SDK should usually keep the alias for a release.",
+      lookup: ["TypeScript Omit", "deprecation"],
+      selfCheck: {
+        question:
+          "Why does ClientOptions.retry leave out shouldRetry? What could go wrong if callers could set it there?",
+        answer:
+          "The client decides which HTTP statuses are worth retrying through its own shouldRetry. A caller's version would be overwritten and silently ignored, so the type leaves it out instead.",
+      },
     },
     "tests/retry.test.ts": {
       example: {
@@ -92,6 +102,15 @@ const en: DemoContent = buildDemoContent({
       concept:
         "Fake timers and test doubles\nvi.useFakeTimers takes over the timers, and mockReturnValue(0.5) pins the random value. The first ceiling is 1 second, so moving time forward by 500 ms triggers the second call.",
       tip: "These are sample tests, not full coverage. They still need cases for the retry limit, the longest wait, repeated failures, option validation and the status codes the client retries.",
+      alternatives:
+        "The tests could pass a fake `sleep` into withRetry and record each requested wait instead of using fake timers. That checks the waits directly without mocking timers, but it changes the helper's public signature for the tests alone. Fake timers keep the API as it is.",
+      lookup: ["fake timers", "dependency injection"],
+      selfCheck: {
+        question:
+          "Why does the first test move time forward by exactly 500 ms? What could happen if Math.random were not pinned?",
+        answer:
+          "With Math.random pinned to 0.5 and a first ceiling of 1 second, the wait is 500 ms. Unpinned, the wait would be random, so the test could fail or pass by luck.",
+      },
     },
     "README.md": {
       example: {
@@ -109,6 +128,15 @@ const en: DemoContent = buildDemoContent({
       concept:
         "Docs from the user's side\nSay what the feature does first, then give a config example people can adapt, and finish with the limits and how to migrate.",
       tip: "When you review docs, check every default against the code. The example should also show how to import the client, and say that retries do not replace the app's own error handling.",
+      alternatives:
+        "The retry settings could live on a separate guide page linked from the README. The README would stay short, but people upgrading often read only the README and could miss the migration note. For a small SDK, one README section is easier to find.",
+      lookup: ["migration guide", "semantic versioning"],
+      selfCheck: {
+        question:
+          "With the default settings, how many requests can one GET make in total, and which statuses fail at once?",
+        answer:
+          "Up to 4: the first attempt and 3 retries. Statuses outside 408, 429, 500, 502, 503 and 504, such as 404, fail without a retry.",
+      },
     },
   },
   run: {
@@ -318,8 +346,6 @@ const en: DemoContent = buildDemoContent({
     sources: {
       "demo-contributing": {
         label: "Contributing guide (sample)",
-        content:
-          "# Sample contributing guide\n\nTitles should describe the improvement users get.\n\nThe testing section should separate the checks you ran from the items still to verify.\n\nCommit subjects use the format type(scope): summary, followed by a blank line and the reason.",
       },
       "demo-template": {
         label: "PR template (sample)",
@@ -599,6 +625,88 @@ const en: DemoContent = buildDemoContent({
     title: "Draft PR opened",
     note: "Sample: not created on GitHub",
   },
+  understanding: {
+    summary:
+      "This change makes failed GET requests retry with growing, randomized waits instead of a fixed one-second pause. Only temporary failures such as a 503 or a network error are retried, and no wait goes past maxDelay. Renaming delay to baseDelay could break existing configs.",
+    answers: {
+      "selfCheck:src/utils/retry.ts": {
+        answer: "The ceiling is 2 seconds, and the real wait is a random value below it.",
+        correction: "The ceiling doubles from 1 second, so attempt 2 caps at 4 seconds.",
+      },
+      untested: {
+        answer:
+          "I didn't test a server that sends Retry-After, because the client ignores it today.",
+      },
+    },
+    forecastQuestion: "They'll ask whether the retry cap is tested.",
+  },
+  quizzes: {
+    "src/utils/retry.ts":
+      "Up to 4 seconds; jitter makes each real wait random and usually shorter.",
+    "src/client.ts":
+      "No. 404 is not in the retry list, so the HttpError fails right away.",
+    "src/types.ts":
+      "So callers can't replace the client's own check of which statuses retry.",
+    "tests/retry.test.ts":
+      "The pinned random value halves the first one-second ceiling to 500 ms.",
+    "README.md": "Three requests, and a 404 fails at once.",
+  },
+  roads: {
+    "src/utils/retry.ts": {
+      guess: "Wait the same short time between tries, with a little randomness.",
+      why: "A fixed wait still sends a wave of retries when the server is overloaded.",
+    },
+    "src/client.ts": {
+      guess: "Check error.status inside shouldRetry instead of a new error class.",
+      why: "HttpError keeps the whole response, which helps when debugging.",
+    },
+    "src/types.ts": {
+      guess: "Keep delay as a deprecated alias for one release.",
+      why: "Existing configs would keep working while people upgrade.",
+    },
+    "tests/retry.test.ts": {
+      guess: "Pass a fake sleep function into withRetry.",
+      why: "Simpler to read, but it changes the public signature for tests only.",
+    },
+    "README.md": {
+      guess: "Put the retry settings on a separate guide page.",
+      why: "People upgrading read the README first.",
+    },
+  },
+  feedbackLessons: {
+    "retry-after":
+      "Read what the server asks for, such as Retry-After, before choosing a wait.",
+  },
+  practice: {
+    "retry-check": {},
+    "retry-after-feedback": {
+      question:
+        "A maintainer asked about 429 and 503 responses in src/client.ts. What should the wait honor when the server sends one?",
+      reference:
+        "The Retry-After header: the server says how long to wait, and the client should wait at least that long, still capped by maxDelay.",
+    },
+    "types-self-check": {},
+  },
+  debrief: {
+    quotes: [
+      "Please add a test for the exhausted case: after `maxRetries`, the last error should be thrown.",
+    ],
+    drills: [
+      {
+        context: "Choosing how withRetry waits between attempts.",
+        optionA: "Wait a fixed 1 second, plus or minus 0.3 seconds.",
+        optionB:
+          "Wait a random time under a ceiling that doubles each attempt, capped by maxDelay.",
+        question: "Which fits this project, and why?",
+        reveal:
+          "B: many screens share this client, so failures arrive together, and a growing random wait spreads the retries out. A is simpler and fine when only a few clients retry.",
+      },
+    ],
+    nextStep:
+      "Before your next pull request here, write the test for the last allowed attempt first.",
+  },
+  restatement:
+    "Keep the old delay option working for one release, and add a test that the last error is thrown.",
 });
 
 export default en;

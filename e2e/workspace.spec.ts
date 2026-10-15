@@ -379,6 +379,11 @@ test("the AI-assistance switch saves the line into the draft, and an applied sug
     await sample.getByRole("button", { name: guidance.generate.demo }).click();
     await sample.getByRole("button", { name: guidance.apply.apply }).click();
     const sampleSwitch = sample.getByRole("switch", { name: guidance.disclosure.label });
+    // The sample project asks contributors to say when AI helped, so the
+    // switch starts on; it still turns off and on.
+    await expect(sampleSwitch).toBeChecked();
+    await sampleSwitch.click();
+    await expect(sampleSwitch).not.toBeChecked();
     await sampleSwitch.click();
     await expect(sampleSwitch).toBeChecked();
     await sample.getByRole("button", { name: workspace.draft.edit, exact: true }).click();
