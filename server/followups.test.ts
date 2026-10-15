@@ -284,8 +284,18 @@ else process.exit(97);
   };
 }
 
+/**
+ * How long a background follow-up round may take before a test gives
+ * up. The whole suite runs its files in parallel, and on a loaded machine
+ * the fake agents, Git and the saves take far longer than alone, so the
+ * wait is generous; BELLPR_AGENT_TIMEOUT_SCALE stretches it further. A
+ * round that settles sooner ends the wait at once.
+ */
+const settleTimeoutMs =
+  30_000 * (Number(process.env.BELLPR_AGENT_TIMEOUT_SCALE) || 1);
+
 async function settled(run: Run) {
-  const end = Date.now() + 8000;
+  const end = Date.now() + settleTimeoutMs;
   while (run.status === "running") {
     if (Date.now() > end) throw new Error("follow-up round did not finish");
     await new Promise((resolve) => setTimeout(resolve, 20));

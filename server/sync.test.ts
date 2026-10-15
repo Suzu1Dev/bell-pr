@@ -453,8 +453,18 @@ test("conflict labels keep the bytes of non-UTF-8 files and CRLF line ends, at e
   }
 });
 
+/**
+ * How long a background resolution may take before a test gives up. The
+ * whole suite runs its files in parallel, and on a loaded machine the fake
+ * agents, Git and the saves take far longer than alone, so the wait is
+ * generous; BELLPR_AGENT_TIMEOUT_SCALE stretches it further. It ends as
+ * soon as the predicate holds.
+ */
+const settleTimeoutMs =
+  30_000 * (Number(process.env.BELLPR_AGENT_TIMEOUT_SCALE) || 1);
+
 async function until(predicate: () => boolean) {
-  const end = Date.now() + 8000;
+  const end = Date.now() + settleTimeoutMs;
   while (!predicate()) {
     if (Date.now() > end) throw new Error("timed out");
     await new Promise((resolve) => setTimeout(resolve, 20));
