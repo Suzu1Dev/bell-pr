@@ -222,3 +222,19 @@ test("with the check turned off, the run says so and approval needs the ticks on
     await server.stop();
   }
 });
+
+test("a quiz answered during review counts in the check, after a reload too", async ({ page }) => {
+  const quiz = review.tryFirst;
+  await page.goto(`/#/runs/demo-run/changes?file=${retry.path}&locale=en`);
+  const card = page.locator(".explain-card-selfcheck");
+  await card.getByRole("textbox", { name: quiz.quiz.answerLabel }).fill(demo.quizSamples!["src/utils/retry.ts"].answer);
+  await card.getByRole("radio", { name: quiz.confidences.think }).check();
+  await card.getByRole("button", { name: quiz.quiz.reveal }).click();
+  await card.getByRole("button", { name: quiz.grades.got }).click();
+  await expect(card.locator(".tf-graded")).toHaveText(quiz.quiz.graded.got);
+  // The attempt is kept with the sample in this browser.
+  await page.reload();
+  await expect(page.locator(".explain-card-selfcheck .tf-graded")).toHaveText(quiz.quiz.graded.got);
+  await page.goto("/#/runs/demo-run/changes?panel=check&locale=en");
+  await expect(item(page, retryQuestion)).toContainText(t.credited);
+});
