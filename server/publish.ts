@@ -168,7 +168,9 @@ export async function publishChecks(
       facts: extra.facts ?? run.contributionFacts,
       overrides: extra.overrides ?? run.guardOverrides,
       testReasons: run.reviewability?.testReasons,
-      understandingOff: !understandingRequired(),
+      // A pass counts whatever the setting says: only an unpassed run
+      // with the check turned off asks about a rule on explaining a change.
+      understandingOff: !understandingRequired() && !run.understanding?.passedAt,
       issueUrl: run.contributionSettings?.issueUrl,
     },
     locale,

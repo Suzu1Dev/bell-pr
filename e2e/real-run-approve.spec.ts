@@ -36,9 +36,10 @@ const testBody = (assertion: string) =>
 /**
  * A checkout whose working tree changes the greeting and loosens its test's
  * assertion (toBe → toBeDefined), and state.json with the run in review on
- * a GitHub project.
+ * a GitHub project. `options.loosenTest: false` changes the greeting only;
+ * `options.rules` are the project's rules BELL read.
  */
-async function seed(dataDir: string) {
+async function seed(dataDir: string, options: { loosenTest?: boolean; rules?: unknown } = {}) {
   const checkout = path.join(dataDir, "checkouts", "widgets");
   await mkdir(path.join(checkout, "src"), { recursive: true });
   await mkdir(path.join(checkout, "test"), { recursive: true });
@@ -58,7 +59,8 @@ async function seed(dataDir: string) {
   git("commit", "-q", "-m", "Add the greeting and its test");
   const baseSha = git("rev-parse", "HEAD");
   await writeFile(path.join(checkout, source), 'export const greeting = "Hello, world";\n');
-  await writeFile(path.join(checkout, testFile), testBody("expect(greeting).toBeDefined();"));
+  if (options.loosenTest !== false)
+    await writeFile(path.join(checkout, testFile), testBody("expect(greeting).toBeDefined();"));
   const now = new Date().toISOString();
   await writeFile(
     path.join(dataDir, "state.json"),
@@ -73,6 +75,7 @@ async function seed(dataDir: string) {
           path: checkout,
           defaultBranch: "main",
           url: "https://github.com/e2e-sample/widgets",
+          ...(options.rules ? { contributionRules: options.rules } : {}),
         },
       ],
       runs: [
@@ -211,6 +214,83 @@ test("a seeded real run is approved through the UI and the publish dialog opens 
     expect(run.status).toBe("approved");
     expect(run.understandingCheckOff).not.toBe(true);
     expect(Object.keys(run.reviewability?.testReasons ?? {})).toEqual([`${testFile}#-5`]);
+  } finally {
+    await context.close();
+    await server.stop();
+  }
+});
+
+test("a passed check counts after the setting is turned off: publishing asks nothing about the check", async ({ browser }) => {
+  const rule = "You must be able to explain your change in review.";
+  const server = await launchServer({
+    seed: (dataDir: string) =>
+      seed(dataDir, {
+        loosenTest: false,
+        rules: {
+          checkedAt: new Date().toISOString(),
+          findings: [{ kind: "understand", path: "CONTRIBUTING.md", line: 7, quote: rule, contribution: false }],
+          filesRead: ["CONTRIBUTING.md"],
+        },
+      }),
+  });
+  const context = await browser.newContext({
+    baseURL: server.baseURL,
+    storageState: server.storageState,
+    viewport: { width: 1440, height: 900 },
+    locale: "en-US",
+    timezoneId: "UTC",
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto(`/#/runs/${runId}/changes?locale=en`);
+    await expect(page.locator(".workspace-heading h1")).toHaveText("Greet the whole world");
+    await page.locator(`.file-item[title="${source}"]`).click();
+    const reviewed = page.getByRole("checkbox", { name: review.diff.reviewed });
+    await reviewed.click();
+    await expect(reviewed).toBeChecked();
+
+    // Explain it back while the check is on.
+    const check = workspace.check;
+    await page.getByRole("button", { name: workspace.footer.explainBack }).click();
+    const panel = page.locator(".understanding-check");
+    await panel
+      .getByRole("textbox", { name: check.explainPrompt })
+      .fill("The greeting was a bare hello, so it now greets the whole world, which reads friendlier to people.");
+    const answers = panel.getByRole("region", { name: check.answerTitle }).getByRole("listitem");
+    await expect(answers).toHaveCount(1);
+    await answers.getByRole("textbox").fill("I did not run the greeting in a terminal.");
+    await panel.getByRole("radio", { name: check.confidences.sure }).check();
+    await panel.getByRole("button", { name: check.lock }).click();
+    const footer = page.locator(".review-footer");
+    await expect(footer).toContainText(workspace.footer.passed);
+
+    // Then the check is turned off; the pass still counts.
+    const turnedOff = await page.request.put("/api/app-settings", { data: { skipUnderstandingCheck: true } });
+    expect(turnedOff.status()).toBe(200);
+    await footer.getByRole("button", { name: workspace.footer.approvePr }).click();
+    const dialog = page.getByRole("dialog", { name: workspace.publish.title });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(workspace.publish.factsLoading)).toHaveCount(0);
+    const { checks } = (await (await page.request.get(`/api/runs/${runId}/preflight`)).json()) as {
+      checks: DraftCheck[];
+    };
+    expect(checks.map((item) => item.id)).not.toContain("project-rules");
+    await expect(dialog.getByText(workspace.publish.checkOff)).toHaveCount(0);
+    await expect(dialog.getByText(rule)).toHaveCount(0);
+    await expect(dialog).not.toContainText("your understanding check is off");
+    // The run is approved with its pass and no Check off mark.
+    const { run } = (await (await page.request.get(`/api/runs/${runId}`)).json()) as {
+      run: { status: string; understandingCheckOff?: boolean };
+    };
+    expect(run.status).toBe("approved");
+    expect(run.understandingCheckOff).not.toBe(true);
+
+    // The Draft checklist agrees: the rule asks nothing, the check passed.
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await page.locator("#workspace-tab-draft").click();
+    await expect(page.locator('[data-row="understanding"]')).toContainText(draft.guidance.checklist.understandingPassed);
+    await expect(page.locator('[data-row="rules"]')).not.toContainText("your understanding check is off");
   } finally {
     await context.close();
     await server.stop();

@@ -32,6 +32,9 @@ test("the sample publishes with every check passing, and asks to confirm its rul
     const off = samplePublishChecks(demo, run, demo.files, locale, true);
     assert.deepEqual(off.map((check) => [check.id, check.kind]), [["project-rules", "confirm"]], locale);
     if (locale === "en") assertNoHan(JSON.stringify(off));
+    // A pass counts whatever the setting says.
+    const passed = { ...run, understanding: { passedAt: "2026-10-15T00:00:00.000Z" } };
+    assert.deepEqual(samplePublishChecks(demo, passed, demo.files, locale, true), [], locale);
   }
   // The sample's draft without its AI line: the project's own rule blocks it.
   const demo = getDemo("en");

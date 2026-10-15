@@ -15,6 +15,7 @@ import type { PlannedItem } from "../shared/understanding.js";
 import { createApp } from "./index.js";
 import { git } from "./process.js";
 import { readDiff } from "./git.js";
+import { publishChecks } from "./publish.js";
 import { withLocale } from "./i18n/index.js";
 import { Store } from "./store.js";
 import { AppError, type Run } from "./types.js";
@@ -641,6 +642,31 @@ test("the publish dialog shows the project's rules from the stored facts, withou
   );
   assert.equal(checks[0].details[1], 'AI_POLICY.md:4: "Pull requests made with AI tools are not accepted."');
   await assert.rejects(readFile(calls, "utf8"), /ENOENT/);
+});
+
+test("a passed check counts with the setting off: a rule on explaining a change asks nothing at publish", async (t) => {
+  const f = await fixture(t);
+  await f.write("src/a.ts", lines("a", 40));
+  await f.reviewAll();
+  f.repo.contributionRules = {
+    checkedAt: "2026-10-15T00:00:00.000Z",
+    findings: [
+      { kind: "understand", path: "CONTRIBUTING.md", line: 7, quote: "You must be able to explain your change in review.", contribution: false },
+    ],
+    filesRead: ["CONTRIBUTING.md"],
+  };
+  const offDetails = async () =>
+    (await publishChecks(f.run, await readDiff(f.run), f.store.directory, "en", { repo: f.repo }))
+      .flatMap((check) => check.details)
+      .filter((detail) => detail.includes("your understanding check is off"));
+  await f.workbench.updateAppSettings({ skipUnderstandingCheck: true });
+  assert.equal((await offDetails()).length, 1);
+  await passCheck(f);
+  assert.ok(f.run.understanding?.passedAt);
+  assert.deepEqual(await offDetails(), []);
+  // Approved with the setting still off, the pass marks nothing.
+  assert.equal((await f.workbench.approve(f.run.id, { ...f.run.draft })).understandingCheckOff, undefined);
+  assert.deepEqual(await offDetails(), []);
 });
 
 test("publish accepts overrides only for someone else's PR, with a 20 to 200 character reason, and records them", async (t) => {

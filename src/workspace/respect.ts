@@ -43,7 +43,8 @@ export function changesOf(
  * The sample's publish checks, as the server would compute them for a real
  * run: its rules, its GitHub facts, its reviewability and its issue link.
  * They all pass on the sample as shipped; with the understanding check
- * off, the sample's own rule about explaining a change asks for a confirm.
+ * off and not passed, the sample's own rule about explaining a change
+ * asks for a confirm. A pass counts whatever the setting says.
  */
 export function samplePublishChecks(
   sample: DemoContent,
@@ -65,7 +66,7 @@ export function samplePublishChecks(
       changes: changesOf(run, files, undefined, sample),
       testReasons: run.reviewability?.testReasons,
       issueUrl: run.contributionSettings?.issueUrl,
-      understandingOff,
+      understandingOff: understandingOff && !run.understanding?.passedAt,
     },
     locale,
   );

@@ -237,9 +237,12 @@ export function DraftGuidancePanel({
             facts,
             changes,
             issueUrl,
-            // The check is not required only while the person turned it off.
+            // The check is not required only while the person turned it
+            // off, and a pass counts whatever the setting says.
             understandingOff:
-              understanding && (understanding.off || !understanding.required),
+              understanding &&
+              !understanding.passed &&
+              (understanding.off || !understanding.required),
           },
           locale,
         )

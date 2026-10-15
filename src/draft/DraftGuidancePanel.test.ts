@@ -539,6 +539,30 @@ test("with the sample's rules, facts and changes every row is green", () => {
   assert.match(checklistRow(withoutLine, "disclosure"), /The project requires a disclosure, and publishing waits for it\./);
 });
 
+test("a passed check counts with the setting off: the sample's rule on explaining a change asks nothing", () => {
+  const props = {
+    demo: true,
+    draftBody: sampleEn.run.draft.body,
+    issueUrl: sampleEn.run.contributionSettings?.issueUrl,
+    rules: sampleRules,
+    facts: sampleEn.contributionFacts,
+    changes: sampleChanges,
+  };
+  const passed = renderEnglish(sampleEn.draftPreparation, {
+    ...props,
+    understanding: { required: false, passed: true, off: true },
+  });
+  assert.deepEqual(new Set(Object.values(rowStatuses(passed))), new Set(["ok"]));
+  assert.doesNotMatch(passed, /your understanding check is off/);
+  // Not passed with the setting off, the rule asks to be confirmed.
+  const off = renderEnglish(sampleEn.draftPreparation, {
+    ...props,
+    understanding: { required: false, passed: false, off: true },
+  });
+  assert.equal(rowStatuses(off).understanding, "off");
+  assert.match(checklistRow(off, "rules"), /your understanding check is off/);
+});
+
 test("the respect checks move from the preflight list to the checklist rows", () => {
   const facts = {
     ...sampleEn.contributionFacts!,
