@@ -228,7 +228,7 @@ export function checklistRows(
       if (issue.state?.toUpperCase() === "CLOSED")
         return { status: "block", lines: [m.issueClosed], sources: [field("state", "CLOSED")] };
       // Another person's pull request would close the issue, and no check
-      // says so: never "nobody else is on it".
+      // says so: never the row that found no one else on it.
       const login = door?.login?.toLowerCase();
       const competing = (issue.otherPrs ?? []).filter(
         (pr) =>

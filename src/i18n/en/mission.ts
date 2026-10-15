@@ -535,7 +535,7 @@ const mission = {
   start: {
     title: "Before you start",
     lead: "Read once for this issue link. Nothing here stops you from practising; publishing checks again.",
-    noIssue: `Link the issue you will work on, and ${product.name} checks that it is still open and that nobody else is on it.`,
+    noIssue: `Link the issue you will work on, and ${product.name} checks whether it is still open and whether someone else is already on it.`,
     notGitHub:
       "Issue facts are read for GitHub issue links, such as https://github.com/owner/repo/issues/123.",
     checking: "Checking the issue on GitHub…",

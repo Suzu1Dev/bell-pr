@@ -394,7 +394,7 @@ const m: Translation<typeof en> = {
   start: {
     title: "開始之前",
     lead: "每個 issue 連結只讀取一次。這裡的內容不會阻止你練習；發布時會再確認一次。",
-    noIssue: `連結你要處理的 issue，${product.name} 會確認它仍開著，而且沒有別人在做。`,
+    noIssue: `連結你要處理的 issue，${product.name} 會確認它是否仍開著，以及是否已有別人在做。`,
     notGitHub:
       "只有 GitHub issue 連結會讀取 issue 資訊，例如 https://github.com/owner/repo/issues/123。",
     checking: "正在到 GitHub 確認這個 issue…",

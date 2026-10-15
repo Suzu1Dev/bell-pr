@@ -177,8 +177,8 @@ const draft = {
       issueClosed: "The linked issue is closed, so publishing is blocked.",
       issueOpen: ({ number }: { number?: number }) =>
         number === undefined
-          ? "The linked issue is open, and nobody else is on it."
-          : `Issue #${number} is open, and nobody else is on it.`,
+          ? `The linked issue is open. ${product.name} found no one else assigned to it, claiming it or with a pull request linked to it.`
+          : `Issue #${number} is open. ${product.name} found no one else assigned to it, claiming it or with a pull request linked to it.`,
       /** Another person's open pull request would close the linked issue. */
       otherPr: ({ author, number }: { author: string; number: number }) =>
         `@${author}'s pull request #${number} would also close this issue.`,

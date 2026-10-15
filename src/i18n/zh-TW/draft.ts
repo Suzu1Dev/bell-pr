@@ -137,8 +137,8 @@ const m: Translation<typeof en> = {
       issueClosed: "連結的 issue 已關閉，所以會阻擋發布。",
       issueOpen: ({ number }) =>
         number === undefined
-          ? "連結的 issue 仍開著，也沒有別人在做。"
-          : `Issue #${number} 仍開著，也沒有別人在做。`,
+          ? `連結的 issue 仍開著。${product.name} 沒有找到其他人被指派、認領它，或開了連結它的 Pull Request。`
+          : `Issue #${number} 仍開著。${product.name} 沒有找到其他人被指派、認領它，或開了連結它的 Pull Request。`,
       otherPr: ({ author, number }) => `@${author} 的 Pull Request #${number} 也會關閉這個 issue。`,
       pacing: ({ open, budget }) =>
         `你在這裡開著的 PR：${fmt.number(open)} / ${fmt.number(budget)}（${product.name} 預設值，所有方案都一樣）。`,

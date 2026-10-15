@@ -60,7 +60,7 @@ test("the sample's checks are all clear, so every row is green", () => {
   assert.match(byId.rules.sources[0], /^CONTRIBUTING\.md:\d+: "Open an issue before changing behavior\."$/);
   assert.deepEqual(byId.door.lines, ["Pull requests: open to you."]);
   assert.deepEqual(byId.door.sources, ["GitHub pull_request_creation_policy: all"]);
-  assert.deepEqual(byId.issue.lines, ["Issue #42 is open, and nobody else is on it."]);
+  assert.deepEqual(byId.issue.lines, ["Issue #42 is open. BELL PR found no one else assigned to it, claiming it or with a pull request linked to it."]);
   assert.match(byId.issue.sources.join("\n"), /GitHub state: OPEN/);
   assert.match(byId.issue.sources.join("\n"), /A maintainer said: “PRs welcome for the retry cap\.”/);
   assert.deepEqual(byId.pacing.lines, ["Your open PRs here: 0 of 1 (BELL PR default, the same on every plan)."]);
