@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { z } from "zod";
-import { testReasonLimits } from "../contribution-facts.js";
+import { testReasonLimits } from "../../shared/contribution.js";
 import { parseGitHubIssueUrl } from "../git.js";
 import { sm } from "../i18n/index.js";
 import type { RouteDeps } from "./types.js";

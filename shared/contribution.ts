@@ -169,6 +169,14 @@ export type OverridableCheckId = (typeof overridableCheckIds)[number];
 export const overrideReasonLimits = { min: 20, max: 200 } as const;
 
 /**
+ * A weakened-test reason (`run.reviewability.testReasons`, DESIGN F9): a
+ * line a maintainer can check, at least 3 words (one CJK character counts
+ * as a word) and at most 300 characters. The client, the route and the
+ * publish check share it.
+ */
+export const testReasonLimits = { words: 3, chars: 300 } as const;
+
+/**
  * How many of the person's pull requests may be open in one repository
  * before BELL asks to close the loop first: 1 before their first merged
  * pull request there, 2 after. BELL defaults.
@@ -403,7 +411,7 @@ export function respectChecks(
 
   // Weakened tests need a reason each.
   const unexplained = (input.changes?.weakened ?? []).filter(
-    (item) => draftProseWords(input.testReasons?.[item.id] ?? "") < 3,
+    (item) => draftProseWords(input.testReasons?.[item.id] ?? "") < testReasonLimits.words,
   );
   if (unexplained.length)
     blocks.push({

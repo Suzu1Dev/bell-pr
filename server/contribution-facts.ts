@@ -14,6 +14,7 @@
  */
 import {
   pacingExempt,
+  testReasonLimits,
   type ContributionFacts,
   type ContributionRules,
   type DoorFacts,
@@ -52,9 +53,6 @@ const now = () => new Date().toISOString();
 const runFactsTimeoutMs = 10_000;
 /** How long reading a project's door and account defaults may take in all. */
 const rulesTimeoutMs = 30_000;
-
-/** The limits of a weakened-test reason (DESIGN F9): a line a maintainer can check. */
-export const testReasonLimits = { words: 3, chars: 300 } as const;
 
 const reasonKeys = {
   "gh-missing": "ghMissing",
