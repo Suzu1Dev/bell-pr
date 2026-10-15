@@ -1,13 +1,14 @@
-// The learning notes page: the sample notes, and a person's own notes read
-// page by page from GET /api/learning.
+// The learning page: the sample notes, a person's own notes read page by
+// page from GET /api/learning, and the coach debrief view (Pro).
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page, type Request } from "@playwright/test";
+import { expect, test, type Browser, type Page, type Request } from "@playwright/test";
 import { splitConceptHeading } from "../shared/explanations";
 import { getDemo } from "../src/demo";
 import learning from "../src/i18n/en/learning";
-import { launchServer } from "./start-server.mjs";
+import license from "../src/i18n/en/license";
+import { launchServer, type LaunchedServer } from "./start-server.mjs";
 
 const demo = getDemo("en");
 const repoId = "e2e-learning-repo";
@@ -182,4 +183,103 @@ test("seeded notes load from /api/learning, 20 contributions at a time", async (
     await context.close();
     await server.stop();
   }
+});
+
+/** A signed-in page on a spec-local server; closed with the server. */
+async function onServer(
+  browser: Browser,
+  options: Parameters<typeof launchServer>[0],
+  fn: (page: Page, server: LaunchedServer) => Promise<void>,
+) {
+  const server = await launchServer(options);
+  const context = await browser.newContext({
+    baseURL: server.baseURL,
+    storageState: server.storageState,
+    locale: "en-US",
+  });
+  try {
+    await fn(await context.newPage(), server);
+  } finally {
+    await context.close();
+    await server.stop();
+  }
+}
+
+/** One imported project with one published contribution, nothing else. */
+const debriefRepo = {
+  id: "e2e-debrief-repo",
+  name: "debrief",
+  owner: "e2e-sample",
+  fullName: "e2e-sample/debrief",
+  defaultBranch: "main",
+  url: "",
+};
+function publishedState(dataDir: string, repoExtra: Record<string, unknown> = {}) {
+  const id = "e2e-debrief-run";
+  return JSON.stringify({
+    version: 1,
+    repos: [{ ...debriefRepo, path: path.join(dataDir, "repos", "debrief"), ...repoExtra }],
+    runs: [
+      {
+        id,
+        repoId: debriefRepo.id,
+        title: "Published contribution",
+        prompt: "A run written into state.json before the start.",
+        status: "published",
+        branch: `fix/${id}`,
+        baseBranch: "main",
+        baseSha: "",
+        worktreePath: path.join(dataDir, "worktrees", id),
+        createdAt: "2026-10-01T08:00:00.000Z",
+        workspaceRemovedAt: "2026-10-02T08:00:00.000Z",
+        agents: [],
+        logs: [],
+        draft: { title: "Published contribution", body: "" },
+        reviewedFiles: [],
+        reviewedFingerprints: {},
+        reports: {},
+      },
+    ],
+  });
+}
+
+test("on Free the coach debrief opens the upgrade dialog without a request, and the sample shows", async ({ browser }) => {
+  await onServer(
+    browser,
+    { seed: (dataDir) => writeFile(path.join(dataDir, "state.json"), publishedState(dataDir)) },
+    async (page) => {
+      const posts: string[] = [];
+      page.on("request", (request) => {
+        if (request.method() === "POST" && new URL(request.url()).pathname === "/api/learning/debrief")
+          posts.push(request.url());
+      });
+      await page.goto("/#/learning?view=debrief&locale=en");
+      await expect(page.locator('.learning-views a[aria-current="page"]')).toHaveText(learning.views.debrief);
+      const view = page.locator("section.debrief");
+      await expect(view.getByRole("heading", { level: 2, name: learning.debrief.title })).toBeVisible();
+      await expect(view.getByLabel(learning.debrief.project)).toHaveValue(debriefRepo.id);
+      const request = view.getByRole("button", { name: new RegExp(`^${learning.debrief.request}`) });
+      // The plan is known once the PRO badge shows.
+      await expect(request.locator(".pro-badge")).toBeVisible();
+      await expect(view).toContainText(learning.debrief.locked);
+      await request.click();
+      const dialog = page.getByRole("dialog", { name: license.upgrade.title });
+      await expect(dialog).toBeVisible();
+      await expect(dialog).toContainText(license.upgrade.featureNeedsPro.coachDebrief);
+      expect(posts).toEqual([]);
+      await page.keyboard.press("Escape");
+      await expect(dialog).toHaveCount(0);
+
+      // With no debrief of its own, the sample shows, labelled PRO.
+      const sample = view.locator("section.debrief-sample");
+      await expect(sample.getByRole("heading", { level: 2, name: new RegExp(learning.debrief.sampleTitle) })).toBeVisible();
+      await expect(sample.locator(".pro-badge")).toBeVisible();
+      await expect(sample).toContainText(demo.debriefSample!.nextStep);
+      const toggle = sample.getByRole("button", { name: learning.debrief.showTradeOff });
+      await toggle.click();
+      await expect(sample.getByRole("button", { name: learning.debrief.hideTradeOff })).toHaveAttribute("aria-expanded", "true");
+      await expect(sample).toContainText(demo.debriefSample!.drills![0].reveal);
+      expect(await axeProblems(page)).toEqual([]);
+    },
+  );
 });

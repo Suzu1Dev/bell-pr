@@ -10,6 +10,7 @@ import {
 
 test("a view= value names a view; anything else is the notes", () => {
   assert.equal(parseLearningView("practice"), "practice");
+  assert.equal(parseLearningView("debrief"), "debrief");
   assert.equal(parseLearningView(undefined), "notes");
   assert.equal(parseLearningView("streams"), "notes");
   assert.equal(parseLearningView("__proto__"), "notes");
@@ -31,7 +32,8 @@ test("the views are links, and the one shown is the current page", () => {
     '<nav class="learning-views" aria-label="Learning views">' +
       '<a href="#/learning?locale=en" data-view="notes">Notes</a>' +
       '<a href="#/learning?locale=en&amp;view=practice" aria-current="page" data-view="practice">Practice</a>' +
+      '<a href="#/learning?locale=en&amp;view=debrief" data-view="debrief">Coach debrief</a>' +
       "</nav>",
   );
-  assert.match(renderZh(createElement(LearningViewNav, { view: "notes" })), /aria-current="page" data-view="notes">筆記<\/a>.*>練習<\/a>/);
+  assert.match(renderZh(createElement(LearningViewNav, { view: "notes" })), /aria-current="page" data-view="notes">筆記<\/a>.*>練習<\/a>.*>教練回顧<\/a>/);
 });

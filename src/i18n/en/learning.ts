@@ -62,6 +62,7 @@ const learning = {
     label: "Learning views",
     notes: "Notes",
     practice: "Practice",
+    debrief: "Coach debrief",
     /** While a view's code loads. */
     loading: "Loading…",
   },
@@ -132,6 +133,50 @@ const learning = {
     sampleIntro:
       "Items from the built-in sample contribution, so you can try the deck. Grading them saves nothing.",
     sampleDone: "That was the last sample item.",
+  },
+  /**
+   * The coach debrief (Pro): a model-written reading of the person's own
+   * records for one project. It describes the work, never the person.
+   */
+  debrief: {
+    title: "Coach debrief",
+    intro:
+      "A model reads your own records for one project: your explanations, misses and corrections, the approaches you chose, your forecasts and the maintainers' comments. It names what maintainers raised most, quoting your records, builds up to 3 drills from your own changes and suggests one next step. It describes the work, never you, and its drills join your practice.",
+    project: "Project",
+    loadingProjects: "Loading your projects…",
+    noProjects:
+      "A debrief reads approved contributions. Once a contribution in a project is approved, you can ask for one here.",
+    request: "Debrief my contributions to this project",
+    /** Under the button on Free; it opens the upgrade dialog. */
+    locked:
+      "The coach debrief is a Pro feature. Debriefs you already have stay readable on every plan.",
+    working: "Writing your debrief. This can take a few minutes.",
+    ready: "Your debrief is ready.",
+    failed: ({ error }: { error: string }) =>
+      `The debrief could not be written: ${error}`,
+    loading: "Loading the debriefs…",
+    loadFailed: ({ error }: { error: string }) =>
+      `The debriefs could not be loaded: ${error}`,
+    none: "No debrief for this project yet.",
+    aiWritten: "AI-written",
+    written: ({ date }: { date: string }) => `Written ${date}`,
+    read: ({ count }: { count: number }) =>
+      `From ${fmt.number(count)} ${fmt.plural(count) === "one" ? "contribution" : "contributions"}`,
+    recurring: ({ dimension }: { dimension: string }) =>
+      `What maintainers raised most: ${dimension}`,
+    /** Heads the verbatim quotes, which the server checked against the records. */
+    quotes: "Quoted from your records",
+    drills: "Drills",
+    drill: ({ number }: { number: number }) => `Drill ${fmt.number(number)}`,
+    versionA: "Version A",
+    versionB: "Version B",
+    showTradeOff: "Show the trade-off",
+    hideTradeOff: "Hide the trade-off",
+    tradeOff: "The trade-off",
+    nextStep: "Next step",
+    sampleTitle: "Sample debrief",
+    sampleIntro:
+      "A debrief of the built-in sample contribution, so you can see what one looks like.",
   },
   /** What maintainers may question, in the same words as the check. */
   dimensions: {

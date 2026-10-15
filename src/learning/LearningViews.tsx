@@ -1,9 +1,9 @@
 /**
- * The learning page's views: the notes (the default) and the practice
- * deck. Each has its own address, `#/learning?view=<view>` read from the
- * hash query, so a link, a reload or Back shows the same view; the other
- * flags (presentation, locale) stay on the links. The deck loads on its
- * own the first time it opens.
+ * The learning page's views: the notes (the default), the practice deck
+ * and the coach debrief. Each has its own address, `#/learning?view=<view>`
+ * read from the hash query, so a link, a reload or Back shows the same
+ * view; the other flags (presentation, locale) stay on the links. The
+ * deck and the debrief load on their own the first time they open.
  */
 import { Suspense, lazy } from "react";
 import { LoaderCircle } from "lucide-react";
@@ -15,11 +15,16 @@ import {
 } from "../navigation/route";
 import type { Repo } from "../types";
 
-export const learningViews = ["notes", "practice"] as const;
+export const learningViews = ["notes", "practice", "debrief"] as const;
 export type LearningView = (typeof learningViews)[number];
 
 const PracticeDeck = lazy(() =>
   import("./PracticeDeck").then((module) => ({ default: module.PracticeDeck })),
+);
+const CoachDebriefPanel = lazy(() =>
+  import("./CoachDebriefPanel").then((module) => ({
+    default: module.CoachDebriefPanel,
+  })),
 );
 
 /** The view a `view=` value names; anything else is the notes. */
@@ -79,7 +84,7 @@ function ViewLoading() {
   );
 }
 
-/** The practice deck, loaded when first shown. */
+/** The practice deck or the coach debrief, loaded when first shown. */
 export function LearningViewContent({
   view,
   repos,
@@ -91,7 +96,11 @@ export function LearningViewContent({
 }) {
   return (
     <Suspense fallback={<ViewLoading />}>
-      {view === "practice" && <PracticeDeck repos={repos} onOpen={onOpen} />}
+      {view === "practice" ? (
+        <PracticeDeck repos={repos} onOpen={onOpen} />
+      ) : (
+        <CoachDebriefPanel repos={repos} />
+      )}
     </Suspense>
   );
 }
