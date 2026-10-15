@@ -133,6 +133,43 @@ const aiPermission = new RegExp(
   flags,
 );
 
+/**
+ * A condition the contributor meets by their own conduct ("unless you have
+ * reviewed every line", "without disclosure", "code you do not
+ * understand", "the author has not reviewed", "low-effort"): the refusal
+ * is about how AI is used, not a ban of it, and BELL asks for the review,
+ * the understanding and the disclosure itself. "Closed without review" is
+ * what happens, not a condition.
+ */
+const conductCondition = new RegExp(
+  [
+    String.raw`\b(?:unless|except)\b`,
+    String.raw`(?<!\b(?:closed|rejected|declined|refused|removed|deleted|locked|ignored|dismissed)\s+(?:\w+ly\s+)?)\bwithout\s+(?:\w+\s+){0,2}?(?:disclos|declar|attribut|mention|label|review|understand|test|edit|verif|check|explain|human|modif|curat|oversight|care)\w*`,
+    String.raw`\b(?:you|they|he|she|the\s+(?:author|contributor|submitter|person)s?|authors?|contributors?|submitters?)\s+(?:do|does|did|ca|can|could|have|has|had|are|is|were|was)(?:\s*not|n't)\s+(?:\w+\s+){0,2}?(?:understand|explain|review|read|test|verif|check|edit|write|wr[io]te|know|able|own|have\s+the\s+(?:knowledge|abilit|skill))\w*`,
+    String.raw`\b(?:has|have|had|was|were)(?:\s+not|n't)\s+(?:been\s+)?(?:\w+\s+)?(?:understood|reviewed|tested|verified|checked|edited|explained|read|disclosed|declared|labell?ed)\b`,
+    String.raw`\bun(?:reviewed|tested|edited|verified|checked|disclosed|declared|attributed|labell?ed|curated|modified)\b`,
+    String.raw`\blow[- ](?:effort|quality)\b`,
+    String.raw`\bblind(?:ly)?\b`,
+  ].join("|"),
+  flags,
+);
+/** Permission only maintainers give ("unless approved by core") keeps a refusal a ban. */
+const maintainerPermission = new RegExp(
+  String.raw`\b(?:prior|explicit|express|written|advance)\s+(?:written\s+)?(?:approval|permission|consent|agreement|authori[sz]ation)\b|\b(?:approved|permitted|authori[sz]ed|allowed|agreed|requested|invited)\s+(?:by|in\s+advance|beforehand)\b|\b(?:approval|permission|consent)\s+(?:of|by|from)\b`,
+  flags,
+);
+
+/** What a rule restricts when it is about talking to people rather than the change. */
+const conversation = new RegExp(
+  String.raw`\b(?:descriptions?|comments?|messages?|repl(?:y|ies)|respon(?:d|ds|ding|ses?)|discussions?|conversations?|communicat\w*)\b`,
+  flags,
+);
+/** The change itself: its code, commits or patches, or a pull request as a whole. */
+const changeObject = new RegExp(
+  String.raw`\b(?:code(?!\s+of\s+conduct)|patch(?:es|sets?)?|contributions?|implementations?|diffs?|commits?(?!\s+messages?))\b|(?<!\b(?:on|in|to|under|for)\s+(?:your|the|a|their|each|every|this)\s+)\b(?:PRs?|pull[- ]requests?|merge\s+requests?)\b(?!\s+(?:descriptions?|titles?|bod(?:y|ies)|text|comments?|messages?|templates?|reviews?))`,
+  flags,
+);
+
 /** Issues set aside for people who are learning. */
 const learningIssues = new RegExp(
   String.raw`\bgood[- ]first[- ]issues?\b|\bfirst[- ]timers?(?:[- ]only)?\b|\b(?:beginner(?:[- ]friendly)?|newcomer|starter|easy)\s+issues?\b`,
@@ -421,13 +458,20 @@ export function classifyPolicy(path: string, text: string): PolicyFinding[] {
           sentence.start + match.end <= term.start &&
           term.start - (sentence.start + match.end) <= 20,
       );
-      add(
-        agentTerm && autonomousAction.test(words) ? "agent" : "ban",
-        block,
-        search,
-        span,
-        permitted,
-      );
+      // "… unless you have reviewed every line": a rule about how AI is used.
+      const conditional =
+        conductCondition.test(words) && !maintainerPermission.test(words);
+      // "Write the PR description and comments without AI": a rule about
+      // the conversation, not the change; for the description it is the
+      // project's own-words rule.
+      const aboutConversation =
+        conversation.test(words) && !changeObject.test(words);
+      if (agentTerm && autonomousAction.test(words))
+        add("agent", block, search, span);
+      else if (aboutConversation && /\bdescriptions?\b/i.test(words))
+        add("own-words", block, search, span);
+      else
+        add("ban", block, search, span, permitted || conditional || aboutConversation);
     }
     for (const match of allMatches(addressedToAgents, search))
       add("agent", block, search, match);
@@ -477,6 +521,8 @@ const disclosurePattern = new RegExp(
     `\\b${aiTerm}[^.\\n]{0,80}\\b(?:must|should|please|needs? to|has to|have to|is required to|are required to|shall)\\b(?:[^.\\n]{0,40}\\b${disclosedPassive}\\b|\\s+(?:\\w+\\s+)?${discloseVerb}\\b)`,
     // "If you used AI tools, say so in the PR description."
     `\\b${aiTerm}[^.\\n]{0,80}\\bsay so\\b`,
+    // "We will not accept AI-generated contributions without disclosure."
+    `\\b${aiTerm}[^.\\n]{0,80}\\bwithout\\s+(?:\\w+\\s+)?(?:disclos\\w*|declar\\w*|attribution|labell?ing)\\b`,
   ].join("|"),
   "i",
 );

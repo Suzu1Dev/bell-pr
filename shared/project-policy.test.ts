@@ -45,24 +45,80 @@ test("a policy refusing AI-generated pull requests is a ban with contribution co
   const text = [
     "# AI usage policy",
     "",
-    "We welcome contributors who use AI tools as a learning aid.",
+    "We are a small team and review every change by hand.",
     "",
-    "Pull requests that consist of AI-generated code the author",
-    "has not reviewed and edited will be closed without review.",
+    "AI-generated pull requests",
+    "will be closed without review.",
   ].join("\n");
   const findings = assertVerbatim(text);
   assert.deepEqual(
     findings.map((finding) => [finding.kind, finding.contribution, finding.line]),
     [["ban", true, 5]],
   );
-  assert.equal(
-    findings[0].quote,
-    "Pull requests that consist of AI-generated code the author has not reviewed and edited will be closed without review.",
-  );
+  assert.equal(findings[0].quote, "AI-generated pull requests will be closed without review.");
   // The same refusal without naming a contribution is ambiguous, never a block.
   assert.deepEqual(kinds("AI_POLICY.md", "We do not use AI tools in our own release process."), [
     ["ban", false],
   ]);
+});
+
+test("a refusal with a condition the contributor meets is ambiguous, never a block", () => {
+  // Reviewed, understood or disclosed AI help is welcome here, and BELL
+  // asks for all three itself.
+  const text = [
+    "# AI usage policy",
+    "",
+    "We welcome contributors who use AI tools as a learning aid.",
+    "",
+    "Pull requests that consist of AI-generated code the author",
+    "has not reviewed and edited will be closed without review.",
+  ].join("\n");
+  assert.deepEqual(
+    assertVerbatim(text).map((finding) => [finding.kind, finding.contribution, finding.line]),
+    [["ban", false, 5]],
+  );
+  for (const text of [
+    "Do not submit AI-generated code that you do not understand.",
+    "Please don't submit pull requests made with AI tools unless you have reviewed every line.",
+    "Contributors must not submit LLM output they cannot explain.",
+    "We do not accept low-effort AI-generated pull requests.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [["ban", false]], text);
+  // A refusal without disclosure asks for the disclosure.
+  assert.deepEqual(
+    kinds("CONTRIBUTING.md", "We will not accept AI-generated contributions without disclosure."),
+    [
+      ["ban", false],
+      ["disclose", true],
+    ],
+  );
+  // Permission only the maintainers give is not such a condition.
+  assert.deepEqual(
+    kinds("CONTRIBUTING.md", "AI-generated pull requests will be closed unless approved by a maintainer."),
+    [["ban", true]],
+  );
+});
+
+test("a rule about the description or comments is not a ban of AI-assisted changes", () => {
+  for (const text of [
+    "The PR description and comments must be written by the contributor, with no AI assistance beyond grammar or English translations.",
+    "Do not use AI tools to write pull request descriptions or comments; write them yourself.",
+    "Do not use AI tools to write the PR description; write it yourself.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [["own-words", true]], text);
+  assert.deepEqual(
+    kinds("CONTRIBUTING.md", "Do not use AI tools to respond to review comments on your pull request."),
+    [["ban", false]],
+  );
+  assert.deepEqual(
+    kinds("CONTRIBUTING.md", "LLM output is prohibited for any direct communication with maintainers."),
+    [["ban", false]],
+  );
+  // The change itself named next to the description stays a ban.
+  assert.deepEqual(
+    kinds("CONTRIBUTING.md", "Do not use AI tools to write pull requests or their descriptions."),
+    [["ban", true]],
+  );
 });
 
 test("a rule inside an HTML comment of a pull request template is found", () => {
