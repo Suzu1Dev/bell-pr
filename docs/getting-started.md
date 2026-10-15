@@ -137,8 +137,10 @@ BELL PR reads these files from its own clone, at import and when you
 update the project, and asks GitHub for the pull request facts; **Check
 again** reads them anew. When it finds no rule, it says which files it
 read: some projects publish their rules on a website or wiki, so check
-there before you publish. A fact it could not read shows as "Couldn't
-check" with the reason.
+there before you publish. A GitHub fact it could not read shows as
+"Couldn't check" with the reason, and a rule file it could not read (or
+the account's default files) as "Couldn't read", in words; neither is
+ever counted as a pass.
 
 ### The analysis
 

@@ -401,9 +401,12 @@ you from starting a run or practising on a change locally.
 GitHub CLI is signed out, GitHub did not answer in time, the rate limit
 was reached, or the project has no GitHub origin), the dialog says which
 fact and why. An unknown fact is never counted as a pass: it is a confirm,
-and you check the fact on GitHub yourself before you publish. Fix the
-cause (for example `gh auth login`) and open the dialog again, or use
-**Check again** on the project's **Before you contribute** card.
+and you check the fact on GitHub yourself before you publish. The same
+goes for the project's rules when BELL PR has not read them yet, or could
+not read one of its rule files or the account's default files: an AI ban
+or a required disclosure may be in them. Fix the cause (for example
+`gh auth login`) and open the dialog again, or use **Check again** on the
+project's **Before you contribute** card.
 
 Each block has an id, which the dialog does not show; the headings below
 use it.
