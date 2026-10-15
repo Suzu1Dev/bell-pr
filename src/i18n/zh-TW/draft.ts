@@ -139,6 +139,19 @@ const m: Translation<typeof en> = {
       clear: "已儲存的草稿沒有需要處理的檢查項目。",
     },
   },
+  yourWords: {
+    title: "PR 裡用你自己的話",
+    lead: "這是你在理解檢查中寫的說明。按下按鈕之前，不會放進 PR 說明；放進去之後，你可以繼續修改。",
+    summary: "你的說明",
+    untested: "你沒有測試的部分與原因",
+    useExplanation: "使用我的說明",
+    addUntested: "把我沒測試的部分加到 Testing",
+    inserted: "已在說明中",
+    english: "PR 說明使用英文；請參考你的說明，用英文寫。",
+    copy: "複製",
+    copied: "已複製",
+    copyFailed: "無法複製，請自行選取文字複製。",
+  },
   sync: {
     title: "目標分支",
     intro: {

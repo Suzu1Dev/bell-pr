@@ -176,6 +176,24 @@ const draft = {
       clear: "No check needs your attention in the saved draft.",
     },
   },
+  /**
+   * YourWordsCard: the person's own explanation and not-tested answer from
+   * the understanding check, put into the description only on a click.
+   */
+  yourWords: {
+    title: "Your words in the PR",
+    lead: "Your explanation from the understanding check. Nothing goes into the description until you click, and you edit it from there.",
+    summary: "Your explanation",
+    untested: "What you did not test, and why",
+    useExplanation: "Use my explanation",
+    addUntested: "Add my not-tested answer to Testing",
+    inserted: "In the description",
+    english:
+      "The PR description is in English; write it in English using your explanation.",
+    copy: "Copy",
+    copied: "Copied",
+    copyFailed: "Couldn't copy. Select the text and copy it yourself.",
+  },
   /** SyncPanel: where the contribution stands against its target branch. */
   sync: {
     title: "Target branch",
