@@ -10,11 +10,14 @@ import { getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Run } from "../types";
 import {
+  groupChecks,
   maskPersonalText,
+  PublishChecks,
   PublishIdentity,
   PublishModal,
   publishIdentity,
 } from "./PublishModal";
+import { pacingOf, samplePublishChecks } from "./respect";
 
 const { files: demoFiles, repo: demoRepo, run: demoRun } = getDemo("zh-TW");
 
@@ -69,8 +72,10 @@ const element = (props: Partial<Props> = {}, draft: Partial<Props["draft"]> = {}
       formError: "",
       draft: {
         draftChecks,
-        publishBlocked: undefined,
-        publishConfirmations: [],
+        publishChecks: [],
+        async loadPublishChecks() {},
+        overrides: [],
+        setOverrides() {},
         acknowledged: [],
         setAcknowledged() {},
         followUp: undefined,
@@ -121,25 +126,31 @@ test("blocking checks and unconfirmed items keep Send disabled", () => {
   const blocked = render(
     {},
     {
-      publishBlocked: {
-        id: "placeholder",
-        kind: "block",
-        message: "說明還有待填寫的內容",
-        details: ["TODO: 補上測試結果"],
-      },
+      publishChecks: [
+        {
+          id: "placeholder",
+          kind: "block",
+          message: "說明還有待填寫的內容",
+          details: ["TODO: 補上測試結果"],
+        },
+      ],
     },
   );
-  assert.match(blocked, /<p role="alert" class="inline-error">說明還有待填寫的內容\nTODO: 補上測試結果<\/p>/);
+  assert.match(
+    blocked,
+    /<div class="publish-block" role="alert"><span>會擋下送出：說明還有待填寫的內容<small>TODO: 補上測試結果<\/small><\/span><\/div>/,
+  );
+  assert.match(blocked, /<legend>你的文字與可審閱性<\/legend>/);
   assert.match(blocked, /<button class="button primary" disabled="">/);
 
-  const unconfirmed = render({}, { publishConfirmations: [confirm] });
-  assert.match(unconfirmed, /<legend>送出前請逐項確認<\/legend>/);
+  const unconfirmed = render({}, { publishChecks: [confirm] });
+  assert.match(unconfirmed, /送出前請逐項確認/);
   assert.match(unconfirmed, /說明很短<small>請確認維護者看得懂<\/small>/);
   assert.match(unconfirmed, /<button class="button primary" disabled="">/);
 
   const confirmed = render(
     {},
-    { publishConfirmations: [confirm], acknowledged: ["brevity"] },
+    { publishChecks: [confirm], acknowledged: ["brevity"] },
   );
   assert.match(confirmed, /<input type="checkbox" checked=""\/>/);
   assert.doesNotMatch(confirmed, /<button class="button primary" disabled="">/);
@@ -155,7 +166,7 @@ test("a publish error stays in the dialog", () => {
   );
 });
 
-test("the demo previews its PR body and opens the sample PR without any check", () => {
+test("the demo previews its PR body and needs neither Git nor the GitHub CLI", () => {
   // No environment report at all: the sample needs neither Git nor the GitHub CLI.
   const html = render({ demo: true, doctor: doctorWith(null) });
   assert.match(html, /你的示範貢獻，準備好了。/);
@@ -166,7 +177,9 @@ test("the demo previews its PR body and opens the sample PR without any check", 
   assert.doesNotMatch(html, /會送到 GitHub/);
   assert.doesNotMatch(html, /readiness-notice/);
   assert.doesNotMatch(html, /Commit 作者/);
-  assert.doesNotMatch(html, /disabled=""/);
+  // Its checks load with the sample's rules; until then nothing is "sent".
+  assert.match(html, /<button class="button primary" disabled="">.*開啟範例 Draft PR<\/button>/);
+  assert.doesNotMatch(html, /正在讀取 GitHub 資訊/);
 });
 
 test("publishing waits for Git's identity and the GitHub CLI, and says how to fix them", () => {
@@ -336,13 +349,14 @@ test("the publish dialog reads in English with no Chinese left", () => {
     element(
       { formError: "Push failed" },
       {
-        publishConfirmations: [
+        publishChecks: [
           { ...confirm, message: "The description is short", details: ["Make sure maintainers can follow it"] },
         ],
       },
     ),
   );
-  assert.match(confirmations, /<legend>Confirm each item before submitting<\/legend>/);
+  assert.match(confirmations, /Confirm each item before submitting/);
+  assert.match(confirmations, /<legend>Your words and reviewability<\/legend>/);
   assertNoHan(confirmations);
 
   const demo = renderEn(element({ demo: true }));
@@ -374,15 +388,119 @@ test("the server's local-path, workflow and author e-mail checks each need a tic
     { id: "workflows", kind: "confirm", message: "This change edits CI configuration.", details: ["Changed: .github/workflows/ci.yml"] },
     { id: "author-email", kind: "confirm", message: "The commit will carry ada@example.com.", details: [] },
   ];
-  const html = renderEn(element({}, { publishConfirmations: checks }));
+  const html = renderEn(element({}, { publishChecks: checks }));
   assert.equal(html.match(/<input type="checkbox"\/>/g)?.length, 3);
   assert.match(html, /The PR text contains a path on this computer\.<small>Found: \/home\/ada\/notes\.md<\/small>/);
   assert.match(html, /Changed: \.github\/workflows\/ci\.yml/);
   assert.match(html, /The commit will carry ada@example\.com\./);
   assert.match(html, /<button class="button primary" disabled="">.*Submit Draft PR<\/button>/);
   const ticked = renderEn(
-    element({}, { publishConfirmations: checks, acknowledged: checks.map((check) => check.id) }),
+    element({}, { publishChecks: checks, acknowledged: checks.map((check) => check.id) }),
   );
   assert.doesNotMatch(ticked, /<button class="button primary" disabled="">/);
+  assertNoHan(html);
+});
+
+type ChecksProps = Parameters<typeof PublishChecks>[0];
+const checksElement = (props: Partial<ChecksProps> = {}) =>
+  createElement(PublishChecks, {
+    checks: [],
+    facts: { loading: false },
+    pacing: undefined,
+    checkOff: false,
+    acknowledged: [],
+    setAcknowledged() {},
+    reason: "",
+    onReason() {},
+    mask: (text: string) => text,
+    ...props,
+  });
+
+test("the checks are grouped by topic, in the dialog's order", () => {
+  const check = (id: DraftCheck["id"], kind: DraftCheck["kind"] = "confirm"): DraftCheck => ({ id, kind, message: id, details: [] });
+  assert.deepEqual(
+    groupChecks([
+      check("secret", "block"),
+      check("pacing"),
+      check("facts-unknown"),
+      check("issue-state"),
+      check("brevity"),
+      check("ai-disclosure", "block"),
+    ]).map((group) => [group.topic, group.checks.map((item) => item.id)]),
+    [
+      ["unknown", ["facts-unknown"]],
+      ["rules", ["ai-disclosure"]],
+      ["issue", ["issue-state"]],
+      ["pacing", ["pacing"]],
+      ["words", ["brevity"]],
+      ["safety", ["secret"]],
+    ],
+  );
+});
+
+test("a respect check says why maintainers care and where it comes from", () => {
+  const checks: DraftCheck[] = [
+    {
+      id: "issue-has-pr",
+      kind: "block",
+      message: "Someone else's open pull request would close this issue.",
+      details: ["Two pull requests for one issue split the maintainers' review time.", "#41 by @someone"],
+    },
+    {
+      id: "issue-state",
+      kind: "confirm",
+      message: "The issue may not be free to work on.",
+      details: ["Maintainers coordinate work on the issue itself.", "Assigned to @someone"],
+    },
+  ];
+  const html = renderEn(checksElement({ checks }));
+  assert.match(html, /<legend>The issue<\/legend>/);
+  assert.match(
+    html,
+    /<div class="publish-block" role="alert"><span>Blocks publishing: Someone else&#x27;s open pull request would close this issue\.<small class="publish-why">Two pull requests for one issue split the maintainers&#x27; review time\.<\/small><small>#41 by @someone<\/small><\/span>/,
+  );
+  // Only this block can be lifted, with a reason of 20 to 200 characters.
+  assert.match(html, /Why publish anyway\? Saved on this run, 20 to 200 characters<textarea class="text-input" maxLength="200">/);
+  assert.match(html, /0 of 20 to 200 characters/);
+  assert.match(html, /<input type="checkbox"\/><span>The issue may not be free to work on\.<small class="publish-why">/);
+  assertNoHan(html);
+});
+
+test("a typed reason lifts someone else's PR; without one, Send stays off", () => {
+  const block: DraftCheck = { id: "issue-has-pr", kind: "block", message: "Another PR fixes this.", details: ["why", "#41"] };
+  assert.match(render({}, { publishChecks: [block] }), /<button class="button primary" disabled="">/);
+  const reason = "Their PR was abandoned months ago and the author asked me to continue.";
+  const lifted = render({}, { publishChecks: [block], overrides: [{ id: "issue-has-pr", reason }] });
+  assert.doesNotMatch(lifted, /<button class="button primary" disabled="">/);
+  assert.ok(lifted.includes(`>${reason}</textarea>`));
+  // Too short to count.
+  assert.match(
+    render({}, { publishChecks: [block], overrides: [{ id: "issue-has-pr", reason: "Mine is better" }] }),
+    /<button class="button primary" disabled="">/,
+  );
+});
+
+test("the facts line: reading, couldn't check, the pace here, and the check off", () => {
+  assert.match(renderEn(checksElement({ facts: { loading: true } })), /role="status">.*Reading the GitHub facts…/);
+  const unknown = renderEn(checksElement({ facts: { loading: false, error: "this build cannot read the GitHub facts yet" } }));
+  assert.match(unknown, /Couldn&#x27;t check: this build cannot read the GitHub facts yet/);
+  // Unknown is never a pass: no "all clear" claim without checks.
+  assert.doesNotMatch(renderEn(checksElement({ checks: undefined })), /Every check passes/);
+  assert.match(
+    renderEn(checksElement({ pacing: { open: 0, budget: 1, first: true } })),
+    /Your open PRs here: 0 of 1 \(first contribution here\)/,
+  );
+  assert.match(renderEn(checksElement({ pacing: "exempt" })), /not paced, since you can write to this repository/);
+  assert.match(renderEn(checksElement({ checkOff: true })), /Understanding check: off/);
+  assert.match(renderZh(checksElement({ checkOff: true, pacing: { open: 1, budget: 2, first: false } })), /你在這裡開著的 PR：1 \/ 2.*理解檢查：已關閉/);
+});
+
+test("the sample's checks all pass, with its pace shown, in English", () => {
+  const demo = getDemo("en");
+  const checks = samplePublishChecks(demo, { ...demo.run, status: "approved" }, demo.files, "en");
+  const html = renderEn(checksElement({ checks, pacing: pacingOf(demo.contributionFacts) }));
+  assert.match(html, /Every check passes\./);
+  assert.match(html, /Your open PRs here: 0 of 1 \(first contribution here\)/);
+  assert.doesNotMatch(html, /<fieldset/);
   assertNoHan(html);
 });

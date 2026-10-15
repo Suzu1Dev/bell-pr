@@ -253,6 +253,7 @@ export function useRunActions({
     draftPublishBranch,
     acknowledged,
     setAcknowledged,
+    overrides,
     loadPublishChecks,
     followUp,
   } = draft;
@@ -911,7 +912,11 @@ export function useRunActions({
     try {
       const result = await api<{ run: Run; url?: string }>(
         `/runs/${run.id}/publish`,
-        send("POST", { fingerprint: run.approvedFingerprint, acknowledged }),
+        send("POST", {
+          fingerprint: run.approvedFingerprint,
+          acknowledged,
+          ...(overrides.length ? { overrides } : {}),
+        }),
       );
       setRun(result.run);
       closeModal();
