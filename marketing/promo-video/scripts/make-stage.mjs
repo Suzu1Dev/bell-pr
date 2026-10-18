@@ -7,12 +7,15 @@
  * Each is a soft light pool (a normalized Gaussian of the elliptical radius,
  * mixed in linear light: no color stops, so no ring for the eye or the
  * encoder to find), quantized to 8 bits with TPDF +-1 LSB dither. The dark
- * plate also carries a static, coarse (2x2 px at 1080p) TPDF grain of
- * +-1.5 LSB, the light plate one of +-2 LSB: x264 flattens single-pixel
- * dither but keeps 2-px clusters, so the decoded gradient does not contour
- * (lookdev STYLE-GUIDE §6.3-6.4, variants C and B's measured fixes; the
- * light plate's +-1 LSB dither alone gave 200-600 px flat runs after
- * encoding). Seeded, so every run writes the same files.
+ * plate also carries a static, coarse TPDF grain of +-2.5 LSB in 5x5 px
+ * cells at 1080p, the light plate one of +-2 LSB in 2x2 px cells: the
+ * encoders flatten single-pixel dither but keep clusters, so the decoded
+ * gradient does not contour (lookdev STYLE-GUIDE §6.3-6.4, variants C and
+ * B's measured fixes). The dark plate's cells are the size VP9 at CRF 35
+ * keeps (measured on the plate alone: 2x2 px cells gave 391 px flat runs in
+ * the WebM, 5x5 px at +-2.5 LSB 86 px; x264 kept either at 40 px). Near
+ * white a one-level step is under 0.5% and does not show, so the light
+ * plate keeps its finer grain. Seeded, so every run writes the same files.
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -74,7 +77,7 @@ for (const [suffix, scale] of [["", 1], ["@2x", 2]]) {
   // The dark stage of the type beats: a lifted green-black centre, no glow.
   await writeFile(
     path.join(out, `dark${suffix}.png`),
-    plate({ ...size, center: [0.5, 0.46], radius: [0.8, 0.92], inner: "#10221a", outer: "#020403", falloff: 2.6, grain: 1.5, cell: 2 * scale }),
+    plate({ ...size, center: [0.5, 0.46], radius: [0.8, 0.92], inner: "#10221a", outer: "#020403", falloff: 2.6, grain: 2.5, cell: 5 * scale }),
   );
   // The light studio of the product beats: a white key light upper middle, warm grey corners.
   await writeFile(
