@@ -2,14 +2,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createMusic, fps, music, type TrackAnalysis } from "./music.ts";
-import { buildTimeline, shotSpecs, timeline } from "./timeline.ts";
+import { END_HOLD_SECONDS, buildTimeline, shotSpecs, timeline } from "./timeline.ts";
 
 const analysis = JSON.parse(readFileSync(new URL("../music/track.analysis.json", import.meta.url), "utf8")) as TrackAnalysis;
 const seconds = (frames: number) => frames / fps;
 
-test("the film is 75-90 s and ends with the music's last sound", () => {
-  assert.equal(timeline.durationInFrames, music.durationInFrames);
-  assert.ok(seconds(timeline.durationInFrames) >= 75 && seconds(timeline.durationInFrames) <= 90);
+test("the film is 75-90 s: the music's last sound, then the complete end card held a little over 2 s", () => {
+  assert.equal(timeline.durationInFrames, music.durationInFrames + Math.round(END_HOLD_SECONDS * fps));
+  assert.ok(END_HOLD_SECONDS >= 2 && END_HOLD_SECONDS <= 2.5);
+  assert.ok(seconds(timeline.durationInFrames) >= 75 && seconds(timeline.durationInFrames) <= 89.5);
   assert.equal(timeline.shots.at(-1)!.to, timeline.durationInFrames);
 });
 

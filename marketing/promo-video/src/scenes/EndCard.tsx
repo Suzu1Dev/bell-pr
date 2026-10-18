@@ -1,41 +1,54 @@
 /**
- * S14 End on the dark stage, the bookend of the opening: a hard cut on the
- * measured final hit; the logo pulls into focus and locks on the final chord
- * (music.landingFrame) with one light sweep inside its letters; then the
- * owner's headline, beat by beat: "From vibe coding" / "to knowing why.",
- * with "vibe coding" racked soft and dim (2 px at most, so the rest frame
- * works as a still) and "knowing why." turning mint while "From" and "to"
- * stay near white (COMPARISON.md must-fixes 1-2). Then `npx bell-pr`,
- * "Free to start · Runs on your machine", the homepage only when
- * shared/product.ts sets one, and the non-affiliation line.
+ * S14 End on the dark stage, the bookend of the opening:
+ *
+ * - a hard cut on the measured final hit (the pushed kick); the logo, large
+ *   and centred, pulls into focus and locks ON the final chord, where its
+ *   one light sweep (inside its letters) and the glint start;
+ * - one beat later it moves up to its slot, and the owner's headline comes
+ *   in beat by beat: "From vibe coding" / "to knowing why.";
+ * - on the next beat "vibe coding" racks soft and dim while "knowing why."
+ *   turns mint and "From"/"to" stay near white (COMPARISON.md must-fixes
+ *   1-2), and the call to action comes in at once: `npx bell-pr`, "Free to
+ *   start · Runs on your machine", the homepage only when shared/product.ts
+ *   sets one, and the non-affiliation line;
+ * - "vibe coding" then resolves back to sharp (it keeps its dim), so the
+ *   complete card holds sharp for over three seconds, past the music's last
+ *   sound, and the picture fades to black on the last frames.
  */
 import { AbsoluteFill, Img, staticFile, useCurrentFrame } from "remotion";
 import { MONO, SANS } from "../look/fonts.ts";
 import { blurCss, ease, tween } from "../look/motion.ts";
 import { DARK, StageImage } from "../look/Stage.tsx";
 import { FocusLine, ROLES, words } from "../look/type.tsx";
-import { endLogoState } from "../logo.ts";
+import { chordFrame, endLogoPlace, endLogoState } from "../logo.ts";
 import { music } from "../music.ts";
-import { shotById } from "../timeline.ts";
+import { FADE_OUT_FRAMES, shotById } from "../timeline.ts";
 import { product } from "../../../../shared/product.ts";
 
 const shot = shotById("s14-end");
 const beat = music.beatFrames;
-const land = music.landingFrame;
-/** The logo's focus pull runs from the cut to the chord. */
-export const LOGO_WIDTH = 330;
+const LOGO_RATIO = 64 / 196;
+
+/** The beats of the end card, from the headline's first line. */
+export const endBeats = (() => {
+  const line1 = shot.captions[0].from;
+  const rack = line1 + 2 * beat;
+  return { line1, line2: line1 + beat, rack, footer: rack, sharpFrom: rack + beat, sharp: rack + 2 * beat, fade: shot.to - FADE_OUT_FRAMES };
+})();
 
 export const EndCard: React.FC = () => {
   const f = useCurrentFrame() + shot.from;
-  const headline = shot.captions[0];
-  const [line1, line2] = ["From vibe coding", "to knowing why."];
-  const rack = headline.from + 2 * beat;
+  const { line1, line2, rack, footer: footerAt, sharpFrom, sharp, fade } = endBeats;
   const logo = endLogoState(f);
-  const sweep = tween(f, land + 4, land + 28, ease.sweep);
-  const sweepOn = f >= land + 4 && f <= land + 28;
-  const footer = tween(f, rack + beat, rack + 2 * beat, ease.softArrive);
-  const legal = tween(f, rack + 2 * beat, rack + 3 * beat, ease.softArrive);
+  const place = endLogoPlace(f);
+  const sweep = tween(f, chordFrame, chordFrame + 24, ease.sweep);
+  const sweepOn = f >= chordFrame && f <= chordFrame + 24;
+  const footer = tween(f, footerAt, footerAt + beat, ease.softArrive);
   const drift = 1 + (0.008 * (f - shot.from)) / music.barFrames;
+  // "vibe coding" softens with the rack and resolves to sharp a beat later, keeping its dim.
+  const soften = 1.6 * (1 - tween(f, sharpFrom, sharp, ease.standard));
+  const black = tween(f, fade, shot.to - 1, ease.standard);
+  const logoHeight = place.width * LOGO_RATIO;
   return (
     <AbsoluteFill style={{ backgroundColor: DARK.edge }}>
       <StageImage kind="dark" />
@@ -43,9 +56,9 @@ export const EndCard: React.FC = () => {
         <div
           style={{
             position: "absolute",
-            top: 168,
-            width: LOGO_WIDTH,
-            height: (LOGO_WIDTH * 64) / 196,
+            top: place.cy - logoHeight / 2,
+            width: place.width,
+            height: logoHeight,
             opacity: logo.opacity,
             filter: blurCss(logo.blur),
             transform: `scale(${logo.scale.toFixed(5)})`,
@@ -71,18 +84,18 @@ export const EndCard: React.FC = () => {
           ) : null}
         </div>
         <FocusLine
-          words={words(line1, { 0: "base", 1: "soft", 2: "soft" })}
+          words={words("From vibe coding", { 0: "base", 1: "soft", 2: "soft" })}
           frame={f}
-          enter={headline.from}
-          rack={{ at: rack, dimTo: DARK.dim, soften: 1.6, frames: 14 }}
+          enter={line1}
+          rack={{ at: rack, dimTo: DARK.dim, soften: f >= sharpFrom ? soften : 1.6, frames: 14 }}
           role={ROLES.displayL}
           color={DARK.text}
           style={{ position: "absolute", top: 372 }}
         />
         <FocusLine
-          words={words(line2, { 0: "base", 1: "key", 2: "key" })}
+          words={words("to knowing why.", { 0: "base", 1: "key", 2: "key" })}
           frame={f}
-          enter={headline.from + beat}
+          enter={line2}
           rack={{ at: rack, dimTo: DARK.dim, keyTo: DARK.mint, frames: 14 }}
           sweepAt={rack + 8}
           role={ROLES.displayL}
@@ -119,12 +132,13 @@ export const EndCard: React.FC = () => {
             fontSize: 22,
             letterSpacing: "0.005em",
             color: DARK.muted,
-            opacity: legal,
+            opacity: footer,
           }}
         >
           BELL PR is independent and not affiliated with GitHub, OpenAI or Anthropic.
         </div>
       </AbsoluteFill>
+      <AbsoluteFill style={{ backgroundColor: "#000000", opacity: black }} />
     </AbsoluteFill>
   );
 };

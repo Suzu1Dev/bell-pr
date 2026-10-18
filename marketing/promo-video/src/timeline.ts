@@ -22,6 +22,10 @@
  * 4. A missing optional event (riser, accent): the shot starts on the bar
  *    line nearest to where the nominal lengths put it.
  * 5. A total outside 75-90 s is an error: re-edit the analysis segments.
+ *
+ * The picture holds the complete end card for END_HOLD_SECONDS after the
+ * music's last sound, then fades to black, so the call to action can be
+ * read (and paused on) whole.
  */
 import { fps, music as loadedMusic, type EventName, type Music } from "./music.ts";
 
@@ -67,6 +71,11 @@ export interface ShotSpec {
 }
 
 const secondsAt120 = (min: number, nominal: number, max: number) => ({ min: min * 2, nominal: nominal * 2, max: max * 2 });
+
+/** Seconds the complete end card holds after the music's last sound (a picture choice, not a music number). */
+export const END_HOLD_SECONDS = 2.2;
+/** The picture fades to black over the film's last frames. */
+export const FADE_OUT_FRAMES = 12;
 
 /** VIDEO.md §3, bars at 120 BPM restated in seconds (x 2.0 s). */
 export const shotSpecs: ShotSpec[] = [
@@ -205,7 +214,8 @@ export const shotSpecs: ShotSpec[] = [
     title: "End",
     anchor: "finalHit",
     seconds: { min: 3, nominal: 5.5, max: 8 },
-    captions: [{ text: "From vibe coding to knowing why.", from: 1, style: "title" }],
+    // The logo is the hero on the final chord (the shot's first beat), then moves up as the headline enters.
+    captions: [{ text: "From vibe coding to knowing why.", from: 2, style: "title" }],
     takes: [{ id: "end-card" }],
   },
 ];
@@ -287,7 +297,8 @@ export function buildTimeline(music: Music = loadedMusic, specs: ShotSpec[] = sh
     if (anchored(spec)) phrases.push({ start: music.events[spec.anchor!]!, end: 0, shots: [working] });
     else phrases.at(-1)!.shots.push(working);
   }
-  phrases.forEach((phrase, index) => (phrase.end = phrases[index + 1]?.start ?? music.durationInFrames));
+  const durationInFrames = music.durationInFrames + Math.round(END_HOLD_SECONDS * fps);
+  phrases.forEach((phrase, index) => (phrase.end = phrases[index + 1]?.start ?? durationInFrames));
 
   const shots: Shot[] = [];
   for (const phrase of phrases) {
@@ -398,7 +409,6 @@ export function buildTimeline(music: Music = loadedMusic, specs: ShotSpec[] = sh
     });
   }
 
-  const durationInFrames = music.durationInFrames;
   const seconds = durationInFrames / fps;
   if (seconds < 75 || seconds > 90) throw new Error(`The cut is ${seconds.toFixed(2)} s: re-edit the analysis segments (75-90 s).`);
   return {

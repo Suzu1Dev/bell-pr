@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { endLogoState, logoLeaves, logoState, logoTake } from "./logo.ts";
+import { END_LOGO, chordFrame, endLogoState, logoLeaves, logoState, logoTake } from "./logo.ts";
 import { darkFrom, exhale, hit, stop } from "./moments.ts";
-import { music } from "./music.ts";
+import { frameOf, music } from "./music.ts";
 import { timeline } from "./timeline.ts";
 
 test("the first-hit logo: invisible before the hit, fully present and crisp on it", () => {
@@ -27,6 +27,21 @@ test("the logo holds at least 36 frames, then has fully gone before the window's
 test("the breath before the hit: a beat of stillness, the exhale, four dark frames", () => {
   assert.equal(exhale - stop, music.beatFrames);
   assert.equal(hit - darkFrom, 4);
+});
+
+test("the end-card logo resolves ON the final chord: still under 72% eight frames after the cut, settled from 1.02 on the chord", () => {
+  const end = timeline.shots.at(-1)!;
+  assert.ok(endLogoState(end.from + 8).opacity <= 0.72, `${endLogoState(end.from + 8).opacity.toFixed(2)}`);
+  assert.ok(endLogoState(chordFrame - 1).scale > 1);
+  const on = endLogoState(chordFrame);
+  assert.equal(on.opacity, 1);
+  assert.equal(on.blur, 0);
+  assert.equal(on.scale, 1);
+  assert.equal(chordFrame, frameOf(music.track.events.landing!));
+  assert.ok(chordFrame <= music.landingFrame && music.landingFrame - chordFrame <= 1);
+  // It is the hero on the chord, then moves up to its slot a beat later, before the headline's first line.
+  assert.equal(END_LOGO.moveFrom, chordFrame + music.beatFrames);
+  assert.ok(END_LOGO.moveTo <= end.captions[0].from);
 });
 
 test("the end-card logo pulls into focus from the cut and locks on the final chord", () => {

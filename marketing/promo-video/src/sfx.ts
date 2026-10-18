@@ -9,7 +9,7 @@
  *   different files, alternating, at most one per bar);
  * - a quiet, dry tick on every click the pointer makes on screen;
  * - a sparse keyboard bed while an answer types out (never per character);
- * - one glint with the end card's light sweep.
+ * - one glint, its onset on the final chord, with the end card's light sweep.
  *
  * Levels (measured against a music-only render, review.md): the swell and
  * the whooshes sit 17-23 dB under the music at their moments, the glint
@@ -23,6 +23,7 @@ import { music } from "./music.ts";
 import { looks } from "./shots.ts";
 import { timeline } from "./timeline.ts";
 import { clicksBetween } from "./look/pointer.ts";
+import { chordFrame } from "./logo.ts";
 
 export const SFX = {
   swell: { file: "mixkit-vacuum-swoosh-transition-1465.wav", peakFrame: 47 },
@@ -129,15 +130,15 @@ export function sfxCues(footage: Footage): SfxCue[] {
         typed += 1;
       }
     }
-  const end = timeline.shots.at(-1)!;
   cues.push({
     name: "glint: end-card sweep",
     file: SFX.glint.file,
-    from: music.landingFrame + 4 - SFX.glint.onsetFrame,
+    from: chordFrame - SFX.glint.onsetFrame,
     trimBefore: 0,
-    durationInFrames: Math.min(36, end.to - (music.landingFrame + 4 - SFX.glint.onsetFrame)),
-    gainDb: -20,
-    fadeOutFrames: 8,
+    durationInFrames: 36,
+    // Quieter than before: a touch of air on the chord, under the music (owner's listen pending).
+    gainDb: -24,
+    fadeOutFrames: 10,
   });
   return cues.filter((cue) => cue.durationInFrames > 0).sort((a, b) => a.from - b.from);
 }

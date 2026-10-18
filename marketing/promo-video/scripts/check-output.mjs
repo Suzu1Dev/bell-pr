@@ -3,9 +3,9 @@
  * Checks the rendered outputs in out/ and exits non-zero on any failure:
  *
  * - every video (ffprobe): the composition's length (± 0.1 s, inside
- *   75-90 s) at 30/1 fps; the 4K master 3840x2160 H.264 + AAC; the web
- *   MP4 1920x1080 H.264 + AAC and the WebM 1920x1080 VP9 + Opus, each web
- *   file at most 20 MB;
+ *   75-90 s: the music's 86.8 s plus the end card's hold) at 30/1 fps;
+ *   the 4K master 3840x2160 H.264 + AAC; the web MP4 1920x1080 H.264 +
+ *   AAC and the WebM 1920x1080 VP9 + Opus, each web file at most 20 MB;
  * - poster.jpg: 1920x1080, at most 500 KB;
  * - captions.en.vtt: the cues of src/timeline.ts, in order, without
  *   overlap, within the caption rules, all ending inside the video;
@@ -28,6 +28,7 @@ import { decodeMono, frameLevels, largestRise, measureLoudness, packageRoot, pro
 const webOnly = process.argv.includes("--web-only");
 const { music, fps } = await tsImport("../src/music.ts", import.meta.url);
 const { timeline } = await tsImport("../src/timeline.ts", import.meta.url);
+const { chordFrame } = await tsImport("../src/logo.ts", import.meta.url);
 
 const limits = {
   duration: timeline.durationInFrames / fps,
@@ -133,10 +134,10 @@ if ((await size(mp4)) !== undefined) {
     `${mp4}: the final hit measures at frame ${hit.frame} (${(hit.frame / fps).toFixed(3)} s, +${hit.rise.toFixed(1)} dB); the analysis records ${music.events.finalHit}`,
   );
   const chord = hit.frame / fps + (music.track.events.landing - music.track.events.finalHit);
-  const offset = music.landingFrame / fps - chord;
+  const offset = chordFrame / fps - chord;
   report(
     Math.abs(offset) <= limits.landing,
-    `end-card logo locks at frame ${music.landingFrame}, ${offset >= 0 ? "+" : ""}${offset.toFixed(3)} s from the final chord (${chord.toFixed(3)} s; within ±${limits.landing} s)`,
+    `end-card logo locks at frame ${chordFrame}, ${offset >= 0 ? "+" : ""}${offset.toFixed(3)} s from the final chord (${chord.toFixed(3)} s; within ±${limits.landing} s)`,
   );
 }
 

@@ -3,7 +3,8 @@ import { test } from "node:test";
 import type { Footage } from "./footage.ts";
 import { hit } from "./moments.ts";
 import { music } from "./music.ts";
-import { cueGain, sfxCues } from "./sfx.ts";
+import { SFX, cueGain, sfxCues } from "./sfx.ts";
+import { chordFrame } from "./logo.ts";
 import { looks } from "./shots.ts";
 import { timeline } from "./timeline.ts";
 
@@ -63,8 +64,8 @@ test("levels stay under the music: swells and whooshes at -15 dB or lower, ticks
   assert.equal(cueGain(swell, swell.durationInFrames - 1) < cueGain(swell, swell.durationInFrames - 3), true);
 });
 
-test("one glint, with the end card's light sweep", () => {
+test("one glint, its onset on the final chord with the end card's light sweep", () => {
   const glints = cues.filter((cue) => cue.name.startsWith("glint"));
   assert.equal(glints.length, 1);
-  assert.ok(glints[0].from >= music.events.finalHit && glints[0].from <= music.landingFrame + 4);
+  assert.equal(glints[0].from + SFX.glint.onsetFrame, chordFrame);
 });
