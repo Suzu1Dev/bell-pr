@@ -60,8 +60,9 @@ The edit plays at -4.5 dB: about -14 LUFS integrated, true peak about
 81.1-84.0 s: frame 2438, 81.267 s); the end-card logo resolves on the
 final E chord 0.45 s later (81.718 s: frame 2451, the frame whose interval
 holds it; the lead's rounded frame is 2452). After the music's last sound
-(86.8 s) the picture holds the complete end card 2.2 s in silence and
-fades to black, so the film is 89.0 s; the music edit itself is unchanged.
+(86.8 s) the picture holds the complete end card 0.8 s in silence and
+fades to black over 0.4 s, so the film is 88.0 s; the music edit itself is
+unchanged.
 
 ### Where the file goes
 

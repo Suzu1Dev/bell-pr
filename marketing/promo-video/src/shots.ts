@@ -8,18 +8,20 @@
  * variant B's whole floating window (all four edges, turned to face the
  * viewer, contact shadow; "establish" takes, with the "Sample project"
  * badge in view), then cuts on the beat to variant C's push-ins on the
- * detail, with two-plane depth of field that keeps the subject sharp and
- * leaves the caption a quiet place to sit. Each section has one
- * beat-locked push (15-25% over one or two beats, landing on a downbeat),
- * and the compositions change from section to section: the panel against
- * the window's right edge (S6), the window on the left with the studio
- * and the caption on the right (S7), the selection mid-frame (S8), macros
- * of the decisive line (S6, S7, S9, S10, S12, S13), the window's bottom
- * edge over a strip of studio (S11, S13).
+ * detail, with two-plane depth of field that keeps the component the shot
+ * is about (a card, a panel, a dialog) sharp, its feathers in the UI's
+ * gutters, and leaves the caption a quiet place to sit. Pushes that start
+ * on a cut leave it already moving (`arrive`), and the compositions change
+ * from section to section: the panel against the window's right edge (S6),
+ * the window on the left with the studio on the right (S7), the selection
+ * mid-frame and the panel centred (S8), macros of the decisive line (S6,
+ * S7, S8, S9, S10, S12), a whole card or a run of checklist rows (S11,
+ * S13).
  *
  * Clip times avoid the capture's own scrolls and reflows: a take starts
  * after one and ends before the next (`clipTo` freezes a take on its last
- * settled frame), so nothing jumps inside a take.
+ * settled frame, or holds a single frame: S8's answer, S11's checklist),
+ * so nothing jumps inside a take.
  */
 import { focusRect, rackRect, type Feather, type Mask, type Rect } from "./look/dof.ts";
 import { floating, push, type Key } from "./look/camera.ts";

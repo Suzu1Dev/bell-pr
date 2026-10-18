@@ -1,7 +1,7 @@
 # BELL PR launch film
 
-The 89-second English launch film for BELL PR v1.1 (the 86.8 s music edit,
-then the complete end card held 2.2 s), built with
+The 88-second English launch film for BELL PR v1.1 (the 86.8 s music edit,
+then the complete end card held and faded over 1.2 s), built with
 [Remotion](https://www.remotion.dev/) from real footage of the product's
 sample project. This package is separate from the product: it has its own
 `package.json` and lockfile and is never published.
@@ -50,11 +50,11 @@ npm run hit             # measure the final hit in the source against the analys
 npm run render:web      # 1080p MP4 + WebM, poster, captions
 npm run render:master   # the 4K master (--scale=2)
 npm run check           # check every output (`-- --web-only` for the 1080p files only)
-npm run review          # QA frames, index, contact sheet, and the per-frame scans (exit 1 on a finding)
+npm run review          # QA frames, index, contact sheet, the per-frame scans and the depth-of-field check (exit 1 on a finding)
 npm run stills -- 291 1011 2452   # quick stills of chosen frames
 npm run site            # copy the 1080p web files into site/media/
 npm run studio          # Remotion Studio
-npm test                # timeline, music, look, logo, sound and script tests
+npm test                # timeline, music, look, logo, sound and script tests; the depth-of-field check when the footage is there
 npm run typecheck
 ```
 
@@ -83,9 +83,9 @@ states against the existing product build.
 2. **Assets** (`scripts/prepare-assets.mjs`): the checked music copy, the
    product's brand SVGs, pre-dithered stage plates (`scripts/make-stage.mjs`:
    no CSS gradient for a large slow ramp, so no banding after x264), the
-   sound effects, and two footage proxies (`scripts/make-proxies.mjs`): DPR 2
-   for shots that need no more, and a pre-blurred copy for the
-   depth-of-field back plane.
+   sound effects, the DPR 2 footage proxy for shots that need no more
+   (`scripts/make-proxies.mjs`), and where the pointer's disc sits beside
+   each click the film shows, off every glyph (`scripts/pointer-spots.mjs`).
 3. **The cut** (`src/timeline.ts`) lays the 14 shots on the music's events
    from `music/track.analysis.json` with the flex rules of VIDEO.md §3, in
    seconds: shot cuts on bar lines (else half-bars, else a beat), takes on
@@ -98,11 +98,16 @@ states against the existing product build.
    "lights on" cut to the light studio on the first hit; each product
    section opens on the whole floating window (no title bar, no window
    buttons, no device; layered and contact shadows) turning to face the
-   viewer, then cuts on the beat to slow push-ins with two-plane depth of
-   field (the back plane veiled and lightly blurred); one beat-locked push
-   per section and macros on the decisive lines; the climax opens with a
-   bar of display type on the dark stage; captions on a frosted glass card
-   over a soft pool of light, never on the sharp plane. Moves use
+   viewer, then cuts on the beat to push-ins that leave the cut already
+   moving (`arrive`), with two-plane depth of field: the same picture
+   blurred 3.5 px on screen behind at every magnification, and the
+   component the shot is about (a card, a panel, a dialog) sharp on top,
+   every feather in a gutter of the UI (`scripts/check-dof.mjs` checks it
+   against the footage); one beat-locked push per section and macros on
+   the decisive lines; the climax opens with a bar of display type on the
+   dark stage; captions (DM Sans 56 px, bottom-left or top-left) on a
+   frosted glass card over a soft pool of light, never on the sharp
+   plane. Moves use
    `transform` only; a push never exceeds 2.0 output pixels per capture
    pixel (one DPR-4 pixel per pixel of the 4K master), a macro 2.6 (at
    least 1.5 source pixels per output pixel at 1080p; the 4K master
@@ -124,7 +129,7 @@ In `out/` (gitignored):
 | `bell-pr-promo-en-2160p.mp4` | the 4K master: H.264 CRF 16 + AAC 320 kb/s, no size cap |
 | `bell-pr-promo-en-1080p.mp4` | web: H.264 + AAC 192 kb/s, at most 20 MB |
 | `bell-pr-promo-en-1080p.webm` | web: VP9 + Opus 160 kb/s, at most 20 MB |
-| `poster.jpg` | the complete end card, sharp (frame 2640), at most 500 KB |
+| `poster.jpg` | the complete end card, sharp (frame 2610), at most 500 KB |
 | `captions.en.vtt`, `captions.en.srt` | the captions, the same cues as the film |
 | `review/`, `contact-sheet.png` | the QA frames, their index and `review/scans.tsv` (`npm run review`) |
 | `capture.log` | the capture's privacy and badge checks |
