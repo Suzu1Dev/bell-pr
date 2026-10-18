@@ -192,6 +192,26 @@ async function glideInWindow(rec, page, locator, offset = 0, duration = 0.8) {
 /** Clicks a demo-only "Fill with the sample answer" button without the pointer (no hover, no drawn click). */
 const fill = (locator) => locator.dispatchEvent("click");
 
+/**
+ * The demo's "Fill with the sample answer" controls stand in for the person
+ * typing; a real run has none. Left on screen, a sharp "Fill with the sample
+ * answer" link under the box where the film says *you* answer reads as "AI
+ * fills in your explain-back", the opposite of the product. So the states
+ * that show them hide them while filming: `visibility: hidden` on the
+ * demo-only buttons (.tf-fill, .check-fill) and nothing else, so the layout
+ * and every other pixel stay as the product draws them. The buttons are
+ * still clicked (fill(), without the pointer) to type the sample text.
+ */
+async function hideDemoFill(page) {
+  await page.addStyleTag({ content: ".tf-fill, .check-fill { visibility: hidden !important; }" });
+  await sleep(50);
+  const shown = await page.locator(".tf-fill, .check-fill").evaluateAll((list) => list.filter((el) => getComputedStyle(el).visibility !== "hidden").length);
+  if (shown) throw new Error(`${shown} demo fill control(s) are still visible.`);
+}
+
+/** A demo fill button, found even while hidden. */
+const fillButton = (scope, name) => scope.getByRole("button", { name, includeHidden: true });
+
 /** Steps frames until a field holds `text` (a typewriter at 30 ms a character). */
 async function typedOut(rec, field, text, seconds = 12) {
   await rec.until(async () => (await field.inputValue()) === text, seconds);
@@ -296,6 +316,8 @@ const states = {
     await S.openPlayedFile(page, "src/client.ts");
     const card = page.locator(".explain-card-selfcheck");
     await placeInScroller(card, 8);
+    await hideDemoFill(page);
+    rec.log(`${rec.id} · demo-only fill controls hidden while filming (visibility only)`);
     await S.parkPointer(page);
     await rec.target("panel", page.locator(".explain-panel"));
     await rec.still("establish");
@@ -306,7 +328,7 @@ const states = {
     await rec.hold(0.4);
     rec.mark("typing");
     const answer = card.getByRole("textbox", { name: tf.quiz.answerLabel });
-    await fill(card.getByRole("button", { name: tf.fill }));
+    await fill(fillButton(card, tf.fill));
     await typedOut(rec, answer, sample.answer);
     rec.mark("typed");
     await rec.hold(0.3);
@@ -344,6 +366,8 @@ const states = {
     await S.openPlayedFile(page, "src/utils/retry.ts");
     const card = page.locator(".explain-card-alternatives");
     await placeInScroller(card, 8);
+    await hideDemoFill(page);
+    rec.log(`${rec.id} · demo-only fill controls hidden while filming (visibility only)`);
     await rec.park(1250, 700);
     await rec.startFrames();
     await rec.check("question");
@@ -351,7 +375,7 @@ const states = {
     await rec.hold(0.4);
     rec.mark("typing");
     const guess = card.getByRole("textbox", { name: tf.road.guessLabel });
-    await fill(card.getByRole("button", { name: tf.fill }));
+    await fill(fillButton(card, tf.fill));
     await typedOut(rec, guess, sample.guess);
     rec.mark("typed");
     await rec.hold(0.3);
@@ -371,7 +395,7 @@ const states = {
     const why = card.getByRole("textbox", { name: tf.road.whyLabel });
     await glideInScroller(rec, why, 200, 0.6);
     rec.mark("why");
-    await fill(card.getByRole("button", { name: tf.fill }));
+    await fill(fillButton(card, tf.fill));
     await typedOut(rec, why, sample.why);
     rec.mark("why-typed");
     await rec.target("why", why);
@@ -438,6 +462,8 @@ const states = {
     await S.reviewAll(page);
     await S.openCheck(page);
     const panel = checkPanel(page);
+    await hideDemoFill(page);
+    rec.log(`${rec.id} · demo-only fill controls hidden while filming (visibility only)`);
     await S.parkPointer(page);
     await rec.target("panel", panel);
     await rec.still("closed-book");
@@ -449,7 +475,7 @@ const states = {
     await rec.target("explain", explain);
     await rec.hold(0.4);
     rec.mark("summary");
-    await fill(explain.getByRole("button", { name: c.fill }));
+    await fill(fillButton(explain, c.fill));
     await typedOut(rec, explain.getByRole("textbox"), sample.summary);
     rec.mark("summary-typed");
     await rec.hold(0.4);
@@ -458,7 +484,7 @@ const states = {
     await glideInScroller(rec, question, 16, 0.8);
     rec.mark("question");
     await rec.target("question", question);
-    await fill(question.getByRole("button", { name: c.fill }));
+    await fill(fillButton(question, c.fill));
     await typedOut(rec, question.getByRole("textbox"), sample.answers["selfCheck:src/utils/retry.ts"].answer);
     rec.mark("question-typed");
     await rec.hold(0.2);
@@ -471,7 +497,7 @@ const states = {
     await glideInScroller(rec, untested, 16, 0.7);
     rec.mark("untested");
     await rec.target("untested", untested);
-    await fill(untested.getByRole("button", { name: c.fill }));
+    await fill(fillButton(untested, c.fill));
     await typedOut(rec, untested.getByRole("textbox"), sample.answers.untested.answer);
     rec.mark("untested-typed");
     await untested.getByRole("radio", { name: c.confidences[sample.answers.untested.confidence] }).dispatchEvent("click");
@@ -499,7 +525,7 @@ const states = {
     await glideInScroller(rec, correct, 60, 0.6);
     rec.mark("correction");
     await rec.target("correction", correct);
-    await fill(correct.getByRole("button", { name: c.fill }));
+    await fill(fillButton(correct, c.fill));
     await typedOut(rec, correct.getByRole("textbox"), sample.answers["selfCheck:src/utils/retry.ts"].correction);
     rec.mark("correction-typed");
     await rec.hold(0.3);
@@ -527,6 +553,8 @@ const states = {
     await S.gradeCheck(page);
     const forecast = S.checkStep(page, c.forecastTitle);
     await placeInScroller(forecast, 16);
+    await hideDemoFill(page);
+    rec.log(`${rec.id} · demo-only fill controls hidden while filming (visibility only)`);
     await rec.park(1250, 700);
     await rec.startFrames();
     await rec.check("forecast");
@@ -538,7 +566,7 @@ const states = {
     await rec.hold(0.3);
     rec.hideCursor();
     rec.mark("typing");
-    await fill(forecast.getByRole("button", { name: c.fill }));
+    await fill(fillButton(forecast, c.fill));
     await typedOut(rec, forecast.getByRole("textbox"), sample.forecast.question);
     rec.mark("typed");
     await rec.hold(0.3);
@@ -695,7 +723,8 @@ const states = {
     const item = demo.practiceSample[0];
     await deck.getByRole("heading", { level: 3, name: item.question }).waitFor();
     await placeInWindow(page, deck, 60);
-    await deck.getByLabel(p.answer).fill("The wait doubles each time, up to the cap.");
+    // A right answer to the question (the reference: min(30, 1 x 2^2) = 4 s, full jitter below it), so "Got it" is earned.
+    await deck.getByLabel(p.answer).fill("4 seconds: 1 s doubled twice. Full jitter picks a random wait below that.");
     await deck.getByRole("radio", { name: p.confidences.think }).dispatchEvent("click");
     await deck.getByRole("button", { name: p.show }).dispatchEvent("click");
     await S.tick(page, 500);
