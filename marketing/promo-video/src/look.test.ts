@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { CAPTURE } from "./footage.ts";
 import { cardBox } from "./look/captionLayout.ts";
 import { corners, floating, project, push, viewAt, wholeWindowInFrame, type View } from "./look/camera.ts";
+import { keyframeCuts } from "./keyframes.ts";
 import { planesOf, sharpPlane } from "./look/dof.ts";
 import { pointerAt, pointerWindows } from "./look/pointer.ts";
 import { MACRO_MAX_M, PUSH_MAX_M, looks, type TakeLook } from "./shots.ts";
@@ -251,4 +252,13 @@ test("a caption card never sits on the sharp plane (12 px clear): it sits over t
     }
   }
   assert.deepEqual(problems, []);
+});
+
+test("the WebM gets a keyframe on every cut between the stages and on every take that opens on the studio", () => {
+  const cuts = keyframeCuts();
+  for (const frame of [music.events.firstHit, music.events.finalHit]) assert.ok(cuts.includes(frame), `${frame}`);
+  const title = timeline.shots.find((shot) => shot.id === "s9-explain-back")!.takes.find((take) => take.id === "title")!;
+  assert.ok(cuts.includes(title.from) && cuts.includes(title.to), "the climax title's two cuts");
+  for (const { take, look } of takes) if (look.float) assert.ok(cuts.includes(take.from), `${take.id} at ${take.from}`);
+  assert.ok(cuts.length <= 24, "keyframes cost bits: only where a plate first shows");
 });
