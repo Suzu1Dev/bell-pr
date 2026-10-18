@@ -30,8 +30,11 @@ sample project. This package is separate from the product: it has its own
   first use.
 - Port 4651 on 127.0.0.1 free during the capture (`PROMO_CAPTURE_PORT`
   changes it). The capture's temporary HOME and data dir go under
-  `/tmp/claude-1000/` (or `TMPDIR`) and are removed when it ends; set
-  `TMPDIR` to keep Remotion's temporary files in the same place.
+  `/tmp/claude-1000/` (or `TMPDIR`) and are removed when it ends.
+- Remotion's temporary files need about 10 GB on disk for the WebM: VP9
+  keeps every rendered frame until it encodes them. Where `/tmp` is a
+  RAM-backed tmpfs, point `TMPDIR` at a disk folder for the renders (for
+  example `out/tmp`, gitignored), or Chrome's page crashes part-way.
 - Network access to `assets.mixkit.co` the first time `npm run assets`
   runs (it downloads the six sound effects of `SFX-LICENSES.md` and checks
   their MD5s; `--offline` refuses to download).
