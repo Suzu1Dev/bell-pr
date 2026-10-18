@@ -1,7 +1,8 @@
 /**
- * Caption cues from src/timeline.json, their rules, and the WebVTT and
- * SubRip formats. The burned-in captions (src/components/Captions.tsx) read
- * the same cues, so the files and the video agree to the frame.
+ * Caption cues from src/timeline.ts, their rules, and the WebVTT and SubRip
+ * formats. The film's captions (src/look/Captions.tsx and the kinetic title
+ * lines of the opening and the end card) read the same cues, so the files
+ * and the video agree to the frame.
  */
 
 /** The rules every cue keeps. */
@@ -12,7 +13,7 @@ export const captionRules = {
   minSeconds: { 1: 1.8, 2: 2.6 },
 };
 
-/** Cues in seconds, in time order: {start, end, lines}. */
+/** Cues in seconds, in time order: {start, end, lines}, from a timeline with `fps` and `captions` in frames. */
 export function cuesFromTimeline(timeline) {
   return timeline.captions
     .map((cue) => ({

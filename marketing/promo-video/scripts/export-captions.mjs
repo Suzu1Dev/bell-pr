@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 /**
- * Writes out/captions.en.vtt and out/captions.en.srt from the cues in
- * src/timeline.json, the same cues the video burns in. Fails when a cue
- * breaks a caption rule (scripts/lib/captions.mjs).
+ * Writes out/captions.en.vtt and out/captions.en.srt from the cues of
+ * src/timeline.ts, the same cues the film shows (the kinetic title lines
+ * and the caption cards). Fails when a cue breaks a caption rule
+ * (scripts/lib/captions.mjs).
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { tsImport } from "tsx/esm/api";
 import { captionProblems, cuesFromTimeline, toSrt, toVtt } from "./lib/captions.mjs";
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
-const timeline = JSON.parse(await readFile(path.join(packageRoot, "src", "timeline.json"), "utf8"));
+const { timeline } = await tsImport("../src/timeline.ts", import.meta.url);
 const cues = cuesFromTimeline(timeline);
 const problems = captionProblems(cues, { duration: timeline.durationInFrames / timeline.fps });
 if (problems.length) {

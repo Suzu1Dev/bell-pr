@@ -1,8 +1,8 @@
 /**
  * The ffmpeg and ffprobe that ship with Remotion (`npx remotion ffmpeg`,
  * `npx remotion ffprobe`); no system ffmpeg is needed. Remotion's build
- * leaves most filters out, so loudness is measured with whatever EBU R128
- * filter it has, and per-frame levels are computed here from decoded PCM.
+ * leaves most filters out, so loudness is measured with loudnorm's analysis
+ * and per-frame levels are computed here from decoded PCM.
  */
 import { execFile } from "node:child_process";
 import path from "node:path";
@@ -42,38 +42,20 @@ export async function probe(file) {
   return JSON.parse(stdout.toString());
 }
 
-/** The names of the filters the bundled ffmpeg has. */
-export async function ffmpegFilters() {
-  const { stdout } = await remotion(["ffmpeg", "-hide_banner", "-filters"]);
-  const names = new Set();
-  for (const line of stdout.toString().split("\n")) {
-    const match = /^\s*[.A-Z|]{2,3}\s+(\w+)\s+\S+->\S+/.exec(line);
-    if (match) names.add(match[1]);
-  }
-  return names;
-}
-
 /**
- * The integrated loudness (LUFS) of a file's audio, measured per EBU R128
- * with the ebur128 filter, else with loudnorm's analysis; null when the
- * bundled ffmpeg has neither.
+ * The integrated loudness (LUFS, EBU R128) and true peak (dBTP) of a file's
+ * audio, from loudnorm's analysis pass (the bundled ffmpeg has no ebur128
+ * filter); null when it cannot be read.
  */
-export async function measureLoudness(file, filters) {
-  const input = path.resolve(packageRoot, file);
-  if (filters.has("ebur128")) {
-    const { stderr } = await remotion(["ffmpeg", "-hide_banner", "-nostats", "-i", input, "-vn", "-af", "ebur128", "-f", "null", "-"]);
-    const summary = stderr.toString().split("Summary:").pop();
-    const match = /I:\s+(-?[\d.]+) LUFS/.exec(summary);
-    if (match) return { method: "ebur128", lufs: Number(match[1]) };
-  }
-  if (filters.has("loudnorm")) {
-    const { stderr } = await remotion([
-      "ffmpeg", "-hide_banner", "-nostats", "-i", input, "-vn", "-af", "loudnorm=print_format=json", "-f", "null", "-",
-    ]);
-    const match = /"input_i"\s*:\s*"(-?[\d.]+)"/.exec(stderr.toString());
-    if (match) return { method: "loudnorm (EBU R128 integrated)", lufs: Number(match[1]) };
-  }
-  return null;
+export async function measureLoudness(file) {
+  const { stderr } = await remotion([
+    "ffmpeg", "-hide_banner", "-nostats", "-i", path.resolve(packageRoot, file), "-vn", "-af", "loudnorm=print_format=json", "-f", "null", "-",
+  ]);
+  const text = stderr.toString();
+  const lufs = /"input_i"\s*:\s*"(-?[\d.]+)"/.exec(text);
+  const truePeak = /"input_tp"\s*:\s*"(-?[\d.]+)"/.exec(text);
+  if (!lufs || !truePeak) return null;
+  return { lufs: Number(lufs[1]), truePeak: Number(truePeak[1]) };
 }
 
 /** Decodes `duration` seconds from `start` as mono 16-bit samples (-1..1). */

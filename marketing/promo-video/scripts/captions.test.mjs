@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { tsImport } from "tsx/esm/api";
 import { captionProblems, cuesFromTimeline, formatTime, parseVtt, toSrt, toVtt } from "./lib/captions.mjs";
 
-const timeline = JSON.parse(readFileSync(new URL("../src/timeline.json", import.meta.url), "utf8"));
+const { timeline } = await tsImport("../src/timeline.ts", import.meta.url);
 const cue = (start, end, ...lines) => ({ start, end, lines });
 
 test("the timeline's captions keep every rule", () => {
