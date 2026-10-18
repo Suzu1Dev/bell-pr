@@ -4,60 +4,71 @@
 `"reviewed": true` in `music/track.analysis.json` after listening).
 
 1920x1080 at 30 fps (the 4K master is the same composition at
-`--scale=2`), **86.8 s (2604 frames)**, English captions, no voice-over,
-music "Rock Sport Top" (Short A, 100 BPM; `MUSIC-LICENSE.md`). The brief is
-plan `direction-v1.1/VIDEO.md` (§3 storyboard, §4 demo states, §5 honesty
-rules and the lead addenda); the look is the owner's choice from the
-look-dev: variant C (Cinematic hybrid) with variant B's floating window and
-frosted caption card.
+`--scale=2`), **89.0 s (2670 frames)**: the 86.8 s music edit, then the
+complete end card held 2.2 s past the music's last sound and faded to
+black. English captions, no voice-over, music "Rock Sport Top" (Short A,
+100 BPM; `MUSIC-LICENSE.md`). The brief is plan `direction-v1.1/VIDEO.md`
+(§3 storyboard, §4 demo states, §5 honesty rules and the lead addenda); the
+look is the owner's choice from the look-dev: variant C (Cinematic hybrid)
+with variant B's floating window and frosted caption card.
 
 Every product picture is real UI of the fictional sample project
 `openfetch-sample/open-fetch` in demo playback (`present=1&locale=en&capture=1`),
 filmed at device scale 4 (`scripts/capture.mjs`). Nothing reaches GitHub or
-an AI model. The pointer is drawn by the film from the capture's recorded
-moves and clicks: a neutral round disc, never an operating-system arrow.
+an AI model. The demo-only "Fill with the sample answer" controls (they
+stand in for the person typing; a real run has none) are hidden while
+filming, so no frame suggests that AI fills in the person's answers. The
+pointer is drawn by the film from the capture's recorded moves and clicks:
+a neutral round disc beside its hotspot, never an operating-system arrow.
 
 ## How the cut is made
 
 `src/timeline.ts` lays the shots on the music's events
 (`music/track.analysis.json`): an anchored shot starts on its event, the
 shots between two anchors share the gap by their nominal seconds (VIDEO.md's
-bars at 120 BPM, restated in seconds as the lead's addendum asks), every
-cut snaps to a beat, and captions and takes are placed in beats from their
-shot's first beat. `npm test` checks every rule against the loaded
-analysis. With this track no flex step is needed: all fourteen shots are in,
-S8 is kept and S10 is not merged; S6, S7 and S9 are at or above nominal.
-The opening is the "tighter opening" the addendum accepts: S1 runs from the
-intro to the riser (4.9 s) and S2 from the riser through the 2-beat stop to
-the first hit (4.8 s).
+bars at 120 BPM, restated in seconds as the lead's addendum asks), and
+every cut snaps to the grid: a bar line first, else a half-bar, else a beat
+only where the limits leave nothing else. Takes sit on half-bars, and every
+crash downbeat of the track (bars 5, 9, 21, 23 and 31 of the edit) is a cut.
+`npm test` checks every rule against the loaded analysis. With this track
+no flex step is needed: all fourteen shots are in, S8 is kept and S10 is
+not merged; S6, S7 and S9 are at or above nominal. Two shot cuts are not on
+a bar line: S7 and S13 start on beat 3 (a bar line would break S6-S8's or
+S12-S13's limits), and S10 on beat 2 of bar 25 (S9 never goes under its
+nominal 10 s and S10 needs its 4 s, and the 14.4 s gap from the climax to
+the accent leaves only that beat). The opening is the "tighter opening" the
+addendum accepts: S1 runs from the intro to the riser (4.9 s) and S2 from
+the riser through the 2-beat stop to the first hit (4.8 s).
 
 ## Shots
 
 | Shot | Frames | Seconds | Anchor | Takes (first frame) | Picture |
 | --- | --- | --- | --- | --- | --- |
-| S1 Problem | 0-146 | 0.00-4.90 | intro | queue 0 | Dark stage. A soft, endless queue of identical pull-request cards (no names, numbers or platform chrome) drifts left; one reviewer's round pointer hovers and pings on every other beat. The lines pull into focus (K3); on beat 3 of bar 2 "Reviewing them still" racks soft and dim while "isn’t." stays sharp (K5). |
-| S2 Turn | 147-290 | 4.90-9.70 | riser | lift 147 | On the riser the queue slows to a halt over two beats; the question pulls into focus line by line; on the kick one card lifts out of the queue, turns to face the viewer and lights up, landing on the stop (255). Everything freezes for a beat, exhales (273-286), and the stage is dark for the four frames before the hit. |
-| S3 Rules first | 291-560 | 9.70-18.70 | firstHit | logo 291, establish 345, rules 471 | "Lights on": a hard cut to the light studio with the wordmark already crisp (settling from 1.02); two beats later it lifts and dissolves away, gone before the window enters. The floating window (`v-rules-card`, the overview with the "Sample project" badge) rises in, turns to face the viewer and lands with its contact shadow; one light sweep. Cut on the beat to a push-in on "Before you contribute": "Pull requests: open to you" and the three quoted rules with their `CONTRIBUTING.md` lines. |
-| S4 Still yours | 561-722 | 18.70-24.10 | | chips 561, plan 651 | `v-before-you-start`: the task dialog glides to "Before you start #42 (sample)"; the camera pushes onto the green chips (Open, Unassigned, No other open PR, the maintainer's "PRs welcome", "Your open PRs here: 0 of 1") while the rest of the dialog racks soft. Then `v-plan`: the plan waiting for approval. |
-| S5 Legwork | 723-866 | 24.10-28.90 | | board 723 | `v-board`: the pointer approves the plan, the plan folds away, the camera eases back as tasks move across the board and the team's messages arrive. |
-| S6 Try first | 867-1118 | 28.90-37.30 | lift | establish 867, answer 957, example 1065 | The review screen as the floating window, turning to face the viewer while the answer types out (`v-quiz-attempt`, `src/client.ts`). Push-in on the quiz card: "Think so", Show answer, the reference labelled AI-written, "Got it". Then the plain-language example card. |
-| S7 Taste | 1119-1316 | 37.30-43.90 | | guess 1119, keep 1209 | `v-road-choice` on `src/utils/retry.ts`: "What if it were done differently?", the guess types, "Show the alternative" (fixed interval with jitter); then "Keep this approach" and the why types out. |
-| S8 Ask | 1317-1442 | 43.90-48.10 | | select 1317, answer 1371 | `v-line-ask`: lines 10-15 of the diff selected; "Explain this code"; the question bubble with its diff block and the answer, the camera easing from the diff to the panel. |
-| S9 Explain it back | 1443-1748 | 48.10-58.30 | climax | establish 1443, summary 1515, answer 1569, grade 1677 | The closed-book check as the floating window (`v-check`). Push-ins: the summary types; the `retry.ts` question is answered at "Think so"; "What did you not test?" is answered; the reveal, "Partly", and the one-line correction. |
-| S10 Predict | 1749-1874 | 58.30-62.50 | | forecast 1749 | `v-forecast`: the "Tests" chip, "They'll ask whether the retry cap is tested." types, and the saved prediction beside the result line "You explained the change and answered 2 questions. You missed 1 and corrected it." |
-| S11 Your words | 1875-2090 | 62.50-69.70 | accent | establish 1875, words 1947, checklist 2019 | The calm section, half-speed camera: the draft tab as the floating window (the contribution guide, "Follows the project's rules"); "Use my explanation" and "Add my not-tested answer to Testing"; the maintainer checklist, every row OK. |
-| S12 Send one | 2091-2270 | 69.70-75.70 | | dialog 2091, published 2181 | `v-publish`: the publish dialog, its checks ("Your open PRs here: 0 of 1", "Every check passes."), "Open the sample Draft PR"; the card "Draft PR opened · Sample: not created on GitHub". |
-| S13 Learn | 2271-2437 | 75.70-81.27 | | compare 2271, practice 2361 | `v-forecast-vs-reality`: "Your forecast: Tests" beside the sample maintainer's comments, "Saw it coming", "Changes requested"; quick cut to `v-practice`: "Got it", "Next review in 3 days". |
-| S14 End | 2438-2603 | 81.27-86.80 | finalHit | end-card 2438 | A hard cut back to the dark stage on the measured hit; the logo pulls into focus and locks on the final chord (2452) with one light sweep inside its letters; "From vibe coding" / "to knowing why." beat by beat, "vibe coding" racked soft and dim, "knowing why." turning mint, "From" and "to" near white; `npx bell-pr` · "Free to start · Runs on your machine"; "BELL PR is independent and not affiliated with GitHub, OpenAI or Anthropic." No homepage: `shared/product.ts` sets none. |
+| S1 Problem | 0-146 | 0.00-4.90 | intro | queue 0 | Dark stage. A queue of identical pull-request cards (a generic pull-request glyph, title bars, a green and red diff stat; no names, numbers or platform chrome) grows faster than it is reviewed: cards drop in on the beats and pile up three rows deep while the one reviewer (a round pointer with a ring) opens the centre card, clears it, and sees another take its place. The lines pull into focus (K3); on beat 3 of bar 2 "Reviewing them still" racks soft and dim while "isn’t." stays sharp (K5), through the cut. |
+| S2 Turn | 147-290 | 4.90-9.70 | riser | lift 147 | The question pulls into focus line by line; on the kick the card in the reviewer's slot lifts out, turns to face the viewer and lights up, landing on the stop (255). Everything freezes for a beat, exhales (273-286), and the stage is dark for the four frames before the hit. |
+| S3 Rules first | 291-578 | 9.70-19.30 | firstHit | logo 291, establish 345, rules 471 | "Lights on": a hard cut to the light studio with the wordmark already crisp (settling from 1.02), held at full strength to 335 and gone by 345. The floating window (`v-rules-card`, the overview with the "Sample project" badge) rises in from a beat before the bar-6 downbeat it lands on (363), turns to face the viewer and settles with its contact shadow; one light sweep. Cut on beat 3 to a push-in on "Before you contribute": "Pull requests: open to you" and the three quoted rules with their `CONTRIBUTING.md` lines. |
+| S4 Still yours | 579-722 | 19.30-24.10 | | chips 579, plan 651 | On the bar-9 crash: `v-before-you-start` with the facts already settled, the camera pushing onto "Before you start #42 (sample)" and its green chips (Open, Unassigned, No other open PR, the maintainer's "PRs welcome", "Your open PRs here: 0 of 1") while the rest of the dialog stays soft. Then `v-plan`: one push over the bar onto the plan waiting for approval. |
+| S5 Legwork | 723-866 | 24.10-28.90 | | board 723 | The same framing across the section cut: the pointer approves the plan on beat 3 (759, the person's call); the plan folds away and the camera pulls back as the tasks move across the board a beat apart and the team's messages arrive (`v-board` at 0.62x). |
+| S6 Try first | 867-1118 | 28.90-37.30 | lift | establish 867, answer 903, reveal 975, example 1011 | The review screen as the floating window, turning to face the viewer for two beats (`v-quiz-attempt`, `src/client.ts`). On beat 3 a push onto the quiz card while the answer types out at 1.9x magnification, "Think so", Show answer; a macro on the AI-written reference beside the answer and "Got it"; then the plain-language example card. |
+| S7 Taste | 1119-1298 | 37.30-43.30 | | guess 1119, keep 1191, why 1227 | `v-road-choice` on `src/utils/retry.ts`, the window on the left with the studio on the right: "What if it were done differently?", the guess types, "Show the alternative"; a macro on "For this project, which would you choose?" and the click on "Keep this approach"; the why types out and is saved. |
+| S8 Ask | 1299-1442 | 43.30-48.10 | | select 1299, answer 1371 | `v-line-ask`: lines 10-15 of the diff selected mid-frame, the selection bar ("7 lines selected · Explain this code") in the sharp plane and pressed; then the panel: the question with its diff block, the focus racking down to the answer as it types (the demo's "prewritten" line between them stays soft). |
+| S9 Explain it back | 1443-1748 | 48.10-58.30 | climax | title 1443, establish 1515, question 1587, partly 1659, result 1695 | On the climax crash a cut back to the dark stage for one bar: "Before it ships, explain it back." pulls into focus, "Before it ships," racking soft. "Lights on" on the next downbeat (the music's join): the closed-book check as the floating window (no explanation tabs, the diff stays) while the summary types, pushing in to land on the loudest downbeat (1587), a cut to a macro on the `retry.ts` question being answered and "Think so"; on bar 24 a macro on the AI-written reference and "Partly"; then the settled result: "You explained the change and answered 2 questions. You missed 1 and corrected it." with the one-line correction whole. |
+| S10 Predict | 1749-1874 | 58.30-62.50 | | tests 1749, line 1803 | `v-forecast`: a macro on the taste-dimension chips, "Tests" picked, "They'll ask whether the retry cap is tested." types; then a tight macro on the saved prediction line. |
+| S11 Your words | 1875-2090 | 62.50-69.70 | accent | establish 1875, words 1947, checklist 2019 | The calm section, half-speed camera: the draft tab as the floating window, entering from the left, the captions on the right; "Use my explanation" fills the description's summary under it (seen landing), "Add my not-tested answer to Testing"; the maintainer checklist, every row OK. |
+| S12 Send one | 2091-2270 | 69.70-75.70 | | dialog 2091, published 2163 | `v-publish`: a push onto the publish dialog's checks ("Your open PRs here: 0 of 1 (first contribution here)", "Every check passes.") and "Open the sample Draft PR", pressed two frames before the bar-31 crash; on the crash, the card "Draft PR opened · Sample: not created on GitHub" in a macro. |
+| S13 Learn | 2271-2437 | 75.70-81.27 | | compare 2271, practice 2343, next 2379 | `v-forecast-vs-reality`: "Your forecast: Tests" beside the sample maintainer's comments, "Saw it coming", "Changes requested"; on beat 3 `v-practice`: days later the question comes back, answered right, "Got it"; then a macro ending on "What you had wrong last time" and "Next review in 3 days". |
+| S14 End | 2438-2669 | 81.27-89.00 | finalHit | end-card 2438 | A hard cut back to the dark stage on the measured hit; the logo, large and centred, pulls into focus and resolves ON the final chord (2451), its light sweep and the glint starting there; a beat later it moves up as "From vibe coding" / "to knowing why." come in beat by beat; then "vibe coding" racks dim (it resolves back to sharp, keeping its dim), "knowing why." turns mint, "From" and "to" stay near white, and `npx bell-pr` · "Free to start · Runs on your machine" and "BELL PR is independent and not affiliated with GitHub, OpenAI or Anthropic." come in together (2523). The complete card holds sharp to 2657 and fades to black over the last 12 frames. No homepage: `shared/product.ts` sets none. |
 
 ## Captions
 
 At most 42 characters a line and 2 lines; on screen at least 1.8 s (one
 line) or 2.6 s (two lines); each starts on the half-beat grid. The title
-lines (S1, S2, S14) are the display type itself; the others sit on the
-frosted caption card, on a soft pool of studio light, where the shot leaves
-room (never over what the shot is about). `captions.en.vtt` and `.srt` are
-written from the same cues (`npm run captions`).
+lines (S1, S2, S9's first line and S14) are the display type itself; the
+others sit on the frosted caption card, on a soft pool of studio light,
+over the soft plane or the studio (a test keeps every card 12 px clear of
+the sharp plane). A cue that follows another in the same shot keeps the
+card and swaps its lines. `captions.en.vtt` and `.srt` are written from the
+same cues (`npm run captions`).
 
 | Shot | Frames | Seconds | Caption |
 | --- | --- | --- | --- |
@@ -65,27 +76,29 @@ written from the same cues (`npm run captions`).
 | S1 | 75-147 | 2.50-4.90 | Reviewing them still isn’t. |
 | S2 | 147-273 | 4.90-9.10 | What if AI made you better, / not just faster? |
 | S3 | 381-471 | 12.70-15.70 | First, read the project’s rules. |
-| S3 | 471-561 | 15.70-18.70 | Every rule, quoted from its source. |
-| S4 | 579-651 | 19.30-21.70 | Check the issue is still yours. |
+| S3 | 471-579 | 15.70-19.30 | Every rule, quoted from its source. |
+| S4 | 588-651 | 19.60-21.70 | Check the issue is still yours. |
 | S5 | 741-867 | 24.70-28.90 | Agents do the legwork, / on your own machine. |
-| S6 | 885-975 | 29.50-32.50 | Answer first. |
+| S6 | 903-975 | 30.10-32.50 | Answer first. |
 | S6 | 975-1119 | 32.50-37.30 | Then see the explanation. |
-| S7 | 1128-1209 | 37.60-40.30 | Which way would you do it? |
-| S7 | 1209-1317 | 40.30-43.90 | Taste grows by weighing trade-offs. |
-| S8 | 1326-1443 | 44.20-48.10 | Stuck on a line? Ask about it. |
-| S9 | 1461-1677 | 48.70-55.90 | Before it ships, explain it back. |
-| S9 | 1677-1749 | 55.90-58.30 | Missed something? Fix it in a line. |
+| S7 | 1128-1191 | 37.60-39.70 | Which way would you do it? |
+| S7 | 1191-1299 | 39.70-43.30 | Taste grows by weighing trade-offs. |
+| S8 | 1308-1443 | 43.60-48.10 | Stuck on a line? Ask about it. |
+| S9 | 1443-1515 | 48.10-50.50 | Before it ships, explain it back. (display type on the dark stage) |
+| S9 | 1659-1749 | 55.30-58.30 | Missed something? Fix it in a line. |
 | S10 | 1758-1875 | 58.60-62.50 | Predict what the maintainer will ask. |
-| S11 | 1893-1965 | 63.10-65.50 | Your words. The project’s rules. |
-| S11 | 1965-2019 | 65.50-67.30 | And what you didn’t test. |
+| S11 | 1893-2001 | 63.10-66.70 | Your words. The project’s rules. |
+| S11 | 2001-2091 | 66.70-69.70 | And what you didn’t test. |
 | S12 | 2109-2271 | 70.30-75.70 | One Draft PR. Then stay for the review. |
-| S13 | 2280-2361 | 76.00-78.70 | Learn from what they actually said. |
-| S14 | 2469-2604 | 82.30-86.80 | From vibe coding to knowing why. (the end card's headline) |
+| S13 | 2280-2438 | 76.00-81.27 | Learn from what they actually said. |
+| S14 | 2487-2670 | 82.90-89.00 | From vibe coding to knowing why. (the end card's headline) |
 
 ## Honesty
 
 Only shipped behaviour of the sample, unretouched (cropped, lit, tilted and
-focused only). No real projects, maintainers or numbers; no PR count rising;
-never "automatic", "autonomous" or "proves" (`npm test` checks the captions);
-no GitHub, OpenAI or Anthropic logos; S1 is a metaphor, not data; no Apple
-fonts, devices, window buttons or "9:41" (the capture clock reads 10:24).
+focused only; the demo-only fill controls hidden while filming, nothing
+else changed). No real projects, maintainers or numbers; no PR count
+rising; never "automatic", "autonomous" or "proves" (`npm test` checks the
+captions); no GitHub, OpenAI or Anthropic logos; S1 is a metaphor, not data;
+no Apple fonts, devices, window buttons or "9:41" (the capture clock reads
+10:24). The "Sample project" badge is in every establishing window.

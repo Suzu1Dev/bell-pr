@@ -1,6 +1,7 @@
 # BELL PR launch film
 
-The 86.8-second English launch film for BELL PR v1.1, built with
+The 89-second English launch film for BELL PR v1.1 (the 86.8 s music edit,
+then the complete end card held 2.2 s), built with
 [Remotion](https://www.remotion.dev/) from real footage of the product's
 sample project. This package is separate from the product: it has its own
 `package.json` and lockfile and is never published.
@@ -49,7 +50,7 @@ npm run hit             # measure the final hit in the source against the analys
 npm run render:web      # 1080p MP4 + WebM, poster, captions
 npm run render:master   # the 4K master (--scale=2)
 npm run check           # check every output (`-- --web-only` for the 1080p files only)
-npm run review          # QA frames, out/review/index.tsv and out/contact-sheet.png
+npm run review          # QA frames, index, contact sheet, and the per-frame scans (exit 1 on a finding)
 npm run stills -- 291 1011 2452   # quick stills of chosen frames
 npm run site            # copy the 1080p web files into site/media/
 npm run studio          # Remotion Studio
@@ -72,8 +73,11 @@ states against the existing product build.
    clock installed and paused at 2026-10-14 10:24 UTC and GPU off, so the
    frames are deterministic: PNG stills and frame-stepped clips (the clock
    moves 1/30 s per frame). It reaches each state with the drivers
-   `e2e/promo-states.spec.ts` checks. Every named state must pass the
-   privacy check (no owner identifier, home or temp path or e-mail address
+   `e2e/promo-states.spec.ts` checks. The demo-only "Fill with the sample
+   answer" controls are hidden while filming (`visibility: hidden` on
+   those buttons only; they are still clicked to type the sample text), so
+   no frame shows a fill link under the box where the person answers.
+   Every named state must pass the privacy check (no owner identifier, home or temp path or e-mail address
    in the page text; **no exemption**) and show the "Sample project" badge,
    or the capture fails. The log goes to `out/capture.log`.
 2. **Assets** (`scripts/prepare-assets.mjs`): the checked music copy, the
@@ -84,7 +88,9 @@ states against the existing product build.
    depth-of-field back plane.
 3. **The cut** (`src/timeline.ts`) lays the 14 shots on the music's events
    from `music/track.analysis.json` with the flex rules of VIDEO.md §3, in
-   seconds; `src/music.ts` is the only place a music number lives.
+   seconds: shot cuts on bar lines (else half-bars, else a beat), takes on
+   half-bars, a cut on every crash downbeat the analysis lists;
+   `src/music.ts` is the only place a music number lives.
    **Swapping the track** means replacing the gitignored audio and that JSON
    file, then `npm test` and `npm run check`.
 4. **The look** (`src/look/`, `src/scenes/`, `src/shots.ts`): the dark stage
@@ -93,9 +99,14 @@ states against the existing product build.
    section opens on the whole floating window (no title bar, no window
    buttons, no device; layered and contact shadows) turning to face the
    viewer, then cuts on the beat to slow push-ins with two-plane depth of
-   field; captions on a frosted glass card over a soft pool of light. Moves
-   use `transform` only; magnification never exceeds 2.0 output pixels per
-   capture pixel (one DPR-4 pixel per pixel of the 4K master).
+   field (the back plane veiled and lightly blurred); one beat-locked push
+   per section and macros on the decisive lines; the climax opens with a
+   bar of display type on the dark stage; captions on a frosted glass card
+   over a soft pool of light, never on the sharp plane. Moves use
+   `transform` only; a push never exceeds 2.0 output pixels per capture
+   pixel (one DPR-4 pixel per pixel of the 4K master), a macro 2.6 (at
+   least 1.5 source pixels per output pixel at 1080p; the 4K master
+   upsamples those few frames by up to 1.3x).
 5. **Sound** (`src/Soundtrack.tsx`, `src/sfx.ts`): the music edit (two
    segments, -4.5 dB, an equal-power crossfade before the join) and the
    Mixkit effects, placed from the cut.
@@ -113,9 +124,9 @@ In `out/` (gitignored):
 | `bell-pr-promo-en-2160p.mp4` | the 4K master: H.264 CRF 16 + AAC 320 kb/s, no size cap |
 | `bell-pr-promo-en-1080p.mp4` | web: H.264 + AAC 192 kb/s, at most 20 MB |
 | `bell-pr-promo-en-1080p.webm` | web: VP9 + Opus 160 kb/s, at most 20 MB |
-| `poster.jpg` | the end card, at most 500 KB |
+| `poster.jpg` | the complete end card, sharp (frame 2640), at most 500 KB |
 | `captions.en.vtt`, `captions.en.srt` | the captions, the same cues as the film |
-| `review/`, `contact-sheet.png` | the QA frames and their index (`npm run review`) |
+| `review/`, `contact-sheet.png` | the QA frames, their index and `review/scans.tsv` (`npm run review`) |
 | `capture.log` | the capture's privacy and badge checks |
 
 `npm run site` copies the 1080p web files to `site/media/bell-pr-promo.mp4`,

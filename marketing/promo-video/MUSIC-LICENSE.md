@@ -25,7 +25,10 @@ package, the site repository or a press kit.
   MEGA tiers, put "@musicforvideolibrary" in the description of every
   video that carries the track. On Advanced and above no credit is
   required. Check which tier the licence was obtained on before
-  publishing.
+  publishing (owner). If the credit is required, the line is
+  "Music: Rock Sport Top, MUSIC4VIDEO (@musicforvideolibrary)": in every
+  platform description, and in the caption of the site's video figure
+  (`site/index.html`, outside this package; it has no credit today).
 - **Individual creators only.** The creator's terms grant usage to
   individual content creators; companies are not allowed. Re-check the
   licence if the product is later sold by a company.
@@ -54,8 +57,11 @@ package, the site repository or a press kit.
 The edit plays at -4.5 dB: about -14 LUFS integrated, true peak about
 -3.4 dBTP in the render. The final hit is measured
 (`scripts/measure-hit.mjs`, the largest per-frame level rise in video
-81.1-84.0 s: frame 2438, 81.267 s); the end-card logo locks on the final E
-chord 0.45 s later (frame 2452, 81.718 s).
+81.1-84.0 s: frame 2438, 81.267 s); the end-card logo resolves on the
+final E chord 0.45 s later (81.718 s: frame 2451, the frame whose interval
+holds it; the lead's rounded frame is 2452). After the music's last sound
+(86.8 s) the picture holds the complete end card 2.2 s in silence and
+fades to black, so the film is 89.0 s; the music edit itself is unchanged.
 
 ### Where the file goes
 
