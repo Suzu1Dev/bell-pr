@@ -26,7 +26,11 @@
  *   the same layout as the film, the text measured in Chrome with the
  *   film's font), the count of pixels with a luma step above 70 to their
  *   neighbour; more than 8 means a sharp line of UI text (or the pointer)
- *   runs into the card instead of soft plane or studio.
+ *   runs into the card instead of soft plane or studio;
+ * - empty cards: on the second frame of every caption card that comes in
+ *   (not one handed over), the card's box must already hold its text (at
+ *   least 150 pixels 40 levels darker than the card's own median), never an
+ *   empty frosted box (review rounds 1 and 7).
  *
  * A third check runs on the footage itself, at every take's settled frames
  * (scripts/check-dof.mjs): no glyph in a depth-of-field feather and no
@@ -258,6 +262,21 @@ const decoded = await eachFrame(video, (frame, pixels) => {
     }
   }
   previous = grid;
+  // Empty cards: the second frame of a card that comes in already shows its lines.
+  const arriving = cards.find(({ cue }) => frame === cue.from + 1 && !cards.some((other) => other.cue !== cue && other.cue.shot === cue.shot && other.cue.to === cue.from));
+  if (arriving) {
+    const { left, top, width, height } = arriving.box;
+    const values = [];
+    for (let y = Math.round(top + 14); y < Math.round(top + height - 14); y += 1)
+      for (let x = Math.round(left + 14); x < Math.round(left + width - 14); x += 1) values.push(pixels[y * 1920 + x]);
+    const median = [...values].sort((a, b) => a - b)[values.length >> 1];
+    const ink = values.filter((v) => v < median - 40).length;
+    if (ink < 150) {
+      const { shot, take } = where(frame);
+      findings.push(`frame ${frame}: the caption card "${arriving.cue.lines[0]}" shows without its text (${ink} ink px) (${shot.id}/${take.id})`);
+      scanRows.push(`${frame}\t${(frame / fps).toFixed(3)}\tempty card\t${ink}\t${shot.id}/${take.id}`);
+    }
+  }
   // Card edges: settled card frames only (not while a card comes in, hands over or leaves).
   const card = cards.find(({ cue }) => frame >= cue.from + 8 && frame < cue.to - 8);
   if (card && frame % 2 === 0) {

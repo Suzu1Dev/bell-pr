@@ -4,8 +4,10 @@
  * inner light edge and an outer ink hairline, a soft tinted shadow.
  *
  * - A card comes in fast (opaque in 6 frames, settling 16 px) and its lines
- *   mask-rise from 70% risen, starting two frames later, so the card is
- *   never empty and no glyph tops show alone (COMPARISON.md must-fix 6).
+ *   mask-rise from 70% risen on the same frames, fully opaque inside the
+ *   card from its first visible frame, so the card is never seen empty (a
+ *   frame of empty card came back in round 7 when the lines started two
+ *   frames late) and no glyph tops show alone (COMPARISON.md must-fix 6).
  * - A cue that follows another one in the same shot keeps the same card:
  *   the old lines drop out over their last 6 frames at the old size; then,
  *   on the new cue's first frame, the card eases to the new text's size as
@@ -124,7 +126,7 @@ export const GlassCaptions: React.FC = () => {
       >
         <div style={{ position: "absolute", left: CARD_PAD.x, top: CARD_PAD.top }}>
           {cue.lines.map((line, index) => (
-            <MaskRise key={`${cue.from}-${index}`} frame={frame} enter={cue.from + (from ? 0 : 2) + index * 4} leave={leave}>
+            <MaskRise key={`${cue.from}-${index}`} frame={frame} enter={cue.from + index * (from ? 4 : 0)} solid={!from} leave={leave}>
               <div style={{ ...roleStyle(ROLES.caption), color: LIGHT.ink }}>{line}</div>
             </MaskRise>
           ))}
@@ -162,15 +164,18 @@ const LightPool: React.FC<{ place: CaptionPlace; opacity: number }> = ({ place, 
  * alone (COMPARISON.md: B's empty card at 364-368, C's glyph tops at
  * 366-368); `leave` (0..1) drops the line out again (X2).
  */
-const MaskRise: React.FC<{ frame: number; enter: number; leave: number; children: React.ReactNode }> = ({
+const MaskRise: React.FC<{ frame: number; enter: number; leave: number; solid?: boolean; children: React.ReactNode }> = ({
   frame,
   enter,
   leave,
+  solid = false,
   children,
 }) => {
   const rise = spring({ frame: frame - enter, fps, config: springs.typeRise });
   const y = (1 - rise) * 0.3 + 1.05 * leave;
-  const opacity = frame < enter ? 0 : (0.35 + 0.65 * tween(frame, enter, enter + 6, ease.softArrive)) * (1 - leave);
+  // A new card's lines are as opaque as the card itself from its first frame (the card's own fade carries them in);
+  // a handed-over card's new lines fade up over it.
+  const opacity = frame < enter ? 0 : (solid ? 1 : 0.35 + 0.65 * tween(frame, enter, enter + 6, ease.softArrive)) * (1 - leave);
   return (
     <div style={{ overflow: "hidden", paddingTop: "0.08em", marginTop: "-0.08em", paddingBottom: "0.16em", marginBottom: "-0.16em" }}>
       <div style={{ transform: `translate3d(0, ${y.toFixed(4)}em, 0)`, opacity }}>{children}</div>
