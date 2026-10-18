@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
- * Copies the renders into the landing site's media folder under the names
- * the site references. site/media/ is gitignored: the files are published
- * with the site, never committed. Refuses to copy into a tracked path.
+ * Copies the 1080p web files into the landing site's media folder under the
+ * names site/index.html references: the web MP4 and WebM, the poster and the
+ * captions. The 4K master never goes to the site. site/media/ is
+ * gitignored: the files are published with the site, never committed.
+ * Refuses to copy into a tracked path.
  */
 import { execFileSync } from "node:child_process";
 import { copyFile, mkdir, stat } from "node:fs/promises";
@@ -34,7 +36,7 @@ for (const [from, to] of copies) {
   const source = path.join(packageRoot, from);
   const target = path.join(media, to);
   await stat(source).catch(() => {
-    throw new Error(`${from} is missing; run "npm run render" first.`);
+    throw new Error(`${from} is missing; run "npm run render:web" first.`);
   });
   if (!ignored(path.relative(repoRoot, target)))
     throw new Error(`site/media/${to} is not gitignored; refusing to copy it there.`);
