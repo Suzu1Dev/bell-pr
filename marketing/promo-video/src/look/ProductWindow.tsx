@@ -66,9 +66,9 @@ export const ProductWindow: React.FC<WindowProps> = ({
   const radius = 0.0095 * CAPTURE.width * layout;
   const shadow = SHADOW.map(([x, y, blur, spread, color]) => `${px(x * k)} ${px(y * k)} ${px(blur * k)} ${px(spread * k)} ${color}`).join(", ");
   const scaledMask = mask?.map((layer) => layer.replace(/(-?\d*\.?\d+)cpx/g, (_, n: string) => px(parseFloat(n) * layout)));
-  // A short shutter (about 110 degrees, capped at 12 px): the rise reads as motion, not as a smear.
-  const sx = Math.min(12, Math.abs(shutter?.x ?? 0) * 0.12);
-  const sy = Math.min(12, Math.abs(shutter?.y ?? 0) * 0.12);
+  // A short shutter (about 90 degrees, capped at 8 px): the rise reads as motion, not as a smear.
+  const sx = Math.min(8, Math.abs(shutter?.x ?? 0) * 0.1);
+  const sy = Math.min(8, Math.abs(shutter?.y ?? 0) * 0.1);
   const blurOn = sx >= 0.3 || sy >= 0.3;
   const image = { position: "absolute", left: 0, top: 0, width: w, height: h, maxWidth: "none", display: "block" } as const;
   const floor = contact > 0 ? contactShadow(view) : undefined;

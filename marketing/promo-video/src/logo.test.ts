@@ -17,7 +17,9 @@ test("the first-hit logo: invisible before the hit, fully present and crisp on i
 test("the logo holds at least 36 frames, then has fully gone before the window's take starts", () => {
   assert.ok(logoLeaves - hit >= 36);
   assert.equal(logoState(logoLeaves).opacity, 1);
-  assert.equal(logoState(logoTake.to - 1).opacity, 0);
+  const last = logoState(logoTake.to - 1).opacity;
+  assert.ok(last > 0 && last < 0.35, `the last logo frame is a faint trace (${last.toFixed(2)}), not an empty frame`);
+  assert.equal(logoState(logoTake.to).opacity, 0);
   const s3 = timeline.shots.find((shot) => shot.id === "s3-rules")!;
   assert.equal(s3.takes[1].from, logoTake.to);
 });
@@ -31,6 +33,7 @@ test("the end-card logo pulls into focus from the cut and locks on the final cho
   const end = timeline.shots.at(-1)!;
   assert.equal(end.from, music.events.finalHit);
   assert.equal(endLogoState(end.from - 1).opacity, 0);
+  assert.ok(endLogoState(end.from).opacity > 0.2, "the cut frame already shows the soft logo");
   const landed = endLogoState(music.landingFrame);
   assert.equal(landed.opacity, 1);
   assert.equal(landed.blur, 0);

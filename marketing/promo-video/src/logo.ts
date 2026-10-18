@@ -20,7 +20,8 @@ export const logoTake = take;
 export function logoState(f: number) {
   if (f < take.from || f >= take.to) return { opacity: 0, scale: 1, blur: 0, y: 0 };
   const settle = spring({ frame: f - take.from, fps, config: springs.macroLock });
-  const leave = tween(f, logoLeaves, take.to - 1, ease.depart);
+  // It fades out through the take's last frame, so no empty frame sits between it and the window.
+  const leave = tween(f, logoLeaves, take.to, ease.depart);
   return {
     opacity: 1 - leave,
     scale: (1.02 - 0.02 * settle) * drift(Math.min(f, logoLeaves) - take.from),
@@ -29,9 +30,10 @@ export function logoState(f: number) {
   };
 }
 
-/** Opacity, blur and scale of the end-card logo at absolute frame f: it pulls into focus from the cut and locks on the chord. */
+/** Opacity, blur and scale of the end-card logo at absolute frame f: it pulls into focus from the cut (never an empty frame) and locks on the chord. */
 export function endLogoState(f: number) {
   if (f < end.from) return { opacity: 0, blur: 0, scale: 1 };
-  const p = tween(f, end.from, music.landingFrame, ease.arrive);
+  // The pull starts as if two frames before the cut, so the cut frame already holds a soft logo.
+  const p = tween(f, end.from - 2, music.landingFrame, ease.arrive);
   return { opacity: p, blur: 18 * (1 - p), scale: 1.05 - 0.05 * p };
 }

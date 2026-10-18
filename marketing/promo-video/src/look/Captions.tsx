@@ -75,7 +75,7 @@ export const GlassCaptions: React.FC = () => {
       }}
     >
       {cue.lines.map((line, index) => (
-        <MaskRise key={index} frame={frame} enter={cue.from + 2 + index * 6}>
+        <MaskRise key={index} frame={frame} enter={cue.from + index * 4}>
           <div style={{ ...roleStyle(ROLES.caption), color: LIGHT.ink }}>{line}</div>
         </MaskRise>
       ))}
@@ -107,11 +107,15 @@ const LightPool: React.FC<{ place: CaptionPlace; opacity: number }> = ({ place, 
   );
 };
 
-/** K2 mask rise, starting 45% risen under an opacity ramp. */
+/**
+ * K2 mask rise, starting 70% risen; the line is on from its first frame (under the card's own
+ * fade), so the card never shows empty and no glyph tops show alone (COMPARISON.md: B's empty
+ * card at 364-368, C's glyph tops at 366-368).
+ */
 const MaskRise: React.FC<{ frame: number; enter: number; children: React.ReactNode }> = ({ frame, enter, children }) => {
   const rise = spring({ frame: frame - enter, fps, config: springs.typeRise });
-  const y = (1 - rise) * 0.55;
-  const opacity = tween(frame, enter, enter + 8, ease.softArrive);
+  const y = (1 - rise) * 0.3;
+  const opacity = frame < enter ? 0 : 0.35 + 0.65 * tween(frame, enter, enter + 6, ease.softArrive);
   return (
     <div style={{ overflow: "hidden", paddingTop: "0.08em", marginTop: "-0.08em", paddingBottom: "0.16em", marginBottom: "-0.16em" }}>
       <div style={{ transform: `translate3d(0, ${y.toFixed(4)}em, 0)`, opacity }}>{children}</div>
