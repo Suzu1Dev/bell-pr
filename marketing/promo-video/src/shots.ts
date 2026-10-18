@@ -55,6 +55,11 @@ export interface TakeLook {
   focus?: { at: number; amount: number }[];
   /** Draw the capture's pointer moves and clicks (default: on for clips). */
   pointer?: boolean;
+  /**
+   * Clip seconds from which the captured UI updates in place without a click (the board's cards moving between
+   * columns as the agents work): the per-frame jump scan of `npm run review` expects those steps.
+   */
+  liveFrom?: number;
 }
 
 /** Pushes stay at or under 2.0 output px per capture px (one DPR-4 pixel per pixel of the 4K master); a macro may go to 2.6. */
@@ -151,6 +156,7 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       // moves fall a beat apart (777-850).
       clipFrom: 0.06,
       rate: 0.617,
+      liveFrom: 0.867,
       // On the plan (S4's last framing): the approval, the person's call; then, as the plan folds into the board, a
       // short move to the whole board, and the drift.
       keys: [
@@ -253,8 +259,8 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       rate: 0.7,
       macro: true,
       keys: [
-        { at: 0, view: push(1250, 657, 2.46, { right: EDGE, bottom: 210 }) },
-        { at: 2, view: push(1250, 657, 2.5, { right: EDGE, bottom: 204 }) },
+        { at: 0, view: push(1250, 657, 2.46, { right: EDGE, bottom: 246 }) },
+        { at: 2, view: push(1250, 657, 2.5, { right: EDGE, bottom: 240 }) },
       ],
       lifts: [{ box: [1105, 626, 1395, 688], radius: 6 }],
     },
@@ -491,15 +497,18 @@ export const looks: Record<string, Record<string, TakeLook>> = {
     compare: {
       state: "v-forecast-vs-reality",
       // After the scroll to the comparison (1.10-2.00 s): "Your forecast: Tests" beside the first maintainer comment,
-      // whole: "2. Please add a test for the exhausted case ...", its "Tests" tag and "Saw it coming". The comment
-      // shows its inline code as raw backticks (a product fix in the known issues), as developers read Markdown.
+      // whole, for a beat and a half; then the camera pushes onto the comment, past 2x, as the forecast drops back and
+      // leaves the frame: "2. Please add a test for the exhausted case ...", its "Tests" tag and "Saw it coming". The
+      // comment shows its inline code as raw backticks (a product fix in the known issues), as developers read Markdown.
       clipFrom: 2.1,
+      macro: true,
       keys: [
         { at: 0, view: push(834, 239, 1.7, { sy: 420 }) },
-        { at: 4, view: push(834, 239, 1.74, { sy: 420 }) },
+        { at: 1.5, view: push(834, 239, 1.72, { sy: 420 }) },
+        { at: 6, view: push(990, 254, 2.3, { sy: 430, cover: false }) },
       ],
       drift: { scale: 0.015, x: 0 },
-      lifts: [{ box: [310, 112, 654, 217] }, { box: [671, 142, 1358, 366] }],
+      lifts: [{ box: [310, 112, 654, 217], to: 1.9, settle: true }, { box: [671, 142, 1358, 366] }],
     },
     practice: {
       state: "v-practice",

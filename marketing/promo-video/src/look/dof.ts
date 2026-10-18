@@ -23,8 +23,10 @@ export interface Lift {
   radius?: number | [tl: number, tr: number, br: number, bl: number];
   /** Beats from the take's start: lifted from here (ramping in over RACK_FRAMES when after the start)... */
   from?: number;
-  /** ...until here (a hard end: the UI under it changed, such as a plan that folds). */
+  /** ...until here (a hard end: the UI under it changed, such as a plan that folds)... */
   to?: number;
+  /** ...or, with `settle`, dropping back over the RACK_FRAMES before `to` (the camera leaves it). */
+  settle?: boolean;
 }
 
 /** The lifted layer's scale about its own centre, and the back plane's veil (studio colour) and blur (1080p screen px). */
@@ -41,10 +43,11 @@ export function liftOn(lift: Lift, f: number) {
   const from = (lift.from ?? 0) * beatFrames;
   const to = lift.to === undefined ? Infinity : lift.to * beatFrames;
   if (f < from || f >= to) return 0;
-  if (from <= 0) return 1;
-  const x = Math.min(1, (f - from) / RACK_FRAMES);
   // `standard` (in-out), as a rack focus.
-  return x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2;
+  const rack = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
+  const rackIn = from <= 0 ? 1 : rack((f - from) / RACK_FRAMES);
+  const rackOut = lift.settle ? rack((to - f) / RACK_FRAMES) : 1;
+  return Math.min(rackIn, rackOut);
 }
 
 /** A box scaled by s about its centre. */

@@ -20,8 +20,10 @@
  *
  * - discontinuities: the mean absolute luma difference to the frame before
  *   (on a 480x270 copy); above 8 on a frame that is not a cut (nor the
- *   UI's answer, within 6 frames, to a click the pointer makes on screen),
- *   the picture jumped inside a take (a capture's scroll or reflow);
+ *   UI's answer, within 6 frames, to a click the pointer makes on screen,
+ *   nor a frame where the camera itself moves more than 4 px at a frame
+ *   corner, nor a take whose UI updates in place, `liveFrom`), the picture
+ *   jumped inside a take (a capture's scroll or reflow);
  * - card edges: in a ring 6-18 px around every caption card (its box from
  *   the same layout as the film, the text measured in Chrome with the
  *   film's font), the count of pixels with a luma step above 70 to their
@@ -53,6 +55,8 @@ import { packageRoot, remotion } from "./lib/media.mjs";
 const { timeline } = await tsImport("../src/timeline.ts", import.meta.url);
 const { music, fps } = await tsImport("../src/music.ts", import.meta.url);
 const { looks } = await tsImport("../src/shots.ts", import.meta.url);
+const { takeView } = await tsImport("../src/takes.ts", import.meta.url);
+const { project } = await tsImport("../src/look/camera.ts", import.meta.url);
 const { cardBox, CAPTION_ROLE } = await tsImport("../src/look/captionLayout.ts", import.meta.url);
 const video = process.argv[2] ?? "out/bell-pr-promo-en-1080p.mp4";
 const out = path.join(packageRoot, "out", "review");
@@ -243,6 +247,27 @@ const clickFrames = (() => {
 })();
 const answersClick = (frame) => clickFrames.some((click) => frame > click && frame <= click + 6);
 
+/** Whether the camera itself moves fast at this frame (more than 4 px at a frame corner): a push, not a jump. */
+const cameraMoves = (frame) => {
+  const { shot, take } = where(frame);
+  const look = looks[shot.id]?.[take.id];
+  if (!look || frame <= take.from) return false;
+  const [a, b] = [takeView(look, frame - 1 - take.from), takeView(look, frame - take.from)];
+  return [[0, 0], [1920, 0], [1920, 1080], [0, 1080]].some(([X, Y]) => {
+    const p = { x: a.cx + (X - a.sx) / a.m, y: a.cy + (Y - a.sy) / a.m };
+    const q = project(b, p.x, p.y);
+    return Math.hypot(q.x - X, q.y - Y) > 4;
+  });
+};
+
+/** Whether the take's captured UI updates in place at this frame (`liveFrom`, clip seconds). */
+const live = (frame) => {
+  const { shot, take } = where(frame);
+  const look = looks[shot.id]?.[take.id];
+  if (look?.liveFrom === undefined) return false;
+  return (look.clipFrom ?? 0) + ((frame - take.from) / fps) * (look.rate ?? 1) >= look.liveFrom;
+};
+
 const cards = await measuredCards();
 const findings = [];
 const scanRows = ["frame\tseconds\tscan\tvalue\twhere"];
@@ -255,7 +280,7 @@ const decoded = await eachFrame(video, (frame, pixels) => {
     let sum = 0;
     for (let i = 0; i < grid.length; i += 1) sum += Math.abs(grid[i] - previous[i]);
     const diff = sum / grid.length;
-    if (diff > 8 && !cutFrames.has(frame) && !answersClick(frame)) {
+    if (diff > 8 && !cutFrames.has(frame) && !answersClick(frame) && !cameraMoves(frame) && !live(frame)) {
       const { shot, take } = where(frame);
       findings.push(`frame ${frame}: the picture jumps (mean luma step ${diff.toFixed(1)}) inside ${shot.id}/${take.id}`);
       scanRows.push(`${frame}\t${(frame / fps).toFixed(3)}\tdiscontinuity\t${diff.toFixed(2)}\t${shot.id}/${take.id}`);
