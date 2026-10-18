@@ -1,37 +1,39 @@
-# BELL PR promo video
+# BELL PR launch film
 
-The 75-second English promo for BELL PR, built with [Remotion](https://www.remotion.dev/)
-from real footage of the product's sample playback. This package is
-separate from the product: it has its own `package.json` and lockfile and
-is never published.
+The 86.8-second English launch film for BELL PR v1.1, built with
+[Remotion](https://www.remotion.dev/) from real footage of the product's
+sample project. This package is separate from the product: it has its own
+`package.json` and lockfile and is never published.
 
-- Storyboard and captions: [`script.md`](script.md)
-- Music and its license terms: [`MUSIC-LICENSE.md`](MUSIC-LICENSE.md)
-- Frame-review checklist: [`review.md`](review.md)
-- Shot, camera and caption timing: [`src/timeline.json`](src/timeline.json)
+- Storyboard, captions and timing: [`script.md`](script.md)
+- Music and its licence conditions: [`MUSIC-LICENSE.md`](MUSIC-LICENSE.md)
+- Sound effects and their licence: [`SFX-LICENSES.md`](SFX-LICENSES.md)
+- The visual QA record: [`review.md`](review.md)
+- The beat analysis the cut is laid on: [`music/track.analysis.json`](music/track.analysis.json)
 
 ## Prerequisites
 
-- Node 22 and this repository checked out; the capture builds the product
-  with the repository's own `npm run build`, so the root needs its
-  dependencies installed (`npm ci` at the root).
-- The licensed music file: put `mixkit-ramp-it-up-69.mp3` in
-  `public/music/`, or set `PROMO_MUSIC_FILE` to its path. The capture checks
-  its MD5 first.
+- Node 22 and this repository checked out with its root dependencies
+  installed (`npm ci` at the root): the capture builds the product with the
+  root `npm run build` and reads its demo drivers
+  (`e2e/helpers/sample-states.ts`) and English copy.
+- The licensed music file at `public/music/rock-sport-top.mp3`, or
+  `PROMO_MUSIC_FILE` set to its path (`MUSIC-LICENSE.md`); its MD5 is
+  checked first.
 - `PLAYWRIGHT_CHROMIUM_EXECUTABLE`: a local Chrome or Chrome headless shell
-  for the capture, for example Playwright's
+  for the capture and the contact sheet, for example Playwright's
   `chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell`
-  in the Playwright browser cache. `playwright-core` (pinned here) never
-  downloads a browser.
+  in the Playwright browser cache. `playwright-core` never downloads one.
 - `REMOTION_BROWSER_EXECUTABLE`: the Chrome headless shell Remotion renders
-  with (the same file works). When it is not set, Remotion downloads its own
-  headless shell on first use; that is the fallback, not the default.
-- Port 4573 on 127.0.0.1 free during the capture (`PROMO_CAPTURE_PORT`
-  changes it).
-- The capture's temporary HOME and data dir (`bellpr-7C-*`) go under
-  `/tmp/claude-1000/`, and Remotion's temporary files to the system temp
-  dir; set `TMPDIR` to keep both elsewhere. The capture removes its own
-  directory when it ends.
+  with (the same file works). Without it Remotion downloads its own on
+  first use.
+- Port 4651 on 127.0.0.1 free during the capture (`PROMO_CAPTURE_PORT`
+  changes it). The capture's temporary HOME and data dir go under
+  `/tmp/claude-1000/` (or `TMPDIR`) and are removed when it ends; set
+  `TMPDIR` to keep Remotion's temporary files in the same place.
+- Network access to `assets.mixkit.co` the first time `npm run assets`
+  runs (it downloads the six sound effects of `SFX-LICENSES.md` and checks
+  their MD5s; `--offline` refuses to download).
 
 No system ffmpeg is needed: Remotion ships its own (`npx remotion ffmpeg`,
 `npx remotion ffprobe`).
@@ -39,44 +41,68 @@ No system ffmpeg is needed: Remotion ships its own (`npx remotion ffmpeg`,
 ## Commands
 
 ```sh
-npm ci                 # this package's dependencies
-npm run build          # capture, then render
-npm run capture        # footage only (builds the product first)
-npm run render         # MP4, WebM, poster, captions, then the checks
-npm run check          # check the outputs again
-npm run review         # QA frames and the contact sheet (see review.md)
-npm run site           # copy the outputs into site/media/
-npm run studio         # Remotion Studio, to preview and tune the timeline
-npm test               # unit tests (timeline, camera, cursor, music, captions)
+npm ci                  # this package's dependencies
+npm run build           # capture, assets, hit, render (web + 4K master), check
+npm run capture         # footage only: builds the product, films the 13 states at DPR 4
+npm run assets          # music copy, brand SVGs, stage plates, sound effects, footage proxies
+npm run hit             # measure the final hit in the source against the analysis
+npm run render:web      # 1080p MP4 + WebM, poster, captions
+npm run render:master   # the 4K master (--scale=2)
+npm run check           # check every output (`-- --web-only` for the 1080p files only)
+npm run review          # QA frames, out/review/index.tsv and out/contact-sheet.png
+npm run stills -- 291 1011 2452   # quick stills of chosen frames
+npm run site            # copy the 1080p web files into site/media/
+npm run studio          # Remotion Studio
+npm test                # timeline, music, look, logo, sound and script tests
 npm run typecheck
 ```
 
-`npm run capture -- --skip-build --only=s7-explain,s8-review` re-films some
-shots against the existing product build.
+`npm run capture -- --skip-build --only=v-check,v-publish` re-films some
+states against the existing product build.
 
 ## How it works
 
 1. **Capture** (`scripts/capture.mjs`) starts the product with
-   `bell-pr start --no-open --port 4573` on a temporary HOME and data dir,
-   with stand-in `codex`, `claude` and `gh` commands first on `PATH` (they
-   answer the setup checks and fail everything else, so no agent and no
-   GitHub request can run). It signs in, marks onboarding done and the EULA
-   accepted, and films each shot in a 1440x810 window at device scale 2:
-   PNG stills, CDP screencast clips (JPEG quality 100, every frame with its
-   timestamp) or frame-stepped clips (the page clock moves 1/30 s per frame
-   and each frame is screenshot). `src/timeline.json` names each shot's
-   method. Every captured state must pass the privacy check (no owner
-   identifier, home or temp path, or e-mail address in the page text) and,
-   in workspace shots, show the "Sample project" badge; otherwise the
-   capture fails. The log goes to `out/capture.log`.
-2. **Composition** (`src/`) plays the stills and clips through a virtual
-   camera (eased pans and zooms), draws the cursor and the captions, adds
-   the title and end cards in the product's brand and fonts, and lays the
-   music edit under it all (`src/music.ts`).
-3. **Render** writes the outputs below, and `scripts/check-output.mjs`
-   checks them with the bundled ffprobe: duration, size, frame rate,
-   codecs, audio, file sizes, caption timings, loudness and the end-card
-   logo against the music's measured final hit.
+   `bell-pr start --no-open --port 4651` on a temporary HOME and data dir,
+   with stand-in `codex`, `claude` and `gh` first on `PATH` (they answer
+   the setup checks and fail everything else, so no agent and no GitHub
+   request can run), signs in, and marks onboarding done and the EULA
+   accepted. It films each state of plan `direction-v1.1/VIDEO.md` §4 in a
+   1440x810 window at device scale 4 (5760x3240 pixels), with the page
+   clock installed and paused at 2026-10-14 10:24 UTC and GPU off, so the
+   frames are deterministic: PNG stills and frame-stepped clips (the clock
+   moves 1/30 s per frame). It reaches each state with the drivers
+   `e2e/promo-states.spec.ts` checks. Every named state must pass the
+   privacy check (no owner identifier, home or temp path or e-mail address
+   in the page text; **no exemption**) and show the "Sample project" badge,
+   or the capture fails. The log goes to `out/capture.log`.
+2. **Assets** (`scripts/prepare-assets.mjs`): the checked music copy, the
+   product's brand SVGs, pre-dithered stage plates (`scripts/make-stage.mjs`:
+   no CSS gradient for a large slow ramp, so no banding after x264), the
+   sound effects, and two footage proxies (`scripts/make-proxies.mjs`): DPR 2
+   for shots that need no more, and a pre-blurred copy for the
+   depth-of-field back plane.
+3. **The cut** (`src/timeline.ts`) lays the 14 shots on the music's events
+   from `music/track.analysis.json` with the flex rules of VIDEO.md §3, in
+   seconds; `src/music.ts` is the only place a music number lives.
+   **Swapping the track** means replacing the gitignored audio and that JSON
+   file, then `npm test` and `npm run check`.
+4. **The look** (`src/look/`, `src/scenes/`, `src/shots.ts`): the dark stage
+   with focus-pull type for the opening and the end card; a hard
+   "lights on" cut to the light studio on the first hit; each product
+   section opens on the whole floating window (no title bar, no window
+   buttons, no device; layered and contact shadows) turning to face the
+   viewer, then cuts on the beat to slow push-ins with two-plane depth of
+   field; captions on a frosted glass card over a soft pool of light. Moves
+   use `transform` only; magnification never exceeds 2.0 output pixels per
+   capture pixel (one DPR-4 pixel per pixel of the 4K master).
+5. **Sound** (`src/Soundtrack.tsx`, `src/sfx.ts`): the music edit (two
+   segments, -4.5 dB, an equal-power crossfade before the join) and the
+   Mixkit effects, placed from the cut.
+6. **Render and check**: `scripts/check-output.mjs` checks duration, sizes,
+   codecs, loudness and true peak, the captions file against the timeline,
+   the final hit measured again in the render and the end-card logo on the
+   final chord.
 
 ## Outputs
 
@@ -84,35 +110,40 @@ In `out/` (gitignored):
 
 | File | What |
 | --- | --- |
-| `bell-pr-promo-en-1080p.mp4` | H.264 + AAC 192 kb/s, at most 20 MB |
-| `bell-pr-promo-en-1080p.webm` | VP9 + Opus 192 kb/s, at most 20 MB |
+| `bell-pr-promo-en-2160p.mp4` | the 4K master: H.264 CRF 16 + AAC 320 kb/s, no size cap |
+| `bell-pr-promo-en-1080p.mp4` | web: H.264 + AAC 192 kb/s, at most 20 MB |
+| `bell-pr-promo-en-1080p.webm` | web: VP9 + Opus 160 kb/s, at most 20 MB |
 | `poster.jpg` | the end card, at most 500 KB |
-| `captions.en.vtt`, `captions.en.srt` | the captions, same cues as the burned-in ones |
-| `contact-sheet.png`, `review/` | QA frames (`npm run review`) |
+| `captions.en.vtt`, `captions.en.srt` | the captions, the same cues as the film |
+| `review/`, `contact-sheet.png` | the QA frames and their index (`npm run review`) |
 | `capture.log` | the capture's privacy and badge checks |
 
-`npm run site` copies them to `site/media/bell-pr-promo.mp4`,
-`bell-pr-promo.webm`, `poster.jpg` and `captions.en.vtt`, which are also
-gitignored. Footage (`public/footage/`), the music copy (`public/music/`)
-and the renders are never committed.
+`npm run site` copies the 1080p web files to `site/media/bell-pr-promo.mp4`,
+`bell-pr-promo.webm`, `poster.jpg` and `captions.en.vtt` (also gitignored;
+it refuses a tracked target). Footage, proxies, stage plates, the music copy,
+the sound effects and the renders are never committed.
 
-## Licenses
+## Licences
 
-- **Remotion** is not free for every company: its license is free for
-  individuals and companies with up to 3 employees, and larger companies
-  need a company license. Confirm which applies before the video is
-  published (owner action).
-- **Music:** see [`MUSIC-LICENSE.md`](MUSIC-LICENSE.md). Never register the
-  music or the video's audio with YouTube Content ID or any
-  rights-management service, and never publish the MP3 on its own.
+- **Remotion** is not free for every company: its licence is free for
+  individuals and companies with up to 3 employees; larger companies need a
+  company licence before the film is published (owner action).
+- **Music:** [`MUSIC-LICENSE.md`](MUSIC-LICENSE.md): the owner's Patreon
+  licence and its conditions (credit on the tiers that require it,
+  individual creators only, Content ID).
+- **Sound effects:** [`SFX-LICENSES.md`](SFX-LICENSES.md): Mixkit Sound
+  Effects Free License, no attribution.
+- **Fonts:** DM Sans and IBM Plex Mono (SIL Open Font License), bundled
+  through @fontsource.
 
 ## Dependencies
 
 | Package | Why |
 | --- | --- |
-| `remotion`, `@remotion/cli` (4.0.531, the same exact version) | the composition, rendering, and the bundled ffmpeg/ffprobe |
+| `remotion`, `@remotion/cli` (4.0.531, exact) | the composition, rendering, and the bundled ffmpeg/ffprobe |
+| `@remotion/bundler`, `@remotion/renderer` (4.0.531, exact) | `scripts/stills.mjs` renders chosen frames from one bundle and one browser |
 | `react`, `react-dom` | Remotion renders React |
 | `playwright-core` | drives Chrome for the capture and the contact sheet |
-| `@fontsource-variable/dm-sans`, `@fontsource/ibm-plex-mono` | the brand fonts, bundled, with no font request at render time |
-| `tsx` | loads the product's TypeScript (its English copy, `shared/product.ts`, `src/music.ts`) from the Node scripts, and runs the unit tests |
+| `@fontsource-variable/dm-sans`, `@fontsource/ibm-plex-mono` | the brand fonts (DM Sans with its optical-size axis), bundled |
+| `tsx` | loads the product's TypeScript and `src/*.ts` from the Node scripts, and runs the tests |
 | `typescript`, `@types/react`, `@types/node` | type checking |
