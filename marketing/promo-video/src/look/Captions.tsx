@@ -11,8 +11,9 @@
  *   on the new cue's first frame, the card eases to the new text's size as
  *   the new lines rise (K2), so the card never blinks and never shows the
  *   old text off-centre in a resized card; a card that grows uncovers the
- *   end of the rising line as it opens (the card eases out over 5 frames,
- *   fast first, and the line starts rising a frame in, still faint).
+ *   end of the rising line as it opens (the card eases out fast, over 93% of
+ *   the way on the new cue's first frame, where the line starts rising,
+ *   still faint: no frame of an empty card).
  * - A cue that ends on a cut leaves with the cut.
  *
  * The title cues (S1, S2, S9's first line, S14) are drawn by their scenes
@@ -88,7 +89,7 @@ export const GlassCaptions: React.FC = () => {
   let height = box.height;
   if (from) {
     const old = cardBox(from, measureLine);
-    const swap = ease.arrive(Math.min(1, (frame - cue.from) / SWAP));
+    const swap = ease.arrive(Math.min(1, (frame - cue.from + 2) / SWAP));
     width = mix(old.width, box.width, swap);
     height = mix(old.height, box.height, swap);
   }
@@ -123,7 +124,7 @@ export const GlassCaptions: React.FC = () => {
       >
         <div style={{ position: "absolute", left: CARD_PAD.x, top: CARD_PAD.top }}>
           {cue.lines.map((line, index) => (
-            <MaskRise key={`${cue.from}-${index}`} frame={frame} enter={cue.from + (from ? 1 : 2) + index * 4} leave={leave}>
+            <MaskRise key={`${cue.from}-${index}`} frame={frame} enter={cue.from + (from ? 0 : 2) + index * 4} leave={leave}>
               <div style={{ ...roleStyle(ROLES.caption), color: LIGHT.ink }}>{line}</div>
             </MaskRise>
           ))}
