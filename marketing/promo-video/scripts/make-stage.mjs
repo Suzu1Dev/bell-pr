@@ -79,10 +79,11 @@ for (const [suffix, scale] of [["", 1], ["@2x", 2]]) {
     path.join(out, `dark${suffix}.png`),
     plate({ ...size, center: [0.5, 0.46], radius: [0.8, 0.92], inner: "#10221a", outer: "#020403", falloff: 2.6, grain: 2.5, cell: 5 * scale }),
   );
-  // The light studio of the product beats: a white key light upper middle, warm grey corners.
+  // The light studio of the product beats: a soft key light upper middle, deeper green-grey corners.
+  // It sits 12-20 levels under the app's white UI, so the window reads as a lit object on it (review round 5).
   await writeFile(
     path.join(out, `light${suffix}.png`),
-    plate({ ...size, center: [0.5, 0.36], radius: [1.0, 1.15], inner: "#ffffff", outer: "#e7ebe4", falloff: 2.0, grain: 2, cell: 2 * scale, seed: 11 }),
+    plate({ ...size, center: [0.5, 0.36], radius: [1.0, 1.15], inner: "#eff1ed", outer: "#dde2da", falloff: 2.0, grain: 2, cell: 2 * scale, seed: 11 }),
   );
 }
 console.log("stage: public/stage/dark.png, light.png and their @2x versions");

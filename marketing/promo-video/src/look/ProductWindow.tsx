@@ -13,14 +13,22 @@ import { CAPTURE } from "../footage.ts";
 import { corners, PERSPECTIVE, PERSPECTIVE_ORIGIN, viewTransform, type View } from "./camera.ts";
 import type { PointerState } from "./pointer.ts";
 
+/**
+ * The light studio's shadow stack, tinted with the token hue (STYLE-GUIDE
+ * §5.1), one step deeper than the guide's starting values: on the studio
+ * plate the window's white UI must read as a lit object, not as more white.
+ */
 const SHADOW = [
-  [0, 0, 0, 1, "rgba(17,26,21,0.07)"],
-  [0, 1, 2, 0, "rgba(22,43,36,0.06)"],
-  [0, 4, 12, 0, "rgba(22,43,36,0.06)"],
-  [0, 16, 40, 0, "rgba(22,43,36,0.08)"],
-  [0, 40, 100, 0, "rgba(22,43,36,0.12)"],
-  [0, 90, 160, -40, "rgba(22,43,36,0.20)"],
+  [0, 0, 0, 1, "rgba(17,26,21,0.12)"],
+  [0, 1, 2, 0, "rgba(22,43,36,0.08)"],
+  [0, 4, 12, 0, "rgba(22,43,36,0.08)"],
+  [0, 16, 40, 0, "rgba(22,43,36,0.12)"],
+  [0, 40, 100, 0, "rgba(22,43,36,0.20)"],
+  [0, 90, 160, -40, "rgba(22,43,36,0.26)"],
 ] as const;
+
+/** The soft plane recedes: a light veil over the pre-blurred copy, under the sharp one. */
+const VEIL = "rgba(246,247,244,0.42)";
 
 const px = (value: number) => `${+value.toFixed(3)}px`;
 
@@ -66,9 +74,9 @@ export const ProductWindow: React.FC<WindowProps> = ({
   const radius = 0.0095 * CAPTURE.width * layout;
   const shadow = SHADOW.map(([x, y, blur, spread, color]) => `${px(x * k)} ${px(y * k)} ${px(blur * k)} ${px(spread * k)} ${color}`).join(", ");
   const scaledMask = mask?.map((layer) => layer.replace(/(-?\d*\.?\d+)cpx/g, (_, n: string) => px(parseFloat(n) * layout)));
-  // A short shutter (about 90 degrees, capped at 8 px): the rise reads as motion, not as a smear.
-  const sx = Math.min(8, Math.abs(shutter?.x ?? 0) * 0.1);
-  const sy = Math.min(8, Math.abs(shutter?.y ?? 0) * 0.1);
+  // A short shutter (about 90 degrees, capped at 4 px): the rise reads as motion, and UI titles stay legible.
+  const sx = Math.min(4, Math.abs(shutter?.x ?? 0) * 0.1);
+  const sy = Math.min(4, Math.abs(shutter?.y ?? 0) * 0.1);
   const blurOn = sx >= 0.3 || sy >= 0.3;
   const image = { position: "absolute", left: 0, top: 0, width: w, height: h, maxWidth: "none", display: "block" } as const;
   const floor = contact > 0 ? contactShadow(view) : undefined;
@@ -83,7 +91,7 @@ export const ProductWindow: React.FC<WindowProps> = ({
             width: floor.w,
             height: floor.h,
             borderRadius: "50%",
-            background: "radial-gradient(closest-side, rgba(22,43,36,0.18), rgba(22,43,36,0.08) 55%, rgba(22,43,36,0) 100%)",
+            background: "radial-gradient(closest-side, rgba(22,43,36,0.30), rgba(22,43,36,0.12) 55%, rgba(22,43,36,0) 100%)",
             filter: "blur(18px)",
             opacity: contact * opacity,
           }}
@@ -116,7 +124,12 @@ export const ProductWindow: React.FC<WindowProps> = ({
           }}
         >
           <div style={{ position: "absolute", inset: 0, borderRadius: radius, overflow: "hidden", background: "#ffffff", boxShadow: shadow }}>
-            {soft && scaledMask ? <Img src={soft} style={image} /> : null}
+            {soft && scaledMask ? (
+              <>
+                <Img src={soft} style={image} />
+                <div style={{ position: "absolute", inset: 0, background: VEIL }} />
+              </>
+            ) : null}
             <Img
               src={src}
               style={{
@@ -147,7 +160,8 @@ export const ProductWindow: React.FC<WindowProps> = ({
                 position: "absolute",
                 inset: 0,
                 borderRadius: radius,
-                boxShadow: `inset 0 ${px(k)} 0 rgba(255,255,255,0.9), inset 0 0 0 ${px(k)} rgba(17,26,21,0.06)`,
+                // The top rim light (two px of white along the top edge) and an ink hairline all round.
+                boxShadow: `inset 0 ${px(2 * k)} 0 rgba(255,255,255,0.95), inset 0 0 0 ${px(k)} rgba(17,26,21,0.09)`,
               }}
             />
           </div>
@@ -157,10 +171,19 @@ export const ProductWindow: React.FC<WindowProps> = ({
   );
 };
 
-/** The neutral round pointer on the light UI: a 20 px ink disc with a white ring and a soft shadow; a green ring where it clicks. */
+/**
+ * The neutral round pointer on the light UI: an ink disc (70%) with a white
+ * ring and a soft shadow, drawn 9 capture px right of and 11 below its
+ * hotspot (14-28 screen px at the pushes' magnification), like an arrow's
+ * tip, so it never sits on the label it clicks; a thin green ring around
+ * the hotspot where it clicks.
+ */
+export const POINTER_OFFSET = { x: 9, y: 11 } as const;
+
 const Pointer: React.FC<{ state: PointerState; layout: number; k: number }> = ({ state, layout, k }) => {
-  if (state.opacity <= 0.001) return null;
+  if (state.opacity <= 0.001 && state.ripple === undefined) return null;
   const size = 20 * k * (1 - 0.18 * state.press);
+  const disc = { x: (state.x + POINTER_OFFSET.x) * layout, y: (state.y + POINTER_OFFSET.y) * layout };
   const ring = state.ripple === undefined ? undefined : state.ripple / 0.5;
   return (
     <>
@@ -168,28 +191,28 @@ const Pointer: React.FC<{ state: PointerState; layout: number; k: number }> = ({
         <div
           style={{
             position: "absolute",
-            left: state.x * layout,
-            top: state.y * layout,
+            left: (state.rippleAt?.x ?? state.x) * layout,
+            top: (state.rippleAt?.y ?? state.y) * layout,
             width: (22 + 40 * ring) * k,
             height: (22 + 40 * ring) * k,
             marginLeft: (-(22 + 40 * ring) * k) / 2,
             marginTop: (-(22 + 40 * ring) * k) / 2,
             borderRadius: "50%",
-            border: `${px(2 * k)} solid rgba(31,109,80,${(0.55 * (1 - ring) * state.opacity).toFixed(3)})`,
+            border: `${px(2 * k)} solid rgba(31,109,80,${(0.55 * (1 - ring)).toFixed(3)})`,
           }}
         />
       )}
       <div
         style={{
           position: "absolute",
-          left: state.x * layout,
-          top: state.y * layout,
+          left: disc.x,
+          top: disc.y,
           width: size,
           height: size,
           marginLeft: -size / 2,
           marginTop: -size / 2,
           borderRadius: "50%",
-          background: "rgba(17,26,21,0.78)",
+          background: "rgba(17,26,21,0.7)",
           boxShadow: `0 0 0 ${px(2 * k)} rgba(255,255,255,0.95), 0 ${px(2 * k)} ${px(8 * k)} rgba(17,26,21,0.3)`,
           opacity: state.opacity,
         }}
