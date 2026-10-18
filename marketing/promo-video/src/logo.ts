@@ -53,15 +53,23 @@ export const chordFrame = Math.min(music.landingFrame, frameOf(music.track.event
 /**
  * Opacity, blur and scale of the end-card logo at absolute frame f: it pulls
  * into focus from the cut (a soft logo on the cut frame, never an empty
- * one) on an even in-out curve, so it is still resolving through the pushed kick
- * (no more than 70% by the eighth frame) and locks ON the final chord,
- * settling from 1.02 to 1.0 on the same frame.
+ * one) to about 78% three frames before the final chord (no more than 70%
+ * by the eighth frame), then the last of the resolve and the settle from
+ * 1.02 to 1.0 happen together over those three frames, completing ON the
+ * chord: the lock is the chord's own visible event (review round 7: a logo
+ * 95% resolved four frames early left the chord with nothing to show).
  */
+export const LOCK_FRAMES = 3;
 export function endLogoState(f: number) {
   if (f < end.from) return { opacity: 0, blur: 0, scale: 1 };
-  // An even in-out (`drift`): about two thirds there eight frames after the cut, whole on the chord.
-  const p = tween(f, end.from, chordFrame, ease.drift);
-  return { opacity: Math.max(0.22, p), blur: 14 * (1 - p), scale: 1.02 - 0.02 * p };
+  const lockFrom = chordFrame - LOCK_FRAMES;
+  if (f < lockFrom) {
+    const p = 0.78 * tween(f, end.from, lockFrom, ease.drift);
+    return { opacity: Math.max(0.22, p), blur: 14 * (1 - p), scale: 1.02 };
+  }
+  const q = tween(f, lockFrom, chordFrame, ease.standard);
+  const p = 0.78 + 0.22 * q;
+  return { opacity: p, blur: 14 * (1 - p), scale: 1.02 - 0.02 * q };
 }
 
 /** The logo is the hero on the chord (centred, 520 px), then moves up to its slot over the headline in one beat. */

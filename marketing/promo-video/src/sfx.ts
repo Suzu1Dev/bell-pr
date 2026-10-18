@@ -11,7 +11,7 @@
  *   trailing it (two different files, alternating, at most one per bar);
  * - a quiet, dry tick on every click the pointer makes on screen;
  * - a sparse keyboard bed while an answer types out (never per character);
- * - one glint, its onset on the final chord, with the end card's light sweep.
+ * - one glint, its onset on the final chord, as the end-card logo locks.
  *
  * Levels (measured against a music-only render, review.md): the swell and
  * the whooshes sit 17-23 dB under the music at their moments, the glint
@@ -134,7 +134,7 @@ export function sfxCues(footage: Footage): SfxCue[] {
       }
     }
   cues.push({
-    name: "glint: end-card sweep",
+    name: "glint: end-card logo locks",
     file: SFX.glint.file,
     from: chordFrame - SFX.glint.onsetFrame,
     trimBefore: 0,

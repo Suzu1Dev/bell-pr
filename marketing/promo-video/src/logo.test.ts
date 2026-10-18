@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { END_LOGO, chordFrame, endLogoState, flareAt, logoLeaves, logoState, logoTake } from "./logo.ts";
+import { END_LOGO, LOCK_FRAMES, chordFrame, endLogoState, flareAt, logoLeaves, logoState, logoTake } from "./logo.ts";
 import { darkFrom, exhale, hit, stop } from "./moments.ts";
 import { frameOf, music } from "./music.ts";
 import { timeline } from "./timeline.ts";
@@ -64,4 +64,14 @@ test("the drop is never a still: the first-hit lockup pushes 1.00 to 1.04 throug
   assert.ok(flareAt(hit) >= 0.2 && flareAt(hit) <= 0.35, "about 6-8 levels brighter on the hit");
   assert.equal(flareAt(hit - 1), 0);
   assert.ok(flareAt(hit + 6) < 0.001, "back to normal six frames later");
+});
+
+test("the end-card logo's last fifth of resolve and its settle from 1.02 happen on the frames before the chord", () => {
+  const before = endLogoState(chordFrame - LOCK_FRAMES);
+  assert.ok(before.opacity >= 0.75 && before.opacity <= 0.8, `${before.opacity.toFixed(2)} three frames before`);
+  assert.ok(Math.abs(before.scale - 1.02) < 1e-9);
+  for (let f = chordFrame - LOCK_FRAMES; f < chordFrame; f += 1) {
+    assert.ok(endLogoState(f + 1).opacity > endLogoState(f).opacity, `frame ${f}`);
+    assert.ok(endLogoState(f + 1).scale < endLogoState(f).scale, `frame ${f}`);
+  }
 });

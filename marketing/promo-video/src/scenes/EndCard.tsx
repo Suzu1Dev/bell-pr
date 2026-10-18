@@ -2,8 +2,10 @@
  * S14 End on the dark stage, the bookend of the opening:
  *
  * - a hard cut on the measured final hit (the pushed kick); the logo, large
- *   and centred, pulls into focus and locks ON the final chord, where its
- *   one light sweep (inside its letters) and the glint start;
+ *   and centred, pulls into focus and locks ON the final chord: the last of
+ *   its resolve and its settle from 1.02 happen on the three frames before
+ *   the chord, with the glint (a sweep across the near-white wordmark could
+ *   not be seen, so there is none: review round 7);
  * - one beat later it moves up to its slot, and the owner's headline comes
  *   in beat by beat: "From vibe coding" / "to knowing why.";
  * - on the next beat "vibe coding" racks soft and dim while "knowing why."
@@ -20,7 +22,7 @@ import { MONO, SANS } from "../look/fonts.ts";
 import { blurCss, ease, tween } from "../look/motion.ts";
 import { DARK, StageImage } from "../look/Stage.tsx";
 import { FocusLine, ROLES, words } from "../look/type.tsx";
-import { chordFrame, endLogoPlace, endLogoState } from "../logo.ts";
+import { endLogoPlace, endLogoState } from "../logo.ts";
 import { music } from "../music.ts";
 import { FADE_OUT_FRAMES, shotById } from "../timeline.ts";
 import { product } from "../../../../shared/product.ts";
@@ -28,6 +30,8 @@ import { product } from "../../../../shared/product.ts";
 const shot = shotById("s14-end");
 const beat = music.beatFrames;
 const LOGO_RATIO = 64 / 196;
+/** The call to action's size: the one command a viewer must read, about 12 px even in a phone-width embed. */
+export const CTA_SIZE = 60;
 
 /** The beats of the end card, from the headline's first line. */
 export const endBeats = (() => {
@@ -41,8 +45,6 @@ export const EndCard: React.FC = () => {
   const { line1, line2, rack, footer: footerAt, sharpFrom, sharp, fade } = endBeats;
   const logo = endLogoState(f);
   const place = endLogoPlace(f);
-  const sweep = tween(f, chordFrame, chordFrame + 24, ease.sweep);
-  const sweepOn = f >= chordFrame && f <= chordFrame + 24;
   const footer = tween(f, footerAt, footerAt + beat, ease.softArrive);
   const drift = 1 + (0.008 * (f - shot.from)) / music.barFrames;
   // "vibe coding" softens with the rack and resolves to sharp a beat later, keeping its dim.
@@ -65,23 +67,6 @@ export const EndCard: React.FC = () => {
           }}
         >
           <Img src={staticFile("brand-assets/logo-on-dark.svg")} style={{ width: "100%", display: "block" }} />
-          {sweepOn ? (
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                // The band is masked by the logo itself, so it can only light the letters.
-                maskImage: `url(${staticFile("brand-assets/logo-on-dark.svg")})`,
-                WebkitMaskImage: `url(${staticFile("brand-assets/logo-on-dark.svg")})`,
-                maskSize: "100% 100%",
-                WebkitMaskSize: "100% 100%",
-                background: "linear-gradient(105deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.85) 50%, rgba(255,255,255,0) 60%)",
-                backgroundSize: "300% 100%",
-                backgroundPosition: `${((1 - sweep) * 100).toFixed(2)}% 0`,
-                mixBlendMode: "screen",
-              }}
-            />
-          ) : null}
         </div>
         <FocusLine
           words={words("From vibe coding", { 0: "base", 1: "soft", 2: "soft" })}
@@ -105,7 +90,7 @@ export const EndCard: React.FC = () => {
         <div
           style={{
             position: "absolute",
-            top: 724,
+            top: 712,
             display: "flex",
             alignItems: "baseline",
             gap: 36,
@@ -113,8 +98,8 @@ export const EndCard: React.FC = () => {
             transform: `translate3d(0, ${(14 * (1 - footer)).toFixed(3)}px, 0)`,
           }}
         >
-          <span style={{ fontFamily: MONO, fontWeight: 500, fontSize: 44, color: DARK.mint, letterSpacing: 0 }}>npx bell-pr</span>
-          <span style={{ fontFamily: SANS, fontWeight: 560, fontSize: 30, color: DARK.secondary, fontOpticalSizing: "auto" }}>
+          <span style={{ fontFamily: MONO, fontWeight: 500, fontSize: CTA_SIZE, color: DARK.mint, letterSpacing: 0 }}>npx bell-pr</span>
+          <span style={{ fontFamily: SANS, fontWeight: 560, fontSize: 32, color: DARK.secondary, fontOpticalSizing: "auto" }}>
             Free to start · Runs on your machine
           </span>
         </div>

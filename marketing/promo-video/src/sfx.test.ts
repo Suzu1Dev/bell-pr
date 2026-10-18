@@ -65,7 +65,7 @@ test("levels stay under the music: swells and whooshes at -15 dB or lower, ticks
   assert.equal(cueGain(swell, swell.durationInFrames - 1) < cueGain(swell, swell.durationInFrames - 3), true);
 });
 
-test("one glint, its onset on the final chord with the end card's light sweep", () => {
+test("one glint, its onset on the final chord as the end-card logo locks", () => {
   const glints = cues.filter((cue) => cue.name.startsWith("glint"));
   assert.equal(glints.length, 1);
   assert.equal(glints[0].from + SFX.glint.onsetFrame, chordFrame);
