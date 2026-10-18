@@ -147,10 +147,10 @@ export const shotSpecs: ShotSpec[] = [
     seconds: secondsAt120(3, 3, 4),
     keepNominal: true,
     captions: [
-      { text: "Which way would you do it?", from: 0.5, to: 4, place: "bottom-right" },
-      { text: "Taste grows by weighing trade-offs.", from: 4, place: "bottom-right" },
+      { text: "Which way would you do it?", from: 0.5, to: 4, place: "top-left" },
+      { text: "Taste grows by weighing trade-offs.", from: 4, place: "top-left" },
     ],
-    takes: [{ id: "guess", until: 4 }, { id: "keep", until: 6 }, { id: "why" }],
+    takes: [{ id: "guess", until: 2 }, { id: "alternative", until: 6 }, { id: "keep", until: 8 }, { id: "why" }],
   },
   {
     id: "s8-ask",
@@ -158,7 +158,7 @@ export const shotSpecs: ShotSpec[] = [
     seconds: secondsAt120(2, 2, 3),
     droppable: true,
     captions: [{ text: "Stuck on a line? Ask about it.", from: 0.5, place: "top-left" }],
-    takes: [{ id: "select", until: 4 }, { id: "answer" }],
+    takes: [{ id: "select", until: 2 }, { id: "question", until: 4 }, { id: "answer" }],
   },
   {
     id: "s9-explain-back",
@@ -185,7 +185,7 @@ export const shotSpecs: ShotSpec[] = [
     title: "Predict",
     seconds: secondsAt120(2, 2, 3),
     mergeInto: "s9-explain-back",
-    captions: [{ text: "Predict what the maintainer will ask.", from: 0.5, place: "bottom-right" }],
+    captions: [{ text: "Predict what the maintainer will ask.", from: 0.5, place: "bottom-left" }],
     takes: [{ id: "tests", until: 3 }, { id: "line" }],
   },
   {
@@ -196,10 +196,12 @@ export const shotSpecs: ShotSpec[] = [
     minOneCaption: 4,
     holdOrder: 3,
     captions: [
-      { text: "Your words. The project’s rules.", from: 1, to: 7, place: "bottom-right" },
-      { text: "And what you didn’t test.", from: 7, place: "bottom-right" },
+      { text: "Your words. The project’s rules.", from: 1, to: 8, place: "bottom-left" },
+      { text: "And what you didn’t test.", from: 8, place: "bottom-left" },
     ],
-    takes: [{ id: "establish", until: 4 }, { id: "words", until: 8 }, { id: "checklist" }],
+    // The checklist (the project's rules) under the first line, then the not-tested answer going into the
+    // description under the second, so each caption plays over what it says.
+    takes: [{ id: "establish", until: 4 }, { id: "checklist", until: 8 }, { id: "words" }],
   },
   {
     id: "s12-send-one",
@@ -212,8 +214,10 @@ export const shotSpecs: ShotSpec[] = [
     id: "s13-learn",
     title: "Learn",
     seconds: secondsAt120(2, 3, 3),
-    captions: [{ text: "Learn from what they actually said.", from: 0.5, place: "bottom-left" }],
-    takes: [{ id: "compare", until: 4 }, { id: "practice", until: 6 }, { id: "next" }],
+    // The caption ends with the maintainers' comments; the practice item that follows (your own check, days
+    // later) plays without one.
+    captions: [{ text: "Learn from what they actually said.", from: 0.5, to: 4, place: "bottom-left" }],
+    takes: [{ id: "compare", until: 4 }, { id: "practice" }],
   },
   {
     id: "s14-end",

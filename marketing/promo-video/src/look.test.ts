@@ -107,10 +107,10 @@ test("no jump cuts: a cut to the same moment of one captured state changes the f
       const a = looks[shot.id]?.[shot.takes[i - 1].id];
       const b = looks[shot.id]?.[shot.takes[i].id];
       if (!a || !b || a.state !== b.state) continue;
-      // A later moment of the clip (after a scroll or a step) is another picture, not a jump cut.
+      // Another moment of the clip (after a scroll or a step, later or earlier) is another picture, not a jump cut.
       const spanA = clipSpan(a, shot.takes[i - 1].to - shot.takes[i - 1].from);
       const spanB = clipSpan(b, shot.takes[i].to - shot.takes[i].from);
-      if (spanA && spanB && spanB[0] - spanA[1] > 0.5) continue;
+      if (spanA && spanB && (spanB[0] - spanA[1] > 0.5 || spanA[0] - spanB[1] > 0.5)) continue;
       if ((a.still ?? "") !== (b.still ?? "") && (a.still || b.still)) continue;
       const before = takeView(a, shot.takes[i - 1].to - shot.takes[i - 1].from - 1);
       const after = takeView(b, 0);
@@ -146,13 +146,16 @@ test("no slivers: a push either covers each frame edge or leaves at least 60 px 
   assert.deepEqual(problems.slice(0, 12), []);
 });
 
-test("a push that crops the app's sidebar at the frame edge puts it in the soft plane", () => {
+test("a push that shows the app's sidebar keeps all of it in the soft plane: every feather ends in the gutter after it", () => {
   for (const { shot, take, look } of takes) {
     if (look.float) continue;
     for (let f = 0; f < take.to - take.from; f += 6) {
       const view = takeView(look, f);
-      const edge = view.cx - (view.sx / view.m); // capture x at the frame's left edge (no tilt)
-      if (edge > 20 && edge < 266) assert.ok(look.dof, `${shot.id}/${take.id} frame ${f}: the sidebar is cut at capture x ${edge.toFixed(0)}`);
+      const edge = view.cx - view.sx / view.m; // capture x at the frame's left edge (no tilt)
+      if (edge >= 240) continue;
+      assert.ok(look.dof, `${shot.id}/${take.id} frame ${f}: the sidebar is in frame from capture x ${edge.toFixed(0)}`);
+      for (const rect of sharpRects(look, f / music.beatFrames) ?? [])
+        assert.ok(rect.x0 - rect.fl >= 240, `${shot.id}/${take.id} frame ${f}: a feather starts at capture x ${(rect.x0 - rect.fl).toFixed(0)}, inside the sidebar`);
     }
   }
 });

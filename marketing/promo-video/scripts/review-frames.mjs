@@ -28,7 +28,11 @@
  *   neighbour; more than 8 means a sharp line of UI text (or the pointer)
  *   runs into the card instead of soft plane or studio.
  *
- * Both go to out/review/scans.tsv; any finding makes the script exit 1.
+ * A third check runs on the footage itself, at every take's settled frames
+ * (scripts/check-dof.mjs): no glyph in a depth-of-field feather and no
+ * sharp line cut by a frame or window edge.
+ *
+ * All go to out/review/scans.tsv; any finding makes the script exit 1.
  *
  *   node scripts/review-frames.mjs [video]   (default out/bell-pr-promo-en-1080p.mp4)
  */
@@ -39,6 +43,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
 import { tsImport } from "tsx/esm/api";
+import { checkDof } from "./check-dof.mjs";
 import { packageRoot, remotion } from "./lib/media.mjs";
 
 const { timeline } = await tsImport("../src/timeline.ts", import.meta.url);
@@ -273,6 +278,11 @@ const decoded = await eachFrame(video, (frame, pixels) => {
     }
   }
 });
+// The sharp planes against the footage: no glyph in a feather, no sharp line cut by an edge (scripts/check-dof.mjs).
+for (const finding of await checkDof()) {
+  findings.push(`depth of field: ${finding}`);
+  scanRows.push(`\t\tdepth of field\t\t${finding}`);
+}
 await writeFile(path.join(out, "scans.tsv"), `${scanRows.join("\n")}\n`);
 console.log(`review: scanned ${decoded} frames for jumps inside takes and sharp UI against caption cards (out/review/scans.tsv)`);
 if (decoded !== timeline.durationInFrames) findings.push(`decoded ${decoded} frames, the composition has ${timeline.durationInFrames}`);

@@ -21,7 +21,7 @@
  * after one and ends before the next (`clipTo` freezes a take on its last
  * settled frame), so nothing jumps inside a take.
  */
-import { focusRect, rackRect, type Mask } from "./look/dof.ts";
+import { focusRect, rackRect, type Feather, type Mask, type Rect } from "./look/dof.ts";
 import { floating, push, type Key } from "./look/camera.ts";
 
 export interface TakeLook {
@@ -56,13 +56,13 @@ export const PUSH_MAX_M = 2.0;
 export const MACRO_MAX_M = 2.6;
 
 const REST = { width: 1340, x: 70, y: -48, rx: 5, ry: -9 };
-/** The mirror rest (S11): the window left of centre, turned the other way, the caption on the right. */
-const REST_LEFT = { width: 1300, x: -110, y: -64, rx: 5, ry: 9 };
 
 /**
  * The establishing move of a section after the first (B's turn to face):
  * the window is in frame from the cut, turned away, and turns to face the
- * viewer over `beats` beats, landing on a beat.
+ * viewer over `beats` beats, landing on a beat. It leaves the cut already
+ * moving (`arrive`: fast in, long settle), since every section starts on a
+ * downbeat (lookdev STYLE-GUIDE §4.3).
  */
 const establish = (beats = 3, amount = 1, rest = REST, from = 1): Key[] => [
   {
@@ -74,7 +74,7 @@ const establish = (beats = 3, amount = 1, rest = REST, from = 1): Key[] => [
       ry: rest.ry - 15 * amount * from,
     }),
   },
-  { at: beats, view: floating(rest.width, { x: rest.x, y: rest.y, rx: rest.rx, ry: rest.ry }), ease: "standard" },
+  { at: beats, view: floating(rest.width, { x: rest.x, y: rest.y, rx: rest.rx, ry: rest.ry }), ease: "arrive" },
 ];
 
 /**
@@ -90,12 +90,29 @@ const riseIn = (): Key[] => [
 
 /** The plan waiting for approval, where S4 ends and S5 begins: the same view and sharp plane on both sides of the cut. */
 const PLAN_VIEW = (m: number) => push(910, 252, m);
-const PLAN_SHARP: [number, number, number, number] = [291, 100, 1377, 420];
+/** The plan card: its feathers in the gaps above it (under the stepper) and under the approve row. */
+const PLAN_SHARP: Rect = [291, 150, 1377, 336];
+const PLAN_FEATHER: Feather = [40, 24, 40, 24];
+/**
+ * The board's columns from their headers down (the stepper and the run's summary card above them soft): "Done" and
+ * the team's messages to the window's bottom, "To do" and "In progress" (empty by then) to y 560, so the caption
+ * under them sits on the soft plane. The two planes meet in the gutter between "In progress" and "Done".
+ */
+const BOARD_LEFT: Rect = [291, 296, 790, 560];
+const BOARD_LEFT_FEATHER: Feather = [20, 18, 6, 30];
+const BOARD_RIGHT: Rect = [803, 296, 1440, 810];
+const BOARD_RIGHT_FEATHER: Feather = [6, 18, 0, 0];
 
-/** The review screen's right-hand panel (explanation, check): its cards start at x 1097-1099. */
-const PANEL = { x0: 1099, x1: 1405 } as const;
-/** A sharp band of the right-hand panel; its ramp sits in the panel's own left padding, so no diff token is half sharp. */
-const panelBand = (y0: number, y1: number, feather = 14) => (a: number) => focusRect(PANEL.x0, y0, PANEL.x1, y1, feather, a);
+/** The review screen's right-hand panel (explanation, check, ask): its text starts at x 1097-1099. */
+const PANEL = { x0: 1096, x1: 1405 } as const;
+/**
+ * A sharp band of the right-hand panel. The left feather sits in the gutter between the diff and the panel; the
+ * top and bottom feathers default to the gaps above and below (the sticky module line ends at y 323).
+ */
+const panelBand = (y0: number, y1: number, top = 7, bottom = 14) => (a: number) =>
+  focusRect(PANEL.x0, y0, PANEL.x1, y1, [14, top, 14, bottom], a);
+/** The `right` that centres the panel (x 1250) on the frame at magnification m: the window's right edge in frame. */
+const panelCentred = (m: number) => 960 - (1440 - 1250) * m;
 
 /** A look for each take, by shot id and take id. */
 export const looks: Record<string, Record<string, TakeLook>> = {
@@ -111,12 +128,12 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       state: "v-rules-card",
       still: "card",
       keys: [
-        { at: 0, view: push(720, 440, 1.37, { ry: -3 }) },
-        { at: 4, view: push(835, 442, 1.6, { ry: -2 }), ease: "drift" },
+        { at: 0, view: push(810, 446, 1.53, { ry: -3 }) },
+        { at: 4, view: push(835, 445, 1.6, { ry: -2 }), ease: "arrive" },
       ],
-      // The card's rules sharp; the "files read" line and the next section under it go soft, under the caption
-      // (the ramp sits in the gap under the third rule).
-      dof: { mask: (a) => focusRect(318, 120, 1355, 642, 22, a), keys: [{ at: 0, amount: 1 }] },
+      // The whole rules card sharp down to the third rule; "Files BELL PR read" and the next section soft, under
+      // the caption (the ramp sits in the gap between the third rule and that line).
+      dof: { mask: (a) => focusRect(314, 120, 1355, 638, [18, 22, 22, 16], a), keys: [{ at: 0, amount: 1 }] },
     },
   },
   "s4-still-yours": {
@@ -125,22 +142,22 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       // After the dialog's own scroll (1.50-2.47 s): the facts settled, the chips green.
       clipFrom: 2.55,
       keys: [
-        { at: 0, view: push(720, 232, 1.55) },
-        { at: 4, view: push(720, 232, 1.85), ease: "standard" },
+        { at: 0, view: push(720, 232, 1.69) },
+        { at: 4, view: push(720, 232, 1.85), ease: "arrive" },
       ],
-      dof: { mask: (a) => focusRect(361, 160, 1079, 299, 22, a), keys: [{ at: 0, amount: 1 }] },
+      // The "Before you start" box; its top ramp sits in the gap under the field's hint line.
+      dof: { mask: (a) => focusRect(361, 158, 1079, 299, [22, 7, 22, 20], a), keys: [{ at: 0, amount: 1 }] },
     },
     plan: {
       state: "v-plan",
       still: "plan",
       // It ends on the framing S5 opens on, the same picture (the board's clip starts on this plan), so the
-      // section change is seamless and the approval follows on.
-      // One push over the bar, landing on the S5 downbeat.
+      // section change is seamless and the approval follows on. One push over the bar, landing on the S5 downbeat.
       keys: [
-        { at: 0, view: PLAN_VIEW(1.46) },
-        { at: 4, view: PLAN_VIEW(1.68), ease: "drift" },
+        { at: 0, view: PLAN_VIEW(1.61) },
+        { at: 4, view: PLAN_VIEW(1.68), ease: "arrive" },
       ],
-      dof: { mask: (a) => focusRect(...PLAN_SHARP, 40, a), keys: [{ at: 0, amount: 1 }] },
+      dof: { mask: (a) => focusRect(...PLAN_SHARP, PLAN_FEATHER, a), keys: [{ at: 0, amount: 1 }] },
     },
   },
   "s5-legwork": {
@@ -156,8 +173,15 @@ export const looks: Record<string, Record<string, TakeLook>> = {
         { at: 2, view: PLAN_VIEW(1.7), ease: "drift" },
         { at: 7, view: push(900, 410, 1.45), ease: "drift" },
       ],
-      // The plan sharp, then the board's top rows; the cropped sidebar and the lower board (under the caption) soft.
-      dof: { mask: rackRect(PLAN_SHARP, [291, 0, 1440, 575], 2, 7, 40), keys: [{ at: 0, amount: 1 }] },
+      // The plan sharp, then the board's columns; the stepper, the run's card and the emptied columns' lower half soft.
+      dof: {
+        mask: (a, beats) => [
+          rackRect(PLAN_SHARP, BOARD_LEFT, 2, 7, PLAN_FEATHER, BOARD_LEFT_FEATHER)(a, beats),
+          // The right plane starts as the plan's right part (inside the plan's plane) and keeps its left edge in the gutter.
+          rackRect([803, PLAN_SHARP[1], PLAN_SHARP[2], PLAN_SHARP[3]], BOARD_RIGHT, 2, 7, PLAN_FEATHER, BOARD_RIGHT_FEATHER)(a, beats),
+        ],
+        keys: [{ at: 0, amount: 1 }],
+      },
     },
   },
   "s6-try-first": {
@@ -175,10 +199,10 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       rate: 1.25,
       clipTo: 4.08,
       keys: [
-        { at: 0, view: push(1250, 465, 1.6, { right: 120, ry: -5 }) },
-        { at: 2, view: push(1250, 470, 1.92, { right: 120, ry: -4 }), ease: "drift" },
+        { at: 0, view: push(1250, 468, 1.81, { right: 120, ry: -5 }) },
+        { at: 2, view: push(1250, 470, 1.92, { right: 120, ry: -4 }), ease: "arrive" },
       ],
-      dof: { mask: panelBand(330, 712), keys: [{ at: 0, amount: 1 }] },
+      dof: { mask: panelBand(331, 712), keys: [{ at: 0, amount: 1 }] },
     },
     reveal: {
       state: "v-quiz-attempt",
@@ -187,9 +211,9 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       macro: true,
       keys: [
         { at: 0, view: push(1250, 545, 2.3, { ry: -3 }) },
-        { at: 2, view: push(1250, 550, 2.38, { ry: -3 }), ease: "drift" },
+        { at: 2, view: push(1250, 550, 2.38, { ry: -3 }), ease: "arrive" },
       ],
-      dof: { mask: panelBand(330, 712), keys: [{ at: 0, amount: 1 }] },
+      dof: { mask: panelBand(331, 712), keys: [{ at: 0, amount: 1 }] },
     },
     example: {
       state: "v-quiz-attempt",
@@ -197,74 +221,104 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       clipFrom: 7.75,
       keys: [
         { at: 0, view: push(1250, 520, 1.62, { right: 120, ry: -4 }) },
-        { at: 6, view: push(1250, 520, 1.7, { right: 120, ry: -3 }), ease: "drift" },
+        { at: 6, view: push(1250, 520, 1.7, { right: 120, ry: -3 }), ease: "arrive" },
       ],
-      dof: { mask: panelBand(345, 712), keys: [{ at: 0, amount: 1 }] },
+      dof: { mask: panelBand(331, 712), keys: [{ at: 0, amount: 1 }] },
     },
   },
   "s7-taste": {
     guess: {
       state: "v-road-choice",
-      // The guess types out; "Show the alternative" just before the cut (the reveal's scroll starts at 3.63 s).
-      clipFrom: 0.35,
-      rate: 1.25,
+      // The guess finishes typing; "Show the alternative" is pressed on the take's last frames (the reveal's
+      // scroll starts at 3.63 s).
+      clipFrom: 1.75,
+      rate: 1.2,
       clipTo: 3.18,
       keys: [
-        { at: 0, view: push(1250, 420, 1.62, { right: 700, ry: 7 }) },
-        { at: 2, view: push(1250, 420, 1.92, { right: 640, ry: 6 }), ease: "standard" },
+        { at: 0, view: push(1250, 440, 1.8, { right: 680, ry: 7 }) },
+        { at: 2, view: push(1250, 440, 1.92, { right: 650, ry: 6 }), ease: "arrive" },
       ],
-      dof: { mask: panelBand(230, 560), keys: [{ at: 0, amount: 1 }] },
+      dof: { mask: panelBand(331, 560), keys: [{ at: 0, amount: 1 }] },
+    },
+    alternative: {
+      state: "v-road-choice",
+      macro: true,
+      // After the scroll: the revealed alternative (a fixed interval with jitter, and when it would be the better
+      // choice), whole and sharp, before the pointer moves to the choice at 5.10 s.
+      clipFrom: 4.7,
+      rate: 0.15,
+      keys: [
+        { at: 0, view: push(1250, 482, 1.98, { right: 640, ry: 6 }) },
+        { at: 4, view: push(1250, 484, 2.1, { right: 620, ry: 5 }), ease: "arrive" },
+      ],
+      dof: { mask: panelBand(360, 606, 18, 18), keys: [{ at: 0, amount: 1 }] },
     },
     keep: {
       state: "v-road-choice",
-      // After the scroll: the choice, and the click on "Keep this approach" late in the take.
-      clipFrom: 4.65,
+      // The pointer moves to "Keep this approach" and clicks. "It depends" under it, which the panel's sticky footer
+      // cuts, is in the soft plane with the footer; the window's bottom edge leaves a strip of studio.
+      clipFrom: 5.1,
+      rate: 0.7,
       macro: true,
       keys: [
-        { at: 0, view: push(1250, 650, 2.45, { right: 600, bottom: 150, ry: 6 }) },
-        { at: 2, view: push(1250, 650, 2.55, { right: 580, bottom: 150, ry: 5 }), ease: "drift" },
+        { at: 0, view: push(1250, 668, 2.45, { right: 600, bottom: 150, ry: 6 }) },
+        { at: 2, view: push(1250, 668, 2.5, { right: 590, bottom: 146, ry: 5 }), ease: "arrive" },
       ],
-      // The question and its three choices sharp; the alternative's paragraph above them wholly soft.
-      dof: { mask: panelBand(622, 720, 12), keys: [{ at: 0, amount: 1 }] },
+      // The question and its first row of choices sharp; the paragraph above and "It depends" below soft.
+      dof: { mask: panelBand(626, 690, 26, 8), keys: [{ at: 0, amount: 1 }] },
     },
     why: {
       state: "v-road-choice",
-      // After the scroll to the why (5.97-6.47 s): it types out and is saved.
-      clipFrom: 6.5,
-      rate: 1.3,
+      // After the scroll to the why (5.97-6.47 s): it finishes typing and is saved.
+      clipFrom: 7.4,
+      rate: 1.45,
       macro: true,
       keys: [
-        { at: 0, view: push(1250, 500, 2.0, { right: 620, ry: 6 }) },
-        { at: 4, view: push(1250, 500, 2.08, { right: 610, ry: 5 }), ease: "drift" },
+        { at: 0, view: push(1250, 556, 2.2, { right: 620, ry: 6 }) },
+        { at: 2, view: push(1250, 556, 2.3, { right: 610, ry: 5 }), ease: "arrive" },
       ],
-      dof: { mask: panelBand(395, 650), keys: [{ at: 0, amount: 1 }] },
+      dof: { mask: panelBand(496, 618, 14, 14), keys: [{ at: 0, amount: 1 }] },
     },
   },
   "s8-ask": {
     select: {
       state: "v-line-ask",
-      // The two clicks select lines 10-15; "Explain this code" in the selection bar is pressed late in the take.
-      clipFrom: 0.3,
+      // The second click selects lines 10-15, then "Explain this code" in the selection bar is pressed.
+      clipFrom: 1.45,
       keys: [
-        { at: 0, view: push(760, 600, 1.55, { bottom: 170, ry: 3 }) },
-        { at: 4, view: push(770, 605, 1.62, { bottom: 160, ry: 2 }), ease: "drift" },
+        { at: 0, view: push(760, 615, 1.55, { bottom: 170, ry: 3 }) },
+        { at: 2, view: push(765, 615, 1.62, { bottom: 165, ry: 2 }), ease: "arrive" },
       ],
-      // The selection and its bar sharp, the code above it soft under the caption.
-      dof: { mask: (a) => focusRect(437, 482, 1075, 764, 22, a), keys: [{ at: 0, amount: 1 }] },
+      // The selected lines with the code around them and the selection bar sharp; the code above, the file list and
+      // the panel soft (the caption sits over the code above).
+      dof: { mask: (a) => focusRect(436, 476, 1078, 758, [16, 11, 16, 16], a), keys: [{ at: 0, amount: 1 }] },
+    },
+    question: {
+      state: "v-line-ask",
+      // The question arrives with its diff block (the lines asked about) while the agent reads the change; it
+      // holds before the panel's jump at 3.10 s.
+      clipFrom: 2.75,
+      rate: 0.27,
+      clipTo: 3.07,
+      macro: true,
+      keys: [
+        { at: 0, view: push(1250, 430, 2.2, { right: panelCentred(2.2), ry: -3 }) },
+        { at: 2, view: push(1250, 432, 2.3, { right: panelCentred(2.3), ry: -3 }), ease: "arrive" },
+      ],
+      dof: { mask: panelBand(336, 530, 12, 20), keys: [{ at: 0, amount: 1 }] },
     },
     answer: {
       state: "v-line-ask",
-      // After the panel's jump to the new question (3.10 s): the question's diff block, then the answer types out (stops before 4.27 s).
-      clipFrom: 3.12,
-      rate: 0.47,
-      clipTo: 4.24,
+      // The answer, whole: its first paragraph complete on the frame where the rest of the reply arrives (4.27 s),
+      // held. The paragraph under it (whose heading runs into its first line) stays soft.
+      clipFrom: 4.27,
+      clipTo: 4.27,
+      macro: true,
       keys: [
-        { at: 0, view: push(1150, 445, 1.6, { right: 120, ry: -3 }) },
-        { at: 3, view: push(1250, 470, 1.85, { right: 120, ry: -5 }), ease: "drift" },
+        { at: 0, view: push(1250, 386, 2.3, { right: panelCentred(2.3), ry: -3 }) },
+        { at: 4, view: push(1250, 386, 2.45, { right: panelCentred(2.45), ry: -3 }), ease: "arrive" },
       ],
-      // The question's diff block sharp, then a rack down to the answer as it types: the "Sample · prewritten"
-      // line between them and the sticky module line above stay in the soft plane.
-      dof: { mask: rackRect([PANEL.x0, 330, PANEL.x1, 440], [PANEL.x0, 553, PANEL.x1, 612], 0.6, 1.4, 6), keys: [{ at: 0, amount: 1 }] },
+      dof: { mask: panelBand(350, 420, 18, 18), keys: [{ at: 0, amount: 1 }] },
     },
   },
   "s9-explain-back": {
@@ -288,20 +342,20 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       macro: true,
       keys: [
         { at: 0, view: push(1250, 300, 2.3, { ry: -3 }) },
-        { at: 4, view: push(1250, 305, 2.4, { ry: -3 }), ease: "drift" },
+        { at: 4, view: push(1250, 305, 2.4, { ry: -3 }), ease: "arrive" },
       ],
-      dof: { mask: panelBand(170, 422), keys: [{ at: 0, amount: 1 }] },
+      dof: { mask: panelBand(166, 424, 8, 12), keys: [{ at: 0, amount: 1 }] },
     },
     partly: {
       state: "v-check",
-      // After the reveal's scroll: the AI-written reference beside the answer, and "Partly".
+      // After the reveal's scroll: the answer, the AI-written reference beside it, and "Partly".
       clipFrom: 8.75,
       macro: true,
       keys: [
-        { at: 0, view: push(1250, 515, 2.35, { ry: -3 }) },
-        { at: 2, view: push(1250, 518, 2.42, { ry: -3 }), ease: "drift" },
+        { at: 0, view: push(1250, 478, 2.1, { ry: -3 }) },
+        { at: 2, view: push(1250, 480, 2.18, { ry: -3 }), ease: "arrive" },
       ],
-      dof: { mask: panelBand(380, 612), keys: [{ at: 0, amount: 1 }] },
+      dof: { mask: panelBand(343, 606, 14, 10), keys: [{ at: 0, amount: 1 }] },
     },
     result: {
       state: "v-check",
@@ -310,9 +364,9 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       macro: true,
       keys: [
         { at: 0, view: push(1250, 430, 2.05, { ry: -3 }) },
-        { at: 3, view: push(1250, 434, 2.12, { ry: -3 }), ease: "drift" },
+        { at: 3, view: push(1250, 434, 2.12, { ry: -3 }), ease: "arrive" },
       ],
-      dof: { mask: panelBand(296, 556), keys: [{ at: 0, amount: 1 }] },
+      dof: { mask: panelBand(292, 556, 12, 10), keys: [{ at: 0, amount: 1 }] },
     },
   },
   "s10-predict": {
@@ -322,21 +376,21 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       clipFrom: 0.2,
       macro: true,
       keys: [
-        { at: 0, view: push(1250, 320, 1.9, { ry: -3 }) },
-        { at: 3, view: push(1250, 322, 2.15, { ry: -3 }), ease: "standard" },
+        { at: 0, view: push(1250, 321, 1.88, { ry: -3 }) },
+        { at: 3, view: push(1250, 322, 2.0, { ry: -3 }), ease: "arrive" },
       ],
-      dof: { mask: panelBand(180, 428), keys: [{ at: 0, amount: 1 }] },
+      dof: { mask: panelBand(178, 425, 8, 20), keys: [{ at: 0, amount: 1 }] },
     },
     line: {
       state: "v-forecast",
-      // The saved prediction in the result, beside the result line.
+      // The saved prediction beside the check's result line, both sharp.
       clipFrom: 2.15,
       macro: true,
       keys: [
-        { at: 0, view: push(1250, 330, 2.55, { ry: -3 }) },
-        { at: 4, view: push(1250, 332, 2.58, { ry: -3 }), ease: "drift" },
+        { at: 0, view: push(1250, 300, 2.32, { ry: -3 }) },
+        { at: 4, view: push(1250, 302, 2.42, { ry: -3 }), ease: "arrive" },
       ],
-      dof: { mask: panelBand(318, 356, 10), keys: [{ at: 0, amount: 1 }] },
+      dof: { mask: panelBand(238, 362, 12, 18), keys: [{ at: 0, amount: 1 }] },
     },
   },
   "s11-your-words": {
@@ -345,30 +399,32 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       still: "top",
       float: true,
       sweepAt: 1,
-      // A different entrance: the window comes from the left and faces right, the captions on the right.
-      keys: establish(2, 0.6, REST_LEFT, -1),
-    },
-    words: {
-      state: "v-draft-your-words",
-      // "Use my explanation" fills the description, "Add my not-tested answer" fills Testing (before the scroll at
-      // 2.50 s). The description sits under the card, so the explanation is seen landing in the PR; the window's
-      // bottom edge leaves a strip of studio for the caption. Half-speed camera in the calm bars.
-      clipFrom: 0.1,
-      keys: [
-        { at: 0, view: push(700, 440, 1.38, { bottom: 212 }) },
-        { at: 4, view: push(700, 445, 1.46, { bottom: 206 }), ease: "drift" },
-      ],
-      dof: { mask: (a) => focusRect(291, 70, 1109, 810, 30, a), keys: [{ at: 0, amount: 1 }] },
+      keys: establish(2, 0.6),
     },
     checklist: {
       state: "v-draft-your-words",
+      // The maintainer checklist after the scroll: its last rows (your pace, your own words, a reviewable change)
+      // sharp; the rows above, with the sample GitHub facts, and the header with its read times soft or out of frame.
+      // The window's bottom edge leaves a strip of studio for the caption. Half-speed camera in the calm bars.
       clipFrom: 5.92,
+      rate: 0.5,
       keys: [
-        { at: 0, view: push(840, 405, 1.42) },
-        { at: 4, view: push(840, 440, 1.6), ease: "drift" },
+        { at: 0, view: push(834, 660, 1.74, { bottom: 230 }) },
+        { at: 4, view: push(834, 660, 1.8, { bottom: 224 }), ease: "arrive" },
       ],
-      // The checklist's rows sharp, the cropped sidebar and the rows under the caption soft.
-      dof: { mask: (a) => focusRect(316, 58, 1352, 470, 8, a), keys: [{ at: 0, amount: 1 }] },
+      dof: { mask: (a) => focusRect(316, 527, 1352, 810, [20, 5, 20, 0], a), keys: [{ at: 0, amount: 1 }] },
+    },
+    words: {
+      state: "v-draft-your-words",
+      // The card after "Use my explanation": the not-tested answer, then "Add my not-tested answer to Testing" and
+      // its "In the description" (before the scroll at 2.50 s). The whole card sharp, the editor under it soft.
+      clipFrom: 1.0,
+      rate: 0.6,
+      keys: [
+        { at: 0, view: push(700, 312, 1.95) },
+        { at: 4, view: push(702, 313, 2.0), ease: "arrive" },
+      ],
+      dof: { mask: (a) => focusRect(291, 92, 1112, 462, [20, 20, 16, 18], a), keys: [{ at: 0, amount: 1 }] },
     },
   },
   "s12-send-one": {
@@ -379,10 +435,11 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       clipFrom: 2.3,
       rate: 0.625,
       keys: [
-        { at: 0, view: push(720, 560, 1.68, { ry: 3 }) },
-        { at: 3, view: push(720, 590, 1.97, { ry: 2 }), ease: "standard" },
+        { at: 0, view: push(720, 600, 1.75, { ry: 3 }) },
+        { at: 3, view: push(720, 610, 1.97, { ry: 2 }), ease: "arrive" },
       ],
-      dof: { mask: (a) => focusRect(500, 580, 940, 740, 22, a), keys: [{ at: 0, amount: 1 }] },
+      // The dialog under its preview: the preview's last line, which its own scroll box cuts, stays soft.
+      dof: { mask: (a) => focusRect(506, 582, 935, 742, [10, 12, 12, 12], a), keys: [{ at: 0, amount: 1 }] },
     },
     published: {
       state: "v-publish",
@@ -390,8 +447,8 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       macro: true,
       // The card's left edge (its icon) stays in frame; its right side is plain tint.
       keys: [
-        { at: 0, view: push(640, 232, 2.2) },
-        { at: 4, view: push(640, 232, 2.5), ease: "standard" },
+        { at: 0, view: push(640, 232, 2.34) },
+        { at: 4, view: push(640, 232, 2.5), ease: "arrive" },
       ],
       // The published card sharp; the guide and the sample notice under it soft.
       dof: { mask: (a) => focusRect(291, 197, 1377, 300, 12, a), keys: [{ at: 0, amount: 1 }] },
@@ -400,33 +457,32 @@ export const looks: Record<string, Record<string, TakeLook>> = {
   "s13-learn": {
     compare: {
       state: "v-forecast-vs-reality",
-      // After the scroll to the comparison (1.10-2.00 s).
+      // After the scroll to the comparison (1.10-2.00 s): "Your forecast: Tests" and the maintainer's tags on the
+      // first comment ("Tests", "Saw it coming") sharp; the comments' text soft (its inline code shows raw backticks,
+      // a product fix in the known issues).
       clipFrom: 2.1,
       keys: [
-        { at: 0, view: push(830, 368, 1.52) },
-        { at: 3, view: push(830, 362, 1.72), ease: "drift" },
+        { at: 0, view: push(832, 214, 1.61) },
+        { at: 3, view: push(832, 214, 1.68), ease: "arrive" },
       ],
-      dof: { mask: (a) => focusRect(291, 30, 1377, 520, 30, a), keys: [{ at: 0, amount: 1 }] },
+      dof: {
+        mask: (a) => [focusRect(300, 56, 655, 222, [10, 10, 12, 20], a), focusRect(676, 290, 1365, 362, [6, 6, 14, 20], a)],
+        keys: [{ at: 0, amount: 1 }],
+      },
     },
     practice: {
       state: "v-practice",
-      // Days later the question comes back: the answer, "Got it" (frozen before the scroll at 1.13 s).
-      clipFrom: 0.25,
+      // Days later the question comes back on the Learning page ("Sample practice", from your understanding check):
+      // the answer, the reference, what you had wrong last time, "Next review in 3 days" (after "Got it", before
+      // the scroll at 1.13 s). The whole card sharp, the sidebar soft.
+      clipFrom: 0.85,
       clipTo: 1.1,
-      keys: [{ at: 0, view: push(650, 470, 1.32, { left: 110, bottom: 212 }) }],
-      dof: { mask: (a) => focusRect(185, 100, 1440, 810, 30, a), keys: [{ at: 0, amount: 1 }] },
-    },
-    next: {
-      state: "v-practice",
-      // After the scroll: what you had wrong last time, and "Next review in 3 days" as the end framing.
-      clipFrom: 1.5,
-      macro: true,
+      rate: 0.08,
       keys: [
-        { at: 0, view: push(540, 540, 2.15) },
-        { at: 3, view: push(520, 560, 2.4), ease: "drift" },
+        { at: 0, view: push(706, 430, 1.46) },
+        { at: 4, view: push(700, 440, 1.52), ease: "arrive" },
       ],
-      // What you had wrong and the next review sharp; the "Next item" button, cut by the frame's edge, soft.
-      dof: { mask: (a) => focusRect(285, 455, 770, 600, 18, a), keys: [{ at: 0, amount: 1 }] },
+      dof: { mask: (a) => focusRect(264, 84, 1405, 752, [22, 20, 14, 20], a), keys: [{ at: 0, amount: 1 }] },
     },
   },
 };
