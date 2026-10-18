@@ -1,88 +1,79 @@
-# Music license: promo video soundtrack
+# Music license: the launch film's soundtrack
 
-The BELL PR promo video uses one music track. The MP3 file is licensed for
-use inside the video only. It is **not** part of this repository, the npm
-package, a press kit or the website.
+The BELL PR v1.1 launch film uses one music track. The MP3 file is licensed
+for use inside the video only. It is **not** part of this repository, the npm
+package, the site repository or a press kit.
 
-## The track
+<a id="rock-sport-top"></a>
+
+## Rock Sport Top (in use)
 
 | | |
 | --- | --- |
-| Title | Ramp It Up |
-| Artist | Ahjay Stelino |
-| Source | Mixkit Free Stock Music, Mixkit item 69 (listed at <https://mixkit.co/free-stock-music/tag/technology/>) |
-| Download URL | <https://assets.mixkit.co/music/69/69.mp3> |
-| License | Mixkit Stock Music Free License, <https://mixkit.co/license/#musicFree> |
-| User Terms | <https://mixkit.co/terms/> |
-| Downloaded | 2026-10-13 |
-| File | `mixkit-ramp-it-up-69.mp3`, MP3, 256 kbps, 44.1 kHz stereo, 102.13 s |
-| MD5 | `eea11c69fe4b634318f2a2d8d393d589` |
-| Attribution | Not required. The license grants its rights with no credit condition. |
+| Title | Rock Sport Top (928, Short A edit) |
+| Artist | 2BStudio, publishing as MUSIC FOR VIDEO LIBRARY (MUSIC4VIDEO); the same track is sold on AudioJungle as "Fast Rock" (item 53584223) |
+| Source | the creator's Patreon, post 928 "Rock Sport Top" |
+| Licence | the creator's Patreon usage rights for patrons (paid tiers) |
+| Owner's confirmation | 2026-10-15: the owner downloaded the track from the creator's Patreon and holds the right to use it; it is **not** a publication blocker (plan README §17.0 Q1) |
+| File | `rock-sport-top.mp3` (Short A), MP3, 320 kbps, 44.1 kHz stereo, 92.55 s |
+| MD5 | `b410171cd89e53948a9abda31136ff6f` |
+| Beat analysis | [`music/track.analysis.json`](music/track.analysis.json) (tracked, path-free; `reviewed: false` until the owner has listened) |
 
-## Key license terms (verbatim, retrieved 2026-10-13)
+### Conditions to observe
 
-From the Mixkit Stock Music Free License:
+- **Credit on tiers that require it.** On the Free, Beginner, Basic and
+  MEGA tiers, put "@musicforvideolibrary" in the description of every
+  video that carries the track. On Advanced and above no credit is
+  required. Check which tier the licence was obtained on before
+  publishing.
+- **Individual creators only.** The creator's terms grant usage to
+  individual content creators; companies are not allowed. Re-check the
+  licence if the product is later sold by a company.
+- **Content ID.** The creator registers every track with Elite Alliance
+  Content ID, so copies uploaded to YouTube and similar platforms can
+  receive claims. Ask the creator to whitelist the channel (EXCLUSIVE
+  tier), or dispute claims while the subscription is active (claims can
+  only be released while subscribed). The site's self-hosted
+  `site/media/` files are not affected by Content ID.
+- **The MP3 never travels on its own.** It and the renders never enter
+  git, the npm package, the site repository or a press kit. Never publish
+  a music-only edit.
+- The receipt, the account and any order id stay private; nothing of them
+  is recorded here.
 
-> Allowed: Podcasts · Social Media video posts · Online marketing ads ·
-> Educational Purposes · YouTube videos*
->
-> Not Allowed: CDs & DVDs · TV & Radio Broadcasts · Video Games
+### The edit used
 
-> "Items under the Mixkit Stock Music Free License can be used in your
-> commercial and non-commercial projects for free."
+`src/music.ts` reads every number from `music/track.analysis.json`:
 
-> "You're permitted to download, copy, modify, distribute and publicly
-> perform the Music Items on any web or social media platform, including
-> internet-based video on demand services, podcasts and advertisements."
+1. source 0-50.5 s at video 0-50.5 s, with a 2-frame fade-in;
+2. source 55.3-91.6 s at video 50.5-86.8 s: bars 22-23 (one cycle of the
+   2-bar riff) are cut, so both sides stay on the 100 BPM grid; the join
+   is an equal-power crossfade over the 2 frames before it, so the
+   downbeat after it is the second segment's alone.
 
-> "You're not allowed to use them in CDs or DVDs, video games or tv or radio
-> broadcast. You're also not allowed to remix them (or incorporate in a
-> music-only track), claim them as your own or register them on any rights
-> management service."
+The edit plays at -4.5 dB: about -14 LUFS integrated, true peak about
+-3.4 dBTP in the render. The final hit is measured
+(`scripts/measure-hit.mjs`, the largest per-frame level rise in video
+81.1-84.0 s: frame 2438, 81.267 s); the end-card logo locks on the final E
+chord 0.45 s later (frame 2452, 81.718 s).
 
-> "* If you receive a claim, please forward the details to team@mixkit.co
-> for assistance."
-
-From the Mixkit User Terms: "by downloading Items on Mixkit you are only
-receiving a non-exclusive license to use that Item. You do not acquire any
-rights of ownership in that Item."
-
-## What this means for the promo
-
-- **Allowed:** commercial use of the promo on the web, on social media,
-  as an online ad and on the product's landing page; trimming, cutting and
-  fading the track to fit the video.
-- **Never** register the music, or the video's audio, with YouTube Content
-  ID or any other rights-management service.
-- **Never** redistribute the MP3 on its own, and never publish a
-  music-only edit or remix of it.
-- **Never** use the promo in TV or radio broadcasts, on CDs or DVDs, or in
-  games.
-- **If a claim appears** (for example on YouTube), forward its details to
-  team@mixkit.co.
-
-## The edit used
-
-The video uses two segments of the track, cut on bar starts of its 120 BPM
-grid (see `src/music.ts`):
-
-1. source 9.146-49.146 s (bars 5-24) at video 0-40 s, with a 0.5 s fade-in;
-2. source 65.146 s (bar 33) to the track's natural end at 100.43 s, at
-   video 40-75.28 s, joined to the first with a 2-frame crossfade.
-
-The edit plays at -4.2 dB, about -14 LUFS integrated.
-
-## Where the file goes
+### Where the file goes
 
 Put the licensed file at:
 
 ```text
-marketing/promo-video/public/music/mixkit-ramp-it-up-69.mp3
+marketing/promo-video/public/music/rock-sport-top.mp3
 ```
 
-or set `PROMO_MUSIC_FILE` to its path; `npm run capture` copies it there.
-Either way the capture checks the MD5 above before it starts.
+or set `PROMO_MUSIC_FILE` to its path; `npm run assets` (and
+`npm run capture`) copies it there. Both check the MD5 above first.
+`public/music/`, every `*.mp3`, and the rendered `*.mp4` and `*.webm` files
+are gitignored.
 
-`public/music/`, every `*.mp3`, and the rendered `*.mp4` and `*.webm`
-files are gitignored. Never commit them, and never publish the MP3 or the
-renders outside the uses listed above.
+## Ramp It Up (no longer used)
+
+The v1 promo used "Ramp It Up" by Ahjay Stelino (Mixkit item 69, Mixkit
+Stock Music Free License). The v1.1 film no longer uses it: nothing in this
+package reads it, and its copy can be deleted from `public/music/`. Its
+terms (no Content ID registration, no standalone redistribution) applied
+only to that track.
