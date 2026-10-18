@@ -130,7 +130,8 @@ export const Opening: React.FC = () => {
         <FocusLine
           words={words(c1.text)}
           frame={frame}
-          enter={c1.from}
+          // The pull starts as if four frames before the film, so frame 0 already shows the line, still soft (no black thumbnail).
+          enter={c1.from - 4}
           exit={{ start: c1.to - 12, end: c1.to }}
           role={ROLES.displayM}
           color={DARK.text}
@@ -168,7 +169,8 @@ export const Opening: React.FC = () => {
 
 /** A card dropping into its slot: it lands on its beat (a 9-frame settle that ends there), fading in on the way. */
 function dropIn(f: number, at: number) {
-  if (at <= 0) return { y: 0, opacity: tween(f, s1.captions[0].from, s1.captions[0].from + 12, ease.softArrive) };
+  // The first row is there, soft, from frame 0 (the fade starts as if four frames before the film).
+  if (at <= 0) return { y: 0, opacity: tween(f, s1.captions[0].from - 4, s1.captions[0].from + 10, ease.softArrive) };
   const p = spring({ frame: f - (at - 9), fps: 30, config: springs.heroSettle, durationInFrames: 9 });
   return { y: -64 * (1 - p), opacity: tween(f, at - 9, at - 3, ease.softArrive) };
 }
