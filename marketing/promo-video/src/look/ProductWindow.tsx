@@ -231,7 +231,7 @@ const Lifted: React.FC<{ lift: Lift; on: number; src: string; layout: number; sh
  * beside its tip (by default 9 capture px right of and 11 below it; per
  * click, wherever the footage leaves it off every glyph, scripts/
  * pointer-spots.mjs), so it never sits on the text it clicks; a thin green
- * ring around the hotspot where it clicks.
+ * ring round the disc where it clicks.
  */
 export const POINTER_OFFSET = { x: 9, y: 11 } as const;
 
@@ -247,12 +247,13 @@ const Pointer: React.FC<{ state: PointerState; layout: number; k: number }> = ({
         <div
           style={{
             position: "absolute",
-            left: (state.rippleAt?.x ?? state.x) * layout,
-            top: (state.rippleAt?.y ?? state.y) * layout,
-            width: (22 + 40 * ring) * k,
-            height: (22 + 40 * ring) * k,
-            marginLeft: (-(22 + 40 * ring) * k) / 2,
-            marginTop: (-(22 + 40 * ring) * k) / 2,
+            // Round the disc, not the hotspot: the hotspot is on the label clicked, and a ring there crossed its glyphs.
+            left: ((state.rippleAt?.x ?? state.x) + offset.x) * layout,
+            top: ((state.rippleAt?.y ?? state.y) + offset.y) * layout,
+            width: (22 + 26 * ring) * k,
+            height: (22 + 26 * ring) * k,
+            marginLeft: (-(22 + 26 * ring) * k) / 2,
+            marginTop: (-(22 + 26 * ring) * k) / 2,
             borderRadius: "50%",
             border: `${px(2 * k)} solid rgba(31,109,80,${(0.55 * (1 - ring)).toFixed(3)})`,
           }}

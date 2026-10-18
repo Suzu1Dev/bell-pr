@@ -28,8 +28,12 @@ const OFFSETS = [
   [24, 16], [18, 22], [26, 10], [14, 25], [-9, 12], [-13, 9], [28, 20], [20, 26], [30, 26], [24, 30], [34, 18],
   [-18, 26], [36, 28], [28, 34], [40, 22], [-24, 30],
 ];
-/** The disc's radius on screen (1080p px): the 20 px disc, its 2 px white ring and a pixel of margin. */
-const DISC = 13;
+/**
+ * The disc's radius on screen (1080p px): the 20 px disc, its 2 px white ring and two pixels of margin; the click's
+ * ring is drawn round the disc and grows to 24 px, so it is checked too (RING).
+ */
+const DISC = 14;
+const RING = 24;
 /** Clip frames after a click searched for the UI's answer, and the mean step (levels) round the click that counts. */
 const AFTER = 8;
 const CHANGE = 20;
@@ -114,7 +118,12 @@ for (const [state, byClick] of [...shown].sort()) {
         break;
       }
     const R = Math.ceil(DISC / byClick.get(click.t));
-    const cost = ([dx, dy]) => covered(before, click.x + dx, click.y + dy, R) + covered(after, click.x + dx, click.y + dy, R);
+    const ringR = Math.ceil(RING / byClick.get(click.t));
+    // The disc must cover no glyph edge; its ring counts too, at a quarter weight (it is thin and brief).
+    const cost = ([dx, dy]) =>
+      covered(before, click.x + dx, click.y + dy, R) +
+      covered(after, click.x + dx, click.y + dy, R) +
+      Math.floor((covered(before, click.x + dx, click.y + dy, ringR) - covered(before, click.x + dx, click.y + dy, R)) / 4);
     let offset = OFFSETS.find((o) => cost(o) === 0);
     if (!offset) {
       // A dense spot (a row of chips over a line of help text): the offset that covers the least.
