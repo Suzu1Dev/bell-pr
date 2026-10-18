@@ -87,26 +87,19 @@ export const Opening: React.FC = () => {
               if (opened) {
                 // The opened card leaves when it is cleared; a new one drops into its slot, and that one lifts out in S2.
                 const cleared = tween(f, REVIEW.clear, REVIEW.clear + 10, ease.depart);
-                const refill = dropIn(f, REVIEW.refill);
-                return (
-                  <div key={key}>
-                    {cleared < 1 ? (
-                      <PrCard
-                        x={slotX(row, card.slot)}
-                        y={ROWS[row].y + drop.y + 40 * cleared}
-                        scale={ROWS[row].scale}
-                        blur={rest.blur}
-                        alpha={rest.alpha * drop.opacity * (1 - cleared)}
-                        stat={card.stat}
-                        review={tween(f, REVIEW.open, REVIEW.clear, ease.drift)}
-                        focus={tween(f, REVIEW.open, REVIEW.open + 8, ease.softArrive) * (1 - cleared)}
-                      />
-                    ) : null}
-                    {f >= REVIEW.refill - 9 ? (
-                      <LiftedCard x={slotX(row, card.slot)} y={ROWS[row].y + refill.y} alpha={refill.opacity} lift={lift} />
-                    ) : null}
-                  </div>
-                );
+                return cleared < 1 ? (
+                  <PrCard
+                    key={key}
+                    x={slotX(row, card.slot)}
+                    y={ROWS[row].y + drop.y + 40 * cleared}
+                    scale={ROWS[row].scale}
+                    blur={rest.blur}
+                    alpha={rest.alpha * drop.opacity * (1 - cleared)}
+                    stat={card.stat}
+                    review={tween(f, REVIEW.open, REVIEW.clear, ease.drift)}
+                    focus={tween(f, REVIEW.open, REVIEW.open + 8, ease.softArrive) * (1 - cleared)}
+                  />
+                ) : null;
               }
               return (
                 <PrCard
@@ -122,6 +115,15 @@ export const Opening: React.FC = () => {
               );
             }),
         )}
+        {/* The refilled card that lifts out is drawn above the whole queue: its neighbours' blur and shadows never paint over it. */}
+        {f >= REVIEW.refill - 9 ? (
+          <LiftedCard
+            x={slotX(OPENED.row, OPENED.slot)}
+            y={ROWS[OPENED.row].y + dropIn(f, REVIEW.refill).y}
+            alpha={dropIn(f, REVIEW.refill).opacity}
+            lift={lift}
+          />
+        ) : null}
         <Reviewer frame={f} />
       </AbsoluteFill>
       <AbsoluteFill style={{ alignItems: "center" }}>
