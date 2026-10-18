@@ -83,9 +83,10 @@ export async function loadFootage(states: { state: string; clip: boolean }[]): P
       "targets.json",
     );
     const frames = clip ? (await readJson<{ frames: { file: string; t: number }[] }>(state, "frames.json")).frames : undefined;
-    // Optional (npm run assets writes it for the clicks the film shows); without it the disc keeps its default offset.
-    const spotsFile = await fetch(staticFile(`footage-2x/${state}/pointer.json`));
-    const spots = spotsFile.ok ? ((await spotsFile.json()) as { spots: PointerSpot[] }).spots : undefined;
+    // Clips only, and optional (npm run assets writes it for the clicks the film shows); without it the disc keeps
+    // its default offset.
+    const spotsFile = clip ? await fetch(staticFile(`footage-2x/${state}/pointer.json`)) : undefined;
+    const spots = spotsFile?.ok ? ((await spotsFile.json()) as { spots: PointerSpot[] }).spots : undefined;
     footage[state] = { boxes: targets.boxes, events: targets.events, marks: targets.marks ?? {}, frames, spots };
   }
   return footage;
