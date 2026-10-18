@@ -12,8 +12,8 @@ const s3 = shotById("s3-rules");
 const take = takeOf(s3, "logo");
 const end = shotById("s14-end");
 
-/** The wordmark starts to leave two beats after the hit and has gone at the end of its take. */
-export const logoLeaves = take.from + 2 * music.beatFrames;
+/** The wordmark holds at full strength until ten frames before its take ends, then leaves, so the white studio is empty for two or three frames at most. */
+export const logoLeaves = take.to - 10;
 export const logoTake = take;
 
 /** Opacity, scale, blur and lift of the first-hit wordmark at absolute frame f. */

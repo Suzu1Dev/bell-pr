@@ -40,10 +40,12 @@
     "tailEnd": 86.8
   },
   "stop": { "from": 8.518, "to": 9.718 },
+  "crashes": [9.718, 19.318, 48.118, 52.918, 72.118],
   "finalHitWindow": [81.1, 84.0],
   "measuredBy": {
     "finalHit": "scripts/measure-hit.mjs: the largest per-frame RMS rise (30 fps, mono 48 kHz) in video 81.1-84.0 s (finalHitWindow)",
     "landing": "the final E chord (bar 37 downbeat): the first beat of the grid after finalHit; the end-card logo lands on it",
+    "crashes": "script analysis of the edit: the downbeats where the band above 6 kHz jumps about +7 dB and stays up (crash cymbals; source bars 5, 9, 21, 25 and 33); the cut puts a cut on each",
     "others": "script analysis (beat grid, band levels, bar similarity); not yet checked by ear in Remotion Studio"
   },
   "reviewed": false

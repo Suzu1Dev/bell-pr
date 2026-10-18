@@ -5,8 +5,10 @@
  *
  * - an air swell through the exhale of the stop, cut on the first hit (no
  *   impact on the crash itself);
- * - a soft whoosh peaking as each section's floating window lands (two
- *   different files, alternating, at most one per bar);
+ * - a soft whoosh peaking on the frame before each section's floating
+ *   window arrives on its downbeat (or, for the first window, the
+ *   downbeat its rise lands on), so it leads into the beat instead of
+ *   trailing it (two different files, alternating, at most one per bar);
  * - a quiet, dry tick on every click the pointer makes on screen;
  * - a sparse keyboard bed while an answer types out (never per character);
  * - one glint, its onset on the final chord, with the end card's light sweep.
@@ -78,13 +80,14 @@ export function sfxCues(footage: Footage): SfxCue[] {
       const look = looks[shot.id]?.[take.id];
       if (!look) continue;
       if (look.float) {
-        // Peaks as the window arrives: a rise lands on its second key; a turn in place starts on the cut.
-        const landing = take.from + (look.keys.length > 2 ? Math.round(look.keys[1].at * music.beatFrames) : 4);
+        // A rise lands on its gliding key; a turn in place arrives with the cut. The peak leads that downbeat by a frame.
+        const glide = look.keys.find((key) => key.ease === "glide");
+        const landing = take.from + (glide ? Math.round(glide.at * music.beatFrames) : 0);
         const sound = whoosh % 2 === 0 ? SFX.whooshA : SFX.whooshB;
         cues.push({
           name: `whoosh: ${shot.id} window lands`,
           file: sound.file,
-          from: landing - sound.peakFrame,
+          from: landing - 1 - sound.peakFrame,
           trimBefore: 0,
           durationInFrames: sound.peakFrame + 30,
           gainDb: shot.id === "s11-your-words" ? -21 : -17,
@@ -96,7 +99,7 @@ export function sfxCues(footage: Footage): SfxCue[] {
       if (!state || look.still !== undefined) continue;
       const clipFrom = look.clipFrom ?? 0;
       const rate = look.rate ?? 1;
-      const clipTo = clipFrom + ((take.to - take.from) / 30) * rate;
+      const clipTo = Math.min(look.clipTo ?? Infinity, clipFrom + ((take.to - take.from) / 30) * rate);
       const filmFrame = (t: number) => take.from + Math.round(((t - clipFrom) / rate) * 30);
       for (const click of clicksBetween(state.events, clipFrom, clipTo))
         cues.push({
@@ -114,7 +117,7 @@ export function sfxCues(footage: Footage): SfxCue[] {
         const b = state.marks[end];
         if (a === undefined || b === undefined) continue;
         const from = Math.max(take.from, filmFrame(a));
-        const to = Math.min(take.to, filmFrame(b));
+        const to = Math.min(take.to, filmFrame(Math.min(b, clipTo)));
         if (to - from < 8) continue;
         cues.push({
           name: `keys: ${shot.id} ${start}`,

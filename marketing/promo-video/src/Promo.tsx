@@ -9,6 +9,7 @@ import type { Footage } from "./footage.ts";
 import "./look/fonts.ts";
 import { GlassCaptions } from "./look/Captions.tsx";
 import { BrandHit } from "./scenes/BrandHit.tsx";
+import { ClimaxTitle, climaxTitle } from "./scenes/ClimaxTitle.tsx";
 import { EndCard } from "./scenes/EndCard.tsx";
 import { Opening } from "./scenes/Opening.tsx";
 import { ProductShot } from "./scenes/ProductShot.tsx";
@@ -39,11 +40,14 @@ export const Promo: React.FC<PromoProps> = ({ footage, music = true, sfx = true 
         .filter((shot) => shot.from >= opening.to && shot.id !== end.id)
         .map((shot) => (
           <Sequence key={shot.id} from={shot.from} durationInFrames={shot.to - shot.from} name={`${shot.id}: ${shot.title}`}>
-            <ProductShot shot={shot} footage={footage} skip={["logo"]} />
+            <ProductShot shot={shot} footage={footage} skip={["logo", "title"]} />
           </Sequence>
         ))}
       <Sequence from={logo.from} durationInFrames={logo.to - logo.from} name="S3 logo on the hit">
         <BrandHit />
+      </Sequence>
+      <Sequence from={climaxTitle.from} durationInFrames={climaxTitle.to - climaxTitle.from} name="S9 title on the dark stage">
+        <ClimaxTitle />
       </Sequence>
       <Sequence from={end.from} durationInFrames={end.to - end.from} name="S14 end card">
         <EndCard />

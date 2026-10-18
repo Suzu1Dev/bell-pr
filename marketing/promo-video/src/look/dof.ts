@@ -11,3 +11,15 @@ export function focusRect(x0: number, y0: number, x1: number, y1: number, feathe
     `linear-gradient(180deg, ${out} ${y0 - feather}cpx, #000 ${y0}cpx, #000 ${y1}cpx, ${out} ${y1 + feather}cpx)`,
   ];
 }
+
+export type Rect = [x0: number, y0: number, x1: number, y1: number];
+
+/** The sharp plane moving from rect `a` to rect `b` between beats `from` and `to` (a rack across the UI, `standard`). */
+export const rackRect =
+  (a: Rect, b: Rect, from: number, to: number, feather = 40) =>
+  (amount: number, beats: number): string[] => {
+    const x = Math.min(1, Math.max(0, (beats - from) / Math.max(1e-6, to - from)));
+    const t = x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2;
+    const r = a.map((v, i) => v + (b[i] - v) * t) as Rect;
+    return focusRect(r[0], r[1], r[2], r[3], feather, amount);
+  };

@@ -11,8 +11,11 @@
  * Flex rules (VIDEO.md §3; src/timeline.test.ts asserts them):
  * 1. An anchored shot starts on its event. The shots between two anchors
  *    share the gap in proportion to their nominal seconds, each clamped to
- *    its min-max, and every cut snaps to the nearest beat (the other
- *    neighbouring beat when the nearest one breaks a limit).
+ *    its min-max, and every cut snaps to the grid: to the nearest bar line
+ *    (section changes on downbeats, lookdev STYLE-GUIDE §2.2), else the
+ *    nearest half-bar (beat 3), else the nearest beat, taking at each step
+ *    the nearest candidate or a neighbour that keeps every limit. Takes
+ *    are placed on half-bars (src/timeline.test.ts).
  * 2. A gap shorter than the sum of the minimums: drop the second caption
  *    beat of S3, then of S11; merge S10 into the tail of S9; drop S8.
  *    S6, S7 and S9 never go below nominal. A shot bounded by two anchors
@@ -108,20 +111,21 @@ export const shotSpecs: ShotSpec[] = [
       { text: "First, read the project’s rules.", from: 5, to: 10, place: "bottom-left" },
       { text: "Every rule, quoted from its source.", from: 10, place: "bottom-left" },
     ],
+    // The window starts to rise a beat before the bar-6 downbeat it lands on (anticipate, then land).
     takes: [{ id: "logo", until: 3 }, { id: "establish", until: 10 }, { id: "rules" }],
   },
   {
     id: "s4-still-yours",
     title: "Still yours",
     seconds: secondsAt120(2, 2.5, 3),
-    captions: [{ text: "Check the issue is still yours.", from: 1, to: 5, place: "bottom-left" }],
-    takes: [{ id: "chips", until: 5 }, { id: "plan" }],
+    captions: [{ text: "Check the issue is still yours.", from: 0.5, to: 4, place: "bottom-left" }],
+    takes: [{ id: "chips", until: 4 }, { id: "plan" }],
   },
   {
     id: "s5-legwork",
     title: "Legwork",
     seconds: secondsAt120(2, 2, 3),
-    captions: [{ text: "Agents do the legwork,\non your own machine.", from: 1, place: "top-right" }],
+    captions: [{ text: "Agents do the legwork,\non your own machine.", from: 1, place: "bottom-left" }],
     takes: [{ id: "board" }],
   },
   {
@@ -132,10 +136,10 @@ export const shotSpecs: ShotSpec[] = [
     keepNominal: true,
     holdOrder: 2,
     captions: [
-      { text: "Answer first.", from: 1, to: 6, place: "bottom-left" },
+      { text: "Answer first.", from: 2, to: 6, place: "bottom-left" },
       { text: "Then see the explanation.", from: 6, place: "bottom-left" },
     ],
-    takes: [{ id: "establish", until: 5 }, { id: "answer", until: 11 }, { id: "example" }],
+    takes: [{ id: "establish", until: 2 }, { id: "answer", until: 6 }, { id: "reveal", until: 8 }, { id: "example" }],
   },
   {
     id: "s7-taste",
@@ -143,18 +147,18 @@ export const shotSpecs: ShotSpec[] = [
     seconds: secondsAt120(3, 3, 4),
     keepNominal: true,
     captions: [
-      { text: "Which way would you do it?", from: 0.5, to: 5, place: "bottom-left" },
-      { text: "Taste grows by weighing trade-offs.", from: 5, place: "bottom-left" },
+      { text: "Which way would you do it?", from: 0.5, to: 4, place: "bottom-right" },
+      { text: "Taste grows by weighing trade-offs.", from: 4, place: "bottom-right" },
     ],
-    takes: [{ id: "guess", until: 5 }, { id: "keep" }],
+    takes: [{ id: "guess", until: 4 }, { id: "keep", until: 6 }, { id: "why" }],
   },
   {
     id: "s8-ask",
     title: "Ask",
     seconds: secondsAt120(2, 2, 3),
     droppable: true,
-    captions: [{ text: "Stuck on a line? Ask about it.", from: 0.5, place: "bottom-left" }],
-    takes: [{ id: "select", until: 3 }, { id: "answer" }],
+    captions: [{ text: "Stuck on a line? Ask about it.", from: 0.5, place: "top-left" }],
+    takes: [{ id: "select", until: 4 }, { id: "answer" }],
   },
   {
     id: "s9-explain-back",
@@ -163,15 +167,17 @@ export const shotSpecs: ShotSpec[] = [
     seconds: secondsAt120(4, 5, 6),
     keepNominal: true,
     holdOrder: 1,
+    // The climax opens on the dark stage with its line as display type, then "lights on" to the window.
     captions: [
-      { text: "Before it ships, explain it back.", from: 1, to: 13, place: "bottom-left" },
-      { text: "Missed something? Fix it in a line.", from: 13, place: "bottom-left" },
+      { text: "Before it ships, explain it back.", from: 0, to: 4, style: "title" },
+      { text: "Missed something? Fix it in a line.", from: 12, place: "bottom-left" },
     ],
     takes: [
-      { id: "establish", until: 4 },
-      { id: "summary", until: 7 },
-      { id: "answer", until: 13 },
-      { id: "grade" },
+      { id: "title", until: 4 },
+      { id: "establish", until: 8 },
+      { id: "question", until: 12 },
+      { id: "partly", until: 14 },
+      { id: "result" },
     ],
   },
   {
@@ -179,8 +185,8 @@ export const shotSpecs: ShotSpec[] = [
     title: "Predict",
     seconds: secondsAt120(2, 2, 3),
     mergeInto: "s9-explain-back",
-    captions: [{ text: "Predict what the maintainer will ask.", from: 0.5, place: "bottom-left" }],
-    takes: [{ id: "forecast" }],
+    captions: [{ text: "Predict what the maintainer will ask.", from: 0.5, place: "bottom-right" }],
+    takes: [{ id: "tests", until: 3 }, { id: "line" }],
   },
   {
     id: "s11-your-words",
@@ -190,8 +196,8 @@ export const shotSpecs: ShotSpec[] = [
     minOneCaption: 4,
     holdOrder: 3,
     captions: [
-      { text: "Your words. The project’s rules.", from: 1, to: 5, place: "bottom-left" },
-      { text: "And what you didn’t test.", from: 5, to: 8, place: "bottom-left" },
+      { text: "Your words. The project’s rules.", from: 1, to: 7, place: "bottom-right" },
+      { text: "And what you didn’t test.", from: 7, place: "bottom-right" },
     ],
     takes: [{ id: "establish", until: 4 }, { id: "words", until: 8 }, { id: "checklist" }],
   },
@@ -199,15 +205,15 @@ export const shotSpecs: ShotSpec[] = [
     id: "s12-send-one",
     title: "Send one",
     seconds: secondsAt120(2, 2.5, 3),
-    captions: [{ text: "One Draft PR. Then stay for the review.", from: 1, place: "bottom-left" }],
-    takes: [{ id: "dialog", until: 5 }, { id: "published" }],
+    captions: [{ text: "One Draft PR. Then stay for the review.", from: 1, place: "top-left" }],
+    takes: [{ id: "dialog", until: 4 }, { id: "published" }],
   },
   {
     id: "s13-learn",
     title: "Learn",
     seconds: secondsAt120(2, 3, 3),
-    captions: [{ text: "Learn from what they actually said.", from: 0.5, to: 5, place: "bottom-left" }],
-    takes: [{ id: "compare", until: 5 }, { id: "practice" }],
+    captions: [{ text: "Learn from what they actually said.", from: 0.5, place: "bottom-left" }],
+    takes: [{ id: "compare", until: 4 }, { id: "practice", until: 6 }, { id: "next" }],
   },
   {
     id: "s14-end",
@@ -388,10 +394,8 @@ export function buildTimeline(music: Music = loadedMusic, specs: ShotSpec[] = sh
       ideal += length.get(shot)! * fps;
       let to = phrase.end;
       if (index < phrase.shots.length - 1) {
-        const step = phrase.shots[index + 1].barStart ? music.beatsPerBar : 1;
-        const near = music.nearestBeat(Math.round(ideal), step);
-        const index0 = music.nearestBeatIndex(Math.round(ideal), step);
-        const candidates = [near, music.beatFrame(index0 - step), music.beatFrame(index0 + step)];
+        // Bar line first, then half-bar, then beat (a bar line only after a missing anchor, rule 4).
+        const steps = phrase.shots[index + 1].barStart ? [music.beatsPerBar] : [music.beatsPerBar, music.beatsPerBar / 2, 1];
         const fits = (end: number) => {
           const seconds = (end - from) / fps;
           const restMin = phrase.shots.slice(index + 1).reduce((total, s) => total + s.min, 0);
@@ -401,7 +405,13 @@ export function buildTimeline(music: Music = loadedMusic, specs: ShotSpec[] = sh
             seconds >= shot.min - 1e-9 && seconds <= shot.max + 1e-9 && rest >= restMin - 1e-9 && rest <= restMax + 1e-9
           );
         };
-        to = candidates.find(fits) ?? near;
+        let found: number | undefined;
+        for (const step of steps) {
+          const index0 = music.nearestBeatIndex(Math.round(ideal), step);
+          found = [index0, index0 - step, index0 + step].map(music.beatFrame).find(fits);
+          if (found !== undefined) break;
+        }
+        to = found ?? music.nearestBeat(Math.round(ideal), steps[0]);
       }
       const first = music.beatIndexAtOrAfter(from);
       shots.push(resolveShot(music, shot, from, to, first, bounded));

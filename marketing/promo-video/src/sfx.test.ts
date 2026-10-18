@@ -47,8 +47,9 @@ test("ticks fall on the clicks the pointer makes on screen, and nowhere else", (
       const look = looks[shot.id]?.[take.id];
       if (!look || look.still) continue;
       const clipFrom = look.clipFrom ?? 0;
-      const frame = take.from + Math.round((1 - clipFrom) * 30);
-      if (clipFrom <= 1 && frame < take.to) expected.push(frame);
+      const rate = look.rate ?? 1;
+      const frame = take.from + Math.round(((1 - clipFrom) / rate) * 30);
+      if (clipFrom <= 1 && (look.clipTo ?? Infinity) > 1 && frame < take.to) expected.push(frame);
     }
   const ticks = cues.filter((cue) => cue.name.startsWith("tick")).map((cue) => cue.from);
   assert.deepEqual(ticks.sort((a, b) => a - b), expected.sort((a, b) => a - b));
@@ -68,4 +69,11 @@ test("one glint, its onset on the final chord with the end card's light sweep", 
   const glints = cues.filter((cue) => cue.name.startsWith("glint"));
   assert.equal(glints.length, 1);
   assert.equal(glints[0].from + SFX.glint.onsetFrame, chordFrame);
+});
+
+test("each whoosh peaks on the frame before its window's downbeat, leading into the beat", () => {
+  const whooshes = cues.filter((cue) => cue.name.startsWith("whoosh"));
+  const peaks = whooshes.map((cue) => cue.from + (cue.file === SFX.whooshA.file ? SFX.whooshA.peakFrame : SFX.whooshB.peakFrame));
+  const downbeats = [music.barFrame(6), music.events.lift, music.barFrame(22), music.events.accent!];
+  assert.deepEqual(peaks, downbeats.map((frame) => frame - 1));
 });

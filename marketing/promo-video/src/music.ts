@@ -41,6 +41,8 @@ export interface TrackAnalysis {
   };
   events: Record<RequiredEvent, number> & Partial<Record<OptionalEvent, number>>;
   stop?: { from: number; to: number };
+  /** Video seconds of the crash downbeats (the cut puts a cut on each). */
+  crashes?: number[];
   finalHitWindow: [number, number];
   measuredBy: Record<string, string>;
   reviewed: boolean;
@@ -145,6 +147,8 @@ export function createMusic(track: TrackAnalysis) {
     landingFrame,
     /** The 2-beat stop before the first hit (kick and bass out), if the track has one. */
     stop: track.stop ? { from: frameOf(track.stop.from), to: frameOf(track.stop.to) } : undefined,
+    /** The crash downbeats, in frames: each one is a cut (src/timeline.test.ts). */
+    crashes: (track.crashes ?? []).map(frameOf),
     musicFile: track.audioFile,
     gainDb: track.loudness.gainDb,
     volume: 10 ** (track.loudness.gainDb / 20),

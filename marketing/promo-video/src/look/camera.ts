@@ -38,8 +38,9 @@ export const floating = (width: number, { x = 0, y = 0, rx = 0, ry = 0 } = {}): 
  * A push-in on capture point (cx, cy) at magnification m, placed at screen
  * (sx, sy). By default the placement is nudged so the projected window
  * covers every frame edge by at least 20 px (no sliver of studio at an edge;
- * the tilt's perspective is taken into account), or, with `right`/`left`,
- * shows that one window edge on purpose that many px inside the frame. An
+ * the tilt's perspective is taken into account), or, with `right`/`left`
+ * (and `bottom`), shows that window edge on purpose that many px inside
+ * the frame, with the studio beyond it. An
  * axis the window is too small to cover is centred (src/look.test.ts then
  * asks for at least 60 px of studio on both sides).
  */
@@ -55,6 +56,7 @@ export const push = (
     cover = true,
     right,
     left,
+    bottom,
   }: {
     sx?: number;
     sy?: number;
@@ -64,10 +66,12 @@ export const push = (
     /** Show the window's right (or left) edge this many px inside the frame, with the studio beyond it. */
     right?: number;
     left?: number;
+    /** Show the window's bottom edge this many px above the frame's bottom, a strip of studio under it. */
+    bottom?: number;
   } = {},
 ): View => {
   let view: View = { cx, cy, m, sx, sy, rx, ry };
-  if (!cover && right === undefined && left === undefined) return view;
+  if (!cover && right === undefined && left === undefined && bottom === undefined) return view;
   const M = 20;
   for (let i = 0; i < 12; i += 1) {
     const [tl, tr, br, bl] = corners(view);
@@ -80,7 +84,8 @@ export const push = (
       const gapR = 1920 + M - Math.min(tr.x, br.x);
       dx = gapL > 0 && gapR > 0 ? (gapR - gapL) / 2 : gapL > 0 ? -gapL : gapR > 0 ? gapR : 0;
     }
-    if (cover) {
+    if (bottom !== undefined) dy = 1080 - bottom - (bl.y + br.y) / 2;
+    else if (cover) {
       const gapT = Math.max(tl.y, tr.y) + M;
       const gapB = 1080 + M - Math.min(bl.y, br.y);
       dy = gapT > 0 && gapB > 0 ? (gapB - gapT) / 2 : gapT > 0 ? -gapT : gapB > 0 ? gapB : 0;

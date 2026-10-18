@@ -35,11 +35,60 @@ test("every anchored shot starts on its event frame", () => {
   for (const shot of anchored) assert.equal(shot.from, music.events[shot.anchor!], shot.id);
 });
 
-test("every other cut, and every cut between takes, lands on a beat", () => {
-  for (const shot of timeline.shots) {
-    if (!shot.anchor) assert.ok(music.onBeat(shot.from), `${shot.id} at ${shot.from}`);
-    for (const take of shot.takes.slice(1)) assert.ok(music.onBeat(take.from), `${shot.id}/${take.id} at ${take.from}`);
+/** The beat index of a frame on the grid (a whole number when the frame is on a beat). */
+const beatIndex = (frame: number) => music.nearestBeatIndex(frame);
+const onHalfBar = (frame: number) => music.onBeat(frame) && beatIndex(frame) % 2 === 0;
+const onBar = (frame: number) => music.onBeat(frame) && beatIndex(frame) % music.beatsPerBar === 0;
+
+test("section changes on bar lines, else half-bars; a beat only where the limits leave nothing else", () => {
+  const offBar: string[] = [];
+  const offHalf: string[] = [];
+  for (const shot of timeline.shots.filter((s) => !s.anchor)) {
+    assert.ok(music.onBeat(shot.from), `${shot.id} at ${shot.from}`);
+    if (!onBar(shot.from)) offBar.push(shot.id);
+    if (!onHalfBar(shot.from)) offHalf.push(shot.id);
   }
+  // S7 and S13 take a half-bar: a bar line would break S6/S7/S8's or S12/S13's limits.
+  assert.deepEqual(offBar, ["s7-taste", "s10-predict", "s13-learn"]);
+  // S10 starts on beat 2 of bar 25: S9 never goes under its nominal 10 s and S10 needs its 4 s minimum,
+  // and the climax-to-accent gap (14.4 s) leaves only that beat (a bar line or half-bar breaks one of them).
+  assert.deepEqual(offHalf, ["s10-predict"]);
+  const s9 = timeline.shots.find((s) => s.id === "s9-explain-back")!;
+  for (const step of [2, 4]) {
+    const index = beatIndex(s9.to);
+    for (const candidate of [Math.floor(index / step) * step, Math.ceil(index / step) * step]) {
+      const cut = music.beatFrame(candidate);
+      const s9s = seconds(cut - s9.from);
+      const s10s = seconds(music.events.accent! - cut);
+      assert.ok(s9s < 10 - 1e-9 || s10s < 4 - 1e-9, `a cut at ${cut} would keep both limits`);
+    }
+  }
+});
+
+test("cuts between takes fall on half-bars (beat 1 or 3), but for the rise a beat before the bar-6 downbeat", () => {
+  for (const shot of timeline.shots)
+    for (const take of shot.takes.slice(1)) {
+      if (shot.id === "s3-rules" && take.id === "establish") {
+        // Anticipate, then land: the window starts to rise on beat 4 and lands on the bar line after it.
+        assert.ok(music.onBeat(take.from) && onBar(take.from + music.beatFrames), `${take.from}`);
+        continue;
+      }
+      if (shot.id === "s10-predict") {
+        // S10 starts off the half-bar grid (above); its takes keep to beats.
+        assert.ok(music.onBeat(take.from), `${shot.id}/${take.id} at ${take.from}`);
+        continue;
+      }
+      assert.ok(onHalfBar(take.from), `${shot.id}/${take.id} at ${take.from}`);
+    }
+});
+
+test("every crash downbeat of the track is a cut (within a frame)", () => {
+  assert.ok(music.crashes.length >= 3);
+  const cuts = timeline.shots.flatMap((shot) => [shot.from, ...shot.takes.slice(1).map((take) => take.from)]);
+  for (const crash of music.crashes)
+    assert.ok(cuts.some((cut) => Math.abs(cut - crash) <= 1), `the crash at ${crash} (${seconds(crash).toFixed(3)} s) is a cut`);
+  // The two clearest crashes, bar 9 and the loudest downbeat (bar 23), and the last phrase's return (bar 31).
+  for (const frame of [579, 1587, 2163]) assert.ok(cuts.includes(frame), `${frame}`);
 });
 
 test("every shot keeps its limits in seconds; only shots fixed by two anchors may not", () => {
