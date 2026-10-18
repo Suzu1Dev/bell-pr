@@ -55,7 +55,7 @@ export interface TakeLook {
 export const PUSH_MAX_M = 2.0;
 export const MACRO_MAX_M = 2.6;
 
-const REST = { width: 1340, x: 70, y: -48, rx: 5, ry: -9 };
+const REST = { width: 1320, x: 80, y: -72, rx: 5, ry: -9 };
 
 /**
  * The establishing move of a section after the first (B's turn to face):

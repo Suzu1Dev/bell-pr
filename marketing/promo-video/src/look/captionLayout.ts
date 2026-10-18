@@ -5,15 +5,18 @@
  */
 import type { Caption } from "../timeline.ts";
 
-/** The caption role of the type scale (lookdev STYLE-GUIDE §3.2, between Supporting and Label). */
-export const CAPTION_ROLE = { size: 46, weight: 560, tracking: -0.012, lineHeight: 1.18 } as const;
+/**
+ * The caption role of the type scale: a step above Supporting (lookdev STYLE-GUIDE §3.2), so the line still reads
+ * at about 11-12 px in a phone-width embed of the 1080p film (review round 6).
+ */
+export const CAPTION_ROLE = { size: 56, weight: 560, tracking: -0.012, lineHeight: 1.18 } as const;
 
 export const CARD_MARGIN = { x: 96, y: 80 } as const;
 export const CARD_PAD = { x: 38, top: 26, bottom: 28 } as const;
 export const CARD_LINE = CAPTION_ROLE.size * CAPTION_ROLE.lineHeight;
 
 /**
- * A generous estimate of a caption line's width (DM Sans 560 at 46 px, about
+ * A generous estimate of a caption line's width (DM Sans 560 at 56 px, about
  * 0.53 em a character, rounded up) for the layout tests, where no font is
  * loaded; the film measures the real text.
  */

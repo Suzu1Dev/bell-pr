@@ -7,8 +7,12 @@
  *   mask-rise from 70% risen, starting two frames later, so the card is
  *   never empty and no glyph tops show alone (COMPARISON.md must-fix 6).
  * - A cue that follows another one in the same shot keeps the same card:
- *   the old lines drop out over their last 6 frames, the card's size eases
- *   to the new text and the new lines rise (K2), so the card never blinks.
+ *   the old lines drop out over their last 6 frames at the old size; then,
+ *   on the new cue's first frame, the card eases to the new text's size as
+ *   the new lines rise (K2), so the card never blinks and never shows the
+ *   old text off-centre in a resized card; a card that grows uncovers the
+ *   end of the rising line as it opens (the card eases out over 5 frames,
+ *   fast first, and the line starts rising a frame in, still faint).
  * - A cue that ends on a cut leaves with the cut.
  *
  * The title cues (S1, S2, S9's first line, S14) are drawn by their scenes
@@ -25,7 +29,8 @@ import { SANS } from "./fonts.ts";
 import { ROLES, roleStyle } from "./type.tsx";
 import { CARD_PAD, cardBox, cardPlace, estimateWidth } from "./captionLayout.ts";
 
-const SWAP = 10;
+/** Frames over which a kept card eases to the new cue's size, from its first frame. */
+const SWAP = 5;
 
 const widths = new Map<string, number>();
 /** The rendered width of a caption line, measured once in the page with the loaded font. */
@@ -77,21 +82,15 @@ export const GlassCaptions: React.FC = () => {
   const from = before(cue, timeline.captions);
   const next = after(cue, timeline.captions);
   const box = cardBox(cue, measureLine);
-  // A hand-over keeps the card and eases its size, so the text inside always fits: a card that must grow
-  // grows while the old lines leave (before the new ones come in); one that may shrink shrinks after them.
+  // A hand-over keeps the card: it holds the old size while the old lines leave, then eases to the new size from
+  // the new cue's first frame, as the new lines rise.
   let width = box.width;
   let height = box.height;
-  const nextBox = next ? cardBox(next, measureLine) : undefined;
-  if (nextBox) {
-    const grow = ease.standard(Math.min(1, Math.max(0, (frame - (cue.to - 6)) / 6)));
-    width = mix(box.width, Math.max(box.width, nextBox.width), grow);
-    height = mix(box.height, Math.max(box.height, nextBox.height), grow);
-  }
   if (from) {
     const old = cardBox(from, measureLine);
-    const shrink = ease.standard(Math.min(1, (frame - cue.from) / SWAP));
-    width = Math.max(width, mix(Math.max(old.width, box.width), box.width, shrink));
-    height = Math.max(height, mix(Math.max(old.height, box.height), box.height, shrink));
+    const swap = ease.arrive(Math.min(1, (frame - cue.from) / SWAP));
+    width = mix(old.width, box.width, swap);
+    height = mix(old.height, box.height, swap);
   }
   const { left, top } = cardPlace(cue.place, width, height);
   // Lines leave over the cue's last frames when the next cue keeps the card.
@@ -124,7 +123,7 @@ export const GlassCaptions: React.FC = () => {
       >
         <div style={{ position: "absolute", left: CARD_PAD.x, top: CARD_PAD.top }}>
           {cue.lines.map((line, index) => (
-            <MaskRise key={`${cue.from}-${index}`} frame={frame} enter={cue.from + (from ? 0 : 2) + index * 4} leave={leave}>
+            <MaskRise key={`${cue.from}-${index}`} frame={frame} enter={cue.from + (from ? 1 : 2) + index * 4} leave={leave}>
               <div style={{ ...roleStyle(ROLES.caption), color: LIGHT.ink }}>{line}</div>
             </MaskRise>
           ))}
