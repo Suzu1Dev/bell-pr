@@ -18,7 +18,10 @@
  *    are placed on half-bars (src/timeline.test.ts).
  * 2. A gap shorter than the sum of the minimums: drop the second caption
  *    beat of S3, then of S11; merge S10 into the tail of S9; drop S8.
- *    S6, S7 and S9 never go below nominal. A shot bounded by two anchors
+ *    S6, S7 and S9 never go below nominal, counted in the track's own bars:
+ *    the 120 BPM nominal scaled to this tempo and rounded to the half-bar
+ *    grid the cuts live on (S9's 5 bars at 120 BPM are 4.17 bars at 100 BPM:
+ *    4 bars, 9.6 s). A shot bounded by two anchors
  *    takes its whole gap: the music fixes it (here S1, intro to riser,
  *    4.9 s: the "tighter opening" the lead's addendum accepts).
  * 3. A gap longer than the sum of the maximums: hold S9, then S6, then S11.
@@ -63,7 +66,7 @@ export interface ShotSpec {
   takes: TakeSpec[];
   /** Flex rule 2: the shot's minimum once its second caption beat is dropped. */
   minOneCaption?: number;
-  /** Flex rule 2: never shortened below nominal. */
+  /** Flex rule 2: never shortened below nominal (in the track's bars, on the half-bar grid). */
   keepNominal?: boolean;
   /** Flex rule 2: merged into the tail of this shot when the gap is short. */
   mergeInto?: string;
@@ -186,7 +189,7 @@ export const shotSpecs: ShotSpec[] = [
     seconds: secondsAt120(2, 2, 3),
     mergeInto: "s9-explain-back",
     captions: [{ text: "Predict what the maintainer will ask.", from: 0.5, place: "bottom-left" }],
-    takes: [{ id: "tests", until: 3 }, { id: "line" }],
+    takes: [{ id: "tests", until: 4 }, { id: "line" }],
   },
   {
     id: "s11-your-words",
@@ -286,6 +289,15 @@ interface Working {
   barStart: boolean;
 }
 
+/**
+ * A nominal length counted in the track's own bars: the seconds (bars at 120 BPM) on this tempo, rounded to the
+ * nearest half-bar, the grid the cuts live on (S9: 10 s is 4.17 bars at 100 BPM, so 4 bars, 9.6 s).
+ */
+export const nominalOnGrid = (music: Music, seconds: number) => {
+  const half = (music.beatsPerBar / 2) * (music.beatFrames / fps);
+  return Math.round(seconds / half - 1e-9) * half;
+};
+
 /** Lays the shots on `music` by the flex rules. */
 export function buildTimeline(music: Music = loadedMusic, specs: ShotSpec[] = shotSpecs): Timeline {
   const flexSteps: string[] = [];
@@ -297,7 +309,7 @@ export function buildTimeline(music: Music = loadedMusic, specs: ShotSpec[] = sh
   for (const spec of specs) {
     const working: Working = {
       spec,
-      min: spec.keepNominal ? spec.seconds.nominal : spec.seconds.min,
+      min: spec.keepNominal ? nominalOnGrid(music, spec.seconds.nominal) : spec.seconds.min,
       nominal: spec.seconds.nominal,
       max: spec.seconds.max,
       captions: [...spec.captions],

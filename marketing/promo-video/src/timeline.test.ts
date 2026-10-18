@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createMusic, fps, music, type TrackAnalysis } from "./music.ts";
-import { END_HOLD_SECONDS, FADE_OUT_FRAMES, buildTimeline, shotSpecs, timeline } from "./timeline.ts";
+import { END_HOLD_SECONDS, FADE_OUT_FRAMES, buildTimeline, nominalOnGrid, shotSpecs, timeline } from "./timeline.ts";
 
 const analysis = JSON.parse(readFileSync(new URL("../music/track.analysis.json", import.meta.url), "utf8")) as TrackAnalysis;
 const seconds = (frames: number) => frames / fps;
@@ -50,20 +50,20 @@ test("section changes on bar lines, else half-bars; a beat only where the limits
     if (!onHalfBar(shot.from)) offHalf.push(shot.id);
   }
   // S7 and S13 take a half-bar: a bar line would break S6/S7/S8's or S12/S13's limits.
-  assert.deepEqual(offBar, ["s7-taste", "s10-predict", "s13-learn"]);
-  // S10 starts on beat 2 of bar 25: S9 never goes under its nominal 10 s and S10 needs its 4 s minimum,
-  // and the climax-to-accent gap (14.4 s) leaves only that beat (a bar line or half-bar breaks one of them).
-  assert.deepEqual(offHalf, ["s10-predict"]);
+  assert.deepEqual(offBar, ["s7-taste", "s13-learn"]);
+  assert.deepEqual(offHalf, []);
+  // S9 is the climax's 4 bars (its 5 bars at 120 BPM, 4.17 at this tempo, on the half-bar grid) and S10 the 2 bars
+  // left before the accent: the cut is on the bar-25 downbeat, not on a weak beat.
   const s9 = timeline.shots.find((s) => s.id === "s9-explain-back")!;
-  for (const step of [2, 4]) {
-    const index = beatIndex(s9.to);
-    for (const candidate of [Math.floor(index / step) * step, Math.ceil(index / step) * step]) {
-      const cut = music.beatFrame(candidate);
-      const s9s = seconds(cut - s9.from);
-      const s10s = seconds(music.events.accent! - cut);
-      assert.ok(s9s < 10 - 1e-9 || s10s < 4 - 1e-9, `a cut at ${cut} would keep both limits`);
-    }
-  }
+  assert.equal(s9.to - s9.from, 4 * music.barFrames);
+  assert.ok(onBar(s9.to));
+});
+
+test("a shot kept at nominal is counted in the track's bars, rounded to the half-bar grid", () => {
+  const halfBar = (music.beatsPerBar / 2) * (music.beatFrames / fps);
+  assert.equal(nominalOnGrid(music, 10), 8 * halfBar); // S9: 4.17 bars at 100 BPM -> 4 bars
+  assert.equal(nominalOnGrid(music, 8), 7 * halfBar); // S6: 3.33 bars -> 3.5
+  assert.equal(nominalOnGrid(music, 6), 5 * halfBar); // S7: 2.5 bars
 });
 
 test("cuts between takes fall on half-bars (beat 1 or 3), but for the rise a beat before the bar-6 downbeat", () => {
@@ -72,11 +72,6 @@ test("cuts between takes fall on half-bars (beat 1 or 3), but for the rise a bea
       if (shot.id === "s3-rules" && take.id === "establish") {
         // Anticipate, then land: the window starts to rise on beat 4 and lands on the bar line after it.
         assert.ok(music.onBeat(take.from) && onBar(take.from + music.beatFrames), `${take.from}`);
-        continue;
-      }
-      if (shot.id === "s10-predict") {
-        // S10 starts off the half-bar grid (above); its takes keep to beats.
-        assert.ok(music.onBeat(take.from), `${shot.id}/${take.id} at ${take.from}`);
         continue;
       }
       assert.ok(onHalfBar(take.from), `${shot.id}/${take.id} at ${take.from}`);
@@ -103,10 +98,10 @@ test("every shot keeps its limits in seconds; only shots fixed by two anchors ma
     timeline.shots.filter((shot) => shot.bounded).map((shot) => shot.id),
     ["s1-problem", "s2-turn", "s14-end"],
   );
-  // S6, S7 and S9 never go below nominal.
+  // S6, S7 and S9 never go below nominal (in the track's bars).
   for (const id of ["s6-try-first", "s7-taste", "s9-explain-back"]) {
     const shot = timeline.shots.find((s) => s.id === id)!;
-    assert.ok(seconds(shot.to - shot.from) >= shot.spec.seconds.nominal - 1e-9, id);
+    assert.ok(seconds(shot.to - shot.from) >= nominalOnGrid(music, shot.spec.seconds.nominal) - 1e-9, id);
   }
 });
 
@@ -180,7 +175,7 @@ test("flex rule 2: a learn-the-change phrase too short for all three drops S8, n
   assert.ok(cut.flexSteps.includes("s8-ask dropped"), cut.flexSteps.join("; "));
   for (const id of ["s6-try-first", "s7-taste"]) {
     const shot = cut.shots.find((s) => s.id === id)!;
-    assert.ok(seconds(shot.to - shot.from) >= shot.spec.seconds.nominal - 1e-9, id);
+    assert.ok(seconds(shot.to - shot.from) >= nominalOnGrid(music, shot.spec.seconds.nominal) - 1e-9, id);
   }
 });
 
