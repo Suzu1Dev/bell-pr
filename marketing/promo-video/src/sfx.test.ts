@@ -55,7 +55,7 @@ test("ticks fall on the clicks the pointer makes on screen, and nowhere else", (
 
 test("levels stay under the music: swells and whooshes at -15 dB or lower, ticks and keys lower still", () => {
   for (const cue of cues) {
-    const ceiling = /^(swell|whoosh)/.test(cue.name) ? -15 : -20;
+    const ceiling = /^(swell|whoosh)/.test(cue.name) ? -15 : -19;
     assert.ok(cue.gainDb <= ceiling, `${cue.name}: ${cue.gainDb} dB`);
     assert.ok(cue.from >= 0 && cue.from + cue.durationInFrames <= timeline.durationInFrames, cue.name);
   }

@@ -11,8 +11,11 @@
  * - a sparse keyboard bed while an answer types out (never per character);
  * - one glint with the end card's light sweep.
  *
- * Levels sit 10-20 LU under the music at their moments; the full mix stays
- * within +0.3 LU of the music alone (measured by scripts/check-output.mjs).
+ * Levels (measured against a music-only render, review.md): the swell and
+ * the whooshes sit 17-23 dB under the music at their moments, the glint
+ * about 20, the ticks and the keyboard bed lower still; alone, no effect
+ * peaks above -16 dBTP and no tick above -20 dBTP; the full mix measures
+ * the same integrated loudness as the music alone.
  */
 import type { Footage } from "./footage.ts";
 import { exhale } from "./moments.ts";
@@ -101,7 +104,8 @@ export function sfxCues(footage: Footage): SfxCue[] {
           from: filmFrame(click.t),
           trimBefore: 0,
           durationInFrames: 5,
-          gainDb: -24,
+          // The file peaks at -1 dBTP: -19.5 dB keeps a tick under -20 dBTP alone (STYLE-GUIDE §8.3).
+          gainDb: -19.5,
           fadeOutFrames: 2,
         });
       for (const [start, end] of TYPING) {
@@ -117,7 +121,8 @@ export function sfxCues(footage: Footage): SfxCue[] {
           from,
           trimBefore: 45 + 66 * (typed % 8),
           durationInFrames: to - from,
-          gainDb: -31,
+          // -20.5 LUFS in the file: about 25 LU under the music, a bed that is felt, not heard.
+          gainDb: -19,
           fadeInFrames: 3,
           fadeOutFrames: 4,
         });
@@ -131,7 +136,7 @@ export function sfxCues(footage: Footage): SfxCue[] {
     from: music.landingFrame + 4 - SFX.glint.onsetFrame,
     trimBefore: 0,
     durationInFrames: Math.min(36, end.to - (music.landingFrame + 4 - SFX.glint.onsetFrame)),
-    gainDb: -23,
+    gainDb: -20,
     fadeOutFrames: 8,
   });
   return cues.filter((cue) => cue.durationInFrames > 0).sort((a, b) => a.from - b.from);
