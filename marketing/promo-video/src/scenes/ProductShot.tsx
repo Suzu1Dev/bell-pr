@@ -58,7 +58,7 @@ const TakeView: React.FC<{ look: TakeLook; take: Take; footage: Footage }> = ({ 
   const mask = look.dof && amount > 0.001 ? look.dof.mask(amount, f / music.beatFrames) : undefined;
   // The window centre's screen speed, for the shutter blur.
   const moving = speed(takeView(look, f - 0.5), takeView(look, f + 0.5), 720, 405);
-  const pointer = (look.pointer ?? !look.still) ? pointerAt(state.events, t) : undefined;
+  const pointer = (look.pointer ?? !look.still) ? pointerAt(state.events, t, look.rate ?? 1, state.spots) : undefined;
   const sweep = look.sweepAt === undefined ? undefined : sweepAt(f, look.sweepAt * music.beatFrames);
   return (
     <ProductWindow

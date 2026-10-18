@@ -24,10 +24,18 @@ export type PointerEvent =
   | { type: "click"; t: number; x: number; y: number; target?: string }
   | { type: "hide"; t: number };
 
+/** Where the pointer's disc sits beside a click (capture px from the hotspot), so it covers no glyph (scripts/pointer-spots.mjs). */
+export interface PointerSpot {
+  t: number;
+  dx: number;
+  dy: number;
+}
+
 export interface StateFootage {
   boxes: Record<string, Box>;
   events: PointerEvent[];
   marks: Record<string, number>;
+  spots?: PointerSpot[];
   /** Clip frames: file names (frames/00000.jpg) and their times in seconds. */
   frames?: { file: string; t: number }[];
 }
@@ -72,7 +80,10 @@ export async function loadFootage(states: { state: string; clip: boolean }[]): P
       "targets.json",
     );
     const frames = clip ? (await readJson<{ frames: { file: string; t: number }[] }>(state, "frames.json")).frames : undefined;
-    footage[state] = { boxes: targets.boxes, events: targets.events, marks: targets.marks ?? {}, frames };
+    // Optional (npm run assets writes it for the clicks the film shows); without it the disc keeps its default offset.
+    const spotsFile = await fetch(staticFile(`footage-2x/${state}/pointer.json`));
+    const spots = spotsFile.ok ? ((await spotsFile.json()) as { spots: PointerSpot[] }).spots : undefined;
+    footage[state] = { boxes: targets.boxes, events: targets.events, marks: targets.marks ?? {}, frames, spots };
   }
   return footage;
 }

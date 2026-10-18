@@ -173,18 +173,20 @@ export const ProductWindow: React.FC<WindowProps> = ({
 
 /**
  * The neutral round pointer on the light UI: an ink disc (70%) with a white
- * ring and a soft shadow, drawn 9 capture px right of and 11 below its
- * hotspot (14-28 screen px at the pushes' magnification), like an arrow's
- * tip, so it never sits on the label it clicks; a thin green ring around
- * the hotspot where it clicks.
+ * ring and a soft shadow, drawn beside its hotspot like an arrow's body
+ * beside its tip (by default 9 capture px right of and 11 below it; per
+ * click, wherever the footage leaves it off every glyph, scripts/
+ * pointer-spots.mjs), so it never sits on the text it clicks; a thin green
+ * ring around the hotspot where it clicks.
  */
 export const POINTER_OFFSET = { x: 9, y: 11 } as const;
 
 const Pointer: React.FC<{ state: PointerState; layout: number; k: number }> = ({ state, layout, k }) => {
   if (state.opacity <= 0.001 && state.ripple === undefined) return null;
   const size = 20 * k * (1 - 0.18 * state.press);
-  const disc = { x: (state.x + POINTER_OFFSET.x) * layout, y: (state.y + POINTER_OFFSET.y) * layout };
-  const ring = state.ripple === undefined ? undefined : state.ripple / 0.5;
+  const offset = state.offset ?? POINTER_OFFSET;
+  const disc = { x: (state.x + offset.x) * layout, y: (state.y + offset.y) * layout };
+  const ring = state.ripple;
   return (
     <>
       {ring === undefined ? null : (

@@ -9,7 +9,9 @@
  * 4. sfx/: the Mixkit sound effects of SFX-LICENSES.md, downloaded from
  *    Mixkit's own asset URLs and checked by MD5 (`--offline` refuses to
  *    download and fails when one is missing);
- * 5. footage-2x/ and footage-soft/: the footage proxies (scripts/make-proxies.mjs).
+ * 5. footage-2x/ and footage-soft/: the footage proxies (scripts/make-proxies.mjs)
+ *    and, per state, where the pointer's disc sits at each click the film
+ *    shows (scripts/pointer-spots.mjs).
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -80,3 +82,4 @@ if (!existsSync(path.join(packageRoot, "public", "stage", "light@2x.png"))) node
 else console.log("assets: public/stage/ (present)");
 await sounds();
 node("make-proxies.mjs");
+node("pointer-spots.mjs");

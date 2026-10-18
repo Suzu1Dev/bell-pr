@@ -171,12 +171,17 @@ test("the pointer shows only while it works: in before a move, out after its cli
     { type: "hide" as const, t: 1.8 },
   ];
   assert.equal(pointerAt(events, 0.5), undefined);
-  assert.deepEqual(pointerWindows(events)[0][0], 0.8);
+  // It shows at most 12 frames before its click (here later than its move's start, less the fade-in).
+  assert.ok(Math.abs(pointerWindows(events)[0][0] - 1.1) < 1e-9);
   const moving = pointerAt(events, 1.25)!;
   assert.ok(moving.x > 100 && moving.x < 300);
   const pressed = pointerAt(events, 1.55)!;
   assert.ok(pressed.press > 0 && pressed.ripple !== undefined);
   assert.equal(pointerAt(events, 2.5), undefined);
+  // On a clip slowed to half speed the same rhythm holds on screen: the windows stretch with the clip.
+  assert.ok(Math.abs(pointerWindows(events, 0.5)[0][0] - 1.3) < 1e-9);
+  // The click's ring is gone 8 frames after it, before the UI under it has settled.
+  assert.equal(pointerAt(events, 1.5 + 9 / 30)?.ripple, undefined);
 });
 
 /** The sharp core of a focusRect mask (capture px), read back from its gradient stops. */
