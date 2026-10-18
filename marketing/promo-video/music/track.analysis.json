@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "trackId": "rock-sport-top",
+  "title": "Rock Sport Top",
+  "artist": "2BStudio",
+  "licenseRef": "MUSIC-LICENSE.md#rock-sport-top",
+  "audioFile": "music/rock-sport-top.mp3",
+  "md5": "b410171cd89e53948a9abda31136ff6f",
+  "durationSeconds": 92.552,
+  "soundEndSeconds": 91.6,
+  "grid": {
+    "bpm": 100.0,
+    "beatZeroSeconds": 0.118,
+    "beatsPerBar": 4,
+    "firstBarSeconds": 0.118
+  },
+  "loudness": {
+    "lufs": -9.5,
+    "peakDbfs": 0.27,
+    "gainDb": -4.5
+  },
+  "edit": {
+    "segments": [
+      { "sourceFrom": 0.0, "sourceTo": 50.5, "videoFrom": 0.0 },
+      { "sourceFrom": 55.3, "sourceTo": 91.6, "videoFrom": 50.5 }
+    ],
+    "fadeInFrames": 2,
+    "crossfadeFrames": 2,
+    "crossfade": "equal-power"
+  },
+  "events": {
+    "intro": 0,
+    "riser": 4.918,
+    "firstHit": 9.718,
+    "lift": 28.918,
+    "climax": 48.118,
+    "accent": 62.518,
+    "finalHit": 81.267,
+    "landing": 81.718,
+    "tailEnd": 86.8
+  },
+  "stop": { "from": 8.518, "to": 9.718 },
+  "finalHitWindow": [81.1, 84.0],
+  "measuredBy": {
+    "finalHit": "scripts/measure-hit.mjs: the largest per-frame RMS rise (30 fps, mono 48 kHz) in video 81.1-84.0 s (finalHitWindow)",
+    "landing": "the final E chord (bar 37 downbeat): the first beat of the grid after finalHit; the end-card logo lands on it",
+    "others": "script analysis (beat grid, band levels, bar similarity); not yet checked by ear in Remotion Studio"
+  },
+  "reviewed": false
+}
