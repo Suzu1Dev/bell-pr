@@ -25,11 +25,16 @@ const riser = s2.from;
 
 export const CARD = { w: 300, h: 176 } as const;
 
-/** The queue's rows: front (sharp, bright) to back (smaller, softer, dimmer). */
+/**
+ * The queue's rows: front (sharp, bright) to back (smaller, softer, dimmer),
+ * on a fixed grid where each row sits wholly above the one in front of it,
+ * so no back-row card shows in pieces between front-row cards (review round
+ * 7: a sliver of diff stat between two front cards read as a layout bug).
+ */
 const ROWS = [
   { y: 812, scale: 1, blur: 0.6, alpha: 1, xs: [260, 610, 960, 1310, 1660] },
-  { y: 706, scale: 0.8, blur: 2.5, alpha: 0.7, xs: [260, 540, 820, 1100, 1380, 1660] },
-  { y: 628, scale: 0.64, blur: 5, alpha: 0.45, xs: [288, 512, 736, 960, 1184, 1408, 1632] },
+  { y: 642, scale: 0.8, blur: 2.5, alpha: 0.7, xs: [260, 540, 820, 1100, 1380, 1660] },
+  { y: 516, scale: 0.56, blur: 5, alpha: 0.45, xs: [288, 512, 736, 960, 1184, 1408, 1632] },
 ] as const;
 
 /** The card the reviewer opens and clears, the card that refills its slot, and the next one it opens. */

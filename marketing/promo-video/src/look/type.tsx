@@ -99,6 +99,7 @@ export const FocusLine: React.FC<{
         filter: blurCss(k3.blur + x3.blur),
         transform: `scale(${k3.scale.toFixed(5)})`,
         transformOrigin: "50% 55%",
+        wordSpacing: DISPLAY_WORD_SPACING,
         visibility: opacity <= 0.001 ? "hidden" : undefined,
         ...style,
       }}
@@ -119,6 +120,8 @@ export const FocusLine: React.FC<{
             key={i}
             style={{
               display: "inline-block",
+              // The space after "AI" opens a little more than the others (spaced()).
+              wordSpacing: w.text.includes("AI") ? `calc(${DISPLAY_WORD_SPACING} + ${AI_AIR.space}em)` : undefined,
               color: swept ? "transparent" : tone,
               filter: blurCss(soft),
               ...(swept
@@ -144,17 +147,26 @@ export const FocusLine: React.FC<{
 
 /**
  * In DM Sans a capital I and a lowercase l are the same plain stem, so "AI"
- * reads as "Al" at display sizes: a little air after the A (+0.045em) keeps
- * the pair apart (lookdev review round 5).
+ * reads as "Al" at display sizes: a little air after the A (+0.02em) keeps
+ * the pair apart, and the space after the word opens by 0.1em, so the pair
+ * never sits as far apart as the words round it ("A Imade", review round 7).
  */
+export const AI_AIR = { pair: 0.02, space: 0.1 } as const;
 export const spaced = (text: string) => {
   const at = text.indexOf("AI");
   if (at < 0) return text;
+  const end = at + 2;
+  const space = text[end] === " " || text[end] === "-" ? 1 : 0;
   return (
     <>
       {text.slice(0, at)}
-      <span style={{ letterSpacing: "0.045em" }}>A</span>
-      {text.slice(at + 1)}
+      <span style={{ letterSpacing: `${AI_AIR.pair}em` }}>A</span>
+      {text.slice(at + 1, end)}
+      {space ? <span style={{ wordSpacing: text[end] === " " ? `${AI_AIR.space}em` : undefined }}>{text[end]}</span> : null}
+      {text.slice(end + space)}
     </>
   );
 };
+
+/** Display lines open their word spaces a little (+0.06em): the display cut's tight default reads crowded at 88 px. */
+export const DISPLAY_WORD_SPACING = "0.06em";
