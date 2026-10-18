@@ -4,10 +4,13 @@ import { CAPTURE } from "./footage.ts";
 import { cardBox } from "./look/captionLayout.ts";
 import { corners, floating, project, push, viewAt, wholeWindowInFrame, type View } from "./look/camera.ts";
 import { keyframeCuts } from "./keyframes.ts";
-import { planesOf, sharpPlane } from "./look/dof.ts";
+import { liftOn, sharpBoxes } from "./look/dof.ts";
+import { ease } from "./look/motion.ts";
 import { pointerAt, pointerWindows } from "./look/pointer.ts";
 import { MACRO_MAX_M, PUSH_MAX_M, looks, type TakeLook } from "./shots.ts";
 import { takeMaxM, takeView } from "./takes.ts";
+import { focusAmount } from "./scenes/ProductShot.tsx";
+
 import { timeline } from "./timeline.ts";
 import { music } from "./music.ts";
 
@@ -49,7 +52,7 @@ test("every establishing take holds the whole floating window for two beats or m
     let whole = 0;
     for (let f = 0; f < take.to - take.from; f += 1) {
       const view = takeView(look, f);
-      if (wholeWindowInFrame(view, 40) && view.m <= 1) whole += 1;
+      if (wholeWindowInFrame(view, 40, look.height) && view.m <= 1) whole += 1;
     }
     assert.ok(whole >= 2 * music.beatFrames, `${shot.id}: the whole window for ${whole} frames`);
   }
@@ -76,7 +79,7 @@ test("readable UI never moves faster than 8 px a frame once a take has settled (
       // The capture points of the sharp plane that are on screen: its corners and centre, clipped to the frame.
       const lo = under(va, 0, 0);
       const hi = under(va, 1920, 1080);
-      const rects = sharpRects(look, f / music.beatFrames) ?? [
+      const rects = sharpRects(look, f) ?? [
         { x0: under(va, 560, 290).x, x1: under(va, 1360, 790).x, y0: under(va, 560, 290).y, y1: under(va, 1360, 790).y },
       ];
       for (const rect of rects) {
@@ -147,17 +150,68 @@ test("no slivers: a push either covers each frame edge or leaves at least 60 px 
   assert.deepEqual(problems.slice(0, 12), []);
 });
 
-test("a push that shows the app's sidebar keeps all of it in the soft plane: every feather ends in the gutter after it", () => {
+test("a push that shows the app's sidebar keeps all of it dropped back: no lift reaches into it", () => {
   for (const { shot, take, look } of takes) {
     if (look.float) continue;
     for (let f = 0; f < take.to - take.from; f += 6) {
       const view = takeView(look, f);
       const edge = view.cx - view.sx / view.m; // capture x at the frame's left edge (no tilt)
       if (edge >= 240) continue;
-      assert.ok(look.dof, `${shot.id}/${take.id} frame ${f}: the sidebar is in frame from capture x ${edge.toFixed(0)}`);
-      for (const rect of sharpRects(look, f / music.beatFrames) ?? [])
-        assert.ok(rect.x0 - rect.fl >= 240, `${shot.id}/${take.id} frame ${f}: a feather starts at capture x ${(rect.x0 - rect.fl).toFixed(0)}, inside the sidebar`);
+      assert.ok(look.lifts?.length, `${shot.id}/${take.id} frame ${f}: the sidebar is in frame from capture x ${edge.toFixed(0)}`);
+      for (const rect of sharpRects(look, f) ?? [])
+        assert.ok(rect.x0 >= 240, `${shot.id}/${take.id} frame ${f}: a lift starts at capture x ${rect.x0.toFixed(0)}, inside the sidebar`);
     }
+  }
+});
+
+test("the camera never stops: every product take still moves on its last frame and on every frame before it", () => {
+  for (const { shot, take, look } of takes) {
+    // Floating windows breathe more slowly (S9's locked-off wide barely moves, on purpose); pushes drift.
+    const least = look.float ? 0.1 : 0.25;
+    for (let f = 0; f < take.to - take.from; f += 1) {
+      const [a, b] = [takeView(look, f), takeView(look, f + 1)];
+      // The largest screen move of the frame's four corners and its centre (the capture points under them).
+      let most = 0;
+      for (const [X, Y] of [[0, 0], [1920, 0], [1920, 1080], [0, 1080], [960, 540]]) {
+        const p = under(a, X, Y);
+        const q = project(b, p.x, p.y);
+        most = Math.max(most, Math.hypot(q.x - X, q.y - Y));
+      }
+      assert.ok(most >= least, `${shot.id}/${take.id} frame ${f}: the camera moves ${most.toFixed(3)} px`);
+    }
+  }
+});
+
+test("a move that leaves a cut covers at most 60% of its travel in its first beat (no lurch, then freeze)", () => {
+  for (const { shot, take, look } of takes) {
+    const [first, second] = look.keys;
+    if (!second || first.at !== 0 || second.at < 1) continue;
+    // A hold (the same framing, or within 3% and 15 capture px of it) has no travel to speak of.
+    const ratio = Math.max(first.view.m, second.view.m) / Math.min(first.view.m, second.view.m);
+    if (ratio < 1.03 && Math.hypot(first.view.cx - second.view.cx, first.view.cy - second.view.cy) < 15) continue;
+    const name = second.ease ?? "push";
+    if (name === "glide") continue; // S3's rise from below the frame: in from off-stage, not a push
+    const covered = (ease[name] as (x: number) => number)(1 / second.at);
+    assert.ok(covered <= 0.605, `${shot.id}/${take.id}: ${(covered * 100).toFixed(0)}% in the first beat (${name})`);
+  }
+});
+
+test("a lift that comes forward inside a take racks in 12-18 frames", () => {
+  for (const { shot, take, look } of takes)
+    for (const lift of look.lifts ?? []) {
+      if (!lift.from) continue;
+      const start = lift.from * music.beatFrames;
+      let end = start;
+      while (liftOn(lift, end) < 0.999 && end < take.to - take.from) end += 1;
+      assert.ok(end - start >= 12 && end - start <= 18, `${shot.id}/${take.id}: ${end - start} frames`);
+    }
+});
+
+test("pushes are flat: no tilt once the camera is at 1.4 or closer", () => {
+  for (const { shot, take, look } of takes) {
+    if (look.float) continue;
+    for (const key of look.keys)
+      if (key.view.m >= 1.4) assert.ok(key.view.rx === 0 && key.view.ry === 0, `${shot.id}/${take.id} at beat ${key.at}`);
   }
 });
 
@@ -199,10 +253,13 @@ test("the pointer shows only while it works: in before a move, out after its cli
   assert.ok((pointerAt(events, 1.5 + 3 / 30, 1, spots)?.opacity ?? 0) < 0.01);
 });
 
-/** The sharp planes of a take's mask (capture px, cores and feathers), read back from their gradient stops. */
-function sharpRects(look: TakeLook, beats: number) {
-  if (!look.dof) return undefined;
-  return planesOf(look.dof.mask(1, beats)).map(sharpPlane);
+/** The lifted boxes in front at frame f of a take (capture px, scaled), or undefined when nothing is lifted. */
+function sharpRects(look: TakeLook, f: number) {
+  if (!look.lifts?.length) return undefined;
+  const amount = focusAmount(look.focus ?? [{ at: 0, amount: 1 }], f / music.beatFrames);
+  // A window that has not dropped back yet is sharp all over.
+  if (amount < 0.5) return undefined;
+  return sharpBoxes(look.lifts, f, amount).map(([x0, y0, x1, y1]) => ({ x0, y0, x1, y1 }));
 }
 
 /** Whether point p is inside the convex quad (corners in order). */
@@ -237,7 +294,7 @@ test("a caption card never sits on the sharp plane (12 px clear): it sits over t
       for (let frame = Math.max(take.from, cue.from); frame < Math.min(take.to, cue.to); frame += 3) {
         const f = frame - take.from;
         const view = takeView(look, f);
-        const rects = sharpRects(look, f / music.beatFrames) ?? [{ x0: 0, x1: 1440, y0: 0, y1: 810 }];
+        const rects = sharpRects(look, f) ?? [{ x0: 0, x1: 1440, y0: 0, y1: look.height ?? 810 }];
         const quads = rects.map((rect) => [
           project(view, rect.x0, rect.y0),
           project(view, rect.x1, rect.y0),

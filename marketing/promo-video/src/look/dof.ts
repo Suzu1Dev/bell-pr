@@ -1,78 +1,83 @@
 /**
- * Depth-of-field masks for src/look/ProductWindow.tsx, in capture CSS px
- * ("cpx", turned into layout px by the window). Opaque = the sharp plane.
+ * Depth of field as a lift (review round 7): the component a take is about
+ * (a card, a row, a dialog's section, a block of quoted text) comes forward
+ * as its own layer, cropped on its own outer border, a little larger
+ * (LIFT_SCALE) and with a soft layered shadow under it, while the rest of
+ * the window drops back: the same picture blurred SOFT_BLUR px on screen
+ * under a uniform veil of the studio's colour. The crop follows a border
+ * or, inside an unbordered run of text, a gutter, so no card, row or line
+ * is ever half sharp (a sharp rectangle drawn on the flat page read as a
+ * blur box added in post: rounds 6 and 7). `npm run review` checks every
+ * box against the captured footage (scripts/check-dof.mjs).
  *
- * The sharp plane is a rectangle with soft edges (feathers). Each feather is
- * placed in a gutter of the UI (between cards, rows or columns), so no line
- * of text or icon is half sharp: `npm run review` checks every settled mask
- * against the captured footage (scripts/check-dof.mjs).
+ * Boxes are in capture CSS px ("cpx", 1440x810), turned into layout px by
+ * src/look/ProductWindow.tsx.
  */
-
-/** Feather widths in capture px: one for all sides, or [left, top, right, bottom]. */
-export type Feather = number | [left: number, top: number, right: number, bottom: number];
-
-const sides = (feather: Feather) => (typeof feather === "number" ? [feather, feather, feather, feather] : feather);
-
-/** A sharp band in capture CSS px with soft edges `feather` px wide, as two intersected mask layers. */
-export function focusRect(x0: number, y0: number, x1: number, y1: number, feather: Feather = 60, amount = 1): string[] {
-  const out = `rgba(0,0,0,${(1 - amount).toFixed(3)})`;
-  const [fl, ft, fr, fb] = sides(feather);
-  return [
-    `linear-gradient(90deg, ${out} ${x0 - fl}cpx, #000 ${x0}cpx, #000 ${x1}cpx, ${out} ${x1 + fr}cpx)`,
-    `linear-gradient(180deg, ${out} ${y0 - ft}cpx, #000 ${y0}cpx, #000 ${y1}cpx, ${out} ${y1 + fb}cpx)`,
-  ];
-}
+import { music } from "../music.ts";
 
 export type Rect = [x0: number, y0: number, x1: number, y1: number];
 
-/**
- * The sharp plane moving from rect `a` (feathers `fa`) to rect `b` (feathers `fb`, default `fa`) between beats `from`
- * and `to`: a rack across the UI (`standard`).
- */
-export const rackRect =
-  (a: Rect, b: Rect, from: number, to: number, fa: Feather = 40, fb: Feather = fa) =>
-  (amount: number, beats: number): string[] => {
-    const x = Math.min(1, Math.max(0, (beats - from) / Math.max(1e-6, to - from)));
-    const t = x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2;
-    const r = a.map((v, i) => v + (b[i] - v) * t) as Rect;
-    const [sa, sb] = [sides(fa), sides(fb)];
-    const f = sa.map((v, i) => v + (sb[i] - v) * t) as [number, number, number, number];
-    return focusRect(r[0], r[1], r[2], r[3], f, amount);
-  };
-
-/** The sharp plane of a mask read back from its gradient stops: the sharp core and the feather on each side (capture px). */
-export interface SharpPlane {
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-  /** Feather widths: left, top, right, bottom. */
-  fl: number;
-  ft: number;
-  fr: number;
-  fb: number;
+/** One lifted component: its box and corner radius (cpx; per corner tl, tr, br, bl where a side is the UI's own scroll clip). */
+export interface Lift {
+  box: Rect;
+  radius?: number | [tl: number, tr: number, br: number, bl: number];
+  /** Beats from the take's start: lifted from here (ramping in over RACK_FRAMES when after the start)... */
+  from?: number;
+  /** ...until here (a hard end: the UI under it changed, such as a plan that folds). */
+  to?: number;
 }
 
-export function sharpPlane(layers: string[]): SharpPlane {
-  const stops = (layer: string) => [...layer.matchAll(/(-?[\d.]+)cpx/g)].map((m) => Number(m[1]));
-  const [a, x0, x1, b] = stops(layers[0]);
-  const [c, y0, y1, d] = stops(layers[1]);
-  return { x0, y0, x1, y1, fl: x0 - a, ft: y0 - c, fr: b - x1, fb: d - y1 };
+/** The lifted layer's scale about its own centre, and the back plane's veil (studio colour) and blur (1080p screen px). */
+export const LIFT_SCALE = 1.025;
+export const VEIL = { color: [239, 241, 237] as const, alpha: 0.25 };
+export const SOFT_BLUR = 3.5;
+/** A lift that starts inside a take comes forward over this many frames (lookdev STYLE-GUIDE §5.3: a rack in 12-18 f). */
+export const RACK_FRAMES = 15;
+
+const beatFrames = music.beatFrames;
+
+/** How far each lift is forward at frame f of the take (0..1), before the take's focus amount. */
+export function liftOn(lift: Lift, f: number) {
+  const from = (lift.from ?? 0) * beatFrames;
+  const to = lift.to === undefined ? Infinity : lift.to * beatFrames;
+  if (f < from || f >= to) return 0;
+  if (from <= 0) return 1;
+  const x = Math.min(1, (f - from) / RACK_FRAMES);
+  // `standard` (in-out), as a rack focus.
+  return x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2;
 }
 
-/** How sharp capture point (x, y) is under the plane: 1 in the core, falling to 0 across the feathers. */
-export function sharpness(plane: SharpPlane, x: number, y: number) {
-  const along = (v: number, lo: number, hi: number, fLo: number, fHi: number) =>
-    v < lo ? Math.max(0, 1 - (lo - v) / Math.max(1e-6, fLo)) : v > hi ? Math.max(0, 1 - (v - hi) / Math.max(1e-6, fHi)) : 1;
-  return along(x, plane.x0, plane.x1, plane.fl, plane.fr) * along(y, plane.y0, plane.y1, plane.ft, plane.fb);
+/** A box scaled by s about its centre. */
+export const scaleBox = ([x0, y0, x1, y1]: Rect, s: number): Rect => {
+  const cx = (x0 + x1) / 2;
+  const cy = (y0 + y1) / 2;
+  return [cx + (x0 - cx) * s, cy + (y0 - cy) * s, cx + (x1 - cx) * s, cy + (y1 - cy) * s];
+};
+
+/** Where capture point (x, y) shows once the lift `on` (0..1) carries it: lifted points move with their layer. */
+export const liftPoint = (lift: Lift, on: number, x: number, y: number) => {
+  const [x0, y0, x1, y1] = lift.box;
+  if (on <= 0 || x < x0 || x > x1 || y < y0 || y > y1) return { x, y };
+  const s = 1 + (LIFT_SCALE - 1) * on;
+  const cx = (x0 + x1) / 2;
+  const cy = (y0 + y1) / 2;
+  return { x: cx + (x - cx) * s, y: cy + (y - cy) * s };
+};
+
+/** The lifted boxes in front at frame f (on ≥ 0.5), scaled: the sharp plane, for the layout tests and checks. */
+export const sharpBoxes = (lifts: readonly Lift[], f: number, amount = 1): Rect[] =>
+  lifts.filter((lift) => liftOn(lift, f) * amount >= 0.5).map((lift) => scaleBox(lift.box, 1 + (LIFT_SCALE - 1) * liftOn(lift, f) * amount));
+
+/** How sharp capture point (x, y) is: 1 inside a lifted box, falling to 0 over `feather` cpx outside it. */
+export function sharpnessAt(lifts: readonly Lift[], f: number, x: number, y: number, feather = 40, amount = 1) {
+  let best = 0;
+  for (const lift of lifts) {
+    const on = liftOn(lift, f) * amount;
+    if (on <= 0) continue;
+    const [x0, y0, x1, y1] = lift.box;
+    const dx = Math.max(0, x0 - x, x - x1);
+    const dy = Math.max(0, y0 - y, y - y1);
+    best = Math.max(best, on * Math.max(0, 1 - Math.hypot(dx, dy) / feather));
+  }
+  return best;
 }
-
-/** A mask: one sharp plane (two layers) or several (a union, each drawn as its own sharp copy). */
-export type Mask = string[] | string[][];
-
-/** The planes of a mask. */
-export const planesOf = (mask: Mask): string[][] => (Array.isArray(mask[0]) ? (mask as string[][]) : [mask as string[]]);
-
-/** How sharp capture point (x, y) is under the union of a mask's planes. */
-export const sharpnessOf = (planes: SharpPlane[], x: number, y: number) =>
-  1 - planes.reduce((rest, plane) => rest * (1 - sharpness(plane, x, y)), 1);

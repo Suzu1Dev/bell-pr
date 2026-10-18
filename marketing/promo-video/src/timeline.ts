@@ -128,7 +128,8 @@ export const shotSpecs: ShotSpec[] = [
     id: "s5-legwork",
     title: "Legwork",
     seconds: secondsAt120(2, 2, 3),
-    captions: [{ text: "Agents do the legwork,\non your own machine.", from: 1, place: "bottom-left" }],
+    // Once the plan has folded and the board has come forward (beat 3), over the soft stepper and run card above it.
+    captions: [{ text: "Agents do the legwork,\non your own machine.", from: 3, place: "top-left" }],
     takes: [{ id: "board" }],
   },
   {
@@ -150,8 +151,8 @@ export const shotSpecs: ShotSpec[] = [
     seconds: secondsAt120(3, 3, 4),
     keepNominal: true,
     captions: [
-      { text: "Which way would you do it?", from: 0.5, to: 4, place: "top-left" },
-      { text: "Taste grows by weighing trade-offs.", from: 4, place: "top-left" },
+      { text: "Which way would you do it?", from: 0.5, to: 4, place: "bottom-left" },
+      { text: "Taste grows by weighing trade-offs.", from: 4, place: "bottom-left" },
     ],
     takes: [{ id: "guess", until: 2 }, { id: "alternative", until: 6 }, { id: "keep", until: 8 }, { id: "why" }],
   },
@@ -160,7 +161,7 @@ export const shotSpecs: ShotSpec[] = [
     title: "Ask",
     seconds: secondsAt120(2, 2, 3),
     droppable: true,
-    captions: [{ text: "Stuck on a line? Ask about it.", from: 0.5, place: "top-left" }],
+    captions: [{ text: "Stuck on a line? Ask about it.", from: 0.5, place: "bottom-left" }],
     takes: [{ id: "select", until: 2 }, { id: "question", until: 4 }, { id: "answer" }],
   },
   {
@@ -199,7 +200,7 @@ export const shotSpecs: ShotSpec[] = [
     minOneCaption: 4,
     holdOrder: 3,
     captions: [
-      { text: "Your words. The project’s rules.", from: 1, to: 8, place: "bottom-left" },
+      { text: "Your words. The project’s rules.", from: 2, to: 8, place: "bottom-left" },
       { text: "And what you didn’t test.", from: 8, place: "bottom-left" },
     ],
     // The checklist (the project's rules) under the first line, then the not-tested answer going into the
@@ -211,7 +212,8 @@ export const shotSpecs: ShotSpec[] = [
     title: "Send one",
     seconds: secondsAt120(2, 2.5, 3),
     captions: [{ text: "One Draft PR. Then stay for the review.", from: 1, place: "top-left" }],
-    takes: [{ id: "dialog", until: 4 }, { id: "published" }],
+    // The published card for a bar from the crash, then the draft waiting for the review, with "Read feedback".
+    takes: [{ id: "dialog", until: 4 }, { id: "published", until: 8 }, { id: "waiting" }],
   },
   {
     id: "s13-learn",

@@ -7,7 +7,7 @@ import { packageRoot } from "./lib/media.mjs";
 // The footage is gitignored: this runs after `npm run capture` and `npm run assets` (the 2x proxies).
 const footage = existsSync(path.join(packageRoot, "public", "footage-2x"));
 
-test("no glyph lies in a depth-of-field feather and no sharp line is cut by an edge (against the footage)", { skip: !footage && "no footage" }, async () => {
+test("no lifted component is cropped through a glyph and no lifted line is cut by an edge (against the footage)", { skip: !footage && "no footage" }, async () => {
   const { checkDof } = await import("./check-dof.mjs");
   assert.deepEqual(await checkDof(), []);
 });

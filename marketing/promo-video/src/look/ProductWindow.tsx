@@ -2,19 +2,20 @@
  * The generic floating window around a real capture (lookdev STYLE-GUIDE
  * §5.1): no title bar, no window buttons, no device. Rounded corners, a
  * hairline, a top rim light, the tinted shadow stack of the light studio and,
- * when it floats, a contact shadow on the floor. Two-plane depth of field
- * (§5.3): the same picture blurred behind, the sharp copy in front under a
- * mask drawn in capture CSS px. The back plane's blur is set in screen px
- * (it shrinks in capture px as the camera pushes in), so the soft plane
- * recedes the same at every magnification, like a lens, and it is not
- * veiled: the two planes have the same brightness, so no rectangle shows
- * where they meet. A one-axis shutter blur only while the window moves
- * fast (§4.6; never CameraMotionBlur, which posterizes).
+ * when it floats, a contact shadow on the floor. Depth of field as a lift
+ * (src/look/dof.ts): the window drops back (the same picture blurred
+ * SOFT_BLUR px on screen, so it recedes the same at every magnification,
+ * under a uniform veil of the studio's colour) and the component the take is
+ * about comes forward as its own layer, cropped on its own border, a little
+ * larger, with a soft layered shadow under it. A one-axis shutter blur only
+ * while the window moves fast (§4.6; never CameraMotionBlur, which
+ * posterizes).
  */
 import { useId, type ReactNode } from "react";
 import { Img } from "remotion";
 import { CAPTURE } from "../footage.ts";
 import { corners, PERSPECTIVE, PERSPECTIVE_ORIGIN, viewTransform, type View } from "./camera.ts";
+import { LIFT_SCALE, SOFT_BLUR, VEIL, type Lift } from "./dof.ts";
 import type { PointerState } from "./pointer.ts";
 
 /**
@@ -33,16 +34,32 @@ const SHADOW = [
 
 const px = (value: number) => `${+value.toFixed(3)}px`;
 
+/** The lifted layer's shadow (screen px at 1080p): variant B's layered stack, smaller, so the component floats just off the page. */
+const LIFT_SHADOW = [
+  [0, 0, 0, 1, "rgba(17,26,21,0.10)"],
+  [0, 1, 2, 0, "rgba(22,43,36,0.10)"],
+  [0, 6, 16, 0, "rgba(22,43,36,0.12)"],
+  [0, 18, 44, 0, "rgba(22,43,36,0.16)"],
+] as const;
+
+/** A lift as the window draws it: the component and how far forward it is (0..1). */
+export interface LiftState {
+  lift: Lift;
+  on: number;
+}
+
 export interface WindowProps {
   view: View;
   /** Layout px per capture CSS px. */
   layout: number;
   /** The sharp picture. */
   src: string;
-  /** The back plane's blur in layout px, when depth of field is on. */
-  softBlur?: number;
-  /** The sharp planes: per plane, CSS mask layers (intersected) in capture CSS px; opaque = sharp. */
-  mask?: string[][];
+  /** How far the window drops back behind its lifts (0..1): the back plane's blur and veil. */
+  focus?: number;
+  /** The components lifted out of the page. */
+  lifts?: LiftState[];
+  /** The window's visible height in capture px (it may end above the viewport's bottom, in a gutter). */
+  height?: number;
   /** 0..1 progress of the one light sweep across the window, or undefined. */
   sweep?: number;
   pointer?: PointerState;
@@ -58,8 +75,9 @@ export const ProductWindow: React.FC<WindowProps> = ({
   view,
   layout,
   src,
-  softBlur,
-  mask,
+  focus = 0,
+  lifts = [],
+  height = CAPTURE.height,
   sweep,
   pointer,
   shutter,
@@ -69,18 +87,20 @@ export const ProductWindow: React.FC<WindowProps> = ({
 }) => {
   const id = `shutter${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const w = CAPTURE.width * layout;
-  const h = CAPTURE.height * layout;
+  const h = height * layout;
+  const full = CAPTURE.height * layout;
   // On-screen px -> layout px: the element is scaled by view.m / layout.
   const k = layout / view.m;
   const radius = 0.0095 * CAPTURE.width * layout;
   const shadow = SHADOW.map(([x, y, blur, spread, color]) => `${px(x * k)} ${px(y * k)} ${px(blur * k)} ${px(spread * k)} ${color}`).join(", ");
-  const scaledMask = mask?.map((plane) => plane.map((layer) => layer.replace(/(-?\d*\.?\d+)cpx/g, (_, n: string) => px(parseFloat(n) * layout))));
+  const liftShadow = LIFT_SHADOW.map(([x, y, blur, spread, color]) => `${px(x * k)} ${px(y * k)} ${px(blur * k)} ${px(spread * k)} ${color}`).join(", ");
   // A short shutter (about 90 degrees, capped at 4 px): the rise reads as motion, and UI titles stay legible.
   const sx = Math.min(4, Math.abs(shutter?.x ?? 0) * 0.1);
   const sy = Math.min(4, Math.abs(shutter?.y ?? 0) * 0.1);
   const blurOn = sx >= 0.3 || sy >= 0.3;
-  const image = { position: "absolute", left: 0, top: 0, width: w, height: h, maxWidth: "none", display: "block" } as const;
-  const floor = contact > 0 ? contactShadow(view) : undefined;
+  const image = { position: "absolute", left: 0, top: 0, width: w, height: full, maxWidth: "none", display: "block" } as const;
+  const floor = contact > 0 ? contactShadow(view, height) : undefined;
+  const back = focus > 0.001;
   return (
     <>
       {floor ? (
@@ -125,20 +145,17 @@ export const ProductWindow: React.FC<WindowProps> = ({
           }}
         >
           <div style={{ position: "absolute", inset: 0, borderRadius: radius, overflow: "hidden", background: "#ffffff", boxShadow: shadow }}>
-            {softBlur !== undefined && scaledMask ? <Img src={src} style={{ ...image, filter: `blur(${softBlur.toFixed(3)}px)` }} /> : null}
-            {(scaledMask ?? [undefined]).map((plane, index) => (
-              <Img
-                key={index}
-                src={src}
-                style={{
-                  ...image,
-                  maskImage: plane?.join(", "),
-                  WebkitMaskImage: plane?.join(", "),
-                  maskComposite: plane && plane.length > 1 ? "intersect" : undefined,
-                  WebkitMaskComposite: plane && plane.length > 1 ? "source-in" : undefined,
-                }}
-              />
-            ))}
+            {back ? (
+              <>
+                <Img src={src} style={{ ...image, filter: `blur(${((SOFT_BLUR * focus * layout) / view.m).toFixed(3)}px)` }} />
+                <div style={{ position: "absolute", inset: 0, background: `rgba(${VEIL.color.join(",")},${(VEIL.alpha * focus).toFixed(3)})` }} />
+              </>
+            ) : (
+              <Img src={src} style={image} />
+            )}
+            {back
+              ? lifts.map(({ lift, on }, index) => (on * focus > 0.001 ? <Lifted key={index} lift={lift} on={on * focus} src={src} layout={layout} shadow={liftShadow} /> : null))
+              : null}
             {children}
             {pointer ? <Pointer state={pointer} layout={layout} k={k} /> : null}
             {sweep === undefined ? null : (
@@ -165,6 +182,44 @@ export const ProductWindow: React.FC<WindowProps> = ({
             />
           </div>
         </div>
+      </div>
+    </>
+  );
+};
+
+/**
+ * One lifted component: the same picture cropped on the component's box,
+ * scaled about the box's centre (laid out larger, not transformed, so the
+ * raster stays crisp), with its shadow on the page under it.
+ */
+const Lifted: React.FC<{ lift: Lift; on: number; src: string; layout: number; shadow: string }> = ({ lift, on, src, layout, shadow }) => {
+  const s = 1 + (LIFT_SCALE - 1) * on;
+  const [x0, y0, x1, y1] = lift.box.map((v) => v * layout);
+  const cx = (x0 + x1) / 2;
+  const cy = (y0 + y1) / 2;
+  const left = cx + (x0 - cx) * s;
+  const top = cy + (y0 - cy) * s;
+  const width = (x1 - x0) * s;
+  const height = (y1 - y0) * s;
+  const r = lift.radius ?? 8;
+  const radius = (Array.isArray(r) ? r : [r, r, r, r]).map((v) => px(v * layout * s)).join(" ");
+  const box = { position: "absolute", left, top, width, height, borderRadius: radius } as const;
+  return (
+    <>
+      <div style={{ ...box, boxShadow: shadow, opacity: Math.min(1, on * 1.4) }} />
+      <div style={{ ...box, overflow: "hidden", opacity: on >= 0.999 ? 1 : on }}>
+        <Img
+          src={src}
+          style={{
+            position: "absolute",
+            left: cx * (1 - s) - left,
+            top: cy * (1 - s) - top,
+            width: CAPTURE.width * layout * s,
+            height: CAPTURE.height * layout * s,
+            maxWidth: "none",
+            display: "block",
+          }}
+        />
       </div>
     </>
   );
@@ -223,8 +278,8 @@ const Pointer: React.FC<{ state: PointerState; layout: number; k: number }> = ({
 };
 
 /** The contact shadow's ellipse on the floor under the window's projected bottom edge. */
-function contactShadow(view: View) {
-  const [, , br, bl] = corners(view);
+function contactShadow(view: View, height: number) {
+  const [, , br, bl] = corners(view, height);
   const width = Math.hypot(br.x - bl.x, br.y - bl.y);
   return { x: (br.x + bl.x) / 2, y: Math.max(br.y, bl.y) + 40, w: width * 0.7, h: Math.max(24, width * 0.05) };
 }

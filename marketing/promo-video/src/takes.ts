@@ -1,21 +1,35 @@
 /**
  * The camera of a take over time (pure; src/scenes/ProductShot.tsx draws it,
- * src/look.test.ts checks it): the keys of src/shots.ts in beats, then the
- * camera's breathing after the last key.
+ * src/look.test.ts checks it), in two parts (review round 7): the keys of
+ * src/shots.ts in beats (the move that leaves the cut, eased with `push` by
+ * default: no more than 60% of a two-beat move in its first beat), and a
+ * linear drift through the whole take, so the camera is still moving on the
+ * out-cut, on a held clip frame as much as on a moving one.
  */
 import { viewAt, type View } from "./look/camera.ts";
-import { drift } from "./look/motion.ts";
 import { music } from "./music.ts";
 import type { TakeLook } from "./shots.ts";
 
-/** The camera at frame `f` of a take (frames from its start), breathing after its last key. */
+/** The drift per bar: scale (fraction) and screen px along x and y. */
+export interface Drift {
+  scale?: number;
+  x?: number;
+  y?: number;
+}
+
+/** The default drift: +2% scale and 12 px to the left a bar (the reviewers asked for 1.5-2.5% and 8-16 px). */
+export const DRIFT = { scale: 0.02, x: -12, y: 0 } as const;
+
+/** A view carried `frames` frames along by a drift. */
+export const driftView = (view: View, frames: number, drift: Drift = {}): View => {
+  const bars = Math.max(0, frames) / music.barFrames;
+  const d = { ...DRIFT, ...drift };
+  return { ...view, m: view.m * (1 + d.scale * bars), sx: view.sx + d.x * bars, sy: view.sy + d.y * bars };
+};
+
+/** The camera at frame `f` of a take (frames from its start). */
 export function takeView(look: TakeLook, f: number): View {
-  const beats = f / music.beatFrames;
-  const view = viewAt(look.keys, beats);
-  const last = look.keys.at(-1)!.at;
-  if (beats <= last) return view;
-  const k = drift((beats - last) * music.beatFrames, look.breathe ?? 0.012);
-  return { ...view, m: view.m * k };
+  return driftView(viewAt(look.keys, f / music.beatFrames), f, look.drift);
 }
 
 /** The largest magnification of a take. */
@@ -24,4 +38,3 @@ export const takeMaxM = (look: TakeLook, frames: number) => {
   for (let f = 0; f <= frames; f += 6) max = Math.max(max, takeView(look, f).m);
   return Math.max(max, takeView(look, frames).m);
 };
-

@@ -4,7 +4,7 @@
  */
 import { AbsoluteFill, Sequence, useCurrentFrame } from "remotion";
 import { clipFrameAt, densityFor, frameUrl, stillUrl, type Footage } from "../footage.ts";
-import { planesOf, sharpnessOf, sharpPlane } from "../look/dof.ts";
+import { liftOn, liftPoint, sharpnessAt } from "../look/dof.ts";
 import { speed } from "../look/camera.ts";
 import { takeMaxM, takeView } from "../takes.ts";
 import { ease, mix, tween } from "../look/motion.ts";
@@ -50,15 +50,29 @@ const TakeView: React.FC<{ look: TakeLook; take: Take; footage: Footage }> = ({ 
     if (!state.frames) throw new Error(`${look.state} has no clip frames.`);
     src = frameUrl(look.state, clipFrameAt(state.frames, t).file, density);
   }
-  const amount = look.dof ? dofAmount(look.dof.keys, f / music.beatFrames) : 0;
-  const mask = look.dof && amount > 0.001 ? planesOf(look.dof.mask(amount, f / music.beatFrames)) : undefined;
+  const lifts = look.lifts ?? [];
+  const focus = lifts.length ? focusAmount(look.focus ?? [{ at: 0, amount: 1 }], f / music.beatFrames) : 0;
+  const liftStates = lifts.map((lift) => ({ lift, on: liftOn(lift, f) }));
   // The window centre's screen speed, for the shutter blur.
   const moving = speed(takeView(look, f - 0.5), takeView(look, f + 0.5), 720, 405);
   let pointer = (look.pointer ?? !look.still) ? pointerAt(state.events, t, look.rate ?? 1, state.spots) : undefined;
-  if (pointer && mask) {
-    // The pointer belongs to the sharp plane: it fades out over 40 capture px beyond it, so no sharp disc floats on the soft plane.
-    const wide = mask.map((plane) => ({ ...sharpPlane(plane), fl: 40, ft: 40, fr: 40, fb: 40 }));
-    pointer = { ...pointer, opacity: pointer.opacity * sharpnessOf(wide, pointer.x, pointer.y) };
+  if (pointer && focus > 0.001) {
+    // The pointer belongs to the lifted component: it moves with that layer, and fades out over 40 capture px beyond
+    // it, so no sharp disc floats on the page behind.
+    const carry = (x: number, y: number) => {
+      for (const { lift, on } of liftStates) {
+        const p = liftPoint(lift, on * focus, x, y);
+        if (p.x !== x || p.y !== y) return p;
+      }
+      return { x, y };
+    };
+    const at = carry(pointer.x, pointer.y);
+    pointer = {
+      ...pointer,
+      ...at,
+      rippleAt: pointer.rippleAt ? carry(pointer.rippleAt.x, pointer.rippleAt.y) : undefined,
+      opacity: pointer.opacity * (1 - focus + focus * sharpnessAt(lifts, f, pointer.x, pointer.y)),
+    };
   }
   const sweep = look.sweepAt === undefined ? undefined : sweepAt(f, look.sweepAt * music.beatFrames);
   return (
@@ -66,8 +80,9 @@ const TakeView: React.FC<{ look: TakeLook; take: Take; footage: Footage }> = ({ 
       view={view}
       layout={layout}
       src={src}
-      softBlur={mask ? (SOFT_BLUR * layout) / view.m : undefined}
-      mask={mask}
+      focus={focus}
+      lifts={liftStates}
+      height={look.height}
       pointer={pointer}
       shutter={{ x: moving.dx, y: moving.dy }}
       contact={look.float ? contactFor(view.m) : 0}
@@ -76,13 +91,11 @@ const TakeView: React.FC<{ look: TakeLook; take: Take; footage: Footage }> = ({ 
   );
 };
 
-/** The back plane's blur in 1080p screen px, the same at every magnification (a lens, not a smear). */
-export const SOFT_BLUR = 3.5;
-
 /** The contact shadow belongs to the whole floating window: it fades as a push takes the window past its rest size. */
 export const contactFor = (m: number) => Math.min(1, Math.max(0, (1.2 - m) / 0.2));
 
-const dofAmount = (keys: { at: number; amount: number }[], beats: number) => {
+/** How far the window drops back behind its lifts at `beats` (keys eased `standard`). */
+export const focusAmount = (keys: { at: number; amount: number }[], beats: number) => {
   if (beats <= keys[0].at) return keys[0].amount;
   for (let i = 1; i < keys.length; i += 1)
     if (beats <= keys[i].at)

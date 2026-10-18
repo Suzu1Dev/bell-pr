@@ -19,6 +19,12 @@ export const ease = {
   depart: Easing.bezier(0.32, 0, 0.67, 0),
   whip: Easing.bezier(0.76, 0, 0.24, 1),
   sweep: Easing.bezier(0.45, 0, 0.55, 1),
+  /**
+   * A camera move that starts on a cut: already moving at the cut (at the move's average speed), 60% of the way at
+   * its middle, settling to rest at its end, where the take's linear drift carries on (src/takes.ts). Unlike
+   * `arrive`, a two-beat push covers at most 60% of its travel in its first beat: no lurch, then freeze.
+   */
+  push: Easing.bezier(0.4, 0.4, 0.7, 1),
   linear: (x: number) => x,
   /** heroGlide stretched over the move (a rise from rest that settles long, no overshoot). */
   glide: (x: number) =>

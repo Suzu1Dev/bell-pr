@@ -72,7 +72,8 @@ export const push = (
 ): View => {
   let view: View = { cx, cy, m, sx, sy, rx, ry };
   if (!cover && right === undefined && left === undefined && bottom === undefined) return view;
-  const M = 20;
+  // 40 px: room for the take's drift (src/takes.ts) to move the window without uncovering an edge.
+  const M = 40;
   for (let i = 0; i < 12; i += 1) {
     const [tl, tr, br, bl] = corners(view);
     let dx = 0;
@@ -100,7 +101,7 @@ export interface Key {
   /** Beats from the take's start. */
   at: number;
   view: View;
-  /** The easing of the move that ends on this key. */
+  /** The easing of the move that ends on this key (default `push`: it leaves the cut moving). */
   ease?: EaseName;
 }
 
@@ -111,7 +112,7 @@ export function viewAt(keys: Key[], beats: number): View {
     const a = keys[i - 1];
     const b = keys[i];
     if (beats <= b.at) {
-      const t = (ease[b.ease ?? "standard"] as (x: number) => number)((beats - a.at) / Math.max(1e-6, b.at - a.at));
+      const t = (ease[b.ease ?? "push"] as (x: number) => number)((beats - a.at) / Math.max(1e-6, b.at - a.at));
       return lerpView(a.view, b.view, t);
     }
   }
@@ -149,17 +150,17 @@ export function project(v: View, x: number, y: number) {
   return { x: PERSPECTIVE_ORIGIN.x + (wx - PERSPECTIVE_ORIGIN.x) * k, y: PERSPECTIVE_ORIGIN.y + (wy - PERSPECTIVE_ORIGIN.y) * k, z: pz };
 }
 
-/** The window's four projected corners. */
-export const corners = (v: View) => [
+/** The window's four projected corners (a window may end above the viewport's bottom: `height` capture px). */
+export const corners = (v: View, height: number = CAPTURE.height) => [
   project(v, 0, 0),
   project(v, CAPTURE.width, 0),
-  project(v, CAPTURE.width, CAPTURE.height),
-  project(v, 0, CAPTURE.height),
+  project(v, CAPTURE.width, height),
+  project(v, 0, height),
 ];
 
 /** Whether all four window edges are inside the frame with `margin` px to spare. */
-export const wholeWindowInFrame = (v: View, margin = 0) =>
-  corners(v).every((c) => c.x >= margin && c.x <= 1920 - margin && c.y >= margin && c.y <= 1080 - margin);
+export const wholeWindowInFrame = (v: View, margin = 0, height: number = CAPTURE.height) =>
+  corners(v, height).every((c) => c.x >= margin && c.x <= 1920 - margin && c.y >= margin && c.y <= 1080 - margin);
 
 /** Screen speed (px per frame) of capture point (x, y) between two views one frame apart. */
 export const speed = (a: View, b: View, x: number, y: number) => {
