@@ -10,7 +10,8 @@ import { pointerAt, pointerWindows } from "./look/pointer.ts";
 import { MACRO_MAX_M, PUSH_MAX_M, looks, type TakeLook } from "./shots.ts";
 import { takeMaxM, takeView } from "./takes.ts";
 import { focusAmount } from "./scenes/ProductShot.tsx";
-
+import { DESCRIPTOR } from "./logo.ts";
+import { readFileSync } from "node:fs";
 import { timeline } from "./timeline.ts";
 import { music } from "./music.ts";
 
@@ -318,4 +319,11 @@ test("the WebM gets a keyframe on every cut between the stages and on every take
   assert.ok(cuts.includes(title.from) && cuts.includes(title.to), "the climax title's two cuts");
   for (const { take, look } of takes) if (look.float) assert.ok(cuts.includes(take.from), `${take.id} at ${take.from}`);
   assert.ok(cuts.length <= 24, "keyframes cost bits: only where a plate first shows");
+});
+
+test("the line under the first-hit wordmark is the product's own published description, not new copy", () => {
+  const site = readFileSync(new URL("../../../site/index.html", import.meta.url), "utf8");
+  const description = /<meta name="description" content="([^"]+)"/.exec(site)?.[1] ?? "";
+  assert.ok(description.toLowerCase().includes(DESCRIPTOR.toLowerCase().replace(/^a /, "")), description);
+  assert.doesNotMatch(DESCRIPTOR, /automatic|autonomous|proves/i);
 });

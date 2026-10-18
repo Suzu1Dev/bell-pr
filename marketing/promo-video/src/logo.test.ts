@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { END_LOGO, chordFrame, endLogoState, logoLeaves, logoState, logoTake } from "./logo.ts";
+import { END_LOGO, chordFrame, endLogoState, flareAt, logoLeaves, logoState, logoTake } from "./logo.ts";
 import { darkFrom, exhale, hit, stop } from "./moments.ts";
 import { frameOf, music } from "./music.ts";
 import { timeline } from "./timeline.ts";
@@ -56,4 +56,12 @@ test("the end-card logo pulls into focus from the cut and locks on the final cho
   assert.ok(endLogoState(music.landingFrame - 3).blur > 0, "still pulling in just before the chord");
   // Within ±0.25 s of the chord (VIDEO.md acceptance).
   assert.ok(Math.abs(music.landingFrame / 30 - (music.track.events.landing ?? 0)) <= 0.25);
+});
+
+test("the drop is never a still: the first-hit lockup pushes 1.00 to 1.04 through its take, and the studio flares for six frames", () => {
+  for (let f = hit; f < logoTake.to - 1; f += 1) assert.ok(logoState(f + 1).scale > logoState(f).scale, `frame ${f}`);
+  assert.ok(Math.abs(logoState(logoTake.to - 1).scale - 1.04) < 1e-9);
+  assert.ok(flareAt(hit) >= 0.2 && flareAt(hit) <= 0.35, "about 6-8 levels brighter on the hit");
+  assert.equal(flareAt(hit - 1), 0);
+  assert.ok(flareAt(hit + 6) < 0.001, "back to normal six frames later");
 });
