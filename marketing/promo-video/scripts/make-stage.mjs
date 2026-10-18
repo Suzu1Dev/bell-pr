@@ -8,10 +8,11 @@
  * mixed in linear light: no color stops, so no ring for the eye or the
  * encoder to find), quantized to 8 bits with TPDF +-1 LSB dither. The dark
  * plate also carries a static, coarse (2x2 px at 1080p) TPDF grain of
- * +-1.5 LSB: x264 flattens single-pixel dither in dark areas but keeps 2-px
- * clusters, so the decoded gradient does not contour (lookdev STYLE-GUIDE
- * §6.3-6.4, variant C's measured fix). Seeded, so every run writes the same
- * files.
+ * +-1.5 LSB, the light plate one of +-2 LSB: x264 flattens single-pixel
+ * dither but keeps 2-px clusters, so the decoded gradient does not contour
+ * (lookdev STYLE-GUIDE §6.3-6.4, variants C and B's measured fixes; the
+ * light plate's +-1 LSB dither alone gave 200-600 px flat runs after
+ * encoding). Seeded, so every run writes the same files.
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -78,7 +79,7 @@ for (const [suffix, scale] of [["", 1], ["@2x", 2]]) {
   // The light studio of the product beats: a white key light upper middle, warm grey corners.
   await writeFile(
     path.join(out, `light${suffix}.png`),
-    plate({ ...size, center: [0.5, 0.36], radius: [1.0, 1.15], inner: "#ffffff", outer: "#e7ebe4", falloff: 2.0, seed: 11 }),
+    plate({ ...size, center: [0.5, 0.36], radius: [1.0, 1.15], inner: "#ffffff", outer: "#e7ebe4", falloff: 2.0, grain: 2, cell: 2 * scale, seed: 11 }),
   );
 }
 console.log("stage: public/stage/dark.png, light.png and their @2x versions");
