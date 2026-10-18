@@ -15,8 +15,25 @@
  * the landing, labelled. Every frame is looked at; the verdicts go to
  * review.md.
  *
+ * Two scans run over EVERY frame of the video (one decode pass), because a
+ * defect a few frames long hides between samples:
+ *
+ * - discontinuities: the mean absolute luma difference to the frame before
+ *   (on a 480x270 copy); above 8 on a frame that is not a cut (nor the
+ *   UI's answer, within 6 frames, to a click the pointer makes on screen),
+ *   the picture jumped inside a take (a capture's scroll or reflow);
+ * - card edges: in a ring 6-18 px around every caption card (its box from
+ *   the same layout as the film, the text measured in Chrome with the
+ *   film's font), the count of pixels with a luma step above 70 to their
+ *   neighbour; more than 8 means a sharp line of UI text (or the pointer)
+ *   runs into the card instead of soft plane or studio.
+ *
+ * Both go to out/review/scans.tsv; any finding makes the script exit 1.
+ *
  *   node scripts/review-frames.mjs [video]   (default out/bell-pr-promo-en-1080p.mp4)
  */
+import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -27,6 +44,7 @@ import { packageRoot, remotion } from "./lib/media.mjs";
 const { timeline } = await tsImport("../src/timeline.ts", import.meta.url);
 const { music, fps } = await tsImport("../src/music.ts", import.meta.url);
 const { looks } = await tsImport("../src/shots.ts", import.meta.url);
+const { cardBox, CAPTION_ROLE } = await tsImport("../src/look/captionLayout.ts", import.meta.url);
 const video = process.argv[2] ?? "out/bell-pr-promo-en-1080p.mp4";
 const out = path.join(packageRoot, "out", "review");
 
@@ -140,3 +158,126 @@ try {
   await browser.close();
 }
 console.log(`review: out/contact-sheet.png (${tiles.length} frames)`);
+
+// The scans over every frame -------------------------------------------------------------
+
+/** Every cut of the film: shot starts and take starts (the frame a new picture begins). */
+const cutFrames = new Set(timeline.shots.flatMap((shot) => [shot.from, ...shot.takes.map((take) => take.from)]));
+
+/** The caption cards' boxes, with every line measured in Chrome in the film's font. */
+async function measuredCards() {
+  const fontFile = path.join(packageRoot, "node_modules/@fontsource-variable/dm-sans/files/dm-sans-latin-opsz-normal.woff2");
+  const cues = timeline.captions.filter((cue) => cue.style === "card");
+  const lines = [...new Set(cues.flatMap((cue) => cue.lines))];
+  const page = `<!doctype html><meta charset="utf-8"><style>
+    @font-face { font-family: "Promo DM Sans"; src: url("${pathToFileURL(fontFile)}") format("woff2-variations"); font-weight: 100 1000; }
+    span { position: absolute; white-space: pre; font: ${CAPTION_ROLE.weight} ${CAPTION_ROLE.size}px "Promo DM Sans";
+      letter-spacing: ${CAPTION_ROLE.tracking}em; font-optical-sizing: auto; font-kerning: normal; }
+  </style>${lines.map((line, i) => `<span id="l${i}">${line.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</span>`).join("")}`;
+  const file = path.join(out, "measure.html");
+  await writeFile(file, page);
+  const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || process.env.REMOTION_BROWSER_EXECUTABLE });
+  try {
+    const tab = await browser.newPage();
+    await tab.goto(pathToFileURL(file).href);
+    await tab.evaluate(() => document.fonts.ready);
+    const widths = await tab.evaluate((n) => Array.from({ length: n }, (_, i) => document.getElementById(`l${i}`).getBoundingClientRect().width), lines.length);
+    const width = new Map(lines.map((line, i) => [line, widths[i]]));
+    return cues.map((cue) => ({ cue, box: cardBox(cue, (line) => width.get(line)) }));
+  } finally {
+    await browser.close();
+  }
+}
+
+/** Decodes the video once, as full-resolution luma, and hands every frame to `each(frame, pixels)`. */
+function eachFrame(file, each) {
+  const W = 1920;
+  const H = 1080;
+  const size = W * H;
+  return new Promise((resolve, reject) => {
+    const child = spawn("npx", ["remotion", "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", path.join(packageRoot, file),
+      "-vf", "format=gray", "-f", "image2pipe", "-c:v", "rawvideo", "pipe:1"], { cwd: packageRoot });
+    let buffer = Buffer.alloc(0);
+    let frame = 0;
+    child.stdout.on("data", (chunk) => {
+      buffer = buffer.length ? Buffer.concat([buffer, chunk]) : chunk;
+      while (buffer.length >= size) {
+        each(frame, buffer.subarray(0, size));
+        frame += 1;
+        buffer = buffer.subarray(size);
+        if (buffer.length) buffer = Buffer.from(buffer);
+      }
+    });
+    child.on("error", reject);
+    child.on("close", (code) => (code === 0 ? resolve(frame) : reject(new Error(`ffmpeg exited ${code}`))));
+  });
+}
+
+/**
+ * The film frames on which the UI answers one of the pointer's clicks (up to 6 frames after it): the plan
+ * folding on "Approve", a card collapsing on "Got it". Those are cause and effect, not a capture's scroll.
+ */
+const clickFrames = (() => {
+  const frames = [];
+  for (const shot of timeline.shots)
+    for (const take of shot.takes) {
+      const look = looks[shot.id]?.[take.id];
+      if (!look || look.still !== undefined) continue;
+      const targets = JSON.parse(readFileSync(path.join(packageRoot, "public", "footage", look.state, "targets.json"), "utf8"));
+      const from = look.clipFrom ?? 0;
+      const rate = look.rate ?? 1;
+      const to = Math.min(look.clipTo ?? Infinity, from + ((take.to - take.from) / fps) * rate);
+      for (const event of targets.events)
+        if (event.type === "click" && event.t >= from && event.t < to) frames.push(take.from + Math.round(((event.t - from) / rate) * fps));
+    }
+  return frames;
+})();
+const answersClick = (frame) => clickFrames.some((click) => frame > click && frame <= click + 6);
+
+const cards = await measuredCards();
+const findings = [];
+const scanRows = ["frame\tseconds\tscan\tvalue\twhere"];
+let previous;
+const decoded = await eachFrame(video, (frame, pixels) => {
+  // Discontinuities: a 480x270 grid of the luma.
+  const grid = new Uint8Array(480 * 270);
+  for (let y = 0; y < 270; y += 1) for (let x = 0; x < 480; x += 1) grid[y * 480 + x] = pixels[(y * 4 + 2) * 1920 + x * 4 + 2];
+  if (previous) {
+    let sum = 0;
+    for (let i = 0; i < grid.length; i += 1) sum += Math.abs(grid[i] - previous[i]);
+    const diff = sum / grid.length;
+    if (diff > 8 && !cutFrames.has(frame) && !answersClick(frame)) {
+      const { shot, take } = where(frame);
+      findings.push(`frame ${frame}: the picture jumps (mean luma step ${diff.toFixed(1)}) inside ${shot.id}/${take.id}`);
+      scanRows.push(`${frame}\t${(frame / fps).toFixed(3)}\tdiscontinuity\t${diff.toFixed(2)}\t${shot.id}/${take.id}`);
+    }
+  }
+  previous = grid;
+  // Card edges: settled card frames only (not while a card comes in, hands over or leaves).
+  const card = cards.find(({ cue }) => frame >= cue.from + 8 && frame < cue.to - 8);
+  if (card && frame % 2 === 0) {
+    const { left, top, width, height } = card.box;
+    const [l, t, r, b] = [Math.round(left), Math.round(top), Math.round(left + width), Math.round(top + height)];
+    let count = 0;
+    // The ring 6-18 px outside the box: clear of the card's own edge and shadow (and of a few px of text-measure difference).
+    for (let y = Math.max(1, t - 18); y < Math.min(1079, b + 18); y += 1)
+      for (let x = Math.max(1, l - 18); x < Math.min(1919, r + 18); x += 1) {
+        if (x >= l - 6 && x < r + 6 && y >= t - 6 && y < b + 6) continue;
+        const v = pixels[y * 1920 + x];
+        if (Math.abs(v - pixels[y * 1920 + x + 1]) > 70 || Math.abs(v - pixels[(y + 1) * 1920 + x]) > 70) count += 1;
+      }
+    if (count > 8) {
+      const { shot, take } = where(frame);
+      findings.push(`frame ${frame}: ${count} sharp edge pixels in the ring round the card "${card.cue.lines[0]}" (${shot.id}/${take.id})`);
+      scanRows.push(`${frame}\t${(frame / fps).toFixed(3)}\tcard edge\t${count}\t${shot.id}/${take.id}`);
+    }
+  }
+});
+await writeFile(path.join(out, "scans.tsv"), `${scanRows.join("\n")}\n`);
+console.log(`review: scanned ${decoded} frames for jumps inside takes and sharp UI against caption cards (out/review/scans.tsv)`);
+if (decoded !== timeline.durationInFrames) findings.push(`decoded ${decoded} frames, the composition has ${timeline.durationInFrames}`);
+for (const finding of findings.slice(0, 40)) console.error(`review: ${finding}`);
+if (findings.length) {
+  console.error(`review: ${findings.length} finding(s)`);
+  process.exitCode = 1;
+}
