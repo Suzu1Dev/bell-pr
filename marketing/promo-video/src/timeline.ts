@@ -76,7 +76,7 @@ export interface ShotSpec {
 const secondsAt120 = (min: number, nominal: number, max: number) => ({ min: min * 2, nominal: nominal * 2, max: max * 2 });
 
 /** Seconds the complete end card holds after the music's last sound (a picture choice, not a music number). */
-export const END_HOLD_SECONDS = 2.2;
+export const END_HOLD_SECONDS = 1.2;
 /** The picture fades to black over the film's last frames. */
 export const FADE_OUT_FRAMES = 12;
 

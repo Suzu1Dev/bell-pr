@@ -2,14 +2,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createMusic, fps, music, type TrackAnalysis } from "./music.ts";
-import { END_HOLD_SECONDS, buildTimeline, shotSpecs, timeline } from "./timeline.ts";
+import { END_HOLD_SECONDS, FADE_OUT_FRAMES, buildTimeline, shotSpecs, timeline } from "./timeline.ts";
 
 const analysis = JSON.parse(readFileSync(new URL("../music/track.analysis.json", import.meta.url), "utf8")) as TrackAnalysis;
 const seconds = (frames: number) => frames / fps;
 
-test("the film is 75-90 s: the music's last sound, then the complete end card held a little over 2 s", () => {
+test("the film is 75-90 s: the music's last sound, then the complete end card held about a second and faded", () => {
   assert.equal(timeline.durationInFrames, music.durationInFrames + Math.round(END_HOLD_SECONDS * fps));
-  assert.ok(END_HOLD_SECONDS >= 2 && END_HOLD_SECONDS <= 2.5);
+  // At most 1.0 s of silent hold past the music's last sound, then the fade (no dead air before a loop).
+  assert.ok(END_HOLD_SECONDS * fps - FADE_OUT_FRAMES <= 1.0 * fps && END_HOLD_SECONDS >= 0.8);
   assert.ok(seconds(timeline.durationInFrames) >= 75 && seconds(timeline.durationInFrames) <= 89.5);
   assert.equal(timeline.shots.at(-1)!.to, timeline.durationInFrames);
 });
