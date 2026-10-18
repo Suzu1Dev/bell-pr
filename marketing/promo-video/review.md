@@ -2,10 +2,11 @@
 
 The film is checked twice: by the scripts after every capture and render,
 and by people before it is published. Frame numbers are film frames (30 a
-second) of the 89.0 s cut (2670 frames: the 86.8 s music edit and the end
-card's 2.2 s hold); the cut itself is in [`script.md`](script.md). Rounds 1-4
-below were made on the first cut; round 5 re-cut the film after three
-reviewers' findings, and its verdicts are the current ones.
+second) of the 88.0 s cut (2640 frames: the 86.8 s music edit and the end
+card's 1.2 s hold and fade); the cut itself is in [`script.md`](script.md).
+Rounds 1-4 below were made on the first cut; round 5 re-cut the film after
+three reviewers' findings, and round 6 answered a second set of three
+reviews. Round 6's verdicts are the current ones.
 
 ## Automated: enforced on every run
 
@@ -36,7 +37,7 @@ only where the fill links were, checked on frames 30-400 of each), and
 `npm run check` (`scripts/check-output.mjs`; `-- --web-only` while the 4K
 master is not rendered) fails unless:
 
-- every video lasts the composition's 89.0 s ± 0.1 s (inside 75-90 s) at
+- every video lasts the composition's 88.0 s ± 0.1 s (inside 75-90 s) at
   30/1 fps: the web MP4 1920x1080 H.264 + AAC and the WebM VP9 + Opus,
   each at most 20 MB, and the 4K master 3840x2160 H.264 + AAC;
 - `poster.jpg` is 1920x1080 and at most 500 KB;
@@ -48,7 +49,7 @@ master is not rendered) fails unless:
   81.1-84.0 s, is where the analysis records it, and the end-card logo
   locks within ±0.25 s of the final chord (it locks on 2451, -0.018 s).
 
-`npm test` (55 tests) keeps the cut honest against the **loaded** analysis
+`npm test` (57 tests) keeps the cut honest against the **loaded** analysis
 file: anchored shots on their events, section changes on bar lines (else
 half-bars; the one beat-2 cut, S10, proven to be the only legal one), takes
 on half-bars, a cut on every crash downbeat of the analysis, shot lengths inside their limits in seconds, the flex rules on altered
@@ -61,35 +62,42 @@ the owner's headline on the end card, no "automatic", "autonomous" or
 output px per capture px (one DPR-4 pixel per pixel of the 4K master) and
 no macro above 2.6, the sharp plane never faster than 8 px a frame once
 settled, no jump cut inside one captured state, no sliver of studio under
-60 px at a frame edge, a sidebar cropped by the frame edge always in the
-soft plane, **no caption card within 12 px of the sharp plane**, the logo
+60 px at a frame edge, a sidebar in frame always wholly in the soft plane
+(every feather ends in the gutter after it), **no caption card within 12 px
+of the sharp plane**, the pointer only around its clicks (at most 12 frames
+before, its ring 8 frames), the logo
 moments (the end-card logo under 72% eight frames after the cut and
 resolved on the chord), the breath before the hit, and the sound effects'
 placement (whooshes peaking a frame before their downbeat, the glint on the
-chord) and levels.
+chord) and levels. With the footage in place it also runs the depth-of-field
+check below against the captured pictures.
 
 `npm run review` also scans **every frame** of the MP4 (one decode) and
 exits 1 on a finding: a mean luma step above 8 between two frames that are
 not a cut (nor the UI's answer to an on-screen click) is a jump inside a
 take; more than 8 sharp-edge pixels in the ring 6-18 px round a settled
 caption card (its box measured in Chrome in the film's font) is UI text
-running into the card. Findings go to `out/review/scans.tsv`.
+running into the card. A third check runs on the footage itself
+(`scripts/check-dof.mjs`), at every take's settled frames: no glyph lies in
+a feather of the sharp plane (where it would come out half sharp) and no
+sharp line of text is cut by a frame edge or the window's own edge.
+Findings go to `out/review/scans.tsv`.
 
 ## Visual QA by the engineer
 
 `npm run review` extracts frames from the web MP4 into `out/review/` and
 writes the frame index `out/review/index.tsv` (frame, seconds, shot, take,
 file, why) and `out/contact-sheet.png` (the middle of every take, the first
-hit and the end-card landing). In round 5, 271 frames: every shot and take
+hit and the end-card landing). In round 6, 276 frames: every shot and take
 midpoint, every caption midpoint, two frames either side of every cut and
 the cut frame itself, the breath before the hit (255, 273, 286, 290), the
 hit (291), the measured final hit (2438), the logo landing (2452), the last
-frame, and every 15th frame of every product take (123 frames of push-ins,
-22 of floating windows). Every one was looked at, in 4x3 sheets at 640 px
-and then at full size where anything was in doubt, and the whole contact
-sheet; the 4K master was looked at in full-resolution crops (below).
+frame, and every 15th frame of every product take. Every one was looked
+at, in 4x4 sheets at 490 px and then at full size where anything was in
+doubt, and the whole contact sheet; the 4K master was looked at in
+full-resolution crops (below).
 
-Five rounds: each one rendered the web files again, extracted the frames
+Six rounds: each one rendered the web files again, extracted the frames
 again and looked at all of them.
 
 ### Round 1 (renders of 2026-10-18 16:46 and 16:59): found and fixed
@@ -169,7 +177,7 @@ GitHub, OpenAI or Anthropic logo; only the fictional sample.
 M 1.9), 1680 and 2316 have crisp UI text at full resolution: the DPR 4
 captures give at least one source pixel per 4K output pixel everywhere.
 
-### Round 5 (renders of 2026-10-18 20:02, 20:08 and the 4K master): three reviewers' findings, the re-cut, verdicts
+### Round 5 (renders of 2026-10-18 20:02, 20:08 and the 4K master): three reviewers' findings, the re-cut, verdicts (superseded by round 6)
 
 Three reviewers looked at the round-4 cut frame by frame. Every high and
 medium finding is fixed below, or explained where it would break the spec
@@ -269,19 +277,131 @@ half-word at a frame edge in a sharp plane; no fill link; no double
 exposure; no Apple fonts, devices, window buttons or "9:41"; no GitHub,
 OpenAI or Anthropic logo; only the fictional sample.
 
+### Round 6 (renders of 2026-10-18 21:50 and 22:22 and the 4K master): a second set of three reviews, verdicts
+
+Three reviewers looked at the round-5 cut again. Every high and medium
+finding is fixed below, or explained where it would break the spec or an
+owner decision; the cheap low ones are fixed too. The web files, poster,
+captions and the 4K master were rendered again, the 276 review frames
+were extracted and looked at, and the three checks (jumps inside a take,
+UI against a caption card, the depth of field against the footage) ran
+over every frame with no finding.
+
+**Fixed** (the frames are the new cut's):
+
+| Finding | Fix | Frames now |
+| --- | --- | --- |
+| S2: a dark smudge down the lifted card's right edge through the freeze (the next card's blur and shadow painted over it) | The lifted card is drawn after the whole queue, before the reviewer. Decoded 273: 229 across the card to its edge (it was 193 at the edge) | 219-286; 255, 273 at full size |
+| S8: the answer unreadable, cut mid-sentence by the mask, 90% of the frame soft | S8 is three takes: the selection growing to lines 10-15 and "Explain this code" pressed (1299); a macro of the centred panel on the question's diff block, sharp for 36 frames (1335); then the answer's first paragraph, complete and sharp, held 72 frames at M 2.3-2.45 (1371-1442): "If many users fail and retry at the same moment, the server is flooded again. Spreading the retries out breaks that chain reaction." The paragraph under it (whose heading runs into its body, a product glitch) stays soft | 1299-1442; 1353, 1407 |
+| WebM: VP9 at CRF 35 flattened the darkened light plate's grain (flat runs 543-649 px, contour rings) | The light plate's grain is ±2.5 LSB in 4x4 px cells (8x8 at 4K; it was ±2 in 2x2), the WebM renders at CRF 30, and it gets a keyframe on every cut where a stage plate first shows (`src/keyframes.ts`: the stage cuts and every take that opens on the studio, 16 in all; VP9 had coded 1515 and 1875 as inter frames and flattened the plate there, 425-490 px runs even at CRF 30). Decoded WebM, longest flat run on studio-only lines (pass ≤ 120 px): 300 and 330: 20-40 px, 1530: 32-75 px, 1890: 41-133 px (the 133 px run is in the moving window's shadow during the establishing turn, below); MP4: 10-33 px on all three | 300, 1530, 1890 |
+| The depth of field read as a flat mask laid on in post: milky blur, visible boxes (1839: 255 against 251), half-veiled labels, mush at M 2-2.6 | The back plane is the same picture blurred 3.5 px on screen at every magnification (the blur shrinks in capture px as the camera pushes in; the 1/5-scale pre-blur grew with M) and is no longer veiled, so both planes have the same brightness and no rectangle shows. Each sharp plane is the whole component the shot is about (a card, a panel, the dialog's checks), each feather in a gutter of the UI, and `scripts/check-dof.mjs` (in `npm run review` and `npm test`) fails on any glyph in a feather. The windows keep their small tilts; a falloff that follows a tilt would cut text rows diagonally, which the no-half-word rule forbids | every push; 1839, 2307 at full size |
+| S13 practice: the mask started in the sidebar ("ready", "PRO", "…aches" sharp) | The practice take is the whole card, sharp from capture x 264 with its feather in the gutter after the sidebar (242-264); a test asks every take with the sidebar in frame to keep every feather at x 240 or more | 2343-2437 |
+| S7: "It depends" cut by the panel's sticky footer in the sharp macro | The keep take's sharp plane is the question and its first row of choices (626-690); "It depends" and the footer that cuts it are in the soft plane, the window's bottom edge 146-150 px above the frame's | 1227-1262 |
+| S7: the trade-off never legible; the pointer over the soft paragraph | A new take, 2.4 s at M 2.0-2.1, on the revealed alternative, whole and sharp ("Another option is a fixed interval with a little random jitter … a fixed interval would be the better choice."), before the pointer moves; the guess take is two beats from late in its typing to "Show the alternative" | 1155-1226; 1191, 1209 |
+| S12: the preview's last line half sharp and sliced by its scroll box | The sharp plane starts at y 582 (ramp 570-582 in the gap above "Before it reaches the maintainers"); the sliced line is wholly soft | 2091-2162; 2127 |
+| Pushes on downbeat cuts eased with `drift` (zero velocity on the cut) | Every push that starts on a cut uses `arrive` (fast in, long settle), and so does every establishing turn; `drift` is kept for S5's moves inside its take. The sharp plane stays under 8 px a frame (the test; fastest now 7.2 px) | 471, 579, 651, 903, 975, 1011, 1119-1298, 1299-1442, 1587-1874, 1947-2090, 2091-2437 |
+| S11: "And what you didn't test." over the maintainer checklist; S11's checklist showed the sample GitHub facts and "GitHub read … 1:35 AM" sharp, against "nothing was read from GitHub" in S3 and S4; the rows that close the story blurred | The takes are swapped: the checklist plays under "Your words. The project's rules." (1947-2018), held on the frame where the capture's scroll passes its last rows, "A reviewable change", "Disclosing AI help" with `CONTRIBUTING.md:9` and "Understanding check: You explained the change back", all OK and sharp; the header with its read times and the rows with the GitHub facts are out of frame. "And what you didn't test." starts with the cut to the "Your words in the PR" card (2019), whole and sharp, as "Add my not-tested answer to Testing" is pressed, ending on its "In the description" | 1947-2090; 1983, 2055 |
+| S13: raw backticks sharp in the maintainers' comments, the subject of the take | The compare take frames "Your forecast: Tests" and "Changes requested" with the first comment's tags ("Tests", "Saw it coming") sharp, two planes; the comments' text is soft. The product fix (render inline code) is a known issue | 2271-2342; 2307 |
+| S13: "Learn from what they actually said." over the practice item (your own check, not the maintainers) | The cue ends at 2343 (2.1 s); the practice item plays 3.2 s without a caption, on the Learning page's "Sample practice" header and the card's "From your understanding check", answered right, the reference, "What you had wrong last time" and "Next review in 3 days", the whole card sharp | 2280-2343, 2343-2437 |
+| S10: the line take repeated the forecast, smaller, alone | The macro holds the check's result line and the saved prediction under it, both sharp | 1803-1874; 1839 |
+| Pointer: a sharp disc over the soft plane far from any click; the ring outlasting the fold; the disc on a word | The disc shows at most 12 frames before its click and is gone six frames after; the ring lasts at most 8 frames, and where the UI replaces what was clicked (the plan folding at 761, a dialog closing, a layout shift: `scripts/pointer-spots.mjs` finds the frame) the ring ends there and the disc fades within two frames; its timings scale with the clip's rate; it fades out over 40 capture px beyond the sharp plane; and for each click the film shows, `scripts/pointer-spots.mjs` places the disc beside the hotspot where it covers no glyph before or after the click (two clicks in S6, on a dense chip row, cover a single edge pixel at best) | every click: 759, 952, 971, 1006, 1154, 1247, 1303, 1330, 1646, 1691, 1766, 2064, 2161 |
+| A caption card widened while the old line was still on (469-471) | A kept card holds the old size while the old lines leave, then eases to the new size from the new cue's first frame, over 93% of the way there, as the new line rises (no frame of an empty card) | 471, 975, 1191, 2019 |
+| Caption cards in three corners; 46 px type, about 11 px in a phone embed | Two positions only (bottom-left, top-left: S7, S8, S12), DM Sans at 56 px; the establishing windows rest slightly smaller and higher so the larger cards clear them | every cue |
+| S14: 2.2 s of silent hold after the chord's tail | 0.8 s of hold, then the 12-frame fade: 88.0 s (inside 75-90 s); the complete call to action holds 2.9 s from 2541; the poster is frame 2610 | 2541-2639 |
+| Frame 0 an empty dark stage (a black thumbnail) | The first line's focus pull and the front row's fade start as if four frames before the film: frame 0 shows them, soft | 0 |
+| S6: after "Got it" the panel's sample notice slid under the sticky footer, sliced, for the take's last frames | The take holds at 6.13 s, as "Got it" is pressed, before the card collapses | 975-1010 |
+
+**Not done, and why:**
+
+- *The WebM during the establishing turns:* VP9 smooths the window's
+  moving shadow (a CSS gradient over the plate) into one-level steps: flat
+  runs up to 133 px at 1890 and 150-180 px inside the shadow on S11's turn
+  (1875-1946), against 16-33 px in the MP4. No contour ring shows at
+  viewing contrast; at 10x contrast the shadow's falloff shows steps. CRF
+  27 only cut the worst run to 123-149 px for 17% more bits, so the WebM
+  stays at CRF 30 (16.32 MB). Listing the MP4 first in `site/index.html`
+  (outside this package) would serve the MP4 to every browser that plays
+  it; for the owner.
+- *S9 to S10 on beat 2 (1749):* cutting on the bar line at 1731 makes S9
+  9.6 s, under its nominal 10 s (5 bars at 120 BPM; the 5/6 scaling the
+  addendum allows also gives 10 s), and VIDEO.md's flex rule 2 says never
+  to shorten S9 below nominal. Kept; whether 1749 lands on the snare is for
+  the owner's listen.
+- *S9's correction typing before the result (1692-1695):* the correction
+  types at clip 10.8-11.7 s and the result follows a scroll at 12.9 s; one
+  take cannot hold both without the scroll inside it. The result take keeps
+  the one-line correction whole for 54 frames.
+- *Product fixes* (render inline code in maintainer comments; a separator
+  between the alternative's heading and body in the explanation; label the
+  checklist's sample GitHub facts and read times as sample under
+  `capture=1`): outside this package's files (spec: `marketing/promo-video/**`
+  and `site/media/**` only). Each is framed out or held in the soft plane
+  (S13's comments, S8's second paragraph, S11's header and GitHub rows) and
+  listed in the known issues.
+- *New copy* ("Agents do the legwork, / in your own worktrees."; "Days
+  later, it comes back to practice."): VIDEO.md's captions are binding;
+  owner decisions. S13's caption now ends where its subject ends.
+- *The site's video figure* (the `<track kind="captions">` that doubles the
+  burned-in captions, the WebM listed first, the music credit):
+  `site/index.html` is outside this package; for the owner, with the credit
+  in every platform description where the tier needs it
+  (`MUSIC-LICENSE.md`).
+- *Text at an establishing window's bottom edge (408):* that edge is the
+  app viewport's own bottom, as in any window; the text there is about
+  12 px in the whole-window picture and not a sharp-plane subject.
+- *A pixel test for scroll-container edges:* `scripts/check-dof.mjs` checks
+  frame and window edges; a scroll box's edge cannot be told from a card's
+  border in the pixels, so those cases are handled by framing (S6, S7, S12)
+  and by the look at every review frame.
+
+**Verdicts on the round-6 cut** (renders: MP4 12.95 MB, WebM 16.32 MB,
+`npm run check` passes; the three scans over all 2640 frames find nothing):
+
+| Shot | Frames looked at | Verdict |
+| --- | --- | --- |
+| S1 Problem | 0, 39, 73, 111, 145 | ok: frame 0 shows the soft first line and the front row; the queue piles up three rows deep; the reviewer's ringed pointer on the open card. |
+| S2 Turn | 147, 149, 210, 219, 255, 273, 286, 289, 290 | ok: the question pulls in line by line; the lifted card clean to its edges through the freeze (255, 273 at full size); 287-290 dark on purpose. |
+| S3 Rules first | 291, 293, 343, 345, 347, 360-470, 471-577 | ok: lights on, the wordmark, the window rising in and landing on 363; the push on the whole rules card, its feather in the gap under the third rule, the caption over the soft "files read" line. |
+| S4 Still yours | 579-650, 651-722 | ok: the crash cut on the settled facts, the "Before you start" box sharp; the plan card sharp, its feathers in the gaps above and below it. |
+| S5 Legwork | 723-866 | ok: the approve click on 759, the ring and the disc gone as the plan folds (761); the plan folds, the board's columns sharp in two planes meeting in the gutter between "In progress" and "Done", the stepper and the run's card soft; the caption over the emptied columns' soft lower half. |
+| S6 Try first | 867-902, 903-974, 975-1010, 1011-1118 | ok: the turn leaves the cut moving; the answer types inside the push; the reference and "Got it", held as it is pressed; the example card. |
+| S7 Taste | 1119-1154, 1155-1226, 1227-1262, 1263-1298 | ok: the guess and "Show the alternative"; the alternative whole and sharp for 2.4 s under "Taste grows by weighing trade-offs."; "Keep this approach" pressed, "It depends" and the footer soft; the why types out and is saved. |
+| S8 Ask | 1299-1334, 1335-1370, 1371-1442 | ok: the selection and "Explain this code"; the question's diff block sharp in a centred macro; the answer's first paragraph complete and sharp, held to the cut. |
+| S9 Explain it back | 1443-1514, 1515-1586, 1587-1658, 1659-1694, 1695-1748 | ok: the dark title bar; lights on to the closed book; the question answered and "Think so"; the reference and "Partly"; the result with the correction. |
+| S10 Predict | 1749-1802, 1803-1874 | ok: "Tests" and the forecast typing; the result line and the saved prediction, both sharp. |
+| S11 Your words | 1875-1946, 1947-2018, 2019-2090 | ok: the window turning to face; the checklist's last rows, disclosure and understanding check OK, no GitHub fact or read time in frame; the words card with the not-tested answer going into the description under "And what you didn't test." |
+| S12 Send one | 2091-2162, 2163-2270 | ok: the checks and the click before the crash, the preview's sliced line soft; the published card. |
+| S13 Learn | 2271-2342, 2343-2437 | ok: the forecast and the maintainer's tags sharp, the comments soft; the practice card, whole, under the Learning page's header, without a caption. |
+| S14 End | 2438, 2440, 2452, 2539, 2563, 2610 (poster), 2639 | ok: the soft logo on the measured hit, resolved on the chord; the complete card from 2541, held to 2627, black on the last frame. |
+
+4K master (`out/bell-pr-promo-en-2160p.mp4`, rendered again in 13 min at
+concurrency 3): 73.57 MB, 3840x2160 at 30/1, -14.03 LUFS, true peak
+-3.35 dBTP; `npm run check` (all three videos) passes. Full-resolution
+crops of 273 (the lifted card, clean to its edges), 1209 (the alternative
+at M 2.1), 1407 (the answer at M 2.45), 1839 and 2307: the UI text is
+crisp; in the macros the 1.2-1.3x upsampling of the DPR-4 capture shows
+only as a slight softening of glyph edges at 100%.
+
+Every frame (the 276 review frames and the scans over all 2640): no
+blank or loading frame other than the four intended dark ones and the
+closing fade; no jump inside a take; no caption card on sharp UI; no glyph
+in a depth-of-field feather; no sharp line cut by a frame or window edge;
+no fill link; no double exposure; no Apple fonts, devices, window buttons
+or "9:41"; no GitHub, OpenAI or Anthropic logo; only the fictional sample.
+
 ### The look-dev's must-fix list (COMPARISON.md), as fixed here
 
 | # | Must-fix | Fixed, frames |
 | --- | --- | --- |
 | C1 | Title sweep drew a misregistered ghost copy of "knowing why." | The sweep is drawn inside the letters of the same element (`background-clip: text` on the word itself), so it cannot misregister; it crosses "knowing why." over 2531-2555 (no ghost). The logo's sweep is masked by the logo itself (2451-2475). |
-| C2 | Title contrast: "From"/"to" dimmed, "vibe coding" left blurred | "From" and "to" stay #f4f7f3; only "vibe coding" dims (#56695d) and softens, at most 1.6 px, for one beat, then resolves to sharp (from 2559); "knowing why." turns mint. 2578, the hold to 2657 and the poster (2640) read as stills. |
+| C2 | Title contrast: "From"/"to" dimmed, "vibe coding" left blurred | "From" and "to" stay #f4f7f3; only "vibe coding" dims (#56695d) and softens, at most 1.6 px, for one beat, then resolves to sharp (from 2559); "knowing why." turns mint. 2578, the hold to 2627 and the poster (2610) read as stills. |
 | C3 | The bell alone on an empty white frame during the match cut; a rotated smear | No traveling bell: the wordmark holds at full strength (291-334), lifts and dissolves (335-344), and the window's top edge is already in frame on 345; no empty frame (343, 345, 347 in the review). |
 | C4 | No establishing shot of the whole window | Every product section opens on the whole floating window, four edges in frame, contact shadow, scale ≤ 1, for two beats or more: 352-470, 867-902, 1515-1568 (then the push), 1875-1946 (test). |
-| C5 | Shutter blur and depth of field smeared the UI during the dolly | The sharp plane moves at most 8 px a frame once a take has settled (test) and carries no shutter blur; depth of field is a pre-blurred, veiled back copy under a mask, so the sharp plane never doubles: 471-577, 903-1118, 1587-1748 sharp at every 15th frame. |
+| C5 | Shutter blur and depth of field smeared the UI during the dolly | The sharp plane moves at most 8 px a frame once a take has settled (test) and carries no shutter blur; depth of field is the same picture blurred 3.5 px on screen behind a sharp copy (round 6: no veil, the same blur at every magnification, every feather in a gutter, checked against the footage), so the sharp plane never doubles: 471-577, 903-1118, 1587-1748 sharp at every 15th frame. |
 | C6 | Supporting line: glyph tops at its start, over blurred code, covering the diff | Captions sit on a frosted card over a soft pool of light, over the soft plane or the studio (test and scan), beside the subject; the lines show whole from their first frames: 381, 471, 903, 1308, 1659, 1893. |
-| C7 | Soft 4K product frames (DPR 2) | DPR 4 captures; pushes ≤ 2.0 (test). The 4K master is rendered and checked (round 5): crops of 408, 1623, 1839 and 2217 are crisp; the macros (≤ 2.6) are upsampled up to 1.3x in it, a slight softening at 100%. |
+| C7 | Soft 4K product frames (DPR 2) | DPR 4 captures; pushes ≤ 2.0 (test). The 4K master is rendered and checked (rounds 5 and 6): crops of 408, 1407, 1623, 1839 and 2217 are crisp; the macros (≤ 2.6) are upsampled up to 1.3x in it, a slight softening at 100%. |
 | C8 | Sound needs a listen; the swell may be inaudible | Measured: swell 16.7 dB, whooshes 17-25 dB, glint about 24 dB, ticks and keyboard 25-30 dB under the music at their moments; effects alone peak at -16.2 dBTP (ticks under -20); the mix measures the same integrated loudness as the music alone. **The listen is an owner sign-off.** |
-| C9 | Grain and bitrate | Coarse static grain on both plates (the light one added in round 1, the dark one coarsened for VP9 in round 3, the light one darkened in round 5); MP4 14.55 MB, WebM 14.11 MB, inside 20 MB. |
+| C9 | Grain and bitrate | Coarse static grain on both plates (the light one added in round 1, the dark one coarsened for VP9 in round 3, the light one darkened in round 5 and coarsened for VP9 in round 6); MP4 12.95 MB, WebM 16.32 MB, inside 20 MB. |
 | B | Hand-off ghosting in the light wipe | No wipe and no cross-dissolve between the logo and the window: the logo has gone before the window enters (A's rule). |
 
 ## By people: OWNER SIGN-OFF (not an agent gate)
@@ -295,9 +415,15 @@ OpenAI or Anthropic logo; only the fictional sample.
 - [ ] Remotion's company licence, if it applies (README.md).
 - [ ] The glint on the chord: keep the (quieter) sparkle or swap it for a
       softer tonal shimmer (`SFX-LICENSES.md`).
-- [ ] Copy left as VIDEO.md has it: "on your own machine" (S5), and no new
-      captions for S4's plan or S11's checklist, no descriptor under the
-      wordmark and no "replies prewritten" lower third (round 5).
+- [ ] Copy left as VIDEO.md has it: "on your own machine" (S5; a
+      reviewer suggests "in your own worktrees", or keeping the line and
+      naming the user's own Claude Code / Codex CLI and account in the
+      video description), and no new captions for S4's plan or S11's
+      checklist, no descriptor under the wordmark, no "replies prewritten"
+      lower third (round 5) and no "Days later, it comes back to practice."
+      (round 6).
+- [ ] The S9 to S10 cut on beat 2 of bar 25 (1749): kept because S9 may
+      not go under its nominal 10 s; by ear, does it land?
 - [ ] The site's video figure (`site/index.html`, outside this package):
       the music credit if the tier needs it, and its `<track
       kind="captions">`, which doubles the captions burned into the picture.
