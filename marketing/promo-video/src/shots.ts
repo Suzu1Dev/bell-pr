@@ -206,8 +206,10 @@ export const looks: Record<string, Record<string, TakeLook>> = {
     },
     reveal: {
       state: "v-quiz-attempt",
-      // After the scroll to the grades: the AI-written reference, then "Got it".
+      // After the scroll to the grades: the AI-written reference, then "Got it" (held before the card collapses and
+      // the panel's notice under it slides behind the sticky footer, 6.15 s).
       clipFrom: 5.05,
+      clipTo: 6.13,
       macro: true,
       keys: [
         { at: 0, view: push(1250, 545, 2.3, { ry: -3 }) },
@@ -403,16 +405,18 @@ export const looks: Record<string, Record<string, TakeLook>> = {
     },
     checklist: {
       state: "v-draft-your-words",
-      // The maintainer checklist after the scroll: its last rows (your pace, your own words, a reviewable change)
-      // sharp; the rows above, with the sample GitHub facts, and the header with its read times soft or out of frame.
-      // The window's bottom edge leaves a strip of studio for the caption. Half-speed camera in the calm bars.
-      clipFrom: 5.92,
-      rate: 0.5,
+      // The maintainer checklist's last rows, held on the frame where the capture's scroll passes them (5.43 s): "A
+      // reviewable change", "Disclosing AI help" with the project's rule, "Understanding check: You explained the
+      // change back", every one OK, sharp; the rows above (with the sample GitHub facts) and the header with its
+      // read times out of frame or soft, the reviewability snapshot under them soft for the caption. Half-speed
+      // camera in the calm bars.
+      clipFrom: 5.433,
+      clipTo: 5.433,
       keys: [
-        { at: 0, view: push(834, 660, 1.74, { bottom: 230 }) },
-        { at: 4, view: push(834, 660, 1.8, { bottom: 224 }), ease: "arrive" },
+        { at: 0, view: push(834, 446, 1.7) },
+        { at: 4, view: push(834, 446, 1.78), ease: "arrive" },
       ],
-      dof: { mask: (a) => focusRect(316, 527, 1352, 810, [20, 5, 20, 0], a), keys: [{ at: 0, amount: 1 }] },
+      dof: { mask: (a) => focusRect(316, 268, 1352, 600, [20, 6, 20, 30], a), keys: [{ at: 0, amount: 1 }] },
     },
     words: {
       state: "v-draft-your-words",
@@ -462,8 +466,8 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       // a product fix in the known issues).
       clipFrom: 2.1,
       keys: [
-        { at: 0, view: push(832, 214, 1.61) },
-        { at: 3, view: push(832, 214, 1.68), ease: "arrive" },
+        { at: 0, view: push(831, 312, 1.74) },
+        { at: 3, view: push(831, 312, 1.82), ease: "arrive" },
       ],
       dof: {
         mask: (a) => [focusRect(300, 56, 655, 222, [10, 10, 12, 20], a), focusRect(676, 290, 1365, 362, [6, 6, 14, 20], a)],
@@ -479,8 +483,8 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       clipTo: 1.1,
       rate: 0.08,
       keys: [
-        { at: 0, view: push(706, 430, 1.46) },
-        { at: 4, view: push(700, 440, 1.52), ease: "arrive" },
+        { at: 0, view: push(706, 424, 1.46) },
+        { at: 4, view: push(700, 432, 1.52), ease: "arrive" },
       ],
       dof: { mask: (a) => focusRect(264, 84, 1405, 752, [22, 20, 14, 20], a), keys: [{ at: 0, amount: 1 }] },
     },
