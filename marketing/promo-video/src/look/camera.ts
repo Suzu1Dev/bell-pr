@@ -36,8 +36,12 @@ export const floating = (width: number, { x = 0, y = 0, rx = 0, ry = 0 } = {}): 
 
 /**
  * A push-in on capture point (cx, cy) at magnification m, placed at screen
- * (sx, sy). By default the placement is clamped so the window covers the
- * whole frame (no sliver of studio at an edge; a tilt widens the margin).
+ * (sx, sy). By default the placement is nudged so the projected window
+ * covers every frame edge by at least 20 px (no sliver of studio at an edge;
+ * the tilt's perspective is taken into account), or, with `right`/`left`,
+ * shows that one window edge on purpose that many px inside the frame. An
+ * axis the window is too small to cover is centred (src/look.test.ts then
+ * asks for at least 60 px of studio on both sides).
  */
 export const push = (
   cx: number,
@@ -62,19 +66,30 @@ export const push = (
     left?: number;
   } = {},
 ): View => {
-  if (right !== undefined) sx = 1920 - right - (CAPTURE.width - cx) * m;
-  else if (left !== undefined) sx = left + cx * m;
-  else if (cover) sx = coverClamp(sx, cx, m, CAPTURE.width, 1920, 30 + Math.abs(ry) * 9);
-  if (cover) sy = coverClamp(sy, cy, m, CAPTURE.height, 1080, 30 + Math.abs(rx) * 9);
-  return { cx, cy, m, sx, sy, rx, ry };
+  let view: View = { cx, cy, m, sx, sy, rx, ry };
+  if (!cover && right === undefined && left === undefined) return view;
+  const M = 20;
+  for (let i = 0; i < 12; i += 1) {
+    const [tl, tr, br, bl] = corners(view);
+    let dx = 0;
+    let dy = 0;
+    if (right !== undefined) dx = 1920 - right - (tr.x + br.x) / 2;
+    else if (left !== undefined) dx = left - (tl.x + bl.x) / 2;
+    else if (cover) {
+      const gapL = Math.max(tl.x, bl.x) + M;
+      const gapR = 1920 + M - Math.min(tr.x, br.x);
+      dx = gapL > 0 && gapR > 0 ? (gapR - gapL) / 2 : gapL > 0 ? -gapL : gapR > 0 ? gapR : 0;
+    }
+    if (cover) {
+      const gapT = Math.max(tl.y, tr.y) + M;
+      const gapB = 1080 + M - Math.min(bl.y, br.y);
+      dy = gapT > 0 && gapB > 0 ? (gapB - gapT) / 2 : gapT > 0 ? -gapT : gapB > 0 ? gapB : 0;
+    }
+    if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) break;
+    view = { ...view, sx: view.sx + dx, sy: view.sy + dy };
+  }
+  return view;
 };
-
-/** The screen position of point c (of a span `span` long, magnified m) that keeps the span over [-margin, frame + margin]. */
-function coverClamp(s: number, c: number, m: number, span: number, frame: number, margin: number) {
-  const low = frame + margin - (span - c) * m;
-  const high = c * m - margin;
-  return low <= high ? Math.min(high, Math.max(low, s)) : (low + high) / 2;
-}
 
 export interface Key {
   /** Beats from the take's start. */

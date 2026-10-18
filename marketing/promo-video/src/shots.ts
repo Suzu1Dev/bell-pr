@@ -56,7 +56,7 @@ const establish = (beats = 3, amount = 1): Key[] => [
 
 /** The first product shot rises in from below the frame right after the logo has gone, then turns to face. */
 const riseIn = (): Key[] => [
-  { at: 0, view: floating(REST.width * 0.94, { x: REST.x + 150, y: REST.y + 860, rx: 18, ry: -24 }) },
+  { at: 0, view: floating(REST.width * 0.94, { x: REST.x + 150, y: REST.y + 640, rx: 18, ry: -24 }) },
   { at: 2, view: floating(REST.width * 0.97, { x: REST.x + 90, y: REST.y + 20, rx: 11, ry: -18 }), ease: "glide" },
   { at: 5, view: floating(REST.width, { x: REST.x, y: REST.y, rx: REST.rx, ry: REST.ry }), ease: "standard" },
 ];
@@ -86,7 +86,7 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       state: "v-before-you-start",
       clipFrom: 1.5,
       keys: [
-        { at: 0, view: push(720, 380, 1.3) },
+        { at: 0, view: push(720, 380, 1.42) },
         { at: 3.5, view: push(720, 250, 1.75), ease: "standard" },
       ],
       dof: { mask: (a) => focusRect(361, 160, 1079, 299, 80, a), keys: [{ at: 1.5, amount: 0 }, { at: 3.5, amount: 1 }] },
@@ -95,8 +95,8 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       state: "v-plan",
       still: "plan",
       keys: [
-        { at: 0, view: push(834, 320, 1.42) },
-        { at: 4, view: push(850, 320, 1.5), ease: "drift" },
+        { at: 0, view: push(900, 250, 1.66) },
+        { at: 4, view: push(910, 250, 1.74), ease: "drift" },
       ],
       dof: { mask: (a) => focusRect(291, 150, 1377, 600, 70, a), keys: [{ at: 0, amount: 1 }] },
     },
@@ -106,10 +106,12 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       state: "v-board",
       clipFrom: 0,
       keys: [
-        { at: 0, view: push(850, 320, 1.5) },
-        { at: 3, view: push(834, 360, 1.36), ease: "standard" },
-        { at: 8, view: push(834, 370, 1.4), ease: "drift" },
+        { at: 0, view: push(834, 330, 1.42) },
+        { at: 3, view: push(860, 380, 1.45), ease: "standard" },
+        { at: 8, view: push(860, 390, 1.49), ease: "drift" },
       ],
+      // The sidebar, cut by the frame edge, goes soft; the board stays sharp.
+      dof: { mask: (a) => focusRect(280, 0, 1440, 810, 40, a), keys: [{ at: 0, amount: 1 }] },
     },
   },
   "s6-try-first": {
@@ -133,8 +135,8 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       state: "v-quiz-attempt",
       clipFrom: 7.6,
       keys: [
-        { at: 0, view: push(1251, 470, 1.9, { right: 120, ry: -4 }) },
-        { at: 3, view: push(1251, 470, 1.95, { right: 120, ry: -3 }), ease: "drift" },
+        { at: 0, view: push(1251, 470, 1.55, { right: 120, ry: -4 }) },
+        { at: 3, view: push(1251, 470, 1.62, { right: 120, ry: -3 }), ease: "drift" },
       ],
       dof: { mask: (a) => focusRect(1085, 120, 1420, 800, 50, a), keys: [{ at: 0, amount: 1 }] },
     },
@@ -144,8 +146,8 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       state: "v-road-choice",
       clipFrom: 0.35,
       keys: [
-        { at: 0, view: push(1180, 470, 1.45, { right: 120, ry: -6 }) },
-        { at: 5, view: push(1230, 470, 1.6, { right: 120, ry: -5 }), ease: "drift" },
+        { at: 0, view: push(1180, 470, 1.46, { right: 120, ry: -6 }) },
+        { at: 5, view: push(1230, 470, 1.55, { right: 120, ry: -5 }), ease: "drift" },
       ],
       dof: { mask: (a) => focusRect(1085, 120, 1420, 800, 50, a), keys: [{ at: 0, amount: 0.6 }, { at: 2, amount: 1 }] },
     },
@@ -173,7 +175,7 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       state: "v-line-ask",
       clipFrom: 2.3,
       keys: [
-        { at: 0, view: push(1000, 420, 1.4, { ry: -3 }) },
+        { at: 0, view: push(1000, 420, 1.4, { right: 120, ry: -3 }) },
         { at: 4, view: push(1220, 380, 1.6, { right: 120, ry: -5 }), ease: "drift" },
       ],
       dof: { mask: (a) => focusRect(880, 100, 1420, 760, 60, a), keys: [{ at: 1, amount: 0 }, { at: 3, amount: 1 }] },
@@ -200,8 +202,8 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       state: "v-check",
       clipFrom: 2.75,
       keys: [
-        { at: 0, view: push(1170, 330, 1.5, { right: 120, ry: -6 }) },
-        { at: 6, view: push(1230, 420, 1.7, { right: 120, ry: -4 }), ease: "drift" },
+        { at: 0, view: push(1170, 330, 1.45, { right: 120, ry: -6 }) },
+        { at: 6, view: push(1230, 420, 1.58, { right: 120, ry: -4 }), ease: "drift" },
       ],
       dof: { mask: (a) => focusRect(1085, 120, 1420, 800, 50, a), keys: [{ at: 0, amount: 1 }] },
     },
@@ -209,8 +211,8 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       state: "v-check",
       clipFrom: 9.3,
       keys: [
-        { at: 0, view: push(1251, 520, 1.85, { right: 120, ry: -4 }) },
-        { at: 4, view: push(1251, 540, 1.9, { right: 120, ry: -3 }), ease: "drift" },
+        { at: 0, view: push(1251, 520, 1.92, { right: 120, ry: -4 }) },
+        { at: 4, view: push(1251, 540, 1.97, { right: 120, ry: -3 }), ease: "drift" },
       ],
       dof: { mask: (a) => focusRect(1085, 120, 1420, 800, 50, a), keys: [{ at: 0, amount: 1 }] },
     },
@@ -220,7 +222,7 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       state: "v-forecast",
       clipFrom: 0.25,
       keys: [
-        { at: 0, view: push(1130, 330, 1.4, { right: 120, ry: -6 }) },
+        { at: 0, view: push(1130, 330, 1.47, { right: 120, ry: -6 }) },
         { at: 7, view: push(1200, 400, 1.6, { right: 120, ry: -4 }), ease: "drift" },
       ],
       dof: { mask: (a) => focusRect(1085, 120, 1420, 800, 50, a), keys: [{ at: 0, amount: 1 }] },
@@ -238,8 +240,8 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       state: "v-draft-your-words",
       clipFrom: 0.37,
       keys: [
-        { at: 0, view: push(700, 270, 1.45) },
-        { at: 4, view: push(700, 280, 1.5), ease: "drift" },
+        { at: 0, view: push(700, 270, 1.6) },
+        { at: 4, view: push(700, 280, 1.66), ease: "drift" },
       ],
       dof: { mask: (a) => focusRect(291, 90, 1109, 462, 60, a), keys: [{ at: 0, amount: 1 }] },
     },
@@ -247,9 +249,11 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       state: "v-draft-your-words",
       clipFrom: 5.9,
       keys: [
-        { at: 0, view: push(760, 330, 1.3) },
-        { at: 4, view: push(760, 360, 1.34), ease: "drift" },
+        { at: 0, view: push(760, 330, 1.42) },
+        { at: 4, view: push(760, 360, 1.46), ease: "drift" },
       ],
+      // The sidebar, cut by the frame edge, goes soft; the checklist stays sharp.
+      dof: { mask: (a) => focusRect(300, 0, 1440, 810, 30, a), keys: [{ at: 0, amount: 1 }] },
     },
   },
   "s12-send-one": {
@@ -257,8 +261,8 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       state: "v-publish",
       clipFrom: 1.25,
       keys: [
-        { at: 0, view: push(720, 420, 1.25, { left: 300, ry: 4 }) },
-        { at: 4, view: push(720, 560, 1.5, { left: 260, ry: 3 }), ease: "standard" },
+        { at: 0, view: push(720, 420, 1.4, { left: 300, ry: 4 }) },
+        { at: 4, view: push(720, 560, 1.55, { left: 260, ry: 3 }), ease: "standard" },
       ],
       dof: { mask: (a) => focusRect(480, 40, 960, 769, 40, a), keys: [{ at: 0, amount: 1 }] },
     },
@@ -266,10 +270,11 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       state: "v-publish",
       clipFrom: 4.4,
       keys: [
-        { at: 0, view: push(640, 260, 1.6) },
-        { at: 5, view: push(640, 260, 1.66), ease: "drift" },
+        { at: 0, view: push(834, 250, 1.58) },
+        { at: 5, view: push(834, 250, 1.64), ease: "drift" },
       ],
-      dof: { mask: (a) => focusRect(291, 190, 1377, 270, 60, a), keys: [{ at: 0, amount: 0.8 }] },
+      // The ramp falls in the gap under the published card, so no line of text sits half in focus.
+      dof: { mask: (a) => focusRect(291, 190, 1377, 262, 18, a), keys: [{ at: 0, amount: 0.8 }] },
     },
   },
   "s13-learn": {
@@ -277,9 +282,11 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       state: "v-forecast-vs-reality",
       clipFrom: 1.9,
       keys: [
-        { at: 0, view: push(830, 330, 1.35) },
-        { at: 5, view: push(830, 260, 1.5), ease: "drift" },
+        { at: 0, view: push(830, 330, 1.42) },
+        { at: 5, view: push(830, 260, 1.52), ease: "drift" },
       ],
+      // The sidebar, cut by the frame edge, goes soft so no half-word reads sharp.
+      dof: { mask: (a) => focusRect(291, 30, 1377, 700, 40, a), keys: [{ at: 0, amount: 1 }] },
     },
     practice: {
       state: "v-practice",
