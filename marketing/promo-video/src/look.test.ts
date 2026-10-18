@@ -191,6 +191,11 @@ test("the pointer shows only while it works: in before a move, out after its cli
   assert.ok(Math.abs(pointerWindows(events, 0.5)[0][0] - 1.3) < 1e-9);
   // The click's ring is gone 8 frames after it, before the UI under it has settled.
   assert.equal(pointerAt(events, 1.5 + 9 / 30)?.ripple, undefined);
+  // When the UI replaces what was clicked (scripts/pointer-spots.mjs records when), the ring ends and the disc goes.
+  const spots = [{ t: 1.5, dx: 9, dy: 11, changeAt: 1.5 + 1 / 30 }];
+  assert.ok(pointerAt(events, 1.5, 1, spots)!.ripple !== undefined);
+  assert.equal(pointerAt(events, 1.5 + 2 / 30, 1, spots)?.ripple, undefined);
+  assert.ok((pointerAt(events, 1.5 + 3 / 30, 1, spots)?.opacity ?? 0) < 0.01);
 });
 
 /** The sharp planes of a take's mask (capture px, cores and feathers), read back from their gradient stops. */

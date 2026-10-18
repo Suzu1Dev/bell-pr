@@ -4,8 +4,9 @@
  * pointer (lookdev STYLE-GUIDE §5.5, never an OS arrow) only while it works:
  * it fades in at most 12 frames before its click (just before its move when
  * that is shorter), eases to the target, presses, and has faded out six
- * frames after the click unless the next move follows at once. The film
- * also fades it out of the soft plane (src/scenes/ProductShot.tsx).
+ * frames after the click unless the next move follows at once, or as soon
+ * as the UI replaces what was under the click (a fold, a collapse). The
+ * film also fades it out of the soft plane (src/scenes/ProductShot.tsx).
  */
 import type { PointerEvent, PointerSpot } from "../footage.ts";
 import { ease } from "./motion.ts";
@@ -98,12 +99,15 @@ export function pointerAt(events: readonly PointerEvent[], t: number, rate = 1, 
   const spot = near && spots?.find((s) => Math.abs(s.t - near.t) < 1e-3);
   const fadeIn = window ? Math.min(1, (t - window[0]) / (FADE_IN * rate)) : 0;
   const fadeOut = window ? Math.min(1, (window[1] - t) / (FADE_OUT * rate)) : 0;
+  // Once the UI answers the click by replacing what was under it, the ring ends and the disc fades within 2 frames.
+  const lastSpot = lastClick && spots?.find((s) => Math.abs(s.t - lastClick.t) < 1e-3);
+  const changed = lastSpot?.changeAt !== undefined && t >= lastSpot.changeAt ? (t - lastSpot.changeAt) / ((2 / 30) * rate) : 0;
   return {
     x,
     y,
-    opacity: Math.max(0, Math.min(fadeIn, fadeOut)),
+    opacity: Math.max(0, Math.min(fadeIn, fadeOut, 1 - changed)),
     press,
-    ripple: rippleAge === undefined ? undefined : rippleAge / (RIPPLE * rate),
+    ripple: rippleAge === undefined || changed > 0 ? undefined : rippleAge / (RIPPLE * rate),
     rippleAt: lastClick && rippleAge !== undefined ? { x: lastClick.x, y: lastClick.y } : undefined,
     offset: spot ? { x: spot.dx, y: spot.dy } : undefined,
   };

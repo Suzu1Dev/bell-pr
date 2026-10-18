@@ -10,7 +10,10 @@
  * a label that changes). A glyph is a sharp step in the picture (light text
  * on a dark button as much as dark text on white): a flat area, light or
  * dark, is clear. Where no offset is clear (a dense row of chips), the one
- * that covers the least is used and reported. Writes public/footage-2x/<state>/pointer.json
+ * that covers the least is used and reported. It also records when the UI
+ * answers the click by replacing what was under it (a plan folding, a card
+ * collapsing): the click's ring and the disc end there instead of floating
+ * over the new UI. Writes public/footage-2x/<state>/pointer.json
  * (gitignored, read with the footage).
  */
 import { readFile, writeFile } from "node:fs/promises";
@@ -27,6 +30,22 @@ const OFFSETS = [
 ];
 /** The disc's radius on screen (1080p px): the 20 px disc, its 2 px white ring and a pixel of margin. */
 const DISC = 13;
+/** Clip frames after a click searched for the UI's answer, and the mean step (levels) round the click that counts. */
+const AFTER = 8;
+const CHANGE = 20;
+
+/** Mean absolute difference of two pictures in a 160x80 capture px box round (x, y). */
+const areaDiff = (a, b, x, y) => {
+  let sum = 0;
+  let n = 0;
+  for (let py = Math.max(0, Math.round(y - 40)); py < Math.min(H, Math.round(y + 40)); py += 1)
+    for (let px = Math.max(0, Math.round(x - 80)); px < Math.min(W, Math.round(x + 80)); px += 1) {
+      sum += Math.abs(a[py * W + px] - b[py * W + px]);
+      n += 1;
+    }
+  return sum / Math.max(1, n);
+};
+
 /** A step this large between neighbouring capture px is the edge of a glyph (or a button's outline). */
 const STEP = 48;
 
@@ -76,10 +95,24 @@ for (const [state, byClick] of [...shown].sort()) {
   const frames = JSON.parse(await readFile(path.join(dir, "frames.json"), "utf8")).frames;
   const clicks = JSON.parse(await readFile(path.join(dir, "targets.json"), "utf8")).events.filter((e) => e.type === "click" && byClick.has(e.t));
   const at = (t) => frames[Math.min(frames.length - 1, Math.max(0, Math.floor(t * 30 + 1e-6)))].file;
-  const files = clicks.flatMap((click) => [at(click.t - 1 / 30), at(click.t + 4 / 30)].map((file) => path.join(root, "footage-2x", state, file)));
+  // Per click: the frame before it, then the AFTER clip frames that follow it.
+  const files = clicks.flatMap((click) =>
+    [at(click.t - 1 / 30), ...Array.from({ length: AFTER }, (_, k) => at(click.t + (k + 1) / 30))].map((file) => path.join(root, "footage-2x", state, file)),
+  );
   const pictures = await decodeGrey(files);
   const spots = clicks.map((click, i) => {
-    const [before, after] = [pictures[2 * i], pictures[2 * i + 1]];
+    const group = pictures.slice(i * (AFTER + 1), (i + 1) * (AFTER + 1));
+    const [before, after] = [group[0], group[4]];
+    // The UI's answer that replaces what was clicked (a plan folding, a dialog closing, a layout shift): the first
+    // frame, from the second after the click on, that differs from the first (the control's own pressed or selected
+    // state) by more than CHANGE levels on average round the click (a chip turning selected changes it by 5-8, a
+    // fold by 80). The ring and the disc end there.
+    let changeAt;
+    for (let k = 2; k < group.length; k += 1)
+      if (areaDiff(group[1], group[k], click.x, click.y) > CHANGE) {
+        changeAt = click.t + (k - 1) / 30;
+        break;
+      }
     const R = Math.ceil(DISC / byClick.get(click.t));
     const cost = ([dx, dy]) => covered(before, click.x + dx, click.y + dy, R) + covered(after, click.x + dx, click.y + dy, R);
     let offset = OFFSETS.find((o) => cost(o) === 0);
@@ -88,9 +121,11 @@ for (const [state, byClick] of [...shown].sort()) {
       offset = OFFSETS.reduce((best, o) => (cost(o) < cost(best) ? o : best));
       crowded.push(`${state} ${click.t.toFixed(2)} s (${click.target}): ${cost(offset)} edge px under the disc at best`);
     }
-    return { t: click.t, dx: offset[0], dy: offset[1] };
+    return { t: click.t, dx: offset[0], dy: offset[1], ...(changeAt === undefined ? {} : { changeAt: +changeAt.toFixed(4) }) };
   });
   await writeFile(path.join(root, "footage-2x", state, "pointer.json"), `${JSON.stringify({ spots }, null, 1)}\n`);
-  console.log(`pointer: ${state}: ${spots.map((spot) => `${spot.t.toFixed(2)} s (${spot.dx}, ${spot.dy})`).join(", ")}`);
+  console.log(
+    `pointer: ${state}: ${spots.map((spot) => `${spot.t.toFixed(2)} s (${spot.dx}, ${spot.dy})${spot.changeAt ? ` UI changes ${spot.changeAt.toFixed(3)} s` : ""}`).join(", ")}`,
+  );
 }
 for (const line of crowded) console.log(`pointer: no clear spot for ${line}`);

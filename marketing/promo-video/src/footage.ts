@@ -30,6 +30,8 @@ export interface PointerSpot {
   t: number;
   dx: number;
   dy: number;
+  /** Clip seconds where the UI under the click is replaced (a fold, a collapse): the ring and the disc end there. */
+  changeAt?: number;
 }
 
 export interface StateFootage {
