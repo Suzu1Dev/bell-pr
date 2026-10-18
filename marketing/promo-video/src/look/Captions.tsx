@@ -1,47 +1,72 @@
 /**
  * The captions of the product shots, on variant B's frosted-glass card
- * (lookdev STYLE-GUIDE §6.2): white 55% with a 28 px backdrop blur, a 1 px
- * inner light edge and an outer ink hairline, a soft tinted shadow. The card
- * fades and rises in (12 f) while its lines mask-rise (K2: they start partly
- * risen with an opacity ramp, so no glyph tops show alone, COMPARISON.md
- * must-fix 6). A cue that ends on a cut leaves with the cut; one that hands
- * over to the next cue in the same shot fades out over 6 frames first.
+ * (lookdev STYLE-GUIDE §6.2): white 58% with a 28 px backdrop blur, a 1 px
+ * inner light edge and an outer ink hairline, a soft tinted shadow.
  *
- * The title cues (S1, S2, S14) are drawn by their scenes as display type.
- * scripts/export-captions.mjs writes every cue to captions.en.vtt/.srt.
+ * - A card comes in fast (opaque in 6 frames, settling 16 px) and its lines
+ *   mask-rise from 70% risen, starting two frames later, so the card is
+ *   never empty and no glyph tops show alone (COMPARISON.md must-fix 6).
+ * - A cue that follows another one in the same shot keeps the same card:
+ *   the old lines drop out over their last 6 frames, the card's size eases
+ *   to the new text and the new lines rise (K2), so the card never blinks.
+ * - A cue that ends on a cut leaves with the cut.
+ *
+ * The title cues (S1, S2, S9's first line, S14) are drawn by their scenes
+ * as display type. scripts/export-captions.mjs writes every cue to
+ * captions.en.vtt/.srt.
  */
 import { spring, useCurrentFrame } from "remotion";
 import { fps } from "../music.ts";
 import { timeline, type Caption, type CaptionPlace } from "../timeline.ts";
-import { ease, springs, tween } from "./motion.ts";
+export { cardBox } from "./captionLayout.ts";
+import { ease, mix, springs, tween } from "./motion.ts";
 import { LIGHT } from "./Stage.tsx";
+import { SANS } from "./fonts.ts";
 import { ROLES, roleStyle } from "./type.tsx";
+import { CARD_PAD, cardBox, cardPlace, estimateWidth } from "./captionLayout.ts";
 
-const MARGIN = { x: 96, y: 80 };
+const SWAP = 10;
 
-const placeStyle = (place: CaptionPlace): React.CSSProperties => {
-  switch (place) {
-    case "bottom-right":
-      return { right: MARGIN.x, bottom: MARGIN.y };
-    case "top-left":
-      return { left: MARGIN.x, top: MARGIN.y };
-    case "top-right":
-      return { right: MARGIN.x, top: MARGIN.y };
-    case "bottom":
-      return { left: "50%", bottom: MARGIN.y, transform: "translateX(-50%)" };
-    default:
-      return { left: MARGIN.x, bottom: MARGIN.y };
-  }
-};
+const widths = new Map<string, number>();
+/** The rendered width of a caption line, measured once in the page with the loaded font. */
+function measureLine(line: string) {
+  const known = widths.get(line);
+  if (known !== undefined) return known;
+  if (typeof document === "undefined") return estimateWidth(line);
+  const probe = document.createElement("span");
+  const role = ROLES.caption;
+  probe.style.cssText = [
+    "position: absolute",
+    "visibility: hidden",
+    "left: 0",
+    "top: 0",
+    "white-space: pre",
+    `font: ${role.weight} ${role.size}px ${SANS}`,
+    `letter-spacing: ${role.tracking}em`,
+    "font-optical-sizing: auto",
+    "font-kerning: normal",
+  ].join("; ");
+  probe.textContent = line;
+  document.body.appendChild(probe);
+  const width = probe.getBoundingClientRect().width;
+  probe.remove();
+  if (document.fonts.check(`${ROLES.caption.weight} ${ROLES.caption.size}px "Promo DM Sans"`)) widths.set(line, width);
+  return width;
+}
 
-/** Card opacity and lift for a cue at `frame`; zero outside it. */
+/** The cue in the same shot that hands over to `cue` on its first frame. */
+const before = (cue: Caption, cues: readonly Caption[]) =>
+  cues.find((other) => other !== cue && other.style === "card" && other.shot === cue.shot && other.to === cue.from);
+const after = (cue: Caption, cues: readonly Caption[]) =>
+  cues.find((other) => other !== cue && other.style === "card" && other.shot === cue.shot && other.from === cue.to);
+
+/** Card opacity and lift for a cue at `frame`; zero outside it. A hand-over keeps the card. */
 export function cardState(cue: Caption, frame: number, cues: readonly Caption[] = timeline.captions) {
   if (frame < cue.from || frame >= cue.to) return { opacity: 0, rise: 0 };
-  const handsOver = cues.some((other) => other !== cue && other.shot === cue.shot && other.from === cue.to);
-  const enter = tween(frame, cue.from, cue.from + 12, ease.softArrive);
-  const leave = handsOver ? 1 - tween(frame, cue.to - 6, cue.to, ease.depart) : 1;
+  if (before(cue, cues)) return { opacity: 1, rise: 0 };
+  const enter = tween(frame, cue.from, cue.from + 6, ease.softArrive);
   const settle = spring({ frame: frame - cue.from, fps, config: springs.heroSettle });
-  return { opacity: Math.min(enter, leave), rise: 28 * (1 - settle) };
+  return { opacity: enter, rise: 16 * (1 - settle) };
 }
 
 export const GlassCaptions: React.FC = () => {
@@ -49,36 +74,61 @@ export const GlassCaptions: React.FC = () => {
   const cue = timeline.captions.find((c) => c.style === "card" && frame >= c.from && frame < c.to);
   if (!cue) return null;
   const { opacity, rise } = cardState(cue, frame);
-  const place = placeStyle(cue.place);
-  const baseTransform = typeof place.transform === "string" ? `${place.transform} ` : "";
+  const from = before(cue, timeline.captions);
+  const next = after(cue, timeline.captions);
+  const box = cardBox(cue, measureLine);
+  // A hand-over keeps the card and eases its size, so the text inside always fits: a card that must grow
+  // grows while the old lines leave (before the new ones come in); one that may shrink shrinks after them.
+  let width = box.width;
+  let height = box.height;
+  const nextBox = next ? cardBox(next, measureLine) : undefined;
+  if (nextBox) {
+    const grow = ease.standard(Math.min(1, Math.max(0, (frame - (cue.to - 6)) / 6)));
+    width = mix(box.width, Math.max(box.width, nextBox.width), grow);
+    height = mix(box.height, Math.max(box.height, nextBox.height), grow);
+  }
+  if (from) {
+    const old = cardBox(from, measureLine);
+    const shrink = ease.standard(Math.min(1, (frame - cue.from) / SWAP));
+    width = Math.max(width, mix(Math.max(old.width, box.width), box.width, shrink));
+    height = Math.max(height, mix(Math.max(old.height, box.height), box.height, shrink));
+  }
+  const { left, top } = cardPlace(cue.place, width, height);
+  // Lines leave over the cue's last frames when the next cue keeps the card.
+  const leave = next ? tween(frame, cue.to - 6, cue.to, ease.depart) : 0;
   return (
     <>
       <LightPool place={cue.place} opacity={opacity} />
       <div
-      style={{
-        position: "absolute",
-        ...place,
-        transform: `${baseTransform}translate3d(0, ${rise.toFixed(3)}px, 0)`,
-        opacity,
-        borderRadius: 26,
-        padding: "26px 38px 28px",
-        background: "rgba(255,255,255,0.58)",
-        backdropFilter: "blur(28px) saturate(1.25)",
-        WebkitBackdropFilter: "blur(28px) saturate(1.25)",
-        boxShadow: [
-          "inset 0 0 0 1px rgba(255,255,255,0.7)",
-          "inset 0 1px 0 rgba(255,255,255,0.95)",
-          "0 0 0 1px rgba(17,26,21,0.06)",
-          "0 2px 6px rgba(22,43,36,0.05)",
-          "0 24px 60px rgba(22,43,36,0.14)",
-        ].join(", "),
-      }}
-    >
-      {cue.lines.map((line, index) => (
-        <MaskRise key={index} frame={frame} enter={cue.from + index * 4}>
-          <div style={{ ...roleStyle(ROLES.caption), color: LIGHT.ink }}>{line}</div>
-        </MaskRise>
-      ))}
+        style={{
+          position: "absolute",
+          left,
+          top,
+          width,
+          height,
+          transform: `translate3d(0, ${rise.toFixed(3)}px, 0)`,
+          opacity,
+          borderRadius: 26,
+          overflow: "hidden",
+          background: "rgba(255,255,255,0.58)",
+          backdropFilter: "blur(28px) saturate(1.25)",
+          WebkitBackdropFilter: "blur(28px) saturate(1.25)",
+          boxShadow: [
+            "inset 0 0 0 1px rgba(255,255,255,0.7)",
+            "inset 0 1px 0 rgba(255,255,255,0.95)",
+            "0 0 0 1px rgba(17,26,21,0.06)",
+            "0 2px 6px rgba(22,43,36,0.05)",
+            "0 24px 60px rgba(22,43,36,0.14)",
+          ].join(", "),
+        }}
+      >
+        <div style={{ position: "absolute", left: CARD_PAD.x, top: CARD_PAD.top }}>
+          {cue.lines.map((line, index) => (
+            <MaskRise key={`${cue.from}-${index}`} frame={frame} enter={cue.from + (from ? 0 : 2) + index * 4} leave={leave}>
+              <div style={{ ...roleStyle(ROLES.caption), color: LIGHT.ink }}>{line}</div>
+            </MaskRise>
+          ))}
+        </div>
       </div>
     </>
   );
@@ -86,7 +136,7 @@ export const GlassCaptions: React.FC = () => {
 
 /**
  * A soft pool of studio light behind the card, so the caption sits on a quiet
- * area rather than over blurred UI (COMPARISON.md must-fix 6).
+ * area rather than over busy UI (COMPARISON.md must-fix 6).
  */
 const LightPool: React.FC<{ place: CaptionPlace; opacity: number }> = ({ place, opacity }) => {
   const right = place.endsWith("right");
@@ -108,14 +158,19 @@ const LightPool: React.FC<{ place: CaptionPlace; opacity: number }> = ({ place, 
 };
 
 /**
- * K2 mask rise, starting 70% risen; the line is on from its first frame (under the card's own
- * fade), so the card never shows empty and no glyph tops show alone (COMPARISON.md: B's empty
- * card at 364-368, C's glyph tops at 366-368).
+ * K2 mask rise, starting 70% risen with an opacity ramp, so no glyph tops show
+ * alone (COMPARISON.md: B's empty card at 364-368, C's glyph tops at
+ * 366-368); `leave` (0..1) drops the line out again (X2).
  */
-const MaskRise: React.FC<{ frame: number; enter: number; children: React.ReactNode }> = ({ frame, enter, children }) => {
+const MaskRise: React.FC<{ frame: number; enter: number; leave: number; children: React.ReactNode }> = ({
+  frame,
+  enter,
+  leave,
+  children,
+}) => {
   const rise = spring({ frame: frame - enter, fps, config: springs.typeRise });
-  const y = (1 - rise) * 0.3;
-  const opacity = frame < enter ? 0 : 0.35 + 0.65 * tween(frame, enter, enter + 6, ease.softArrive);
+  const y = (1 - rise) * 0.3 + 1.05 * leave;
+  const opacity = frame < enter ? 0 : (0.35 + 0.65 * tween(frame, enter, enter + 6, ease.softArrive)) * (1 - leave);
   return (
     <div style={{ overflow: "hidden", paddingTop: "0.08em", marginTop: "-0.08em", paddingBottom: "0.16em", marginBottom: "-0.16em" }}>
       <div style={{ transform: `translate3d(0, ${y.toFixed(4)}em, 0)`, opacity }}>{children}</div>

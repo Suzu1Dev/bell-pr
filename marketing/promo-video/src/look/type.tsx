@@ -8,6 +8,7 @@
  */
 import type { CSSProperties } from "react";
 import { interpolateColors } from "remotion";
+import { CAPTION_ROLE } from "./captionLayout.ts";
 import { SANS } from "./fonts.ts";
 import { blurCss, ease, tween } from "./motion.ts";
 
@@ -23,7 +24,7 @@ export const ROLES = {
   displayM: { size: 88, weight: 600, tracking: -0.018, lineHeight: 1.08 },
   title: { size: 64, weight: 560, tracking: -0.015, lineHeight: 1.12 },
   supporting: { size: 52, weight: 500, tracking: -0.012, lineHeight: 1.15 },
-  caption: { size: 46, weight: 560, tracking: -0.012, lineHeight: 1.18 },
+  caption: CAPTION_ROLE,
   label: { size: 28, weight: 600, tracking: 0, lineHeight: 1.2 },
   legal: { size: 22, weight: 450, tracking: 0.005, lineHeight: 1.35 },
 } satisfies Record<string, TypeRole>;
@@ -132,11 +133,28 @@ export const FocusLine: React.FC<{
                 : null),
             }}
           >
-            {w.text}
+            {spaced(w.text)}
             {i < list.length - 1 ? " " : ""}
           </span>
         );
       })}
     </div>
+  );
+};
+
+/**
+ * In DM Sans a capital I and a lowercase l are the same plain stem, so "AI"
+ * reads as "Al" at display sizes: a little air after the A (+0.045em) keeps
+ * the pair apart (lookdev review round 5).
+ */
+export const spaced = (text: string) => {
+  const at = text.indexOf("AI");
+  if (at < 0) return text;
+  return (
+    <>
+      {text.slice(0, at)}
+      <span style={{ letterSpacing: "0.045em" }}>A</span>
+      {text.slice(at + 1)}
+    </>
   );
 };
