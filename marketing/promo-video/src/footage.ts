@@ -4,10 +4,11 @@
  * clips, the frame list (frames.json). The composition's calculateMetadata
  * loads them once before rendering.
  *
- * Three copies of every picture (scripts/make-proxies.mjs):
+ * Two copies of every picture (scripts/make-proxies.mjs):
  * - public/footage/: the capture, DPR 4 (5760x3240): 4K pushes;
- * - public/footage-2x/: DPR 2 (2880x1620): shots that need no more;
- * - public/footage-soft/: 1440x810, pre-blurred: the depth-of-field back plane.
+ * - public/footage-2x/: DPR 2 (2880x1620): shots that need no more.
+ * The depth of field's back plane is the same picture, blurred in the
+ * render (src/look/ProductWindow.tsx).
  */
 import { staticFile } from "remotion";
 
@@ -45,9 +46,9 @@ export type Footage = Record<string, StateFootage>;
 /** The capture's CSS viewport (src/timeline.json `viewport`). */
 export const CAPTURE = { width: 1440, height: 810 } as const;
 
-export type Density = "4x" | "2x" | "soft";
+export type Density = "4x" | "2x";
 
-const roots: Record<Density, string> = { "4x": "footage", "2x": "footage-2x", soft: "footage-soft" };
+const roots: Record<Density, string> = { "4x": "footage", "2x": "footage-2x" };
 
 /** The URL of a still (`name` without extension) at a density. */
 export const stillUrl = (state: string, name: string, density: Density) =>

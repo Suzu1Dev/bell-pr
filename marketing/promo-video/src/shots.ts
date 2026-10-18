@@ -21,7 +21,7 @@
  * after one and ends before the next (`clipTo` freezes a take on its last
  * settled frame), so nothing jumps inside a take.
  */
-import { focusRect, rackRect } from "./look/dof.ts";
+import { focusRect, rackRect, type Mask } from "./look/dof.ts";
 import { floating, push, type Key } from "./look/camera.ts";
 
 export interface TakeLook {
@@ -40,8 +40,11 @@ export interface TakeLook {
   sweepAt?: number;
   /** A macro on the decisive line: magnification up to MACRO_MAX_M (src/look.test.ts). */
   macro?: boolean;
-  /** Sharp-plane mask (capture CSS px) and how much of it applies (0..1), keyed in beats; the mask may move with the beats. */
-  dof?: { mask: (amount: number, beats: number) => string[]; keys: { at: number; amount: number }[] };
+  /**
+   * The sharp plane (capture CSS px; one rect or a union of rects, src/look/dof.ts) and how much of it applies (0..1),
+   * keyed in beats; the mask may move with the beats. Every feather sits in a gutter of the UI (scripts/check-dof.mjs).
+   */
+  dof?: { mask: (amount: number, beats: number) => Mask; keys: { at: number; amount: number }[] };
   /** Draw the capture's pointer moves and clicks (default: on for clips). */
   pointer?: boolean;
   /** Camera breathing after the last key: scale per bar (default 1.2%). */

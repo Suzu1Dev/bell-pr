@@ -4,6 +4,7 @@
  */
 import { AbsoluteFill, Sequence, useCurrentFrame } from "remotion";
 import { clipFrameAt, densityFor, frameUrl, stillUrl, type Footage } from "../footage.ts";
+import { planesOf, sharpnessOf, sharpPlane } from "../look/dof.ts";
 import { speed } from "../look/camera.ts";
 import { takeMaxM, takeView } from "../takes.ts";
 import { ease, mix, tween } from "../look/motion.ts";
@@ -44,28 +45,28 @@ const TakeView: React.FC<{ look: TakeLook; take: Take; footage: Footage }> = ({ 
   if (!state) throw new Error(`No footage for ${look.state}.`);
   const t = Math.min(look.clipTo ?? Infinity, (look.clipFrom ?? 0) + (f / 30) * (look.rate ?? 1));
   let src: string;
-  let soft: string | undefined;
-  if (look.still) {
-    src = stillUrl(look.state, look.still, density);
-    soft = stillUrl(look.state, look.still, "soft");
-  } else {
+  if (look.still) src = stillUrl(look.state, look.still, density);
+  else {
     if (!state.frames) throw new Error(`${look.state} has no clip frames.`);
-    const frame = clipFrameAt(state.frames, t);
-    src = frameUrl(look.state, frame.file, density);
-    soft = frameUrl(look.state, frame.file, "soft");
+    src = frameUrl(look.state, clipFrameAt(state.frames, t).file, density);
   }
   const amount = look.dof ? dofAmount(look.dof.keys, f / music.beatFrames) : 0;
-  const mask = look.dof && amount > 0.001 ? look.dof.mask(amount, f / music.beatFrames) : undefined;
+  const mask = look.dof && amount > 0.001 ? planesOf(look.dof.mask(amount, f / music.beatFrames)) : undefined;
   // The window centre's screen speed, for the shutter blur.
   const moving = speed(takeView(look, f - 0.5), takeView(look, f + 0.5), 720, 405);
-  const pointer = (look.pointer ?? !look.still) ? pointerAt(state.events, t, look.rate ?? 1, state.spots) : undefined;
+  let pointer = (look.pointer ?? !look.still) ? pointerAt(state.events, t, look.rate ?? 1, state.spots) : undefined;
+  if (pointer && mask) {
+    // The pointer belongs to the sharp plane: it fades out over 40 capture px beyond it, so no sharp disc floats on the soft plane.
+    const wide = mask.map((plane) => ({ ...sharpPlane(plane), fl: 40, ft: 40, fr: 40, fb: 40 }));
+    pointer = { ...pointer, opacity: pointer.opacity * sharpnessOf(wide, pointer.x, pointer.y) };
+  }
   const sweep = look.sweepAt === undefined ? undefined : sweepAt(f, look.sweepAt * music.beatFrames);
   return (
     <ProductWindow
       view={view}
       layout={layout}
       src={src}
-      soft={mask ? soft : undefined}
+      softBlur={mask ? (SOFT_BLUR * layout) / view.m : undefined}
       mask={mask}
       pointer={pointer}
       shutter={{ x: moving.dx, y: moving.dy }}
@@ -74,6 +75,9 @@ const TakeView: React.FC<{ look: TakeLook; take: Take; footage: Footage }> = ({ 
     />
   );
 };
+
+/** The back plane's blur in 1080p screen px, the same at every magnification (a lens, not a smear). */
+export const SOFT_BLUR = 3.5;
 
 /** The contact shadow belongs to the whole floating window: it fades as a push takes the window past its rest size. */
 export const contactFor = (m: number) => Math.min(1, Math.max(0, (1.2 - m) / 0.2));

@@ -3,9 +3,13 @@
  * §5.1): no title bar, no window buttons, no device. Rounded corners, a
  * hairline, a top rim light, the tinted shadow stack of the light studio and,
  * when it floats, a contact shadow on the floor. Two-plane depth of field
- * (§5.3): the pre-blurred copy behind, the sharp copy in front under a mask
- * drawn in capture CSS px. A one-axis shutter blur only while the window
- * moves fast (§4.6; never CameraMotionBlur, which posterizes).
+ * (§5.3): the same picture blurred behind, the sharp copy in front under a
+ * mask drawn in capture CSS px. The back plane's blur is set in screen px
+ * (it shrinks in capture px as the camera pushes in), so the soft plane
+ * recedes the same at every magnification, like a lens, and it is not
+ * veiled: the two planes have the same brightness, so no rectangle shows
+ * where they meet. A one-axis shutter blur only while the window moves
+ * fast (§4.6; never CameraMotionBlur, which posterizes).
  */
 import { useId, type ReactNode } from "react";
 import { Img } from "remotion";
@@ -27,9 +31,6 @@ const SHADOW = [
   [0, 90, 160, -40, "rgba(22,43,36,0.26)"],
 ] as const;
 
-/** The soft plane recedes: a light veil over the pre-blurred copy, under the sharp one. */
-const VEIL = "rgba(246,247,244,0.42)";
-
 const px = (value: number) => `${+value.toFixed(3)}px`;
 
 export interface WindowProps {
@@ -38,10 +39,10 @@ export interface WindowProps {
   layout: number;
   /** The sharp picture. */
   src: string;
-  /** The pre-blurred picture, when depth of field is on. */
-  soft?: string;
-  /** CSS mask layers (intersected) for the sharp plane, in capture CSS px; opaque = sharp. */
-  mask?: string[];
+  /** The back plane's blur in layout px, when depth of field is on. */
+  softBlur?: number;
+  /** The sharp planes: per plane, CSS mask layers (intersected) in capture CSS px; opaque = sharp. */
+  mask?: string[][];
   /** 0..1 progress of the one light sweep across the window, or undefined. */
   sweep?: number;
   pointer?: PointerState;
@@ -57,7 +58,7 @@ export const ProductWindow: React.FC<WindowProps> = ({
   view,
   layout,
   src,
-  soft,
+  softBlur,
   mask,
   sweep,
   pointer,
@@ -73,7 +74,7 @@ export const ProductWindow: React.FC<WindowProps> = ({
   const k = layout / view.m;
   const radius = 0.0095 * CAPTURE.width * layout;
   const shadow = SHADOW.map(([x, y, blur, spread, color]) => `${px(x * k)} ${px(y * k)} ${px(blur * k)} ${px(spread * k)} ${color}`).join(", ");
-  const scaledMask = mask?.map((layer) => layer.replace(/(-?\d*\.?\d+)cpx/g, (_, n: string) => px(parseFloat(n) * layout)));
+  const scaledMask = mask?.map((plane) => plane.map((layer) => layer.replace(/(-?\d*\.?\d+)cpx/g, (_, n: string) => px(parseFloat(n) * layout))));
   // A short shutter (about 90 degrees, capped at 4 px): the rise reads as motion, and UI titles stay legible.
   const sx = Math.min(4, Math.abs(shutter?.x ?? 0) * 0.1);
   const sy = Math.min(4, Math.abs(shutter?.y ?? 0) * 0.1);
@@ -124,22 +125,20 @@ export const ProductWindow: React.FC<WindowProps> = ({
           }}
         >
           <div style={{ position: "absolute", inset: 0, borderRadius: radius, overflow: "hidden", background: "#ffffff", boxShadow: shadow }}>
-            {soft && scaledMask ? (
-              <>
-                <Img src={soft} style={image} />
-                <div style={{ position: "absolute", inset: 0, background: VEIL }} />
-              </>
-            ) : null}
-            <Img
-              src={src}
-              style={{
-                ...image,
-                maskImage: scaledMask?.join(", "),
-                WebkitMaskImage: scaledMask?.join(", "),
-                maskComposite: scaledMask && scaledMask.length > 1 ? "intersect" : undefined,
-                WebkitMaskComposite: scaledMask && scaledMask.length > 1 ? "source-in" : undefined,
-              }}
-            />
+            {softBlur !== undefined && scaledMask ? <Img src={src} style={{ ...image, filter: `blur(${softBlur.toFixed(3)}px)` }} /> : null}
+            {(scaledMask ?? [undefined]).map((plane, index) => (
+              <Img
+                key={index}
+                src={src}
+                style={{
+                  ...image,
+                  maskImage: plane?.join(", "),
+                  WebkitMaskImage: plane?.join(", "),
+                  maskComposite: plane && plane.length > 1 ? "intersect" : undefined,
+                  WebkitMaskComposite: plane && plane.length > 1 ? "source-in" : undefined,
+                }}
+              />
+            ))}
             {children}
             {pointer ? <Pointer state={pointer} layout={layout} k={k} /> : null}
             {sweep === undefined ? null : (

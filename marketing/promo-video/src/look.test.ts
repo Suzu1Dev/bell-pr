@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { CAPTURE } from "./footage.ts";
 import { cardBox } from "./look/captionLayout.ts";
 import { corners, floating, project, push, viewAt, wholeWindowInFrame, type View } from "./look/camera.ts";
+import { planesOf, sharpPlane } from "./look/dof.ts";
 import { pointerAt, pointerWindows } from "./look/pointer.ts";
 import { MACRO_MAX_M, PUSH_MAX_M, looks, type TakeLook } from "./shots.ts";
 import { takeMaxM, takeView } from "./takes.ts";
@@ -74,16 +75,21 @@ test("readable UI never moves faster than 8 px a frame once a take has settled (
       // The capture points of the sharp plane that are on screen: its corners and centre, clipped to the frame.
       const lo = under(va, 0, 0);
       const hi = under(va, 1920, 1080);
-      const rect = sharpRect(look, f / music.beatFrames) ?? { x0: under(va, 560, 290).x, x1: under(va, 1360, 790).x, y0: under(va, 560, 290).y, y1: under(va, 1360, 790).y };
-      const x0 = Math.max(rect.x0, lo.x);
-      const x1 = Math.min(rect.x1, hi.x);
-      const y0 = Math.max(rect.y0, lo.y);
-      const y1 = Math.min(rect.y1, hi.y);
-      const points = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [(x0 + x1) / 2, (y0 + y1) / 2]];
-      for (const [x, y] of points) {
-        const a = project(va, x, y);
-        const b = project(vb, x, y);
-        assert.ok(Math.hypot(b.x - a.x, b.y - a.y) <= 8, `${shot.id}/${take.id} frame ${f} at capture ${x.toFixed(0)},${y.toFixed(0)}`);
+      const rects = sharpRects(look, f / music.beatFrames) ?? [
+        { x0: under(va, 560, 290).x, x1: under(va, 1360, 790).x, y0: under(va, 560, 290).y, y1: under(va, 1360, 790).y },
+      ];
+      for (const rect of rects) {
+        const x0 = Math.max(rect.x0, lo.x);
+        const x1 = Math.min(rect.x1, hi.x);
+        const y0 = Math.max(rect.y0, lo.y);
+        const y1 = Math.min(rect.y1, hi.y);
+        if (x0 >= x1 || y0 >= y1) continue;
+        const points = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [(x0 + x1) / 2, (y0 + y1) / 2]];
+        for (const [x, y] of points) {
+          const a = project(va, x, y);
+          const b = project(vb, x, y);
+          assert.ok(Math.hypot(b.x - a.x, b.y - a.y) <= 8, `${shot.id}/${take.id} frame ${f} at capture ${x.toFixed(0)},${y.toFixed(0)}`);
+        }
       }
     }
   }
@@ -184,14 +190,10 @@ test("the pointer shows only while it works: in before a move, out after its cli
   assert.equal(pointerAt(events, 1.5 + 9 / 30)?.ripple, undefined);
 });
 
-/** The sharp core of a focusRect mask (capture px), read back from its gradient stops. */
-function sharpRect(look: TakeLook, beats: number) {
+/** The sharp planes of a take's mask (capture px, cores and feathers), read back from their gradient stops. */
+function sharpRects(look: TakeLook, beats: number) {
   if (!look.dof) return undefined;
-  const [h, v] = look.dof.mask(1, beats);
-  const stops = (layer: string) => [...layer.matchAll(/#000 (-?[\d.]+)cpx/g)].map((m) => Number(m[1]));
-  const [x0, x1] = stops(h);
-  const [y0, y1] = stops(v);
-  return { x0, x1, y0, y1 };
+  return planesOf(look.dof.mask(1, beats)).map(sharpPlane);
 }
 
 /** Whether point p is inside the convex quad (corners in order). */
@@ -226,14 +228,14 @@ test("a caption card never sits on the sharp plane (12 px clear): it sits over t
       for (let frame = Math.max(take.from, cue.from); frame < Math.min(take.to, cue.to); frame += 3) {
         const f = frame - take.from;
         const view = takeView(look, f);
-        const rect = sharpRect(look, f / music.beatFrames) ?? { x0: 0, x1: 1440, y0: 0, y1: 810 };
-        const quad = [
+        const rects = sharpRects(look, f / music.beatFrames) ?? [{ x0: 0, x1: 1440, y0: 0, y1: 810 }];
+        const quads = rects.map((rect) => [
           project(view, rect.x0, rect.y0),
           project(view, rect.x1, rect.y0),
           project(view, rect.x1, rect.y1),
           project(view, rect.x0, rect.y1),
-        ];
-        if (cardTouches(card, quad)) {
+        ]);
+        if (quads.some((quad) => cardTouches(card, quad))) {
           problems.push(`${shot.id}/${take.id} frame ${frame}: "${cue.lines[0]}"`);
           break;
         }

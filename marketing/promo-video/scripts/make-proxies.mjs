@@ -1,22 +1,16 @@
 #!/usr/bin/env node
 /**
- * Derives two smaller copies of the captured footage (public/footage/, DPR 4,
- * 5760x3240) with the bundled ffmpeg, all gitignored:
+ * Derives a smaller copy of the captured footage (public/footage/, DPR 4,
+ * 5760x3240) with the bundled ffmpeg, gitignored: public/footage-2x/,
+ * 2880x1620 (Lanczos), for shots whose magnification needs no more than
+ * DPR 2 (the composition picks per take and per render scale,
+ * src/footage.ts). The depth of field's back plane is blurred in the render,
+ * by a fixed amount in screen px (src/look/ProductWindow.tsx), so it needs
+ * no copy of its own.
  *
- * - public/footage-2x/: 2880x1620 (Lanczos), for shots whose magnification
- *   needs no more than DPR 2 (the composition picks per take and per render
- *   scale, src/footage.ts);
- * - public/footage-soft/: 1440x810, scaled down to 1/5 and back up (bicubic),
- *   which is a cheap, smooth blur of about 1.5 capture px (3 px on screen
- *   at the pushes' magnification): the back plane of the two-plane depth of
- *   field, so the render does not blur a full-frame layer every frame. The
- *   film also veils it (src/look/ProductWindow.tsx): readable-size text in
- *   the soft plane is dimmed and lightly blurred, not smeared.
- *
- * Stills (PNG) become JPEGs in both. Chroma is kept at full resolution
- * (4:4:4) so the brand-green text does not bleed. Skips a state whose
- * copies are newer than its footage; `--force` redoes everything and
- * `--force-soft` only the soft copies.
+ * Stills (PNG) become JPEGs. Chroma is kept at full resolution (4:4:4) so
+ * the brand-green text does not bleed. Skips a state whose copy is newer
+ * than its footage; `--force` redoes everything.
  */
 import { existsSync } from "node:fs";
 import { mkdir, readdir, rm, stat } from "node:fs/promises";
@@ -24,12 +18,8 @@ import path from "node:path";
 import { packageRoot, remotion } from "./lib/media.mjs";
 
 const force = process.argv.includes("--force");
-const forceSoft = process.argv.includes("--force-soft");
 const source = path.join(packageRoot, "public", "footage");
-const targets = {
-  "footage-2x": "scale=2880:1620:flags=lanczos",
-  "footage-soft": "scale=288:162:flags=area,scale=1440:810:flags=bicubic",
-};
+const targets = { "footage-2x": "scale=2880:1620:flags=lanczos" };
 
 if (!existsSync(source)) throw new Error('public/footage/ is missing: run "npm run capture" first.');
 const ffmpeg = (args) => remotion(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", ...args]);
@@ -46,7 +36,7 @@ for (const state of (await readdir(source)).sort()) {
   const updated = await newest(from);
   for (const [name, filter] of Object.entries(targets)) {
     const to = path.join(packageRoot, "public", name, state);
-    if (!force && !(forceSoft && name === "footage-soft") && existsSync(to) && (await newest(to)) > updated) continue;
+    if (!force && existsSync(to) && (await newest(to)) > updated) continue;
     await rm(to, { recursive: true, force: true });
     await mkdir(to, { recursive: true });
     const files = await readdir(from);
