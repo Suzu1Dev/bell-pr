@@ -2596,10 +2596,6 @@ button {
     width: 100%;
     min-height: 380px;
   }
-  .review-totals > svg,
-  .review-totals > span:last-child {
-    display: none;
-  }
   .title-row {
     flex-wrap: wrap;
     gap: 8px;
