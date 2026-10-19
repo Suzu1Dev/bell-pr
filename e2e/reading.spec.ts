@@ -134,20 +134,20 @@ test.describe("reading a real run in review", () => {
       await page.goto(`/#/runs/${runId}/changes?file=${tablePath}&locale=en`);
       const diff = page.locator(".rv-diff");
       await expect(diff.locator(".rv-line-added")).toHaveCount(2);
-      // Lines 7 to 42 sit between the two changes, and 4 lines follow the last one.
-      const gap = diff.locator(".rv-gap").filter({ hasText: t.review.diff.gap.hidden({ count: 36 }) });
+      // Lines 7 to 41 sit between the two changes; more follow the last one.
+      const gap = diff.locator(".rv-gap").filter({ hasText: t.review.diff.gap.hidden({ count: 35 }) });
       await expect(gap).toHaveCount(1);
       await gap.getByRole("button", { name: t.review.diff.gap.showBelow({ count: 20 }) }).click();
-      await expect(diff.locator(".rv-gap").filter({ hasText: t.review.diff.gap.hidden({ count: 16 }) })).toHaveCount(1);
+      await expect(diff.locator(".rv-gap").filter({ hasText: t.review.diff.gap.hidden({ count: 15 }) })).toHaveCount(1);
       // The lines come from the base and are marked as context read from it.
       await expect(diff.locator(".rv-line-expanded").first()).toBeVisible();
-      await expect(diff.locator(".rv-line-expanded", { hasText: "export const row1 = 1;" })).toHaveCount(1);
+      await expect(diff.locator(".rv-line-expanded", { hasText: "export const row2 = 2;" })).toHaveCount(1);
       await diff
         .locator(".rv-gap")
-        .filter({ hasText: t.review.diff.gap.hidden({ count: 16 }) })
-        .getByRole("button", { name: t.review.diff.gap.showAll({ count: 16 }) })
+        .filter({ hasText: t.review.diff.gap.hidden({ count: 15 }) })
+        .getByRole("button", { name: t.review.diff.gap.showAll({ count: 15 }) })
         .click();
-      await expect(diff.locator(".rv-gap").filter({ hasText: t.review.diff.gap.hidden({ count: 16 }) })).toHaveCount(0);
+      await expect(diff.locator(".rv-gap").filter({ hasText: t.review.diff.gap.hidden({ count: 15 }) })).toHaveCount(0);
       await expect(diff.locator(".rv-line-expanded", { hasText: "export const row36 = 36;" })).toHaveCount(1);
       // The whole file shows every line, the last ones included.
       const whole = page.getByRole("button", { name: t.review.diff.gap.wholeFile });
@@ -170,12 +170,14 @@ test.describe("reading a real run in review", () => {
       const card = page.locator(".walkthrough-card");
       await expect(card.locator(".walkthrough-title strong")).toHaveText("total", { timeout: 30_000 });
       await expect(card.getByText("Adds each finite value.")).toBeVisible();
-      const step = card.getByRole("button", { name: t.review.walkthrough.locateStep }).nth(1);
+      // A step's line button marks its lines in the diff.
+      const step = card.getByRole("button", { name: t.review.walkthrough.lines({ start: 3, end: 3 }) });
+      await expect(step).toHaveAttribute("title", t.review.walkthrough.locateStep);
       await step.click();
       await expect(step).toHaveAttribute("aria-pressed", "true");
       const marked = page.locator(".rv-diff .rv-line-highlighted");
-      await expect(marked).toHaveCount(2);
-      await expect(marked.last()).toContainText("Number.isFinite(value)");
+      await expect(marked).toHaveCount(1);
+      await expect(marked).toContainText("Number.isFinite(value)");
       await axe(page, ".explain-panel");
       await expectNoOverflow(page, [".explain-panel"]);
     } finally {

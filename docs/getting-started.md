@@ -242,9 +242,9 @@ When the team is done, the run waits for your review in **Code changes**:
   reports, with the parts about this file marked. **Run the review again**
   after you changed something.
 - **Code walkthrough**: for a modified code file, the functions around
-  each change, step by step, each with the lines it covers (**Mark this
-  range in the code** marks them in the diff), what calls it and what it
-  calls, another way to see it and a question to check yourself. A function the change adds whole has no
+  each change, step by step, each with the lines it covers (click them to
+  mark those lines in the diff), what calls it and what it calls, another
+  way to see it and a question to check yourself. A function the change adds whole has no
   earlier version to walk through, so it points to the explanation
   instead. Walkthroughs are written one file at a time, the selected file
   first, and are kept for that version of the diff.

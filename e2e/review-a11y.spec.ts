@@ -187,6 +187,10 @@ test("the explanation panel's tabs move with the arrow keys and keep one tab sto
     page.getByRole("tab", { name: review.panel.tabs[name] });
   await expect(page.locator('.explain-tabs [role=tab][tabindex="0"]')).toHaveCount(1);
   await tab("explain").focus();
+  // The code walkthrough follows the explanation, then the reviews.
+  await page.keyboard.press("ArrowRight");
+  await expect(tab("walkthrough")).toBeFocused();
+  await expect(tab("walkthrough")).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowRight");
   await expect(tab("reports")).toBeFocused();
   await expect(tab("reports")).toHaveAttribute("aria-selected", "true");
