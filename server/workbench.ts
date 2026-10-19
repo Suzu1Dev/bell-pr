@@ -9,13 +9,7 @@ import {
   defaultAgentProcessLimit,
 } from "./agent-slots.js";
 import { defaultAgentTimeoutScale } from "./agent-timeouts.js";
-import {
-  AppError,
-  withRunLocale,
-  type Repository,
-  type Run,
-  type RunLogEntry,
-} from "./types.js";
+import { AppError, type Repository, type Run, type RunLogEntry } from "./types.js";
 import { getModelCatalog } from "./models.js";
 import type { TransientSleep } from "./agent-cli.js";
 import type { AgentProvider } from "../shared/models.js";
@@ -32,7 +26,7 @@ import { synchronizeExplanations } from "./explanations.js";
 import { sm, withLocale } from "./i18n/index.js";
 import { parseLocale } from "../shared/i18n/locale.js";
 import { closeLog, initLog, log } from "./log.js";
-import { logged, logRunQueued } from "./run-events.js";
+import { logged } from "./run-events.js";
 import {
   activeFollowUp,
   type FollowUpStartInput,
@@ -47,6 +41,7 @@ import * as executor from "./run-executor.js";
 import { retryTeam } from "./team-retry.js";
 import * as teamPlan from "./team-plan.js";
 import { createRun, type NewRunSources } from "./new-run.js";
+import { RunQueue } from "./run-queue.js";
 import * as publishing from "./publish.js";
 import * as learning from "./learning.js";
 import * as drafting from "./draft-jobs.js";
@@ -76,11 +71,8 @@ const retentionIntervalMs = 24 * 60 * 60 * 1000;
 
 export class Workbench {
   private controllers = new Map<string, AbortController>();
-  private queue: string[] = [];
-  private active = 0;
   private stopping = false;
   private jobs = new Set<Promise<void>>();
-  private runJobs = new Map<string, Set<Promise<void>>>();
   private locks = new Map<string, Promise<unknown>>();
   private explanationJobs = new Map<string, Promise<void>>();
   private walkthroughJobs = new Map<string, Promise<void>>();
@@ -115,6 +107,8 @@ export class Workbench {
   /** Feedback tags, the practice deck, the counts and the coach debrief (learning-loop.ts). */
   readonly learningLoop: LearningLoopFacade;
   private readonly context: WorkbenchContext;
+  /** Runs waiting for an active slot, and the ones executing (run-queue.ts). */
+  private readonly runQueue: RunQueue;
   /** The startup janitor, then the first retention pass; never rejects. */
   readonly maintenance: Promise<void>;
   private retentionTimer?: NodeJS.Timeout;
@@ -185,11 +179,8 @@ export class Workbench {
         collectDraftContext: dependencies.collectDraftContext,
       },
       stopping: () => this.stopping,
-      assertQueueCapacity: () => this.assertQueueCapacity(),
-      enqueue: (id) => {
-        this.queue.push(id);
-        this.drain();
-      },
+      assertQueueCapacity: () => this.runQueue.assertCapacity(),
+      enqueue: (id) => this.runQueue.push(id),
       log: executor.appendRunLog,
       run: (id) => this.run(id),
       repo: (id) => this.repo(id),
@@ -198,6 +189,10 @@ export class Workbench {
       explanations: (id) => this.explanations(id),
       prepareRunDraft: (id, options) => this.prepareRunDraft(id, options),
     };
+    this.runQueue = new RunQueue(this.context, {
+      active: () => this.effectiveMaxActiveRuns,
+      queued: () => this.maxQueuedRuns,
+    });
     this.understanding = understandingFacade(this.context, {
       lockedBy: () => this.appSettings.lockedBy().skipUnderstandingCheck,
     });
@@ -228,47 +223,9 @@ export class Workbench {
     }
   }
 
-  /**
-   * Queues again, oldest first, the runs a restart left queued before they
-   * started (Store keeps them queued). Runs beyond the queue capacity, or
-   * whose project is gone, fail with the reason and can be retried.
-   */
+  /** Queues again the runs a restart left queued (run-queue.ts). */
   resume() {
-    const queued = this.store.data.runs
-      .filter((run) => run.status === "queued" && !this.queue.includes(run.id))
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    if (!queued.length) return;
-    let used = this.store.data.runs.filter((run) =>
-      ["running", "awaiting_plan"].includes(run.status),
-    ).length;
-    let failed = false;
-    for (const run of queued) {
-      const full = used >= this.maxQueuedRuns;
-      const orphaned = !this.store.data.repos.some((repo) => repo.id === run.repoId);
-      if (full || orphaned) {
-        run.status = "failed";
-        run.error = withRunLocale(run, () =>
-          orphaned
-            ? sm().run.repos.notFound
-            : sm().run.queue.full({ max: this.maxQueuedRuns }),
-        );
-        if (run.team) run.team.phase = "failed";
-        failed = true;
-        log.warn("run.not_resumed", {
-          runId: run.id,
-          reason: orphaned ? "repository_missing" : "queue_full",
-        });
-        continue;
-      }
-      used++;
-      withRunLocale(run, () =>
-        this.log(run, "system", sm().storage.recovery.resumed),
-      );
-      logRunQueued(run, "resumed");
-      this.queue.push(run.id);
-    }
-    if (failed) void this.store.save().catch(() => undefined);
-    this.drain();
+    this.runQueue.resume();
   }
 
   /** Frees the files of finished runs past the retention period (cleanup.ts). */
@@ -319,7 +276,7 @@ export class Workbench {
     this.agentSlots.setLimit(
       this.appSettings.get().maxAgentProcesses ?? this.base.maxAgentProcesses,
     );
-    this.drain();
+    this.runQueue.drain();
   }
 
   /**
@@ -416,56 +373,13 @@ export class Workbench {
     return createRun(this.context, sources, repoId, prompt, title, settings);
   }
 
-  /** New and retried runs share the same cap on queued, running and paused work. */
-  private assertQueueCapacity() {
-    if (
-      this.store.data.runs.filter((run) =>
-        ["queued", "running", "awaiting_plan"].includes(run.status),
-      ).length >= this.maxQueuedRuns
-    )
-      throw new AppError(
-        (m) => m.run.queue.full({ max: this.maxQueuedRuns }),
-        429,
-      );
-  }
-
-  private drain() {
-    if (this.stopping) return;
-    while (this.active < this.effectiveMaxActiveRuns && this.queue.length) {
-      const id = this.queue.shift()!;
-      const run = this.run(id);
-      if (run.status !== "queued") continue;
-      this.active++;
-      // Whoever drains the queue (a request, another run finishing), the
-      // run executes in its own locale.
-      const job = withRunLocale(run, () =>
-        executor.executeRun(this.context, id),
-      )
-        .catch((error) => {
-          log.error("run.persist_failed", { runId: id, error });
-        })
-        .finally(() => {
-          this.active--;
-          this.jobs.delete(job);
-          const pending = this.runJobs.get(id);
-          pending?.delete(job);
-          if (pending?.size === 0) this.runJobs.delete(id);
-          this.drain();
-        });
-      this.jobs.add(job);
-      const pending = this.runJobs.get(id) ?? new Set<Promise<void>>();
-      pending.add(job);
-      this.runJobs.set(id, pending);
-    }
-  }
-
   /**
    * Called after the plan changed (a license or trial started or ended):
    * starts queued runs the new plan allows. Running runs are never stopped,
    * and existing runs keep their team size.
    */
   entitlementsChanged(): void {
-    this.drain();
+    this.runQueue.drain();
   }
 
   /** Appends to the run's own log through the context (see appendRunLog). */
@@ -519,7 +433,7 @@ export class Workbench {
     // Do not hold a run/repository/integration lock here: workers must finish
     // their cleanup and persist final task states before the HTTP response.
     // Queued or already-paused plans have no active work to wait for.
-    await Promise.allSettled([...(this.runJobs.get(id) ?? [])]);
+    await this.runQueue.settled(id);
     return run;
   }
 
@@ -736,13 +650,7 @@ export class Workbench {
     this.stopping = true;
     clearInterval(this.retentionTimer);
     deactivateAppSettings(this.appSettings);
-    // A run that never started stays queued and starts again on the next
-    // start (resume); one that already has a worktree is cancelled.
-    for (const id of this.queue) {
-      const run = this.run(id);
-      if (run.status === "queued" && run.baseSha) run.status = "cancelled";
-    }
-    this.queue = [];
+    this.runQueue.clear();
     for (const controller of this.controllers.values()) controller.abort();
     await Promise.allSettled([...this.jobs, this.maintenance]);
     await this.store.save();
