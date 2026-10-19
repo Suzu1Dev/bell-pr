@@ -4,14 +4,14 @@ import { CAPTURE } from "./footage.ts";
 import { cardBox } from "./look/captionLayout.ts";
 import { corners, floating, project, push, viewAt, wholeWindowInFrame, type View } from "./look/camera.ts";
 import { keyframeCuts } from "./keyframes.ts";
-import { liftOn, sharpBoxes } from "./look/dof.ts";
+import { liftOn, liftPoint, sharpBoxes } from "./look/dof.ts";
 import { ease } from "./look/motion.ts";
-import { pointerAt, pointerWindows } from "./look/pointer.ts";
+import { POINTER, takePointer } from "./look/pointer.ts";
 import { MACRO_MAX_M, PUSH_MAX_M, looks, type TakeLook } from "./shots.ts";
 import { takeMaxM, takeView } from "./takes.ts";
 import { focusAmount } from "./scenes/ProductShot.tsx";
 import { DESCRIPTOR, FLARE_FRAMES } from "./logo.ts";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { timeline } from "./timeline.ts";
 import { music } from "./music.ts";
 
@@ -228,30 +228,119 @@ test("camera keys interpolate magnification in log space and hold outside their 
   assert.equal(viewAt(keys, 5), b);
 });
 
-test("the pointer shows only while it works: in before a move, out after its click", () => {
-  const events = [
-    { type: "start" as const, t: 0, x: 100, y: 100 },
-    { type: "move" as const, from: 1, t: 1.5, x: 300, y: 200, target: "a" },
-    { type: "click" as const, t: 1.5, x: 300, y: 200, target: "a" },
-    { type: "hide" as const, t: 1.8 },
-  ];
-  assert.equal(pointerAt(events, 0.5), undefined);
-  // It shows at most 12 frames before its click (here later than its move's start, less the fade-in).
-  assert.ok(Math.abs(pointerWindows(events)[0][0] - 1.1) < 1e-9);
-  const moving = pointerAt(events, 1.25)!;
-  assert.ok(moving.x > 100 && moving.x < 300);
-  const pressed = pointerAt(events, 1.55)!;
-  assert.ok(pressed.press > 0 && pressed.ripple !== undefined);
-  assert.equal(pointerAt(events, 2.5), undefined);
-  // On a clip slowed to half speed the same rhythm holds on screen: the windows stretch with the clip.
-  assert.ok(Math.abs(pointerWindows(events, 0.5)[0][0] - 1.3) < 1e-9);
-  // The click's ring is gone 8 frames after it, before the UI under it has settled.
-  assert.equal(pointerAt(events, 1.5 + 9 / 30)?.ripple, undefined);
-  // When the UI replaces what was clicked (scripts/pointer-spots.mjs records when), the ring ends and the disc goes.
-  const spots = [{ t: 1.5, dx: 9, dy: 11, changeAt: 1.5 + 1 / 30 }];
-  assert.ok(pointerAt(events, 1.5, 1, spots)!.ripple !== undefined);
-  assert.equal(pointerAt(events, 1.5 + 2 / 30, 1, spots)?.ripple, undefined);
-  assert.ok((pointerAt(events, 1.5 + 3 / 30, 1, spots)?.opacity ?? 0) < 0.01);
+/** A stand-in take for the pointer: a flat push, a clip at real time from 0 s, one lift round both buttons. */
+const pointerLook: TakeLook = {
+  state: "x",
+  clipFrom: 0,
+  keys: [{ at: 0, view: push(400, 300, 2, { cover: false }) }],
+  lifts: [{ box: [300, 250, 520, 350] }],
+};
+const pointerEvents = (gap: number) => ({
+  boxes: { a: { x: 340, y: 280, width: 60, height: 30 }, b: { x: 440, y: 280, width: 60, height: 30 } },
+  events: [
+    { type: "start" as const, t: 0, x: 900, y: 700 },
+    { type: "move" as const, from: 1, t: 1.5, x: 370, y: 295, target: "a" },
+    { type: "click" as const, t: 1.5, x: 370, y: 295, target: "a" },
+    { type: "move" as const, from: 1.5 + gap - 0.4, t: 1.5 + gap, x: 470, y: 295, target: "b" },
+    { type: "click" as const, t: 1.5 + gap, x: 470, y: 295, target: "b" },
+  ],
+});
+
+test("the pointer comes in, travels, presses on the click point and stays, in the plane of what it clicks", () => {
+  const pointer = takePointer(pointerLook, 300, pointerEvents(4));
+  // Two clicks far apart: two separate appearances.
+  assert.equal(pointer.runs.length, 2);
+  const [a] = pointer.clicks;
+  assert.equal(a.pressFrame, 45);
+  // Not before it comes in; it fades in over 12 frames (in steps of 1/12) while it rests, then travels.
+  const run = pointer.runs[0];
+  assert.equal(pointer.at(run.appear - 1), undefined);
+  assert.ok(pointer.at(run.legs[0].a)!.opacity > 0 && pointer.at(run.legs[0].a)!.opacity < 1);
+  assert.ok(run.legs[0].a - run.appear >= 4, "it rests a few frames before it moves");
+  assert.ok(pointer.at(run.legs[0].a + 3)!.moving);
+  // At the press: on the click point carried by its lift (the footage's own liftPoint), at full opacity, pressed.
+  const lifted = liftPoint(pointerLook.lifts![0], 1, a.x, a.y);
+  const pressed = pointer.at(a.pressFrame)!;
+  assert.ok(Math.hypot(pressed.x - lifted.x, pressed.y - lifted.y) < 1e-6);
+  assert.equal(pressed.opacity, 1);
+  assert.ok(pointer.at(a.f + 2)!.press > 0 && pointer.at(a.f + 2)!.ripple !== undefined);
+  // It comes in from just outside the target, 160 px on screen, towards where the capture's pointer came from.
+  const from = run.legs[0].from;
+  const view = takeView(pointerLook, run.legs[0].a);
+  const p = project(view, from.x, from.y);
+  const q = project(view, a.x, a.y);
+  assert.ok(Math.abs(Math.hypot(p.x - q.x, p.y - q.y) - 160) < 1, "160 px out");
+  assert.ok(from.x > a.x && from.y > a.y, "from the lower right, where it was parked");
+  // It stays on the click for half a second, then fades out over 12 frames.
+  assert.equal(pointer.at(a.f + 15)!.opacity, 1);
+  assert.equal(pointer.at(a.f + 15 + 12), undefined);
+  // A second click soon after keeps it on screen: it travels from the first click to the second.
+  const close = takePointer(pointerLook, 300, pointerEvents(1));
+  assert.equal(close.runs.length, 1);
+  const [, b] = close.clicks;
+  for (let f = a.f; f <= b.f; f += 1) assert.equal(close.at(f)!.opacity, 1);
+  const leg = close.runs[0].legs[1];
+  assert.ok(leg.from.x === a.x && leg.to.x === b.x && leg.a >= a.f + 6);
+});
+
+const footageThere = existsSync(new URL("../public/footage", import.meta.url));
+
+/** Every product take with a click the film shows, with its pointer (the footage's targets.json). */
+const pointerTakes = () =>
+  takes
+    .filter(({ look }) => look.still === undefined && look.pointer !== false)
+    .map(({ shot, take, look }) => {
+      const targets = JSON.parse(readFileSync(new URL(`../public/footage/${look.state}/targets.json`, import.meta.url), "utf8"));
+      return { name: `${shot.id}/${take.id}`, frames: take.to - take.from, look, pointer: takePointer(look, take.to - take.from, targets) };
+    })
+    .filter(({ pointer }) => pointer.clicks.length);
+
+test("every click in the film lands on its target: the hotspot on the click point, inside the recorded box", { skip: !footageThere && "no footage" }, () => {
+  let count = 0;
+  for (const { name, look, pointer } of pointerTakes())
+    for (const click of pointer.clicks) {
+      const state = pointer.at(click.pressFrame)!;
+      // The footage's own lifted layer at the press (src/look/dof.ts): the lift that holds the click, furthest forward.
+      let expected = { x: click.x, y: click.y };
+      let best = 0.001;
+      const amount = focusAmount(look.focus ?? [{ at: 0, amount: 1 }], click.pressFrame / music.beatFrames);
+      for (const lift of look.lifts ?? []) {
+        const on = liftOn(lift, click.pressFrame) * amount;
+        const [x0, y0, x1, y1] = lift.box;
+        if (on >= best && click.x >= x0 && click.x <= x1 && click.y >= y0 && click.y <= y1) {
+          best = on;
+          expected = liftPoint(lift, on, click.x, click.y);
+        }
+      }
+      assert.ok(Math.hypot(state.x - expected.x, state.y - expected.y) < 0.05, `${name} ${click.target}: ${state.x},${state.y}`);
+      assert.equal(state.opacity, 1, `${name} ${click.target}`);
+      assert.ok(!state.moving, `${name} ${click.target} settled`);
+      const box = click.box!;
+      assert.ok(click.x > box.x && click.x < box.x + box.width && click.y > box.y && click.y < box.y + box.height, `${name} ${click.target} in its box`);
+      count += 1;
+    }
+  assert.ok(count >= 12, `${count} clicks`);
+});
+
+test("the pointer never pops: no cut brings it in, it fades in and out over 12 frames, and a cut ends it only 10 frames after a press", { skip: !footageThere && "no footage" }, () => {
+  for (const { name, frames, pointer } of pointerTakes()) {
+    const opacity = Array.from({ length: frames }, (_, f) => pointer.at(f)?.opacity ?? 0);
+    assert.equal(opacity[0], 0, `${name}: shows on the cut in`);
+    for (let f = 1; f < frames; f += 1) assert.ok(Math.abs(opacity[f] - opacity[f - 1]) <= 1 / 12 + 1e-9, `${name} frame ${f}: ${opacity[f - 1]} to ${opacity[f]}`);
+    for (const run of pointer.runs) {
+      // In over at least 8 frames, starting before it moves.
+      assert.ok(run.legs[0].a > run.appear, `${name}: it moves before it has come in`);
+      for (const click of run.clicks) {
+        // On full from before the press to half a second after it, or to the cut.
+        for (let f = click.pressFrame - 2; f <= Math.min(frames - 1, Math.floor(click.f + POINTER.HOLD)); f += 1) assert.equal(opacity[f], 1, `${name} ${click.target} frame ${f}`);
+      }
+    }
+    if (opacity[frames - 1] > 0) {
+      const last = pointer.clicks.at(-1)!;
+      assert.ok(frames - last.pressFrame >= 10, `${name}: the cut comes ${frames - last.pressFrame} frames after the press`);
+      assert.ok(!pointer.at(frames - 1)!.moving, `${name}: the cut comes while it travels`);
+    }
+  }
 });
 
 /** The lifted boxes in front at frame f of a take (capture px, scaled), or undefined when nothing is lifted. */

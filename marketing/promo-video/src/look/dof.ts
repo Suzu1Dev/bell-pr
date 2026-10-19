@@ -14,6 +14,7 @@
  * src/look/ProductWindow.tsx.
  */
 import { music } from "../music.ts";
+import { ease, mix } from "./motion.ts";
 
 export type Rect = [x0: number, y0: number, x1: number, y1: number];
 
@@ -71,16 +72,11 @@ export const liftPoint = (lift: Lift, on: number, x: number, y: number) => {
 export const sharpBoxes = (lifts: readonly Lift[], f: number, amount = 1): Rect[] =>
   lifts.filter((lift) => liftOn(lift, f) * amount >= 0.5).map((lift) => scaleBox(lift.box, 1 + (LIFT_SCALE - 1) * liftOn(lift, f) * amount));
 
-/** How sharp capture point (x, y) is: 1 inside a lifted box, falling to 0 over `feather` cpx outside it. */
-export function sharpnessAt(lifts: readonly Lift[], f: number, x: number, y: number, feather = 40, amount = 1) {
-  let best = 0;
-  for (const lift of lifts) {
-    const on = liftOn(lift, f) * amount;
-    if (on <= 0) continue;
-    const [x0, y0, x1, y1] = lift.box;
-    const dx = Math.max(0, x0 - x, x - x1);
-    const dy = Math.max(0, y0 - y, y - y1);
-    best = Math.max(best, on * Math.max(0, 1 - Math.hypot(dx, dy) / feather));
-  }
-  return best;
-}
+/** How far the window drops back behind its lifts at `beats` from the take's start (keys eased `standard`). */
+export const focusAmount = (keys: readonly { at: number; amount: number }[], beats: number) => {
+  if (beats <= keys[0].at) return keys[0].amount;
+  for (let i = 1; i < keys.length; i += 1)
+    if (beats <= keys[i].at)
+      return mix(keys[i - 1].amount, keys[i].amount, ease.standard((beats - keys[i - 1].at) / (keys[i].at - keys[i - 1].at)));
+  return keys.at(-1)!.amount;
+};

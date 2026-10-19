@@ -27,8 +27,10 @@
  * - card edges: in a ring 6-18 px around every caption card (its box from
  *   the same layout as the film, the text measured in Chrome with the
  *   film's font), the count of pixels with a luma step above 70 to their
- *   neighbour; more than 8 means a sharp line of UI text (or the pointer)
- *   runs into the card instead of soft plane or studio;
+ *   neighbour, leaving out the window's own outline (within 2 px of its
+ *   projected edges: a frame edge, not UI); more than 8 means a sharp line
+ *   of UI text (or the pointer) runs into the card instead of soft plane or
+ *   studio;
  * - empty cards: on the second frame of every caption card that comes in
  *   (not one handed over), the card's box must already hold its text (at
  *   least 150 pixels 40 levels darker than the card's own median), never an
@@ -56,7 +58,7 @@ const { timeline } = await tsImport("../src/timeline.ts", import.meta.url);
 const { music, fps } = await tsImport("../src/music.ts", import.meta.url);
 const { looks } = await tsImport("../src/shots.ts", import.meta.url);
 const { takeView } = await tsImport("../src/takes.ts", import.meta.url);
-const { project } = await tsImport("../src/look/camera.ts", import.meta.url);
+const { corners, project } = await tsImport("../src/look/camera.ts", import.meta.url);
 const { cardBox, CAPTION_ROLE } = await tsImport("../src/look/captionLayout.ts", import.meta.url);
 const video = process.argv[2] ?? "out/bell-pr-promo-en-1080p.mp4";
 const out = path.join(packageRoot, "out", "review");
@@ -268,6 +270,26 @@ const live = (frame) => {
   return (look.clipFrom ?? 0) + ((frame - take.from) / fps) * (look.rate ?? 1) >= look.liveFrom;
 };
 
+/**
+ * Whether screen pixel (x, y) is within 2 px of the window's own outline at this frame (its four projected edges):
+ * the window's edge against the studio is a sharp line by design, not UI running into a card. (Round 10: the encoder
+ * put the outline 6-18 px right of S8's card one step either side of the threshold on different encodes.)
+ */
+const onWindowEdge = (frame) => {
+  const { shot, take } = where(frame);
+  const look = looks[shot.id]?.[take.id];
+  if (!look) return () => false;
+  const [a, b, c, d] = corners(takeView(look, frame - take.from), look.height);
+  const sides = [[a, b], [b, c], [c, d], [d, a]];
+  return (x, y) =>
+    sides.some(([p, q]) => {
+      const [px, py] = [x + 0.5, y + 0.5];
+      const [dx, dy] = [q.x - p.x, q.y - p.y];
+      const t = Math.max(0, Math.min(1, ((px - p.x) * dx + (py - p.y) * dy) / (dx * dx + dy * dy)));
+      return Math.hypot(px - (p.x + t * dx), py - (p.y + t * dy)) <= 2;
+    });
+};
+
 const cards = await measuredCards();
 const findings = [];
 const scanRows = ["frame\tseconds\tscan\tvalue\twhere"];
@@ -307,11 +329,13 @@ const decoded = await eachFrame(video, (frame, pixels) => {
   if (card && frame % 2 === 0) {
     const { left, top, width, height } = card.box;
     const [l, t, r, b] = [Math.round(left), Math.round(top), Math.round(left + width), Math.round(top + height)];
+    const outline = onWindowEdge(frame);
     let count = 0;
     // The ring 6-18 px outside the box: clear of the card's own edge and shadow (and of a few px of text-measure difference).
     for (let y = Math.max(1, t - 18); y < Math.min(1079, b + 18); y += 1)
       for (let x = Math.max(1, l - 18); x < Math.min(1919, r + 18); x += 1) {
         if (x >= l - 6 && x < r + 6 && y >= t - 6 && y < b + 6) continue;
+        if (outline(x, y)) continue;
         const v = pixels[y * 1920 + x];
         if (Math.abs(v - pixels[y * 1920 + x + 1]) > 70 || Math.abs(v - pixels[(y + 1) * 1920 + x]) > 70) count += 1;
       }

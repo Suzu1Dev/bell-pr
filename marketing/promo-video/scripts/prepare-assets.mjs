@@ -9,9 +9,10 @@
  * 4. sfx/: the Mixkit sound effects of SFX-LICENSES.md, downloaded from
  *    Mixkit's own asset URLs and checked by MD5 (`--offline` refuses to
  *    download and fails when one is missing);
- * 5. footage-2x/: the footage proxy (scripts/make-proxies.mjs) and, per
- *    state, where the pointer's disc sits at each click the film shows
- *    (scripts/pointer-spots.mjs).
+ * 5. footage-2x/: the footage proxy (scripts/make-proxies.mjs); then every
+ *    click the film shows is checked against it: inside its recorded
+ *    target, the target where the footage shows the control
+ *    (scripts/pointer-spots.mjs; it fails on a finding).
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";

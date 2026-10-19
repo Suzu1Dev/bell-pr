@@ -1,8 +1,10 @@
 /**
  * A minimal PNG writer (8-bit RGB, no filter) on Node's zlib, for the
- * stage plates. No image library is needed.
+ * stage plates and the pointer check's crops, and a reader for the 8-bit
+ * RGB or RGBA, non-interlaced PNGs Chrome renders (the pointer check's
+ * reference frames). No image library is needed.
  */
-import { deflateSync } from "node:zlib";
+import { deflateSync, inflateSync } from "node:zlib";
 
 const crcTable = new Int32Array(256).map((_, n) => {
   let c = n;
@@ -44,4 +46,59 @@ export function encodePng(width, height, rgb) {
     chunk("IDAT", deflateSync(raw, { level: 9 })),
     chunk("IEND", Buffer.alloc(0)),
   ]);
+}
+
+/** Decodes an 8-bit RGB or RGBA, non-interlaced PNG file buffer to RGB (alpha dropped). */
+export function decodePng(buffer) {
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let channels = 0;
+  const data = [];
+  while (offset < buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const type = buffer.toString("ascii", offset + 4, offset + 8);
+    const body = buffer.subarray(offset + 8, offset + 8 + length);
+    if (type === "IHDR") {
+      width = body.readUInt32BE(0);
+      height = body.readUInt32BE(4);
+      if (body[8] !== 8 || body[12] !== 0 || ![2, 6].includes(body[9])) throw new Error("decodePng reads 8-bit RGB or RGBA, non-interlaced PNGs only.");
+      channels = body[9] === 6 ? 4 : 3;
+    } else if (type === "IDAT") data.push(body);
+    else if (type === "IEND") break;
+    offset += 12 + length;
+  }
+  const raw = inflateSync(Buffer.concat(data));
+  const stride = width * channels;
+  const pixels = Buffer.alloc(stride * height);
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[y * (stride + 1)];
+    const row = raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1));
+    const out = y * stride;
+    for (let x = 0; x < stride; x += 1) {
+      const a = x >= channels ? pixels[out + x - channels] : 0;
+      const b = y > 0 ? pixels[out - stride + x] : 0;
+      const c = x >= channels && y > 0 ? pixels[out - stride + x - channels] : 0;
+      let value = row[x];
+      if (filter === 1) value += a;
+      else if (filter === 2) value += b;
+      else if (filter === 3) value += (a + b) >> 1;
+      else if (filter === 4) {
+        const p = a + b - c;
+        const pa = Math.abs(p - a);
+        const pb = Math.abs(p - b);
+        const pc = Math.abs(p - c);
+        value += pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      }
+      pixels[out + x] = value & 0xff;
+    }
+  }
+  if (channels === 3) return { width, height, data: pixels };
+  const rgb = Buffer.alloc(width * height * 3);
+  for (let i = 0, j = 0; i < pixels.length; i += 4, j += 3) {
+    rgb[j] = pixels[i];
+    rgb[j + 1] = pixels[i + 1];
+    rgb[j + 2] = pixels[i + 2];
+  }
+  return { width, height, data: rgb };
 }

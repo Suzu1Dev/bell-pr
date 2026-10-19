@@ -10,7 +10,10 @@ and round 7 a third. Round 8 rebuilt everything from a clean state (a new
 capture of all 13 states included) and made that rebuild repeat the
 reviewed film. Round 9 answers the owner's feedback on that cut (the bell
 flies into the first window; `npx bell-pr` on a line of its own); round 7's
-verdicts stand for every frame round 9 did not change.
+verdicts stand for every frame round 9 did not change. Round 10 answers the
+owner's feedback on the pointer (it did not seem to click where it should,
+and sometimes vanished): every click and every frame the pointer shows is
+measured in the rendered film; nothing else changes.
 
 ## Automated: enforced on every run
 
@@ -50,7 +53,7 @@ master is not rendered) fails unless:
   81.1-84.0 s, is where the analysis records it, and the end-card logo
   locks within ±0.25 s of the final chord (it locks on 2451, -0.018 s).
 
-`npm test` (77 tests) keeps the cut honest against the **loaded** analysis
+`npm test` (80 tests) keeps the cut honest against the **loaded** analysis
 file: anchored shots on their events, section changes on bar lines (else
 half-bars; S9's nominal counted in the track's own bars, so S10 starts on
 the bar-25 downbeat), takes
@@ -69,8 +72,13 @@ flat pushes (no tilt at 1.4x or closer), a lift that comes forward inside
 a take racking in 12-18 frames, no jump cut inside one captured state, no
 sliver of studio under 60 px at a frame edge, a sidebar in frame always
 wholly dropped back (no lift reaches into it), **no caption card within
-12 px of a lifted component**, the pointer only around its clicks (at most
-12 frames before, its ring 8 frames), the logo moments (the first-hit
+12 px of a lifted component**, **the pointer** (`src/look/pointer.ts`: at
+every press its hotspot on the capture's click point, carried as the
+footage's lifted layer is, inside the recorded box, at full opacity and at
+rest; no pointer on a take's first frame; opacity steps of at most 1/12 a
+frame; on full from two frames before each press to half a second after
+it; a take that cuts with the pointer on cuts 10 frames or more after the
+press and never while it travels), the logo moments (the first-hit
 lockup readable whole for 1.2 s, pushing at 1.00-1.04 in 53 frames with the
 six-frame flare, its name gone within 9 frames of the flight's start; the
 end-card logo under 72% eight frames after the cut, its last fifth and its
@@ -94,7 +102,32 @@ sound effects' placement (whooshes peaking a frame before their downbeat,
 the glint on the chord) and levels. With the footage in place it also runs
 the depth-of-field check below against the captured pictures, and checks
 that the film's box for the app's bell is where `scripts/measure-bell.mjs`
-finds it in the capture (within 0.1 capture px).
+finds it in the capture (within 0.1 capture px), and that every click the
+film shows lies inside its recorded target and that target is where the
+footage shows the control on the frame of the press: its outline on an
+edge of the picture for at least 70% of its length
+(`scripts/pointer-spots.mjs`; 91-100% on the 13 clicks, and every box
+moved 9-12 px fails it).
+
+`npm run pointer` (`scripts/check-pointer.mjs`) measures the drawn pointer
+in the rendered film and exits 1 on a finding. Every frame of the 12 takes
+that show a click is rendered three times at 1080p, losslessly: as the
+film, without the pointer and with it at full opacity; in those frames,
+and again in the web MP4, the pointer's opacity on every frame is a
+least-squares fit of the film's difference from the pointer-less frame on
+the full pointer's, and at every press its centre is a circle fitted to its
+ring in the pixels, while the point the capture clicked is found in the
+pointer-less frame by matching the captured picture round it (footage-2x
+at the shot's magnification). Findings: a hotspot more than 4 px from its
+click or outside its target's box (render or MP4); an opacity step above
+0.13 between two frames of one take; a pointer on a take's first frame; a
+take that cuts with the pointer on less than 10 frames after a press or
+while it travels; the render more than 0.05 from the model; the MP4 more
+than 0.12 from the render. Results go to `out/review/pointer.tsv` and
+`out/review/pointer-opacity.tsv` (run it after `npm run review`, which
+empties `out/review/`); `-- --strips=<dir>` writes every click's frames and
+every appearance and disappearance, cropped 2x, with a contact sheet per
+take.
 
 `npm run moments` (`scripts/check-moments.mjs`) measures the same two
 moments in rendered frames and exits 1 on a finding: every frame from the
@@ -703,6 +736,181 @@ the labelled sheets):
 | The turn | 381-470 | ok: as before, a little shorter (from a nearer, less tilted landing framing): the window turns to rest by 435, the light sweep, whole window for 130 frames. |
 | End card | 2438-2639 | ok: the logo pull and lock on 2451, the headline and its rack as before; on 2523-2541 `npx bell-pr` and, under it, "Free to start · Runs on your machine" rise in with the footer; the complete card (2541-2627) reads in three groups (logo; headline; command with its subline) with the footer at the foot; nothing crowded; the fade. |
 
+
+### Round 10 (2026-10-19): the owner's feedback on the pointer
+
+The owner, on the round-9 cut (translated): "In the current cut the cursor
+doesn't seem to click where it should, and sometimes it suddenly
+disappears." Both were so. Measured on the round-9 cut (its pointer model
+replayed frame by frame with its depth-of-field fade, and its frames):
+
+**Found: off target.** The disc was drawn beside its hotspot, at the offset
+`scripts/pointer-spots.mjs` chose to keep it off every glyph (9-40 capture
+px right and down), and the click's ring was drawn round the disc. At 12 of
+the 14 presses the film showed, the disc sat outside the control it pressed,
+35-79 px from the point clicked: on "Approve the plan and start
+development" (759) it sat 74 px away, on the dotted rule under the button;
+on "Open the sample Draft PR" (2162), 79 px. The position itself followed
+the window's transform and the lift exactly; the offset was the miss.
+
+**Found: vanishing.** It came in at most 12 frames before a click (over 6
+frames) and was gone 4-6 frames after it, within 2 frames where the UI
+answered the click; it was faded with the depth of field, so it jumped in as
+it crossed into a lifted component; and five takes cut 1-5 frames after a
+press with it on. Every abrupt appearance and disappearance of the round-9
+cut, and what happens there now:
+
+| Round 9 | What happened | Now |
+| --- | --- | --- |
+| S5 761-763 | gone 2-4 frames after "Approve" (1.0, 0.8, 0.3, 0) as the plan folds | stays on the click through the fold (in the plan's plane, held as at the press), 0.5 s, fades out 774-786 |
+| S6 954-956 | gone 3-5 frames after "Think so" (0.7, 0.2, 0) | stays and travels on to "Show answer" (948-958) |
+| S6 971 | back at full on the "Show answer" press (0 to 1), cut 4 frames later | on since 921, pressed at 960, 15 frames to the cut |
+| S6 1006 | in at full on the "Got it" press (0 to 1), cut 5 frames later | fades in from the cut (975-987) above the card, pressed at 996, 15 frames to the cut |
+| S7 1146-1147 | jumps in as it crosses into the lifted card (0.25 to 0.90); cut 1 frame after "Show the alternative" | fades in at rest on the card (1119-1131), pressed at 1139, 16 frames to the cut |
+| S7 1248-1251 | in at full on the "Keep this approach" press, gone 3 frames later | fades in at rest above the row (1227-1239), pressed at 1248, 15 frames to the cut |
+| S8 1299 | on at full on the cut-in, travelling | fades in from the cut (1299-1311) at rest |
+| S8 1305-1308 | gone 2-5 frames after the line-15 click | that click is now just before the take (the take opens on lines 10-15 selected) |
+| S8 1319-1324 | jumps in into the lifted selection bar (0.54 to 0.91); cut 5 frames after "Explain this code" at 0.34 | pressed at 1320, 15 frames to the cut |
+| S9 1641-1652 | jumps in (0.21 to 0.75); gone 2-6 frames after "Think so" | fades in at rest (1623-1635), pressed at 1647, on to the cut 12 frames later |
+| S9 1684-1694 | jumps in (0 to 0.42 to 0.88); cut 4 frames after "Partly", mid-fade | fades in from the cut (1659-1671), pressed at 1680, 15 frames to the cut |
+| S10 1745-1760 | jumps in (0.26 to 0.72); gone 2-6 frames after "Tests" | fades in (1731-1743), pressed at 1754, stays to 1769, fades out by 1781 |
+| S11 2066-2070 | gone 2-6 frames after "Add my not-tested answer to Testing" | stays on the click (now "In the description") to 2079, fades out to the cut |
+| S12 2162 | cut 1 frame after "Open the sample Draft PR" | pressed on the beat before the crash (2145), 18 frames to the cut |
+| S12 2267-2270 | cut 4 frames after "Read feedback", mid-fade | pressed at 2256, 15 frames to the cut |
+
+**Fixed** (`src/look/pointer.ts`, `src/look/ProductWindow.tsx`,
+`src/scenes/ProductShot.tsx`):
+
+- **On target.** The pointer is a neutral ring (24 px: a white ring between
+  two ink hairlines round a 16% ink tint, a round shadow; STYLE-GUIDE §5.5,
+  no OS or Apple arrow) whose centre is its hotspot, and at every press the
+  hotspot is the capture's own click point. The click's ring spreads from
+  that point (24 to 60 px over 14 frames). It is drawn inside the window's
+  own transform, so camera, drift and tilt carry it like the footage, and
+  the lifted component that holds its target carries it (the same scale
+  about the same centre as the footage's lifted layer) from its first frame
+  to its last, so it never jumps as it crosses a lift's edge; after a press
+  it keeps the plane as it was at the press, so a lift that ends (the plan
+  that folds) does not move it.
+- **No pop.** Per click, in film frames (a slowed or held clip keeps the
+  rhythm): it fades in over 12 frames at rest just outside what it clicks
+  (160 px out on screen and 40 px clear of the target's box, towards where
+  the capture's pointer came from), starting 6 frames before it moves;
+  travels on one eased path (the capture's move, 12-18 frames); settles on
+  the click point 2 frames before the press; presses; stays 15 frames
+  (0.5 s); fades out over 12 frames. A click that follows soon after keeps it
+  on screen: it travels from the click before (S6's "Think so" to "Show
+  answer"). The depth of field no longer fades it.
+- **No cut on a click.** Seven takes now start or hold their clip so every
+  press is 12 frames or more before the take's cut (cuts, captions, music,
+  the bell's flight and the end card are unchanged):
+
+| Take | Clip was | Clip now | Press, frames to the cut |
+| --- | --- | --- | --- |
+| S6 answer | 1.20 s, held at 4.08 s | 1.66 s, held at 4.08 s ("Show answer" pressed, the frame before the reveal replaces the card) | "Think so" 952 to 941; "Show answer" 971 to 960, 4 to 15 |
+| S6 reveal | 5.05 s, held at 6.13 s | 5.367 s, held at 6.13 s | "Got it" 1006 to 996, 5 to 15 |
+| S7 guess | 1.75 s, held at 3.18 s | 2.37 s (the guess typed), held at 3.18 s | "Show the alternative" 1154 to 1139, 1 to 16 |
+| S8 select | 1.45 s | 1.767 s (lines 10-15 already selected) | "Explain this code" 1330 to 1320, 5 to 15 |
+| S9 partly | 8.75 s | 9.10 s, held at 10.17 s (before the scroll to the correction) | "Partly" 1691 to 1680, 4 to 15 |
+| S12 dialog | 2.30 s | 2.642 s, held at 3.80 s (pressed, before the dialog closes) | "Open the sample Draft PR" 2162 to 2145 (the beat before the crash), 1 to 18 |
+| S12 waiting | 0 s | 0.275 s, held at 1.00 s (before the page scrolls) | "Read feedback" 2267 to 2256, 4 to 15; the first comment now comes in beside the forecast before the cut |
+
+  The UI tick of each click moves with it (`src/sfx.ts` places it from the
+  footage); S8's tick for the line-15 click and S7's 15-frame keyboard bed
+  (the guess's last characters) are gone with those moments, S6's keyboard
+  bed is 19 frames instead of 30.
+- **The click targets, checked.** `scripts/pointer-spots.mjs` no longer
+  places a disc: it checks every click the film shows against the footage
+  (inside its recorded target, and that target's outline on an edge of the
+  frame of the press for 91-100% of its length). No re-capture was needed.
+- **Measured in the film.** `scripts/check-pointer.mjs` (`npm run
+  pointer`, above).
+
+**Measured** (the 4K master and the web files made from it, rendered once
+from this source; `npm run pointer` on the web MP4, its references rendered
+at 2x and brought to 1080p with the web files' own Lanczos filter; the
+1x `render:draft` cut measured the same way with `--scale=1` while
+iterating):
+
+| Press | Take | Target | Hotspot to click, render / MP4 (px) | Inside the box | On before / after the press (frames) | Ends |
+| --- | --- | --- | --- | --- | --- | --- |
+| 759 | S5 board | Approve the plan and start development | 0.66 / 0.27 | yes | 25 / 27 | faded |
+| 941 | S6 answer | Think so | 0.38 / 0.32 | yes | 19 / 34 | travels on to the next click |
+| 960 | S6 answer | Show answer | 0.57 / 0.36 | yes | 38 / 15 | with the cut |
+| 996 | S6 reveal | Got it | 0.63 / 0.53 | yes | 20 / 15 | with the cut |
+| 1139 | S7 guess | Show the alternative | 0.46 / 0.07 | yes | 19 / 16 | with the cut |
+| 1248 | S7 keep | Keep this approach | 0.24 / 0.33 | yes | 20 / 15 | with the cut |
+| 1320 | S8 select | Explain this code | 0.13 / 0.12 | yes | 20 / 15 | with the cut |
+| 1647 | S9 question | Think so | 0.09 / 0.15 | yes | 23 / 12 | with the cut |
+| 1680 | S9 partly | Partly | 0.45 / 0.64 | yes | 20 / 15 | with the cut |
+| 1754 | S10 tests | Tests | 0.39 / 0.30 | yes | 22 / 27 | faded |
+| 2064 | S11 words | Add my not-tested answer to Testing | 0.26 / 0.34 | yes | 25 / 27 | with the cut (fading, 0.08) |
+| 2145 | S12 dialog | Open the sample Draft PR | 0.37 / 0.04 | yes | 25 / 18 | with the cut |
+| 2256 | S12 waiting | Read feedback | 0.20 / 0.17 | yes | 20 / 15 | with the cut |
+
+- Every hotspot within 0.7 px of the point the capture clicked (limit 4),
+  inside its target's box; the click point is found in the frames by
+  matching the captured picture (match 0.95-0.99).
+- Opacity (out/review/pointer-opacity.tsv, every frame of the 12 takes):
+  largest step 0.096 a frame in the render (limit 0.13), at most 0.016 from
+  the model; no pointer on a take's first frame; every take that cuts with
+  the pointer on cuts 12-18 frames after the press, the pointer at rest.
+  In the web MP4 the pointer measures 0.82-1.33 times the render's where it
+  is whole (median 0.94): the master's own path (JPEG frames, H.264, Lanczos,
+  H.264) renders the thin ring half a 4K pixel apart and sharpens it over a
+  dark button, so the MP4's "opacity" jumps (up to 0.43) as the pointer
+  crosses from white onto a green or blue button; looked at frame by frame
+  in the strips, no change shows there. The check holds the MP4 to 0.5-1.5
+  times the render (a lost or a stray pointer).
+- `npm run check`: every check passes. 88.021 s (MP4s) / 88.029 s (WebM);
+  MP4 17.39 MB, WebM 14.79 MB, 4K master 82.11 MB; -14.13 / -14.02 /
+  -14.03 LUFS, true peak -1.99 / -3.05 / -3.35 dBTP (the ticks moved with
+  their clicks); poster and captions byte-identical to round 9's; the final
+  hit at 2438; the end-card logo locks on 2451 (-0.018 s).
+- `npm test`: 80 tests pass (the pointer's synthetic run, every click on
+  its target, no pop, and the click targets against the footage);
+  `npm run typecheck` passes.
+- `npm run review`: 278 frames and the contact sheet; the scans over all
+  2640 frames found nothing. The card-edge scan first flagged S8's last
+  frame (1334: 10 sharp px, limit 8) on the window's own bottom edge 6-18 px
+  right of the caption card, which round 9's web file had one step under
+  the threshold (the two 4K masters agree there to 2 levels): the scan now
+  leaves out the window's projected outline (2 px), which is a frame edge,
+  not UI running into a card.
+- Against round 9's web MP4, every frame decoded (480x270 luma): S1-S3
+  with the bell's flight (0-470), S13 and S14 identical (0.000); above 0.5
+  levels only inside the retimed takes (943-953, 1299-1304, 1322-1333,
+  1691-1694, 2091-2092, 2259-2269); elsewhere at most 0.42, the encoder's
+  noise carried through the frames after a changed take: lossless renders
+  of 600, 897, 1050, 1190, 1400, 1710, 1850 and 2200 from round 9's and this
+  source are pixel-identical.
+
+**Verdicts** (looked at in `bell-pr-product-assets/film-rerun/v3/pointer-frames/`:
+the 12 contact sheets of the web MP4, every click from 14 frames before its
+press to 20 after, every 2nd frame, and every appearance and
+disappearance, cropped 2x with the click point marked; and the contact
+sheet):
+
+| Take | Verdict |
+| --- | --- |
+| S5 board (734-786) | ok: comes in over the plan's text under the button, rises onto "Approve the plan and start development" and presses on its centre; stays through the fold (over the board's "Team conversation" header) and fades. |
+| S6 answer (921-974) | ok: comes in beside "Show answer", onto "Think so", presses as the chip fills, travels down to "Show answer", presses; held pressed to the cut. |
+| S6 reveal (975-1010) | ok: fades in over the soft heading above the grades, comes down into the "Got it" card, presses on it, the ring spreads; held to the cut. |
+| S7 guess (1119-1154) | ok: fades in on the "Look up" chips, up onto "Show the alternative", presses; held to the cut. |
+| S7 keep (1227-1262) | ok: from the soft paragraph above, down onto "Keep this approach", presses as it turns blue. |
+| S8 select (1299-1334) | ok: fades in over the soft code above the selection bar, onto "Explain this code", presses. |
+| S9 question (1623-1658) | ok: from the soft row below, up onto "Think so", presses as it turns green. |
+| S9 partly (1659-1694) | ok: from the soft answer below, up onto "Partly", presses as it turns green. |
+| S10 tests (1731-1781) | ok: from below, onto "Tests", presses as it turns green, stays, fades. |
+| S11 words (2038-2090) | ok: from the heading above, down onto "Add my not-tested answer to Testing", presses; the button becomes "In the description" under it; fades to the cut. |
+| S12 dialog (2119-2162) | ok: comes in just right of "Open the sample Draft PR" (outside it), slides onto it, presses on the beat before the crash; held to the cut. |
+| S12 waiting (2235-2270) | ok: comes in left of "Read feedback", onto it, presses; the button becomes "Read feedback again" and the first comment arrives beside the forecast; held to the cut. |
+
+The label under a button is legible through the ring at every press; the
+ring sits on it for the half second after the click (it is a 16% tint, the
+glyphs show through), then fades. No frame shows a pointer appear or vanish
+except by its 12-frame fades and at the ten cuts that end it (12-18 frames
+after a press).
 
 ### The look-dev's must-fix list (COMPARISON.md), as fixed here
 

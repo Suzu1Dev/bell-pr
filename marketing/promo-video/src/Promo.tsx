@@ -31,6 +31,11 @@ export interface PromoProps {
    * out on every frame) or the footage's bell alone (no flying bell, no patch), and compares the two.
    */
   bellProbe?: "flight" | "footage";
+  /**
+   * The pointer check (scripts/check-pointer.mjs) renders the product takes without the drawn pointer, or with it at
+   * full opacity wherever it is, and measures the film's pointer against both.
+   */
+  pointerProbe?: "none" | "solid";
 }
 
 const opening = { from: shotById("s1-problem").from, to: shotById("s2-turn").to };
@@ -38,7 +43,7 @@ const s3 = shotById("s3-rules");
 const logo = takeOf(s3, "logo");
 const end = shotById("s14-end");
 
-export const Promo: React.FC<PromoProps> = ({ footage, music = true, sfx = true, bellProbe }) => {
+export const Promo: React.FC<PromoProps> = ({ footage, music = true, sfx = true, bellProbe, pointerProbe }) => {
   if (!footage) throw new Error('The footage metadata did not load; run "npm run capture".');
   return (
     <AbsoluteFill style={{ backgroundColor: "#020403" }}>
@@ -54,6 +59,7 @@ export const Promo: React.FC<PromoProps> = ({ footage, music = true, sfx = true,
               footage={footage}
               skip={["logo", "title"]}
               bellProbe={bellProbe}
+              pointerProbe={pointerProbe}
               // The first-hit lockup sits on the studio, under the window that rises in as it dissolves.
               under={
                 shot.id === s3.id ? (
