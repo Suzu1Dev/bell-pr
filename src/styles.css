@@ -2,7 +2,6 @@
 @import "./theme/fonts.css";
 
 :root {
-  font-family: var(--font-sans);
   color: var(--color-text);
   background: var(--color-bg);
   font-synthesis: none;
@@ -1775,7 +1774,6 @@ button {
 }
 .repository-card p {
   color: var(--color-text-muted);
-  font-size: var(--text-xs);
   line-height: 1.9;
   overflow-wrap: anywhere;
 }
@@ -1864,7 +1862,6 @@ button {
   color: var(--color-text-muted);
 }
 .team-role > p {
-  font-size: var(--text-xs);
   color: var(--color-text-muted);
   line-height: 1.9;
   margin: 19px 0 28px;
@@ -1931,7 +1928,6 @@ button {
   font-weight: 550;
 }
 .note-card p {
-  font-size: var(--text-xs);
   color: var(--color-text-muted);
   line-height: 2;
   margin: 15px 0;
@@ -3472,11 +3468,8 @@ button {
   gap: 8px;
 }
 .follow-up-status {
-  padding: 1px 8px;
-  border-radius: 999px;
   background: var(--color-brand-50);
   color: var(--color-brand-600);
-  font-size: var(--text-2xs);
 }
 .follow-up-round-head time {
   margin-left: auto;

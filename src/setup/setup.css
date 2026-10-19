@@ -131,12 +131,7 @@
   padding: var(--space-2) 0;
 }
 .setup-spin {
-  animation: setup-spin 1s linear infinite;
-}
-@keyframes setup-spin {
-  to {
-    transform: rotate(360deg);
-  }
+  animation: spin 1s linear infinite;
 }
 
 .copy-command {

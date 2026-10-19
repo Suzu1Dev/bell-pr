@@ -25,7 +25,6 @@
   overflow: hidden;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
 }
 /* Read by screen readers, not shown: the diff's keyboard help and status. */
 .rv-visually-hidden {
@@ -61,7 +60,6 @@
   gap: 8px;
   min-width: 0;
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
   color: var(--color-text-muted);
 }
 .rv-file-path > svg {
@@ -123,7 +121,6 @@
   margin-left: 8px;
   font-family: inherit;
   color: var(--color-text-muted);
-  font-size: var(--text-2xs);
   cursor: pointer;
 }
 .rv-reviewed input {
@@ -203,11 +200,7 @@
   display: flex;
   position: relative;
   align-items: stretch;
-  min-height: 24px;
   width: 100%;
-  font-size: var(--text-2xs);
-  line-height: 24px;
-  font-family: var(--font-mono);
   transition:
     box-shadow 0.12s,
     filter 0.12s;
@@ -226,7 +219,6 @@
   flex: 0 0 35px;
   text-align: right;
   padding-right: 10px;
-  font-size: var(--text-2xs);
   user-select: none;
   background: color-mix(in srgb, var(--color-surface-sunken) 42%, transparent);
 }
@@ -347,7 +339,6 @@
   border-top: 1px solid var(--color-border);
   background: var(--color-surface);
   padding: 0 16px;
-  font-size: var(--text-2xs);
   color: var(--color-text-muted);
 }
 .rv-diff-footer > span {
@@ -399,7 +390,6 @@
   background: var(--color-diff-add-bg);
 }
 .rv-split-content {
-  min-width: 720px;
   width: max-content;
   min-width: max(100%, 720px);
 }
@@ -1519,7 +1509,7 @@
   color: var(--color-text-muted);
 }
 .explain-spin {
-  animation: explain-spin 1.5s linear infinite;
+  animation: spin 1.5s linear infinite;
 }
 .explain-skeleton {
   border: 1px solid var(--color-border-subtle);
@@ -1702,11 +1692,6 @@
   to {
     opacity: 0.3;
     transform: translateY(-2px);
-  }
-}
-@keyframes explain-spin {
-  to {
-    transform: rotate(360deg);
   }
 }
 @media (prefers-reduced-motion: reduce) {
