@@ -515,22 +515,22 @@ const navLinks = (html: string) =>
     (match) => [match[1], match[2]],
   );
 
-test("a sticky nav links to every section, and a run's overview keeps the directions last", () => {
+test("a sticky nav links to every section; a run's overview leads with its brief and keeps the directions last", () => {
   const html = renderEnglish({ run: englishRun });
   assertNoHan(html);
   assert.match(html, /<nav class="mission-section-nav" aria-label="On this page">/);
   assert.deepEqual(navLinks(html), [
+    ["overview-contribution", "This contribution"],
     ["overview-purpose", "Purpose"],
     ["overview-journey", "How people use it"],
     ["overview-reading", "Where to start reading"],
-    ["overview-contribution", "This contribution"],
     ["overview-directions", "Directions"],
   ]);
   assert.deepEqual(sectionOrder(html), [
+    "overview-contribution",
     "overview-purpose",
     "overview-journey",
     "overview-reading",
-    "overview-contribution",
     "overview-directions",
   ]);
   // Each target can take focus when a link moves there.
@@ -745,4 +745,36 @@ test("the premise check in the brief reads in English", () => {
   assert.equal(html.match(/As you assumed; not confirmed yet/g)?.length, 2);
   assert.match(html, /Check the premise again/);
   assert.match(html, /These are the goals of this contribution/);
+});
+
+test("an open contribution leads with its brief, which does not repeat the title, before the project analysis", () => {
+  const run = {
+    id: "r",
+    repoId: "demo-repo",
+    title: "確認呼叫端使用回傳的 id",
+    prompt: "讓呼叫端使用回傳的 id。",
+    status: "review",
+    branch: "fix/abc",
+    baseBranch: "main",
+    createdAt: "2026-10-14T00:00:00Z",
+    agents: [],
+    logs: [],
+    draft: { title: "t", body: "b" },
+    reviewedFiles: [],
+  } as unknown as NonNullable<ProjectOverviewProps["run"]>;
+  const html = render({ run });
+  const brief = html.indexOf("這次改動，會帶來什麼不同？");
+  assert.ok(brief >= 0 && brief < html.indexOf("先看懂專案，再決定怎麼改。"));
+  assert.ok(brief < html.indexOf('id="mission-purpose-title"'));
+  // The header shows the title; the brief does not repeat it.
+  assert.doesNotMatch(html, /mission-contribution-name|確認呼叫端使用回傳的 id/);
+  // The product keeps the directions on a run's overview, after the analysis.
+  assert.ok(html.indexOf("mission-ideas-title") > html.indexOf('id="mission-purpose-title"'));
+  // While the analysis loads, or before there is one, the brief still leads.
+  for (const props of [{ loading: true, insights: null }, { insights: null }]) {
+    const pending = render({ run, ...props });
+    assert.ok(pending.indexOf("這次改動，會帶來什麼不同？") < pending.indexOf("mission-overview-empty"));
+  }
+  // The project page has no brief.
+  assert.doesNotMatch(render(), /這次改動，會帶來什麼不同？/);
 });

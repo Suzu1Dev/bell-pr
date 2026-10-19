@@ -181,10 +181,12 @@
 .mission-source-demo {
   background: var(--color-surface-sunken);
 }
+/* The summary is often a paragraph; it reads as a lead, not a headline. */
 .mission-project-card h3 {
-  font-size: 25px;
-  line-height: 1.5;
-  letter-spacing: -0.5px;
+  font-size: 19px;
+  font-weight: 500;
+  line-height: 1.75;
+  letter-spacing: -0.2px;
   max-width: 860px;
   margin: 20px 0 10px;
 }
@@ -459,13 +461,6 @@
   border: 1px solid var(--color-border);
   border-radius: 10px;
   background: var(--color-surface);
-}
-.mission-contribution-name {
-  font-size: var(--text-lg);
-  line-height: 1.6;
-  margin: 0 0 20px;
-  font-weight: 550;
-  color: var(--color-accent-700);
 }
 .mission-contribution-reason {
   display: grid;
@@ -1686,7 +1681,7 @@
     padding: 22px 20px 17px;
   }
   .mission-project-card h3 {
-    font-size: 23px;
+    font-size: 18px;
   }
   .mission-project-meta {
     flex-wrap: wrap;
@@ -1737,7 +1732,7 @@
     font-size: 17px;
   }
   .mission-project-card h3 {
-    font-size: 21px;
+    font-size: 17px;
   }
   .mission-before-after {
     grid-template-columns: 1fr;
@@ -2108,8 +2103,10 @@
 }
 
 /* The lead's premise check inside the contribution brief. */
-.mission-contribution .premise-notice {
-  margin: -8px 0 18px;
+/* Right below the heading, now that the brief no longer repeats the title. */
+.mission-contribution .premise-notice,
+.mission-premise-missing {
+  margin: 0 0 18px;
 }
 .mission-premise-tag {
   margin-left: var(--space-2);
@@ -2122,7 +2119,6 @@
   font-weight: 500;
   white-space: nowrap;
 }
-.mission-premise-missing,
 .mission-premise-recheck {
   margin: -8px 0 18px;
 }

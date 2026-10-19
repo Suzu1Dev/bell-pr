@@ -359,7 +359,6 @@ function Brief({
           <Target size={20} />
         </span>
       </div>
-      <h3 className="mission-contribution-name">{run.title}</h3>
       <PremiseNotice premise={premise} />
       {premise && checkButton && (
         <div className="mission-premise-recheck">
@@ -733,15 +732,17 @@ export function ProjectOverview({
         : (insights?.recommendations.length ?? 0) >= maxProjectRecommendations
           ? t.ideas.moreLimit({ max: maxProjectRecommendations })
           : t.ideas.moreHint;
-  // Without a run (a project just imported), where to help comes right
-  // after the project card; a run's overview keeps it after the brief.
+  // A run's overview leads with its brief, the project as its background,
+  // and keeps where else to help last. Without a run (a project just
+  // imported), where to help comes right after the project card.
   const sections: OverviewSection[] = insights
     ? [
+        ...(run ? (["contribution"] as const) : []),
         "purpose",
         ...(run ? [] : (["directions"] as const)),
         ...(insights.userJourney.length ? (["journey"] as const) : []),
         ...(insights.readingPath?.length ? (["reading"] as const) : []),
-        ...(run ? (["contribution", "directions"] as const) : []),
+        ...(run ? (["directions"] as const) : []),
       ]
     : [];
   // The reading path opens on its first steps; "Show all" lists the rest
@@ -933,6 +934,15 @@ export function ProjectOverview({
   );
   return (
     <div className="mission-overview">
+      {/* This contribution first; the project's analysis is its background. */}
+      {run && (
+        <Brief
+          run={run}
+          brief={brief}
+          onCheckPremise={onCheckPremise}
+          checkingPremise={checkingPremise}
+        />
+      )}
       <div className="mission-overview-heading">
         <div>
           <span className="mission-kicker">
@@ -1183,15 +1193,6 @@ export function ProjectOverview({
 
           {run && projectContext}
         </>
-      )}
-
-      {run && (
-        <Brief
-          run={run}
-          brief={brief}
-          onCheckPremise={onCheckPremise}
-          checkingPremise={checkingPremise}
-        />
       )}
 
       {insights && (
