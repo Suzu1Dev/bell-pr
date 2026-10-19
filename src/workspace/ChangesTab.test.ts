@@ -149,7 +149,8 @@ test("the diff toolbar is one labelled tab stop", () => {
   const toolbar = (props: Partial<Props> = {}) => {
     const html = renderEn(element(props));
     const start = html.indexOf('role="toolbar"');
-    const markup = html.slice(start, html.indexOf('<div class="worktree-hint', start));
+    // Up to the diff: the premise and worktree row sits above the review grid.
+    const markup = html.slice(start, html.indexOf('class="rv-diff', start));
     return {
       html,
       stops: [...markup.matchAll(/<button[^>]*tabindex="(-?\d)"/g)].map((match) => match[1]),

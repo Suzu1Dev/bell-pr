@@ -398,7 +398,8 @@
   .is-focused .workspace-heading,
   .is-focused .file-panel,
   .is-focused .explanation-wrap,
-  .is-focused .pane-resizer {
+  .is-focused .pane-resizer,
+  .is-focused .diff-context-bar {
     display: none;
   }
   .is-focused .main-shell {

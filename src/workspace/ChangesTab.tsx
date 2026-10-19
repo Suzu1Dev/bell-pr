@@ -295,6 +295,23 @@ export function ChangesTab({
       (!onlyUnreviewed || !run.reviewedFiles.includes(f.path)),
   );
   return (
+    <>
+    {/* The lead's premise check, folded (the diff is read file after file),
+        and the worktree share one row above the code. It comes before the
+        file list, so the way from the files to the explanation stays short. */}
+    {(run.team?.premise || showWorktree) && (
+      <div className="diff-context-bar">
+        <PremiseNotice premise={run.team?.premise} compact />
+        {showWorktree && (
+          <WorktreeHint
+            path={run.worktreePath!}
+            presenting={present}
+            maskPath={maskPath}
+            onCopy={copyWorktreePath}
+          />
+        )}
+      </div>
+    )}
     <div
       ref={reviewGridRef}
       className={`review-grid ${!showFiles ? "files-hidden" : ""} ${!showExplanation ? "explanation-hidden" : ""}`}
@@ -551,21 +568,6 @@ export function ChangesTab({
             </div>
           </div>
         </div>
-        {/* The lead's premise check, folded (the diff is read file after
-            file), and the worktree share one row above the diff. */}
-        {(run.team?.premise || showWorktree) && (
-          <div className="diff-context-bar">
-            <PremiseNotice premise={run.team?.premise} compact />
-            {showWorktree && (
-              <WorktreeHint
-                path={run.worktreePath!}
-                presenting={present}
-                maskPath={maskPath}
-                onCopy={copyWorktreePath}
-              />
-            )}
-          </div>
-        )}
         {file ? (
           <DiffView
             key={`${run.id}:${file.path}:${run.baseSha ?? ""}`}
@@ -768,6 +770,7 @@ export function ChangesTab({
         </>
       )}
     </div>
+    </>
   );
 }
 
@@ -787,7 +790,7 @@ export function WorktreeHint({
   onCopy: () => void;
 }) {
   const t = useT("workspace").changes;
-  // One line that keeps the end of the path; the editing hint is its tooltip.
+  // The editing hint is the tooltip; screen readers read it with the path.
   return (
     <div className="worktree-hint" title={t.worktreeHint}>
       <FolderGit2 size={14} aria-hidden="true" />
