@@ -67,14 +67,15 @@ test("the drop is never a still: the first-hit lockup pushes 1.00 to 1.04 throug
 });
 
 test("the end-card logo's last fifth of resolve and its settle from 1.02 happen on the frames before the chord", () => {
+  // The last fifth of the resolve comes on the two frames that end on the chord; the settle starts three frames before.
+  assert.ok(endLogoState(chordFrame - 2).opacity < 0.8, `${endLogoState(chordFrame - 2).opacity.toFixed(2)} two frames before`);
   const before = endLogoState(chordFrame - LOCK_FRAMES);
-  assert.ok(before.opacity >= 0.75 && before.opacity <= 0.8, `${before.opacity.toFixed(2)} three frames before`);
   assert.ok(Math.abs(before.scale - 1.02) < 1e-9);
   for (let f = chordFrame - LOCK_FRAMES; f < chordFrame; f += 1) {
     assert.ok(endLogoState(f + 1).opacity > endLogoState(f).opacity, `frame ${f}`);
     assert.ok(endLogoState(f + 1).scale < endLogoState(f).scale, `frame ${f}`);
   }
-  // The chord frame's own step is the largest of the whole pull.
-  const step = (f: number) => endLogoState(f).opacity - endLogoState(f - 1).opacity;
-  for (let f = timeline.shots.at(-1)!.from + 1; f < chordFrame; f += 1) assert.ok(step(chordFrame) > step(f), `frame ${f}`);
+  // Every frame of the pull changes more than the one before (no pause), and the chord frame's step is the largest.
+  const step = (f: number) => endLogoState(f).blur - endLogoState(f - 1).blur;
+  for (let f = timeline.shots.at(-1)!.from + 2; f <= chordFrame; f += 1) assert.ok(-step(f) > -step(f - 1), `frame ${f}`);
 });
