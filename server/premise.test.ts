@@ -101,6 +101,16 @@ test("a finished run without a premise check gets one from the code and its repo
     const same = await workbench.checkPremise(run.id);
     assert.deepEqual(same.premise, premise);
     assert.equal(run.explanations!["id.ts"].status, "ready");
+    // The same verdict in other words is not a change: the new wording is
+    // kept, and so are the explanations and walkthroughs.
+    run.walkthroughs = { "id.ts": { fingerprint, status: "ready", content: { functions: [] } } };
+    const reworded = { ...premise, statement: "呼叫端會交出自己產生的 id。", evidence: "見 id.ts 第 2 行：直接回傳傳入值。" };
+    answer = JSON.stringify({ premise: reworded });
+    const rewordedCheck = await workbench.checkPremise(run.id);
+    assert.deepEqual(run.team!.premise, reworded);
+    assert.equal(rewordedCheck.files[0].explanationStatus, "ready");
+    assert.equal(rewordedCheck.files[0].walkthroughStatus, "ready");
+    assert.match(run.logs.at(-1)!.message, /結論沒有改變/);
     // A changed verdict replaces the old one and has them made again.
     const unclear = { ...premise, verdict: "unclear" };
     answer = JSON.stringify({ premise: unclear });

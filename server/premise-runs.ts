@@ -112,8 +112,10 @@ export async function checkPremise(ctx: WorkbenchContext, id: string) {
       return premiseCheck((value as { premise?: unknown } | null)?.premise);
     });
     return await ctx.lock(id, async () => {
+      // Only the verdict counts: an agent rarely words its evidence the same
+      // way twice, and the new wording is stored either way.
       const changed =
-        JSON.stringify(premise ?? null) !== JSON.stringify(team.premise ?? null);
+        (premise?.verdict ?? null) !== (team.premise?.verdict ?? null);
       if (premise) team.premise = premise;
       else delete team.premise;
       if (changed) {
