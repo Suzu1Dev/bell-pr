@@ -34,6 +34,7 @@ starting the trial sends nothing anywhere.
 | Diff review, explanations, try-first questions, follow-up chat, notes, suggested review order | Free | No limit |
 | Explain it back before approval | Free | On by default; you can turn it off in Settings → Learning, and runs approved without it are marked |
 | Re-run Reviewer and Test analyst | Free | No limit (part of the human review safety gate) |
+| Code walkthroughs, the unchanged code around each change, the premise check, commit history, setup guidance | Free | No limit |
 | Rule-aware PR draft, preflight checks, publishing a Draft PR | Free | Human approval is required on every plan |
 | Project-rule, issue, reviewability and pacing checks | Free | On every plan; no plan can skip them |
 | Syncing a run onto the latest target branch, agent conflict resolution, updating a project's local clone | Free | No limit (unpublished runs and published PRs) |

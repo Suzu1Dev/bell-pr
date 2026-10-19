@@ -49,6 +49,10 @@ const plans: Translation<typeof en> = {
       label: "重新執行 Reviewer 與 Test analyst",
       limit: "不限（屬於人工審查的安全關卡）",
     },
+    reading: {
+      label: "程式碼解說、變更周圍未修改的程式碼、前提查核、Commit 歷程與環境設定指引",
+      limit: "不限",
+    },
     publish: {
       label: "依專案規範撰寫 PR 草稿、送出前檢查、發布 Draft PR",
       limit: "所有方案都必須經過人工核准",

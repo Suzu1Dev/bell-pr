@@ -78,8 +78,8 @@ test("re-running the review is Free and Pro-only efforts are real efforts", () =
   for (const effort of proOnlyEfforts) assert.ok(reasoningEfforts.includes(effort));
 });
 
-test("the plan table has the 25 rows in order, and every Pro feature gates one row", () => {
-  assert.equal(planFeatureIds.length, 25);
+test("the plan table has the 26 rows in order, and every Pro feature gates one row", () => {
+  assert.equal(planFeatureIds.length, 26);
   assert.deepEqual(planFeatureTable.map((row) => row.id), [...planFeatureIds]);
   for (const feature of proFeatures) {
     const rows = planFeatureTable.filter((row) => row.feature === feature);
@@ -94,6 +94,10 @@ test("the plan table has the 25 rows in order, and every Pro feature gates one r
   assert.equal(tier("licenseTerm"), "pro");
   // Syncing, conflict resolution and updating the clone are Free (README §10 row 20).
   assert.equal(tier("sync"), "free");
+  // Walkthroughs, expanded context, the premise check, commit history and
+  // setup guidance are learning and integrity features (AGENTS rule 11).
+  assert.equal(tier("reading"), "free");
+  assert.equal(planFeatureIds.indexOf("reading"), planFeatureIds.indexOf("reviewRerun") + 1);
   assert.equal(planFeatureIds.indexOf("sync"), planFeatureIds.indexOf("respectChecks") + 1);
 });
 

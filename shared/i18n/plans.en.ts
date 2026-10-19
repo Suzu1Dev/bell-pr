@@ -54,6 +54,11 @@ const plans = {
       label: "Re-run Reviewer and Test analyst",
       limit: "No limit (part of the human review safety gate)",
     },
+    reading: {
+      label:
+        "Code walkthroughs, the unchanged code around each change, the premise check, commit history, setup guidance",
+      limit: "No limit",
+    },
     publish: {
       label: "Rule-aware PR draft, preflight checks, publishing a Draft PR",
       limit: "Human approval is required on every plan",
