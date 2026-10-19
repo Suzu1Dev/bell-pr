@@ -238,7 +238,6 @@
     gap: 0;
   }
   .is-sidebar-collapsed .brand > span:not(.brand-symbol),
-  .is-sidebar-collapsed .workspace-switch,
   .is-sidebar-collapsed .nav-label,
   .is-sidebar-collapsed .recent-list,
   .is-sidebar-collapsed .profile {
