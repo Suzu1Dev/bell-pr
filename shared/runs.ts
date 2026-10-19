@@ -1,7 +1,7 @@
 /**
  * Fields GET /api/runs leaves out. They are large (logs, reports, PR draft
  * preparation, file Q&A, PR feedback, review follow-up rounds, target-branch
- * syncs, file explanations, the person's notes, the understanding check,
+ * syncs, file explanations, function walkthroughs, the person's notes, the understanding check,
  * try-first attempts, feedback tags, practice schedules, GitHub facts,
  * overrides and test reasons) and only the open run reads them; the lists
  * only need id, title, repo, branch and status (and the "Check off" mark,
@@ -17,6 +17,7 @@ export const runDetailFields = [
   "followUps",
   "sync",
   "explanations",
+  "walkthroughs",
   "notes",
   "understanding",
   "attempts",

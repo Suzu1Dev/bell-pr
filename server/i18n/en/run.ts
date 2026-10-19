@@ -303,6 +303,25 @@ export default {
     stale: "The file's changes were updated; refresh the changes.",
     baseMoved: "The run's base was updated; refresh the changes.",
     wholeFile: "Added and deleted files are already shown whole.",
+    unreadable: "The file cannot be read or is larger than 512 KB.",
+  },
+  /** Function walkthroughs: the code around each change, step by step. */
+  walkthrough: {
+    wholeFile:
+      "An added or deleted file has no earlier logic to walk through; see the explanation.",
+    noFunctions: "This kind of file has no functions to walk through.",
+    tooLarge:
+      "The changes are larger than 100 KB, so no code walkthrough is made automatically.",
+    overLimit: ({ limit }: { limit: number }) =>
+      `This change touches more than ${limit} code files, and code walkthroughs are made automatically for the first ${limit} only; ask about the others in "Ask the agent".`,
+    incomplete: "The agent's code walkthrough was incomplete.",
+    tooEarly: "Wait for development to finish before generating code walkthroughs.",
+    stopped: "The code walkthrough stopped; you can retry it.",
+    failed: "Generating the code walkthrough failed; try again.",
+    notFinished: ({ path, reason }: { path: string; reason: string }) =>
+      `The code walkthrough of ${path} did not finish: ${reason}`,
+    /** A unit the agent left unnamed, by its first line. */
+    lineName: ({ line }: { line: number }) => `Line ${line}`,
   },
   /** Taking a teammate's finished task into the run's worktree. */
   integration: {
@@ -583,6 +602,8 @@ export default {
       "The service restarted, so the PR draft suggestion stopped; your current draft is kept, and you can generate the suggestion again.",
     explanation:
       "The service restarted, so generating the explanation stopped; you can retry it.",
+    walkthrough:
+      "The service restarted, so the code walkthrough stopped; you can retry it.",
     /** An agent card's detail, without a final period. */
     review:
       "The service restarted, so the review rerun stopped; the earlier reports are kept",

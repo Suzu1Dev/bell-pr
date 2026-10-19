@@ -281,6 +281,7 @@ export const runReadSchema = loose({
     explanations: z
       .record(loose({ fingerprint: text, status: text }))
       .optional(),
+    walkthroughs: later(z.record(loose({ fingerprint: text, status: text }))),
     draftPreparation: loose({ status: text, fingerprint: text }).optional(),
     conversations: z.record(loose({})).optional(),
     team: loose({
@@ -462,6 +463,12 @@ export class Store {
         if (explanation.status === "generating") {
           explanation.status = "failed";
           explanation.error = recovery.explanation;
+        }
+      }
+      for (const walkthrough of Object.values(run.walkthroughs ?? {})) {
+        if (walkthrough.status === "generating") {
+          walkthrough.status = "failed";
+          walkthrough.error = recovery.walkthrough;
         }
       }
       // A re-review interrupted by a crash leaves reviewer/tester agents "running" on a finished run.

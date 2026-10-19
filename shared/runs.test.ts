@@ -124,6 +124,7 @@ test("every detail field is left out", () => {
       "reviewability",
       "sync",
       "understanding",
+      "walkthroughs",
     ],
   );
 });

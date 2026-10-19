@@ -176,6 +176,20 @@ const m: Translation<typeof en> = {
     stale: "檔案差異已更新，請重新整理差異。",
     baseMoved: "工作的基準已更新，請重新整理差異。",
     wholeFile: "新增或刪除的檔案已經完整顯示。",
+    unreadable: "檔案無法讀取或超過 512 KB。",
+  },
+  walkthrough: {
+    wholeFile: "新增或刪除的檔案沒有原本的邏輯可以拆解；請看「變更解說」。",
+    noFunctions: "這類檔案沒有函式可以拆解。",
+    tooLarge: "差異超過 100 KB，不自動產生程式碼解說。",
+    overLimit: ({ limit }) =>
+      `這次修改超過 ${limit} 個程式檔，只為前 ${limit} 個自動產生程式碼解說；其他檔案可以在「追問 Agent」詢問。`,
+    incomplete: "Agent 回傳的程式碼解說格式不完整",
+    tooEarly: "請等待開發完成後再產生程式碼解說。",
+    stopped: "程式碼解說已中斷，可以重試。",
+    failed: "程式碼解說產生失敗，請重試。",
+    notFinished: ({ path, reason }) => `${path} 的程式碼解說未完成：${reason}`,
+    lineName: ({ line }) => `第 ${line} 行`,
   },
   integration: {
     snapshotBlocked: "整合快照含有無法審閱的檔案，已停止派工。",
@@ -342,6 +356,7 @@ const m: Translation<typeof en> = {
       `無法讀取 ${path}：${reason}。請檢查檔案是否為有效 JSON（version 1）。`,
     draft: "服務重新啟動，PR 草稿建議已中斷；現有草稿保留，可重新產生。",
     explanation: "服務重新啟動，解說產生已中斷；可重試產生解說。",
+    walkthrough: "服務重新啟動，程式碼解說已中斷；可重試。",
     review: "服務重新啟動，重新審查已中斷；原有報告保留",
     conflicts:
       "服務重新啟動，解衝突已中斷；已改的檔案保留，可以自行完成，或再請 Agent 處理。",

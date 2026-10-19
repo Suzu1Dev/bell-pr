@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { lstat, realpath } from "node:fs/promises";
+import { lstat, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { assertGitConfigSafe, git } from "./process.js";
 import { redact, secretInPatch } from "./secrets.js";
@@ -256,6 +256,22 @@ export async function baseFileLines(
   const lines = content.split("\n").map(redact);
   if (lines.at(-1) === "") lines.pop();
   return lines;
+}
+
+/** How many lines a file of the checkout has, read with the same checks as a new file. */
+export async function checkoutLineCount(
+  run: Pick<Run, "worktreePath">,
+  filePath: string,
+) {
+  const fullPath = path.join(run.worktreePath, filePath);
+  const metadata = await lstat(fullPath);
+  if (!metadata.isFile() || metadata.size > contextFileLimit)
+    throw new AppError((m) => m.run.context.unreadable, 422);
+  const resolved = await realpath(fullPath);
+  if (!resolved.startsWith((await realpath(run.worktreePath)) + path.sep))
+    throw new AppError((m) => m.run.diff.outsideWorktree, 422);
+  const lines = (await readFile(resolved, "utf8")).split("\n");
+  return lines.at(-1) === "" ? lines.length - 1 : lines.length;
 }
 
 export async function readDiff(

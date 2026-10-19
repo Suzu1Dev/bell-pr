@@ -886,6 +886,35 @@ function runWithUpstreamFields(): Run {
   run.followUps![0].setup = [
     { need: "rustfmt", command: "rustup component add rustfmt", reason: "cargo fmt --check needs it." },
   ];
+  run.walkthroughs = {
+    "hello.ts": {
+      fingerprint: "e".repeat(64),
+      status: "ready",
+      generatedAt: "2026-10-15T00:06:00.000Z",
+      content: {
+        functions: [
+          {
+            name: "greeting",
+            kind: "function",
+            startLine: 1,
+            endLine: 3,
+            summary: "Returns the greeting for a name.",
+            change: "The empty name now falls back to world.",
+            steps: [
+              { startLine: 1, endLine: 1, explanation: "Takes the name." },
+              { startLine: 2, endLine: 3, explanation: "Builds the text." },
+            ],
+            callers: [{ name: "main", path: "src/main.ts", line: 4, note: "Prints it." }],
+            callees: [],
+            analogy: "Like a receptionist who greets everyone.",
+            selfCheck: { question: "What does an empty name print?", answer: "Hello, world." },
+          },
+        ],
+        newUnits: ["greetingTest"],
+      },
+    },
+    "notes.md": { fingerprint: "f".repeat(64), status: "unavailable", error: "This kind of file has no functions to walk through." },
+  };
   return run;
 }
 
@@ -910,6 +939,7 @@ function withoutElementField(
 }
 
 const upstreamRunSchemas = {
+  walkthroughs: runReadSchema.omit({ walkthroughs: true }),
   "team.tasks[].setup": withoutElementField("team.tasks", "setup"),
   "followUps[].setup": withoutElementField("followUps", "setup"),
 };
@@ -945,4 +975,19 @@ test("runs with every field of the upstream port load and save unchanged, and a 
   assert.equal(reopened.recovery, undefined);
   assert.equal(reopened.data.runs[0].team!.tasks[0].setup, undefined);
   assert.equal(reopened.data.runs[0].followUps![0].setup?.length, 1);
+  // The run list leaves the walkthroughs to the open run.
+  assert.equal("walkthroughs" in summarizeRun(runWithUpstreamFields()), false);
+});
+
+test("a walkthrough a restart interrupted is failed in the run's language, and can be retried", async (t) => {
+  const run = runWithUpstreamFields();
+  run.walkthroughs!["hello.ts"] = { fingerprint: "e".repeat(64), status: "generating" };
+  const { directory, cleanup } = await stateWith([run]);
+  t.after(cleanup);
+  const store = new Store(directory);
+  await store.initialize();
+  const loaded = store.data.runs[0].walkthroughs!["hello.ts"];
+  assert.equal(loaded.status, "failed");
+  // runWithV11Fields is an English run.
+  assert.match(loaded.error!, /^The service restarted, so the code walkthrough stopped/);
 });
