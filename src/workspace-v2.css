@@ -18,6 +18,8 @@
 }
 .review-toolbar {
   height: 58px;
+  /* The totals never touch the last tab, even when the row scrolls. */
+  column-gap: var(--space-6);
 }
 .explore-page {
   padding-top: 30px;
@@ -512,6 +514,13 @@
   }
   .is-focused .diff-topbar > span {
     display: flex;
+  }
+}
+/* The review-mode label goes first, before the totals crowd the five tabs. */
+@media (min-width: 761px) and (max-width: 1180px) {
+  .review-totals > svg,
+  .review-totals > span:last-child {
+    display: none;
   }
 }
 @media (max-width: 760px) {

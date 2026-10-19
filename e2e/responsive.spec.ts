@@ -293,6 +293,38 @@ test.describe("every page", () => {
           );
         });
 
+  // The run's five tabs and the +/− totals beside them never touch, and the
+  // review-mode label shows only where the row has room for it.
+  for (const locale of locales)
+    test(`the run's tabs keep clear of the totals in ${locale}`, async ({ browser }) => {
+      for (const width of [900, 1024, 1100, 1181, 1280, 1440]) {
+        const context = await browser.newContext({
+          baseURL: server!.baseURL,
+          storageState: server!.storageState,
+          viewport: { width, height: 800 },
+        });
+        try {
+          const page = await context.newPage();
+          await page.goto(`/#/runs/demo-run/changes?present=1&capture=1&locale=${locale}`);
+          await settled(page, locale);
+          const row = await page.evaluate(() => {
+            const bar = document.querySelector(".review-toolbar")!;
+            const tab = [...document.querySelectorAll(".review-tabs > button")].at(-1)!;
+            const totals = document.querySelector(".review-totals")!;
+            return {
+              gap: totals.getBoundingClientRect().left - tab.getBoundingClientRect().right,
+              cut: bar.scrollWidth - bar.clientWidth,
+              label: getComputedStyle(totals.lastElementChild!).display !== "none",
+            };
+          });
+          expect(row.gap, `${locale} at ${width} px`).toBeGreaterThanOrEqual(16);
+          if (row.label) expect(row.cut, `${locale} at ${width} px`).toBe(0);
+        } finally {
+          await context.close();
+        }
+      }
+    });
+
   for (const locale of locales)
     for (const route of runRoutes)
       for (const viewport of railViewports)
