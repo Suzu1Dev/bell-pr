@@ -144,6 +144,65 @@ npx ./bell-pr-1.0.0-rc.1.tgz start --no-open --port 4400 --data-dir /tmp/bellpr-
 tests, pack, checks, checksums, release notes, `npm publish --dry-run` and
 a Docker build) and publishes nothing.
 
+## Size limits
+
+Two files have a line cap, and `node scripts/check-pack.mjs` (run it after
+`npm run build`) holds the web bundle to gzip budgets. Do not raise a
+budget; make room instead.
+
+| What | Limit |
+| --- | --- |
+| `server/workbench.ts` | 700 lines |
+| `server/run-executor.ts` | 900 lines |
+| Largest JS chunk (the startup chunk) | 116 kB gzip |
+| All JS | 460 kB gzip |
+| All CSS | 45 kB gzip |
+
+How the code stays within them:
+
+- `server/workbench.ts` is a façade: its methods keep the routes' and the
+  CLI's API (`server/workbench-api.test.ts` lists them) and hand the work
+  to modules that receive a `WorkbenchContext`
+  (`server/workbench-context.ts`), such as `run-queue.ts`, `new-run.ts`,
+  `team-plan.ts`, `run-executor.ts`, `sync-runs.ts`, `followup-runs.ts`
+  and `learning.ts`. New server work goes into such a module.
+- Views most visits do not open load on demand: `React.lazy` inside an
+  `ErrorBoundary` and a `Suspense` whose fallback adds nothing, at a place
+  where nothing below them moves when they arrive.
+- English copy for the startup chunk is bundled (`src/i18n/en/core.ts`);
+  the namespaces only lazily loaded views read (`src/i18n/en/deferred.ts`)
+  load with the first of those views. Load such a view with
+  `lazy(() => withMessages(import("./View")))`, so its code and its copy
+  arrive together; `src/i18n/deferred.test.ts` fails otherwise. zh-TW,
+  its dictionary and the sample project's zh-TW text, is one file
+  (`src/locales/zh-TW.ts`) that loads only when zh-TW shows.
+- `vite.config.ts` gives React, the icons, the sample project's shared
+  data and the Markdown stack (loaded on demand) chunks of their own, and
+  builds for the browsers the stylesheets already require.
+- The CSS ships as one file: split per lazy view, each small file was
+  compressed on its own and cost more than the whole. To find style rules
+  nothing uses, run `node scripts/unused-css.mjs`; with the classes an e2e
+  run rendered (see the script for the `scripts/css-usage-hook.mjs`
+  capture), it also lists the rules that never matched. Review each rule
+  before you delete it.
+
+The engineering-health pass (wave N1A) took these from where wave U2 left
+them:
+
+| Figure | Before | After |
+| --- | --- | --- |
+| `server/workbench.ts` | 1,028 lines | 660 lines |
+| `server/run-executor.ts` | 838 lines | 838 lines |
+| Packed size | 1.18 MB | 1.17 MB |
+| Unpacked size | 3.92 MB | 3.89 MB |
+| Entries | 97 | 83 |
+| `.woff` / `.woff2` files | 0 / 8 | 0 / 8 |
+| Largest JS chunk (startup) | 112.1 kB | 94.3 kB |
+| All JS | 458.3 kB in 50 files | 442.4 kB in 42 files |
+| All CSS | 45.0 kB in 7 files | 41.4 kB in 1 file |
+| JS a first visit loads (English) | 229.4 kB in 3 files | 203.9 kB in 4 files |
+| CSS a first visit loads | 32.9 kB | 41.4 kB |
+
 ## Test and tool variables
 
 These variables are for BELL PR's own tests and tools, not for using the
@@ -156,6 +215,7 @@ product.
 | `BELLPR_E2E_BASE_URL`, `BELLPR_E2E_STORAGE_STATE`, `BELLPR_E2E_DATA_DIR` | the e2e harness | Set by the harness for the tests; do not set them yourself |
 | `BELLPR_SCREENSHOTS` | `e2e/screenshots.spec.ts` | `docs` writes the screenshot set for `docs/images/` |
 | `BELLPR_CANARY_TMPDIR` | `scripts/agent-sandbox-canary.mjs` | Temporary folder of the sandbox canary |
+| `CSS_USAGE_DIR` | `scripts/css-usage-hook.mjs` | Folder the hook writes the class names an e2e run rendered to |
 | `BELLPR_TEST_ENV_FILE_LOADED` | `server/cli.test.ts` | Marks that `--env-file` was loaded |
 | `PLAYWRIGHT_CHROMIUM_EXECUTABLE` | Playwright configs, site checks, brand assets | Use an installed Chromium build |
 
