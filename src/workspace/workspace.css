@@ -166,6 +166,12 @@
   color: var(--color-text-muted);
 }
 
+/* Before publishing, the guide and the sync panel follow the editor and
+   can close the tab: keep the last one off the card's edge. */
+.draft-workspace > :last-child:not(.draft-layout, .pr-feedback) {
+  margin-bottom: var(--space-6);
+}
+
 /* The sample's "published" Draft PR at the top of the draft tab. */
 .draft-workspace .sample-published {
   display: flex;
