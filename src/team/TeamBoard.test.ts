@@ -589,7 +589,7 @@ test("the model and usage cards fold into Run details, whose summary names what 
     },
   });
   // Folded even with data, so the board stays in the first screen.
-  assert.match(recorded, /<details class="team-run-details"><summary><strong>Run details<\/strong><span>Claude Code · claude-opus-4-1 · 9 AI calls<\/span>/);
+  assert.match(recorded, /<details class="team-run-details"><summary><strong>Run details<\/strong><span>Claude Code · claude-opus-4-1 · 9 AI calls · 10 input · 1 output tokens<\/span>/);
   assert.match(
     english({ ...englishRun, modelExecution: { source: "cli-default" }, efficiency: undefined }),
     /<span>Codex<\/span>/,
@@ -670,3 +670,61 @@ test("the lead's premise check shows under the plan, in each language", () => {
   assert.doesNotMatch(render({ ...demoRun, team: { ...demoTeam, premise: undefined } }), /premise-notice/);
 });
 
+
+test("the folded Run details name the tokens, and a long plan opens to its first lines unless it awaits approval", () => {
+  const plan = Array.from({ length: 12 }, (_, index) => `【第 ${index + 1} 段】說明`).join("\n");
+  const efficiency = {
+    policyVersion: "1",
+    mode: "lite" as const,
+    calls: 3,
+    completedCalls: 3,
+    failedCalls: 0,
+    measuredCalls: 2,
+    durationMs: 1000,
+    inputTokens: 5349122,
+    cachedInputTokens: 0,
+    outputTokens: 197068,
+  };
+  const run: Run = {
+    ...demoRun,
+    modelExecution: { provider: "claude", model: "opus", source: "selected", reported: { model: "claude-opus-5-5" } },
+    efficiency,
+    team: { ...demoTeam, planSummary: plan },
+  };
+  const html = render(run, false);
+  assert.match(
+    html,
+    /<details class="team-run-details"><summary><strong>執行細節<\/strong><span>Claude Code · claude-opus-5-5 · 3 次 AI 呼叫 · 輸入 5,349,122 · 輸出 197,068 tokens（部分回報）<\/span>/,
+  );
+  // The cards themselves stay inside, unchanged.
+  assert.match(html, /team-run-details.*class="model-summary".*class="efficiency-summary/s);
+  assert.match(html, /<p class="team-plan-folded">【第 1 段】/);
+  assert.match(html, /aria-expanded="false">顯示完整計畫/);
+  // Unreported usage is unknown, not zero.
+  assert.match(
+    render({ ...run, efficiency: { ...efficiency, measuredCalls: 0 } }, false),
+    /<span>Claude Code · claude-opus-5-5 · 3 次 AI 呼叫 · 用量未回報<\/span>/,
+  );
+  const awaiting = render({ ...run, team: { ...demoTeam, phase: "awaiting_approval", planSummary: plan } }, false);
+  assert.doesNotMatch(awaiting, /team-plan-folded|顯示完整計畫/);
+  assert.doesNotMatch(render({ ...run, team: { ...demoTeam, planSummary: "短計畫" } }, false), /顯示完整計畫/);
+  // So does a long task description in its narrow lane; short ones stay as they are.
+  const [first, second] = demoTeam.tasks;
+  const tasks = render({ ...run, team: { ...demoTeam, tasks: [{ ...first, description: "範圍說明。".repeat(60) }, second] } }, false);
+  assert.equal(tasks.match(/class="team-task-folded"/g)?.length, 1);
+  assert.equal(tasks.match(/顯示完整說明/g)?.length, 1);
+
+  const english = renderEn(
+    board(
+      {
+        ...run,
+        efficiency: { ...efficiency, measuredCalls: 3 },
+        team: { ...englishTeam, planSummary: Array.from({ length: 9 }, (_, index) => `Step ${index + 1}.`).join("\n") },
+      },
+      false,
+    ),
+  );
+  assert.match(english, /<span>Claude Code · claude-opus-5-5 · 3 AI calls · 5,349,122 input · 197,068 output tokens<\/span>/);
+  assert.match(english, /aria-expanded="false">Show the whole plan<\/button>/);
+  assertNoHan(english);
+});

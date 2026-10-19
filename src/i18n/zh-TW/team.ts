@@ -47,6 +47,8 @@ const m: Translation<typeof en> = {
     replanning: "Lead 正依你的意見重新規劃。",
     none: "Lead 完成計畫前，團隊就已停止。",
     reading: "正在閱讀專案並建立有明確範圍與相依關係的計畫。",
+    showAll: "顯示完整計畫",
+    showLess: "收起計畫",
   },
   revisions: {
     label: "計畫重擬紀錄",
@@ -99,6 +101,8 @@ const m: Translation<typeof en> = {
     filesPending: "規劃中",
     dependsOn: ({ tasks }) => `先完成 ${tasks}`,
     integrated: ({ files }) => `已整合：${files}`,
+    showAll: "顯示完整說明",
+    showLess: "收起說明",
     showError: "查看失敗原因",
     showReport: "查看工作報告",
     checks: ({ count }) =>
@@ -136,6 +140,9 @@ const m: Translation<typeof en> = {
     title: "執行細節",
     hint: "模型、推理強度與 AI 用量",
     calls: ({ count }) => `${count} 次 AI 呼叫`,
+    tokens: ({ input, output, partial }) =>
+      `輸入 ${input} · 輸出 ${output} tokens${partial ? "（部分回報）" : ""}`,
+    unreported: "用量未回報",
   },
   premise: {
     label: "前提查核",

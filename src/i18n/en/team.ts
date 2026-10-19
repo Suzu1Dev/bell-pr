@@ -73,6 +73,9 @@ const team = {
     none: "The team stopped before the lead finished a plan.",
     reading:
       "Reading the project and building a plan with clear scopes and dependencies.",
+    /** The toggle of a long plan, folded to its first lines. */
+    showAll: "Show the whole plan",
+    showLess: "Show less of the plan",
   },
   revisions: {
     label: "Plan revision history",
@@ -135,6 +138,9 @@ const team = {
     filesPending: "Being planned",
     dependsOn: ({ tasks }: { tasks: string }) => `Waits for ${tasks}`,
     integrated: ({ files }: { files: string }) => `Integrated: ${files}`,
+    /** The toggle of a long task description, folded to its first lines. */
+    showAll: "Show the whole description",
+    showLess: "Show less of the description",
     showError: "View the failure reason",
     showReport: "View the work report",
     checks: ({ count }: { count: number }) =>
@@ -181,6 +187,10 @@ const team = {
     hint: "Model, reasoning effort and AI usage",
     calls: ({ count }: { count: number }) =>
       count === 1 ? "1 AI call" : `${count} AI calls`,
+    tokens: ({ input, output, partial }: { input: string; output: string; partial: boolean }) =>
+      `${input} input · ${output} output tokens${partial ? " (partly reported)" : ""}`,
+    /** Calls ran but none reported usage: unknown, not zero. */
+    unreported: "usage not reported",
   },
   /** The lead's check of the request's assumption, made by reading the code. */
   premise: {

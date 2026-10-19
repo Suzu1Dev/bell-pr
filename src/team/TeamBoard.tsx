@@ -92,6 +92,11 @@ export function TeamBoard({
   const [retryError, setRetryError] = useState("");
   // Explicit toggles win; otherwise a failed task shows its reason right away.
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
+  // A long plan and long task descriptions open to their first lines.
+  const [planOpen, setPlanOpen] = useState(false);
+  const [openDescriptions, setOpenDescriptions] = useState<
+    Record<string, boolean>
+  >({});
   const isExpanded = (task: TeamTask) =>
     toggled[task.id] ?? (task.status === "failed" && !!task.error);
   const team = run.team;
@@ -148,7 +153,8 @@ export function TeamBoard({
   // Folded so the board stays in the first screen; the summary line names
   // what the run recorded.
   const execution = demo ? undefined : run.modelExecution;
-  const calls = demo ? 0 : (run.efficiency?.calls ?? 0);
+  const usage = demo ? undefined : run.efficiency;
+  const calls = usage?.calls ?? 0;
   const detailFacts = [
     execution &&
       [
@@ -158,7 +164,21 @@ export function TeamBoard({
         .filter(Boolean)
         .join(" · "),
     calls > 0 && t.runDetails.calls({ count: calls }),
+    // Missing usage is unknown, not zero; partial reports say so.
+    usage?.measuredCalls
+      ? t.runDetails.tokens({
+          input: fmt.number(usage.inputTokens),
+          output: fmt.number(usage.outputTokens),
+          partial: usage.measuredCalls < usage.calls,
+        })
+      : calls > 0 && t.runDetails.unreported,
   ].filter(Boolean);
+  // A long plan opens to its first lines, except while it waits for approval.
+  const foldPlan =
+    team.phase !== "awaiting_approval" &&
+    (team.planSummary.length > 600 || team.planSummary.split("\n").length > 8);
+  // A long task description opens to its first lines in the narrow lanes.
+  const longDescription = 180;
   return (
     <section className="team-board" aria-label={t.boardLabel}>
       <div className="team-board-header">
@@ -245,7 +265,7 @@ export function TeamBoard({
             <span>{t.progress({ done, total: team.tasks.length })}</span>
           )}
         </div>
-        <p>
+        <p className={foldPlan && !planOpen ? "team-plan-folded" : undefined}>
           {team.planSummary ||
             (queued
               ? t.plan.queued
@@ -255,6 +275,16 @@ export function TeamBoard({
                   ? t.plan.replanning
                   : t.plan.reading)}
         </p>
+        {foldPlan && (
+          <button
+            type="button"
+            className="team-more-toggle"
+            aria-expanded={planOpen}
+            onClick={() => setPlanOpen(!planOpen)}
+          >
+            {planOpen ? t.plan.showLess : t.plan.showAll}
+          </button>
+        )}
         <PremiseNotice premise={team.premise} />
         {revisions.length > 0 && (
           <ol className="team-plan-revisions" aria-label={t.revisions.label}>
@@ -457,7 +487,33 @@ export function TeamBoard({
                       </span>
                     </div>
                     <h4>{task.title}</h4>
-                    <p>{task.description}</p>
+                    <p
+                      className={
+                        task.description.length > longDescription &&
+                        !openDescriptions[task.id]
+                          ? "team-task-folded"
+                          : undefined
+                      }
+                    >
+                      {task.description}
+                    </p>
+                    {task.description.length > longDescription && (
+                      <button
+                        type="button"
+                        className="team-more-toggle"
+                        aria-expanded={!!openDescriptions[task.id]}
+                        onClick={() =>
+                          setOpenDescriptions((open) => ({
+                            ...open,
+                            [task.id]: !open[task.id],
+                          }))
+                        }
+                      >
+                        {openDescriptions[task.id]
+                          ? t.task.showLess
+                          : t.task.showAll}
+                      </button>
+                    )}
                     <div className="team-task-owner">
                       <Bot size={13} />
                       {task.owner}

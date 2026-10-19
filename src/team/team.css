@@ -150,6 +150,27 @@
   margin: 12px 0 0;
   white-space: pre-wrap;
 }
+/* A long plan and long task descriptions open to their first lines. */
+.team-plan > p.team-plan-folded,
+.team-task > p.team-task-folded {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  overflow: hidden;
+}
+.team-task > p.team-task-folded {
+  -webkit-line-clamp: 5;
+}
+.team-more-toggle {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-600);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .team-plan-action {
   display: flex;
   justify-content: space-between;
