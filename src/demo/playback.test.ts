@@ -240,6 +240,8 @@ for (const locale of locales)
       const source = demo.team.tasks.find((each) => each.id === task.id)!;
       assert.equal(task.report, source.report);
       assert.deepEqual(task.checks, source.checks);
+      // The setup a teammate lacked shows once its task is done.
+      assert.deepEqual(task.setup, source.setup);
       assert.ok(Date.parse(task.startedAt!) < Date.parse(task.completedAt!));
     }
     // Team messages appear while the team works, not before approval.

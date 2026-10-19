@@ -568,6 +568,8 @@ export const team = {
       files: ["tests/retry.test.ts"],
       dependsOn: ["task-2", "task-3"],
       status: "complete",
+      /** What the tester could not run here; its words are in the copy. */
+      setup: [{ command: "npx playwright install chromium" }],
     },
   ],
   messages: [
@@ -1119,6 +1121,14 @@ export function buildDemoContent(copy: DemoCopy): DemoContent {
           dependsOn: [...task.dependsOn],
           status: task.status,
           report: text.report,
+          ...("setup" in task
+            ? {
+                setup: task.setup.map((need, index) => ({
+                  command: need.command,
+                  ...text.setup![index],
+                })),
+              }
+            : {}),
           ...("checks" in task
             ? {
                 checks: task.checks.map((check) => ({ ...check })),

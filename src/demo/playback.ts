@@ -450,6 +450,8 @@ export function createDemoPlayback({
       if (done?.report) task.report = done.report;
       if (done?.checks) task.checks = copy(done.checks);
       if (done?.integratedFiles) task.integratedFiles = [...done.integratedFiles];
+      // What the teammate could not run here shows once its task is done.
+      if (done?.setup) task.setup = copy(done.setup);
       finished.add(task.owner);
     }
     appendLogs(finished);

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { mergeSetupNeeds } from "../../shared/setup-needs";
+import { getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import { runSetupNeeds, SetupNeeds } from "./SetupNeeds";
 
@@ -61,4 +62,20 @@ test("the checklist reads in English and names teammates and follow-up rounds", 
   assert.match(html, /Setup this machine needs from you/);
   assert.match(html, /Reported by Teammate 1, Follow-up round 1/);
   assert.match(html, /aria-label="Copy the command: rustup component add rustfmt"/);
+});
+
+test("the sample lists the setup its tester lacked, in both languages", () => {
+  for (const locale of ["en", "zh-TW"] as const) {
+    const { run, team } = getDemo(locale);
+    const needs = runSetupNeeds({ ...run, team }, (number) => `round ${number}`);
+    assert.equal(needs.length, 1);
+    assert.equal(needs[0].command, "npx playwright install chromium");
+    assert.deepEqual(needs[0].from, [run.agents.find((agent) => agent.id === "member-1")?.name ?? "member-1"]);
+  }
+  const en = renderEn(createElement(SetupNeeds, { needs: runSetupNeeds({ ...getDemo("en").run, team: getDemo("en").team }, String) }));
+  assertNoHan(en);
+  assert.match(en, /Chromium for the browser tests/);
+  assert.match(en, /npm run test:browser/);
+  const zh = renderZh(createElement(SetupNeeds, { needs: runSetupNeeds({ ...getDemo("zh-TW").run, team: getDemo("zh-TW").team }, String) }));
+  assert.match(zh, /瀏覽器測試需要的 Chromium/);
 });

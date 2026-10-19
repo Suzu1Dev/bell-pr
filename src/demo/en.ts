@@ -338,6 +338,13 @@ const en: DemoContent = buildDemoContent({
           "Check the retry limit, the errors that never retry and what the last failure returns.",
         report:
           "This is a sample test plan. No tests were run against a real repository.",
+        setup: [
+          {
+            need: "Chromium for the browser tests",
+            reason:
+              "The README's “Browser tests” section runs the retry tests in a browser with npm run test:browser. This machine has no Chromium for Playwright, so that check did not run here.",
+          },
+        ],
       },
     },
     messages: {

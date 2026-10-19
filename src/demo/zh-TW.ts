@@ -302,6 +302,13 @@ const zhTW: DemoContent = buildDemoContent({
         title: "驗證邊界與整合行為",
         description: "檢查重試上限、不可重試錯誤與最後一次失敗的回傳行為。",
         report: "此為示範測試計畫，未執行真實 repository 的測試。",
+        setup: [
+          {
+            need: "瀏覽器測試需要的 Chromium",
+            reason:
+              "README 的「Browser tests」一節以 npm run test:browser 在瀏覽器中執行重試測試。這台電腦沒有 Playwright 可用的 Chromium，因此這項檢查沒有在這裡執行。",
+          },
+        ],
       },
     },
     messages: {

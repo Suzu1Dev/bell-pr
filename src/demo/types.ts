@@ -216,7 +216,13 @@ export interface DemoCopy {
     premise: { statement: string; evidence: string };
     tasks: Record<
       DemoTaskId,
-      { title: string; description: string; report: string }
+      {
+        title: string;
+        description: string;
+        report: string;
+        /** The words of each setup need in shared.ts, in its order. */
+        setup?: { need: string; reason: string }[];
+      }
     >;
     messages: Record<DemoMessageId, string>;
   };
