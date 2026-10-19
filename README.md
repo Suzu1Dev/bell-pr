@@ -187,7 +187,7 @@ disclosure the project requires is there. Publishing pushes a branch (to
 your fork when needed) and opens a **Draft** PR through the GitHub CLI;
 nothing is ever force-pushed.
 
-![The PR draft tab: the contribution guide, the AI-assistance disclosure and the maintainer checklist](docs/images/en/run-draft-1280.png)
+![The PR draft tab: the pull request title and description editor, with what is left to do before you submit beside it](docs/images/en/run-draft-1280.png)
 
 ### Respect the maintainer's time
 
