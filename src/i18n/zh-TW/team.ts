@@ -137,6 +137,13 @@ const m: Translation<typeof en> = {
     hint: "模型、推理強度與 AI 用量",
     calls: ({ count }) => `${count} 次 AI 呼叫`,
   },
+  setupNeeds: {
+    title: "需要你在這台機器準備的環境",
+    intro:
+      "Agent 被要求不改動這台機器（不用 sudo，也不做全域或使用者層級的安裝），所以下列檢查在這次工作中沒有完整執行。指令是 Agent 的建議，執行前請對照專案文件確認；裝好後可以自己在工作目錄重跑這些檢查，之後的貢獻也能直接執行。",
+    reportedBy: ({ names }) => `回報者：${names}`,
+    round: ({ number }) => `修正第 ${number} 輪`,
+  },
   howItWorks: "運作方式",
   protocolNote: ({ provider }) =>
     `${product.name} 使用共享任務、獨立工作目錄及回合間訊息協作。這是由 ${provider} 逐回合驅動的 ${product.name} 實作，並非 Claude Code 原生 Agent Teams。`,

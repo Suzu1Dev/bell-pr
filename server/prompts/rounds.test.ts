@@ -12,8 +12,9 @@ import { outputLanguage, respondIn } from "../prompt-language.js";
  * The fixture holds each prompt as its lines. It was recorded from the
  * upstream code (cdcfb06) before these prompts moved into server/prompts/,
  * recorded again in English when they started to take the run's locale,
- * and again when the person's restatements became the follow-up task, so
- * a failure means the text the follow-up or conflict agent receives
+ * when the person's restatements became the follow-up task, and when the
+ * install rules and the setup list came from upstream 1fb6329, so a
+ * failure means the text the follow-up or conflict agent receives
  * changed.
  */
 async function fixture() {

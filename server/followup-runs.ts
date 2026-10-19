@@ -262,6 +262,7 @@ async function runFollowUp(
         restatements: round.restatements,
         note: round.note,
         changedFiles: files.map((file) => file.path),
+        provider: run.modelExecution?.provider,
       }),
       controller.signal,
       false,
@@ -274,6 +275,7 @@ async function runFollowUp(
       round.report = result.summary;
       round.addressed = result.addressed;
       round.notAddressed = result.notAddressed;
+      if (result.setup.length) round.setup = result.setup;
       // Commands the application saw run, not the agent's own list.
       if (checks.length) round.checks = checks;
       const moved = await restoreAgentHead(run, round.parentCommit);

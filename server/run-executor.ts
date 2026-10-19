@@ -32,6 +32,7 @@ import {
   type TeamTask,
 } from "../shared/team.js";
 import { defaultPonytailMode } from "../shared/efficiency.js";
+import { mergeSetupNeeds } from "../shared/setup-needs.js";
 import { addEfficiency, applyPonytail, trackEfficiency } from "./efficiency.js";
 import {
   type AgentTimeoutKind,
@@ -542,6 +543,12 @@ async function executeTeamTask(
       );
       task.report = result.report;
       run.reports![task.id] = result.report;
+      // A later turn may not repeat what an earlier one could not run.
+      const setup = mergeSetupNeeds([
+        { from: task.owner, needs: task.setup },
+        { from: task.owner, needs: result.setup },
+      ]).map(({ from: _from, ...need }) => need);
+      if (setup.length) task.setup = setup;
       for (const message of result.messages) {
         try {
           queueTeamMessage(ctx, run, task.owner, message.to, message.content);

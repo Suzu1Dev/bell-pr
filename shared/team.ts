@@ -1,4 +1,5 @@
 import type { AgentProvider } from "./models.js";
+import type { SetupNeed } from "./setup-needs.js";
 
 export type TeamTaskStatus =
   "pending" | "ready" | "running" | "complete" | "failed" | "blocked";
@@ -40,6 +41,8 @@ export interface TeamTask {
   checks?: TeamCheck[];
   /** Repository-relative paths the application applied to the review worktree; absent before this field existed. */
   integratedFiles?: string[];
+  /** What the machine lacked for checks this task could not run; absent when none was reported. */
+  setup?: SetupNeed[];
 }
 
 export interface TeamMessage {

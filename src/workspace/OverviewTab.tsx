@@ -9,6 +9,7 @@ import type {
 } from "../../shared/insights";
 import type { Tab } from "../app/AppShell";
 import { ErrorBoundary } from "../app/ErrorBoundary";
+import { runSetupNeeds, SetupNeeds } from "../team/SetupNeeds";
 
 // The overview is the largest view in the app; it loads with its first visit.
 const ProjectOverview = lazy(() =>
@@ -62,10 +63,14 @@ export function OverviewTab({
   updatingRepo,
 }: OverviewTabProps) {
   const t = useT("workspace");
+  const setupMessages = useT("team").setupNeeds;
   const [locale] = useLocale();
   return (
-    // A chunk that fails to load stops at this tab; the draft and the
-    // review keep what the person typed.
+    <>
+    {/* What the agents could not run here: the person installs it. */}
+    <SetupNeeds needs={runSetupNeeds(run, (number) => setupMessages.round({ number }))} />
+    {/* A chunk that fails to load stops at this tab; the draft and the
+        review keep what the person typed. */}
     <ErrorBoundary resetKey={run.id}>
     <Suspense fallback={null}>
     <ProjectOverview
@@ -96,5 +101,6 @@ export function OverviewTab({
     />
     </Suspense>
     </ErrorBoundary>
+    </>
   );
 }

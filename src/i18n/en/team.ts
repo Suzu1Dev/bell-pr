@@ -182,6 +182,18 @@ const team = {
     calls: ({ count }: { count: number }) =>
       count === 1 ? "1 AI call" : `${count} AI calls`,
   },
+  /**
+   * What agents could not run because this machine lacks something, on the
+   * run's overview: one list, each command once, with who reported it.
+   */
+  setupNeeds: {
+    title: "Setup this machine needs from you",
+    intro:
+      "Agents are asked not to change this machine (no sudo, no global or user-level installs), so the checks below did not fully run in this contribution. Each command is an agent's suggestion: check it against the project's documentation before you run it. Once it is installed, you can rerun these checks in the working directory yourself, and later contributions can run them directly.",
+    reportedBy: ({ names }: { names: string }) => `Reported by ${names}`,
+    /** Who reported a need: a follow-up round, by its number among the run's rounds. */
+    round: ({ number }: { number: number }) => `Follow-up round ${number}`,
+  },
   /** The disclosure holding the protocol note. */
   howItWorks: "How it works",
   protocolNote: ({ provider }: { provider: string }) =>

@@ -1,3 +1,5 @@
+import type { SetupNeed } from "./setup-needs.js";
+
 /**
  * A round of changes made after maintainers reviewed the published PR. Each
  * round the person approves becomes one more commit on the same PR branch;
@@ -52,6 +54,8 @@ export interface FollowUpRound {
   resolving?: boolean;
   /** Commits pushed on GitHub outside BELL that BELL took over; nothing was pushed. */
   adopted?: boolean;
+  /** What the machine lacked for checks this round could not run; absent when none was reported. */
+  setup?: SetupNeed[];
 }
 
 export interface FollowUpRestatement {

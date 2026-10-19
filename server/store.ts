@@ -199,6 +199,11 @@ const attemptSchema = loose({
   }).optional(),
 });
 
+/** What an agent reported the machine lacks (TeamTask.setup, FollowUpRound.setup); its write caps. */
+const setupNeedsSchema = z
+  .array(loose({ need: text.max(120), command: text.max(300), reason: text.max(600) }))
+  .max(10);
+
 const pacingSchema = loose({
   openPrs: count.optional(),
   mergedPrs: count.optional(),
@@ -290,6 +295,7 @@ export const runReadSchema = loose({
           files: list,
           dependsOn: list,
           status: text,
+          setup: later(setupNeedsSchema),
         }),
       ),
       messages: z.array(loose({})),
@@ -311,6 +317,7 @@ export const runReadSchema = loose({
           restatements: later(
             z.array(loose({ url: text, text: text.max(300) })).max(20),
           ),
+          setup: later(setupNeedsSchema),
         }),
       )
       .optional(),

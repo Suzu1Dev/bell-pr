@@ -868,3 +868,81 @@ test("a v1.1 field this build cannot read is left out instead of quarantining th
   );
   assert.equal(store.data.runs[0].understandingCheckOff, true);
 });
+
+// Fields ported from upstream 1fb6329 (PRs #15-#28), under the same rules:
+// optional, and readable by a build whose schema lacks them.
+
+/** A published run in review that carries every field the upstream port adds. */
+function runWithUpstreamFields(): Run {
+  const run = runWithV11Fields();
+  run.id = "run-upstream-1fb6329";
+  run.team!.tasks[0].setup = [
+    {
+      need: "GLib development headers",
+      command: "sudo apt install libglib2.0-dev",
+      reason: "cargo test needs them; the README lists GLib under Build time.",
+    },
+  ];
+  run.followUps![0].setup = [
+    { need: "rustfmt", command: "rustup component add rustfmt", reason: "cargo fmt --check needs it." },
+  ];
+  return run;
+}
+
+/** The run read schema with one field of a nested list's elements left out. */
+function withoutElementField(
+  list: "team.tasks" | "followUps",
+  field: string,
+) {
+  if (list === "followUps") {
+    const element = runReadSchema.shape.followUps.unwrap().element;
+    return runReadSchema.extend({
+      followUps: z.array(element.omit({ [field]: true } as never)).optional(),
+    });
+  }
+  const team = runReadSchema.shape.team.unwrap();
+  const task = team.shape.tasks.element;
+  return runReadSchema.extend({
+    team: team
+      .extend({ tasks: z.array(task.omit({ [field]: true } as never)) })
+      .optional(),
+  });
+}
+
+const upstreamRunSchemas = {
+  "team.tasks[].setup": withoutElementField("team.tasks", "setup"),
+  "followUps[].setup": withoutElementField("followUps", "setup"),
+};
+
+for (const [field, older] of Object.entries(upstreamRunSchemas))
+  test(`a build that predates the run's ${field} (upstream 1fb6329) still reads a run that has it`, () => {
+    const written = JSON.parse(JSON.stringify(runWithUpstreamFields()));
+    const read = lenientRead(older).safeParse(written);
+    assert.ok(read.success, read.success ? "" : read.error.message);
+    // state.json passes unknown fields through, so the field survives a save.
+    assert.deepEqual(read.data, written);
+  });
+
+test("runs with every field of the upstream port load and save unchanged, and a malformed one is left out", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const fixture: Database = { version: 1, repos: [repository], runs: [runWithUpstreamFields()] };
+  await writeFile(path.join(directory, "state.json"), JSON.stringify(fixture));
+  const store = new Store(directory);
+  await store.initialize();
+  assert.equal(store.recovery, undefined);
+  assert.deepEqual(store.data, fixture);
+  await store.save();
+  assert.deepEqual(JSON.parse(await readFile(path.join(directory, "state.json"), "utf8")), fixture);
+
+  // A shape this build does not accept drops that field, not the run.
+  const odd = runWithUpstreamFields();
+  (odd.team!.tasks[0] as unknown as Record<string, unknown>).setup = "not a list";
+  const other = await stateWith([odd]);
+  t.after(other.cleanup);
+  const reopened = new Store(other.directory);
+  await reopened.initialize();
+  assert.equal(reopened.recovery, undefined);
+  assert.equal(reopened.data.runs[0].team!.tasks[0].setup, undefined);
+  assert.equal(reopened.data.runs[0].followUps![0].setup?.length, 1);
+});
