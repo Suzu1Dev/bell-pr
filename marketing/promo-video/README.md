@@ -46,12 +46,13 @@ No system ffmpeg is needed: Remotion ships its own (`npx remotion ffmpeg`,
 
 ```sh
 npm ci                  # this package's dependencies
-npm run build           # capture, assets, hit, render (web + 4K master), check
+npm run build           # capture, assets, hit, render (4K master, then the web files from it), check
 npm run capture         # footage only: builds the product, films the 13 states at DPR 4
 npm run assets          # music copy, brand SVGs, stage plates, sound effects, footage proxies
 npm run hit             # measure the final hit in the source against the analysis
-npm run render:web      # 1080p MP4 + WebM, poster, captions
-npm run render:master   # the 4K master (--scale=2)
+npm run render:master   # the 4K master (--scale=2); the web files are made from it
+npm run render:web      # 1080p MP4 + WebM from the master (Lanczos), poster, captions
+npm run render:draft    # a quick 1x preview, out/draft-1080p.mp4 (not a deliverable)
 npm run check           # check every output (`-- --web-only` for the 1080p files only)
 npm run review          # QA frames, index, contact sheet, the per-frame scans and the depth-of-field check (exit 1 on a finding)
 npm run stills -- 291 1011 2452   # quick stills of chosen frames
@@ -98,27 +99,31 @@ states against the existing product build.
    file, then `npm test` and `npm run check`.
 4. **The look** (`src/look/`, `src/scenes/`, `src/shots.ts`): the dark stage
    with focus-pull type for the opening and the end card; a hard
-   "lights on" cut to the light studio on the first hit; each product
-   section opens on the whole floating window (no title bar, no window
-   buttons, no device; layered and contact shadows) turning to face the
-   viewer, then cuts on the beat to push-ins that leave the cut already
-   moving (`arrive`), with two-plane depth of field: the same picture
-   blurred 3.5 px on screen behind at every magnification, and the
-   component the shot is about (a card, a panel, a dialog) sharp on top,
-   every feather in a gutter of the UI (`scripts/check-dof.mjs` checks it
-   against the footage); one beat-locked push per section and macros on
-   the decisive lines; the climax opens with a bar of display type on the
-   dark stage; captions (DM Sans 56 px, bottom-left or top-left) on a
-   frosted glass card over a soft pool of light, never on the sharp
-   plane. Moves use
-   `transform` only; a push never exceeds 2.0 output pixels per capture
-   pixel (one DPR-4 pixel per pixel of the 4K master), a macro 2.6 (at
-   least 1.5 source pixels per output pixel at 1080p; the 4K master
-   upsamples those few frames by up to 1.3x).
+   "lights on" cut to the light studio on the first hit, the wordmark with
+   the product's one-line description under it; each product section opens
+   on the whole floating window (no title bar, no window buttons, no
+   device; layered and contact shadows), each with its own move, then cuts
+   on the beat to push-ins. In a push the component the shot is about (a
+   card, a row, a dialog's section) is lifted out of the page, cropped on
+   its own border, a little larger and with a soft shadow, while the rest
+   drops back, blurred 3.5 px under a veil of the studio's colour
+   (`src/look/dof.ts`; `scripts/check-dof.mjs` checks every box against the
+   footage). Every camera leaves its cut moving and drifts to the next one
+   (`src/takes.ts`); pushes are flat. The climax opens with a bar of display
+   type on the dark stage; captions (DM Sans 56 px, bottom-left or top-left)
+   sit on a frosted glass card over a soft pool of light, never on a lifted
+   component. Moves use `transform` only; a push never exceeds 2.0 output
+   pixels per capture pixel (one DPR-4 pixel per pixel of the 4K master), a
+   macro 2.6 (at least 1.5 source pixels per output pixel at 1080p; the 4K
+   master upsamples those few frames by up to 1.3x).
 5. **Sound** (`src/Soundtrack.tsx`, `src/sfx.ts`): the music edit (two
    segments, -4.5 dB, an equal-power crossfade before the join) and the
    Mixkit effects, placed from the cut.
-6. **Render and check**: `scripts/check-output.mjs` checks duration, sizes,
+6. **Render and check**: the 4K master renders the composition at
+   `--scale=2`; `scripts/web-from-master.mjs` makes the 1080p web files
+   from it with a Lanczos downscale (x264 slow at CRF 21; VP9 at CRF 30
+   with a keyframe on every cut where a stage plate first shows), sharper
+   than a 1x render. `scripts/check-output.mjs` checks duration, sizes,
    codecs, loudness and true peak, the captions file against the timeline,
    the final hit measured again in the render and the end-card logo on the
    final chord.
@@ -130,8 +135,8 @@ In `out/` (gitignored):
 | File | What |
 | --- | --- |
 | `bell-pr-promo-en-2160p.mp4` | the 4K master: H.264 CRF 16 + AAC 320 kb/s, no size cap |
-| `bell-pr-promo-en-1080p.mp4` | web: H.264 + AAC 192 kb/s, at most 20 MB |
-| `bell-pr-promo-en-1080p.webm` | web: VP9 + Opus 160 kb/s, at most 20 MB |
+| `bell-pr-promo-en-1080p.mp4` | web, from the master: H.264 CRF 21 + AAC 192 kb/s, at most 20 MB |
+| `bell-pr-promo-en-1080p.webm` | web, from the master: VP9 CRF 30 + Opus 160 kb/s, at most 20 MB |
 | `poster.jpg` | the complete end card, sharp (frame 2610), at most 500 KB |
 | `captions.en.vtt`, `captions.en.srt` | the captions, the same cues as the film |
 | `review/`, `contact-sheet.png` | the QA frames, their index and `review/scans.tsv` (`npm run review`) |
@@ -141,6 +146,21 @@ In `out/` (gitignored):
 `bell-pr-promo.webm`, `poster.jpg` and `captions.en.vtt` (also gitignored;
 it refuses a tracked target). Footage, proxies, stage plates, the music copy,
 the sound effects and the renders are never committed.
+
+## Text to publish with the film (owner)
+
+The film says what BELL PR is in one line under the wordmark; every
+platform description should lead with the same line and carry the facts the
+film cannot (owner copy; the music credit only on the Patreon tiers that
+require it, `MUSIC-LICENSE.md`):
+
+> BELL PR: a learning workbench for AI-assisted open-source contributions.
+> An AI agent team does the legwork in isolated worktrees on your machine;
+> you understand every change, explain it back, and send one Draft PR that
+> follows the project's rules. Uses the Codex or Claude Code CLI you
+> installed and signed in to; usage counts against your own account. The
+> project, maintainer and replies in the film are a fictional sample.
+> Music: Rock Sport Top, MUSIC4VIDEO (@musicforvideolibrary).
 
 ## Licences
 

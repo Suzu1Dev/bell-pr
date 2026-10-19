@@ -73,7 +73,7 @@ credit condition).
 | 1471 wind swoosh | 854-895, 1862-1903 | -17 dB, -21 dB (the calm section) | peaks on the frame before the cuts to S6's and S11's floating windows (867, 1875) |
 | 2997 clear mouse clicks | the first click only (5 frames), at every on-screen click: 759, 952, 971, 1006, 1186, 1219, 1314, 1337, 1364, 1646, 1691, 1766, 1968, 2001, 2161, 2359 | -19.5 dB | a quiet, dry tick under the drawn pointer's press; alone it peaks under -20 dBTP |
 | 2531 laptop keyboard | 879-932, 1120-1166, 1228-1278, 1530-1573, 1589-1623, 1776-1794 | -19 dB | a sparse bed while an answer types out (the file itself is a soft -20.5 LUFS), a different stretch of the file each time, 3-frame fade-in, 4-frame fade-out |
-| 871 fairy magic sparkle | 2446-2481 | -24 dB | the one glint: its onset on the final chord (2451), with the light sweep inside the end-card logo as it resolves there; quieter than before (a touch of air under the chord). Whether it suits the film, or a softer tonal shimmer should replace it, is for the owner's listen |
+| 871 fairy magic sparkle | 2446-2481 | -24 dB | the one glint: its onset on the final chord (2451), as the end-card logo locks there; quieter than before (a touch of air under the chord). Whether it suits the film, or a softer tonal shimmer should replace it, is for the owner's listen |
 
 Levels sit well under the music, measured against a music-only render at
 each moment: the swell 16.7 dB under, the whooshes 17-25 dB, the glint
