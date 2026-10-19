@@ -50,7 +50,9 @@ export function SetupNeeds({ needs }: { needs: MergedSetupNeed[] }) {
             <strong>{need.need}</strong>
             {need.reason && <p>{need.reason}</p>}
             <CopyCommand command={need.command} />
-            <small>{t.reportedBy({ names: format.list(need.from) })}</small>
+            <small>
+              {t.reportedBy({ names: format.list(need.from, { type: "unit" }) })}
+            </small>
           </li>
         ))}
       </ul>

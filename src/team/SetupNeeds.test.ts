@@ -24,8 +24,7 @@ test("missing setup becomes a checklist of commands to verify and copy, and noth
   assert.match(html, /需要你在這台機器準備的環境/);
   assert.match(html, /<code>sudo apt install libglib2\.0-dev<\/code>/);
   assert.match(html, /aria-label="複製指令：sudo apt install libglib2\.0-dev"/);
-  // The reporters are listed the zh-TW way (Intl.ListFormat).
-  assert.match(html, /回報者：Teammate 1和Teammate 2/);
+  assert.match(html, /回報者：Teammate 1、Teammate 2/);
   assert.match(html, /執行前請對照專案文件確認/);
   assert.equal(render([]), "");
 });
@@ -60,6 +59,6 @@ test("the checklist reads in English and names teammates and follow-up rounds", 
   const html = renderEn(createElement(SetupNeeds, { needs }));
   assertNoHan(html);
   assert.match(html, /Setup this machine needs from you/);
-  assert.match(html, /Reported by Teammate 1 and Follow-up round 1/);
+  assert.match(html, /Reported by Teammate 1, Follow-up round 1/);
   assert.match(html, /aria-label="Copy the command: rustup component add rustfmt"/);
 });
