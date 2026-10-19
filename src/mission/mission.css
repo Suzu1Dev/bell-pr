@@ -2106,3 +2106,46 @@
     padding: 16px 14px;
   }
 }
+
+/* The lead's premise check inside the contribution brief. */
+.mission-contribution .premise-notice {
+  margin: -8px 0 18px;
+}
+.mission-premise-tag {
+  margin-left: var(--space-2);
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  font-size: var(--text-2xs);
+  font-style: normal;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.mission-premise-missing,
+.mission-premise-recheck {
+  margin: -8px 0 18px;
+}
+.mission-premise-missing {
+  padding: var(--space-3) 14px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+.mission-premise-missing p {
+  margin: 0 0 10px;
+  font-size: var(--text-xs);
+  line-height: 1.75;
+  color: var(--color-text-secondary);
+}
+.mission-premise-recheck {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--space-3);
+}
+.mission-premise-recheck small {
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+}
+

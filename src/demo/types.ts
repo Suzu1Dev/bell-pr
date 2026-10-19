@@ -205,6 +205,8 @@ export interface DemoCopy {
   contributionBrief: ContributionBrief;
   team: {
     planSummary: string;
+    /** The words of the lead's premise check; its verdict is in shared.ts. */
+    premise: { statement: string; evidence: string };
     tasks: Record<
       DemoTaskId,
       { title: string; description: string; report: string }

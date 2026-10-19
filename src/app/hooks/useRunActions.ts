@@ -1097,6 +1097,7 @@ export function useRunActions({
   }
   return {
     setRun,
+    setFiles,
     notify,
     plan,
     exporting,

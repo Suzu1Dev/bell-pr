@@ -634,6 +634,72 @@
   font-size: var(--text-sm);
   line-height: 1.9;
 }
+/* The lead's check of the request's assumption. */
+.premise-notice {
+  margin-top: var(--space-3);
+  padding: 11px 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  font-size: var(--text-xs);
+  line-height: 1.75;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.premise-notice.premise-refuted {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-bg);
+}
+.premise-notice h3,
+.premise-notice summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.premise-notice summary {
+  flex-wrap: wrap;
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+.premise-notice summary > span {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-weight: 400;
+}
+.premise-compact details:not([open]) summary > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.premise-holds svg {
+  color: var(--color-success);
+}
+.premise-refuted svg {
+  color: var(--color-warning);
+}
+.premise-unclear svg {
+  color: var(--color-text-muted);
+}
+.premise-notice p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+}
+.premise-notice .premise-statement {
+  font-weight: 550;
+}
+.premise-notice small {
+  display: block;
+  margin-top: 6px;
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+}
+.premise-compact {
+  margin: 0;
+  border-width: 0 0 1px;
+  border-radius: 0;
+}
 /* Setup the machine lacks for checks agents could not run: the person installs it. */
 .setup-needs {
   margin: 0 var(--space-7) var(--space-5);

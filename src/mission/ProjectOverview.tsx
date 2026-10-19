@@ -45,6 +45,7 @@ import { directionOptions } from "./DirectionSettings";
 import { usePlan } from "./plan";
 import { useSampleAnalysis } from "./sample-analysis";
 import { FailureText } from "../FailureText";
+import { knownVerdict, PremiseNotice } from "../team/PremiseNotice";
 import {
   moveRecommendation,
   orderedRecommendations,
@@ -84,6 +85,13 @@ export interface ProjectOverviewProps {
    * project is never locked.
    */
   canRecommendMore?: boolean;
+  /**
+   * Checks the request's assumption of a finished run against its code and
+   * reports: again, or for the first time on a run made before premise
+   * checks. Absent while the check cannot run (the sample, an active run).
+   */
+  onCheckPremise?: () => void;
+  checkingPremise?: boolean;
   /** What the plan unlocks, when the parent knows it. */
   entitlements?: Entitlements;
 }
@@ -293,8 +301,48 @@ function SectionNav({ sections }: { sections: OverviewSection[] }) {
   );
 }
 
-function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
+function Brief({
+  run,
+  brief,
+  onCheckPremise,
+  checkingPremise = false,
+}: {
+  run: Run;
+  brief?: ContributionBrief;
+  onCheckPremise?: () => void;
+  checkingPremise?: boolean;
+}) {
   const t = useT("mission").brief;
+  const premise = run.team?.premise;
+  const verdict = premise ? knownVerdict(premise.verdict) : undefined;
+  // Text copied from the request still states the assumption; it is labelled, never rewritten.
+  const tag =
+    verdict === "refuted"
+      ? t.premiseRefuted
+      : verdict === "unclear"
+        ? t.premiseUnclear
+        : undefined;
+  const checkButton = onCheckPremise && (
+    <button
+      type="button"
+      className="mission-button mission-button-secondary"
+      onClick={onCheckPremise}
+      disabled={checkingPremise}
+    >
+      {checkingPremise ? (
+        <Loader2 className="mission-spin" size={15} />
+      ) : premise ? (
+        <RefreshCw size={15} />
+      ) : (
+        <Check size={15} />
+      )}
+      {checkingPremise
+        ? t.premiseChecking
+        : premise
+          ? t.premiseRecheck
+          : t.premiseCheck}
+    </button>
+  );
   return (
     <section
       id={sectionAnchor("contribution")}
@@ -312,6 +360,19 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
         </span>
       </div>
       <h3 className="mission-contribution-name">{run.title}</h3>
+      <PremiseNotice premise={premise} />
+      {premise && checkButton && (
+        <div className="mission-premise-recheck">
+          {checkButton}
+          <small>{t.premiseRecheckNote}</small>
+        </div>
+      )}
+      {!premise && checkButton && (
+        <div className="mission-premise-missing">
+          <p>{t.premiseMissing}</p>
+          {checkButton}
+        </div>
+      )}
       {brief ? (
         <>
           <div className="mission-contribution-reason">
@@ -320,7 +381,10 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
               <p>{brief.problem}</p>
             </div>
             <div>
-              <span>{t.motivation}</span>
+              <span>
+                {t.motivation}
+                {tag && <em className="mission-premise-tag">{tag}</em>}
+              </span>
               <p>{brief.motivation}</p>
             </div>
           </div>
@@ -346,11 +410,14 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
             <article className="mission-after">
               <span className="mission-change-label">
                 {t.after} <span>{t.afterCaption}</span>
+                {tag && <em className="mission-premise-tag">{tag}</em>}
               </span>
               <p>{brief.after}</p>
             </article>
           </div>
-          <p className="mission-impact-note">{t.impactNote}</p>
+          <p className="mission-impact-note">
+            {verdict === "refuted" ? t.impactRefuted : t.impactNote}
+          </p>
           <div className="mission-validation-grid">
             {brief.validation.length > 0 && (
               <div>
@@ -415,6 +482,8 @@ export function ProjectOverview({
   updatingRepo = false,
   canRecommendMore,
   entitlements,
+  onCheckPremise,
+  checkingPremise = false,
 }: ProjectOverviewProps) {
   const t = useT("mission");
   const common = useT("common");
@@ -1116,7 +1185,14 @@ export function ProjectOverview({
         </>
       )}
 
-      {run && <Brief run={run} brief={brief} />}
+      {run && (
+        <Brief
+          run={run}
+          brief={brief}
+          onCheckPremise={onCheckPremise}
+          checkingPremise={checkingPremise}
+        />
+      )}
 
       {insights && (
         <section

@@ -178,6 +178,14 @@ const m: Translation<typeof en> = {
     wholeFile: "新增或刪除的檔案已經完整顯示。",
     unreadable: "檔案無法讀取或超過 512 KB。",
   },
+  premise: {
+    tooEarly: "請等待開發完成後再查核前提。",
+    busy: "這個工作還有 Agent、審查或解說在進行；請等它完成再查核前提。",
+    incomplete: "Agent 回傳的前提查核格式不完整",
+    checked: ({ verdict, changed }) =>
+      `前提查核：${{ holds: "假設成立", refuted: "假設不成立", unclear: "無法確認假設" }[verdict]}。${changed ? "變更解說與程式碼解說會依這個結論重新產生。" : "結論沒有改變。"}`,
+    noAssumption: "前提查核：需求裡沒有需要查核的假設。",
+  },
   walkthrough: {
     wholeFile: "新增或刪除的檔案沒有原本的邏輯可以拆解；請看「變更解說」。",
     noFunctions: "這類檔案沒有函式可以拆解。",

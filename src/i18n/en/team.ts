@@ -5,7 +5,7 @@
  */
 import type { Plan } from "../../../shared/plans";
 import { product } from "../../../shared/product";
-import type { AgentTeam } from "../../../shared/team";
+import type { AgentTeam, PremiseVerdict } from "../../../shared/team";
 import type { TeamLaneId } from "../../team/lanes";
 
 const taskCount = (count: number) =>
@@ -181,6 +181,17 @@ const team = {
     hint: "Model, reasoning effort and AI usage",
     calls: ({ count }: { count: number }) =>
       count === 1 ? "1 AI call" : `${count} AI calls`,
+  },
+  /** The lead's check of the request's assumption, made by reading the code. */
+  premise: {
+    label: "Premise check",
+    heading: ({ verdict }: { verdict: string }) => `Premise check: ${verdict}`,
+    verdicts: {
+      holds: "the assumption holds",
+      refuted: "the assumption does not hold",
+      unclear: "the assumption could not be confirmed",
+    } satisfies Record<PremiseVerdict, string>,
+    source: "Found by the lead reading the code; check it against the cited lines.",
   },
   /**
    * What agents could not run because this machine lacks something, on the

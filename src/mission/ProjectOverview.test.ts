@@ -3,6 +3,7 @@ import test from "node:test";
 import { createElement } from "react";
 import { formatters } from "../../shared/i18n/locale";
 import type { ProjectInsights } from "../../shared/insights";
+import type { AgentTeam } from "../../shared/team";
 import { freeEntitlements, proEntitlements } from "../../shared/plans";
 import { getDemo } from "../demo";
 import type { PlaybackClock } from "../demo/playback";
@@ -639,4 +640,109 @@ test("the sample's overview reads no plan, also while its analysis plays", async
     await view.unmount();
     globalThis.fetch = realFetch;
   }
+});
+
+test("the contribution brief shows the premise verdict and labels what still states the assumption", () => {
+  const base = {
+    id: "r",
+    repoId: "demo-repo",
+    title: "確認呼叫端使用回傳的 id",
+    prompt: "假設（未驗證）：呼叫端把自己產生的 id 交給瀏覽器。",
+    status: "review",
+    branch: "fix/abc",
+    baseBranch: "main",
+    createdAt: "2026-10-14T00:00:00Z",
+    agents: [],
+    logs: [],
+    draft: { title: "t", body: "b" },
+    reviewedFiles: [],
+  } as unknown as NonNullable<ProjectOverviewProps["run"]>;
+  const team: AgentTeam = {
+    config: { maxTeammates: 2, requirePlanApproval: false, provider: "claude", protocol: "bell-shared-tasks", messageDelivery: "between-turns" },
+    phase: "complete",
+    planSummary: "",
+    tasks: [],
+    messages: [],
+  };
+  const brief = {
+    problem: base.prompt,
+    motivation: "若此假設成立，候選人重新整理後就無法開始面試。",
+    beneficiaries: [],
+    before: "目前存在任務描述中的問題。",
+    after: "若此假設成立，候選人重新整理後就無法開始面試。",
+    validation: [],
+    risks: [],
+  };
+  const refuted = render({
+    run: {
+      ...base,
+      team: {
+        ...team,
+        premise: { verdict: "refuted", statement: "呼叫端交出自己產生的 id。", evidence: "src/web/interviews.rs:195 用的是回傳值。" },
+      },
+    },
+    brief,
+  });
+  assert.match(refuted, /前提查核：假設不成立/);
+  assert.match(refuted, /src\/web\/interviews\.rs:195/);
+  // The request's wording is kept but labelled on both cards that copy it.
+  assert.equal(refuted.match(/依你的假設，查證後不成立/g)?.length, 2);
+  assert.match(refuted, /若此假設成立，候選人重新整理後就無法開始面試。/);
+  assert.match(refuted, /上面依假設描述的問題與影響實際上不會發生/);
+  // A check can be made again; the button appears only with the action.
+  assert.doesNotMatch(refuted, /重新查核前提/);
+  const recheck = render({
+    run: { ...base, team: { ...team, premise: { verdict: "refuted", statement: "s", evidence: "e:1" } } },
+    brief,
+    onCheckPremise() {},
+  });
+  assert.match(recheck, /重新查核前提/);
+  assert.doesNotMatch(recheck, /依審查結果查核前提/);
+
+  // A run made before premise checks offers one; without the action, nothing is offered.
+  const missing = render({ run: { ...base, team }, brief, onCheckPremise() {} });
+  assert.match(missing, /這個貢獻建立時還沒有前提查核/);
+  assert.match(missing, /依審查結果查核前提/);
+  assert.doesNotMatch(missing, /依你的假設/);
+  assert.doesNotMatch(render({ run: { ...base, team }, brief }), /依審查結果查核前提/);
+});
+
+test("the premise check in the brief reads in English", () => {
+  const run = {
+    id: "r",
+    repoId: "demo-repo",
+    title: "Use the returned id",
+    prompt: "Assumption (unverified): the caller hands the browser an id it made itself.",
+    status: "review",
+    branch: "fix/abc",
+    baseBranch: "main",
+    createdAt: "2026-10-14T00:00:00Z",
+    agents: [],
+    logs: [],
+    draft: { title: "t", body: "b" },
+    reviewedFiles: [],
+    team: {
+      config: { maxTeammates: 2, requirePlanApproval: false, provider: "claude", protocol: "bell-shared-tasks", messageDelivery: "between-turns" },
+      phase: "complete",
+      planSummary: "",
+      tasks: [],
+      messages: [],
+      premise: { verdict: "unclear", statement: "The caller hands over an id it made.", evidence: "src/web/interviews.rs:195 uses the returned value." },
+    },
+  } as unknown as NonNullable<ProjectOverviewProps["run"]>;
+  const brief = {
+    problem: run.prompt,
+    motivation: "If this holds, a candidate who reloads cannot start the interview.",
+    beneficiaries: [],
+    before: "Today the problem in the request exists.",
+    after: "If this holds, a candidate who reloads cannot start the interview.",
+    validation: [],
+    risks: [],
+  };
+  const html = renderEnglish({ run, brief, onCheckPremise() {} });
+  assertNoHan(html);
+  assert.match(html, /Premise check: the assumption could not be confirmed/);
+  assert.equal(html.match(/As you assumed; not confirmed yet/g)?.length, 2);
+  assert.match(html, /Check the premise again/);
+  assert.match(html, /These are the goals of this contribution/);
 });

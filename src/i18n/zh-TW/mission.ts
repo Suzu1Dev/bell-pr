@@ -117,6 +117,16 @@ const m: Translation<typeof en> = {
     validation: "如何知道改動有用？",
     risks: "一起留意的取捨",
     request: "你提出的需求",
+    premiseRefuted: "依你的假設，查證後不成立",
+    premiseUnclear: "依你的假設，尚未能確認",
+    impactRefuted:
+      "前提查核顯示這個假設不成立：上面依假設描述的問題與影響實際上不會發生，請以查核結果與 Lead 的整合摘要為準。",
+    premiseMissing:
+      "這個貢獻建立時還沒有前提查核，需求裡的假設是否成立沒有記錄下來。可以請 Lead 依目前的程式碼與審查報告補做一次；完成後，變更解說與程式碼解說會依結論重新產生。",
+    premiseCheck: "依審查結果查核前提",
+    premiseRecheck: "重新查核前提",
+    premiseChecking: "正在查核前提…",
+    premiseRecheckNote: "結論改變時，變更解說與程式碼解說會依新的結論重新產生。",
     pending:
       "尚未產生這次貢獻的使用者影響分析。先保留原始需求，完成分析後再連結到具體動機與驗收方式。",
   },

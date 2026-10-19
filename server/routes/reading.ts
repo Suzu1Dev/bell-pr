@@ -4,8 +4,9 @@ import type { RouteDeps } from "./types.js";
 
 /**
  * Reading a run's code beyond its diff: the unchanged code around each
- * change and the walkthroughs of the functions that hold them. Reading is
- * learning, so these routes are open on every plan.
+ * change, the walkthroughs of the functions that hold them, and checking
+ * the request's premise against the code. Reading and checking are
+ * learning and integrity, so these routes are open on every plan.
  */
 export function registerReadingRoutes(app: Express, { workbench }: RouteDeps) {
   app.get("/api/runs/:id/context", async (req, res) => {
@@ -30,5 +31,9 @@ export function registerReadingRoutes(app: Express, { workbench }: RouteDeps) {
       .strict()
       .parse(req.body);
     res.json(await workbench.walkthrough(req.params.id, filePath, retry));
+  });
+  app.post("/api/runs/:id/premise", async (req, res) => {
+    z.object({}).strict().parse(req.body ?? {});
+    res.json(await workbench.checkPremise(req.params.id));
   });
 }

@@ -43,6 +43,7 @@ import { useRovingList } from "../a11y/useRovingList";
 import { fileStatusLabel } from "../app/labels";
 import { usePresentation } from "../app/presentation";
 import { FailureText } from "../FailureText";
+import { PremiseNotice } from "../team/PremiseNotice";
 import type { RunActions } from "../app/hooks/useRunActions";
 import type { Walkthroughs } from "../app/hooks/useWalkthroughs";
 import type { PanelTab } from "../review/ExplanationPanel";
@@ -548,6 +549,8 @@ export function ChangesTab({
             </div>
           </div>
         </div>
+        {/* The lead's premise check, folded: the diff is read file after file. */}
+        <PremiseNotice premise={run.team?.premise} compact />
         {editable && run.worktreePath && !run.workspaceRemovedAt && (
           <WorktreeHint
             path={run.worktreePath}

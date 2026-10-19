@@ -305,6 +305,16 @@ export default {
     wholeFile: "Added and deleted files are already shown whole.",
     unreadable: "The file cannot be read or is larger than 512 KB.",
   },
+  /** Checking the request's assumption again on a finished run. */
+  premise: {
+    tooEarly: "Wait for development to finish before checking the premise.",
+    busy: "An agent, a review or an explanation is still working on this run; check the premise once it finishes.",
+    incomplete: "The agent's premise check was incomplete.",
+    /** One line in the run's log; `changed` says whether the verdict is new. */
+    checked: ({ verdict, changed }: { verdict: "holds" | "refuted" | "unclear"; changed: boolean }) =>
+      `Premise check: ${{ holds: "the assumption holds", refuted: "the assumption does not hold", unclear: "the assumption could not be confirmed" }[verdict]}. ${changed ? "The explanations and code walkthroughs are made again with this verdict." : "The verdict did not change."}`,
+    noAssumption: "Premise check: the request states no assumption to check.",
+  },
   /** Function walkthroughs: the code around each change, step by step. */
   walkthrough: {
     wholeFile:

@@ -32,6 +32,7 @@ import { useEntitlements } from "../license/useEntitlements";
 import { ModelSummary } from "../models/ModelSummary";
 import { providerLabels } from "../../shared/models";
 import { teamLanes, type TeamLaneId } from "./lanes";
+import { PremiseNotice } from "./PremiseNotice";
 import "./team.css";
 
 /** No status to start from: useEntitlements then reads the license. */
@@ -254,6 +255,7 @@ export function TeamBoard({
                   ? t.plan.replanning
                   : t.plan.reading)}
         </p>
+        <PremiseNotice premise={team.premise} />
         {revisions.length > 0 && (
           <ol className="team-plan-revisions" aria-label={t.revisions.label}>
             {revisions.map((revision, index) => (

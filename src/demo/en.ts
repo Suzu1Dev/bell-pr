@@ -304,6 +304,12 @@ const en: DemoContent = buildDemoContent({
   team: {
     planSummary:
       "Four scoped tasks: shared types first, then the client and the docs in parallel, then tests and a cross-review to confirm that retries cover only recoverable GET failures.",
+    premise: {
+      statement:
+        "The request takes for granted that GET requests do not retry today, so one brief failure fails the request outright.",
+      evidence:
+        "src/client.ts:12 sends a single fetch and reads the JSON without checking the status. src/utils/retry.ts:6 defines withRetry, but nothing calls it yet.",
+    },
     tasks: {
       "task-1": {
         title: "Define the retry policy and types",

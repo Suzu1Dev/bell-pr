@@ -422,6 +422,8 @@ export const team = {
     messageDelivery: "between-turns",
   },
   phase: "complete",
+  /** The lead's premise check: the request takes for granted that GET does not retry yet. */
+  premiseVerdict: "holds",
   tasks: [
     {
       id: "task-1",
@@ -994,6 +996,7 @@ export function buildDemoContent(copy: DemoCopy): DemoContent {
       config: { ...team.config },
       phase: team.phase,
       planSummary: copy.team.planSummary,
+      premise: { verdict: team.premiseVerdict, ...copy.team.premise },
       tasks: team.tasks.map((task) => {
         const text = copy.team.tasks[task.id];
         return {

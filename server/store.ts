@@ -300,6 +300,9 @@ export const runReadSchema = loose({
         }),
       ),
       messages: z.array(loose({})),
+      premise: later(
+        loose({ verdict: text, statement: text.max(1_000), evidence: text.max(3_000) }),
+      ),
     }).optional(),
     followUps: z
       .array(

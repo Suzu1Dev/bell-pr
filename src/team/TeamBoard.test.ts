@@ -209,6 +209,7 @@ const englishMessages: Record<string, string> = {
 const englishTeam: AgentTeam = {
   ...demoTeam,
   planSummary: "Add retries to the client in four small, reviewable tasks.",
+  premise: getDemo("en").team.premise,
   tasks: demoTeam.tasks.map((task) => ({ ...task, ...englishText[task.id] })),
   messages: demoTeam.messages.map((message) => ({
     ...message,
@@ -658,3 +659,14 @@ test(
     playback.stop();
   },
 );
+
+test("the lead's premise check shows under the plan, in each language", () => {
+  const html = render({ ...demoRun, team: demoTeam });
+  assert.match(html, /<section class="premise-notice premise-holds" aria-label="前提查核"><h3>.*前提查核：假設成立/);
+  assert.match(html, /src\/client\.ts:12/);
+  const english = renderEn(board(englishRun, true));
+  assert.match(english, /Premise check: the assumption holds/);
+  // A run whose request stated no assumption shows none.
+  assert.doesNotMatch(render({ ...demoRun, team: { ...demoTeam, premise: undefined } }), /premise-notice/);
+});
+

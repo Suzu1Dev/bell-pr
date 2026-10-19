@@ -29,6 +29,7 @@ import type { RunActions } from "../app/hooks/useRunActions";
 import type { RunRounds } from "../app/hooks/useRunRounds";
 import type { Walkthroughs } from "../app/hooks/useWalkthroughs";
 import { useRunRecords } from "../app/hooks/useRunRecords";
+import { premiseCheckable, usePremiseCheck } from "../app/hooks/usePremiseCheck";
 import { openCheckPanel, useUnderstanding } from "../app/hooks/useUnderstanding";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import { ChangesTab } from "./ChangesTab";
@@ -168,6 +169,7 @@ export function WorkspacePage({
   const { approve, plan, exporting, exportLearning } = actions;
   // The Explain-it-back check and the person's other records on this run.
   const understanding = useUnderstanding(run, files, { demo, setRun: actions.setRun });
+  const premise = usePremiseCheck(run, actions);
   const records = useRunRecords(run, files, { demo, setRun: actions.setRun, notify: actions.notify, file, ask: actions.ask, setSelectedPath, setTab });
   // The sample's playback queues for a moment behind nothing.
   const queuedOnFree =
@@ -394,6 +396,12 @@ export function WorkspacePage({
               setTab={setTab}
               onUpdateRepo={onUpdateRepo}
               updatingRepo={updatingRepo}
+              onCheckPremise={
+                premiseCheckable(run, demo, active)
+                  ? () => void premise.checkPremise()
+                  : undefined
+              }
+              checkingPremise={premise.checkingPremise}
             />
           )}
           {tab === "changes" && (

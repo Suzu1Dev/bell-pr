@@ -49,6 +49,9 @@ interface OverviewTabProps {
   /** Updates BELL's clone to the latest default branch; absent for local imports and the demo. */
   onUpdateRepo?: () => void;
   updatingRepo: boolean;
+  /** Checks the run's premise against its code; absent while it cannot run. */
+  onCheckPremise?: () => void;
+  checkingPremise?: boolean;
 }
 
 /** The workspace's first tab: the project overview and why this change. */
@@ -61,6 +64,8 @@ export function OverviewTab({
   setTab,
   onUpdateRepo,
   updatingRepo,
+  onCheckPremise,
+  checkingPremise,
 }: OverviewTabProps) {
   const t = useT("workspace");
   const setupMessages = useT("team").setupNeeds;
@@ -98,6 +103,8 @@ export function OverviewTab({
       onReadCode={() => setTab("changes")}
       onUpdateRepo={onUpdateRepo}
       updatingRepo={updatingRepo}
+      onCheckPremise={onCheckPremise}
+      checkingPremise={checkingPremise}
     />
     </Suspense>
     </ErrorBoundary>

@@ -100,11 +100,14 @@ const structuralKeys = new Set([
   "to",
   "topic",
   "url",
+  "verdict",
 ]);
 
 // Inside a code walkthrough, what the unit is (its kind) and the name of a
-// caller that is no function (such as a README example) are copy too.
-const walkthroughCopy = /\.walkthrough\.functions\.(kind|callers\.name)$/;
+// caller that is no function (such as a README example) are copy too, and
+// so is the evidence of the lead's premise check.
+const walkthroughCopy =
+  /\.walkthrough\.functions\.(kind|callers\.name)$|\.team\.premise\.evidence$/;
 
 /** The demo with its copy blanked out: what every locale must share. */
 function structure(value: unknown, key = "", copyOnly = false, where = ""): unknown {

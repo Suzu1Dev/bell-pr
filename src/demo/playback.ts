@@ -387,6 +387,8 @@ export function createDemoPlayback({
     if (!run?.team) return;
     const team = run.team;
     team.planSummary = demo.team.planSummary;
+    // The lead checks the request's premise while it plans.
+    if (demo.team.premise) team.premise = { ...demo.team.premise };
     team.tasks = demo.team.tasks.map(
       (task): TeamTask => ({
         id: task.id,

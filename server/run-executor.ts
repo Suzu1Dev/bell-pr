@@ -723,6 +723,8 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
       );
       team.planSummary = parsed.summary;
       team.tasks = parsed.tasks;
+      if (parsed.premise) team.premise = parsed.premise;
+      else delete team.premise;
       if (revisions.length && parsed.revisionNotes)
         revisions[revisions.length - 1].revisionNotes = parsed.revisionNotes;
       const members = [...new Set(team.tasks.map((task) => task.owner))];

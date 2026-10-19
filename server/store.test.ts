@@ -886,6 +886,11 @@ function runWithUpstreamFields(): Run {
   run.followUps![0].setup = [
     { need: "rustfmt", command: "rustup component add rustfmt", reason: "cargo fmt --check needs it." },
   ];
+  run.team!.premise = {
+    verdict: "refuted",
+    statement: "The greeting prints a dangling comma for an empty name.",
+    evidence: "hello.ts:2 falls back to world, so no comma dangles.",
+  };
   run.walkthroughs = {
     "hello.ts": {
       fingerprint: "e".repeat(64),
@@ -940,6 +945,9 @@ function withoutElementField(
 
 const upstreamRunSchemas = {
   walkthroughs: runReadSchema.omit({ walkthroughs: true }),
+  "team.premise": runReadSchema.extend({
+    team: runReadSchema.shape.team.unwrap().omit({ premise: true }).optional(),
+  }),
   "team.tasks[].setup": withoutElementField("team.tasks", "setup"),
   "followUps[].setup": withoutElementField("followUps", "setup"),
 };
@@ -968,12 +976,21 @@ test("runs with every field of the upstream port load and save unchanged, and a 
   // A shape this build does not accept drops that field, not the run.
   const odd = runWithUpstreamFields();
   (odd.team!.tasks[0] as unknown as Record<string, unknown>).setup = "not a list";
+  (odd.team! as unknown as Record<string, unknown>).premise = { verdict: "holds" };
   const other = await stateWith([odd]);
   t.after(other.cleanup);
   const reopened = new Store(other.directory);
   await reopened.initialize();
   assert.equal(reopened.recovery, undefined);
   assert.equal(reopened.data.runs[0].team!.tasks[0].setup, undefined);
+  assert.equal(reopened.data.runs[0].team!.premise, undefined);
+  // A verdict word a later build may add is kept as written.
+  const later = runWithUpstreamFields();
+  later.team!.premise!.verdict = "partly" as never;
+  assert.equal(
+    lenientRead(runReadSchema).safeParse(JSON.parse(JSON.stringify(later))).data?.team?.premise?.verdict,
+    "partly",
+  );
   assert.equal(reopened.data.runs[0].followUps![0].setup?.length, 1);
   // The run list leaves the walkthroughs to the open run.
   assert.equal("walkthroughs" in summarizeRun(runWithUpstreamFields()), false);

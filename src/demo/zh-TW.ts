@@ -276,6 +276,11 @@ const zhTW: DemoContent = buildDemoContent({
   team: {
     planSummary:
       "將重試策略、HTTP client 整合與驗證拆成明確範圍。先建立共用型別，再讓 client 與文件分頭作業；最後整合測試並交叉審閱，確認重試只套用在可恢復的 GET 失敗。",
+    premise: {
+      statement: "需求假設目前的 GET 請求不會重試，一次短暫失敗就讓整個請求失敗。",
+      evidence:
+        "src/client.ts:12 只送一次 fetch 就讀 JSON，不檢查狀態碼。src/utils/retry.ts:6 定義了 withRetry，但還沒有任何地方呼叫它。",
+    },
     tasks: {
       "task-1": {
         title: "定義重試策略與型別",

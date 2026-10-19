@@ -386,6 +386,9 @@ const m: Translation<typeof en> = {
     submit: "送出 Draft PR",
   },
   notices: {
+    premiseChecked: ({ verdict }) =>
+      `前提查核完成：${verdict}。結論改變時，變更解說與程式碼解說會依結論重新產生。`,
+    premiseNone: "需求裡沒有需要查核的假設。",
     stopResolving:
       "已停止解衝突；已改的檔案保留，可以自行完成，或再請 Agent 處理。",
     stopRoundKept:

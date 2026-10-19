@@ -21,6 +21,7 @@ const roleOrder: readonly string[] = [
   "explanations",
   "guide",
   "walkthrough",
+  "premise",
   "followup",
   "sync",
 ] satisfies RoleGroup[];

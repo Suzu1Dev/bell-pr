@@ -61,6 +61,7 @@ import * as drafting from "./draft-jobs.js";
 import * as syncing from "./sync-runs.js";
 import * as followUps from "./followup-runs.js";
 import * as walkthroughs from "./walkthrough-runs.js";
+import * as premises from "./premise-runs.js";
 import { synchronizeWalkthroughs } from "./walkthroughs.js";
 import {
   synchronizeUnderstanding,
@@ -745,6 +746,8 @@ export class Workbench {
       run.agents = run.agents.filter((agent) => !/^member-/.test(agent.id));
       team.tasks = [];
       team.planSummary = "";
+      // The check belonged to the plan sent back; the new plan makes its own.
+      delete team.premise;
       team.phase = "planning";
       run.status = "queued";
       this.log(
@@ -862,6 +865,12 @@ export class Workbench {
 
   async approve(id: string, displayedDraft: Run["draft"]) {
     return publishing.approve(this.context, id, displayedDraft);
+  }
+
+  /** Checks a finished run's premise again, or for the first time (premise-runs.ts). */
+  async checkPremise(id: string) {
+    cleanup.assertWorkspacePresent(this.run(id));
+    return premises.checkPremise(this.context, id);
   }
 
   /** Explains the functions around one file's changes (walkthrough-runs.ts). */
