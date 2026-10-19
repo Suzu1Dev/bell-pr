@@ -180,8 +180,8 @@ const mission = {
     risks: "Trade-offs to keep in mind",
     request: "Your request",
     /** On the cards that copy the request's wording when its assumption was checked. */
-    premiseRefuted: "As you assumed; the check found it does not hold",
-    premiseUnclear: "As you assumed; not confirmed yet",
+    premiseRefuted: "Based on an assumption the check refuted",
+    premiseUnclear: "Based on an unconfirmed assumption",
     impactRefuted:
       "The premise check found that the assumption does not hold: the problem and impact described above from it do not happen. Go by the check and the lead's integration report.",
     premiseMissing:

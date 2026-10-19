@@ -743,7 +743,12 @@ test("the premise check in the brief reads in English", () => {
   const html = renderEnglish({ run, brief, onCheckPremise() {} });
   assertNoHan(html);
   assert.match(html, /Premise check: the assumption could not be confirmed/);
-  assert.equal(html.match(/As you assumed; not confirmed yet/g)?.length, 2);
+  assert.equal(html.match(/Based on an unconfirmed assumption/g)?.length, 2);
+  // In the after card the tag is on a line of its own, outside the label's mono caps.
+  assert.match(
+    html,
+    /<span class="mission-change-label">AFTER <span>The improvement we hope for<\/span><\/span><em class="mission-premise-tag">Based on an unconfirmed assumption<\/em>/,
+  );
   assert.match(html, /Check the premise again/);
   assert.match(html, /These are the goals of this contribution/);
 });

@@ -504,10 +504,8 @@ function Brief({
               <BriefText text={brief.problem} />
             </div>
             <div>
-              <span>
-                {t.motivation}
-                {tag && <em className="mission-premise-tag">{tag}</em>}
-              </span>
+              <span>{t.motivation}</span>
+              {tag && <em className="mission-premise-tag">{tag}</em>}
               <BriefText text={brief.motivation} />
             </div>
           </div>
@@ -533,8 +531,9 @@ function Brief({
             <article className="mission-after">
               <span className="mission-change-label">
                 {t.after} <span>{t.afterCaption}</span>
-                {tag && <em className="mission-premise-tag">{tag}</em>}
               </span>
+              {/* Under the label, never squeezed by its mono caps. */}
+              {tag && <em className="mission-premise-tag">{tag}</em>}
               <BriefText text={brief.after} />
             </article>
           </div>

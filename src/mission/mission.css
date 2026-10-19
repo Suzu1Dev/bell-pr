@@ -536,7 +536,7 @@
 }
 .mission-before-after {
   display: grid;
-  grid-template-columns: 1fr 35px 1fr;
+  grid-template-columns: minmax(0, 1fr) 35px minmax(0, 1fr);
   align-items: stretch;
   margin-top: 20px;
 }
@@ -1771,7 +1771,7 @@
     font-size: 17px;
   }
   .mission-before-after {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0;
   }
   .mission-change-arrow {
@@ -2144,8 +2144,10 @@
 .mission-premise-missing {
   margin: 0 0 18px;
 }
+/* On a line of its own, under the caption it qualifies. */
 .mission-premise-tag {
-  margin-left: var(--space-2);
+  display: inline-block;
+  max-width: 100%;
   padding: 1px 7px;
   border-radius: var(--radius-pill);
   background: var(--color-warning-bg);
@@ -2153,7 +2155,12 @@
   font-size: var(--text-2xs);
   font-style: normal;
   font-weight: 500;
-  white-space: nowrap;
+}
+.mission-contribution-reason .mission-premise-tag {
+  margin-bottom: var(--space-2);
+}
+.mission-before-after .mission-premise-tag {
+  margin-top: var(--space-2);
 }
 .mission-premise-recheck {
   margin: -8px 0 18px;

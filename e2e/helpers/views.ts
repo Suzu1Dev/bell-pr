@@ -4,8 +4,10 @@
 // check-off dialog open, the Practice view, the rules card, the Draft
 // tab's maintainer checklist, the sample's code walkthrough with a range
 // marked in the diff, its commit history with a commit open on a file's
-// diff, and the publish dialog's groups of checks on a real run. Each view opens its route, then drive() takes it to the
-// state; `include` names the part of the page the view is about.
+// diff, the brief of a real run whose premise was refuted, and the publish
+// dialog's groups of checks on a real run. Each view opens its route, then
+// drive() takes it to the state; `include` names the part of the page the
+// view is about.
 import { expect, type Page } from "@playwright/test";
 import type { Locale } from "../../shared/i18n/locale";
 import { getDemo } from "../../src/demo";
@@ -22,6 +24,8 @@ export interface StateView {
   include: string;
   /** The view needs a real project's server (startRealProject with these options). */
   real?: RealProjectOptions;
+  /** Wider windows to check besides the phones, where the view's layout changes. */
+  wider?: { width: number; height: number }[];
 }
 
 const panel = (page: Page) => page.locator(".understanding-check");
@@ -155,6 +159,39 @@ export const stateViews: StateView[] = [
       await review.getByRole("button", { name: t.show }).click();
       await review.locator(".commit-files .file-item").first().click();
       await expect(review.locator(".rv-line").first()).toBeVisible();
+    },
+  },
+  {
+    // A real run whose premise check refuted the request's assumption: the
+    // brief's motivation and after card carry the tag, at every width.
+    name: "premise-refuted",
+    route: `#/runs/${runId}/overview`,
+    include: ".mission-contribution",
+    real: {
+      run: {
+        // Short enough for the sidebar's run list at 768 and 1024 px.
+        title: "Greet by language",
+        team: {
+          config: { maxTeammates: 2, requirePlanApproval: true, provider: "codex", protocol: "bell-shared-tasks", messageDelivery: "between-turns" },
+          phase: "complete",
+          planSummary: "Look greetings up in a table of languages.",
+          tasks: [],
+          messages: [],
+          premise: {
+            verdict: "refuted",
+            statement: "Greetings are always in English today.",
+            evidence: "src/greeting.ts already reads the language from its options.",
+          },
+        },
+      },
+    },
+    wider: [
+      { width: 768, height: 1024 },
+      { width: 1024, height: 768 },
+    ],
+    async drive(page, locale) {
+      const t = messages[locale].mission.brief;
+      await expect(page.locator(".mission-after .mission-premise-tag")).toHaveText(t.premiseRefuted);
     },
   },
   {
