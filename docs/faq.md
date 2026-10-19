@@ -178,6 +178,12 @@ agents, they have your full user rights, and those runs are marked. The
 [security model](security-model.md) explains every protection and its
 limits.
 
+Agents are also told never to change the machine: no `sudo` and no
+global or user-level installs. When a check needs a tool the machine
+lacks, the run's overview lists it with a suggested command, for you to
+check against the project's documentation and run yourself; BELL PR never
+runs it.
+
 ### Why do I need a sign-in link for a program on my own computer?
 
 BELL PR is a local web server. The link proves that the browser belongs to
@@ -264,6 +270,13 @@ Yes. Add `?present=1` to the address after the `#/…` part, for example
 folders. The sample project can play its whole run as a timeline with
 `#/runs/demo-run/activity?demo=play`; `speed=1` to `4` sets the pace, and
 `locale=en` or `locale=zh-TW` sets the language for that page load only.
+
+### Does an address with `?run=` still open?
+
+Yes. An address that keeps the view in a query string, such as
+`?run=<id>&tab=draft`, `?project=<id>` or `?page=discovery`, opens the
+same contribution, tab, project or page, and the address bar switches to
+the `#/…` form.
 
 ### Where is my data, and how do I delete it?
 
