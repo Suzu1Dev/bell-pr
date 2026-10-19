@@ -66,14 +66,22 @@ export function describeAgentTimeout(timeoutMs: number): string {
 }
 
 /**
- * Replaces command()'s generic 504 with advice the person can act on; any
- * other error is returned unchanged so git/gh behaviour stays the same.
+ * Replaces command()'s generic 504 with advice the person can act on, and its
+ * exit failure (the raw tail of the CLI's output) with the error the CLI
+ * reported in its event stream, when it reported one; any other error is
+ * returned unchanged so git/gh behaviour stays the same.
  */
 export function withAgentTimeoutHint(
   error: unknown,
   executable: string,
   timeoutMs: number,
+  reported?: string,
 ): unknown {
+  if (error instanceof AppError && error.statusCode === 422 && reported)
+    return new AppError(
+      (m) => m.run.command.failed({ executable, output: reported }),
+      422,
+    );
   if (!(error instanceof AppError) || error.statusCode !== 504) return error;
   return new AppError(
     (m) =>
