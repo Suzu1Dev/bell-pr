@@ -36,6 +36,18 @@ export interface WalkthroughCardsProps {
   busy?: boolean;
 }
 
+/**
+ * A one-sentence note with its `code` spans shown as code, the way the
+ * cards' Markdown shows them; phrasing content, so it fits a <summary>.
+ */
+function InlineCode({ text }: { text: string }) {
+  return text
+    .split(/(`[^`\n]+`)/)
+    .map((part, index) =>
+      index % 2 ? <code key={index}>{part.slice(1, -1)}</code> : part,
+    );
+}
+
 function References({
   title,
   icon,
@@ -63,7 +75,11 @@ function References({
                   {entry.line !== null && `:${entry.line}`}
                 </code>
               )}
-              {entry.note && <span>{entry.note}</span>}
+              {entry.note && (
+                <span>
+                  <InlineCode text={entry.note} />
+                </span>
+              )}
             </li>
           ))}
         </ul>
@@ -267,7 +283,11 @@ export function WalkthroughCards({
           )}
           {unit.selfCheck.question && (
             <details className="walkthrough-check">
-              <summary>{t.selfCheck({ question: unit.selfCheck.question })}</summary>
+              <summary>
+                {withNodes(t.selfCheck, {
+                  question: <InlineCode text={unit.selfCheck.question} />,
+                })}
+              </summary>
               <MarkdownContent>{unit.selfCheck.answer}</MarkdownContent>
             </details>
           )}

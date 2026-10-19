@@ -31,6 +31,17 @@ test("a ready walkthrough shows the function, its parts with their lines, caller
   assert.match(html, /<details class="walkthrough-check"><summary>考考自己：/);
 });
 
+test("code in a caller's or callee's note and in the self-check question shows as code, not backticks", () => {
+  for (const html of [
+    render(client, { demo: true }),
+    renderEn(createElement(WalkthroughCards, { file: getDemo("en").files.find((entry) => entry.path === "src/client.ts")!, demo: true })),
+  ]) {
+    assert.doesNotMatch(html, /`/);
+    assert.match(html, /<span>[^<]*<code>baseURL<\/code>/);
+    assert.match(html, /<summary>[^<]*<code>fetch<\/code>/);
+  }
+});
+
 test("waiting, failed, unavailable and empty walkthroughs each explain themselves", () => {
   const base: DiffFile = { ...client, walkthrough: undefined };
   assert.match(render({ ...base, walkthroughStatus: "pending" }), /程式碼解說會自動準備好/);
