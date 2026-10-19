@@ -76,10 +76,15 @@ const common = {
    * behind its leading label (FailureText).
    */
   failureText: {
-    /** The label before the first colon, such as "claude failed", as a sentence. */
-    label: ({ label }: { label: string }) => `${label}.`,
+    /**
+     * The label before the first colon, such as "claude failed", as a
+     * sentence. It is in the error's language: `fullWidth` when it ended at
+     * a full-width colon (Chinese text), which keeps its own punctuation.
+     */
+    label: ({ label, fullWidth }: { label: string; fullWidth: boolean }) =>
+      fullWidth ? label : `${label}.`,
     /** The label when the error starts with no short one. */
-    fallback: "The command failed",
+    fallback: "The command failed.",
     showRaw: ({ count }: { count: string }) =>
       `Show the raw output (${count} characters)`,
     hideRaw: "Hide the raw output",

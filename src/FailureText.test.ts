@@ -28,3 +28,11 @@ test("in English the label ends at the first colon and the length is a formatted
   assert.match(html, /Show the raw output \(1,375 characters\)/);
   assert.match(renderEn(createElement(FailureText, { text: "y".repeat(300) })), /^The command failed\.<button/);
 });
+
+test("the label keeps its own language's full stop when the page is in the other language", () => {
+  const english = `codex failed: ${'{"type":"error"},'.repeat(40)}`;
+  assert.match(render(english), /^codex failed\.<button/);
+  const chinese = `claude 執行失敗：${'{"type":"error"},'.repeat(40)}`;
+  const html = renderEn(createElement(FailureText, { text: chinese }));
+  assert.match(html, /^claude 執行失敗<button/);
+});

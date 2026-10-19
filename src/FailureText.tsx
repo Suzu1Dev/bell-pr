@@ -6,15 +6,17 @@ const readableLength = 280;
 
 /**
  * The short label an error opens with, such as "claude failed" in
- * "claude failed: …" (or the zh-TW full-width colon), or undefined.
+ * "claude failed: …" (or the zh-TW full-width colon), and whether it ended
+ * at a full-width colon; or undefined.
  */
 function leadingLabel(text: string) {
   // i18n-allow: parser
-  const colons = [text.indexOf("："), text.indexOf(": ")].filter(
-    (index) => index > 0,
-  );
+  const fullWidth = text.indexOf("：");
+  const colons = [fullWidth, text.indexOf(": ")].filter((index) => index > 0);
   const colon = colons.length ? Math.min(...colons) : -1;
-  return colon > 0 && colon <= 40 ? text.slice(0, colon) : undefined;
+  return colon > 0 && colon <= 40
+    ? { label: text.slice(0, colon), fullWidth: colon === fullWidth }
+    : undefined;
 }
 
 /**
@@ -27,9 +29,12 @@ export function FailureText({ text }: { text: string }) {
   const format = useFormat();
   const [open, setOpen] = useState(false);
   if (text.length <= readableLength) return <>{text}</>;
+  // The label is in the error's own language (the run's), so it ends with
+  // that language's full stop, not the page's.
+  const leading = leadingLabel(text);
   return (
     <>
-      {t.label({ label: leadingLabel(text) ?? t.fallback })}
+      {leading ? t.label(leading) : t.fallback}
       <button
         type="button"
         className="failure-toggle"
