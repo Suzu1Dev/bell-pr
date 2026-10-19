@@ -400,6 +400,112 @@ test("a state.json written by upstream cdcfb06 with follow-up rounds and syncs l
   assert.deepEqual(reopened.data, JSON.parse(written));
 });
 
+/**
+ * A state.json written by the upstream repository at 1fb6329, by its own
+ * Workbench (its team, follow-up and walkthrough tests, instrumented to
+ * keep the file): a team run whose lead checked the premise and whose
+ * teammates reported missing setup, a published run whose follow-up rounds
+ * reported missing setup, and a run with a function walkthrough (temp
+ * paths replaced).
+ */
+const upstream1fb6329 = () =>
+  readFile(
+    path.join(import.meta.dirname, "fixtures", "state-upstream-1fb6329.json"),
+    "utf8",
+  );
+
+test("a state.json written by upstream 1fb6329 with premise checks, setup needs and walkthroughs loads and saves unchanged", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const written = await upstream1fb6329();
+  await writeFile(path.join(directory, "state.json"), written);
+  const store = new Store(directory);
+  await store.initialize();
+  // Nothing was interrupted, so loading changes nothing.
+  assert.deepEqual(store.data, JSON.parse(written));
+  const [team, published, walked] = store.data.runs;
+  assert.deepEqual(team.team?.premise, {
+    verdict: "unclear",
+    statement: "輸出格式在各模組不一致。",
+    evidence: "a.ts:1 與 b.ts:1 各自定義格式。",
+  });
+  assert.deepEqual(
+    team.team?.tasks.map((task) => task.setup?.map((need) => need.command)),
+    [["sudo apt install libglib2.0-dev"], ["rustup component add rustfmt"], undefined],
+  );
+  // A constant the diff replaced whole is new code; a changed function is explained.
+  assert.deepEqual(team.walkthroughs?.["a.ts"]?.content, { functions: [], newUnits: ["value"] });
+  const walkthrough = walked.walkthroughs?.["count.ts"];
+  assert.equal(walkthrough?.status, "ready");
+  assert.equal(walkthrough?.content?.functions[0].name, "count");
+  assert.deepEqual(walkthrough?.content?.functions[0].steps, [
+    { startLine: 2, endLine: 3, explanation: "計算並回傳。" },
+  ]);
+  assert.deepEqual(
+    published.followUps?.map((round) => [round.status, round.setup?.[0]?.command]),
+    [
+      ["published", "rustup component add rustfmt"],
+      ["failed", "rustup component add rustfmt"],
+      ["discarded", "rustup component add rustfmt"],
+    ],
+  );
+  assert.ok(published.publishCommit);
+  // The run list leaves the walkthroughs and the rounds to the open run.
+  for (const run of store.data.runs) {
+    const summary = summarizeRun(run) as Record<string, unknown>;
+    assert.equal("walkthroughs" in summary, false);
+    assert.equal("followUps" in summary, false);
+  }
+  // This build writes it back field for field.
+  await store.save();
+  const reopened = new Store(directory);
+  await reopened.initialize();
+  assert.deepEqual(reopened.data, JSON.parse(written));
+});
+
+/**
+ * A state.json written by this product before the port of upstream
+ * #15-#28 (fb60a66), by its own Workbench (the team test, instrumented to
+ * add a note and a review mark and keep the file; temp paths replaced).
+ */
+test("a state.json written by the product at fb60a66 loads and saves unchanged, without the ported fields", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const written = await readFile(
+    path.join(import.meta.dirname, "fixtures", "state-product-fb60a66.json"),
+    "utf8",
+  );
+  await writeFile(path.join(directory, "state.json"), written);
+  const store = new Store(directory);
+  await store.initialize();
+  assert.deepEqual(store.data, JSON.parse(written));
+  const [run] = store.data.runs;
+  assert.equal(run.locale, "zh-TW");
+  assert.equal(run.notes?.["a.ts"]?.text, "The value now matches the other modules.");
+  assert.equal(run.team?.premise, undefined);
+  assert.equal(run.walkthroughs, undefined);
+  assert.ok(run.team?.tasks.every((task) => task.setup === undefined));
+  await store.save();
+  const reopened = new Store(directory);
+  await reopened.initialize();
+  assert.deepEqual(reopened.data, JSON.parse(written));
+});
+
+test("an upstream 1fb6329 state saved while a walkthrough was being written reopens with it failed", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const data = JSON.parse(await upstream1fb6329()) as Database;
+  data.runs[0].walkthroughs!["b.ts"].status = "generating";
+  await writeFile(path.join(directory, "state.json"), JSON.stringify(data));
+  const store = new Store(directory);
+  await store.initialize();
+  const entry = store.data.runs[0].walkthroughs!["b.ts"];
+  assert.equal(entry.status, "failed");
+  assert.ok(entry.error);
+  // The other files' walkthroughs stay as they were.
+  assert.equal(store.data.runs[0].walkthroughs!["a.ts"].status, "ready");
+});
+
 test("an upstream state saved during a follow-up round or a conflict resolution reopens in review", async (t) => {
   const { directory, cleanup } = await dataDirectory();
   t.after(cleanup);
