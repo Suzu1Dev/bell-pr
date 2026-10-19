@@ -236,12 +236,12 @@ When the team is done, the run waits for your review in **Code changes**:
   example of the behavior before and after, what changed and why, the
   concepts involved, what to check, another way it could have been done and
   a question to test yourself.
-- **Ask the agent**: click a line (Shift for several) and ask about it.
+- **Ask**: click a line (Shift for several) and ask the agent about it.
   Answers are saved with the run.
 - **Reviews**: the Lead's summary and the Reviewer's and Test analyst's
   reports, with the parts about this file marked. **Run the review again**
   after you changed something.
-- **Code walkthrough**: for a modified code file, the functions around
+- **Walkthrough**: for a modified code file, the functions around
   each change, step by step, each with the lines it covers (click them to
   mark those lines in the diff), what calls it and what it calls, another
   way to see it and a question to check yourself. A function the change adds whole has no

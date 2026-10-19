@@ -181,6 +181,21 @@ test("a click on either side of the split view leaves the keys working from that
   await expect(page.locator('.rv-diff [role=listbox] [tabindex="0"]')).toHaveCount(1);
 });
 
+test("the explanation panel's four tabs share one row at desktop widths, in both languages", async ({ page }) => {
+  for (const locale of locales)
+    for (const width of [1280, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      // As the screenshots show it: presentation mode, where the panel is narrowest.
+      await page.goto(`/#/runs/demo-run/changes?present=1&capture=1&locale=${locale}`);
+      await expect(page.locator(".explain-tabs [role=tab]")).toHaveCount(4);
+      await page.evaluate(() => document.fonts.ready);
+      const tops = await page
+        .locator(".explain-tabs [role=tab]")
+        .evaluateAll((tabs) => tabs.map((tab) => Math.round(tab.getBoundingClientRect().top)));
+      expect(new Set(tops).size, `${locale} at ${width} px: ${tops.join(", ")}`).toBe(1);
+    }
+});
+
 test("the explanation panel's tabs move with the arrow keys and keep one tab stop", async ({ page }) => {
   await openChanges(page);
   const tab = (name: keyof typeof review.panel.tabs) =>

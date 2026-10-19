@@ -450,7 +450,7 @@ test("an English render of the explanation tab has no Han in its own text", () =
       'aria-label="Learning panel"',
       "Explanation</button>",
       "Reviews</button>",
-      "Ask the agent</button>",
+      "Ask</button>",
       "A plain-language example",
       "Picture this",
       "What changed here?",
@@ -917,6 +917,6 @@ test("the panel opens on the tab the reader last chose and reports each change o
     }),
   );
   assertNoHan(english);
-  assert.match(english, /aria-selected="true"[^>]*>(?:(?!<\/button>).)*Code walkthrough/);
+  assert.match(english, /aria-selected="true"[^>]*>(?:(?!<\/button>).)*Walkthrough<\/button>/);
 });
 

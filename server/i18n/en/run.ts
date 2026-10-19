@@ -332,7 +332,7 @@ export default {
     tooLarge:
       "The changes are larger than 100 KB, so no code walkthrough is made automatically.",
     overLimit: ({ limit }: { limit: number }) =>
-      `This change touches more than ${limit} code files, and code walkthroughs are made automatically for the first ${limit} only; ask about the others in "Ask the agent".`,
+      `This change touches more than ${limit} code files, and code walkthroughs are made automatically for the first ${limit} only; ask about the others in the Ask tab.`,
     incomplete: "The agent's code walkthrough was incomplete.",
     tooEarly: "Wait for development to finish before generating code walkthroughs.",
     stopped: "The code walkthrough stopped; you can retry it.",

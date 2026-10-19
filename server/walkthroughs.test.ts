@@ -480,7 +480,7 @@ test("the reasons a file gets no walkthrough are worded in the run's language", 
   withLocale("en", () => synchronizeWalkthroughs(run, files));
   assert.equal(files[0].walkthroughError, "This kind of file has no functions to walk through.");
   assert.match(files[1].walkthroughError!, /^An added or deleted file has no earlier logic/);
-  assert.match(files.at(-1)!.walkthroughError!, /more than 12 code files[^]*"Ask the agent"/);
+  assert.match(files.at(-1)!.walkthroughError!, /more than 12 code files[^]*in the Ask tab\./);
   assert.equal(
     withLocale("en", () =>
       parseWalkthrough(
