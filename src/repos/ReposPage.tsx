@@ -126,7 +126,13 @@ export function ReposPage({
               </div>
               <span className="repo-owner">{repo.owner}</span>
               <h2>{repo.name}</h2>
-              <p>{sample ? t.demoDescription : maskPath(repo.path)}</p>
+              {sample ? (
+                <p>{t.demoDescription}</p>
+              ) : (
+                <p className="repository-path" title={maskPath(repo.path)}>
+                  <span>{maskPath(repo.path)}</span>
+                </p>
+              )}
               <div className="repository-meta">
                 <span>
                   <span className="language-dot" />

@@ -22,12 +22,16 @@ const workspace = {
     review: { title: "Understand and review", description: "Read it, then explain it back" },
     submit: { title: "Submit", description: "Your next pull request" },
   },
+  /** A workflow step's tooltip: its number, name and what happens in it. */
+  stepTooltip: ({ n, title, description }: { n: string; title: string; description: string }) =>
+    `${n} ${title}: ${description}`,
   tabsLabel: "Task content",
   tabs: {
     overview: "Overview & motivation",
     changes: "Code changes",
     activity: "Agent activity",
     draft: "PR draft",
+    commits: "Commit history",
   },
   /** The badge of a run whose Claude Code agent ran without the OS sandbox. */
   unsandboxed: {
@@ -124,6 +128,7 @@ const workspace = {
     viewMode: "Diff view mode",
     unified: "Unified view",
     split: "Split view",
+    worktreeLabel: "Worktree",
     worktreeHint:
       "You can edit files in this folder directly. Refresh the diff to update the explanations and the review status.",
     copyWorktree: "Copy the worktree path",
@@ -243,9 +248,10 @@ const workspace = {
   activity: {
     runTitle: "How it ran",
     runText:
-      "The task board is above; the full log, error messages and the stop button stay here.",
+      "The task board is above; the full log, error messages and the stop button stay here. Development runs in a separate Git worktree, and after the review you decide when to submit.",
     teamTitle: "Your agent team",
-    teamText: "Each role has its own job, and everything happens here.",
+    teamText:
+      "Each role has its own job, and everything happens here. Development runs in a separate Git worktree, and after the review you decide when to submit.",
     stopReview: "Stop the re-review",
     stopTask: "Stop the task",
     log: "Run log",
@@ -256,10 +262,6 @@ const workspace = {
     all: "All",
     emptyLog: "The log appears here once the task starts.",
     emptyFilter: "This role has no log entries yet.",
-    eyebrow: "MISSION BRIEF",
-    goal: "This contribution's goal",
-    isolation:
-      "Development runs in a separate Git worktree. After the review, you decide when to submit.",
   },
   /** Defaults of the contribution brief built from a run's settings. */
   brief: {
@@ -281,9 +283,9 @@ const workspace = {
       "This sync adds one merge commit to the PR branch and keeps the PR title and description as they are. Review the files the target branch changed in “Code changes” first, then check the commit message below.",
     roundNotice:
       "This round adds one new commit to the PR branch and keeps the PR title and description as they are. Review the files this round changed in “Code changes” first, then check the commit message below.",
-    proposalNotice: `The description below is the suggestion ${product.name} wrote from the project's rules, and you have not edited it yet. It goes to GitHub exactly as it is: confirm it in your own words before submitting, and keep to-dos in the checklist above, not in the description.`,
+    proposalNotice: `The description below is the suggestion ${product.name} wrote from the project's rules, and you have not edited it yet. It goes to GitHub exactly as it is: confirm it in your own words before submitting, and keep to-dos in the checklist of the guide below, not in the description.`,
     emptyNotice:
-      "There is no PR description yet. Generate and apply a suggested draft above, or write in your own words what changed, why, and which checks you actually ran. The agents' full reports are in the explanation panel next to the code.",
+      "There is no PR description yet. Generate and apply a suggested draft below, or write in your own words what changed, why, and which checks you actually ran. The agents' full reports are in the explanation panel next to the code.",
     titleLabel: "Pull request title",
     /** The group of the Edit and Preview buttons. */
     modeLabel: "Description view",
@@ -494,6 +496,10 @@ const workspace = {
   },
   /** Toasts and confirmations from the run hooks. */
   notices: {
+    /** `verdict` is one of team.premise.verdicts. */
+    premiseChecked: ({ verdict }: { verdict: string }) =>
+      `Premise checked: ${verdict}. If the verdict changed, the code walkthroughs, and the explanations you have not answered yet, are made again with it.`,
+    premiseNone: "The request states no assumption to check.",
     stopResolving:
       "Stopped resolving conflicts. The files already changed are kept; finish them yourself or ask the agent again.",
     stopRoundKept:

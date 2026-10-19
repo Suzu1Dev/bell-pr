@@ -210,6 +210,98 @@ test("demo=play plays the sample from queued to a published sample PR, with no t
   }
 });
 
+test("while capturing, a played answer starts on the same tick every time and the chat jumps to it", async ({ browser }) => {
+  test.setTimeout(90_000);
+  const context = await browser.newContext({
+    baseURL: server.baseURL,
+    storageState: server.storageState,
+    viewport: { width: 1440, height: 900 },
+    locale: "en-US",
+    timezoneId: "UTC",
+  });
+  try {
+    const page = await context.newPage();
+    // How each scroll into view was asked for.
+    await page.addInitScript(() => {
+      const behaviors: string[] = [];
+      (window as unknown as { behaviors: string[] }).behaviors = behaviors;
+      const scroll = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = function (options?: boolean | ScrollIntoViewOptions) {
+        if (typeof options === "object" && options.behavior) behaviors.push(options.behavior);
+        return scroll.call(this, options);
+      };
+    });
+    await page.goto("/#/runs/demo-run/activity?demo=play&speed=4&capture=1&locale=en");
+    const badge = page.locator(".workspace-heading .status-badge");
+    await expect(badge).toHaveText(status.awaiting_plan, { timeout: 20_000 });
+    await page.getByRole("button", { name: team.approval.approve }).click();
+    await expect(badge).toHaveText(status.review, { timeout: 30_000 });
+
+    await page.locator("#workspace-tab-changes").click();
+    await page.getByRole("button", { name: review.panel.askAboutChange }).click();
+    // From here the page's clock stands still until the test moves it.
+    await page.clock.install({ time: new Date("2026-10-19T09:00:00Z") });
+    await page.clock.pauseAt(new Date("2026-10-19T09:00:01Z"));
+    const question = page.getByRole("textbox", { name: review.chat.inputLabel });
+    await question.fill("Why full jitter?");
+    await question.press("Enter");
+    const answer = page.locator(".explain-message-assistant");
+    // Capturing waits the middle of the pause range, 600 ms, every time.
+    await page.clock.runFor(599);
+    await expect(answer).toHaveCount(0);
+    await page.clock.runFor(1);
+    await expect(answer).toHaveCount(1);
+    await page.clock.runFor(10_000);
+    await expect(page.locator(".explain-loading")).toHaveCount(0);
+    const behaviors = await page.evaluate(
+      () => (window as unknown as { behaviors: string[] }).behaviors,
+    );
+    expect(behaviors.length).toBeGreaterThan(0);
+    expect(new Set(behaviors)).toEqual(new Set(["instant"]));
+  } finally {
+    await context.close();
+  }
+});
+
+test("the chat scrolls smoothly unless the person prefers reduced motion", async ({ browser }) => {
+  for (const reducedMotion of ["no-preference", "reduce"] as const) {
+    const context = await browser.newContext({
+      baseURL: server.baseURL,
+      storageState: server.storageState,
+      viewport: { width: 1440, height: 900 },
+      locale: "en-US",
+      reducedMotion,
+    });
+    try {
+      const page = await context.newPage();
+      await page.addInitScript(() => {
+        const behaviors: string[] = [];
+        (window as unknown as { behaviors: string[] }).behaviors = behaviors;
+        const scroll = Element.prototype.scrollIntoView;
+        Element.prototype.scrollIntoView = function (options?: boolean | ScrollIntoViewOptions) {
+          if (typeof options === "object" && options.behavior) behaviors.push(options.behavior);
+          return scroll.call(this, options);
+        };
+      });
+      await page.goto("/#/runs/demo-run/changes?locale=en");
+      await page.getByRole("button", { name: review.panel.askAboutChange }).click();
+      const question = page.getByRole("textbox", { name: review.chat.inputLabel });
+      await question.fill("Why full jitter?");
+      await question.press("Enter");
+      await expect(page.locator(".explain-message-assistant")).toHaveCount(1);
+      const behaviors = await page.evaluate(
+        () => (window as unknown as { behaviors: string[] }).behaviors,
+      );
+      expect(behaviors.length).toBeGreaterThan(0);
+      expect(new Set(behaviors)).toEqual(
+        new Set([reducedMotion === "reduce" ? "instant" : "smooth"]),
+      );
+    } finally {
+      await context.close();
+    }
+  }
+});
+
 test("stopping the sample's team sends nothing and leaves it stopped", async ({ browser }) => {
   const context = await browser.newContext({
     baseURL: server.baseURL,

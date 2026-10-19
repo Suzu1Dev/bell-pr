@@ -9,6 +9,7 @@ import {
   maskPath,
   maskUser,
   parsePresentationFlags,
+  scrollBehavior,
   usePresentation,
 } from "./presentation";
 
@@ -160,3 +161,17 @@ test("the masked login reads 'you' in the UI language", async (t) => {
   await setLocale("en");
   assert.equal(maskUser("real-user", true), "you");
 });
+
+test("scrolling into view jumps while capturing or for reduced motion, and glides otherwise", () => {
+  const media = (reduce: boolean) => (query: string) => ({
+    matches: reduce && query === "(prefers-reduced-motion: reduce)",
+  });
+  assert.equal(scrollBehavior(true, media(false)), "instant");
+  assert.equal(scrollBehavior(false, media(true)), "instant");
+  assert.equal(scrollBehavior(false, media(false)), "smooth");
+  // Without a browser (a test, a server render) nothing asks for reduced motion.
+  assert.equal(scrollBehavior(false, undefined), "smooth");
+  // capture=1 in the address is the flag it reads by default.
+  assert.equal(parsePresentationFlags("#/runs/demo-run/changes?capture=1").capture, true);
+});
+

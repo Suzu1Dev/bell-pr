@@ -100,22 +100,32 @@ const structuralKeys = new Set([
   "to",
   "topic",
   "url",
+  "verdict",
 ]);
 
+// Inside a code walkthrough, what the unit is (its kind) and the name of a
+// caller that is no function (such as a README example) are copy too, and
+// so is the evidence of the lead's premise check.
+const walkthroughCopy =
+  /\.walkthrough\.functions\.(kind|callers\.name)$|\.team\.premise\.evidence$/;
+
 /** The demo with its copy blanked out: what every locale must share. */
-function structure(value: unknown, key = "", copyOnly = false): unknown {
+function structure(value: unknown, key = "", copyOnly = false, where = ""): unknown {
   if (typeof value === "function") return "<function>";
   if (value instanceof RegExp) return "<RegExp>";
   if (Array.isArray(value))
-    return value.map((item) => structure(item, key, copyOnly));
+    return value.map((item) => structure(item, key, copyOnly, where));
   if (value && typeof value === "object")
     return Object.fromEntries(
       Object.entries(value).map(([name, item]) => [
         name,
-        structure(item, name, copyOnly || key === "discovery"),
+        structure(item, name, copyOnly || key === "discovery", `${where}.${name}`),
       ]),
     );
-  if (typeof value === "string" && (copyOnly || !structuralKeys.has(key)))
+  if (
+    typeof value === "string" &&
+    (copyOnly || !structuralKeys.has(key) || walkthroughCopy.test(where))
+  )
     return "<copy>";
   return value;
 }

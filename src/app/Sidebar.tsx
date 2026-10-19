@@ -1,11 +1,5 @@
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import {
-  Fragment,
-  type Dispatch,
-  type ReactNode,
-  type SetStateAction,
-} from "react";
-import {
-  ArrowUpRight,
   BookOpen,
   ChevronRight,
   CircleHelp,
@@ -17,7 +11,6 @@ import {
   Plus,
   Search,
   Settings2,
-  Sparkles,
   UserRound,
   Workflow,
   type LucideIcon,
@@ -195,23 +188,6 @@ export function Sidebar({
           </button>
         </div>
         <div className="sidebar-bottom">
-          <div className="learning-card">
-            <div className="learning-card-icon">
-              <Sparkles size={17} />
-            </div>
-            <strong>{t.sidebar.learningTitle}</strong>
-            <p>
-              {t.sidebar.learningText.split("\n").map((line, index) => (
-                <Fragment key={index}>
-                  {index > 0 && <br />}
-                  {line}
-                </Fragment>
-              ))}
-            </p>
-            <button onClick={() => navigate("learning")}>
-              {t.sidebar.learningAction} <ArrowUpRight size={14} />
-            </button>
-          </div>
           {navItem("settings", Settings2)}
           <button
             className="nav-item"

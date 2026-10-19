@@ -3,13 +3,12 @@ import {
   Bot,
   Circle,
   CircleCheck,
-  GitBranch,
   Loader2,
-  ShieldCheck,
   Square,
 } from "lucide-react";
 import { useFormat, useT } from "../i18n";
 import type { Run } from "../types";
+import { FailureText } from "../FailureText";
 import { TeamBoard } from "../team/TeamBoard";
 import type { RunActions } from "../app/hooks/useRunActions";
 
@@ -32,7 +31,7 @@ interface ActivityTabProps {
   >;
 }
 
-/** The agent team's board, the run log and the mission brief. */
+/** The agent team's board and the run log. */
 export function ActivityTab({
   run,
   demo,
@@ -182,21 +181,12 @@ export function ActivityTab({
               <p className="muted">{t.emptyFilter}</p>
             )}
           </div>
-          {run.error && <p className="inline-error">{run.error}</p>}
+          {run.error && (
+            <p className="inline-error">
+              <FailureText text={run.error} />
+            </p>
+          )}
         </div>
-        <aside className="task-brief">
-          <span className="eyebrow">{t.eyebrow}</span>
-          <h3>{t.goal}</h3>
-          <p>{run.prompt}</p>
-          <div className="brief-meta">
-            <GitBranch size={16} />
-            <span>{run.branch}</span>
-          </div>
-          <div className="callout">
-            <ShieldCheck size={18} />
-            <p>{t.isolation}</p>
-          </div>
-        </aside>
       </div>
     </>
   );

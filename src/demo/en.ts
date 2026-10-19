@@ -304,6 +304,12 @@ const en: DemoContent = buildDemoContent({
   team: {
     planSummary:
       "Four scoped tasks: shared types first, then the client and the docs in parallel, then tests and a cross-review to confirm that retries cover only recoverable GET failures.",
+    premise: {
+      statement:
+        "The request takes for granted that GET requests do not retry today, so one brief failure fails the request outright.",
+      evidence:
+        "src/client.ts:12 sends a single fetch and reads the JSON without checking the status. src/utils/retry.ts:6 defines withRetry, but nothing calls it yet.",
+    },
     tasks: {
       "task-1": {
         title: "Define the retry policy and types",
@@ -332,6 +338,13 @@ const en: DemoContent = buildDemoContent({
           "Check the retry limit, the errors that never retry and what the last failure returns.",
         report:
           "This is a sample test plan. No tests were run against a real repository.",
+        setup: [
+          {
+            need: "Chromium for the browser tests",
+            reason:
+              "The README's “Browser tests” section runs the retry tests in a browser with npm run test:browser. This machine has no Chromium for Playwright, so that check did not run here.",
+          },
+        ],
       },
     },
     messages: {
@@ -707,6 +720,38 @@ const en: DemoContent = buildDemoContent({
   },
   restatement:
     "Keep the old delay option working for one release, and add a test that the last error is thrown.",
+  walkthrough: {
+    kind: "function",
+    summary:
+      "Takes the settings (`baseURL` and `retry`) and returns an object with a `get` method. `get` builds the full URL from `baseURL`, sends the request and reads the reply as JSON. Before this change, `get` sent one request and read the JSON without looking at the status code, so a `503` reply was read as data too.",
+    change:
+      "The change wraps the body of `get` in `withRetry` and checks `response.ok` before reading the JSON. A failure throws an `HttpError`, so `shouldRetry` can decide from the status code whether to try again; how you call `createClient` stays the same.",
+    steps: [
+      "A factory function: it keeps `options` in a closure, so every later call to `get` on the returned object reads the same settings.",
+      "The heart of `get`: build the URL, send the request, make sure the status code is a success, then parse the JSON. These lines sit inside the function passed to `withRetry`, so every retry sends the request again.",
+      "The retry settings: start from the caller's `retry`, then add which errors are worth retrying. Temporary server errors and network errors try again; errors that need a fix, such as `401` or `404`, do not.",
+      "The wrap-up: it closes the `withRetry` call and the returned object.",
+    ],
+    callers: [
+      {
+        name: "The README's usage example",
+        note: "Shows how to create a client with `baseURL` and `retry`.",
+      },
+    ],
+    callees: [
+      "Owns the number of retries and the waits; `get` only tells it what to do and which errors may try again.",
+      "Keeps the failed Response, so `shouldRetry` can see its status code.",
+      "The HTTP request built into browsers and Node.js; on a `500` it still returns a Response instead of throwing.",
+    ],
+    analogy:
+      "Like asking an assistant to book tables: you hand over the list of restaurants once (`baseURL`), then just name the one you want (`path`). On a busy line the assistant calls again by your rules (`withRetry`), but when the place says it doesn't exist, there's no point redialing.",
+    selfCheck: {
+      question:
+        "Why does the `fetch` line sit inside the function passed to `withRetry`, instead of calling `fetch` once and handing the result to `withRetry`?",
+      answer:
+        "`withRetry` calls the function it was given again on every retry. With `fetch` inside it, every retry really sends a new request; calling `fetch` first would only re-read the same failed result.",
+    },
+  },
 });
 
 export default en;

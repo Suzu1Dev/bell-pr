@@ -150,6 +150,27 @@
   margin: 12px 0 0;
   white-space: pre-wrap;
 }
+/* A long plan and long task descriptions open to their first lines. */
+.team-plan > p.team-plan-folded,
+.team-task > p.team-task-folded {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  overflow: hidden;
+}
+.team-task > p.team-task-folded {
+  -webkit-line-clamp: 5;
+}
+.team-more-toggle {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-600);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .team-plan-action {
   display: flex;
   justify-content: space-between;
@@ -634,6 +655,114 @@
   font-size: var(--text-sm);
   line-height: 1.9;
 }
+/* The lead's check of the request's assumption. */
+.premise-notice {
+  margin-top: var(--space-3);
+  padding: 11px 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  font-size: var(--text-xs);
+  line-height: 1.75;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.premise-notice.premise-refuted {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-bg);
+}
+.premise-notice h3,
+.premise-notice summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.premise-notice summary {
+  flex-wrap: wrap;
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+.premise-notice summary > span {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-weight: 400;
+}
+.premise-holds svg {
+  color: var(--color-success);
+}
+.premise-refuted svg {
+  color: var(--color-warning);
+}
+.premise-unclear svg {
+  color: var(--color-text-muted);
+}
+.premise-notice p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+}
+.premise-notice .premise-statement {
+  font-weight: 550;
+}
+.premise-notice small {
+  display: block;
+  margin-top: 6px;
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+}
+.premise-compact {
+  margin: 0;
+  border-width: 0 0 1px;
+  border-radius: 0;
+}
+/* Setup the machine lacks for checks agents could not run: the person installs it. */
+.setup-needs {
+  margin: 0 var(--space-7) var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-bg);
+}
+.setup-needs h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 550;
+}
+.setup-needs > p {
+  margin: 6px 0 var(--space-3);
+  font-size: var(--text-xs);
+  line-height: 1.8;
+  color: var(--color-text-secondary);
+}
+.setup-needs ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.setup-needs li {
+  min-width: 0;
+  padding: 10px var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: var(--text-xs);
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.setup-needs li p {
+  margin: 2px 0 6px;
+  color: var(--color-text-secondary);
+}
+.setup-needs li small {
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+}
 @media (max-width: 1250px) {
   .team-board-content {
     grid-template-columns: 1fr;
@@ -657,6 +786,9 @@
   }
 }
 @media (max-width: 760px) {
+  .setup-needs {
+    margin: 0 var(--space-4) var(--space-4);
+  }
   .team-board {
     padding: 22px 15px;
   }

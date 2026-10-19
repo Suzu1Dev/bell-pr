@@ -276,6 +276,11 @@ const zhTW: DemoContent = buildDemoContent({
   team: {
     planSummary:
       "將重試策略、HTTP client 整合與驗證拆成明確範圍。先建立共用型別，再讓 client 與文件分頭作業；最後整合測試並交叉審閱，確認重試只套用在可恢復的 GET 失敗。",
+    premise: {
+      statement: "需求假設目前的 GET 請求不會重試，一次短暫失敗就讓整個請求失敗。",
+      evidence:
+        "src/client.ts:12 只送一次 fetch 就讀 JSON，不檢查狀態碼。src/utils/retry.ts:6 定義了 withRetry，但還沒有任何地方呼叫它。",
+    },
     tasks: {
       "task-1": {
         title: "定義重試策略與型別",
@@ -297,6 +302,13 @@ const zhTW: DemoContent = buildDemoContent({
         title: "驗證邊界與整合行為",
         description: "檢查重試上限、不可重試錯誤與最後一次失敗的回傳行為。",
         report: "此為示範測試計畫，未執行真實 repository 的測試。",
+        setup: [
+          {
+            need: "瀏覽器測試需要的 Chromium",
+            reason:
+              "README 的「Browser tests」一節以 npm run test:browser 在瀏覽器中執行重試測試。這台電腦沒有 Playwright 可用的 Chromium，因此這項檢查沒有在這裡執行。",
+          },
+        ],
       },
     },
     messages: {
@@ -659,6 +671,38 @@ const zhTW: DemoContent = buildDemoContent({
     nextStep: "下次在這裡開 Pull Request 前，先寫最後一次允許重試的測試。",
   },
   restatement: "讓舊的 delay 選項再支援一個版本，並補上會拋出最後一次錯誤的測試。",
+  walkthrough: {
+    kind: "函式",
+    summary:
+      "收到設定（`baseURL` 與 `retry`）後，回傳一個帶有 `get` 方法的物件。`get` 用 `baseURL` 組出完整網址、送出請求，再把回覆讀成 JSON。改動前的 `get` 只送一次請求就讀 JSON，不看狀態碼，所以伺服器回 `503` 時也會被當成資料讀取。",
+    change:
+      "這次把 `get` 的本體包進 `withRetry`，並在讀 JSON 前檢查 `response.ok`。失敗時丟出 `HttpError`，讓 `shouldRetry` 依狀態碼決定要不要再試；`createClient` 本身的用法沒有變。",
+    steps: [
+      "工廠函式：把 `options` 記在閉包裡，回傳的物件之後每次呼叫 `get` 都讀得到同一份設定。",
+      "`get` 的核心：組網址、送請求、確認狀態碼成功，再解析 JSON。這幾行包在傳給 `withRetry` 的函式裡，所以每次重試都會重新送一次請求。",
+      "重試設定：先沿用使用者給的 `retry`，再加上判斷哪些錯誤值得重試。暫時性的伺服器錯誤與網路錯誤會再試，`401`、`404` 這類需要修正的錯誤不會。",
+      "收尾：結束 `withRetry` 呼叫與回傳的物件。",
+    ],
+    callers: [
+      {
+        name: "README 的使用範例",
+        note: "示範用 `baseURL` 與 `retry` 建立 client。",
+      },
+    ],
+    callees: [
+      "負責重試次數與等待時間；`get` 只告訴它要做什麼、哪些錯誤可以再試。",
+      "把失敗的 Response 留下來，`shouldRetry` 才看得到狀態碼。",
+      "瀏覽器與 Node.js 內建的 HTTP 請求；遇到 `500` 仍會正常回傳 Response，不會自己丟錯。",
+    ],
+    analogy:
+      "像請助理幫你打電話訂位：你先交代餐廳名單（`baseURL`），之後每次只說想訂哪一家（`path`）。忙線時助理會照你的規則再撥（`withRetry`），但對方說「沒有這家店」就不必一直重撥。",
+    selfCheck: {
+      question:
+        "為什麼 `fetch` 那一行要放在傳給 `withRetry` 的函式裡，而不是先 `fetch` 一次再把結果交給 `withRetry`？",
+      answer:
+        "`withRetry` 每次重試都會重新呼叫傳進去的函式。把 `fetch` 放在裡面，每次重試才會真的重新送出請求；先 `fetch` 再交出去，重試只會重複讀同一個失敗的結果。",
+    },
+  },
 });
 
 export default zhTW;

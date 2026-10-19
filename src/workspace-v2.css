@@ -1,10 +1,7 @@
 /* A dedicated reading surface: give the code the space it deserves. */
 .workspace-heading {
-  padding-top: 24px;
-  padding-bottom: 21px;
-}
-.workflow-strip {
-  margin-bottom: 22px;
+  padding-top: 22px;
+  padding-bottom: 14px;
 }
 .review-tabs {
   gap: 23px;
@@ -241,10 +238,8 @@
     gap: 0;
   }
   .is-sidebar-collapsed .brand > span:not(.brand-symbol),
-  .is-sidebar-collapsed .workspace-switch,
   .is-sidebar-collapsed .nav-label,
   .is-sidebar-collapsed .recent-list,
-  .is-sidebar-collapsed .learning-card,
   .is-sidebar-collapsed .profile {
     display: none;
   }
@@ -403,7 +398,8 @@
   .is-focused .workspace-heading,
   .is-focused .file-panel,
   .is-focused .explanation-wrap,
-  .is-focused .pane-resizer {
+  .is-focused .pane-resizer,
+  .is-focused .diff-context-bar {
     display: none;
   }
   .is-focused .main-shell {

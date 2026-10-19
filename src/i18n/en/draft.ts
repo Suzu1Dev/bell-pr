@@ -22,9 +22,9 @@ const draft = {
       "Read the contribution rules and the template first, then turn this contribution into a clear draft.",
     status: {
       generating:
-        "Reading the contribution guidelines and the PR template and matching them against this change. You can keep editing the draft below.",
+        "Reading the contribution guidelines and the PR template and matching them against this change. You can keep editing the draft above.",
       failed:
-        "The draft suggestion could not be prepared this time. Try again later; your edits below are kept.",
+        "The draft suggestion could not be prepared this time. Try again later; your edits above are kept.",
       stale:
         "The changes were updated, so this suggestion needs to be prepared again. Generate a new suggestion before you apply it.",
     },
@@ -72,7 +72,7 @@ const draft = {
     preview: "Preview the suggested draft",
     apply: {
       appliedNote:
-        "The editor below holds this suggestion's text unchanged. The description is sent to GitHub as it is, so put it in your own words before you publish.",
+        "The editor above holds this suggestion's text unchanged. The description is sent to GitHub as it is, so put it in your own words before you publish.",
       note: "You can still edit after applying; the draft is updated when you save.",
       applied: "Applied",
       apply: "Apply the suggested draft",

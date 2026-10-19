@@ -194,7 +194,13 @@ Start the run with **Generate the team plan** (with plan approval) or
 **Start the agent team**. Everything happens in **Agent activity**:
 
 - The **Lead** splits the work into tasks, each with the files it may
-  change and what it depends on.
+  change and what it depends on. Before it plans, it checks any
+  assumption the request states (often marked "Assumption" or
+  "unverified") against the code: the **premise check** says whether the
+  assumption holds, does not hold or is unclear, citing the lines it read,
+  and every role is told. A long plan or task description shows its first
+  lines with a button for the rest; a plan waiting for your approval is
+  always shown in full.
 - With plan approval on, you read the plan first. **Approve the plan and
   start development**, or **Send back with feedback** for a new plan (up
   to 3 times).
@@ -203,7 +209,19 @@ Start the run with **Generate the team plan** (with plan approval) or
   task or everyone.
 - The work is integrated, then a **Reviewer** and a **Test analyst** check
   the result. Their reports are independent static reviews; the commands
-  the teammates really ran are listed separately.
+  the teammates really ran are listed separately. The Lead's summary owns
+  the overall conclusion; the Reviewer opens by saying whether it agrees
+  and adds only what the summary lacks, and the Test analyst keeps the one
+  list of checks still to run.
+- Agents are told never to change your machine: no `sudo`, no global or
+  user-level installs. When a check needs something the machine lacks, the
+  teammate reports it, and **Overview & motivation** lists it under "Setup
+  this machine needs from you" with a suggested command and who reported
+  it. Check the command against the project's documentation before you run
+  it; BELL PR never runs it.
+- **Run details** folds the model and the AI usage: its line names the
+  agent, the model, the calls and the input and output tokens, marks
+  partial reports and says when usage was not reported, never 0.
 - A failed subtask can be retried; finished subtasks are kept.
 
 Free runs one contribution at a time; the next one waits in the queue.
@@ -223,6 +241,21 @@ When the team is done, the run waits for your review in **Code changes**:
 - **Reviews**: the Lead's summary and the Reviewer's and Test analyst's
   reports, with the parts about this file marked. **Run the review again**
   after you changed something.
+- **Code walkthrough**: for a modified code file, the functions around
+  each change, step by step, each with the lines it covers (click them to
+  mark those lines in the diff), what calls it and what it calls, another
+  way to see it and a question to check yourself. A function the change adds whole has no
+  earlier version to walk through, so it points to the explanation
+  instead. Walkthroughs are written one file at a time, the selected file
+  first, and are kept for that version of the diff.
+- **Unchanged code**: the bar between two changes says how many unchanged
+  lines it hides; show 20 more above or below, or all of them, and
+  **Whole file** shows the whole file between the changes. The lines are
+  read from the run's base commit and are marked as context; you can
+  select them and ask about them too.
+- Above the diff, one row holds the **premise check**, folded to its
+  verdict and the assumption, and the **worktree** path with a copy button
+  (hover for the editing hint).
 - **My understanding**: write a note in your own words, then mark the file
   as **Reviewed**.
 
@@ -247,6 +280,14 @@ explanations and need another review.
 
 Explanations and answers come from an AI and can be wrong. Check them
 against the code.
+
+**Overview & motivation** leads with this contribution's brief: the premise
+check, the problem and the motivation, before and after, and how to
+validate it, in Markdown as written. The project's analysis follows as its
+background, and the directions come last. On a finished run you can check
+the premise again (or for the first time, on a run made before premise
+checks); a changed verdict has the walkthroughs written again, and the
+explanations you have not answered from yet.
 
 ## 6. Explain it back
 
@@ -305,7 +346,10 @@ project-rule, issue and pacing check applies.
 
 ## 7. Prepare and publish the pull request
 
-The **PR draft** tab reads the project's contribution rules, its pull
+The **PR draft** tab opens with the editor; the contribution guide and the
+reviewability snapshot follow, then the target-branch sync. (After you
+publish, the tab leads with the sync and the review rounds instead.) It
+reads the project's contribution rules, its pull
 request template, its agent guides (`AGENTS.md`, `CLAUDE.md`) and the
 workflows that check pull requests, and suggests a title, a description and
 a commit message, each with the source it follows. You decide what to
@@ -403,6 +447,12 @@ opens a Draft PR. Nothing is ever force-pushed.
   maintainer's comment only as context, then changes the code. You review
   each file, explain the round back (while the understanding check is on),
   and push the round as one new commit to the same PR.
+- **Commit history**: the tab lists every commit of the pull request,
+  oldest first, labelled by where it came from (the first push, a review
+  round, a sync with the target branch, a commit taken over from GitHub),
+  with its author, date and changed lines, and linked to the pull request.
+  A commit opens to its files and a file to its diff; sensitive files are
+  named but not shown.
 - **Can't continue?** Close the pull request yourself on GitHub, with a
   short note in your own words.
 

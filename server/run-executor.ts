@@ -32,6 +32,7 @@ import {
   type TeamTask,
 } from "../shared/team.js";
 import { defaultPonytailMode } from "../shared/efficiency.js";
+import { mergeSetupNeeds } from "../shared/setup-needs.js";
 import { addEfficiency, applyPonytail, trackEfficiency } from "./efficiency.js";
 import {
   type AgentTimeoutKind,
@@ -343,7 +344,12 @@ export async function runAgent(
         // claude exits non-zero after losing the OAuth refresh race; its result event
         // (flushed before the rejection) already classified the attempt as retryable.
         if (!retryable)
-          throw withAgentTimeoutHint(error, cli.executable, timeoutMs);
+          throw withAgentTimeoutHint(
+            error,
+            cli.executable,
+            timeoutMs,
+            terminalFailure,
+          );
       });
       return { retryable };
     } finally {
@@ -537,6 +543,12 @@ async function executeTeamTask(
       );
       task.report = result.report;
       run.reports![task.id] = result.report;
+      // A later turn may not repeat what an earlier one could not run.
+      const setup = mergeSetupNeeds([
+        { from: task.owner, needs: task.setup },
+        { from: task.owner, needs: result.setup },
+      ]).map(({ from: _from, ...need }) => need);
+      if (setup.length) task.setup = setup;
       for (const message of result.messages) {
         try {
           queueTeamMessage(ctx, run, task.owner, message.to, message.content);
@@ -711,6 +723,8 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
       );
       team.planSummary = parsed.summary;
       team.tasks = parsed.tasks;
+      if (parsed.premise) team.premise = parsed.premise;
+      else delete team.premise;
       if (revisions.length && parsed.revisionNotes)
         revisions[revisions.length - 1].revisionNotes = parsed.revisionNotes;
       const members = [...new Set(team.tasks.map((task) => task.owner))];

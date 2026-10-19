@@ -9,6 +9,7 @@ import type {
 } from "../../shared/insights";
 import type { Tab } from "../app/AppShell";
 import { ErrorBoundary } from "../app/ErrorBoundary";
+import { runSetupNeeds, SetupNeeds } from "../team/SetupNeeds";
 
 // The overview is the largest view in the app; it loads with its first visit.
 const ProjectOverview = lazy(() =>
@@ -48,6 +49,9 @@ interface OverviewTabProps {
   /** Updates BELL's clone to the latest default branch; absent for local imports and the demo. */
   onUpdateRepo?: () => void;
   updatingRepo: boolean;
+  /** Checks the run's premise against its code; absent while it cannot run. */
+  onCheckPremise?: () => void;
+  checkingPremise?: boolean;
 }
 
 /** The workspace's first tab: the project overview and why this change. */
@@ -60,12 +64,18 @@ export function OverviewTab({
   setTab,
   onUpdateRepo,
   updatingRepo,
+  onCheckPremise,
+  checkingPremise,
 }: OverviewTabProps) {
   const t = useT("workspace");
+  const setupMessages = useT("team").setupNeeds;
   const [locale] = useLocale();
   return (
-    // A chunk that fails to load stops at this tab; the draft and the
-    // review keep what the person typed.
+    <>
+    {/* What the agents could not run here: the person installs it. */}
+    <SetupNeeds needs={runSetupNeeds(run, (number) => setupMessages.round({ number }))} />
+    {/* A chunk that fails to load stops at this tab; the draft and the
+        review keep what the person typed. */}
     <ErrorBoundary resetKey={run.id}>
     <Suspense fallback={null}>
     <ProjectOverview
@@ -93,8 +103,11 @@ export function OverviewTab({
       onReadCode={() => setTab("changes")}
       onUpdateRepo={onUpdateRepo}
       updatingRepo={updatingRepo}
+      onCheckPremise={onCheckPremise}
+      checkingPremise={checkingPremise}
     />
     </Suspense>
     </ErrorBoundary>
+    </>
   );
 }

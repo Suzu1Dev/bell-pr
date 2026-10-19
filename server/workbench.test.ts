@@ -450,6 +450,94 @@ test("sensitive files and credential-like diff content are blocked and hidden", 
   }
 });
 
+test("the base version around a modified file is served only for the current, reviewable diff", async () => {
+  const f = await fixture();
+  const app = createApp(f.workbench, {
+    staticDirectory: path.join(f.directory, "missing"),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing server port");
+  const url = `http://127.0.0.1:${address.port}/api/runs/${f.run.id}/context`;
+  const local = { host: "127.0.0.1:4311" };
+  try {
+    await writeFile(
+      path.join(f.repository, "hello.ts"),
+      'export const hello = "after";\n',
+    );
+    await writeFile(path.join(f.repository, "new.ts"), "export const n = 1;\n");
+    await writeFile(path.join(f.repository, ".env"), "PASSWORD=private-value");
+    const files = await readDiff(f.run);
+    const print = (file: string) =>
+      files.find((entry) => entry.path === file)!.fingerprint;
+    const query = (file: string, fingerprint: string, base = f.run.baseSha!) =>
+      `${url}?${new URLSearchParams({ path: file, fingerprint, base })}`;
+
+    const ok = await http(query("hello.ts", print("hello.ts")), { headers: local });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(await ok.json(), { lines: ['export const hello = "before";'] });
+    // An older diff, a whole new file, a blocked file and an unknown path are refused.
+    const stale = await http(query("hello.ts", "0".repeat(64)), { headers: local });
+    assert.equal(stale.status, 409);
+    // A base that moved since the diff was read (a sync) is refused too.
+    const moved = await http(query("hello.ts", print("hello.ts"), "a".repeat(40)), { headers: local });
+    assert.equal(moved.status, 409);
+    assert.equal((await http(query("new.ts", print("new.ts")), { headers: local })).status, 409);
+    assert.equal((await http(query(".env", print(".env")), { headers: local })).status, 409);
+    assert.equal((await http(query("missing.ts", print("hello.ts")), { headers: local })).status, 404);
+    assert.equal((await http(`${url}?path=hello.ts`, { headers: local })).status, 400);
+    assert.equal(
+      (await http(`${url}?${new URLSearchParams({ path: "hello.ts", fingerprint: print("hello.ts") })}`, { headers: local })).status,
+      400,
+    );
+    assert.equal(
+      (await http(`${query("hello.ts", print("hello.ts"))}&extra=1`, { headers: local })).status,
+      400,
+    );
+
+    // A credential in an unchanged part of the file never leaves the server.
+    const secret = path.join(f.repository, "secret.ts");
+    const body = Array.from({ length: 12 }, (_, index) => `const line${index} = ${index};`);
+    await writeFile(
+      secret,
+      [`const token = "${"ghp_" + "a".repeat(36)}";`, ...body].join("\n") + "\n",
+    );
+    await git(f.repository, ["add", "--", "secret.ts"]);
+    await git(f.repository, ["commit", "-m", "secret"]);
+    f.run.baseSha = (await git(f.repository, ["rev-parse", "HEAD"])).stdout.trim();
+    await writeFile(
+      secret,
+      [`const token = "${"ghp_" + "a".repeat(36)}";`, ...body.slice(0, -1), "const last = 0;"].join("\n") + "\n",
+    );
+    const changed = (await readDiff(f.run)).find((entry) => entry.path === "secret.ts")!;
+    assert.equal(changed.blocked, undefined);
+    await assert.rejects(
+      f.workbench.contextLines(f.run.id, "secret.ts", changed.fingerprint, f.run.baseSha!),
+      (error: AppError) => error.statusCode === 422 && /憑證/.test(error.message),
+    );
+
+    // A password assignment is not a blocking secret, but it is masked line by line.
+    const config = path.join(f.repository, "config.ts");
+    const settings = ['const password = "hunter2-correct-horse";', ...body];
+    await writeFile(config, settings.join("\n") + "\n");
+    await git(f.repository, ["add", "--", "config.ts"]);
+    await git(f.repository, ["commit", "-m", "config"]);
+    f.run.baseSha = (await git(f.repository, ["rev-parse", "HEAD"])).stdout.trim();
+    await writeFile(config, [...settings.slice(0, -1), "const last = 0;"].join("\n") + "\n");
+    const configured = (await readDiff(f.run)).find((entry) => entry.path === "config.ts")!;
+    const { lines } = await f.workbench.contextLines(f.run.id, "config.ts", configured.fingerprint, f.run.baseSha!);
+    assert.equal(lines.length, settings.length);
+    assert.doesNotMatch(lines[0], /hunter2/);
+    assert.match(lines[0], /\[REDACTED\]/);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await f.cleanup();
+  }
+});
+
 test("a held-back file's reason follows the run's locale, so reading the diff in another language changes no fingerprint", async () => {
   const f = await fixture();
   try {
@@ -1570,7 +1658,8 @@ test("a Claude Code turn that lost the OAuth refresh lock and exited non-zero is
     );
     assert.equal(f.run.agents[0].detail, "已完成，報告可供審閱");
 
-    // Any other API error still fails the turn at once with command()'s own message.
+    // Any other API error still fails the turn at once, with the error claude
+    // reported rather than the raw JSON tail command() keeps.
     let invocations = 0;
     waits.length = 0;
     const plain = new Workbench(f.store, undefined, {
@@ -1586,7 +1675,7 @@ test("a Claude Code turn that lost the OAuth refresh lock and exited non-zero is
           terminal_reason: "api_error",
           result: "API Error: 500 Internal server error",
         });
-        throw exitFailure("API Error: 500 Internal server error");
+        throw exitFailure(`{"type":"result","is_error":true,"result":"API Error: 500 Internal server error","session_id":"s"}`);
       },
     });
     await assert.rejects(

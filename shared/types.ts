@@ -1,4 +1,5 @@
 import type { LearnerNote, StoredExplanation } from "./explanations.js";
+import type { StoredWalkthrough } from "./walkthroughs.js";
 import type { EfficiencyMetrics } from "./efficiency.js";
 import type { AgentTeam } from "./team.js";
 import type { ContributionSettings } from "./insights.js";
@@ -85,6 +86,8 @@ export interface RunCore {
   modelExecution?: ModelExecution;
   /** Stored per-file explanations keyed by path; the learning page aggregates the ready ones. */
   explanations?: Record<string, StoredExplanation>;
+  /** Walkthroughs of the functions around each change, keyed by path; absent before they existed. */
+  walkthroughs?: Record<string, StoredWalkthrough>;
   efficiency?: EfficiencyMetrics;
   id: string;
   repoId: string;
@@ -119,6 +122,8 @@ export interface RunCore {
   error?: string;
   /** The GitHub branch the publish commit was pushed to; absent until a push succeeds. The branch field is locked once set. */
   publishedBranch?: string;
+  /** The PR head BELL last pushed or took over; absent until the run is published. */
+  publishCommit?: string;
   /** True while BELL pushes to GitHub. */
   publishing?: boolean;
   /** owner/name the PR branch was pushed to: the target repository or the person's fork. */

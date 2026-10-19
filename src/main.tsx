@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { parsePresentationFlags } from "./app/presentation";
 import { LocaleProvider, initialLocale, loadLocale } from "./i18n";
+import { adoptViewSearch } from "./navigation/view-url";
 import { defaultLocale, type Locale } from "../shared/i18n/locale";
 import "./styles.css";
 import "./workspace-v2.css";
@@ -18,6 +19,10 @@ function render(locale: Locale) {
     </React.StrictMode>,
   );
 }
+
+// An address an upstream BELL build wrote (?run=…&tab=…, ?project=…,
+// ?page=…) opens the same place through the hash route.
+adoptViewSearch(window);
 
 // The dictionary loads before the first render, so the UI never flashes in
 // another language. If it cannot load, the app still starts in English.

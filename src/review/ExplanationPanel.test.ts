@@ -52,7 +52,8 @@ test("a demo file with an explanation renders every learning section", () => {
 test("test files get a reading hint and extra presets while source files keep the fixed three", () => {
   const testFile = demoFiles.find((file) => file.path === "tests/retry.test.ts")!;
   const html = render(testFile);
-  assert.equal(html.match(/role="tab"/g)?.length, 3);
+  assert.equal(html.match(/role="tab"/g)?.length, 4);
+  assert.match(html, /程式碼解說/);
   assert.match(html, /審查者怎麼看/);
   assert.match(html, /測試就是行為規格：先讀 it\/test 描述/);
   assert.doesNotMatch(render(demoFiles[0]), /測試就是行為規格/);
@@ -496,9 +497,15 @@ test("only the selected tab is a tab stop, and the tab panel is one too", () => 
     ].map(([, name, tabIndex, selected]) => `${name} ${tabIndex} ${selected}`);
   const explain = renderPanel();
   assertNoHan(explain);
-  assert.deepEqual(tabs(explain), ["explain 0 true", "reports -1 false", "chat -1 false"]);
+  assert.deepEqual(tabs(explain), [
+    "explain 0 true",
+    "walkthrough -1 false",
+    "reports -1 false",
+    "chat -1 false",
+  ]);
   assert.deepEqual(tabs(renderPanel({ chatRequestId: 1 })), [
     "explain -1 false",
+    "walkthrough -1 false",
     "reports -1 false",
     "chat 0 true",
   ]);
@@ -883,3 +890,33 @@ test("the demo's try-first cards offer its sample answers, and a real run's do n
   assert.equal(demo.match(/>Fill with the sample answer<\/button>/g)?.length, 2);
   assert.ok(!renderPanel({ demo: false }).includes("Fill with the sample answer"));
 });
+
+test("the panel opens on the tab the reader last chose and reports each change of tab", () => {
+  const chosen: string[] = [];
+  const html = renderZh(
+    createElement(ExplanationPanel, {
+      file: demoFiles.find((file) => file.path === "src/client.ts")!,
+      messages: [],
+      loading: false,
+      onAsk() {},
+      demo: true,
+      initialTab: "walkthrough",
+      onTabChange: (tab) => chosen.push(tab),
+    }),
+  );
+  assert.match(html, /aria-selected="true"[^>]*>(?:(?!<\/button>).)*程式碼解說/);
+  assert.match(html, /createClient/);
+  const english = renderEn(
+    createElement(ExplanationPanel, {
+      file: getDemo("en").files.find((file) => file.path === "src/client.ts")!,
+      messages: [],
+      loading: false,
+      onAsk() {},
+      demo: true,
+      initialTab: "walkthrough",
+    }),
+  );
+  assertNoHan(english);
+  assert.match(english, /aria-selected="true"[^>]*>(?:(?!<\/button>).)*Code walkthrough/);
+});
+

@@ -245,19 +245,23 @@ export function DraftTab({
   const [locale] = useLocale();
   const sampleRestatements = demo ? (getDemo(locale).restatementSample ?? []) : [];
   const selected = run.prFeedback?.items.filter((item) => followUpSelection.includes(item.url)) ?? [];
+  // A published PR's draft tab leads with its sync and review rounds (the
+  // draft itself is sent); before that it leads with the editor, then the
+  // guide, then the sync. A run has a base only once its checkout exists; a
+  // queued run has nothing to sync.
+  const sync = !demo && !!run.baseSha && (
+    <SyncPanel
+      run={run}
+      busy={busy}
+      onSync={() => void syncToLatest()}
+      onResolve={() => void resolveSyncConflicts()}
+      onUndo={() => void undoSync()}
+    />
+  );
   return (
     <div className="draft-workspace">
       {demo && <SamplePublishedCard run={run} />}
-      {/* A run has a base only once its checkout exists; a queued run has nothing to sync. */}
-      {!demo && !!run.baseSha && (
-        <SyncPanel
-          run={run}
-          busy={busy}
-          onSync={() => void syncToLatest()}
-          onResolve={() => void resolveSyncConflicts()}
-          onUndo={() => void undoSync()}
-        />
-      )}
+      {run.prUrl && sync}
       {!!run.followUps?.length && (
         <FollowUpRounds
           rounds={run.followUps}
@@ -270,51 +274,6 @@ export function DraftTab({
               : undefined
           }
         />
-      )}
-      {!followUp && (
-      <ErrorBoundary resetKey={run.id}>
-        <Suspense
-          fallback={<p className="muted">{t.draft.loadingGuide}</p>}
-        >
-          <DraftGuide
-            run={run}
-            files={files}
-            repo={currentRepo}
-            check={understanding ?? { required: true, passed: false, off: false }}
-            preparation={run.draftPreparation}
-            busy={draftRequests.has(run.id)}
-            disabled={
-              active ||
-              busy ||
-              !["review", "approved"].includes(run.status)
-            }
-            demo={demo}
-            issueUrl={run.contributionSettings?.issueUrl}
-            onGenerate={prepareDraft}
-            onApply={applyDraftProposal}
-            applied={
-              !!run.draftPreparation?.proposal &&
-              draftTitle === run.draftPreparation.proposal.title &&
-              // BELL's AI-disclosure line is not a change to the suggestion.
-              !!draftChecks?.sameDraftProse(
-                draftBody,
-                run.draftPreparation.proposal.body,
-              )
-            }
-            aiDisclosure={run.draft.aiDisclosure}
-            alwaysDiscloseAi={alwaysDiscloseAi}
-            draftBody={draftBody}
-            onAiDisclosureChange={(on) => void setAiDisclosure(on)}
-            checks={checkable && draftChecks ? publishChecks : undefined}
-            readOnly={run.status === "published"}
-          />
-        </Suspense>
-      </ErrorBoundary>
-      )}
-      {!followUp && files.length > 0 && (
-        <Deferred resetKey={run.id}>
-          <Reviewability run={run} files={files} repo={currentRepo} demo={demo} onSaveReasons={records?.saveTestReasons} onAskSplit={records?.askSplit} />
-        </Deferred>
       )}
       <div className="draft-layout">
         <div className="draft-editor">
@@ -647,6 +606,52 @@ export function DraftTab({
           </div>
         </aside>
       </div>
+      {!followUp && (
+      <ErrorBoundary resetKey={run.id}>
+        <Suspense
+          fallback={<p className="muted">{t.draft.loadingGuide}</p>}
+        >
+          <DraftGuide
+            run={run}
+            files={files}
+            repo={currentRepo}
+            check={understanding ?? { required: true, passed: false, off: false }}
+            preparation={run.draftPreparation}
+            busy={draftRequests.has(run.id)}
+            disabled={
+              active ||
+              busy ||
+              !["review", "approved"].includes(run.status)
+            }
+            demo={demo}
+            issueUrl={run.contributionSettings?.issueUrl}
+            onGenerate={prepareDraft}
+            onApply={applyDraftProposal}
+            applied={
+              !!run.draftPreparation?.proposal &&
+              draftTitle === run.draftPreparation.proposal.title &&
+              // BELL's AI-disclosure line is not a change to the suggestion.
+              !!draftChecks?.sameDraftProse(
+                draftBody,
+                run.draftPreparation.proposal.body,
+              )
+            }
+            aiDisclosure={run.draft.aiDisclosure}
+            alwaysDiscloseAi={alwaysDiscloseAi}
+            draftBody={draftBody}
+            onAiDisclosureChange={(on) => void setAiDisclosure(on)}
+            checks={checkable && draftChecks ? publishChecks : undefined}
+            readOnly={run.status === "published"}
+          />
+        </Suspense>
+      </ErrorBoundary>
+      )}
+      {!followUp && files.length > 0 && (
+        <Deferred resetKey={run.id}>
+          <Reviewability run={run} files={files} repo={currentRepo} demo={demo} onSaveReasons={records?.saveTestReasons} onAskSplit={records?.askSplit} />
+        </Deferred>
+      )}
+      {!run.prUrl && sync}
       {run.status === "published" && run.prUrl && (
         <section
           className="pr-feedback"

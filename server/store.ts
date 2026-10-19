@@ -199,6 +199,11 @@ const attemptSchema = loose({
   }).optional(),
 });
 
+/** What an agent reported the machine lacks (TeamTask.setup, FollowUpRound.setup); its write caps. */
+const setupNeedsSchema = z
+  .array(loose({ need: text.max(120), command: text.max(300), reason: text.max(600) }))
+  .max(10);
+
 const pacingSchema = loose({
   openPrs: count.optional(),
   mergedPrs: count.optional(),
@@ -276,6 +281,7 @@ export const runReadSchema = loose({
     explanations: z
       .record(loose({ fingerprint: text, status: text }))
       .optional(),
+    walkthroughs: later(z.record(loose({ fingerprint: text, status: text }))),
     draftPreparation: loose({ status: text, fingerprint: text }).optional(),
     conversations: z.record(loose({})).optional(),
     team: loose({
@@ -290,9 +296,13 @@ export const runReadSchema = loose({
           files: list,
           dependsOn: list,
           status: text,
+          setup: later(setupNeedsSchema),
         }),
       ),
       messages: z.array(loose({})),
+      premise: later(
+        loose({ verdict: text, statement: text.max(1_000), evidence: text.max(3_000) }),
+      ),
     }).optional(),
     followUps: z
       .array(
@@ -311,6 +321,7 @@ export const runReadSchema = loose({
           restatements: later(
             z.array(loose({ url: text, text: text.max(300) })).max(20),
           ),
+          setup: later(setupNeedsSchema),
         }),
       )
       .optional(),
@@ -455,6 +466,12 @@ export class Store {
         if (explanation.status === "generating") {
           explanation.status = "failed";
           explanation.error = recovery.explanation;
+        }
+      }
+      for (const walkthrough of Object.values(run.walkthroughs ?? {})) {
+        if (walkthrough.status === "generating") {
+          walkthrough.status = "failed";
+          walkthrough.error = recovery.walkthrough;
         }
       }
       // A re-review interrupted by a crash leaves reviewer/tester agents "running" on a finished run.

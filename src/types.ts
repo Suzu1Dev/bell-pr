@@ -3,6 +3,7 @@ import type {
   ExplanationStatus,
 } from "../shared/explanations";
 import type { RunDetailField } from "../shared/runs";
+import type { FileWalkthrough } from "../shared/walkthroughs";
 import type { Repository, RunCore } from "../shared/types";
 
 export type { ChatMessage } from "../shared/chat";
@@ -31,6 +32,9 @@ export interface DiffFile {
   explanation?: ChangeExplanation;
   explanationStatus?: ExplanationStatus;
   explanationError?: string;
+  walkthrough?: FileWalkthrough;
+  walkthroughStatus?: ExplanationStatus;
+  walkthroughError?: string;
   hunks?: unknown;
   blocked?: string;
 }

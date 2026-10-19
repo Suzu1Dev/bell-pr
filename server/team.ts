@@ -2,9 +2,11 @@ import { z } from "zod";
 import { AppError, type DiffFile } from "./types.js";
 import { sm } from "./i18n/index.js";
 import { safeRelativePath, sensitivePath } from "./git.js";
-import type { AgentTeam, TeamTask } from "../shared/team.js";
+import type { AgentTeam, PremiseCheck, TeamTask } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import type { ModelExecution } from "../shared/models.js";
+import type { SetupNeed } from "../shared/setup-needs.js";
+import { parseSetupNeeds, setupJsonSchema } from "./setup-needs.js";
 
 /**
  * The five settings that describe what the person wants. Provider, model,
@@ -64,7 +66,39 @@ const planSchema = z.object({
   tasks: z.array(taskSchema).min(1).max(8),
   /** Lead's explanation of what changed after the person sent a plan back; null/absent on a first plan. */
   revisionNotes: z.string().trim().max(4000).nullish(),
+  // Read by premiseCheck; a malformed check never costs the whole plan.
+  premise: z.unknown().optional(),
 });
+
+const premiseSchema = z.object({
+  verdict: z.enum(["holds", "refuted", "unclear"]),
+  statement: z.string().trim().min(1).max(1_000),
+  // A finding without a citation is not presented as one.
+  evidence: z.string().trim().min(1).max(3_000),
+});
+
+/** The lead's premise check, or undefined when there is none or it is malformed. */
+export function premiseCheck(value: unknown): PremiseCheck | undefined {
+  const result = premiseSchema.safeParse(value);
+  return result.success ? result.data : undefined;
+}
+
+/** A premise check in structured output: the check, or null when the request states no assumption. */
+export const premiseJsonSchema = {
+  anyOf: [
+    {
+      type: "object",
+      properties: {
+        verdict: { type: "string", enum: ["holds", "refuted", "unclear"] },
+        statement: { type: "string" },
+        evidence: { type: "string" },
+      },
+      required: ["verdict", "statement", "evidence"],
+      additionalProperties: false,
+    },
+    { type: "null" },
+  ],
+};
 
 /**
  * Hand-written JSON Schemas for the CLIs' structured output (Codex
@@ -77,6 +111,7 @@ export const teamPlanJsonSchema = {
   properties: {
     summary: { type: "string" },
     revisionNotes: { type: ["string", "null"] },
+    premise: premiseJsonSchema,
     tasks: {
       type: "array",
       items: {
@@ -93,7 +128,7 @@ export const teamPlanJsonSchema = {
       },
     },
   },
-  required: ["summary", "revisionNotes", "tasks"],
+  required: ["summary", "revisionNotes", "premise", "tasks"],
   additionalProperties: false,
 };
 
@@ -118,8 +153,9 @@ export const memberReportJsonSchema = {
         },
         tradeoffs: { type: "string" },
         limitations: { type: "string" },
+        setup: setupJsonSchema,
       },
-      required: ["summary", "checks", "tradeoffs", "limitations"],
+      required: ["summary", "checks", "tradeoffs", "limitations", "setup"],
       additionalProperties: false,
     },
     messages: {
@@ -315,6 +351,7 @@ export function parseTeamPlan(answer: string, maxTeammates: number) {
   return {
     summary: parsed.summary,
     revisionNotes: parsed.revisionNotes || undefined,
+    premise: premiseCheck(parsed.premise),
     tasks: parsed.tasks.map((task, index): TeamTask => ({
       ...task,
       files: [...new Set(task.files)],
@@ -455,6 +492,8 @@ const structuredReportSchema = z.object({
     .max(40),
   tradeoffs: z.string().trim().max(6000),
   limitations: z.string().trim().max(6000),
+  // Read by parseSetupNeeds; reports from before the field existed have none.
+  setup: z.unknown().optional(),
 });
 
 const memberResultSchema = z.object({
@@ -504,6 +543,8 @@ export function formatMemberReport(
 export function parseMemberResult(answer: string): {
   report: string;
   messages: { to: string; content: string }[];
+  /** Kept on the task for the person's checklist, never in the report text. */
+  setup: SetupNeed[];
 } {
   try {
     const value = memberResultSchema.parse(JSON.parse(jsonText(answer)));
@@ -513,8 +554,12 @@ export function parseMemberResult(answer: string): {
           ? value.report
           : formatMemberReport(value.report),
       messages: value.messages,
+      setup:
+        typeof value.report === "string"
+          ? []
+          : parseSetupNeeds(value.report.setup),
     };
   } catch {
-    return { report: answer.slice(0, memberReportLimit), messages: [] };
+    return { report: answer.slice(0, memberReportLimit), messages: [], setup: [] };
   }
 }

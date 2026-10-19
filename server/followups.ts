@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { followUpFeedbackLimit } from "../shared/followups.js";
+import type { SetupNeed } from "../shared/setup-needs.js";
+import { parseSetupNeeds, setupJsonSchema } from "./setup-needs.js";
 import { commitMessageControl, personTrailer } from "./drafts.js";
 import { jsonText } from "./team.js";
 import { AppError } from "./types.js";
@@ -36,9 +38,10 @@ export const followUpJsonSchema = {
       },
       maxItems: 40,
     },
+    setup: setupJsonSchema,
     commitMessage: { type: "string" },
   },
-  required: ["summary", "addressed", "notAddressed", "checks", "commitMessage"],
+  required: ["summary", "addressed", "notAddressed", "checks", "setup", "commitMessage"],
   additionalProperties: false,
 };
 
@@ -53,6 +56,7 @@ const resultSchema = z.object({
   notAddressed: z.array(z.object({ url: z.string(), reason: clipped(1_200) })),
   // The agent's own list is not kept: the round stores the commands BELL saw run.
   checks: z.unknown(),
+  setup: z.unknown().optional(),
   commitMessage: z.string(),
 });
 
@@ -60,6 +64,7 @@ export type FollowUpResult = {
   summary: string;
   addressed: { url: string; change: string }[];
   notAddressed: { url: string; reason: string }[];
+  setup: SetupNeed[];
   commitMessage: string;
 };
 
@@ -97,6 +102,7 @@ export function parseFollowUpResult(
     notAddressed: result.notAddressed
       .filter((item) => item.reason && known(item.url))
       .slice(0, entryLimit),
+    setup: parseSetupNeeds(result.setup),
     // Empty when every line was a trailer, it is too long or it holds a
     // control character such as an escape sequence: the person then writes it.
     commitMessage:

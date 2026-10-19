@@ -1,15 +1,17 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { mock } from "node:test";
 import { assertNoHan } from "../../test-utils/render";
 import en from "../../i18n/en";
 import zhTW from "../../i18n/zh-TW";
 import {
+  answerDelayRandom,
   answerTyping,
   mergePlaybackRun,
   readRunFiles,
   runPath,
   stopNotice,
   stopSampleRun,
+  typeOut,
   withSampleFeedback,
 } from "./useRunActions";
 import { getDemo } from "../../demo";
@@ -306,3 +308,67 @@ test("the sample's feedback comes with its own tags, unless the reader tagged it
   const own = { [review.url]: { dimension: "naming" as const, at: "2026-10-13T00:00:00Z" } };
   assert.deepEqual(withSampleFeedback({ ...sample.run, feedbackTags: own }, sample).feedbackTags, own);
 });
+
+test("an answer's first pause replays alike: fixed while presenting or capturing, else picked by the answer", () => {
+  const answer = "Full jitter spreads the retries of many clients over time.";
+  const other = "A capped backoff keeps the last retry within the time budget.";
+  // Presenting and capturing wait the middle of 300-900 ms every time.
+  for (const flags of [
+    { present: true, capture: false },
+    { present: false, capture: true },
+  ]) {
+    assert.equal(answerTyping(answer, 1, answerDelayRandom(flags, answer)).delay, 600);
+    assert.equal(answerTyping(other, 1, answerDelayRandom(flags, other)).delay, 600);
+  }
+  // Otherwise the answer picks it: the same on every run, different between answers.
+  const plain = { present: false, capture: false };
+  const first = answerTyping(answer, 1, answerDelayRandom(plain, answer)).delay;
+  assert.equal(answerTyping(answer, 1, answerDelayRandom(plain, answer)).delay, first);
+  assert.equal(answerTyping(answer, 1).delay, first);
+  assert.ok(first >= 300 && first < 900, String(first));
+  const delays = new Set(
+    Array.from({ length: 20 }, (_, index) => answerTyping(`${other} ${index}`, 1).delay),
+  );
+  assert.ok(delays.size > 10, `only ${delays.size} different pauses`);
+});
+
+test("under fake timers the answer types out on the same ticks every time", async () => {
+  mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    const answer = "Full jitter spreads the retries of many clients over time.".repeat(4);
+    const typing = answerTyping(answer, 2, answerDelayRandom({ present: false, capture: true }, answer));
+    const shown: string[] = [];
+    const done = typeOut(typing, (content) => {
+      shown.push(content);
+      return true;
+    });
+    // Nothing shows before the pause ends; the first slice right at its end.
+    mock.timers.tick(typing.delay - 1);
+    await Promise.resolve();
+    assert.deepEqual(shown, []);
+    mock.timers.tick(1);
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.deepEqual(shown, [typing.slices[0]]);
+    for (let index = 1; index < typing.slices.length; index++) {
+      mock.timers.tick(typing.pause);
+      for (let step = 0; step < 3; step++) await Promise.resolve();
+      assert.equal(shown.length, index + 1);
+    }
+    await done;
+    assert.deepEqual(shown, typing.slices);
+
+    // A reader who leaves stops the typing at once.
+    const stopped: string[] = [];
+    const left = typeOut(typing, (content) => {
+      stopped.push(content);
+      return false;
+    });
+    mock.timers.tick(typing.delay);
+    await left;
+    assert.deepEqual(stopped, [typing.slices[0]]);
+  } finally {
+    mock.timers.reset();
+  }
+});
+

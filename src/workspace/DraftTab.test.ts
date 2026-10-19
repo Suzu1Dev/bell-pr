@@ -252,6 +252,35 @@ test("the target branch panel waits until the run has a checkout to sync", () =>
   assert.match(render({ run: { ...unpublished, status: "review" } }), /同步到最新目標分支/);
 });
 
+test("before publishing the draft tab leads with the editor, then the guide, then the sync; a published PR leads with its sync and rounds", () => {
+  const unpublished: Run = {
+    ...published,
+    status: "review",
+    prUrl: undefined,
+    publishedBranch: undefined,
+    followUps: undefined,
+    prFeedback: undefined,
+  };
+  const at = (html: string, marker: string) => {
+    const index = html.indexOf(marker);
+    assert.ok(index >= 0, marker);
+    return index;
+  };
+  const draft = renderEn(element({ run: unpublished }));
+  const editor = at(draft, 'class="draft-layout"');
+  assert.ok(editor < at(draft, "Loading the draft guidelines…"));
+  assert.ok(at(draft, "Loading the draft guidelines…") < at(draft, 'class="sync-panel"'));
+  // Copy that points at the guide or the editor follows the order.
+  assert.match(
+    renderEn(element({ run: { ...unpublished, draft: { title: "t", body: "" } } }, { draftBody: "" })),
+    /Generate and apply a suggested draft below/,
+  );
+  const sent = renderEn(element());
+  assert.ok(at(sent, 'class="sync-panel"') < at(sent, 'class="follow-up-rounds"'));
+  assert.ok(at(sent, 'class="follow-up-rounds"') < at(sent, 'class="draft-layout"'));
+  assert.equal(sent.match(/class="sync-panel"/g)?.length, 1);
+});
+
 test("an open follow-up round's draft tab reads in English with no Chinese left", () => {
   const html = renderEn(
     element({ run: inRound }, { followUp: open, commitMessageUnfinished: true }),

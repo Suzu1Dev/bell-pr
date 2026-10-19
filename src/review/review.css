@@ -1823,3 +1823,315 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* Unchanged code around the changes: expand arrows, whole-file toggle, read-error notice. */
+.rv-line-expanded .rv-gutter {
+  background: var(--color-surface-muted);
+}
+.rv-gap {
+  height: auto;
+  min-height: 31px;
+}
+.rv-hunk > .rv-gap-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 6px;
+  font-size: var(--text-2xs);
+}
+.rv-gap-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-accent-600);
+  cursor: pointer;
+}
+.rv-gap-actions button:hover:not(:disabled),
+.rv-gap-actions button:focus-visible {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface);
+}
+.rv-gap-actions button:disabled,
+.rv-whole:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.rv-gap-header {
+  margin-left: var(--space-3);
+}
+.rv-whole {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 3px var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-accent-600);
+  font: inherit;
+  cursor: pointer;
+}
+.rv-whole-on {
+  border-color: var(--color-accent-300);
+  background: var(--color-accent-50);
+  color: var(--color-accent-700);
+}
+.rv-context-error {
+  margin: 0;
+  padding: 7px 15px;
+  border-bottom: 1px solid var(--color-danger-border);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: var(--text-2xs);
+}
+
+/* A narrow panel keeps its four tabs on one row: icons go first, then size.
+   Wrapping stays as the last resort. */
+@container (max-width: 440px) {
+  .explain-tabs {
+    gap: 0 12px;
+    padding: 0 14px;
+  }
+  .explain-panel .explain-tabs button > svg {
+    display: none;
+  }
+}
+@container (max-width: 330px) {
+  .explain-tabs {
+    gap: 0 9px;
+    padding: 0 11px;
+  }
+  .explain-panel .explain-tabs button {
+    font-size: var(--text-2xs);
+  }
+}
+
+/* Lines a walkthrough part marks in the diff. */
+.rv-line-highlighted {
+  box-shadow: inset 3px 0 0 var(--color-accent-500);
+}
+.rv-line-context.rv-line-highlighted:not(.rv-line-selected) {
+  background: var(--color-accent-50);
+}
+
+/* Walkthroughs of the functions around a change. */
+.explain-panel .walkthrough-title > span {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.walkthrough-title strong {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+.walkthrough-title small {
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+}
+.walkthrough-locate,
+.walkthrough-step-lines {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-accent-600);
+  font: inherit;
+  font-size: var(--text-2xs);
+  cursor: pointer;
+}
+.walkthrough-locate {
+  flex-shrink: 0;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  font-weight: 500;
+}
+.walkthrough-step-lines {
+  margin-bottom: 2px;
+  padding: 1px 6px;
+  border-color: transparent;
+  border-radius: 5px;
+  background: transparent;
+  font-family: var(--font-mono);
+}
+.walkthrough-step-lines:hover,
+.walkthrough-step-lines:focus-visible {
+  border-color: var(--color-border-strong);
+}
+.walkthrough-locate[aria-pressed="true"],
+.walkthrough-step-lines[aria-pressed="true"] {
+  border-color: var(--color-accent-300);
+  background: var(--color-accent-50);
+  color: var(--color-accent-700);
+}
+.walkthrough-card h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 6px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.walkthrough-change,
+.walkthrough-analogy {
+  margin-top: var(--space-3);
+  padding: 10px var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  font-size: var(--text-xs);
+}
+.walkthrough-analogy {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-bg);
+}
+.walkthrough-change > span,
+.walkthrough-analogy > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+}
+/* Grid items default to their content's width, so a long name or path
+   would push the lists past the panel; they keep to its width. */
+.walkthrough-steps ol,
+.walkthrough-references ul {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.walkthrough-references ul {
+  gap: var(--space-1);
+}
+.walkthrough-steps li,
+.walkthrough-references li {
+  min-width: 0;
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.walkthrough-steps li {
+  padding: var(--space-2) 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 7px;
+  background: var(--color-surface);
+}
+.walkthrough-steps li.walkthrough-step-selected {
+  border-color: var(--color-accent-500);
+  background: var(--color-accent-50);
+  box-shadow: inset 3px 0 0 var(--color-accent-500);
+}
+.walkthrough-references li strong,
+.walkthrough-references li code {
+  margin-right: 6px;
+}
+.walkthrough-references li code {
+  color: var(--color-accent-700);
+  font-size: var(--text-2xs);
+}
+.walkthrough-references li span,
+.walkthrough-references > p,
+.walkthrough-new-units {
+  color: var(--color-text-secondary);
+}
+.walkthrough-references > p {
+  margin: 0;
+  font-size: var(--text-xs);
+}
+.walkthrough-check {
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+  line-height: 1.7;
+}
+.walkthrough-check summary {
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+.walkthrough-card pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.walkthrough-new-units {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.walkthrough-new-units code {
+  font-size: var(--text-2xs);
+}
+
+/* Commit history of a published contribution: its files read as the code
+   changes tab's file list, its patches as the diff. */
+.commit-list,
+.commit-files {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+.commit-item {
+  min-width: 0;
+  padding: 14px var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-left: 3px solid var(--color-accent-500);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.commit-sync {
+  border-left-color: var(--color-info);
+}
+.commit-head,
+.commit-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--space-3);
+  color: var(--color-text-muted);
+}
+.commit-subject {
+  margin-top: 6px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.commit-body {
+  white-space: pre-wrap;
+}
+.commit-item .button {
+  margin-top: var(--space-2);
+}
+.commit-files {
+  gap: 0;
+  margin-top: var(--space-2);
+}
+.commit-files code {
+  flex: 1;
+  min-width: 0;
+}
+.commit-files .rv-code-scroll {
+  max-height: 520px;
+  overflow: auto;
+}

@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
 import {
   Activity,
   ArrowDownToLine,
@@ -13,6 +13,7 @@ import {
   GitBranch,
   GitPullRequest,
   Globe2,
+  History,
   Lock,
   Plus,
   ShieldCheck,
@@ -27,15 +28,29 @@ import type { Tab } from "../app/AppShell";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
 import type { RunActions } from "../app/hooks/useRunActions";
 import type { RunRounds } from "../app/hooks/useRunRounds";
+import type { Walkthroughs } from "../app/hooks/useWalkthroughs";
 import { useRunRecords } from "../app/hooks/useRunRecords";
+import { premiseCheckable, usePremiseCheck } from "../app/hooks/usePremiseCheck";
 import { openCheckPanel, useUnderstanding } from "../app/hooks/useUnderstanding";
-import { ActivityTab } from "./ActivityTab";
+import { ErrorBoundary } from "../app/ErrorBoundary";
 import { ChangesTab } from "./ChangesTab";
 import { checkFooter } from "./checkFooter";
 import { DraftTab } from "./DraftTab";
 import { OverviewTab } from "./OverviewTab";
 import { RunNotices, showsCheckOff, UnderstandingOffBadge, UnsandboxedBadge } from "./RunNotices";
 import "./workspace.css";
+
+// The activity tab carries the team board, which most reviews never open;
+// it loads with its first visit.
+const ActivityTab = lazy(() =>
+  import("./ActivityTab").then((module) => ({ default: module.ActivityTab })),
+);
+// The commit history matters once a PR is published; it loads on its own too.
+const CommitHistory = lazy(() =>
+  import("../review/CommitHistory").then((module) => ({
+    default: module.CommitHistory,
+  })),
+);
 
 interface WorkspacePageProps {
   run: Run;
@@ -89,6 +104,8 @@ interface WorkspacePageProps {
     retry?: boolean,
     filePath?: string,
   ) => Promise<void>;
+  /** The code walkthroughs of the run's files (useWalkthroughs); without it, nothing is prepared or retried. */
+  walkthroughs?: Walkthroughs;
   beginContribution: () => void;
   chooseRecommendation: (idea: ContributionRecommendation) => void;
   draft: DraftEditor;
@@ -143,6 +160,7 @@ export function WorkspacePage({
   intelligence,
   explanationRequests,
   prepareExplanations,
+  walkthroughs,
   beginContribution,
   chooseRecommendation,
   draft,
@@ -158,6 +176,7 @@ export function WorkspacePage({
   const { approve, plan, exporting, exportLearning } = actions;
   // The Explain-it-back check and the person's other records on this run.
   const understanding = useUnderstanding(run, files, { demo, setRun: actions.setRun });
+  const premise = usePremiseCheck(run, actions);
   const records = useRunRecords(run, files, { demo, setRun: actions.setRun, notify: actions.notify, file, ask: actions.ask, setSelectedPath, setTab });
   // The sample's playback queues for a moment behind nothing.
   const queuedOnFree =
@@ -258,31 +277,23 @@ export function WorkspacePage({
           { n: "03", ...t.steps.review, icon: Code2 },
           { n: "04", ...t.steps.submit, icon: GitPullRequest },
         ].map((step, index) => {
+          const current = index === currentStep && !halted;
+          // One row of small steps: the description moves to the tooltip.
           return (
             <div
-              className={`workflow-step ${index === currentStep && !halted ? "current" : ""} ${index < currentStep ? "done" : ""}`}
-              aria-current={index === currentStep && !halted ? "step" : undefined}
+              className={`workflow-step ${current ? "current" : ""} ${index < currentStep ? "done" : ""}`}
+              aria-current={current ? "step" : undefined}
+              title={t.stepTooltip(step)}
               key={step.n}
             >
               <span className="step-icon">
                 {index < currentStep ? (
-                  <Check size={17} />
+                  <Check size={13} />
                 ) : (
-                  <step.icon size={18} />
+                  <step.icon size={13} />
                 )}
               </span>
-              <div>
-                <span className="step-number">{step.n}</span>
-                <strong>{step.title}</strong>
-                <small>
-                  {index === 1 && currentStep === 1
-                    ? statusLabels[run.status]
-                    : step.description}
-                </small>
-              </div>
-              {index < 3 && (
-                <ChevronRight className="step-chevron" size={16} />
-              )}
+              <strong>{step.title}</strong>
             </div>
           );
         })}
@@ -360,6 +371,18 @@ export function WorkspacePage({
               {t.tabs.draft}
               {draftDirty && <span>•</span>}
             </button>
+            <button
+              role="tab"
+              id="workspace-tab-commits"
+              aria-controls="workspace-panel"
+              tabIndex={tab === "commits" ? 0 : -1}
+              aria-selected={tab === "commits"}
+              className={tab === "commits" ? "selected" : ""}
+              onClick={() => setTab("commits")}
+            >
+              <History size={16} />
+              {t.tabs.commits}
+            </button>
           </div>
           <div className="review-totals">
             <span className="additions">+{additions}</span>
@@ -384,6 +407,12 @@ export function WorkspacePage({
               setTab={setTab}
               onUpdateRepo={onUpdateRepo}
               updatingRepo={updatingRepo}
+              onCheckPremise={
+                premiseCheckable(run, demo, active)
+                  ? () => void premise.checkPremise()
+                  : undefined
+              }
+              checkingPremise={premise.checkingPremise}
             />
           )}
           {tab === "changes" && (
@@ -422,21 +451,35 @@ export function WorkspacePage({
               intelligence={intelligence}
               explanationRequests={explanationRequests}
               prepareExplanations={prepareExplanations}
+              walkthroughs={walkthroughs}
               actions={actions}
               understanding={understanding}
             />
           )}
           {tab === "activity" && (
-            <ActivityTab
-              run={run}
-              demo={demo}
-              busy={busy}
-              active={active}
-              reviewRerunning={reviewRerunning}
-              logFilter={logFilter}
-              setLogFilter={setLogFilter}
-              actions={actions}
-            />
+            // A chunk that fails to load stops at this tab; the draft and
+            // the review keep what the person typed.
+            <ErrorBoundary resetKey={run.id}>
+              <Suspense fallback={null}>
+                <ActivityTab
+                  run={run}
+                  demo={demo}
+                  busy={busy}
+                  active={active}
+                  reviewRerunning={reviewRerunning}
+                  logFilter={logFilter}
+                  setLogFilter={setLogFilter}
+                  actions={actions}
+                />
+              </Suspense>
+            </ErrorBoundary>
+          )}
+          {tab === "commits" && (
+            <ErrorBoundary resetKey={run.id}>
+              <Suspense fallback={null}>
+                <CommitHistory run={run} demo={demo} />
+              </Suspense>
+            </ErrorBoundary>
           )}
           {tab === "draft" && (
             <DraftTab

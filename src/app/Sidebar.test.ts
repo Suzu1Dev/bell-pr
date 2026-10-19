@@ -48,7 +48,8 @@ test("the sidebar lists every page and marks the open one", () => {
   assert.match(html, /<nav aria-label="主要導覽">/);
   assert.match(html, /class="nav-item active" title="貢獻工作台" aria-current="page"/);
   assert.equal(html.match(/aria-current="page"/g)?.length, 1);
-  assert.match(html, /每一次貢獻，都有所收穫。/);
+  // The learning notes are one item; no card below repeats the link.
+  assert.doesNotMatch(html, /learning-card/);
 
   const learning = render({ page: "learning" });
   assert.match(learning, /class="nav-item active" title="學習筆記" aria-current="page"/);
@@ -142,7 +143,6 @@ test("the sidebar reads in English with no Chinese left", () => {
     assert.ok(html.includes(`<span>${label}</span>`), label);
   assert.match(html, /<nav aria-label="Main navigation">/);
   assert.match(html, /<div class="recent-sample-heading">Sample<\/div><button class="recent-item selected"><span class="small-status "><\/span><span>SDK smart retries<\/span>/);
-  assert.match(html, /Every contribution teaches you something\./);
   assert.match(html, /<strong>My workspace<\/strong>/);
   assert.match(html, /aria-label="Close navigation"/);
   assertNoHan(withoutOtherLanguages(html));

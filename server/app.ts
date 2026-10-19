@@ -25,6 +25,7 @@ import { registerLearningRoutes } from "./routes/learning.js";
 import { registerLicenseRoutes } from "./routes/license.js";
 import { registerMaintenanceRoutes } from "./routes/maintenance.js";
 import { registerModelSettingsRoutes } from "./routes/model-settings.js";
+import { registerReadingRoutes } from "./routes/reading.js";
 import { registerReposRoutes } from "./routes/repos.js";
 import { registerReviewRoutes } from "./routes/review.js";
 import { registerRunsRoutes } from "./routes/runs.js";
@@ -182,6 +183,7 @@ export function createApp(workbench: Workbench, options: AppOptions = {}) {
   registerModelSettingsRoutes(app, deps);
   registerRunsRoutes(app, deps);
   registerReviewRoutes(app, deps);
+  registerReadingRoutes(app, deps);
   registerSyncRoutes(app, deps);
   registerFollowUpsRoutes(app, deps);
   // Route modules that later work fills in, in a fixed order, so none of

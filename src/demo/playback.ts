@@ -387,6 +387,8 @@ export function createDemoPlayback({
     if (!run?.team) return;
     const team = run.team;
     team.planSummary = demo.team.planSummary;
+    // The lead checks the request's premise while it plans.
+    if (demo.team.premise) team.premise = { ...demo.team.premise };
     team.tasks = demo.team.tasks.map(
       (task): TeamTask => ({
         id: task.id,
@@ -448,6 +450,8 @@ export function createDemoPlayback({
       if (done?.report) task.report = done.report;
       if (done?.checks) task.checks = copy(done.checks);
       if (done?.integratedFiles) task.integratedFiles = [...done.integratedFiles];
+      // What the teammate could not run here shows once its task is done.
+      if (done?.setup) task.setup = copy(done.setup);
       finished.add(task.owner);
     }
     appendLogs(finished);

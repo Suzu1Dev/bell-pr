@@ -30,6 +30,7 @@ import {
   SquarePen,
   X,
 } from "lucide-react";
+import { api } from "../api";
 import { useT } from "../i18n";
 import type { DiffFile, Repo, Run } from "../types";
 import { applyReviewOrder, parseReviewOrder } from "../../shared/review-order";
@@ -41,7 +42,12 @@ import { ErrorBoundary } from "../app/ErrorBoundary";
 import { useRovingList } from "../a11y/useRovingList";
 import { fileStatusLabel } from "../app/labels";
 import { usePresentation } from "../app/presentation";
+import { FailureText } from "../FailureText";
+import { PremiseNotice } from "../team/PremiseNotice";
 import type { RunActions } from "../app/hooks/useRunActions";
+import type { Walkthroughs } from "../app/hooks/useWalkthroughs";
+import type { PanelTab } from "../review/ExplanationPanel";
+import type { LineRange } from "../review/WalkthroughCards";
 import {
   closeCheckPanel,
   openCheckPanel,
@@ -98,6 +104,8 @@ interface ChangesTabProps {
     retry?: boolean,
     filePath?: string,
   ) => Promise<void>;
+  /** The code walkthroughs of the run's files (useWalkthroughs). */
+  walkthroughs?: Walkthroughs;
   actions: Pick<
     RunActions,
     | "messages"
@@ -114,6 +122,22 @@ interface ChangesTabProps {
   >;
   /** The Explain-it-back check of the run (useUnderstanding). */
   understanding?: Understanding;
+}
+
+/**
+ * The file at the run's base commit, for the unchanged code around its
+ * changes. The fingerprint and the base tie the answer to the diff shown.
+ */
+async function loadBaseLines(run: Run, target: DiffFile) {
+  const query = new URLSearchParams({
+    path: target.path,
+    fingerprint: target.fingerprint ?? "",
+    base: run.baseSha ?? "",
+  });
+  const { lines } = await api<{ lines: string[] }>(
+    `/runs/${encodeURIComponent(run.id)}/context?${query}`,
+  );
+  return lines;
 }
 
 /** The code review tab: changed files, the diff and the explanation panel. */
@@ -152,6 +176,7 @@ export function ChangesTab({
   intelligence,
   explanationRequests,
   prepareExplanations,
+  walkthroughs,
   actions,
   understanding,
 }: ChangesTabProps) {
@@ -173,6 +198,8 @@ export function ChangesTab({
     ask,
   } = actions;
   const { present, maskPath } = usePresentation();
+  const showWorktree =
+    editable && !!run.worktreePath && !run.workspaceRemovedAt;
   // Closed book: while the check is open it takes the explanation's place,
   // and questions to the agent wait until it closes.
   const checkMode = useCheckPanel(run.id);
@@ -188,6 +215,22 @@ export function ChangesTab({
     setShowExplanation(true);
     setFocusMode(false);
   }, [checking, setShowExplanation, setFocusMode]);
+  /**
+   * The current-file lines a walkthrough part marks in the diff, with the
+   * diff version its line numbers belong to.
+   */
+  const [highlight, setHighlight] = useState<
+    (LineRange & { runId: string; path: string; fingerprint?: string }) | null
+  >(null);
+  // The panel remounts per file; it opens on the tab the reader chose last.
+  const [panelTab, setPanelTab] = useState<PanelTab>("explain");
+  const shownHighlight =
+    file &&
+    highlight?.runId === run.id &&
+    highlight.path === file.path &&
+    highlight.fingerprint === file.fingerprint
+      ? { startLine: highlight.startLine, endLine: highlight.endLine }
+      : undefined;
   const reviewGridRef = useRef<HTMLDivElement>(null);
   // On a phone the file search hides behind an icon button; a query keeps it open.
   const [searchOpen, setSearchOpen] = useState(false);
@@ -252,6 +295,23 @@ export function ChangesTab({
       (!onlyUnreviewed || !run.reviewedFiles.includes(f.path)),
   );
   return (
+    <>
+    {/* The lead's premise check, folded (the diff is read file after file),
+        and the worktree share one row above the code. It comes before the
+        file list, so the way from the files to the explanation stays short. */}
+    {(run.team?.premise || showWorktree) && (
+      <div className="diff-context-bar">
+        <PremiseNotice premise={run.team?.premise} compact />
+        {showWorktree && (
+          <WorktreeHint
+            path={run.worktreePath!}
+            presenting={present}
+            maskPath={maskPath}
+            onCopy={copyWorktreePath}
+          />
+        )}
+      </div>
+    )}
     <div
       ref={reviewGridRef}
       className={`review-grid ${!showFiles ? "files-hidden" : ""} ${!showExplanation ? "explanation-hidden" : ""}`}
@@ -508,23 +568,21 @@ export function ChangesTab({
             </div>
           </div>
         </div>
-        {editable && run.worktreePath && !run.workspaceRemovedAt && (
-          <WorktreeHint
-            path={run.worktreePath}
-            presenting={present}
-            maskPath={maskPath}
-            onCopy={copyWorktreePath}
-          />
-        )}
         {file ? (
           <DiffView
-            key={`${run.id}:${file.path}`}
+            key={`${run.id}:${file.path}:${run.baseSha ?? ""}`}
             file={file}
             reviewed={run.reviewedFiles.includes(file.path)}
             onReview={reviewFile}
             onAsk={checking ? () => setAskWaiting(true) : ask}
             view={diffView}
             hasNote={Boolean(run.notes?.[file.path]?.text)}
+            onLoadBase={
+              !demo && file.fingerprint && run.baseSha
+                ? () => loadBaseLines(run, file)
+                : undefined
+            }
+            highlight={shownHighlight}
           />
         ) : (
           <div className="empty-state">
@@ -539,10 +597,13 @@ export function ChangesTab({
                   : t.noChanges}
             </h3>
             <p>
-              {run.error ||
-                (run.workspaceRemovedAt
-                  ? notices.workspaceRemoved
-                  : t.noChangesHint)}
+              {run.error ? (
+                <FailureText text={run.error} />
+              ) : run.workspaceRemovedAt ? (
+                notices.workspaceRemoved
+              ) : (
+                t.noChangesHint
+              )}
             </p>
             <button
               className="button secondary"
@@ -669,6 +730,32 @@ export function ChangesTab({
                     }
                     tryFirst={understanding?.tryFirst ?? true}
                     generated={currentRepo?.contributionRules?.generated}
+                    highlight={shownHighlight}
+                    onHighlight={(range) =>
+                      setHighlight(
+                        range
+                          ? {
+                              runId: run.id,
+                              path: file.path,
+                              fingerprint: file.fingerprint,
+                              ...range,
+                            }
+                          : null,
+                      )
+                    }
+                    onRetryWalkthrough={
+                      demo || !walkthroughs
+                        ? undefined
+                        : () =>
+                            void walkthroughs.requestWalkthrough(
+                              run.id,
+                              file.path,
+                              true,
+                            )
+                    }
+                    walkthroughBusy={walkthroughs?.walkthroughBusy}
+                    initialTab={panelTab === "chat" ? "explain" : panelTab}
+                    onTabChange={setPanelTab}
                   />
                 </Suspense>
               </ErrorBoundary>
@@ -683,6 +770,7 @@ export function ChangesTab({
         </>
       )}
     </div>
+    </>
   );
 }
 
@@ -702,11 +790,15 @@ export function WorktreeHint({
   onCopy: () => void;
 }) {
   const t = useT("workspace").changes;
+  // The editing hint is the tooltip; screen readers read it with the path.
   return (
-    <div className="worktree-hint">
-      <FolderGit2 size={14} />
-      <span>{t.worktreeHint}</span>
-      <code>{maskPath(path)}</code>
+    <div className="worktree-hint" title={t.worktreeHint}>
+      <FolderGit2 size={14} aria-hidden="true" />
+      <span>{t.worktreeLabel}</span>
+      <span className="visually-hidden">{t.worktreeHint}</span>
+      <code>
+        <span>{maskPath(path)}</span>
+      </code>
       {!presenting && (
         <button
           type="button"

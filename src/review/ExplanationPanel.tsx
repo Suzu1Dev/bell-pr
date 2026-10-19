@@ -19,6 +19,7 @@ import {
   RotateCcw,
   Shuffle,
   Sparkles,
+  Workflow,
 } from "lucide-react";
 import type { LearnerNote } from "../../shared/explanations";
 import { parseLocale, type Locale } from "../../shared/i18n/locale";
@@ -31,12 +32,14 @@ import {
   type FileAttemptInput,
 } from "../../shared/understanding";
 import { useTablistKeys } from "../a11y/useTablistKeys";
+import { scrollBehavior } from "../app/presentation";
 import { useFormat, useLocale, useT } from "../i18n";
 import type { ChatMessage, DiffFile, Run } from "../types";
 import { MarkdownContent } from "./MarkdownContent";
 import { QuizAttempt } from "./QuizAttempt";
 import { RoadChoice } from "./RoadChoice";
 import { currentAttempt, demoSamples } from "./try-first";
+import { WalkthroughCards, type LineRange } from "./WalkthroughCards";
 import { withNodes } from "./withNodes";
 import "./review.css";
 
@@ -86,7 +89,19 @@ export interface ExplanationPanelProps {
   tryFirst?: boolean;
   /** The project's `linguist-generated` patterns (`contributionRules.generated`); those files get no prompts, as in the check. */
   generated?: readonly string[];
+  /** The current-file lines a walkthrough part marks in the diff. */
+  highlight?: LineRange;
+  onHighlight?: (range: LineRange | undefined) => void;
+  /** Prepares this file's walkthrough again; the retry button renders when given. */
+  onRetryWalkthrough?: () => void;
+  walkthroughBusy?: boolean;
+  /** The tab to open on; the panel remounts per file, so the caller keeps the reader's choice. */
+  initialTab?: PanelTab;
+  onTabChange?: (tab: PanelTab) => void;
 }
+
+/** The learning panel's tabs. */
+export type PanelTab = "explain" | "walkthrough" | "reports" | "chat";
 
 /**
  * Says where agent-written text comes from: AI output that may be wrong, or
@@ -299,13 +314,23 @@ export function ExplanationPanel({
   onAttempt,
   tryFirst = true,
   generated,
+  highlight,
+  onHighlight,
+  onRetryWalkthrough,
+  walkthroughBusy,
+  initialTab = "explain",
+  onTabChange,
 }: ExplanationPanelProps) {
   const t = useT("review");
   const fmt = useFormat();
   const [locale] = useLocale();
-  const [tab, setTab] = useState<"explain" | "reports" | "chat">(
-    chatRequestId ? "chat" : "explain",
+  const [tab, setTab] = useState<PanelTab>(
+    chatRequestId ? "chat" : initialTab,
   );
+  // Reported on every change, so the next file opens on the same tab.
+  const tabChanged = useRef(onTabChange);
+  tabChanged.current = onTabChange;
+  useEffect(() => tabChanged.current?.(tab), [tab]);
   const [question, setQuestion] = useState("");
   const [showAnswer, setShowAnswer] = useState(false);
   const [noteDraft, setNoteDraft] = useState(note?.text ?? "");
@@ -318,9 +343,13 @@ export function ExplanationPanel({
   useEffect(() => {
     setQuestion("");
     setShowAnswer(false);
-    // Reports are run-level, so stay on that tab when the reader clicks through files.
+    // Reports are run-level and walkthroughs are read file after file, so those tabs stay.
     setTab((current) =>
-      chatRequestId ? "chat" : current === "reports" ? "reports" : "explain",
+      chatRequestId
+        ? "chat"
+        : current === "reports" || current === "walkthrough"
+          ? current
+          : "explain",
     );
     lastMessageCount.current = messages.length;
   }, [file.path]);
@@ -347,7 +376,10 @@ export function ExplanationPanel({
 
   useEffect(() => {
     if (tab === "chat")
-      chatEnd.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      chatEnd.current?.scrollIntoView({
+        block: "nearest",
+        behavior: scrollBehavior(),
+      });
   }, [messages.length, loading, tab]);
 
   useEffect(() => {
@@ -447,6 +479,19 @@ export function ExplanationPanel({
         >
           <BookOpen size={14} />
           {t.panel.tabs.explain}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id={`${panelId}-walkthrough`}
+          tabIndex={tab === "walkthrough" ? 0 : -1}
+          aria-selected={tab === "walkthrough"}
+          aria-controls={`${panelId}-content`}
+          className={tab === "walkthrough" ? "explain-tab-active" : ""}
+          onClick={() => setTab("walkthrough")}
+        >
+          <Workflow size={14} />
+          {t.panel.tabs.walkthrough}
         </button>
         <button
           type="button"
@@ -817,6 +862,15 @@ export function ExplanationPanel({
               </section>
             )}
           </>
+        ) : tab === "walkthrough" ? (
+          <WalkthroughCards
+            file={file}
+            demo={demo}
+            highlight={highlight}
+            onHighlight={onHighlight}
+            onRetry={onRetryWalkthrough}
+            busy={walkthroughBusy}
+          />
         ) : tab === "reports" ? (
           <ReviewReports
             file={file}

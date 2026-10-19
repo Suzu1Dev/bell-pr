@@ -264,3 +264,127 @@ test("a diff without code lines shows its empty state instead of an empty list",
   );
   assert.doesNotMatch(blocked, /role="listbox"|rv-visually-hidden/);
 });
+
+test("a modified file offers its unchanged code around the changes; the demo shows its files as they are", () => {
+  const file: DiffFile = {
+    path: "src/count.ts",
+    language: "TypeScript",
+    additions: 1,
+    deletions: 1,
+    status: "modified",
+    fingerprint: "f".repeat(64),
+    patch: [
+      "@@ -4,3 +4,3 @@ export function count() {",
+      " const a = 1;",
+      "-const b = 2;",
+      "+const b = 3;",
+      " const c = 4;",
+    ].join("\n"),
+  };
+  const html = renderZh(
+    createElement(DiffView, {
+      file,
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "unified",
+      onLoadBase: async () => [],
+    }),
+  );
+  assert.match(html, /aria-pressed="false"[^>]*>.*完整檔案/);
+  assert.match(html, /aria-label="顯示這段變更上方的 3 行"/);
+  assert.match(html, /3 行未變更/);
+  assert.match(html, /aria-label="顯示到檔案結尾"/);
+  assert.match(html, /aria-label="顯示上一段變更下方的 20 行"/);
+  // No loader: the plain hunk header, no arrows and no whole-file toggle.
+  for (const demo of demoFiles) {
+    const plain = render(demo);
+    assert.doesNotMatch(plain, /完整檔案|rv-gap/);
+  }
+  assert.doesNotMatch(render(file), /完整檔案|rv-gap/);
+  assert.match(render(file), /@@ -4,3 \+4,3 @@/);
+  // The gap rows stay inside the list's groups, which they name.
+  assert.match(html, /role="group" aria-label="export function count\(\) \{ 中，從舊版第 4 行、新版第 4 行起的變更"><div class="rv-hunk rv-gap" role="none">/);
+  assert.match(html, /role="group" aria-label="最後一段變更之後的未變更程式碼"><div class="rv-hunk rv-gap" role="none">/);
+  const english = renderEn(
+    createElement(DiffView, {
+      file,
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "split",
+      onLoadBase: async () => [],
+    }),
+  );
+  assertNoHan(english);
+  assert.match(english, /aria-label="Show 3 more lines above this change"/);
+  assert.match(english, /3 unchanged lines/);
+  assert.match(english, /aria-label="Show the rest of the file"/);
+  assert.match(english, /Whole file/);
+});
+
+test("a submodule or a mode-only change offers no expansion", () => {
+  const withLoader = (file: DiffFile) =>
+    renderZh(
+      createElement(DiffView, {
+        file,
+        reviewed: false,
+        onReview() {},
+        onAsk() {},
+        view: "unified",
+        onLoadBase: async () => [],
+      }),
+    );
+  const base = {
+    language: "Text",
+    additions: 1,
+    deletions: 1,
+    status: "modified",
+    fingerprint: "f".repeat(64),
+  } as const;
+  const submodule = withLoader({
+    ...base,
+    path: "vendor/lib",
+    patch: [
+      "diff --git a/vendor/lib b/vendor/lib",
+      "index 1111111..2222222 160000",
+      "--- a/vendor/lib",
+      "+++ b/vendor/lib",
+      "@@ -1 +1 @@",
+      "-Subproject commit 1111111111111111111111111111111111111111",
+      "+Subproject commit 2222222222222222222222222222222222222222",
+    ].join("\n"),
+  });
+  assert.doesNotMatch(submodule, /完整檔案|rv-gap/);
+  const modeOnly = withLoader({
+    ...base,
+    path: "run.sh",
+    additions: 0,
+    deletions: 0,
+    patch: "diff --git a/run.sh b/run.sh\nold mode 100644\nnew mode 100755\n",
+  });
+  assert.doesNotMatch(modeOnly, /完整檔案|rv-gap/);
+});
+
+test("a highlighted range marks its lines in the changed version only", () => {
+  const client = demoFiles.find((entry) => entry.path === "src/client.ts")!;
+  const html = renderZh(
+    createElement(DiffView, {
+      file: client,
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "unified",
+      highlight: { startLine: 12, endLine: 16 },
+    }),
+  );
+  // Each marked row's new-file number, from its second gutter.
+  const marked = [
+    ...html.matchAll(
+      /class="rv-line [^"]*rv-line-highlighted[^"]*"[^>]*>(?:<span class="rv-gutter rv-gutter-old">\d*<\/span>)<span class="rv-gutter">(\d+)<\/span>/g,
+    ),
+  ].map((match) => Number(match[1]));
+  // Lines 12 to 16 of the new file; the two removed lines in between are not marked.
+  assert.deepEqual(marked, [12, 13, 14, 15, 16]);
+  assert.doesNotMatch(html, /rv-line-removed[^"]*rv-line-highlighted/);
+});

@@ -5,6 +5,7 @@
  * as a DemoCopy, and buildDemoContent() joins the two, so every locale shares
  * the same ids, paths and times.
  */
+import type { CommitDetail, CommitSummary } from "../../shared/commits";
 import { ponytailPolicyVersion, type EfficiencyMetrics } from "../../shared/efficiency";
 import type { ContributionFacts } from "../../shared/contribution";
 import { aiDisclosureLine } from "../../shared/drafts";
@@ -223,6 +224,141 @@ function diff(
 }
 
 /**
+ * The sample's function walkthrough of src/client.ts: the unit, its parts,
+ * the code it points to and the unit the diff adds whole. Line numbers are
+ * in the changed version of the file; each locale's copy has the words.
+ */
+export const walkthrough = {
+  path: "src/client.ts",
+  name: "createClient",
+  startLine: 10,
+  endLine: 25,
+  steps: [
+    [10, 11],
+    [12, 16],
+    [17, 21],
+    [22, 25],
+  ],
+  callers: [{ path: "README.md", line: 11 }],
+  callees: [
+    { name: "withRetry", path: "src/utils/retry.ts", line: 6 },
+    { name: "HttpError", path: "src/client.ts", line: 4 },
+    { name: "fetch", path: "", line: null },
+  ],
+  newUnits: ["HttpError"],
+} as const;
+
+/** One file of a sample commit, its patch from the hunk lines. */
+function commitFile(
+  path: string,
+  lines: readonly string[],
+  status: "added" | "modified" = "modified",
+) {
+  const changed = diff(path, lines, {} as NonNullable<DiffFile["explanation"]>, status);
+  return {
+    path,
+    status,
+    additions: changed.additions,
+    deletions: changed.deletions,
+    patch: changed.patch,
+  };
+}
+
+/**
+ * The commits the sample PR has once it is published, a review round is
+ * pushed and the target branch is merged in: the first push (the sample's
+ * own diff), the round that keeps the old `delay` option for one release,
+ * and the merge of `main`. Commit messages are English in every locale,
+ * like every commit BELL writes; nothing here was ever on GitHub.
+ */
+export const commitHistory = (() => {
+  const shas = {
+    base: "0c1d2e3f40516273849506a7b8c9d0e1f2a3b4c5",
+    initial: "7a1f3c9e2b4d6f8a0c2e4f6a8b0d2c4e6f8a1b3c",
+    review: "b42e7d1c9a3f5e7b1d3c5a7e9f1b3d5c7a9e2f4b",
+    target: "c9e8d7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0",
+    sync: "e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6",
+  };
+  const initialFiles = diffs.map((file) =>
+    commitFile(file.path, file.lines, "status" in file ? file.status : "modified"),
+  );
+  const reviewFiles = [
+    commitFile("src/types.ts", [
+      " export interface RetryOptions {",
+      "   maxRetries?: number;",
+      "+  /** @deprecated Use baseDelay; kept for one release. */",
+      "+  delay?: number;",
+      "   /** Initial backoff ceiling, in milliseconds. */",
+      "   baseDelay?: number;",
+    ]),
+    commitFile("src/utils/retry.ts", [
+      "   const {",
+      "     maxRetries = 3,",
+      "-    baseDelay = 1000,",
+      "+    delay,",
+      "+    baseDelay = delay ?? 1000,",
+      "     maxDelay = 30_000,",
+      "     shouldRetry = () => true,",
+      "   } = options;",
+    ]),
+  ];
+  const syncFiles = [
+    commitFile("CONTRIBUTING.md", [
+      " # Contributing to Open Fetch",
+      " ",
+      "+Run `npm test` before you open a pull request.",
+      "+",
+    ]),
+  ];
+  const count = (files: { additions: number; deletions: number }[]) => ({
+    files: files.length,
+    additions: files.reduce((sum, file) => sum + file.additions, 0),
+    deletions: files.reduce((sum, file) => sum + file.deletions, 0),
+  });
+  const author = "Sample Contributor";
+  return {
+    commits: [
+      {
+        sha: shas.initial,
+        parents: [shas.base],
+        author,
+        date: "2026-10-03T10:20:00+08:00",
+        subject: "feat(client): add exponential backoff and jitter to GET retries",
+        body: "Temporary network errors forced users to repeat read requests.\nRetry only idempotent reads, cap the attempts and keep the final\nerror message when the retries are exhausted.",
+        source: "initial",
+        ...count(initialFiles),
+      },
+      {
+        sha: shas.review,
+        parents: [shas.initial],
+        author,
+        date: "2026-10-05T14:05:00+08:00",
+        subject: "Keep the delay option working for one release",
+        body: "Address the review: existing configs that set retry.delay keep\ntheir first wait until they move to baseDelay.",
+        source: "review",
+        round: 1,
+        ...count(reviewFiles),
+      },
+      {
+        sha: shas.sync,
+        parents: [shas.review, shas.target],
+        author,
+        date: "2026-10-06T09:40:00+08:00",
+        subject: "Merge branch 'main' into fix/smart-retry",
+        body: "",
+        source: "sync",
+        ...count(syncFiles),
+      },
+    ] satisfies CommitSummary[],
+    details: {
+      [shas.initial]: { files: initialFiles, omitted: 0 },
+      [shas.review]: { files: reviewFiles, omitted: 0 },
+      [shas.sync]: { files: syncFiles, omitted: 0 },
+    } satisfies Record<string, CommitDetail>,
+  };
+})();
+
+/**
  * The issue the sample run is for. It is a fragment, shown as "#42
  * (sample)" and never as a link, and it meets the sample project's
  * "issue first" rule.
@@ -397,6 +533,8 @@ export const team = {
     messageDelivery: "between-turns",
   },
   phase: "complete",
+  /** The lead's premise check: the request takes for granted that GET does not retry yet. */
+  premiseVerdict: "holds",
   tasks: [
     {
       id: "task-1",
@@ -430,6 +568,8 @@ export const team = {
       files: ["tests/retry.test.ts"],
       dependsOn: ["task-2", "task-3"],
       status: "complete",
+      /** What the tester could not run here; its words are in the copy. */
+      setup: [{ command: "npx playwright install chromium" }],
     },
   ],
   messages: [
@@ -873,14 +1013,48 @@ function recommendation(
 export function buildDemoContent(copy: DemoCopy): DemoContent {
   return {
     repo,
-    files: diffs.map((file) =>
-      diff(
+    files: diffs.map((file) => {
+      const changed = diff(
         file.path,
         file.lines,
         copy.explanations[file.path],
         "status" in file ? file.status : undefined,
-      ),
-    ),
+      );
+      if (file.path !== walkthrough.path) return changed;
+      const text = copy.walkthrough;
+      return {
+        ...changed,
+        walkthroughStatus: "ready",
+        walkthrough: {
+          functions: [
+            {
+              name: walkthrough.name,
+              kind: text.kind,
+              startLine: walkthrough.startLine,
+              endLine: walkthrough.endLine,
+              summary: text.summary,
+              change: text.change,
+              steps: walkthrough.steps.map(([startLine, endLine], index) => ({
+                startLine,
+                endLine,
+                explanation: text.steps[index],
+              })),
+              callers: walkthrough.callers.map((caller, index) => ({
+                ...caller,
+                ...text.callers[index],
+              })),
+              callees: walkthrough.callees.map((callee, index) => ({
+                ...callee,
+                note: text.callees[index],
+              })),
+              analogy: text.analogy,
+              selfCheck: { ...text.selfCheck },
+            },
+          ],
+          newUnits: [...walkthrough.newUnits],
+        },
+      };
+    }),
     run: {
       id: run.id,
       repoId: repo.id,
@@ -935,6 +1109,7 @@ export function buildDemoContent(copy: DemoCopy): DemoContent {
       config: { ...team.config },
       phase: team.phase,
       planSummary: copy.team.planSummary,
+      premise: { verdict: team.premiseVerdict, ...copy.team.premise },
       tasks: team.tasks.map((task) => {
         const text = copy.team.tasks[task.id];
         return {
@@ -946,6 +1121,14 @@ export function buildDemoContent(copy: DemoCopy): DemoContent {
           dependsOn: [...task.dependsOn],
           status: task.status,
           report: text.report,
+          ...("setup" in task
+            ? {
+                setup: task.setup.map((need, index) => ({
+                  command: need.command,
+                  ...text.setup![index],
+                })),
+              }
+            : {}),
           ...("checks" in task
             ? {
                 checks: task.checks.map((check) => ({ ...check })),
@@ -1088,5 +1271,6 @@ export function buildDemoContent(copy: DemoCopy): DemoContent {
     restatementSample: [
       { url: prFeedback.items[0].url, text: copy.restatement },
     ],
+    commitHistory: structuredClone(commitHistory),
   };
 }

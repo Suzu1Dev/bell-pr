@@ -17,12 +17,14 @@ const m: Translation<typeof en> = {
     review: { title: "理解與審查", description: "讀懂它，再用自己的話講一遍" },
     submit: { title: "送出貢獻", description: "你的下一個 Pull Request" },
   },
+  stepTooltip: ({ n, title, description }) => `${n} ${title}：${description}`,
   tabsLabel: "任務內容",
   tabs: {
     overview: "全貌與動機",
     changes: "程式碼變更",
     activity: "Agent 動態",
     draft: "PR 草稿",
+    commits: "Commit 歷程",
   },
   unsandboxed: {
     label: "未使用沙箱執行",
@@ -102,6 +104,7 @@ const m: Translation<typeof en> = {
     viewMode: "Diff 顯示模式",
     unified: "統一檢視",
     split: "並排檢視",
+    worktreeLabel: "工作目錄",
     worktreeHint:
       "你可以直接在這個目錄修改，重新整理差異後會重新解說與審閱狀態",
     copyWorktree: "複製工作目錄路徑",
@@ -201,9 +204,11 @@ const m: Translation<typeof en> = {
   },
   activity: {
     runTitle: "執行過程",
-    runText: "任務板在上方；完整紀錄、錯誤訊息與停止操作保留在這裡。",
+    runText:
+      "任務板在上方；完整紀錄、錯誤訊息與停止操作保留在這裡。開發在獨立的 Git worktree 中執行，審查完成後由你決定何時送出。",
     teamTitle: "你的 Agent team",
-    teamText: "每個角色各司其職，所有過程都在這裡。",
+    teamText:
+      "每個角色各司其職，所有過程都在這裡。開發在獨立的 Git worktree 中執行，審查完成後由你決定何時送出。",
     stopReview: "停止重新審查",
     stopTask: "停止任務",
     log: "執行紀錄",
@@ -214,10 +219,6 @@ const m: Translation<typeof en> = {
     all: "全部",
     emptyLog: "任務開始後會在此顯示紀錄。",
     emptyFilter: "這個角色目前沒有紀錄。",
-    eyebrow: "任務簡介",
-    goal: "這次的貢獻目標",
-    isolation:
-      "開發在獨立的 Git worktree 中執行。審查完成後，由你決定何時送出。",
   },
   brief: {
     motivation: "這次貢獻的價值仍需由任務需求與驗收結果確認。",
@@ -234,9 +235,9 @@ const m: Translation<typeof en> = {
       "這次同步會在 PR 分支加上一個合併 commit，PR 標題與說明維持原樣。請先在「程式碼變更」審閱目標分支改到的檔案，再確認下方的提交訊息。",
     roundNotice:
       "這輪修正只會在 PR 分支加上一個新的 commit，PR 標題與說明維持原樣。請先在「程式碼變更」審閱這輪改到的檔案，再確認下方的提交訊息。",
-    proposalNotice: `下方說明是 ${product.name} 依專案規範產生的建議原文，你還沒有修改。這段文字會原樣送到 GitHub：送出前請用自己的話確認內容，待辦事項留在上方的核對清單，不要寫進說明。`,
+    proposalNotice: `下方說明是 ${product.name} 依專案規範產生的建議原文，你還沒有修改。這段文字會原樣送到 GitHub：送出前請用自己的話確認內容，待辦事項留在下方規範區的核對清單，不要寫進說明。`,
     emptyNotice:
-      "還沒有 PR 說明。可以在上方產生並套用建議草稿，或用自己的話寫下改了什麼、為什麼，以及實際執行過哪些檢查。Agent 的完整報告在「審查者怎麼看」。",
+      "還沒有 PR 說明。可以在下方產生並套用建議草稿，或用自己的話寫下改了什麼、為什麼，以及實際執行過哪些檢查。Agent 的完整報告在「審查者怎麼看」。",
     titleLabel: "Pull Request 標題",
     modeLabel: "說明檢視方式",
     edit: "編輯",
@@ -386,6 +387,9 @@ const m: Translation<typeof en> = {
     submit: "送出 Draft PR",
   },
   notices: {
+    premiseChecked: ({ verdict }) =>
+      `前提查核完成：${verdict}。結論改變時，程式碼解說與你還沒作答的變更解說會依結論重新產生。`,
+    premiseNone: "需求裡沒有需要查核的假設。",
     stopResolving:
       "已停止解衝突；已改的檔案保留，可以自行完成，或再請 Agent 處理。",
     stopRoundKept:

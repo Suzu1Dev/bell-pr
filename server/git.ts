@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { lstat, realpath } from "node:fs/promises";
+import { lstat, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { assertGitConfigSafe, git } from "./process.js";
-import { secretInPatch } from "./secrets.js";
+import { redact, secretInPatch } from "./secrets.js";
 import { AppError, type DiffFile, type Run } from "./types.js";
 import { sm, withLocale } from "./i18n/index.js";
 import { parseLocale, type Locale } from "../shared/i18n/locale.js";
@@ -220,6 +220,58 @@ export function parseNumstat(
         binary: match[1] === "-",
       };
     });
+}
+
+/** The largest base version shown around a diff; the same bound as a new file. */
+export const contextFileLimit = 512_000;
+
+/**
+ * A changed file as it was at the run's base commit, split into lines. The
+ * lines a diff leaves out are unchanged, so they read the same here as in
+ * the checkout. Callers check the path against the current diff first.
+ */
+export async function baseFileLines(
+  run: Pick<Run, "worktreePath" | "baseSha">,
+  filePath: string,
+) {
+  const blob = `${run.baseSha}:${filePath}`;
+  // A submodule is a commit, not file content.
+  const type = (await git(run.worktreePath, ["cat-file", "-t", blob])).stdout.trim();
+  if (type !== "blob") throw new AppError((m) => m.run.context.notAFile, 422);
+  const size = Number(
+    (await git(run.worktreePath, ["cat-file", "-s", blob])).stdout.trim(),
+  );
+  if (!(size <= contextFileLimit))
+    throw new AppError((m) => m.run.context.tooLarge, 422);
+  const content = (
+    await git(run.worktreePath, ["cat-file", "blob", blob], {
+      maxBytes: contextFileLimit + 1_000,
+    })
+  ).stdout;
+  if (content.includes("\0"))
+    throw new AppError((m) => m.run.context.binary, 422);
+  if (secretInPatch(content))
+    throw new AppError((m) => m.run.context.credentials, 422);
+  // Masked line by line, so password=… or URL credentials never leave and numbering holds.
+  const lines = content.split("\n").map(redact);
+  if (lines.at(-1) === "") lines.pop();
+  return lines;
+}
+
+/** How many lines a file of the checkout has, read with the same checks as a new file. */
+export async function checkoutLineCount(
+  run: Pick<Run, "worktreePath">,
+  filePath: string,
+) {
+  const fullPath = path.join(run.worktreePath, filePath);
+  const metadata = await lstat(fullPath);
+  if (!metadata.isFile() || metadata.size > contextFileLimit)
+    throw new AppError((m) => m.run.context.unreadable, 422);
+  const resolved = await realpath(fullPath);
+  if (!resolved.startsWith((await realpath(run.worktreePath)) + path.sep))
+    throw new AppError((m) => m.run.diff.outsideWorktree, 422);
+  const lines = (await readFile(resolved, "utf8")).split("\n");
+  return lines.at(-1) === "" ? lines.length - 1 : lines.length;
 }
 
 export async function readDiff(

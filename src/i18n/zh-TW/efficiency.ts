@@ -16,6 +16,8 @@ const m: Translation<typeof en> = {
     draft: "PR 草稿",
     explanations: "解說",
     guide: "追問",
+    walkthrough: "程式碼解說",
+    premise: "前提查核",
     followup: "Review 修正",
     sync: "解衝突",
   },

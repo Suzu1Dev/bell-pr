@@ -81,6 +81,28 @@ const review = {
     shiftHint: ({ key }: { key: string }) => `Hold ${key} for several lines`,
     clearSelection: "Clear selection",
     askSelection: "Explain this code",
+    /** The unchanged code a modified file's patch leaves out, read from the run's base. */
+    gap: {
+      showBelow: ({ count }: { count: number }) =>
+        plural(count) === "one"
+          ? "Show 1 more line below the change above"
+          : `Show ${count} more lines below the change above`,
+      showAbove: ({ count }: { count: number }) =>
+        plural(count) === "one"
+          ? "Show 1 more line above this change"
+          : `Show ${count} more lines above this change`,
+      showAll: ({ count }: { count: number }) =>
+        plural(count) === "one" ? "Show the 1 line here" : `Show all ${count} lines here`,
+      showToEnd: "Show the rest of the file",
+      hidden: ({ count }: { count: number }) =>
+        plural(count) === "one" ? "1 unchanged line" : `${count} unchanged lines`,
+      toEnd: "More unchanged code follows to the end of the file",
+      /** The accessible name of the gap after the last change. */
+      endLabel: "Unchanged code after the last change",
+      wholeFile: "Whole file",
+      wholeFileTitle: "Show the whole file between the changes",
+      loadFailed: "Could not read the code around the changes.",
+    },
   },
   /** The question DiffView sends about the selected lines. */
   selection: {
@@ -144,6 +166,7 @@ const review = {
     tabsLabel: "Learning panel",
     tabs: {
       explain: "Explanation",
+      walkthrough: "Code walkthrough",
       reports: "Reviews",
       chat: "Ask the agent",
     },
@@ -370,6 +393,77 @@ const review = {
       saveWhy: "Save",
       saved: "Saved",
     },
+  },
+  /**
+   * The code walkthrough tab: the function, method or test around each
+   * change, explained as it works now, part by part.
+   */
+  walkthrough: {
+    lines: ({ start, end }: { start: number; end: number }) =>
+      start === end ? `Line ${start}` : `Lines ${start}–${end}`,
+    none: "None found.",
+    unavailableTitle: "This file has no code walkthrough",
+    demoOnly: "The sample prepared a code walkthrough for some files only.",
+    failedTitle: "The code walkthrough isn't finished",
+    failedBody:
+      "Something went wrong while preparing the code walkthrough; the changes can still be reviewed.",
+    retry: "Prepare the code walkthrough again",
+    busy: "Another code walkthrough is being prepared…",
+    generatingTitle: "Reading this file and its callers",
+    generatingBody:
+      "Finding the function that holds each change and taking apart how it works now.",
+    pendingTitle: "The code walkthrough will be ready on its own",
+    pendingBody:
+      "One is prepared for each modified code file in turn, starting with the one you're reading.",
+    onlyNewTitle: "Every change in this file is new code",
+    noneTitle: "No function holds these changes",
+    noneBody:
+      "The changes may be in top-level settings or declarations. Expand the code around them, or ask in “Ask the agent”.",
+    readyDemo: "Sample walkthrough · prewritten learning content",
+    readyLive: "Read the current file and its callers",
+    locate: "Mark this range in the code",
+    locateStep: "Mark these lines in the code",
+    change: "How this change affects it",
+    steps: "Step by step",
+    callers: "Who calls it",
+    callees: "What it calls",
+    analogy: "Another way to see it",
+    selfCheck: ({ question }: { question: string }) => `Check yourself: ${question}`,
+    /** `names` is the list of new units, each shown as code. */
+    newUnits: ({ names }: { names: string }) =>
+      `The new code has no earlier logic to take apart: ${names}. See the explanation for it.`,
+  },
+  /** The commit history tab of a published contribution. */
+  commits: {
+    title: "Commit history",
+    sources: {
+      initial: "First push",
+      review: ({ round }: { round: string }) => `Review round ${round}`,
+      sync: "Merged the target branch",
+      adopted: "Taken over from GitHub",
+      other: "Other commit",
+    },
+    files: ({ count }: { count: number }) =>
+      plural(count) === "one" ? "1 file" : `${count} files`,
+    mergeNote:
+      "Merge commit: the changes below are against the PR's previous version and include what the target branch brought in.",
+    show: "See what changed",
+    hide: "Hide",
+    loadingDetail: "Reading what this commit changed…",
+    omitted: ({ count }: { count: number }) =>
+      plural(count) === "one"
+        ? "1 more file is past the display limit; see the full diff on GitHub."
+        : `${count} more files are past the display limit; see the full diff on GitHub.`,
+    unpublished: `This contribution has not sent its PR yet. ${product.name} keeps the changes uncommitted until you publish and makes the first commit then; every review round and every sync with the target branch adds one more commit here.`,
+    unpublishedDemo:
+      "The sample has not sent a PR, so it has no commits yet. Below is the sample's history as it looks after the first push, one review round and a merge of the target branch.",
+    publishedDemo:
+      "The sample PR's commits: the first push, one review round and a merge of the target branch. Nothing was sent to GitHub.",
+    loading: "Reading the commit history…",
+    intro: ({ count }: { count: number }) =>
+      plural(count) === "one"
+        ? `The PR branch's 1 commit; the label says where it came from in ${product.name}.`
+        : `The PR branch's ${count} commits, oldest first; each label says where the commit came from in ${product.name}.`,
   },
 };
 

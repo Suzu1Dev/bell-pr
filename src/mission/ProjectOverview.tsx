@@ -44,6 +44,8 @@ import { ModelSummary } from "../models/ModelSummary";
 import { directionOptions } from "./DirectionSettings";
 import { usePlan } from "./plan";
 import { useSampleAnalysis } from "./sample-analysis";
+import { FailureText } from "../FailureText";
+import { knownVerdict, PremiseNotice } from "../team/PremiseNotice";
 import {
   moveRecommendation,
   orderedRecommendations,
@@ -83,6 +85,13 @@ export interface ProjectOverviewProps {
    * project is never locked.
    */
   canRecommendMore?: boolean;
+  /**
+   * Checks the request's assumption of a finished run against its code and
+   * reports: again, or for the first time on a run made before premise
+   * checks. Absent while the check cannot run (the sample, an active run).
+   */
+  onCheckPremise?: () => void;
+  checkingPremise?: boolean;
   /** What the plan unlocks, when the parent knows it. */
   entitlements?: Entitlements;
 }
@@ -292,8 +301,97 @@ function SectionNav({ sections }: { sections: OverviewSection[] }) {
   );
 }
 
-function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
+const MarkdownContent = lazy(() =>
+  import("../review/MarkdownContent").then((module) => ({
+    default: module.MarkdownContent,
+  })),
+);
+
+/**
+ * A short label opening a line, with an optional full-width parenthetical,
+ * before a full-width colon, as zh-TW requests label their sections.
+ */
+const sectionLabel =
+  // i18n-allow: parser
+  /^([^\s\d：:（(，。、,.*+#>`|-][^\n：:（(，。、,.]{0,11})((?:（[^）\n]*）)?)：/;
+/** The same in English: "User impact:", "Source evidence (…):". */
+const englishSectionLabel = /^([A-Z][A-Za-z ]{0,23}?)((?: \([^)\n]*\))?):(?= |$)/;
+
+/**
+ * Bolds the label of each section in a request written as labelled lines
+ * ("Problem:", "Acceptance:"), and starts each section as its own paragraph
+ * so it never reads as the continuation of a list item above it. List
+ * items, sentences and long phrases are left alone.
+ */
+export function briefMarkdown(text: string) {
+  return text
+    .split("\n")
+    .map((line, index) => {
+      const match = sectionLabel.exec(line);
+      const english = match ? null : englishSectionLabel.exec(line);
+      const found = match ?? english;
+      if (!found) return line;
+      // i18n-allow: parser
+      const colon = match ? "：" : ":";
+      const section = `**${found[1]}**${found[2]}${colon}${line.slice(found[0].length)}`;
+      return index > 0 ? `\n${section}` : section;
+    })
+    .join("\n");
+}
+
+/** Request and direction text as Markdown, its line breaks kept as written. */
+function BriefText({ text }: { text: string }) {
+  return (
+    <Suspense fallback={<p>{text}</p>}>
+      <div className="mission-brief-text">
+        <MarkdownContent>{briefMarkdown(text)}</MarkdownContent>
+      </div>
+    </Suspense>
+  );
+}
+
+function Brief({
+  run,
+  brief,
+  onCheckPremise,
+  checkingPremise = false,
+}: {
+  run: Run;
+  brief?: ContributionBrief;
+  onCheckPremise?: () => void;
+  checkingPremise?: boolean;
+}) {
   const t = useT("mission").brief;
+  const premise = run.team?.premise;
+  const verdict = premise ? knownVerdict(premise.verdict) : undefined;
+  // Text copied from the request still states the assumption; it is labelled, never rewritten.
+  const tag =
+    verdict === "refuted"
+      ? t.premiseRefuted
+      : verdict === "unclear"
+        ? t.premiseUnclear
+        : undefined;
+  const checkButton = onCheckPremise && (
+    <button
+      type="button"
+      className="mission-button mission-button-secondary"
+      onClick={onCheckPremise}
+      disabled={checkingPremise}
+    >
+      {checkingPremise ? (
+        <Loader2 className="mission-spin" size={15} />
+      ) : premise ? (
+        <RefreshCw size={15} />
+      ) : (
+        <Check size={15} />
+      )}
+      {checkingPremise
+        ? t.premiseChecking
+        : premise
+          ? t.premiseRecheck
+          : t.premiseCheck}
+    </button>
+  );
   return (
     <section
       id={sectionAnchor("contribution")}
@@ -310,17 +408,37 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
           <Target size={20} />
         </span>
       </div>
-      <h3 className="mission-contribution-name">{run.title}</h3>
+      <PremiseNotice premise={premise} />
+      {premise && checkButton && (
+        <div className="mission-premise-recheck">
+          {checkButton}
+          <small>{t.premiseRecheckNote}</small>
+        </div>
+      )}
+      {!premise && checkButton && (
+        <div className="mission-premise-missing">
+          <p>{t.premiseMissing}</p>
+          {checkButton}
+        </div>
+      )}
       {brief ? (
         <>
-          <div className="mission-contribution-reason">
+          <div
+            className={`mission-contribution-reason${
+              // A request written in sections reads better across the full width.
+              brief.problem.length > 280 ? " is-stacked" : ""
+            }`}
+          >
             <div>
               <span>{t.problem}</span>
-              <p>{brief.problem}</p>
+              <BriefText text={brief.problem} />
             </div>
             <div>
-              <span>{t.motivation}</span>
-              <p>{brief.motivation}</p>
+              <span>
+                {t.motivation}
+                {tag && <em className="mission-premise-tag">{tag}</em>}
+              </span>
+              <BriefText text={brief.motivation} />
             </div>
           </div>
           {brief.beneficiaries.length > 0 && (
@@ -337,7 +455,7 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
               <span className="mission-change-label">
                 {t.before} <span>{t.beforeCaption}</span>
               </span>
-              <p>{brief.before}</p>
+              <BriefText text={brief.before} />
             </article>
             <div className="mission-change-arrow" aria-hidden="true">
               <ArrowRight size={20} />
@@ -345,11 +463,14 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
             <article className="mission-after">
               <span className="mission-change-label">
                 {t.after} <span>{t.afterCaption}</span>
+                {tag && <em className="mission-premise-tag">{tag}</em>}
               </span>
-              <p>{brief.after}</p>
+              <BriefText text={brief.after} />
             </article>
           </div>
-          <p className="mission-impact-note">{t.impactNote}</p>
+          <p className="mission-impact-note">
+            {verdict === "refuted" ? t.impactRefuted : t.impactNote}
+          </p>
           <div className="mission-validation-grid">
             {brief.validation.length > 0 && (
               <div>
@@ -359,7 +480,9 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
                 </h4>
                 <ul>
                   {brief.validation.map((item, index) => (
-                    <li key={index}>{item}</li>
+                    <li key={index}>
+                      <BriefText text={item} />
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -372,7 +495,9 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
                 </h4>
                 <ul>
                   {brief.risks.map((item, index) => (
-                    <li key={index}>{item}</li>
+                    <li key={index}>
+                      <BriefText text={item} />
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -382,7 +507,7 @@ function Brief({ run, brief }: { run: Run; brief?: ContributionBrief }) {
       ) : (
         <div className="mission-brief-pending">
           <span className="mission-field-caption">{t.request}</span>
-          <p>{run.prompt}</p>
+          <BriefText text={run.prompt} />
           <small>{t.pending}</small>
         </div>
       )}
@@ -414,6 +539,8 @@ export function ProjectOverview({
   updatingRepo = false,
   canRecommendMore,
   entitlements,
+  onCheckPremise,
+  checkingPremise = false,
 }: ProjectOverviewProps) {
   const t = useT("mission");
   const common = useT("common");
@@ -663,15 +790,17 @@ export function ProjectOverview({
         : (insights?.recommendations.length ?? 0) >= maxProjectRecommendations
           ? t.ideas.moreLimit({ max: maxProjectRecommendations })
           : t.ideas.moreHint;
-  // Without a run (a project just imported), where to help comes right
-  // after the project card; a run's overview keeps it after the brief.
+  // A run's overview leads with its brief, the project as its background,
+  // and keeps where else to help last. Without a run (a project just
+  // imported), where to help comes right after the project card.
   const sections: OverviewSection[] = insights
     ? [
+        ...(run ? (["contribution"] as const) : []),
         "purpose",
         ...(run ? [] : (["directions"] as const)),
         ...(insights.userJourney.length ? (["journey"] as const) : []),
         ...(insights.readingPath?.length ? (["reading"] as const) : []),
-        ...(run ? (["contribution", "directions"] as const) : []),
+        ...(run ? (["directions"] as const) : []),
       ]
     : [];
   // The reading path opens on its first steps; "Show all" lists the rest
@@ -863,6 +992,15 @@ export function ProjectOverview({
   );
   return (
     <div className="mission-overview">
+      {/* This contribution first; the project's analysis is its background. */}
+      {run && (
+        <Brief
+          run={run}
+          brief={brief}
+          onCheckPremise={onCheckPremise}
+          checkingPremise={checkingPremise}
+        />
+      )}
       <div className="mission-overview-heading">
         <div>
           <span className="mission-kicker">
@@ -923,7 +1061,9 @@ export function ProjectOverview({
 
       {error && (
         <div className="mission-alert mission-alert-error" role="alert">
-          <span>{error}</span>
+          <span>
+            <FailureText text={error} />
+          </span>
           <button
             type="button"
             onClick={onAnalyze}
@@ -1113,8 +1253,6 @@ export function ProjectOverview({
         </>
       )}
 
-      {run && <Brief run={run} brief={brief} />}
-
       {insights && (
         <section
           id={sectionAnchor("directions")}
@@ -1244,7 +1382,9 @@ export function ProjectOverview({
               className="mission-alert mission-alert-error mission-more-error"
               role="alert"
             >
-              <span>{recommendationError}</span>
+              <span>
+                <FailureText text={recommendationError} />
+              </span>
               <button
                 type="button"
                 onClick={onRecommendMore}

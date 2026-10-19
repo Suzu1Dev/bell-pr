@@ -289,6 +289,59 @@ export default {
     heldBack: ({ reason }: { reason: string }) =>
       `Publishing this file is on hold: ${reason}`,
   },
+  /** The unchanged code around a modified file's changes, read from the run's base. */
+  context: {
+    notAFile:
+      "A submodule or special entry has no code to show around its changes.",
+    tooLarge:
+      "The file is larger than 512 KB, so the code around its changes cannot be shown.",
+    binary: "A binary file has no code to show around its changes.",
+    credentials:
+      "The file looks like it contains credentials, so the code around its changes is not shown.",
+    blocked:
+      "This file cannot be reviewed right now, so the code around its changes is not shown either.",
+    stale: "The file's changes were updated; refresh the changes.",
+    baseMoved: "The run's base was updated; refresh the changes.",
+    wholeFile: "Added and deleted files are already shown whole.",
+    unreadable: "The file cannot be read or is larger than 512 KB.",
+  },
+  /** The commits of a published contribution, and why one file's change is not shown. */
+  commits: {
+    notFound: "This commit is not part of the contribution.",
+    unsupportedName: "The file name contains unsupported characters.",
+    sensitive: "A sensitive file or build artifact; its content is not shown.",
+    binary: "A binary file; its content is not shown.",
+    tooLarge: "The change is larger than 600 KB; its content is not shown.",
+    credentials: "The change looks like it contains credentials; its content is not shown.",
+  },
+  /** Checking the request's assumption again on a finished run. */
+  premise: {
+    tooEarly: "Wait for development to finish before checking the premise.",
+    busy: "An agent, a review or an explanation is still working on this run; check the premise once it finishes.",
+    incomplete: "The agent's premise check was incomplete.",
+    /** One line in the run's log; `changed` says whether the verdict is new. */
+    checked: ({ verdict, changed }: { verdict: "holds" | "refuted" | "unclear"; changed: boolean }) =>
+      `Premise check: ${{ holds: "the assumption holds", refuted: "the assumption does not hold", unclear: "the assumption could not be confirmed" }[verdict]}. ${changed ? "The code walkthroughs, and the explanations not answered yet, are made again with this verdict." : "The verdict did not change."}`,
+    noAssumption: "Premise check: the request states no assumption to check.",
+  },
+  /** Function walkthroughs: the code around each change, step by step. */
+  walkthrough: {
+    wholeFile:
+      "An added or deleted file has no earlier logic to walk through; see the explanation.",
+    noFunctions: "This kind of file has no functions to walk through.",
+    tooLarge:
+      "The changes are larger than 100 KB, so no code walkthrough is made automatically.",
+    overLimit: ({ limit }: { limit: number }) =>
+      `This change touches more than ${limit} code files, and code walkthroughs are made automatically for the first ${limit} only; ask about the others in "Ask the agent".`,
+    incomplete: "The agent's code walkthrough was incomplete.",
+    tooEarly: "Wait for development to finish before generating code walkthroughs.",
+    stopped: "The code walkthrough stopped; you can retry it.",
+    failed: "Generating the code walkthrough failed; try again.",
+    notFinished: ({ path, reason }: { path: string; reason: string }) =>
+      `The code walkthrough of ${path} did not finish: ${reason}`,
+    /** A unit the agent left unnamed, by its first line. */
+    lineName: ({ line }: { line: number }) => `Line ${line}`,
+  },
   /** Taking a teammate's finished task into the run's worktree. */
   integration: {
     snapshotBlocked:
@@ -568,6 +621,8 @@ export default {
       "The service restarted, so the PR draft suggestion stopped; your current draft is kept, and you can generate the suggestion again.",
     explanation:
       "The service restarted, so generating the explanation stopped; you can retry it.",
+    walkthrough:
+      "The service restarted, so the code walkthrough stopped; you can retry it.",
     /** An agent card's detail, without a final period. */
     review:
       "The service restarted, so the review rerun stopped; the earlier reports are kept",

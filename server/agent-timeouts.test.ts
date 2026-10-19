@@ -9,6 +9,7 @@ import {
   withAgentTimeoutHint,
 } from "./agent-timeouts.js";
 import { AppError } from "./types.js";
+import { withCliSetupHint } from "./cli-errors.js";
 import { withLocale } from "./i18n/index.js";
 import { command } from "./process.js";
 
@@ -72,7 +73,7 @@ test("only Claude or xhigh/max turns announce the longer wait", () => {
   assert.equal(describeAgentTimeout(2_250_000), "最多等待 37.5 分鐘");
 });
 
-test("only command()'s 504 is replaced with the actionable timeout message", () => {
+test("command()'s 504 gets the timeout advice and an explained exit failure its explanation", () => {
   const replaced = withAgentTimeoutHint(
     new AppError("claude 執行逾時。", 504),
     "claude",
@@ -86,6 +87,32 @@ test("only command()'s 504 is replaced with the actionable timeout message", () 
   );
   const failure = new AppError("codex 執行失敗：exit 1", 422);
   assert.equal(withAgentTimeoutHint(failure, "codex", 240_000), failure);
+  // An exit failure the CLI explained in its event stream shows that explanation.
+  const raw = new AppError('claude 執行失敗：..."result":"API Error: 500","session_id":"s"}', 422);
+  const explained = withAgentTimeoutHint(raw, "claude", 900_000, "API Error: 500");
+  assert.ok(explained instanceof AppError);
+  assert.equal(explained.statusCode, 422);
+  assert.equal(explained.message, "claude 執行失敗：API Error: 500");
+  assert.equal(withAgentTimeoutHint(raw, "claude", 900_000), raw);
+  // The stderr tail command() kept stays with the explained failure.
+  const tail = new AppError("claude 執行失敗：{}", 422, { details: { stderr: "boom", exitCode: 1 } });
+  const kept = withAgentTimeoutHint(tail, "claude", 900_000, "API Error: 500");
+  assert.ok(kept instanceof AppError);
+  assert.deepEqual(kept.details, { stderr: "boom", exitCode: 1 });
+  // A failure recognised as a setup problem keeps its code and its sign-in fix.
+  const signedOut = withCliSetupHint(
+    new AppError("claude 執行失敗：{}", 422, {
+      details: { stderr: "Invalid API key · Please run /login" },
+    }),
+    "claude",
+  );
+  assert.ok(signedOut instanceof AppError);
+  assert.equal(signedOut.code, "claude_unauthenticated");
+  assert.ok(signedOut.fixes?.length);
+  assert.equal(
+    withAgentTimeoutHint(signedOut, "claude", 900_000, "Invalid API key · Please run /login"),
+    signedOut,
+  );
   const plain = new Error("boom");
   assert.equal(withAgentTimeoutHint(plain, "codex", 240_000), plain);
 });
@@ -104,6 +131,14 @@ test("time limits and command failures are worded in the locale in effect", asyn
       replaced.message,
       "claude timed out after 15 minutes. A higher reasoning effort or a large project needs more time: lower the effort, choose a faster model, or raise BELLPR_AGENT_TIMEOUT_SCALE.",
     );
+    const explained = withAgentTimeoutHint(
+      new AppError('claude failed: {"type":"result","is_error":true}', 422),
+      "claude",
+      900_000,
+      "API Error: 500",
+    );
+    assert.ok(explained instanceof AppError);
+    assert.equal(explained.message, "claude failed: API Error: 500");
     // command() words its own failures in the caller's locale too.
     await assert.rejects(
       command(process.execPath, ["-e", "process.exit(3)"]),

@@ -400,6 +400,112 @@ test("a state.json written by upstream cdcfb06 with follow-up rounds and syncs l
   assert.deepEqual(reopened.data, JSON.parse(written));
 });
 
+/**
+ * A state.json written by the upstream repository at 1fb6329, by its own
+ * Workbench (its team, follow-up and walkthrough tests, instrumented to
+ * keep the file): a team run whose lead checked the premise and whose
+ * teammates reported missing setup, a published run whose follow-up rounds
+ * reported missing setup, and a run with a function walkthrough (temp
+ * paths replaced).
+ */
+const upstream1fb6329 = () =>
+  readFile(
+    path.join(import.meta.dirname, "fixtures", "state-upstream-1fb6329.json"),
+    "utf8",
+  );
+
+test("a state.json written by upstream 1fb6329 with premise checks, setup needs and walkthroughs loads and saves unchanged", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const written = await upstream1fb6329();
+  await writeFile(path.join(directory, "state.json"), written);
+  const store = new Store(directory);
+  await store.initialize();
+  // Nothing was interrupted, so loading changes nothing.
+  assert.deepEqual(store.data, JSON.parse(written));
+  const [team, published, walked] = store.data.runs;
+  assert.deepEqual(team.team?.premise, {
+    verdict: "unclear",
+    statement: "輸出格式在各模組不一致。",
+    evidence: "a.ts:1 與 b.ts:1 各自定義格式。",
+  });
+  assert.deepEqual(
+    team.team?.tasks.map((task) => task.setup?.map((need) => need.command)),
+    [["sudo apt install libglib2.0-dev"], ["rustup component add rustfmt"], undefined],
+  );
+  // A constant the diff replaced whole is new code; a changed function is explained.
+  assert.deepEqual(team.walkthroughs?.["a.ts"]?.content, { functions: [], newUnits: ["value"] });
+  const walkthrough = walked.walkthroughs?.["count.ts"];
+  assert.equal(walkthrough?.status, "ready");
+  assert.equal(walkthrough?.content?.functions[0].name, "count");
+  assert.deepEqual(walkthrough?.content?.functions[0].steps, [
+    { startLine: 2, endLine: 3, explanation: "計算並回傳。" },
+  ]);
+  assert.deepEqual(
+    published.followUps?.map((round) => [round.status, round.setup?.[0]?.command]),
+    [
+      ["published", "rustup component add rustfmt"],
+      ["failed", "rustup component add rustfmt"],
+      ["discarded", "rustup component add rustfmt"],
+    ],
+  );
+  assert.ok(published.publishCommit);
+  // The run list leaves the walkthroughs and the rounds to the open run.
+  for (const run of store.data.runs) {
+    const summary = summarizeRun(run) as Record<string, unknown>;
+    assert.equal("walkthroughs" in summary, false);
+    assert.equal("followUps" in summary, false);
+  }
+  // This build writes it back field for field.
+  await store.save();
+  const reopened = new Store(directory);
+  await reopened.initialize();
+  assert.deepEqual(reopened.data, JSON.parse(written));
+});
+
+/**
+ * A state.json written by this product before the port of upstream
+ * #15-#28 (fb60a66), by its own Workbench (the team test, instrumented to
+ * add a note and a review mark and keep the file; temp paths replaced).
+ */
+test("a state.json written by the product at fb60a66 loads and saves unchanged, without the ported fields", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const written = await readFile(
+    path.join(import.meta.dirname, "fixtures", "state-product-fb60a66.json"),
+    "utf8",
+  );
+  await writeFile(path.join(directory, "state.json"), written);
+  const store = new Store(directory);
+  await store.initialize();
+  assert.deepEqual(store.data, JSON.parse(written));
+  const [run] = store.data.runs;
+  assert.equal(run.locale, "zh-TW");
+  assert.equal(run.notes?.["a.ts"]?.text, "The value now matches the other modules.");
+  assert.equal(run.team?.premise, undefined);
+  assert.equal(run.walkthroughs, undefined);
+  assert.ok(run.team?.tasks.every((task) => task.setup === undefined));
+  await store.save();
+  const reopened = new Store(directory);
+  await reopened.initialize();
+  assert.deepEqual(reopened.data, JSON.parse(written));
+});
+
+test("an upstream 1fb6329 state saved while a walkthrough was being written reopens with it failed", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const data = JSON.parse(await upstream1fb6329()) as Database;
+  data.runs[0].walkthroughs!["b.ts"].status = "generating";
+  await writeFile(path.join(directory, "state.json"), JSON.stringify(data));
+  const store = new Store(directory);
+  await store.initialize();
+  const entry = store.data.runs[0].walkthroughs!["b.ts"];
+  assert.equal(entry.status, "failed");
+  assert.ok(entry.error);
+  // The other files' walkthroughs stay as they were.
+  assert.equal(store.data.runs[0].walkthroughs!["a.ts"].status, "ready");
+});
+
 test("an upstream state saved during a follow-up round or a conflict resolution reopens in review", async (t) => {
   const { directory, cleanup } = await dataDirectory();
   t.after(cleanup);
@@ -867,4 +973,144 @@ test("a v1.1 field this build cannot read is left out instead of quarantining th
     32,
   );
   assert.equal(store.data.runs[0].understandingCheckOff, true);
+});
+
+// Fields ported from upstream 1fb6329 (PRs #15-#28), under the same rules:
+// optional, and readable by a build whose schema lacks them.
+
+/** A published run in review that carries every field the upstream port adds. */
+function runWithUpstreamFields(): Run {
+  const run = runWithV11Fields();
+  run.id = "run-upstream-1fb6329";
+  run.team!.tasks[0].setup = [
+    {
+      need: "GLib development headers",
+      command: "sudo apt install libglib2.0-dev",
+      reason: "cargo test needs them; the README lists GLib under Build time.",
+    },
+  ];
+  run.followUps![0].setup = [
+    { need: "rustfmt", command: "rustup component add rustfmt", reason: "cargo fmt --check needs it." },
+  ];
+  run.team!.premise = {
+    verdict: "refuted",
+    statement: "The greeting prints a dangling comma for an empty name.",
+    evidence: "hello.ts:2 falls back to world, so no comma dangles.",
+  };
+  run.walkthroughs = {
+    "hello.ts": {
+      fingerprint: "e".repeat(64),
+      status: "ready",
+      generatedAt: "2026-10-15T00:06:00.000Z",
+      content: {
+        functions: [
+          {
+            name: "greeting",
+            kind: "function",
+            startLine: 1,
+            endLine: 3,
+            summary: "Returns the greeting for a name.",
+            change: "The empty name now falls back to world.",
+            steps: [
+              { startLine: 1, endLine: 1, explanation: "Takes the name." },
+              { startLine: 2, endLine: 3, explanation: "Builds the text." },
+            ],
+            callers: [{ name: "main", path: "src/main.ts", line: 4, note: "Prints it." }],
+            callees: [],
+            analogy: "Like a receptionist who greets everyone.",
+            selfCheck: { question: "What does an empty name print?", answer: "Hello, world." },
+          },
+        ],
+        newUnits: ["greetingTest"],
+      },
+    },
+    "notes.md": { fingerprint: "f".repeat(64), status: "unavailable", error: "This kind of file has no functions to walk through." },
+  };
+  return run;
+}
+
+/** The run read schema with one field of a nested list's elements left out. */
+function withoutElementField(
+  list: "team.tasks" | "followUps",
+  field: string,
+) {
+  if (list === "followUps") {
+    const element = runReadSchema.shape.followUps.unwrap().element;
+    return runReadSchema.extend({
+      followUps: z.array(element.omit({ [field]: true } as never)).optional(),
+    });
+  }
+  const team = runReadSchema.shape.team.unwrap();
+  const task = team.shape.tasks.element;
+  return runReadSchema.extend({
+    team: team
+      .extend({ tasks: z.array(task.omit({ [field]: true } as never)) })
+      .optional(),
+  });
+}
+
+const upstreamRunSchemas = {
+  walkthroughs: runReadSchema.omit({ walkthroughs: true }),
+  "team.premise": runReadSchema.extend({
+    team: runReadSchema.shape.team.unwrap().omit({ premise: true }).optional(),
+  }),
+  "team.tasks[].setup": withoutElementField("team.tasks", "setup"),
+  "followUps[].setup": withoutElementField("followUps", "setup"),
+};
+
+for (const [field, older] of Object.entries(upstreamRunSchemas))
+  test(`a build that predates the run's ${field} (upstream 1fb6329) still reads a run that has it`, () => {
+    const written = JSON.parse(JSON.stringify(runWithUpstreamFields()));
+    const read = lenientRead(older).safeParse(written);
+    assert.ok(read.success, read.success ? "" : read.error.message);
+    // state.json passes unknown fields through, so the field survives a save.
+    assert.deepEqual(read.data, written);
+  });
+
+test("runs with every field of the upstream port load and save unchanged, and a malformed one is left out", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const fixture: Database = { version: 1, repos: [repository], runs: [runWithUpstreamFields()] };
+  await writeFile(path.join(directory, "state.json"), JSON.stringify(fixture));
+  const store = new Store(directory);
+  await store.initialize();
+  assert.equal(store.recovery, undefined);
+  assert.deepEqual(store.data, fixture);
+  await store.save();
+  assert.deepEqual(JSON.parse(await readFile(path.join(directory, "state.json"), "utf8")), fixture);
+
+  // A shape this build does not accept drops that field, not the run.
+  const odd = runWithUpstreamFields();
+  (odd.team!.tasks[0] as unknown as Record<string, unknown>).setup = "not a list";
+  (odd.team! as unknown as Record<string, unknown>).premise = { verdict: "holds" };
+  const other = await stateWith([odd]);
+  t.after(other.cleanup);
+  const reopened = new Store(other.directory);
+  await reopened.initialize();
+  assert.equal(reopened.recovery, undefined);
+  assert.equal(reopened.data.runs[0].team!.tasks[0].setup, undefined);
+  assert.equal(reopened.data.runs[0].team!.premise, undefined);
+  // A verdict word a later build may add is kept as written.
+  const later = runWithUpstreamFields();
+  later.team!.premise!.verdict = "partly" as never;
+  assert.equal(
+    lenientRead(runReadSchema).safeParse(JSON.parse(JSON.stringify(later))).data?.team?.premise?.verdict,
+    "partly",
+  );
+  assert.equal(reopened.data.runs[0].followUps![0].setup?.length, 1);
+  // The run list leaves the walkthroughs to the open run.
+  assert.equal("walkthroughs" in summarizeRun(runWithUpstreamFields()), false);
+});
+
+test("a walkthrough a restart interrupted is failed in the run's language, and can be retried", async (t) => {
+  const run = runWithUpstreamFields();
+  run.walkthroughs!["hello.ts"] = { fingerprint: "e".repeat(64), status: "generating" };
+  const { directory, cleanup } = await stateWith([run]);
+  t.after(cleanup);
+  const store = new Store(directory);
+  await store.initialize();
+  const loaded = store.data.runs[0].walkthroughs!["hello.ts"];
+  assert.equal(loaded.status, "failed");
+  // runWithV11Fields is an English run.
+  assert.match(loaded.error!, /^The service restarted, so the code walkthrough stopped/);
 });

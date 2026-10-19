@@ -1,4 +1,5 @@
 import type { AgentProvider } from "./models.js";
+import type { SetupNeed } from "./setup-needs.js";
 
 export type TeamTaskStatus =
   "pending" | "ready" | "running" | "complete" | "failed" | "blocked";
@@ -40,6 +41,8 @@ export interface TeamTask {
   checks?: TeamCheck[];
   /** Repository-relative paths the application applied to the review worktree; absent before this field existed. */
   integratedFiles?: string[];
+  /** What the machine lacked for checks this task could not run; absent when none was reported. */
+  setup?: SetupNeed[];
 }
 
 export interface TeamMessage {
@@ -95,4 +98,20 @@ export interface AgentTeam {
   approvedAt?: string;
   /** Optional: runs created before plan revision existed have none. Oldest first. */
   planRevisions?: TeamPlanRevision[];
+  /** The lead's check of the request's assumption; absent when it stated none or before this existed. */
+  premise?: PremiseCheck;
+}
+
+/** What the lead found about an assumption: the code confirms it, contradicts it, or neither. */
+export type PremiseVerdict = "holds" | "refuted" | "unclear";
+
+/**
+ * An assumption in the request, checked by the lead against the repository
+ * before planning, or again later on request. The statement and the
+ * evidence (with path:line) are in the run's language.
+ */
+export interface PremiseCheck {
+  verdict: PremiseVerdict;
+  statement: string;
+  evidence: string;
 }

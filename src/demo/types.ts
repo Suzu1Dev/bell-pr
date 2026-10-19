@@ -5,6 +5,7 @@ import type {
   ProjectInsights,
 } from "../../shared/insights";
 import type { PrFeedback } from "../../shared/pr-feedback";
+import type { CommitDetail, CommitSummary } from "../../shared/commits";
 import type { AgentTeam } from "../../shared/team";
 import type { DraftPreparation } from "../../shared/drafts";
 import type { CoachDebrief, CoachDrill } from "../../shared/coach";
@@ -172,6 +173,12 @@ export interface DemoContent {
   debriefSample?: CoachDebrief;
   /** The person's restatement of the sample review before an AI round. */
   restatementSample?: FollowUpRestatement[];
+  /**
+   * The sample PR's commits once published with a review round and a merge
+   * of the target branch, with what each changed; the commit messages are
+   * English in every locale.
+   */
+  commitHistory?: { commits: CommitSummary[]; details: Record<string, CommitDetail> };
 }
 
 /**
@@ -205,9 +212,17 @@ export interface DemoCopy {
   contributionBrief: ContributionBrief;
   team: {
     planSummary: string;
+    /** The words of the lead's premise check; its verdict is in shared.ts. */
+    premise: { statement: string; evidence: string };
     tasks: Record<
       DemoTaskId,
-      { title: string; description: string; report: string }
+      {
+        title: string;
+        description: string;
+        report: string;
+        /** The words of each setup need in shared.ts, in its order. */
+        setup?: { need: string; reason: string }[];
+      }
     >;
     messages: Record<DemoMessageId, string>;
   };
@@ -268,4 +283,19 @@ export interface DemoCopy {
   debrief: { quotes: string[]; drills: CoachDrill[]; nextStep: string };
   /** The person's restatement of the review comment. */
   restatement: string;
+  /**
+   * The words of the src/client.ts walkthrough (shared.ts `walkthrough`):
+   * one explanation per step, one caller with its name, and one note per
+   * callee, in the order shared.ts lists them.
+   */
+  walkthrough: {
+    kind: string;
+    summary: string;
+    change: string;
+    steps: [string, string, string, string];
+    callers: [{ name: string; note: string }];
+    callees: [string, string, string];
+    analogy: string;
+    selfCheck: { question: string; answer: string };
+  };
 }

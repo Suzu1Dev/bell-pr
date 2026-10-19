@@ -47,6 +47,8 @@ const m: Translation<typeof en> = {
     replanning: "Lead 正依你的意見重新規劃。",
     none: "Lead 完成計畫前，團隊就已停止。",
     reading: "正在閱讀專案並建立有明確範圍與相依關係的計畫。",
+    showAll: "顯示完整計畫",
+    showLess: "收起計畫",
   },
   revisions: {
     label: "計畫重擬紀錄",
@@ -99,6 +101,8 @@ const m: Translation<typeof en> = {
     filesPending: "規劃中",
     dependsOn: ({ tasks }) => `先完成 ${tasks}`,
     integrated: ({ files }) => `已整合：${files}`,
+    showAll: "顯示完整說明",
+    showLess: "收起說明",
     showError: "查看失敗原因",
     showReport: "查看工作報告",
     checks: ({ count }) =>
@@ -136,6 +140,26 @@ const m: Translation<typeof en> = {
     title: "執行細節",
     hint: "模型、推理強度與 AI 用量",
     calls: ({ count }) => `${count} 次 AI 呼叫`,
+    tokens: ({ input, output, partial }) =>
+      `輸入 ${input} · 輸出 ${output} tokens${partial ? "（部分回報）" : ""}`,
+    unreported: "用量未回報",
+  },
+  premise: {
+    label: "前提查核",
+    heading: ({ verdict }) => `前提查核：${verdict}`,
+    verdicts: {
+      holds: "假設成立",
+      refuted: "假設不成立",
+      unclear: "無法確認假設",
+    },
+    source: "由 Lead 閱讀程式碼得出，可對照引用的位置確認。",
+  },
+  setupNeeds: {
+    title: "需要你在這台機器準備的環境",
+    intro:
+      "Agent 被要求不改動這台機器（不用 sudo，也不做全域或使用者層級的安裝），所以下列檢查在這次工作中沒有完整執行。指令是 Agent 的建議，執行前請對照專案文件確認；裝好後可以自己在工作目錄重跑這些檢查，之後的貢獻也能直接執行。",
+    reportedBy: ({ names }) => `回報者：${names}`,
+    round: ({ number }) => `修正第 ${number} 輪`,
   },
   howItWorks: "運作方式",
   protocolNote: ({ provider }) =>

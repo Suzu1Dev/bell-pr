@@ -3,6 +3,7 @@ import type {
   ExplanationStatus,
 } from "../shared/explanations.js";
 import type { ErrorCode, Fix } from "../shared/errors.js";
+import type { FileWalkthrough } from "../shared/walkthroughs.js";
 import type { RunDetailField } from "../shared/runs.js";
 import type { Repository, RunCore } from "../shared/types.js";
 import { parseLocale } from "../shared/i18n/locale.js";
@@ -24,7 +25,6 @@ export interface Run extends RunCore {
   baseSha: string;
   worktreePath: string;
   reviewedFingerprints: Record<string, string>;
-  publishCommit?: string;
 }
 
 /** What GET /api/runs returns for each run (see shared/runs.ts). */
@@ -45,6 +45,9 @@ export interface DiffFile {
   explanation?: ChangeExplanation;
   explanationStatus?: ExplanationStatus;
   explanationError?: string;
+  walkthrough?: FileWalkthrough;
+  walkthroughStatus?: ExplanationStatus;
+  walkthroughError?: string;
   path: string;
   language: string;
   additions: number;

@@ -5,7 +5,7 @@
  */
 import type { Plan } from "../../../shared/plans";
 import { product } from "../../../shared/product";
-import type { AgentTeam } from "../../../shared/team";
+import type { AgentTeam, PremiseVerdict } from "../../../shared/team";
 import type { TeamLaneId } from "../../team/lanes";
 
 const taskCount = (count: number) =>
@@ -73,6 +73,9 @@ const team = {
     none: "The team stopped before the lead finished a plan.",
     reading:
       "Reading the project and building a plan with clear scopes and dependencies.",
+    /** The toggle of a long plan, folded to its first lines. */
+    showAll: "Show the whole plan",
+    showLess: "Show less of the plan",
   },
   revisions: {
     label: "Plan revision history",
@@ -135,6 +138,9 @@ const team = {
     filesPending: "Being planned",
     dependsOn: ({ tasks }: { tasks: string }) => `Waits for ${tasks}`,
     integrated: ({ files }: { files: string }) => `Integrated: ${files}`,
+    /** The toggle of a long task description, folded to its first lines. */
+    showAll: "Show the whole description",
+    showLess: "Show less of the description",
     showError: "View the failure reason",
     showReport: "View the work report",
     checks: ({ count }: { count: number }) =>
@@ -181,6 +187,33 @@ const team = {
     hint: "Model, reasoning effort and AI usage",
     calls: ({ count }: { count: number }) =>
       count === 1 ? "1 AI call" : `${count} AI calls`,
+    tokens: ({ input, output, partial }: { input: string; output: string; partial: boolean }) =>
+      `${input} input · ${output} output tokens${partial ? " (partly reported)" : ""}`,
+    /** Calls ran but none reported usage: unknown, not zero. */
+    unreported: "usage not reported",
+  },
+  /** The lead's check of the request's assumption, made by reading the code. */
+  premise: {
+    label: "Premise check",
+    heading: ({ verdict }: { verdict: string }) => `Premise check: ${verdict}`,
+    verdicts: {
+      holds: "the assumption holds",
+      refuted: "the assumption does not hold",
+      unclear: "the assumption could not be confirmed",
+    } satisfies Record<PremiseVerdict, string>,
+    source: "Found by the lead reading the code; check it against the cited lines.",
+  },
+  /**
+   * What agents could not run because this machine lacks something, on the
+   * run's overview: one list, each command once, with who reported it.
+   */
+  setupNeeds: {
+    title: "Setup this machine needs from you",
+    intro:
+      "Agents are asked not to change this machine (no sudo, no global or user-level installs), so the checks below did not fully run in this contribution. Each command is an agent's suggestion: check it against the project's documentation before you run it. Once it is installed, you can rerun these checks in the working directory yourself, and later contributions can run them directly.",
+    reportedBy: ({ names }: { names: string }) => `Reported by ${names}`,
+    /** Who reported a need: a follow-up round, by its number among the run's rounds. */
+    round: ({ number }: { number: number }) => `Follow-up round ${number}`,
   },
   /** The disclosure holding the protocol note. */
   howItWorks: "How it works",

@@ -146,6 +146,19 @@ test("the current workflow step is marked as the current step", () => {
   );
 });
 
+test("the four phases are one row of small steps, each describing itself in its tooltip", () => {
+  const html = renderEn(element());
+  const strip = html.slice(html.indexOf('class="workflow-strip"'), html.indexOf('class="review-area"'));
+  assert.match(
+    strip,
+    /<div class="workflow-step {2}done" title="01 Define the task: Set your contribution goal"><span class="step-icon">/,
+  );
+  assert.match(strip, /title="03 Understand and review: Read it, then explain it back"[^>]*><span class="step-icon">.*?<\/span><strong>Understand and review<\/strong><\/div>/);
+  // No numbers, descriptions or chevrons on screen.
+  assert.doesNotMatch(strip, /<small>|step-number|step-chevron/);
+  assert.match(renderZh(element()), /title="02 協作開發：Agent team 分工完成"/);
+});
+
 test("an unsandboxed run carries the warning badge; a sandboxed one does not", () => {
   assert.match(
     renderEn(element({ run: { ...realRun, unsandboxed: true } })),

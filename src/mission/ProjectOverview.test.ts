@@ -3,11 +3,13 @@ import test from "node:test";
 import { createElement } from "react";
 import { formatters } from "../../shared/i18n/locale";
 import type { ProjectInsights } from "../../shared/insights";
+import type { AgentTeam } from "../../shared/team";
 import { freeEntitlements, proEntitlements } from "../../shared/plans";
 import { getDemo } from "../demo";
 import type { PlaybackClock } from "../demo/playback";
 import { assertNoHan, renderEn, renderWith, renderZh } from "../test-utils/render";
-import { ProjectOverview, type ProjectOverviewProps } from "./ProjectOverview";
+import { MarkdownContent } from "../review/MarkdownContent";
+import { briefMarkdown, ProjectOverview, type ProjectOverviewProps } from "./ProjectOverview";
 import { playSampleAnalysis, stopSampleAnalysis } from "./sample-analysis";
 import { mount } from "./test-dom";
 
@@ -514,22 +516,22 @@ const navLinks = (html: string) =>
     (match) => [match[1], match[2]],
   );
 
-test("a sticky nav links to every section, and a run's overview keeps the directions last", () => {
+test("a sticky nav links to every section; a run's overview leads with its brief and keeps the directions last", () => {
   const html = renderEnglish({ run: englishRun });
   assertNoHan(html);
   assert.match(html, /<nav class="mission-section-nav" aria-label="On this page">/);
   assert.deepEqual(navLinks(html), [
+    ["overview-contribution", "This contribution"],
     ["overview-purpose", "Purpose"],
     ["overview-journey", "How people use it"],
     ["overview-reading", "Where to start reading"],
-    ["overview-contribution", "This contribution"],
     ["overview-directions", "Directions"],
   ]);
   assert.deepEqual(sectionOrder(html), [
+    "overview-contribution",
     "overview-purpose",
     "overview-journey",
     "overview-reading",
-    "overview-contribution",
     "overview-directions",
   ]);
   // Each target can take focus when a link moves there.
@@ -639,4 +641,217 @@ test("the sample's overview reads no plan, also while its analysis plays", async
     await view.unmount();
     globalThis.fetch = realFetch;
   }
+});
+
+test("the contribution brief shows the premise verdict and labels what still states the assumption", () => {
+  const base = {
+    id: "r",
+    repoId: "demo-repo",
+    title: "確認呼叫端使用回傳的 id",
+    prompt: "假設（未驗證）：呼叫端把自己產生的 id 交給瀏覽器。",
+    status: "review",
+    branch: "fix/abc",
+    baseBranch: "main",
+    createdAt: "2026-10-14T00:00:00Z",
+    agents: [],
+    logs: [],
+    draft: { title: "t", body: "b" },
+    reviewedFiles: [],
+  } as unknown as NonNullable<ProjectOverviewProps["run"]>;
+  const team: AgentTeam = {
+    config: { maxTeammates: 2, requirePlanApproval: false, provider: "claude", protocol: "bell-shared-tasks", messageDelivery: "between-turns" },
+    phase: "complete",
+    planSummary: "",
+    tasks: [],
+    messages: [],
+  };
+  const brief = {
+    problem: base.prompt,
+    motivation: "若此假設成立，候選人重新整理後就無法開始面試。",
+    beneficiaries: [],
+    before: "目前存在任務描述中的問題。",
+    after: "若此假設成立，候選人重新整理後就無法開始面試。",
+    validation: [],
+    risks: [],
+  };
+  const refuted = render({
+    run: {
+      ...base,
+      team: {
+        ...team,
+        premise: { verdict: "refuted", statement: "呼叫端交出自己產生的 id。", evidence: "src/web/interviews.rs:195 用的是回傳值。" },
+      },
+    },
+    brief,
+  });
+  assert.match(refuted, /前提查核：假設不成立/);
+  assert.match(refuted, /src\/web\/interviews\.rs:195/);
+  // The request's wording is kept but labelled on both cards that copy it.
+  assert.equal(refuted.match(/依你的假設，查證後不成立/g)?.length, 2);
+  assert.match(refuted, /若此假設成立，候選人重新整理後就無法開始面試。/);
+  assert.match(refuted, /上面依假設描述的問題與影響實際上不會發生/);
+  // A check can be made again; the button appears only with the action.
+  assert.doesNotMatch(refuted, /重新查核前提/);
+  const recheck = render({
+    run: { ...base, team: { ...team, premise: { verdict: "refuted", statement: "s", evidence: "e:1" } } },
+    brief,
+    onCheckPremise() {},
+  });
+  assert.match(recheck, /重新查核前提/);
+  assert.doesNotMatch(recheck, /依審查結果查核前提/);
+
+  // A run made before premise checks offers one; without the action, nothing is offered.
+  const missing = render({ run: { ...base, team }, brief, onCheckPremise() {} });
+  assert.match(missing, /這個貢獻建立時還沒有前提查核/);
+  assert.match(missing, /依審查結果查核前提/);
+  assert.doesNotMatch(missing, /依你的假設/);
+  assert.doesNotMatch(render({ run: { ...base, team }, brief }), /依審查結果查核前提/);
+});
+
+test("the premise check in the brief reads in English", () => {
+  const run = {
+    id: "r",
+    repoId: "demo-repo",
+    title: "Use the returned id",
+    prompt: "Assumption (unverified): the caller hands the browser an id it made itself.",
+    status: "review",
+    branch: "fix/abc",
+    baseBranch: "main",
+    createdAt: "2026-10-14T00:00:00Z",
+    agents: [],
+    logs: [],
+    draft: { title: "t", body: "b" },
+    reviewedFiles: [],
+    team: {
+      config: { maxTeammates: 2, requirePlanApproval: false, provider: "claude", protocol: "bell-shared-tasks", messageDelivery: "between-turns" },
+      phase: "complete",
+      planSummary: "",
+      tasks: [],
+      messages: [],
+      premise: { verdict: "unclear", statement: "The caller hands over an id it made.", evidence: "src/web/interviews.rs:195 uses the returned value." },
+    },
+  } as unknown as NonNullable<ProjectOverviewProps["run"]>;
+  const brief = {
+    problem: run.prompt,
+    motivation: "If this holds, a candidate who reloads cannot start the interview.",
+    beneficiaries: [],
+    before: "Today the problem in the request exists.",
+    after: "If this holds, a candidate who reloads cannot start the interview.",
+    validation: [],
+    risks: [],
+  };
+  const html = renderEnglish({ run, brief, onCheckPremise() {} });
+  assertNoHan(html);
+  assert.match(html, /Premise check: the assumption could not be confirmed/);
+  assert.equal(html.match(/As you assumed; not confirmed yet/g)?.length, 2);
+  assert.match(html, /Check the premise again/);
+  assert.match(html, /These are the goals of this contribution/);
+});
+
+test("an open contribution leads with its brief, which does not repeat the title, before the project analysis", () => {
+  const run = {
+    id: "r",
+    repoId: "demo-repo",
+    title: "確認呼叫端使用回傳的 id",
+    prompt: "讓呼叫端使用回傳的 id。",
+    status: "review",
+    branch: "fix/abc",
+    baseBranch: "main",
+    createdAt: "2026-10-14T00:00:00Z",
+    agents: [],
+    logs: [],
+    draft: { title: "t", body: "b" },
+    reviewedFiles: [],
+  } as unknown as NonNullable<ProjectOverviewProps["run"]>;
+  const html = render({ run });
+  const brief = html.indexOf("這次改動，會帶來什麼不同？");
+  assert.ok(brief >= 0 && brief < html.indexOf("先看懂專案，再決定怎麼改。"));
+  assert.ok(brief < html.indexOf('id="mission-purpose-title"'));
+  // The header shows the title; the brief does not repeat it.
+  assert.doesNotMatch(html, /mission-contribution-name|確認呼叫端使用回傳的 id/);
+  // The product keeps the directions on a run's overview, after the analysis.
+  assert.ok(html.indexOf("mission-ideas-title") > html.indexOf('id="mission-purpose-title"'));
+  // While the analysis loads, or before there is one, the brief still leads.
+  for (const props of [{ loading: true, insights: null }, { insights: null }]) {
+    const pending = render({ run, ...props });
+    assert.ok(pending.indexOf("這次改動，會帶來什麼不同？") < pending.indexOf("mission-overview-empty"));
+  }
+  // The project page has no brief.
+  assert.doesNotMatch(render(), /這次改動，會帶來什麼不同？/);
+});
+
+test("a request written in labelled sections renders as Markdown with its labels in bold", () => {
+  const request = [
+    "問題：觀察：create_interview 會回傳既有列的 id。",
+    "使用者影響：若此假設成立，候選人重新整理後就無法開始面試。",
+    "建議做法：1) 用 `grep -rn 'create_interview(' src/` 找出呼叫端。",
+    "驗收：",
+    "- `./scripts/test.sh` 通過",
+    "原始碼依據（引文已核對；推論仍待確認）：",
+    "- src/accounts/interviews.rs：「The caller supplies the id」",
+  ].join("\n");
+  const marked = briefMarkdown(request);
+  for (const label of ["問題", "使用者影響", "建議做法", "驗收"])
+    assert.ok(marked.includes(`**${label}**：`), label);
+  // A parenthetical stays outside the bold; list items, sentences and later colons are untouched.
+  assert.ok(marked.includes("**原始碼依據**（引文已核對；推論仍待確認）："));
+  assert.ok(marked.includes("觀察：create_interview"));
+  assert.ok(marked.includes("- src/accounts/interviews.rs：「"));
+  assert.equal(briefMarkdown("若此假設成立，候選人：無法開始"), "若此假設成立，候選人：無法開始");
+  // An ordered list stays a list.
+  assert.equal(briefMarkdown("1) 步驟：先讀"), "1) 步驟：先讀");
+
+  const html = renderZh(createElement(MarkdownContent, { children: marked }));
+  // Each section is its own paragraph, so the one after a list is not absorbed into it.
+  assert.match(html, /<p><strong>問題<\/strong>：觀察：create_interview 會回傳既有列的 id。<\/p>/);
+  assert.match(html, /<p><strong>使用者影響<\/strong>：/);
+  assert.match(html, /<code>grep -rn &#x27;create_interview\(&#x27; src\/<\/code>/);
+  assert.match(html, /<p><strong>驗收<\/strong>：<\/p>\s*<ul>\s*<li><code>\.\/scripts\/test\.sh<\/code> 通過<\/li>\s*<\/ul>/);
+  assert.match(html, /<p><strong>原始碼依據<\/strong>（引文已核對；推論仍待確認）：<\/p>\s*<ul>/);
+});
+
+test("an English request's section labels are bolded the same way, and sentences are not", () => {
+  const request = [
+    "Problem: GET requests fail on the first brief outage.",
+    "User impact: Retries would spare people a reload.",
+    "Acceptance:",
+    "- `npm test` passes",
+    "Source evidence (each quote was checked; inferences are unconfirmed):",
+    "- src/client.ts: “fetch(url)” — one attempt",
+  ].join("\n");
+  const marked = briefMarkdown(request);
+  for (const label of ["Problem", "User impact", "Acceptance"]) assert.ok(marked.includes(`**${label}**:`), label);
+  assert.ok(marked.includes("**Source evidence** (each quote was checked; inferences are unconfirmed):"));
+  assert.ok(marked.includes("- src/client.ts: “fetch(url)”"));
+  // A sentence with a comma, a lowercase start or a URL is not a label.
+  for (const line of ["If this holds, the caller: fails", "note: lowercase", "https://example.com/a: b", "1) Step: read"])
+    assert.equal(briefMarkdown(line), line);
+  const html = renderEn(createElement(MarkdownContent, { children: marked }));
+  assert.match(html, /<p><strong>Acceptance<\/strong>:<\/p>\s*<ul>\s*<li><code>npm test<\/code> passes<\/li>/);
+});
+
+test("the brief's request and direction text render through the Markdown view, and a long request spans the width", async () => {
+  const run = { ...englishRun, prompt: "Problem: one attempt." } as NonNullable<ProjectOverviewProps["run"]>;
+  const brief = {
+    problem: "Problem: x\n".repeat(30),
+    motivation: "Fewer reloads.",
+    beneficiaries: [],
+    before: "One attempt.",
+    after: "Three attempts.",
+    validation: ["`npm test` passes"],
+    risks: [],
+  };
+  // The Markdown view loads with its first use; until then the text shows as before.
+  renderEnglish({ run, brief });
+  await import("../review/MarkdownContent");
+  await new Promise((resolve) => setImmediate(resolve));
+  const html = renderEnglish({ run, brief });
+  assert.match(html, /class="mission-contribution-reason is-stacked"/);
+  assert.match(
+    html,
+    /<li><div class="mission-brief-text"><div class="markdown-content"><p><code>npm test<\/code> passes<\/p><\/div><\/div><\/li>/,
+  );
+  assert.match(html, /<span>The problem to solve<\/span><div class="mission-brief-text"><div class="markdown-content"><p><strong>Problem<\/strong>: x<\/p>/);
+  assert.doesNotMatch(renderEnglish({ run, brief: { ...brief, problem: "Short." } }), /is-stacked/);
+  assert.match(renderEnglish({ run, brief: undefined }), /<div class="mission-brief-pending">.*<p><strong>Problem<\/strong>: one attempt\.<\/p>/s);
 });

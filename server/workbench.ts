@@ -60,6 +60,10 @@ import * as learning from "./learning.js";
 import * as drafting from "./draft-jobs.js";
 import * as syncing from "./sync-runs.js";
 import * as followUps from "./followup-runs.js";
+import * as walkthroughs from "./walkthrough-runs.js";
+import * as premises from "./premise-runs.js";
+import { commitDetail, listCommits } from "./commits.js";
+import { synchronizeWalkthroughs } from "./walkthroughs.js";
 import {
   synchronizeUnderstanding,
   understandingFacade,
@@ -97,6 +101,8 @@ export interface WorkbenchContext {
   jobs: Set<Promise<void>>;
   /** Explanations being generated, by run id. */
   explanationJobs: Map<string, Promise<void>>;
+  /** Function walkthroughs being generated, one per run and file, keyed `${runId}\0${path}`. */
+  walkthroughJobs: Map<string, Promise<void>>;
   /** PR draft preparation in progress, by run id. */
   draftJobs: Map<string, Promise<void>>;
   /** Learner-requested reviewer/tester reruns; one per run, aborted through controllers[run.id]. */
@@ -151,6 +157,7 @@ export class Workbench {
   private runJobs = new Map<string, Set<Promise<void>>>();
   private locks = new Map<string, Promise<unknown>>();
   private explanationJobs = new Map<string, Promise<void>>();
+  private walkthroughJobs = new Map<string, Promise<void>>();
   private draftJobs = new Map<string, Promise<void>>();
   /** Learner-requested reviewer/tester reruns; one per run, aborted through controllers[run.id]. */
   private reviewJobs = new Map<string, Promise<void>>();
@@ -240,6 +247,7 @@ export class Workbench {
       controllers: this.controllers,
       jobs: this.jobs,
       explanationJobs: this.explanationJobs,
+      walkthroughJobs: this.walkthroughJobs,
       draftJobs: this.draftJobs,
       reviewJobs: this.reviewJobs,
       followUpJobs: this.followUpJobs,
@@ -739,6 +747,8 @@ export class Workbench {
       run.agents = run.agents.filter((agent) => !/^member-/.test(agent.id));
       team.tasks = [];
       team.planSummary = "";
+      // The check belonged to the plan sent back; the new plan makes its own.
+      delete team.premise;
       team.phase = "planning";
       run.status = "queued";
       this.log(
@@ -801,6 +811,7 @@ export class Workbench {
     // viewer's; runs saved without a locale were written in zh-TW.
     withLocale(parseLocale(run.locale) ?? legacyRunLocale, () => {
       synchronizeExplanations(run, files);
+      synchronizeWalkthroughs(run, files);
       synchronizeDraftPreparation(run, files);
     });
     if (run.status !== "published") {
@@ -855,6 +866,42 @@ export class Workbench {
 
   async approve(id: string, displayedDraft: Run["draft"]) {
     return publishing.approve(this.context, id, displayedDraft);
+  }
+
+  /** The commits on a published contribution's branch, oldest first (commits.ts). */
+  async commits(id: string) {
+    const run = this.run(id);
+    cleanup.assertWorkspacePresent(run);
+    return listCommits(run);
+  }
+
+  /** What one of those commits changed, with the review screen's protections. */
+  async commit(id: string, sha: string) {
+    const run = this.run(id);
+    cleanup.assertWorkspacePresent(run);
+    return commitDetail(run, sha);
+  }
+
+  /** Checks a finished run's premise again, or for the first time (premise-runs.ts). */
+  async checkPremise(id: string) {
+    cleanup.assertWorkspacePresent(this.run(id));
+    return premises.checkPremise(this.context, id);
+  }
+
+  /** Explains the functions around one file's changes (walkthrough-runs.ts). */
+  async walkthrough(id: string, filePath: string, retry = false) {
+    return walkthroughs.walkthrough(this.context, id, filePath, retry);
+  }
+
+  /** The base version around a modified file's changes (learning.ts). */
+  async contextLines(
+    id: string,
+    filePath: string,
+    fingerprint: string,
+    baseSha: string,
+  ) {
+    cleanup.assertWorkspacePresent(this.run(id));
+    return learning.contextLines(this.context, id, filePath, fingerprint, baseSha);
   }
 
   async saveNote(id: string, filePath: string, text: string) {

@@ -308,7 +308,17 @@ export interface RealProjectOptions {
    * loosened test's reason written, so the run can be approved at once.
    */
   reviewed?: boolean;
+  /** More files: `before` in the project, `after` in the run's worktree. */
+  extraFiles?: { path: string; before: string; after: string }[];
+  /**
+   * The run's changes committed on its branch as its first push, and the
+   * run published with that commit as a Draft PR.
+   */
+  published?: boolean;
 }
+
+/** The seeded run's pull request when it is published. */
+export const prUrl = `${repoUrl}/pull/12`;
 
 /** The loosened assertion's weakened-test item (the removed line 5). */
 export const weakenedItem = `${testFile}#-5`;
@@ -328,6 +338,7 @@ export async function startRealProject(options: RealProjectOptions = {}): Promis
         [files.greeting]: greetingBefore,
         [files.format]: formatBefore,
         [files.test]: testBody('expect(greeting("Ada")).toBe("Hello, Ada!");'),
+        ...Object.fromEntries((options.extraFiles ?? []).map((file) => [file.path, file.before])),
       },
     });
     // The stand-in put its bin first on this process's PATH; only the server uses it.
@@ -395,7 +406,35 @@ esac
         await writeFile(path.join(worktreePath, files.greeting), greetingAfter);
         await writeFile(path.join(worktreePath, files.format), formatAfter);
         await writeFile(path.join(worktreePath, files.test), testBody("expect(greeting(\"Ada\")).toBeDefined();"));
+        for (const file of options.extraFiles ?? []) {
+          await mkdir(path.dirname(path.join(worktreePath, file.path)), { recursive: true });
+          await writeFile(path.join(worktreePath, file.path), file.after);
+        }
         const prints = await fingerprints(worktreePath, baseSha, gitconfig);
+        let published: Record<string, unknown> = {};
+        if (options.published) {
+          git(worktreePath, "add", "-A");
+          git(
+            worktreePath,
+            "-c",
+            "user.name=Sample Contributor",
+            "-c",
+            "user.email=contributor@example.com",
+            "commit",
+            "-q",
+            "-m",
+            "Greet people in their own language",
+          );
+          const publishCommit = git(worktreePath, "rev-parse", "HEAD");
+          published = {
+            status: "published",
+            prUrl,
+            publishedBranch: "fix/greet-languages",
+            publishCommit,
+            reviewedFiles: Object.keys(prints),
+            reviewedFingerprints: prints,
+          };
+        }
         await writeFile(
           path.join(dataDir, "state.json"),
           JSON.stringify({
@@ -422,6 +461,7 @@ esac
                       },
                     }
                   : {}),
+                ...published,
                 ...options.run,
               }),
             ],

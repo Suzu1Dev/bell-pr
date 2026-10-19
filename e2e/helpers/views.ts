@@ -2,8 +2,9 @@
 // gate (e2e/a11y.spec.ts) and the narrow widths (e2e/responsive.spec.ts):
 // each step of the Explain-it-back panel, Settings → Learning with the
 // check-off dialog open, the Practice view, the rules card, the Draft
-// tab's maintainer checklist, and the publish dialog's groups of checks
-// on a real run. Each view opens its route, then drive() takes it to the
+// tab's maintainer checklist, the sample's code walkthrough with a range
+// marked in the diff, its commit history with a commit open on a file's
+// diff, and the publish dialog's groups of checks on a real run. Each view opens its route, then drive() takes it to the
 // state; `include` names the part of the page the view is about.
 import { expect, type Page } from "@playwright/test";
 import type { Locale } from "../../shared/i18n/locale";
@@ -129,6 +130,31 @@ export const stateViews: StateView[] = [
     include: ".draft-checklist",
     async drive(page) {
       await expect(page.locator(".draft-checklist-row")).toHaveCount(8);
+    },
+  },
+  {
+    name: "walkthrough",
+    route: "#/runs/demo-run/changes?file=src/client.ts",
+    include: ".explain-panel",
+    async drive(page, locale) {
+      const t = messages[locale].review;
+      await page.getByRole("tab", { name: t.panel.tabs.walkthrough }).click();
+      const locate = page.locator(".walkthrough-locate").first();
+      await locate.click();
+      await expect(locate).toHaveAttribute("aria-pressed", "true");
+      await expect(page.locator(".rv-line-highlighted").first()).toBeVisible();
+    },
+  },
+  {
+    name: "commit-history",
+    route: "#/runs/demo-run/commits",
+    include: ".commit-history",
+    async drive(page, locale) {
+      const t = messages[locale].review.commits;
+      const review = page.locator(".commit-item").nth(1);
+      await review.getByRole("button", { name: t.show }).click();
+      await review.locator(".commit-files .file-item").first().click();
+      await expect(review.locator(".rv-line").first()).toBeVisible();
     },
   },
   {

@@ -120,7 +120,16 @@ tasks with clear file scopes, and you can approve or send back the plan.
 findings through a team inbox. They are told to stay inside their file
 scopes, to make no formatting-only changes and never to weaken, skip or
 delete a test. A **Reviewer** and a **Test analyst** then check the
-integrated result. Failed subtasks can be retried.
+integrated result, each adding only what the Lead's summary does not say.
+Failed subtasks can be retried.
+
+Before it plans, the Lead checks any assumption the request states against
+the code, and every role is told the verdict. The brief shows it, and once
+the run is finished you can check it again, also on a run made before
+these checks. Agents are told never to change your
+machine: no `sudo` and no global installs. When a check needs something
+the machine lacks, the overview lists it with a suggested command, for you
+to verify and run yourself.
 
 ![Agent activity: the team's plan, progress and reports](docs/images/en/run-activity-1280.png)
 
@@ -136,6 +145,12 @@ which one you would take for this project, and why. Click a line to ask
 the agent about it, follow the suggested review order, write your own
 notes, mark each file reviewed, then explain the change back before you
 approve. You can also edit the code yourself and refresh the diff.
+
+The diff opens onto the unchanged code around each change, 20 lines at a
+time or the whole file. A **Code walkthrough** explains the functions
+around each change step by step, marks their lines in the diff and names
+what calls them and what they call; a function the change adds whole
+points back to its explanation instead.
 
 **Ship only what you can explain.** Before approval, a short closed-book
 check opens next to the diff: explain the change in a few sentences of
@@ -218,6 +233,9 @@ every plan: compare them with what you predicted, and tag what each
 comment raised and whether you saw it coming. With Pro, let an agent
 address selected comments in a follow-up round, after you restate each one
 in your own words; you review the round and push it as one more commit.
+**Commit history** lists every commit of the pull request, from the first
+push to review rounds, syncs and commits made on GitHub, each opening to
+its files' diffs.
 
 ### Find your next contribution (Pro)
 
@@ -249,7 +267,8 @@ can export a contribution's complete learning record as Markdown.
 
 Choose the Codex CLI or Claude Code, the model and the reasoning effort,
 and an efficiency mode (Lean, Full or Off). Each run shows the usage the
-provider reported. The interface and the agents' explanations are in
+provider reported. When a CLI fails, the error it reported shows first and
+its raw output folds away. The interface and the agents' explanations are in
 English or Traditional Chinese (Taiwan); pull requests stay in English
 unless the project asks otherwise.
 
