@@ -25,7 +25,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
 import { htmlLang, locales, type Locale } from "../shared/i18n/locale";
-import { getDemo } from "../src/demo";
+import { getDemo } from "../src/demo/all";
 import reviewEn from "../src/i18n/en/review";
 import workspaceEn from "../src/i18n/en/workspace";
 import reviewZh from "../src/i18n/zh-TW/review";

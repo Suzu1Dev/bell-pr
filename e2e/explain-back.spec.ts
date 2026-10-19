@@ -6,7 +6,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
-import { getDemo } from "../src/demo";
+import { getDemo } from "../src/demo/all";
 import review from "../src/i18n/en/review";
 import workspace from "../src/i18n/en/workspace";
 import { expectNoOverflow } from "./helpers/overflow";

@@ -67,7 +67,9 @@ function manualChunks(id: string): string | undefined {
     )
   )
     return "markdown";
-  if (file.includes("/src/demo/")) return "demo";
+  // The sample's zh-TW text loads with the zh-TW dictionary (src/locales).
+  if (file.includes("/src/demo/") && !file.endsWith("/src/demo/zh-TW.ts"))
+    return "demo";
   return undefined;
 }
 

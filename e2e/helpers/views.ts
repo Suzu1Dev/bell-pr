@@ -10,7 +10,7 @@
 // view is about.
 import { expect, type Page } from "@playwright/test";
 import type { Locale } from "../../shared/i18n/locale";
-import { getDemo } from "../../src/demo";
+import { getDemo } from "../../src/demo/all";
 import { issueNode, otherPr, runId, welcomeFacts, type RealProjectOptions } from "./real-project";
 import { messages } from "./sample-states";
 

@@ -3,7 +3,7 @@
 // record, and deep links into its tabs and files.
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
-import { getDemo } from "../src/demo";
+import { getDemo } from "../src/demo/all";
 import common from "../src/i18n/en/common";
 import review from "../src/i18n/en/review";
 import workspace from "../src/i18n/en/workspace";

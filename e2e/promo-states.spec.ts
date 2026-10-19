@@ -28,7 +28,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 import checkMessages from "../shared/i18n/draft-checks.en";
 import type { Locale } from "../shared/i18n/locale";
-import { getDemo } from "../src/demo";
+import { getDemo } from "../src/demo/all";
 import { assertNoHan } from "../src/test-utils/render";
 import { expectNoOverflow } from "./helpers/overflow";
 import { startReadyServer } from "./helpers/ready-server";

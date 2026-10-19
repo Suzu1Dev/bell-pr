@@ -8,7 +8,7 @@
 import { readFileSync } from "node:fs";
 import { expect, type Locator, type Page } from "@playwright/test";
 import { htmlLang, type Locale } from "../../shared/i18n/locale";
-import { getDemo } from "../../src/demo";
+import { getDemo } from "../../src/demo/all";
 import en from "../../src/i18n/en";
 import zhTW from "../../src/i18n/zh-TW";
 

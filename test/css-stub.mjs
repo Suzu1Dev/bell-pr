@@ -24,3 +24,8 @@ export function load(url, context, next) {
 `;
 
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
+
+// Tests read the sample project in both languages synchronously (getDemo).
+// The app loads a language's sample with its dictionary (src/main.tsx), so
+// the tests load both here, after the stylesheet loader above.
+await import("../src/demo/all.ts");

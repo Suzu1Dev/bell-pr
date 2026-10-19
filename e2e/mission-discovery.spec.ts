@@ -5,7 +5,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { locales } from "../shared/i18n/locale";
 import { playbackTiming } from "../src/demo/playback";
-import { getDemo } from "../src/demo";
+import { getDemo } from "../src/demo/all";
 import { getSampleDiscoveryJob } from "../src/demo/discovery";
 import discovery from "../src/i18n/en/discovery";
 import mission from "../src/i18n/en/mission";

@@ -5,7 +5,7 @@ import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page, type Request } from "@playwright/test";
 import { splitConceptHeading } from "../shared/explanations";
-import { getDemo } from "../src/demo";
+import { getDemo } from "../src/demo/all";
 import app from "../src/i18n/en/app";
 import learning from "../src/i18n/en/learning";
 import license from "../src/i18n/en/license";

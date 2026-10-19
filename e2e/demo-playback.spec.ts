@@ -6,7 +6,7 @@ import { mkdtemp, rm, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { getDemo } from "../src/demo";
+import { getDemo } from "../src/demo/all";
 import common from "../src/i18n/en/common";
 import review from "../src/i18n/en/review";
 import team from "../src/i18n/en/team";

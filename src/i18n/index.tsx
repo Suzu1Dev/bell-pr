@@ -74,7 +74,7 @@ export const LocaleContext = createContext<LocaleState>({
 // Dictionaries that are ready to use. English is bundled with the app.
 const loaded = new Map<Locale, Messages>([["en", english]]);
 const loaders: Record<Exclude<Locale, "en">, () => Promise<Messages>> = {
-  "zh-TW": () => import("./zh-TW/index").then((module) => module.default),
+  "zh-TW": () => import("../locales/zh-TW").then((module) => module.messages),
 };
 // The deferred namespaces of a locale whose dictionary comes without them.
 const deferredLoaders: Partial<
@@ -129,15 +129,32 @@ export function getCurrentMessages(): Messages {
   return active.messages;
 }
 
+// What a locale needs besides its dictionary before it shows, such as the
+// sample project's text; main.tsx adds it (addLocaleResource).
+const resources: ((locale: Locale) => Promise<void>)[] = [];
+
+/** Adds a load that `loadLocale` waits for along with each dictionary. */
+export function addLocaleResource(load: (locale: Locale) => Promise<void>) {
+  resources.push(load);
+}
+
 /**
- * Loads a locale's dictionary so it can be shown; English is always loaded.
- * It does not change the active locale.
+ * Loads a locale's dictionary, and what `addLocaleResource` added, so it
+ * can be shown; the English dictionary is always loaded. It does not
+ * change the active locale.
  */
 export async function loadLocale(locale: Locale): Promise<void> {
-  if (loaded.has(locale)) return;
-  const load = loaders[locale as Exclude<Locale, "en">];
-  if (!load) throw new Error(`Unsupported locale: ${String(locale)}`);
-  loaded.set(locale, await load());
+  const load = loaded.has(locale)
+    ? undefined
+    : loaders[locale as Exclude<Locale, "en">];
+  if (!loaded.has(locale) && !load)
+    throw new Error(`Unsupported locale: ${String(locale)}`);
+  const [messages] = await Promise.all([
+    load?.(),
+    ...resources.map((resource) => resource(locale)),
+  ]);
+  // The first dictionary loaded stays: loadDeferred() adds to that object.
+  if (messages && !loaded.has(locale)) loaded.set(locale, messages);
 }
 
 /**
