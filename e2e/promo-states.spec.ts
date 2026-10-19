@@ -487,13 +487,20 @@ test.describe.configure({ mode: "parallel" });
 // a dialog's blurred backdrop, its shadow came out in one of a few
 // versions (at most 4 of 255 levels apart) on screenshots taken one after
 // another of a page that did not change. Software rendering on one raster
-// thread draws it the same every time, so a changed hash is the app's.
+// thread, each frame drawn only after every compositor stage ran, draws it
+// the same every time, so a changed hash is the app's. (Without the last
+// flag, the task dialog's edges came out in either of two versions in about
+// one film in three.)
 test.use({
   launchOptions: {
     ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
       ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE }
       : {}),
-    args: ["--disable-gpu", "--num-raster-threads=1"],
+    args: [
+      "--disable-gpu",
+      "--num-raster-threads=1",
+      "--run-all-compositor-stages-before-draw",
+    ],
   },
 });
 
