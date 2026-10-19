@@ -15,10 +15,15 @@ import { outputLanguage } from "../prompt-language.js";
 export const installBoundaries =
   "Never change this machine: no sudo or system package managers, no global or user-level installs (for example npm -g, pip install --user, cargo install, rustup component add) and no edits outside this working directory, except in a temporary directory you create. Installing inside them is allowed: the project's own lockfile install (such as npm ci) or a package unpacked into a temporary directory that build tools are pointed at. When a check still needs a change to the machine, skip it and report what is missing.";
 
-/** Where an agent's commands really run, so it describes its limits truthfully. */
+/**
+ * Where an agent's commands really run, so it describes its limits
+ * truthfully. A Claude Code agent that edits files runs inside the OS
+ * sandbox (sandbox.ts) unless the person allowed agents without it; the
+ * turn is refused otherwise, so the prompt names both cases.
+ */
 export function commandEnvironment(provider: AgentProvider = "codex") {
   return provider === "claude"
-    ? "Your commands are not sandboxed: they run with the person's own account on their machine, which is why the rules about changing the machine matter."
+    ? "Claude Code runs your commands in an OS sandbox: writing outside this worktree and network access are blocked, so a check that needs them is reported as missing setup. Your commands are not sandboxed only when the person allowed agents to run without it; they then run with the person's own account on their machine, which is why the rules about changing the machine matter."
     : "Codex runs your commands in a workspace-write sandbox: writing outside this worktree and network access may be blocked, so a check that needs them is reported as missing setup.";
 }
 

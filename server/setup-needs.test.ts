@@ -6,6 +6,9 @@ import { parseSetupNeeds } from "./setup-needs.js";
 
 test("agents are told plainly where their commands run and what they may install", () => {
   assert.match(commandEnvironment("claude"), /not sandboxed/);
+  // Claude Code's write turns run in the OS sandbox unless the person allowed otherwise.
+  assert.match(commandEnvironment("claude"), /^Claude Code runs your commands in an OS sandbox/);
+  assert.match(commandEnvironment("claude"), /only when the person allowed agents to run without it/);
   assert.match(commandEnvironment("codex"), /workspace-write sandbox/);
   assert.equal(commandEnvironment(), commandEnvironment("codex"));
   assert.match(installBoundaries, /no sudo/);
