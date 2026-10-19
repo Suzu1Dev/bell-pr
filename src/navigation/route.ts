@@ -5,7 +5,8 @@
  *
  *   #/home  #/demo  #/repos  #/repos/:id  #/discover  #/team  #/learning
  *   #/settings/:section?  #/about
- *   #/runs/:runId/:tab?file=<path>   (tab: overview, changes, activity, draft)
+ *   #/runs/:runId/:tab?file=<path>   (tab: overview, changes, activity, draft,
+ *                                     commits)
  *
  * Any route may carry query flags after `?`, for example
  * `#/runs/demo-run/activity?demo=play&speed=4&locale=en`; `src/app/presentation.ts`
@@ -21,7 +22,13 @@ import { useSyncExternalStore } from "react";
 import { product } from "../../shared/product";
 import type { Messages } from "../i18n";
 
-export const runTabs = ["overview", "changes", "activity", "draft"] as const;
+export const runTabs = [
+  "overview",
+  "changes",
+  "activity",
+  "draft",
+  "commits",
+] as const;
 export type RunTab = (typeof runTabs)[number];
 
 /**

@@ -305,6 +305,15 @@ export default {
     wholeFile: "Added and deleted files are already shown whole.",
     unreadable: "The file cannot be read or is larger than 512 KB.",
   },
+  /** The commits of a published contribution, and why one file's change is not shown. */
+  commits: {
+    notFound: "This commit is not part of the contribution.",
+    unsupportedName: "The file name contains unsupported characters.",
+    sensitive: "A sensitive file or build artifact; its content is not shown.",
+    binary: "A binary file; its content is not shown.",
+    tooLarge: "The change is larger than 600 KB; its content is not shown.",
+    credentials: "The change looks like it contains credentials; its content is not shown.",
+  },
   /** Checking the request's assumption again on a finished run. */
   premise: {
     tooEarly: "Wait for development to finish before checking the premise.",

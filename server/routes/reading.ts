@@ -4,9 +4,10 @@ import type { RouteDeps } from "./types.js";
 
 /**
  * Reading a run's code beyond its diff: the unchanged code around each
- * change, the walkthroughs of the functions that hold them, and checking
- * the request's premise against the code. Reading and checking are
- * learning and integrity, so these routes are open on every plan.
+ * change, the walkthroughs of the functions that hold them, the commits of
+ * a published contribution, and checking the request's premise against the
+ * code. Reading and checking are learning and integrity, so these routes
+ * are open on every plan.
  */
 export function registerReadingRoutes(app: Express, { workbench }: RouteDeps) {
   app.get("/api/runs/:id/context", async (req, res) => {
@@ -31,6 +32,13 @@ export function registerReadingRoutes(app: Express, { workbench }: RouteDeps) {
       .strict()
       .parse(req.body);
     res.json(await workbench.walkthrough(req.params.id, filePath, retry));
+  });
+  app.get("/api/runs/:id/commits", async (req, res) => {
+    res.json({ commits: await workbench.commits(req.params.id) });
+  });
+  app.get("/api/runs/:id/commits/:sha", async (req, res) => {
+    const sha = z.string().regex(/^[0-9a-f]{40,64}$/).parse(req.params.sha);
+    res.json(await workbench.commit(req.params.id, sha));
   });
   app.post("/api/runs/:id/premise", async (req, res) => {
     z.object({}).strict().parse(req.body ?? {});

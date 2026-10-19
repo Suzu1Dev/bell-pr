@@ -178,6 +178,14 @@ const m: Translation<typeof en> = {
     wholeFile: "新增或刪除的檔案已經完整顯示。",
     unreadable: "檔案無法讀取或超過 512 KB。",
   },
+  commits: {
+    notFound: "找不到這個貢獻的 commit。",
+    unsupportedName: "檔案名稱包含不支援的字元。",
+    sensitive: "敏感檔案或產物，不顯示內容。",
+    binary: "二進位檔案，不顯示內容。",
+    tooLarge: "差異超過 600 KB，不顯示內容。",
+    credentials: "差異疑似包含憑證，不顯示內容。",
+  },
   premise: {
     tooEarly: "請等待開發完成後再查核前提。",
     busy: "這個工作還有 Agent、審查或解說在進行；請等它完成再查核前提。",

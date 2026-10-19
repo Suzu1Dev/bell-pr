@@ -34,6 +34,7 @@ const canonical: [string, Route][] = [
   ["#/runs/demo-run/changes", { name: "run", runId: "demo-run", tab: "changes" }],
   ["#/runs/demo-run/activity", { name: "run", runId: "demo-run", tab: "activity" }],
   ["#/runs/demo-run/draft", { name: "run", runId: "demo-run", tab: "draft" }],
+  ["#/runs/demo-run/commits", { name: "run", runId: "demo-run", tab: "commits" }],
   [
     "#/runs/demo-run/changes?file=src/utils/retry.ts",
     { name: "run", runId: "demo-run", tab: "changes", file: "src/utils/retry.ts" },

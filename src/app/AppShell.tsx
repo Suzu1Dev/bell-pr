@@ -78,7 +78,7 @@ export type Page =
   | "team"
   | "learning"
   | "settings";
-export type Tab = "overview" | "changes" | "activity" | "draft";
+export type Tab = "overview" | "changes" | "activity" | "draft" | "commits";
 export type ModalName =
   | "import"
   | "task"

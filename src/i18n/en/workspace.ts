@@ -31,6 +31,7 @@ const workspace = {
     changes: "Code changes",
     activity: "Agent activity",
     draft: "PR draft",
+    commits: "Commit history",
   },
   /** The badge of a run whose Claude Code agent ran without the OS sandbox. */
   unsandboxed: {

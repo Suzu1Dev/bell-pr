@@ -5,6 +5,7 @@ import type {
   ProjectInsights,
 } from "../../shared/insights";
 import type { PrFeedback } from "../../shared/pr-feedback";
+import type { CommitDetail, CommitSummary } from "../../shared/commits";
 import type { AgentTeam } from "../../shared/team";
 import type { DraftPreparation } from "../../shared/drafts";
 import type { CoachDebrief, CoachDrill } from "../../shared/coach";
@@ -172,6 +173,12 @@ export interface DemoContent {
   debriefSample?: CoachDebrief;
   /** The person's restatement of the sample review before an AI round. */
   restatementSample?: FollowUpRestatement[];
+  /**
+   * The sample PR's commits once published with a review round and a merge
+   * of the target branch, with what each changed; the commit messages are
+   * English in every locale.
+   */
+  commitHistory?: { commits: CommitSummary[]; details: Record<string, CommitDetail> };
 }
 
 /**

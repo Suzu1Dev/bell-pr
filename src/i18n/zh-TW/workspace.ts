@@ -24,6 +24,7 @@ const m: Translation<typeof en> = {
     changes: "程式碼變更",
     activity: "Agent 動態",
     draft: "PR 草稿",
+    commits: "Commit 歷程",
   },
   unsandboxed: {
     label: "未使用沙箱執行",

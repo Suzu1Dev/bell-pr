@@ -62,6 +62,7 @@ import * as syncing from "./sync-runs.js";
 import * as followUps from "./followup-runs.js";
 import * as walkthroughs from "./walkthrough-runs.js";
 import * as premises from "./premise-runs.js";
+import { commitDetail, listCommits } from "./commits.js";
 import { synchronizeWalkthroughs } from "./walkthroughs.js";
 import {
   synchronizeUnderstanding,
@@ -865,6 +866,20 @@ export class Workbench {
 
   async approve(id: string, displayedDraft: Run["draft"]) {
     return publishing.approve(this.context, id, displayedDraft);
+  }
+
+  /** The commits on a published contribution's branch, oldest first (commits.ts). */
+  async commits(id: string) {
+    const run = this.run(id);
+    cleanup.assertWorkspacePresent(run);
+    return listCommits(run);
+  }
+
+  /** What one of those commits changed, with the review screen's protections. */
+  async commit(id: string, sha: string) {
+    const run = this.run(id);
+    cleanup.assertWorkspacePresent(run);
+    return commitDetail(run, sha);
   }
 
   /** Checks a finished run's premise again, or for the first time (premise-runs.ts). */

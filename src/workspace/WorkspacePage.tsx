@@ -13,6 +13,7 @@ import {
   GitBranch,
   GitPullRequest,
   Globe2,
+  History,
   Lock,
   Plus,
   ShieldCheck,
@@ -43,6 +44,12 @@ import "./workspace.css";
 // it loads with its first visit.
 const ActivityTab = lazy(() =>
   import("./ActivityTab").then((module) => ({ default: module.ActivityTab })),
+);
+// The commit history matters once a PR is published; it loads on its own too.
+const CommitHistory = lazy(() =>
+  import("../review/CommitHistory").then((module) => ({
+    default: module.CommitHistory,
+  })),
 );
 
 interface WorkspacePageProps {
@@ -364,6 +371,18 @@ export function WorkspacePage({
               {t.tabs.draft}
               {draftDirty && <span>•</span>}
             </button>
+            <button
+              role="tab"
+              id="workspace-tab-commits"
+              aria-controls="workspace-panel"
+              tabIndex={tab === "commits" ? 0 : -1}
+              aria-selected={tab === "commits"}
+              className={tab === "commits" ? "selected" : ""}
+              onClick={() => setTab("commits")}
+            >
+              <History size={16} />
+              {t.tabs.commits}
+            </button>
           </div>
           <div className="review-totals">
             <span className="additions">+{additions}</span>
@@ -452,6 +471,13 @@ export function WorkspacePage({
                   setLogFilter={setLogFilter}
                   actions={actions}
                 />
+              </Suspense>
+            </ErrorBoundary>
+          )}
+          {tab === "commits" && (
+            <ErrorBoundary resetKey={run.id}>
+              <Suspense fallback={null}>
+                <CommitHistory run={run} demo={demo} />
               </Suspense>
             </ErrorBoundary>
           )}

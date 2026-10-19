@@ -122,6 +122,8 @@ export interface RunCore {
   error?: string;
   /** The GitHub branch the publish commit was pushed to; absent until a push succeeds. The branch field is locked once set. */
   publishedBranch?: string;
+  /** The PR head BELL last pushed or took over; absent until the run is published. */
+  publishCommit?: string;
   /** True while BELL pushes to GitHub. */
   publishing?: boolean;
   /** owner/name the PR branch was pushed to: the target repository or the person's fork. */

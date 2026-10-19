@@ -2080,3 +2080,57 @@
 .walkthrough-new-units code {
   font-size: var(--text-2xs);
 }
+
+/* Commit history of a published contribution: its files read as the code
+   changes tab's file list, its patches as the diff. */
+.commit-list,
+.commit-files {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+.commit-item {
+  min-width: 0;
+  padding: 14px var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-left: 3px solid var(--color-accent-500);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.commit-sync {
+  border-left-color: var(--color-info);
+}
+.commit-head,
+.commit-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--space-3);
+  color: var(--color-text-muted);
+}
+.commit-subject {
+  margin-top: 6px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.commit-body {
+  white-space: pre-wrap;
+}
+.commit-item .button {
+  margin-top: var(--space-2);
+}
+.commit-files {
+  gap: 0;
+  margin-top: var(--space-2);
+}
+.commit-files code {
+  flex: 1;
+  min-width: 0;
+}
+.commit-files .rv-code-scroll {
+  max-height: 520px;
+  overflow: auto;
+}
