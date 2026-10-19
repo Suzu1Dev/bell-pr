@@ -473,6 +473,17 @@ const states = {
     await rec.target("answer", answer);
     await rec.check("answer");
     await rec.hold(1.0);
+    // Back up 57 px to the answer's first paragraph, as someone rereading it would. The panel's own scroll to the
+    // end of the reply is a smooth scroll on Chrome's real-time clock, so the frame that catches it partway shows a
+    // different position on each capture; this tween runs on the page clock. S8's answer take holds "reread": the
+    // position its framing was made on (the smooth scroll caught 57 px short of the end).
+    const chat = await scrollerOf(answer);
+    const end = await chat.evaluate((element) => element.scrollTop);
+    await rec.scrollTo(end - 57, { scroller: chat, duration: 0.5 });
+    await rec.hold(0.5 + 1 / 30);
+    rec.mark("reread");
+    await rec.check("reread");
+    await rec.hold(0.5);
     await rec.stopFrames();
   },
 

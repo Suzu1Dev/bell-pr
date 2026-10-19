@@ -308,10 +308,11 @@ export const looks: Record<string, Record<string, TakeLook>> = {
     },
     answer: {
       state: "v-line-ask",
-      // The answer's first paragraph, complete on the frame where the rest of the reply arrives (4.27 s), held; the
-      // paragraph under it (whose heading runs into its first line) and the sticky header above drop back.
-      clipFrom: 4.27,
-      clipTo: 4.27,
+      // The answer's first paragraph, complete, held at "reread" (6.97 s): the capture backs the panel up to it once
+      // the reply has settled, so the frame is the same on every capture; the paragraph under it (whose heading runs
+      // into its first line) and the sticky header above drop back.
+      clipFrom: 6.97,
+      clipTo: 6.97,
       macro: true,
       keys: [
         { at: 0, view: panel(385, 2.32, 470) },
