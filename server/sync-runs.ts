@@ -37,6 +37,7 @@ import { conflictPrompt } from "./prompts/sync.js";
 import { log } from "./log.js";
 import { logged, parseAgentOutput } from "./run-events.js";
 import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
+import { walkthroughKeyPrefix } from "./walkthroughs.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 const now = () => new Date().toISOString();
@@ -50,14 +51,26 @@ type ConflictHolder = {
   resolving?: boolean;
 };
 
-/** Agents, reviews, drafts, explanations or questions still working on this run. */
-export function runBusy(ctx: WorkbenchContext, id: string) {
+/**
+ * Agents, reviews, drafts, explanations or questions still working on this
+ * run. A code walkthrough only reads the checkout and keeps its result only
+ * if its file did not change meanwhile, so `walkthroughs: false` lets a
+ * sync or a premise check go ahead of the ones being written in the
+ * background; removing the checkout still waits for them.
+ */
+export function runBusy(
+  ctx: WorkbenchContext,
+  id: string,
+  { walkthroughs = true }: { walkthroughs?: boolean } = {},
+) {
   return (
     ctx.followUpJobs.has(id) ||
     ctx.conflictJobs.has(id) ||
     ctx.reviewJobs.has(id) ||
     [...ctx.controllers.keys()].some(
-      (key) => key === id || key.endsWith(`:${id}`),
+      (key) =>
+        (key === id || key.endsWith(`:${id}`)) &&
+        (walkthroughs || !key.startsWith(walkthroughKeyPrefix)),
     )
   );
 }
@@ -83,7 +96,8 @@ async function syncRunLocked(ctx: WorkbenchContext, id: string) {
       run.publishing
     )
       throw new AppError((m) => m.run.sync.notAllowed, 409);
-    if (runBusy(ctx, id)) throw new AppError((m) => m.run.sync.busy, 409);
+    if (runBusy(ctx, id, { walkthroughs: false }))
+      throw new AppError((m) => m.run.sync.busy, 409);
     // A first publish that stopped after its commit, which may be on GitHub.
     if (run.publishCommit)
       throw new AppError((m) => m.run.sync.partlyPublished, 409);
@@ -181,7 +195,8 @@ async function syncPublishedRun(ctx: WorkbenchContext, run: Run) {
     throw new AppError((m) => m.run.sync.prOnly, 409);
   if (activeFollowUp(run.followUps))
     throw new AppError((m) => m.run.sync.roundOpen, 409);
-  if (runBusy(ctx, run.id)) throw new AppError((m) => m.run.sync.busy, 409);
+  if (runBusy(ctx, run.id, { walkthroughs: false }))
+    throw new AppError((m) => m.run.sync.busy, 409);
   const head = (
     await git(run.worktreePath, ["rev-parse", "HEAD"])
   ).stdout.trim();
@@ -286,7 +301,8 @@ async function undoSyncLocked(ctx: WorkbenchContext, id: string) {
       !["review", "approved", "awaiting_plan"].includes(run.status)
     )
       throw new AppError((m) => m.run.sync.nothingToUndo, 409);
-    if (runBusy(ctx, id)) throw new AppError((m) => m.run.sync.busyUndo, 409);
+    if (runBusy(ctx, id, { walkthroughs: false }))
+      throw new AppError((m) => m.run.sync.busyUndo, 409);
     if (run.publishCommit)
       throw new AppError((m) => m.run.sync.partlyPublished, 409);
     await git(run.worktreePath, ["rev-parse", "--verify", `${sync.snapshot}^{commit}`]);
@@ -333,7 +349,7 @@ export async function resolveConflicts(ctx: WorkbenchContext, id: string) {
     )
       throw new AppError((m) => m.run.sync.noConflicts, 409);
     const sync = target.holder;
-    if (runBusy(ctx, id))
+    if (runBusy(ctx, id, { walkthroughs: false }))
       throw new AppError((m) => m.run.sync.busyResolve, 409);
     const open = await filesWithConflictMarkers(run.worktreePath, sync.conflicts);
     if (!open.length)

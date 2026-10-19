@@ -20,6 +20,8 @@ export const walkthroughFileLimit = 12;
 export const walkthroughFunctionLimit = 6;
 export const walkthroughStepLimit = 8;
 export const walkthroughReferenceLimit = 5;
+/** Starts the key of a walkthrough job's controller (sync-runs.ts runBusy). */
+export const walkthroughKeyPrefix = "walkthrough:";
 
 /** Languages without functions to walk through. */
 const nonCode = new Set(["Markdown", "Text", "JSON", "YAML", "CSS", "SCSS", "HTML"]);

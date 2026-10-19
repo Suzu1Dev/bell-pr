@@ -21,6 +21,7 @@ import {
   reviewDiffContext,
 } from "./team.js";
 import { AppError, withRunLocale, type Run } from "./types.js";
+import { walkthroughKeyPrefix } from "./walkthroughs.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 /** Statuses whose work is finished enough to check against. */
@@ -61,7 +62,10 @@ export async function checkPremise(ctx: WorkbenchContext, id: string) {
   const team = run.team;
   if (!team || !finishedStatuses.includes(run.status) || run.publishing)
     throw new AppError((m) => m.run.premise.tooEarly, 409);
-  if (runBusy(ctx, id)) throw new AppError((m) => m.run.premise.busy, 409);
+  // Walkthroughs written in the background do not hold it up; a changed
+  // verdict stops them and has them written again.
+  if (runBusy(ctx, id, { walkthroughs: false }))
+    throw new AppError((m) => m.run.premise.busy, 409);
   const controller = new AbortController();
   // Ends with the run id, so runBusy sees it and shutdown stops it.
   const key = `premise:${id}`;
@@ -122,6 +126,9 @@ export async function checkPremise(ctx: WorkbenchContext, id: string) {
         // Made with the old verdict, or none; they are made again with this one.
         dropUnansweredExplanations(run);
         delete run.walkthroughs;
+        for (const [key, walkthrough] of ctx.controllers)
+          if (key.startsWith(walkthroughKeyPrefix) && key.endsWith(`:${id}`))
+            walkthrough.abort();
       }
       withRunLocale(run, () =>
         ctx.log(

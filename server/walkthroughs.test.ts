@@ -323,6 +323,102 @@ test("a run's walkthrough is generated from the checkout, cached by fingerprint,
   }
 });
 
+test("walkthroughs written in the background let a sync and a premise check go ahead, and a changed verdict writes them again", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-walkthrough-busy-test-"));
+  const repository = path.join(directory, "repo");
+  const walkthroughs: TeamAgentInput[] = [];
+  let release: (() => void) | undefined;
+  const answer = JSON.stringify({
+    functions: [
+      {
+        name: "count",
+        kind: "函式",
+        startLine: 1,
+        endLine: 4,
+        summary: "回傳陣列長度。",
+        change: "多加了 0。",
+        steps: [{ startLine: 2, endLine: 3, explanation: "計算並回傳。" }],
+        callers: [],
+        callees: [],
+        analogy: "像數人頭。",
+        selfCheck: { question: "空陣列回傳什麼？", answer: "0。" },
+      },
+    ],
+  });
+  const premise = { verdict: "refuted", statement: "呼叫端會傳入空陣列。", evidence: "count.ts:2 只讀長度。" };
+  try {
+    await git(directory, ["init", "-q", "-b", "main", repository]);
+    await git(repository, ["config", "user.name", "Walkthrough Test"]);
+    await git(repository, ["config", "user.email", "walkthrough@example.invalid"]);
+    const source = ["export function count(items: number[]) {", "  const total = items.length;", "  return total;", "}"];
+    await writeFile(path.join(repository, "count.ts"), source.join("\n") + "\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-qm", "base"]);
+    const baseSha = (await git(repository, ["rev-parse", "HEAD"])).stdout.trim();
+    await writeFile(path.join(repository, "count.ts"), source.join("\n").replace("items.length", "items.length + 0") + "\n");
+    const store = new Store(path.join(directory, "state"));
+    await store.initialize();
+    const workbench = new Workbench(store, async (input) => {
+      if (input.role === "premise") return JSON.stringify({ premise });
+      walkthroughs.push(input);
+      // The first walkthrough is held until it is stopped or released.
+      if (walkthroughs.length > 1) return answer;
+      return new Promise<string>((resolve, reject) => {
+        release = () => resolve(answer);
+        input.signal.addEventListener("abort", () => reject(new Error("stopped")));
+      });
+    });
+    const repo = await workbench.importRepository(repository);
+    const run: Run = {
+      id: "busy-run",
+      repoId: repo.id,
+      title: "Count items",
+      prompt: "假設（未驗證）：呼叫端會傳入空陣列。",
+      status: "review",
+      branch: "main",
+      baseBranch: "main",
+      baseSha,
+      worktreePath: repository,
+      createdAt: new Date().toISOString(),
+      agents: [],
+      logs: [],
+      draft: { title: "t", body: "b" },
+      reviewedFiles: [],
+      reviewedFingerprints: {},
+      team: {
+        config: { maxTeammates: 2, requirePlanApproval: false, provider: "claude", protocol: "bell-shared-tasks", messageDelivery: "between-turns" },
+        phase: "complete",
+        planSummary: "計算長度。",
+        tasks: [],
+        messages: [],
+      },
+    };
+    store.data.runs.push(run);
+    const held = workbench.walkthrough(run.id, "count.ts");
+    while (!release) await new Promise((resolve) => setImmediate(resolve));
+
+    // A sync is not refused because of it (here the target branch has not moved).
+    assert.equal((await workbench.syncRun(run.id)).updated, false);
+    // Nor is the premise check; its new verdict stops the walkthrough written with none.
+    const checked = await workbench.checkPremise(run.id);
+    assert.deepEqual(checked.premise, premise);
+    assert.equal(walkthroughs[0].signal.aborted, true);
+    assert.equal(checked.files[0].walkthroughStatus, "pending");
+    // The stopped one is not a failure: it is pending, and the next request writes it.
+    const stopped = (await held).files[0];
+    assert.equal(stopped.walkthroughStatus, "pending");
+    assert.ok(!run.logs.some((entry) => /程式碼解說未完成/.test(entry.message)));
+    const again = (await workbench.walkthrough(run.id, "count.ts")).files[0];
+    assert.equal(again.walkthroughStatus, "ready");
+    assert.equal(walkthroughs.length, 2);
+    assert.match(walkthroughs[1].prompt, /呼叫端會傳入空陣列/);
+
+    await workbench.shutdown();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("a function the diff adds whole is listed as new instead of explained", () => {
   // Lines 10 to 14 are a new test; line 3 changes an existing function.
   const patch = [

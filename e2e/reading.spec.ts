@@ -190,7 +190,8 @@ test.describe("reading a real run in review", () => {
     const { page, close } = await open(browser);
     try {
       await page.goto(`/#/runs/${runId}/overview?locale=en`);
-      // A premise check waits for the run's walkthroughs: let them finish.
+      // The stand-in agent gives every turn the same answer: let the
+      // walkthroughs and explanations finish before it answers the premise.
       await expect
         .poll(
           async () => {

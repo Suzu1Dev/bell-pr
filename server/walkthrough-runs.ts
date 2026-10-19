@@ -20,10 +20,19 @@ import {
   addedLines,
   parseWalkthrough,
   walkthroughJsonSchema,
+  walkthroughKeyPrefix,
 } from "./walkthroughs.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 const now = () => new Date().toISOString();
+
+/** The file's walkthrough still waits for the job that began this version of it. */
+function generating(run: Run, file: DiffFile) {
+  const stored = run.walkthroughs?.[file.path];
+  return (
+    stored?.status === "generating" && stored.fingerprint === file.fingerprint
+  );
+}
 /** Statuses whose diff is final enough to walk through. */
 const readableStatuses: Run["status"][] = [
   "review",
@@ -88,7 +97,7 @@ async function generateWalkthrough(
 ) {
   const controller = new AbortController();
   // Ends with the run id, so runBusy sees it and shutdown stops it.
-  const key = `walkthrough:${file.path}:${run.id}`;
+  const key = `${walkthroughKeyPrefix}${file.path}:${run.id}`;
   ctx.controllers.set(key, controller);
   run.walkthroughs![file.path] = {
     fingerprint: file.fingerprint,
@@ -117,21 +126,31 @@ async function generateWalkthrough(
       // reports; it still reads this checkout to find callers.
       { outputSchema, isolated: true },
     );
-    const lineCount = await checkoutLineCount(run, file.path);
-    const content = parseAgentOutput(run, "walkthrough", () =>
-      parseWalkthrough(answer, lineCount, addedLines(file.patch)),
-    );
-    const current = (await readDiff(run)).find(
-      (entry) => entry.path === file.path,
-    );
-    // The file changed while the agent read it: the next diff asks again.
-    if (current?.fingerprint !== file.fingerprint || current.blocked) return;
-    run.walkthroughs![file.path] = {
-      fingerprint: file.fingerprint,
-      status: "ready",
-      content,
-      generatedAt: now(),
-    };
+    // A sync or a premise check may have gone ahead of this job; the
+    // checkout is read, and the result kept, only between them.
+    await ctx.lock(run.id, async () => {
+      const lineCount = await checkoutLineCount(run, file.path);
+      const content = parseAgentOutput(run, "walkthrough", () =>
+        parseWalkthrough(answer, lineCount, addedLines(file.patch)),
+      );
+      const current = (await readDiff(run)).find(
+        (entry) => entry.path === file.path,
+      );
+      // The file changed while the agent read it, or a changed premise
+      // verdict asked for the walkthroughs again: the next diff asks again.
+      if (
+        current?.fingerprint !== file.fingerprint ||
+        current.blocked ||
+        !generating(run, file)
+      )
+        return;
+      run.walkthroughs![file.path] = {
+        fingerprint: file.fingerprint,
+        status: "ready",
+        content,
+        generatedAt: now(),
+      };
+    });
   } catch (error) {
     const stored = run.walkthroughs?.[file.path];
     const message = controller.signal.aborted
@@ -139,13 +158,15 @@ async function generateWalkthrough(
       : redact(
           error instanceof Error ? error.message : sm().run.walkthrough.failed,
         );
-    if (stored?.fingerprint === file.fingerprint && stored.status === "generating")
+    // One asked for again meanwhile is not a failure: the next diff asks again.
+    if (stored && generating(run, file)) {
       run.walkthroughs![file.path] = { ...stored, status: "failed", error: message };
-    ctx.log(
-      run,
-      "walkthrough",
-      sm().run.walkthrough.notFinished({ path: file.path, reason: message }),
-    );
+      ctx.log(
+        run,
+        "walkthrough",
+        sm().run.walkthrough.notFinished({ path: file.path, reason: message }),
+      );
+    }
   } finally {
     if (ctx.controllers.get(key) === controller) ctx.controllers.delete(key);
     if (temporary) await rm(temporary, { recursive: true, force: true });
