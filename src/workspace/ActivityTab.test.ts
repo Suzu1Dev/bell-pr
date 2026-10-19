@@ -60,3 +60,18 @@ test("a run that recorded its model names it on the folded Run details", () => {
   assert.equal(count(html, /class="model-summary"/), 1);
   assert.match(html, /<details class="team-run-details"><summary><strong>Run details<\/strong><span>[^<]*gpt-5/);
 });
+
+test("the run log takes the full width; the request is not repeated beside it, the worktree note moves into the description", () => {
+  const html = renderEn(element());
+  assert.doesNotMatch(html, /task-brief/);
+  assert.doesNotMatch(html.slice(html.indexOf('class="activity-layout"')), /<aside/);
+  // The request reads in full on the overview; the branch is in the header.
+  assert.ok(!html.includes(demo.run.prompt));
+  assert.match(
+    html,
+    /<h2>How it ran<\/h2><p>The task board is above; the full log, error messages and the stop button stay here\. Development runs in a separate Git worktree, and after the review you decide when to submit\.<\/p>/,
+  );
+  const zh = renderZh(element({ run: { ...getDemo("zh-TW").run, team: getDemo("zh-TW").team } }));
+  assert.match(zh, /開發在獨立的 Git worktree 中執行，審查完成後由你決定何時送出。<\/p>/);
+  assert.doesNotMatch(zh, /這次的貢獻目標/);
+});

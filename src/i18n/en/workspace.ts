@@ -243,9 +243,10 @@ const workspace = {
   activity: {
     runTitle: "How it ran",
     runText:
-      "The task board is above; the full log, error messages and the stop button stay here.",
+      "The task board is above; the full log, error messages and the stop button stay here. Development runs in a separate Git worktree, and after the review you decide when to submit.",
     teamTitle: "Your agent team",
-    teamText: "Each role has its own job, and everything happens here.",
+    teamText:
+      "Each role has its own job, and everything happens here. Development runs in a separate Git worktree, and after the review you decide when to submit.",
     stopReview: "Stop the re-review",
     stopTask: "Stop the task",
     log: "Run log",
@@ -256,10 +257,6 @@ const workspace = {
     all: "All",
     emptyLog: "The log appears here once the task starts.",
     emptyFilter: "This role has no log entries yet.",
-    eyebrow: "MISSION BRIEF",
-    goal: "This contribution's goal",
-    isolation:
-      "Development runs in a separate Git worktree. After the review, you decide when to submit.",
   },
   /** Defaults of the contribution brief built from a run's settings. */
   brief: {

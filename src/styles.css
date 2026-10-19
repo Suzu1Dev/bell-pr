@@ -1255,8 +1255,6 @@ button {
   margin-top: 7px;
 }
 .activity-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 270px;
   min-height: 530px;
 }
 .activity-main {
@@ -1425,32 +1423,6 @@ button {
 }
 .log-status p {
   color: var(--color-text-muted);
-}
-.task-brief {
-  padding: 28px 22px;
-  background: var(--color-bg);
-  border-left: 1px solid var(--color-border);
-}
-.task-brief h3 {
-  font-size: var(--text-lg);
-  line-height: 1.7;
-  margin: 15px 0;
-}
-.task-brief > p {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  line-height: 1.9;
-  white-space: pre-wrap;
-}
-.brief-meta {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  color: var(--color-text-muted);
-  margin: 22px 0;
-  overflow-wrap: anywhere;
 }
 .callout {
   display: flex;
@@ -2663,9 +2635,6 @@ button {
   .note-card > code {
     font-size: var(--text-xs);
   }
-  .activity-layout {
-    grid-template-columns: minmax(0, 1fr) 240px;
-  }
   .activity-main {
     padding: 20px;
   }
@@ -2727,13 +2696,6 @@ button {
   }
   .review-grid .explain-body {
     max-height: 400px;
-  }
-  .activity-layout {
-    grid-template-columns: 1fr;
-  }
-  .task-brief {
-    border-left: 0;
-    border-top: 1px solid var(--color-border);
   }
   .draft-layout {
     grid-template-columns: 1fr;
@@ -3307,9 +3269,6 @@ button {
   font-size: var(--text-xs);
 }
 .draft-textarea {
-  font-size: var(--text-sm);
-}
-.task-brief > p {
   font-size: var(--text-sm);
 }
 .checklist-item {

@@ -201,9 +201,11 @@ const m: Translation<typeof en> = {
   },
   activity: {
     runTitle: "執行過程",
-    runText: "任務板在上方；完整紀錄、錯誤訊息與停止操作保留在這裡。",
+    runText:
+      "任務板在上方；完整紀錄、錯誤訊息與停止操作保留在這裡。開發在獨立的 Git worktree 中執行，審查完成後由你決定何時送出。",
     teamTitle: "你的 Agent team",
-    teamText: "每個角色各司其職，所有過程都在這裡。",
+    teamText:
+      "每個角色各司其職，所有過程都在這裡。開發在獨立的 Git worktree 中執行，審查完成後由你決定何時送出。",
     stopReview: "停止重新審查",
     stopTask: "停止任務",
     log: "執行紀錄",
@@ -214,10 +216,6 @@ const m: Translation<typeof en> = {
     all: "全部",
     emptyLog: "任務開始後會在此顯示紀錄。",
     emptyFilter: "這個角色目前沒有紀錄。",
-    eyebrow: "任務簡介",
-    goal: "這次的貢獻目標",
-    isolation:
-      "開發在獨立的 Git worktree 中執行。審查完成後，由你決定何時送出。",
   },
   brief: {
     motivation: "這次貢獻的價值仍需由任務需求與驗收結果確認。",
