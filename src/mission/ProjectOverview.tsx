@@ -316,24 +316,94 @@ const sectionLabel =
   /^([^\s\d：:（(，。、,.*+#>`|-][^\n：:（(，。、,.]{0,11})((?:（[^）\n]*）)?)：/;
 /** The same in English: "User impact:", "Source evidence (…):". */
 const englishSectionLabel = /^([A-Z][A-Za-z ]{0,23}?)((?: \([^)\n]*\))?):(?= |$)/;
+/** A line that opens or closes a fenced code block, and its fence. */
+const codeFence = /^ {0,3}(`{3,}|~{3,})/;
+/** A web address, left as written so it still links. */
+const webAddress = /((?:https?:\/\/|www\.)[^\s<]*)/;
+const wordCharacter = /[\p{L}\p{N}]/u;
+
+/**
+ * Escapes what Markdown would hide or turn into markup in plain text: a
+ * tag-like `<Dialog>` or `Vec<u8>` (raw HTML is dropped, never shown), an
+ * entity, a backslash, and underscores that would emphasize, as in
+ * `__init__.py`. An underscore inside a word (`snake_case`) never does, so
+ * it stays. Web addresses are left as they are.
+ */
+function escapePlain(text: string) {
+  return text
+    .split(webAddress)
+    .map((part, index) =>
+      index % 2
+        ? part
+        : part.replace(/[\\<&_]/g, (character, offset: number) =>
+            character === "_" &&
+            wordCharacter.test(part[offset - 1] ?? "") &&
+            wordCharacter.test(part[offset + 1] ?? "")
+              ? character
+              : `\\${character}`,
+          ),
+    )
+    .join("");
+}
+
+/**
+ * Escapes a line's text outside its code spans; a span runs from a run of
+ * backticks to the next run of the same length, and is kept as written.
+ */
+function escapeOutsideCode(line: string) {
+  let result = "";
+  let index = 0;
+  while (index < line.length) {
+    const open = line.indexOf("`", index);
+    if (open < 0) break;
+    const run = /^`+/.exec(line.slice(open))![0];
+    const ticks = /`+/g;
+    ticks.lastIndex = open + run.length;
+    let close = ticks.exec(line);
+    while (close && close[0].length !== run.length) close = ticks.exec(line);
+    result += escapePlain(line.slice(index, open));
+    const end = close ? close.index + run.length : open + run.length;
+    result += line.slice(open, end);
+    index = end;
+  }
+  return result + escapePlain(line.slice(index));
+}
 
 /**
  * Bolds the label of each section in a request written as labelled lines
  * ("Problem:", "Acceptance:"), and starts each section as its own paragraph
  * so it never reads as the continuation of a list item above it. List
- * items, sentences and long phrases are left alone.
+ * items, sentences and long phrases are left alone. The person's words
+ * show as written: Markdown marks them up (lists, code, bold), but nothing
+ * that looks like HTML or emphasis outside code is lost.
  */
 export function briefMarkdown(text: string) {
+  let fence: string | undefined;
   return text
     .split("\n")
     .map((line, index) => {
+      // A fenced code block is code: kept as written, labels and all.
+      const marker = codeFence.exec(line)?.[1];
+      if (fence) {
+        if (
+          marker?.[0] === fence[0] &&
+          marker.length >= fence.length &&
+          !line.trim().slice(marker.length).trim()
+        )
+          fence = undefined;
+        return line;
+      }
+      if (marker) {
+        fence = marker;
+        return line;
+      }
       const match = sectionLabel.exec(line);
       const english = match ? null : englishSectionLabel.exec(line);
       const found = match ?? english;
-      if (!found) return line;
+      if (!found) return escapeOutsideCode(line);
       // i18n-allow: parser
       const colon = match ? "：" : ":";
-      const section = `**${found[1]}**${found[2]}${colon}${line.slice(found[0].length)}`;
+      const section = `**${escapeOutsideCode(found[1])}**${escapeOutsideCode(found[2])}${colon}${escapeOutsideCode(line.slice(found[0].length))}`;
       return index > 0 ? `\n${section}` : section;
     })
     .join("\n");

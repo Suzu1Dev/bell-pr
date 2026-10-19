@@ -830,6 +830,33 @@ test("an English request's section labels are bolded the same way, and sentences
   assert.match(html, /<p><strong>Acceptance<\/strong>:<\/p>\s*<ul>\s*<li><code>npm test<\/code> passes<\/li>/);
 });
 
+test("a request's generics, tags, dunder names and paths show as written, while its code stays code", () => {
+  const request = [
+    "Problem: Make get() return Promise<Response> instead of Promise<any>, and fix the import in src/__init__.py.",
+    "The <Dialog> component closes on Escape; make <Select> do the same for Result<Vec<u8>, Error> & Array<string>.",
+    "Keep snake_case_names and C:\\Users\\me\\new_dir; see https://example.com/a_b/c_d.",
+    "Run `make <target> __all__` first.",
+    "```",
+    "Problem: <b>kept</b> __as__ written",
+    "```",
+  ].join("\n");
+  const html = renderEn(createElement(MarkdownContent, { children: briefMarkdown(request) }));
+  const text = html.replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  for (const written of [
+    "Make get() return Promise<Response> instead of Promise<any>, and fix the import in src/__init__.py.",
+    "The <Dialog> component closes on Escape; make <Select> do the same for Result<Vec<u8>, Error> & Array<string>.",
+    "Keep snake_case_names and C:\\Users\\me\\new_dir; see https://example.com/a_b/c_d.",
+  ])
+    assert.ok(text.includes(written), written);
+  // Nothing became emphasis, and the label is still bold.
+  assert.doesNotMatch(html, /<em>|<strong>init/);
+  assert.match(html, /<p><strong>Problem<\/strong>: Make get\(\)/);
+  assert.match(html, /<a href="https:\/\/example\.com\/a_b\/c_d"/);
+  // Code spans and fenced blocks are code, exactly as written.
+  assert.match(html, /<code>make &lt;target&gt; __all__<\/code>/);
+  assert.match(html, /<pre><code>Problem: &lt;b&gt;kept&lt;\/b&gt; __as__ written\n<\/code><\/pre>/);
+});
+
 test("the brief's request and direction text render through the Markdown view, and a long request spans the width", async () => {
   const run = { ...englishRun, prompt: "Problem: one attempt." } as NonNullable<ProjectOverviewProps["run"]>;
   const brief = {
