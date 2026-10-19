@@ -1104,7 +1104,7 @@ button {
   flex-shrink: 0;
   color: var(--color-accent-600);
 }
-/* One line that keeps the end of the path, where worktrees differ. */
+/* No text is cut off: a long path wraps anywhere. */
 .worktree-hint > code {
   min-width: 0;
   font-family: var(--font-mono);
@@ -1114,16 +1114,8 @@ button {
   border: 1px solid var(--color-border-subtle);
   border-radius: 4px;
   padding: 2px 6px;
-  direction: rtl;
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
   user-select: all;
-}
-.worktree-hint > code > span {
-  direction: ltr;
-  unicode-bidi: embed;
 }
 .worktree-hint > .icon-button {
   flex-shrink: 0;
@@ -1149,9 +1141,7 @@ button {
 .diff-context-bar > .worktree-hint {
   flex: 0 1 420px;
   min-width: 0;
-  flex-wrap: nowrap;
   border-bottom: 0;
-  white-space: nowrap;
 }
 .view-toggle {
   display: flex;
@@ -1788,18 +1778,6 @@ button {
   font-size: var(--text-xs);
   line-height: 1.9;
   overflow-wrap: anywhere;
-}
-/* One line that keeps the end of the path, where clones differ. */
-.repository-card p.repository-path {
-  direction: rtl;
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.repository-path > span {
-  direction: ltr;
-  unicode-bidi: embed;
 }
 .repository-meta {
   display: flex;

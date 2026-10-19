@@ -689,11 +689,6 @@
   min-width: 0;
   font-weight: 400;
 }
-.premise-compact details:not([open]) summary > span {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 .premise-holds svg {
   color: var(--color-success);
 }
