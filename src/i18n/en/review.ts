@@ -422,7 +422,7 @@ const review = {
     noneBody:
       "The changes may be in top-level settings or declarations. Expand the code around them, or ask about them in the Ask tab.",
     readyDemo: "Sample walkthrough · prewritten learning content",
-    readyLive: "Read the current file and its callers",
+    readyLive: "Written from the current file and its callers",
     locate: "Mark this range in the code",
     locateStep: "Mark these lines in the code",
     change: "How this change affects it",

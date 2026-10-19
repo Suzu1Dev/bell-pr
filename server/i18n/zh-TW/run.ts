@@ -189,7 +189,7 @@ const m: Translation<typeof en> = {
   premise: {
     tooEarly: "請等待開發完成後再查核前提。",
     busy: "這個工作還有 Agent、審查或解說在進行；請等它完成再查核前提。",
-    incomplete: "Agent 回傳的前提查核格式不完整",
+    incomplete: "Agent 回傳的前提查核格式不完整。",
     checked: ({ verdict, changed }) =>
       `前提查核：${{ holds: "假設成立", refuted: "假設不成立", unclear: "無法確認假設" }[verdict]}。${changed ? "程式碼解說與還沒作答的變更解說會依這個結論重新產生。" : "結論沒有改變。"}`,
     noAssumption: "前提查核：需求裡沒有需要查核的假設。",
@@ -200,7 +200,7 @@ const m: Translation<typeof en> = {
     tooLarge: "差異超過 100 KB，不自動產生程式碼解說。",
     overLimit: ({ limit }) =>
       `這次修改超過 ${limit} 個程式檔，只為前 ${limit} 個自動產生程式碼解說；其他檔案可以在「追問 Agent」詢問。`,
-    incomplete: "Agent 回傳的程式碼解說格式不完整",
+    incomplete: "Agent 回傳的程式碼解說格式不完整。",
     tooEarly: "請等待開發完成後再產生程式碼解說。",
     stopped: "程式碼解說已中斷，可以重試。",
     failed: "程式碼解說產生失敗，請重試。",
