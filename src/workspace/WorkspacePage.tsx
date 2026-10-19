@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
 import {
   Activity,
   ArrowDownToLine,
@@ -30,13 +30,19 @@ import type { RunRounds } from "../app/hooks/useRunRounds";
 import type { Walkthroughs } from "../app/hooks/useWalkthroughs";
 import { useRunRecords } from "../app/hooks/useRunRecords";
 import { openCheckPanel, useUnderstanding } from "../app/hooks/useUnderstanding";
-import { ActivityTab } from "./ActivityTab";
+import { ErrorBoundary } from "../app/ErrorBoundary";
 import { ChangesTab } from "./ChangesTab";
 import { checkFooter } from "./checkFooter";
 import { DraftTab } from "./DraftTab";
 import { OverviewTab } from "./OverviewTab";
 import { RunNotices, showsCheckOff, UnderstandingOffBadge, UnsandboxedBadge } from "./RunNotices";
 import "./workspace.css";
+
+// The activity tab carries the team board, which most reviews never open;
+// it loads with its first visit.
+const ActivityTab = lazy(() =>
+  import("./ActivityTab").then((module) => ({ default: module.ActivityTab })),
+);
 
 interface WorkspacePageProps {
   run: Run;
@@ -432,16 +438,22 @@ export function WorkspacePage({
             />
           )}
           {tab === "activity" && (
-            <ActivityTab
-              run={run}
-              demo={demo}
-              busy={busy}
-              active={active}
-              reviewRerunning={reviewRerunning}
-              logFilter={logFilter}
-              setLogFilter={setLogFilter}
-              actions={actions}
-            />
+            // A chunk that fails to load stops at this tab; the draft and
+            // the review keep what the person typed.
+            <ErrorBoundary resetKey={run.id}>
+              <Suspense fallback={null}>
+                <ActivityTab
+                  run={run}
+                  demo={demo}
+                  busy={busy}
+                  active={active}
+                  reviewRerunning={reviewRerunning}
+                  logFilter={logFilter}
+                  setLogFilter={setLogFilter}
+                  actions={actions}
+                />
+              </Suspense>
+            </ErrorBoundary>
           )}
           {tab === "draft" && (
             <DraftTab
