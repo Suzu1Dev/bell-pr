@@ -295,12 +295,12 @@ const m: Translation<typeof en> = {
     loadingDetail: "讀取這個 commit 的改動…",
     omitted: ({ count }) => `另外 ${count} 個檔案超過顯示上限，請到 GitHub 查看完整差異。`,
     unpublished:
-      "這個貢獻還沒送出 PR。BELL 在送出前把修改保留為未提交的變更，送出時才建立第一個 commit；之後每一輪依 review 修正、同步目標分支，都會在這裡多一個 commit。",
+      `這個貢獻還沒送出 PR。${product.name} 在送出前把修改保留為未提交的變更，送出時才建立第一個 commit；之後每一輪依 review 修正、同步目標分支，都會在這裡多一個 commit。`,
     unpublishedDemo:
       "示範資料還沒有送出 PR，所以還沒有 commit。下面是示範 PR 在初次送出、一輪依 review 修正與同步目標分支之後的歷程。",
     publishedDemo: "示範 PR 的 commit：初次送出、一輪依 review 修正與同步目標分支。沒有送出任何內容到 GitHub。",
     loading: "讀取 commit 歷程…",
-    intro: ({ count }) => `PR 分支上的 ${count} 個 commit，依時間順序；標籤說明它在 BELL 裡的來源。`,
+    intro: ({ count }) => `PR 分支上的 ${count} 個 commit，依時間順序；標籤說明它在 ${product.name} 裡的來源。`,
   },
 };
 

@@ -454,8 +454,7 @@ const review = {
       plural(count) === "one"
         ? "1 more file is past the display limit; see the full diff on GitHub."
         : `${count} more files are past the display limit; see the full diff on GitHub.`,
-    unpublished:
-      "This contribution has not sent its PR yet. BELL keeps the changes uncommitted until you publish and makes the first commit then; every review round and every sync with the target branch adds one more commit here.",
+    unpublished: `This contribution has not sent its PR yet. ${product.name} keeps the changes uncommitted until you publish and makes the first commit then; every review round and every sync with the target branch adds one more commit here.`,
     unpublishedDemo:
       "The sample has not sent a PR, so it has no commits yet. Below is the sample's history as it looks after the first push, one review round and a merge of the target branch.",
     publishedDemo:
@@ -463,8 +462,8 @@ const review = {
     loading: "Reading the commit history…",
     intro: ({ count }: { count: number }) =>
       plural(count) === "one"
-        ? "The PR branch's 1 commit; the label says where it came from in BELL."
-        : `The PR branch's ${count} commits, oldest first; each label says where the commit came from in BELL.`,
+        ? `The PR branch's 1 commit; the label says where it came from in ${product.name}.`
+        : `The PR branch's ${count} commits, oldest first; each label says where the commit came from in ${product.name}.`,
   },
 };
 
