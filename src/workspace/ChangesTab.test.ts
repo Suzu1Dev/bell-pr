@@ -164,7 +164,7 @@ test("the diff toolbar is one labelled tab stop", () => {
 
 test("the worktree path can be copied, except while presenting, when it loses its folders", () => {
   const html = renderEn(element());
-  assert.match(html, /<code>\/home\/someone\/\.bellpr\/worktrees\/run-1<\/code>/);
+  assert.match(html, /<code><span>\/home\/someone\/\.bellpr\/worktrees\/run-1<\/span><\/code>/);
   assert.match(html, /aria-label="Copy the worktree path"/);
   const path = run.worktreePath!;
   const presenting = renderEn(
@@ -175,10 +175,34 @@ test("the worktree path can be copied, except while presenting, when it loses it
       onCopy() {},
     }),
   );
-  assert.match(presenting, /<code>…\/run-1<\/code>/);
+  assert.match(presenting, /<code><span>…\/run-1<\/span><\/code>/);
   assert.doesNotMatch(presenting, /someone|\/home\//);
   assert.doesNotMatch(presenting, /Copy the worktree path/);
   assertNoHan(presenting);
+});
+
+test("the premise check and the worktree share one row above the diff, the path on one line with the hint as its tooltip", () => {
+  const premise = {
+    verdict: "holds",
+    statement: "GET requests do not retry today.",
+    evidence: "src/client.ts:12 sends one fetch.",
+  } as const;
+  const team = { ...(run.team ?? {}), premise } as NonNullable<Run["team"]>;
+  const html = renderEn(element({ run: { ...run, team } }));
+  const bar = html.slice(html.indexOf('<div class="diff-context-bar">'));
+  assert.match(
+    bar,
+    /^<div class="diff-context-bar"><section class="premise-notice premise-holds premise-compact" aria-label="Premise check"><details><summary>.*?<span>GET requests do not retry today\.<\/span><\/summary>/,
+  );
+  assert.match(
+    bar,
+    /<\/section><div class="worktree-hint" title="You can edit files in this folder directly\. Refresh the diff to update the explanations and the review status\."><svg[^>]*><path[^]*?<\/svg><span>Worktree<\/span><span class="visually-hidden">You can edit files/,
+  );
+  assertNoHan(html);
+  assert.match(renderZh(element({ run: { ...run, team } })), /<span>工作目錄<\/span>/);
+  // Without a premise the bar holds the worktree alone; with neither, there is no bar.
+  assert.match(renderEn(element()), /<div class="diff-context-bar"><div class="worktree-hint"/);
+  assert.doesNotMatch(renderEn(element({ editable: false })), /diff-context-bar/);
 });
 
 test("a run whose files were cleaned up says so instead of offering its folder", () => {

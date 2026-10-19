@@ -103,6 +103,7 @@ const m: Translation<typeof en> = {
     viewMode: "Diff 顯示模式",
     unified: "統一檢視",
     split: "並排檢視",
+    worktreeLabel: "工作目錄",
     worktreeHint:
       "你可以直接在這個目錄修改，重新整理差異後會重新解說與審閱狀態",
     copyWorktree: "複製工作目錄路徑",

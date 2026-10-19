@@ -1114,7 +1114,9 @@ button {
   flex-shrink: 0;
   color: var(--color-accent-600);
 }
+/* One line that keeps the end of the path, where worktrees differ. */
 .worktree-hint > code {
+  min-width: 0;
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   color: var(--color-accent-700);
@@ -1122,12 +1124,44 @@ button {
   border: 1px solid var(--color-border-subtle);
   border-radius: 4px;
   padding: 2px 6px;
-  overflow-wrap: anywhere;
+  direction: rtl;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   user-select: all;
 }
+.worktree-hint > code > span {
+  direction: ltr;
+  unicode-bidi: embed;
+}
 .worktree-hint > .icon-button {
+  flex-shrink: 0;
   width: 24px;
   height: 24px;
+}
+/* Above the diff: the premise check and the worktree share one row. */
+.diff-context-bar {
+  display: flex;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-accent-50);
+}
+.diff-context-bar > .premise-compact {
+  flex: 1 1 320px;
+  min-width: 0;
+  border: 0;
+  padding: 7px 15px;
+}
+.diff-context-bar > .premise-compact:has(details[open]) {
+  flex-basis: 100%;
+}
+.diff-context-bar > .worktree-hint {
+  flex: 0 1 420px;
+  min-width: 0;
+  flex-wrap: nowrap;
+  border-bottom: 0;
+  white-space: nowrap;
 }
 .view-toggle {
   display: flex;

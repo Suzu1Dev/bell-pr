@@ -198,6 +198,8 @@ export function ChangesTab({
     ask,
   } = actions;
   const { present, maskPath } = usePresentation();
+  const showWorktree =
+    editable && !!run.worktreePath && !run.workspaceRemovedAt;
   // Closed book: while the check is open it takes the explanation's place,
   // and questions to the agent wait until it closes.
   const checkMode = useCheckPanel(run.id);
@@ -549,15 +551,20 @@ export function ChangesTab({
             </div>
           </div>
         </div>
-        {/* The lead's premise check, folded: the diff is read file after file. */}
-        <PremiseNotice premise={run.team?.premise} compact />
-        {editable && run.worktreePath && !run.workspaceRemovedAt && (
-          <WorktreeHint
-            path={run.worktreePath}
-            presenting={present}
-            maskPath={maskPath}
-            onCopy={copyWorktreePath}
-          />
+        {/* The lead's premise check, folded (the diff is read file after
+            file), and the worktree share one row above the diff. */}
+        {(run.team?.premise || showWorktree) && (
+          <div className="diff-context-bar">
+            <PremiseNotice premise={run.team?.premise} compact />
+            {showWorktree && (
+              <WorktreeHint
+                path={run.worktreePath!}
+                presenting={present}
+                maskPath={maskPath}
+                onCopy={copyWorktreePath}
+              />
+            )}
+          </div>
         )}
         {file ? (
           <DiffView
@@ -780,11 +787,15 @@ export function WorktreeHint({
   onCopy: () => void;
 }) {
   const t = useT("workspace").changes;
+  // One line that keeps the end of the path; the editing hint is its tooltip.
   return (
-    <div className="worktree-hint">
-      <FolderGit2 size={14} />
-      <span>{t.worktreeHint}</span>
-      <code>{maskPath(path)}</code>
+    <div className="worktree-hint" title={t.worktreeHint}>
+      <FolderGit2 size={14} aria-hidden="true" />
+      <span>{t.worktreeLabel}</span>
+      <span className="visually-hidden">{t.worktreeHint}</span>
+      <code>
+        <span>{maskPath(path)}</span>
+      </code>
       {!presenting && (
         <button
           type="button"

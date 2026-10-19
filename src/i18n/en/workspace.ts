@@ -127,6 +127,7 @@ const workspace = {
     viewMode: "Diff view mode",
     unified: "Unified view",
     split: "Split view",
+    worktreeLabel: "Worktree",
     worktreeHint:
       "You can edit files in this folder directly. Refresh the diff to update the explanations and the review status.",
     copyWorktree: "Copy the worktree path",
