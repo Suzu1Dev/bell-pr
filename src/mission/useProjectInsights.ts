@@ -5,7 +5,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { locales, type Locale } from "../../shared/i18n/locale";
+import type { Locale } from "../../shared/i18n/locale";
 import {
   maxProjectRecommendations,
   projectRecommendationBatchSize,
@@ -51,10 +51,12 @@ function sampleInsights(locale: Locale, expanded: boolean): ProjectInsights {
   return insights;
 }
 const sampleAnalyses = new Map<string, ProjectInsights>();
-/** Every sample analysis made so far, and whether it has the extra batch. */
+/**
+ * Every sample analysis made so far, and whether it has the extra batch.
+ * sampleInsights() is the only maker, so a sample shown in any language is
+ * in here; a language's sample text loads only when the app shows it.
+ */
 const sampleVariants = new Map<ProjectInsights, boolean>();
-for (const locale of locales)
-  for (const expanded of [false, true]) sampleInsights(locale, expanded);
 
 /** The prewritten sample analysis in the active UI language. */
 const demoInsights = () => sampleInsights(getCurrentLocale(), false);
