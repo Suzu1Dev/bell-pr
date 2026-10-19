@@ -87,6 +87,11 @@ export default defineConfig({
     // The largest chunk's budget in kB (minified, before gzip); the gzip
     // budgets live in scripts/check-pack.mjs.
     chunkSizeWarningLimit: 450,
+    // One stylesheet. Split per lazy view, each of the six small ones was
+    // compressed on its own and the CSS took 3.6 kB more gzip (45.1 instead
+    // of 41.5 kB); in one file it still comes after the shell's rules, as
+    // the lazy files did.
+    cssCodeSplit: false,
     rollupOptions: { output: { manualChunks } },
   },
   server: {
