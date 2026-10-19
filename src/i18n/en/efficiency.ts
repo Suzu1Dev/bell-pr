@@ -28,6 +28,7 @@ const efficiency = {
     draft: "PR draft",
     explanations: "Explanations",
     guide: "Follow-up questions",
+    walkthrough: "Code walkthroughs",
     followup: "Review fixes",
     sync: "Conflict resolution",
   },

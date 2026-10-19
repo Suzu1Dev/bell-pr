@@ -44,6 +44,9 @@ import { fileStatusLabel } from "../app/labels";
 import { usePresentation } from "../app/presentation";
 import { FailureText } from "../FailureText";
 import type { RunActions } from "../app/hooks/useRunActions";
+import type { Walkthroughs } from "../app/hooks/useWalkthroughs";
+import type { PanelTab } from "../review/ExplanationPanel";
+import type { LineRange } from "../review/WalkthroughCards";
 import {
   closeCheckPanel,
   openCheckPanel,
@@ -100,6 +103,8 @@ interface ChangesTabProps {
     retry?: boolean,
     filePath?: string,
   ) => Promise<void>;
+  /** The code walkthroughs of the run's files (useWalkthroughs). */
+  walkthroughs?: Walkthroughs;
   actions: Pick<
     RunActions,
     | "messages"
@@ -170,6 +175,7 @@ export function ChangesTab({
   intelligence,
   explanationRequests,
   prepareExplanations,
+  walkthroughs,
   actions,
   understanding,
 }: ChangesTabProps) {
@@ -206,6 +212,22 @@ export function ChangesTab({
     setShowExplanation(true);
     setFocusMode(false);
   }, [checking, setShowExplanation, setFocusMode]);
+  /**
+   * The current-file lines a walkthrough part marks in the diff, with the
+   * diff version its line numbers belong to.
+   */
+  const [highlight, setHighlight] = useState<
+    (LineRange & { runId: string; path: string; fingerprint?: string }) | null
+  >(null);
+  // The panel remounts per file; it opens on the tab the reader chose last.
+  const [panelTab, setPanelTab] = useState<PanelTab>("explain");
+  const shownHighlight =
+    file &&
+    highlight?.runId === run.id &&
+    highlight.path === file.path &&
+    highlight.fingerprint === file.fingerprint
+      ? { startLine: highlight.startLine, endLine: highlight.endLine }
+      : undefined;
   const reviewGridRef = useRef<HTMLDivElement>(null);
   // On a phone the file search hides behind an icon button; a query keeps it open.
   const [searchOpen, setSearchOpen] = useState(false);
@@ -548,6 +570,7 @@ export function ChangesTab({
                 ? () => loadBaseLines(run, file)
                 : undefined
             }
+            highlight={shownHighlight}
           />
         ) : (
           <div className="empty-state">
@@ -695,6 +718,32 @@ export function ChangesTab({
                     }
                     tryFirst={understanding?.tryFirst ?? true}
                     generated={currentRepo?.contributionRules?.generated}
+                    highlight={shownHighlight}
+                    onHighlight={(range) =>
+                      setHighlight(
+                        range
+                          ? {
+                              runId: run.id,
+                              path: file.path,
+                              fingerprint: file.fingerprint,
+                              ...range,
+                            }
+                          : null,
+                      )
+                    }
+                    onRetryWalkthrough={
+                      demo || !walkthroughs
+                        ? undefined
+                        : () =>
+                            void walkthroughs.requestWalkthrough(
+                              run.id,
+                              file.path,
+                              true,
+                            )
+                    }
+                    walkthroughBusy={walkthroughs?.walkthroughBusy}
+                    initialTab={panelTab === "chat" ? "explain" : panelTab}
+                    onTabChange={setPanelTab}
                   />
                 </Suspense>
               </ErrorBoundary>

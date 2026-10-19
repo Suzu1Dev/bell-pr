@@ -255,6 +255,45 @@ export function hunkStart(
 }
 
 /**
+ * The reveal that also shows lines startLine to endLine of the current file.
+ * Lines already shown change nothing; otherwise a gap opens upward from the
+ * change below it when the range reaches that change or the lines already
+ * opened there (or is nearer to it), and downward from the change above
+ * otherwise. A function around a change so appears whole without
+ * unrolling the rest of the gap.
+ */
+export function revealLines(
+  lines: DiffLine[],
+  base: string[],
+  reveal: Reveal,
+  startLine: number,
+  endLine: number,
+): Reveal {
+  const next = { ...reveal };
+  for (const gap of diffGaps(lines, base)) {
+    if (gap.end === null) continue;
+    const first = Math.max(gap.start, startLine - gap.offset);
+    const last = Math.min(gap.end, endLine - gap.offset);
+    if (first > last) continue;
+    const shown = next[gap.index] ?? { below: 0, above: 0 };
+    const belowEnd = gap.start + shown.below - 1;
+    const aboveStart = gap.end - shown.above + 1;
+    let hidden = false;
+    for (let line = first; line <= last && !hidden; line++)
+      hidden = line > belowEnd && line < aboveStart;
+    if (!hidden) continue;
+    // Grow the side the range touches, or the nearer one.
+    const upward =
+      !!gap.next &&
+      (last >= aboveStart - 1 || gap.end - last < first - gap.start);
+    next[gap.index] = upward
+      ? { ...shown, above: Math.max(shown.above, gap.end - first + 1) }
+      : { ...shown, below: Math.max(shown.below, last - gap.start + 1) };
+  }
+  return next;
+}
+
+/**
  * Short badges keyed by the language names server/git.ts languageFor emits.
  * JSON gets its own badge so it never collides with JavaScript's "JS".
  */

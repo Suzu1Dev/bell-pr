@@ -365,3 +365,26 @@ test("a submodule or a mode-only change offers no expansion", () => {
   });
   assert.doesNotMatch(modeOnly, /完整檔案|rv-gap/);
 });
+
+test("a highlighted range marks its lines in the changed version only", () => {
+  const client = demoFiles.find((entry) => entry.path === "src/client.ts")!;
+  const html = renderZh(
+    createElement(DiffView, {
+      file: client,
+      reviewed: false,
+      onReview() {},
+      onAsk() {},
+      view: "unified",
+      highlight: { startLine: 12, endLine: 16 },
+    }),
+  );
+  // Each marked row's new-file number, from its second gutter.
+  const marked = [
+    ...html.matchAll(
+      /class="rv-line [^"]*rv-line-highlighted[^"]*"[^>]*>(?:<span class="rv-gutter rv-gutter-old">\d*<\/span>)<span class="rv-gutter">(\d+)<\/span>/g,
+    ),
+  ].map((match) => Number(match[1]));
+  // Lines 12 to 16 of the new file; the two removed lines in between are not marked.
+  assert.deepEqual(marked, [12, 13, 14, 15, 16]);
+  assert.doesNotMatch(html, /rv-line-removed[^"]*rv-line-highlighted/);
+});

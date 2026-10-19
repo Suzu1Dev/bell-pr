@@ -67,6 +67,7 @@ import { useRunActions } from "./hooks/useRunActions";
 import { useRunPolling } from "./hooks/useRunPolling";
 import { useRunRounds } from "./hooks/useRunRounds";
 import { useTaskSetup } from "./hooks/useTaskSetup";
+import { useWalkthroughs } from "./hooks/useWalkthroughs";
 
 export type Page =
   | "home"
@@ -700,6 +701,17 @@ function AppShell({
     setFiles,
     setRun,
   });
+  const walkthroughs = useWalkthroughs({
+    run,
+    demo,
+    active,
+    files,
+    selectedPath,
+    runIdRef,
+    draftMutationEpoch,
+    setFiles,
+    setRun,
+  });
   function openModal(value: typeof modal) {
     navigationIntent.current++;
     setModal(value);
@@ -1109,6 +1121,7 @@ function AppShell({
             intelligence={intelligence}
             explanationRequests={explanationRequests}
             prepareExplanations={prepareExplanations}
+            walkthroughs={walkthroughs}
             beginContribution={beginContribution}
             chooseRecommendation={chooseRecommendation}
             draft={draft}

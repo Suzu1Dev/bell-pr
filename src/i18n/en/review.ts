@@ -166,6 +166,7 @@ const review = {
     tabsLabel: "Learning panel",
     tabs: {
       explain: "Explanation",
+      walkthrough: "Code walkthrough",
       reports: "Reviews",
       chat: "Ask the agent",
     },
@@ -392,6 +393,45 @@ const review = {
       saveWhy: "Save",
       saved: "Saved",
     },
+  },
+  /**
+   * The code walkthrough tab: the function, method or test around each
+   * change, explained as it works now, part by part.
+   */
+  walkthrough: {
+    lines: ({ start, end }: { start: number; end: number }) =>
+      start === end ? `Line ${start}` : `Lines ${start}–${end}`,
+    none: "None found.",
+    unavailableTitle: "This file has no code walkthrough",
+    demoOnly: "The sample prepared a code walkthrough for some files only.",
+    failedTitle: "The code walkthrough isn't finished",
+    failedBody:
+      "Something went wrong while preparing the code walkthrough; the changes can still be reviewed.",
+    retry: "Prepare the code walkthrough again",
+    busy: "Another code walkthrough is being prepared…",
+    generatingTitle: "Reading this file and its callers",
+    generatingBody:
+      "Finding the function that holds each change and taking apart how it works now.",
+    pendingTitle: "The code walkthrough will be ready on its own",
+    pendingBody:
+      "One is prepared for each modified code file in turn, starting with the one you're reading.",
+    onlyNewTitle: "Every change in this file is new code",
+    noneTitle: "No function holds these changes",
+    noneBody:
+      "The changes may be in top-level settings or declarations. Expand the code around them, or ask in “Ask the agent”.",
+    readyDemo: "Sample walkthrough · prewritten learning content",
+    readyLive: "Read the current file and its callers",
+    locate: "Mark this range in the code",
+    locateStep: "Mark these lines in the code",
+    change: "How this change affects it",
+    steps: "Step by step",
+    callers: "Who calls it",
+    callees: "What it calls",
+    analogy: "Another way to see it",
+    selfCheck: ({ question }: { question: string }) => `Check yourself: ${question}`,
+    /** `names` is the list of new units, each shown as code. */
+    newUnits: ({ names }: { names: string }) =>
+      `The new code has no earlier logic to take apart: ${names}. See the explanation for it.`,
   },
 };
 

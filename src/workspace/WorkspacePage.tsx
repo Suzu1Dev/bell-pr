@@ -27,6 +27,7 @@ import type { Tab } from "../app/AppShell";
 import type { DraftEditor } from "../app/hooks/useDraftEditor";
 import type { RunActions } from "../app/hooks/useRunActions";
 import type { RunRounds } from "../app/hooks/useRunRounds";
+import type { Walkthroughs } from "../app/hooks/useWalkthroughs";
 import { useRunRecords } from "../app/hooks/useRunRecords";
 import { openCheckPanel, useUnderstanding } from "../app/hooks/useUnderstanding";
 import { ActivityTab } from "./ActivityTab";
@@ -89,6 +90,8 @@ interface WorkspacePageProps {
     retry?: boolean,
     filePath?: string,
   ) => Promise<void>;
+  /** The code walkthroughs of the run's files (useWalkthroughs); without it, nothing is prepared or retried. */
+  walkthroughs?: Walkthroughs;
   beginContribution: () => void;
   chooseRecommendation: (idea: ContributionRecommendation) => void;
   draft: DraftEditor;
@@ -143,6 +146,7 @@ export function WorkspacePage({
   intelligence,
   explanationRequests,
   prepareExplanations,
+  walkthroughs,
   beginContribution,
   chooseRecommendation,
   draft,
@@ -422,6 +426,7 @@ export function WorkspacePage({
               intelligence={intelligence}
               explanationRequests={explanationRequests}
               prepareExplanations={prepareExplanations}
+              walkthroughs={walkthroughs}
               actions={actions}
               understanding={understanding}
             />

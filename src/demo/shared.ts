@@ -223,6 +223,31 @@ function diff(
 }
 
 /**
+ * The sample's function walkthrough of src/client.ts: the unit, its parts,
+ * the code it points to and the unit the diff adds whole. Line numbers are
+ * in the changed version of the file; each locale's copy has the words.
+ */
+export const walkthrough = {
+  path: "src/client.ts",
+  name: "createClient",
+  startLine: 10,
+  endLine: 25,
+  steps: [
+    [10, 11],
+    [12, 16],
+    [17, 21],
+    [22, 25],
+  ],
+  callers: [{ path: "README.md", line: 11 }],
+  callees: [
+    { name: "withRetry", path: "src/utils/retry.ts", line: 6 },
+    { name: "HttpError", path: "src/client.ts", line: 4 },
+    { name: "fetch", path: "", line: null },
+  ],
+  newUnits: ["HttpError"],
+} as const;
+
+/**
  * The issue the sample run is for. It is a fragment, shown as "#42
  * (sample)" and never as a link, and it meets the sample project's
  * "issue first" rule.
@@ -873,14 +898,48 @@ function recommendation(
 export function buildDemoContent(copy: DemoCopy): DemoContent {
   return {
     repo,
-    files: diffs.map((file) =>
-      diff(
+    files: diffs.map((file) => {
+      const changed = diff(
         file.path,
         file.lines,
         copy.explanations[file.path],
         "status" in file ? file.status : undefined,
-      ),
-    ),
+      );
+      if (file.path !== walkthrough.path) return changed;
+      const text = copy.walkthrough;
+      return {
+        ...changed,
+        walkthroughStatus: "ready",
+        walkthrough: {
+          functions: [
+            {
+              name: walkthrough.name,
+              kind: text.kind,
+              startLine: walkthrough.startLine,
+              endLine: walkthrough.endLine,
+              summary: text.summary,
+              change: text.change,
+              steps: walkthrough.steps.map(([startLine, endLine], index) => ({
+                startLine,
+                endLine,
+                explanation: text.steps[index],
+              })),
+              callers: walkthrough.callers.map((caller, index) => ({
+                ...caller,
+                ...text.callers[index],
+              })),
+              callees: walkthrough.callees.map((callee, index) => ({
+                ...callee,
+                note: text.callees[index],
+              })),
+              analogy: text.analogy,
+              selfCheck: { ...text.selfCheck },
+            },
+          ],
+          newUnits: [...walkthrough.newUnits],
+        },
+      };
+    }),
     run: {
       id: run.id,
       repoId: repo.id,

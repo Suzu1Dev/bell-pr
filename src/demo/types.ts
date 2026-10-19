@@ -268,4 +268,19 @@ export interface DemoCopy {
   debrief: { quotes: string[]; drills: CoachDrill[]; nextStep: string };
   /** The person's restatement of the review comment. */
   restatement: string;
+  /**
+   * The words of the src/client.ts walkthrough (shared.ts `walkthrough`):
+   * one explanation per step, one caller with its name, and one note per
+   * callee, in the order shared.ts lists them.
+   */
+  walkthrough: {
+    kind: string;
+    summary: string;
+    change: string;
+    steps: [string, string, string, string];
+    callers: [{ name: string; note: string }];
+    callees: [string, string, string];
+    analogy: string;
+    selfCheck: { question: string; answer: string };
+  };
 }
