@@ -160,6 +160,19 @@ function loadDeferred(locale: Locale): Promise<void> {
   return load;
 }
 
+/**
+ * Loads a lazily loaded view's code together with the deferred namespaces
+ * it reads, so the view shows in one step:
+ * `lazy(() => withMessages(import("./View")).then(...))`. Without it the
+ * view would wait a second time, for its copy, and React reveals each wait
+ * on a timer, which a paused clock (captures, some e2e tests) never runs.
+ */
+export function withMessages<T>(load: Promise<T>): Promise<T> {
+  return Promise.all([load, loadDeferred(active.locale)]).then(
+    ([module]) => module,
+  );
+}
+
 function readStoredLocale(): Locale | undefined {
   try {
     return parseLocale(globalThis.localStorage?.getItem(localeStorageKey));

@@ -19,7 +19,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { useT } from "../i18n";
+import { useT, withMessages } from "../i18n";
 import { ProBadge } from "../license/ProBadge";
 import type { DiffFile, Repo, Run } from "../types";
 import type { useProjectInsights } from "../mission/useProjectInsights";
@@ -43,7 +43,9 @@ import "./workspace.css";
 // The activity tab carries the team board, which most reviews never open;
 // it loads with its first visit.
 const ActivityTab = lazy(() =>
-  import("./ActivityTab").then((module) => ({ default: module.ActivityTab })),
+  withMessages(import("./ActivityTab")).then((module) => ({
+    default: module.ActivityTab,
+  })),
 );
 // The commit history matters once a PR is published; it loads on its own too.
 const CommitHistory = lazy(() =>

@@ -1,6 +1,6 @@
 import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
 import { getDemo } from "../demo";
-import { useLocale, useT, type Messages } from "../i18n";
+import { useLocale, useT, withMessages, type Messages } from "../i18n";
 import type { Repo, Run } from "../types";
 import type { useProjectInsights } from "../mission/useProjectInsights";
 import type {
@@ -13,7 +13,7 @@ import { runSetupNeeds, SetupNeeds } from "../team/SetupNeeds";
 
 // The overview is the largest view in the app; it loads with its first visit.
 const ProjectOverview = lazy(() =>
-  import("../mission/ProjectOverview").then((module) => ({
+  withMessages(import("../mission/ProjectOverview")).then((module) => ({
     default: module.ProjectOverview,
   })),
 );

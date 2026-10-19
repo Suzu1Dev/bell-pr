@@ -7,7 +7,7 @@
  */
 import { Suspense, lazy } from "react";
 import { LoaderCircle } from "lucide-react";
-import { useT } from "../i18n";
+import { useT, withMessages } from "../i18n";
 import {
   serializeRoute,
   useHashRoute,
@@ -19,10 +19,12 @@ export const learningViews = ["notes", "practice", "debrief"] as const;
 export type LearningView = (typeof learningViews)[number];
 
 const PracticeDeck = lazy(() =>
-  import("./PracticeDeck").then((module) => ({ default: module.PracticeDeck })),
+  withMessages(import("./PracticeDeck")).then((module) => ({
+    default: module.PracticeDeck,
+  })),
 );
 const CoachDebriefPanel = lazy(() =>
-  import("./CoachDebriefPanel").then((module) => ({
+  withMessages(import("./CoachDebriefPanel")).then((module) => ({
     default: module.CoachDebriefPanel,
   })),
 );

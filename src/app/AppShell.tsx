@@ -29,7 +29,7 @@ import { api, ApiError, authRequiredEvent, send } from "../api";
 import { Logo } from "../brand/Logo";
 import { getDemo } from "../demo";
 import { HomePage } from "../home/HomePage";
-import { useLocale, useT } from "../i18n";
+import { useLocale, useT, withMessages } from "../i18n";
 import { UpgradeDialog } from "../license/UpgradeDialog";
 import { useEntitlements } from "../license/useEntitlements";
 import type { Run, DiffFile, Repo } from "../types";
@@ -96,17 +96,25 @@ listenForPreloadErrors();
 // Shown once (the first start), on request (About) or rarely (a new
 // license agreement), so they load on their own instead of with the app.
 const Welcome = lazy(() =>
-  import("../onboarding/Welcome").then((module) => ({ default: module.Welcome })),
+  withMessages(import("../onboarding/Welcome")).then((module) => ({
+    default: module.Welcome,
+  })),
 );
 const AboutDialog = lazy(() =>
-  import("../about/AboutDialog").then((module) => ({ default: module.AboutDialog })),
+  withMessages(import("../about/AboutDialog")).then((module) => ({
+    default: module.AboutDialog,
+  })),
 );
 const EulaPrompt = lazy(() =>
-  import("../onboarding/EulaPrompt").then((module) => ({ default: module.EulaPrompt })),
+  withMessages(import("../onboarding/EulaPrompt")).then((module) => ({
+    default: module.EulaPrompt,
+  })),
 );
 // Settings are a page most visits never open; it loads on its own too.
 const SettingsPage = lazy(() =>
-  import("../settings/SettingsPage").then((module) => ({ default: module.SettingsPage })),
+  withMessages(import("../settings/SettingsPage")).then((module) => ({
+    default: module.SettingsPage,
+  })),
 );
 // Opened on request (Ctrl+K, the learning page), so each loads on its own.
 const CommandPalette = lazy(() =>
@@ -115,7 +123,9 @@ const CommandPalette = lazy(() =>
   })),
 );
 const LearningPage = lazy(() =>
-  import("../pages/LearningPage").then((module) => ({ default: module.LearningPage })),
+  withMessages(import("../pages/LearningPage")).then((module) => ({
+    default: module.LearningPage,
+  })),
 );
 // The task and model dialogs carry the direction and model pickers, which
 // load with the dialog that needs them.
@@ -123,7 +133,7 @@ const NewTaskModal = lazy(() =>
   import("../modals/NewTaskModal").then((module) => ({ default: module.NewTaskModal })),
 );
 const ModelSettingsModal = lazy(() =>
-  import("../settings/ModelSettingsModal").then((module) => ({
+  withMessages(import("../settings/ModelSettingsModal")).then((module) => ({
     default: module.ModelSettingsModal,
   })),
 );
