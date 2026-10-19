@@ -1,6 +1,23 @@
+import { gfmFromMarkdown } from "mdast-util-gfm";
+import { gfm } from "micromark-extension-gfm";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { useT } from "../i18n";
+
+/**
+ * GitHub Flavored Markdown (tables, task lists, strikethrough, autolinks
+ * and footnotes) for reading. remark-gfm also adds a Markdown writer, which
+ * react-markdown never calls; this plugin adds only the two parsing
+ * extensions, the ones shared/draft-checks.ts already uses.
+ */
+function remarkGfm(this: { data(): object }) {
+  // The two lists remark-parse reads from the processor's data.
+  const data = this.data() as {
+    micromarkExtensions?: unknown[];
+    fromMarkdownExtensions?: unknown[];
+  };
+  (data.micromarkExtensions ??= []).push(gfm());
+  (data.fromMarkdownExtensions ??= []).push(gfmFromMarkdown());
+}
 
 function safeLink(value: string) {
   try {
