@@ -2,22 +2,32 @@
  * A product shot: its takes in order, each a camera on one captured state
  * (src/shots.ts) in the light studio. Takes cut hard on their beats.
  */
+import type { ReactNode } from "react";
 import { AbsoluteFill, Sequence, useCurrentFrame } from "remotion";
 import { clipFrameAt, densityFor, frameUrl, stillUrl, type Footage } from "../footage.ts";
 import { liftOn, liftPoint, sharpnessAt } from "../look/dof.ts";
 import { speed } from "../look/camera.ts";
-import { takeMaxM, takeView } from "../takes.ts";
+import { takeMaxM, takeOpacity, takeView } from "../takes.ts";
 import { ease, mix, tween } from "../look/motion.ts";
 import { pointerAt } from "../look/pointer.ts";
 import { ProductWindow } from "../look/ProductWindow.tsx";
 import { hiDpi, StageImage } from "../look/Stage.tsx";
 import { music } from "../music.ts";
 import { looks, type TakeLook } from "../shots.ts";
+import { footagePatch, PATCH_BOX, SIDEBAR_PAPER } from "../bell.ts";
 import type { Shot, Take } from "../timeline.ts";
 
-export const ProductShot: React.FC<{ shot: Shot; footage: Footage; skip?: string[] }> = ({ shot, footage, skip = [] }) => (
+export const ProductShot: React.FC<{
+  shot: Shot;
+  footage: Footage;
+  skip?: string[];
+  /** Drawn on the studio, under the takes (S3's first-hit lockup). */
+  under?: ReactNode;
+  bellProbe?: "flight" | "footage";
+}> = ({ shot, footage, skip = [], under, bellProbe }) => (
   <AbsoluteFill>
     <StageImage kind="light" />
+    {under}
     {shot.takes
       .filter((take) => !skip.includes(take.id))
       .map((take) => {
@@ -25,14 +35,14 @@ export const ProductShot: React.FC<{ shot: Shot; footage: Footage; skip?: string
         if (!look) throw new Error(`No look for ${shot.id}/${take.id} in src/shots.ts.`);
         return (
           <Sequence key={take.id} from={take.from - shot.from} durationInFrames={take.to - take.from} name={`${shot.id}/${take.id}`}>
-            <TakeView look={look} take={take} footage={footage} />
+            <TakeView look={look} take={take} footage={footage} bellProbe={bellProbe} />
           </Sequence>
         );
       })}
   </AbsoluteFill>
 );
 
-const TakeView: React.FC<{ look: TakeLook; take: Take; footage: Footage }> = ({ look, take, footage }) => {
+const TakeView: React.FC<{ look: TakeLook; take: Take; footage: Footage; bellProbe?: "flight" | "footage" }> = ({ look, take, footage, bellProbe }) => {
   const f = useCurrentFrame();
   const frames = take.to - take.from;
   const view = takeView(look, f);
@@ -75,6 +85,10 @@ const TakeView: React.FC<{ look: TakeLook; take: Take; footage: Footage }> = ({ 
     };
   }
   const sweep = look.sweepAt === undefined ? undefined : sweepAt(f, look.sweepAt * music.beatFrames);
+  const opacity = takeOpacity(look, f);
+  // While the first-hit bell flies onto the app's own bell, the footage's bell is covered with the sidebar's paper,
+  // so only one bell shows; from the landing the flying bell carries that paper itself (src/bell.ts HANDOFF).
+  const patch = !look.bellPatch || bellProbe === "footage" ? 0 : bellProbe === "flight" ? 1 : footagePatch(take.from + f);
   return (
     <ProductWindow
       view={view}
@@ -87,7 +101,22 @@ const TakeView: React.FC<{ look: TakeLook; take: Take; footage: Footage }> = ({ 
       shutter={{ x: moving.dx, y: moving.dy }}
       contact={look.float ? contactFor(view.m) : 0}
       sweep={sweep}
-    />
+      opacity={opacity}
+    >
+      {patch > 0.001 ? (
+        <div
+          style={{
+            position: "absolute",
+            left: PATCH_BOX[0] * layout,
+            top: PATCH_BOX[1] * layout,
+            width: (PATCH_BOX[2] - PATCH_BOX[0]) * layout,
+            height: (PATCH_BOX[3] - PATCH_BOX[1]) * layout,
+            background: SIDEBAR_PAPER,
+            opacity: patch,
+          }}
+        />
+      ) : null}
+    </ProductWindow>
   );
 };
 

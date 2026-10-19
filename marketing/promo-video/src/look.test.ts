@@ -191,7 +191,7 @@ test("a move that leaves a cut covers at most 60% of its travel in its first bea
     const ratio = Math.max(first.view.m, second.view.m) / Math.min(first.view.m, second.view.m);
     if (ratio < 1.03 && Math.hypot(first.view.cx - second.view.cx, first.view.cy - second.view.cy) < 15) continue;
     const name = second.ease ?? "push";
-    if (name === "glide") continue; // S3's rise from below the frame: in from off-stage, not a push
+    if (look.landsAt !== undefined) continue; // S3's rise from below the frame under the flying bell: in from off-stage, not a push
     const covered = (ease[name] as (x: number) => number)(1 / second.at);
     assert.ok(covered <= 0.605, `${shot.id}/${take.id}: ${(covered * 100).toFixed(0)}% in the first beat (${name})`);
   }

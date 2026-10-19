@@ -55,10 +55,12 @@ npm run render:web      # 1080p MP4 + WebM from the master (Lanczos), poster, ca
 npm run render:draft    # a quick 1x preview, out/draft-1080p.mp4 (not a deliverable)
 npm run check           # check every output (`-- --web-only` for the 1080p files only)
 npm run review          # QA frames, index, contact sheet, the per-frame scans and the depth-of-field check (exit 1 on a finding)
+npm run moments         # the bell's landing and hand-off, and the end card's lines, measured in rendered frames (exit 1 on a finding)
+node scripts/measure-bell.mjs   # where the app's own bell is in the capture the bell lands on
 npm run stills -- 291 1011 2452   # quick stills of chosen frames
 npm run site            # copy the 1080p web files into site/media/
 npm run studio          # Remotion Studio
-npm test                # timeline, music, look, logo, sound and script tests; the depth-of-field check when the footage is there
+npm test                # timeline, music, look, logo, bell, end-card, sound and script tests; the depth-of-field and bell-position checks when the footage is there
 npm run typecheck
 ```
 
@@ -105,7 +107,13 @@ states against the existing product build.
 4. **The look** (`src/look/`, `src/scenes/`, `src/shots.ts`): the dark stage
    with focus-pull type for the opening and the end card; a hard
    "lights on" cut to the light studio on the first hit, the wordmark with
-   the product's one-line description under it; each product section opens
+   the product's one-line description under it, whose bell then flies on one
+   eased arc into the first floating window and lands exactly on the app's
+   own sidebar bell, drawn through the window's own transform, then
+   cross-dissolves into the footage (`src/bell.ts`, `src/look/BellFlight.tsx`;
+   `scripts/measure-bell.mjs` finds that bell in the capture by its moments,
+   `scripts/check-moments.mjs` measures the landing in rendered frames);
+   each product section opens
    on the whole floating window (no title bar, no window buttons, no
    device; layered and contact shadows), each with its own move, then cuts
    on the beat to push-ins. In a push the component the shot is about (a
@@ -145,6 +153,7 @@ In `out/` (gitignored):
 | `poster.jpg` | the complete end card, sharp (frame 2610), at most 500 KB |
 | `captions.en.vtt`, `captions.en.srt` | the captions, the same cues as the film |
 | `review/`, `contact-sheet.png` | the QA frames, their index and `review/scans.tsv` (`npm run review`) |
+| `review/moments.tsv`, `review/moments/` | the bell's landing and hand-off and the end card's lines, measured (`npm run moments`) |
 | `capture.log` | the capture's privacy and badge checks |
 
 `npm run site` copies the 1080p web files to `site/media/bell-pr-promo.mp4`,

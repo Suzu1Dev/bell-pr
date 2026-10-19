@@ -43,6 +43,12 @@ export interface TakeLook {
   drift?: Drift;
   /** A whole floating window: contact shadow and one light sweep. */
   float?: boolean;
+  /** The window fades in over these beats from the take's start (a window that rises in under the first-hit bell). */
+  fadeIn?: { from: number; to: number };
+  /** Beats from the take's start where a window rising in lands (its whoosh peaks on the frame before, src/sfx.ts). */
+  landsAt?: number;
+  /** The first-hit bell flies onto the app's own bell in this take: the footage's bell is patched out until it lands (src/bell.ts). */
+  bellPatch?: boolean;
   /** Beats from the take's start where the window's light sweep starts. */
   sweepAt?: number;
   /** The window's visible height (capture px), ending in a gutter above the viewport's bottom so no line is sliced. */
@@ -70,15 +76,22 @@ const REST = { width: 1320, x: 80, y: -72, rx: 5, ry: -9 };
 const rest = () => floating(REST.width, { x: REST.x, y: REST.y, rx: REST.rx, ry: REST.ry });
 
 /**
- * The first product shot rises in from below the frame as the logo goes, a
- * beat before the bar-6 downbeat it lands on (heroGlide stretched over 18
- * frames), then turns to face, landing on the next bar line.
+ * The first product shot fades and rises in under the first-hit bell as it flies (src/bell.ts): once the lockup's
+ * name has dissolved and the bell has left its place in it, the window comes up from below, turning towards the
+ * viewer, and settles a few frames before the bell lands on the app's own bell in its sidebar on the bar-6
+ * downbeat (so the bell docks into a window at rest); it holds there for a beat while the bell hands off to the
+ * footage, then turns to face the viewer and settles at rest.
  */
-const riseIn = (): Key[] => [
-  { at: 0, view: floating(REST.width * 0.94, { x: REST.x + 150, y: REST.y + 640, rx: 18, ry: -24 }) },
-  { at: 1, view: floating(REST.width * 0.97, { x: REST.x + 90, y: REST.y - 10, rx: 11, ry: -18 }), ease: "glide" },
-  { at: 5, view: rest(), ease: "standard" },
-];
+export const LAND = { width: REST.width * 0.97, x: REST.x + 60, y: REST.y - 8, rx: 9, ry: -14 } as const;
+const riseIn = (): Key[] => {
+  const land = floating(LAND.width, { x: LAND.x, y: LAND.y, rx: LAND.rx, ry: LAND.ry });
+  return [
+    { at: 0, view: floating(REST.width * 0.93, { x: LAND.x + 50, y: LAND.y + 640, rx: 17, ry: -23 }) },
+    { at: 32 / 18, view: land, ease: "rise" },
+    { at: 3, view: land, ease: "linear" },
+    { at: 6, view: rest(), ease: "standard" },
+  ];
+};
 
 /** The window's right edge this far inside the frame in a push on the right-hand panel: studio on at most 6% of the width. */
 const EDGE = 120;
@@ -114,9 +127,13 @@ export const looks: Record<string, Record<string, TakeLook>> = {
       state: "v-rules-card",
       still: "overview",
       float: true,
-      sweepAt: 5,
+      sweepAt: 6,
       height: 783,
       keys: riseIn(),
+      // Faded in from the frame the bell has left its place in the lockup (src/bell.test.ts), whole by mid-flight.
+      fadeIn: { from: 3 / 18, to: 13 / 18 },
+      landsAt: 2,
+      bellPatch: true,
       drift: { scale: 0.012, x: 0 },
     },
     rules: {

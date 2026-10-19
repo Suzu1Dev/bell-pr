@@ -8,7 +8,9 @@ Rounds 1-4 below were made on the first cut; round 5 re-cut the film after
 three reviewers' findings, round 6 answered a second set of three reviews
 and round 7 a third. Round 8 rebuilt everything from a clean state (a new
 capture of all 13 states included) and made that rebuild repeat the
-reviewed film; round 7's verdicts are the current ones.
+reviewed film. Round 9 answers the owner's feedback on that cut (the bell
+flies into the first window; `npx bell-pr` on a line of its own); round 7's
+verdicts stand for every frame round 9 did not change.
 
 ## Automated: enforced on every run
 
@@ -48,7 +50,7 @@ master is not rendered) fails unless:
   81.1-84.0 s, is where the analysis records it, and the end-card logo
   locks within ±0.25 s of the final chord (it locks on 2451, -0.018 s).
 
-`npm test` (65 tests) keeps the cut honest against the **loaded** analysis
+`npm test` (77 tests) keeps the cut honest against the **loaded** analysis
 file: anchored shots on their events, section changes on bar lines (else
 half-bars; S9's nominal counted in the track's own bars, so S10 starts on
 the bar-25 downbeat), takes
@@ -69,13 +71,41 @@ sliver of studio under 60 px at a frame edge, a sidebar in frame always
 wholly dropped back (no lift reaches into it), **no caption card within
 12 px of a lifted component**, the pointer only around its clicks (at most
 12 frames before, its ring 8 frames), the logo moments (the first-hit
-lockup pushing 1.00 to 1.04 with the six-frame flare, the end-card logo
-under 72% eight frames after the cut, its last fifth and its settle on the
-three frames before the chord), the line under the first-hit wordmark
+lockup readable whole for 1.2 s, pushing at 1.00-1.04 in 53 frames with the
+six-frame flare, its name gone within 9 frames of the flight's start; the
+end-card logo under 72% eight frames after the cut, its last fifth and its
+settle on the three frames before the chord), **the bell's flight**
+(`src/bell.test.ts`: lift-off on a half-bar after 1.2 s of the lockup,
+landing on the bar-6 downbeat, 0.8-1.4 s; every point of the bell's
+outline within 0.01 px of the app's own bell through the window's
+transform on every frame from the landing to the end of the hold, its
+size within 0.1%; one rise and fall of speed with no reversal, near rest
+at both ends; an arc bowing 5-15% of its length; the window shown only
+once the lockup's name has gone and the bell has left its place, and
+whole by mid-flight; the bell never over the app's "BELL PR" or
+"WORKSPACE" on its way in; the footage's bell patched until the landing,
+then a cross-dissolve of at least 6 frames inside the hold), **the end
+card's lines** (`src/endCard.test.ts`: logo, headline, `npx bell-pr`
+alone, the facts alone and the footer never touching, with at least 64,
+24 and 80 px clear above the command, the facts and the footer, all inside
+a 60 px margin to the last frame), the line under the first-hit wordmark
 being the site's own description, the breath before the hit, and the
 sound effects' placement (whooshes peaking a frame before their downbeat,
 the glint on the chord) and levels. With the footage in place it also runs
-the depth-of-field check below against the captured pictures.
+the depth-of-field check below against the captured pictures, and checks
+that the film's box for the app's bell is where `scripts/measure-bell.mjs`
+finds it in the capture (within 0.1 capture px).
+
+`npm run moments` (`scripts/check-moments.mjs`) measures the same two
+moments in rendered frames and exits 1 on a finding: every frame from the
+landing to the end of the hand-off rendered three ways (the film, the
+flying bell alone with the footage's bell patched out, the footage's bell
+alone), the bell's centre and size from the brand green's coverage: the
+flying bell within 1 px and 2% of the footage's bell, the film's bell
+within 0.25 px and 2% of it on every frame of the cross-dissolve (no jump),
+and identical to it after; and on the complete end card (frame 2610) the
+rows of ink, top to bottom, with the clear space between them and the
+command and the facts centred. Results go to `out/review/moments.tsv`.
 
 `npm run review` also scans **every frame** of the MP4 (one decode) and
 exits 1 on a finding: a mean luma step above 8 between two frames that are
@@ -562,20 +592,132 @@ a subject. Banding (STYLE-GUIDE B.7, longest flat run on studio-only
 regions, in 4K px, pass at most 240): dark stage 41-48 (39, 2554, 2610),
 light studio 26-54 (291 top and bottom, 400, 1530).
 
+### Round 9 (2026-10-19): the owner's feedback on the round-8 cut
+
+The owner, on the round-8 cut: the BELL PR bell should fly **smoothly** at
+the transition onto the next shot's demo screen, and on the final card
+`npx bell-pr` should be on a line of its own ("otherwise it looks messy").
+Nothing else in the film changes: every shot, take, caption and sound
+cue keeps its frames except S3's internal timing below (the logo take now
+ends on beat 3 of bar 5, 327, where the window's take starts; S3's cuts,
+the caption at 381 and the bar-6 downbeat whoosh are where they were).
+
+**The bell's flight** (`src/bell.ts`, `src/look/BellFlight.tsx`;
+`src/scenes/BrandHit.tsx` now draws the lockup's name and descriptor
+without the bell):
+
+| Frames | What happens |
+| --- | --- |
+| 291-326 | The lockup as before: lights on, the six-frame flare, the slow push (the reviewed rate, 1.00 to 1.04 in 53 frames), readable whole for 1.2 s. The name and the descriptor are the reviewed cut's own column and wordmark image, clipped to the name; the bell is drawn on its own in the wordmark's place, on the same push. In the 4K master, like for like against round 8's (frames 291, 300, 320): name and descriptor within 0.01 px, the bell within 0.1 px. |
+| 327 | Beat 3 of bar 5: the bell lifts off. |
+| 327-333 | "BELL PR" and the descriptor dissolve (69% on 330, 10% on 332, gone on 333-334; a little blur and lift). |
+| 331-340 | The window (`v-rules-card` overview) fades in under the flying bell (4% on 332, 50% on 335, whole on 340, before mid-flight), rising from 640 px below its landing place and turning towards the viewer (17°/-23° to 9°/-14°); its top edge stays under the bell's place in the lockup until the bell has left it (336) and under the descriptor until the descriptor has gone; it settles by 359, so the bell docks into a window at rest. |
+| 327-363 | The flight: one quadratic arc from the lockup to the app's own bell, bowed 10% of its length to the lower left with its bend a quarter of the way towards the landing (`ARC`, `SKEW`), so the bell leaves its name moving left and up and comes into the window's sidebar from the left, never across the app's "BELL PR"; eased in and out (`ease.flight`, a cubic Bezier 0.3/0/0.2/1, zero speed at both ends, no overshoot), peak 30.5 px a frame; its size and its tilt on the same eased curve (from 141 px wide to the app's 18.5 px, from flat to the window's tilt). A crisp vector the whole way: the brand path as inline SVG laid out at its on-screen size each frame, no motion blur. |
+| 363 | The bar-6 downbeat (the whoosh peaks on 362): the bell is on the app's own bell. |
+| 363-381 | A beat's hold. On 363 the patch that hid the footage's bell during the flight gives way to the same paper carried under the flying bell; 365-375 the flying bell and its paper fade out together, a per-pixel cross-dissolve from the vector to the footage. |
+| 381-435 | The window turns to face the viewer and settles at rest as the caption comes in (381); the light sweep on 435, as before. |
+
+How the landing point is found and hit: `scripts/measure-bell.mjs` finds
+the app's bell in the capture by its moments (the brand green's coverage
+over the sidebar's paper against the brand path's own area and centroid):
+its 64-unit box at (23.258, 30.572) capture px, 29.971 px square; the
+sidebar's CSS puts it at (23.25, 30.5), 30 px (27 px in, 30 px high,
+centred in the 35 px brand row): 0.07 px apart, which `scripts/bell.test.mjs`
+holds to 0.1. The film uses the CSS box. The flying bell is then drawn
+through the window's own transform: from the landing on, its centre is
+the app's bell's centre in the stage's 3D space (`place()` in
+`src/look/camera.ts`, the window's CSS transform applied to that point),
+with the window's tilt and scale and the same perspective, so the two are
+one shape on screen. During the flight the arc ends on that point and the
+window's last few px of travel are taken up as the bell arrives (t^6), so
+the meeting is exact on every frame without the window's rise bending the
+arc. `src/bell.test.ts` checks every point of the outline within 0.01 px
+from the landing to the end of the hold.
+
+**Found and fixed while making it** (stills of every frame 317-391,
+looked at whole and in 2-8x crops round the bell):
+
+| Found | Fix |
+| --- | --- |
+| Interpolated in log space, the bell's size halved in five frames and it reached the window as a 20 px dot that drifted for 20 frames | the size runs linear on the same eased curve: it reads as the logo until the window is there, then comes down to the app's size as it docks |
+| A window rising from wholly below the frame needed 100 px a frame and, still far below when the bell was half way, bent its arc into a dip (y 436, 397, then 406) | the window fades in from 330 as it rises 640 px and settles by 359; the arc is aimed at the landing point itself, the window's remaining travel added as t^6 |
+| Bowed up and to the right, the arc brought the bell into its place from the right, across the app's "BELL PR" (frames 349-357 in 2x crops) | bowed to the lower left, it comes in from the left; a test checks the bell's box against the projected name and "WORKSPACE" on every frame |
+| The first hand-off faded the patch out under the bell, then the bell: for a few frames both bells showed and their union read 7% heavier | a true cross-dissolve (the flying bell carries the paper): the film's bell stays within 0.11 px and 0.6% of the app's on every frame |
+| Laid out afresh (absolute positions tuned on 1x stills), the lockup sat 0.5 px (wordmark) and 1.0 px (descriptor) higher than round 8's in the 4K master: Chrome puts replaced boxes and text on the device pixel, which differs at the master's 2x | BrandHit keeps the reviewed cut's own column and wordmark image (clipped to the name, the mark drawn by BellFlight at the box's drawn top, 348); in the master, like for like, name and descriptor now match round 8 to 0.01 px and the bell to 0.1 px. The end card's footer likewise keeps line-height normal (0.00 px) |
+
+**The end card** (`src/scenes/endCardLayout.ts`): `npx bell-pr` alone on
+its line, centred, IBM Plex Mono 500 at 60 px in mint, its baseline at 772
+(87 px clear under the headline on the rendered card); "Free to start ·
+Runs on your machine" on its own line under it, DM Sans 500 at 30 px in the
+secondary green, baseline 838 (33-34 px clear); the non-affiliation line at
+the foot where it was (132 px clear). Logo, headline and its focus
+treatment, the footer and the logo's landing on the chord (2451) are as
+before. Each line is placed by its baseline from the fonts' own metrics, so
+the test and the pixel check agree with the render.
+
+**Renders and checks** (the 4K master of 2026-10-19 and the web files
+made from it; the round-8 files kept aside for the comparison):
+
+- `npm run check`: every check passes. 88.021 s (MP4s) / 88.029 s (WebM);
+  MP4 17.32 MB, WebM 14.71 MB, 4K master 81.95 MB; -14.12 / -14.02 /
+  -14.03 LUFS, true peak -2.49 / -3.05 / -3.35 dBTP; poster 124 KB; the 20
+  caption cues; the final hit at 2438; the end-card logo locking on 2451
+  (-0.018 s from the chord). The sound is unchanged (the S3 whoosh still
+  peaks on 362, now the frame before the bell lands).
+- `npm test`: 77 tests pass (65 before; the bell's flight, the end card's
+  lines, the lockup's new timing, the bell's box against the capture);
+  `npm run typecheck` passes.
+- `npm run review`: 278 frames and the contact sheet; the per-frame scans
+  over all 2640 frames found nothing (`out/review/scans.tsv` is empty).
+- `npm run moments` (`out/review/moments.tsv`, and `--scale=2` on the 4K
+  master's pixels, `moments@4k.tsv`): the flying bell against the app's own
+  bell, every frame 363-374: centres 0.02-0.12 px apart (4K: 0.03-0.06),
+  sizes within 0.8% (4K: 0.4%); the film's bell through the cross-dissolve
+  within 0.09 px and 0.8% of the app's bell on every frame 363-375 (no
+  jump; the mean level difference round the bell, vector against footage
+  raster, 4.5 at 363, blended to 0 by 375); after it, the film is the
+  footage (0.000). The complete end card: six rows of ink, the command
+  87 px under the headline, the facts 33-34 px under the command, the
+  footer 132 px under the facts; command and facts centred within 1.5 px.
+- The new web MP4 against round 8's, every frame decoded (480x270 luma):
+  frames above 0.5 levels apart only in 329-470 (the flight, the window's
+  new entrance and turn) and 2525-2634 (the call to action); everywhere
+  else 0.009 levels on average (at most 0.49, on 292: encoder noise on the
+  flare's keyframe). The lockup (291-326) and S3's push (471-578) are
+  unchanged; in the 4K masters, like for like, the lockup's name and
+  descriptor are within 0.01 px of round 8's and its bell within 0.1 px;
+  the end card's logo, headline and footer within 0.12 px.
+
+**Verdicts** (looked at whole and in 1.6-8x crops: every frame 310-395 and
+every 6th of the end card from the web MP4, the 4K stills of the landing,
+the contact sheet; `bell-pr-product-assets/film-rerun/v2/frames/` holds
+the labelled sheets):
+
+| Moment | Frames | Verdict |
+| --- | --- | --- |
+| The lockup | 291-326 | ok: as round 8 (lights on, flare, push, the descriptor), readable for 1.2 s. |
+| Lift-off | 327-334 | ok: the bell leaves its name moving up and to the left; "BELL PR" and the descriptor blur out behind it; at no frame is the frame studio and bell alone (the window is coming in under the name's last 10%). |
+| The flight | 335-362 | ok: one smooth arc, fast out of the lockup (peak 30.5 px a frame, 334-335), slowing all the way in; a crisp vector at every size (141 px to 18.5 px), no smear or doubling; the window is whole from 340 and settled by 359; the bell crosses the window's left edge on 345-347 and comes in from the left, never over "BELL PR", "FREE", "BETA" or "WORKSPACE". |
+| The landing | 363 | ok: on the bar-6 downbeat the bell sits on the app's bell, one shape at 8x. |
+| Hold and hand-off | 363-381 | ok: no visible change while the vector gives way to the footage (365-375); the eye has a beat with the logo in the app before the turn and the caption (381). |
+| The turn | 381-470 | ok: as before, a little shorter (from a nearer, less tilted landing framing): the window turns to rest by 435, the light sweep, whole window for 130 frames. |
+| End card | 2438-2639 | ok: the logo pull and lock on 2451, the headline and its rack as before; on 2523-2541 `npx bell-pr` and, under it, "Free to start · Runs on your machine" rise in with the footer; the complete card (2541-2627) reads in three groups (logo; headline; command with its subline) with the footer at the foot; nothing crowded; the fade. |
+
+
 ### The look-dev's must-fix list (COMPARISON.md), as fixed here
 
 | # | Must-fix | Fixed, frames |
 | --- | --- | --- |
 | C1 | Title sweep drew a misregistered ghost copy of "knowing why." | The sweep is drawn inside the letters of the same element (`background-clip: text` on the word itself), so it cannot misregister; it crosses "knowing why." over 2531-2555 (no ghost). The logo's own sweep was dropped in round 7 (it could only be seen on the green bell). |
 | C2 | Title contrast: "From"/"to" dimmed, "vibe coding" left blurred | "From" and "to" stay #f4f7f3; only "vibe coding" dims (#56695d) and softens, at most 1.6 px, for one beat, then resolves to sharp (from 2559); "knowing why." turns mint. 2578, the hold to 2627 and the poster (2610) read as stills. |
-| C3 | The bell alone on an empty white frame during the match cut; a rotated smear | No traveling bell: the wordmark holds at full strength (291-334), lifts and dissolves (335-344), and the window's top edge is already in frame on 345; no empty frame (343, 345, 347 in the review). |
-| C4 | No establishing shot of the whole window | Every product section opens on the whole floating window, four edges in frame (its bottom in a gutter), contact shadow, scale ≤ 1, for two beats or more, each with its own move: 352-470 (rise), 867-902 (in from the left), 1515-1550 (locked off, then the push), 1890-1946 (pull-back) (test). |
+| C3 | The bell alone on an empty white frame during the match cut; a rotated smear | Round 9 (the owner asked for the traveling bell): the bell flies as a crisp vector (no directional blur, no rotation smear: its only tilt is the window's, taken up on the same curve), and no frame is studio and bell alone: the window fades in as the name goes (332: name 10%, window 4%; 334: name gone, window 25%); the window is whole by 340, before mid-flight and the bell lands on the app's own bell (round 9 below). |
+| C4 | No establishing shot of the whole window | Every product section opens on the whole floating window, four edges in frame (its bottom in a gutter), contact shadow, scale ≤ 1, for two beats or more, each with its own move: 341-470 (rising in under the flying bell), 867-902 (in from the left), 1515-1550 (locked off, then the push), 1890-1946 (pull-back) (test). |
 | C5 | Shutter blur and depth of field smeared the UI during the dolly | The sharp plane moves at most 8 px a frame once a take has settled (test) and carries no shutter blur; depth of field is a lift (round 7): the component cropped on its own border, 2.5% larger, with a soft shadow, over the same picture blurred 3.5 px under a 25% studio veil, so no card or line is ever half sharp and the sharp plane never doubles (checked against the footage at every third frame): 471-577, 903-1118, 1587-1730 sharp at every 15th frame. |
 | C6 | Supporting line: glyph tops at its start, over blurred code, covering the diff | Captions sit on a frosted card over a soft pool of light, over the soft plane or the studio (test and scan), beside the subject; the lines show whole from their first frames: 381, 471, 903, 1308, 1659, 1893. |
 | C7 | Soft 4K product frames (DPR 2) | DPR 4 captures; pushes ≤ 2.0 (test). The 4K master is rendered and checked (rounds 5-7), and since round 7 the web files are made from it: crops of 408, 1407, 1623, 1839 and 2217 are crisp; the macros (≤ 2.6) are upsampled up to 1.3x in it, a slight softening at 100%. |
 | C8 | Sound needs a listen; the swell may be inaudible | Measured: swell 16.7 dB, whooshes 17-25 dB, glint about 24 dB, ticks and keyboard 25-30 dB under the music at their moments; effects alone peak at -16.2 dBTP (ticks under -20); the mix measures the same integrated loudness as the music alone. **The listen is an owner sign-off.** |
 | C9 | Grain and bitrate | Coarse static grain on both plates (the light one added in round 1, the dark one coarsened for VP9 in round 3, the light one darkened in round 5 and coarsened for VP9 in round 6); MP4 12.95 MB, WebM 16.32 MB, inside 20 MB in round 6; round 7 makes both from the 4K master (MP4 x264 slow CRF 21: 17.26 MB, WebM VP9 CRF 30: 14.65 MB). |
-| B | Hand-off ghosting in the light wipe | No wipe and no cross-dissolve between the logo and the window: the logo has gone before the window enters (A's rule). |
+| B | Hand-off ghosting in the light wipe | No wipe: the lockup's name and descriptor have dissolved before the window comes in under them, and the window covers the bell's place in the lockup only after the bell has left it (test); the one cross-dissolve is the bell's own hand-off to the footage's bell, a true per-pixel blend of two bells within 0.12 px of each other (round 9). |
 
 ## By people: OWNER SIGN-OFF (not an agent gate)
 

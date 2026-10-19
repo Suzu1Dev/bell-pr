@@ -1,7 +1,8 @@
 /**
  * The two logo moments as pure functions of the frame (unit-tested in
  * src/logo.test.ts): the wordmark on the first hit (variant C: crisp on the
- * hit, no blur-in) and the end-card logo that locks on the final chord.
+ * hit, no blur-in; its bell then flies into S3's window, src/bell.ts) and
+ * the end-card logo that locks on the final chord.
  */
 import { ease, tween } from "./look/motion.ts";
 import { fps, frameOf, music } from "./music.ts";
@@ -14,25 +15,49 @@ const end = shotById("s14-end");
 /** The product's own one-line description (site/index.html), under the wordmark on the first hit (an owner sign-off). */
 export const DESCRIPTOR = "A learning workbench for AI-assisted open-source contributions.";
 
-/** The wordmark holds at full strength until ten frames before its take ends, then leaves, so the white studio is empty for two or three frames at most. */
-export const logoLeaves = take.to - 10;
 export const logoTake = take;
 
 /**
- * Opacity, scale, blur and lift of the first-hit wordmark (and the line
- * under it) at absolute frame f: crisp on the hit, then a slow linear push
- * from 1.00 to 1.04 through the whole take, so the drop is never a still.
+ * The first-hit lockup, laid out as the reviewed cut laid it out (src/scenes/BrandHit.tsx keeps its centred
+ * column): the wordmark 560 px wide (its 196 x 64 unit box) pulled up 110 px, the descriptor (DM Sans 44 px,
+ * line-height normal, 1.302 em) 34 px under it, the column centred in the frame. That puts the wordmark's box at
+ * 347.93, which Chrome draws on the device pixel: 348 at 1x and at the 4K master's 2x. The bell, drawn on its own
+ * (src/look/BellFlight.tsx), sits in that box. The push scales the whole lockup about the frame's centre.
+ */
+const COLUMN = (560 * 64) / 196 - 110 + 34 + 44 * 1.302;
+export const LOCKUP = {
+  width: 560,
+  /** Screen px a wordmark unit, before the push. */
+  unit: 560 / 196,
+  left: 960 - 560 / 2,
+  marginTop: -110,
+  descriptorGap: 34,
+  /** The wordmark box's top as drawn (the column's 347.93 on the device pixel). */
+  top: Math.round((1080 - COLUMN) / 2 - 110),
+  /** The descriptor's line box top (the column's own value; Chrome sets the text on the device pixel). */
+  descriptorTop: (1080 - COLUMN) / 2 - 110 + (560 * 64) / 196 + 34,
+  origin: { x: 960, y: 540 },
+} as const;
+
+/** The slow push of the reviewed cut (1.00 to 1.04 over its 53 frames), from the hit until the lockup has gone. */
+export const PUSH_PER_FRAME = 0.04 / 53;
+export const lockupScale = (f: number) => 1 + PUSH_PER_FRAME * Math.max(0, f - take.from);
+
+/**
+ * The name and the descriptor dissolve over the first seven frames of the bell's flight (src/bell.ts), as the bell
+ * lifts off: crisp and whole until then, gone before the window rising under them reaches them.
+ */
+export const TEXT_LEAVE = { from: take.to, to: take.to + 7 } as const;
+
+/**
+ * Opacity, scale, blur and lift of the lockup's name and descriptor at absolute frame f: crisp on the hit, the slow
+ * linear push through the hold (the drop is never a still), then a short blurred dissolve. The bell is drawn on
+ * its own (src/look/BellFlight.tsx) on the same push.
  */
 export function logoState(f: number) {
-  if (f < take.from || f >= take.to) return { opacity: 0, scale: 1, blur: 0, y: 0 };
-  // It fades out through the take's last frame, so no empty frame sits between it and the window.
-  const leave = tween(f, logoLeaves, take.to, ease.depart);
-  return {
-    opacity: 1 - leave,
-    scale: 1 + (0.04 * (f - take.from)) / (take.to - 1 - take.from),
-    blur: 6 * leave,
-    y: -16 * leave,
-  };
+  if (f < take.from || f >= TEXT_LEAVE.to) return { opacity: 0, scale: 1, blur: 0, y: 0 };
+  const leave = tween(f, TEXT_LEAVE.from, TEXT_LEAVE.to, ease.standard);
+  return { opacity: 1 - leave, scale: lockupScale(f), blur: 5 * leave, y: -12 * leave };
 }
 
 /**

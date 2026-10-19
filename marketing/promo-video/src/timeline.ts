@@ -114,8 +114,9 @@ export const shotSpecs: ShotSpec[] = [
       { text: "First, read the project’s rules.", from: 5, to: 10, place: "bottom-left" },
       { text: "Every rule, quoted from its source.", from: 10, place: "bottom-left" },
     ],
-    // The window starts to rise a beat before the bar-6 downbeat it lands on (anticipate, then land).
-    takes: [{ id: "logo", until: 3 }, { id: "establish", until: 10 }, { id: "rules" }],
+    // The lockup holds a bar and a half; on beat 3 its bell lifts off and flies into the window rising under it,
+    // landing on the bar-6 downbeat (src/bell.ts).
+    takes: [{ id: "logo", until: 2 }, { id: "establish", until: 10 }, { id: "rules" }],
   },
   {
     id: "s4-still-yours",

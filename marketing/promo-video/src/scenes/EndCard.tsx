@@ -10,13 +10,16 @@
  *   in beat by beat: "From vibe coding" / "to knowing why.";
  * - on the next beat "vibe coding" racks soft and dim while "knowing why."
  *   turns mint and "From"/"to" stay near white (COMPARISON.md must-fixes
- *   1-2), and the call to action comes in at once: `npx bell-pr`, "Free to
- *   start · Runs on your machine", the homepage only when shared/product.ts
- *   sets one, and the non-affiliation line;
+ *   1-2), and the call to action comes in at once: `npx bell-pr` alone on
+ *   its line, "Free to start · Runs on your machine" on its own line under
+ *   it, smaller and quieter (owner's feedback after round 8: the two on one
+ *   row read as clutter), the homepage only when shared/product.ts sets
+ *   one, and the non-affiliation line (src/scenes/endCardLayout.ts);
  * - "vibe coding" then resolves back to sharp (it keeps its dim), so the
  *   complete card holds sharp for over three seconds, past the music's last
  *   sound, and the picture fades to black on the last frames.
  */
+import type { CSSProperties, ReactNode } from "react";
 import { AbsoluteFill, Img, staticFile, useCurrentFrame } from "remotion";
 import { MONO, SANS } from "../look/fonts.ts";
 import { blurCss, ease, tween } from "../look/motion.ts";
@@ -26,12 +29,35 @@ import { endLogoPlace, endLogoState } from "../logo.ts";
 import { music } from "../music.ts";
 import { FADE_OUT_FRAMES, shotById } from "../timeline.ts";
 import { product } from "../../../../shared/product.ts";
+import { END_CARD, lineTop, type CardLine } from "./endCardLayout.ts";
 
 const shot = shotById("s14-end");
 const beat = music.beatFrames;
 const LOGO_RATIO = 64 / 196;
 /** The call to action's size: the one command a viewer must read, about 12 px even in a phone-width embed. */
-export const CTA_SIZE = 60;
+export const CTA_SIZE = END_CARD.command.size;
+
+/** One centred line of the card, its box placed so its baseline lands where src/scenes/endCardLayout.ts puts it. */
+const Line: React.FC<{ line: CardLine; opacity: number; rise?: number; style: CSSProperties; children: ReactNode }> = ({ line, opacity, rise = 0, style, children }) => (
+  <div
+    style={{
+      position: "absolute",
+      left: 0,
+      right: 0,
+      top: lineTop(line),
+      height: line.normal ? undefined : line.lineHeight,
+      lineHeight: line.normal ? "normal" : `${line.lineHeight}px`,
+      fontSize: line.size,
+      textAlign: "center",
+      whiteSpace: "pre",
+      opacity,
+      transform: rise ? `translate3d(0, ${rise.toFixed(3)}px, 0)` : undefined,
+      ...style,
+    }}
+  >
+    {children}
+  </div>
+);
 
 /** The beats of the end card, from the headline's first line. */
 export const endBeats = (() => {
@@ -46,6 +72,7 @@ export const EndCard: React.FC = () => {
   const logo = endLogoState(f);
   const place = endLogoPlace(f);
   const footer = tween(f, footerAt, footerAt + beat, ease.softArrive);
+  const rise = 14 * (1 - footer);
   const drift = 1 + (0.008 * (f - shot.from)) / music.barFrames;
   // "vibe coding" softens with the rack and resolves to sharp a beat later, keeping its dim.
   const soften = 1.6 * (1 - tween(f, sharpFrom, sharp, ease.standard));
@@ -75,7 +102,7 @@ export const EndCard: React.FC = () => {
           rack={{ at: rack, dimTo: DARK.dim, soften: f >= sharpFrom ? soften : 1.6, frames: 14 }}
           role={ROLES.displayL}
           color={DARK.text}
-          style={{ position: "absolute", top: 372 }}
+          style={{ position: "absolute", top: END_CARD.headlineTops[0] }}
         />
         <FocusLine
           words={words("to knowing why.", { 0: "base", 1: "key", 2: "key" })}
@@ -85,43 +112,23 @@ export const EndCard: React.FC = () => {
           sweepAt={rack + 8}
           role={ROLES.displayL}
           color={DARK.text}
-          style={{ position: "absolute", top: 372 + 133 }}
+          style={{ position: "absolute", top: END_CARD.headlineTops[1] }}
         />
-        <div
-          style={{
-            position: "absolute",
-            top: 712,
-            display: "flex",
-            alignItems: "baseline",
-            gap: 36,
-            opacity: footer,
-            transform: `translate3d(0, ${(14 * (1 - footer)).toFixed(3)}px, 0)`,
-          }}
-        >
-          <span style={{ fontFamily: MONO, fontWeight: 500, fontSize: CTA_SIZE, color: DARK.mint, letterSpacing: 0 }}>npx bell-pr</span>
-          <span style={{ fontFamily: SANS, fontWeight: 560, fontSize: 32, color: DARK.secondary, fontOpticalSizing: "auto" }}>
-            Free to start · Runs on your machine
-          </span>
-        </div>
+        {/* The call to action: the command alone on its line, the facts on their own line under it, quieter. */}
+        <Line line={END_CARD.command} opacity={footer} rise={rise} style={{ fontFamily: MONO, fontWeight: 500, color: DARK.mint, letterSpacing: 0 }}>
+          npx bell-pr
+        </Line>
+        <Line line={END_CARD.facts} opacity={footer} rise={rise} style={{ fontFamily: SANS, fontWeight: 500, color: DARK.secondary, fontOpticalSizing: "auto" }}>
+          Free to start · Runs on your machine
+        </Line>
         {product.homepageUrl ? (
-          <div style={{ position: "absolute", top: 806, fontFamily: SANS, fontWeight: 500, fontSize: 28, color: DARK.secondary, opacity: footer }}>
+          <Line line={END_CARD.homepage} opacity={footer} rise={rise} style={{ fontFamily: SANS, fontWeight: 500, color: DARK.secondary }}>
             {product.homepageUrl.replace(/^https?:\/\//, "")}
-          </div>
+          </Line>
         ) : null}
-        <div
-          style={{
-            position: "absolute",
-            top: 968,
-            fontFamily: SANS,
-            fontWeight: 450,
-            fontSize: 22,
-            letterSpacing: "0.005em",
-            color: DARK.muted,
-            opacity: footer,
-          }}
-        >
+        <Line line={END_CARD.footer} opacity={footer} style={{ fontFamily: SANS, fontWeight: 450, letterSpacing: "0.005em", color: DARK.muted }}>
           BELL PR is independent and not affiliated with GitHub, OpenAI or Anthropic.
-        </div>
+        </Line>
       </AbsoluteFill>
       <AbsoluteFill style={{ backgroundColor: "#000000", opacity: black }} />
     </AbsoluteFill>

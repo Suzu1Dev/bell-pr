@@ -66,16 +66,14 @@ test("a shot kept at nominal is counted in the track's bars, rounded to the half
   assert.equal(nominalOnGrid(music, 6), 5 * halfBar); // S7: 2.5 bars
 });
 
-test("cuts between takes fall on half-bars (beat 1 or 3), but for the rise a beat before the bar-6 downbeat", () => {
+test("cuts between takes fall on half-bars (beat 1 or 3); S3's window rises in on beat 3 of bar 5 under the bell's flight", () => {
   for (const shot of timeline.shots)
-    for (const take of shot.takes.slice(1)) {
-      if (shot.id === "s3-rules" && take.id === "establish") {
-        // Anticipate, then land: the window starts to rise on beat 4 and lands on the bar line after it.
-        assert.ok(music.onBeat(take.from) && onBar(take.from + music.beatFrames), `${take.from}`);
-        continue;
-      }
-      assert.ok(onHalfBar(take.from), `${shot.id}/${take.id} at ${take.from}`);
-    }
+    for (const take of shot.takes.slice(1)) assert.ok(onHalfBar(take.from), `${shot.id}/${take.id} at ${take.from}`);
+  const s3 = timeline.shots.find((s) => s.id === "s3-rules")!;
+  const establish = s3.takes.find((t) => t.id === "establish")!;
+  // The bell lifts off on beat 3 of bar 5 and lands on the bar-6 downbeat two beats later (src/bell.ts).
+  assert.ok(!onBar(establish.from) && onBar(establish.from + 2 * music.beatFrames));
+  assert.equal(establish.from + 2 * music.beatFrames, music.barFrame(6));
 });
 
 test("every crash downbeat of the track is a cut (within a frame)", () => {

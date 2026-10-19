@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { END_LOGO, LOCK_FRAMES, chordFrame, endLogoState, flareAt, logoLeaves, logoState, logoTake } from "./logo.ts";
+import { END_LOGO, LOCK_FRAMES, TEXT_LEAVE, chordFrame, endLogoState, flareAt, lockupScale, logoState, logoTake } from "./logo.ts";
 import { darkFrom, exhale, hit, stop } from "./moments.ts";
 import { frameOf, music } from "./music.ts";
 import { timeline } from "./timeline.ts";
@@ -14,14 +14,16 @@ test("the first-hit logo: invisible before the hit, fully present and crisp on i
   assert.equal(on.blur, 0);
 });
 
-test("the logo holds at least 36 frames, then has fully gone before the window's take starts", () => {
-  assert.ok(logoLeaves - hit >= 36);
-  assert.equal(logoState(logoLeaves).opacity, 1);
-  const last = logoState(logoTake.to - 1).opacity;
-  assert.ok(last > 0 && last < 0.35, `the last logo frame is a faint trace (${last.toFixed(2)}), not an empty frame`);
-  assert.equal(logoState(logoTake.to).opacity, 0);
+test("the lockup holds whole and readable for 1.2 s, then its name and descriptor dissolve as the bell lifts off", () => {
+  // Readable from the hit to the flight's first frame (src/bell.ts), then gone within the flight's first quarter.
+  assert.equal(TEXT_LEAVE.from, logoTake.to);
+  assert.ok(TEXT_LEAVE.from - hit >= 36, `${TEXT_LEAVE.from - hit} frames`);
+  for (let f = hit; f <= TEXT_LEAVE.from; f += 1) assert.equal(logoState(f).opacity, 1, `frame ${f}`);
+  assert.ok(TEXT_LEAVE.to - TEXT_LEAVE.from <= 9, "an early dissolve");
+  for (let f = TEXT_LEAVE.from; f < TEXT_LEAVE.to; f += 1) assert.ok(logoState(f + 1).opacity < logoState(f).opacity, `frame ${f}`);
+  assert.equal(logoState(TEXT_LEAVE.to).opacity, 0);
   const s3 = timeline.shots.find((shot) => shot.id === "s3-rules")!;
-  assert.equal(s3.takes[1].from, logoTake.to);
+  assert.equal(s3.takes[1].from, logoTake.to, "the window's take starts on the flight's first frame");
 });
 
 test("the breath before the hit: a beat of stillness, the exhale, four dark frames", () => {
@@ -58,9 +60,10 @@ test("the end-card logo pulls into focus from the cut and locks on the final cho
   assert.ok(Math.abs(music.landingFrame / 30 - (music.track.events.landing ?? 0)) <= 0.25);
 });
 
-test("the drop is never a still: the first-hit lockup pushes 1.00 to 1.04 through its take, and the studio flares for six frames", () => {
-  for (let f = hit; f < logoTake.to - 1; f += 1) assert.ok(logoState(f + 1).scale > logoState(f).scale, `frame ${f}`);
-  assert.ok(Math.abs(logoState(logoTake.to - 1).scale - 1.04) < 1e-9);
+test("the drop is never a still: the first-hit lockup pushes on (the reviewed cut's 1.00-1.04 in 53 frames) until it has gone, and the studio flares for six frames", () => {
+  for (let f = hit; f < TEXT_LEAVE.to - 1; f += 1) assert.ok(logoState(f + 1).scale > logoState(f).scale, `frame ${f}`);
+  assert.ok(Math.abs(lockupScale(hit + 53) - 1.04) < 1e-9);
+  assert.equal(lockupScale(hit), 1);
   assert.ok(flareAt(hit) >= 0.2 && flareAt(hit) <= 0.35, "about 6-8 levels brighter on the hit");
   assert.equal(flareAt(hit - 1), 0);
   assert.ok(flareAt(hit + 6) < 0.001, "back to normal six frames later");

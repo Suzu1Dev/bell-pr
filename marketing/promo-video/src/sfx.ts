@@ -6,9 +6,10 @@
  * - an air swell through the exhale of the stop, cut on the first hit (no
  *   impact on the crash itself);
  * - a soft whoosh peaking on the frame before each section's floating
- *   window arrives on its downbeat (or, for the first window, the
- *   downbeat its rise lands on), so it leads into the beat instead of
- *   trailing it (two different files, alternating, at most one per bar);
+ *   window arrives on its downbeat (for the first window, the bar-6
+ *   downbeat the first-hit bell lands on, `landsAt`), so it leads into the
+ *   beat instead of trailing it (two different files, alternating, at most
+ *   one per bar);
  * - a quiet, dry tick on every click the pointer makes on screen;
  * - a sparse keyboard bed while an answer types out (never per character);
  * - one glint, its onset on the final chord, as the end-card logo locks.
@@ -80,9 +81,8 @@ export function sfxCues(footage: Footage): SfxCue[] {
       const look = looks[shot.id]?.[take.id];
       if (!look) continue;
       if (look.float) {
-        // A rise lands on its gliding key; a turn in place arrives with the cut. The peak leads that downbeat by a frame.
-        const glide = look.keys.find((key) => key.ease === "glide");
-        const landing = take.from + (glide ? Math.round(glide.at * music.beatFrames) : 0);
+        // A rise lands where its look says; a turn in place arrives with the cut. The peak leads that downbeat by a frame.
+        const landing = take.from + Math.round((look.landsAt ?? 0) * music.beatFrames);
         const sound = whoosh % 2 === 0 ? SFX.whooshA : SFX.whooshB;
         cues.push({
           name: `whoosh: ${shot.id} window lands`,

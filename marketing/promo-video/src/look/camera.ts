@@ -134,8 +134,12 @@ export const viewTransform = (v: View, layout: number) =>
   `translate3d(${v.sx.toFixed(3)}px, ${v.sy.toFixed(3)}px, 0) rotateY(${v.ry.toFixed(4)}deg) rotateX(${v.rx.toFixed(4)}deg) ` +
   `scale(${(v.m / layout).toFixed(6)}) translate(${(-v.cx * layout).toFixed(3)}px, ${(-v.cy * layout).toFixed(3)}px)`;
 
-/** Where capture CSS point (x, y) lands on screen under view v (the CSS 3D math, with the perspective divide). */
-export function project(v: View, x: number, y: number) {
+/**
+ * Where capture CSS point (x, y) sits in the stage's 3D space under view v, before the perspective divide: the
+ * window's transform (viewTransform) applied to that point. An element drawn there with the view's tilt
+ * (src/look/BellFlight.tsx) lies in the window's plane.
+ */
+export function place(v: View, x: number, y: number) {
   let px = (x - v.cx) * v.m;
   let py = (y - v.cy) * v.m;
   let pz = 0;
@@ -144,10 +148,19 @@ export function project(v: View, x: number, y: number) {
   // rotateX applies first (rightmost in the transform list), then rotateY.
   [py, pz] = [py * Math.cos(rx) - pz * Math.sin(rx), py * Math.sin(rx) + pz * Math.cos(rx)];
   [px, pz] = [px * Math.cos(ry) + pz * Math.sin(ry), -px * Math.sin(ry) + pz * Math.cos(ry)];
-  const wx = v.sx + px;
-  const wy = v.sy + py;
-  const k = PERSPECTIVE / (PERSPECTIVE - pz);
-  return { x: PERSPECTIVE_ORIGIN.x + (wx - PERSPECTIVE_ORIGIN.x) * k, y: PERSPECTIVE_ORIGIN.y + (wy - PERSPECTIVE_ORIGIN.y) * k, z: pz };
+  return { x: v.sx + px, y: v.sy + py, z: pz };
+}
+
+/** A point of the stage's 3D space on screen (the perspective divide of the stage's perspective). */
+export const perspective = (p: { x: number; y: number; z: number }) => {
+  const k = PERSPECTIVE / (PERSPECTIVE - p.z);
+  return { x: PERSPECTIVE_ORIGIN.x + (p.x - PERSPECTIVE_ORIGIN.x) * k, y: PERSPECTIVE_ORIGIN.y + (p.y - PERSPECTIVE_ORIGIN.y) * k, z: p.z, k };
+};
+
+/** Where capture CSS point (x, y) lands on screen under view v (the CSS 3D math, with the perspective divide). */
+export function project(v: View, x: number, y: number) {
+  const { x: px, y: py, z } = perspective(place(v, x, y));
+  return { x: px, y: py, z };
 }
 
 /** The window's four projected corners (a window may end above the viewport's bottom: `height` capture px). */

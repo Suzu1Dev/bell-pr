@@ -26,6 +26,13 @@ export const ease = {
    */
   push: Easing.bezier(0.4, 0.4, 0.7, 1),
   linear: (x: number) => x,
+  /**
+   * The first-hit bell's flight (src/bell.ts): an ease-in-out, a little quicker to leave than to land, with zero
+   * speed at both ends (it lifts off the lockup and docks in the window with no bump) and no overshoot.
+   */
+  flight: Easing.bezier(0.3, 0, 0.2, 1),
+  /** The window rising in under the flying bell: from rest, decelerating long into its place (no overshoot). */
+  rise: Easing.bezier(0.4, 0, 0.15, 1),
   /** heroGlide stretched over the move (a rise from rest that settles long, no overshoot). */
   glide: (x: number) =>
     x <= 0 ? 0 : x >= 1 ? 1 : spring({ frame: x * 36, fps: 30, config: { mass: 1.4, damping: 30, stiffness: 70 }, durationInFrames: 36 }),

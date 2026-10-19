@@ -7,6 +7,7 @@
  * out-cut, on a held clip frame as much as on a moving one.
  */
 import { viewAt, type View } from "./look/camera.ts";
+import { ease, tween } from "./look/motion.ts";
 import { music } from "./music.ts";
 import type { TakeLook } from "./shots.ts";
 
@@ -38,3 +39,7 @@ export const takeMaxM = (look: TakeLook, frames: number) => {
   for (let f = 0; f <= frames; f += 6) max = Math.max(max, takeView(look, f).m);
   return Math.max(max, takeView(look, frames).m);
 };
+
+/** The window's opacity at frame `f` of a take: 1, or its fade-in (a window rising in under the first-hit bell). */
+export const takeOpacity = (look: TakeLook, f: number) =>
+  look.fadeIn ? tween(f, look.fadeIn.from * music.beatFrames, look.fadeIn.to * music.beatFrames, ease.standard) : 1;
