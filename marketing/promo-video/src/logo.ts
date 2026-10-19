@@ -40,7 +40,8 @@ export function logoState(f: number) {
  * white wash of `alpha`, about 7 levels on the plate) and settles to its
  * normal level six frames later. The wordmark is drawn above it, crisp.
  */
-export const flareAt = (f: number) => (f < take.from ? 0 : 0.28 * (1 - tween(f, take.from, take.from + 6, ease.arrive)));
+export const FLARE_FRAMES = 6;
+export const flareAt = (f: number) => (f < take.from ? 0 : 0.28 * (1 - tween(f, take.from, take.from + FLARE_FRAMES, ease.arrive)));
 
 /**
  * The final chord, by the frame rule (the frame whose display interval
@@ -53,21 +54,22 @@ export const chordFrame = Math.min(music.landingFrame, frameOf(music.track.event
 /**
  * Opacity, blur and scale of the end-card logo at absolute frame f: it pulls
  * into focus from the cut (a soft logo on the cut frame, never an empty
- * one) to about 78% three frames before the final chord (no more than 70%
- * by the eighth frame), then the last of the resolve and the settle from
- * 1.02 to 1.0 happen together over those three frames, completing ON the
- * chord: the lock is the chord's own visible event (review round 7: a logo
- * 95% resolved four frames early left the chord with nothing to show).
+ * one) at an even pace to about 78% three frames before the final chord
+ * (no more than 70% by the eighth frame), then the last of the resolve and
+ * the settle from 1.02 to 1.0 accelerate into the chord and complete ON it:
+ * the largest change of the whole pull is the chord frame's own, so the
+ * lock is the chord's visible event (review round 7: a logo 95% resolved
+ * four frames early left the chord with nothing to show).
  */
 export const LOCK_FRAMES = 3;
 export function endLogoState(f: number) {
   if (f < end.from) return { opacity: 0, blur: 0, scale: 1 };
   const lockFrom = chordFrame - LOCK_FRAMES;
   if (f < lockFrom) {
-    const p = 0.78 * tween(f, end.from, lockFrom, ease.drift);
+    const p = 0.78 * tween(f, end.from, lockFrom, ease.linear);
     return { opacity: Math.max(0.22, p), blur: 14 * (1 - p), scale: 1.02 };
   }
-  const q = tween(f, lockFrom, chordFrame, ease.standard);
+  const q = tween(f, lockFrom, chordFrame, ease.depart);
   const p = 0.78 + 0.22 * q;
   return { opacity: p, blur: 14 * (1 - p), scale: 1.02 - 0.02 * q };
 }

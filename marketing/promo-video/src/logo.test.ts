@@ -74,4 +74,7 @@ test("the end-card logo's last fifth of resolve and its settle from 1.02 happen 
     assert.ok(endLogoState(f + 1).opacity > endLogoState(f).opacity, `frame ${f}`);
     assert.ok(endLogoState(f + 1).scale < endLogoState(f).scale, `frame ${f}`);
   }
+  // The chord frame's own step is the largest of the whole pull.
+  const step = (f: number) => endLogoState(f).opacity - endLogoState(f - 1).opacity;
+  for (let f = timeline.shots.at(-1)!.from + 1; f < chordFrame; f += 1) assert.ok(step(chordFrame) > step(f), `frame ${f}`);
 });
