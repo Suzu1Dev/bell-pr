@@ -10,7 +10,7 @@ import { pointerAt, pointerWindows } from "./look/pointer.ts";
 import { MACRO_MAX_M, PUSH_MAX_M, looks, type TakeLook } from "./shots.ts";
 import { takeMaxM, takeView } from "./takes.ts";
 import { focusAmount } from "./scenes/ProductShot.tsx";
-import { DESCRIPTOR } from "./logo.ts";
+import { DESCRIPTOR, FLARE_FRAMES } from "./logo.ts";
 import { readFileSync } from "node:fs";
 import { timeline } from "./timeline.ts";
 import { music } from "./music.ts";
@@ -318,7 +318,9 @@ test("the WebM gets a keyframe on every cut between the stages and on every take
   const title = timeline.shots.find((shot) => shot.id === "s9-explain-back")!.takes.find((take) => take.id === "title")!;
   assert.ok(cuts.includes(title.from) && cuts.includes(title.to), "the climax title's two cuts");
   for (const { take, look } of takes) if (look.float) assert.ok(cuts.includes(take.from), `${take.id} at ${take.from}`);
-  assert.ok(cuts.length <= 24, "keyframes cost bits: only where a plate first shows");
+  // The lights-on flare: every frame of it, to the frame it settles on.
+  for (let f = music.events.firstHit; f <= music.events.firstHit + FLARE_FRAMES; f += 1) assert.ok(cuts.includes(f), `flare ${f}`);
+  assert.ok(cuts.length - FLARE_FRAMES <= 24, "keyframes cost bits: only where a plate first shows");
 });
 
 test("the line under the first-hit wordmark is the product's own published description, not new copy", () => {

@@ -23,9 +23,11 @@ const covers = (look: Parameters<typeof takeView>[0]) => {
 
 /** Film frames of the cuts that need a keyframe, in order. */
 export function keyframeCuts(): number[] {
-  // The first hit, and the frame its lights-on flare settles on (VP9 codes the flare's fading wash as a smooth
-  // residual over the keyframe and loses the plate's grain until the next keyframe: review round 7).
-  const frames = new Set<number>([music.events.firstHit, music.events.firstHit + FLARE_FRAMES, music.events.finalHit]);
+  // The first hit and every frame of its lights-on flare, to the frame it settles on: VP9 codes the flare's fading
+  // wash as a smooth residual over the frame before and loses the plate's grain (review round 7: flat runs of
+  // 670 px), so each of those few frames is coded whole.
+  const flare = Array.from({ length: FLARE_FRAMES + 1 }, (_, i) => music.events.firstHit + i);
+  const frames = new Set<number>([...flare, music.events.finalHit]);
   for (const shot of timeline.shots)
     for (const take of shot.takes) {
       if (take.id === "title") {
