@@ -214,6 +214,8 @@ const team = {
     reportedBy: ({ names }: { names: string }) => `Reported by ${names}`,
     /** Who reported a need: a follow-up round, by its number among the run's rounds. */
     round: ({ number }: { number: number }) => `Follow-up round ${number}`,
+    /** …or a teammate, by its name and the id the task board shows. */
+    agent: ({ name, id }: { name: string; id: string }) => `${name} (${id})`,
   },
   /** The disclosure holding the protocol note. */
   howItWorks: "How it works",

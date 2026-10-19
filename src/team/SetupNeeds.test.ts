@@ -55,12 +55,17 @@ test("the checklist reads in English and names teammates and follow-up rounds", 
       { id: "r1", requestedAt: "", feedbackUrls: [], status: "published" as const, parentCommit: "p", setup: [{ need: "rustfmt", command: "rustup component add rustfmt", reason: "Again." }] },
     ],
   };
-  const needs = runSetupNeeds(run, (number) => `Follow-up round ${number}`);
-  assert.deepEqual(needs.map((need) => need.from), [["Teammate 1", "Follow-up round 1"]]);
+  const needs = runSetupNeeds(
+    run,
+    (number) => `Follow-up round ${number}`,
+    (name, id) => `${name} (${id})`,
+  );
+  // The teammate's name, with the id the task board shows for it.
+  assert.deepEqual(needs.map((need) => need.from), [["Teammate 1 (member-1)", "Follow-up round 1"]]);
   const html = renderEn(createElement(SetupNeeds, { needs }));
   assertNoHan(html);
   assert.match(html, /Setup this machine needs from you/);
-  assert.match(html, /Reported by Teammate 1, Follow-up round 1/);
+  assert.match(html, /Reported by Teammate 1 \(member-1\), Follow-up round 1/);
   assert.match(html, /aria-label="Copy the command: rustup component add rustfmt"/);
 });
 

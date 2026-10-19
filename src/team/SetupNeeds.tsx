@@ -8,18 +8,22 @@ import "./team.css";
 /**
  * Every need the run's teammates and follow-up rounds reported, each
  * command once with who reported it. `roundLabel` names a round by its
- * number among the run's rounds.
+ * number among the run's rounds; `agentLabel` names a teammate by its name
+ * and its id, the id the task board shows.
  */
 export function runSetupNeeds(
   run: Pick<Run, "agents" | "team" | "followUps">,
   roundLabel: (number: number) => string,
+  agentLabel: (name: string, id: string) => string = (name) => name,
 ): MergedSetupNeed[] {
   return mergeSetupNeeds([
-    ...(run.team?.tasks ?? []).map((task) => ({
-      from:
-        run.agents.find((agent) => agent.id === task.owner)?.name ?? task.owner,
-      needs: task.setup,
-    })),
+    ...(run.team?.tasks ?? []).map((task) => {
+      const name = run.agents.find((agent) => agent.id === task.owner)?.name;
+      return {
+        from: name && name !== task.owner ? agentLabel(name, task.owner) : task.owner,
+        needs: task.setup,
+      };
+    }),
     ...(run.followUps ?? []).map((round, index) => ({
       from: roundLabel(index + 1),
       needs: round.setup,

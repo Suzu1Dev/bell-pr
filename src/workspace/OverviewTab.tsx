@@ -73,7 +73,13 @@ export function OverviewTab({
   return (
     <>
     {/* What the agents could not run here: the person installs it. */}
-    <SetupNeeds needs={runSetupNeeds(run, (number) => setupMessages.round({ number }))} />
+    <SetupNeeds
+      needs={runSetupNeeds(
+        run,
+        (number) => setupMessages.round({ number }),
+        (name, id) => setupMessages.agent({ name, id }),
+      )}
+    />
     {/* A chunk that fails to load stops at this tab; the draft and the
         review keep what the person typed. */}
     <ErrorBoundary resetKey={run.id}>

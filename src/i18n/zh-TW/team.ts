@@ -160,6 +160,7 @@ const m: Translation<typeof en> = {
       "Agent 被要求不改動這台機器（不用 sudo，也不做全域或使用者層級的安裝），所以下列檢查在這次工作中沒有完整執行。指令是 Agent 的建議，執行前請對照專案文件確認；裝好後可以自己在工作目錄重跑這些檢查，之後的貢獻也能直接執行。",
     reportedBy: ({ names }) => `回報者：${names}`,
     round: ({ number }) => `修正第 ${number} 輪`,
+    agent: ({ name, id }) => `${name}（${id}）`,
   },
   howItWorks: "運作方式",
   protocolNote: ({ provider }) =>

@@ -211,7 +211,9 @@ test.describe("reading a real run in review", () => {
       const setup = page.locator(".setup-needs");
       await expect(setup.getByRole("heading", { name: t.team.setupNeeds.title })).toBeVisible();
       await expect(setup).toContainText("Deno for the benchmark");
-      await expect(setup).toContainText(t.team.setupNeeds.reportedBy({ names: "Member 1" }));
+      await expect(setup).toContainText(
+        t.team.setupNeeds.reportedBy({ names: t.team.setupNeeds.agent({ name: "Member 1", id: "member-1" }) }),
+      );
       await expect(setup.locator("code")).toHaveText("curl -fsSL https://deno.land/install.sh | sh");
       // A run made before premise checks offers one; the verdict then leads the brief.
       const brief = page.locator("#overview-contribution");
