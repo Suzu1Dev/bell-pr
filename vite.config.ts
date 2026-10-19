@@ -53,11 +53,14 @@ function bundledModules(): Plugin {
 /**
  * Stable vendor code and the sample project get chunks of their own, which
  * browsers keep cached across releases that only change the app. The
- * Markdown stack is loaded on demand only.
+ * Markdown stack is loaded on demand only. The icons share one chunk, so
+ * the icons that only lazily loaded views use do not each become a chunk
+ * of a few hundred bytes.
  */
 function manualChunks(id: string): string | undefined {
   const file = id.replace(/\\/g, "/");
   if (/\/node_modules\/(react|react-dom|scheduler)\//.test(file)) return "react";
+  if (file.includes("/node_modules/lucide-react/")) return "icons";
   if (
     /\/node_modules\/(react-markdown|remark-[^/]+|micromark[^/]*|mdast-util-[^/]+|hast-util-[^/]+|unist-util-[^/]+|unified|vfile[^/]*)\//.test(
       file,
