@@ -87,4 +87,7 @@ test("the Workbench keeps its public members", () => {
     assert.equal(typeof own(name)?.value, "function", `${name}() is a method`);
   for (const name of getters)
     assert.equal(typeof own(name)?.get, "function", `${name} is a getter`);
+  // Fields belong to each instance, not to the prototype.
+  for (const name of fields)
+    assert.equal(own(name), undefined, `${name} is an instance field`);
 });
