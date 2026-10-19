@@ -720,6 +720,24 @@ test("a repository overview has its own address; an unknown one shows the list",
   await expect(breadcrumb(page)).toContainText(app.pages.repos);
 });
 
+test("an address an upstream BELL build wrote opens the same run, tab, project or page", async ({ page }) => {
+  await page.goto("/?run=demo-run&tab=changes");
+  await expect(page).toHaveURL(/\/#\/runs\/demo-run\/changes$/);
+  await expect(page.locator("#workspace-tab-changes")).toHaveAttribute("aria-selected", "true");
+  await expect(heading(page)).toHaveText(demo.run.title);
+
+  await page.goto("/?project=demo-repo");
+  await expect(page).toHaveURL(/\/#\/repos\/demo-repo$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(demo.repo.fullName);
+
+  await page.goto("/?page=discovery");
+  await expect(page).toHaveURL(/\/#\/discover$/);
+  await expect(breadcrumb(page)).toContainText(app.pages.discovery);
+  // A hash route of its own wins over the query.
+  await page.goto("/?page=discovery#/settings");
+  await expect(breadcrumb(page)).toContainText(app.pages.settings);
+});
+
 test("a run id that is no plain name never reaches the API", async ({ page }) => {
   const asked: string[] = [];
   page.on("request", (request) => asked.push(new URL(request.url()).pathname));
