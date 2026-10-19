@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { command, redact } from "./process.js";
+import { command } from "./process.js";
 import { legacyRunLocale, readDiff, synchronizeReview } from "./git.js";
 import type { TeamAgentRunner } from "./team.js";
-import { maxPlanRevisions } from "../shared/team.js";
 import type { ContributionSettings } from "../shared/insights.js";
 import { Store } from "./store.js";
 import {
@@ -54,6 +53,7 @@ import { synchronizeDraftPreparation } from "./drafts.js";
 import * as repositories from "./repositories.js";
 import * as executor from "./run-executor.js";
 import { retryTeam } from "./team-retry.js";
+import * as teamPlan from "./team-plan.js";
 import * as publishing from "./publish.js";
 import * as learning from "./learning.js";
 import * as drafting from "./draft-jobs.js";
@@ -612,94 +612,16 @@ export class Workbench {
   }
 
   async sendTeamMessage(id: string, input: { to: string; content: string }) {
-    return this.lock(`team-message:${id}`, async () => {
-      const run = this.run(id);
-      if (!["queued", "running", "awaiting_plan"].includes(run.status))
-        throw new AppError((m) => m.run.queue.teamStopped, 409);
-      executor.queueTeamMessage(
-        this.context,
-        run,
-        "user",
-        input.to,
-        input.content,
-      );
-      await this.store.save();
-      return run;
-    });
+    return teamPlan.sendTeamMessage(this.context, id, input);
   }
 
   async approvePlan(id: string) {
-    return this.lock(id, async () => {
-      const run = this.run(id);
-      if (run.status !== "awaiting_plan" || !run.team?.tasks.length)
-        throw new AppError((m) => m.run.queue.noPlanToApprove, 409);
-      run.team.approvedAt = now();
-      run.team.phase = "developing";
-      run.status = "queued";
-      this.log(run, "user", sm().run.queue.planApproved);
-      await this.store.save();
-      logRunQueued(run, "plan_approved");
-      this.queue.push(id);
-      this.drain();
-      return run;
-    });
+    return teamPlan.approvePlan(this.context, id);
   }
 
-  /**
-   * Sends back to the lead a plan the person did not approve. The planning
-   * branch of executeRun() runs again with the feedback attached; there is no
-   * second planning path. Messages queued to tasks of the old plan stay in the
-   * inbox under their old task ids and are not forwarded.
-   */
+  /** Sends a plan back to the lead with the person's feedback (team-plan.ts). */
   async revisePlan(id: string, feedback: string) {
-    return this.lock(id, async () => {
-      const run = this.run(id);
-      const team = run.team;
-      if (run.status !== "awaiting_plan" || !team?.tasks.length)
-        throw new AppError((m) => m.run.queue.noPlanToApprove, 409);
-      const content = redact(feedback.trim());
-      if (!content || content.length > 4000)
-        throw new AppError((m) => m.run.queue.feedbackLength, 400);
-      const revisions = (team.planRevisions ??= []);
-      if (revisions.length >= maxPlanRevisions)
-        throw new AppError(
-          (m) => m.run.queue.revisionLimit({ max: maxPlanRevisions }),
-          409,
-        );
-      revisions.push({
-        feedback: content,
-        previousSummary: team.planSummary,
-        previousTasks: team.tasks.map(({ id, title, files, dependsOn }) => ({
-          id,
-          title,
-          files,
-          dependsOn,
-        })),
-        createdAt: now(),
-      });
-      // The planning branch inserts one agent per member of the new plan;
-      // the old members must go first or they would be listed twice.
-      run.agents = run.agents.filter((agent) => !/^member-/.test(agent.id));
-      team.tasks = [];
-      team.planSummary = "";
-      // The check belonged to the plan sent back; the new plan makes its own.
-      delete team.premise;
-      team.phase = "planning";
-      run.status = "queued";
-      this.log(
-        run,
-        "user",
-        sm().run.queue.planSentBack({
-          revision: revisions.length,
-          max: maxPlanRevisions,
-        }),
-      );
-      await this.store.save();
-      logRunQueued(run, "plan_revised");
-      this.queue.push(id);
-      this.drain();
-      return run;
-    });
+    return teamPlan.revisePlan(this.context, id, feedback);
   }
 
   async retryTeam(id: string, message?: string) {
