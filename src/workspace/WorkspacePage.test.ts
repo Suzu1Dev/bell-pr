@@ -151,7 +151,7 @@ test("the four phases are one row of small steps, each describing itself in its 
   const strip = html.slice(html.indexOf('class="workflow-strip"'), html.indexOf('class="review-area"'));
   assert.match(
     strip,
-    /<div class="workflow-step  done" title="01 Define the task: Set your contribution goal"><span class="step-icon">/,
+    /<div class="workflow-step {2}done" title="01 Define the task: Set your contribution goal"><span class="step-icon">/,
   );
   assert.match(strip, /title="03 Understand and review: Read it, then explain it back"[^>]*><span class="step-icon">.*?<\/span><strong>Understand and review<\/strong><\/div>/);
   // No numbers, descriptions or chevrons on screen.

@@ -313,7 +313,7 @@ const MarkdownContent = lazy(() =>
  */
 const sectionLabel =
   // i18n-allow: parser
-  /^([^\s\d：:（(，。、,.*+#>`|\-][^\n：:（(，。、,.]{0,11})((?:（[^）\n]*）)?)：/;
+  /^([^\s\d：:（(，。、,.*+#>`|-][^\n：:（(，。、,.]{0,11})((?:（[^）\n]*）)?)：/;
 /** The same in English: "User impact:", "Source evidence (…):". */
 const englishSectionLabel = /^([A-Z][A-Za-z ]{0,23}?)((?: \([^)\n]*\))?):(?= |$)/;
 
