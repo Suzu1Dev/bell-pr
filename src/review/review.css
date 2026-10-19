@@ -1823,3 +1823,71 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* Unchanged code around the changes: expand arrows, whole-file toggle, read-error notice. */
+.rv-line-expanded .rv-gutter {
+  background: var(--color-surface-muted);
+}
+.rv-gap {
+  height: auto;
+  min-height: 31px;
+}
+.rv-hunk > .rv-gap-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 6px;
+  font-size: var(--text-2xs);
+}
+.rv-gap-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-accent-600);
+  cursor: pointer;
+}
+.rv-gap-actions button:hover:not(:disabled),
+.rv-gap-actions button:focus-visible {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface);
+}
+.rv-gap-actions button:disabled,
+.rv-whole:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.rv-gap-header {
+  margin-left: var(--space-3);
+}
+.rv-whole {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 3px var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-accent-600);
+  font: inherit;
+  cursor: pointer;
+}
+.rv-whole-on {
+  border-color: var(--color-accent-300);
+  background: var(--color-accent-50);
+  color: var(--color-accent-700);
+}
+.rv-context-error {
+  margin: 0;
+  padding: 7px 15px;
+  border-bottom: 1px solid var(--color-danger-border);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: var(--text-2xs);
+}

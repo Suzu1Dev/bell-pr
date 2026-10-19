@@ -2,10 +2,23 @@ import type { Messages } from "../i18n";
 
 export type DiffLine = {
   id: number;
-  kind: "context" | "added" | "removed" | "hunk" | "note";
+  kind: "context" | "added" | "removed" | "hunk" | "note" | "gap";
   text: string;
   oldLine: number | null;
   newLine: number | null;
+  /** An unchanged line read from the base version, beyond the patch's own context. */
+  expanded?: boolean;
+  /**
+   * A gap row: unchanged lines the patch leaves out. hidden is null at the
+   * end of the file until the base version is read. afterChange and
+   * beforeChange say whether a change sits above or below the gap.
+   */
+  gap?: {
+    index: number;
+    hidden: number | null;
+    afterChange: boolean;
+    beforeChange: boolean;
+  };
 };
 
 /** Parse unified diff without interpreting code as HTML or losing hunk offsets. */
@@ -73,6 +86,133 @@ export function parseDiff(patch: string): DiffLine[] {
 
 export type SplitRow = { left?: DiffLine; right?: DiffLine; hunk?: DiffLine };
 
+/** Lines shown in each gap: below the change above it, and above the change below it. */
+export type Reveal = Record<number, { below: number; above: number }>;
+
+const hunkHeader = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;
+
+type HunkRange = {
+  header: DiffLine;
+  oldBegin: number;
+  oldCount: number;
+  newBegin: number;
+  newCount: number;
+  body: DiffLine[];
+};
+
+/**
+ * The hunks of a parsed diff and the gaps of unchanged lines around them, in
+ * old-file numbers. A gap's new numbers are its old ones plus offset; the
+ * last gap's end is null until the base version is known.
+ */
+function diffGaps(lines: DiffLine[], base: string[] | null) {
+  const hunks: HunkRange[] = [];
+  for (const line of lines) {
+    const match = line.kind === "hunk" ? hunkHeader.exec(line.text) : null;
+    if (match) {
+      const oldCount = match[2] === undefined ? 1 : Number(match[2]);
+      const newCount = match[4] === undefined ? 1 : Number(match[4]);
+      // A side with no lines starts after the line its header names.
+      hunks.push({
+        header: line,
+        oldBegin: Number(match[1]) + (oldCount === 0 ? 1 : 0),
+        oldCount,
+        newBegin: Number(match[3]) + (newCount === 0 ? 1 : 0),
+        newCount,
+        body: [],
+      });
+    } else hunks.at(-1)?.body.push(line);
+  }
+  return hunks.length
+    ? Array.from({ length: hunks.length + 1 }, (_, index) => {
+        const previous = hunks[index - 1];
+        const next = hunks[index];
+        const start = previous ? previous.oldBegin + previous.oldCount : 1;
+        return {
+          index,
+          previous,
+          next,
+          start,
+          end: next ? next.oldBegin - 1 : base ? base.length : null,
+          offset: next
+            ? next.newBegin - next.oldBegin
+            : previous.newBegin + previous.newCount - start,
+        };
+      })
+    : [];
+}
+
+/**
+ * The diff with unchanged lines of the base version shown around its hunks.
+ * Lines outside the hunks are the same in both versions, so the base file
+ * gives their text, and each gap's new line numbers are its old ones plus a
+ * fixed offset. `base` is null until it is read; `readable` says whether it
+ * can be (a modified file outside the demo). "all" shows the whole file.
+ */
+export function expandDiff(
+  lines: DiffLine[],
+  base: string[] | null,
+  reveal: Reveal | "all",
+  readable: boolean,
+): DiffLine[] {
+  const gaps = diffGaps(lines, base);
+  if (!gaps.length) return lines;
+  const result: DiffLine[] = [];
+  const push = (line: Omit<DiffLine, "id">) =>
+    result.push({ ...line, id: result.length });
+  const showBase = (from: number, to: number, offset: number) => {
+    for (let oldLine = from; oldLine <= to; oldLine++) {
+      const text = base?.[oldLine - 1];
+      if (text === undefined) return;
+      push({
+        kind: "context",
+        text,
+        oldLine,
+        newLine: oldLine + offset,
+        expanded: true,
+      });
+    }
+  };
+  for (const { index, previous, next, start, end, offset } of gaps) {
+    const size = end === null ? null : Math.max(0, end - start + 1);
+    const gap = {
+      index,
+      afterChange: !!previous,
+      beforeChange: !!next,
+    };
+    if (size === null) {
+      // The end of the file is unknown until the base version is read.
+      if (readable)
+        push({
+          kind: "gap",
+          text: "",
+          oldLine: null,
+          newLine: null,
+          gap: { ...gap, hidden: null },
+        });
+    } else if (size > 0) {
+      const wanted =
+        reveal === "all" ? { below: size, above: size } : reveal[index];
+      const below = base ? Math.min(wanted?.below ?? 0, size) : 0;
+      const above = base ? Math.min(wanted?.above ?? 0, size - below) : 0;
+      const hidden = size - below - above;
+      showBase(start, start + below - 1, offset);
+      if (hidden > 0 && readable)
+        push({
+          kind: "gap",
+          text: next?.header.text ?? "",
+          oldLine: null,
+          newLine: null,
+          gap: { ...gap, hidden },
+        });
+      else if (hidden > 0 && next) push({ ...next.header });
+      showBase(end! - above + 1, end!, offset);
+    } else if (next) push({ ...next.header });
+    for (const line of next?.body ?? []) push({ ...line });
+  }
+  return result;
+}
+
 /** Lines of code a reader can select and ask about (not hunk headers or notes). */
 export function isCodeLine(line: DiffLine): boolean {
   return (
@@ -83,11 +223,16 @@ export function isCodeLine(line: DiffLine): boolean {
 /** One hunk: its header line and the lines below it, notes included. */
 export type Hunk = { header?: DiffLine; lines: DiffLine[] };
 
-/** The hunks of a parsed diff in order; lines before any header form a hunk without one. */
+/**
+ * The hunks of a parsed diff in order; lines before any header form a hunk
+ * without one. A gap row of unchanged lines (expandDiff) heads the hunk
+ * below it the way its header would.
+ */
 export function groupHunks(lines: DiffLine[]): Hunk[] {
   const hunks: Hunk[] = [];
   for (const line of lines) {
-    if (line.kind === "hunk") hunks.push({ header: line, lines: [] });
+    if (line.kind === "hunk" || line.kind === "gap")
+      hunks.push({ header: line, lines: [] });
     else {
       if (!hunks.length) hunks.push({ lines: [] });
       hunks[hunks.length - 1].lines.push(line);
@@ -208,7 +353,7 @@ export function splitDiff(lines: DiffLine[]): SplitRow[] {
   const rows: SplitRow[] = [];
   for (let index = 0; index < lines.length;) {
     const line = lines[index];
-    if (line.kind === "hunk" || line.kind === "note") {
+    if (line.kind === "hunk" || line.kind === "note" || line.kind === "gap") {
       rows.push({ hunk: line });
       index++;
     } else if (line.kind === "context") {

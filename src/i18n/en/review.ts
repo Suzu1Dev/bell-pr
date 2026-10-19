@@ -81,6 +81,28 @@ const review = {
     shiftHint: ({ key }: { key: string }) => `Hold ${key} for several lines`,
     clearSelection: "Clear selection",
     askSelection: "Explain this code",
+    /** The unchanged code a modified file's patch leaves out, read from the run's base. */
+    gap: {
+      showBelow: ({ count }: { count: number }) =>
+        plural(count) === "one"
+          ? "Show 1 more line below the change above"
+          : `Show ${count} more lines below the change above`,
+      showAbove: ({ count }: { count: number }) =>
+        plural(count) === "one"
+          ? "Show 1 more line above this change"
+          : `Show ${count} more lines above this change`,
+      showAll: ({ count }: { count: number }) =>
+        plural(count) === "one" ? "Show the 1 line here" : `Show all ${count} lines here`,
+      showToEnd: "Show the rest of the file",
+      hidden: ({ count }: { count: number }) =>
+        plural(count) === "one" ? "1 unchanged line" : `${count} unchanged lines`,
+      toEnd: "More unchanged code follows to the end of the file",
+      /** The accessible name of the gap after the last change. */
+      endLabel: "Unchanged code after the last change",
+      wholeFile: "Whole file",
+      wholeFileTitle: "Show the whole file between the changes",
+      loadFailed: "Could not read the code around the changes.",
+    },
   },
   /** The question DiffView sends about the selected lines. */
   selection: {

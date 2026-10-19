@@ -857,6 +857,17 @@ export class Workbench {
     return publishing.approve(this.context, id, displayedDraft);
   }
 
+  /** The base version around a modified file's changes (learning.ts). */
+  async contextLines(
+    id: string,
+    filePath: string,
+    fingerprint: string,
+    baseSha: string,
+  ) {
+    cleanup.assertWorkspacePresent(this.run(id));
+    return learning.contextLines(this.context, id, filePath, fingerprint, baseSha);
+  }
+
   async saveNote(id: string, filePath: string, text: string) {
     return learning.saveNote(this.context, id, filePath, text);
   }

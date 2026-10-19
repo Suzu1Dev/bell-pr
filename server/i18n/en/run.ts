@@ -289,6 +289,21 @@ export default {
     heldBack: ({ reason }: { reason: string }) =>
       `Publishing this file is on hold: ${reason}`,
   },
+  /** The unchanged code around a modified file's changes, read from the run's base. */
+  context: {
+    notAFile:
+      "A submodule or special entry has no code to show around its changes.",
+    tooLarge:
+      "The file is larger than 512 KB, so the code around its changes cannot be shown.",
+    binary: "A binary file has no code to show around its changes.",
+    credentials:
+      "The file looks like it contains credentials, so the code around its changes is not shown.",
+    blocked:
+      "This file cannot be reviewed right now, so the code around its changes is not shown either.",
+    stale: "The file's changes were updated; refresh the changes.",
+    baseMoved: "The run's base was updated; refresh the changes.",
+    wholeFile: "Added and deleted files are already shown whole.",
+  },
   /** Taking a teammate's finished task into the run's worktree. */
   integration: {
     snapshotBlocked:

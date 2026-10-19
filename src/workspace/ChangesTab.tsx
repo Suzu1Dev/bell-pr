@@ -30,6 +30,7 @@ import {
   SquarePen,
   X,
 } from "lucide-react";
+import { api } from "../api";
 import { useT } from "../i18n";
 import type { DiffFile, Repo, Run } from "../types";
 import { applyReviewOrder, parseReviewOrder } from "../../shared/review-order";
@@ -115,6 +116,22 @@ interface ChangesTabProps {
   >;
   /** The Explain-it-back check of the run (useUnderstanding). */
   understanding?: Understanding;
+}
+
+/**
+ * The file at the run's base commit, for the unchanged code around its
+ * changes. The fingerprint and the base tie the answer to the diff shown.
+ */
+async function loadBaseLines(run: Run, target: DiffFile) {
+  const query = new URLSearchParams({
+    path: target.path,
+    fingerprint: target.fingerprint ?? "",
+    base: run.baseSha ?? "",
+  });
+  const { lines } = await api<{ lines: string[] }>(
+    `/runs/${encodeURIComponent(run.id)}/context?${query}`,
+  );
+  return lines;
 }
 
 /** The code review tab: changed files, the diff and the explanation panel. */
@@ -519,13 +536,18 @@ export function ChangesTab({
         )}
         {file ? (
           <DiffView
-            key={`${run.id}:${file.path}`}
+            key={`${run.id}:${file.path}:${run.baseSha ?? ""}`}
             file={file}
             reviewed={run.reviewedFiles.includes(file.path)}
             onReview={reviewFile}
             onAsk={checking ? () => setAskWaiting(true) : ask}
             view={diffView}
             hasNote={Boolean(run.notes?.[file.path]?.text)}
+            onLoadBase={
+              !demo && file.fingerprint && run.baseSha
+                ? () => loadBaseLines(run, file)
+                : undefined
+            }
           />
         ) : (
           <div className="empty-state">

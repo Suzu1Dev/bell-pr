@@ -8,7 +8,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { command, redact } from "./process.js";
-import { parseGitHubSource, readDiff } from "./git.js";
+import { baseFileLines, parseGitHubSource, readDiff } from "./git.js";
 import {
   conversationContentLimit,
   conversationMessageLimit,
@@ -277,6 +277,35 @@ async function generateExplanations(
     if (temporary) await rm(temporary, { recursive: true, force: true });
     await ctx.store.save();
   }
+}
+
+/**
+ * The base version of a modified file in the current diff, for reading the
+ * unchanged code around its hunks. The fingerprint ties the request to the
+ * diff the person sees, and the base commit to the version it was read
+ * from (a sync can keep a patch, and so its fingerprint, while the base
+ * moves); added and deleted files are shown whole already.
+ */
+export async function contextLines(
+  ctx: WorkbenchContext,
+  id: string,
+  filePath: string,
+  fingerprint: string,
+  baseSha: string,
+) {
+  return ctx.lock(id, async () => {
+    const run = ctx.run(id);
+    if (run.baseSha !== baseSha)
+      throw new AppError((m) => m.run.context.baseMoved, 409);
+    const file = (await readDiff(run)).find((entry) => entry.path === filePath);
+    if (!file) throw new AppError((m) => m.run.review.fileNotFound, 404);
+    if (file.blocked) throw new AppError((m) => m.run.context.blocked, 409);
+    if (file.fingerprint !== fingerprint)
+      throw new AppError((m) => m.run.context.stale, 409);
+    if (file.status !== "modified")
+      throw new AppError((m) => m.run.context.wholeFile, 409);
+    return { lines: await baseFileLines(run, filePath) };
+  });
 }
 
 /**

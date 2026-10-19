@@ -167,6 +167,16 @@ const m: Translation<typeof en> = {
     },
     heldBack: ({ reason }) => `此檔案已暫停發佈：${reason}`,
   },
+  context: {
+    notAFile: "子模組或特殊項目沒有可展開的程式碼。",
+    tooLarge: "檔案超過 512 KB，無法展開周圍的程式碼。",
+    binary: "二進位檔案無法展開周圍的程式碼。",
+    credentials: "檔案疑似包含憑證，周圍的程式碼不會顯示。",
+    blocked: "這個檔案目前無法審閱，也不會顯示周圍的程式碼。",
+    stale: "檔案差異已更新，請重新整理差異。",
+    baseMoved: "工作的基準已更新，請重新整理差異。",
+    wholeFile: "新增或刪除的檔案已經完整顯示。",
+  },
   integration: {
     snapshotBlocked: "整合快照含有無法審閱的檔案，已停止派工。",
     noWorktree: "任務缺少隔離工作目錄。",

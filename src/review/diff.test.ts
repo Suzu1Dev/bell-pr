@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  expandDiff,
   groupHunks,
   hunkStart,
   isCodeLine,
@@ -257,4 +258,110 @@ test("a hunk header gives where its lines start and the code it names", () => {
   });
   assert.deepEqual(hunkStart("@@ -80 +91 @@"), { oldLine: 80, newLine: 91, context: "" });
   assert.equal(hunkStart("not a header"), undefined);
+});
+
+const oldFile = Array.from({ length: 30 }, (_, index) => `line ${index + 1}`);
+const newFile = oldFile.flatMap((line) =>
+  line === "line 5" ? ["five"] : line === "line 20" ? [line, "inserted"] : [line],
+);
+// `git diff --no-index -U3` of the two files above.
+const twoHunks = [
+  "diff --git a/old.txt b/new.txt",
+  "--- a/old.txt",
+  "+++ b/new.txt",
+  "@@ -2,7 +2,7 @@ line 1",
+  " line 2",
+  " line 3",
+  " line 4",
+  "-line 5",
+  "+five",
+  " line 6",
+  " line 7",
+  " line 8",
+  "@@ -18,6 +18,7 @@ line 17",
+  " line 18",
+  " line 19",
+  " line 20",
+  "+inserted",
+  " line 21",
+  " line 22",
+  " line 23",
+].join("\n");
+
+test("gaps around hunks are counted from the headers, and the end of the file once it is read", () => {
+  const parsed = parseDiff(twoHunks);
+  const gaps = (base: string[] | null) =>
+    expandDiff(parsed, base, {}, true)
+      .filter((line) => line.kind === "gap")
+      .map((line) => line.gap);
+  assert.deepEqual(gaps(null), [
+    { index: 0, hidden: 1, afterChange: false, beforeChange: true },
+    { index: 1, hidden: 9, afterChange: true, beforeChange: true },
+    { index: 2, hidden: null, afterChange: true, beforeChange: false },
+  ]);
+  assert.equal(gaps(oldFile)[2]!.hidden, 7);
+  // A file that cannot be read (the demo, an added file) keeps its plain hunk rows.
+  const plain = expandDiff(parsed, null, {}, false);
+  assert.deepEqual(plain, parsed);
+});
+
+test("revealed lines carry the old and new numbers of the gap they fill", () => {
+  const shown = expandDiff(
+    parseDiff(twoHunks),
+    oldFile,
+    { 1: { below: 2, above: 3 }, 2: { below: 2, above: 0 } },
+    true,
+  );
+  const expanded = shown.filter((line) => line.expanded);
+  assert.deepEqual(
+    expanded.map((line) => [line.text, line.oldLine, line.newLine]),
+    [
+      ["line 9", 9, 9],
+      ["line 10", 10, 10],
+      ["line 15", 15, 15],
+      ["line 16", 16, 16],
+      ["line 17", 17, 17],
+      // After the inserted line, new numbers are one ahead.
+      ["line 24", 24, 25],
+      ["line 25", 25, 26],
+    ],
+  );
+  const middle = shown.find((line) => line.gap?.index === 1)!;
+  assert.equal(middle.gap!.hidden, 4);
+  assert.match(middle.text, /^@@ -18,6 \+18,7 @@/);
+  assert.deepEqual(
+    shown.map((line) => line.id),
+    shown.map((_, index) => index),
+  );
+});
+
+test("the whole file rebuilds both versions with every line number in order", () => {
+  const shown = expandDiff(parseDiff(twoHunks), oldFile, "all", true);
+  assert.ok(shown.every((line) => line.kind !== "gap" && line.kind !== "hunk"));
+  const before = shown.filter((line) => line.oldLine !== null);
+  const after = shown.filter((line) => line.newLine !== null);
+  assert.deepEqual(before.map((line) => line.text), oldFile);
+  assert.deepEqual(after.map((line) => line.text), newFile);
+  assert.deepEqual(before.map((line) => line.oldLine), oldFile.map((_, index) => index + 1));
+  assert.deepEqual(after.map((line) => line.newLine), newFile.map((_, index) => index + 1));
+  // Split view pairs revealed lines on both sides like any unchanged line.
+  const rows = splitDiff(shown);
+  assert.ok(rows.every((row) => !row.hunk));
+  assert.equal(rows.find((row) => row.left?.text === "line 30")?.right?.newLine, 31);
+});
+
+test("a gap row heads the hunk below it, like the header it replaces", () => {
+  const shown = expandDiff(parseDiff(twoHunks), null, {}, true);
+  const groups = groupHunks(shown);
+  assert.deepEqual(
+    groups.map((group) => [group.header?.kind, group.header?.gap?.index]),
+    [
+      ["gap", 0],
+      ["gap", 1],
+      ["gap", 2],
+    ],
+  );
+  // The gap before a change carries its header, for the group's name.
+  assert.match(groups[1].header!.text, /^@@ -18,6 \+18,7 @@/);
+  assert.equal(groups[2].header!.text, "");
 });

@@ -36,6 +36,18 @@ const m: Translation<typeof en> = {
     shiftKey: "Shift",
     shiftHint: ({ key }) => `${key} 可多行選取`,
     clearSelection: "清除選取",
+    gap: {
+      showBelow: ({ count }) => `顯示上一段變更下方的 ${count} 行`,
+      showAbove: ({ count }) => `顯示這段變更上方的 ${count} 行`,
+      showAll: ({ count }) => `顯示這裡全部 ${count} 行`,
+      showToEnd: "顯示到檔案結尾",
+      hidden: ({ count }) => `${count} 行未變更`,
+      toEnd: "檔案後面還有未變更的程式碼",
+      endLabel: "最後一段變更之後的未變更程式碼",
+      wholeFile: "完整檔案",
+      wholeFileTitle: "在變更之間顯示整個檔案",
+      loadFailed: "無法讀取周圍的程式碼。",
+    },
     askSelection: "解說這段程式碼",
   },
   selection: {

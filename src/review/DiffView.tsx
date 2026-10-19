@@ -10,18 +10,23 @@ import {
 } from "react";
 import {
   Check,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   Code2,
   FileCode2,
   FileText,
+  FoldVertical,
   MessageSquare,
   MousePointer2,
+  UnfoldVertical,
   X,
 } from "lucide-react";
 import { useRovingList } from "../a11y/useRovingList";
 import { useT } from "../i18n";
 import type { DiffFile } from "../types";
 import {
+  expandDiff,
   groupHunks,
   hunkStart,
   isCodeLine,
@@ -30,12 +35,15 @@ import {
   selectionQuestion,
   splitDiff,
   type DiffLine,
+  type Reveal,
 } from "./diff";
 import { withNodes } from "./withNodes";
 import "./review.css";
 
 /** How far PageUp and PageDown move in the list of lines. */
 const linesPerPage = 10;
+/** Lines one click on an expand arrow shows. */
+const expandStep = 20;
 
 export interface DiffViewProps {
   file: DiffFile;
@@ -45,6 +53,8 @@ export interface DiffViewProps {
   view: "unified" | "split";
   /** When given and false, a soft hint invites a learner note; it never blocks the checkbox. */
   hasNote?: boolean;
+  /** Reads the base version of a modified file, so the code around its changes can be shown. */
+  onLoadBase?: () => Promise<string[]>;
 }
 
 // Memoized: every arrow key in the list re-renders the diff, and a line's
@@ -86,11 +96,34 @@ export function DiffView({
   onAsk,
   view,
   hasNote,
+  onLoadBase,
 }: DiffViewProps) {
   const t = useT("review");
-  const lines = useMemo(
+  const parsed = useMemo(
     () => (file.blocked ? [] : parseDiff(file.patch)),
     [file.patch, file.blocked],
+  );
+  // Added and deleted files are whole in the patch; only a modified one has
+  // code around it, and only with a hunk to place it (not a mode change)
+  // and as a regular file (a submodule, mode 160000, is a commit).
+  const readable =
+    !!onLoadBase &&
+    file.status === "modified" &&
+    !file.blocked &&
+    parsed.some((line) => line.kind === "hunk") &&
+    !/^index [0-9a-f]+\.\.[0-9a-f]+ 160000$/m.test(file.patch);
+  const [base, setBase] = useState<string[] | null>(null);
+  const [reveal, setReveal] = useState<Reveal>({});
+  const [whole, setWhole] = useState(false);
+  const [baseLoading, setBaseLoading] = useState(false);
+  const [baseError, setBaseError] = useState("");
+  const version = `${file.path}\0${file.patch}`;
+  const currentVersion = useRef(version);
+  currentVersion.current = version;
+  const pendingBase = useRef<Promise<string[] | null> | null>(null);
+  const lines = useMemo(
+    () => expandDiff(parsed, base, whole ? "all" : reveal, readable),
+    [parsed, base, whole, reveal, readable],
   );
   const hunks = useMemo(() => groupHunks(lines), [lines]);
   const splitHunks = useMemo(
@@ -113,7 +146,64 @@ export function DiffView({
   const focusAskButton = useRef(false);
   const hintId = useId();
 
-  useEffect(() => setSelection(null), [file.path, file.patch, file.blocked]);
+  useEffect(() => {
+    setBase(null);
+    setReveal({});
+    setWhole(false);
+    setBaseError("");
+    setBaseLoading(false);
+    pendingBase.current = null;
+  }, [version]);
+  // Shown lines are renumbered whenever more code appears.
+  useEffect(() => setSelection(null), [file.blocked, lines]);
+
+  /** The base version, read once per diff version; null when it cannot be read. */
+  function readBase(): Promise<string[] | null> {
+    if (base) return Promise.resolve(base);
+    if (!onLoadBase || !readable) return Promise.resolve(null);
+    if (!pendingBase.current) {
+      const requested = version;
+      setBaseLoading(true);
+      setBaseError("");
+      pendingBase.current = onLoadBase().then(
+        (value) => {
+          if (currentVersion.current !== requested) return null;
+          setBase(value);
+          setBaseLoading(false);
+          return value;
+        },
+        (error: unknown) => {
+          if (currentVersion.current !== requested) return null;
+          pendingBase.current = null;
+          setBaseLoading(false);
+          setBaseError(
+            error instanceof Error ? error.message : t.diff.gap.loadFailed,
+          );
+          return null;
+        },
+      );
+    }
+    return pendingBase.current;
+  }
+
+  async function expand(index: number, side: "below" | "above" | "all") {
+    if (!(await readBase())) return;
+    setReveal((current) => {
+      const shown = current[index] ?? { below: 0, above: 0 };
+      return {
+        ...current,
+        [index]:
+          side === "all"
+            ? { below: Infinity, above: 0 }
+            : { ...shown, [side]: shown[side] + expandStep },
+      };
+    });
+  }
+
+  async function toggleWhole() {
+    if (whole) setWhole(false);
+    else if (await readBase()) setWhole(true);
+  }
 
   useEffect(() => {
     // Enter on an unselected line selects it first; the ask button that
@@ -158,6 +248,8 @@ export function DiffView({
 
   function onLinesKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     const current = codeLines[roving.activeIndex];
+    // The buttons of a gap row take their own keys.
+    if ((event.target as HTMLElement).closest?.("button")) return;
     if (
       !current ||
       event.altKey ||
@@ -195,6 +287,8 @@ export function DiffView({
 
   function hunkLabel(header: DiffLine | undefined) {
     if (!header) return undefined;
+    // The gap after the last change heads no hunk of its own.
+    if (header.kind === "gap" && !header.text) return t.diff.gap.endLabel;
     const start = hunkStart(header.text);
     if (!start) return header.text;
     return start.context ? t.diff.hunkLabelIn(start) : t.diff.hunkLabel(start);
@@ -212,9 +306,66 @@ export function DiffView({
     );
   }
 
+  /** Unchanged lines the patch leaves out, with the controls that show them. */
+  function renderGap(line: DiffLine, split: boolean) {
+    const gap = line.gap!;
+    const count =
+      gap.hidden === null ? expandStep : Math.min(expandStep, gap.hidden);
+    const below = t.diff.gap.showBelow({ count });
+    const above = t.diff.gap.showAbove({ count });
+    const all =
+      gap.hidden === null
+        ? t.diff.gap.showToEnd
+        : t.diff.gap.showAll({ count: gap.hidden });
+    return (
+      <div className={`rv-hunk${split ? " rv-split-hunk" : ""} rv-gap`} role="none">
+        <span className="rv-gap-actions">
+          {gap.afterChange && (
+            <button
+              type="button"
+              onClick={() => void expand(gap.index, "below")}
+              disabled={baseLoading}
+              aria-label={below}
+              title={below}
+            >
+              <ChevronDown size={13} aria-hidden="true" />
+            </button>
+          )}
+          {gap.beforeChange && (
+            <button
+              type="button"
+              onClick={() => void expand(gap.index, "above")}
+              disabled={baseLoading}
+              aria-label={above}
+              title={above}
+            >
+              <ChevronUp size={13} aria-hidden="true" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => void expand(gap.index, "all")}
+            disabled={baseLoading}
+            aria-label={all}
+            title={all}
+          >
+            <UnfoldVertical size={13} aria-hidden="true" />
+          </button>
+        </span>
+        <code aria-hidden="true">
+          {gap.hidden === null
+            ? t.diff.gap.toEnd
+            : t.diff.gap.hidden({ count: gap.hidden })}
+          {line.text && <span className="rv-gap-header">{line.text}</span>}
+        </code>
+      </div>
+    );
+  }
+
   function renderHeader(header: DiffLine | undefined, split: boolean) {
     // The group's name says where the hunk starts, so the raw header is not read out.
     if (!header) return null;
+    if (header.kind === "gap") return renderGap(header, split);
     return (
       <div
         className={`rv-hunk${split ? " rv-split-hunk" : ""}`}
@@ -241,7 +392,7 @@ export function DiffView({
       line.kind === "added" ? "+" : line.kind === "removed" ? "−" : " ";
     const kind =
       line.kind === "added" || line.kind === "removed" ? line.kind : "context";
-    const className = `rv-line rv-line-${line.kind}${isSelected ? " rv-line-selected" : ""}`;
+    const className = `rv-line rv-line-${line.kind}${line.expanded ? " rv-line-expanded" : ""}${isSelected ? " rv-line-selected" : ""}`;
     const content = (
       <>
         {side ? (
@@ -337,6 +488,23 @@ export function DiffView({
           <span className="rv-file-language">{languageLabel}</span>
         </div>
         <div className="rv-file-actions">
+          {readable && (
+            <button
+              type="button"
+              className={`rv-whole${whole ? " rv-whole-on" : ""}`}
+              aria-pressed={whole}
+              onClick={() => void toggleWhole()}
+              disabled={baseLoading}
+              title={t.diff.gap.wholeFileTitle}
+            >
+              {whole ? (
+                <FoldVertical size={13} aria-hidden="true" />
+              ) : (
+                <UnfoldVertical size={13} aria-hidden="true" />
+              )}
+              {t.diff.gap.wholeFile}
+            </button>
+          )}
           <span className="rv-additions">+{file.additions}</span>
           <span className="rv-deletions">−{file.deletions}</span>
           {hasNote === false && !reviewed && !file.blocked && (
@@ -356,6 +524,11 @@ export function DiffView({
           </label>
         </div>
       </div>
+      {baseError && (
+        <p className="rv-context-error" role="alert">
+          {baseError}
+        </p>
+      )}
       {file.blocked || codeLines.length === 0 ? (
         <div className="rv-empty">
           <Code2 size={28} />
