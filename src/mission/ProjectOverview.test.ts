@@ -8,7 +8,8 @@ import { freeEntitlements, proEntitlements } from "../../shared/plans";
 import { getDemo } from "../demo";
 import type { PlaybackClock } from "../demo/playback";
 import { assertNoHan, renderEn, renderWith, renderZh } from "../test-utils/render";
-import { ProjectOverview, type ProjectOverviewProps } from "./ProjectOverview";
+import { MarkdownContent } from "../review/MarkdownContent";
+import { briefMarkdown, ProjectOverview, type ProjectOverviewProps } from "./ProjectOverview";
 import { playSampleAnalysis, stopSampleAnalysis } from "./sample-analysis";
 import { mount } from "./test-dom";
 
@@ -777,4 +778,80 @@ test("an open contribution leads with its brief, which does not repeat the title
   }
   // The project page has no brief.
   assert.doesNotMatch(render(), /這次改動，會帶來什麼不同？/);
+});
+
+test("a request written in labelled sections renders as Markdown with its labels in bold", () => {
+  const request = [
+    "問題：觀察：create_interview 會回傳既有列的 id。",
+    "使用者影響：若此假設成立，候選人重新整理後就無法開始面試。",
+    "建議做法：1) 用 `grep -rn 'create_interview(' src/` 找出呼叫端。",
+    "驗收：",
+    "- `./scripts/test.sh` 通過",
+    "原始碼依據（引文已核對；推論仍待確認）：",
+    "- src/accounts/interviews.rs：「The caller supplies the id」",
+  ].join("\n");
+  const marked = briefMarkdown(request);
+  for (const label of ["問題", "使用者影響", "建議做法", "驗收"])
+    assert.ok(marked.includes(`**${label}**：`), label);
+  // A parenthetical stays outside the bold; list items, sentences and later colons are untouched.
+  assert.ok(marked.includes("**原始碼依據**（引文已核對；推論仍待確認）："));
+  assert.ok(marked.includes("觀察：create_interview"));
+  assert.ok(marked.includes("- src/accounts/interviews.rs：「"));
+  assert.equal(briefMarkdown("若此假設成立，候選人：無法開始"), "若此假設成立，候選人：無法開始");
+  // An ordered list stays a list.
+  assert.equal(briefMarkdown("1) 步驟：先讀"), "1) 步驟：先讀");
+
+  const html = renderZh(createElement(MarkdownContent, { children: marked }));
+  // Each section is its own paragraph, so the one after a list is not absorbed into it.
+  assert.match(html, /<p><strong>問題<\/strong>：觀察：create_interview 會回傳既有列的 id。<\/p>/);
+  assert.match(html, /<p><strong>使用者影響<\/strong>：/);
+  assert.match(html, /<code>grep -rn &#x27;create_interview\(&#x27; src\/<\/code>/);
+  assert.match(html, /<p><strong>驗收<\/strong>：<\/p>\s*<ul>\s*<li><code>\.\/scripts\/test\.sh<\/code> 通過<\/li>\s*<\/ul>/);
+  assert.match(html, /<p><strong>原始碼依據<\/strong>（引文已核對；推論仍待確認）：<\/p>\s*<ul>/);
+});
+
+test("an English request's section labels are bolded the same way, and sentences are not", () => {
+  const request = [
+    "Problem: GET requests fail on the first brief outage.",
+    "User impact: Retries would spare people a reload.",
+    "Acceptance:",
+    "- `npm test` passes",
+    "Source evidence (each quote was checked; inferences are unconfirmed):",
+    "- src/client.ts: “fetch(url)” — one attempt",
+  ].join("\n");
+  const marked = briefMarkdown(request);
+  for (const label of ["Problem", "User impact", "Acceptance"]) assert.ok(marked.includes(`**${label}**:`), label);
+  assert.ok(marked.includes("**Source evidence** (each quote was checked; inferences are unconfirmed):"));
+  assert.ok(marked.includes("- src/client.ts: “fetch(url)”"));
+  // A sentence with a comma, a lowercase start or a URL is not a label.
+  for (const line of ["If this holds, the caller: fails", "note: lowercase", "https://example.com/a: b", "1) Step: read"])
+    assert.equal(briefMarkdown(line), line);
+  const html = renderEn(createElement(MarkdownContent, { children: marked }));
+  assert.match(html, /<p><strong>Acceptance<\/strong>:<\/p>\s*<ul>\s*<li><code>npm test<\/code> passes<\/li>/);
+});
+
+test("the brief's request and direction text render through the Markdown view, and a long request spans the width", async () => {
+  const run = { ...englishRun, prompt: "Problem: one attempt." } as NonNullable<ProjectOverviewProps["run"]>;
+  const brief = {
+    problem: "Problem: x\n".repeat(30),
+    motivation: "Fewer reloads.",
+    beneficiaries: [],
+    before: "One attempt.",
+    after: "Three attempts.",
+    validation: ["`npm test` passes"],
+    risks: [],
+  };
+  // The Markdown view loads with its first use; until then the text shows as before.
+  renderEnglish({ run, brief });
+  await import("../review/MarkdownContent");
+  await new Promise((resolve) => setImmediate(resolve));
+  const html = renderEnglish({ run, brief });
+  assert.match(html, /class="mission-contribution-reason is-stacked"/);
+  assert.match(
+    html,
+    /<li><div class="mission-brief-text"><div class="markdown-content"><p><code>npm test<\/code> passes<\/p><\/div><\/div><\/li>/,
+  );
+  assert.match(html, /<span>The problem to solve<\/span><div class="mission-brief-text"><div class="markdown-content"><p><strong>Problem<\/strong>: x<\/p>/);
+  assert.doesNotMatch(renderEnglish({ run, brief: { ...brief, problem: "Short." } }), /is-stacked/);
+  assert.match(renderEnglish({ run, brief: undefined }), /<div class="mission-brief-pending">.*<p><strong>Problem<\/strong>: one attempt\.<\/p>/s);
 });

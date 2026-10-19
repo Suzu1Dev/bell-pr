@@ -301,6 +301,55 @@ function SectionNav({ sections }: { sections: OverviewSection[] }) {
   );
 }
 
+const MarkdownContent = lazy(() =>
+  import("../review/MarkdownContent").then((module) => ({
+    default: module.MarkdownContent,
+  })),
+);
+
+/**
+ * A short label opening a line, with an optional full-width parenthetical,
+ * before a full-width colon, as zh-TW requests label their sections.
+ */
+const sectionLabel =
+  // i18n-allow: parser
+  /^([^\s\d：:（(，。、,.*+#>`|\-][^\n：:（(，。、,.]{0,11})((?:（[^）\n]*）)?)：/;
+/** The same in English: "User impact:", "Source evidence (…):". */
+const englishSectionLabel = /^([A-Z][A-Za-z ]{0,23}?)((?: \([^)\n]*\))?):(?= |$)/;
+
+/**
+ * Bolds the label of each section in a request written as labelled lines
+ * ("Problem:", "Acceptance:"), and starts each section as its own paragraph
+ * so it never reads as the continuation of a list item above it. List
+ * items, sentences and long phrases are left alone.
+ */
+export function briefMarkdown(text: string) {
+  return text
+    .split("\n")
+    .map((line, index) => {
+      const match = sectionLabel.exec(line);
+      const english = match ? null : englishSectionLabel.exec(line);
+      const found = match ?? english;
+      if (!found) return line;
+      // i18n-allow: parser
+      const colon = match ? "：" : ":";
+      const section = `**${found[1]}**${found[2]}${colon}${line.slice(found[0].length)}`;
+      return index > 0 ? `\n${section}` : section;
+    })
+    .join("\n");
+}
+
+/** Request and direction text as Markdown, its line breaks kept as written. */
+function BriefText({ text }: { text: string }) {
+  return (
+    <Suspense fallback={<p>{text}</p>}>
+      <div className="mission-brief-text">
+        <MarkdownContent>{briefMarkdown(text)}</MarkdownContent>
+      </div>
+    </Suspense>
+  );
+}
+
 function Brief({
   run,
   brief,
@@ -374,17 +423,22 @@ function Brief({
       )}
       {brief ? (
         <>
-          <div className="mission-contribution-reason">
+          <div
+            className={`mission-contribution-reason${
+              // A request written in sections reads better across the full width.
+              brief.problem.length > 280 ? " is-stacked" : ""
+            }`}
+          >
             <div>
               <span>{t.problem}</span>
-              <p>{brief.problem}</p>
+              <BriefText text={brief.problem} />
             </div>
             <div>
               <span>
                 {t.motivation}
                 {tag && <em className="mission-premise-tag">{tag}</em>}
               </span>
-              <p>{brief.motivation}</p>
+              <BriefText text={brief.motivation} />
             </div>
           </div>
           {brief.beneficiaries.length > 0 && (
@@ -401,7 +455,7 @@ function Brief({
               <span className="mission-change-label">
                 {t.before} <span>{t.beforeCaption}</span>
               </span>
-              <p>{brief.before}</p>
+              <BriefText text={brief.before} />
             </article>
             <div className="mission-change-arrow" aria-hidden="true">
               <ArrowRight size={20} />
@@ -411,7 +465,7 @@ function Brief({
                 {t.after} <span>{t.afterCaption}</span>
                 {tag && <em className="mission-premise-tag">{tag}</em>}
               </span>
-              <p>{brief.after}</p>
+              <BriefText text={brief.after} />
             </article>
           </div>
           <p className="mission-impact-note">
@@ -426,7 +480,9 @@ function Brief({
                 </h4>
                 <ul>
                   {brief.validation.map((item, index) => (
-                    <li key={index}>{item}</li>
+                    <li key={index}>
+                      <BriefText text={item} />
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -439,7 +495,9 @@ function Brief({
                 </h4>
                 <ul>
                   {brief.risks.map((item, index) => (
-                    <li key={index}>{item}</li>
+                    <li key={index}>
+                      <BriefText text={item} />
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -449,7 +507,7 @@ function Brief({
       ) : (
         <div className="mission-brief-pending">
           <span className="mission-field-caption">{t.request}</span>
-          <p>{run.prompt}</p>
+          <BriefText text={run.prompt} />
           <small>{t.pending}</small>
         </div>
       )}
