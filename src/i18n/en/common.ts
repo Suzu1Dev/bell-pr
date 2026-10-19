@@ -71,6 +71,19 @@ const common = {
     serverUnreachable: `Cannot reach the local ${product.name} service. Is it still running?`,
     generic: "Something went wrong. Please try again.",
   },
+  /**
+   * A long error, usually the raw tail of an agent CLI's output, folded
+   * behind its leading label (FailureText).
+   */
+  failureText: {
+    /** The label before the first colon, such as "claude failed", as a sentence. */
+    label: ({ label }: { label: string }) => `${label}.`,
+    /** The label when the error starts with no short one. */
+    fallback: "The command failed",
+    showRaw: ({ count }: { count: string }) =>
+      `Show the raw output (${count} characters)`,
+    hideRaw: "Hide the raw output",
+  },
 };
 
 export default common;

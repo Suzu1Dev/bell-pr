@@ -57,6 +57,12 @@ const m: Translation<typeof en> = {
     serverUnreachable: `無法連線至本機 ${product.name} 服務，請確認它仍在執行。`,
     generic: "操作未完成，請再試一次。",
   },
+  failureText: {
+    label: ({ label }) => `${label}。`,
+    fallback: "執行失敗",
+    showRaw: ({ count }) => `查看原始輸出（${count} 字）`,
+    hideRaw: "收起原始輸出",
+  },
 };
 
 export default m;

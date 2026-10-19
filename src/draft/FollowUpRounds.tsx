@@ -13,6 +13,7 @@ import {
 import type { FollowUpRound } from "../../shared/followups";
 import type { PrFeedbackItem } from "../../shared/pr-feedback";
 import { useFormat, useT } from "../i18n";
+import { FailureText } from "../FailureText";
 import { rich } from "./rich";
 import "./rounds.css";
 
@@ -116,7 +117,7 @@ export function FollowUpRounds({
               )}
               {round.error && (
                 <p className="follow-up-error" role="status">
-                  {round.error}
+                  <FailureText text={round.error} />
                 </p>
               )}
               {round.report && <p className="follow-up-report">{round.report}</p>}

@@ -44,6 +44,7 @@ import { ModelSummary } from "../models/ModelSummary";
 import { directionOptions } from "./DirectionSettings";
 import { usePlan } from "./plan";
 import { useSampleAnalysis } from "./sample-analysis";
+import { FailureText } from "../FailureText";
 import {
   moveRecommendation,
   orderedRecommendations,
@@ -923,7 +924,9 @@ export function ProjectOverview({
 
       {error && (
         <div className="mission-alert mission-alert-error" role="alert">
-          <span>{error}</span>
+          <span>
+            <FailureText text={error} />
+          </span>
           <button
             type="button"
             onClick={onAnalyze}
@@ -1244,7 +1247,9 @@ export function ProjectOverview({
               className="mission-alert mission-alert-error mission-more-error"
               role="alert"
             >
-              <span>{recommendationError}</span>
+              <span>
+                <FailureText text={recommendationError} />
+              </span>
               <button
                 type="button"
                 onClick={onRecommendMore}

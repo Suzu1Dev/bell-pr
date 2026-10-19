@@ -41,6 +41,7 @@ import { ErrorBoundary } from "../app/ErrorBoundary";
 import { useRovingList } from "../a11y/useRovingList";
 import { fileStatusLabel } from "../app/labels";
 import { usePresentation } from "../app/presentation";
+import { FailureText } from "../FailureText";
 import type { RunActions } from "../app/hooks/useRunActions";
 import {
   closeCheckPanel,
@@ -539,10 +540,13 @@ export function ChangesTab({
                   : t.noChanges}
             </h3>
             <p>
-              {run.error ||
-                (run.workspaceRemovedAt
-                  ? notices.workspaceRemoved
-                  : t.noChangesHint)}
+              {run.error ? (
+                <FailureText text={run.error} />
+              ) : run.workspaceRemovedAt ? (
+                notices.workspaceRemoved
+              ) : (
+                t.noChangesHint
+              )}
             </p>
             <button
               className="button secondary"

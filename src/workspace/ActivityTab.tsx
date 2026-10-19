@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useFormat, useT } from "../i18n";
 import type { Run } from "../types";
+import { FailureText } from "../FailureText";
 import { TeamBoard } from "../team/TeamBoard";
 import type { RunActions } from "../app/hooks/useRunActions";
 
@@ -182,7 +183,11 @@ export function ActivityTab({
               <p className="muted">{t.emptyFilter}</p>
             )}
           </div>
-          {run.error && <p className="inline-error">{run.error}</p>}
+          {run.error && (
+            <p className="inline-error">
+              <FailureText text={run.error} />
+            </p>
+          )}
         </div>
         <aside className="task-brief">
           <span className="eyebrow">{t.eyebrow}</span>

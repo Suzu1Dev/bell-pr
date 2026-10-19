@@ -55,7 +55,11 @@ test("an imported repository can be deleted, the sample cannot, and paths mask w
     /<button type="button" class="run-list-action run-list-action-danger" data-repo-delete="repo-1" aria-label="Delete repository: octo\/widgets"><svg[^]*?Delete repository<\/button>/,
   );
   assert.equal(html.match(/repository-delete/g)?.length, 1);
-  assert.match(html, /<p>…\/widgets<\/p>/);
+  // One line that keeps the end of the path; the full (masked) path is its title.
+  assert.match(
+    html,
+    /<p class="repository-path" title="…\/widgets"><span>…\/widgets<\/span><\/p>/,
+  );
   assert.doesNotMatch(html, /\/tmp\/widgets/);
   // On Free the discovery entry says PRO.
   assert.match(

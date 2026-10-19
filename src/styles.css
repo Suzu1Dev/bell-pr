@@ -266,54 +266,6 @@ button {
   margin-top: auto;
   padding-top: 38px;
 }
-.learning-card {
-  margin: 0 4px 22px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 8px;
-  padding: 15px 13px;
-  background: linear-gradient(120deg, var(--color-accent-50), var(--color-surface-sunken));
-  position: relative;
-  overflow: hidden;
-}
-.learning-card:after {
-  content: "";
-  position: absolute;
-  right: -26px;
-  top: -32px;
-  width: 94px;
-  height: 94px;
-  border: 1px solid var(--color-accent-200);
-  border-radius: 50%;
-  box-shadow:
-    0 0 0 13px var(--color-accent-50),
-    0 0 0 14px var(--color-accent-100);
-  pointer-events: none;
-}
-.learning-card-icon {
-  color: var(--color-accent-600);
-  margin-bottom: 13px;
-}
-.learning-card strong {
-  font-size: var(--text-2xs);
-  font-weight: 550;
-  position: relative;
-  z-index: 1;
-}
-.learning-card p {
-  font-size: var(--text-2xs);
-  color: var(--color-text-muted);
-  line-height: 1.9;
-  margin-top: 7px;
-}
-.learning-card button {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-  padding: 0;
-  margin-top: 15px;
-  font-size: var(--text-2xs);
-  color: var(--color-accent-600);
-}
 .shortcut {
   border: 1px solid var(--color-border-strong);
   border-radius: 3px;
@@ -1876,6 +1828,18 @@ button {
   line-height: 1.9;
   overflow-wrap: anywhere;
 }
+/* One line that keeps the end of the path, where clones differ. */
+.repository-card p.repository-path {
+  direction: rtl;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.repository-path > span {
+  direction: ltr;
+  unicode-bidi: embed;
+}
 .repository-meta {
   display: flex;
   justify-content: space-between;
@@ -2034,7 +1998,7 @@ button {
   margin: 15px 0;
   min-height: 72px;
 }
-.note-card code {
+.note-card > code {
   display: block;
   background: var(--color-surface-sunken);
   border: 1px solid var(--color-border-subtle);
@@ -2418,6 +2382,27 @@ button {
   margin-top: 15px;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+/* FailureText: a CLI's raw output folded behind a one-line error. */
+.failure-toggle {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.failure-raw {
+  display: block;
+  margin-top: 8px;
+  max-height: 240px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .guide-list {
   padding-left: 25px;
@@ -3299,7 +3284,7 @@ button {
 .note-card p {
   font-size: var(--text-md);
 }
-.note-card code {
+.note-card > code {
   font-size: var(--text-2xs);
 }
 .section-heading p {
@@ -3318,12 +3303,6 @@ button {
   font-size: var(--text-xs);
 }
 .callout p {
-  font-size: var(--text-xs);
-}
-.learning-card p {
-  font-size: var(--text-2xs);
-}
-.learning-card strong {
   font-size: var(--text-xs);
 }
 .draft-textarea {

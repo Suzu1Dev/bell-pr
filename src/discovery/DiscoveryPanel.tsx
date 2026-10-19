@@ -49,6 +49,7 @@ import { EfficiencySummary } from "../efficiency/EfficiencySummary";
 import { MarkdownContent } from "../review/MarkdownContent";
 import { ReadinessMessage, readinessOf } from "../setup/ReadinessNotice";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
+import { FailureText } from "../FailureText";
 import "../review/review.css";
 import "./discovery.css";
 
@@ -599,7 +600,9 @@ export default function DiscoveryPanel({
       </form>
       {error && (
         <div className="discovery-alert" role="alert">
-          <span>{error}</span>
+          <span>
+            <FailureText text={error} />
+          </span>
           <button
             className="button secondary"
             onClick={() => void reload()}
@@ -666,7 +669,9 @@ export default function DiscoveryPanel({
           className={`discovery-status ${shown.status === "failed" ? "has-error" : ""}`}
           role="status"
         >
-          <span>{shown.error || shown.message}</span>
+          <span>
+            {shown.error ? <FailureText text={shown.error} /> : shown.message}
+          </span>
           <small>{t.searchedAt({ date: date(shown.createdAt) })}</small>
         </div>
       )}
