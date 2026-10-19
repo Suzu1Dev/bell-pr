@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-import path from "node:path";
 import { command } from "./process.js";
 import { legacyRunLocale, readDiff, synchronizeReview } from "./git.js";
 import type { TeamAgentRunner } from "./team.js";
@@ -18,26 +16,20 @@ import {
   type Run,
   type RunLogEntry,
 } from "./types.js";
-import { getModelCatalog, resolveModelExecution } from "./models.js";
+import { getModelCatalog } from "./models.js";
 import type { TransientSleep } from "./agent-cli.js";
 import type { AgentProvider } from "../shared/models.js";
-import {
-  clampContributionSettings,
-  proEntitlements,
-  type Entitlements,
-} from "../shared/plans.js";
+import { proEntitlements, type Entitlements } from "../shared/plans.js";
 import {
   activateAppSettings,
   AppSettingsService,
   deactivateAppSettings,
 } from "./app-settings.js";
 import { cliStatus, runDoctor, type DoctorAppInfo } from "./doctor.js";
-import { setupError } from "./cli-errors.js";
-import { enforceAgentSandbox } from "./sandbox.js";
 import { analysisRunning } from "./insights.js";
 import { discoveryRunning, resetDiscovery } from "./discovery.js";
 import { synchronizeExplanations } from "./explanations.js";
-import { currentLocale, sm, withLocale } from "./i18n/index.js";
+import { sm, withLocale } from "./i18n/index.js";
 import { parseLocale } from "../shared/i18n/locale.js";
 import { closeLog, initLog, log } from "./log.js";
 import { logged, logRunQueued } from "./run-events.js";
@@ -54,6 +46,7 @@ import * as repositories from "./repositories.js";
 import * as executor from "./run-executor.js";
 import { retryTeam } from "./team-retry.js";
 import * as teamPlan from "./team-plan.js";
+import { createRun, type NewRunSources } from "./new-run.js";
 import * as publishing from "./publish.js";
 import * as learning from "./learning.js";
 import * as drafting from "./draft-jobs.js";
@@ -78,8 +71,6 @@ import type { WorkbenchContext } from "./workbench-context.js";
 
 export type { WorkbenchContext };
 
-const now = () => new Date().toISOString();
-const newId = () => randomUUID();
 /** How often the retention period is applied while the server runs. */
 const retentionIntervalMs = 24 * 60 * 60 * 1000;
 
@@ -396,41 +387,6 @@ export class Workbench {
     return cliStatus(await this.doctor());
   }
 
-  /**
-   * Refuses a new run before it is queued when its provider is not
-   * installed or not signed in, or when it is Claude Code and its sandbox
-   * cannot start (unless unsandboxed agents are allowed). Each refusal has
-   * a code and the commands that fix it.
-   */
-  private async assertProviderReady(provider: AgentProvider) {
-    const capability = await this.status();
-    if (provider === "claude") {
-      if (!capability.claude)
-        throw new AppError((m) => m.run.queue.claudeMissing, 503, {
-          code: "claude_missing",
-          fixes: setupError("claude_missing").fixes,
-        });
-      if (!capability.claudeAuthenticated)
-        throw new AppError((m) => m.run.queue.claudeSignedOut, 503, {
-          code: "claude_unauthenticated",
-          fixes: setupError("claude_unauthenticated").fixes,
-        });
-      // Every contribution run has agents that edit files.
-      await enforceAgentSandbox("claude", "write");
-    } else {
-      if (!capability.codex)
-        throw new AppError((m) => m.run.queue.codexMissing, 503, {
-          code: "codex_missing",
-          fixes: setupError("codex_missing").fixes,
-        });
-      if (!capability.codexAuthenticated)
-        throw new AppError((m) => m.run.queue.codexSignedOut, 503, {
-          code: "codex_unauthenticated",
-          fixes: setupError("codex_unauthenticated").fixes,
-        });
-    }
-  }
-
   async importRepository(source: string) {
     return repositories.importRepository(this.context, source);
   }
@@ -444,109 +400,20 @@ export class Workbench {
     return repositories.updateRepository(this.context, id);
   }
 
+  /** Creates a run and queues it (new-run.ts). */
   async createRun(
     repoId: string,
     prompt: string,
     title?: string,
     settings?: ContributionSettings,
   ) {
-    const repo = this.repo(repoId);
-    const modelExecution = resolveModelExecution(
-      settings ?? {},
-      await this.models(settings?.provider),
-    );
-    await this.assertProviderReady(modelExecution.provider ?? "codex");
-    this.assertQueueCapacity();
-    // The plan decides how many teammates a new run gets; runs created
-    // before keep their recorded team.
-    const requested = {
-      ...settings,
-      maxTeammates: settings?.maxTeammates ?? (3 as const),
+    // Through `this`, so a replaced method (as tests do) applies.
+    const sources: NewRunSources = {
+      models: (provider) => this.models(provider),
+      status: () => this.status(),
+      entitlements: () => this.entitlements(),
     };
-    const { settings: allowed, clamped } = clampContributionSettings(
-      requested,
-      this.entitlements(),
-    );
-    const id = newId();
-    const agents = sm().run.agents;
-    const run: Run = {
-      id,
-      repoId,
-      title: title || prompt.slice(0, 72),
-      prompt,
-      status: "queued",
-      // Every run branch uses the fix/ prefix; the GitHub branch field can override it per run.
-      branch: `fix/${id.slice(0, 8)}`,
-      baseBranch: repo.defaultBranch,
-      baseSha: "",
-      worktreePath: path.join(this.store.directory, "worktrees", id),
-      createdAt: now(),
-      // The request's locale; the run's background work and agents use it.
-      locale: currentLocale(),
-      agents: [
-        {
-          id: "lead",
-          name: "Atlas",
-          role: "Team lead",
-          status: "waiting",
-          detail: agents.lead,
-        },
-        {
-          id: "reviewer",
-          name: "Lens",
-          role: "Reviewer",
-          status: "waiting",
-          detail: agents.reviewer,
-        },
-        {
-          id: "tester",
-          name: "Scout",
-          role: "Test analyst",
-          status: "waiting",
-          detail: agents.tester,
-        },
-      ],
-      logs: [],
-      draft: { title: title || prompt.slice(0, 72), body: "" },
-      reviewedFiles: [],
-      reviewedFingerprints: {},
-      reports: {},
-      contributionSettings: settings
-        ? { ...settings, maxTeammates: allowed.maxTeammates }
-        : undefined,
-      modelExecution,
-      team: {
-        config: {
-          maxTeammates: allowed.maxTeammates,
-          requirePlanApproval: settings?.requirePlanApproval ?? true,
-          provider: modelExecution.provider ?? "codex",
-          protocol: "bell-shared-tasks",
-          messageDelivery: "between-turns",
-        },
-        phase: "planning",
-        planSummary: "",
-        tasks: [],
-        messages: [],
-      },
-    };
-    if (clamped)
-      withRunLocale(run, () =>
-        this.log(
-          run,
-          "system",
-          sm().setup.plan.teamClamped({
-            max: allowed.maxTeammates,
-            pro: proEntitlements(1).maxTeammates,
-          }),
-          { kind: "notice" },
-        ),
-      );
-    this.store.data.runs.unshift(run);
-    await this.store.save();
-    logRunQueued(run, "created");
-    this.queue.push(id);
-    this.drain();
-    return run;
+    return createRun(this.context, sources, repoId, prompt, title, settings);
   }
 
   /** New and retried runs share the same cap on queued, running and paused work. */
