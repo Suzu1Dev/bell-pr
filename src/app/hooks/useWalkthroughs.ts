@@ -37,6 +37,24 @@ export interface Walkthroughs {
 }
 
 /**
+ * The file whose walkthrough to ask for next: one already being written
+ * first (the page was reloaded, or another tab asked; the request returns
+ * when it is done), then the file being read, then the others in order.
+ */
+export function nextWalkthrough(files: DiffFile[], selectedPath: string) {
+  const waiting = files.filter(
+    (value) =>
+      value.walkthroughStatus === "pending" ||
+      value.walkthroughStatus === "generating",
+  );
+  return (
+    waiting.find((value) => value.walkthroughStatus === "generating") ??
+    waiting.find((value) => value.path === selectedPath) ??
+    waiting[0]
+  );
+}
+
+/**
  * Prepares the code walkthroughs of the open run's changed files once the
  * run stops: one file at a time (each is a full agent turn), the file being
  * read first, and again when the reader retries one. The sample's are
@@ -103,9 +121,7 @@ export function useWalkthroughs({
 
   useEffect(() => {
     if (demo || active || walkthroughBusy) return;
-    const waiting = files.filter((value) => value.walkthroughStatus === "pending");
-    const next =
-      waiting.find((value) => value.path === selectedPath) ?? waiting[0];
+    const next = nextWalkthrough(files, selectedPath);
     if (next) void requestWalkthrough(run.id, next.path);
   }, [run.id, demo, active, files, selectedPath, walkthroughBusy, requestWalkthrough]);
 

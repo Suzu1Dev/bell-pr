@@ -67,8 +67,11 @@ export async function walkthrough(
       (entry) => entry.path === filePath,
     );
     if (!file) throw new AppError((m) => m.run.review.fileNotFound, 404);
+    // With no job for this file, "generating" was left by a job that
+    // stopped without a result: it is made again, like a pending one.
     const wanted =
       file.walkthroughStatus === "pending" ||
+      file.walkthroughStatus === "generating" ||
       (retry && file.walkthroughStatus === "failed");
     if (wanted) {
       // Background work of the run: its agent and its messages use the run's language.

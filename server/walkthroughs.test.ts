@@ -413,6 +413,11 @@ test("walkthroughs written in the background let a sync and a premise check go a
     assert.equal(walkthroughs.length, 2);
     assert.match(walkthroughs[1].prompt, /呼叫端會傳入空陣列/);
 
+    // A "generating" left without its job is written again rather than awaited forever.
+    run.walkthroughs!["count.ts"] = { fingerprint: again.fingerprint, status: "generating" };
+    const stale = (await workbench.walkthrough(run.id, "count.ts")).files[0];
+    assert.equal(stale.walkthroughStatus, "ready");
+    assert.equal(walkthroughs.length, 3);
     await workbench.shutdown();
   } finally {
     await rm(directory, { recursive: true, force: true });
