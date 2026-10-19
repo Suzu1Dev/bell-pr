@@ -74,6 +74,11 @@ export default defineConfig({
   cacheDir: ".vite-cache",
   define: { __APP_VERSION__: JSON.stringify(version) },
   build: {
+    // The stylesheets use color-mix(), which needs Chrome and Edge 111,
+    // Firefox 113 or Safari 16.2, so the app cannot run on older browsers.
+    // Scripts and styles keep the syntax these versions support instead of
+    // being rewritten for older ones (Vite's default target).
+    target: ["chrome111", "edge111", "firefox113", "safari16.2"],
     // The largest chunk's budget in kB (minified, before gzip); the gzip
     // budgets live in scripts/check-pack.mjs.
     chunkSizeWarningLimit: 450,
