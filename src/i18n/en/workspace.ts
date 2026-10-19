@@ -498,7 +498,7 @@ const workspace = {
   notices: {
     /** `verdict` is one of team.premise.verdicts. */
     premiseChecked: ({ verdict }: { verdict: string }) =>
-      `Premise checked: ${verdict}. If the verdict changed, the explanations and code walkthroughs are made again with it.`,
+      `Premise checked: ${verdict}. If the verdict changed, the code walkthroughs, and the explanations you have not answered yet, are made again with it.`,
     premiseNone: "The request states no assumption to check.",
     stopResolving:
       "Stopped resolving conflicts. The files already changed are kept; finish them yourself or ask the agent again.",

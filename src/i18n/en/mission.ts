@@ -185,12 +185,12 @@ const mission = {
     impactRefuted:
       "The premise check found that the assumption does not hold: the problem and impact described above from it do not happen. Go by the check and the lead's integration report.",
     premiseMissing:
-      "This contribution was made before premise checks, so whether the request's assumption holds was not recorded. The lead can check it once against the current code and the review reports; the explanations and code walkthroughs are then made again with the verdict.",
+      "This contribution was made before premise checks, so whether the request's assumption holds was not recorded. The lead can check it once against the current code and the review reports; the code walkthroughs, and the explanations you have not answered yet, are then made again with the verdict.",
     premiseCheck: "Check the premise against the review",
     premiseRecheck: "Check the premise again",
     premiseChecking: "Checking the premise…",
     premiseRecheckNote:
-      "If the verdict changes, the explanations and code walkthroughs are made again with it.",
+      "If the verdict changes, the code walkthroughs, and the explanations you have not answered yet, are made again with it.",
     pending:
       "The user impact of this contribution has not been analyzed yet. Your original request is kept here; once the analysis is done, it is tied to a concrete motivation and acceptance checks.",
   },

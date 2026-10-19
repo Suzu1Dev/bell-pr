@@ -286,8 +286,8 @@ check, the problem and the motivation, before and after, and how to
 validate it, in Markdown as written. The project's analysis follows as its
 background, and the directions come last. On a finished run you can check
 the premise again (or for the first time, on a run made before premise
-checks); a changed verdict has the explanations and walkthroughs written
-again.
+checks); a changed verdict has the walkthroughs written again, and the
+explanations you have not answered from yet.
 
 ## 6. Explain it back
 

@@ -2,11 +2,13 @@
  * Checks a finished run's premise again, or for the first time on a run
  * made before premise checks: one read-only lead turn reads the code and
  * treats the team's plan and reports as claims to confirm. A changed
- * verdict has the run's explanations and walkthroughs made again.
+ * verdict has the run's walkthroughs, and the explanations the person has
+ * not answered from, made again.
  */
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { practiceKey } from "../shared/practice.js";
 import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
 import { premiseCheckPrompt } from "./prompts/premise.js";
 import { contributionContext } from "./prompts/team.js";
@@ -29,6 +31,29 @@ const finishedStatuses: Run["status"][] = [
   "failed",
   "cancelled",
 ];
+
+/**
+ * Drops the explanations a changed verdict should have made again. One the
+ * person already answered from at its file's version keeps its card: a
+ * try-first answer or approach, an Explain-it-back answer, or a practice
+ * grade on its self-check. A remade card would put a new question (and a
+ * new reference answer) in place of the one they answered.
+ */
+export function dropUnansweredExplanations(
+  run: Pick<Run, "explanations" | "attempts" | "understanding" | "practice">,
+) {
+  const explanations = run.explanations;
+  if (!explanations) return;
+  for (const [file, stored] of Object.entries(explanations)) {
+    const answered =
+      run.attempts?.[file]?.fingerprint === stored.fingerprint ||
+      !!run.understanding?.items?.some(
+        (item) => item.path === file && item.fingerprint === stored.fingerprint,
+      ) ||
+      !!run.practice?.[practiceKey("selfCheck", file)];
+    if (!answered) delete explanations[file];
+  }
+}
 
 export async function checkPremise(ctx: WorkbenchContext, id: string) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
@@ -93,7 +118,7 @@ export async function checkPremise(ctx: WorkbenchContext, id: string) {
       else delete team.premise;
       if (changed) {
         // Made with the old verdict, or none; they are made again with this one.
-        delete run.explanations;
+        dropUnansweredExplanations(run);
         delete run.walkthroughs;
       }
       withRunLocale(run, () =>

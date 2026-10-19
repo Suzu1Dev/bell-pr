@@ -321,7 +321,7 @@ export default {
     incomplete: "The agent's premise check was incomplete.",
     /** One line in the run's log; `changed` says whether the verdict is new. */
     checked: ({ verdict, changed }: { verdict: "holds" | "refuted" | "unclear"; changed: boolean }) =>
-      `Premise check: ${{ holds: "the assumption holds", refuted: "the assumption does not hold", unclear: "the assumption could not be confirmed" }[verdict]}. ${changed ? "The explanations and code walkthroughs are made again with this verdict." : "The verdict did not change."}`,
+      `Premise check: ${{ holds: "the assumption holds", refuted: "the assumption does not hold", unclear: "the assumption could not be confirmed" }[verdict]}. ${changed ? "The code walkthroughs, and the explanations not answered yet, are made again with this verdict." : "The verdict did not change."}`,
     noAssumption: "Premise check: the request states no assumption to check.",
   },
   /** Function walkthroughs: the code around each change, step by step. */
