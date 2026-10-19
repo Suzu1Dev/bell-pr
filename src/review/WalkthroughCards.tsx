@@ -15,7 +15,8 @@ import type {
   CodeReference,
   FunctionWalkthrough,
 } from "../../shared/walkthroughs";
-import { useFormat, useT } from "../i18n";
+import { getDemo } from "../demo";
+import { useFormat, useLocale, useT } from "../i18n";
 import type { DiffFile } from "../types";
 import { MarkdownContent } from "./MarkdownContent";
 import { withNodes } from "./withNodes";
@@ -106,6 +107,7 @@ export function WalkthroughCards({
 }: WalkthroughCardsProps) {
   const t = useT("review").walkthrough;
   const format = useFormat();
+  const [locale] = useLocale();
   const status = file.walkthroughStatus;
   const walkthrough = file.walkthrough;
   const lines = (start: number, end: number) => t.lines({ start, end });
@@ -116,12 +118,32 @@ export function WalkthroughCards({
       selected(startLine, endLine) ? undefined : { startLine, endLine },
     );
 
+  // The locale's separator between listed names (", " or the ideographic comma).
+  const separator = format.list(["", ""], { type: "unit" });
+  const codeList = (names: string[]) =>
+    names.map((name, index) => (
+      <span key={`${name}:${index}`}>
+        {index > 0 && separator}
+        <code>{name}</code>
+      </span>
+    ));
   if (file.blocked || status === "unavailable" || (demo && !walkthrough))
     return (
       <div className="explain-empty">
         <AlertCircle size={28} />
         <h3>{t.unavailableTitle}</h3>
-        <p>{file.blocked || file.walkthroughError || t.demoOnly}</p>
+        <p>
+          {file.blocked ||
+            file.walkthroughError ||
+            // The sample names the files it has one for.
+            withNodes(t.demoOnly, {
+              paths: codeList(
+                getDemo(locale)
+                  .files.filter((entry) => entry.walkthrough)
+                  .map((entry) => entry.path),
+              ),
+            })}
+        </p>
       </div>
     );
   if (status === "failed")
@@ -162,22 +184,9 @@ export function WalkthroughCards({
       </div>
     );
   const added = walkthrough.newUnits ?? [];
-  // The locale's separator between listed names (", " or the ideographic comma).
-  const separator = format.list(["", ""], { type: "unit" });
   const addedNote = added.length > 0 && (
     <p className="walkthrough-new-units">
-      {withNodes(t.newUnits, {
-        names: (
-          <>
-            {added.map((name, index) => (
-              <span key={`${name}:${index}`}>
-                {index > 0 && separator}
-                <code>{name}</code>
-              </span>
-            ))}
-          </>
-        ),
-      })}
+      {withNodes(t.newUnits, { names: codeList(added) })}
     </p>
   );
   if (!walkthrough.functions.length)

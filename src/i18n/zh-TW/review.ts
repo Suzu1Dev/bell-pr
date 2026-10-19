@@ -254,7 +254,7 @@ const m: Translation<typeof en> = {
       start === end ? `第 ${start} 行` : `第 ${start}–${end} 行`,
     none: "沒有找到。",
     unavailableTitle: "這個檔案沒有程式碼解說",
-    demoOnly: "示範資料只為部分檔案準備了程式碼解說。",
+    demoOnly: ({ paths }) => `示範資料只為 ${paths} 準備了程式碼解說；從檔案清單打開它就能看到。`,
     failedTitle: "程式碼解說尚未完成",
     failedBody: "產生程式碼解說時發生問題，變更內容仍可正常審閱。",
     retry: "重新產生程式碼解說",

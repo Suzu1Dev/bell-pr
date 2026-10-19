@@ -57,8 +57,12 @@ test("waiting, failed, unavailable and empty walkthroughs each explain themselve
     render({ ...base, walkthroughStatus: "ready", walkthrough: { functions: [] } }),
     /沒有找到包住這些變更的函式/,
   );
-  // Demo files without a prepared walkthrough say so instead of waiting forever.
-  assert.match(render(demoFiles[0], { demo: true }), /示範資料只為部分檔案準備了程式碼解說/);
+  // Demo files without a prepared walkthrough say so instead of waiting
+  // forever, and name the file that has one.
+  assert.match(render(demoFiles[0], { demo: true }), /示範資料只為 <span><code>src\/client\.ts<\/code><\/span> 準備了程式碼解說/);
+  const english = renderEn(createElement(WalkthroughCards, { file: getDemo("en").files[0], demo: true }));
+  assertNoHan(english);
+  assert.match(english, /The sample has a code walkthrough for <span><code>src\/client\.ts<\/code><\/span> only/);
 });
 
 test("new code is named and sent to the change explanation instead of being walked through", () => {

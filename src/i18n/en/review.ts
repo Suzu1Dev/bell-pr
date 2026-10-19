@@ -403,7 +403,9 @@ const review = {
       start === end ? `Line ${start}` : `Lines ${start}–${end}`,
     none: "None found.",
     unavailableTitle: "This file has no code walkthrough",
-    demoOnly: "The sample prepared a code walkthrough for some files only.",
+    /** `paths` lists the sample's files that have one, each shown as code. */
+    demoOnly: ({ paths }: { paths: string }) =>
+      `The sample has a code walkthrough for ${paths} only; open it from the file list to see one.`,
     failedTitle: "The code walkthrough isn't finished",
     failedBody:
       "Something went wrong while preparing the code walkthrough; the changes can still be reviewed.",
