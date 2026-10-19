@@ -247,7 +247,11 @@ When the team is done, the run waits for your review in **Code changes**:
   way to see it and a question to check yourself. A function the change adds whole has no
   earlier version to walk through, so it points to the explanation
   instead. Walkthroughs are written one file at a time, the selected file
-  first, and are kept for that version of the diff.
+  first, and are kept for that version of the diff. The walkthrough's
+  question is a hint: click it to see its answer. Unlike the
+  explanation's "Quiz yourself", it does not ask for your answer first,
+  nothing is recorded, and it does not count toward the understanding
+  check.
 - **Unchanged code**: the bar between two changes says how many unchanged
   lines it hides; show 20 more above or below, or all of them, and
   **Whole file** shows the whole file between the changes. The lines are
