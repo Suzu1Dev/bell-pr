@@ -31,6 +31,7 @@ import {
   type FileAttemptInput,
 } from "../../shared/understanding";
 import { useTablistKeys } from "../a11y/useTablistKeys";
+import { scrollBehavior } from "../app/presentation";
 import { useFormat, useLocale, useT } from "../i18n";
 import type { ChatMessage, DiffFile, Run } from "../types";
 import { MarkdownContent } from "./MarkdownContent";
@@ -347,7 +348,10 @@ export function ExplanationPanel({
 
   useEffect(() => {
     if (tab === "chat")
-      chatEnd.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      chatEnd.current?.scrollIntoView({
+        block: "nearest",
+        behavior: scrollBehavior(),
+      });
   }, [messages.length, loading, tab]);
 
   useEffect(() => {

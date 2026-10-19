@@ -12,7 +12,8 @@
  *   cursor=1     a synthetic cursor follows the mouse
  *   capture=1    the capture tooling is recording: `data-capture` is set
  *                on <html>, and the shell's CSS hides scrollbars and the
- *                caret blink for it
+ *                caret blink for it; scrolling into view jumps instead of
+ *                gliding (scrollBehavior)
  *
  * The flags ride on any route, for example
  * `#/runs/demo-run/activity?demo=play&speed=4&present=1&locale=en`.
@@ -137,6 +138,23 @@ export function maskPath(
   if (!isAbsolute(full)) return path;
   const name = full.split(separator).pop();
   return name && name !== "~" ? `…/${name}` : "…";
+}
+
+/**
+ * How to scroll something into view: smoothly, unless the person prefers
+ * reduced motion or the capture tooling records (capture=1). A smooth
+ * scroll runs on the browser's real-time clock, so captures with a paused
+ * or stepped page clock would differ from one recording to the next.
+ */
+export function scrollBehavior(
+  capture = flagsNow().capture,
+  matchMedia: ((query: string) => Pick<MediaQueryList, "matches">) | undefined =
+    typeof window === "undefined" ? undefined : window.matchMedia?.bind(window),
+): ScrollBehavior {
+  if (capture) return "instant";
+  return matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    ? "instant"
+    : "smooth";
 }
 
 /** Sets or removes `data-capture` on <html> for the capture flag. */

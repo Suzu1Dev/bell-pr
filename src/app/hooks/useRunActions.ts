@@ -26,7 +26,7 @@ import type { ContributionSettings } from "../../../shared/insights";
 import { summarizeRun } from "../../../shared/runs";
 import { activeFollowUp } from "../../../shared/followups";
 import type { ModalName, Notify, Page, Tab } from "../AppShell";
-import { usePresentation } from "../presentation";
+import { usePresentation, type PresentationFlags } from "../presentation";
 import {
   demoRunInLocale,
   loadDemo,
@@ -158,6 +158,34 @@ export function withSampleFeedback(
 }
 
 /**
+ * A number in [0, 1) decided by `text` alone (FNV-1a, 32 bits): the same
+ * text always gives the same number.
+ */
+export function textRandom(text: string): () => number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index++) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  const value = hash / 2 ** 32;
+  return () => value;
+}
+
+/**
+ * Where an answer's first pause comes from. Presenting (present=1) and
+ * capturing (capture=1) wait the middle of the range every time; otherwise
+ * the answer itself picks the pause, so answers still differ, while a
+ * recording or a test with a paused page clock sees the same frames on
+ * every run.
+ */
+export function answerDelayRandom(
+  flags: Pick<PresentationFlags, "present" | "capture">,
+  answer: string,
+): () => number {
+  return flags.present || flags.capture ? () => 0.5 : textRandom(answer);
+}
+
+/**
  * How a playback answer types out: a pause of 300-900 ms first, then the
  * text in at most 40 growing slices about 1.2 s apart in total at speed 1
  * (faster at a higher speed, never under 16 ms a slice).
@@ -165,7 +193,7 @@ export function withSampleFeedback(
 export function answerTyping(
   answer: string,
   speed: number,
-  random: () => number = Math.random,
+  random: () => number = textRandom(answer),
 ): { delay: number; pause: number; slices: string[] } {
   const steps = Math.max(1, Math.min(40, Math.ceil(answer.length / 8)));
   const size = Math.max(1, Math.ceil(answer.length / steps));
@@ -178,6 +206,22 @@ export function answerTyping(
     pause: Math.max(16, Math.round(1200 / speed / slices.length)),
     slices,
   };
+}
+
+/**
+ * Types out a playback answer on timers: its first pause, then each slice
+ * after the one before. `show` gets every slice in order and returns false
+ * to stop, as when the reader opened another run.
+ */
+export async function typeOut(
+  typing: ReturnType<typeof answerTyping>,
+  show: (content: string, index: number) => boolean,
+) {
+  await wait(typing.delay);
+  for (const [index, content] of typing.slices.entries()) {
+    if (index) await wait(typing.pause);
+    if (!show(content, index)) return;
+  }
 }
 
 /**
@@ -827,12 +871,14 @@ export function useRunActions({
     answer: string,
     fingerprint?: string,
   ) {
-    const { delay, pause, slices } = answerTyping(answer, presentation.speed);
-    await wait(delay);
+    const typing = answerTyping(
+      answer,
+      presentation.speed,
+      answerDelayRandom(presentation, answer),
+    );
     let shown: ChatMessage | undefined;
-    for (const [index, content] of slices.entries()) {
-      if (index) await wait(pause);
-      if (runIdRef.current !== runId) return;
+    await typeOut(typing, (content) => {
+      if (runIdRef.current !== runId) return false;
       const previousTurn = shown;
       const turn: ChatMessage = { role: "assistant", content, fingerprint };
       shown = turn;
@@ -846,7 +892,8 @@ export function useRunActions({
           [key]: list.map((each) => (each === previousTurn ? turn : each)),
         };
       });
-    }
+      return true;
+    });
   }
   /** Opens the Explain-it-back check instead of approving or publishing. */
   function checkFirst() {
