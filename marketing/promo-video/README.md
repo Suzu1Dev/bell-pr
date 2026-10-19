@@ -76,7 +76,12 @@ states against the existing product build.
    1440x810 window at device scale 4 (5760x3240 pixels), with the page
    clock installed and paused at 2026-10-14 10:24 UTC and GPU off, so the
    frames are deterministic: PNG stills and frame-stepped clips (the clock
-   moves 1/30 s per frame). It reaches each state with the drivers
+   moves 1/30 s per frame). Two things the page clock does not drive are
+   pinned in `v-line-ask`: the demo answer's random pause before it types
+   (a queued `Math.random` value, 560 ms) and the chat's smooth scroll,
+   which runs on Chrome's real-time clock (the answer take holds the
+   "reread" frame the capture reaches with its own page-clock scroll). It
+   reaches each state with the drivers
    `e2e/promo-states.spec.ts` checks. The demo-only "Fill with the sample
    answer" controls are hidden while filming (`visibility: hidden` on
    those buttons only; they are still clicked to type the sample text), so

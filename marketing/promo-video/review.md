@@ -6,7 +6,9 @@ second) of the 88.0 s cut (2640 frames: the 86.8 s music edit and the end
 card's 1.2 s hold and fade); the cut itself is in [`script.md`](script.md).
 Rounds 1-4 below were made on the first cut; round 5 re-cut the film after
 three reviewers' findings, round 6 answered a second set of three reviews
-and round 7 a third. Round 7's verdicts are the current ones.
+and round 7 a third. Round 8 rebuilt everything from a clean state (a new
+capture of all 13 states included) and made that rebuild repeat the
+reviewed film; round 7's verdicts are the current ones.
 
 ## Automated: enforced on every run
 
@@ -21,18 +23,15 @@ state of every VIDEO.md §4 state it films:
 - the "Sample project" badge is visible;
 - the licensed MP3 matches its MD5 before anything starts.
 
-`out/capture.log` holds the capture behind this cut: 13 states, 50 named
-states each "privacy ok; sample badge visible", "every named state passed
-the privacy and badge checks (no exemption)". Seven states were filmed on
-2026-10-15 at device scale 4 on the same product commit;
-`v-draft-your-words` was filmed again on 2026-10-18 to add the establishing
-still `top` (its clip came out pixel-identical to the earlier one: mean
-absolute difference 0.0 on frames 0, 100 and 200); and in round 5
-`v-quiz-attempt`, `v-road-choice`, `v-check`, `v-forecast` and
-`v-practice` were filmed again with the demo-only "Fill with the sample
-answer" controls hidden (same frame counts, same marks; the frames differ
-only where the fill links were, checked on frames 30-400 of each), and
-`v-practice` with a right answer.
+`out/capture.log` holds the capture behind this cut: one run of
+`npm run capture` from a clean state on 2026-10-19 (round 8), 13 states at
+device scale 4, 51 named states each "privacy ok; sample badge visible",
+the in-page guard reporting "no finding" for every state, and "every named
+state passed the privacy and badge checks (no exemption)". Rounds 5-7 were
+reviewed on footage filmed on 2026-10-15 (seven states) and 2026-10-18 (six
+states, the demo-only "Fill with the sample answer" controls hidden and
+`v-practice` with a right answer); round 8 checks that the clean capture
+gives the same pictures (below).
 
 `npm run check` (`scripts/check-output.mjs`; `-- --web-only` while the 4K
 master is not rendered) fails unless:
@@ -498,6 +497,70 @@ component, none shown empty; no lift cropping a glyph; no lifted line cut
 by a frame or window edge; no dead third of studio; no fill link; no
 double exposure; no Apple fonts, devices, window buttons or "9:41"; no
 GitHub, OpenAI or Anthropic logo; only the fictional sample.
+
+### Round 8 (the clean rebuild of 2026-10-19): a capture that repeats the reviewed film
+
+From a clean state (`node_modules` and `out/` removed, the MP3 in place),
+`npm ci`, `npm run build` (the capture of all 13 states, assets, hit, the 4K
+master, the web files, check) and `npm run check` exit 0, and so do
+`npm test` (65 tests, the depth-of-field check against the new footage
+included) and `npm run review` (no finding in the four scans over all 2640
+frames).
+
+**Found:** the first clean rebuild filmed `v-line-ask` with its answer 0.1 s
+late (the "answer" mark at 4.333 s instead of 4.233 s, 197 frames instead of
+194), so S8's answer take (1371-1442), which held clip time 4.27 s, showed
+the question's diff block lifted instead of the answer's first paragraph.
+`npm run check`, `npm test` and the scans passed (a tidy but wrong
+component is nothing they look for); looking at frame 1407 of the 4K master
+caught it. Two things in that state do not run on the page clock:
+
+- the demo's prewritten answer waits a random 300-899 ms before it types
+  (the product's `answerTyping` calls `Math.random`);
+- when the reply finishes, the chat's `scrollIntoView({ behavior: "smooth" })`
+  runs on Chrome's real-time clock, so clip frame 128 caught it at a
+  different position on each capture (three captures with the same pause:
+  two of them 1.6 levels off the reviewed frame on average, the text up to
+  15 px lower).
+
+**Fixed** (b430e09, 0581cf3): the capture pins the pause at 560 ms (a queued
+`Math.random` value; it fails if the answer did not take it), so the answer
+types from clip frame 92 as before, after the frames the question take
+shows; and once the reply has settled it tweens the chat back 57 px on the
+page clock, to the position the take was framed on, and marks "reread"
+(6.967 s). The answer take holds 6.97 s. The reread frame is pixel-identical
+to the reviewed frame 128 (mean and largest difference 0).
+
+**The second clean rebuild against the reviewed film:**
+
+- footage: `v-plan`, `v-board`, `v-quiz-attempt`, `v-road-choice`,
+  `v-check`, `v-forecast`, `v-draft-your-words` and
+  `v-forecast-vs-reality` byte-identical to the footage rounds 5-7 were
+  reviewed on; `v-rules-card` and `v-publish` within 1-7 levels; in
+  `v-before-you-start` only clip frames 26-30 differ, a transition caught at
+  other moments, before the 2.55 s the film starts that clip from;
+  `v-practice` differs in its JPEG bytes, with no difference in the film
+  (below);
+- the web MP4 against the round-7 web MP4, every frame decoded (480x270
+  luma): 0.022 levels apart on average; above 0.05 only on 830-902 (at most
+  0.37: render noise of at most 13 levels on a few dozen pixels in S5's last
+  beat and S6's floating window) and 1227-1442 (at most 0.71, on 1333: in
+  S8's select take the dropped-back chat behind the selection, blurred under
+  the veil, where the scroll after "Explain this code", clip frames 76-78,
+  still lands a few px apart from capture to capture); S13's practice card
+  under 0.05; the poster and the captions file byte-identical;
+- the two clean rebuilds' 4K masters: 13 of 14 frames sampled in both
+  bit-identical, the 14th S8's answer (1407), the fix.
+
+**4K master, looked at in full** (12 frames, whole and in native-resolution
+crops): 39, 291, 400, 649, 828, 1011, 1155, 1407, 1623, 1983, 2330, 2610.
+The wordmark and the lifted text in pushes are crisp (291, 1407, 1983);
+the macro on the chips (649) and the push onto the maintainer's comment
+(2330) show the known slight softening of glyph edges where the 4K master
+upsamples the DPR-4 capture; the end card's type and grain are clean; no smear, ghosting, cropped UI, empty frame or caption on
+a subject. Banding (STYLE-GUIDE B.7, longest flat run on studio-only
+regions, in 4K px, pass at most 240): dark stage 41-48 (39, 2554, 2610),
+light studio 26-54 (291 top and bottom, 400, 1530).
 
 ### The look-dev's must-fix list (COMPARISON.md), as fixed here
 
