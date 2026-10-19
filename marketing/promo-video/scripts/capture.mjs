@@ -212,6 +212,27 @@ async function hideDemoFill(page) {
 /** A demo fill button, found even while hidden. */
 const fillButton = (scope, name) => scope.getByRole("button", { name, includeHidden: true });
 
+/**
+ * Installed in every page before its own scripts: Math.random with a queue
+ * the capture can fill. A queued value is what the page's next
+ * Math.random() call returns; with the queue empty it is the browser's own.
+ * The demo's prewritten chat answer waits a random 300-899 ms before it
+ * types (the product's answerTyping), so without a pinned value S8's
+ * answer landed on a different frame on each capture, while the cut holds
+ * fixed clip times (src/shots.ts).
+ */
+function queuedRandom() {
+  const random = Math.random.bind(Math);
+  const queue = [];
+  Object.defineProperty(window, "__promoRandomQueue", { value: queue });
+  Math.random = () => (queue.length ? queue.shift() : random());
+}
+
+/** Makes the demo answer's next pause before it types exactly `ms` (300-899). */
+async function pinAnswerPause(page, ms) {
+  await page.evaluate((value) => window.__promoRandomQueue.push(value), (ms - 300 + 0.5) / 600);
+}
+
 /** Steps frames until a field holds `text` (a typewriter at 30 ms a character). */
 async function typedOut(rec, field, text, seconds = 12) {
   await rec.until(async () => (await field.inputValue()) === text, seconds);
@@ -431,6 +452,9 @@ const states = {
     await rec.check("lines selected");
     await rec.hold(0.4);
     await rec.moveTo("explain", page.getByRole("button", { name: r.diff.askSelection }), { duration: 0.45 });
+    // The answer's pause before it types, pinned: it starts typing on frame 92, after the frames S8's question take
+    // shows (as in the footage the cut was made on).
+    await pinAnswerPause(page, 560);
     await rec.click("explain");
     rec.mark("asked");
     await rec.hold(0.3);
@@ -442,6 +466,8 @@ const states = {
     await rec.until(async () => (await page.locator(".explain-loading").count()) === 0, 12);
     const answer = page.locator(".explain-message-assistant").last();
     await rec.until(() => answer.isVisible(), 5);
+    if (await page.evaluate(() => window.__promoRandomQueue.length))
+      throw new Error("v-line-ask: the answer did not take its pinned pause.");
     rec.mark("answer");
     await rec.hold(1.2);
     await rec.target("answer", answer);
@@ -831,6 +857,7 @@ async function main() {
       const context = await browser.newContext({ ...contextOptions, storageState });
       try {
         await context.addInitScript(privacyGuard, privacyGuardArgs());
+        await context.addInitScript(queuedRandom);
         const page = await context.newPage();
         await fitWindow(page, viewport);
         await S.pauseClock(page);
