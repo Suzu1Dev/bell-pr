@@ -126,7 +126,7 @@ Failed subtasks can be retried.
 Before it plans, the Lead checks any assumption the request states against
 the code, and every role is told the verdict. The brief shows it, and once
 the run is finished you can check it again, also on a run made before
-these checks. Agents never change your
+these checks. Agents are told never to change your
 machine: no `sudo` and no global installs. When a check needs something
 the machine lacks, the overview lists it with a suggested command, for you
 to verify and run yourself.

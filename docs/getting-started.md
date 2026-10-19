@@ -213,11 +213,11 @@ Start the run with **Generate the team plan** (with plan approval) or
   the overall conclusion; the Reviewer opens by saying whether it agrees
   and adds only what the summary lacks, and the Test analyst keeps the one
   list of checks still to run.
-- Agents never change your machine: no `sudo`, no global or user-level
-  installs. When a check needs something the machine lacks, the teammate
-  reports it, and **Overview & motivation** lists it under "Setup this
-  machine needs from you" with a suggested command and who reported it.
-  Check the command against the project's documentation before you run
+- Agents are told never to change your machine: no `sudo`, no global or
+  user-level installs. When a check needs something the machine lacks, the
+  teammate reports it, and **Overview & motivation** lists it under "Setup
+  this machine needs from you" with a suggested command and who reported
+  it. Check the command against the project's documentation before you run
   it; BELL PR never runs it.
 - **Run details** folds the model and the AI usage: its line names the
   agent, the model, the calls and the input and output tokens, marks
