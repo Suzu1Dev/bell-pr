@@ -9,6 +9,7 @@
  * can check it.
  */
 import { corners } from "./look/camera.ts";
+import { FLARE_FRAMES } from "./logo.ts";
 import { music } from "./music.ts";
 import { looks } from "./shots.ts";
 import { takeView } from "./takes.ts";
@@ -22,7 +23,9 @@ const covers = (look: Parameters<typeof takeView>[0]) => {
 
 /** Film frames of the cuts that need a keyframe, in order. */
 export function keyframeCuts(): number[] {
-  const frames = new Set<number>([music.events.firstHit, music.events.finalHit]);
+  // The first hit, and the frame its lights-on flare settles on (VP9 codes the flare's fading wash as a smooth
+  // residual over the keyframe and loses the plate's grain until the next keyframe: review round 7).
+  const frames = new Set<number>([music.events.firstHit, music.events.firstHit + FLARE_FRAMES, music.events.finalHit]);
   for (const shot of timeline.shots)
     for (const take of shot.takes) {
       if (take.id === "title") {
