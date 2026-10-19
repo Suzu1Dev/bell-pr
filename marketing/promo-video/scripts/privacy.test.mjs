@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { privacyFindings, privacyPattern } from "./lib/privacy.mjs";
+import { allowedPlaceholders, privacyFindings, privacyPattern } from "./lib/privacy.mjs";
 
 const join = (...parts) => parts.join("");
 
@@ -19,10 +19,10 @@ test("owner identifiers, home and temp paths and e-mail addresses fail, by rule 
   assert.deepEqual(privacyFindings("Mail me: someone@example.org"), ["e-mail address"]);
 });
 
-test("only the product's own fictional example path is allowed", () => {
-  assert.deepEqual(privacyFindings("such as /home/you/projects/repository"), []);
-  assert.deepEqual(privacyFindings("/home/you/projects/other"), ["Linux home path"]);
-  assert.ok(privacyPattern.test("/home/you/projects/repository"), "the raw pattern still matches it");
+test("the rule has no exemption, not even the product's own example path", () => {
+  assert.deepEqual(allowedPlaceholders, []);
+  assert.deepEqual(privacyFindings("such as /home/you/projects/repository"), ["Linux home path"]);
+  assert.ok(privacyPattern.test("/home/you/projects/repository"));
 });
 
 test("the rule file never contains the identifiers it looks for", () => {

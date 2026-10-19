@@ -2,14 +2,16 @@
  * Records one shot of the promo footage from a Playwright page:
  *
  * - stills: PNG screenshots at named states (`<state>.png`);
- * - screencast clips: every frame Chrome paints, through CDP
- *   Page.startScreencast (JPEG quality 100), saved with its timestamp;
  * - frame-stepped clips: with the page clock paused, the clock moves on by
- *   1/30 s and the page is screenshot, frame after frame.
+ *   1/30 s and the page is screenshot (JPEG quality 100), frame after frame.
  *
- * It also keeps the cursor targets (element boxes in CSS pixels of the
- * 1440x810 viewport) and the pointer moves and clicks with their times, for
- * the Remotion cursor, and runs the privacy check at every state.
+ * Screenshots carry the window's device scale factor (4 for the promo: a
+ * 1440x810 CSS viewport becomes 5760x3240 pixels).
+ *
+ * It also keeps element boxes (CSS pixels of the 1440x810 viewport) for the
+ * cameras and the pointer, the pointer moves and clicks with their times,
+ * named moments ("marks") for the cuts, and runs the privacy check at every
+ * named state.
  */
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -76,9 +78,10 @@ export class ShotRecorder {
    * @param {string} options.id the shot id, for the log
    * @param {boolean} options.workspace whether the sample badge must show
    * @param {(line: string) => void} options.log
+   * @param {{ width: number, height: number, deviceScaleFactor: number }} options.viewport
    */
-  constructor({ page, dir, id, workspace, log }) {
-    Object.assign(this, { page, dir, id, workspace, log });
+  constructor({ page, dir, id, workspace, log, viewport }) {
+    Object.assign(this, { page, dir, id, workspace, log, viewport });
     this.boxes = {};
     this.events = [];
     /** Named moments of a clip, in seconds, for cuts in src/timeline.json. */
@@ -144,77 +147,33 @@ export class ShotRecorder {
 
   /** Seconds since the clip's first frame. */
   elapsed() {
-    if (this.method === "clock") return this.frameIndex / 30;
-    return Date.now() / 1000 - this.t0;
+    return this.frameIndex / 30;
   }
 
-  /** Sleeps until `t` seconds after the clip's first frame. */
+  /** Steps frames until `t` seconds after the clip's first frame. */
   async at(t) {
-    if (this.method === "clock") {
-      while (this.frameIndex < Math.round(t * 30)) await this.frame();
-      return;
-    }
-    await sleep((this.t0 + t) * 1000 - Date.now());
+    while (this.frameIndex < Math.round(t * 30)) await this.frame();
   }
 
-  /** Starts the CDP screencast; resolves at its first frame. */
-  async startScreencast() {
-    this.method = "screencast";
-    await mkdir(path.join(this.dir, "frames"), { recursive: true });
-    const cdp = await this.page.context().newCDPSession(this.page);
-    this.cdp = cdp;
-    this.writes = [];
-    let first;
-    const started = new Promise((resolve) => (first = resolve));
-    cdp.on("Page.screencastFrame", (frame) => {
-      const file = `frames/${String(this.frames.length).padStart(5, "0")}.jpg`;
-      this.frames.push({ file, timestamp: frame.metadata.timestamp });
-      this.writes.push(writeFile(path.join(this.dir, file), Buffer.from(frame.data, "base64")));
-      cdp.send("Page.screencastFrameAck", { sessionId: frame.sessionId }).catch(() => {});
-      if (this.frames.length === 1) first(frame.metadata.timestamp);
-    });
-    await cdp.send("Page.startScreencast", {
-      format: "jpeg",
-      quality: 100,
-      everyNthFrame: 1,
-      maxWidth: 2880,
-      maxHeight: 1620,
-    });
-    this.t0 = await started;
-    this.markStart();
+  /** Steps frames for `seconds` more: the page holds (or keeps playing). */
+  async hold(seconds) {
+    await this.at(this.elapsed() + seconds);
   }
 
-  /** The cursor starts the clip where the pointer was parked. */
+  /** The pointer starts the clip where it was parked. */
   markStart() {
     if (this.pointer) this.events.push({ type: "start", t: 0, ...this.pointer });
   }
 
-  async stopScreencast() {
-    await this.cdp.send("Page.stopScreencast");
-    await Promise.all(this.writes);
-    await this.cdp.detach();
-  }
-
   /**
-   * Pauses the page clock (installed before navigation) where it is now, so
-   * no timer of the page runs until frames are stepped. Before a navigation,
-   * pass `at` (a moment after the clock's install time) to keep a playback
-   * at its first step.
-   */
-  async pauseClock(at) {
-    if (this.clockAt !== undefined) return;
-    this.clockAt = at ? at.getTime() : (await this.page.evaluate(() => Date.now())) + 1;
-    await this.page.clock.pauseAt(new Date(this.clockAt));
-  }
-
-  /**
-   * Frame stepping. The page clock (timers, Date, requestAnimationFrame)
-   * moves on by exactly 1/30 s per frame. CSS animations and transitions run
-   * on the document timeline, which the clock does not drive: the timeline
-   * is stopped through CDP (playback rate 0) and each frame moves every
-   * running animation on by 1/30 s, so a dialog fades in over the same
-   * frames it would on screen, however long a screenshot takes. Scrolls are
-   * tweened per frame (scrollTo) rather than left to smooth scrolling.
+   * Frame stepping. The page clock (timers, Date, requestAnimationFrame),
+   * which the caller installed and paused before the page loaded, moves on
+   * by exactly 1/30 s per frame. CSS animations and transitions run on the
+   * document timeline, which the clock does not drive: the timeline is
+   * stopped through CDP (playback rate 0) and each frame moves every running
+   * animation on by 1/30 s, so a dialog fades in over the same frames it
+   * would on screen, however long a screenshot takes. Scrolls are tweened
+   * per frame (scrollTo) rather than left to smooth scrolling.
    * Frame 0 is the state when this is called.
    */
   async startFrames() {
@@ -222,7 +181,8 @@ export class ShotRecorder {
     this.frameIndex = 0;
     this.tweens = [];
     await mkdir(path.join(this.dir, "frames"), { recursive: true });
-    await this.pauseClock();
+    // The clock is paused, so the page's time stands still between calls.
+    this.clockAt = await this.page.evaluate(() => Date.now());
     this.clockStart = this.clockAt;
     this.cdp = await this.page.context().newCDPSession(this.page);
     await this.cdp.send("Animation.enable");
@@ -285,7 +245,7 @@ export class ShotRecorder {
     await this.page.screenshot({
       path: path.join(this.dir, file),
       type: "jpeg",
-      quality: 95,
+      quality: 100,
       caret: "hide",
     });
     this.frames.push({ file, timestamp: this.frameIndex / 30 });
@@ -294,12 +254,13 @@ export class ShotRecorder {
   async stopFrames() {
     await this.cdp.send("Animation.setPlaybackRate", { playbackRate: 1 });
     await this.cdp.detach();
+    this.stopped = true;
   }
 
   /**
    * Scrolls `scroller` (an element handle, or the window when omitted) to
    * `top` over `duration` seconds from now, eased in and out, one step per
-   * frame. In a screencast clip it scrolls smoothly in real time instead.
+   * frame.
    */
   async scrollTo(top, { duration = 0.8, scroller } = {}) {
     const apply = (value) =>
@@ -309,17 +270,12 @@ export class ShotRecorder {
     const from = await (scroller
       ? scroller.evaluate((element) => element.scrollTop)
       : this.page.evaluate(() => window.scrollY));
-    if (this.method !== "clock") {
-      await (scroller
-        ? scroller.evaluate((element, y) => element.scrollTo({ top: y, behavior: "smooth" }), top)
-        : this.page.evaluate((y) => window.scrollTo({ top: y, behavior: "smooth" }), top));
-      return;
-    }
     const first = this.frameIndex;
     const frames = Math.max(1, Math.round(duration * 30));
     this.onFrame(async (index) => {
       const progress = Math.min(1, (index - first) / frames);
-      await apply(Math.round(from + (top - from) * easeInOutCubic(progress)));
+      // Quarter CSS pixels: whole device pixels at the 4x capture.
+      await apply(Math.round((from + (top - from) * easeInOutCubic(progress)) * 4) / 4);
       return progress >= 1;
     });
   }
@@ -333,17 +289,12 @@ export class ShotRecorder {
     while (!(await condition())) {
       if (this.elapsed() > end)
         throw new Error(`${this.id}: a step did not finish within ${seconds} s.`);
-      if (this.method === "clock") await this.frame();
-      else await sleep(50);
+      await this.frame();
     }
   }
 
   /** Types `text` into the focused field at `cps` characters per second. */
   async type(text, { cps = 20 } = {}) {
-    if (this.method !== "clock") {
-      await this.page.keyboard.type(text, { delay: 1000 / cps });
-      return;
-    }
     const first = this.frameIndex;
     let typed = 0;
     while (typed < text.length) {
@@ -396,8 +347,7 @@ export class ShotRecorder {
     const t = this.elapsed();
     if (shift) await this.page.keyboard.down("Shift");
     await this.page.mouse.down();
-    if (this.method === "clock") await this.frame();
-    else await sleep(90);
+    await this.frame();
     await this.page.mouse.up();
     if (shift) await this.page.keyboard.up("Shift");
     this.events.push({ type: "click", t: round(t), x: this.pointer.x, y: this.pointer.y, target: name });
@@ -413,23 +363,20 @@ export class ShotRecorder {
     await this.check("end of shot");
     const checks = await this.page.evaluate(() => window.__promoPrivacy?.checks ?? 0);
     this.log(`${this.id} · the privacy guard checked the page text after ${checks} DOM changes; no finding`);
+    const { width, height, deviceScaleFactor: scale } = this.viewport;
     await writeFile(
       path.join(this.dir, "targets.json"),
-      `${JSON.stringify({ boxes: this.boxes, events: this.events, marks: this.marks }, null, 2)}\n`,
+      `${JSON.stringify({ viewport: this.viewport, boxes: this.boxes, events: this.events, marks: this.marks }, null, 2)}\n`,
     );
     if (this.method === "still") return;
-    const t0 = this.method === "screencast" ? this.t0 : 0;
-    const frames = this.frames.map(({ file, timestamp }) => ({
-      file,
-      t: round(timestamp - t0, 4),
-    }));
+    const frames = this.frames.map(({ file, timestamp }) => ({ file, t: round(timestamp, 4) }));
     await writeFile(
       path.join(this.dir, "frames.json"),
       `${JSON.stringify(
         {
           method: this.method,
-          width: 2880,
-          height: 1620,
+          width: width * scale,
+          height: height * scale,
           duration: frames.at(-1)?.t ?? 0,
           frames,
         },

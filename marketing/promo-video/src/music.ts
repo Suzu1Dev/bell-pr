@@ -1,88 +1,167 @@
 /**
- * The music edit: "Ramp It Up" by Ahjay Stelino (Mixkit item 69, Mixkit
- * Stock Music Free License; see MUSIC-LICENSE.md), cut to 75.28 s on its
- * bar grid.
+ * The music, as the film sees it: music/track.analysis.json (the tracked,
+ * path-free beat-analysis contract of plan direction-v1.1/VIDEO.md §2)
+ * turned into video frames. No other file holds a music number: the
+ * timeline, the scenes, the sound effects and the checks all read them from
+ * here, so swapping the track means swapping the gitignored audio and that
+ * one JSON file.
  *
- * Numbers derived from the owner's beat analysis (the analysis file itself is
- * not copied: it holds a local path):
- * - 120 BPM on a fitted grid, beat 0 at 0.146 s, a bar every 2.0 s;
- * - the whole track: -10.4 LUFS integrated, peak +0.48 dBFS, 102.13 s,
- *   sound until 100.43 s;
- * - the edit: source 9.146-49.146 s plays at video 0-40 s (bars 5-24),
- *   then source 65.146 s to its natural end plays from video 40 s (bar 33
- *   on). Both edit points are bar starts.
- *
- * Remotion trims audio in whole video frames: the segments start at source
- * frames 274 and 1954 (9.133 s and 65.133 s), 13 ms before the grid.
+ * The frame rule (lookdev STYLE-GUIDE §2.1): an event at time t belongs to
+ * floor(t * fps), the frame whose display interval contains it, so the
+ * picture leads the sound by less than a frame. The one exception is the
+ * end-card landing on the final chord, which the lead fixed at the rounded
+ * frame (VIDEO.md addendum: 81.718 s = frame 2452).
  */
+import analysis from "../music/track.analysis.json";
+
 export const fps = 30;
 
-export const musicFile = "music/mixkit-ramp-it-up-69.mp3";
+export type RequiredEvent = "intro" | "firstHit" | "lift" | "climax" | "finalHit" | "tailEnd";
+export type OptionalEvent = "riser" | "accent" | "landing";
+export type EventName = RequiredEvent | OptionalEvent;
+export const requiredEvents: readonly RequiredEvent[] = ["intro", "firstHit", "lift", "climax", "finalHit", "tailEnd"];
 
-export const track = {
-  bpm: 120,
-  beatZeroSeconds: 0.146,
-  /** Bar 1 starts two beats in. */
-  firstBarSeconds: 1.146,
-  barSeconds: 2,
-  lufs: -10.4,
-  peakDbfs: 0.48,
-  durationSeconds: 102.13,
-  soundEndSeconds: 100.43,
-} as const;
-
-/** The two source segments, in video frames. */
-export const segments = [
-  { from: 0, to: 1200, trimBefore: 274, sourceSeconds: [9.146, 49.146] },
-  { from: 1200, to: 2259, trimBefore: 1954, sourceSeconds: [65.146, 100.43] },
-] as const;
-
-/**
- * Video-time events, in frames. `finalHit` is measured, not estimated: the
- * frame with the largest rise of per-frame RMS level in video 69.5-73.0 s
- * (scripts/measure-hit.mjs; check-output.mjs measures it again in the
- * render). It is the downbeat at 70.0 s (+7.8 dB over the frame before);
- * at about 72.0 s the track falls into its tail, it does not hit.
- */
-export const events = {
-  riser: 180,
-  drop: 240,
-  lift: 720,
-  climax: 1200,
-  accent: 1620,
-  finalHit: 2099,
-  tailEnd: 2258.4,
-} as const;
-
-/** The end-card logo lands this many frames after the measured hit (±7.5 allowed). */
-export const logoLandOffset = 5;
-export const logoLandFrame = events.finalHit + logoLandOffset;
-
-/**
- * Gain. The whole track measures -10.4 LUFS, but the edit skips its quiet
- * intro and measures -9.75 LUFS, so -4.2 dB (not the -3.6 dB the whole
- * track would need) brings the edit to about -14 LUFS.
- */
-export const gainDb = -4.2;
-export const volume = 10 ** (gainDb / 20);
-
-/** A fade-in over the first 0.5 s and a 2-frame crossfade at the 40 s cut. */
-export const fadeInFrames = 15;
-export const crossfadeFrames = 2;
-
-/**
- * The volume of segment `index` at composition frame `frame`: the fade-in,
- * then the crossfade centred on the cut, otherwise the gain.
- */
-export function segmentVolume(index: 0 | 1, frame: number): number {
-  const cut = segments[1].from;
-  const half = crossfadeFrames / 2;
-  let level = 1;
-  if (index === 0) {
-    level = Math.min(1, Math.max(0, frame / fadeInFrames));
-    if (frame > cut - half) level *= Math.max(0, (cut + half - frame) / crossfadeFrames);
-  } else if (frame < cut + half) {
-    level = Math.max(0, (frame - (cut - half)) / crossfadeFrames);
-  }
-  return level * volume;
+export interface TrackAnalysis {
+  version: number;
+  trackId: string;
+  title: string;
+  artist: string;
+  licenseRef: string;
+  audioFile: string;
+  md5: string;
+  durationSeconds: number;
+  soundEndSeconds: number;
+  grid: { bpm: number; beatZeroSeconds: number; beatsPerBar: number; firstBarSeconds: number };
+  loudness: { lufs: number; peakDbfs: number; gainDb: number };
+  edit: {
+    segments: { sourceFrom: number; sourceTo: number; videoFrom: number }[];
+    fadeInFrames: number;
+    crossfadeFrames: number;
+    crossfade?: "equal-power" | "linear";
+  };
+  events: Record<RequiredEvent, number> & Partial<Record<OptionalEvent, number>>;
+  stop?: { from: number; to: number };
+  /** Video seconds of the crash downbeats (the cut puts a cut on each). */
+  crashes?: number[];
+  finalHitWindow: [number, number];
+  measuredBy: Record<string, string>;
+  reviewed: boolean;
 }
+
+export interface Segment {
+  /** Video frames [from, to). */
+  from: number;
+  to: number;
+  /** Source frame at `from` (Remotion trims audio in whole frames). */
+  trimBefore: number;
+}
+
+/** The frame whose display interval contains `seconds`. */
+export const frameOf = (seconds: number) => Math.floor(seconds * fps + 1e-6);
+
+/** Everything the film needs from one analysis file, in frames. */
+export function createMusic(track: TrackAnalysis) {
+  const { bpm, beatsPerBar, beatZeroSeconds } = track.grid;
+  const beatSeconds = 60 / bpm;
+
+  /** The first frame of grid beat `index` (0 = the first beat; halves allowed). */
+  const beatFrame = (index: number) => frameOf(beatZeroSeconds + index * beatSeconds);
+  /** The beat index (on a grid of `step` beats) nearest to `frame`. */
+  const nearestBeatIndex = (frame: number, step = 1) =>
+    Math.max(0, Math.round((frame / fps - beatZeroSeconds) / beatSeconds / step) * step);
+  /** The first whole beat at or after `frame`. */
+  const beatIndexAtOrAfter = (frame: number) => {
+    let index = Math.max(0, Math.floor((frame / fps - beatZeroSeconds) / beatSeconds) - 1);
+    while (beatFrame(index) < frame) index += 1;
+    return index;
+  };
+  const nearestBeat = (frame: number, step = 1) => beatFrame(nearestBeatIndex(frame, step));
+  const onBeat = (frame: number, step = 1) => nearestBeat(frame, step) === frame;
+
+  const events = {} as Record<RequiredEvent, number> & Partial<Record<OptionalEvent, number>>;
+  for (const [name, seconds] of Object.entries(track.events))
+    if (typeof seconds === "number")
+      events[name as EventName] = name === "tailEnd" ? Math.round(seconds * fps) : frameOf(seconds);
+  for (const name of requiredEvents)
+    if (events[name] === undefined) throw new Error(`music/track.analysis.json has no "${name}" event.`);
+
+  const durationInFrames = events.tailEnd;
+  const landingFrame =
+    track.events.landing !== undefined
+      ? Math.round(track.events.landing * fps)
+      : beatFrame(Math.ceil((track.events.finalHit - beatZeroSeconds) / beatSeconds));
+
+  const segments: Segment[] = track.edit.segments.map((segment, index, all) => ({
+    from: Math.round(segment.videoFrom * fps),
+    to: index + 1 < all.length ? Math.round(all[index + 1].videoFrom * fps) : durationInFrames,
+    trimBefore: Math.round(segment.sourceFrom * fps),
+  }));
+  const { fadeInFrames, crossfadeFrames } = track.edit;
+  const linear = track.edit.crossfade === "linear";
+  const curve = (x: number, out: boolean) =>
+    linear ? (out ? 1 - x : x) : out ? Math.cos((x * Math.PI) / 2) : Math.sin((x * Math.PI) / 2);
+
+  /**
+   * The gain of segment `index` at video frame `frame` (before the master
+   * volume): the fade-in at the start, and the crossfade at each join. The
+   * crossfade runs over the `crossfadeFrames` frames before the join, so
+   * the downbeat after it is the next segment's alone; it is equal-power
+   * (cos/sin) unless the analysis says linear (a linear 2-frame fade dips
+   * about 2 dB just before the downbeat, analysis notes).
+   */
+  function segmentGain(index: number, frame: number): number {
+    let gain = 1;
+    if (index === 0 && fadeInFrames > 0) gain *= Math.min(1, Math.max(0, (frame + 1) / (fadeInFrames + 1)));
+    const segment = segments[index];
+    const next = segments[index + 1];
+    if (next && frame >= next.from - crossfadeFrames) {
+      if (frame >= next.from) return 0;
+      gain *= curve((frame - (next.from - crossfadeFrames) + 0.5) / crossfadeFrames, true);
+    }
+    if (index > 0 && frame < segment.from) {
+      if (frame < segment.from - crossfadeFrames) return 0;
+      gain *= curve((frame - (segment.from - crossfadeFrames) + 0.5) / crossfadeFrames, false);
+    }
+    return gain;
+  }
+
+  return {
+    track,
+    bpm,
+    beatsPerBar,
+    beatSeconds,
+    /** Frames per beat (18 at 100 BPM) and per bar (72). */
+    beatFrames: beatSeconds * fps,
+    barFrames: beatSeconds * fps * beatsPerBar,
+    beatFrame,
+    /** The first frame of beat `beat` (1-based) of bar `bar` (1-based). */
+    barFrame: (bar: number, beat = 1) => beatFrame((bar - 1) * beatsPerBar + (beat - 1)),
+    nearestBeatIndex,
+    beatIndexAtOrAfter,
+    nearestBeat,
+    onBeat,
+    /** Video-time events in frames; optional events are missing when the track has none. */
+    events,
+    durationInFrames,
+    /** The frame the end-card logo locks on (the final chord). */
+    landingFrame,
+    /** The 2-beat stop before the first hit (kick and bass out), if the track has one. */
+    stop: track.stop ? { from: frameOf(track.stop.from), to: frameOf(track.stop.to) } : undefined,
+    /** The crash downbeats, in frames: each one is a cut (src/timeline.test.ts). */
+    crashes: (track.crashes ?? []).map(frameOf),
+    musicFile: track.audioFile,
+    gainDb: track.loudness.gainDb,
+    volume: 10 ** (track.loudness.gainDb / 20),
+    fadeInFrames,
+    crossfadeFrames,
+    segments,
+    segmentGain,
+    /** Where scripts/measure-hit.mjs and check-output.mjs look for the final hit, in frames. */
+    finalHitWindow: track.finalHitWindow.map(frameOf) as [number, number],
+  };
+}
+
+export type Music = ReturnType<typeof createMusic>;
+
+/** The film's music: the loaded analysis. */
+export const music: Music = createMusic(analysis as unknown as TrackAnalysis);

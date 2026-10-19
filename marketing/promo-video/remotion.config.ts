@@ -1,15 +1,33 @@
 /**
- * Remotion settings for the promo render (npx remotion render|still|studio).
+ * Remotion settings for the film (npx remotion render|still|studio).
  *
  * The renderer uses the local Chrome headless shell named by
- * REMOTION_BROWSER_EXECUTABLE. Without it, Remotion downloads its own
- * headless shell on first use (see README.md).
+ * REMOTION_BROWSER_EXECUTABLE; without it, Remotion downloads its own on
+ * first use (see README.md). PNG intermediates (lookdev STYLE-GUIDE §0.2:
+ * smaller and cleaner than JPEG at the same CRF) and BT.709 tagging.
  */
 import { Config } from "@remotion/cli/config";
+import { keyframeCuts } from "./src/keyframes.ts";
 
 Config.setEntryPoint("src/index.ts");
 Config.setBrowserExecutable(process.env.REMOTION_BROWSER_EXECUTABLE || null);
-// UI text is the subject: keep the intermediate frames close to lossless.
-Config.setVideoImageFormat("jpeg");
-Config.setJpegQuality(95);
+Config.setVideoImageFormat("png");
+Config.setColorSpace("bt709");
 Config.setOverwriteOutput(true);
+
+/**
+ * VP9 places a keyframe every 128 frames and codes a cut in between as an
+ * inter frame: a stage plate that first shows on such a cut loses its
+ * static grain and its gradient comes out in contour rings (the dark end
+ * card in round 3, the light studio round the windows in round 6: flat runs
+ * of 400-650 px). A keyframe on every cut between the stages and on every
+ * take that opens on the studio (src/keyframes.ts) keeps the grain, so the
+ * WebM does not band.
+ */
+// Half a frame early, so the keyframe falls on the cut frame itself (frame rule: floor(t * 30)).
+const stageCuts = keyframeCuts().map((frame) => (frame - 0.5) / 30);
+Config.overrideFfmpegCommand(({ type, args }) => {
+  if (type !== "stitcher" || !args.includes("libvpx-vp9")) return args;
+  const output = args.length - 1;
+  return [...args.slice(0, output), "-force_key_frames", stageCuts.map((t) => t.toFixed(4)).join(","), args[output]];
+});

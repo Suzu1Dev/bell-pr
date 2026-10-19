@@ -1,10 +1,17 @@
-# Dependencies, renders, captured footage and the licensed music copy.
-# The MP3 and the renders must never be committed (see MUSIC-LICENSE.md).
-node_modules/
+# Dependencies, renders, captured footage and its proxies, the licensed music
+# copy, the sound effects and the generated stage plates. The MP3, the WAVs
+# and the renders must never be committed (MUSIC-LICENSE.md, SFX-LICENSES.md).
+# "/node_modules" also matches a symlinked node_modules ("node_modules/" would not).
+/node_modules
 out/
 public/footage/
+public/footage-2x/
+public/footage-soft/
 public/music/
+public/sfx/
+public/stage/
 public/brand-assets/
 *.mp3
 *.mp4
 *.webm
+*.wav

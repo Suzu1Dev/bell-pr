@@ -1,6 +1,7 @@
 import { Composition } from "remotion";
 import { loadFootage } from "./footage.ts";
 import { Promo, type PromoProps } from "./Promo.tsx";
+import { footageStates } from "./shots.ts";
 import { timeline } from "./timeline.ts";
 
 export const RemotionRoot: React.FC = () => (
@@ -12,6 +13,6 @@ export const RemotionRoot: React.FC = () => (
     fps={timeline.fps}
     durationInFrames={timeline.durationInFrames}
     defaultProps={{ footage: null } satisfies PromoProps}
-    calculateMetadata={async ({ props }) => ({ props: { ...props, footage: await loadFootage() } })}
+    calculateMetadata={async ({ props }) => ({ props: { ...props, footage: await loadFootage(footageStates()) } })}
   />
 );

@@ -27,13 +27,11 @@ export const privacyPattern = new RegExp(
 );
 
 /**
- * Fictional examples the product itself prints, removed before the check.
- * The import dialog suggests "/home/you/projects/repository" as the form of
- * a local path (src/repos/ImportRepoModal.tsx examplePath()); "you" is not a
- * person. The hint is on screen in S3, so the owner decides at sign-off
- * whether it may stay (review.md).
+ * Text removed before the check: none. The v1.1 cut films no view that
+ * prints a home-like example path (the import dialog is not in it), so the
+ * rule has no exemption at all.
  */
-export const allowedPlaceholders = ["/home/you/projects/repository"];
+export const allowedPlaceholders = [];
 
 /** The names of the rules `text` breaks, after the allowed placeholders go. */
 export function privacyFindings(text, placeholders = allowedPlaceholders) {
