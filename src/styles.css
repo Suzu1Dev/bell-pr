@@ -563,7 +563,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .eyebrow {
   font-family: var(--font-mono);
@@ -596,7 +596,7 @@ button {
   align-items: center;
 }
 .title-row h1 {
-  font-size: 27px;
+  font-size: 24px;
   font-weight: 600;
   letter-spacing: 0.2px;
   line-height: 1.5;
@@ -629,7 +629,7 @@ button {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  margin-top: 15px;
+  margin-top: 8px;
   font-size: var(--text-2xs);
   color: var(--color-text-muted);
 }
@@ -724,82 +724,56 @@ button {
   font-size: var(--text-2xs);
   padding: 7px 11px;
 }
+/* Progress through the four phases: one row of small steps. */
 .workflow-strip {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  margin: 0 34px 30px;
-  border: 1px solid var(--color-border);
-  border-radius: 7px;
-  background: var(--color-surface);
-  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 34px 18px;
 }
 .workflow-step {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 13px;
-  padding: 19px 19px;
-  position: relative;
-  min-width: 0;
+  gap: 7px;
+  padding: 3px 11px 3px 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 30px;
+  background: var(--color-surface);
 }
 .step-icon {
-  width: 32px;
-  height: 32px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--color-surface-sunken);
-  border: 1px solid var(--color-border-subtle);
   color: var(--color-text-muted);
   display: grid;
   place-items: center;
   flex-shrink: 0;
 }
-.step-number {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  margin-right: 7px;
-  color: var(--color-text-muted);
-}
 .workflow-step strong {
   font-size: var(--text-xs);
   font-weight: 500;
   color: var(--color-text-muted);
-}
-.workflow-step small {
-  display: block;
-  color: var(--color-text-muted);
-  font-size: var(--text-2xs);
-  margin-top: 5px;
-}
-.step-chevron {
-  position: absolute;
-  right: 0;
-  top: 35px;
-  color: var(--color-border-strong);
+  white-space: nowrap;
 }
 .workflow-step.done .step-icon {
   color: var(--color-accent-600);
   background: var(--color-diff-add-bg);
-  border-color: var(--color-border-subtle);
 }
 .workflow-step.done strong {
   color: var(--color-accent-600);
 }
 .workflow-step.current {
   background: var(--color-accent-50);
+  border-color: var(--color-accent-200);
 }
 .workflow-step.current .step-icon {
   color: var(--color-text-inverse);
   background: var(--color-brand-600);
-  border-color: var(--color-brand-600);
-  box-shadow: 0 0 0 4px var(--color-accent-100);
 }
 .workflow-step.current strong {
   color: var(--color-accent-700);
-}
-.workflow-step.current .step-number {
-  color: var(--color-accent-600);
-}
-.workflow-step.current small {
-  color: var(--color-accent-600);
 }
 .review-area {
   margin: 0 34px 28px;
@@ -2547,7 +2521,7 @@ button {
     min-height: 600px;
   }
   .title-row h1 {
-    font-size: 31px;
+    font-size: 27px;
   }
   .review-footer {
     padding: 17px 20px;
@@ -2580,30 +2554,8 @@ button {
   .file-item {
     padding-left: 15px;
   }
-  .workflow-step {
-    padding: 17px 12px;
-    gap: 9px;
-  }
-  .workflow-step small {
-    font-size: var(--text-2xs);
-  }
-  .workflow-step strong {
-    font-size: var(--text-2xs);
-  }
-  .step-number {
-    font-size: var(--text-2xs);
-    margin-right: 5px;
-  }
-  .step-icon {
-    width: 28px;
-    height: 28px;
-  }
-  .step-chevron {
-    right: -5px;
-    top: 30px;
-  }
   .title-row h1 {
-    font-size: 24px;
+    font-size: 22px;
   }
   .footer-hint {
     display: none;
@@ -2667,22 +2619,6 @@ button {
   .review-totals > svg,
   .review-totals > span:last-child {
     display: none;
-  }
-  .workflow-step small {
-    display: none;
-  }
-  .workflow-step {
-    padding: 17px 10px;
-  }
-  .step-chevron {
-    top: 24px;
-  }
-  .step-icon {
-    width: 26px;
-    height: 26px;
-  }
-  .workflow-step {
-    gap: 7px;
   }
   .title-row {
     flex-wrap: wrap;
@@ -2797,28 +2733,19 @@ button {
     font-size: var(--text-2xs);
   }
   .workflow-strip {
-    margin: 0 17px 22px;
+    margin: 0 17px 16px;
   }
-  .workflow-step {
-    padding: 13px 6px;
-    flex-direction: column;
-    gap: 8px;
-    text-align: center;
+  /* Only the current step keeps its name on screen; the others stay readable. */
+  .workflow-step:not(.current) {
+    position: relative;
+    padding-right: 4px;
   }
-  .workflow-step > div {
-    display: flex;
-    align-items: center;
-  }
-  .step-number {
-    display: none;
-  }
-  .workflow-step strong {
-    font-size: var(--text-2xs);
-  }
-  .step-chevron {
-    right: -7px;
-    top: 19px;
-    width: 12px;
+  .workflow-step:not(.current) strong {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
   .review-area {
     margin: 0 12px 18px;

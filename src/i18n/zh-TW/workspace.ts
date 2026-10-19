@@ -17,6 +17,7 @@ const m: Translation<typeof en> = {
     review: { title: "理解與審查", description: "讀懂它，再用自己的話講一遍" },
     submit: { title: "送出貢獻", description: "你的下一個 Pull Request" },
   },
+  stepTooltip: ({ n, title, description }) => `${n} ${title}：${description}`,
   tabsLabel: "任務內容",
   tabs: {
     overview: "全貌與動機",

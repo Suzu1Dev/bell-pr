@@ -270,31 +270,23 @@ export function WorkspacePage({
           { n: "03", ...t.steps.review, icon: Code2 },
           { n: "04", ...t.steps.submit, icon: GitPullRequest },
         ].map((step, index) => {
+          const current = index === currentStep && !halted;
+          // One row of small steps: the description moves to the tooltip.
           return (
             <div
-              className={`workflow-step ${index === currentStep && !halted ? "current" : ""} ${index < currentStep ? "done" : ""}`}
-              aria-current={index === currentStep && !halted ? "step" : undefined}
+              className={`workflow-step ${current ? "current" : ""} ${index < currentStep ? "done" : ""}`}
+              aria-current={current ? "step" : undefined}
+              title={t.stepTooltip(step)}
               key={step.n}
             >
               <span className="step-icon">
                 {index < currentStep ? (
-                  <Check size={17} />
+                  <Check size={13} />
                 ) : (
-                  <step.icon size={18} />
+                  <step.icon size={13} />
                 )}
               </span>
-              <div>
-                <span className="step-number">{step.n}</span>
-                <strong>{step.title}</strong>
-                <small>
-                  {index === 1 && currentStep === 1
-                    ? statusLabels[run.status]
-                    : step.description}
-                </small>
-              </div>
-              {index < 3 && (
-                <ChevronRight className="step-chevron" size={16} />
-              )}
+              <strong>{step.title}</strong>
             </div>
           );
         })}

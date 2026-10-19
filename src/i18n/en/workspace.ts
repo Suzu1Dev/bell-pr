@@ -22,6 +22,9 @@ const workspace = {
     review: { title: "Understand and review", description: "Read it, then explain it back" },
     submit: { title: "Submit", description: "Your next pull request" },
   },
+  /** A workflow step's tooltip: its number, name and what happens in it. */
+  stepTooltip: ({ n, title, description }: { n: string; title: string; description: string }) =>
+    `${n} ${title}: ${description}`,
   tabsLabel: "Task content",
   tabs: {
     overview: "Overview & motivation",
