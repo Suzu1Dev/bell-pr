@@ -127,12 +127,18 @@ export async function checkPremise(ctx: WorkbenchContext, id: string) {
       return premiseCheck((value as { premise?: unknown } | null)?.premise);
     });
     return await ctx.lock(id, async () => {
-      // Learn by hand: its statement and evidence are filtered (F7) and recorded as help.
-      if (run.learnByHand && premise) {
-        const filter = await changeFilter(run, await ctx.diff(id));
-        premise.statement = filter.text(premise.statement);
-        premise.evidence = filter.text(premise.evidence);
-        recordStoredHelp(run, "premise", filter.removed);
+      // Learn by hand: the agent read the checkout, so a version edited
+      // since Ready gets nothing (F5); its statement and evidence are
+      // filtered (F7) and recorded as help.
+      if (run.learnByHand) {
+        const read = await ctx.diff(id);
+        assertReady(run, read);
+        if (premise) {
+          const filter = await changeFilter(run, read);
+          premise.statement = filter.text(premise.statement);
+          premise.evidence = filter.text(premise.evidence);
+          recordStoredHelp(run, "premise", filter.removed);
+        }
       }
       // Only the verdict counts: an agent rarely words its evidence the same
       // way twice, and the new wording is stored either way.

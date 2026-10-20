@@ -8,6 +8,7 @@
 // and gh come first on PATH.
 import test, { after, before, type TestContext } from "node:test";
 import assert from "node:assert/strict";
+import { writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -336,6 +337,22 @@ test("after Ready the premise check filters its evidence and records explain hel
   assert.doesNotMatch(f.run.team?.premise?.evidence ?? "", /retryLater/);
   assert.deepEqual(f.run.byHand?.events?.map((event) => [event.kind, event.source]), [["explain", "premise"]]);
   assert.deepEqual(f.calls.map((call) => [call.role, call.readonly]), [["premise", true]]);
+});
+
+test("a premise check whose agent read a version edited since Ready stores nothing and is refused", async (t) => {
+  const f = await fixture(t, {
+    premise: () => {
+      // The person saves an edit while the agent reads the checkout.
+      writeFileSync(path.join(f.run.worktreePath, "src", "retry.ts"), changedSource.replace("attempts = 3", "attempts = 4"));
+      return JSON.stringify({ premise: { verdict: "refuted", statement: "A 503 never reaches getPage.", evidence: "Line 4 retries already." } });
+    },
+  });
+  await f.markReady();
+  await assert.rejects(en(() => f.workbench.checkPremise(f.run.id)), notReady);
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.run.team?.premise, undefined);
+  assert.equal(f.run.byHand?.events, undefined);
+  assert.doesNotMatch(JSON.stringify(f.run), /never reaches getPage|retries already/);
 });
 
 test("a failed turn about the person's change keeps what the agent wrote in its error out of the stored errors and the log", async (t) => {
