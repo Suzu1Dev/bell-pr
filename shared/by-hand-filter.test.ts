@@ -211,3 +211,9 @@ test("no added line of the hidden diff survives unless it is a verbatim quote of
       }
     }
 });
+
+test("a list of * or + items is prose: an operator joins operands on one line only", () => {
+  for (const text of ["Steps:\n* Read the loop\n* Run the tests", "Two ideas\n+ ask a maintainer\n+ read the issue again"])
+    assert.deepEqual(filterAgentText(text, sources), { value: text, removed: 0, dropped: 0 });
+  assert.equal(filterAgentText("Then delayMs * attempt;", sources).value, "Then …");
+});

@@ -118,10 +118,11 @@ const fence = /^( {0,3})(`{3,}|~{3,})[^\n]*\n([\s\S]*?)(?:\n {0,3}\2[`~]*[ \t]*(
 const inline = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g;
 /**
  * An expression written into prose: operands joined by code operators with
- * spaces around them ("delayMs * 2 ** attempt;", "x => y"). A spaced
- * hyphen or slash is a dash or "or" in prose, not an operator.
+ * spaces around them on one line ("delayMs * 2 ** attempt;", "x => y"). A
+ * spaced hyphen or slash is a dash or "or" in prose, not an operator, and
+ * a "*" or "+" that starts a line is a list item.
  */
-const expression = /[\w$.()[\]'"]+(?:\s+(?:=>|===|!==|==|!=|\*\*|&&|\|\||[-+*/%]=|<=|>=|[<>*%+=])\s+[\w$.()[\]'"]+)+;?/g;
+const expression = /[\w$.()[\]'"]+(?:[ \t]+(?:=>|===|!==|==|!=|\*\*|&&|\|\||[-+*/%]=|<=|>=|[<>*%+=])[ \t]+[\w$.()[\]'"]+)+;?/g;
 /** Identifier-like words of prose: camelCase, snake_case and calls such as `retry(`; never part of a path. */
 const identifier = /(?<![\w$./-])(?:[a-z][a-z0-9]*[A-Z][A-Za-z0-9]*|[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+|[A-Za-z_$][\w$]*(?=\())(?![\w$/]|\.\w)/g;
 
