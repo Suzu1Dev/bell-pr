@@ -191,6 +191,8 @@ const prohibition = new RegExp(
   [
     String.raw`\b(?:do|does|will|shall|should|must|may|can)\s*(?:not|n't)\s+(?:\w+\s+){0,3}?(?:accept|allow|permit|use|submit|merge|commit|includ|contain|review|consider|welcome|take|contribut)\w*`,
     String.raw`\b(?:won't|cannot|can't|never)\s+(?:\w+\s+){0,3}?(?:accept|allow|permit|use|submit|merge|commit|includ|contain|review|consider|welcome|take|contribut)\w*`,
+    // "must not involve AI", "may not be involved" (Mesa's word, see `aiInvolved`)
+    String.raw`\b(?:(?:do|does|must|may|shall|should|can|will)\s*(?:not|n't)|cannot|never)\s+(?:be\s+)?involv(?:e|ed)\b`,
     String.raw`\bnot\s+(?:be\s+)?(?:accepted|allowed|permitted|welcome|tolerated|merged|committed|included|reviewed|considered)\b`,
     humanOnly,
     String.raw`\b(?:prohibited|forbidden|forbids?|banned|disallowed|unacceptable|declined?)\b`,
@@ -247,6 +249,22 @@ const largeChange = new RegExp(
   String.raw`\b(?:substantial|significant|large|major|non[- ]?trivial)\s+(?:[\w'-]+\s+){0,2}?(?:PRs?|pull[- ]requests?|merge\s+requests?|changes?|patch(?:es)?)\b`,
   flags,
 );
+/**
+ * AI involved in the contribution, refused: "Contributions must not
+ * involve AI in any way", "AI may not be involved", "any AI involvement",
+ * "patches where AI was involved"; never AI features or modules involved,
+ * nor "whether AI was involved".
+ */
+const aiInvolved = new RegExp(
+  [
+    String.raw`\binvolv(?:e|es|ed|ing)\s+(?:any\s+)?${aiNoun}\b(?=\s*(?:[.!;,)]|$)|\s+(?:in|at|for|with|on|during|whatsoever|will|shall|are|is|get|gets|must|may|can|should)\b)`,
+    String.raw`\b(?:AI|LLM)[- ]involvement\b`,
+    String.raw`\b${aiNoun}\s+(?:(?:must|may|should|shall|can|will)\s*(?:not|n't)|cannot)\s+be\s+involved\b`,
+    String.raw`(?<=\b(?:where|wherever|in\s+which|for\s+which|if|when|that|which)\s+(?:(?:an?|any)\s+)?)${aiNoun}\s+(?:was|were|has\s+been|have\s+been|had\s+been)\s+involved\b`,
+  ].join("|"),
+  flags,
+);
+refusalTerms.push(aiInvolved);
 
 /**
  * Words that let contributors use AI ("You may use AI tools, but do not
