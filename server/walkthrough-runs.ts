@@ -24,6 +24,7 @@ import {
 } from "./walkthroughs.js";
 import type { WorkbenchContext } from "./workbench.js";
 import type { CodeReference, FileWalkthrough } from "../shared/walkthroughs.js";
+import { readyNow } from "../shared/by-hand.js";
 import { assertReaderView, changeFilter, recordStoredHelp } from "./learning.js";
 import { checkoutPaths, filteredError } from "./by-hand.js";
 
@@ -152,10 +153,13 @@ async function generateWalkthrough(
       const current = files.find((entry) => entry.path === file.path);
       // The file changed while the agent read it, or a changed premise
       // verdict asked for the walkthroughs again: the next diff asks again.
+      // In Learn by hand any edit since Ready counts, as the agent read the
+      // other files too (F5).
       if (
         current?.fingerprint !== file.fingerprint ||
         current.blocked ||
-        !generating(run, file)
+        !generating(run, file) ||
+        (run.learnByHand && !readyNow(run, files))
       )
         return;
       // Learn by hand: filtered (F7) and recorded as help before it is stored.

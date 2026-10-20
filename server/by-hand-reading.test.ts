@@ -355,6 +355,23 @@ test("a premise check whose agent read a version edited since Ready stores nothi
   assert.doesNotMatch(JSON.stringify(f.run), /never reaches getPage|retries already/);
 });
 
+test("a walkthrough whose agent read the checkout while another changed file was edited is not stored", async (t) => {
+  skipUnderstandingCheckInTests(true);
+  const f = await fixture(t, {
+    walkthrough: () => {
+      // src/retry.ts stays as it was marked ready; the person edits the other changed file meanwhile.
+      writeFileSync(path.join(f.run.worktreePath, "docs", "notes.md"), "# Notes\n\nRetries a GET three times.\n");
+      return walkthroughAnswer;
+    },
+  });
+  await f.markReady();
+  await en(() => f.workbench.walkthrough(f.run.id, "src/retry.ts"));
+  assert.equal(f.calls.length, 1);
+  assert.notEqual(f.run.walkthroughs?.["src/retry.ts"]?.status, "ready");
+  assert.equal(f.run.walkthroughs?.["src/retry.ts"]?.content, undefined);
+  assert.equal(f.run.byHand?.events, undefined);
+});
+
 test("a failed turn about the person's change keeps what the agent wrote in its error out of the stored errors and the log", async (t) => {
   skipUnderstandingCheckInTests(true);
   const leak = () => {
