@@ -14,8 +14,11 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { getDemo } from "../src/demo/all";
 import en from "../src/i18n/en";
+import zhTW from "../src/i18n/zh-TW";
 import panelStrings from "../src/review/i18n/en";
+import panelStringsZh from "../src/review/i18n/zh-TW";
 import { typewriterStepMs } from "../src/review/try-first";
+import { switchLocale } from "./fixtures";
 import { expectNoOverflow } from "./helpers/overflow";
 import { files, runId, startRealProject, type RealProject } from "./helpers/real-project";
 
@@ -239,6 +242,44 @@ for (const width of [1440, 390])
     await page.evaluate(() => document.fonts.ready);
     await expectNoOverflow(page, [".explain-panel"]);
     await answerUnit(page, "A new request goes out on every retry.", "calls the function it was given again on every retry");
+    await expectNoOverflow(page, [".explain-panel"]);
+  });
+
+test("the walkthrough's Check yourself changes language with the page, without a reload", async ({ page }) => {
+  const zh = zhTW.review.tryFirst;
+  await page.goto("/#/runs/demo-run/changes?file=src/client.ts");
+  await page.getByRole("tab", { name: en.review.panel.tabs.walkthrough }).click();
+  const card = page.locator(".walkthrough-card .tf-card");
+  await expect(card.locator("h3")).toHaveText(`${panelStrings.checkYourself}${t.badge}`);
+  await page.evaluate(() => Object.assign(window, { stillHere: true }));
+  await switchLocale(page, "zh-TW");
+  // The card's own title comes from the panel's module-local strings; the rest from the zh-TW dictionary.
+  await expect(card.locator("h3")).toHaveText(`${panelStringsZh.checkYourself}${zh.badge}`);
+  await expect(card.getByRole("textbox", { name: zh.quiz.answerLabel })).toBeVisible();
+  expect(await page.evaluate(() => "stillHere" in window)).toBe(true);
+  await switchLocale(page, "en");
+  await expect(card.locator("h3")).toHaveText(`${panelStrings.checkYourself}${t.badge}`);
+});
+
+for (const width of [1440, 390])
+  test(`the walkthrough's Check yourself fits its zh-TW text (${width} px)`, async ({ page }) => {
+    const zh = zhTW.review.tryFirst;
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/#/runs/demo-run/changes?file=src/client.ts&locale=zh-TW");
+    await expect(page.locator(".file-item.selected")).toHaveAttribute("title", "src/client.ts");
+    await page.getByRole("tab", { name: zhTW.review.panel.tabs.walkthrough }).click();
+    const card = page.locator(".walkthrough-card .tf-card");
+    await expect(card.locator("h3")).toContainText(panelStringsZh.checkYourself);
+    await page.evaluate(() => document.fonts.ready);
+    await expectNoOverflow(page, [".explain-panel"]);
+    await card.getByRole("textbox", { name: zh.quiz.answerLabel }).fill("每次重試都會再呼叫一次傳進來的函式，所以會送出新的請求。");
+    await card.getByRole("radio", { name: zh.confidences.think }).check();
+    await card.getByRole("button", { name: zh.quiz.reveal }).click();
+    await expect(card.getByRole("group", { name: zh.quiz.gradeLabel })).toBeFocused();
+    await card.getByRole("button", { name: zh.grades.partly }).click();
+    await expect(card.locator(".tf-graded")).toHaveText(zh.quiz.graded.partly);
+    // A walkthrough miss promises no practice deck.
+    await expect(card).not.toContainText(zh.quiz.confidentMiss);
     await expectNoOverflow(page, [".explain-panel"]);
   });
 
