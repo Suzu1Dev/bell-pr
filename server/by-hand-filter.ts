@@ -29,7 +29,7 @@ const maxFileBytes = 1_000_000;
 
 /** A normalised repository-relative path BELL may read: no absolute path, ".", "..", option-like start, backslash or control character. */
 function safePath(file: string) {
-  if (!file || /[\u0000-\u001f\u007f\\]/.test(file) || path.isAbsolute(file) || file.startsWith("-")) return false;
+  if (!file || /[\p{Cc}\\]/u.test(file) || path.isAbsolute(file) || file.startsWith("-")) return false;
   return path.posix.normalize(file) === file && !file.split("/").some((part) => part === ".." || part === "." || part === "");
 }
 
