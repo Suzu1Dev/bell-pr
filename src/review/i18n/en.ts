@@ -1,7 +1,8 @@
 /**
- * The review panel's Learn-by-hand strings (English): "How a reader sees
- * your change". Module-local, so they load with the panel's lazy chunk and
- * not at startup; the zh-TW twin in ./zh-TW is typed against this one.
+ * The review panel's v1.2 strings (English): "How a reader sees your
+ * change" and the walkthrough's answer-first card. Module-local, so they
+ * load with the panel's lazy chunk and not at startup; the zh-TW twin in
+ * ./zh-TW is typed against this one.
  */
 const messages = {
   reader: {
@@ -14,6 +15,8 @@ const messages = {
     answerAll:
       "This file has no question of its own: answer the questions in Explain it back first.",
   },
+  /** The title of a walkthrough unit's answer-first card (try first, D1). */
+  checkYourself: "Check yourself",
 };
 
 export default messages;

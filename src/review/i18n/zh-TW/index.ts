@@ -1,4 +1,4 @@
-/** The review panel's Learn-by-hand strings (Traditional Chinese, Taiwan); see ../en.ts. */
+/** The review panel's v1.2 strings (Traditional Chinese, Taiwan); see ../en.ts. */
 import type { Translation } from "../../../../shared/i18n/locale";
 import type en from "../en";
 
@@ -10,6 +10,7 @@ const messages: Translation<typeof en> = {
     answerFirst: "請先在「用自己的話講一遍」回答這個檔案的問題，讓你自己的答案走在 AI 的解讀之前。",
     answerAll: "這個檔案沒有自己的問題：請先在「用自己的話講一遍」回答其中的問題。",
   },
+  checkYourself: "考考自己",
 };
 
 export default messages;

@@ -35,6 +35,10 @@ export interface QuizAttemptProps {
   /** Demo only: the sample answer "Fill with the sample answer" types. */
   sample?: string;
   demo: boolean;
+  /** The card's title; "Quiz yourself" (the explanation's quiz) by default. */
+  title?: string;
+  /** Shows the saved attempt with nothing to answer or grade (a run that takes no attempts). */
+  readOnly?: boolean;
 }
 
 /** The step being saved. */
@@ -56,6 +60,8 @@ export function QuizAttempt({
   onSave,
   sample,
   demo,
+  title,
+  readOnly,
 }: QuizAttemptProps) {
   const t = useT("review").tryFirst;
   const [answer, setAnswer] = useState(saved?.answer ?? "");
@@ -118,6 +124,8 @@ export function QuizAttempt({
       reference={reference}
       demo={demo}
       sample={sample}
+      title={title}
+      readOnly={readOnly}
       answer={answer}
       confidence={confidence}
       record={record}
@@ -142,6 +150,8 @@ export interface QuizAttemptViewProps {
   reference: string;
   demo: boolean;
   sample?: string;
+  title?: string;
+  readOnly?: boolean;
   /** The answer being written. */
   answer: string;
   confidence?: Confidence;
@@ -166,6 +176,8 @@ export function QuizAttemptView({
   reference,
   demo,
   sample,
+  title,
+  readOnly,
   answer,
   confidence,
   record,
@@ -183,7 +195,7 @@ export function QuizAttemptView({
   const review = useT("review");
   const t = review.tryFirst;
   const id = useId();
-  const gradable = record && !record.skipped && !record.grade;
+  const gradable = !readOnly && record && !record.skipped && !record.grade;
   const confidentMiss =
     record?.grade &&
     record.confidence &&
@@ -195,13 +207,13 @@ export function QuizAttemptView({
     >
       <h3>
         <HelpCircle size={15} aria-hidden="true" />
-        {review.explain.cards.selfCheck}
+        {title ?? review.explain.cards.selfCheck}
         <span className="tf-badge">{t.badge}</span>
       </h3>
       <div id={`${id}-question`}>
         <MarkdownContent>{question}</MarkdownContent>
       </div>
-      {!record && (
+      {!record && !readOnly && (
         <div className="tf-form">
           <label className="tf-label" htmlFor={`${id}-answer`}>
             {t.quiz.answerLabel}

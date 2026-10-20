@@ -11,6 +11,7 @@ import {
   RotateCcw,
   Workflow,
 } from "lucide-react";
+import { walkthroughUnitKey, type FileAttempt } from "../../shared/understanding";
 import type {
   CodeReference,
   FunctionWalkthrough,
@@ -19,6 +20,7 @@ import { getDemo } from "../demo";
 import { useFormat, useLocale, useT } from "../i18n";
 import type { DiffFile } from "../types";
 import { MarkdownContent } from "./MarkdownContent";
+import { WalkthroughAttempt, type WalkthroughInput } from "./WalkthroughAttempt";
 import { withNodes } from "./withNodes";
 
 /** Lines of the current file, inclusive. */
@@ -35,6 +37,12 @@ export interface WalkthroughCardsProps {
   onHighlight?: (range: LineRange | undefined) => void;
   onRetry?: () => void;
   busy?: boolean;
+  /** Try first (Settings → Learning): each unit's "Check yourself" asks before it reveals; off, the fold. */
+  tryFirst?: boolean;
+  /** The unit answers saved at this version of the file (`run.attempts[path].walkthroughs`). */
+  attempts?: FileAttempt["walkthroughs"];
+  /** Saves a unit's answer; without it a saved answer shows read-only, and an unanswered unit folds. */
+  onAttempt?: (input: WalkthroughInput) => Promise<void>;
 }
 
 /**
@@ -104,6 +112,9 @@ export function WalkthroughCards({
   onHighlight,
   onRetry,
   busy,
+  tryFirst,
+  attempts,
+  onAttempt,
 }: WalkthroughCardsProps) {
   const t = useT("review").walkthrough;
   const format = useFormat();
@@ -117,6 +128,9 @@ export function WalkthroughCards({
     onHighlight?.(
       selected(startLine, endLine) ? undefined : { startLine, endLine },
     );
+  // Try first asks while the run takes answers; afterwards only a saved answer is shown.
+  const asks = (unit: FunctionWalkthrough) =>
+    !!tryFirst && (!!onAttempt || !!attempts?.[walkthroughUnitKey(unit)]);
 
   // The locale's separator between listed names (", " or the ideographic comma).
   const separator = format.list(["", ""], { type: "unit" });
@@ -290,7 +304,10 @@ export function WalkthroughCards({
               <MarkdownContent>{unit.analogy}</MarkdownContent>
             </div>
           )}
-          {unit.selfCheck.question && (
+          {unit.selfCheck.question && asks(unit) && (
+            <WalkthroughAttempt unit={unit} attempts={attempts} onAttempt={onAttempt} demo={demo} />
+          )}
+          {unit.selfCheck.question && !asks(unit) && (
             <details className="walkthrough-check">
               <summary>
                 {withNodes(t.selfCheck, {

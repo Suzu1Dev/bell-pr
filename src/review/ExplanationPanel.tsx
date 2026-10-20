@@ -75,17 +75,18 @@ export interface ExplanationPanelProps {
   /** The person's try-first attempt on this file (`run.attempts[path]`). */
   attempt?: FileAttempt;
   /**
-   * Saves the quiz answer before the reveal, its grade, or the road choice
-   * (PATCH /api/runs/:id/attempts). It rejects when the save failed (on a
-   * 409 after reloading the run): the reference stays hidden until it
-   * resolves. Pass it only while the run takes attempts (review or
-   * approved, not publishing): every other save answers 409, so no
-   * reference would show. Without it, an attempt lasts while its card is
-   * on screen.
+   * Saves the quiz answer before the reveal, its grade, the road choice or
+   * a walkthrough unit's answer (PATCH /api/runs/:id/attempts). It rejects
+   * when the save failed (on a 409 after reloading the run): the reference
+   * stays hidden until it resolves. Pass it only while the run takes
+   * attempts (review or approved, not publishing): every other save
+   * answers 409, so no reference would show. Without it, an attempt lasts
+   * while its card is on screen.
    */
   onAttempt?(input: {
     quiz?: FileAttemptInput["quiz"];
     road?: FileAttemptInput["road"];
+    walkthrough?: FileAttemptInput["walkthrough"];
   }): Promise<void>;
   /** Shows the try-first prompts; false brings back the plain reveal (Settings → Learning). */
   tryFirst?: boolean;
@@ -853,6 +854,9 @@ export function ExplanationPanel({
             onHighlight={onHighlight}
             onRetry={onRetryWalkthrough}
             busy={walkthroughBusy}
+            tryFirst={prompts}
+            attempts={fileAttempt?.walkthroughs}
+            onAttempt={onAttempt && ((walkthrough) => onAttempt({ walkthrough }))}
           />
         ) : tab === "reports" ? (
           <ReviewReports
