@@ -399,9 +399,10 @@ refusalTerms.push(useRefused);
 
 /**
  * Where one refused thing ends and the next begins: "Large AI generated
- * PRs and AI generated commit messages are not allowed" refuses two.
+ * PRs and AI generated commit messages are not allowed" refuses two, and
+ * so does "AI-generated code (including large AI-generated PRs) …".
  */
-const partBoundary = /[,;:]|\s(?:and|or|nor)\s/gi;
+const partBoundary = /[,;:()]|\s(?:and|or|nor)\s/gi;
 /**
  * Words that carry a refusal on to things a part doesn't name ("…, nor are
  * small ones", "…, even small ones", "of any size").
