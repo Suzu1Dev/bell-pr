@@ -193,6 +193,27 @@ const prohibition = new RegExp(
 );
 
 /**
+ * Where a contribution is made: at any stage, at all, in its creation, for
+ * patches, when contributing. Not what AI makes ("AI should not be used to
+ * author code", Godot's rule about authoring, which the person weighs).
+ */
+const madeWhere = String.raw`(?:at\s+all|at\s+any\s+(?:stage|point|time|step)|in\s+any\s+(?:way|form|part|stage|step|capacity|manner)|(?:in|during)\s+(?:the\s+)?(?:creation|making|writing|development|preparation|production|authoring)\b|(?:in|for|on|with)\s+(?:(?:your|any|a|an|the|their|this|these|our)\s+)?(?:contribut\w*|patch(?:es)?|pull\s+requests?|PRs?|merge\s+requests?|code(?!\s+reviews?)|commits?|submissions?|changes)\b|(?:when|while)\s+(?:contributing|writing|creating|preparing|submitting)\b|to\s+contribute\b)`;
+/**
+ * AI as what must not be used, or was used, in making the contribution:
+ * "LLMs must not be used at any stage of a contribution", "contributions
+ * where an LLM was used". A "must not be used" says where (`madeWhere`) or
+ * ends the sentence, so "AI must not be used to rank results" (a feature)
+ * is no rule; "was used" counts in a clause about the refused thing
+ * ("where", "in which", "if"), never in "whether AI was used"; "the AI",
+ * "our AI" or "the enemy AI" are the software's.
+ */
+const aiUsed = new RegExp(
+  String.raw`(?<!\b(?:the|our|its|their|this|that|enemy|game|npc|opponent|computer|chess)\s+)\b${aiNoun}\s+(?:(?:(?:must|may|should|shall|can|will)\s*(?:not|n't)|(?:must|may|should|shall|can|will)\s+never|cannot)\s+(?:ever\s+)?be\s+used\b(?=\s*(?:[.!;)]|$)|\s+${madeWhere})|(?<=\b(?:where|wherever|in\s+which|for\s+which|if|when|whenever|that|which)\s+(?:(?:an?|any)\s+)?${aiNoun}\s+)(?:was|were|has\s+been|have\s+been|had\s+been)\s+(?:ever\s+)?used\b)`,
+  flags,
+);
+refusalTerms.push(aiUsed);
+
+/**
  * A refusal of AI help for "substantial pieces of code" or "large changes"
  * depends on the size of what the agents wrote, which only the person can
  * weigh: never a clear ban.
