@@ -34,6 +34,23 @@ type Draft = { id?: string; title: string; files: string; how: string };
 
 const ignore = () => undefined;
 
+/**
+ * The ids the server gave new steps (in the order sent): the n-th written
+ * step takes the n-th saved one's id when it still has that title and no
+ * other step holds it.
+ */
+export function withSavedIds<T extends Pick<Draft, "id" | "title">>(drafts: T[], saved: readonly { id: string; title: string }[] = []) {
+  const used = new Set(drafts.map((draft) => draft.id));
+  let at = -1;
+  return drafts.map((draft) => {
+    if (!draft.title.trim()) return draft;
+    const step = saved[++at];
+    if (draft.id || !step || used.has(step.id) || step.title !== draft.title.trim()) return draft;
+    used.add(step.id);
+    return { ...draft, id: step.id };
+  });
+}
+
 export function PlanWithGuide(props: PlanWithGuideProps) {
   const { run, onSave, onReveal, onConfirm, busy = false, error } = props;
   const t = useWriteText().plan;
@@ -49,13 +66,7 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
   const [unsure, setUnsure] = useState(saved?.unsure ?? "");
   const [prediction, setPrediction] = useState(saved?.prediction ?? "");
   // New steps get their ids from the server; later saves keep them.
-  useEffect(() => {
-    const ids = saved?.steps.map((step) => step.id) ?? [];
-    setDrafts((list) => {
-      let at = 0;
-      return list.map((draft) => (draft.title.trim() ? { ...draft, id: draft.id ?? ids[at++] } : draft));
-    });
-  }, [saved]);
+  useEffect(() => setDrafts((list) => withSavedIds(list, saved?.steps)), [saved]);
   const plan = (): ByHandPlanInput | undefined => {
     const steps = drafts
       .filter((draft) => draft.title.trim())

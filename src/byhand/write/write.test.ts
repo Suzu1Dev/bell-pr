@@ -13,7 +13,7 @@ import type { DiffFile, Run } from "../../types";
 import { GuidePanel, type GuidePanelProps } from "./GuidePanel";
 import en from "./i18n/en";
 import zhTW from "./i18n/zh-TW";
-import { PlanWithGuide, type PlanWithGuideProps } from "./PlanWithGuide";
+import { PlanWithGuide, withSavedIds, type PlanWithGuideProps } from "./PlanWithGuide";
 import { ReadyDialog, type ReadyDialogProps } from "./ReadyDialog";
 import { YourTurn } from "./YourTurn";
 
@@ -105,6 +105,19 @@ test("a run fitted to rules that don't name planning help keeps the outline clos
   const fitted = html(plan({ guidePlan, helpLock: lock }, {}, { status: "awaiting_plan" }));
   assert.ok(fitted.includes(apostrophes("doesn't name planning help: the guide's outline stays closed.")));
   assert.doesNotMatch(fitted, /I don&#x27;t know where to start|step names/);
+});
+
+test("a step added after the first save takes the id the server gave it, never another step's", () => {
+  const draft = (title: string, id?: string) => ({ ...(id ? { id } : {}), title, files: "", how: "" });
+  // The server answers with the steps in the order sent; s1 was saved before.
+  const saved = [{ id: "s1", title: "Find the loop" }, { id: "s2", title: "Cap the retries" }];
+  assert.deepEqual(
+    withSavedIds([draft("Find the loop", "s1"), draft("Cap the retries"), draft("")], saved).map((step) => step.id),
+    ["s1", "s2", undefined],
+  );
+  // A step renamed or removed while the save was on its way keeps no id it doesn't own.
+  assert.deepEqual(withSavedIds([draft("Cap retries at three")], saved.slice(1)).map((step) => step.id), [undefined]);
+  assert.deepEqual(withSavedIds([draft("Cap the retries")], saved).map((step) => step.id), [undefined]);
 });
 
 test("Your turn shows the run's folder to open, and the first open step", () => {
