@@ -180,3 +180,16 @@ test("secrets: redact masks every shape in one text", () => {
     "[REDACTED] [REDACTED] [REDACTED] https://[REDACTED]@host/ secret: [REDACTED]",
   );
 });
+
+test("secrets: the URL-credential shape takes linear time on a crafted line", () => {
+  // The live test tail is masked on every poll; "http://a:a:a…" made the old pattern quadratic.
+  const crafted = `http://${"a:".repeat(32 * 1024)}`;
+  assert.equal(crafted.length >= 64 * 1024, true);
+  const started = performance.now();
+  assert.equal(redact(crafted), crafted);
+  secretInPatch(crafted);
+  const elapsed = performance.now() - started;
+  assert.ok(elapsed < 50, `${elapsed.toFixed(1)} ms`);
+  // A user name never holds a colon, so the password takes the rest: the whole pair is still masked.
+  assert.equal(redact("https://user:pass:word@host/"), "https://[REDACTED]@host/");
+});

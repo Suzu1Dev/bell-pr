@@ -36,7 +36,8 @@ export const secretPatterns: readonly SecretPattern[] = [
     blocks: true,
   },
   {
-    pattern: /(https?:\/\/)[^\s/@]+:[^\s/@]+@/g,
+    // URL credentials. The user part never holds a colon, so the pattern stays linear on "http://a:a:a…".
+    pattern: /(https?:\/\/)[^\s/@:]+:[^\s/@]+@/g,
     replacement: "$1[REDACTED]@",
     blocks: false,
   },
