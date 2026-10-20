@@ -69,4 +69,8 @@ test("reserved-issue rules: LLVM's 'use', matplotlib's output and Node.js's auto
   assert.equal(areaReach("Good first issues are reserved for human contributors."), "unknown");
   // Use wins over output: the stricter reading.
   assert.equal(areaReach("Pull requests using AI-generated code for good first issues will be closed."), "use");
+  // Use wins over automate too, unless the use named is the automating itself.
+  assert.equal(areaReach("Don't use AI on good first issues; automated pull requests will be closed."), "use");
+  assert.equal(areaReach("Using AI tools or automating fixes for good first issues is forbidden."), "use");
+  assert.equal(areaReach("Automated pull requests for good first issues will be closed."), "automate");
 });

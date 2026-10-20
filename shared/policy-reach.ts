@@ -31,6 +31,8 @@ const useWords = /\bus(?:e|es|ed|ing)\b|\bassist\w*/i;
 
 /** Automating the fix: "use AI to automate fixes" (Node.js). */
 const automateWords = /\bautomat\w*/i;
+/** A use of AI that is the automating itself: "use AI to automate". */
+const useToAutomate = /\bus(?:e|es|ed|ing)\s+(?:\S+\s+){0,3}?to\s+automat\w*/gi;
 
 /** The reach of a contribution ban, from its quote. */
 export function banReach(quote: string): BanReach {
@@ -40,13 +42,14 @@ export function banReach(quote: string): BanReach {
 }
 
 /**
- * The wording of a reserved-issue rule, from its quote: automating fixes
- * is narrower than any use, and any other use of AI on the issue is
- * stricter than a rule about AI-generated pull requests.
+ * The wording of a reserved-issue rule, from its quote: a use of AI on the
+ * issue is the strictest, unless the only use named is automating fixes
+ * ("use AI to automate fixes"); then automating, then a rule about
+ * AI-generated pull requests.
  */
 export function areaReach(quote: string): AreaReach {
+  if (useWords.test(quote.replace(useToAutomate, " "))) return "use";
   if (automateWords.test(quote)) return "automate";
-  if (useWords.test(quote)) return "use";
   if (outputWords.test(quote)) return "output";
   return "unknown";
 }
