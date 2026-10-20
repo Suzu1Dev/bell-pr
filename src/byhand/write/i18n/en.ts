@@ -151,7 +151,7 @@ const en = {
     aiRules: "This project has rules about AI use. Check them before asking for an AI review.",
     noReview: "The project's text this run is fitted to doesn't name AI review, so the guide doesn't review here; your tests are the judge.",
     cost: "The review takes about 2 agent turns.",
-    quiet: "Nothing is explained or reviewed until you say it's ready.",
+    quiet: "Your change isn't explained or reviewed until you say it's ready.",
     confirm: "Mark it ready",
   },
 };

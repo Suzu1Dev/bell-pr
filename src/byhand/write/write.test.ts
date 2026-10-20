@@ -324,7 +324,9 @@ test("Ready for review states the version's facts and offers the guide's review"
   assert.ok(text.includes("Not run since your last edit."));
   assert.match(text, /<input type="checkbox" checked=""\/><span class="mission-plan-copy"><strong>Ask the guide to review it<\/strong><small>The guide reads your change/);
   assert.ok(text.includes("The review takes about 2 agent turns."));
-  assert.ok(text.includes(apostrophes("Nothing is explained or reviewed until you say it's ready.")));
+  // Only the change waits for Ready: hints and "Explain this failure" explain while the person writes.
+  assert.ok(text.includes(apostrophes("Your change isn't explained or reviewed until you say it's ready.")));
+  assert.ok(renderZh(ready({})).includes("在你說可以之前，不會解說或審查你的改動。"));
   assert.equal(renderEn(ready({}, { open: false })), "");
   assert.match(html(ready({}, { aiRules: true })), /This project has rules about AI use\./);
   // zh-TW: the time leads, so a number never runs into the words before it.
