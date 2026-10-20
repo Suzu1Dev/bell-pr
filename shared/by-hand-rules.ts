@@ -32,7 +32,7 @@ import { allHelpKinds, type HelpKind, type HelpLock, type HelpLockRule } from ".
 import type { ContributionRules, PolicyAllowance, PolicyFinding } from "./contribution.js";
 import type { ByHandPreflightInput } from "./draft-checks.js";
 import { areaReach, banReach, type AreaReach, type BanReach } from "./policy-reach.js";
-import { refusesAiHelp } from "./project-policy.js";
+import { stopsQuotedConfirm } from "./project-policy.js";
 
 /**
  * Why a finding stays blocked, or why a run can't be fitted (not
@@ -149,10 +149,9 @@ function restrictsOutput(finding: PolicyFinding) {
 /**
  * A ban anywhere in the rules, contribution named or not, that refuses AI
  * help itself or whose reach BELL can't tell ("AI assistance of any kind
- * is not accepted."; `refusesAiHelp`): no quoted confirm while it stands.
+ * is not accepted."): no quoted confirm while it stands.
  */
-const helpRefused = (rules: ContributionRules) =>
-  rules.findings.find((finding) => finding.kind === "ban" && !restrictsOutput(finding) && refusesAiHelp(finding.quote));
+const helpRefused = (rules: ContributionRules) => rules.findings.find(stopsQuotedConfirm);
 
 /** The kinds a finding's carve-outs name, together. */
 const namedKinds = (finding: PolicyFinding) =>

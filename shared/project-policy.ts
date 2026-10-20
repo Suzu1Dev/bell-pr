@@ -13,6 +13,7 @@ import { markdownProse, type DraftRuleQuote } from "./draft-checks.js";
 import { aiDisclosureLine, type DraftSource } from "./drafts.js";
 import type { HelpKind } from "./by-hand.js";
 import { carveOutKinds } from "./by-hand-rules.js";
+import { banReach } from "./policy-reach.js";
 import type { PolicyAllowance, PolicyFinding, PolicyKind } from "./contribution.js";
 
 /** One line of a document outside fenced code, with its 1-based line number. */
@@ -881,9 +882,25 @@ export function classifyPolicy(path: string, document: string): PolicyFinding[] 
 
 /** A document's rules kept at most (`ContributionRules.findings` holds 30). */
 const maxFindings = 30;
-/** The rules that can block publishing: contribution bans, reserved learning issues, disclosure. */
+/**
+ * The rules that can block publishing: contribution bans, reserved
+ * learning issues, disclosure, and a ban that stops the quoted confirm.
+ */
 const blocksPublishing = (finding: PolicyFinding) =>
-  (finding.kind === "ban" && finding.contribution) || finding.kind === "area" || finding.kind === "disclose";
+  (finding.kind === "ban" && finding.contribution) ||
+  finding.kind === "area" ||
+  finding.kind === "disclose" ||
+  stopsQuotedConfirm(finding);
+
+/**
+ * A ban that refuses AI help itself or whose reach BELL can't tell
+ * (`refusesAiHelp`), contribution named or not: while it stands, no
+ * Learn-by-hand run gets the quoted confirm (shared/by-hand-rules.ts), so
+ * no cap of the stored rules may leave it out.
+ */
+export function stopsQuotedConfirm(finding: PolicyFinding) {
+  return finding.kind === "ban" && banReach(finding.quote) !== "output" && refusesAiHelp(finding.quote);
+}
 
 /** The project's own practice, not a rule for contributors: "We do not use AI tools in our release process". */
 const ownPractice =

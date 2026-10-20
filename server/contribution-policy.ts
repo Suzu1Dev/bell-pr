@@ -11,7 +11,7 @@
  */
 import path from "node:path";
 import type { HelpChannel, PolicyFinding, PolicyKind } from "../shared/contribution.js";
-import { attachCarveOuts, classifyPolicy, rawProse } from "../shared/project-policy.js";
+import { attachCarveOuts, classifyPolicy, rawProse, stopsQuotedConfirm } from "../shared/project-policy.js";
 import {
   accountDefaults,
   defaultsKind,
@@ -139,9 +139,13 @@ export function generatedPatterns(content: string): string[] {
   return patterns.slice(0, policyLimits.generated);
 }
 
-/** What the card keeps first when a project states more than 30 rules. */
+/**
+ * What the card keeps first when a project states more than 30 rules:
+ * contribution bans and the bans that stop the quoted confirm, then the
+ * rest by kind.
+ */
 export const findingWeight = (finding: PolicyFinding) =>
-  finding.kind === "ban" && finding.contribution
+  finding.kind === "ban" && (finding.contribution || stopsQuotedConfirm(finding))
     ? 0
     : ((
         {
