@@ -578,9 +578,9 @@ project** needs no new attempt; **I'm stuck** lists the other ways out.
   project**, the guide's outline and **Questions on my plan** are
   planning help; **Explain this failure** is help with tests; the review
   at **Ready for review** is a review. When the next rung is not offered,
-  the guide says so and points to the exits. A run started with every
-  kind of help gets them all, and BELL PR won't publish it on that
-  project.
+  the guide says so and points to the exits. On such a project, a run
+  started with every kind of help gets them all, and BELL PR won't
+  publish it there.
 - **No rung left:** "There is no hint after an example in this project."
   Try an exit: ask a human, make the step smaller or talk it through.
 - **One thing at a time:** "The guide is already working on this run.
