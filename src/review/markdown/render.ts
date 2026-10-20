@@ -145,11 +145,13 @@ function toTree(tree: Root) {
       case "break":
         return [element("br"), text("\n")];
       case "code": {
-        const language = node.lang?.split(/\s+/)[0];
+        // The info's first word; empty when it starts with a Unicode space,
+        // which the parser does not trim.
+        const language = node.lang ? node.lang.split(/\s+/)[0] : undefined;
         return element("pre", {}, [
           element(
             "code",
-            language ? { className: `language-${language}` } : {},
+            language === undefined ? {} : { className: `language-${language}` },
             [text(node.value ? `${node.value}\n` : "")],
           ),
         ]);
