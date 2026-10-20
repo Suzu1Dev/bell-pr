@@ -178,7 +178,7 @@ test("once the file has the most unit answers kept, a new unit still asks first 
   const html = renderEn(createElement(WalkthroughAttempt, { ...props, attempts: answered(limit) }));
   assertNoHan(html);
   assert.match(html, /<textarea/);
-  assert.match(html, /This file already has the most walkthrough answers BELL PR keeps, so this one stays on this page and isn&#x27;t saved\./);
+  assert.match(html, /This file has the most walkthrough answers BELL PR keeps, so this one isn&#x27;t saved\./);
   assert.match(
     renderZh(createElement(WalkthroughAttempt, { ...props, attempts: answered(limit) })),
     /這個檔案的程式碼解說作答已達 BELL PR 保留的上限/,
