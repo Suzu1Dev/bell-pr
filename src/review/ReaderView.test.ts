@@ -6,6 +6,9 @@ import { getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { DiffFile } from "../types";
 import { ExplanationPanel, ReviewReports, type ExplanationPanelProps } from "./ExplanationPanel";
+import { QuizAttempt } from "./QuizAttempt";
+import { WalkthroughAttempt } from "./WalkthroughAttempt";
+import { WalkthroughCards } from "./WalkthroughCards";
 import en from "./i18n/en";
 import zhTW from "./i18n/zh-TW";
 import { readerAllowed, readerRequests, unasked } from "./reader";
@@ -227,4 +230,29 @@ test("Run the review again opens the Ready dialog in a Learn-by-hand run and rer
   assert.deepEqual(calls.splice(0), ["rerun"]);
   // A run that takes no rerun now (published, say) shows no button in either mode.
   assert.equal(rerun({ byHandReview }), undefined);
+});
+
+test("in a Learn-by-hand run the quiz and each walkthrough unit are told so, and promise no check credit", () => {
+  const demoFile = { ...getDemo("en").files.find((entry) => entry.path === "src/client.ts")!, fingerprint: file.fingerprint };
+  const tree = (props: Partial<ExplanationPanelProps>) =>
+    shallow(ExplanationPanel, {
+      file: demoFile,
+      messages: [],
+      loading: false,
+      onAsk() {},
+      demo: false,
+      onAttempt: async () => {},
+      ...props,
+    });
+  const byHandReview = reader(check([`fallback:${file.path}`]));
+  assert.equal(find(tree({ byHandReview }), QuizAttempt)!.props.byHand, true);
+  assert.equal(find(tree({ byHandReview, initialTab: "walkthrough" }), WalkthroughCards)!.props.byHand, true);
+  // An agent run's cards keep the hint that the answer can count.
+  assert.ok(!find(tree({}), QuizAttempt)!.props.byHand);
+  assert.ok(!find(tree({ initialTab: "walkthrough" }), WalkthroughCards)!.props.byHand);
+  const unit = demoFile.walkthrough!.functions[0];
+  const cards = shallow(WalkthroughCards, { file: demoFile, demo: false, tryFirst: true, onAttempt: async () => {}, byHand: true });
+  assert.equal(find(cards, WalkthroughAttempt)!.props.byHand, true);
+  const attempt = shallow(WalkthroughAttempt, { unit, onAttempt: async () => {}, demo: false, byHand: true });
+  assert.equal(find(attempt, QuizAttempt)!.props.byHand, true);
 });

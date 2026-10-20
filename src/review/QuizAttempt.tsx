@@ -41,6 +41,8 @@ export interface QuizAttemptProps {
   readOnly?: boolean;
   /** A confident miss comes back in the practice deck (the default: the deck asks each file's quiz again). */
   practised?: boolean;
+  /** A Learn-by-hand run, whose check takes no quiz answer: no hint says this one can count. */
+  byHand?: boolean;
 }
 
 /** The step being saved. */
@@ -52,8 +54,9 @@ type FocusTarget = "grades" | "graded" | "reference";
 /**
  * The "Quiz yourself" card, tried first: an answer and a confidence before
  * the reference shows, then a self-grade. Show answer with the field empty
- * is a one-click skip. It never gates anything; a graded answer at the
- * file's current version counts toward the understanding check.
+ * is a one-click skip. It never gates anything; in an agent run a graded
+ * answer at the file's current version counts toward the understanding
+ * check.
  */
 export function QuizAttempt({
   question,
@@ -65,6 +68,7 @@ export function QuizAttempt({
   title,
   readOnly,
   practised,
+  byHand,
 }: QuizAttemptProps) {
   const t = useT("review").tryFirst;
   const [answer, setAnswer] = useState(saved?.answer ?? "");
@@ -130,6 +134,7 @@ export function QuizAttempt({
       title={title}
       readOnly={readOnly}
       practised={practised}
+      byHand={byHand}
       answer={answer}
       confidence={confidence}
       record={record}
@@ -157,6 +162,7 @@ export interface QuizAttemptViewProps {
   title?: string;
   readOnly?: boolean;
   practised?: boolean;
+  byHand?: boolean;
   /** The answer being written. */
   answer: string;
   confidence?: Confidence;
@@ -184,6 +190,7 @@ export function QuizAttemptView({
   title,
   readOnly,
   practised = true,
+  byHand,
   answer,
   confidence,
   record,
@@ -256,7 +263,7 @@ export function QuizAttemptView({
               </label>
             ))}
           </div>
-          {answer.trim() && !confidence && (
+          {answer.trim() && !confidence && !byHand && (
             <p className="tf-hint">{t.quiz.confidenceHint}</p>
           )}
           <div className="tf-actions">

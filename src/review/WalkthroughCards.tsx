@@ -43,6 +43,8 @@ export interface WalkthroughCardsProps {
   attempts?: FileAttempt["walkthroughs"];
   /** Saves a unit's answer; without it a saved answer shows read-only, and an unanswered unit folds. */
   onAttempt?: (input: WalkthroughInput) => Promise<void>;
+  /** A Learn-by-hand run: a unit's answer counts toward nothing (WalkthroughAttempt). */
+  byHand?: boolean;
 }
 
 /**
@@ -115,6 +117,7 @@ export function WalkthroughCards({
   tryFirst,
   attempts,
   onAttempt,
+  byHand,
 }: WalkthroughCardsProps) {
   const t = useT("review").walkthrough;
   const format = useFormat();
@@ -305,7 +308,7 @@ export function WalkthroughCards({
             </div>
           )}
           {unit.selfCheck.question && asks(unit) && (
-            <WalkthroughAttempt unit={unit} attempts={attempts} onAttempt={onAttempt} demo={demo} />
+            <WalkthroughAttempt unit={unit} attempts={attempts} onAttempt={onAttempt} demo={demo} byHand={byHand} />
           )}
           {unit.selfCheck.question && !asks(unit) && (
             <details className="walkthrough-check">

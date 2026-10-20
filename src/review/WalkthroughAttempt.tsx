@@ -30,11 +30,14 @@ export function WalkthroughAttempt({
   attempts,
   onAttempt,
   demo,
+  byHand,
 }: {
   unit: FunctionWalkthrough;
   attempts?: FileAttempt["walkthroughs"];
   onAttempt?: (input: WalkthroughInput) => Promise<void>;
   demo: boolean;
+  /** A Learn-by-hand run: the answer counts toward nothing, and no hint says it can. */
+  byHand?: boolean;
 }) {
   const t = usePanelStrings();
   const key = walkthroughUnitKey(unit);
@@ -51,6 +54,7 @@ export function WalkthroughAttempt({
         onSave={onAttempt && !full ? (quiz) => onAttempt({ unit: key, ...quiz }) : undefined}
         readOnly={!onAttempt}
         practised={false}
+        byHand={byHand}
         demo={demo}
       />
       {onAttempt && full && <p className="tf-hint">{t.walkthroughFull}</p>}

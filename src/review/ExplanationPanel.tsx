@@ -700,6 +700,7 @@ export function ExplanationPanel({
                     onSave={onAttempt && ((quiz) => onAttempt({ quiz }))}
                     sample={samples?.quiz}
                     demo={demo}
+                    byHand={!!byHandReview}
                   />
                 )}
                 {explanation.selfCheck && !prompts && (
@@ -858,6 +859,7 @@ export function ExplanationPanel({
             tryFirst={prompts}
             attempts={fileAttempt?.walkthroughs}
             onAttempt={onAttempt && ((walkthrough) => onAttempt({ walkthrough }))}
+            byHand={!!byHandReview}
           />
         ) : tab === "reports" ? (
           <ReviewReports

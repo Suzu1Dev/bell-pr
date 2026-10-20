@@ -102,6 +102,15 @@ test("a typed answer without a confidence says how it can count toward the check
   assert.ok(!view({ answer: "  " }).includes(t.quiz.confidenceHint));
 });
 
+test("in a Learn-by-hand run, whose check takes no quiz answer, no hint says the answer can count", () => {
+  const typed = view({ answer, byHand: true });
+  assertNoHan(typed);
+  assert.ok(!typed.includes(t.quiz.confidenceHint));
+  assert.doesNotMatch(typed, /tf-hint/);
+  // The confidence is still asked for.
+  assert.ok(typed.includes(t.quiz.confidenceLabel));
+});
+
 test("while the answer is being saved, the reference stays out of the markup", () => {
   const saving = view({ answer, confidence: "think", pending: "reveal" });
   assertNoHan(saving);
