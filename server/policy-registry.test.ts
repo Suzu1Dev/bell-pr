@@ -446,6 +446,17 @@ test("signed, each shipped entry makes every outcome of both run kinds at least 
   await assertOnlyStricter(policyRegistry.map(signedOn), now);
 });
 
+test("signed, the kubernetes/* entry gives neither run kind an AI ban: its rules are quoted to weigh", () => {
+  const entry = policyRegistry.find((candidate) => candidate.key === "kubernetes/*")!;
+  const rules: ContributionRules = { checkedAt: now, findings: registryFindings("kubernetes/kubernetes", now, [signedOn(entry)]), filesRead: [] };
+  for (const learnByHand of [undefined, lbh(rules, ["explain", "answer"], false)]) {
+    const checks = respectChecks({ body: "Fixes the cap.", rules, ...(learnByHand ? { learnByHand } : {}) }, "en");
+    assert.deepEqual(checks.map((check) => `${check.id}:${check.kind}`), ["ai-disclosure:block", "project-rules:confirm"]);
+    const weighed = checks.find((check) => check.id === "project-rules")!.details.slice(1);
+    assert.deepEqual(weighed.map((detail) => /:(\d+): /.exec(detail)?.[1]), ["632", "638", "640"]);
+  }
+});
+
 test("signed, Servo's entry blocks an agent-written run on servo/servo", () => {
   const entry = policyRegistry.find((candidate) => candidate.key === "servo/servo")!;
   const rules: ContributionRules = { checkedAt: now, findings: registryFindings("servo/servo", now, [signedOn(entry)]), filesRead: [] };

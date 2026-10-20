@@ -214,6 +214,20 @@ export const policyRegistry: readonly RegistryEntry[] = [
         contribution: false,
         reach: "assistance",
       },
+      {
+        kind: "ban",
+        quote: "[Large AI generated](#large-or-automatic-edits) PRs and AI generated commit messages are not allowed.",
+        line: 638,
+        contribution: false,
+        reach: "output",
+      },
+      {
+        kind: "ban",
+        quote: "Do not leave the first review of AI generated changes to the reviewers.",
+        line: 640,
+        contribution: false,
+        reach: "output",
+      },
     ],
   },
   {
