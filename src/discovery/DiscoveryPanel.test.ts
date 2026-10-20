@@ -208,6 +208,8 @@ test("a learn-by-hand opportunity is tagged, has no agent-team choice, and keeps
   );
   assert.doesNotMatch(html, /Choose this opportunity/);
   assert.match(html, /The issue is labelled for newcomers\. Writing the fix yourself is how you learn the project/);
+  // The person can start writing it, with the guide (DESIGN v1.2 F1).
+  assert.match(html, /<button type="button" class="button primary"><svg[^>]*lucide-hand[\s\S]*?<\/svg>Start learning by hand<\/button>/);
   // The issue it cites opens on GitHub; the overview and the sources stay.
   assert.match(
     html,

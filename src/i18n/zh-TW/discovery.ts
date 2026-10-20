@@ -1,4 +1,5 @@
 import { formatters, type Translation } from "../../../shared/i18n/locale";
+import { product } from "../../../shared/product";
 import type en from "../en/discovery";
 
 const fmt = formatters("zh-TW");
@@ -154,6 +155,9 @@ const m: Translation<typeof en> = {
     learnByHandHint:
       "這個 issue 有新手標籤。親手寫修正才是認識專案的方式，所以 agent 團隊不會接手。先讀計畫與來源，再開啟 issue。",
     openIssue: "開啟 issue",
+    startByHand: "開始親手學",
+    reservedUse: `${product.name} 不會為這個 issue 發布親手學的任務：專案把它留給不靠 AI 工具學習的人。`,
+    reservedOutput: `這個專案會關閉這類 issue 上由 AI 產生的 Pull Request。只有專案自己的文字點名了嚮導提供的每一種協助，而且你確認過被引用的規範之後，${product.name} 才能為它發布親手學的任務；任務對話框會說明是哪一種情況。`,
   },
   runtime: {
     summary: "這次探索使用的模型與用量",
