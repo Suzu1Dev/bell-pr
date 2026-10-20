@@ -708,9 +708,14 @@ feedback is still read, and the run log says what to do first:
 - "The pull request's branch has commits the run's folder doesn't have
   yet. Pull them into the run's folder first; …"
 
-A sync of the pull request refuses with the same words. When the pull
-request's history was rewritten (a force push), BELL PR refuses as it
-does for every run. Taking commits over records them as the pull
+A sync of the pull request refuses with the same words. Like every sync,
+it never overwrites a file you save while it runs: "A file in the run's
+folder changed while BELL PR was syncing, so nothing moved. Sync again.",
+or, when the pull request's branch has new commits that change a file
+you saved meanwhile, "Changes saved in the run's folder touch files that
+the new commits on … change, so nothing moved. Commit or discard those
+changes first." When the pull request's history was rewritten (a force
+push), BELL PR refuses as it does for every run. Taking commits over records them as the pull
 request's; BELL PR doesn't check or review them.
 
 When you discard a round of such a run, BELL PR never drops your commits

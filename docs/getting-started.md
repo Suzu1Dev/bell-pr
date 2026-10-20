@@ -452,7 +452,13 @@ opens a Draft PR. Nothing is ever force-pushed.
   merges the latest target branch into your work (for a published PR, as
   one merge commit). Files the target branch changed need another review.
   Conflicts can be resolved by hand or with **Ask the agent to resolve the
-  conflicts**; an unpublished run's sync can be undone.
+  conflicts**; an unpublished run's sync can be undone. A sync never
+  overwrites a file you save while it runs: "A file in the run's folder
+  changed while BELL PR was syncing, so nothing moved. Sync again." When
+  a published PR's branch has new commits on GitHub that change a file
+  you saved meanwhile, it says "Changes saved in the run's folder touch
+  files that the new commits on … change, so nothing moved. Commit or
+  discard those changes first."
 - **Maintainer feedback**: **Read feedback** reads the reviews, comments
   and CI results of your PR once, when you press it, on every plan, and
   shows them file by file with the PR's state. Nothing polls GitHub. BELL
@@ -770,8 +776,9 @@ it says what to do first:
   yet. Pull them into the run's folder first; …"
 
 A sync of the pull request onto the latest target branch refuses with the
-same words. When the pull request's history was rewritten, BELL PR refuses
-as it does for every run. Conflicts are yours to resolve: there is no
+same words, and, like every sync, never overwrites a file you save while
+it runs (see [After publishing](#8-after-publishing)). When the pull
+request's history was rewritten, BELL PR refuses as it does for every run. Conflicts are yours to resolve: there is no
 conflict agent. "Resolve the markers by hand; BELL PR re-checks them when
 you refresh the diff on the Code changes tab." Approval waits until every
 marker is gone, and changed files need another review.
