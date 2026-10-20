@@ -100,10 +100,11 @@ export function GuidePanel(props: GuidePanelProps) {
   const rulesCase = props.rulesCase ?? (read.rules && byHandRulesCase(read.rules, { learningIssue, now: new Date().toISOString() }));
   const fingerprint = changeFingerprint(files.map(({ path, fingerprint }) => ({ path, fingerprint: fingerprint ?? "" })));
   const clean = byHandClean(run);
-  const banner = lock
+  // A run with every kind of help where it could have been fitted won't publish there either.
+  const blocked = rulesCase?.case === "blocked" ? rulesCase : rulesCase?.case === "fitted" && !lock ? { reason: "not-fitted" as const, finding: undefined } : undefined;
+  const banner = lock && clean.clean
     ? t.fitted({ kinds: helpKindList(lock.kinds, locale) })
-    : rulesCase?.case === "blocked" &&
-      t.blocked({ clause: byHandBlockClause(rulesCase.reason, locale, { checkedOn: rulesCase.finding.source?.checkedOn }) });
+    : blocked && t.blocked({ clause: byHandBlockClause(blocked.reason, locale, { checkedOn: blocked.finding?.source?.checkedOn }) });
   const missing = lock ? allHelpKinds.filter((kind) => !lock.kinds.includes(kind)) : [];
   const thinking = record.busy?.kind === "guide" || record.busy?.kind === "plan";
   const working = busy || !!record.busy;

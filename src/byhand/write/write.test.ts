@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { createElement, type ReactElement } from "react";
 import type { ByHandRecord, HelpLock } from "../../../shared/by-hand";
+import type { ByHandRulesCase } from "../../../shared/by-hand-rules";
 import { changeFingerprint } from "../../../shared/change-fingerprint";
 import { assertNoHan, renderEn, renderZh } from "../../test-utils/render";
 import type { DiffFile, Run } from "../../types";
@@ -214,6 +215,15 @@ test("a run that won't publish here says why, and that practising is fine", () =
     }),
   );
   assert.ok(text.includes("BELL PR won&#x27;t publish this run here: its rule restricts AI help itself, or BELL PR can&#x27;t tell what it covers. Practise freely."));
+});
+
+test("a run with every kind of help on a project it could have been fitted to says BELL won't publish it there", () => {
+  const fittedCase: ByHandRulesCase = { case: "fitted", kinds: ["explain", "answer", "test"], lock };
+  const text = html(guide({}, { rulesCase: fittedCase }));
+  assert.ok(text.includes("BELL PR won&#x27;t publish this run here: this run wasn&#x27;t fitted to its rules when it started. Practise freely."));
+  // The fitted run itself says its help set, and only while its history backs the claim.
+  assert.ok(html(guide({ helpLock: lock }, { rulesCase: fittedCase })).includes("This run is fitted to the project&#x27;s rules"));
+  assert.doesNotMatch(html(guide({ helpLock: lock, agentWrites: 1 }, { rulesCase: fittedCase })), /This run is fitted|Publishing asks you to confirm/);
 });
 
 test("the Tests card runs only a confirmed command and folds the output", () => {
