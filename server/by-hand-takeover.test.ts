@@ -50,6 +50,7 @@ const pushFirst = /^Push your commits first; BELL PR takes them over once they a
 const commitFirst = /^Commit or discard your changes in the run's folder first\./;
 const pullFirst = /^The pull request's branch has commits the run's folder doesn't have yet\./;
 const rewritten = /rewrote history that BELL PR pushed/;
+const switchBack = /^The run's folder isn't on its branch fix\/lbh0001\. Switch back to it first; BELL PR takes over commits only from that branch\./;
 const remoteMoved = /^The PR branch fix\/lbh0001 on GitHub has commits from outside BELL PR/;
 
 /** What the fake gh answers to the feedback read: an open PR with no feedback yet. */
@@ -448,6 +449,32 @@ test("a commit pushed on top of the person's while BELL looks moves the folder w
   assert.equal(await f.head(), onTop);
   assert.equal(await readFile(path.join(f.run.worktreePath, "NOTES.md"), "utf8"), "A maintainer's note.\n");
   assert.equal(await readFile(readme, "utf8"), "# Example, edited\n");
+});
+
+test("a folder on another branch or at a detached HEAD is never taken for the pull request's head", async (t) => {
+  const f = await published(t);
+  const pushedByBell = f.run.publishCommit!;
+  // The person tries something on a branch of their own and pushes it to the pull request's branch.
+  await git(f.run.worktreePath, ["checkout", "-q", "-b", "experiment"]);
+  const mine = await f.commit("export const attempts = 3;\n", "Try three attempts");
+  const refusedHere = async () => {
+    await en(() => f.workbench.fetchPrFeedback(f.run.id));
+    assert.ok(f.run.prFeedback?.fetchedAt);
+    assert.equal(f.run.publishCommit, pushedByBell);
+    assert.equal(f.run.followUps, undefined);
+    assert.match(f.run.logs.at(-2)?.message ?? "", switchBack);
+    assert.equal(f.run.logs.at(-2)?.kind, "notice");
+    await assert.rejects(en(() => f.workbench.syncRun(f.run.id)), refused(switchBack));
+    assert.equal(await f.head(), mine);
+  };
+  await refusedHere();
+  // A detached HEAD at the same commit isn't the run's branch either.
+  await git(f.run.worktreePath, ["checkout", "-q", "--detach", mine]);
+  await refusedHere();
+  // Back on the run's branch, at what the pull request's branch holds, it is taken over.
+  await git(f.run.worktreePath, ["checkout", "-q", "-B", branch, mine]);
+  await en(() => f.workbench.fetchPrFeedback(f.run.id));
+  assert.equal(f.run.publishCommit, mine);
 });
 
 test("adoptRemoteCommits without expectedHead takes over as before; with it, only a head that still holds it", async (t) => {

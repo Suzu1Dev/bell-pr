@@ -8,16 +8,17 @@
  * field or value), which never changes `byHandClean` or the help record.
  * BELL takes the commits over; it doesn't check or review them.
  *
- * Nothing happens unless the run's folder is still there, clean, and its
- * HEAD is past the last pushed commit. BELL adopts only when that HEAD
- * builds on the last push and is exactly the PR branch's head on GitHub
- * (the person pushed), and when the fetched head is still that HEAD or
- * builds on it; the folder then stays as it is, or moves on to that head
- * without a change saved meanwhile. It never resets local commits or saved
- * changes away: unpushed commits, a branch that moved on without them
- * (also while BELL looked), a dirty checkout or rewritten history leave
- * everything as it is, with a notice on the feedback read, or a refusal
- * before a sync. Agent runs are never touched.
+ * Nothing happens unless the run's folder is still there, clean, on the
+ * run's own branch, and its HEAD is past the last pushed commit. BELL
+ * adopts only when that HEAD builds on the last push and is exactly the PR
+ * branch's head on GitHub (the person pushed), and when the fetched head is
+ * still that HEAD or builds on it; the folder then stays as it is, or moves
+ * on to that head without a change saved meanwhile. It never resets local
+ * commits or saved changes away: unpushed commits, a branch that moved on
+ * without them (also while BELL looked), a dirty checkout, another branch
+ * or a detached HEAD, or rewritten history leave everything as it is, with
+ * a notice on the feedback read, or a refusal before a sync. Agent runs are
+ * never touched.
  */
 import { activeFollowUp } from "../shared/followups.js";
 import { sm } from "./i18n/index.js";
@@ -27,7 +28,7 @@ import { AppError, type Run } from "./types.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 /** What a takeover found: adopted, nothing to do, or why it left the commits where they are. */
-export type TakeoverOutcome = "adopted" | "none" | "dirty" | "unpushed" | "behind" | "rewritten";
+export type TakeoverOutcome = "adopted" | "none" | "dirty" | "elsewhere" | "unpushed" | "behind" | "rewritten";
 
 /** Whether `ancestor` is an ancestor of (or the same commit as) `commit` in the run's checkout. */
 async function contains(run: Run, ancestor: string, commit: string) {
@@ -37,6 +38,12 @@ async function contains(run: Run, ancestor: string, commit: string) {
   return result.code === 0;
 }
 
+/** Whether the run's folder is on the run's own branch (not another branch, not a detached HEAD). */
+async function onRunBranch(run: Run) {
+  const ref = await git(run.worktreePath, ["symbolic-ref", "-q", "HEAD"], { allowedCodes: [0, 1] });
+  return ref.stdout.trim() === `refs/heads/${run.branch}`;
+}
+
 /** Looks at the run's checkout and GitHub's PR branch, and adopts only what the person pushed. */
 async function takeOver(ctx: WorkbenchContext, run: Run, again = false): Promise<TakeoverOutcome> {
   if (!run.learnByHand || run.status !== "published" || run.publishing || run.workspaceRemovedAt) return "none";
@@ -44,6 +51,8 @@ async function takeOver(ctx: WorkbenchContext, run: Run, again = false): Promise
   const head = (await git(run.worktreePath, ["rev-parse", "HEAD"])).stdout.trim();
   if (head === run.publishCommit) return "none";
   if (await worktreeDirty(run)) return "dirty";
+  // Only the run's own branch is the pull request's, never another branch or a detached HEAD.
+  if (!(await onRunBranch(run))) return "elsewhere";
   const remote = await remoteBranchHead(run);
   if (!(await contains(run, run.publishCommit, head)))
     // A force push that rewrote what BELL pushed; a local rewrite not pushed is left alone.
@@ -68,6 +77,7 @@ async function takeOver(ctx: WorkbenchContext, run: Run, again = false): Promise
 function notice(run: Run, outcome: TakeoverOutcome) {
   const messages = sm().byHand.flow.takeover;
   if (outcome === "dirty") return messages.commitFirst;
+  if (outcome === "elsewhere") return messages.switchBack({ branch: run.branch });
   if (outcome === "unpushed") return messages.pushFirst;
   if (outcome === "behind") return messages.pullFirst;
   if (outcome === "rewritten") return sm().run.followUp.historyRewritten({ branch: run.publishedBranch ?? run.branch });

@@ -29,6 +29,7 @@ const flow: Translation<typeof en> = {
   takeover: {
     pushFirst: `請先推送你的 commit；它們出現在 Pull Request 的分支上之後，${product.name} 就會接手。`,
     commitFirst: "請先在這個工作的資料夾提交或捨棄你的修改。",
+    switchBack: ({ branch }) => `這個工作的資料夾目前不在它的分支 ${branch} 上。請先切換回這個分支；${product.name} 只接手這個分支上的 commit。`,
     pullFirst: `Pull Request 的分支上有這個工作的資料夾還沒有的 commit。請先把它們拉進這個工作的資料夾；資料夾和分支一致之後，${product.name} 就會接手你的 commit。`,
     adopted: ({ commits }) => `已接手你從這個工作的資料夾推送到 Pull Request 分支的 ${commits} 個 commit。`,
   },

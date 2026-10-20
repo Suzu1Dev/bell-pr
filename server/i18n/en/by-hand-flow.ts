@@ -57,6 +57,8 @@ const flow = {
   takeover: {
     pushFirst: `Push your commits first; ${product.name} takes them over once they are on the pull request's branch.`,
     commitFirst: "Commit or discard your changes in the run's folder first.",
+    switchBack: ({ branch }: { branch: string }) =>
+      `The run's folder isn't on its branch ${branch}. Switch back to it first; ${product.name} takes over commits only from that branch.`,
     pullFirst: `The pull request's branch has commits the run's folder doesn't have yet. Pull them into the run's folder first; ${product.name} takes your commits over once the folder matches the branch.`,
     adopted: ({ commits }: { commits: number }) =>
       `Took over ${fmt.number(commits)} ${fmt.plural(commits) === "one" ? "commit" : "commits"} you pushed from the run's folder to the pull request's branch.`,
