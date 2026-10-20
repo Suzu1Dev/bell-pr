@@ -1,12 +1,14 @@
 /**
- * Agent CLI processes that outlive BELL PR.
+ * Agent CLI processes, and test runs, that outlive BELL PR.
  *
- * Every agent CLI (codex, claude) runs in its own process group. While
- * BELL PR runs, AgentRegistry records the live groups in
+ * Every agent CLI (codex, claude) runs in its own process group, and so
+ * does the person's test command (`/bin/sh -c`, server/by-hand-tests.ts).
+ * While BELL PR runs, AgentRegistry records the live groups in
  * `<dataDir>/children.json` (0600). If BELL PR crashes or is killed, those
- * agents keep running and editing worktrees; at the next start,
- * reapOrphanedAgents stops the recorded groups that are still alive, before
- * the store marks their runs failed.
+ * agents keep running and editing worktrees, and a test run keeps running
+ * in its run's folder; at the next start, reapOrphanedAgents stops the
+ * recorded groups that are still alive, before the store marks their runs
+ * failed.
  *
  * POSIX only: Windows has no process groups, and BELL PR does not record
  * there.
@@ -19,7 +21,11 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { z } from "zod";
 import { log } from "./log.js";
 import { lenientRead } from "./persisted-schema.js";
-import { setSpawnObserver, type SpawnObserver } from "./process.js";
+import {
+  setSpawnObserver,
+  type SpawnDetails,
+  type SpawnObserver,
+} from "./process.js";
 
 /**
  * One recorded process group. Like every persisted file, every field but
@@ -29,7 +35,10 @@ import { setSpawnObserver, type SpawnObserver } from "./process.js";
 export const childSchema = z.object({
   /** The process group, which is the pid of the detached agent CLI. */
   pgid: z.number().int().positive(),
-  /** codex or claude. */
+  /**
+   * codex or claude; or the program of a group command() asked to record
+   * (`sh` for the person's test command).
+   */
   executable: z.string().min(1).max(200).optional(),
   /** When BELL PR started it (ISO). */
   startedAt: z.string().min(1).max(40).optional(),
@@ -85,8 +94,10 @@ export function writeChildren(file: string, children: AgentChild[]): void {
 
 /**
  * Records the agent CLI process groups started from now on in
- * children.json, and removes each group when its process exits. Writes are
- * synchronous, so the file is current at the moment of a crash.
+ * children.json, and the groups command() asks to record (`endGroup`: the
+ * person's test command), and removes each group when its process exits
+ * (for a group command() asked for, once the whole group is gone). Writes
+ * are synchronous, so the file is current at the moment of a crash.
  */
 export class AgentRegistry implements SpawnObserver {
   private readonly children = new Map<number, AgentChild>();
@@ -111,8 +122,8 @@ export class AgentRegistry implements SpawnObserver {
     return [...this.children.values()];
   }
 
-  onSpawn(pid: number, executable: string): void {
-    if (!isAgentExecutable(executable)) return;
+  onSpawn(pid: number, executable: string, details?: SpawnDetails): void {
+    if (!isAgentExecutable(executable) && !details?.recordGroup) return;
     this.children.set(pid, {
       pgid: pid,
       executable: path.basename(executable),
@@ -268,7 +279,10 @@ export interface ReapResult {
  * signalled when one of its processes runs codex or claude, none of them is
  * this process, it was recorded during the current boot, and its first
  * process did not start after it was recorded, so a reused pid is not hit.
- * Clears the file afterwards.
+ * A group recorded at command()'s request (a test run, which may run any
+ * program) needs its first process instead: still there, with a known
+ * start no later than the record. A test run whose first process has
+ * exited is left alone. Clears the file afterwards.
  */
 export async function reapOrphanedAgents(
   file: string,
@@ -288,6 +302,9 @@ export async function reapOrphanedAgents(
     if (!members.length) continue;
     const startedAt = Date.parse(child.startedAt ?? "");
     const leader = members.find((member) => member.pid === child.pgid);
+    // Recorded at command()'s request: a test run, with no agent to look for.
+    const requested =
+      child.executable !== undefined && !isAgentExecutable(child.executable);
     if (
       child.pgid <= 1 ||
       !Number.isFinite(startedAt) ||
@@ -297,7 +314,9 @@ export async function reapOrphanedAgents(
       // group, so its pid was reused for a new group.
       (leader?.startedAt !== undefined && leader.startedAt > startedAt + reusedAfterMs) ||
       members.some((member) => member.pid === process.pid) ||
-      !members.some((member) => isAgentCommand(member.argv))
+      (requested
+        ? leader?.startedAt === undefined
+        : !members.some((member) => isAgentCommand(member.argv)))
     ) {
       result.skipped.push(child);
       log.warn("Left a recorded process group alone: it is not a leftover agent", {
