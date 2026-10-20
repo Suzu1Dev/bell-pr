@@ -94,6 +94,8 @@ const realExpectations: Record<string, readonly (readonly [string, boolean?])[]>
   // Maintainer approval keeps a refusal a ban.
   "netbsd-commit-guidelines.txt": [["ban", true]],
   "gentoo-ai-policy.txt": [["ban", true]],
+  // "forbid" refuses as "forbidden" does; "will be banned" was a ban in v1.1.
+  "asahi-llm-policy.txt": [["ban", true], ["ban", true]],
 };
 
 test("real projects' policies yield the expected kinds, quoted verbatim, and conditional rules never block", async () => {
@@ -122,6 +124,7 @@ const blocksAgentRuns = [
   "gentoo-ai-policy.txt",
   "zig-README.md",
   "netbsd-commit-guidelines.txt",
+  "asahi-llm-policy.txt",
   "qemu-code-provenance.rst",
 ];
 
@@ -264,6 +267,8 @@ test("each policy fixture yields exactly its findings, read locally at the commi
     // "No AI for the enemies": a model named for something other than a contribution.
     "no-ai-for-enemies": [],
     "ai-features": [],
+    // "forbid" next to game AI, or to no AI at all.
+    "forbid-game": [],
     // A note to agents in a comment.
     "agent-note": [["agent", "CONTRIBUTING.md", 4, true]],
   };

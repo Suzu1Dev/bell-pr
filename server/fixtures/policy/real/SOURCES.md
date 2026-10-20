@@ -23,3 +23,4 @@ contribution rules) are quoted as their text, without markup.
 | `godot-contribution-rules.md` | https://contributing.godotengine.org/en/latest/development/contribution_rules.html ("For contributors") |
 | `netbsd-commit-guidelines.txt` | https://www.netbsd.org/developers/commit-guidelines.html |
 | `gentoo-ai-policy.txt` | https://wiki.gentoo.org/wiki/Project:Council/AI_policy |
+| `asahi-llm-policy.txt` | https://asahilinux.org/llm-policy/ (the paragraph with the rule, as text; fetched read-only 2026-10-20, matching the quotes BELL's policy research checked on 2026-10-19) |

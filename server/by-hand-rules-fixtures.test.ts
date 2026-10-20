@@ -139,6 +139,13 @@ test("an unclear-reach ban (synthetic: no verified text has one) stays blocked b
   assert.ok(message(result.lbhChecks, "ai-ban").endsWith(`and ${clause("reach")}.`));
 });
 
+test("Asahi Linux (assistance): blocked by reach for both run kinds", async () => {
+  const rules = await readRules([["AI_POLICY.md", "real/asahi-llm-policy.txt"]]);
+  const result = row(rules, ["explain", "answer"]);
+  assert.deepEqual([result.case, result.lbh, result.reasons, result.agent], ["blocked:reach", ["ai-ban:block"], ["reach", "reach"], ["ai-ban:block"]]);
+  assert.equal(message(result.lbhChecks, "ai-ban"), assistanceCopy);
+});
+
 test("LLVM's good first issues ('Using AI tools to fix … is forbidden'): reserved, blocked by reach", async () => {
   const rules = await readRules([["llvm/docs/AIToolPolicy.md", "real/llvm-AIToolPolicy.md"]]);
   const result = row(rules, ["explain", "answer"], { learning: true });

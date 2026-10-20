@@ -210,6 +210,20 @@ test("AI on good first issues is a reserved learning area, not a ban", () => {
   );
 });
 
+test("'forbid' and 'forbids' refuse as 'forbidden' does", () => {
+  // Asahi Linux's policy (plan research/policies.md).
+  assert.deepEqual(
+    kinds("AI_POLICY.md", "we broadly forbid the use of generative AI tooling for material contributions to Asahi Linux."),
+    [["ban", true]],
+  );
+  assert.deepEqual(kinds("CONTRIBUTING.md", "The project forbids AI-generated patches."), [["ban", true]]);
+  for (const text of [
+    "We forbid force-pushes to main.",
+    "The level editor forbids AI players in ranked maps; pull requests may change that rule.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [], text);
+});
+
 test("a request to disclose AI assistance is a disclosure rule", () => {
   const text = "Please disclose any use of AI assistance in your pull request description.";
   assert.deepEqual(kinds("CONTRIBUTING.md", text), [["disclose", true]]);

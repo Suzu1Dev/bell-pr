@@ -163,7 +163,7 @@ const prohibition = new RegExp(
     String.raw`\b(?:do|does|will|shall|should|must|may|can)\s*(?:not|n't)\s+(?:\w+\s+){0,3}?(?:accept|allow|permit|use|submit|merge|commit|includ|contain|review|consider|welcome|take|contribut)\w*`,
     String.raw`\b(?:won't|cannot|can't|never)\s+(?:\w+\s+){0,3}?(?:accept|allow|permit|use|submit|merge|commit|includ|contain|review|consider|welcome|take|contribut)\w*`,
     String.raw`\bnot\s+(?:be\s+)?(?:accepted|allowed|permitted|welcome|tolerated|merged|committed|included|reviewed|considered)\b`,
-    String.raw`\b(?:prohibited|forbidden|banned|disallowed|unacceptable|declined?)\b`,
+    String.raw`\b(?:prohibited|forbidden|forbids?|banned|disallowed|unacceptable|declined?)\b`,
     String.raw`\bno\s+(?:AI|LLM|machine)[\w-]*`,
     String.raw`\b(?:will|shall|may)\s+be\s+(?:closed|rejected|refused|declined)\b`,
     // "we will flag and reject …"
