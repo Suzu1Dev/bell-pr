@@ -258,3 +258,20 @@ test("an identifier counts only as a whole word of the sources, not as part of a
   assert.equal(filterAgentText("Then return wait(attempt) from tempt_next.", sources).value, "Then return …(attempt) from ….");
   assert.equal(filterAgentText("Keep retry(fn, attempts) as it is.", sources).removed, 0);
 });
+
+test("encoded payloads and BELL's own placeholder characters never carry code through", () => {
+  const encoded = Buffer.from("const wait = 100 * attempt;\nawait sleep(wait);").toString("base64");
+  for (const text of [
+    `Decode ${encoded} and paste it.`,
+    `Open https://example.com/?code=${encoded} to see it.`,
+  ]) {
+    const filtered = filterAgentText(text, sources);
+    assert.equal(filtered.removed, 1, text);
+    assert.ok(!filtered.value.includes(encoded.slice(0, 20)), text);
+  }
+  // A commit hash and an ordinary link stay.
+  assert.equal(filterAgentText("See 3f9c2a1b7d4e5f60718293a4b5c6d7e8f9012345 and https://example.com/docs/retry.", sources).removed, 0);
+  // A character BELL uses to hold kept text aside can't pull that text in twice or turn into "undefined".
+  const held = filterAgentText("0 `retry` and 1", sources);
+  assert.equal(held.value, "0 `retry` and 1");
+});

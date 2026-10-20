@@ -138,6 +138,19 @@ const indentOf = (row: string) => (/^[ \t]*/.exec(row)?.[0] ?? "").replace(/\t/g
 /** A line without up to `width` columns of indentation. */
 const dedent = (row: string, width: number) =>
   row.replace(/^[ \t]+/, (margin) => margin.replace(/\t/g, "    ")).replace(new RegExp(`^ {0,${width}}`), "");
+/**
+ * A long run of base64 (or base64url) text with the mix of capitals,
+ * small letters and digits that encoding gives: a payload the person
+ * could decode, not prose, a path or a commit hash.
+ */
+const encodedRun = /[A-Za-z0-9+/_-]{40,}={0,2}/g;
+const encoded = (run: string) => {
+  const count = (pattern: RegExp) => run.match(pattern)?.length ?? 0;
+  const letters = count(/[A-Za-z]/g);
+  return count(/\d/g) >= 3 && count(/[A-Z]/g) >= letters / 5 && count(/[a-z]/g) >= letters / 5;
+};
+/** Marks text held aside while the rules run; never kept from agent text. */
+const holdMark = "\uE000";
 /** Inline code spans of one or more backticks. */
 const inline = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g;
 /**
@@ -240,11 +253,13 @@ export function filterAgentText(
   };
   // What stays as written is held aside, so a later rule never reads into it.
   const held: string[] = [];
-  const hold = (piece: string) => `\uE000${held.push(piece) - 1}\uE000`;
+  const hold = (piece: string) => `${holdMark}${held.push(piece) - 1}${holdMark}`;
+  /** An encoded payload the sources don't have. */
+  const payload = (run: string) => encoded(run) && !occurs(run);
   /** A code block stays when its lines, as written or without their margin, are a run of a file's lines. */
   const block = (whole: string, ...readings: string[][]) =>
     readings.some((rows) => verbatimLines(rows, sources)) ? hold(whole) : remove();
-  let value = text.replace(fence, (whole, prefix: string, _fence: string, body: string) => {
+  let value = text.replaceAll(holdMark, "").replace(fence, (whole, prefix: string, _fence: string, body: string) => {
     const quoted = /^(?:[ \t]*>[ \t]?)*/;
     const margin = prefix.replace(quoted, "").length;
     const rows = body.split("\n");
@@ -261,10 +276,11 @@ export function filterAgentText(
       const code = body.trim();
       return code && (occurs(code) || (options.tooling && safeCommand(code, sources, isWord))) ? hold(span) : remove();
     })
-    .replace(/\bhttps?:\/\/\S+/g, hold)
+    .replace(/\bhttps?:\/\/\S+/g, (url) => ([...url.matchAll(encodedRun)].some(([run]) => payload(run)) ? remove() : hold(url)))
+    .replace(encodedRun, (run) => (payload(run) ? remove() : run))
     .replace(expression, (code) => (occurs(code.replace(/[.,;:]+$/, "")) ? code : remove()))
     .replace(identifier, (word) => (isWord(word) ? word : remove()));
-  value = value.replace(/\uE000(\d+)\uE000/g, (_match, index: string) => held[Number(index)]);
+  value = value.replace(new RegExp(`${holdMark}(\\d+)${holdMark}`, "g"), (_match, index: string) => held[Number(index)]);
   if (removed && options.refs?.length && !/[\p{L}\p{N}]/u.test(value.replaceAll(removedMark, "")))
     value = options.refs.map(pointer).join("\n");
   return { value, removed, dropped: 0 };
