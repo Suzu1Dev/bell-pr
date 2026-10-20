@@ -456,7 +456,8 @@ export async function storedReview(run: GuideRun, files: DiffFile[], input: Retu
   const verified = (await prose(answer.verified)).slice(0, limits.reviewVerifiedChars);
   const checked: string[] = [];
   for (const item of answer.checked) checked.push((await prose(item)).slice(0, 300));
-  const tester = await prose(reports.tester, [], true);
+  // The test analyst's free text, kept as long as a test run's stored output, then filtered.
+  const tester = await prose(reports.tester.slice(0, limits.tailChars), [], true);
   const review: ByHandReview = { at: now(), changeFingerprint: input.fingerprint, verified, checked, findings };
   if (leastSure) review.leastSure = leastSure;
   if (lastTest) review.testRunAt = lastTest.at;
