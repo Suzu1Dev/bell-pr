@@ -7,7 +7,7 @@
 // first on PATH.
 import test, { after, before, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { aiDisclosureLine, withAiDisclosure } from "../shared/drafts.js";
@@ -668,4 +668,19 @@ test("the PR template comes verbatim from the run's folder: at most three, none 
     ".github/PULL_REQUEST_TEMPLATE/docs.md",
   ]);
   assert.equal(templates[1].content, "# bug.md\n");
+});
+
+test("a PR template that is a link is never read: the project can't point it at the person's own files", async (t) => {
+  const f = await fixture(t);
+  const run = await f.writing();
+  // The person's local settings, ignored by Git, next to a template the project made a link to them.
+  await writeFile(path.join(run.worktreePath, ".env"), "GITHUB_TOKEN=ghp_local_secret\n");
+  await git(run.worktreePath, ["rm", "-q", "--", ".github/pull_request_template.md"]);
+  await mkdir(path.join(run.worktreePath, ".github"), { recursive: true });
+  await symlink("../.env", path.join(run.worktreePath, ".github", "pull_request_template.md"));
+  await mkdir(path.join(run.worktreePath, "docs"), { recursive: true });
+  await symlink("../.env", path.join(run.worktreePath, "docs", "PULL_REQUEST_TEMPLATE.md"));
+  await git(run.worktreePath, ["add", "--", ".github/pull_request_template.md", "docs/PULL_REQUEST_TEMPLATE.md"]);
+  const { templates } = await en(() => f.workbench.byHand.template(run.id));
+  assert.deepEqual(templates, []);
 });

@@ -5,7 +5,7 @@
  * the person's own, and it may start from the project's PR template
  * (`template`, the façade's GET …/by-hand/template).
  */
-import { mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { git, redact } from "./process.js";
@@ -212,9 +212,12 @@ export async function template(
   const templates: ByHandTemplate[] = [];
   for (const file of found) {
     if (templates.length >= templateLimits.files) break;
-    const full = await realpath(path.join(root, file)).catch(() => "");
-    if (!full.startsWith(`${root}${path.sep}`)) continue;
-    const info = await stat(full);
+    // Only a file at its own path: a link (or a linked folder) the project tracks could point at
+    // the person's own files, such as an ignored .env.
+    const own = path.join(root, file);
+    const full = await realpath(own).catch(() => "");
+    if (full !== own) continue;
+    const info = await lstat(full);
     if (!info.isFile() || info.size > templateLimits.bytes) continue;
     templates.push({ path: file, content: await readFile(full, "utf8") });
   }
