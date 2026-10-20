@@ -217,3 +217,38 @@ test("a list of * or + items is prose: an operator joins operands on one line on
     assert.deepEqual(filterAgentText(text, sources), { value: text, removed: 0, dropped: 0 });
   assert.equal(filterAgentText("Then delayMs * attempt;", sources).value, "Then …");
 });
+
+test("code in other Markdown shapes goes too: indented blocks, prefixed fences, HTML code and diff lines", () => {
+  const leaks = {
+    "an indented code block": "Try this:\n\n    if (attempt < attempts) {\n      await sleep(delayMs * attempt);\n    }\n\nThen test.",
+    "a tab-indented block": "Try:\n\n\tconst wait = 100 * attempt;\n\tawait sleep(wait);\n",
+    "an indented block inside a list item": "1. Add a delay:\n\n        const wait = 100 * attempt;\n        await sleep(wait);\n",
+    "an unclosed fence in a list item": "1. Add:\n    ```js\n    const wait = 100 * attempt;\n    await sleep(wait);",
+    "an unclosed fence in a quote": "> ```js\n> const wait = 100 * attempt;\n> await sleep(wait);\n",
+    "an HTML pre element": "Use this:\n<pre>\nfor (const item of items) {\n  total += item.price;\n}\n</pre>\n",
+    "an HTML code element": "Write <code>return fn().catch(handle);</code> in the catch block.",
+    "a diff hunk": "Change it like this:\n@@ -4,1 +4,2 @@\n       return await fn();\n+      await new Promise((resolve) => setTimeout(resolve, 100));\n",
+    "added diff lines without a hunk": "Change:\n- return await fn();\n+ return await fn().catch(handle);\n",
+  };
+  for (const [name, text] of Object.entries(leaks)) {
+    const filtered = filterAgentText(text, sources);
+    assert.ok(filtered.removed >= 1, name);
+    for (const code of ["attempt < attempts", "delayMs * attempt", "100 * attempt", "await sleep", "total += item.price", "catch(handle)", "setTimeout(resolve"])
+      assert.ok(!filtered.value.includes(code), `${name}: ${code} survived in ${JSON.stringify(filtered.value)}`);
+  }
+  // Verbatim lines of the project's files stay in each of these shapes.
+  for (const text of [
+    `The loop:\n\n    ${base[1]}\n    ${base[2]}\n\nRead it.`,
+    `> \`\`\`ts\n> ${base[3]}\n> \`\`\``,
+    `<pre>\n${base[5]}\n</pre>`,
+    `@@ -5,2 +5,2 @@\n ${base[4]}\n-${base[5]}\n+${base[5]}`,
+  ])
+    assert.equal(filterAgentText(text, sources).removed, 0, text);
+  // Prose keeps its lists, its quoted lines and its "+1".
+  for (const text of [
+    "1. Read the loop.\n\n   Then the catch block decides.\n2. Run the tests.",
+    "- Read the loop\n- Run the tests\n+ One more idea: ask a maintainer.",
+    "> The project says to keep pull requests small.",
+  ])
+    assert.equal(filterAgentText(text, sources).removed, 0, text);
+});

@@ -4,8 +4,12 @@
  * person only as quotes BELL cuts itself from the base commit or from the
  * person's own files. server/by-hand-filter.ts reads those files.
  *
- * 1. A fenced code block is removed unless it is a contiguous run of lines
- *    of a cited or changed file, at base or in the worktree.
+ * 1. A code block is removed unless it is a contiguous run of lines of a
+ *    cited or changed file, at base or in the worktree: a fenced block
+ *    (also inside a list item or a quote), an indented block, an HTML
+ *    element that shows code (pre, code, …), or a diff hunk; an added
+ *    diff line ("+" then code) outside a hunk is removed unless it is a
+ *    line of those files or of the person's diff.
  * 2. An inline code span is kept only if its exact text occurs in a cited
  *    file (base or worktree) or in the person's diff, or, for a tooling
  *    answer, if it is a one-line command of at most 120 characters that
@@ -112,8 +116,28 @@ function safeCommand(span: string, sources: FilterSources, occurs: (code: string
   return !(touches && editing.test(span));
 }
 
-/** Fenced code blocks, ``` or ~~~, closed or running to the end of the text. */
-const fence = /^( {0,3})(`{3,}|~{3,})[^\n]*\n([\s\S]*?)(?:\n {0,3}\2[`~]*[ \t]*(?=\n|$)|$(?![\s\S]))/gm;
+/**
+ * Fenced code blocks, ``` or ~~~, after any indentation, quote marker or
+ * list marker, closed by the same fence or running to the end of the text.
+ */
+const fence =
+  /^((?:[ \t]*>)*[ \t]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?[ \t]*)(`{3,}(?![^\n]*`)|~{3,})[^\n]*\n([\s\S]*?)(?:\n(?:[ \t]*>)*[ \t]*\2[`~]*[ \t]*(?=\n|$)|$(?![\s\S]))/gm;
+/** HTML elements that show code (the guide's text is never rendered as HTML, so the code would show). */
+const htmlCode =
+  /<(pre|code|samp|kbd|tt|var|xmp|listing|plaintext|textarea|script|style)\b[^>]*>([\s\S]*?)(?:<\/\1\s*>|$(?![\s\S]))/gi;
+/** A unified diff's hunk header. */
+const hunkHeader = /^[ \t]*@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/;
+/** A line a diff adds, after any indentation or quote marker; "++" is not one. */
+const addedLine = /^((?:[ \t]*>)*[ \t]*)\+(?!\+)(.*)$/;
+/** A character of code, which a prose bullet starting with "+" does not need. */
+const codeCharacter = /[;{}()=<>[\]]/;
+/** A list item's marker and the spaces after it, where the item's text starts. */
+const listMarker = /^[ \t]*(?:[-*+]|\d{1,9}[.)])[ \t]+(?=\S)/;
+/** The width of a line's indentation, a tab counting as 4 columns. */
+const indentOf = (row: string) => (/^[ \t]*/.exec(row)?.[0] ?? "").replace(/\t/g, "    ").length;
+/** A line without up to `width` columns of indentation. */
+const dedent = (row: string, width: number) =>
+  row.replace(/^[ \t]+/, (margin) => margin.replace(/\t/g, "    ")).replace(new RegExp(`^ {0,${width}}`), "");
 /** Inline code spans of one or more backticks. */
 const inline = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g;
 /**
@@ -127,10 +151,71 @@ const expression = /[\w$.()[\]'"]+(?:[ \t]+(?:=>|===|!==|==|!=|\*\*|&&|\|\||[-+*
 const identifier = /(?<![\w$./-])(?:[a-z][a-z0-9]*[A-Z][A-Za-z0-9]*|[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+|[A-Za-z_$][\w$]*(?=\())(?![\w$/]|\.\w)/g;
 
 /**
- * Filters agent prose (rules 1 and 2): fences, inline code spans and
- * invented identifiers. `tooling` allows the one-line commands of rule 2.
- * With `refs`, an answer left with nothing but removals becomes their
- * pointers (rule 4).
+ * The lines of a diff: each hunk (a header and its lines) is kept only when
+ * every line of it is a line of the files or of the person's diff, and an
+ * added line outside a hunk ("+" then code) only when it is one.
+ */
+function diffLines(text: string, known: (line: string) => boolean, keep: (block: string) => string, remove: () => string) {
+  const rows = text.split("\n");
+  const out: string[] = [];
+  for (let index = 0; index < rows.length; index++) {
+    if (hunkHeader.test(rows[index])) {
+      let end = index + 1;
+      while (end < rows.length && /^[ +\-\\]/.test(rows[end]) && !hunkHeader.test(rows[end])) end++;
+      const body = rows.slice(index + 1, end).filter((row) => !row.startsWith("\\"));
+      out.push(body.every((row) => known(row.slice(1))) ? keep(rows.slice(index, end).join("\n")) : remove());
+      index = end - 1;
+      continue;
+    }
+    const added = addedLine.exec(rows[index]);
+    out.push(added && codeCharacter.test(added[2]) && !known(added[2]) ? `${added[1]}${remove()}` : rows[index]);
+  }
+  return out.join("\n");
+}
+
+/**
+ * Indented code blocks: after a blank line, lines indented 4 columns past
+ * the text of the list item they are in (past the margin outside a list).
+ * `block` decides each one from its lines and that width.
+ */
+function indentedBlocks(text: string, block: (rows: string[], width: number) => string) {
+  const rows = text.split("\n");
+  const out: string[] = [];
+  let itemText = 0; // where the text of the current list item starts; 0 outside lists
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index];
+    const afterBlank = index === 0 || !rows[index - 1].trim();
+    const width = itemText + 4;
+    if (row.trim() && afterBlank && indentOf(row) >= width) {
+      let end = index + 1;
+      while (end < rows.length && (!rows[end].trim() || indentOf(rows[end]) >= width)) end++;
+      while (!rows[end - 1].trim()) end--;
+      out.push(block(rows.slice(index, end), width));
+      index = end - 1;
+      continue;
+    }
+    const marker = listMarker.exec(row);
+    if (marker) itemText = indentOf(marker[0].replace(/\S/g, " "));
+    else if (row.trim() && afterBlank && indentOf(row) < itemText) itemText = 0;
+    out.push(row);
+  }
+  return out.join("\n");
+}
+
+/** The text of an HTML element's content: no tags, the usual entities decoded. */
+const elementText = (body: string) =>
+  body
+    .replace(/<\/?[A-Za-z][^>]*>/g, "")
+    .replace(/&(lt|gt|quot|#39|apos|amp);/g, (_entity, name: string) =>
+      ({ lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'", amp: "&" })[name] ?? "",
+    );
+
+/**
+ * Filters agent prose (rules 1 and 2): code blocks (fenced, indented, an
+ * HTML code element or a diff), inline code spans and invented
+ * identifiers. `tooling` allows the one-line commands of rule 2. With
+ * `refs`, an answer left with nothing but removals becomes their pointers
+ * (rule 4).
  */
 export function filterAgentText(
   text: string,
@@ -139,6 +224,12 @@ export function filterAgentText(
 ): Filtered<string> {
   const known = corpus(sources);
   const occurs = (code: string) => known.some((source) => source.includes(code));
+  // Single lines of the files and of the person's diff (without its +, - or space), for diff lines.
+  const lines = new Set([
+    ...allFiles(sources).flatMap((file) => file.map((line) => line.trim())),
+    ...(sources.diff ?? "").split("\n").map((line) => line.slice(1).trim()),
+  ]);
+  const knownLine = (line: string) => !line.trim() || lines.has(line.trim());
   let removed = 0;
   const remove = () => {
     removed++;
@@ -147,10 +238,22 @@ export function filterAgentText(
   // What stays as written is held aside, so a later rule never reads into it.
   const held: string[] = [];
   const hold = (piece: string) => `\uE000${held.push(piece) - 1}\uE000`;
-  let value = text
-    .replace(fence, (block, _indent: string, _fence: string, body: string) =>
-      verbatimLines(body.split("\n"), sources) ? hold(block) : remove(),
-    )
+  /** A code block stays when its lines, as written or without their margin, are a run of a file's lines. */
+  const block = (whole: string, ...readings: string[][]) =>
+    readings.some((rows) => verbatimLines(rows, sources)) ? hold(whole) : remove();
+  let value = text.replace(fence, (whole, prefix: string, _fence: string, body: string) => {
+    const quoted = /^(?:[ \t]*>[ \t]?)*/;
+    const margin = prefix.replace(quoted, "").length;
+    const rows = body.split("\n");
+    return block(whole, rows, rows.map((row) => dedent(prefix.includes(">") ? row.replace(quoted, "") : row, margin)));
+  });
+  value = value.replace(htmlCode, (whole, _tag: string, body: string) => {
+    const code = elementText(body);
+    return !code.trim() || occurs(code.trim()) || verbatimLines(code.split("\n"), sources) ? hold(whole) : remove();
+  });
+  value = diffLines(value, knownLine, hold, remove);
+  value = indentedBlocks(value, (rows, width) => block(rows.join("\n"), rows, rows.map((row) => dedent(row, width))));
+  value = value
     .replace(inline, (span, _ticks: string, body: string) => {
       const code = body.trim();
       return code && (occurs(code) || (options.tooling && safeCommand(code, sources, occurs))) ? hold(span) : remove();
