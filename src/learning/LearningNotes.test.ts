@@ -443,3 +443,37 @@ test("each contribution shows the person's own explanation, and runs approved wi
   assert.match(zh, /<span class="learning-check-off">理解檢查已關閉<\/span>/);
   assert.match(zh, /<strong>你的說明<\/strong>/);
 });
+
+test("a Learn-by-hand run's entry carries its record, which loads with the byhand chunk", () => {
+  const byHand: LearningRun = {
+    ...englishRuns[1],
+    id: "run-by-hand",
+    title: "Cap the retries by hand",
+    explanations: {},
+    notes: {},
+    learnByHand: true,
+    byHandSummary: {
+      helps: { answer: 2 },
+      hintRequests: 1,
+      lowRungRequests: 1,
+      highestRungs: [],
+      predictions: { judged: 0, right: 0, unsure: 0 },
+      namedTests: 0,
+      readyVersions: 1,
+      reviewFindings: [],
+      removedAnswers: 0,
+      removedTotal: 0,
+      outlineBeforeDraft: false,
+      exits: 0,
+      left: false,
+    },
+  };
+  const html = renderEnglish({ initial: { runs: [...checkedRuns, byHand] } });
+  assertNoHan(html);
+  const cards = [...html.matchAll(/<article class="learning-run-card">.*?<\/article>/gs)].map(([card]) => card);
+  assert.equal(cards.length, 3);
+  // Neither an explanation nor the check-off text: the record says what happened.
+  assert.match(cards[2], /<h3>Cap the retries by hand<\/h3><\/article>/);
+  // A run without a record keeps its card as before.
+  assert.doesNotMatch(cards[0], /by hand/i);
+});
