@@ -246,3 +246,21 @@ test("a second review waits for a test run at the new version, and a fitted run 
   assert.doesNotMatch(fitted, /Ask the guide to review it/);
   assert.ok(fitted.includes(apostrophes("doesn't name AI review, so the guide doesn't review here; your tests are the judge.")));
 });
+
+test("an answer's own text stays plain text: an open code fence in it swallows nothing BELL renders after it", () => {
+  const entry = {
+    id: "e9",
+    at,
+    kind: "ask",
+    text: "Look at the limit:\n```\n",
+    quotes: [{ path: "src/retry.ts", startLine: 1, endLine: 1, from: "change", text: "export const maxRetries = 3;" }],
+    ask: "## What do you expect it to do?",
+  };
+  const text = html(guide({ thread: [entry] }));
+  // The agent's words are text, not Markdown: no code block opens from them.
+  assert.ok(text.includes("<p>Look at the limit:\n```\n</p>"));
+  assert.equal(text.match(/<pre>/g)?.length, 1);
+  // BELL's own quote renders from its fields, under its header, after the fence.
+  assert.match(text, /<figcaption><code>src\/retry\.ts:1-1<\/code> From your change<\/figcaption><pre><code>export const maxRetries = 3;<\/code><\/pre>/);
+  assert.ok(text.includes("<p>## What do you expect it to do?</p>"));
+});
