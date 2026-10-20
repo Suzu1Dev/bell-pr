@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import {
   Bug,
   Cpu,
@@ -207,7 +207,11 @@ export function DirectionSettings({
   const [clampedOnLoad, setClampedOnLoad] = useState(false);
   const latest = useRef({ value, onChange, entitlements: plan.entitlements });
   latest.current = { value, onChange, entitlements: plan.entitlements };
-  useEffect(() => {
+  // A layout effect, so the lower value applies in the same commit as the
+  // settings or the plan that brought it. As a passive effect it could run
+  // after a keystroke that came in between (the form unlocks in that
+  // commit) and put back the form without what was just typed.
+  useLayoutEffect(() => {
     const { value: current, onChange: apply, entitlements: limits } =
       latest.current;
     if (!overLimit || !limits) return;
