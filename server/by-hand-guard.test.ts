@@ -122,9 +122,9 @@ test("executeRun sends a Learn-by-hand run to the guide's planning, never to the
   f.run.status = "queued";
   f.ctx.enqueue(f.run.id);
   await f.waitFor(() => f.run.status === "failed");
-  // planByHand is W2A's; the stub fails the run with its message and no agent turn.
-  assert.equal(f.run.error, "This part of Learn by hand is not available in this build yet.");
-  assert.equal(f.calls.length, 0);
+  // planByHand (W2A) asks the guide once, read-only; the fake's plain-text answer is not the guide's form.
+  assert.equal(f.run.error, "The guide's answer was not in the expected form, so nothing was stored. Try again.");
+  assert.deepEqual(f.calls.map((call) => [call.role, call.readonly]), [["lead", true]]);
   assert.deepEqual(f.run.team?.tasks, []);
   assert.deepEqual(f.run.agents.map((agent) => agent.id), ["lead", "reviewer", "tester"]);
 });
@@ -135,10 +135,10 @@ test("retryTeam re-plans a Learn-by-hand run without an outline, and returns one
   f.run.status = "failed";
   f.run.error = "The service restarted.";
   await withLocale("en", () => f.workbench.retryTeam(f.run.id));
-  // The queue reached executeRun's Learn-by-hand branch again (the W1 stub fails it).
+  // The queue reached executeRun's Learn-by-hand branch again: the guide's planning (W2A).
   await f.waitFor(() => f.run.status === "failed" && f.run.error !== "The service restarted.");
-  assert.equal(f.run.error, "This part of Learn by hand is not available in this build yet.");
-  assert.equal(f.calls.length, 0);
+  assert.equal(f.run.error, "The guide's answer was not in the expected form, so nothing was stored. Try again.");
+  assert.deepEqual(f.calls.map((call) => [call.role, call.readonly]), [["lead", true]]);
   // (b) Cancelled with an outline and no confirmed plan: back to the plan, no agent turn.
   f.run.status = "cancelled";
   f.run.team!.phase = "cancelled";
@@ -150,7 +150,7 @@ test("retryTeam re-plans a Learn-by-hand run without an outline, and returns one
   assert.equal(back.status, "awaiting_plan");
   assert.equal(back.team?.phase, "awaiting_approval");
   assert.equal(back.logs.at(-1)?.message, "Back to your plan: nothing runs until you confirm it.");
-  assert.equal(f.calls.length, 0);
+  assert.equal(f.calls.length, 1); // (a)'s planning turn only
   // Past a confirmed plan there is no agent work to retry.
   f.run.status = "failed";
   f.run.byHand.plan!.confirmedAt = new Date().toISOString();
@@ -158,7 +158,7 @@ test("retryTeam re-plans a Learn-by-hand run without an outline, and returns one
     withLocale("en", () => f.workbench.retryTeam(f.run.id)),
     refused(/^A Learn-by-hand run goes on from your own edits/),
   );
-  assert.equal(f.calls.length, 0);
+  assert.equal(f.calls.length, 1); // (a)'s planning turn only
 });
 
 test("retryTeam never re-plans a Learn-by-hand run an older build planned as a team run", async (t) => {

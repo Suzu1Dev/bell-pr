@@ -13,6 +13,7 @@ import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { byHandRulesDecisionInTests, type PolicyFinding } from "../shared/contribution.js";
+import { changeFingerprint } from "../shared/change-fingerprint.js";
 import { createApp } from "./index.js";
 import { readDiff } from "./git.js";
 import { git } from "./process.js";
@@ -122,8 +123,11 @@ async function fixture(t: TestContext) {
   };
   store.data.runs.push(run);
   await writeFile(path.join(repository, "src", "retry.ts"), "export const attempts = 2;\n");
-  for (const file of await readDiff(run))
+  const files = await readDiff(run);
+  for (const file of files)
     await workbench.review(run.id, file.path, true, file.fingerprint);
+  // Approval takes only the version the person marked ready (W2A's Ready check in approve()).
+  run.byHand!.ready = { at: new Date().toISOString(), changeFingerprint: changeFingerprint(files), review: false };
   return { directory, store, workbench, repo, run };
 }
 

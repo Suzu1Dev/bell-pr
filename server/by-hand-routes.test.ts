@@ -1,6 +1,6 @@
 // The Learn-by-hand routes over HTTP (server/routes/by-hand.ts): strict
 // request schemas, a 409 for a run that is not Learn by hand, and open on
-// the Free plan. Their work is stubbed until W2 fills it (501).
+// the Free plan (W2 fills their work; no route answers 501 any more).
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
@@ -136,12 +136,22 @@ test("every Learn-by-hand run route refuses an agent run with 409, and works on 
     const refused = await call(route.method, `/runs/agent-run/${route.path}`, route.body);
     assert.equal(refused.status, 409, `${route.method} ${route.path}`);
     assert.equal(refused.body.error, "This is only for Learn-by-hand runs.");
-    // On a Learn-by-hand run the stub answers that the part is not built yet; never pro_required.
-    const stubbed = await call(route.method, `/runs/lbh-run/${route.path}`, route.body);
-    assert.equal(stubbed.status, 501, `${route.method} ${route.path}`);
-    assert.equal(stubbed.body.error, "This part of Learn by hand is not available in this build yet.");
+    // On a Learn-by-hand run every route is filled (W2A, W2B, W2C): never 402 or pro_required.
+    const answered = await call(route.method, `/runs/lbh-run/${route.path}`, route.body);
+    const seen = `${route.method} ${route.path}: ${answered.status} ${answered.body.error ?? ""}`;
+    assert.notEqual(answered.status, 402, seen);
+    assert.notEqual(answered.body.code, "pro_required", seen);
+    assert.notEqual(answered.status, 501, seen);
   }
-  assert.equal((await call("PUT", `/repos/${repoId}/test-command`, { command: "npm test" })).status, 501);
+  // The guide's own refusals for the seeded run (in review, with no plan of its own).
+  const questions = await call("POST", "/runs/lbh-run/by-hand/plan/questions", {});
+  assert.deepEqual([questions.status, questions.body.error], [409, "The guide asks about your plan before you confirm it."]);
+  const hint = await call("POST", "/runs/lbh-run/by-hand/guide", { kind: "hint", stepId: "s1", rung: 1, tried: "I read the loop" });
+  assert.deepEqual([hint.status, hint.body.error], [409, "Choose a step of your plan for this hint."]);
+  const confirmed = await call("PUT", `/repos/${repoId}/test-command`, { command: "npm test" });
+  assert.notEqual(confirmed.status, 402);
+  assert.notEqual(confirmed.body.code, "pro_required");
+  assert.notEqual(confirmed.status, 501);
   assert.equal((await call("PUT", "/repos/missing/test-command", { command: "npm test" })).status, 404);
   assert.equal((await call("GET", "/runs/missing/by-hand/template")).status, 404);
 });
