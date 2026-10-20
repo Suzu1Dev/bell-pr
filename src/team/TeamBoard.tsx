@@ -131,7 +131,8 @@ export function TeamBoard({
     !demo &&
     !["all", "lead"].includes(recipient) &&
     !team.tasks.some((task) => task.id === recipient && canReceive(task));
-  const messagingDisabled = !demo && (finished || team.phase === "planning");
+  // Nothing reads team messages in a Learn-by-hand run: the guide has no team.
+  const messagingDisabled = !demo && (finished || team.phase === "planning" || !!run.learnByHand);
   const done = team.tasks.filter((task) => task.status === "complete").length;
   const revisions = team.planRevisions ?? [];
   const revisionsLeft = revisions.length < maxPlanRevisions;
@@ -624,7 +625,7 @@ export function TeamBoard({
             </h3>
             <span>{team.messages.length}</span>
           </div>
-          <p className="team-delivery-note">
+          <p className="team-delivery-note" hidden={run.learnByHand}>
             {team.phase === "planning"
               ? t.mailbox.delivery.planning
               : recipient === "lead"

@@ -755,6 +755,9 @@ test("a learn-by-hand run plans with the guide instead of approving a team plan,
   assertNoHan(planning);
   // The premise check shows once, first in the plan panel (loading here), not on the board too.
   assert.doesNotMatch(planning, /Retries never stop\./);
+  // No team reads messages here: nothing can be queued for one, and no delivery is promised.
+  assert.match(planning, /<textarea aria-label="Team message"[^>]*disabled=""/);
+  assert.match(planning, /<p class="team-delivery-note" hidden="">/);
   // The plan panel loads with the byhand chunk; no team approval or "send back".
   assert.match(planning, /<svg[^>]*lucide-loader-circle[^>]*spin/);
   assert.doesNotMatch(planning, /Approve the plan and start development|Send back with feedback/);
