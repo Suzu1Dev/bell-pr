@@ -23,6 +23,7 @@ import { withLocale } from "./i18n/index.js";
 import { z } from "zod";
 import { lenientRead } from "./persisted-schema.js";
 import { persistedDatabaseSchema, repositoryReadSchema, runReadSchema } from "./store.js";
+import { withStoredReach } from "../shared/project-policy.js";
 
 async function dataDirectory() {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-store-test-"));
@@ -1425,7 +1426,7 @@ test("a carve-out this build cannot read is left out, and the rest of the findin
 const v12State = () =>
   readFile(path.join(import.meta.dirname, "fixtures", "state-v1.2-by-hand.json"), "utf8");
 
-test("a v1.2 state with a Learn-by-hand run loads and saves unchanged, its busy mark cleared", async (t) => {
+test("a v1.2 state with a Learn-by-hand run loads and saves unchanged, its busy mark cleared and its rules' reach read", async (t) => {
   const { directory, cleanup } = await dataDirectory();
   t.after(cleanup);
   const written = await v12State();
@@ -1440,8 +1441,13 @@ test("a v1.2 state with a Learn-by-hand run loads and saves unchanged, its busy 
   const store = new Store(directory);
   await store.initialize();
   assert.equal(store.recovery, undefined);
-  // A restart ends whatever was busy; nothing else changes.
+  // A restart ends whatever was busy, and the rules, stored before the
+  // reach was, get it from each quote (server/stored-reach.test.ts);
+  // nothing else changes.
   delete run.byHand!.busy;
+  const rules = expected.repos[0].contributionRules!;
+  rules.findings = rules.findings.map(withStoredReach);
+  assert.equal(rules.findings[0].reach, "output");
   assert.deepEqual(store.data, expected);
   await store.save();
   const reopened = new Store(directory);

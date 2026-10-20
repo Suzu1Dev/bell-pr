@@ -91,7 +91,7 @@ test("an entry's key names one repository or a whole account, in any case", () =
   assert.ok(!registryKeyMatches("gentoo/*", "other/gentoo"));
 });
 
-test("only a signed entry yields findings, with its label, source and its own carve-outs", () => {
+test("only a signed entry yields findings, with its label, source, its own carve-outs and its reach", () => {
   assert.deepEqual(registryFindings("servo/servo", now, [servo]), [
     {
       kind: "ban",
@@ -101,6 +101,8 @@ test("only a signed entry yields findings, with its label, source and its own ca
       contribution: true,
       source: { registry: "servo/servo", url: servo.url, version: "b80695f761", checkedOn: "2026-10-19" },
       allows: [{ line: 33, quote: servoUnderstand, kinds: ["explain", "answer"] }],
+      // The signed reach, as the rules card stores it (plan README §18.10).
+      reach: "output",
     },
   ]);
   // Unsigned, signed after `now`, signed before the check or on no date: never read.

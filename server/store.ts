@@ -18,6 +18,7 @@ import {
   type RunStatus,
 } from "./types.js";
 import { activeFollowUp } from "../shared/followups.js";
+import { withStoredReach } from "../shared/project-policy.js";
 import { sm } from "./i18n/index.js";
 import { writeDurable } from "./fs-atomic.js";
 import { initLog, log } from "./log.js";
@@ -108,6 +109,10 @@ const contributionRulesSchema = loose({
         // and the carve-outs that name kinds of help.
         source: later(registrySourceSchema),
         allows: later(allowsSchema),
+        // v1.2: a ban's or reserved-issue rule's reach (text, so a later
+        // value loads) and a ban that stops the quoted confirm.
+        reach: later(text),
+        stopsConfirm: later(z.literal(true)),
       }),
     )
     .max(30),
@@ -677,6 +682,10 @@ export class Store {
     this.recovery = undefined;
     this.backupsWithoutState = undefined;
     this.data = await this.load();
+    // Rules an older build stored carry no reach: read it from each quote, as a rules read does now.
+    for (const repo of this.data.repos)
+      if (repo.contributionRules)
+        repo.contributionRules.findings = repo.contributionRules.findings.map(withStoredReach);
     const before = new Map(
       this.data.runs.map((run) => [run, { status: run.status, publishing: !!run.publishing }]),
     );

@@ -22,7 +22,7 @@ import { formatters, type Locale } from "./i18n/locale.js";
 import { assistanceDenial, disclosureRule, hasAiDisclosure } from "./project-policy.js";
 import type { HelpKind } from "./by-hand.js";
 import { byHandRulesDecision, type ByHandBlockReason } from "./by-hand-rules.js";
-import { areaReach, banReach } from "./policy-reach.js";
+import { areaReach, banReach, type AreaReach, type BanReach } from "./policy-reach.js";
 
 /** Rule kinds the classifier finds (shared/project-policy.ts); stored as text, frozen. */
 export const policyKinds = [
@@ -63,6 +63,23 @@ export interface PolicyFinding {
    * them. Absent when there are none.
    */
   allows?: PolicyAllowance[];
+  /**
+   * What a `ban` or `area` rule restricts (shared/policy-reach.ts): a ban's
+   * BanReach, a reserved-issue rule's AreaReach. The server reads it from
+   * the stored quote at every rules read and when it loads rules an older
+   * build stored (`withStoredReach`), so the client and the server read the
+   * same reach and the classifier stays out of the client. Stored as text:
+   * absent, or a value this build doesn't know, reads as "unknown", the
+   * strict reading. Absent on the other kinds.
+   */
+  reach?: BanReach | AreaReach;
+  /**
+   * A `ban`, contribution named or not, that refuses AI help itself or
+   * whose reach BELL can't tell (`stopsQuotedConfirm`): while it stands in
+   * a project's rules, no Learn-by-hand run gets the quoted confirm. Set
+   * with `reach`; absent otherwise.
+   */
+  stopsConfirm?: true;
 }
 
 /** One carve-out quote and the kinds of help it names (`PolicyFinding.allows`). */

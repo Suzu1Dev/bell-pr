@@ -13,7 +13,7 @@ import { markdownProse, type DraftRuleQuote } from "./draft-checks.js";
 import { aiDisclosureLine, type DraftSource } from "./drafts.js";
 import type { HelpKind } from "./by-hand.js";
 import { carveOutKinds } from "./by-hand-rules.js";
-import { banReach } from "./policy-reach.js";
+import { areaReach, banReach } from "./policy-reach.js";
 import type { PolicyAllowance, PolicyFinding, PolicyKind } from "./contribution.js";
 
 /** One line of a document outside fenced code, with its 1-based line number. */
@@ -866,7 +866,7 @@ export function classifyPolicy(path: string, document: string): PolicyFinding[] 
     const key = `${kind}:${lineAt(block, offset)}:${quote}`;
     if (seen.has(key)) return;
     seen.add(key);
-    findings.push({
+    findings.push(withStoredReach({
       kind,
       path,
       line: lineAt(block, offset),
@@ -874,7 +874,7 @@ export function classifyPolicy(path: string, document: string): PolicyFinding[] 
       contribution:
         !ambiguous &&
         contributionContext.test(search.slice(sentence.start, sentence.end)),
-    });
+    }));
   };
   // reStructuredText has no fences: its "~~~" lines are section adornments.
   const prose = /\.rst$/i.test(path) ? restProse(text) : rawProse(text);
@@ -962,6 +962,22 @@ const blocksPublishing = (finding: PolicyFinding) =>
  */
 export function stopsQuotedConfirm(finding: PolicyFinding) {
   return finding.kind === "ban" && banReach(finding.quote) !== "output" && refusesAiHelp(finding.quote);
+}
+
+/**
+ * A finding as BELL stores it (plan README §18.10): a `ban` with its
+ * `reach` and, when it stops the quoted confirm, `stopsConfirm`; an `area`
+ * rule with its `reach`; any other kind as it is. Both are read from the
+ * quote again, so a stored value from another build never stands. The
+ * classifier, the rules card's read, the checked list and the load of
+ * rules an older build stored all go through it, so the client reads the
+ * reach without the classifier.
+ */
+export function withStoredReach(finding: PolicyFinding): PolicyFinding {
+  if (finding.kind !== "ban" && finding.kind !== "area") return finding;
+  const { reach: _reach, stopsConfirm: _stops, ...rest } = finding;
+  if (finding.kind === "area") return { ...rest, reach: areaReach(finding.quote) };
+  return { ...rest, reach: banReach(finding.quote), ...(stopsQuotedConfirm(finding) ? { stopsConfirm: true as const } : {}) };
 }
 
 /** The project's own practice, not a rule for contributors: "We do not use AI tools in our release process". */

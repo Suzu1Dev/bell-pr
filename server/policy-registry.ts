@@ -30,6 +30,7 @@ import { allHelpKinds, type HelpKind } from "../shared/by-hand.js";
 import { carveOutKinds, registryStale } from "../shared/by-hand-rules.js";
 import { policyKinds, type PolicyFinding, type PolicyKind } from "../shared/contribution.js";
 import { areaReach, banReach, type AreaReach, type BanReach } from "../shared/policy-reach.js";
+import { withStoredReach } from "../shared/project-policy.js";
 import { findingWeight, policyLimits } from "./contribution-policy.js";
 
 /** One carve-out of an entry's rule, signed per kind: what the source says some uses of AI are fine for. */
@@ -298,8 +299,9 @@ export function registryKeyMatches(key: string, fullName: string) {
  * The findings of the signed entries for the GitHub repository `fullName`
  * (from `parseGitHubSource(repo.url)`; none without one, as for a folder
  * import without a GitHub origin), as the rules card stores them: the
- * entry's label as `path`, its source, and its own carve-outs. An unsigned
- * entry yields nothing.
+ * entry's label as `path`, its source, its own carve-outs and the reach of
+ * its quote (`withStoredReach`, the signed reach the registry check holds
+ * it to). An unsigned entry yields nothing.
  */
 export function registryFindings(
   fullName: string | undefined,
@@ -327,7 +329,8 @@ export function registryFindings(
             }
           : {}),
       })),
-    );
+    )
+    .map(withStoredReach);
 }
 
 /**
