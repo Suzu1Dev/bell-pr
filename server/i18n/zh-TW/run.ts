@@ -51,7 +51,7 @@ const m: Translation<typeof en> = {
   team: {
     guideName: "嚮導",
     started: ({ name, cli, model, effort, web, timeout, inbox }) =>
-      `${name} 開始工作。模型：${model ?? `${cli} CLI 預設（未記錄模型）`}；推理：${effort ?? "模型預設"}${web ? "；已允許上網" : ""}${timeout ? `；${timeout}` : ""}。${inbox ? ` 已在回合起點收到 ${inbox} 則團隊訊息。` : ""}`,
+      `${name}${/\p{Script=Han}$/u.test(name) ? "" : " "}開始工作。模型：${model ?? `${cli} CLI 預設（未記錄模型）`}；推理：${effort ?? "模型預設"}${web ? "；已允許上網" : ""}${timeout ? `；${timeout}` : ""}。${inbox ? ` 已在回合起點收到 ${inbox} 則團隊訊息。` : ""}`,
     waitingForSlot: ({ queued }) => `等待其他 Agent 完成（${queued} 個排隊中）。`,
     structuredResult: "結構化結果已回傳，正在驗證來源與內容。",
     checkFinished: ({ outcome }) => `執行檢查完成（${outcome}）。`,

@@ -77,6 +77,11 @@ test("a Learn-by-hand guide turn starts its log as the guide, an agent run's as 
   assert.match(await startedLine(t, false), /^Atlas started\. Model: /);
 });
 
+test("in zh-TW the guide's first log line has no space between 嚮導 and the verb; a Latin name keeps it", async (t) => {
+  assert.match(await startedLine(t, true, "zh-TW"), /^嚮導開始工作。模型：/);
+  assert.match(await startedLine(t, false, "zh-TW"), /^Atlas 開始工作。模型：/);
+});
+
 // The name is a server string of its own (en and zh-TW).
 test("the guide's name in the run log is in both server dictionaries", async () => {
   const en = (await import("./i18n/en/run.js")).default as unknown as ServerMessages["run"];
