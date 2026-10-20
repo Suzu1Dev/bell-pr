@@ -6,6 +6,7 @@ import { useT } from "../../i18n";
 import { serializeRoute } from "../../navigation/route";
 import { CopyRef } from "./CopyRef";
 import { useWriteText } from "./text";
+import { Channels } from "./Channels";
 
 /** R0's deterministic checks (DESIGN v1.2 F6), from BELL's own test runs. */
 export function talkChecks(tests: readonly TestRun[], fingerprint: string, t: ReturnType<typeof useWriteText>["exits"]) {
@@ -29,6 +30,7 @@ export function GuideExits({
   tests,
   fingerprint,
   issueUrl,
+  channels,
   onStep,
   onCheckIn,
   onLeave,
@@ -95,6 +97,7 @@ export function GuideExits({
                   {t.issue}
                 </a>
               )}
+              <Channels channels={channels} />
               <textarea className="text-input" aria-label={t.human} rows={4} value={note} onChange={(event) => setNote(event.target.value)} />
               <CopyRef text={note} shown={false} />
             </>
