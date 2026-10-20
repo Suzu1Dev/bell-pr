@@ -169,20 +169,23 @@ export async function storedGuideAnswer(run: GuideRun, request: GuideRequest, an
   return answerEntry(run, request, { ...filtered, dropped: filtered.dropped + unknown });
 }
 
+/** An agent turn's error, its message filtered (F7): the CLI's error can carry the agent's own text. */
+function filteredError(error: unknown): never {
+  const { value, removed } = filterAgentText(error instanceof Error ? error.message : String(error), { base: {}, worktree: {} });
+  if (!removed) throw error;
+  throw error instanceof AppError ? new AppError(value, error.statusCode, { code: error.code, params: error.params, fixes: error.fixes }) : new Error(value);
+}
+
 /** One guide turn (DESIGN v1.2 F6, F7): read-only and isolated, under the guide's schema; the caller records it. */
 export async function runGuideTurn(ctx: WorkbenchContext, run: Run, request: GuideRequest, signal: AbortSignal) {
   const prompt = await guideTurnPrompt(run, request, currentLocale());
   const answer = await withSchemaFile(guideAnswerJsonSchema, (outputSchema) =>
     runAgent(ctx, run, "lead", prompt, signal, true, { isolated: true, outputSchema }),
-  );
+  ).catch(filteredError);
   return storedGuideAnswer(run, request, answer);
 }
 
-/**
- * Records one stored answer (DESIGN v1.2 F13): the help event first (it
- * refuses a kind outside a fitted run's lock), then the entry, the step's
- * hint state and highest rung, and the code the filter removed.
- */
+/** Records one stored answer (F13): the help event first (it refuses a kind outside the lock), the entry, the hint state, the removals. */
 function storeAnswer(run: Run, request: GuideRequest, entry: GuideEntry) {
   const hint = request.kind === "hint";
   const source: HelpSource = request.kind;
@@ -213,11 +216,7 @@ function assertIdle(ctx: WorkbenchContext, run: Run) {
     throw new AppError((m) => m.byHand.busy, 409);
 }
 
-/**
- * Starts the guide job `guide:<id>` with its controller and sets
- * `byHand.busy`; however the job ends, it clears `busy` and saves, and a
- * failure is logged on the run so the person sees why no answer came.
- */
+/** Starts the job `guide:<id>` and sets `busy`; however it ends, it clears `busy` and saves, and logs why when it failed. */
 function startGuideJob(ctx: WorkbenchContext, run: Run, request: GuideRequest) {
   const key = `guide:${run.id}`;
   const controller = new AbortController();
@@ -228,9 +227,7 @@ function startGuideJob(ctx: WorkbenchContext, run: Run, request: GuideRequest) {
       const entry = await runGuideTurn(ctx, run, request, controller.signal);
       await ctx.lock(run.id, async () => storeAnswer(ctx.run(run.id), request, entry));
     } catch (error) {
-      // An agent's error can carry its own text, so the reason is logged filtered too (F7).
-      const reason = filterAgentText(error instanceof Error ? error.message : String(error), { base: {}, worktree: {} });
-      ctx.log(run, "lead", reason.value, { kind: "notice" });
+      ctx.log(run, "lead", error instanceof Error ? error.message : String(error), { kind: "notice" });
     } finally {
       if (run.byHand?.busy?.kind === "guide") delete run.byHand.busy;
       if (ctx.controllers.get(key) === controller) ctx.controllers.delete(key);
@@ -484,7 +481,7 @@ export async function review(ctx: WorkbenchContext, run: Run, input: { leastSure
     const [reviewerPrompt, testerPrompt] = [byHandReviewerPrompt(locale, turn.prompt), byHandTesterPrompt(locale, turn.prompt)];
     const reports = await withSchemaFile(reviewerAnswerJsonSchema, (reviewerSchema) =>
       runIndependentReview(ctx, run, files, undefined, signal, { reviewerPrompt, testerPrompt, reviewerSchema, isolated: true }),
-    );
+    ).catch(filteredError);
     const { review: stored, tester } = await storedReview(run, files, turn, reports);
     // Stored together, after every await: the help event first, as it refuses a kind outside the lock.
     recordHelp(run, { source: "review", removed: stored.removed });

@@ -262,17 +262,25 @@ test("one guide turn per run: a second request while one runs is refused, and St
   await assert.rejects(f.ask({ kind: "ask", entry: "project" }), refused(409, "Your tests are running. Ask the guide when they finish."));
 });
 
-test("a guide turn that fails says why in the run's log, without code the agent's error carried", async (t) => {
+test("a guide turn, a chat or a review that fails says why without code the agent's error carried", async (t) => {
   const f = await fixture(t);
-  f.answers.push(() => {
-    throw new Error("Claude Code failed: here is the fix.\n```js\nreturn delayMs * 2 ** attempt;\n```\nUse `retryOnStatus(response)` or retryOnStatus(response).");
-  });
+  const failure = () => {
+    throw new AppError("Claude Code failed: here is the fix.\n```js\nreturn delayMs * 2 ** attempt;\n```\nUse `retryOnStatus(response)` or retryOnStatus(response).", 422);
+  };
+  f.answers.push(failure);
   await f.ask({ kind: "ask", entry: "project", question: "Where is the wait?" });
   const message = f.run.logs.at(-1)?.message ?? "";
   assert.match(message, /^Claude Code failed:/);
   assert.doesNotMatch(message, /delayMs|retryOnStatus/);
   assert.equal(f.run.byHand?.thread, undefined);
   assert.equal(f.run.byHand?.busy, undefined);
+  // The chat's and the review's callers show or log the error they get.
+  const withoutCode = (error: unknown) =>
+    error instanceof AppError && error.statusCode === 422 && /^Claude Code failed:/.test(error.message) && !/delayMs|retryOnStatus/.test(error.message);
+  f.answers.push(failure);
+  await assert.rejects(withLocale("en", () => chat(f.ctx, f.run, "src/client.js", "Why?", new AbortController().signal)), withoutCode);
+  f.answers.push(failure, failure);
+  await assert.rejects(withLocale("en", () => review(f.ctx, f.run, {}, new AbortController().signal)), withoutCode);
 });
 
 test("a stored answer has no code BELL could not find, quotes BELL cut itself, and counts what it removed and dropped", async (t) => {
