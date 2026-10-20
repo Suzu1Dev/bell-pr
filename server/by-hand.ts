@@ -285,6 +285,10 @@ export async function checkIn(
     const record = (run.byHand ??= {});
     if (input.stepId && !record.plan?.steps.some((step) => step.id === input.stepId))
       throw refuse((m) => m.byHand.flow.noStep, 404);
+    // The repeated-failure card shown again for its step since BELL's last test run is already recorded.
+    const lastRun = Math.max(0, ...(record.tests ?? []).filter((test) => !test.reported).map((test) => Date.parse(test.at)));
+    const seen = (entry: { stepId?: string; signal: string; at: string }) => entry.signal === input.signal && entry.stepId === input.stepId && Date.parse(entry.at) >= lastRun;
+    if (input.signal === "repeat-failure" && !input.choice && record.checkIns?.some(seen)) return { run };
     const at = now();
     const step = input.stepId ? { stepId: input.stepId } : {};
     record.checkIns = [
