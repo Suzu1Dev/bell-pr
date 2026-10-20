@@ -1,23 +1,42 @@
 /**
  * The guide (DESIGN v1.2 F6, F9, F12): the aside of the Changes tab while
  * the run is not at its ready version: the person's steps, the hint ladder
- * (R0 local, R1-R4 behind the attempt gate), free questions, the exits,
- * the stuck card, the Tests card, and the banner of a run that can't
- * publish here or is fitted to the project's rules. STUB: the props are
- * final; W2D builds it.
+ * (R1-R3 behind the attempt gate), free questions, the exits, the stuck
+ * card, the Tests card, and the banner of a run that can't publish here or
+ * is fitted to the project's rules. A fitted run never offers a kind of
+ * help outside its help set; the server refuses it anyway.
  */
-import type {
-  ByHandCheckInInput,
-  ByHandGuideInput,
-  ByHandStepInput,
-  ByHandTestInput,
-  ByHandTestReportInput,
-  LiveTests,
-  TestCommandView,
+import { useEffect, useRef, useState } from "react";
+import { Check, CircleMinus, Hand, Lightbulb, Loader2, MessageSquare } from "lucide-react";
+import {
+  allHelpKinds,
+  askEntries,
+  attemptSince,
+  byHandClean,
+  helpAllowed,
+  helpKindOf,
+  needsWhy,
+  type AskEntry,
+  type ByHandCheckInInput,
+  type ByHandGuideInput,
+  type ByHandStepInput,
+  type ByHandTestInput,
+  type ByHandTestReportInput,
+  type LiveTests,
+  type TestCommandView,
 } from "../../../shared/by-hand";
-import type { ByHandRulesCase } from "../../../shared/by-hand-rules";
-import type { HelpChannel } from "../../../shared/contribution";
+import { byHandRulesCase, type ByHandRulesCase } from "../../../shared/by-hand-rules";
+import { changeFingerprint } from "../../../shared/change-fingerprint";
+import { byHandBlockClause, learningLabel, type ContributionRules, type HelpChannel } from "../../../shared/contribution";
+import { api } from "../../api";
+import { useLocale } from "../../i18n";
+import { helpKindList, rulesFrom } from "../../mission/respect";
 import type { DiffFile, Run } from "../../types";
+import { GuideExits } from "./GuideExits";
+import { GuideThread } from "./GuideThread";
+import { TestsCard } from "./TestsCard";
+import { useWriteText } from "./text";
+import "./byhand.css";
 
 export interface GuidePanelProps {
   run: Run;
@@ -50,7 +69,179 @@ export interface GuidePanelProps {
   error?: string;
 }
 
+const quiet = () => undefined;
+
 export function GuidePanel(props: GuidePanelProps) {
-  void props;
-  return null;
+  const { run, files, selection, onGuide, onStep, busy = false, error } = props;
+  const text = useWriteText();
+  const t = text.guide;
+  const [locale] = useLocale();
+  const record = run.byHand ?? {};
+  const steps = record.plan?.steps ?? [];
+  const step = steps.find((item) => !item.doneAt && !item.parkedAt);
+  const lock = record.helpLock;
+  // What the workspace didn't pass, read here (both local reads): the test
+  // command, and the project's stored rules for the case of a run that
+  // won't publish there (a fitted run says its own help set instead).
+  const [read, setRead] = useState<{ rules?: ContributionRules; command?: TestCommandView }>({});
+  const runPath = `/runs/${encodeURIComponent(run.id)}/by-hand`;
+  useEffect(() => {
+    let live = true;
+    const keep = (value: typeof read) => live && setRead((current) => ({ ...current, ...value }));
+    api<TestCommandView>(`${runPath}/test-command`).then((command) => keep({ command }), quiet);
+    api<unknown>(`/repos/${encodeURIComponent(run.repoId)}/contribution-rules`).then((body) => keep({ rules: rulesFrom(body) }), quiet);
+    return () => {
+      live = false;
+    };
+  }, [runPath, run.repoId]);
+  const testCommand = props.testCommand ?? read.command;
+  const learningIssue = (run.contributionFacts?.issue?.labels ?? []).some(learningLabel);
+  const rulesCase = props.rulesCase ?? (read.rules && byHandRulesCase(read.rules, { learningIssue, now: new Date().toISOString() }));
+  const fingerprint = changeFingerprint(files.map(({ path, fingerprint }) => ({ path, fingerprint: fingerprint ?? "" })));
+  const clean = byHandClean(run);
+  const banner = lock
+    ? t.fitted({ kinds: helpKindList(lock.kinds, locale) })
+    : rulesCase?.case === "blocked" &&
+      t.blocked({ clause: byHandBlockClause(rulesCase.reason, locale, { checkedOn: rulesCase.finding.source?.checkedOn }) });
+  const missing = lock ? allHelpKinds.filter((kind) => !lock.kinds.includes(kind)) : [];
+  const thinking = record.busy?.kind === "guide" || record.busy?.kind === "plan";
+  const working = busy || !!record.busy;
+
+  const [entry, setEntry] = useState<AskEntry>("project");
+  const [question, setQuestion] = useState("");
+  const [tried, setTried] = useState("");
+  const [why, setWhy] = useState<{ stepId: string; text: string }>();
+  const box = useRef<HTMLTextAreaElement>(null);
+  const ask = (prefill: string) => {
+    setQuestion((current) => `${prefill}${current}`);
+    box.current?.focus();
+  };
+  useEffect(() => {
+    if (!selection) return;
+    const { path, startLine, endLine } = selection;
+    setQuestion((current) => `${startLine ? `${path}:${startLine}-${endLine}` : path} ${current}`);
+    box.current?.focus();
+  }, [selection]);
+
+  // The ladder of the step the person is on: the next rung after the
+  // highest so far, if the run offers its kind, behind the attempt gate.
+  const hintState = step ? record.hints?.[step.id] : undefined;
+  const rungs = [1, 2, 3].filter((rung) => helpAllowed(run, helpKindOf("hint", rung)));
+  const next = (hintState?.rung ?? 0) + 1;
+  const attempt = attemptSince(hintState, { fingerprint, tests: record.tests, tried });
+  const review = record.reviews?.at(-1);
+  const send = (input: ByHandGuideInput) =>
+    void onGuide({ ...input, ...(step ? { stepId: step.id } : {}), ...(tried.trim() ? { tried: tried.trim() } : {}) }).then(() => {
+      setQuestion("");
+      setTried("");
+    }, quiet);
+  const where = selection?.startLine ? { path: selection.path, startLine: selection.startLine, endLine: selection.endLine } : {};
+  return (
+    <div className="by-hand guide-panel">
+      <h3>
+        <Hand size={17} aria-hidden="true" /> {t.title}
+      </h3>
+      {banner && <p className="by-hand-note">{banner}</p>}
+      <p className="field-help">{clean.clean ? t.clean : t.unclean({ reason: t.reasons[clean.reason] ?? clean.reason })}</p>
+      {missing.length > 0 && <p className="field-help">{t.notOffered({ kinds: helpKindList(missing, locale) })}</p>}
+      {steps.length > 0 && (
+        <section aria-label={t.steps}>
+          <h3>{t.steps}</h3>
+          <ol className="by-hand-steps">
+            {steps.map((item) => (
+              <li key={item.id} aria-current={item === step ? "step" : undefined}>
+                {item.doneAt ? <Check size={14} aria-label={t.done} /> : item.parkedAt ? <CircleMinus size={14} aria-label={t.park} /> : null}
+                <span>{item.title}</span>
+                {!item.doneAt && (
+                  <span className="by-hand-row">
+                    <button type="button" className="mission-text-button" disabled={working}
+                      onClick={() => (needsWhy(item) && why?.stepId !== item.id ? setWhy({ stepId: item.id, text: "" }) : void onStep(item.id, { done: true, ...(why?.stepId === item.id ? { why: why.text.trim() } : {}) }).then(() => setWhy(undefined), quiet))}>
+                      {t.done}
+                    </button>
+                    {!item.parkedAt && (
+                      <button type="button" className="mission-text-button" disabled={working} onClick={() => void onStep(item.id, { parked: true }).catch(quiet)}>
+                        {t.park}
+                      </button>
+                    )}
+                  </span>
+                )}
+                {why?.stepId === item.id && (
+                  <input className="text-input" aria-label={t.why} placeholder={t.why} maxLength={300} value={why.text} onChange={(event) => setWhy({ stepId: item.id, text: event.target.value })} />
+                )}
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+      {review && review.changeFingerprint !== fingerprint && review.findings.length > 0 && (
+        <ul aria-label={t.aboutReview}>
+          {review.findings.map((finding) => (
+            <li key={`${finding.path}:${finding.line}`}>
+              {finding.observed}{" "}
+              <button type="button" className="mission-text-button"
+                onClick={() => ask(t.reviewAsk({ at: `${finding.path}${finding.line ? `:${finding.line}` : ""}`, observed: finding.observed }))}>
+                {t.aboutReview}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form
+        className="by-hand"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (question.trim()) send({ kind: "ask", entry, question: question.trim(), ...where });
+        }}
+      >
+        <h3>
+          <MessageSquare size={16} aria-hidden="true" /> {t.ask}
+        </h3>
+        <fieldset className="by-hand-row" aria-label={t.ask}>
+          {askEntries.map((value) => (
+            <label key={value} className="by-hand-chip">
+              <input type="radio" name="by-hand-entry" checked={entry === value} onChange={() => setEntry(value)} />
+              {t.entries[value]}
+            </label>
+          ))}
+        </fieldset>
+        <textarea ref={box} className="text-input" aria-label={t.question} placeholder={t.question} rows={3} maxLength={600} value={question} onChange={(event) => setQuestion(event.target.value)} />
+        <details>
+          <summary>{t.tried}</summary>
+          <textarea className="text-input" aria-label={t.tried} rows={2} maxLength={300} value={tried} onChange={(event) => setTried(event.target.value)} />
+        </details>
+        <div className="by-hand-row">
+          <button type="submit" className="button primary" disabled={working || !question.trim()}>
+            <MessageSquare size={15} aria-hidden="true" /> {t.ask}
+          </button>
+          {step && rungs.includes(next) && (
+            <button type="button" className="button secondary" disabled={working || !attempt} onClick={() => send({ kind: "hint", rung: next })}>
+              <Lightbulb size={15} aria-hidden="true" /> {t.next({ rung: t.rungs[next] })}
+            </button>
+          )}
+        </div>
+        {step && (rungs.includes(next) ? !attempt && <p className="field-help">{t.tryFirst}</p> : <p className="field-help">{t.noRung}</p>)}
+      </form>
+      {thinking && (
+        <p role="status">
+          <Loader2 size={14} className="spin" aria-hidden="true" /> {t.working}
+        </p>
+      )}
+      {error && (
+        <p className="inline-error" role="alert">
+          {error}
+        </p>
+      )}
+      <GuideExits runId={run.id} step={step} tests={record.tests ?? []} fingerprint={fingerprint} issueUrl={props.issueUrl}
+        onStep={onStep} onCheckIn={props.onCheckIn} onLeave={props.onLeave} busy={working} />
+      <TestsCard record={record} testCommand={testCommand} onRunTests={props.onRunTests}
+        onConfirmTestCommand={(command) =>
+          props.onConfirmTestCommand(command).then(() =>
+            setRead((current) => ({ ...current, command: { suggestion: testCommand?.suggestion ?? "", confirmed: { command, confirmedAt: new Date().toISOString() } } })),
+          )
+        }
+        onStopTests={props.onStopTests} onExplain={() => send({ kind: "test" })} busy={working} />
+      <GuideThread entries={record.thread ?? []} steps={steps} onStep={onStep} busy={working} />
+      <p className="field-help">{t.wrong}</p>
+    </div>
+  );
 }
