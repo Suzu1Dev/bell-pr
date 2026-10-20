@@ -30,6 +30,11 @@ const en = {
     closed: "The project's text this run is fitted to doesn't name planning help: the guide's outline stays closed.",
     confirm: "This is my plan",
   },
+  questions: {
+    title: "Questions on my plan",
+    left: ({ left, max }: { left: number; max: number }) => `${left} of ${max} left`,
+    reading: "The guide is reading your plan…",
+  },
   turn: {
     title: "Your turn",
     open: "Open this folder in your editor, make your first step's change, save, and come back.",
