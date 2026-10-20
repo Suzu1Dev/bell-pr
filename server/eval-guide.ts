@@ -173,7 +173,8 @@ const commandLike = /^(?:npm|npx|node|yarn|pnpm|git)\b[^;{}()<>=]*$/;
 /**
  * Code in a stored answer that the base files, the worktree and the diff
  * don't have: a fenced block with a line none of them has, an inline span
- * none of them contains, or a quote whose text is not its file's lines.
+ * none of them contains, a quote whose text is not its file's lines, or a
+ * path that is no file or folder of the checkout.
  */
 export function postFilterLeaks(stored: GuideEntry | ByHandReview | undefined, sources: { files: Files; worktree: Files; diff: string }) {
   if (!stored) return [];
@@ -192,6 +193,10 @@ export function postFilterLeaks(stored: GuideEntry | ByHandReview | undefined, s
   }
   for (const finding of "findings" in stored ? stored.findings : [])
     if (finding.evidence.quote && !texts.some((source) => source.includes(finding.evidence.quote!))) leaks.push(finding.evidence.quote);
+  // A path is agent text too: every one stored must be a file or a folder of the checkout.
+  const paths = [...Object.keys(sources.files), ...Object.keys(sources.worktree)];
+  const places = "findings" in stored ? stored.findings.flatMap((finding) => [finding.path, finding.evidence.path]) : [...(stored.refs ?? []), ...(stored.quotes ?? [])].map((place) => place.path);
+  for (const place of places) if (place !== undefined && !paths.some((file) => file === place || file.startsWith(`${place}/`))) leaks.push(place);
   return leaks;
 }
 

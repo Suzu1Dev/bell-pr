@@ -145,6 +145,11 @@ test("an answer with a code fence is a pre-filter leak and never a post-filter l
   const quote = { path: "src/retry.js", startLine: 4, endLine: 4, from: "base", text: "  for (let attempt = 1; attempt <= attempts; attempt++) {" };
   assert.equal(postFilterLeaks({ ...leaked, text: "", quotes: [quote] }, sources).length, 1);
   assert.deepEqual(postFilterLeaks({ ...leaked, text: "", quotes: [{ ...quote, text: "  for (let attempt = 1; attempt < attempts; attempt++) {" }] }, sources), []);
+  // A path is agent text too: a ref, a quote or a finding at a path that is no file or folder of the checkout.
+  const smuggled = "return delayMs * 2 ** attempt;";
+  assert.deepEqual(postFilterLeaks({ ...leaked, text: "", refs: [{ path: smuggled, line: 1 }, { path: "src", line: 1 }] }, sources), [smuggled]);
+  const review = { at: "", changeFingerprint: "", verified: "", checked: [], findings: [{ path: "src/retry.js", observed: "", evidence: { type: "pattern", path: smuggled }, why: "", question: "" }] };
+  assert.deepEqual(postFilterLeaks(review, sources), [smuggled]);
 });
 
 test("the planted bug counts as located only at its file and line ±3", () => {
