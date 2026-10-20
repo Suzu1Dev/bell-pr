@@ -777,7 +777,7 @@ const othersApproval = /\b(?:approv\w*|permission|consent|sign[- ]?off|agree\w*|
 const contrastTakesBack = /^\W*(?:but\s+)?(?:not|never|no)\b/i;
 /** Somebody else's view, a rule of the past or one not decided: never the project's permission. */
 const notTheProjects =
-  /\b(?:no\s+longer|anymore|used\s+to|previously|formerly|until\s+recently|whether|myths?|misconceptions?|(?:some|many|other)\s+(?:people|contributors|users|folks|projects)|people\s+(?:often\s+|sometimes\s+)?(?:think|believe|say|claim|assume)|(?:you|they|others)\s+(?:may|might)\s+(?:think|believe|hear|have\s+heard)|(?:it\s+is|it['’]s)\s+(?:often\s+|commonly\s+|widely\s+|sometimes\s+)?(?:said|claimed|believed|assumed|thought))\b/i;
+  /\b(?:no\s+longer|anymore|used\s+to|previously|formerly|until\s+recently|in\s+the\s+past|whether|myths?|misconceptions?|(?:some|many|other)\s+(?:people|contributors|users|folks|projects)|people\s+(?:often\s+|sometimes\s+)?(?:think|believe|say|claim|assume)|(?:you|they|others)\s+(?:may|might)\s+(?:think|believe|hear|have\s+heard)|(?:it\s+is|it['’]s)\s+(?:often\s+|commonly\s+|widely\s+|sometimes\s+)?(?:said|claimed|believed|assumed|thought))\b/i;
 /** The next sentence takes it back: "Just kidding: it is not." */
 const takenBack =
   /^\W*(?:just\s+kidding|kidding|not\s+really|nope|(?:it|that|this)\s+(?:is|was)(?:\s+not|n['’]t)\b|(?:it|that|this)\s+no\s+longer\b)/i;
@@ -799,6 +799,8 @@ const plainYes = /^\W*yes\b[\s,.!;:-]*(?:$|(?:but\s+)?(?:see|note|remember|keep\
 /** A question about the person asking using AI ("Can I use …?", "Is it OK to …?"), not about others. */
 const askerUsesAi =
   /^\W*(?:(?:can|may|could)\s+(?:I|we|you|one|contributors?|newcomers?)\b|(?:is\s+it|it['’]s)\s+(?:ok|okay|fine|acceptable|allowed|permitted|alright)\b|(?:am\s+I|are\s+(?:we|you|contributors?|newcomers?))\s+(?:allowed|permitted)\b)/i;
+/** Where a question's condition starts. */
+const questionCondition = /\b(?:if|when|once|after|unless|provided|as\s+long\s+as|so\s+long\s+as|while|but)\b/i;
 const listItem = /^\s*(?:[-*+]|\d{1,9}[.)])\s+/;
 
 /**
@@ -906,7 +908,10 @@ function readCarveOuts(path: string, document: string): PolicyAllowance[] {
       if (!aiMention.test(words)) return;
       // A question about the person using AI, answered "Yes" in the next sentence or block.
       if (/\?\W*$/.test(words)) {
-        if (!askerUsesAi.test(words)) return;
+        if (!askerUsesAi.test(words) || permissionScoped.test(words) || othersApproval.test(words) || notTheProjects.test(words))
+          return;
+        // What is asked ends at its condition: "… to write the code if I then debug it myself?"
+        const asked = words.slice(0, questionCondition.exec(words)?.index ?? words.length);
         const following = all[index + 1];
         const next = sentences[at + 1]
           ? { block, sentence: sentences[at + 1] }
@@ -919,11 +924,11 @@ function readCarveOuts(path: string, document: string): PolicyAllowance[] {
         const said = answered.slice(next.sentence.start, after?.end ?? next.sentence.end);
         if (!yesAnswer.test(answer) || yesButDont.test(said) || permissionScoped.test(said)) return;
         // "Yes, for understanding the code": only what the answer names too.
-        const kinds = carveOutKinds(words).filter((kind) => plainYes.test(answer) || carveOutKinds(answer).includes(kind));
-        const asked = quoteOf(block.text, sentence, sentence);
+        const kinds = carveOutKinds(asked).filter((kind) => plainYes.test(answer) || carveOutKinds(answer).includes(kind));
+        const question = quoteOf(block.text, sentence, sentence);
         const yes = quoteOf(next.block.text, next.sentence, next.sentence);
-        const quote = `${asked.quote} ${yes.quote}`;
-        if (quote.length <= 300) add(block, { quote, offset: asked.offset }, kinds);
+        const quote = `${question.quote} ${yes.quote}`;
+        if (quote.length <= 300) add(block, { quote, offset: question.offset }, kinds);
         return;
       }
       // Somebody else's view, a past or undecided rule, or one the next sentence takes back.

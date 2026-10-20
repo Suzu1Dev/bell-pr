@@ -706,6 +706,17 @@ test("a Yes counts for the person asking, and only as far as it goes", () => {
     "Does the CI use an LLM to debug failures? Yes.",
   ])
     assert.deepEqual(carveOuts(`${ban}\n\n${text}`), [], text);
+  // A question asks only up to its condition, and never for a role, an approval or the past.
+  for (const text of [
+    "Can I use AI to write the code if I then debug it myself? Yes.",
+    "Can I use AI to debug my patch once a maintainer approves it? Yes.",
+    "Can I use AI to debug my patch if I am a core developer? Yes.",
+    "Could I use AI to debug my patch in the past? Yes.",
+  ])
+    assert.deepEqual(carveOuts(`${ban}\n\n${text}`), [], text);
+  assert.deepEqual(carveOuts(`${ban}\n\nCan I use AI to understand the code before I ask on the forum? Yes.`), [
+    "3: Can I use AI to understand the code before I ask on the forum? Yes. [explain, answer]",
+  ]);
 });
 
 test("a list under a heading or lead-in naming acceptable uses counts; never under an unacceptable one", () => {
