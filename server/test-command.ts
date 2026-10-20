@@ -218,8 +218,9 @@ function secretName(name: string) {
  * Authorization header or after "Bearer"; the user and password of a URL
  * of any scheme (postgres://, redis://…); tokens with a known prefix (npm,
  * Slack, Stripe, GitLab, Google, Hugging Face); the value of an assignment
- * to a secret name (secretName); and the base64 lines of a private key
- * whose BEGIN line was cut off before the text, up to its END line.
+ * to a secret name (secretName); and the base64 lines a text starts with
+ * up to a private key's END line (its BEGIN line was cut off before the
+ * text).
  */
 const outputSecrets: readonly [RegExp, string | ((...match: string[]) => string)][] = [
   [/\b((?:proxy-)?authorization["']?\s*[:=]\s*["']?(?:(?:bearer|basic|token|digest|bot)\s+)?)[^\s"',;]{6,}/gi, "$1[REDACTED]"],
@@ -233,7 +234,7 @@ const outputSecrets: readonly [RegExp, string | ((...match: string[]) => string)
     /(?<![\w.-])([\w.-]{1,100})(["']?\s*[:=]\s*["']?)([^\s"',;]{8,})/g,
     (match, name, separator) => (secretName(name) ? `${name}${separator}[REDACTED]` : match),
   ],
-  [/^[\s\S]*?-----END (?:[A-Z]+ )?PRIVATE KEY-----/, "[REDACTED]"],
+  [/^(?:[A-Za-z0-9+/=]{1,100}\r?\n)+-----END (?:[A-Z]+ )?PRIVATE KEY-----/, "[REDACTED]"],
 ];
 
 /** Test output and the test command as BELL keeps or shows them: redact() and the shapes above masked. */

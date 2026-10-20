@@ -305,10 +305,14 @@ test("the output mask keeps what holds no credential: parser messages, counts, p
     "key: valueThatIsLong, monkey=bananas123",
   ];
   for (const line of kept) assert.equal(maskOutput(line), line);
+  // A key whose BEGIN line was cut off before the text: its lines go.
   assert.equal(
-    maskOutput("ok\nAAAAB3NzaC1yc2EAAAADAQABAAABAQC7\n-----END RSA PRIVATE KEY-----\nnext"),
+    maskOutput("AAAAB3NzaC1yc2EAAAADAQABAAABAQC7\r\nQ0FGRQ==\n-----END RSA PRIVATE KEY-----\nnext"),
     "[REDACTED]\nnext",
   );
+  // An END line after other output masks nothing before it.
+  const parser = "Error: expected the key to end with\n-----END PRIVATE KEY-----\nnext";
+  assert.equal(maskOutput(parser), parser);
 });
 
 test("the output mask takes time linear in the text's length, also on crafted text", () => {
@@ -323,6 +327,8 @@ test("the output mask takes time linear in the text's length, also on crafted te
     "bearer ".repeat(n / 7),
     "npm_".repeat(n / 4),
     "-----END ".repeat(n / 9),
+    "QUJD\n".repeat(n / 5),
+    `${"A".repeat(99)}\n`.repeat(n / 100) + "x",
     "a_b-c.d".repeat(n / 7) + "=x",
   ];
   const started = Date.now();
