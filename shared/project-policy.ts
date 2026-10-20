@@ -240,10 +240,15 @@ const maintainerPermission = new RegExp(
  * (`weighedRefusal`), so "AI-generated code and Co-authored-by trailers
  * are not allowed" stays a ban.
  */
-const creditObject = /\b(?:trailer|co-?author\w*|co-?sign\w*|Co-authored-by|Assisted-by|Generated-by)\b/i;
-/** The credit itself, with the commits or code it is on: "co-signing commits", "a co-author on code you submit". */
+const creditObject =
+  /\b(?:trailer|co-?author\w*|co-?sign\w*|Co-authored-by|Assisted-by|Generated-by|commit\s+messages?)\b/i;
+/**
+ * The credit itself, with the commits or code it is on: "co-signing
+ * commits", "a co-author on code you submit", "commit messages for your
+ * patches" (Kubernetes: "AI generated commit messages are not allowed").
+ */
 const creditPhrase =
-  /\b(?:co-?sign\w*|co-?author\w*)(?:\s+(?:on|of|in|for|to))?\s+(?:(?:the|your|their|a|an|any|all|each|every)\s+)?(?:commits?|code|patch(?:es)?|changes?|contributions?|PRs?|pull[- ]requests?)\b|\bcommits?\s+trailers?\b|\b(?:trailer|co-?author\w*|co-?sign\w*|Co-authored-by|Assisted-by|Generated-by)\b/gi;
+  /\b(?:co-?sign\w*|co-?author\w*|commit\s+messages?)(?:\s+(?:on|of|in|for|to))?\s+(?:(?:the|your|their|a|an|any|all|each|every)\s+)?(?:commits?|code|patch(?:es)?|changes?|contributions?|PRs?|pull[- ]requests?)\b|\bcommits?\s+trailers?\b|\b(?:trailer|co-?author\w*|co-?sign\w*|Co-authored-by|Assisted-by|Generated-by|commit\s+messages?)\b/gi;
 
 /** What a rule restricts when it is about talking to people rather than the change. */
 const conversation = new RegExp(
