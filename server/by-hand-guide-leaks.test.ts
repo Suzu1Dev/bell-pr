@@ -163,3 +163,12 @@ test("Markdown escapes, character references and invisible characters can't spel
   assert.doesNotMatch(shown(answer), fix, answer);
   assert.doesNotMatch(answer, /delay\\\*2|&#42;|&#x2B;|&ast;|\u200B/, answer);
 });
+
+test("a link can't carry code in its path, query or fragment", async (t) => {
+  const f = await fixture(t);
+  const text = "See https://example.com/?fix=return+delay*2**attempt and https://example.com/x#attempt%2B%2B and https://example.com/search?q=a%3D%3Db then https://developer.mozilla.org/en-US/docs/Web/API/setTimeout for the timer.";
+  f.answers.push(JSON.stringify({ text, question: null, refs: [], quotes: [], options: null, topic: "project", askedForCode: false }));
+  const answer = await withLocale("en", () => chat(f.ctx, f.run, "src/retry.js", "Where do I read about timers?", new AbortController().signal));
+  assert.doesNotMatch(answer, /fix=|attempt%2B|a%3D%3Db/, answer);
+  assert.match(answer, /https:\/\/developer\.mozilla\.org\/en-US\/docs\/Web\/API\/setTimeout/);
+});

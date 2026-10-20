@@ -197,6 +197,19 @@ const compactCode = (run: string) =>
   ((/[A-Za-z_$"']/.test(run) && compactOperator.test(run)) || compactShapes.some((shape) => shape.test(run)));
 /** A call with arguments, or a member call ("retry(fn, 2)", "Math.max(a, b)"); "file(s)" is prose. */
 const call = /(?<![\w$.])[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\((?!(?:s|es|ies)\))[^()\n]{0,120}\)/g;
+/** Whether a piece of text has code in it, read without the files (a link's path or query). */
+const hasCode = (text: string) =>
+  new RegExp(expression.source).test(text) || (text.match(word) ?? []).some(compactCode) || new RegExp(call.source).test(text);
+/** Whether a link's path, query or fragment, decoded, spells code ("?fix=return+delay*2**attempt"). */
+function linkCode(url: string) {
+  let rest = url.replace(/^https?:\/\/[^/?#]*/, "").replace(/\+/g, " ");
+  try {
+    rest = decodeURIComponent(rest);
+  } catch {
+    // A malformed escape is read as written.
+  }
+  return rest.split(/[/?&#]/).some((part) => hasCode(part.replace(/^[\w.-]*=/, "")));
+}
 /** Characters a reader never sees: zero-width space, word joiner, soft hyphen, byte-order mark, direction marks. */
 const invisible = /[\u00AD\u200B\u2060\uFEFF\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
 /** ASCII punctuation by its HTML entity name, which Markdown decodes. */
@@ -354,7 +367,7 @@ export function filterAgentText(
       const code = body.trim();
       return code && (occurs(code) || (options.tooling && safeCommand(code, sources, isWord))) ? hold(span) : remove();
     })
-    .replace(/\bhttps?:\/\/\S+/g, (url) => ([...url.matchAll(encodedRun)].some(([run]) => payload(run)) ? remove() : hold(url)));
+    .replace(/\bhttps?:\/\/\S+/g, (url) => ([...url.matchAll(encodedRun)].some(([run]) => payload(run)) || linkCode(url) ? remove() : hold(url)));
   // From here on the rules read prose as Markdown shows it.
   value = asShown(value).replace(encodedRun, (run) => (payload(run) ? remove() : run));
   value = replaceShown(value, expression, (code) =>
