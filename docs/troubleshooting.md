@@ -634,7 +634,7 @@ rule covers:
 | its text doesn't name … | This run used a kind of help that the project's text doesn't name. A new run fitted to the project's rules when it starts offers only the kinds the text names. |
 | its text doesn't name explanations and answers | The guide can't work without them, so BELL PR won't publish a learn-by-hand run there. |
 | BELL PR's checked list entry is more than 90 days old (…) | The rule comes from BELL PR's checked list, and its quotes were last checked more than 90 days ago: it still blocks, but it can't lead to the confirm. |
-| its rules weren't read since this run started (check them again) | Choose **Check again** on the project's **Before you contribute** card (for a fitted run, the publish dialog offers it on the block too), then open the publish dialog again. |
+| its rules weren't read since this run started (check them again) | Choose **Check again** on the block in the publish dialog: BELL PR reads the project's rules and then its checks again. **Check again** on the project's **Before you contribute** card works too; then open the publish dialog again. |
 | this run wasn't fitted to its rules when it started | A run started with every kind of help can't be fitted later. Start a new run and choose **Fit the guide to the project's rules**. |
 | its rules changed since this run started | The quotes this run was fitted to are no longer in the project's rules. Check the rules again; if they changed for good, start a new fitted run. |
 | another of its AI rules applies | This rule could lead to the confirm, but another AI rule of the project blocks; its own block says why. |
