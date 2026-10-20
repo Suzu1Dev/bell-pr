@@ -32,6 +32,7 @@ import { parseAgentOutput } from "./run-events.js";
 import type { WorkbenchContext } from "./workbench.js";
 import { filterAgentText, filterCodeField } from "../shared/by-hand-filter.js";
 import type { ChangeExplanation } from "../shared/explanations.js";
+import * as guide from "./by-hand-guide.js";
 import { turnFiles } from "./by-hand-filter.js";
 import { assertHelpAllowed, recordHelp } from "./by-hand-record.js";
 import { assertReady, countRemoved, reviewAgain } from "./by-hand.js";
@@ -370,6 +371,7 @@ export async function chat(
   filePath: string,
   question: string,
 ) {
+  if (ctx.run(id).learnByHand) return chatByHand(ctx, id, filePath, question);
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     if (!readableStatuses.includes(run.status))
@@ -494,8 +496,9 @@ export async function fetchPrFeedback(ctx: WorkbenchContext, id: string) {
   });
 }
 
-// Learn by hand (DESIGN v1.2): "How a reader sees your change" (F10) and
-// the filter of what agents wrote about the person's change (F7).
+// Learn by hand (DESIGN v1.2): "How a reader sees your change" (F10), the
+// per-file Ask tab after Ready (F6) and the filter of what agents wrote
+// about the person's change (F7).
 
 /**
  * A filter of what an agent wrote about the person's change, before it is
@@ -579,4 +582,53 @@ export function assertReaderView(run: Run, files: readonly DiffFile[], filePath:
   const own = plan.find((item) => item.path === filePath);
   if (own ? answered(own) : plan.every(answered)) return;
   throw refuse((m) => m.byHand.flow.answerFirst);
+}
+
+/**
+ * The per-file Ask tab of a Learn-by-hand run (F6): after Ready only, the
+ * guide's chat (server/by-hand-guide.ts) instead of the mentor; it filters
+ * the answer and records its help event. The run lock is held to read the
+ * change and to save, never across the turn, and the answer is stored in
+ * `run.conversations` as an agent run's answer is. A guide job of the run
+ * is never displaced: its Stop keeps working.
+ */
+async function chatByHand(ctx: WorkbenchContext, id: string, filePath: string, question: string) {
+  const { run, file } = await ctx.lock(id, async () => {
+    const run = ctx.run(id);
+    if (!readableStatuses.includes(run.status)) throw new AppError((m) => m.run.review.chatTooEarly, 409);
+    const files = await ctx.diff(id);
+    assertReady(run, files);
+    const file = files.find((value) => value.path === filePath);
+    if (!file || file.blocked) throw new AppError((m) => m.run.review.chatUnavailable, 422);
+    assertHelpAllowed(run, "answer");
+    if (ctx.byHandJobs.has(`guide:${id}`)) throw new AppError((m) => m.byHand.busy, 409);
+    return { run, file };
+  });
+  const controller = new AbortController();
+  const key = `guide:${id}`;
+  if (!ctx.controllers.has(key)) ctx.controllers.set(key, controller);
+  let answer: string;
+  try {
+    answer = await guide.chat(ctx, run, filePath, question, controller.signal);
+  } finally {
+    if (ctx.controllers.get(key) === controller) ctx.controllers.delete(key);
+  }
+  return ctx.lock(id, async () => {
+    const stored = run.conversations?.[filePath]?.messages ?? [];
+    const turn = (role: ChatMessage["role"], content: string): ChatMessage => ({
+      role,
+      content: redact(content).slice(0, conversationContentLimit),
+      fingerprint: file.fingerprint,
+    });
+    run.conversations = {
+      ...run.conversations,
+      [filePath]: {
+        fingerprint: file.fingerprint,
+        messages: [...stored, turn("user", question), turn("assistant", answer)].slice(-conversationMessageLimit),
+        updatedAt: now(),
+      },
+    };
+    await ctx.store.save();
+    return answer;
+  });
 }

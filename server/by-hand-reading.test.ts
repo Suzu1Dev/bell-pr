@@ -191,6 +191,7 @@ test("before Ready nothing is explained, walked through, premise-checked, review
   await assert.rejects(en(() => f.workbench.walkthrough(f.run.id, "src/retry.ts")), notReady);
   await assert.rejects(en(() => f.workbench.checkPremise(f.run.id)), notReady);
   await assert.rejects(en(() => f.workbench.rerunReview(f.run.id)), notReady);
+  await assert.rejects(en(() => f.workbench.chat(f.run.id, "src/retry.ts", "Why three?")), notReady);
   // Changed after Ready: the same refusals until the person marks it ready again.
   await f.markReady();
   await writeFile(path.join(f.run.worktreePath, "src", "retry.ts"), retrySource.replace("attempts = 1", "attempts = 4"));
@@ -310,6 +311,29 @@ test("a changed premise verdict keeps the walkthroughs whose units were answered
   assert.notEqual(f.run.walkthroughs?.[notes.path]?.status, "ready");
 });
 
+test("after Ready the Ask tab goes to the guide; until the guide's turn exists nothing is stored; agent runs keep the mentor", async (t) => {
+  const f = await fixture(t);
+  await f.markReady();
+  // The guide's chat is W2B's; on this branch it still answers 501, and nothing is stored or recorded.
+  await assert.rejects(
+    en(() => f.workbench.chat(f.run.id, "src/retry.ts", "Why three attempts?")),
+    refused(501, /^This part of Learn by hand is not available in this build yet\./),
+  );
+  const conversation = () => f.run.conversations?.["src/retry.ts"];
+  assert.equal(conversation(), undefined);
+  assert.deepEqual(f.run.byHand?.events ?? [], []);
+  assert.equal(f.calls.length, 0);
+  // An agent run's question goes to the mentor and is stored as before.
+  delete f.run.learnByHand;
+  const answer = await en(() => f.workbench.chat(f.run.id, "src/retry.ts", "Why three attempts?"));
+  assert.equal(answer, "The retry count is in src/retry.ts:1.");
+  assert.deepEqual(f.calls.map((call) => call.role), ["guide"]);
+  assert.deepEqual(
+    conversation()?.messages.map((message) => message.role),
+    ["user", "assistant"],
+  );
+});
+
 test("Run the review again on the ready version is the guide's review, never the team's prompts", async (t) => {
   const f = await fixture(t);
   const reviewed: string[] = [];
@@ -332,4 +356,32 @@ test("Run the review again on the ready version is the guide's review, never the
   assert.deepEqual(f.run.reports, {});
   // The second review needs a test run of this version first.
   await assert.rejects(en(() => f.workbench.rerunReview(f.run.id)), refused(409, /^Run your tests on this version first/));
+});
+
+test("the Ask tab never displaces a running guide job, so Stop still ends it", async (t) => {
+  const f = await fixture(t);
+  await f.markReady();
+  const key = `guide:${f.run.id}`;
+  const controller = new AbortController();
+  let stopped = false;
+  const job = new Promise<void>((resolve) =>
+    controller.signal.addEventListener("abort", () => {
+      stopped = true;
+      resolve();
+    }),
+  ).finally(() => {
+    f.ctx.byHandJobs.delete(key);
+    f.ctx.controllers.delete(key);
+  });
+  f.ctx.controllers.set(key, controller);
+  f.ctx.byHandJobs.set(key, job);
+  await assert.rejects(
+    en(() => f.workbench.chat(f.run.id, "src/retry.ts", "Why three?")),
+    refused(409, /^The guide is already working on this run/),
+  );
+  assert.equal(f.ctx.controllers.get(key), controller);
+  await en(() => f.workbench.cancel(f.run.id));
+  assert.equal(stopped, true);
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.run.conversations?.["src/retry.ts"], undefined);
 });
