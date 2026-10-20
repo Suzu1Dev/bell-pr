@@ -624,6 +624,29 @@ test("the test command view: BELL's suggestion from the run's folder and the per
   );
 });
 
+test("a run uses the command confirmed last before it starts, and a confirmation while it runs applies to the next run", async (t) => {
+  const f = await fixture(t);
+  await f.confirm(`node -e "console.log('first')"`);
+  // A new confirmation lands while the run reads the change.
+  const diff = f.workbench.diff.bind(f.workbench);
+  f.workbench.diff = async (id) => {
+    const files = await diff(id);
+    if (f.run.byHand?.tests === undefined) await f.confirm(`node -e "console.log('second')"`);
+    return files;
+  };
+  const first = await f.runOnce();
+  assert.equal(first.command, `node -e "console.log('second')"`);
+  assert.equal(first.outputTail, "second");
+  // Confirmed while a run goes on: that run keeps its command and records it.
+  await f.confirm(`node -e "setTimeout(() => console.log('slow'), 500)"`);
+  await en(() => f.byHand.runTests(f.run.id, {}));
+  await f.confirm(`node -e "console.log('third')"`);
+  const slow = await f.finished(2);
+  assert.equal(slow.outputTail, "slow");
+  assert.equal(slow.command, `node -e "setTimeout(() => console.log('slow'), 500)"`);
+  assert.equal((await f.runOnce()).outputTail, "third");
+});
+
 test("only the confirmed command runs: no route takes a command with a run request", async (t) => {
   const f = await fixture(t);
   // Every Learn-by-hand request schema except the confirm refuses a command field.

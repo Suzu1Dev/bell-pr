@@ -186,14 +186,18 @@ export async function runTests(
     if ((busy && busy.kind !== "tests") || ["guide", "review"].some((kind) => ctx.byHandJobs.has(`${kind}:${id}`)))
       throw new AppError((m) => m.byHand.busy, 409);
     // Only the command the person confirmed for the project, never one from a request.
-    const confirmed = ctx.repo(run.repoId).testCommand?.command;
-    if (!confirmed) throw new AppError((m) => m.byHand.tests.noCommand, 409);
+    const confirmed = () => ctx.repo(run.repoId).testCommand?.command;
+    if (!confirmed()) throw new AppError((m) => m.byHand.tests.noCommand, 409);
     const files = await ctx.diff(id);
     const untracked = await untrackedFiles(run.worktreePath);
     if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
+    // Read again with no await before the start: a confirmation that
+    // landed meanwhile is the command that runs and is recorded.
+    const latest = confirmed();
+    if (!latest) throw new AppError((m) => m.byHand.tests.noCommand, 409);
     startJob(ctx, run, input, {
       at: now(),
-      command: confirmed,
+      command: latest,
       changeFingerprint: changeFingerprint(files),
       ...(untracked ? { untracked } : {}),
     });
