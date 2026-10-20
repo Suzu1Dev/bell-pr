@@ -178,6 +178,10 @@ test("the guide says the agents can't edit files, lists the steps, and offers th
   assert.match(renderZh(guide({ plan: { steps, savedAt: at } })), /我卡住了/);
 });
 
+test("with no rung left on the step, \"My change\" isn't offered either", () => {
+  assert.doesNotMatch(html(guide({ plan: { steps, savedAt: at }, hints: { s2: { rung: 4, at, fingerprint } } })), /My change/);
+});
+
 test("a run whose history withdrew the claim says why instead of the in-run line", () => {
   const text = html(guide({ agentWrites: 1 }));
   assert.doesNotMatch(text, /agents can&#x27;t edit files/);
@@ -195,8 +199,9 @@ test("a fitted run names its help set and offers no hint, test help or review ou
   );
   assert.ok(text.includes("This run is fitted to the project&#x27;s rules: the guide offers only explanations, answers, and test help."));
   assert.ok(text.includes("Not offered in this run: the project&#x27;s text it is fitted to doesn&#x27;t name planning help and reviews."));
-  // R3 is planning help: no rung button, the exits instead.
-  assert.doesNotMatch(text, /Next hint: Options/);
+  // R3 is planning help: no rung button, the exits instead, and no "My change" (it would ask for R3).
+  assert.doesNotMatch(text, /Next hint: Options|My change/);
+  assert.ok(text.includes("This project"));
   assert.ok(text.includes("No hint left on this step; the exits are below."));
   // Test help is in the set: the failure can be explained.
   assert.ok(text.includes("You predicted Fail; it failed."));

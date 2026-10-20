@@ -130,7 +130,11 @@ export function GuidePanel(props: GuidePanelProps) {
   const hintState = step ? record.hints?.[step.id] : undefined;
   const rungs = [1, 2, 3, 4].filter((rung) => helpAllowed(run, helpKindOf("hint", rung)));
   const next = (hintState?.rung ?? 0) + 1;
+  const offered = !!step && rungs.includes(next);
   const attempt = attemptSince(hintState, { fingerprint, tests: record.tests, tried });
+  // "My change" goes to that next rung, so it is offered only with it.
+  const entries = askEntries.filter((value) => value !== "change" || offered);
+  const asked = entries.includes(entry) ? entry : "project";
   const review = record.reviews?.at(-1);
   const send = (input: ByHandGuideInput) =>
     void onGuide({ ...input, ...(step ? { stepId: step.id } : {}), ...(tried.trim() ? { tried: tried.trim() } : {}) }).then(() => {
@@ -182,14 +186,14 @@ export function GuidePanel(props: GuidePanelProps) {
         className="by-hand"
         onSubmit={(event) => {
           event.preventDefault();
-          if (question.trim()) send({ kind: "ask", entry, question: question.trim(), ...where });
+          if (question.trim()) send({ kind: "ask", entry: asked, question: question.trim(), ...where });
         }}
       >
         <h3><MessageSquare size={16} aria-hidden="true" /> {t.ask}</h3>
         <fieldset className="by-hand-row" aria-label={t.ask}>
-          {askEntries.map((value) => (
+          {entries.map((value) => (
             <label key={value} className="by-hand-chip">
-              <input type="radio" name="by-hand-entry" checked={entry === value} onChange={() => setEntry(value)} />
+              <input type="radio" name="by-hand-entry" checked={asked === value} onChange={() => setEntry(value)} />
               {t.entries[value]}
             </label>
           ))}
@@ -203,13 +207,13 @@ export function GuidePanel(props: GuidePanelProps) {
           <button type="submit" className="button primary" disabled={working || !question.trim()}>
             <MessageSquare size={15} aria-hidden="true" /> {t.ask}
           </button>
-          {step && rungs.includes(next) && (
+          {offered && (
             <button type="button" className="button secondary" disabled={working || !attempt} onClick={() => send({ kind: "hint", rung: next })}>
               <Lightbulb size={15} aria-hidden="true" /> {t.next({ rung: t.rungs[next] })}
             </button>
           )}
         </div>
-        {step && (rungs.includes(next) ? !attempt && <p className="field-help">{t.tryFirst}</p> : <p className="field-help">{t.noRung}</p>)}
+        {step && (offered ? !attempt && <p className="field-help">{t.tryFirst}</p> : <p className="field-help">{t.noRung}</p>)}
       </form>
       {step && <TalkItThrough step={step} tests={record.tests ?? []} fingerprint={fingerprint} onStep={onStep} />}
       <RepeatFailure key={step?.id} step={step} tests={record.tests ?? []} onCheckIn={props.onCheckIn} />
