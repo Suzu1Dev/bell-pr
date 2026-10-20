@@ -22,7 +22,7 @@ const en = {
   helpCount: ({ kind, count }: { kind: string; count: number }) => `${kind} (${count})`,
   noHelp: "The guide gave no help.",
   tests: ({ runs, more, right, judged }: { runs: number; more: boolean; right: number; judged: number }) =>
-    `${product.name} ran your tests ${more ? "at least " : ""}${times(runs)}${judged ? `; your first prediction after each change was right ${right} of ${judged} times` : ""}.`,
+    `${product.name} ran your tests ${more ? "at least " : ""}${times(runs)}${judged ? `; your first prediction after each change was right ${right} of ${judged} ${judged === 1 ? "time" : "times"}` : ""}.`,
   fitted: ({ kinds }: { kinds: string }) => `This run was fitted to the project's rules when it started: the guide offered only ${kinds}.`,
   otherTools: `${product.name} can't see other tools you used, such as editor autocomplete or another chat.`,
   forYou: "This record is for you. It isn't proof of who wrote the code.",

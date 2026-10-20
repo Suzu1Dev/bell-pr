@@ -227,3 +227,9 @@ test("the publish dialog's record says when the server's checks couldn't be read
   assert.doesNotMatch(record(), /role="(alert|status)"/);
   assert.ok(renderZh(createElement(ByHandRecord, { run: byHandRun(), place: "publish", unchecked: { checking: false, failed: true, onRetry() {} } })).includes(zhTW.unchecked));
 });
+
+test("the test line counts one prediction in the singular", () => {
+  const tests = [{ at, command: "npm test", changeFingerprint: "a", outcome: "failed", ms: 40, prediction: "fail" }];
+  const html = renderEn(createElement(ByHandRecord, { run: byHandRun({ tests }), place: "publish" }));
+  assert.ok(html.includes("BELL PR ran your tests once; your first prediction after each change was right 1 of 1 time."));
+});
