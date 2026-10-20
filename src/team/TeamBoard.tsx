@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import {
   ArrowUp,
   Bot,
@@ -33,7 +33,12 @@ import { ModelSummary } from "../models/ModelSummary";
 import { providerLabels } from "../../shared/models";
 import { teamLanes, type TeamLaneId } from "./lanes";
 import { PremiseNotice } from "./PremiseNotice";
+import { ErrorBoundary } from "../app/ErrorBoundary";
+import type { PlanWithGuideProps } from "../byhand/lazy";
 import "./team.css";
+
+// Learn by hand's plan, from the one lazy byhand chunk (DESIGN v1.2 F3).
+const PlanWithGuide = lazy(() => import("../byhand/lazy").then((module) => ({ default: module.PlanWithGuide })));
 
 /** No status to start from: useEntitlements then reads the license. */
 const readLicense = {};
@@ -58,6 +63,7 @@ export function TeamBoard({
   onRetry,
   busy,
   entitlements,
+  byHand,
 }: {
   run: Run;
   demo: boolean;
@@ -73,8 +79,11 @@ export function TeamBoard({
    * when not given. The demo shows its sample team without a plan limit.
    */
   entitlements?: Entitlements;
+  /** A Learn-by-hand run's plan requests: the person plans with the guide (useByHand). */
+  byHand?: Omit<PlanWithGuideProps, "run">;
 }) {
   const t = useT("team");
+  const byHandText = useT("discovery").byHand;
   const taskLabels = useT("common").teamTaskStatus;
   const fmt = useFormat();
   const license = useEntitlements(
@@ -129,7 +138,8 @@ export function TeamBoard({
     !demo &&
     !!onRetry &&
     ["failed", "cancelled"].includes(team.phase) &&
-    team.tasks.length > 0 &&
+    // Learn by hand retries only a run whose plan the person hasn't confirmed.
+    (run.learnByHand ? !run.byHand?.plan?.confirmedAt : team.tasks.length > 0) &&
     ["failed", "cancelled"].includes(run.status);
   const retriedCount = team.tasks.filter((task) =>
     ["failed", "blocked"].includes(task.status),
@@ -316,7 +326,12 @@ export function TeamBoard({
             ))}
           </ol>
         )}
-        {team.phase === "awaiting_approval" && (
+        {run.learnByHand && byHand && ["awaiting_approval", "developing"].includes(team.phase) && (
+          <ErrorBoundary resetKey={`${run.id}:plan`}>
+            <Suspense fallback={<Loader2 size={18} className="spin" />}><PlanWithGuide run={run} {...byHand} /></Suspense>
+          </ErrorBoundary>
+        )}
+        {team.phase === "awaiting_approval" && !run.learnByHand && (
           <>
             <div className="team-plan-action">
               <span>{t.approval.hint}</span>
@@ -416,13 +431,15 @@ export function TeamBoard({
             }}
           >
             <span>
-              {retriedCount
+              {run.learnByHand
+                ? byHandText.retry
+                : retriedCount
                 ? t.retry.partial({ kept: done, retried: retriedCount })
                 : done === team.tasks.length
                   ? t.retry.integrationOnly
                   : t.retry.notStarted}
             </span>
-            <input
+            {!run.learnByHand && <input
               type="text"
               aria-label={t.retry.label}
               placeholder={t.retry.placeholder}
@@ -430,7 +447,7 @@ export function TeamBoard({
               maxLength={4000}
               onChange={(e) => setRetryMessage(e.target.value)}
               disabled={busy}
-            />
+            />}
             <button className="button primary" disabled={busy}>
               {busy ? (
                 <Loader2 size={15} className="spin" />

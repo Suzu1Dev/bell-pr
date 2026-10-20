@@ -728,3 +728,40 @@ test("the folded Run details name the tokens, and a long plan opens to its first
   assert.match(english, /aria-expanded="false">Show the whole plan<\/button>/);
   assertNoHan(english);
 });
+
+test("a learn-by-hand run plans with the guide instead of approving a team plan, and retries only before its plan", () => {
+  const sample = getDemo("en");
+  const byHand = (status: Run["status"], phase: AgentTeam["phase"], extra: Partial<Run> = {}): Run => ({
+    ...sample.run,
+    status,
+    learnByHand: true,
+    team: { ...sample.team, phase, tasks: [], planSummary: "", messages: [] },
+    ...extra,
+  });
+  const element = (run: Run) =>
+    createElement(TeamBoard, {
+      run,
+      demo: false,
+      onApprove() {},
+      async onRevise() {},
+      async onMessage() {},
+      async onRetry() {},
+      busy: false,
+      entitlements: freeEntitlements,
+      byHand: { onSave: async () => {}, onReveal: async () => {}, onAskQuestions: async () => {}, onConfirm: async () => {} },
+    });
+  const planning = renderEn(element(byHand("awaiting_plan", "awaiting_approval")));
+  assertNoHan(planning);
+  // The plan panel loads with the byhand chunk; no team approval or "send back".
+  assert.match(planning, /<svg[^>]*lucide-loader-circle[^>]*spin/);
+  assert.doesNotMatch(planning, /Approve the plan and start development|Send back with feedback/);
+  // Failed before the person confirmed a plan: the retry goes back to planning, with no note to subtasks.
+  const failed = renderEn(element(byHand("failed", "failed")));
+  assertNoHan(failed);
+  assert.ok(failed.includes("A retry takes this run back to planning with the guide."));
+  assert.doesNotMatch(failed, /Note for the retried subtasks/);
+  // After the person confirmed their plan, no retry can bring agents back.
+  const confirmed = byHand("failed", "failed", { byHand: { plan: { steps: [{ id: "s1", title: "Cap" }], savedAt: sample.run.createdAt, confirmedAt: sample.run.createdAt } } });
+  assert.doesNotMatch(renderEn(element(confirmed)), /A retry takes this run back|Retry failed subtasks/);
+  assert.match(renderZh(element(byHand("failed", "failed"))), /重試會讓這個任務回到和嚮導一起規劃的階段/);
+});

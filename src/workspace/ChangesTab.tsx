@@ -44,6 +44,7 @@ import { usePresentation } from "../app/presentation";
 import { FailureText } from "../FailureText";
 import { PremiseNotice } from "../team/PremiseNotice";
 import type { RunActions } from "../app/hooks/useRunActions";
+import type { ByHand } from "../app/hooks/useByHand";
 import type { Walkthroughs } from "../app/hooks/useWalkthroughs";
 import type { PanelTab } from "../review/ExplanationPanel";
 import type { LineRange } from "../review/WalkthroughCards";
@@ -62,6 +63,9 @@ const ExplanationPanel = lazy(() =>
 );
 /** The Explain-it-back check, loaded the same way. */
 const UnderstandingCheck = lazy(() => import("./UnderstandingCheck"));
+// Learn by hand: the writing views, from the one lazy byhand chunk.
+const YourTurn = lazy(() => import("../byhand/lazy").then((module) => ({ default: module.YourTurn })));
+const GuidePanel = lazy(() => import("../byhand/lazy").then((module) => ({ default: module.GuidePanel })));
 
 interface ChangesTabProps {
   run: Run;
@@ -122,6 +126,8 @@ interface ChangesTabProps {
   >;
   /** The Explain-it-back check of the run (useUnderstanding). */
   understanding?: Understanding;
+  /** A Learn-by-hand run's state and requests (useByHand). */
+  byHand?: ByHand;
 }
 
 /**
@@ -179,6 +185,7 @@ export function ChangesTab({
   walkthroughs,
   actions,
   understanding,
+  byHand,
 }: ChangesTabProps) {
   const workspace = useT("workspace");
   const t = workspace.changes;
@@ -207,6 +214,16 @@ export function ChangesTab({
   // The check is taken while the run waits for review or approval.
   const checkOpen = ["review", "approved"].includes(run.status) && !run.publishing;
   const [askWaiting, setAskWaiting] = useState(false);
+  // Learn by hand: while the person writes, the guide takes the explanation's place.
+  const writing = !!byHand?.writing;
+  useEffect(() => {
+    if (writing) setShowExplanation(true);
+  }, [run.id, writing, setShowExplanation]);
+  const loading = (<div className="empty-state" role="status"><Loader2 className="spin" /><p>{t.loadingPanel}</p></div>);
+  // At the ready version: "Run the review again" opens the Ready dialog, and the reader view's check (W2E).
+  const byHandReview = run.learnByHand && byHand
+    ? { onReviewAgain: byHand.openReady, check: understanding?.view, onOpenCheck: () => openCheckPanel(run.id) }
+    : undefined;
   useEffect(() => {
     if (!checking) {
       setAskWaiting(false);
@@ -312,6 +329,7 @@ export function ChangesTab({
         )}
       </div>
     )}
+    {run.byHand?.ready && writing && <p className="by-hand-note" role="status">{workspace.byHand.changed}</p>}
     <div
       ref={reviewGridRef}
       className={`review-grid ${!showFiles ? "files-hidden" : ""} ${!showExplanation ? "explanation-hidden" : ""}`}
@@ -574,7 +592,7 @@ export function ChangesTab({
             file={file}
             reviewed={run.reviewedFiles.includes(file.path)}
             onReview={reviewFile}
-            onAsk={checking ? () => setAskWaiting(true) : ask}
+            onAsk={checking ? () => setAskWaiting(true) : writing ? (question) => byHand?.ask(file, question) : ask}
             view={diffView}
             hasNote={Boolean(run.notes?.[file.path]?.text)}
             onLoadBase={
@@ -584,6 +602,10 @@ export function ChangesTab({
             }
             highlight={shownHighlight}
           />
+        ) : writing && run.worktreePath ? (
+          <ErrorBoundary resetKey={`${run.id}:turn`}>
+            <Suspense fallback={loading}><YourTurn run={run} worktreePath={run.worktreePath} presenting={present} /></Suspense>
+          </ErrorBoundary>
         ) : (
           <div className="empty-state">
             <div className="empty-icon">
@@ -674,6 +696,10 @@ export function ChangesTab({
                   </Suspense>
                 </ErrorBoundary>
               </div>
+            ) : writing && byHand ? (
+              <ErrorBoundary resetKey={`${run.id}:guide`}>
+                <Suspense fallback={loading}><GuidePanel run={run} files={files} {...byHand.guide} /></Suspense>
+              </ErrorBoundary>
             ) : file ? (
               <ErrorBoundary resetKey={`${run.id}:${file.path}`}>
                 <Suspense
@@ -756,6 +782,7 @@ export function ChangesTab({
                     walkthroughBusy={walkthroughs?.walkthroughBusy}
                     initialTab={panelTab === "chat" ? "explain" : panelTab}
                     onTabChange={setPanelTab}
+                    byHandReview={byHandReview}
                   />
                 </Suspense>
               </ErrorBoundary>

@@ -61,6 +61,14 @@ const workspace = {
   },
   sampleReview: "Sample review",
   humanReview: "Human review",
+  /** Learn by hand (DESIGN v1.2 F4, F5): what shows before the byhand chunk loads. */
+  byHand: {
+    badge: "Learn by hand",
+    ready: "Ready for review",
+    writeFirst: "Write a change first",
+    reviewing: "The guide is reviewing",
+    changed: "You changed the code after marking it ready. The review and the check wait until you mark it ready again.",
+  },
   footer: {
     allReviewed: "Every file reviewed.",
     passed: "You explained it back. Ready to approve.",

@@ -27,8 +27,10 @@ interface RunPollingOptions {
 }
 
 /**
- * Polls the open run every 2.5 s while it is active, preparing a draft or
- * re-running the review, and loads the diff once the team finishes.
+ * Polls the open run every 2.5 s while it is active, preparing a draft,
+ * re-running the review or running a Learn-by-hand job (`byHand.busy`: the
+ * guide, plan questions, the review at Ready, the person's tests), and
+ * loads the diff once the team finishes.
  */
 export function useRunPolling({
   run,
@@ -44,8 +46,9 @@ export function useRunPolling({
   setTab,
   setApiError,
 }: RunPollingOptions) {
+  const byHandBusy = !!run.byHand?.busy;
   useEffect(() => {
-    if (demo || (!active && !preparingDraft && !reviewRerunning)) return;
+    if (demo || (!active && !preparingDraft && !reviewRerunning && !byHandBusy)) return;
     let cancelled = false;
     let observedStatus = run.status;
     let polling = false;
@@ -108,6 +111,7 @@ export function useRunPolling({
     active,
     preparingDraft,
     reviewRerunning,
+    byHandBusy,
     // Refs and state setters never change; listed for the hooks lint rule.
     draftMutationEpoch,
     setRun,

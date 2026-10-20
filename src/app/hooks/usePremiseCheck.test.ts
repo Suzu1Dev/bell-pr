@@ -38,3 +38,10 @@ test("a finished run offers a premise check when its request states an assumptio
   assert.equal(premiseCheckable({ ...run, workspaceRemovedAt: "2026-10-15T00:00:00Z" }, false, false), false);
   assert.equal(premiseCheckable({ ...run, status: "running" }, false, false), false);
 });
+
+test("a learn-by-hand run's premise isn't checked again while the person writes", () => {
+  const byHand = { ...run, learnByHand: true as const };
+  assert.equal(premiseCheckable(byHand, false, false, true), false);
+  // At its ready version, the check is offered as for any run.
+  assert.equal(premiseCheckable(byHand, false, false, false), true);
+});

@@ -15,11 +15,13 @@ const assumptionWords = /假設|未驗證|hypothes|assum|unverified/i;
 /**
  * Whether the person can check a run's premise now: a finished real run
  * with a team and its working directory, that has a check already or whose
- * request states an assumption (in either language).
+ * request states an assumption (in either language), and not while the
+ * person writes a Learn-by-hand change (nothing is checked before Ready).
  */
-export function premiseCheckable(run: Run, demo: boolean, active: boolean) {
+export function premiseCheckable(run: Run, demo: boolean, active: boolean, writing = false) {
   return (
     !demo &&
+    !writing &&
     !active &&
     !!run.team &&
     !run.publishing &&

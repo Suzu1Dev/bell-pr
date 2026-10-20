@@ -265,3 +265,31 @@ test("with the check turned off, approval needs the ticks only, and the run says
   assert.match(marked, /This run was approved without explaining the change back first\./);
   assert.doesNotMatch(renderEn(element({ run: ticked, files })), /check-off-badge/);
 });
+
+test("a learn-by-hand run carries its badge, and while the person writes the footer asks for Ready for review", () => {
+  const byHand: Run = {
+    ...realRun,
+    learnByHand: true,
+    agents: realRun.agents.filter((agent) => agent.id === "lead"),
+    team: realRun.team && { ...realRun.team, tasks: [] },
+  };
+  const changed = [{ path: "src/a.ts", language: "TypeScript", additions: 1, deletions: 0, status: "modified", patch: "@@ -1 +1 @@\n+a", fingerprint: "f1" }];
+  const html = renderEn(element({ run: byHand, files: changed, tab: "overview" }));
+  assertNoHan(html);
+  assert.match(html, /<span class="status-badge"><svg[^>]*lucide-hand[\s\S]*?<\/svg>Learn by hand<\/span>/);
+  assert.match(html, /<button class="button primary"><svg[^>]*lucide-check-check[\s\S]*?<\/svg>Ready for review<svg/);
+  assert.doesNotMatch(html, /Approve and prepare the PR/);
+  // An empty diff: nothing to mark ready yet.
+  assert.match(
+    renderEn(element({ run: byHand, files: [], tab: "overview" })),
+    /<button class="button primary" disabled="" title="Write a change first"><svg[\s\S]*?<\/svg>Write a change first<svg/,
+  );
+  // The guide reviewing: the CTA waits.
+  assert.match(
+    renderEn(element({ run: { ...byHand, byHand: { busy: { kind: "review", since: byHand.createdAt } } }, files: changed, tab: "overview" })),
+    /<button class="button primary" disabled=""><svg[\s\S]*?<\/svg>The guide is reviewing<svg/,
+  );
+  // An agent run keeps its badge-free title and its approval.
+  assert.doesNotMatch(renderEn(element({ files: changed, tab: "overview" })), /Learn by hand|Ready for review/);
+  assert.match(renderZh(element({ run: byHand, files: changed, tab: "overview" })), /可以審查了/);
+});

@@ -365,7 +365,7 @@ export function useUnderstanding(
      * A try-first attempt on `file` (PATCH /api/runs/:id/attempts). It never
      * changes the review; a credited answer can change the check's plan.
      */
-    async saveAttempt(file: DiffFile, input: Pick<FileAttemptInput, "quiz" | "road">) {
+    async saveAttempt(file: DiffFile, input: Pick<FileAttemptInput, "quiz" | "road" | "walkthrough">) {
       if (demo) {
         const attempts = demoRules().demoSaveAttempt(run, file, input, now());
         keep(() => ({ attempts }));
