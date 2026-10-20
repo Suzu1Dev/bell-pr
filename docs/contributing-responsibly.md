@@ -176,8 +176,7 @@ doesn't change what a project's rules say.
 
 ### What stays the same
 
-Every check in the table above applies to a Learn-by-hand run as to any
-other run. A rule that restricts AI help itself (for example, a ban on
+Every check in the table above applies to a Learn-by-hand run too. A rule that restricts AI help itself (for example, a ban on
 any content made with the assistance of AI tools), a rule whose reach
 BELL PR can't tell from its words, and an issue the project keeps for
 people learning without AI tools each block publishing, with no override,
@@ -196,9 +195,10 @@ learning without AI tools.
 
 The publish dialog shows the run's record: the kinds of help you used and
 how often, BELL PR's runs of your tests and your predictions, and how many
-answers BELL PR removed code from. When the run's history is clean (no
-agent changed a file or tried to, and no teammate, team task, AI follow-up
-round or agent conflict resolution ever joined the run), the record says:
+answers BELL PR removed code from. When the run's history is clean (BELL
+PR saw no agent write to its files, and no teammate, team task, AI
+follow-up round or agent conflict resolution ever joined the run), the
+record says:
 
 > BELL PR's agents had no write access and gave you no code for this
 > change. The guide showed only quotes of the project's code and of your
@@ -212,10 +212,10 @@ proof of who wrote the code.
 BELL PR never writes a sentence in your voice and never adds a trailer;
 how you describe the help you had is yours, within the project's rules.
 Where a project asks contributors to say how they used AI, a sentence of
-your own that says what the guide did (it explained, answered, reviewed,
-pointed out or hinted at something) counts as that disclosure in a clean
-Learn-by-hand run, and a negated one, such as "Not reviewed by AI.", does
-not. In an agent run these words never count. When your text says that no
+your own that names the AI and says what it did (it explained, answered,
+reviewed, pointed out, hinted at or guided you through something) counts
+as that disclosure in a clean Learn-by-hand run, and a negated one, such
+as "Not reviewed by AI.", does not. In an agent run these words never count. When your text says that no
 AI helped, in a run where the guide did help, the publish dialog quotes
 that line next to your help record and asks you to confirm or reword it;
 it never calls the line true or false.

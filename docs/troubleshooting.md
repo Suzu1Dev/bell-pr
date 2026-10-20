@@ -585,8 +585,8 @@ project** needs no new attempt; **I'm stuck** lists the other ways out.
   Try an exit: ask a human, make the step smaller or talk it through.
 - **One thing at a time:** "The guide is already working on this run.
   Wait for it to finish, or stop it." and "Your tests are running. Ask the
-  guide when they finish." The guide answers while you write, not while
-  the run plans its first read or publishes.
+  guide when they finish." The guide gives hints and answers questions
+  while you write, not while the run plans or publishes.
 - **A failed turn:** "The guide couldn't answer: …" gives your question
   back; "The guide's answer was not in the expected form, so nothing was
   stored. Try again." means the model's answer could not be read.
@@ -639,9 +639,9 @@ rule covers:
 | its rules changed since this run started | The quotes this run was fitted to are no longer in the project's rules. Check the rules again; if they changed for good, start a new fitted run. |
 | another of its AI rules applies | This rule could lead to the confirm, but another AI rule of the project blocks; its own block says why. |
 
-A run whose history isn't clean (an agent changed or tried to change its
-files, or a teammate, a team task, an AI follow-up round or an agent
-conflict resolution joined it) gets the agent run's checks and words. See
+A run whose history isn't clean (BELL PR saw an agent write to its files,
+or a teammate, a team task, an AI follow-up round or an agent conflict
+resolution joined it) gets the agent run's checks and words. See
 [Contributing
 responsibly](contributing-responsibly.md#when-the-projects-own-text-says-some-uses-of-ai-are-fine)
 for every condition of the quoted confirm.
