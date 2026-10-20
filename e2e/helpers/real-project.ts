@@ -9,7 +9,8 @@
 // signed-in CLI and, when a spec sets them, the maintainer feedback of a
 // pull request; codex and claude answer the environment check only, and
 // codex answers an agent turn only with the text a spec sets
-// (setAgentAnswer), so no real agent can run.
+// (setAgentAnswer), after holdAgent(false) when a spec holds it, so no
+// real agent can run.
 //
 // The project's clone holds CONTRIBUTING.md, two source files and a test,
 // and one run in review whose worktree changes all three (the test's
@@ -292,6 +293,8 @@ export interface RealProject extends LaunchedServer {
   setPrFeedback(response: unknown): Promise<void>;
   /** What codex answers an agent turn: the JSON text of its last message. */
   setAgentAnswer(text: string): Promise<void>;
+  /** While held, an agent turn waits before codex answers (a turn still running). */
+  holdAgent(held: boolean): Promise<void>;
 }
 
 export interface RealProjectOptions {
@@ -349,6 +352,7 @@ export async function startRealProject(options: RealProjectOptions = {}): Promis
     await mkdir(readyBin, { recursive: true });
     const feedbackFile = path.join(temp, "pr-feedback.json");
     const answerFile = path.join(temp, "agent-answer.txt");
+    const holdFile = path.join(temp, "agent-hold");
     await writeFile(
       path.join(readyBin, "gh"),
       `#!/bin/sh
@@ -376,6 +380,7 @@ case "$1" in
   login) echo "Logged in using ChatGPT" ;;
   exec)
     cat > /dev/null
+    while [ -f "${holdFile}" ]; do sleep 0.2; done
     if [ -f "${answerFile}" ]; then
       ${JSON.stringify(process.execPath)} -e 'process.stdout.write(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: require("node:fs").readFileSync(process.argv[1], "utf8") } }) + "\\n")' "${answerFile}"
     else exit 1; fi ;;
@@ -480,6 +485,7 @@ esac
       ghCalls: async () => (await github.calls()).filter((call) => call[0] === "gh"),
       setPrFeedback: (response) => writeFile(feedbackFile, JSON.stringify(response)),
       setAgentAnswer: (text) => writeFile(answerFile, text),
+      holdAgent: (held) => (held ? writeFile(holdFile, "") : rm(holdFile, { force: true })),
       stop: async () => {
         await stop();
         await removeTemp();

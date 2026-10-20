@@ -5,8 +5,10 @@
 // with what a test sets); the lead's premise check made again on the
 // overview; the setup a teammate could not find; on a published run,
 // the commits read from its worktree; and, on a Learn-by-hand run marked
-// ready, no explanation or walkthrough asked for on its own. The tests of
-// each server share it and run in order. Axe checks each new view.
+// ready, no explanation or walkthrough asked for on its own, the reader
+// view and the check it opens, and a reload while they are written (the
+// stand-in's turn held) read with GETs only. The tests of each server
+// share it and run in order. Axe checks each new view.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, request, test, type Browser, type Page } from "@playwright/test";
 import { readyNow } from "../shared/by-hand";
@@ -93,6 +95,39 @@ const walkthroughAnswer = JSON.stringify({
   ],
   newUnits: [],
 });
+
+/**
+ * What the stand-in codex answers a walkthrough of src/greeting.ts in the
+ * Learn-by-hand run; BELL reads greeting() as new code, so the walkthrough
+ * says the file's changes are all new.
+ */
+const greetingWalkthrough = JSON.stringify({
+  functions: [
+    {
+      name: "greeting",
+      kind: "function",
+      startLine: 49,
+      endLine: 53,
+      summary: "Greets a person in their language.",
+      change: "The greeting now comes from a table of languages, with English when a language has none.",
+      steps: [{ startLine: 50, endLine: 50, explanation: "Picks the language's greeting, or the English one." }],
+      callers: [],
+      callees: [],
+      analogy: "Like a phrase book that opens at English when a page is missing.",
+      selfCheck: { question: "What does a language without a greeting get?", answer: "The English greeting." },
+    },
+  ],
+  newUnits: [],
+});
+
+/** The explanation and walkthrough states of `path` in the run's diff, read with a GET. */
+async function readerStatus(page: Page, path: string) {
+  const { files: diff } = (await (await page.request.get(`/api/runs/${runId}/diff`)).json()) as {
+    files: { path: string; explanationStatus?: string; walkthroughStatus?: string }[];
+  };
+  const file = diff.find((entry) => entry.path === path);
+  return [file?.explanationStatus, file?.walkthroughStatus];
+}
 
 async function axe(page: Page, include: string) {
   const results = await new AxeBuilder({ page }).include(include).analyze();
@@ -365,6 +400,23 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
     }
   });
 
+  test("from the reader view, Explain it back leaves the focus on the check's close button", async ({ browser }) => {
+    const { page, close } = await open(browser);
+    try {
+      await page.goto(`/#/runs/${runId}/changes?file=${files.greeting}&locale=en`);
+      const panel = page.locator(".explain-panel");
+      await expect(panel.getByRole("heading", { name: panelStrings.reader.title })).toBeVisible();
+      await panel.getByRole("button", { name: t.workspace.check.title }).focus();
+      await page.keyboard.press("Enter");
+      // The check takes the place of the panel that held the button: the focus goes into it, not to the page.
+      const check = page.locator(".understanding-check");
+      await expect(check.getByRole("button", { name: t.workspace.check.close })).toBeFocused();
+      await expect(page.locator("body")).not.toBeFocused();
+    } finally {
+      await close();
+    }
+  });
+
   for (const width of [1440, 390])
     test(`in zh-TW the reader view fits at ${width} px and names its parts for a screen reader`, async ({ browser }) => {
       const { page, close } = await open(browser);
@@ -460,6 +512,51 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
           { path: "walkthroughs", body: { filePath: files.greeting, retry: true } },
         ]),
       );
+    } finally {
+      await close();
+      await checkOff.stop();
+    }
+  });
+
+  test("a reload while the reader view's explanation and walkthrough are written updates them with reads only", async ({ browser }) => {
+    const checkOff = await startRealProject({
+      appSettings: { skipUnderstandingCheck: true },
+      run: {
+        learnByHand: true,
+        explanations: {},
+        byHand: { ready: { at: "2026-10-14T10:00:00.000Z", changeFingerprint: ready, review: false } },
+      },
+    });
+    // The agent's turns wait until the test lets them answer: both are still written after the reload.
+    await checkOff.holdAgent(true);
+    await checkOff.setAgentAnswer(greetingWalkthrough);
+    const { page, close } = await opener(() => checkOff)(browser);
+    try {
+      await page.goto(`/#/runs/${runId}/changes?file=${files.greeting}&locale=en`);
+      await page.locator(".explain-panel").getByRole("button", { name: panelStrings.reader.show }).click();
+      await expect.poll(() => readerStatus(page, files.greeting)).toEqual(["generating", "generating"]);
+      const asked: string[] = [];
+      const reads: string[] = [];
+      page.on("request", (sent) => {
+        const { pathname } = new URL(sent.url());
+        if (sent.method() === "POST" && /^\/api\/runs\/[^/]+\/(explanations|walkthroughs)$/.test(pathname))
+          asked.push(pathname);
+        if (sent.method() === "GET" && pathname === `/api/runs/${runId}/diff`) reads.push(pathname);
+      });
+      await page.reload();
+      await expect(page.locator(".file-item.selected")).toHaveAttribute("title", files.greeting);
+      const panel = page.locator(".explain-panel");
+      await panel.getByRole("tab", { name: t.review.panel.tabs.walkthrough }).click();
+      const writing = panel.getByRole("heading", { name: t.review.walkthrough.generatingTitle });
+      await expect(writing).toBeVisible();
+      const readsBefore = reads.length;
+      await checkOff.holdAgent(false);
+      // The card fills in from a read of the diff; this tab never asks for one itself.
+      await expect(panel.getByRole("heading", { name: t.review.walkthrough.onlyNewTitle })).toBeVisible({ timeout: 30_000 });
+      await expect(writing).toHaveCount(0);
+      expect(reads.length).toBeGreaterThan(readsBefore);
+      expect(asked).toEqual([]);
+      expect((await readerStatus(page, files.greeting))[1]).toBe("ready");
     } finally {
       await close();
       await checkOff.stop();
