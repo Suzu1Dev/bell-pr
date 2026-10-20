@@ -181,8 +181,8 @@ export function useByHand(
     readyDialog: {
       ...view("ready"),
       onReady: call("ready", "POST", () => setReadyOpen(false)),
-      // Any AI rule but "open an issue first" asks for care before an AI review.
-      aiRules: (repo?.contributionRules?.findings ?? []).some((finding) => finding.kind !== "issue-first"),
+      // A rule about AI (a ban, disclosure, reserved area or one addressed to agents, or one whose words name AI) asks for care before an AI review.
+      aiRules: (repo?.contributionRules?.findings ?? []).some((finding) => ["ban", "disclose", "area", "agent"].includes(finding.kind) || /\b(?:AI|LLMs?|GPT|Copilot)\b|artificial intelligence|language model/i.test(finding.quote)),
     },
   };
 }

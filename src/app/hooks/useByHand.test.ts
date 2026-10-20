@@ -169,3 +169,38 @@ test("the focus moves to an element once it is on screen, and the search gives u
     mock.timers.reset();
   }
 });
+
+test("the Ready dialog's line about AI rules comes only from rules about AI", async () => {
+  const finding = (kind: string, quote: string) => ({ kind, path: "CONTRIBUTING.md", line: 3, quote, contribution: false });
+  function Probe({ findings }: { findings: ReturnType<typeof finding>[] }) {
+    const byHand = useByHand({ id: "run-1", repoId: "repo-1", status: "review", learnByHand: true, agents: [], logs: [] } as unknown as Run, [], {
+      demo: false,
+      repo: { id: "repo-1", contributionRules: { checkedAt: "2026-10-20T09:00:00.000Z", findings, filesRead: [] } } as never,
+      draftMutationEpoch: { current: 0 },
+      actions: { setRun() {}, setFiles() {}, approveTeamPlan: async () => {} },
+      handBack() {},
+    });
+    return createElement("span", null, String(byHand.readyDialog.aiRules));
+  }
+  const aiRules = async (findings: ReturnType<typeof finding>[]) => {
+    const mounted = await mount(createElement(Probe, { findings }));
+    try {
+      return mounted.text();
+    } finally {
+      await mounted.unmount();
+    }
+  };
+  // Open an issue first, write it in your own words, understand your change: not about AI.
+  assert.equal(
+    await aiRules([
+      finding("issue-first", "Open an issue before you change behaviour."),
+      finding("own-words", "Write the description in your own words."),
+      finding("understand", "You must understand every line you submit."),
+    ]),
+    "false",
+  );
+  for (const kind of ["ban", "disclose", "area", "agent"]) assert.equal(await aiRules([finding(kind, "Some rule.")]), "true", kind);
+  // A rule of another kind whose own words are about AI.
+  assert.equal(await aiRules([finding("understand", "If you used an LLM, you must understand every line it wrote.")]), "true");
+  assert.equal(await aiRules([finding("own-words", "Don't paste AI output into the description.")]), "true");
+});
