@@ -252,13 +252,22 @@ function startJob(ctx: WorkbenchContext, run: Run, input: ByHandTestInput, start
   ctx.byHandJobs.set(key, job);
 }
 
+/**
+ * The signal that ended the command when BELL sent none: command() refuses
+ * an exit code outside the allowed ones (none here, so only a run a signal
+ * ended) with `details`, and stops for too much output without them.
+ */
+function foreignSignal(error: unknown) {
+  if (!(error instanceof AppError) || error.statusCode !== 422 || !error.details) return undefined;
+  const { signal } = error.details;
+  return typeof signal === "string" ? signal : "?";
+}
+
 /** Why a run ended in `error`, for the run's log. */
 function errorNote(error: unknown) {
   const m = sm().byHand.tests;
-  // command() refuses an exit code outside the allowed ones (none here, so
-  // only a run a signal ended) with details, and too much output without.
   if (error instanceof AppError && error.statusCode === 422)
-    return error.details ? m.noExitCode : m.tooMuchOutput({ megabytes: Math.round(testRunLimits.maxBytes / 1_048_576) });
+    return m.tooMuchOutput({ megabytes: Math.round(testRunLimits.maxBytes / 1_048_576) });
   const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error;
   return m.couldNotStart({ reason: redact(cause instanceof Error ? cause.message : String(cause)) });
 }
@@ -301,9 +310,15 @@ async function execute(
     exitCode = result.code;
     outcome = result.code === 0 ? "passed" : "failed";
   } catch (error) {
+    const ended = foreignSignal(error);
     if (signal.aborted) outcome = "stopped";
     else if (error instanceof AppError && error.statusCode === 504) outcome = "timeout";
-    else {
+    else if (ended) {
+      // A crash, a segfault or the OOM killer: for the person a failing
+      // suite, so a crash loop shows as repeated failures. No exit code.
+      outcome = "failed";
+      note = sm().byHand.tests.signalled({ signal: ended });
+    } else {
       outcome = "error";
       note = errorNote(error);
     }

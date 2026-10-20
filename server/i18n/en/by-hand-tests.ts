@@ -19,8 +19,9 @@ const tests = {
     `Your tests wrote more than ${megabytes} MB of output, so ${product.name} stopped them. The end of the output is kept.`,
   /** The run's log when the shell could not start the command. */
   couldNotStart: ({ reason }: { reason: string }) => `Your test command could not start: ${reason}`,
-  /** The run's log when the command ended without an exit code (a signal stopped it). */
-  noExitCode: "Your tests ended without an exit code; a signal stopped them.",
+  /** The run's log when a signal BELL did not send (a crash, the OOM killer) ended the command: a failed run. */
+  signalled: ({ signal }: { signal: string }) =>
+    `Your tests were ended by the signal ${signal}, which ${product.name} did not send, so the run counts as failed.`,
 };
 
 export default tests;

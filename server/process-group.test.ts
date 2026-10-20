@@ -259,3 +259,24 @@ test("discardOutput: lines reach onLine, and the result keeps no output", async 
   assert.deepEqual({ ...result }, { stdout: "", stderr: "", code: 0 });
   assert.deepEqual(lines.sort(), ["stderr b", "stdout a", "stdout c"]);
 });
+
+test("endGroup: a command a signal ends that command() did not send rejects naming the signal; the default keeps its details", { skip: !posix }, async () => {
+  const ended = (options: Parameters<typeof command>[2]) =>
+    command("/bin/sh", ["-c", "kill -KILL $$"], { allowedCodes: everyCode, ...options }).then(
+      () => assert.fail("a command a signal ended resolved"),
+      (error: AppError) => {
+        assert.equal(error.statusCode, 422);
+        return error.details;
+      },
+    );
+  assert.deepEqual(await ended({ endGroup: { settleAfterExitMs: 100 } }), { stderr: "", signal: "SIGKILL" });
+  assert.deepEqual(await ended({}), { stderr: "" });
+  // A stop of command() itself is its own error, with no signal named.
+  const controller = new AbortController();
+  const stopped = command(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+    endGroup: { settleAfterExitMs: 100 },
+    signal: controller.signal,
+  });
+  setTimeout(() => controller.abort(), 200);
+  await assert.rejects(stopped, (error: AppError) => error.statusCode === 409 && error.details === undefined);
+});

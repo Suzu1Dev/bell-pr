@@ -10,7 +10,7 @@ const tests: Translation<typeof en> = {
   tooMuchOutput: ({ megabytes }) =>
     `你的測試輸出超過 ${megabytes} MB，所以 ${product.name} 停止了它。輸出的結尾已保留。`,
   couldNotStart: ({ reason }) => `你的測試指令無法啟動：${reason}`,
-  noExitCode: "你的測試沒有結束代碼就停止了；它被某個訊號終止。",
+  signalled: ({ signal }) => `你的測試被訊號 ${signal} 終止；這個訊號不是 ${product.name} 送出的，所以這次執行算是失敗。`,
 };
 
 export default tests;

@@ -246,6 +246,31 @@ test("a failing suite is recorded as failed with its exit code and the end of it
   assert.equal(three.outputTail, undefined);
 });
 
+test("a suite a signal ends that BELL did not send is a failure, with the signal named in the run's log", async (t) => {
+  const f = await fixture(t);
+  // As the OOM killer would: the shell itself dies of SIGKILL (no core file).
+  await f.confirm(`echo "1 passing"; kill -KILL $$`);
+  const crashed = await f.runOnce({ prediction: "pass" });
+  assert.equal(crashed.outcome, "failed");
+  assert.equal(crashed.exitCode, undefined);
+  assert.equal(crashed.outputTail, "1 passing");
+  assert.equal(
+    f.run.logs.at(-1)?.message,
+    "Your tests were ended by the signal SIGKILL, which BELL PR did not send, so the run counts as failed.",
+  );
+  // A crash loop: each run is a failure with the same end of output.
+  const again = await f.runOnce();
+  assert.equal(again.outcome, "failed");
+  assert.equal(again.tailHash, crashed.tailHash);
+  // BELL's own Stop and timeout keep their outcomes.
+  testRunLimits.timeoutMs = 1_000;
+  await f.confirm(`node -e "setInterval(() => {}, 1000)"`);
+  assert.equal((await f.runOnce()).outcome, "timeout");
+  testRunLimits.timeoutMs = 10 * 60_000;
+  await en(() => f.byHand.runTests(f.run.id, {}));
+  assert.equal((await f.byHand.stopTests(f.run.id)).run.byHand?.tests?.at(-1)?.outcome, "stopped");
+});
+
 test("a run past its time limit is recorded as timeout and its process group is stopped", async (t) => {
   const f = await fixture(t);
   testRunLimits.timeoutMs = 2_000;

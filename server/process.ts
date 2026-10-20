@@ -195,7 +195,8 @@ interface CommandOptions {
    * first SIGTERM, also when every pipe has closed. The spawn observer
    * records the group (`recordGroup`) and hears of its exit only then.
    * Processes that left the group (their own session or group) are not
-   * reached.
+   * reached. When a signal command() did not send ends its own process,
+   * the error's details name it (`details.signal`).
    */
   endGroup?: { settleAfterExitMs: number };
   /** Off by default: the output reaches only `onLine`; the result's stdout and stderr stay empty. */
@@ -248,7 +249,9 @@ export async function command(
       // endGroup only: when SIGTERM went to the group, the command's own
       // exit, the wait for the rest of its output, and whether it settled.
       let terminatedAt: number | undefined;
-      let exited: { code: number | null } | undefined;
+      let exited:
+        | { code: number | null; signal: NodeJS.Signals | null }
+        | undefined;
       let settleTimer: NodeJS.Timeout | undefined;
       let settled = false;
       const pending = { stdout: "", stderr: "" };
@@ -266,7 +269,7 @@ export async function command(
         if (exited) {
           // endGroup: the command's own process has exited, so a stop only
           // cuts the wait for the rest of its output.
-          settle(exited.code);
+          settle(exited.code, exited.signal);
           return;
         }
         failure = error;
@@ -357,17 +360,17 @@ export async function command(
             : (withCliSetupHint(spawnFailure, executable) as Error);
       });
       if (group)
-        child.on("exit", (code) => {
-          exited = { code };
+        child.on("exit", (code, signal) => {
+          exited = { code, signal };
           clearTimeout(timer);
           settleTimer = setTimeout(
-            () => settle(code),
+            () => settle(code, signal),
             group.settleAfterExitMs,
           );
         });
-      child.on("close", (code) => {
+      child.on("close", (code, signal) => {
         if (group) {
-          settle(exited ? exited.code : code);
+          settle(exited ? exited.code : code, exited ? exited.signal : signal);
           return;
         }
         clearTimeout(timer);
@@ -379,7 +382,7 @@ export async function command(
         finish(code);
       });
       /** endGroup: stops reading, ends what is left of the group, then settles. */
-      function settle(code: number | null) {
+      function settle(code: number | null, signal: NodeJS.Signals | null) {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
@@ -394,10 +397,15 @@ export async function command(
         child.stderr.destroy();
         void endGroup().then(() => {
           groupGone?.();
-          finish(code);
+          finish(code, signal);
         });
       }
-      function finish(code: number | null) {
+      /**
+       * `signal` comes only with endGroup: the signal that ended the
+       * command's own process, which its error then names in
+       * `details.signal` when no stop of command() came first.
+       */
+      function finish(code: number | null, signal?: NodeJS.Signals | null) {
         if (failure) reject(failure);
         else if (!(options.allowedCodes ?? [0]).includes(code ?? -1)) {
           reject(
@@ -415,6 +423,7 @@ export async function command(
                   details: {
                     stderr: redact(stderr.trim()).slice(-stderrTailLength),
                     ...(code === null ? {} : { exitCode: code }),
+                    ...(code === null && signal ? { signal } : {}),
                   },
                 },
               ),
