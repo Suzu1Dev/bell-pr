@@ -113,8 +113,12 @@ const madeBy = String.raw`[- ](?:generat\w*|assist\w*|written|authored|produced|
  * AI only by leaving it out. Only work a contribution holds counts (not
  * commit messages, which are credit, or "decisions"), and not
  * "human-readable", "by hand" or "reviewed by a human".
+ *
+ * `(?=\w)` before a lookbehind that holds a run of spaces (here and in the
+ * rules below): the lookbehind is tried only where the rule's next word can
+ * start, so a long run of spaces is read once, not once for every space.
  */
-const humanOnly = String.raw`(?<=\b(?:contributions?|code|patch(?:es)?|pull\s+requests?|PRs?|merge\s+requests?|commits|changes|submissions?|work|content|documentation|docs|tests?)\s+)(?:must|shall|should|(?:are|is)\s+required\s+to|ha(?:ve|s)\s+to|needs?\s+to)\s+(?:only\s+)?be\s+(?:(?:entirely|fully|completely|wholly|solely|exclusively|purely|only|100\s*%)\s+)?(?:human[- ](?:authored|written|made|created|produced|crafted)|(?:authored|written|made|created|produced|crafted)\s+(?:(?:entirely|only|solely|exclusively|wholly|fully)\s+)?by\s+(?:a\s+|real\s+)?(?:humans?|human\s+beings?))\b`;
+const humanOnly = String.raw`(?=\w)(?<=\b(?:contributions?|code|patch(?:es)?|pull\s+requests?|PRs?|merge\s+requests?|commits|changes|submissions?|work|content|documentation|docs|tests?)\s+)(?:must|shall|should|(?:are|is)\s+required\s+to|ha(?:ve|s)\s+to|needs?\s+to)\s+(?:only\s+)?be\s+(?:(?:entirely|fully|completely|wholly|solely|exclusively|purely|only|100\s*%)\s+)?(?:human[- ](?:authored|written|made|created|produced|crafted)|(?:authored|written|made|created|produced|crafted)\s+(?:(?:entirely|only|solely|exclusively|wholly|fully)\s+)?by\s+(?:a\s+|real\s+)?(?:humans?|human\s+beings?))\b`;
 /** A model or tool as a part of the software ("LLM providers", "the Claude integration"), not as help. */
 const featureNoun = String.raw`(?!\s+(?:APIs?|providers?|integrations?|backends?|clients?|SDKs?|features?|support|calls?|endpoints?|prompts?|extensions?|plugins?|librar(?:y|ies)|bindings?|adapters?|modules?)\b)`;
 
@@ -146,7 +150,7 @@ const assistanceTerms = [
   new RegExp(String.raw`\b(?:${modelWords}|${toolNames})${madeBy}`, flags),
   // "a large language model or similar technology, such as GitHub's Copilot"
   new RegExp(
-    String.raw`\b(?:AI|${modelWords}|models?|assistants?|technolog(?:y|ies))\s*,?\s+(?:such\s+as|e\.g\.,?|including)\s+(?:[\w/'’-]+\s+){0,2}?${toolNames}\b`,
+    String.raw`\b(?:AI|${modelWords}|models?|assistants?|technolog(?:y|ies))(?:\s*,)?\s+(?:such\s+as|e\.g\.,?|including)\s+(?:[\w/'’-]+\s+){0,2}?${toolNames}\b`,
     flags,
   ),
   new RegExp(
@@ -161,9 +165,9 @@ const assistanceTerms = [
 ];
 
 /** Where the text names AI help (see `assistanceTerms`). */
-function assistanceSpans(text: string): Span[] {
+function assistanceSpans(text: string, matches = allMatches): Span[] {
   return assistanceTerms
-    .flatMap((term) => allMatches(term, text))
+    .flatMap((term) => matches(term, text))
     .filter((span) => asWritten(text.slice(span.start, span.end)));
 }
 
@@ -227,7 +231,7 @@ const madeWhere = String.raw`(?:at\s+all|at\s+any\s+(?:stage|point|time|step)|in
  * "our AI" or "the enemy AI" are the software's.
  */
 const aiUsed = new RegExp(
-  String.raw`(?<!\b(?:the|our|its|their|this|that|enemy|game|npc|opponent|computer|chess)\s+)\b${aiNoun}\s+(?:(?:(?:must|may|should|shall|can|will)\s*(?:not|n't)|(?:must|may|should|shall|can|will)\s+never|cannot)\s+(?:ever\s+)?be\s+used\b(?=\s*(?:[.!;)]|$)|\s+${madeWhere})|(?<=\b(?:where|wherever|in\s+which|for\s+which|if|when|whenever|that|which)\s+(?:(?:an?|any)\s+)?${aiNoun}\s+)(?:was|were|has\s+been|have\s+been|had\s+been)\s+(?:ever\s+)?used\b)`,
+  String.raw`(?=\w)(?<!\b(?:the|our|its|their|this|that|enemy|game|npc|opponent|computer|chess)\s+)\b${aiNoun}\s+(?:(?:(?:must|may|should|shall|can|will)\s*(?:not|n't)|(?:must|may|should|shall|can|will)\s+never|cannot)\s+(?:ever\s+)?be\s+used\b(?=\s*(?:[.!;)]|$)|\s+${madeWhere})|(?=\w)(?<=\b(?:where|wherever|in\s+which|for\s+which|if|when|whenever|that|which)\s+(?:(?:an?|any)\s+)?${aiNoun}\s+)(?:was|were|has\s+been|have\s+been|had\s+been)\s+(?:ever\s+)?used\b)`,
   flags,
 );
 refusalTerms.push(aiUsed);
@@ -264,7 +268,7 @@ const aiInvolved = new RegExp(
     String.raw`\binvolv(?:e|es|ed|ing)\s+(?:any\s+)?${aiNoun}\b(?=\s*(?:[.!;,)]|$)|\s+(?:in|at|for|with|on|during|whatsoever|will|shall|are|is|get|gets|must|may|can|should)\b)`,
     String.raw`\b(?:AI|LLM)[- ]involvement\b`,
     String.raw`\b${aiNoun}\s+(?:(?:must|may|should|shall|can|will)\s*(?:not|n't)|cannot)\s+be\s+involved\b`,
-    String.raw`(?<=\b(?:where|wherever|in\s+which|for\s+which|if|when|that|which)\s+(?:(?:an?|any)\s+)?)${aiNoun}\s+(?:was|were|has\s+been|have\s+been|had\s+been)\s+involved\b`,
+    String.raw`(?=\w)(?<=\b(?:where|wherever|in\s+which|for\s+which|if|when|that|which)\s+(?:(?:an?|any)\s+)?)${aiNoun}\s+(?:was|were|has\s+been|have\s+been|had\s+been)\s+involved\b`,
   ].join("|"),
   flags,
 );
@@ -294,8 +298,8 @@ const inContributing = String.raw`(?:at\s+all|whatsoever|at\s+any\s+(?:stage|poi
  */
 const useAi = new RegExp(
   [
-    String.raw`(?<=(?<!\b(?:if|when|whenever|whether|unless|once|in\s+case)\s+(?:you\s+|contributors?\s+)?)\b(?:(?:please\s+)?(?:do\s+not|don't|never|avoid|refrain\s+from)|(?:you|contributors?|contributions?|patches|pull\s+requests?|PRs?|submissions?)\s+(?:(?:must|may|should|shall|can|will)\s*(?:not|n't)|(?:must|may|should|shall|can|will)\s+never|cannot|are\s+not\s+(?:allowed|permitted)\s+to))\s+(?:(?:ever|even|any|just|simply|really|please)\s+)?)us(?:e|ing)\s+(?:any\s+)?AI\b(?=\s*(?:[.!;,)]|$)|\s+${inContributing})`,
-    String.raw`(?:^|(?<=[^\w\s]\s*)|(?<=\b(?:the|any|all)\s+))(?:using|use\s+of|usage\s+of)\s+(?:any\s+)?AI\s+${inContributing}`,
+    String.raw`(?=\w)(?<=(?<!\b(?:if|when|whenever|whether|unless|once|in\s+case)\s+(?:you\s+|contributors?\s+)?)\b(?:(?:please\s+)?(?:do\s+not|don't|never|avoid|refrain\s+from)|(?:you|contributors?|contributions?|patches|pull\s+requests?|PRs?|submissions?)\s+(?:(?:must|may|should|shall|can|will)\s*(?:not|n't)|(?:must|may|should|shall|can|will)\s+never|cannot|are\s+not\s+(?:allowed|permitted)\s+to))\s+(?:(?:ever|even|any|just|simply|really|please)\s+)?)us(?:e|ing)\s+(?:any\s+)?AI\b(?=\s*(?:[.!;,)]|$)|\s+${inContributing})`,
+    String.raw`(?=\w)(?:^|(?<=[^\w\s]\s*)|(?<=\b(?:the|any|all)\s+))(?:using|use\s+of|usage\s+of)\s+(?:any\s+)?AI\s+${inContributing}`,
   ].join("|"),
   flags,
 );
@@ -312,7 +316,7 @@ refusalTerms.push(useAi);
 const conductCondition = new RegExp(
   [
     String.raw`\b(?:unless|except)\b`,
-    String.raw`(?<!\b(?:closed|rejected|declined|refused|removed|deleted|locked|ignored|dismissed)\s+(?:\w+ly\s+)?)\bwithout\s+(?:\w+\s+){0,2}?(?:disclos|declar|attribut|mention|label|review|understand|test|edit|verif|check|explain|human|modif|curat|oversight|care)\w*`,
+    String.raw`(?=\w)(?<!\b(?:closed|rejected|declined|refused|removed|deleted|locked|ignored|dismissed)\s+(?:\w+ly\s+)?)\bwithout\s+(?:\w+\s+){0,2}?(?:disclos|declar|attribut|mention|label|review|understand|test|edit|verif|check|explain|human|modif|curat|oversight|care)\w*`,
     String.raw`\b(?:you|they|he|she|the\s+(?:author|contributor|submitter|person)s?|authors?|contributors?|submitters?)\s+(?:do|does|did|ca|can|could|have|has|had|are|is|were|was)(?:\s*not|n't)\s+(?:\w+\s+){0,2}?(?:understand|explain|review|read|test|verif|check|edit|write|wr[io]te|know|able|own|have\s+the\s+(?:knowledge|abilit|skill))\w*`,
     String.raw`\b(?:has|have|had|was|were)(?:\s+not|n't)\s+(?:been\s+)?(?:\w+\s+)?(?:understood|reviewed|tested|verified|checked|edited|explained|read|disclosed|declared|labell?ed)\b`,
     String.raw`\bun(?:reviewed|tested|edited|verified|checked|disclosed|declared|attributed|labell?ed|curated|modified)\b`,
@@ -345,7 +349,7 @@ const maintainerPermission = new RegExp(
  * is not allowed to cheat", or AI in ranked games.
  */
 const aiRefused = new RegExp(
-  String.raw`(?<!\b(?:the|our|its|their|this|that|enemy|game|npc|opponent|computer|chess|with|by|using|from|of|via|through)\s+(?:(?:an?|any)\s+)?)\b${aiNoun}(?:\s+(?:use|usage|assistance|help))?\s+(?:is|are)\s+(?:(?:strictly|expressly|completely|entirely|totally|absolutely)\s+)?(?:banned|forbidden|prohibited|disallowed|unacceptable|not\s+(?:allowed|permitted|accepted|welcome|tolerated))\b(?=\s*(?:[.!;,)]|$)|\s+(?:here|anywhere)\b|\s+(?:from|in|for|on|within|with)\s+(?:(?:this|our|the|any|all|your)\s+)?(?:project|repo(?:sitory)?|codebase|contribut\w*|patch(?:es)?|pull\s+requests?|PRs?|merge\s+requests?|code|commits?|submissions?|changes)\b)`,
+  String.raw`(?=\w)(?<!\b(?:the|our|its|their|this|that|enemy|game|npc|opponent|computer|chess|with|by|using|from|of|via|through)\s+(?:(?:an?|any)\s+)?)\b${aiNoun}(?:\s+(?:use|usage|assistance|help))?\s+(?:is|are)\s+(?:(?:strictly|expressly|completely|entirely|totally|absolutely)\s+)?(?:banned|forbidden|prohibited|disallowed|unacceptable|not\s+(?:allowed|permitted|accepted|welcome|tolerated))\b(?=\s*(?:[.!;,)]|$)|\s+(?:here|anywhere)\b|\s+(?:from|in|for|on|within|with)\s+(?:(?:this|our|the|any|all|your)\s+)?(?:project|repo(?:sitory)?|codebase|contribut\w*|patch(?:es)?|pull\s+requests?|PRs?|merge\s+requests?|code|commits?|submissions?|changes)\b)`,
   flags,
 );
 refusalTerms.push(aiRefused);
@@ -376,11 +380,11 @@ const conversation = new RegExp(
 );
 /** A project's no-AI policy: "We have a strict no-AI policy", "follows a no-LLM policy"; not "no AI policy yet". */
 const noAiPolicy =
-  /(?<=\b(?:a|an|our|the|this|its|their|strict)\s+(?:(?:strict|firm|hard|clear)\s+)?)no[- ](?:AI|LLMs?|gen[- ]?AI|generative[- ]AI)[- ]polic(?:y|ies)\b/i;
+  /(?=\w)(?<=\b(?:a|an|our|the|this|its|their|strict)\s+(?:(?:strict|firm|hard|clear)\s+)?)no[- ](?:AI|LLMs?|gen[- ]?AI|generative[- ]AI)[- ]polic(?:y|ies)\b/i;
 refusalTerms.push(noAiPolicy);
 /** The change itself: its code, commits or patches, or a pull request as a whole. */
 const changeObject = new RegExp(
-  String.raw`\b(?:code(?!\s+of\s+conduct)|patch(?:es|sets?)?|contributions?|implementations?|diffs?|commits?(?!\s+messages?))\b|(?<!\b(?:on|in|to|under|for)\s+(?:your|the|a|their|each|every|this)\s+)\b(?:PRs?|pull[- ]requests?|merge\s+requests?)\b(?!\s+(?:descriptions?|titles?|bod(?:y|ies)|text|comments?|messages?|templates?|reviews?))`,
+  String.raw`\b(?:code(?!\s+of\s+conduct)|patch(?:es|sets?)?|contributions?|implementations?|diffs?|commits?(?!\s+messages?))\b|(?=\w)(?<!\b(?:on|in|to|under|for)\s+(?:your|the|a|their|each|every|this)\s+)\b(?:PRs?|pull[- ]requests?|merge\s+requests?)\b(?!\s+(?:descriptions?|titles?|bod(?:y|ies)|text|comments?|messages?|templates?|reviews?))`,
   flags,
 );
 /**
@@ -390,7 +394,7 @@ const changeObject = new RegExp(
  */
 const useRefused = new RegExp(
   [
-    String.raw`(?:^|(?<=[^\w\s]\s*)|(?<=\b(?:the|any|all)\s+))(?:using|use\s+of|usage\s+of)\s+(?:any\s+)?(?:generative\s+)?(?:AI|LLMs?)(?:\s+(?:tools?|models?|assistants?))?(?=\s+(?:is|are)\s+(?:(?:strictly|expressly|completely|entirely|totally|absolutely)\s+)?(?:banned|forbidden|prohibited|disallowed|unacceptable|not\s+(?:allowed|permitted|accepted|welcome|tolerated))\b)`,
+    String.raw`(?=\w)(?:^|(?<=[^\w\s]\s*)|(?<=\b(?:the|any|all)\s+))(?:using|use\s+of|usage\s+of)\s+(?:any\s+)?(?:generative\s+)?(?:AI|LLMs?)(?:\s+(?:tools?|models?|assistants?))?(?=\s+(?:is|are)\s+(?:(?:strictly|expressly|completely|entirely|totally|absolutely)\s+)?(?:banned|forbidden|prohibited|disallowed|unacceptable|not\s+(?:allowed|permitted|accepted|welcome|tolerated))\b)`,
     String.raw`\b(?:with|using|through)\s+(?:the\s+)?(?:help|aid|assistance)\s+of\s+(?:an?\s+|any\s+)?(?:generative\s+)?(?:AI|LLMs?|chatbots?)\b`,
   ].join("|"),
   flags,
@@ -414,12 +418,13 @@ const refusalCarried =
  * The parts of a sentence (see `partBoundary`), Markdown link targets left
  * out ("[Large AI generated](#large-edits) PRs" reads "Large AI generated
  * PRs"), each with whether it names AI at all (`aiMention`, wider than the
- * assistance terms, so more parts must pass).
+ * assistance terms, so more parts must pass). A link's text holds no "["
+ * and its target no "(", so a run of brackets is read once.
  */
 function refusedParts(words: string) {
-  const plain = words.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+  const plain = words.replace(/\[([^[\]]*)\]\([^()]*\)/g, "$1");
   let start = 0;
-  return [...allMatches(partBoundary, plain), { start: plain.length, end: plain.length }].map((bound) => {
+  return [...cachedMatches(partBoundary, plain), { start: plain.length, end: plain.length }].map((bound) => {
     const text = plain.slice(start, bound.start);
     start = bound.end;
     return { text, ai: aiMention.test(text) };
@@ -490,7 +495,7 @@ const addressedToAgents = new RegExp(
   [
     String.raw`\b(?:if\s+)?you(?:'re|\s+are)\s+(?:an?\s+)?(?:AI|LLM)(?:[- ]based)?\s+(?:coding\s+)?(?:agents?|assistants?|models?|tools?|bots?)\b`,
     String.raw`\b(?:if\s+)?you(?:'re|\s+are)\s+(?:an?\s+)?(?:LLM|large language model|language model|coding agent|autonomous agent)\b`,
-    String.raw`^\W*(?:note|instructions?|message|attention|dear)\s*(?:to|for)?\s*(?:all\s+|any\s+)?(?:AI|LLM)(?:[- ]based)?\s+(?:coding\s+)?(?:agents?|assistants?|models?|tools?|bots?)\b`,
+    String.raw`^\W*(?:note|instructions?|message|attention|dear)\s*(?:(?:to|for)\s*)?(?:all\s+|any\s+)?(?:AI|LLM)(?:[- ]based)?\s+(?:coding\s+)?(?:agents?|assistants?|models?|tools?|bots?)\b`,
     String.raw`^\W*(?:AI|LLM)\s+(?:coding\s+)?(?:agents?|assistants?)\s*:`,
     String.raw`\b(?:AI|LLM|coding)\s+agents?\s+(?:must|should|need\s+to|are\s+required\s+to|may\s+not|are\s+not\s+allowed)\b`,
   ].join("|"),
@@ -603,10 +608,10 @@ function blocks(prose: ProseLine[]): Block[] {
   return result;
 }
 
+/** The line of a block an offset is on: that of the last line start at or before it. */
 function lineAt(block: Block, offset: number) {
-  let line = block.starts[0].line;
-  for (const start of block.starts) if (start.offset <= offset) line = start.line;
-  return line;
+  const after = firstIndex(block.starts.length, (index) => block.starts[index].offset > offset);
+  return block.starts[Math.max(0, after - 1)].line;
 }
 
 const blank = (text: string) => " ".repeat(text.length);
@@ -618,8 +623,10 @@ const keepOnly = (whole: string, offset: number, text: string) =>
 /**
  * Inline code a policy writes a label or a trailer in ("`good first
  * issue`", "``Assisted-by:``"): words the reader is meant to read, not code.
+ * The words are checked before the label is looked for, so a long code
+ * span is read once.
  */
-const quotedWords = /^\s*(?:(?:Assisted|Generated)-by:?|[\w\s'’-]*\bgood[- ]first[- ]issues?\b[\w\s'’-]*)\s*$/i;
+const quotedWords = /^(?:\s*(?:Assisted|Generated)-by:?\s*|(?=[\w\s'’-]*$)[\w\s'’-]*\bgood[- ]first[- ]issues?\b[\w\s'’-]*)$/i;
 
 /**
  * Text to search, positions kept: inline code and comment delimiters
@@ -627,16 +634,19 @@ const quotedWords = /^\s*(?:(?:Assisted|Generated)-by:?|[\w\s'’-]*\bgood[- ]fi
  * (":ref:`AI generated <target>`", "`text <url>`_") stays readable.
  * Typographic apostrophes and hyphens read as typed ones ("don’t",
  * "AI‑generated"), one character for one, so a rule written with them is
- * found; quotes keep the file's own characters.
+ * found; quotes keep the file's own characters. A role's or a link's text
+ * is trimmed after it is matched, not by the pattern, which would read a
+ * run of spaces again from each space.
  */
 function searchable(text: string) {
   return text
     .replace(/[\u2018\u2019\u02bc\u2032]/g, "'")
     .replace(/[\u2010\u2011]/g, "-")
     .replace(
-      /:[\w.+-]+:`([^`]*)`|`([^`<]*?)\s*<[^`>]*>`_{1,2}/g,
+      /:[\w.+-]+:`([^`]*)`|`([^`<]*)<[^`>]*>`_{1,2}/g,
       (whole: string, role: string | undefined, link: string | undefined) => {
-        const shown = (role ?? link ?? "").replace(/\s*<[^>]*>\s*$/, "");
+        const target = role === undefined ? undefined : /<[^<>]*>\s*$/.exec(role);
+        const shown = role === undefined ? link!.trimEnd() : target ? role.slice(0, target.index).trimEnd() : role;
         return keepOnly(whole, whole.indexOf("`") + 1, shown);
       },
     )
@@ -651,9 +661,12 @@ function searchable(text: string) {
     .replace(/\*\*|__|(?<![\w*])\*(?=\w)|(?<=\w)\*(?![\w*])|(?<![\w_])_(?=\w)|(?<=\w)_(?![\w_])/g, blank);
 }
 
-/** A Markdown link or image, inline or by reference: what it shows is read, not where it leads. */
+/**
+ * A Markdown link or image, inline or by reference: what it shows is read,
+ * not where it leads. Its text holds no "[" (a run of them is read once).
+ */
 const markdownLink =
-  /!?\[([^\]\n]*)\](?:\((?:[^()\s]|\([^()\s]*\))*(?:\s+(?:"[^"]*"|'[^']*'))?\)|\[[^\]\n]*\])/g;
+  /!?\[([^[\]\n]*)\](?:\((?:[^()\s]|\([^()\s]*\))*(?:\s+(?:"[^"]*"|'[^']*'))?\)|\[[^\]\n]*\])/g;
 /** Inline HTML a policy writes words in ("<b>AI-generated</b>", "<em>not</em>"), and line breaks. */
 const inlineTag =
   /<\/?(?:a|abbr|b|big|cite|code|del|em|font|i|ins|kbd|mark|q|s|small|span|strike|strong|sub|sup|tt|u)\b[^<>]*>|<br\s*\/?>/gi;
@@ -661,36 +674,45 @@ const inlineTag =
 /**
  * Where sentences end: after . ! or ? (and any closing bracket, quote or
  * emphasis marker) before a space or the end, never inside "e.g.", "i.e."
- * or "etc." ("(Copilot, ChatGPT, etc.) are not allowed").
+ * or "etc." ("(Copilot, ChatGPT, etc.) are not allowed"); and at an HTML
+ * comment's delimiters, which never touch the punctuation.
  */
-const sentenceEnd = /(?<!\b(?:e\.g|i\.e|etc))[.!?](["'’”)\]*_]*)(?=\s|$)/gi;
+const sentenceEnd = /<!--|-->|(?<!\b(?:e\.g|i\.e|etc))[.!?]["'’”)\]*_]*(?=\s|$)/gi;
+
+/**
+ * Where the sentences of `text` end (`sentenceEnd`), in reading order, as
+ * [before, after]: a sentence ends after its punctuation, and before a
+ * comment's delimiter.
+ */
+const sentenceEnds = (text: string) =>
+  [...text.matchAll(sentenceEnd)].map((match) => [
+    match.index + ("<-".includes(match[0][0]) ? 0 : 1),
+    match.index + match[0].length,
+  ]);
+
+/** The first index below `length` where `test` holds, for a test that holds from some index on. */
+function firstIndex(length: number, test: (index: number) => boolean) {
+  let low = 0;
+  let high = length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (test(middle)) high = middle;
+    else low = middle + 1;
+  }
+  return low;
+}
 
 /**
  * The sentence around a span: from the end of the sentence before it to
  * the end of the one it ends in. An HTML comment's delimiters end a
  * sentence too, so a rule in a comment is quoted without the text after it.
+ * `ends` are the text's (`sentenceEnds`): in order and never overlapping,
+ * so both are found by halving.
  */
-function sentenceAround(text: string, span: Span): Span {
-  const boundaries = [
-    ...[...text.matchAll(sentenceEnd)].map((match) => [
-      match.index + 1,
-      match.index + match[0].length,
-    ]),
-    ...[...text.matchAll(/<!--|-->/g)].map((match) => [
-      match.index,
-      match.index + match[0].length,
-    ]),
-  ].sort((a, b) => a[0] - b[0]);
-  let start = 0;
-  let end = text.length;
-  for (const [before, after] of boundaries) {
-    if (after <= span.start) start = after;
-    else if (before >= span.end) {
-      end = before;
-      break;
-    }
-  }
-  return { start, end };
+function sentenceAround(text: string, ends: number[][], span: Span): Span {
+  const next = firstIndex(ends.length, (index) => ends[index][0] >= span.end);
+  const previous = Math.min(next, firstIndex(ends.length, (index) => ends[index][1] > span.start)) - 1;
+  return { start: previous < 0 ? 0 : ends[previous][1], end: next < ends.length ? ends[next][0] : text.length };
 }
 
 /** A verbatim quote of at most 300 characters, without Markdown markers at its edges. */
@@ -725,6 +747,27 @@ function allMatches(pattern: RegExp, text: string): Span[] {
   }));
 }
 
+/** Each pattern's global copy, made once: a copy made per call was most of the cost of a document of many short blocks. */
+const globalCopies = new WeakMap<RegExp, RegExp>();
+
+/**
+ * allMatches for the classifier, which asks it thousands of times for a
+ * document of many short blocks: the same spans, each pattern's global
+ * copy made once (no pattern here reads Unicode code points).
+ */
+function cachedMatches(pattern: RegExp, text: string): Span[] {
+  const global = globalCopies.get(pattern) ?? new RegExp(pattern.source, `${pattern.flags.replace("g", "")}g`);
+  globalCopies.set(pattern, global);
+  const spans: Span[] = [];
+  global.lastIndex = 0;
+  for (let match = global.exec(text); match; match = global.exec(text)) {
+    spans.push({ start: match.index, end: match.index + match[0].length });
+    // As matchAll does, an empty match moves on by one character.
+    if (!match[0]) global.lastIndex = match.index + 1;
+  }
+  return spans;
+}
+
 const gap = (a: Span, b: Span) => Math.max(0, b.start - a.end, a.start - b.end);
 
 /**
@@ -746,35 +789,61 @@ refusalTerms.push(
 );
 
 /**
+ * The AI terms of a text by where they start, each with its place in
+ * reading order (assistance terms, then the refusal wordings outside
+ * reported rules), and the longest one's length; the last block's are
+ * kept, as it is asked about twice in a row (same text, same sentences).
+ */
+type Terms = { text?: string; sentenceOf?: (span: Span) => Span; byStart: (Span & { order: number })[]; longest: number };
+let lastTerms: Terms = { byStart: [], longest: 0 };
+function termsOf(text: string, sentenceOf: (span: Span) => Span) {
+  if (lastTerms.text === text && lastTerms.sentenceOf === sentenceOf) return lastTerms;
+  const reportedIn = new Map<string, boolean>();
+  const reported = (span: Span) => {
+    const sentence = sentenceOf(span);
+    const key = `${sentence.start}:${sentence.end}`;
+    if (!reportedIn.has(key)) reportedIn.set(key, othersRule.test(text.slice(sentence.start, sentence.end)));
+    return reportedIn.get(key)!;
+  };
+  const terms = [
+    ...assistanceSpans(text, cachedMatches),
+    ...refusalTerms.flatMap((term) => cachedMatches(term, text)).filter((span) => !reported(span)),
+  ];
+  const byStart = terms.map((span, order) => ({ ...span, order })).sort((a, b) => a.start - b.start);
+  lastTerms = { text, sentenceOf, byStart, longest: byStart.reduce((length, span) => Math.max(length, span.end - span.start), 0) };
+  return lastTerms;
+}
+
+/**
  * Each rule phrase with the nearest AI-assistance term, when one is close
  * enough and in the same sentence to make them one rule; the span covers
  * both. A refusal in one sentence and an AI term in the next ("We do not
  * accept typo-only PRs. AI tools can help you find bugs.") are two things.
+ * Of terms equally near, the first found wins. Each sentence is read for
+ * reported rules once, and a phrase looks only at the terms that start
+ * close enough to it, so many phrases and terms stay linear.
  */
 function nearAssistance(
   text: string,
   rule: RegExp,
   sentenceOf: (span: Span) => Span,
 ) {
-  const reported = (span: Span) => {
-    const sentence = sentenceOf(span);
-    return othersRule.test(text.slice(sentence.start, sentence.end));
-  };
-  const terms = [
-    ...assistanceSpans(text),
-    ...refusalTerms.flatMap((term) => allMatches(term, text)).filter((span) => !reported(span)),
-  ];
+  const { byStart, longest } = termsOf(text, sentenceOf);
   const pairs: { phrase: Span; span: Span; term: Span }[] = [];
-  for (const phrase of allMatches(rule, text)) {
+  for (const phrase of cachedMatches(rule, text)) {
     const sentence = sentenceOf(phrase);
-    const term = terms
-      .filter(
-        (candidate) =>
-          candidate.start >= sentence.start &&
-          candidate.end <= sentence.end &&
-          gap(candidate, phrase) <= proximity,
-      )
-      .sort((a, b) => gap(a, phrase) - gap(b, phrase))[0];
+    // A term within `proximity` of the phrase starts no earlier than this, nor later than `last`.
+    const first = Math.max(sentence.start, phrase.start - proximity - longest);
+    const last = Math.min(sentence.end, phrase.end + proximity);
+    let nearest: (typeof byStart)[number] | undefined;
+    for (let at = firstIndex(byStart.length, (index) => byStart[index].start >= first); at < byStart.length && byStart[at].start <= last; at++) {
+      const candidate = byStart[at];
+      if (candidate.end > sentence.end || gap(candidate, phrase) > proximity) continue;
+      const distance = gap(candidate, phrase);
+      if (!nearest || distance < gap(nearest, phrase) || (distance === gap(nearest, phrase) && candidate.order < nearest.order))
+        nearest = candidate;
+    }
+    const term = nearest && { start: nearest.start, end: nearest.end };
     if (term)
       pairs.push({
         phrase,
@@ -796,7 +865,7 @@ function weighedFor(search: string, sentence: Span, term: Span) {
   const words = search.slice(sentence.start, sentence.end);
   return {
     // "You may use AI tools, but …": the AI use itself is allowed.
-    permitted: allMatches(aiPermission, words).some(
+    permitted: cachedMatches(aiPermission, words).some(
       (match) =>
         sentence.start + match.end <= term.start &&
         term.start - (sentence.start + match.end) <= 20,
@@ -853,6 +922,15 @@ export function classifyPolicy(path: string, document: string): PolicyFinding[] 
   const text = visibleText(document);
   const findings: PolicyFinding[] = [];
   const seen = new Set<string>();
+  // What a sentence's words say is read once per sentence, however many rules it holds.
+  const perSentence = new Map<string, boolean>();
+  const once = (what: string, sentence: Span, read: () => boolean) => {
+    const key = `${what}:${sentence.start}:${sentence.end}`;
+    if (!perSentence.has(key)) perSentence.set(key, read());
+    return perSentence.get(key)!;
+  };
+  // The sentence ends of the block being read, found once for all its rules.
+  let ends: number[][] = [];
   const add = (
     kind: PolicyKind,
     block: Block,
@@ -860,34 +938,36 @@ export function classifyPolicy(path: string, document: string): PolicyFinding[] 
     match: Span,
     ambiguous = false,
   ) => {
-    const sentence = sentenceAround(block.text, match);
+    const sentence = sentenceAround(block.text, ends, match);
     const { quote, offset } = quoteOf(block.text, sentence, match);
     if (!quote.trim()) return;
     const key = `${kind}:${lineAt(block, offset)}:${quote}`;
     if (seen.has(key)) return;
     seen.add(key);
-    findings.push(withStoredReach({
+    findings.push({
       kind,
       path,
       line: lineAt(block, offset),
       quote,
       contribution:
         !ambiguous &&
-        contributionContext.test(search.slice(sentence.start, sentence.end)),
-    }));
+        once("contribution", sentence, () => contributionContext.test(search.slice(sentence.start, sentence.end))),
+    });
   };
   // reStructuredText has no fences: its "~~~" lines are section adornments.
   const prose = /\.rst$/i.test(path) ? restProse(text) : rawProse(text);
   for (const block of blocks(prose)) {
     const search = searchable(block.text);
+    perSentence.clear();
     // One AI finding per sentence: a reserved learning area wins over a ban.
     const decided = new Set<number>();
-    const sentenceOf = (span: Span) => sentenceAround(block.text, span);
+    ends = sentenceEnds(block.text);
+    const sentenceOf = (span: Span) => sentenceAround(block.text, ends, span);
     for (const { phrase, span } of nearAssistance(search, learningIssues, sentenceOf)) {
       const sentence = sentenceOf(phrase);
       const words = search.slice(sentence.start, sentence.end);
       if (decided.has(sentence.start)) continue;
-      if (prohibition.test(words) || reservation.test(words)) {
+      if (once("area", sentence, () => prohibition.test(words) || reservation.test(words))) {
         add("area", block, search, span);
         decided.add(sentence.start);
       }
@@ -915,9 +995,9 @@ export function classifyPolicy(path: string, document: string): PolicyFinding[] 
           permitted || conditional || aboutConversation || sized || credited,
         );
     }
-    for (const match of allMatches(addressedToAgents, search))
+    for (const match of cachedMatches(addressedToAgents, search))
       add("agent", block, search, match);
-    for (const match of allMatches(agentsActingAlone, search))
+    for (const match of cachedMatches(agentsActingAlone, search))
       add("agent", block, search, match);
     for (const sentence of splitSentences(block.text))
       if (asksForDisclosure(search.slice(sentence.start, sentence.end)))
@@ -927,10 +1007,11 @@ export function classifyPolicy(path: string, document: string): PolicyFinding[] 
       ["own-words", ownWordsRule],
       ["issue-first", issueFirstRule],
     ] as const)
-      for (const match of allMatches(rule, search)) add(kind, block, search, match);
+      for (const match of cachedMatches(rule, search)) add(kind, block, search, match);
   }
   const ordered = findings.sort((a, b) => a.line - b.line);
-  if (ordered.length <= maxFindings) return ordered;
+  // The reach is read from each kept quote (`withStoredReach`), once the 30 are chosen.
+  if (ordered.length <= maxFindings) return ordered.map(withStoredReach);
   // Over 30, the rules that block publishing stay, then the rest in reading order.
   const kept = new Set(
     ordered
@@ -939,7 +1020,7 @@ export function classifyPolicy(path: string, document: string): PolicyFinding[] 
       .slice(0, maxFindings)
       .map(({ index }) => index),
   );
-  return ordered.filter((_, index) => kept.has(index));
+  return ordered.filter((_, index) => kept.has(index)).map(withStoredReach);
 }
 
 /** A document's rules kept at most (`ContributionRules.findings` holds 30). */
@@ -1070,7 +1151,7 @@ const listItem = /^\s*(?:[-*+]|\d{1,9}[.)])\s+/;
  * clause the permission is in.
  */
 function permittedWords(words: string, phrase: Span): Span & { clause: number } {
-  const ends = allMatches(permissionEnd, words);
+  const ends = cachedMatches(permissionEnd, words);
   const clause = ends.find((end) => end.start >= phrase.end)?.start ?? words.length;
   if (/to$/i.test(words.slice(phrase.start, phrase.end)) || /^\s+to\b/i.test(words.slice(phrase.end)))
     return { start: phrase.end, end: clause, clause };
@@ -1099,13 +1180,12 @@ export function attachCarveOuts(path: string, text: string, findings: PolicyFind
   const ruled = (finding: PolicyFinding) => finding.kind === "ban" || finding.kind === "area";
   const rules = findings.filter(ruled);
   if (!rules.length) return findings;
-  // A sentence that is itself a ban or a reserved-issue rule is never its carve-out.
-  const allows = readCarveOuts(path, text)
-    .filter(
-      (carveOut) =>
-        !rules.some((rule) => rule.quote.includes(carveOut.quote) || carveOut.quote.includes(rule.quote)),
-    )
-    .slice(0, 3);
+  // A sentence that is itself a ban or a reserved-issue rule is never its carve-out; the first three others count.
+  const allows: PolicyAllowance[] = [];
+  for (const carveOut of readCarveOuts(path, text)) {
+    if (allows.length === 3) break;
+    if (!rules.some((rule) => rule.quote.includes(carveOut.quote) || carveOut.quote.includes(rule.quote))) allows.push(carveOut);
+  }
   if (!allows.length) return findings;
   return findings.map((finding) =>
     ruled(finding)
@@ -1141,6 +1221,13 @@ const attribution = /(?:^|\s)(?:\u2014|\u2015|--)\s*\S/;
 /** A list item marked as not fine: "❌ …", "No: …", "Not …". */
 const markedNo = /^\s*(?:[-*+]|\d{1,9}[.)])\s+(?:\[[ xX]\]\s+)?(?:\u274c|\u2717|\u2718|\u2716|\u{1f6ab}|\u26d4|:x:|:no_entry(?:_sign)?:|(?:no|not|never|don['’]t|avoid)\b)/iu;
 
+/**
+ * Permission phrases read in one sentence: each reads the rest of its
+ * sentence, and real sentences have one or two. Reading fewer can only
+ * leave a rule blocked, never lift one.
+ */
+const maxPermissions = 8;
+
 /** Every carve-out of a document, in reading order (see attachCarveOuts). */
 function readCarveOuts(path: string, document: string): PolicyAllowance[] {
   const rest = /\.rst$/i.test(path);
@@ -1161,64 +1248,76 @@ function readCarveOuts(path: string, document: string): PolicyAllowance[] {
       (rest && restAdornment.test(raw[last] ?? ""));
     return heading && plain.length <= 160 ? searchable(plain) : undefined;
   };
-  const nearestHeading = (index: number, skip: (block: Block) => boolean) => {
-    for (let at = index - 1; at >= 0; at--) {
-      const heading = headingOf(all[at]);
-      if (heading !== undefined) return heading;
-      if (!skip(all[at])) return undefined;
-    }
-    return undefined;
-  };
+  // Each block read once, in one pass: its searched text, its sentences, whether it is a
+  // heading and a list item, the nearest heading above it (`under`), the nearest one above
+  // its run of list items (`aboveItems`) and the list item ending in ":" in that run (`colon`).
+  const searches = all.map((block) => searchable(block.text));
+  const sentencesOf = all.map((block) => splitSentences(block.text));
+  const headings = all.map(headingOf);
+  const items = all.map((block) => listItem.test(block.text));
+  const under: (string | undefined)[] = [];
+  const aboveItems: (string | undefined)[] = [];
+  const colon: (number | undefined)[] = [];
+  for (let index = 1; index < all.length; index++) {
+    const previous = index - 1;
+    under[index] = headings[previous] ?? under[previous];
+    aboveItems[index] = headings[previous] ?? (items[previous] ? aboveItems[previous] : undefined);
+    colon[index] = items[previous] ? (all[previous].text.trim().endsWith(":") ? previous : colon[previous]) : undefined;
+  }
   const found: PolicyAllowance[] = [];
+  const quoted = new Set<string>();
   const add = (block: Block, quote: { quote: string; offset: number }, kinds: HelpKind[]) => {
-    if (kinds.length && quote.quote.trim() && !found.some((other) => other.quote === quote.quote))
-      found.push({ line: lineAt(block, quote.offset), quote: quote.quote, kinds });
+    if (!kinds.length || !quote.quote.trim() || quoted.has(quote.quote)) return;
+    quoted.add(quote.quote);
+    found.push({ line: lineAt(block, quote.offset), quote: quote.quote, kinds });
+  };
+  // A lead-in that names acceptable uses of AI, decided once for every list item under it.
+  const acceptingLeads = new Map<string, boolean>();
+  const accepting = (lead: string) => {
+    if (!acceptingLeads.has(lead))
+      acceptingLeads.set(lead, !refusingHeading.test(lead) && acceptableHeading.test(lead) && headingTopic.test(lead) && !permissionScoped.test(lead));
+    return acceptingLeads.get(lead)!;
   };
   // The lead-in of a list item: a list item ending in ":" before it ("Not acceptable:"), else the heading.
+  const itemLeads: string[] = [];
   const leadOf = (index: number) => {
-    for (let at = index - 1; at >= 0 && listItem.test(all[at].text); at--)
-      if (all[at].text.trim().endsWith(":")) return searchable(all[at].text.replace(listItem, ""));
-    return nearestHeading(index, (other) => listItem.test(other.text));
+    const item = colon[index];
+    return item === undefined ? aboveItems[index] : (itemLeads[item] ??= searchable(all[item].text.replace(listItem, "")));
   };
   all.forEach((block, index) => {
-    const under = nearestHeading(index, () => true);
-    if (under !== undefined && (refusingHeading.test(under) || notTheProjects.test(under) || reportedLead.test(under))) return;
+    if (under[index] !== undefined && (refusingHeading.test(under[index]) || notTheProjects.test(under[index]) || reportedLead.test(under[index]))) return;
     if (indentedCode(index) || (/^\s*>/.test(block.text) && attribution.test(block.text))) return;
-    const search = searchable(block.text);
+    const search = searches[index];
     // A list item under "Acceptable uses" (only list items between them), unless marked as not fine.
-    const lead = listItem.test(block.text) && !markedNo.test(block.text) ? leadOf(index) : undefined;
+    const lead = items[index] && !markedNo.test(block.text) ? leadOf(index) : undefined;
     const whole = { start: 0, end: block.text.length };
     if (
       lead !== undefined &&
-      !refusingHeading.test(lead) &&
-      acceptableHeading.test(lead) &&
-      headingTopic.test(lead) &&
-      !permissionScoped.test(lead) &&
+      accepting(lead) &&
       block.text.length <= 300 &&
       !permissionNegated.test(search) &&
       !permissionScoped.test(search) &&
       !notTheProjects.test(search)
     )
       add(block, quoteOf(block.text, whole, whole), carveOutKinds(search));
-    const sentences = splitSentences(block.text);
+    const sentences = sentencesOf[index];
     sentences.forEach((sentence, at) => {
       const words = search.slice(sentence.start, sentence.end);
       if (!aiMention.test(words)) return;
-      // A question about the person using AI, answered "Yes" in the next sentence or block.
-      if (/\?\W*$/.test(words)) {
+      // A question about the person using AI (a "?" among the sentence's last non-word characters), answered "Yes" in the next sentence or block.
+      if (words.slice(words.search(/\w\W*$/) + 1).includes("?")) {
         if (!askerUsesAi.test(words) || permissionScoped.test(words) || othersApproval.test(words) || notTheProjects.test(words))
           return;
         // What is asked ends at its condition: "… to write the code if I then debug it myself?"
         const asked = words.slice(0, questionCondition.exec(words)?.index ?? words.length);
-        const following = all[index + 1];
-        const next = sentences[at + 1]
-          ? { block, sentence: sentences[at + 1] }
-          : following && { block: following, sentence: splitSentences(following.text)[0] };
+        // The next sentence (in this block, else the first of the next), and the one after it.
+        const [nextIndex, nextAt] = sentences[at + 1] ? [index, at + 1] : [index + 1, 0];
+        const next = sentencesOf[nextIndex]?.[nextAt] && { block: all[nextIndex], sentence: sentencesOf[nextIndex][nextAt] };
         if (!next?.sentence) return;
-        const answered = searchable(next.block.text);
+        const answered = searches[nextIndex];
         const answer = answered.slice(next.sentence.start, next.sentence.end);
         // The answer and the sentence after it: "Yes. But please don't." is no Yes.
-        const after = splitSentences(next.block.text).find((other) => other.start >= next.sentence.end);
+        const after = sentencesOf[nextIndex][nextAt + 1];
         const said = answered.slice(next.sentence.start, after?.end ?? next.sentence.end);
         if (!yesAnswer.test(answer) || yesButDont.test(said) || permissionScoped.test(said)) return;
         // "Yes, for understanding the code": only what the answer names too.
@@ -1232,14 +1331,15 @@ function readCarveOuts(path: string, document: string): PolicyAllowance[] {
       // Somebody else's view, a past or undecided rule, or one the next sentence takes back.
       const following = sentences[at + 1];
       if (notTheProjects.test(words) || (following && takenBack.test(search.slice(following.start, following.end)))) return;
-      for (const phrase of allMatches(permission, words)) {
+      for (const phrase of cachedMatches(permission, words).slice(0, maxPermissions)) {
         const covered = permittedWords(words, phrase);
         // The permitted words and what qualifies them up to the condition, the permission's own words left out.
         const qualified = `${words.slice(covered.start, Math.max(covered.start, phrase.start))} ${words.slice(phrase.end, covered.clause)}`;
         if (permissionNegated.test(qualified)) continue;
         if (contrastTakesBack.test(words.slice(covered.clause).replace(/^\s*;/, ""))) continue;
-        // A permission inside a condition: "If using AI to debug is fine with your reviewer, …".
-        if (subordinate.test(words.slice(0, Math.min(phrase.start, covered.start)))) continue;
+        // A permission inside a condition: "If using AI to debug is fine with your reviewer, …" (read after the last , or ;).
+        const before = words.slice(0, Math.min(phrase.start, covered.start));
+        if (subordinate.test(before.slice(Math.max(before.lastIndexOf(","), before.lastIndexOf(";")) + 1))) continue;
         // Taken back in its own sentence: "…, but changes made that way are not accepted."
         const after = words.slice(covered.clause);
         if (/^\W*but\b/i.test(after) && prohibition.test(after)) continue;
@@ -1261,14 +1361,19 @@ function readCarveOuts(path: string, document: string): PolicyAllowance[] {
   return found;
 }
 
-/** The sentences of a text, split after . ! or ? and at comment delimiters. */
+/**
+ * The sentences of a text, split after . ! or ? and at comment delimiters:
+ * each runs from where the one before it ended to the first end after its
+ * first character.
+ */
 function splitSentences(text: string): Span[] {
   const spans: Span[] = [];
-  let at = 0;
-  while (at < text.length) {
-    const span = sentenceAround(text, { start: at, end: at + 1 });
-    spans.push({ start: Math.max(span.start, at), end: span.end });
-    at = Math.max(span.end, at + 1);
+  const ends = sentenceEnds(text);
+  for (let at = 0, next = 0; at < text.length; ) {
+    while (next < ends.length && ends[next][0] <= at) next++;
+    const end = next < ends.length ? ends[next][0] : text.length;
+    spans.push({ start: at, end });
+    at = end;
   }
   return spans.filter((span) =>
     text.slice(span.start, span.end).replace(/<!--|-->/g, "").trim(),
@@ -1357,8 +1462,12 @@ export function disclosureRule(
   return undefined;
 }
 
-/** A trailer naming the tool that helped, as kernel, LLVM and ASF policies ask. */
-const toolTrailer = /^\s*(?:Assisted|Generated)-by:\s*\S/im;
+/**
+ * A trailer naming the tool that helped, as kernel, LLVM and ASF policies
+ * ask, after spaces on its own line (each line is tried, so the spaces
+ * never run on into the next).
+ */
+const toolTrailer = /^[^\S\n\r\u2028\u2029]*(?:Assisted|Generated)-by:\s*\S/im;
 const disclosureTool = [
   // In the person's own description, a model or tool named with a verb of
   // help is a disclosure, whatever else it is next to.
@@ -1381,13 +1490,25 @@ const disclosureVerb =
 const helpVerb =
   /\b(?:explain(?:s|ed|ing)?|answer(?:s|ed|ing)?|review(?:s|ed|ing)?|point(?:s|ed|ing)?\s+out|hint(?:s|ed|ing)?|guid(?:e|es|ed|ing))\b/gi;
 /** A negation among the three words before a help verb: "not reviewed", "never explained", "not explained or reviewed". */
-const helpNegation = /\b(?:not|never|no|nor|without)\b|n't\b/i;
-/** A help verb of the clause that no negation comes just before. */
-const namesHelp = (clause: string) =>
-  [...clause.matchAll(helpVerb)].some(
-    (match) =>
-      !helpNegation.test(clause.slice(0, match.index).trim().split(/\s+/).slice(-3).join(" ")),
-  );
+const helpNegation = /\b(?:not|never|no|nor|without)\b|n't\b/gi;
+/**
+ * A help verb of the clause that no negation comes just before, among the
+ * three words up to it: one pass over the clause's words and negations.
+ */
+const namesHelp = (clause: string) => {
+  const words = [...clause.matchAll(/\S+/g)];
+  const negations = [...clause.matchAll(helpNegation)];
+  let word = 0;
+  let negation = 0;
+  return [...clause.matchAll(helpVerb)].some(({ index }) => {
+    while (word < words.length && words[word].index < index) word++;
+    // With no word before it, the first word (at or after it) starts the search: no negation is before it.
+    const from = words[Math.max(0, word - 3)]?.index ?? index;
+    while (negation < negations.length && negations[negation].index < from) negation++;
+    const next = negations[negation];
+    return !next || next.index + next[0].length > index;
+  });
+};
 const namesAssistance = (text: string) =>
   assistanceSpans(text).length > 0 || disclosureTool.some((term) => term.test(text));
 

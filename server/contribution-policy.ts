@@ -70,7 +70,9 @@ const linkedText = /\.(?:md|markdown|rst|txt|adoc)$/i;
  * reference links, reStructuredText links, and links to this repository on
  * GitHub. A leading `/` is the repository root; anything else is relative
  * to the linking file. Paths outside the repository, to sensitive files or
- * to anything but a text document are left out.
+ * to anything but a text document are left out. A target or title never
+ * runs on past the next "](" and a label holds no bracket, so a run of
+ * brackets is read once.
  */
 export function linkedPaths(
   from: string,
@@ -78,8 +80,8 @@ export function linkedPaths(
   repository?: string,
 ): string[] {
   const targets = [
-    ...[...content.matchAll(/\]\(\s*<?([^)\s>]+)>?(?:\s+["'(][^)]*)?\)/g)].map((match) => match[1]),
-    ...[...content.matchAll(/^\s{0,3}\[[^\]]+\]:\s*<?(\S+?)>?(?:\s|$)/gm)].map((match) => match[1]),
+    ...[...content.matchAll(/\]\(\s*<?((?:[^)\s>\]]|\](?!\())+)>?(?:\s+["'(](?:[^)\]]|\](?!\())*)?\)/g)].map((match) => match[1]),
+    ...[...content.matchAll(/^\s{0,3}\[[^[\]]+\]:\s*<?(\S+?)>?(?:\s|$)/gm)].map((match) => match[1]),
     ...[...content.matchAll(/`[^`<]*<([^>`]+)>`_{1,2}/g)].map((match) => match[1]),
   ];
   const own = repository
@@ -239,7 +241,8 @@ export function channelLinks(documents: readonly PolicyDocument[], repository?: 
   for (const document of documents)
     for (const { line, text } of rawProse(document.content))
       for (const match of text.matchAll(addressPattern)) {
-        const address = match[0].replace(/[.,;:!?]+$/, "");
+        // Sentence punctuation after the address, read from where its run starts.
+        const address = match[0].replace(/(?<![.,;:!?])[.,;:!?]+$/, "");
         let url: URL;
         try {
           url = new URL(address);
