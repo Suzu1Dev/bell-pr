@@ -105,12 +105,27 @@ test("no module the app loads at startup reads a deferred namespace", () => {
   assert.deepEqual([...startup].filter((file) => readsDeferred(file).length), []);
 });
 
+/**
+ * The `lazy(() => import(…))` calls in a source file's code, with what comes
+ * before import( and its specifier; block comments and whole-line comments
+ * (a doc comment showing a mount) are not code.
+ */
+const lazyCalls = (text: string) =>
+  [...text.replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, "").matchAll(/lazy\(\s*\(\)\s*=>\s*([\s\S]{0,40}?)import\("([^"]+)"\)/g)];
+
+test("a lazy mount shown in a doc comment is not taken for a lazy call", () => {
+  // src/byhand/lazy.ts shows how a mount loads it; only code counts.
+  const text = files.get(path.join(src, "byhand", "lazy.ts"))!;
+  assert.match(text, /lazy\(\(\) => import\("\.\.\/byhand\/lazy"\)/);
+  assert.deepEqual(lazyCalls(text), []);
+});
+
 test("a lazily loaded view that reads deferred namespaces loads them with its code", () => {
   const startup = closure(path.join(src, "main.tsx"));
   const missing: string[] = [];
   let wrapped = 0;
   for (const [file, text] of files)
-    for (const [call, before, specifier] of text.matchAll(/lazy\(\s*\(\)\s*=>\s*([\s\S]{0,40}?)import\("([^"]+)"\)/g)) {
+    for (const [call, before, specifier] of lazyCalls(text)) {
       const view = [...closure(resolve(file, specifier))].filter(
         (module) => !startup.has(module) && readsDeferred(module).length,
       );
