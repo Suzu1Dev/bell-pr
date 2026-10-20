@@ -6,7 +6,8 @@
  * runs until the person confirms a command in a request of its own
  * (server/by-hand-tests.ts).
  */
-import { lstat, readFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, lstat, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
 /** Larger manifests are not read; the suggestion is only a convenience. */
@@ -61,21 +62,49 @@ function makeTestTarget(text: string | undefined) {
 }
 
 /**
+ * Whether an executable file `name` is in one of PATH's absolute folders.
+ * Only looked up, never run; relative folders are skipped, since they
+ * would name folders of the run's worktree.
+ */
+async function onPath(name: string, env: NodeJS.ProcessEnv) {
+  for (const folder of (env.PATH ?? "").split(path.delimiter)) {
+    if (!path.isAbsolute(folder)) continue;
+    const file = path.join(folder, name);
+    try {
+      if (!(await stat(file)).isFile()) continue;
+      await access(file, constants.X_OK);
+      return true;
+    } catch {
+      // Not there, or not executable.
+    }
+  }
+  return false;
+}
+
+/**
  * BELL's suggestion of a test command for the project in `worktree`, in
  * DESIGN F9's order: `scripts.test` in package.json gives `npm test`
  * (`pnpm test` with pnpm-lock.yaml, `yarn test` with yarn.lock);
- * pyproject.toml, pytest.ini or tox.ini give `python -m pytest`;
- * Cargo.toml gives `cargo test`; go.mod gives `go test ./...`; a `test`
- * target in the Makefile gives `make test`. Empty when nothing fits.
+ * pyproject.toml, pytest.ini or tox.ini give `python -m pytest`, or
+ * `python3 -m pytest` when `env`'s PATH (the tests run with it) has
+ * python3 and no python; Cargo.toml gives `cargo test`; go.mod gives
+ * `go test ./...`; a `test` target in the Makefile gives `make test`.
+ * Empty when nothing fits.
  */
-export async function suggestTestCommand(worktree: string): Promise<string> {
+export async function suggestTestCommand(
+  worktree: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string> {
   if (packageTestScript(await readManifest(worktree, "package.json"))) {
     if (await hasFile(worktree, "pnpm-lock.yaml")) return "pnpm test";
     if (await hasFile(worktree, "yarn.lock")) return "yarn test";
     return "npm test";
   }
   for (const name of ["pyproject.toml", "pytest.ini", "tox.ini"])
-    if (await hasFile(worktree, name)) return "python -m pytest";
+    if (await hasFile(worktree, name))
+      return !(await onPath("python", env)) && (await onPath("python3", env))
+        ? "python3 -m pytest"
+        : "python -m pytest";
   if (await hasFile(worktree, "Cargo.toml")) return "cargo test";
   if (await hasFile(worktree, "go.mod")) return "go test ./...";
   // The file names GNU make reads, in its order.

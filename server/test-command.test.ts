@@ -2,6 +2,7 @@
 // environment it runs the confirmed command with (DESIGN v1.2 F9).
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -59,8 +60,9 @@ test("a package.json without a usable test script falls through to the next rule
 });
 
 test("Python, Rust, Go and Make projects get their own test command", async (t) => {
+  // A PATH without python or python3 keeps the rule's own command (see below).
   for (const name of ["pyproject.toml", "pytest.ini", "tox.ini"])
-    assert.equal(await suggestTestCommand(await project(t, { [name]: "[tool]\n" })), "python -m pytest", name);
+    assert.equal(await suggestTestCommand(await project(t, { [name]: "[tool]\n" }), { PATH: "" }), "python -m pytest", name);
   assert.equal(await suggestTestCommand(await project(t, { "Cargo.toml": "[package]\n" })), "cargo test");
   assert.equal(await suggestTestCommand(await project(t, { "go.mod": "module example.com/w\n" })), "go test ./...");
   assert.equal(await suggestTestCommand(await project(t, { Makefile: "build:\n\tcc -o w w.c\ntest: build\n\t./w --self-test\n" })), "make test");
@@ -95,7 +97,7 @@ test("the rules apply in DESIGN F9's order", async (t) => {
   const names = Object.keys(all);
   for (const [index, expected] of order.entries()) {
     const files = Object.fromEntries(names.slice(index).map((name) => [name, all[name as keyof typeof all]]));
-    assert.equal(await suggestTestCommand(await project(t, files)), expected);
+    assert.equal(await suggestTestCommand(await project(t, files), { PATH: "" }), expected);
   }
 });
 
@@ -186,4 +188,27 @@ test("the test environment also drops names that hold TOKEN, SECRET or PASSWORD 
     CI: "1",
     NO_COLOR: "1",
   });
+});
+
+test("a Python project gets python3 -m pytest when PATH has python3 and no python; nothing is run to find out", async (t) => {
+  const bins = await project(t, {});
+  const only3 = path.join(bins, "only3");
+  const both = path.join(bins, "both");
+  const marker = path.join(bins, "ran");
+  for (const directory of [only3, both]) await mkdir(directory);
+  // Each one would leave a marker if BELL ran it.
+  const fake = `#!/bin/sh\ntouch ${JSON.stringify(marker)}\n`;
+  for (const file of [path.join(only3, "python3"), path.join(both, "python3"), path.join(both, "python")])
+    await writeFile(file, fake, { mode: 0o755 });
+  // A folder named python and a file that is not executable do not count.
+  await mkdir(path.join(only3, "python"));
+  await writeFile(path.join(bins, "python"), fake, { mode: 0o644 });
+  const python = await project(t, { "pyproject.toml": "[tool.pytest.ini_options]\n" });
+  const suggest = (PATH: string) => suggestTestCommand(python, { PATH });
+  assert.equal(await suggest([only3, bins].join(path.delimiter)), "python3 -m pytest");
+  assert.equal(await suggest([only3, both].join(path.delimiter)), "python -m pytest");
+  // Neither found, or only a relative folder: the rule's own command.
+  assert.equal(await suggest(bins), "python -m pytest");
+  assert.equal(await suggest(path.relative(process.cwd(), only3)), "python -m pytest");
+  assert.equal(existsSync(marker), false);
 });
