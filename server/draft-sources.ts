@@ -7,7 +7,8 @@ import {
 } from "./git.js";
 import { formatters } from "../shared/i18n/locale.js";
 import { currentLocale, sm } from "./i18n/index.js";
-import { command, redact } from "./process.js";
+import { command } from "./process.js";
+import { redactSecretPatterns } from "./secrets.js";
 import { AppError, type Repository, type Run } from "./types.js";
 
 const maximumFiles = 16;
@@ -382,9 +383,10 @@ export async function collectDraftContext(
       warn(messages.unreadableText({ label: source.label }));
       return;
     }
+    // The shapes redact() only masks (test output first showed them) never drop a project's docs.
     if (
       secretInPatch(source.content) ||
-      redact(source.content) !== source.content
+      redactSecretPatterns(source.content) !== source.content
     ) {
       warn(messages.sensitive({ label: source.label }));
       return;

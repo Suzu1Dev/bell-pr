@@ -1995,3 +1995,29 @@ test("analysis waits longer for Claude Code at xhigh and explains a timeout with
     await f.cleanup();
   }
 });
+
+test("an analysis that names a local setup's credentials or an Authorization header is saved; known secret shapes still reject it", async () => {
+  // redact() masks these since README v1.2 §18.11 item 3; masking is never a reason to reject the whole answer.
+  const f = await fixture();
+  try {
+    const answer = {
+      ...validAnalysis(),
+      howItFitsTogether:
+        "The local setup connects to postgres://postgres:postgres@localhost:5432/app_dev and sends Authorization: Basic dXNlcjpwYXNzd29yZA== to the health check.",
+    };
+    const saved = await new ProjectInsightsService(f.store, {
+      getModelCatalog: async () => ({ models: [], source: "codex" }),
+      command: fakeCodex(() => answer).execute,
+    }).generate(f.repo.id);
+    assert.equal(saved.insights.howItFitsTogether, answer.howItFitsTogether);
+    await assert.rejects(
+      new ProjectInsightsService(f.store, {
+        getModelCatalog: async () => ({ models: [], source: "codex" }),
+        command: fakeCodex(() => ({ ...answer, howItFitsTogether: "It sets password=hunter2hunter2 first." })).execute,
+      }).generate(f.repo.id),
+      (error: any) => error.statusCode === 422,
+    );
+  } finally {
+    await f.cleanup();
+  }
+});

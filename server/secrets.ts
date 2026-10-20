@@ -122,14 +122,22 @@ const maskedShapes: readonly [RegExp, (...match: string[]) => string][] = [
   [/^(?:[A-Za-z0-9+/=]{1,100}\r?\n)+-----END (?:[A-Z]+ )?PRIVATE KEY-----/, () => "[REDACTED]"],
 ];
 
-/** Masks every shape above: logs, agent answers, test output, draft and PR bodies never carry a credential. */
-export function redact(text: string): string {
-  const masked = secretPatterns.reduce(
+/**
+ * The shapes of secretPatterns masked, as redact() did before it masked the
+ * shapes above: a project's document or a model's answer that these change
+ * is dropped. The shapes above are masked, never a reason to drop one.
+ */
+export function redactSecretPatterns(text: string): string {
+  return secretPatterns.reduce(
     (result, { pattern, replacement }) =>
       result.replace(pattern, replacement),
     text,
   );
-  return maskedShapes.reduce((result, [pattern, replace]) => result.replace(pattern, replace), masked);
+}
+
+/** Masks every shape above: logs, agent answers, test output, draft and PR bodies never carry a credential. */
+export function redact(text: string): string {
+  return maskedShapes.reduce((result, [pattern, replace]) => result.replace(pattern, replace), redactSecretPatterns(text));
 }
 
 export function secretInPatch(patch: string): boolean {
