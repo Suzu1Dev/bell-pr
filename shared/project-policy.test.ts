@@ -121,6 +121,24 @@ test("a refusal with a condition the contributor meets is ambiguous, never a blo
   );
 });
 
+test("'do not leave the first review … to the reviewers' asks for the person's own review: a rule to weigh", () => {
+  // Kubernetes contributors/guide/pull-requests.md:640 (plan README §18.10).
+  for (const text of [
+    "Do not leave the first review of AI generated changes to the reviewers.",
+    "Never leave the review of AI-assisted code to the maintainers.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [["ban", false]], text);
+  // "review" as the refusal itself, or a refusal of the change beside the duty, stays a ban.
+  for (const text of [
+    "Do not use AI tools to review PRs.",
+    "We do not review AI-generated PRs.",
+    "AI-generated code will not be reviewed.",
+    "Do not leave the review of AI-generated code to the reviewers; AI-generated code is not accepted.",
+    "Do not leave the review of AI-generated code to the reviewers, and do not submit AI-generated code.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [["ban", true]], text);
+});
+
 test("a refusal of AI as a co-author, a co-signer or a trailer is a rule the person weighs, not a ban", () => {
   // Kubernetes contributors/guide/pull-requests.md (plan research/policies.md).
   const kubernetes =

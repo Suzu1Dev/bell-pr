@@ -77,7 +77,7 @@ const realExpectations: Record<string, readonly (readonly [string, boolean?])[]>
     // Line 13 (source 638): large AI generated PRs and AI generated commit messages.
     ["ban", true],
     // Line 15 (source 640): the first review of AI generated changes, left to the reviewers.
-    ["ban", true],
+    ["ban", false],
     ["ban", false],
     ["understand"],
   ],
@@ -141,7 +141,7 @@ const kubernetesBans = new Map<number, boolean>([
   // Line 13 (source 638): large AI generated PRs and AI generated commit messages.
   [13, true],
   // Line 15 (source 640): the first review of AI generated changes, left to the reviewers.
-  [15, true],
+  [15, false],
 ]);
 
 test("only the projects that ban AI-generated contributions outright block an agent-written change", async () => {

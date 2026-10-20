@@ -190,7 +190,7 @@ test("Kubernetes' AI Guidance gives neither run an AI ban: its rules are quoted 
     // "[Large AI generated](#large-or-automatic-edits) PRs and AI generated commit messages are not allowed."
     [638, true],
     // "Do not leave the first review of AI generated changes to the reviewers."
-    [640, true],
+    [640, false],
   ]);
   const whole = row(await readRules([["contributors/guide/pull-requests.md", "real/kubernetes-pull-requests.md"]]), ["explain", "answer"]);
   const blocking = [...sectionBans].filter(([, ban]) => ban).map(([line]) => line);

@@ -268,8 +268,18 @@ function refusedParts(words: string) {
   });
 }
 
+/**
+ * "Do not leave the first review of AI generated changes to the
+ * reviewers": "review" is what the person does first, not a refusal of
+ * the change (Kubernetes).
+ */
+const reviewLeftToReviewers =
+  /\b(?:do\s+not|don't|never|should\s+not|shouldn't|must\s+not)\s+leave\s+(?:[\w'-]+\s+){0,3}?reviews?\b[^,;:]*?\bto\s+(?:the\s+)?(?:reviewers?|maintainers?)\b/i;
+
 /** One refused thing that is a rule the person weighs, not a ban of AI help. */
 function weighedPart(part: string) {
+  // A review the person owes before the reviewers see the change (Kubernetes).
+  if (reviewLeftToReviewers.test(part)) return true;
   // How AI help is credited, with nothing else of the change (Kubernetes).
   if (creditObject.test(part) && !changeObject.test(part.replace(creditPhrase, " "))) return true;
   return false;
