@@ -260,6 +260,10 @@ It appears only when all of these hold:
    your own code names reviews; possible solutions or solution ideas name
    planning help. They count only where AI gives that help, and other
    words, such as "static analysis" or "suggest", name no kind of help.
+   Text in code or code comments, quotes of other projects' rules, items
+   listed as not acceptable, proposals, sentences with a condition (if,
+   when, unless, except) and permissions taken back ("…, but … not
+   accepted") never count.
 3. **The run's history is clean**: BELL PR's agents had no write access
    and gave you no code for the change.
 4. **BELL PR read the project's rules during this run.** If it read them

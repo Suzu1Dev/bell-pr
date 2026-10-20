@@ -1,7 +1,8 @@
 # BELL PR documentation
 
 - [Getting started](getting-started.md): install, sign in, and your first
-  contribution from import to Draft PR.
+  contribution from import to Draft PR, with the agent team or written by
+  you in Learn by hand.
 - [Configuration](configuration.md): commands, `BELLPR_*` variables and
   the settings in the app.
 - [Troubleshooting](troubleshooting.md): every error code with its fix,

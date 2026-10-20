@@ -275,9 +275,9 @@ project's code, so it is limited:
   you confirm one with **Use this command**, in a request of its own
   (`PUT /api/repos/:id/test-command`). The command is one line of 1 to
   300 characters. Control characters (a tab is fine), invisible
-  formatting characters such as bidirectional overrides, and line or
-  paragraph separators are refused, so the command you read is the one
-  that runs. Every confirmation is a new one, even of the same text. A
+  formatting characters such as bidirectional overrides, line or
+  paragraph separators and broken Unicode are refused, so the command you
+  read is the one that runs. Every confirmation is a new one, even of the same text. A
   test run uses the command confirmed last before it starts and records
   it with credentials masked; a confirmation made while tests run applies
   to the next run.
