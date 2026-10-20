@@ -135,6 +135,24 @@ test("a refusal of AI as a co-author, a co-signer or a trailer is a rule the per
     assert.deepEqual(kinds("CONTRIBUTING.md", text), [["ban", true]], text);
 });
 
+test("a refusal that names a trailer and AI-generated code beside it still bans the code", () => {
+  // Each thing the sentence refuses counts: the trailer is a rule about credit, the code is not.
+  for (const text of [
+    "AI-generated code and Co-authored-by trailers are not allowed.",
+    "AI-generated code, and AI co-authors in commit trailers, are not allowed.",
+    "Commit trailers naming an AI tool and AI-generated patches will be rejected.",
+    "Co-authoring commits with AI-generated code is not allowed.",
+    "AI-generated code listed with a co-author on the commit is not allowed.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [["ban", true]], text);
+  // The credit alone, with what it is credited on, stays a rule the person weighs.
+  for (const text of [
+    "Listing AI tooling as a co-author on code you submit is not allowed.",
+    "Co-signing commits using an AI tool is not allowed.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [["ban", false]], text);
+});
+
 test("a rule about the description or comments is not a ban of AI-assisted changes", () => {
   for (const text of [
     "The PR description and comments must be written by the contributor, with no AI assistance beyond grammar or English translations.",

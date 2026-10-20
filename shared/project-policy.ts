@@ -224,11 +224,14 @@ const maintainerPermission = new RegExp(
  * ("… co-signing commits using an AI tool, or using the `assisted-by`,
  * `co-developed` or similar commit trailer is not allowed"): a rule about
  * how AI help is credited, which the person weighs, not a ban of the help
- * (DESIGN v1.2 F14, Kubernetes). Only words between the AI term and the
- * refusal count, so "AI-generated code is not accepted; …trailer…" stays a
- * ban.
+ * (DESIGN v1.2 F14, Kubernetes). Each thing the sentence refuses counts
+ * (`weighedRefusal`), so "AI-generated code and Co-authored-by trailers
+ * are not allowed" stays a ban.
  */
 const creditObject = /\b(?:trailer|co-?author\w*|co-?sign\w*|Co-authored-by|Assisted-by|Generated-by)\b/i;
+/** The credit itself, with the commits or code it is on: "co-signing commits", "a co-author on code you submit". */
+const creditPhrase =
+  /\b(?:co-?sign\w*|co-?author\w*)(?:\s+(?:on|of|in|for|to))?\s+(?:(?:the|your|their|a|an|any|all|each|every)\s+)?(?:commits?|code|patch(?:es)?|changes?|contributions?|PRs?|pull[- ]requests?)\b|\bcommits?\s+trailers?\b|\b(?:trailer|co-?author\w*|co-?sign\w*|Co-authored-by|Assisted-by|Generated-by)\b/gi;
 
 /** What a rule restricts when it is about talking to people rather than the change. */
 const conversation = new RegExp(
@@ -240,6 +243,53 @@ const changeObject = new RegExp(
   String.raw`\b(?:code(?!\s+of\s+conduct)|patch(?:es|sets?)?|contributions?|implementations?|diffs?|commits?(?!\s+messages?))\b|(?<!\b(?:on|in|to|under|for)\s+(?:your|the|a|their|each|every|this)\s+)\b(?:PRs?|pull[- ]requests?|merge\s+requests?)\b(?!\s+(?:descriptions?|titles?|bod(?:y|ies)|text|comments?|messages?|templates?|reviews?))`,
   flags,
 );
+
+/**
+ * Where one refused thing ends and the next begins: "Large AI generated
+ * PRs and AI generated commit messages are not allowed" refuses two.
+ */
+const partBoundary = /[,;:]|\s(?:and|or|nor)\s/gi;
+/** Words that carry a refusal on to things a part doesn't name ("…, nor are small ones"). */
+const refusalCarried = /\b(?:nor|neither|either|regardless|no\s+matter)\b/i;
+
+/**
+ * The parts of a sentence (see `partBoundary`), Markdown link targets left
+ * out ("[Large AI generated](#large-edits) PRs" reads "Large AI generated
+ * PRs"), each with whether it names AI at all (`aiMention`, wider than the
+ * assistance terms, so more parts must pass).
+ */
+function refusedParts(words: string) {
+  const plain = words.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+  let start = 0;
+  return [...allMatches(partBoundary, plain), { start: plain.length, end: plain.length }].map((bound) => {
+    const text = plain.slice(start, bound.start);
+    start = bound.end;
+    return { text, ai: aiMention.test(text) };
+  });
+}
+
+/** One refused thing that is a rule the person weighs, not a ban of AI help. */
+function weighedPart(part: string) {
+  // How AI help is credited, with nothing else of the change (Kubernetes).
+  if (creditObject.test(part) && !changeObject.test(part.replace(creditPhrase, " "))) return true;
+  return false;
+}
+
+/**
+ * A refusal the person weighs for what it refuses (DESIGN v1.2 F14): a
+ * part that names AI help is such a rule (`weighedPart`), and no part
+ * refuses the change itself otherwise. "AI-generated code and
+ * Co-authored-by trailers are not allowed" still refuses the code.
+ */
+function weighedRefusal(words: string) {
+  if (refusalCarried.test(words)) return false;
+  let weighed = false;
+  for (const part of refusedParts(words)) {
+    if (weighedPart(part.text)) weighed ||= part.ai;
+    else if (changeObject.test(part.text) || (part.ai && !conversation.test(part.text))) return false;
+  }
+  return weighed;
+}
 
 /** Issues set aside for people who are learning. */
 const learningIssues = new RegExp(
@@ -611,8 +661,8 @@ export function classifyPolicy(path: string, text: string): PolicyFinding[] {
       // too much is the person's call.
       const sized = sizeQualifier.test(words);
       // "Listing AI tooling as a co-author … is not allowed": how AI help
-      // is credited, not whether it may help.
-      const credited = creditObject.test(search.slice(span.start, span.end));
+      // is credited, not whether it may help; each refused thing counts.
+      const credited = weighedRefusal(words);
       // A long sentence about good first issues that refuses AI-generated
       // pull requests at its end still reserves the learning issues.
       if (learningIssues.test(words)) add("area", block, search, span);
