@@ -25,7 +25,7 @@ import {
 import type { WorkbenchContext } from "./workbench.js";
 import type { CodeReference, FileWalkthrough } from "../shared/walkthroughs.js";
 import { assertReaderView, changeFilter, recordStoredHelp } from "./learning.js";
-import { filteredError } from "./by-hand.js";
+import { checkoutPaths, filteredError } from "./by-hand.js";
 
 const now = () => new Date().toISOString();
 
@@ -193,15 +193,25 @@ async function generateWalkthrough(
   }
 }
 
-/** A walkthrough of the person's change, filtered (F7): every prose field. */
+/**
+ * A walkthrough of the person's change, filtered (F7): every text field,
+ * names included, and a reference keeps its path (and line) only when the
+ * path is in the checkout, since a "path" is agent text too.
+ */
 async function filterWalkthrough(run: Run, files: readonly DiffFile[], filePath: string, content: FileWalkthrough) {
-  const cited = content.functions.flatMap((unit) => [...unit.callers, ...unit.callees].map((ref) => ref.path));
-  const filter = await changeFilter(run, files, [filePath, ...cited]);
-  const reference = (ref: CodeReference) => ({ ...ref, note: filter.text(ref.note) });
+  const named = content.functions.flatMap((unit) => [...unit.callers, ...unit.callees].map((ref) => ref.path));
+  const known = await checkoutPaths(run, named);
+  const filter = await changeFilter(run, files, [filePath, ...named.filter((file) => known.has(file))]);
+  const reference = (ref: CodeReference): CodeReference => {
+    const kept = known.has(ref.path);
+    return { name: filter.text(ref.name), path: kept ? ref.path : "", line: kept ? ref.line : null, note: filter.text(ref.note) };
+  };
   const value: FileWalkthrough = {
     ...content,
     functions: content.functions.map((unit) => ({
       ...unit,
+      name: filter.text(unit.name),
+      kind: filter.text(unit.kind),
       summary: filter.text(unit.summary),
       change: filter.text(unit.change),
       steps: unit.steps.map((step) => ({ ...step, explanation: filter.text(step.explanation) })),
@@ -210,6 +220,7 @@ async function filterWalkthrough(run: Run, files: readonly DiffFile[], filePath:
       analogy: filter.text(unit.analogy),
       selfCheck: { question: filter.text(unit.selfCheck.question), answer: filter.text(unit.selfCheck.answer) },
     })),
+    ...(content.newUnits ? { newUnits: content.newUnits.map(filter.text) } : {}),
   };
   return { value, removed: filter.removed };
 }

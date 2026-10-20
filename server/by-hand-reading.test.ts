@@ -291,6 +291,38 @@ test("a walkthrough is made only of the version that passed the reader check, ne
   assert.equal(f.run.walkthroughs?.["src/retry.ts"]?.status ?? "pending", "pending");
 });
 
+test("a walkthrough's names and reference paths are agent text too: code is filtered out, only the checkout's paths stay", async (t) => {
+  skipUnderstandingCheckInTests(true);
+  const unit = JSON.parse(walkthroughAnswer).functions[0];
+  const f = await fixture(t, {
+    walkthrough: JSON.stringify({
+      functions: [
+        {
+          ...unit,
+          name: "getPage",
+          kind: "function",
+          callers: [
+            // git show <sha>:<path> prints nothing for a missing path with * in it.
+            { name: "return retryTwice(getPage);", path: "src/*.ts", line: 1, note: "A pattern." },
+            { name: "attempts", path: "src/retry.ts", line: 1, note: "The count." },
+          ],
+        },
+      ],
+      newUnits: ["while (failed) await retryWithJitter();"],
+    }),
+  });
+  await f.markReady();
+  await en(() => f.workbench.walkthrough(f.run.id, "src/retry.ts"));
+  const content = f.run.walkthroughs?.["src/retry.ts"]?.content;
+  assert.equal(f.run.walkthroughs?.["src/retry.ts"]?.status, "ready");
+  assert.equal(content?.functions[0].name, "getPage");
+  const [pattern, real] = content!.functions[0].callers;
+  assert.deepEqual([pattern.path, pattern.line], ["", null]);
+  assert.doesNotMatch(pattern.name, /retryTwice/);
+  assert.deepEqual(real, { name: "attempts", path: "src/retry.ts", line: 1, note: "The count." });
+  assert.doesNotMatch(JSON.stringify(content), /retryTwice|retryWithJitter|src\/\*/);
+});
+
 test("after Ready the premise check filters its evidence and records explain help", async (t) => {
   const f = await fixture(t, {
     premise: JSON.stringify({
