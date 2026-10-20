@@ -1,4 +1,5 @@
 import { formatters, type Translation } from "../../../shared/i18n/locale";
+import { product } from "../../../shared/product";
 import type en from "../en/discovery";
 
 const fmt = formatters("zh-TW");
@@ -154,6 +155,33 @@ const m: Translation<typeof en> = {
     learnByHandHint:
       "這個 issue 有新手標籤。親手寫修正才是認識專案的方式，所以 agent 團隊不會接手。先讀計畫與來源，再開啟 issue。",
     openIssue: "開啟 issue",
+    startByHand: "開始親手學",
+    reservedOutput: `這個專案會關閉這類 issue 上由 AI 產生的 Pull Request。只有專案自己的文字點名了嚮導提供的每一種協助，而且你確認過被引用的規範之後，${product.name} 才能為它發布親手學的任務；任務對話框會說明是哪一種情況。`,
+  },
+  byHand: {
+    legend: "誰來寫程式碼？",
+    agents: "Agent 團隊來寫",
+    hand: "你自己寫（親手學）",
+    handText: `嚮導和你一起規劃、給提示，並在你要求時審查你的修改。這個任務裡，${product.name} 的 agent 無法修改你的檔案。送出之前，你要在沒有協助的情況下把修改解釋一遍。`,
+    sample: "示範專案只示範 agent 團隊。親手學請用你自己的專案。",
+    start: "和嚮導一起規劃",
+    fit: "讓嚮導配合專案規範",
+    full: "所有協助都要，只在本機練習",
+    fullNote: `${product.name} 不會在這裡發布那個任務。`,
+    practice: "嚮導仍然提供所有協助。",
+    planApproval: "親手學一律開啟：動手寫之前，你要先確認自己的計畫。",
+    title: "開始之前",
+    practise: "親手寫，在本機練習",
+    ban: ({ reach, condition }) =>
+      `${product.name} 不會在這裡發布親手學的任務：${reach === "assistance" ? "專案規範限制的是 AI 協助本身，不只是 AI 寫的程式碼" : reach === "output" ? `專案規範不接受 AI 產生的內容，而且${condition}` : `${product.name} 無法從專案規範的原文判斷它涵蓋哪些情況`}。`,
+    area: ({ reach, condition }) =>
+      reach === "output" || reach === "automate"
+        ? `${product.name} 不會為這個 issue 發布親手學的任務：專案會關閉這類 issue 由 AI 產生的 Pull Request，而且${condition}。`
+        : `${product.name} 不會為這個 issue 發布親手學的任務：專案把它留給不靠 AI 工具學習的人。`,
+    fitted: ({ kinds, quote }) =>
+      `只有嚮導始終待在專案原文說可以的範圍內（${kinds}：「${quote}」），而且你確認過專案被引用的規範之後，${product.name} 才能在這裡發布親手學的任務。你的修改是否合適，由維護者決定。`,
+    registry: ({ date }) => `出自 ${product.name} 的檢查清單 · 查核於 ${date}`,
+    retry: "重試會讓這個任務回到和嚮導一起規劃的階段。",
   },
   runtime: {
     summary: "這次探索使用的模型與用量",

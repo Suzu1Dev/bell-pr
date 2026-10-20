@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import {
   ArrowUp,
   Bot,
@@ -33,7 +33,12 @@ import { ModelSummary } from "../models/ModelSummary";
 import { providerLabels } from "../../shared/models";
 import { teamLanes, type TeamLaneId } from "./lanes";
 import { PremiseNotice } from "./PremiseNotice";
+import { ErrorBoundary } from "../app/ErrorBoundary";
+import type { PlanWithGuideProps } from "../byhand/lazy";
 import "./team.css";
+
+// Learn by hand's plan, from the one lazy byhand chunk (DESIGN v1.2 F3).
+const PlanWithGuide = lazy(() => import("../byhand/lazy").then((module) => ({ default: module.PlanWithGuide })));
 
 /** No status to start from: useEntitlements then reads the license. */
 const readLicense = {};
@@ -58,6 +63,7 @@ export function TeamBoard({
   onRetry,
   busy,
   entitlements,
+  byHand,
 }: {
   run: Run;
   demo: boolean;
@@ -73,8 +79,11 @@ export function TeamBoard({
    * when not given. The demo shows its sample team without a plan limit.
    */
   entitlements?: Entitlements;
+  /** A Learn-by-hand run's plan requests: the person plans with the guide (useByHand). */
+  byHand?: Omit<PlanWithGuideProps, "run"> & { writing?: boolean };
 }) {
   const t = useT("team");
+  const byHandText = useT("discovery").byHand;
   const taskLabels = useT("common").teamTaskStatus;
   const fmt = useFormat();
   const license = useEntitlements(
@@ -114,6 +123,8 @@ export function TeamBoard({
       </div>
     );
   const finished = ["complete", "failed", "cancelled"].includes(team.phase);
+  // The plan stays open to split a step whenever the person writes, also after a Ready (then the phase is complete).
+  const byHandPlan = run.learnByHand && byHand && (["awaiting_approval", "developing"].includes(team.phase) || byHand.writing);
   const canReceive = (task: TeamTask) =>
     ["pending", "ready", "running"].includes(task.status) &&
     task.acceptsMessages !== false;
@@ -129,7 +140,8 @@ export function TeamBoard({
     !demo &&
     !!onRetry &&
     ["failed", "cancelled"].includes(team.phase) &&
-    team.tasks.length > 0 &&
+    // Learn by hand retries only a run whose plan the person hasn't confirmed.
+    (run.learnByHand ? !run.byHand?.plan?.confirmedAt : team.tasks.length > 0) &&
     ["failed", "cancelled"].includes(run.status);
   const retriedCount = team.tasks.filter((task) =>
     ["failed", "blocked"].includes(task.status),
@@ -180,8 +192,9 @@ export function TeamBoard({
   // A long task description opens to its first lines in the narrow lanes.
   const longDescription = 180;
   return (
-    <section className="team-board" aria-label={t.boardLabel}>
-      <div className="team-board-header">
+    <section className="team-board" aria-label={run.learnByHand ? undefined : t.boardLabel}>
+      {/* Learn by hand: no agent team to describe, split work for or talk to; the plan and the run's details stay. */}
+      {!run.learnByHand && <div className="team-board-header">
         <div>
           <span className="eyebrow">{t.eyebrow}</span>
           <h2>{t.title}</h2>
@@ -208,7 +221,7 @@ export function TeamBoard({
             )}
           </span>
         </div>
-      </div>
+      </div>}
       <details className="team-run-details">
         <summary>
           <strong>{t.runDetails.title}</strong>
@@ -226,7 +239,7 @@ export function TeamBoard({
           />
         </div>
       </details>
-      <div className="team-flow">
+      {!run.learnByHand && <div className="team-flow">
         <span {...step("plan")}>
           <ListChecks size={18} aria-hidden="true" />
           {t.flow.plan}
@@ -248,7 +261,7 @@ export function TeamBoard({
           <GitMerge size={18} aria-hidden="true" />
           {t.flow.integrate}
         </span>
-      </div>
+      </div>}
       <div
         className={`team-plan ${team.phase === "awaiting_approval" ? "needs-approval" : ""}`}
       >
@@ -285,7 +298,8 @@ export function TeamBoard({
             {planOpen ? t.plan.showLess : t.plan.showAll}
           </button>
         )}
-        <PremiseNotice premise={team.premise} />
+        {/* Learn by hand: the plan panel below shows the premise check first. */}
+        {!byHandPlan && <PremiseNotice premise={team.premise} />}
         {revisions.length > 0 && (
           <ol className="team-plan-revisions" aria-label={t.revisions.label}>
             {revisions.map((revision, index) => (
@@ -316,7 +330,12 @@ export function TeamBoard({
             ))}
           </ol>
         )}
-        {team.phase === "awaiting_approval" && (
+        {byHandPlan && (
+          <ErrorBoundary resetKey={`${run.id}:plan`}>
+            <Suspense fallback={<Loader2 size={18} className="spin" />}><PlanWithGuide run={run} {...byHand} /></Suspense>
+          </ErrorBoundary>
+        )}
+        {team.phase === "awaiting_approval" && !run.learnByHand && (
           <>
             <div className="team-plan-action">
               <span>{t.approval.hint}</span>
@@ -416,13 +435,15 @@ export function TeamBoard({
             }}
           >
             <span>
-              {retriedCount
+              {run.learnByHand
+                ? byHandText.retry
+                : retriedCount
                 ? t.retry.partial({ kept: done, retried: retriedCount })
                 : done === team.tasks.length
                   ? t.retry.integrationOnly
                   : t.retry.notStarted}
             </span>
-            <input
+            {!run.learnByHand && <input
               type="text"
               aria-label={t.retry.label}
               placeholder={t.retry.placeholder}
@@ -430,14 +451,14 @@ export function TeamBoard({
               maxLength={4000}
               onChange={(e) => setRetryMessage(e.target.value)}
               disabled={busy}
-            />
+            />}
             <button className="button primary" disabled={busy}>
               {busy ? (
                 <Loader2 size={15} className="spin" />
               ) : (
                 <RotateCcw size={15} />
               )}
-              {t.retry.action}
+              {run.learnByHand ? byHandText.start : t.retry.action}
             </button>
             {retryError && (
               <p className="inline-error" role="alert">
@@ -447,6 +468,7 @@ export function TeamBoard({
           </form>
         )}
       </div>
+      {!run.learnByHand && <>
       <div className="team-board-content">
         <div
           className={`team-kanban ${team.tasks.length ? "has-tasks" : ""}`}
@@ -759,6 +781,7 @@ export function TeamBoard({
           {t.protocolNote({ provider: providerLabels[team.config.provider] })}
         </p>
       </details>
+      </>}
     </section>
   );
 }

@@ -8,7 +8,8 @@ import {
 import { api, send } from "../../api";
 import { getDemo } from "../../demo";
 import { useFormat, useLocale, useT, type Messages } from "../../i18n";
-import type { Repo } from "../../types";
+import type { Repo, Run } from "../../types";
+import type { RunMode } from "../../byhand/ModeChoice";
 import type {
   ContributionOpportunity,
   DiscoveryCandidate,
@@ -154,11 +155,17 @@ export function useTaskSetup({
   const [settingsReady, setSettingsReady] = useState(false);
   const [settingsNotice, setSettingsNotice] = useState("");
   const settingsSaveButton = useRef<HTMLButtonElement>(null);
+  // Who writes the next run (DESIGN v1.2 F1), never saved with the direction: discovery
+  // can prefer Learn by hand, leaving one prefers the agent team; the dialog decides.
+  const [preferredMode, setPreferredMode] = useState<RunMode>();
+  /** The mode fields of POST /api/runs, set by the task dialog as it submits. */
+  const runRequest = useRef<{ learnByHand?: true; byHandFit?: { learningIssue: boolean } }>({});
   async function configureTaskRepo(
     id: string,
     overrides: Partial<ContributionSettings> = {},
   ) {
     setTaskRepoId(id);
+    setPreferredMode(undefined);
     const request = ++settingsRequest.current;
     setFormError("");
     setSettingsNotice("");
@@ -185,10 +192,17 @@ export function useTaskSetup({
       if (request === settingsRequest.current) setSettingsLoading(false);
     }
   }
+  /** Opens the task dialog; `from` prefills it with a run's task for the agent team. */
   function beginContribution(
     id = insightRepo?.id || repos[0]?.id || demoRepoId,
+    from?: Pick<Run, "title" | "prompt" | "contributionSettings">,
   ) {
-    void configureTaskRepo(id);
+    void configureTaskRepo(id, from?.contributionSettings);
+    if (from) {
+      setTaskTitle(from.title);
+      setPrompt(from.prompt);
+      setPreferredMode("agents");
+    }
     openModal("task");
   }
   async function configureContributionModels() {
@@ -256,6 +270,7 @@ export function useTaskSetup({
   async function chooseOpportunity(
     idea: ContributionOpportunity,
     candidate: DiscoveryCandidate,
+    mode?: RunMode,
   ) {
     const intent = navigationIntent.current;
     const { repo } = await api<{ repo: Repo }>(
@@ -288,6 +303,7 @@ export function useTaskSetup({
       requirePlanApproval: true,
       ...(issueUrl ? { issueUrl } : {}),
     });
+    setPreferredMode(mode);
     setExploreRepoId(repo.id);
     navigate("explore");
     openModal("task");
@@ -352,6 +368,8 @@ export function useTaskSetup({
     chooseRecommendation,
     chooseOpportunity,
     saveDirection,
+    preferredMode,
+    runRequest,
   };
 }
 

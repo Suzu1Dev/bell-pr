@@ -9,6 +9,7 @@ import {
   RefreshCw,
   type LucideIcon,
 } from "lucide-react";
+import { byHandRulesCase } from "../../shared/by-hand-rules";
 import {
   learningLabel,
   openPrBudget,
@@ -40,6 +41,8 @@ export interface BeforeYouStartProps {
   demo: boolean;
   /** The facts read for the link and whether Start should ask once. */
   onFacts?(check: StartCheck): void;
+  /** The person writes the change (Learn by hand): Start says that run's case. */
+  byHand?: boolean;
 }
 
 /** How long the issue link must stay unchanged before GitHub is read. */
@@ -71,6 +74,7 @@ export default function BeforeYouStart({
   issueUrl,
   demo,
   onFacts,
+  byHand = false,
 }: BeforeYouStartProps) {
   const t = useT("mission").start;
   const fmt = useFormat();
@@ -152,11 +156,16 @@ export default function BeforeYouStart({
   // Tell the dialog what Start should ask, whenever it changes.
   const report = useRef(onFacts);
   report.current = onFacts;
-  const reasons = startReasons(facts, rules);
-  const reasonsKey = JSON.stringify(reasons);
+  // Which case a Learn-by-hand run would start in (DESIGN v1.2 F12): area
+  // rules count when the linked issue carries a newcomer label.
+  const learningIssue = (facts?.issue?.labels ?? []).some(learningLabel);
+  const rulesCase = byHandRulesCase(rules, { learningIssue, now: new Date().toISOString() });
+  const reasons = startReasons(facts, rules, byHand ? { rulesCase } : undefined);
+  const reasonsKey = JSON.stringify([reasons, rulesCase]);
   useEffect(() => {
-    report.current?.({ facts, reasons: JSON.parse(reasonsKey) });
-  }, [facts, reasonsKey]);
+    const [shown, known] = JSON.parse(reasonsKey);
+    report.current?.({ facts, reasons: shown, rules, rulesCase: known, learningIssue });
+  }, [facts, rules, reasonsKey, learningIssue]);
   useEffect(() => () => report.current?.({ reasons: [] }), []);
 
   const chips: { key: string; tone: Tone; text: string; title?: string }[] = [];

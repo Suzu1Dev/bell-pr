@@ -13,10 +13,12 @@ import { useLocale, useT } from "../i18n";
 import type { Repo } from "../types";
 import { DirectionSettings } from "../mission/DirectionSettings";
 import { providerReadiness } from "../mission/readiness";
+import { byHandStartReasons, suggestedMode } from "../mission/respect";
 import { StartConfirm, startReasonsKey, type StartCheck } from "../mission/StartConfirm";
 import { providerLabels } from "../../shared/models";
 import type { ModalName, Page } from "../app/AppShell";
 import type { TaskSetup } from "../app/hooks/useTaskSetup";
+import { ModeChoice, type RunMode } from "../byhand/ModeChoice";
 import { readinessOf, ReadinessNotice } from "../setup/ReadinessNotice";
 import type { DoctorState } from "../setup/useDoctor";
 import { Modal } from "./Modal";
@@ -35,6 +37,8 @@ interface NewTaskModalProps {
     | "configureTaskRepo"
     | "changeContributionSettings"
     | "saveDirection"
+    | "preferredMode"
+    | "runRequest"
   >;
   repos: Repo[];
   busy: boolean;
@@ -50,7 +54,7 @@ interface NewTaskModalProps {
   maskUser?: (value: string) => string;
 }
 
-/** Sets up a contribution task for a repository and starts its agent team. */
+/** Sets up a contribution task and starts its agent team, or a run the person writes by hand. */
 export function NewTaskModal({
   setup,
   repos,
@@ -65,6 +69,8 @@ export function NewTaskModal({
   maskUser,
 }: NewTaskModalProps) {
   const t = useT("modals").newTask;
+  // The mode choice's copy is in a deferred namespace: the dialog waits for it once.
+  const modeText = useT("discovery").byHand;
   const common = useT("common");
   const [locale] = useLocale();
   const demoRepo = getDemo(locale).repo;
@@ -80,6 +86,8 @@ export function NewTaskModal({
     configureTaskRepo,
     changeContributionSettings,
     saveDirection,
+    preferredMode,
+    runRequest,
   } = setup;
   const demo = taskRepoId === demoRepo.id;
   // When the facts say publishing will wait, Start asks once per set of reasons.
@@ -87,12 +95,22 @@ export function NewTaskModal({
   const [startCheck, setStartCheck] = useState<StartCheck>({ reasons: [] });
   const [asking, setAsking] = useState(false);
   const accepted = useRef("");
-  const reasonsKey = startReasonsKey(startCheck.reasons);
+  // Who writes it (DESIGN v1.2 F1): the person's choice, else the suggestion; the fitted help set is preselected.
+  const [modeChoice, setModeChoice] = useState<RunMode>();
+  const [fitChoice, setFitChoice] = useState<boolean>();
+  const { rules, rulesCase, learningIssue = false } = startCheck;
+  const mode = demo ? "agents" : (modeChoice ?? suggestedMode({ preferred: preferredMode, learningIssue, rules }));
+  const fitted = mode === "hand" && rulesCase?.case === "fitted" && (fitChoice ?? true);
+  const reasons = mode === "hand" ? byHandStartReasons(startCheck.reasons, rulesCase, fitted) : startCheck.reasons;
+  const reasonsKey = startReasonsKey(reasons);
   const submit = (event: FormEvent) => {
-    if (startCheck.reasons.length && accepted.current !== reasonsKey) {
+    if (reasons.length && accepted.current !== reasonsKey) {
       event.preventDefault();
       setAsking(true);
-    } else startTask(event);
+      return;
+    }
+    runRequest.current = mode === "hand" ? { learnByHand: true, ...(fitted ? { byHandFit: { learningIssue } } : {}) } : {};
+    startTask(event);
   };
   // The sample needs no tools. Otherwise a run waits for a ready provider;
   // when the check itself cannot answer, the server decides on submit.
@@ -115,7 +133,7 @@ export function NewTaskModal({
   return (
     <Modal
       wide
-      title={t.title}
+      title={mode === "hand" ? modeText.start : t.title}
       subtitle={t.subtitle}
       onClose={closeModal}
     >
@@ -186,6 +204,7 @@ export function NewTaskModal({
             doctor={doctor}
             repoId={taskRepoId || undefined}
             onStartCheck={setStartCheck}
+            byHand={mode === "hand"}
           />
         </fieldset>
         <button
@@ -221,6 +240,9 @@ export function NewTaskModal({
           required
           minLength={10}
         />
+        <ModeChoice mode={mode} onModeChange={setModeChoice} rulesCase={rulesCase} fitted={fitted}
+          onFittedChange={setFitChoice} sample={demo} disabled={busy} />
+        {mode === "agents" && <>
         <div className="task-team-preview">
           <Bot size={16} />
           <span>{t.lead}</span>
@@ -232,6 +254,7 @@ export function NewTaskModal({
           <span>{t.reviewers}</span>
         </div>
         <p className="field-help task-team-limit">{t.teamLimit}</p>
+        </>}
         <p className="field-help">
           {t.usage({
             provider: providerLabels[contributionSettings.provider ?? "codex"],
@@ -250,9 +273,10 @@ export function NewTaskModal({
             {formError}
           </p>
         )}
-        {asking && startCheck.reasons.length > 0 && !startDisabled && (
+        {asking && reasons.length > 0 && !startDisabled && (
           <StartConfirm
-            reasons={startCheck.reasons}
+            byHand={mode === "hand"}
+            reasons={reasons}
             onCancel={() => setAsking(false)}
             onConfirm={() => {
               accepted.current = reasonsKey;
@@ -281,7 +305,9 @@ export function NewTaskModal({
             )}
             {demo
               ? t.saveDemo
-              : contributionSettings.requirePlanApproval
+              : mode === "hand"
+                ? modeText.start
+                : contributionSettings.requirePlanApproval
                 ? t.planFirst
                 : t.start}
           </button>

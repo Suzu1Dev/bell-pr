@@ -3,6 +3,7 @@ import test from "node:test";
 import { createElement } from "react";
 import type { DoctorReport } from "../../shared/doctor";
 import { defaultContributionSettings } from "../../shared/insights";
+import { getDemo } from "../demo";
 import type { DoctorState } from "../setup/useDoctor";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { Repo } from "../types";
@@ -63,6 +64,8 @@ const element = (
         configureTaskRepo: async () => {},
         changeContributionSettings() {},
         saveDirection: async () => {},
+        preferredMode: undefined,
+        runRequest: { current: {} },
         ...setup,
       },
       repos: [repo],
@@ -241,4 +244,19 @@ test("the dialog states the team size each plan allows", () => {
     /<p class="field-help task-team-limit">Free: 2 teammates · Pro: up to 4<\/p>/,
   );
   assert.match(renderZh(element()), /免費：2 位 Teammates · Pro：最多 4 位/);
+});
+
+test("under the request the dialog asks who writes the code; the sample shows the agent team only", () => {
+  const html = renderEn(element({ prompt: "Retry failed requests with backoff." }));
+  assertNoHan(html);
+  const goal = html.indexOf('id="task-prompt"');
+  const mode = html.indexOf("Who writes the code?");
+  assert.ok(goal > 0 && mode > goal, "the choice comes after the request");
+  assert.match(html, /<input type="radio" name="[^"]+-mode" checked=""\/><svg[\s\S]*?<strong>The agent team writes it<\/strong>/);
+  // The team runs by default, so its preview and Start stay as they were.
+  assert.ok(html.includes('class="task-team-preview"'));
+  const sample = renderEn(element({ taskRepoId: getDemo("en").repo.id }));
+  assert.ok(sample.includes("The sample shows the agent team. Learn by hand works on your own projects."));
+  const hand = sample.match(/(<input type="radio"[^>]*-mode"[^>]*\/>)<svg(?:(?!<input)[\s\S])*?<strong>You write it/)?.[1];
+  assert.match(hand ?? "", /disabled=""/);
 });

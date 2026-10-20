@@ -4,6 +4,7 @@ import {
   ChevronRight,
   CircleHelp,
   FolderGit2,
+  Hand,
   House,
   Info,
   Languages,
@@ -81,6 +82,7 @@ export function Sidebar({
   chooseRun,
 }: SidebarProps) {
   const t = useT("app");
+  const byHand = useT("workspace").byHand.badge;
   const [locale] = useLocale();
   const demoRun = getDemo(locale).run;
   const login = status?.githubUser ?? "";
@@ -120,6 +122,12 @@ export function Sidebar({
         className={`small-status ${item.status === "running" ? "running" : ""}`}
       />
       <span>{sample ? t.sidebar.demoRunTitle : item.title}</span>
+      {item.learnByHand && (
+        <span title={byHand}>
+          <Hand size={13} aria-hidden="true" />
+          <span className="visually-hidden">{byHand}</span>
+        </span>
+      )}
     </button>
   );
   return (

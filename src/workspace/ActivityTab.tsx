@@ -11,6 +11,7 @@ import type { Run } from "../types";
 import { FailureText } from "../FailureText";
 import { TeamBoard } from "../team/TeamBoard";
 import type { RunActions } from "../app/hooks/useRunActions";
+import type { ByHand } from "../app/hooks/useByHand";
 
 interface ActivityTabProps {
   run: Run;
@@ -29,6 +30,7 @@ interface ActivityTabProps {
     | "retryTeam"
     | "cancel"
   >;
+  byHand?: ByHand["plan"];
 }
 
 /** The agent team's board and the run log. */
@@ -41,6 +43,7 @@ export function ActivityTab({
   logFilter,
   setLogFilter,
   actions,
+  byHand,
 }: ActivityTabProps) {
   const t = useT("workspace").activity;
   const fmt = useFormat();
@@ -69,6 +72,7 @@ export function ActivityTab({
         onMessage={sendTeamMessage}
         onRetry={retryTeam}
         busy={busy}
+        byHand={byHand}
       />
       <div className="activity-layout">
         <div className="activity-main">

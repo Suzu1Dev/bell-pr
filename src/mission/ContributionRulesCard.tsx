@@ -92,6 +92,7 @@ export default function ContributionRulesCard({
   onRefresh,
 }: ContributionRulesCardProps) {
   const t = useT("mission").rules;
+  const byHand = useT("discovery").byHand;
   const { errors } = useT("common");
   const fmt = useFormat();
   const [locale] = useLocale();
@@ -224,7 +225,14 @@ export default function ContributionRulesCard({
                   <figure key={`${finding.path}:${finding.line}:${index}`}>
                     <blockquote>{finding.quote}</blockquote>
                     <figcaption>
-                      <code>{`${finding.path}:${finding.line}`}</code>
+                      {finding.source ? (
+                        <>
+                          <span>{byHand.registry({ date: fmt.date(finding.source.checkedOn) })}</span>
+                          <a href={finding.source.url} target="_blank" rel="noreferrer">{finding.source.url}</a>
+                        </>
+                      ) : (
+                        <code>{`${finding.path}:${finding.line}`}</code>
+                      )}
                       <span className={`rules-card-effect is-${effect}`}>
                         <Icon size={13} aria-hidden="true" />
                         {t.effects[effect]}

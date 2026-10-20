@@ -5,7 +5,8 @@ import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { DiffFile, Run } from "../types";
 import { maskPath } from "../app/presentation";
 import { closeCheckPanel, openCheckPanel, type Understanding } from "../app/hooks/useUnderstanding";
-import { ChangesTab, WorktreeHint } from "./ChangesTab";
+import { ChangesTab } from "./ChangesTab";
+import { WorktreeHint } from "./WorktreeHint";
 
 type Props = Parameters<typeof ChangesTab>[0];
 
@@ -297,4 +298,26 @@ test("while the check is open it takes the explanation's place: closed book", ()
   } finally {
     closeCheckPanel();
   }
+});
+
+test("while the person writes a learn-by-hand change, the guide takes the explanation's place", () => {
+  const byHandRun: Run = { ...run, learnByHand: true, byHand: {} };
+  const writing = { writing: true, openReady() {}, ask() {}, guide: {} } as unknown as Props["byHand"];
+  const html = renderEn(element({ run: byHandRun, byHand: writing }));
+  assertNoHan(html);
+  // The guide's panel loads lazily in the aside, with a fixed loading state.
+  assert.match(html, /<aside class="explanation-wrap"><div class="empty-state" role="status"><svg[^>]*spin[\s\S]*?<\/svg><p>Preparing the reading panel…<\/p><\/div><\/aside>/);
+  // No diff yet: "Your turn" replaces "No code changes yet".
+  const empty = renderEn(element({ run: byHandRun, files: [], file: undefined, byHand: writing }));
+  assert.doesNotMatch(empty, /No code changes yet/);
+  // Changed after Ready: the notice above the diff.
+  const changed = renderEn(element({ run: { ...byHandRun, byHand: { ready: { at: run.createdAt, changeFingerprint: "0000000000000000", review: true } } }, byHand: writing }));
+  assert.ok(changed.includes("You changed the code after marking it ready. The review and the check wait until you mark it ready again."));
+  assert.doesNotMatch(html, /You changed the code after marking it ready/);
+  // An agent run keeps its explanation panel and its empty state.
+  assert.match(renderEn(element({ files: [], file: undefined })), /No code changes yet/);
+  // Explain it back opens after Ready (DESIGN v1.2 F10), not while the person writes.
+  assert.doesNotMatch(renderEn(element({ run: byHandRun, byHand: writing, understanding: understanding() })), /Take the check now/);
+  const ready = { writing: false, openReady() {}, ask() {}, guide: {} } as unknown as Props["byHand"];
+  assert.match(renderEn(element({ run: byHandRun, byHand: ready, understanding: understanding() })), /Take the check now/);
 });

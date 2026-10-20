@@ -166,7 +166,13 @@ test("before the check route exists, the field says it couldn't check, never a p
       mounted.container.querySelectorAll((element) => element.tagName === "li"),
       [],
     );
-    assert.deepEqual(reports.at(-1), { facts: undefined, reasons: [] });
+    assert.deepEqual(reports.at(-1), {
+      facts: undefined,
+      reasons: [],
+      rules: undefined,
+      rulesCase: { case: "none" },
+      learningIssue: false,
+    });
   } finally {
     await mounted.unmount();
   }

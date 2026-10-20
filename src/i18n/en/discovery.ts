@@ -6,6 +6,7 @@ import type {
 } from "../../../shared/discovery";
 import type { PonytailMode } from "../../../shared/efficiency";
 import { formatters, type Locale } from "../../../shared/i18n/locale";
+import { product } from "../../../shared/product";
 
 const fmt = formatters("en");
 
@@ -202,6 +203,42 @@ const discovery = {
     learnByHandHint:
       "The issue is labelled for newcomers. Writing the fix yourself is how you learn the project, so the agent team does not take it. Read the plan and the sources, then open the issue.",
     openIssue: "Open the issue",
+    /** Learn by hand (DESIGN v1.2 F1, F12): the task dialog then shows the project's case. */
+    startByHand: "Start learning by hand",
+    reservedOutput: `This project closes AI-generated pull requests for issues like this one. ${product.name} can publish a learn-by-hand run for it only if the project's own text names each kind of help the guide gives, and only after you confirm the quoted rule; the task dialog shows which.`,
+  },
+  /**
+   * Learn by hand outside the byhand chunk (DESIGN v1.2 F1, F12): the task
+   * dialog's mode choice, the case of the project's rules said before the
+   * first line is written, and one line each for plan approval, the rules
+   * card and the team board. A deferred namespace, so none of it ships in
+   * the startup chunk (plan README §18.8).
+   */
+  byHand: {
+    legend: "Who writes the code?",
+    agents: "The agent team writes it",
+    hand: "You write it (Learn by hand)",
+    handText: `The guide plans with you, gives hints and reviews your change when you ask. ${product.name}'s agents can't edit your files in this run. You'll explain the change back without help before you send it.`,
+    sample: "The sample shows the agent team. Learn by hand works on your own projects.",
+    start: "Plan with the guide",
+    fit: "Fit the guide to the project's rules",
+    full: "Every kind of help, practise locally",
+    fullNote: `${product.name} won't publish that run here.`,
+    practice: "The guide still gives every kind of help.",
+    planApproval: "Always on in Learn by hand: you confirm your own plan before you write.",
+    title: "Before you start",
+    practise: "Practise by hand locally",
+    ban: ({ reach, condition }: { reach: string; condition: string }) =>
+      `${product.name} won't publish a learn-by-hand run here: ${reach === "assistance" ? "the project's rules restrict AI help itself, not only AI-written code" : reach === "output" ? `the project's rules decline AI-generated content, and ${condition}` : `${product.name} can't tell from the project's rule what it covers`}.`,
+    area: ({ reach, condition }: { reach: string; condition: string }) =>
+      reach === "output" || reach === "automate"
+        ? `${product.name} won't publish a learn-by-hand run for this issue: the project closes AI-generated pull requests for issues like it, and ${condition}.`
+        : `${product.name} won't publish a learn-by-hand run for this issue: the project keeps it for people learning without AI tools.`,
+    fitted: ({ kinds, quote }: { kinds: string; quote: string }) =>
+      `${product.name} can publish a learn-by-hand run here only if the guide stays within what the project's own text says is fine (${kinds}: "${quote}"), and only after you confirm the project's quoted rule. The maintainers decide whether your change fits.`,
+    /** A rule from BELL's owner-signed list of rules projects publish outside their repositories (F14). */
+    registry: ({ date }: { date: string }) => `From ${product.name}'s checked list · checked on ${date}`,
+    retry: "A retry takes this run back to planning with the guide.",
   },
   runtime: {
     summary: "Model and usage for this discovery",

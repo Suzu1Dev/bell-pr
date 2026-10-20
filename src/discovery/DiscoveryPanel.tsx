@@ -50,6 +50,7 @@ import { MarkdownContent } from "../review/MarkdownContent";
 import { ReadinessMessage, readinessOf } from "../setup/ReadinessNotice";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
 import { FailureText } from "../FailureText";
+import { LearnByHandFooter } from "./LearnByHandFooter";
 import "../review/review.css";
 import "./discovery.css";
 
@@ -94,6 +95,8 @@ export default function DiscoveryPanel({
   onChoose: (
     opportunity: ContributionOpportunity,
     candidate: DiscoveryCandidate,
+    /** "Start learning by hand" on a newcomer issue: the task dialog suggests Learn by hand. */
+    mode?: "hand",
   ) => void | Promise<void>;
   /**
    * A job to show, with its preferences, before the saved one has loaded,
@@ -245,11 +248,12 @@ export default function DiscoveryPanel({
   async function choose(
     opportunity: ContributionOpportunity,
     candidate: DiscoveryCandidate,
+    mode?: "hand",
   ) {
     setChoosing(opportunity.id);
     setError("");
     try {
-      await onChoose(opportunity, candidate);
+      await onChoose(opportunity, candidate, mode);
     } catch (cause) {
       if (mounted.current) setError((cause as Error).message);
     } finally {
@@ -934,15 +938,8 @@ export default function DiscoveryPanel({
                   </div>
                 </details>
                 {item.learnByHand ? (
-                <footer>
-                  <p>{t.card.learnByHandHint}</p>
-                  {issueLink && (
-                    <a className="button secondary" href={issueLink} target="_blank" rel="noreferrer">
-                      {t.card.openIssue}
-                      <ArrowUpRight size={16} aria-hidden="true" />
-                    </a>
-                  )}
-                </footer>
+                <LearnByHandFooter item={item} issueLink={issueLink} choosing={choosing === item.id}
+                  disabled={sample || !!choosing || !!running || busy} onStart={() => void choose(item, candidate, "hand")} />
                 ) : (
                 <footer>
                   <p>{sample ? t.card.sampleHint : t.card.chooseHint}</p>

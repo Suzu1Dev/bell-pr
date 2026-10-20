@@ -12,7 +12,6 @@ import {
   CircleCheck,
   Code2,
   Columns2,
-  Copy,
   FolderGit2,
   GitBranch,
   ListTree,
@@ -45,6 +44,7 @@ import { usePresentation } from "../app/presentation";
 import { FailureText } from "../FailureText";
 import { PremiseNotice } from "../team/PremiseNotice";
 import type { RunActions } from "../app/hooks/useRunActions";
+import { focusWhenShown, type ByHand } from "../app/hooks/useByHand";
 import type { Walkthroughs } from "../app/hooks/useWalkthroughs";
 import type { PanelTab } from "../review/ExplanationPanel";
 import type { LineRange } from "../review/WalkthroughCards";
@@ -54,6 +54,7 @@ import {
   useCheckPanel,
   type Understanding,
 } from "../app/hooks/useUnderstanding";
+import { WorktreeHint } from "./WorktreeHint";
 
 const ExplanationPanel = lazy(() =>
   import("../review/ExplanationPanel").then((module) => ({
@@ -62,6 +63,9 @@ const ExplanationPanel = lazy(() =>
 );
 /** The Explain-it-back check, loaded the same way. */
 const UnderstandingCheck = lazy(() => import("./UnderstandingCheck"));
+// Learn by hand: the writing views, from the one lazy byhand chunk.
+const YourTurn = lazy(() => import("../byhand/lazy").then((module) => ({ default: module.YourTurn })));
+const GuidePanel = lazy(() => import("../byhand/lazy").then((module) => ({ default: module.GuidePanel })));
 
 interface ChangesTabProps {
   run: Run;
@@ -122,6 +126,8 @@ interface ChangesTabProps {
   >;
   /** The Explain-it-back check of the run (useUnderstanding). */
   understanding?: Understanding;
+  /** A Learn-by-hand run's state and requests (useByHand). */
+  byHand?: ByHand;
 }
 
 /**
@@ -179,6 +185,7 @@ export function ChangesTab({
   walkthroughs,
   actions,
   understanding,
+  byHand,
 }: ChangesTabProps) {
   const workspace = useT("workspace");
   const t = workspace.changes;
@@ -207,6 +214,19 @@ export function ChangesTab({
   // The check is taken while the run waits for review or approval.
   const checkOpen = ["review", "approved"].includes(run.status) && !run.publishing;
   const [askWaiting, setAskWaiting] = useState(false);
+  // Learn by hand: while the person writes, the guide takes the explanation's place.
+  const writing = !!byHand?.writing;
+  useEffect(() => {
+    if (writing) setShowExplanation(true);
+  }, [run.id, writing, setShowExplanation]);
+  const loading = (<div className="empty-state" role="status"><Loader2 className="spin" /><p>{t.loadingPanel}</p></div>);
+  // The check replaces the reader view whose button opens it, so the focus moves into the check (its close button).
+  const checkWrap = useRef<HTMLDivElement>(null);
+  const openCheck = () => (openCheckPanel(run.id), focusWhenShown(() => checkWrap.current?.querySelector<HTMLElement>(".check-header button")));
+  // At the ready version: "Run the review again" opens the Ready dialog, and the reader view's check (W2E ByHandReader).
+  const byHandReview = run.learnByHand && byHand
+    ? { onReviewAgain: byHand.openReady, check: understanding?.view, checkError: understanding?.error, onOpenCheck: openCheck, onRetryCheck: () => understanding?.refresh() }
+    : undefined;
   useEffect(() => {
     if (!checking) {
       setAskWaiting(false);
@@ -312,6 +332,7 @@ export function ChangesTab({
         )}
       </div>
     )}
+    {run.byHand?.ready && writing && <p className="by-hand-note" role="status">{workspace.byHand.changed}</p>}
     <div
       ref={reviewGridRef}
       className={`review-grid ${!showFiles ? "files-hidden" : ""} ${!showExplanation ? "explanation-hidden" : ""}`}
@@ -341,8 +362,8 @@ export function ChangesTab({
               {searchShown ? <X size={15} /> : <Search size={15} />}
             </button>
           </div>
-          {/* Test out: the check before every file is ticked (the ticks stay required). */}
-          {understanding && !checking && checkOpen && (
+          {/* Test out: the check before every file is ticked (the ticks stay required); Learn by hand: after Ready. */}
+          {understanding && !checking && checkOpen && !writing && (
             <button type="button" className="check-link" onClick={() => openCheckPanel(run.id)}>
               <SquarePen size={14} aria-hidden="true" />
               {understanding.passed ? t.openCheck : t.takeCheck}
@@ -574,7 +595,7 @@ export function ChangesTab({
             file={file}
             reviewed={run.reviewedFiles.includes(file.path)}
             onReview={reviewFile}
-            onAsk={checking ? () => setAskWaiting(true) : ask}
+            onAsk={checking ? () => setAskWaiting(true) : writing ? (question) => byHand?.ask(file, question) : ask}
             view={diffView}
             hasNote={Boolean(run.notes?.[file.path]?.text)}
             onLoadBase={
@@ -584,6 +605,10 @@ export function ChangesTab({
             }
             highlight={shownHighlight}
           />
+        ) : writing && run.worktreePath ? (
+          <ErrorBoundary resetKey={`${run.id}:turn`}>
+            <Suspense fallback={loading}><YourTurn run={run} worktreePath={run.worktreePath} presenting={present} /></Suspense>
+          </ErrorBoundary>
         ) : (
           <div className="empty-state">
             <div className="empty-icon">
@@ -643,7 +668,7 @@ export function ChangesTab({
           />
           <aside className="explanation-wrap">
             {checking && understanding ? (
-              <div className="check-wrap">
+              <div className="check-wrap" ref={checkWrap}>
                 {askWaiting && <p className="check-ask-waiting" role="status">{t.closedBookAsk}</p>}
                 <ErrorBoundary resetKey={`${run.id}:check`}>
                   <Suspense
@@ -674,6 +699,10 @@ export function ChangesTab({
                   </Suspense>
                 </ErrorBoundary>
               </div>
+            ) : writing && byHand ? (
+              <ErrorBoundary resetKey={`${run.id}:guide`}>
+                <Suspense fallback={loading}><GuidePanel run={run} files={files} {...byHand.guide} /></Suspense>
+              </ErrorBoundary>
             ) : file ? (
               <ErrorBoundary resetKey={`${run.id}:${file.path}`}>
                 <Suspense
@@ -719,7 +748,7 @@ export function ChangesTab({
                     )}
                     onRerunReview={editable ? rerunReview : undefined}
                     reviewBusy={
-                      reviewRerunning || rerunRequests.has(run.id)
+                      reviewRerunning || rerunRequests.has(run.id) || (!!run.learnByHand && run.byHand?.busy?.kind === "review")
                     }
                     runLocale={run.locale}
                     attempt={run.attempts?.[file.path]}
@@ -756,6 +785,7 @@ export function ChangesTab({
                     walkthroughBusy={walkthroughs?.walkthroughBusy}
                     initialTab={panelTab === "chat" ? "explain" : panelTab}
                     onTabChange={setPanelTab}
+                    byHandReview={byHandReview}
                   />
                 </Suspense>
               </ErrorBoundary>
@@ -771,45 +801,5 @@ export function ChangesTab({
       )}
     </div>
     </>
-  );
-}
-
-/**
- * Where the run's checkout is, for editing files by hand. While presenting
- * the path loses its folders (maskPath) and cannot be copied.
- */
-export function WorktreeHint({
-  path,
-  presenting,
-  maskPath,
-  onCopy,
-}: {
-  path: string;
-  presenting: boolean;
-  maskPath: (path: string) => string;
-  onCopy: () => void;
-}) {
-  const t = useT("workspace").changes;
-  // The editing hint is the tooltip; screen readers read it with the path.
-  return (
-    <div className="worktree-hint" title={t.worktreeHint}>
-      <FolderGit2 size={14} aria-hidden="true" />
-      <span>{t.worktreeLabel}</span>
-      <span className="visually-hidden">{t.worktreeHint}</span>
-      <code>
-        <span>{maskPath(path)}</span>
-      </code>
-      {!presenting && (
-        <button
-          type="button"
-          className="icon-button"
-          aria-label={t.copyWorktree}
-          title={t.copyWorktree}
-          onClick={onCopy}
-        >
-          <Copy size={13} />
-        </button>
-      )}
-    </div>
   );
 }

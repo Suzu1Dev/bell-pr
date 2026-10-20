@@ -35,7 +35,7 @@ import {
 import type { Formatters } from "../../shared/i18n/locale";
 import type { Entitlements } from "../../shared/plans";
 import { getDemo } from "../demo";
-import { useFormat, useLocale, useT, type Messages } from "../i18n";
+import { useFormat, useLocale, useT, withMessages, type Messages } from "../i18n";
 import type { Repo, Run } from "../types";
 import { EfficiencySummary } from "../efficiency/EfficiencySummary";
 import { ProBadge } from "../license/ProBadge";
@@ -53,7 +53,7 @@ import {
 import "./mission.css";
 
 // "Before you contribute": its own chunk, with the rule classifier.
-const ContributionRulesCard = lazy(() => import("./ContributionRulesCard"));
+const ContributionRulesCard = lazy(() => withMessages(import("./ContributionRulesCard")));
 
 export interface ProjectOverviewProps {
   repo: Repo;

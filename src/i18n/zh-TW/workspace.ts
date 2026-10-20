@@ -47,6 +47,14 @@ const m: Translation<typeof en> = {
   },
   sampleReview: "範例審查",
   humanReview: "人工審查",
+  byHand: {
+    badge: "親手學",
+    turn: "換你寫",
+    ready: "可以審查了",
+    writeFirst: "請先寫一點修改",
+    reviewing: "嚮導正在審查",
+    changed: "你在標記可以審查之後又改了程式碼。審查和理解檢查會等你再次標記可以審查。",
+  },
   footer: {
     allReviewed: "每一個檔案都已審閱。",
     passed: "你已用自己的話講過一遍，可以核准了。",

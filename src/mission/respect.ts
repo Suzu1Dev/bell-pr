@@ -5,7 +5,10 @@
  * asks once. Every unknown stays unknown; nothing here turns a missing
  * fact into a pass.
  */
+import type { HelpKind } from "../../shared/by-hand";
+import type { ByHandBlockReason, ByHandRulesCase } from "../../shared/by-hand-rules";
 import {
+  byHandBlockClause,
   collaboratorPermission,
   learningLabel,
   openPrBudget,
@@ -15,9 +18,13 @@ import {
   type ContributionRules,
   type DoorFacts,
 } from "../../shared/contribution";
-import type { Locale } from "../../shared/i18n/locale";
+import en from "../../shared/i18n/draft-checks.en";
+import zhTW from "../../shared/i18n/draft-checks.zh-TW";
+import { formatters, type Locale } from "../../shared/i18n/locale";
+import { areaReach, banReach, type AreaReach, type BanReach } from "../../shared/policy-reach";
 import { classifyPolicy } from "../../shared/project-policy";
 import type { DemoContent } from "../demo/types";
+import type { Messages } from "../i18n";
 
 /**
  * Why the task dialog asks once before Start: the facts say publishing
@@ -27,7 +34,22 @@ import type { DemoContent } from "../demo/types";
 export type StartReason =
   | { id: "issue-closed" | "door" | "ban" | "area" | "learning" }
   | { id: "other-pr"; author: string; number: number }
-  | { id: "pacing"; open: number; budget: number };
+  | { id: "pacing"; open: number; budget: number }
+  | ByHandStartReason;
+
+/**
+ * A Learn-by-hand run's case before it starts (DESIGN v1.2 F12): BELL won't
+ * publish it there (a ban, or a reserved issue), or only through the
+ * quoted confirm when the guide stays within the project's carve-out.
+ */
+export type ByHandStartReason =
+  | {
+      id: "by-hand-ban" | "by-hand-area";
+      reach: BanReach | AreaReach;
+      reason: ByHandBlockReason;
+      checkedOn?: string;
+    }
+  | { id: "by-hand-fitted"; kinds: HelpKind[]; quote: string };
 
 /** What the task dialog's Before-you-start facts report to the dialog. */
 export interface StartCheck {
@@ -35,6 +57,12 @@ export interface StartCheck {
   facts?: ContributionFacts;
   /** Empty when Start needs no confirm. */
   reasons: StartReason[];
+  /** The project's stored rules, once read. */
+  rules?: ContributionRules;
+  /** Which case a Learn-by-hand run would start in (byHandRulesCase). */
+  rulesCase?: ByHandRulesCase;
+  /** The linked issue carries a newcomer label. */
+  learningIssue?: boolean;
 }
 
 /** How the card states the door. */
@@ -141,6 +169,7 @@ const sameLogin = (a?: string, b?: string) =>
 export function startReasons(
   facts?: ContributionFacts,
   rules?: ContributionRules,
+  byHand?: { rulesCase?: ByHandRulesCase },
 ): StartReason[] {
   const reasons: StartReason[] = [];
   const door = knownDoor(facts, rules);
@@ -157,9 +186,12 @@ export function startReasons(
     reasons.push({ id: "other-pr", author: competing.author ?? "?", number: competing.number });
   if (door && doorClosed(door)) reasons.push({ id: "door" });
   const findings = rules?.findings ?? [];
-  if (findings.some((finding) => finding.kind === "ban" && finding.contribution))
+  // A Learn-by-hand run says its own case; the person writes, so no lesson.
+  const byHandReason = byHand && byHandStartReason(byHand.rulesCase);
+  if (byHandReason) reasons.push(byHandReason);
+  if (!byHand && findings.some((finding) => finding.kind === "ban" && finding.contribution))
     reasons.push({ id: "ban" });
-  if ((issue?.labels ?? []).some(learningLabel))
+  if (!byHand && (issue?.labels ?? []).some(learningLabel))
     reasons.push(
       findings.some((finding) => finding.kind === "area") ? { id: "area" } : { id: "learning" },
     );
@@ -174,6 +206,83 @@ export function startReasons(
       reasons.push({ id: "pacing", open: pacing.openPrs, budget });
   }
   return reasons;
+}
+
+/**
+ * The mode the dialog starts with: Learn by hand when discovery chose it or
+ * the linked issue carries a newcomer label, never while the rules are
+ * unread or when they have a contribution ban or a reserved-issue rule (a
+ * banning project is never a reason to preselect it).
+ */
+export function suggestedMode({
+  preferred,
+  learningIssue,
+  rules,
+}: {
+  preferred?: "agents" | "hand";
+  learningIssue: boolean;
+  rules?: ContributionRules;
+}): "agents" | "hand" {
+  const restricted = (rules?.findings ?? []).some(
+    (finding) => (finding.kind === "ban" && finding.contribution) || finding.kind === "area",
+  );
+  const wanted = preferred === "hand" || (preferred !== "agents" && learningIssue);
+  return wanted && rules && !restricted ? "hand" : "agents";
+}
+
+/** Whether a start reason is a Learn-by-hand run's case. */
+export const isByHandReason = (reason: StartReason): reason is ByHandStartReason =>
+  reason.id.startsWith("by-hand-");
+
+/** The start reason of a Learn-by-hand run's case; none when no rule applies. */
+export function byHandStartReason(rulesCase?: ByHandRulesCase): ByHandStartReason | undefined {
+  if (rulesCase?.case === "fitted")
+    return {
+      id: "by-hand-fitted",
+      kinds: rulesCase.kinds,
+      quote: rulesCase.lock.rules.find((rule) => rule.allows.length)?.allows[0].quote ?? "",
+    };
+  if (rulesCase?.case !== "blocked") return undefined;
+  const { finding, reach, reason } = rulesCase;
+  return {
+    id: finding.kind === "area" ? "by-hand-area" : "by-hand-ban",
+    reach,
+    reason,
+    ...(finding.source ? { checkedOn: finding.source.checkedOn } : {}),
+  };
+}
+
+/**
+ * What Start says for a Learn-by-hand run: on a project a run could be
+ * fitted to, "Every kind of help" makes a run BELL won't publish there,
+ * so the fitted case reads as that block (the help set wasn't fixed).
+ */
+export function byHandStartReasons(reasons: StartReason[], rulesCase: ByHandRulesCase | undefined, fitted: boolean) {
+  if (fitted || rulesCase?.case !== "fitted") return reasons;
+  const [rule] = rulesCase.lock.rules;
+  const block: ByHandStartReason =
+    rule.kind === "area"
+      ? { id: "by-hand-area", reach: areaReach(rule.quote), reason: "not-fitted" }
+      : { id: "by-hand-ban", reach: banReach(rule.quote), reason: "not-fitted" };
+  return reasons.map((reason) => (reason.id === "by-hand-fitted" ? block : reason));
+}
+
+/** Kinds of help as the respect checks name them (shared/i18n/draft-checks), as one list. */
+export function helpKindList(kinds: readonly string[], locale: Locale) {
+  const names: Record<string, string> = (locale === "zh-TW" ? zhTW : en).respect.byHand.kinds;
+  return formatters(locale).list(kinds.map((kind) => names[kind] ?? kind));
+}
+
+/** The sentence of a Learn-by-hand start reason, in `locale` (`m`: the `discovery.byHand` messages). */
+export function byHandReasonText(
+  reason: ByHandStartReason,
+  m: Pick<Messages["discovery"]["byHand"], "ban" | "area" | "fitted">,
+  locale: Locale,
+) {
+  if (reason.id === "by-hand-fitted")
+    return m.fitted({ kinds: helpKindList(reason.kinds, locale), quote: reason.quote });
+  const condition = byHandBlockClause(reason.reason, locale, { checkedOn: reason.checkedOn });
+  return (reason.id === "by-hand-ban" ? m.ban : m.area)({ reach: reason.reach, condition });
 }
 
 /**

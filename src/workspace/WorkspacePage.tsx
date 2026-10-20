@@ -11,6 +11,7 @@ import {
   FileText,
   FolderGit2,
   GitBranch,
+  Hand,
   GitPullRequest,
   Globe2,
   History,
@@ -30,6 +31,7 @@ import type { RunActions } from "../app/hooks/useRunActions";
 import type { RunRounds } from "../app/hooks/useRunRounds";
 import type { Walkthroughs } from "../app/hooks/useWalkthroughs";
 import { useRunRecords } from "../app/hooks/useRunRecords";
+import { useByHand } from "../app/hooks/useByHand";
 import { premiseCheckable, usePremiseCheck } from "../app/hooks/usePremiseCheck";
 import { openCheckPanel, useUnderstanding } from "../app/hooks/useUnderstanding";
 import { ErrorBoundary } from "../app/ErrorBoundary";
@@ -47,6 +49,8 @@ const ActivityTab = lazy(() =>
     default: module.ActivityTab,
   })),
 );
+// Learn by hand's Ready dialog, from the one lazy byhand chunk.
+const ReadyDialog = lazy(() => import("../byhand/lazy").then((module) => ({ default: module.ReadyDialog })));
 // The commit history matters once a PR is published; it loads on its own too.
 const CommitHistory = lazy(() =>
   import("../review/CommitHistory").then((module) => ({
@@ -108,7 +112,8 @@ interface WorkspacePageProps {
   ) => Promise<void>;
   /** The code walkthroughs of the run's files (useWalkthroughs); without it, nothing is prepared or retried. */
   walkthroughs?: Walkthroughs;
-  beginContribution: () => void;
+  /** Opens the task dialog; with a run, prefilled with its task for the agent team. */
+  beginContribution: (repoId?: string, from?: Run) => void;
   chooseRecommendation: (idea: ContributionRecommendation) => void;
   draft: DraftEditor;
   actions: RunActions;
@@ -179,6 +184,10 @@ export function WorkspacePage({
   // The Explain-it-back check and the person's other records on this run.
   const understanding = useUnderstanding(run, files, { demo, setRun: actions.setRun });
   const premise = usePremiseCheck(run, actions);
+  const handBack = () => beginContribution(run.repoId, run);
+  const requesting = explanationRequests.has(run.id) || !!walkthroughs?.walkthroughBusy;
+  const byHand = useByHand(run, files, { demo, repo: currentRepo, actions, handBack, draftMutationEpoch: draft.draftMutationEpoch, requesting });
+  const reviewing = !!run.learnByHand && run.byHand?.busy?.kind === "review";
   const records = useRunRecords(run, files, { demo, setRun: actions.setRun, notify: actions.notify, file, ask: actions.ask, setSelectedPath, setTab });
   // The sample's playback queues for a moment behind nothing.
   const queuedOnFree =
@@ -247,9 +256,10 @@ export function WorkspacePage({
             className={`status-badge ${run.status === "failed" ? "error" : ""}`}
           >
             <span />
-            {statusLabels[run.status]}
+            {byHand.writing ? t.byHand.turn : statusLabels[run.status]}
           </span>
           {run.unsandboxed === true && <UnsandboxedBadge />}
+          {run.learnByHand && <span className="status-badge"><Hand size={13} aria-hidden="true" />{t.byHand.badge}</span>}
           {/* The setting's badge leaves a run whose check passed: approving it marks nothing. */}
           {showsCheckOff(run, understanding.off && !understanding.passed) && (
             <UnderstandingOffBadge approved={run.understandingCheckOff === true} />
@@ -410,7 +420,7 @@ export function WorkspacePage({
               onUpdateRepo={onUpdateRepo}
               updatingRepo={updatingRepo}
               onCheckPremise={
-                premiseCheckable(run, demo, active)
+                premiseCheckable(run, demo, active, byHand.writing)
                   ? () => void premise.checkPremise()
                   : undefined
               }
@@ -456,6 +466,7 @@ export function WorkspacePage({
               walkthroughs={walkthroughs}
               actions={actions}
               understanding={understanding}
+              byHand={byHand}
             />
           )}
           {tab === "activity" && (
@@ -472,6 +483,7 @@ export function WorkspacePage({
                   logFilter={logFilter}
                   setLogFilter={setLogFilter}
                   actions={actions}
+                  byHand={byHand.plan}
                 />
               </Suspense>
             </ErrorBoundary>
@@ -533,6 +545,14 @@ export function WorkspacePage({
                 {t.footer.viewPullRequest}
                 <ExternalLink size={14} />
               </a>
+            ) : byHand.writing || reviewing ? (
+              // Learn by hand: the person says when the change is ready (DESIGN v1.2 F5).
+              <button className="button primary" disabled={busy || reviewing || !files.length} title={files.length ? undefined : t.byHand.writeFirst}
+                onClick={byHand.openReady}>
+                <CheckCheck size={16} />
+                {reviewing ? t.byHand.reviewing : files.length ? t.byHand.ready : t.byHand.writeFirst}
+                <ChevronRight size={15} />
+              </button>
             ) : (
               <button
                 className="button primary"
@@ -573,6 +593,13 @@ export function WorkspacePage({
           </div>
         </footer>
       </section>
+      {byHand.readyOpen && (
+        <ErrorBoundary resetKey={`${run.id}:ready`}>
+          <Suspense fallback={null}>
+            <ReadyDialog run={run} files={files} open onClose={byHand.closeReady} {...byHand.readyDialog} />
+          </Suspense>
+        </ErrorBoundary>
+      )}
     </>
   );
 }

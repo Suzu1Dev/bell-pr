@@ -160,3 +160,10 @@ test("the sidebar footer offers the language switcher", () => {
   assert.match(chinese, /<select class="sidebar-language-select" aria-label="語言">/);
   assert.match(chinese, /<option value="zh-TW" lang="zh-Hant-TW" selected="">/);
 });
+
+test("a learn-by-hand run is marked in the recent list", () => {
+  const html = renderEn(element({ runs: [{ ...summary("run-2", "Cap the retries"), learnByHand: true }, summary("run-3", "Add a cache")] }));
+  assertNoHan(withoutOtherLanguages(html));
+  assert.match(html, /<span>Cap the retries<\/span><span title="Learn by hand"><svg[^>]*lucide-hand[\s\S]*?<\/svg><span class="visually-hidden">Learn by hand<\/span><\/span>/);
+  assert.equal(html.match(/title="Learn by hand"/g)?.length, 1);
+});

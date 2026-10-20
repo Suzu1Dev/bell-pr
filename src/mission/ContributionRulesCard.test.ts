@@ -227,3 +227,24 @@ test("a stored reason code is worded in the language the card is read in", () =>
     /Couldn&#x27;t check whether pull requests are open to you: It isn&#x27;t read when a project is imported from a folder\. Choose Check again to read it from GitHub\./,
   );
 });
+
+test("a rule from BELL's checked list says so, with the date it was checked and its source", () => {
+  const listed: PolicyFinding = {
+    ...finding("ban"),
+    path: "https://forge.rust-lang.org/policies/llm-usage.html",
+    line: 1,
+    source: {
+      registry: "rust-lang",
+      url: "https://forge.rust-lang.org/policies/llm-usage.html",
+      checkedOn: "2026-10-19",
+    },
+  };
+  const html = english({ rules: { ...stored, findings: [listed, finding("disclose")] } });
+  assert.match(
+    html,
+    /<figcaption><span>From BELL PR&#x27;s checked list · checked on [^<]*2026[^<]*<\/span><a href="https:\/\/forge\.rust-lang\.org\/policies\/llm-usage\.html" target="_blank" rel="noreferrer">https:\/\/forge\.rust-lang\.org\/policies\/llm-usage\.html<\/a>/,
+  );
+  // A rule from the repository keeps its path:line.
+  assert.match(html, /<code>docs\/AI_POLICY\.md:12<\/code>/);
+  assert.match(renderZh(card({ rules: { ...stored, findings: [listed] } })), /出自 BELL PR 的檢查清單/);
+});

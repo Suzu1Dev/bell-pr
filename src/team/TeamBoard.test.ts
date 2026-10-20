@@ -728,3 +728,59 @@ test("the folded Run details name the tokens, and a long plan opens to its first
   assert.match(english, /aria-expanded="false">Show the whole plan<\/button>/);
   assertNoHan(english);
 });
+
+test("a learn-by-hand run plans with the guide instead of approving a team plan, and retries only before its plan", () => {
+  const sample = getDemo("en");
+  const byHand = (status: Run["status"], phase: AgentTeam["phase"], extra: Partial<Run> = {}): Run => ({
+    ...sample.run,
+    status,
+    learnByHand: true,
+    team: { ...sample.team, phase, tasks: [], planSummary: "", messages: [] },
+    ...extra,
+  });
+  const element = (run: Run) =>
+    createElement(TeamBoard, {
+      run,
+      demo: false,
+      onApprove() {},
+      async onRevise() {},
+      async onMessage() {},
+      async onRetry() {},
+      busy: false,
+      entitlements: freeEntitlements,
+      byHand: { onSave: async () => {}, onReveal: async () => {}, onAskQuestions: async () => {}, onConfirm: async () => {} },
+    });
+  const premise = { verdict: "refuted" as const, statement: "Retries never stop.", evidence: "src/retry.ts:3 caps them." };
+  const planning = renderEn(element(byHand("awaiting_plan", "awaiting_approval", { team: { ...sample.team, phase: "awaiting_approval", tasks: [], planSummary: "", messages: [], premise } })));
+  assertNoHan(planning);
+  // The premise check shows once, first in the plan panel (loading here), not on the board too.
+  assert.doesNotMatch(planning, /Retries never stop\./);
+  // No agent team here: no team header, flow, task lanes or team conversation, only the plan and the run's details.
+  assert.doesNotMatch(planning, /Shared tasks and team messages|Build together|Teammates work in parallel|team-kanban|Team conversation|Team message/);
+  assert.match(planning, /Run details/);
+  // The plan panel loads with the byhand chunk; no team approval or "send back".
+  assert.match(planning, /<svg[^>]*lucide-loader-circle[^>]*spin/);
+  assert.doesNotMatch(planning, /Approve the plan and start development|Send back with feedback/);
+  // Failed before the person confirmed a plan: the retry goes back to planning, with no note to subtasks.
+  const failed = renderEn(element(byHand("failed", "failed")));
+  assertNoHan(failed);
+  assert.ok(failed.includes("A retry takes this run back to planning with the guide."));
+  assert.doesNotMatch(failed, /Note for the retried subtasks|Retry failed subtasks/);
+  assert.match(failed, /<button class="button primary"><svg[\s\S]*?<\/svg>Plan with the guide<\/button>/);
+  // After the person confirmed their plan, no retry can bring agents back.
+  const confirmed = byHand("failed", "failed", { byHand: { plan: { steps: [{ id: "s1", title: "Cap" }], savedAt: sample.run.createdAt, confirmedAt: sample.run.createdAt } } });
+  assert.doesNotMatch(renderEn(element(confirmed)), /A retry takes this run back|Retry failed subtasks/);
+  assert.match(renderZh(element(byHand("failed", "failed"))), /重試會讓這個任務回到和嚮導一起規劃的階段/);
+  // Edited after a Ready (the phase is complete): the plan opens again to split a step.
+  const panel = /<div class="team-plan[^"]*">[\s\S]*?lucide-loader-circle[^>]*spin/;
+  const plan = { onSave: async () => {}, onReveal: async () => {}, onAskQuestions: async () => {}, onConfirm: async () => {} };
+  const after = (writing: boolean) =>
+    renderEn(createElement(TeamBoard, { run: byHand("review", "complete"), demo: false, onApprove() {}, async onRevise() {}, async onMessage() {}, busy: false, entitlements: freeEntitlements, byHand: { ...plan, writing } }));
+  assert.match(after(true), panel);
+  assert.doesNotMatch(after(false), panel);
+  // An agent run keeps its board.
+  assert.match(
+    renderEn(createElement(TeamBoard, { run: { ...sample.run, team: sample.team }, demo: false, onApprove() {}, async onRevise() {}, async onMessage() {}, busy: false, entitlements: freeEntitlements })),
+    /aria-label="Shared tasks and team messages"[\s\S]*Teammates work in parallel[\s\S]*team-kanban[\s\S]*Team conversation/,
+  );
+});
