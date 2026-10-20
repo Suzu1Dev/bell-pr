@@ -5,7 +5,7 @@ import { selectionQuestion, parseDiff } from "../../review/diff";
 import en from "../../i18n/en/review";
 import { mount } from "../../mission/test-dom";
 import type { DiffFile, Run } from "../../types";
-import { selectionOf, useByHand } from "./useByHand";
+import { selectionOf, useByHand, type ByHand } from "./useByHand";
 
 const file: DiffFile = {
   path: "src/retry.ts",
@@ -60,6 +60,42 @@ test("when a test run ends, the diff is read once: the tests may have written ne
     await mounted.rerender(createElement(Probe, { value: run() }));
     await act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
     assert.equal(requests.length, 1);
+  } finally {
+    await mounted.unmount();
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("a refused request shows the server's message in the view that asked, and nowhere else", async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ error: "Try something first: change the code, run the tests, or say what you tried." }), {
+      status: 409,
+      headers: { "Content-Type": "application/json" },
+    })) as typeof fetch;
+  let latest: ByHand | undefined;
+  const value = { id: "run-1", repoId: "repo-1", status: "approved", learnByHand: true, agents: [], byHand: {} } as unknown as Run;
+  function Probe() {
+    latest = useByHand(value, [], {
+      demo: false,
+      draftMutationEpoch: { current: 0 },
+      actions: { setRun() {}, setFiles() {}, approveTeamPlan: async () => {} },
+      handBack() {},
+    });
+    return null;
+  }
+  const mounted = await mount(createElement(Probe));
+  try {
+    await act(async () => latest!.guide.onGuide({ kind: "hint", rung: 2 }).catch(() => undefined));
+    assert.equal(latest!.guide.error, "Try something first: change the code, run the tests, or say what you tried.");
+    assert.equal(latest!.readyDialog.error, "");
+    assert.equal(latest!.plan.error, "");
+    // A refused Ready shows in its dialog, and opening it again starts clean.
+    await act(async () => latest!.readyDialog.onReady({ changeFingerprint: "x", review: false }).catch(() => undefined));
+    assert.equal(latest!.readyDialog.error.length > 0, true);
+    assert.equal(latest!.guide.error, "");
+    await act(async () => latest!.openReady());
+    assert.equal(latest!.readyDialog.error, "");
   } finally {
     await mounted.unmount();
     globalThis.fetch = realFetch;

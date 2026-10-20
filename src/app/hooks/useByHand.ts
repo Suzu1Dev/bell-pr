@@ -50,26 +50,28 @@ export function useByHand(
   const byHand = !!run.learnByHand && !demo;
   const ready = byHand && readyNow(run, files.map(({ path, fingerprint }) => ({ path, fingerprint: fingerprint ?? "" })));
   const open = byHand && run.status === "review" && !run.publishing;
-  const [state, setState] = useState({ busy: false, error: "" });
+  // A refusal shows in the view that asked (the plan, the guide or the Ready dialog), never in another.
+  const [state, setState] = useState({ busy: false, error: "", from: "" });
   const [readyOpen, setReadyOpen] = useState(false);
   const [selection, setSelection] = useState<GuideSelection>();
   const shown = useRef(id);
   shown.current = id;
   useEffect(() => {
-    setState({ busy: false, error: "" });
+    setState({ busy: false, error: "", from: "" });
     setSelection(undefined);
     setReadyOpen(false);
   }, [id]);
   /** A request of this run's; a refusal shows the server's message and rejects. */
   const call = (path: string, method = "POST", then?: () => void) => async (body?: unknown) => {
-    setState({ busy: true, error: "" });
+    const from = path === "ready" ? path : path.startsWith("plan") ? "plan" : "guide";
+    setState({ busy: true, error: "", from });
     try {
       const result = await api<{ run?: Run }>(path.startsWith("/") ? path : `${runPath(id)}/by-hand/${path}`, send(method, body));
       if (result.run && shown.current === id) actions.setRun(result.run);
-      setState({ busy: false, error: "" });
+      setState({ busy: false, error: "", from });
       then?.();
     } catch (cause) {
-      setState({ busy: false, error: shown.current === id ? (cause as Error).message : "" });
+      setState({ busy: false, error: shown.current === id ? (cause as Error).message : "", from });
       throw cause;
     }
   };
@@ -117,24 +119,25 @@ export function useByHand(
     tested.current = testing;
   }, [id, testing, setFiles]);
 
+  const view = (from: string) => ({ busy: state.busy, error: state.from === from ? state.error : "" });
   return {
     /** The person writes: an LBH run in review whose change isn't the version marked ready. */
     writing: open && !ready,
     ready,
     readyOpen,
-    openReady: () => setReadyOpen(true),
+    openReady: () => (setState((now) => (now.from === "ready" ? { ...now, error: "" } : now)), setReadyOpen(true)),
     closeReady: () => setReadyOpen(false),
     /** A diff selection's Ask prefills the guide's question. */
     ask: (file: DiffFile, question: string) => setSelection(selectionOf(file, question)),
     plan: {
-      ...state,
+      ...view("plan"),
       onSave: call("plan", "PUT"),
       onReveal: (mode: "names" | "compare") => call("plan/reveal")({ mode }),
       onAskQuestions: call("plan/questions"),
       onConfirm: actions.approveTeamPlan,
     },
     guide: {
-      ...state,
+      ...view("guide"),
       selection,
       issueUrl: run.contributionSettings?.issueUrl,
       channels: repo?.contributionRules?.channels,
@@ -148,7 +151,7 @@ export function useByHand(
       onLeave: call("leave", "POST", handBack),
     },
     readyDialog: {
-      ...state,
+      ...view("ready"),
       onReady: call("ready", "POST", () => setReadyOpen(false)),
       // Any AI rule but "open an issue first" asks for care before an AI review.
       aiRules: (repo?.contributionRules?.findings ?? []).some((finding) => finding.kind !== "issue-first"),
