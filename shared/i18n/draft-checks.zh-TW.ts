@@ -167,6 +167,8 @@ const messages: Translation<typeof en> = {
         `${fitted ? `開始時就配合了那段文字，嚮導只提供${fitted}。` : ""}${claim}你用到的協助：${used}。`,
       noHelp: "沒有",
       otherTools: `${product.name} 看不到你用過的其他工具，例如編輯器的自動完成。`,
+      denial: ({ line, kinds }) =>
+        `你的文字寫著「${line}」。在這個工作裡，${product.name} 的嚮導給了你${kinds}。如果那句話指的是別的事，請確認；否則請改寫。`,
     },
   },
 };

@@ -252,6 +252,9 @@ const messages = {
         `${fitted ? `Fitted at the start, the guide offered only ${fitted}. ` : ""}${claim} You used: ${used}.`,
       noHelp: "none",
       otherTools: `${product.name} can't see other tools you used, such as editor autocomplete.`,
+      /** disclosure-accuracy: the person's line, quoted; never called true or false. */
+      denial: ({ line, kinds }: { line: string; kinds: string }) =>
+        `Your text says "${line}". In this run ${product.name}'s guide gave you ${kinds}. If that line means something else, confirm; otherwise reword it.`,
     },
   },
 };

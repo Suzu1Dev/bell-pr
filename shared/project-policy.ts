@@ -828,3 +828,33 @@ export function hasAiDisclosure(
       ),
   );
 }
+
+const mentionsAi = new RegExp(String.raw`\b${aiTerm}`, "i");
+
+/**
+ * Headroom item 2 (DESIGN v1.2 F13): the first line of the PR text that
+ * says no AI helped, quoted as written: BELL's agent disclosure line, a
+ * disclosure field answered "no", or a sentence with a clause that
+ * `deniesAssistance` matches, names AI and names none of the guide's help.
+ * A Learn-by-hand run asks whether it means something else; nothing here
+ * judges it true or false.
+ */
+export function assistanceDenial(body: string, commitMessage = "") {
+  if (body.includes(aiDisclosureLine)) return aiDisclosureLine;
+  for (const text of [body, commitMessage]) {
+    const lines = markdownProse(text);
+    const field = lines.find((line) => deniedField.test(disclosureField.exec(line)?.[1].trim() ?? ""));
+    if (field) return field.trim();
+    for (const block of blocks(lines.map((line, index) => ({ line: index + 1, text: line })))) {
+      const visible = block.text.replace(/^\s*(?:[-*+>]|\d+[.)])\s+/, "");
+      const denial = splitSentences(visible).find(({ start, end }) =>
+        visible
+          .slice(start, end)
+          .split(/;|:\s|\bbut\b/i)
+          .some((clause) => deniesAssistance.test(clause) && mentionsAi.test(clause) && !namesHelp(clause)),
+      );
+      if (denial) return visible.slice(denial.start, denial.end).trim();
+    }
+  }
+  return undefined;
+}

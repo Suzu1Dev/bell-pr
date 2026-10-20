@@ -19,7 +19,7 @@ import {
 import en from "./i18n/draft-checks.en.js";
 import zhTW from "./i18n/draft-checks.zh-TW.js";
 import { formatters, type Locale } from "./i18n/locale.js";
-import { disclosureRule, hasAiDisclosure } from "./project-policy.js";
+import { assistanceDenial, disclosureRule, hasAiDisclosure } from "./project-policy.js";
 import type { HelpKind } from "./by-hand.js";
 import { byHandRulesDecision, type ByHandBlockReason } from "./by-hand-rules.js";
 import { areaReach, banReach } from "./policy-reach.js";
@@ -546,6 +546,16 @@ export function respectChecks(
           ? disclosures.map(quote)
           : [dictionaries[locale].ruleQuote(disclosureSource!)]),
       ],
+    });
+  // Headroom item 2 (DESIGN v1.2 F13): a line that says no AI helped, in a
+  // run the guide helped with, is quoted next to the record; never a block.
+  const denial = byHand?.helps.length ? assistanceDenial(input.body, input.commitMessage) : undefined;
+  if (denial)
+    confirms.push({
+      id: "disclosure-accuracy",
+      kind: "confirm",
+      message: bh.denial({ line: denial, kinds: used }),
+      details: [bh.helpRecord({ used }), bh.otherTools],
     });
 
   // The description is still BELL's suggestion: a block where the project

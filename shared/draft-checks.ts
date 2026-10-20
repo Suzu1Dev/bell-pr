@@ -299,7 +299,9 @@ export interface DraftCheck {
     | "facts-unknown"
     // The quoted confirm of a clean Learn-by-hand run (DESIGN v1.2 F12);
     // never an override, never a typed reason.
-    | "by-hand-rules";
+    | "by-hand-rules"
+    // Headroom item 2 (DESIGN v1.2 F13): a line that says no AI helped.
+    | "disclosure-accuracy";
   /** block stops approval and publishing; confirm needs the person's acknowledgement before publishing. */
   kind: "block" | "confirm";
   message: string;
