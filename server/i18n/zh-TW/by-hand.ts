@@ -24,6 +24,7 @@ const byHand: Translation<typeof en> = {
   testFirst: "請先在這個版本上跑一次測試；測試才是裁判。",
   fitUnavailable: ({ reason }) =>
     `${product.name} 已經無法讓這個工作配合專案的規範：${reason}。請重新檢查規範，或改用所有種類的協助開始。`,
+  fitNeedsByHand: "只有親手學的工作才能讓嚮導配合專案的規範。",
   fitNothing: "專案的規範裡沒有可以讓嚮導配合的 AI 規則",
   helpOutsideFit: ({ kind }) => `這個工作不提供：它所配合的專案文字沒有提到${kind}。`,
   helpKinds: {

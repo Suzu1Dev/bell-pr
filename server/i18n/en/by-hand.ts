@@ -43,6 +43,8 @@ const byHand = {
   /** POST /api/runs with byHandFit when the case is no longer fitted. */
   fitUnavailable: ({ reason }: { reason: string }) =>
     `${product.name} can't fit this run to the project's rules any more: ${reason}. Check the rules again, or start with every kind of help.`,
+  /** POST /api/runs with byHandFit but not learnByHand. */
+  fitNeedsByHand: "Fitting the guide to the project's rules is only for Learn-by-hand runs.",
   /** The reason when the project's rules have no AI rule to fit to. */
   fitNothing: "the project's rules have no AI rule to fit the guide to",
   /** A kind of help outside a fitted run's help set (DESIGN v1.2 F12). */

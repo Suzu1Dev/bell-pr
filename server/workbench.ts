@@ -40,7 +40,7 @@ import * as repositories from "./repositories.js";
 import * as executor from "./run-executor.js";
 import { retryTeam } from "./team-retry.js";
 import * as teamPlan from "./team-plan.js";
-import { createRun, type NewRunSources } from "./new-run.js";
+import { createRun, type NewRunMode, type NewRunSources } from "./new-run.js";
 import { RunQueue } from "./run-queue.js";
 import * as publishing from "./publish.js";
 import * as learning from "./learning.js";
@@ -367,12 +367,13 @@ export class Workbench {
     return repositories.updateRepository(this.context, id);
   }
 
-  /** Creates a run and queues it (new-run.ts). */
+  /** Creates a run and queues it (new-run.ts); `mode` makes it a Learn-by-hand run. */
   async createRun(
     repoId: string,
     prompt: string,
     title?: string,
     settings?: ContributionSettings,
+    mode: NewRunMode = {},
   ) {
     // Through `this`, so a replaced method (as tests do) applies.
     const sources: NewRunSources = {
@@ -380,7 +381,7 @@ export class Workbench {
       status: () => this.status(),
       entitlements: () => this.entitlements(),
     };
-    return createRun(this.context, sources, repoId, prompt, title, settings);
+    return createRun(this.context, sources, repoId, prompt, title, settings, mode);
   }
 
   /**
