@@ -742,12 +742,22 @@ const permission =
 /** Where the words a permission covers end: a condition, a contrast or a duty. */
 const permissionEnd =
   /;|\b(?:but|provided|as\s+long\s+as|so\s+long\s+as|if|unless|except|however|although|though|whereas|while|when|should|must|needs?|ha(?:ve|s)\s+to|expected|required)\b/gi;
-/** A negation among the permitted words drops the permission. */
+/** A negation or an exception among the permitted words drops the permission ("for anything other than debugging"). */
 const permissionNegated =
-  /\b(?:not|no|never|neither|nor|without|cannot|forbid\w*|prohibit\w*|ban(?:s|ned)?|disallow\w*|unacceptable|avoid\w*)\b|n['’]t\b/i;
+  /\b(?:not|no|never|neither|nor|without|cannot|forbid\w*|prohibit\w*|ban(?:s|ned)?|disallow\w*|unacceptable|avoid\w*|other\s+than|apart\s+from|aside\s+from|besides|excluding|instead\s+of|rather\s+than|beyond)\b|n['’]t\b/i;
 /** A permission for some people only ("only for maintainers") is no carve-out for the person. */
 const permissionScoped =
   /\b(?:only|solely|exclusively|maintainers?|committers?|core|staff|employees?|team\s+members?)\b/i;
+/** A permission that waits for somebody's approval, anywhere in its sentence ("if a maintainer approves"). */
+const othersApproval = /\b(?:approv\w*|permission|consent|sign[- ]?off|agree\w*|ask(?:s|ed)?\s+(?:you|for)|invit\w*)\b/i;
+/** A contrast right after the permission that takes it back: "fine in your fork, but not in this repository". */
+const contrastTakesBack = /^\W*(?:but\s+)?(?:not|never|no)\b/i;
+/** Somebody else's view, a rule of the past or one not decided: never the project's permission. */
+const notTheProjects =
+  /\b(?:no\s+longer|anymore|used\s+to|previously|formerly|until\s+recently|whether|myths?|misconceptions?|(?:some|many|other)\s+(?:people|contributors|users|folks|projects)|people\s+(?:often\s+|sometimes\s+)?(?:think|believe|say|claim|assume)|(?:you|they|others)\s+(?:may|might)\s+(?:think|believe|hear|have\s+heard)|(?:it\s+is|it['’]s)\s+(?:often\s+|commonly\s+|widely\s+|sometimes\s+)?(?:said|claimed|believed|assumed|thought))\b/i;
+/** The next sentence takes it back: "Just kidding: it is not." */
+const takenBack =
+  /^\W*(?:just\s+kidding|kidding|not\s+really|nope|(?:it|that|this)\s+(?:is|was)(?:\s+not|n['’]t)\b|(?:it|that|this)\s+no\s+longer\b)/i;
 /** A sentence about AI help, as carve-outs are. */
 const aiMention =
   /\b(?:AI|LLMs?|large\s+language\s+models?|language\s+models?|generative|chatbots?|ChatGPT|Copilot|Claude|Codex|Gemini|machine[- ]learning|artificial\s+intelligence)\b/i;
@@ -850,7 +860,7 @@ function readCarveOuts(path: string, text: string): PolicyAllowance[] {
   };
   all.forEach((block, index) => {
     const under = nearestHeading(index, () => true);
-    if (under !== undefined && refusingHeading.test(under)) return;
+    if (under !== undefined && (refusingHeading.test(under) || notTheProjects.test(under))) return;
     const search = searchable(block.text);
     // A list item under "Acceptable uses" (only list items between them).
     const lead = listItem.test(block.text) ? nearestHeading(index, (other) => listItem.test(other.text)) : undefined;
@@ -862,7 +872,8 @@ function readCarveOuts(path: string, text: string): PolicyAllowance[] {
       !permissionScoped.test(lead) &&
       block.text.length <= 300 &&
       !permissionNegated.test(search) &&
-      !permissionScoped.test(search)
+      !permissionScoped.test(search) &&
+      !notTheProjects.test(search)
     )
       add(block, quoteOf(block.text, whole, whole), carveOutKinds(search));
     const sentences = splitSentences(block.text);
@@ -891,10 +902,18 @@ function readCarveOuts(path: string, text: string): PolicyAllowance[] {
         if (quote.length <= 300) add(block, { quote, offset: asked.offset }, kinds);
         return;
       }
+      // Somebody else's view, a past or undecided rule, or one the next sentence takes back.
+      const following = sentences[at + 1];
+      if (notTheProjects.test(words) || (following && takenBack.test(search.slice(following.start, following.end)))) return;
       for (const phrase of allMatches(permission, words)) {
         const covered = permittedWords(words, phrase);
-        if (permissionNegated.test(words.slice(covered.start, covered.end))) continue;
-        if (permissionScoped.test(words.slice(covered.start, covered.clause))) continue;
+        // The permitted words and what qualifies them up to the condition, the permission's own words left out.
+        const qualified = `${words.slice(covered.start, Math.max(covered.start, phrase.start))} ${words.slice(phrase.end, covered.clause)}`;
+        if (permissionNegated.test(qualified)) continue;
+        if (contrastTakesBack.test(words.slice(covered.clause).replace(/^\s*;/, ""))) continue;
+        // A role or somebody's approval anywhere after the permitted words, conditions included.
+        const rest = words.slice(covered.start);
+        if (permissionScoped.test(rest) || othersApproval.test(rest)) continue;
         const quote = quoteOf(block.text, sentence, {
           start: sentence.start + Math.min(phrase.start, covered.start),
           end: sentence.start + Math.max(phrase.end, covered.end),

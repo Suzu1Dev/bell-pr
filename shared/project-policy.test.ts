@@ -611,6 +611,34 @@ test("no carve-out without a permission, under a negation, for some people only,
   assert.deepEqual(attachCarveOuts("CONTRIBUTING.md", text, classifyPolicy("CONTRIBUTING.md", text)), []);
 });
 
+test("no carve-out that its own sentence narrows, takes back, leaves to others or reports", () => {
+  for (const text of [
+    // Narrowed after the permission, or by a contrast right after it.
+    "Using AI to understand the code is acceptable in issues, not in pull requests.",
+    "Using AI to understand the code is fine in your own fork, but not in this repository.",
+    "It's fine to use AI for anything other than debugging.",
+    // Somebody's approval or a role in its condition.
+    "Using AI for debugging is fine if a maintainer approves it first.",
+    "It's fine to use AI for debugging when a maintainer asks you to.",
+    "Debugging with AI is fine with the prior approval of the team.",
+    // Taken back, past, undecided or somebody else's view.
+    "We used to say it's fine to use AI for debugging; that is no longer the case.",
+    "Some people think it's fine to use AI for debugging.",
+    "We are still discussing whether it's fine to use AI for debugging.",
+    "Using AI to explain the code is fine. Just kidding: it is not.",
+  ])
+    assert.deepEqual(carveOuts(`${ban}\n\n${text}`), [], text);
+  // The project's own permission, with a duty or a contrast that leaves it whole, stays.
+  assert.deepEqual(carveOuts(`${ban}\n\nUsing AI as a learning aid is not prohibited.`), [
+    "3: Using AI as a learning aid is not prohibited. [explain, answer]",
+  ]);
+  assert.deepEqual(carveOuts(`${ban}\n\nWe think it's fine to use AI to understand the codebase, but please don't paste its output.`), [
+    "3: We think it's fine to use AI to understand the codebase, but please don't paste its output. [explain, answer]",
+  ]);
+  // Nothing under a heading about past rules or myths.
+  assert.deepEqual(carveOuts(`${ban}\n\n## Myths about AI\n\nIt's fine to use AI for debugging.`), []);
+});
+
 test("a question about using AI answered Yes is a carve-out, never 'Yes, but please don't' or No", () => {
   // Servo's book, src/policy/ai-usage.md (plan research/policies.md), as headings and answers.
   const servo = [
