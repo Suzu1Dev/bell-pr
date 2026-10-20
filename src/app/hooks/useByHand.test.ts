@@ -5,7 +5,7 @@ import { selectionQuestion, parseDiff } from "../../review/diff";
 import en from "../../i18n/en/review";
 import { mount } from "../../mission/test-dom";
 import type { DiffFile, Run } from "../../types";
-import { selectionOf, useByHand, type ByHand } from "./useByHand";
+import { focusWhenShown, selectionOf, useByHand, type ByHand } from "./useByHand";
 
 const file: DiffFile = {
   path: "src/retry.ts",
@@ -147,5 +147,25 @@ test("an explanation asked for before a reload is followed by reading the diff u
     await mounted.unmount();
     mock.timers.reset();
     globalThis.fetch = realFetch;
+  }
+});
+
+test("the focus moves to an element once it is on screen, and the search gives up after a while", () => {
+  mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    let shownAfter = 2;
+    const focused: string[] = [];
+    focusWhenShown(() => (shownAfter-- > 0 ? null : ({ focus: () => focused.push("close") } as unknown as HTMLElement)));
+    assert.deepEqual(focused, []);
+    mock.timers.tick(50);
+    assert.deepEqual(focused, []);
+    mock.timers.tick(50);
+    assert.deepEqual(focused, ["close"]);
+    let calls = 0;
+    focusWhenShown(() => (calls++, null), 3);
+    for (let tick = 0; tick < 10; tick++) mock.timers.tick(50);
+    assert.equal(calls, 4);
+  } finally {
+    mock.timers.reset();
   }
 });

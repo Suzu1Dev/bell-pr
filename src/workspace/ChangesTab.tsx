@@ -44,7 +44,7 @@ import { usePresentation } from "../app/presentation";
 import { FailureText } from "../FailureText";
 import { PremiseNotice } from "../team/PremiseNotice";
 import type { RunActions } from "../app/hooks/useRunActions";
-import type { ByHand } from "../app/hooks/useByHand";
+import { focusWhenShown, type ByHand } from "../app/hooks/useByHand";
 import type { Walkthroughs } from "../app/hooks/useWalkthroughs";
 import type { PanelTab } from "../review/ExplanationPanel";
 import type { LineRange } from "../review/WalkthroughCards";
@@ -220,9 +220,12 @@ export function ChangesTab({
     if (writing) setShowExplanation(true);
   }, [run.id, writing, setShowExplanation]);
   const loading = (<div className="empty-state" role="status"><Loader2 className="spin" /><p>{t.loadingPanel}</p></div>);
-  // At the ready version: "Run the review again" opens the Ready dialog, and the reader view's check (W2E).
+  // The check replaces the reader view whose button opens it, so the focus moves into the check (its close button).
+  const checkWrap = useRef<HTMLDivElement>(null);
+  const openCheck = () => (openCheckPanel(run.id), focusWhenShown(() => checkWrap.current?.querySelector<HTMLElement>(".check-header button")));
+  // At the ready version: "Run the review again" opens the Ready dialog, and the reader view's check (W2E ByHandReader).
   const byHandReview = run.learnByHand && byHand
-    ? { onReviewAgain: byHand.openReady, check: understanding?.view, onOpenCheck: () => openCheckPanel(run.id) }
+    ? { onReviewAgain: byHand.openReady, check: understanding?.view, checkError: understanding?.error, onOpenCheck: openCheck, onRetryCheck: () => understanding?.refresh() }
     : undefined;
   useEffect(() => {
     if (!checking) {
@@ -665,7 +668,7 @@ export function ChangesTab({
           />
           <aside className="explanation-wrap">
             {checking && understanding ? (
-              <div className="check-wrap">
+              <div className="check-wrap" ref={checkWrap}>
                 {askWaiting && <p className="check-ask-waiting" role="status">{t.closedBookAsk}</p>}
                 <ErrorBoundary resetKey={`${run.id}:check`}>
                   <Suspense

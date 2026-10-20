@@ -26,6 +26,13 @@ export function selectionOf(file: DiffFile, question: string): GuideSelection {
   return { path: file.path, startLine: range.length ? Math.min(...range) : 0, endLine: range.length ? Math.max(...range) : 0 };
 }
 
+/** Focuses what `find` returns once it is on screen (a lazy view mounts a render or two later); gives up after 2 s. */
+export function focusWhenShown(find: () => HTMLElement | null | undefined, tries = 40) {
+  const target = find();
+  if (target) target.focus();
+  else if (tries > 0) setTimeout(() => focusWhenShown(find, tries - 1), 50);
+}
+
 /**
  * A Learn-by-hand run in the workspace (DESIGN v1.2 F3-F6, F9, F5): its
  * requests, each showing the server's message when refused, the Ready
