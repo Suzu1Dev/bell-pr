@@ -75,6 +75,7 @@ import {
   webBoundaries,
 } from "./prompts/team.js";
 import type { WorkbenchContext } from "./workbench.js";
+import * as byHand from "./by-hand.js";
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
@@ -116,6 +117,8 @@ export async function runAgent(
     timeout?: Extract<AgentTimeoutKind, "explanations" | "draft">;
   } = {},
 ) {
+  // Learn by hand: BELL's agents never get a write turn (DESIGN v1.2 F2).
+  if (run.learnByHand && !readonly) throw new AppError((m) => m.byHand.noWriteTurn, 409);
   const modelExecution = run.modelExecution ?? {
     source: "cli-default" as const,
   };
@@ -701,6 +704,8 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
     const locale = currentLocale();
     const team = run.team;
     if (!team) throw new AppError((m) => m.run.team.legacyRun, 409);
+    // Learn by hand: the guide's read-only orientation and the outline, never a team task.
+    if (run.learnByHand) return await byHand.planByHand(ctx, run, locale, signal);
     if (!team.tasks.length) {
       enterPhase(run, team, "planning");
       const revisions = team.planRevisions ?? [];

@@ -341,6 +341,8 @@ export async function resolveConflicts(ctx: WorkbenchContext, id: string) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
+    // No conflict agent in Learn by hand: the person resolves the markers.
+    if (run.learnByHand) throw new AppError((m) => m.byHand.resolveByHand, 409);
     const target = conflictHolder(run);
     if (
       !target ||
