@@ -12,7 +12,7 @@ const count = (n: number, noun: string) => (plural(n) === "one" ? `1 ${noun}` : 
 const en = {
   plan: {
     title: "Plan with the guide",
-    intro: "Write your own steps first. The guide's outline stays folded until you save one.",
+    intro: "Write your own steps first.",
     step: ({ number }: { number: number }) => `Step ${number}`,
     files: "Files (optional, comma-separated)",
     how: "What you'll do here (optional)",

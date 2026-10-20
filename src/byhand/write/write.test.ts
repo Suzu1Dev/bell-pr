@@ -112,6 +112,9 @@ test("a run fitted to rules that don't name planning help keeps the outline clos
   const fitted = html(plan({ guidePlan, helpLock: lock }, {}, { status: "awaiting_plan" }));
   assert.ok(fitted.includes(apostrophes("doesn't name planning help: the guide's outline stays closed.")));
   assert.doesNotMatch(fitted, /I don&#x27;t know where to start|step names/);
+  // Nothing on the panel promises the outline later.
+  assert.doesNotMatch(fitted, /folded until/i);
+  assert.doesNotMatch(renderZh(plan({ guidePlan, helpLock: lock }, {}, { status: "awaiting_plan" })), /一直收起來/);
 });
 
 test("a step added after the first save takes the id the server gave it, never another step's", () => {

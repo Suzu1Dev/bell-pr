@@ -8,7 +8,7 @@ const name = product.name;
 const m: Translation<typeof en> = {
   plan: {
     title: "和嚮導一起規劃",
-    intro: "先寫下你自己的步驟。存下第一步之前，嚮導的大綱會一直收起來。",
+    intro: "先寫下你自己的步驟。",
     step: ({ number }) => `第 ${number} 步`,
     files: "檔案（選填，用逗號分隔）",
     how: "你在這一步會怎麼做（選填）",
