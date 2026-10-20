@@ -220,3 +220,50 @@ test("an override of ai-ban or by-hand-rules is a 400 at the publish route", asy
   // Acknowledging the confirm is request data; it reaches publishing, which checks the approval first.
   assert.equal(await publish([]), 409);
 });
+
+test("a Learn-by-hand run's empty PR title reaches approval's own 422 at the route, never a schema error", async (t) => {
+  const f = await fixture(t);
+  // As the server starts a Learn-by-hand run: the PR title is the person's to write (DESIGN v1.2 F11).
+  f.run.draft = { title: "", body: "Retries a GET twice after a 503. I wrote it myself." };
+  // A project without AI rules, so approval stops only at the PR text.
+  f.repo.contributionRules = { ...f.repo.contributionRules!, findings: [] };
+  const app = createApp(f.workbench, { staticDirectory: path.join(f.directory, "missing") });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const { port } = server.address() as AddressInfo;
+  t.after(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await app.locals.insights.shutdown();
+    await app.locals.discovery.shutdown();
+  });
+  const approve = (draft: Run["draft"]) =>
+    new Promise<{ status: number; error?: string }>((resolve, reject) => {
+      const text = JSON.stringify({ draft });
+      const req = request(
+        `http://127.0.0.1:${port}/api/runs/${f.run.id}/approve`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Bell-Locale": "en",
+            Host: "127.0.0.1:4311",
+            "Content-Length": Buffer.byteLength(text),
+          },
+        },
+        (response) => {
+          let body = "";
+          response.setEncoding("utf8");
+          response.on("data", (chunk: string) => (body += chunk));
+          response.on("end", () => resolve({ status: response.statusCode!, error: (JSON.parse(body) as { error?: string }).error }));
+        },
+      );
+      req.on("error", reject);
+      req.end(text);
+    });
+  assert.deepEqual(await approve({ ...f.run.draft }), { status: 422, error: "Fill in the PR title and description first." });
+  assert.equal(f.run.status, "review");
+  // The title the person writes and saves is approved as before.
+  f.run.draft = { ...f.run.draft, title: "Retry a GET twice" };
+  assert.equal((await approve({ ...f.run.draft })).status, 200);
+  assert.equal(f.run.status, "approved");
+});

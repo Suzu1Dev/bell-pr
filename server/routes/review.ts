@@ -133,7 +133,9 @@ export function registerReviewRoutes(
     const { draft } = z
       .object({
         draft: z.object({
-          title: z.string().min(1).max(180),
+          // May be empty: approve() answers 422 prTextRequired, as for a Learn-by-hand run's
+          // PR title, which starts empty (DESIGN v1.2 F11).
+          title: z.string().max(180),
           body: z.string().max(60_000),
           // A stored message can come from an agent, so approval checks it like an edit.
           commitMessage: commitMessageField,
