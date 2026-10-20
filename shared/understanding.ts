@@ -317,6 +317,14 @@ export interface FileAttemptInput {
     skipped?: boolean;
   };
   road?: { guess?: string; choice?: RoadChoice; why?: string };
+  /** A walkthrough unit's "Check yourself", by its key `name:startLine` (D1). */
+  walkthrough?: {
+    unit: string;
+    answer?: string;
+    confidence?: Confidence;
+    grade?: SelfGrade;
+    skipped?: boolean;
+  };
 }
 
 /**
@@ -460,6 +468,93 @@ export interface CheckExplanation {
   content?: ChangeExplanation;
 }
 
+/** What the check reads of a stored walkthrough (`RunCore.walkthroughs`). */
+export interface CheckWalkthrough {
+  fingerprint?: string;
+  status?: string;
+  content?: {
+    functions: { name: string; startLine: number; selfCheck?: { question: string; answer: string } }[];
+  };
+}
+
+/** A walkthrough unit's key in `FileAttempt.walkthroughs`. */
+export function walkthroughUnitKey(unit: { name: string; startLine: number }) {
+  return `${unit.name}:${unit.startLine}`;
+}
+
+/** The units of a file's walkthrough that ask "Check yourself", when it is ready for this version. */
+function walkthroughChecks(stored: CheckWalkthrough | undefined, fingerprint?: string) {
+  if (stored?.status !== "ready" || !stored.content) return [];
+  if (fingerprint && stored.fingerprint && stored.fingerprint !== fingerprint) return [];
+  return stored.content.functions.flatMap((unit) =>
+    unit.selfCheck?.question
+      ? [{ unit: walkthroughUnitKey(unit), question: unit.selfCheck.question, answer: unit.selfCheck.answer }]
+      : [],
+  );
+}
+
+/**
+ * The answer that may fill a file's `attempt:` slot: the card's quiz once
+ * graded (and not skipped), else the first graded walkthrough unit answer
+ * by key (D1). planCheck and creditedQuiz choose alike.
+ */
+function slotAnswer(attempt: FileAttempt | undefined): { quiz: WalkthroughAnswer; unit?: string } | undefined {
+  const quiz = attempt?.quiz;
+  if (quiz?.grade && !quiz.skipped) return { quiz };
+  const [unit, answer] =
+    Object.entries(attempt?.walkthroughs ?? {})
+      .sort(([a], [b]) => a.localeCompare(b))
+      .find(([, value]) => value.grade && !value.skipped) ?? [];
+  return unit && answer ? { quiz: answer, unit } : undefined;
+}
+
+/**
+ * The quiz answer behind a file's `attempt:` check item, the five readers
+ * share it: the card's quiz, or a walkthrough unit's answer with the
+ * unit's question and reference when its walkthrough is ready for the
+ * attempt's version.
+ */
+export function creditedQuiz(
+  run: {
+    attempts?: Record<string, FileAttempt | undefined>;
+    walkthroughs?: Record<string, CheckWalkthrough | undefined>;
+  },
+  path: string,
+): (WalkthroughAnswer & { unit?: string; question?: string; reference?: string }) | undefined {
+  const attempt = run.attempts?.[path];
+  const slot = slotAnswer(attempt);
+  if (!slot) return attempt?.quiz;
+  if (!slot.unit) return slot.quiz;
+  const check = walkthroughChecks(run.walkthroughs?.[path], attempt?.fingerprint).find(
+    (entry) => entry.unit === slot.unit,
+  );
+  return { ...slot.quiz, unit: slot.unit, ...(check ? { question: check.question, reference: check.answer } : {}) };
+}
+
+/**
+ * Keeps the walkthroughs whose units the person answered at their file's
+ * version and drops the rest, as a changed premise verdict does with
+ * explanations (`dropUnansweredExplanations`): a remade walkthrough would
+ * put new questions in place of the ones answered. W2A calls it from
+ * server/premise-runs.ts instead of deleting every walkthrough.
+ */
+export function keepAnsweredWalkthroughs(run: {
+  walkthroughs?: Record<string, CheckWalkthrough>;
+  attempts?: Record<string, FileAttempt | undefined>;
+}) {
+  const stored = run.walkthroughs;
+  if (!stored) return;
+  for (const [file, walkthrough] of Object.entries(stored)) {
+    const attempt = run.attempts?.[file];
+    const answered =
+      !!attempt &&
+      attempt.fingerprint === walkthrough.fingerprint &&
+      Object.keys(attempt.walkthroughs ?? {}).length > 0;
+    if (!answered) delete stored[file];
+  }
+  if (!Object.keys(stored).length) delete run.walkthroughs;
+}
+
 /** The file's explanation card, when it is ready for this version of the file. */
 function readyCard(
   file: CheckFile,
@@ -525,6 +620,7 @@ export function planCheck({
   files,
   explanations,
   attempts,
+  walkthroughs,
   reports,
   reviewOrder,
   generated,
@@ -534,6 +630,12 @@ export function planCheck({
   files: readonly CheckFile[];
   explanations?: Record<string, CheckExplanation | undefined>;
   attempts?: Record<string, FileAttempt | undefined>;
+  /**
+   * The stored walkthroughs (D1, agent runs only): a unit's "Check
+   * yourself" is the file's question when its card has none, and a graded
+   * unit answer can fill the file's slot as a credited attempt.
+   */
+  walkthroughs?: Record<string, CheckWalkthrough | undefined>;
   reports?: Reports;
   reviewOrder?: readonly string[];
   generated?: readonly string[];
@@ -559,13 +661,15 @@ export function planCheck({
   const plan: PlannedItem[] = ranked
     .filter((file) => picked.includes(file))
     .map((file) => {
+      const base = { path: file.path, fingerprint: file.fingerprint };
+      const kept = keep.includes(file) ? locked.get(file.path) : undefined;
       const card = readyCard(file, explanations);
-      const check = card?.selfCheck;
+      // A walkthrough unit's check stands in for a card without one (D1).
+      const units = walkthroughChecks(walkthroughs?.[file.path], file.fingerprint);
+      const check = card?.selfCheck ?? units[0];
       const fallbackReference = card
         ? `${card.summary}\n\n${card.reason}`
         : undefined;
-      const base = { path: file.path, fingerprint: file.fingerprint };
-      const kept = keep.includes(file) ? locked.get(file.path) : undefined;
       if (kept)
         return {
           ...base,
@@ -573,15 +677,24 @@ export function planCheck({
           source: kept.source,
           question: kept.question,
           reference:
-            kept.source === "fallback" ? fallbackReference : check?.answer,
+            kept.source === "fallback"
+              ? fallbackReference
+              : [card?.selfCheck, ...units].find((entry) => entry?.question === kept.question)?.answer ??
+                check?.answer,
         };
-      if (check && creditedAttempt(attempts?.[file.path], file, check.answer))
+      const slot = slotAnswer(attempts?.[file.path]);
+      const credit = slot?.unit ? units.find((unit) => unit.unit === slot.unit) : card?.selfCheck;
+      if (
+        slot &&
+        credit &&
+        creditedAttempt({ fingerprint: attempts![file.path]!.fingerprint, quiz: slot.quiz }, file, credit.answer)
+      )
         return {
           ...base,
           id: `attempt:${file.path}`,
           source: "attempt",
-          question: check.question,
-          reference: check.answer,
+          question: credit.question,
+          reference: credit.answer,
         };
       if (check)
         return {

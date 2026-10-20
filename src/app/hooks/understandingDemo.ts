@@ -13,6 +13,7 @@ import type { ChangeExplanation } from "../../../shared/explanations";
 import { activeFollowUp } from "../../../shared/followups";
 import {
   changeFingerprint,
+  creditedQuiz,
   planCheck,
   recordPass,
   understandingLimits,
@@ -50,6 +51,17 @@ export function demoCheckFiles(files: readonly DiffFile[]): CheckFile[] {
   }));
 }
 
+/** Each file's walkthrough as the check reads it (D1): ready once the sample shows it. */
+function walkthroughs(files: readonly DiffFile[]) {
+  return Object.fromEntries(
+    files.flatMap((file) =>
+      file.walkthrough
+        ? [[file.path, { fingerprint: file.fingerprint ?? file.path, status: "ready", content: file.walkthrough }]]
+        : [],
+    ),
+  );
+}
+
 /** Each file's explanation as the check reads it: ready once the sample shows it. */
 function explanations(files: readonly DiffFile[]) {
   return Object.fromEntries(
@@ -78,6 +90,7 @@ function plan(run: Run, files: readonly DiffFile[], questions: CheckQuestions) {
     files: demoCheckFiles(files),
     explanations: explanations(files),
     attempts: run.attempts,
+    walkthroughs: walkthroughs(files),
     reports: run.reports,
     record: run.understanding,
     questions,
@@ -174,7 +187,7 @@ export function demoLockAnswers(
   const locked = new Set((record.items ?? []).map((item) => item.id));
   const byId = new Map(planned.map((item) => [item.id, item]));
   const credited = planned.flatMap((item): UnderstandingItem[] => {
-    const quiz = run.attempts?.[item.path ?? ""]?.quiz;
+    const quiz = creditedQuiz(run, item.path ?? "");
     if (item.source !== "attempt" || locked.has(item.id) || !quiz?.confidence || !quiz.grade)
       return [];
     return [
@@ -309,7 +322,7 @@ function applyForecast(
 export function demoSaveAttempt(
   run: Run,
   file: DiffFile,
-  input: Pick<FileAttemptInput, "quiz" | "road">,
+  input: Pick<FileAttemptInput, "quiz" | "road" | "walkthrough">,
   at: string,
 ): Record<string, FileAttempt> {
   const fingerprint = file.fingerprint ?? file.path;
@@ -339,6 +352,15 @@ export function demoSaveAttempt(
       }),
       at,
     };
+  // A walkthrough unit's answer, final once graded or skipped, as the quiz (D1).
+  if (input.walkthrough) {
+    const { unit, ...answer } = input.walkthrough;
+    const units = (attempt.walkthroughs ??= {});
+    const prior = units[unit];
+    if (!prior || !(prior.grade || prior.skipped))
+      units[unit] = { ...prior, ...set({ ...answer, answer: answer.answer?.trim() }), at };
+    else if (answer.grade && !prior.grade) units[unit] = { ...prior, grade: answer.grade, at };
+  }
   attempts[file.path] = attempt;
   return attempts;
 }

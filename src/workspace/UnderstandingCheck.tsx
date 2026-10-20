@@ -5,6 +5,7 @@ import {
   changedLines,
   checkScope,
   confidences,
+  creditedQuiz,
   effectiveGrade,
   selfGrades,
   tasteDimensions,
@@ -806,8 +807,8 @@ function AnswerItem({
 }) {
   const t = useT("workspace").check;
   if (planned.source === "attempt") {
-    const quiz = item ?? run.attempts?.[planned.path ?? ""]?.quiz;
-    const grade = item?.grade ?? run.attempts?.[planned.path ?? ""]?.quiz?.grade;
+    const quiz = item ?? creditedQuiz(run, planned.path ?? "");
+    const grade = item?.grade ?? quiz?.grade;
     return (
       <>
         <p className="check-question">{planned.question}</p>

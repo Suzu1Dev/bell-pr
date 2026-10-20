@@ -14,6 +14,7 @@ import { parseLocale } from "../shared/i18n/locale.js";
 import {
   cardTexts,
   changeFingerprint,
+  creditedQuiz,
   looksCopied,
   planCheck,
   recordPass,
@@ -103,6 +104,7 @@ export function planUnderstanding(
       reports: run.reports,
       generated: repo?.contributionRules?.generated,
       record: run.understanding,
+      walkthroughs: run.walkthroughs,
       questions: {
         fallback: (path) => messages.fallbackQuestion({ path }),
         untested: messages.untestedQuestion,
@@ -338,7 +340,7 @@ export function understandingFacade(
           throw new AppError((m) => m.understanding.alreadyLocked, 409);
         const added: UnderstandingItem[] = [
           ...credited.flatMap((planned): UnderstandingItem[] => {
-            const quiz = run.attempts?.[planned.path!]?.quiz;
+            const quiz = creditedQuiz(run, planned.path!);
             if (!quiz?.confidence || !quiz.grade) return [];
             return [
               {
@@ -515,6 +517,32 @@ export function understandingFacade(
               confidence: quiz.confidence,
               grade: quiz.grade,
               skipped: quiz.skipped,
+            }),
+            at,
+          };
+        }
+        if (input.walkthrough) {
+          const { unit, ...answer } = input.walkthrough;
+          const units = (attempt.walkthroughs ??= {});
+          const prior = units[unit];
+          // As the quiz: a graded or skipped answer is final.
+          if (prior && (prior.grade || prior.skipped) && (answer.grade ?? prior.grade) !== prior.grade)
+            throw new AppError((m) => m.understanding.attemptLocked, 409);
+          if (prior && (prior.grade || prior.skipped) && (["answer", "confidence", "skipped"] as const).some(
+            (key) => answer[key] !== undefined && (answer[key] ?? "") !== (prior[key] ?? ""),
+          ))
+            throw new AppError((m) => m.understanding.attemptLocked, 409);
+          if (answer.skipped && answer.answer?.trim())
+            throw new AppError((m) => m.understanding.attemptSkipped, 422);
+          if (!prior && Object.keys(units).length >= understandingLimits.walkthroughUnits)
+            throw new AppError((m) => m.understanding.walkthroughFull, 409);
+          units[unit] = {
+            ...prior,
+            ...defined({
+              answer: answer.answer?.trim(),
+              confidence: answer.confidence,
+              grade: answer.grade,
+              skipped: answer.skipped,
             }),
             at,
           };

@@ -9,6 +9,8 @@ const understanding = {
   fallbackQuestion: ({ path }: { path: string }) =>
     `In one sentence, what does the change to ${path} do, and why?`,
   untestedQuestion: "What did you not test, and why?",
+  /** A walkthrough answer past the units a file keeps. */
+  walkthroughFull: "This file already has the most walkthrough answers BELL keeps.",
   notOpen:
     "The understanding check can be taken while the run waits for your review or approval, not while it runs or publishes.",
   changed:
