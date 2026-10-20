@@ -46,10 +46,10 @@ export function ModeChoice({
   const id = useId();
   const reason = mode === "hand" && !sample ? byHandStartReason(rulesCase) : undefined;
   const line = reason && byHandReasonText(reason, t, locale);
-  // Every carve-out the run would be fitted to, verbatim.
+  // Every carve-out the run would be fitted to, verbatim; the first is quoted in the line above them.
   const quotes =
     rulesCase?.case === "fitted"
-      ? [...new Set(rulesCase.lock.rules.flatMap((rule) => rule.allows.map((allow) => allow.quote)))]
+      ? [...new Set(rulesCase.lock.rules.flatMap((rule) => rule.allows.map((allow) => allow.quote)))].slice(1)
       : [];
   const card = (value: RunMode, Icon: typeof Bot, title: string, text?: string) => (
     <label className={`mission-direction${mode === value ? " mission-direction-selected" : ""}`}>

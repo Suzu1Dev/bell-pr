@@ -86,7 +86,15 @@ test("where the project's text allows the quoted confirm, fitting the guide is p
   assert.match(options, /<input type="radio"[^>]*checked=""[^>]*\/><span class="mission-plan-copy"><strong>Fit the guide to the project&#x27;s rules<\/strong>/);
   assert.ok(options.includes("only if the guide stays within what the project&#x27;s own text says is fine (explanations, answers, and test help:"));
   assert.ok(options.includes("The maintainers decide whether your change fits."));
-  assert.ok(options.includes(`<blockquote>${carveOut}</blockquote>`));
+  // The carve-out shows once, in the line; a second one of the same rules below it.
+  assert.equal(options.split(carveOut).length, 2);
+  assert.doesNotMatch(options, /<blockquote>/);
+  const second = "Asking an LLM questions about an existing codebase is fine.";
+  const two: ByHandRulesCase = structuredClone(fitted);
+  if (two.case === "fitted") two.lock.rules[0].allows.push({ line: 22, quote: second, kinds: ["explain"] });
+  const both = renderEn(choice({ mode: "hand", rulesCase: two, fitted: true }));
+  assert.equal(both.split(carveOut).length, 2);
+  assert.ok(both.includes(`<blockquote>${second}</blockquote>`));
   assert.match(options, /<strong>Every kind of help, practise locally<\/strong><small>BELL PR won&#x27;t publish that run here\.<\/small>/);
   // The agent team chosen: no case at all.
   assert.doesNotMatch(renderEn(choice({ mode: "agents", rulesCase: fitted })), /mode-fit/);
