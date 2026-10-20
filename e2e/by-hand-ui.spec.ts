@@ -15,11 +15,14 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { changeFingerprint } from "../shared/change-fingerprint";
 import type { DiscoveryJob } from "../shared/discovery";
+import type { Locale } from "../shared/i18n/locale";
 import { readDiff } from "../server/git";
 import byHandText from "../src/byhand/write/i18n/en";
+import byHandZh from "../src/byhand/write/i18n/zh-TW";
 import { getSampleDiscoveryJob } from "../src/demo/discovery";
 import discovery from "../src/i18n/en/discovery";
 import workspace from "../src/i18n/en/workspace";
+import { findOverflow } from "./helpers/overflow";
 import { startReadyServer } from "./helpers/ready-server";
 import type { LaunchedServer } from "./start-server.mjs";
 
@@ -215,16 +218,16 @@ test.afterAll(async () => {
   await server?.stop();
 });
 
-async function open(browser: Browser, hash: string) {
+async function open(browser: Browser, hash: string, { locale = "en", width = 1440 }: { locale?: Locale; width?: number } = {}) {
   const context = await browser.newContext({
     baseURL: server.baseURL,
     storageState: server.storageState,
-    viewport: { width: 1440, height: 900 },
-    locale: "en-US",
+    viewport: { width, height: width < 760 ? 844 : 900 },
+    locale: locale === "en" ? "en-US" : locale,
     timezoneId: "UTC",
   });
   const page = await context.newPage();
-  await page.goto(`/${hash}${hash.includes("?") ? "&" : "?"}locale=en`);
+  await page.goto(`/${hash}${hash.includes("?") ? "&" : "?"}locale=${locale}`);
   return { page, close: () => context.close() };
 }
 
@@ -481,3 +484,35 @@ test("discovery never offers to start by hand on an issue kept for people learni
     await close();
   }
 });
+
+for (const locale of ["en", "zh-TW"] as const)
+  for (const width of [390, 1440])
+    test(`the plan, the guide and the Ready dialog fit at ${width} px in ${locale}, in one language`, async ({ browser }) => {
+      const text = locale === "en" ? byHandText : byHandZh;
+      // Every sentence of the other language's dictionary that could show here.
+      const other = Object.values((locale === "en" ? byHandZh : byHandText).guide).filter((value): value is string => typeof value === "string" && value.length > 12);
+      const fits = async (page: Page, root: string) => {
+        await expect(page.locator(root).first()).toBeVisible();
+        expect(await findOverflow(page, [root])).toEqual([]);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+        const shown = await page.locator(root).first().innerText();
+        for (const sentence of other) expect(shown).not.toContain(sentence);
+      };
+      const plan = await open(browser, `#/runs/${runs.planning}/activity`, { locale, width });
+      try {
+        await expect(plan.page.getByRole("region", { name: text.plan.title })).toBeVisible();
+        await fits(plan.page, ".team-plan .by-hand");
+      } finally {
+        await plan.close();
+      }
+      const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`, { locale, width });
+      try {
+        await expect(page.getByRole("heading", { name: text.guide.title, exact: true })).toBeVisible();
+        await fits(page, ".guide-panel");
+        await page.locator(".review-footer button.button.primary").click();
+        await expect(page.getByRole("dialog", { name: text.ready.title })).toBeVisible();
+        await fits(page, "[role=dialog]");
+      } finally {
+        await close();
+      }
+    });

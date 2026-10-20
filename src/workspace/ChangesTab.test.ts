@@ -316,4 +316,8 @@ test("while the person writes a learn-by-hand change, the guide takes the explan
   assert.doesNotMatch(html, /You changed the code after marking it ready/);
   // An agent run keeps its explanation panel and its empty state.
   assert.match(renderEn(element({ files: [], file: undefined })), /No code changes yet/);
+  // Explain it back opens after Ready (DESIGN v1.2 F10), not while the person writes.
+  assert.doesNotMatch(renderEn(element({ run: byHandRun, byHand: writing, understanding: understanding() })), /Take the check now/);
+  const ready = { writing: false, openReady() {}, ask() {}, guide: {} } as unknown as Props["byHand"];
+  assert.match(renderEn(element({ run: byHandRun, byHand: ready, understanding: understanding() })), /Take the check now/);
 });

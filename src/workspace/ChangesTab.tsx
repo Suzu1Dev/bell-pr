@@ -359,8 +359,8 @@ export function ChangesTab({
               {searchShown ? <X size={15} /> : <Search size={15} />}
             </button>
           </div>
-          {/* Test out: the check before every file is ticked (the ticks stay required). */}
-          {understanding && !checking && checkOpen && (
+          {/* Test out: the check before every file is ticked (the ticks stay required); Learn by hand: after Ready. */}
+          {understanding && !checking && checkOpen && !writing && (
             <button type="button" className="check-link" onClick={() => openCheckPanel(run.id)}>
               <SquarePen size={14} aria-hidden="true" />
               {understanding.passed ? t.openCheck : t.takeCheck}
