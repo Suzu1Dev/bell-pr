@@ -31,15 +31,18 @@ provider you set it up for). It receives:
 - for code walkthroughs and premise checks, the changed file, the code
   around the change, the task and the project's files, as for
   explanations;
-- in Learn by hand, for each guide answer: the task, your question, your
-  plan, the step you are on, your current changes to that step's files
-  (up to 40 kB), the end of your last test run's output (up to 4 kB) and
-  the guide's last answers on that step, along with the project files the
-  guide opens. For a review you ask for at **Ready for review**: your
-  change, your plan, your "least sure" line and your last test run at
-  that version. BELL PR never quotes the files it holds back from review
-  (`.env` files, keys and similar) in the guide's answers, and BELL PR's
-  agents can't edit your files in these runs;
+- in Learn by hand, for each guide answer: the task, your question (with
+  what you said you tried and the lines you selected), your plan, the step
+  you are on, your current changes (to that step's files, or to every
+  file when the step names none; up to 40 kB, then the other changed
+  files by name), your last test run with the end of its output (up to
+  4 kB) and the guide's last answers on that step, along with the files of
+  the run's folder that the guide opens. For a review you ask for at **Ready
+  for review**: your change, your plan, your "least sure" line and your
+  last test run at that version. BELL PR never quotes the files it holds
+  back from review (`.env` files, keys and similar) in the guide's
+  answers, but the guide's CLI can open them like any other file of the
+  run's folder; BELL PR's agents can't edit your files in these runs;
 - for a follow-up round (Pro), the review comments you selected, with your
   restatement of each one;
 - for a coach debrief (Pro, only when you ask for one), your own records
