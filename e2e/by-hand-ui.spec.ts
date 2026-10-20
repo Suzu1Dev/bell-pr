@@ -298,7 +298,10 @@ test("the plan saves what changed, once, and This is my plan takes one click rig
       await route.fulfill({ json: { run: { ...run, byHand: { ...run.byHand, plan: { ...body, steps, savedAt: at } } } } });
     });
     const approved = page.waitForRequest((request) => request.url().endsWith(`/api/runs/${runs.planning}/plan/approve`));
-    await page.route(`**/api/runs/${runs.planning}/plan/approve`, (route) => route.fulfill({ status: 409, json: { error: notYet } }));
+    // Confirmed, as W2A answers it: the person's turn to write.
+    await page.route(`**/api/runs/${runs.planning}/plan/approve`, (route) =>
+      route.fulfill({ json: { run: { ...run, status: "review", team: { ...run.team, phase: "developing" }, byHand: { ...run.byHand, plan: { steps: [{ id: "p1", title: "Find where retries are counted" }], savedAt: at, confirmedAt: at } } } } }),
+    );
     const plan = page.getByRole("region", { name: t.plan.title });
     await plan.getByRole("textbox", { name: t.plan.step({ number: 1 }) }).fill("Find where retries are counted");
     await plan.getByRole("textbox", { name: t.plan.unsure }).click();
@@ -315,6 +318,8 @@ test("the plan saves what changed, once, and This is my plan takes one click rig
     await approved;
     expect(saves).toHaveLength(2);
     expect(saves[1]).toMatchObject({ steps: [{ id: "p1", title: "Find where retries are counted" }], unsure: "Whether three is enough" });
+    // The plan gives way to Code changes, and the focus goes with it rather than to the page.
+    await expect(page.getByRole("tab", { name: /Code changes/ })).toBeFocused();
   } finally {
     await close();
   }

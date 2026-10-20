@@ -39,3 +39,6 @@ export const focusAfterReady = () =>
   focusWhenShown(() =>
     document.querySelector("[role=dialog]") ? null : (document.querySelector<HTMLElement>(".check-link") ?? document.querySelector<HTMLElement>(".title-row h1")),
   );
+
+/** After This is my plan the plan gives way to Code changes: the focus goes to that tab, not to the page. */
+export const focusAfterPlan = () => focusWhenShown(() => document.querySelector<HTMLElement>("#workspace-tab-changes[aria-selected=true]"));

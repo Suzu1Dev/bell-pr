@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { ListChecks, Loader2, Play, Plus, Trash2 } from "lucide-react";
-import { useFocusHome } from "./focus";
+import { focusAfterPlan, useFocusHome } from "./focus";
 import { byHandLimits, helpAllowed, type ByHandPlanInput } from "../../../shared/by-hand";
 import { PremiseNotice } from "../../team/PremiseNotice";
 import { PlanCompare } from "./PlanCompare";
@@ -182,7 +182,7 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
       )}
       {!confirmed && (
         <div className="by-hand-row">
-          <button type="button" className="button primary" disabled={busy || !drafted} onClick={action(onConfirm)}>
+          <button type="button" className="button primary" disabled={busy || !drafted} onClick={action(() => onConfirm().then(focusAfterPlan))}>
             {busy ? <Loader2 size={15} className="spin" /> : <Play size={15} aria-hidden="true" />}
             {t.confirm}
           </button>
