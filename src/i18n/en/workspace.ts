@@ -177,6 +177,9 @@ const workspace = {
     title: "Explain it back",
     intro:
       "Closed book: the explanations, notes and questions to the agent stay hidden while you answer; the diff and the file list stay. You grade yourself against the AI-written references. It is a commitment, not a test.",
+    /** A Learn-by-hand run (DESIGN v1.2 F10): the references are the person's own words and the guide's review. */
+    introByHand:
+      "Closed book: the guide, the explanations and your notes stay hidden while you answer; the diff and the file list stay. You grade yourself against your own earlier words and the guide's review. It is a commitment, not a test.",
     off: "The understanding check is off, so approval does not wait for it. You can still take it.",
     close: "Close the check",
     loading: "Loading the check…",
@@ -217,6 +220,8 @@ const workspace = {
     reference: "Reference, AI-written: the diff is the authority",
     testerReference: "The Test analyst's report, AI-written: the diff is the authority",
     noReference: "No reference: compare with the diff yourself.",
+    ownWords: "Your own words",
+    guideReview: "The guide's review",
     notGraded: "Not graded: what you did not test is yours to say.",
     dontKnowAnswer: "You said you don't know, which counts as Missed.",
     grade: "Your grade",

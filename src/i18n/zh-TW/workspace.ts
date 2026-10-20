@@ -142,6 +142,8 @@ const m: Translation<typeof en> = {
     title: "用自己的話講一遍",
     intro:
       "不看解說作答：作答時會隱藏解說、筆記與向 agent 提問，差異與檔案清單仍在。你對照 AI 寫的參考答案替自己評分。這是一個承諾，不是考試。",
+    introByHand:
+      "不看解說作答：作答時會隱藏嚮導、解說與筆記，差異與檔案清單仍在。你對照自己先前寫下的話和嚮導的審查替自己評分。這是一個承諾，不是考試。",
     off: "理解檢查已關閉，核准不需要等它；你仍然可以做。",
     close: "關閉檢查",
     loading: "正在載入檢查…",
@@ -175,6 +177,8 @@ const m: Translation<typeof en> = {
     reference: "參考答案，由 AI 撰寫：以差異內容為準",
     testerReference: "Test analyst 的報告，由 AI 撰寫：以差異內容為準",
     noReference: "沒有參考答案：請自己對照差異內容。",
+    ownWords: "你自己的話",
+    guideReview: "嚮導的審查",
     notGraded: "不評分：沒測到什麼，由你自己說明。",
     dontKnowAnswer: "你選了「我不知道」，算作沒答到。",
     grade: "你的評分",
