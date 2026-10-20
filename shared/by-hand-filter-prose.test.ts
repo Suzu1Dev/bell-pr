@@ -191,3 +191,21 @@ test("a tooling answer's command can't carry code in an inline program or a quot
   for (const text of ["Run `npm ci && npm test` first.", "Run `npx jest -t 'retries a 503'` only.", "Run `git log -p src/retry.ts` to read its history.", "Run `npm test -- retry > out.log` to keep the output."])
     assert.equal(tooling(text), text);
 });
+
+test("no-break spaces, carriage returns and invisible characters can't split code a reader sees whole", () => {
+  for (const [text, piece] of [
+    ["Make it delay\u00A0*\u00A02 there.", "*\u00A02"],
+    ["Make it delay\u202F*\u202F2 there.", "*\u202F2"],
+    ["Make it delay *\r2 there.", "*\r2"],
+    ["Make it delay *\r\n2 there.", "*\r\n2"],
+    ["Make it delay*\u200D2 there.", "*\u200D2"],
+    ["Make it delay\u2062*2 there.", "*2"],
+    ["Make it attempt+\u034F1 there.", "+\u034F1"],
+  ]) {
+    const filtered = filterAgentText(text, sources);
+    assert.ok(filtered.removed >= 1 && !filtered.value.includes(piece), `${JSON.stringify(text)} → ${JSON.stringify(filtered.value)}`);
+  }
+  // Prose keeps its no-break spaces and its line breaks.
+  for (const text of ["It took 2\u00A0seconds.", "Read the loop.\nThen run the tests.", "請先看 src/retry.ts:12\u3000的迴圈。"])
+    assert.deepEqual(filterAgentText(text, sources), { value: text, removed: 0, dropped: 0 }, text);
+});

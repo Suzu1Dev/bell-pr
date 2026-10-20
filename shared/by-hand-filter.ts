@@ -165,11 +165,12 @@ const holdMark = "\uE000";
 const inline = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g;
 /**
  * An expression written into prose: operands joined by code operators with
- * spaces around them ("delayMs * 2 ** attempt;", "x => y", "a ?? b"). A
+ * spaces around them, no-break ones too ("delayMs * 2 ** attempt;", "x => y", "a ?? b"). A
  * spaced hyphen or slash is a dash or "or" in prose, not an operator, and
  * a "*" or "+" that starts a line is a list item.
  */
-const expression = /[\w$.()[\]'"]+(?:[ \t]+(?:\?\?|<<=?|>>>?=?|[&|^]=|=>|===|!==|==|!=|\*\*|&&|\|\||[-+*/%]=|<=|>=|[<>*%+=])[ \t]+[\w$.()[\]'"]+)+;?/g;
+const expression =
+  /[\w$.()[\]'"]+(?:[ \t\u00A0\u2000-\u200A\u202F\u205F\u3000]+(?:\?\?|<<=?|>>>?=?|[&|^]=|=>|===|!==|==|!=|\*\*|&&|\|\||[-+*/%]=|<=|>=|[<>*%+=])[ \t\u00A0\u2000-\u200A\u202F\u205F\u3000]+[\w$.()[\]'"]+)+;?/g;
 /** Identifier-like words of prose: camelCase, snake_case and calls such as `retry(` (not "file(s)"); never part of a path. */
 const identifier = /(?<![\w$./-])(?:[a-z][a-z0-9]*[A-Z][A-Za-z0-9]*|[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+|[A-Za-z_$][\w$]*(?=\((?!(?:s|es|ies)\))))(?![\w$/]|\.\w)/g;
 /** Faces that look like names: "o_O", "xD". */
@@ -218,8 +219,8 @@ function linkCode(url: string) {
   }
   return rest.split(/[/?&#]/).some((part) => hasCode(part.replace(/^[\w.-]*=/, "")));
 }
-/** Characters a reader never sees: zero-width space, word joiner, soft hyphen, byte-order mark, direction marks. */
-const invisible = /[\u00AD\u200B\u2060\uFEFF\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
+/** Characters a reader never sees: zero-width spaces and joiners, invisible operators, fillers, soft hyphen, byte-order mark, direction marks. */
+const invisible = /\u034F|[\u00AD\u115F\u1160\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\u3164\uFEFF\uFFA0]/g;
 /** ASCII punctuation by its HTML entity name, which Markdown decodes. */
 const entityNames: Record<string, string> = {
   lt: "<", gt: ">", amp: "&", quot: '"', apos: "'", ast: "*", midast: "*", lowast: "*", equals: "=", plus: "+",
@@ -358,7 +359,8 @@ export function filterAgentText(
   /** A code block stays when its lines, as written or without their margin, are a run of a file's lines. */
   const block = (whole: string, ...readings: string[][]) =>
     readings.some((rows) => verbatimLines(rows, sources)) ? hold(whole) : remove();
-  let value = text.replaceAll(holdMark, "").replace(fence, (whole, prefix: string, _fence: string, body: string) => {
+  // A carriage return ends a line in Markdown, as a line feed does.
+  let value = text.replaceAll(holdMark, "").replace(/\r\n?/g, "\n").replace(fence, (whole, prefix: string, _fence: string, body: string) => {
     const quoted = /^(?:[ \t]*>[ \t]?)*/;
     const margin = prefix.replace(quoted, "").length;
     const rows = body.split("\n");
