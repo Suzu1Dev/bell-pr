@@ -59,6 +59,8 @@ export interface DiffViewProps {
   onLoadBase?: () => Promise<string[]>;
   /** Lines of the current file to mark, such as a walkthrough step; shown and scrolled to. */
   highlight?: { startLine: number; endLine: number };
+  /** A Learn-by-hand run: the guide answers a selection, so its button and the hint name the guide. */
+  guide?: boolean;
 }
 
 // Memoized: every arrow key in the list re-renders the diff, and a line's
@@ -102,8 +104,10 @@ export function DiffView({
   hasNote,
   onLoadBase,
   highlight,
+  guide = false,
 }: DiffViewProps) {
   const t = useT("review");
+  const askLabel = guide ? t.diff.askGuide : t.diff.askSelection;
   const parsed = useMemo(
     () => (file.blocked ? [] : parseDiff(file.patch)),
     [file.patch, file.blocked],
@@ -637,7 +641,7 @@ export function DiffView({
       {!file.blocked && codeLines.length > 0 && (
         <>
           <p className="rv-visually-hidden" id={hintId}>
-            {t.diff.keyboardHint({ button: t.diff.askSelection })}
+            {t.diff.keyboardHint({ button: askLabel })}
           </p>
           <span className="rv-visually-hidden" role="status">
             {selectedLines.length
@@ -657,7 +661,7 @@ export function DiffView({
             </>
           ) : (
             <>
-              <MousePointer2 size={13} /> {t.diff.idleHint}
+              <MousePointer2 size={13} /> {guide ? t.diff.idleHintGuide : t.diff.idleHint}
               <span className="rv-shift-hint">
                 {withNodes(t.diff.shiftHint, {
                   key: <kbd>{t.diff.shiftKey}</kbd>,
@@ -683,7 +687,7 @@ export function DiffView({
               onClick={askAboutSelection}
             >
               <MessageSquare size={13} />
-              {t.diff.askSelection}
+              {askLabel}
               <ChevronRight size={13} />
             </button>
           </div>

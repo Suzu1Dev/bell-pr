@@ -604,6 +604,7 @@ export function ChangesTab({
                 : undefined
             }
             highlight={shownHighlight}
+            guide={!!run.learnByHand && !demo}
           />
         ) : writing && run.worktreePath ? (
           <ErrorBoundary resetKey={`${run.id}:turn`}>

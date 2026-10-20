@@ -75,12 +75,15 @@ const review = {
         ? `${count} line selected`
         : `${count} lines selected`,
     idleHint: "Click any line and the agent will explain it",
+    /** A Learn-by-hand run: the guide answers a question about the selected lines. */
+    idleHintGuide: "Click any line to ask the guide about it",
     /** The name on the Shift key cap. */
     shiftKey: "Shift",
     /** `key` is shown as the Shift key cap. */
     shiftHint: ({ key }: { key: string }) => `Hold ${key} for several lines`,
     clearSelection: "Clear selection",
     askSelection: "Explain this code",
+    askGuide: "Ask the guide about these lines",
     /** The unchanged code a modified file's patch leaves out, read from the run's base. */
     gap: {
       showBelow: ({ count }: { count: number }) =>
