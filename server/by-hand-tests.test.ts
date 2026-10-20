@@ -796,7 +796,7 @@ test("the test command view: BELL's suggestion from the run's folder and the per
     await assert.rejects(
       f.confirm(command),
       (error: AppError) =>
-        error.statusCode === 400 && error.message === "Write the test command on one line, without control characters.",
+        error.statusCode === 400 && error.message === "Write the test command on one line of up to 300 characters, without control or invisible characters.",
       JSON.stringify(command),
     );
   assert.equal((await f.confirm("go test\t./...")).repo.testCommand?.command, "go test\t./...");

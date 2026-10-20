@@ -12,8 +12,8 @@ const tests = {
   running: "Your tests are already running. Wait for them to finish, or stop them.",
   /** A run outside review, or while publishing. */
   notNow: "Tests run while the change waits for your review, not while the run plans or publishes.",
-  /** A command to confirm that spans lines or holds control characters. */
-  commandInvalid: "Write the test command on one line, without control characters.",
+  /** A command to confirm that is empty, too long, spans lines or holds control or invisible formatting characters. */
+  commandInvalid: "Write the test command on one line of up to 300 characters, without control or invisible characters.",
   /** The run's log when a test run wrote more output than BELL keeps reading. */
   tooMuchOutput: ({ megabytes }: { megabytes: number }) =>
     `Your tests wrote more than ${megabytes} MB of output, so ${product.name} stopped them. The end of the output is kept.`,
