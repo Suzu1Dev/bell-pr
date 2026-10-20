@@ -320,3 +320,41 @@ test("a learn-by-hand run waiting for the person's plan says it's their turn, an
   assert.match(agent, /<span><\/span>Awaiting plan approval<\/span>/);
   assert.match(agent, /title="02 Build together: The agent team splits the work"/);
 });
+
+test("a learn-by-hand run's approval waits for the person's PR title and description, and the footer leads to the PR draft tab", () => {
+  const changed = [{ path: "src/a.ts", language: "TypeScript", additions: 1, deletions: 0, status: "modified", patch: "@@ -1 +1 @@\n+a", fingerprint: "f1" }];
+  const ready: Run = {
+    ...realRun,
+    learnByHand: true,
+    agents: realRun.agents.filter((agent) => agent.id === "lead"),
+    team: realRun.team && { ...realRun.team, tasks: [] },
+    reviewedFiles: ["src/a.ts"],
+    draft: { title: "", body: "" },
+    byHand: { ready: { at: realRun.createdAt, changeFingerprint: changeFingerprint(changed), review: false } },
+  };
+  const footer = (title: string, body: string, run = ready) =>
+    renderEn(
+      element({
+        run,
+        files: changed,
+        tab: "overview",
+        draft: { draftDirty: false, draftUnfinished: undefined, followUp: undefined, commitMessageUnfinished: false, draftTitle: title, draftBody: body } as unknown as Props["draft"],
+      }),
+    );
+  try {
+    setCheckSettingsForTests({ settings: { skipUnderstandingCheck: true }, lockedBy: {} });
+    const empty = footer("", "");
+    assertNoHan(empty);
+    // Off, saying why, rather than a refusal after the click.
+    assert.match(primary(empty), /disabled="" title="Write the PR title and description first"/);
+    assert.match(empty, /<footer class="review-footer">[\s\S]*<button type="button" class="mission-text-button">Write the PR title and description first<\/button>/);
+    assert.match(primary(footer("Cap the retries", "")), /disabled=""/);
+    assert.doesNotMatch(primary(footer("Cap the retries", "Caps them at three.")), /disabled=""/);
+    assert.doesNotMatch(footer("Cap the retries", "Caps them at three."), /Write the PR title and description first/);
+    assert.match(renderZh(element({ run: ready, files: changed, tab: "overview", draft: { draftDirty: false, draftTitle: "", draftBody: "" } as unknown as Props["draft"] })), /先寫好 PR 標題與說明/);
+    // An agent run's draft comes from its agents: no such wait.
+    assert.doesNotMatch(footer("", "", { ...ready, learnByHand: undefined, byHand: undefined }), /Write the PR title and description first/);
+  } finally {
+    setCheckSettingsForTests(undefined);
+  }
+});

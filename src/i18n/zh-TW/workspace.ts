@@ -64,6 +64,7 @@ const m: Translation<typeof en> = {
     turn: "換你寫",
     ready: "可以審查了",
     writeFirst: "請先寫一點修改",
+    writePr: "先寫好 PR 標題與說明",
     reviewing: "嚮導正在審查",
     changed: "你在標記可以審查之後又改了程式碼。審查和理解檢查會等你再次標記可以審查。",
   },

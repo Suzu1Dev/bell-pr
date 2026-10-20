@@ -84,6 +84,8 @@ const workspace = {
     turn: "Your turn",
     ready: "Ready for review",
     writeFirst: "Write a change first",
+    /** The footer while the PR title or description is empty: approval needs both, in the person's words (DESIGN v1.2 F11). */
+    writePr: "Write the PR title and description first",
     reviewing: "The guide is reviewing",
     changed: "You changed the code after marking it ready. The review and the check wait until you mark it ready again.",
   },
