@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
+import { setTimeout as sleep } from "node:timers/promises";
 import type { AgentProvider } from "../shared/models.js";
 import { log } from "./log.js";
 import { redact } from "./secrets.js";
@@ -14,8 +15,17 @@ export { redact };
  * agent process groups and reap leftovers after a crash.
  */
 export interface SpawnObserver {
-  onSpawn(pid: number, executable: string): void;
+  onSpawn(pid: number, executable: string, details?: SpawnDetails): void;
   onExit(pid: number): void;
+}
+
+/**
+ * What command() adds for a command started with `endGroup`: record its
+ * process group whatever the executable. onExit then comes only once the
+ * whole group is gone.
+ */
+export interface SpawnDetails {
+  recordGroup: true;
 }
 
 let spawnObserver: SpawnObserver | undefined;
@@ -32,9 +42,23 @@ export function setSpawnObserver(observer?: SpawnObserver): void {
  * so they cannot break the command.
  */
 export function observeChild(child: ChildProcess, executable: string): void {
+  const exited = reportSpawn(child, executable);
+  if (exited) child.once("close", exited);
+}
+
+/**
+ * Reports `child` to the spawn observer now (with `details` when given),
+ * and returns the call that reports its exit, or nothing when there is no
+ * observer or no pid.
+ */
+function reportSpawn(
+  child: ChildProcess,
+  executable: string,
+  details?: SpawnDetails,
+): (() => void) | undefined {
   const observer = spawnObserver;
   const pid = child.pid;
-  if (!observer || pid === undefined) return;
+  if (!observer || pid === undefined) return undefined;
   const notify = (event: string, call: () => void) => {
     try {
       call();
@@ -42,8 +66,22 @@ export function observeChild(child: ChildProcess, executable: string): void {
       log.warn("Spawn observer failed", { event, executable, pid, error });
     }
   };
-  notify("spawn", () => observer.onSpawn(pid, executable));
-  child.once("close", () => notify("exit", () => observer.onExit(pid)));
+  notify("spawn", () =>
+    details
+      ? observer.onSpawn(pid, executable, details)
+      : observer.onSpawn(pid, executable),
+  );
+  return () => notify("exit", () => observer.onExit(pid));
+}
+
+/** Whether any process of the group is still there (a zombie counts until it is reaped). */
+function groupAlive(pgid: number) {
+  try {
+    process.kill(-pgid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
 }
 
 /** What every agent CLI needs to run: the shell basics and the locale. */
@@ -145,6 +183,24 @@ interface CommandOptions {
   env?: NodeJS.ProcessEnv;
   onLine?: (line: string, stream: "stdout" | "stderr") => void;
   allowedCodes?: number[];
+  /**
+   * Off by default; for the person's test command (server/by-hand-tests.ts),
+   * whose processes may outlive it. POSIX only. The command settles when
+   * its own process exits, at most `settleAfterExitMs` later for the
+   * output still in its pipes (a process it left behind may hold them
+   * open; nothing more is read after that), with that process's exit code.
+   * After its exit no timeout applies, and a stop only cuts that wait.
+   * However it settles, what is left of its process group is ended before
+   * the command resolves or rejects: SIGTERM, and SIGKILL 1.5 s after the
+   * first SIGTERM, also when every pipe has closed. The spawn observer
+   * records the group (`recordGroup`) and hears of its exit only then.
+   * Processes that left the group (their own session or group) are not
+   * reached. When a signal command() did not send ends its own process,
+   * the error's details name it (`details.signal`).
+   */
+  endGroup?: { settleAfterExitMs: number };
+  /** Off by default: the output reaches only `onLine`; the result's stdout and stderr stay empty. */
+  discardOutput?: boolean;
 }
 
 /** How much of a failed command's stderr its error keeps in `details.stderr`. */
@@ -178,28 +234,69 @@ export async function command(
         detached: process.platform !== "win32",
         stdio: ["pipe", "pipe", "pipe"],
       });
-      observeChild(child, executable);
+      // endGroup needs process groups, which Windows does not have.
+      const group =
+        process.platform === "win32" ? undefined : options.endGroup;
+      const groupGone = group
+        ? reportSpawn(child, executable, { recordGroup: true })
+        : undefined;
+      if (!group) observeChild(child, executable);
       let stdout = "";
       let stderr = "";
       let byteCount = 0;
       let failure: Error | undefined;
       let killTimer: NodeJS.Timeout | undefined;
+      // endGroup only: when SIGTERM went to the group, the command's own
+      // exit, the wait for the rest of its output, and whether it settled.
+      let terminatedAt: number | undefined;
+      let exited:
+        | { code: number | null; signal: NodeJS.Signals | null }
+        | undefined;
+      let settleTimer: NodeJS.Timeout | undefined;
+      let settled = false;
       const pending = { stdout: "", stderr: "" };
+      const kill = (signal: NodeJS.Signals) => {
+        try {
+          if (child.pid && process.platform !== "win32")
+            process.kill(-child.pid, signal);
+          else child.kill(signal);
+        } catch {
+          /* Already exited. */
+        }
+      };
       const stop = (error: Error) => {
         if (failure) return;
+        if (exited) {
+          // endGroup: the command's own process has exited, so a stop only
+          // cuts the wait for the rest of its output.
+          settle(exited.code, exited.signal);
+          return;
+        }
         failure = error;
-        const kill = (signal: NodeJS.Signals) => {
-          try {
-            if (child.pid && process.platform !== "win32")
-              process.kill(-child.pid, signal);
-            else child.kill(signal);
-          } catch {
-            /* Already exited. */
-          }
-        };
         kill("SIGTERM");
+        terminatedAt = Date.now();
         killTimer = setTimeout(() => kill("SIGKILL"), 1500);
         killTimer.unref();
+      };
+      /**
+       * endGroup: ends what is left of the group. SIGTERM unless a stop sent
+       * it already, SIGKILL 1.5 s after it to what is still there, and a
+       * moment for the killed processes to be reaped.
+       */
+      const endGroup = async () => {
+        if (killTimer) clearTimeout(killTimer);
+        const pgid = child.pid;
+        if (!pgid || !groupAlive(pgid)) return;
+        if (terminatedAt === undefined) {
+          kill("SIGTERM");
+          terminatedAt = Date.now();
+        }
+        while (groupAlive(pgid) && Date.now() < terminatedAt + 1500)
+          await sleep(50);
+        if (!groupAlive(pgid)) return;
+        kill("SIGKILL");
+        const reaped = Date.now() + 1000;
+        while (groupAlive(pgid) && Date.now() < reaped) await sleep(20);
       };
       // An abort listener runs in the scope of whoever aborted, so the
       // cancellation is worded in the locale of the work that ran this.
@@ -226,12 +323,20 @@ export async function command(
           return;
         }
         const text = buffer.toString("utf8");
-        if (stream === "stdout") stdout += text;
-        else stderr += text;
+        if (!options.discardOutput) {
+          if (stream === "stdout") stdout += text;
+          else stderr += text;
+        }
         if (options.onLine) {
           pending[stream] += text;
+          // What is pending holds no newline, so only a chunk with one ends
+          // a line; searching a long unfinished line again for every chunk
+          // took time quadratic in its length.
           let end: number;
-          while ((end = pending[stream].indexOf("\n")) >= 0) {
+          while (
+            text.includes("\n") &&
+            (end = pending[stream].indexOf("\n")) >= 0
+          ) {
             options.onLine(pending[stream].slice(0, end), stream);
             pending[stream] = pending[stream].slice(end + 1);
           }
@@ -260,13 +365,53 @@ export async function command(
             ? spawnFailure
             : (withCliSetupHint(spawnFailure, executable) as Error);
       });
-      child.on("close", (code) => {
+      if (group)
+        child.on("exit", (code, signal) => {
+          exited = { code, signal };
+          clearTimeout(timer);
+          settleTimer = setTimeout(
+            () => settle(code, signal),
+            group.settleAfterExitMs,
+          );
+        });
+      child.on("close", (code, signal) => {
+        if (group) {
+          settle(exited ? exited.code : code, exited ? exited.signal : signal);
+          return;
+        }
         clearTimeout(timer);
         if (killTimer) clearTimeout(killTimer);
         options.signal?.removeEventListener("abort", abort);
         for (const stream of ["stdout", "stderr"] as const) {
           if (pending[stream]) options.onLine?.(pending[stream], stream);
         }
+        finish(code);
+      });
+      /** endGroup: stops reading, ends what is left of the group, then settles. */
+      function settle(code: number | null, signal: NodeJS.Signals | null) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        clearTimeout(settleTimer);
+        options.signal?.removeEventListener("abort", abort);
+        for (const stream of ["stdout", "stderr"] as const) {
+          if (pending[stream]) options.onLine?.(pending[stream], stream);
+          pending[stream] = "";
+        }
+        // A process left behind may still hold the pipes.
+        child.stdout.destroy();
+        child.stderr.destroy();
+        void endGroup().then(() => {
+          groupGone?.();
+          finish(code, signal);
+        });
+      }
+      /**
+       * `signal` comes only with endGroup: the signal that ended the
+       * command's own process, which its error then names in
+       * `details.signal` when no stop of command() came first.
+       */
+      function finish(code: number | null, signal?: NodeJS.Signals | null) {
         if (failure) reject(failure);
         else if (!(options.allowedCodes ?? [0]).includes(code ?? -1)) {
           reject(
@@ -284,6 +429,7 @@ export async function command(
                   details: {
                     stderr: redact(stderr.trim()).slice(-stderrTailLength),
                     ...(code === null ? {} : { exitCode: code }),
+                    ...(code === null && signal ? { signal } : {}),
                   },
                 },
               ),
@@ -291,7 +437,7 @@ export async function command(
             ),
           );
         } else resolve({ stdout, stderr, code: code ?? -1 });
-      });
+      }
       child.stdin.end(options.input ?? "");
     },
   );
