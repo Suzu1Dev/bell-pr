@@ -34,6 +34,45 @@ test("hostile Markdown of 128 K shows as plain text with a note, quickly, in bot
   assert.match(renderZh(createElement(MarkdownContent, { children: hostile[2] })), new RegExp(panelZh.plainText));
 });
 
+/** An agent's long report or a long PR description: headings, lists, tables, links, code spans and blocks. */
+function longReport(size: number) {
+  const parts: string[] = [];
+  for (let index = 1; parts.join("\n").length < size; index++)
+    parts.push(
+      `## Step ${index}`,
+      "",
+      `The \`retry_${index}\` helper now waits **${index * 10} ms** before the next try; see [the docs](https://example.com/docs/${index}) and _the issue_ #${index}.`,
+      "",
+      `- Checked \`server/file_${index}.ts:${index}\`: it returns early when the cap is hit.`,
+      "- Ran `npm test`: 120 passed, 0 failed (~3 s).",
+      "  - A nested note about ~~old~~ behaviour and __init__ files.",
+      `- [ ] Follow-up: a test for case ${index}`,
+      "",
+      "| file | lines | status |",
+      "| --- | ---: | :---: |",
+      `| a_${index}.ts | ${index} | ok |`,
+      "",
+      "> The maintainers asked for small pull requests.",
+      "",
+      "```ts",
+      `export const value${index} = await retry(() => fetch(url), { cap: 3 });`,
+      "```",
+      "",
+    );
+  return parts.join("\n").slice(0, size);
+}
+
+test("a long agent report or PR description, up to the size limit, renders formatted", () => {
+  // 12,000 characters was the limit at first: a reviewer's report or a detailed PR body lost its formatting.
+  const text = longReport(23_000);
+  assert.ok(text.length > 20_000);
+  const html = renderEn(createElement(MarkdownContent, { children: text }));
+  assert.doesNotMatch(html, /markdown-plain/);
+  assert.match(html, /<h4>Step 1<\/h4>/);
+  assert.match(html, /<table>/);
+  assert.match(html, /<code class="language-ts">/);
+});
+
 test("inline raw HTML that never closes shows as plain text, quickly", () => {
   for (const opener of ["<? ", "<!-- ", "<!A "]) {
     const text = `a ${opener.repeat(11_990 / opener.length)}`;

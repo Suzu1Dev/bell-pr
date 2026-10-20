@@ -6,15 +6,17 @@
  * continuation lines, emphasis, link openers or inline raw HTML is not
  * parsed: the renderer shows it as plain text with a notice, and the draft
  * checks read it with `roughProse`. Both run in linear time. Measured on
- * the parser: the costliest shapes that pass (nested lists by indent,
- * tables, headings, dotted words at 12,000 characters; 1,500 emphasis runs)
- * take up to about 70 ms; beyond the limits, shapes took seconds (setext
- * headings, lazy continuation, emphasis, unclosed inline raw HTML) or threw
- * (nesting).
+ * the parser and the renderer: the costliest shapes that pass take up to
+ * about 120 ms (lists nested by tabs at 12,000 characters) and 90 ms
+ * (lists and tables of e-mail addresses at 24,000, where lines are
+ * indented at most 16 columns and runs without a space are at most 2,000
+ * characters); beyond the limits, shapes took seconds (setext headings,
+ * lazy continuation, emphasis, unclosed inline raw HTML, a dotted word or
+ * dashes of 24,000 characters) or threw (nesting).
  */
 export const markdownLimits = {
-  /** Characters of the whole text. */
-  chars: 12_000,
+  /** Characters of the whole text: an agent's long report or a long PR description. */
+  chars: 24_000,
   /** Lines with text, outside code fences (setext headings, table rows and list items cost most). */
   lines: 1_000,
   /** Block quotes and list items one line opens. */
@@ -33,31 +35,32 @@ const containerMarker = /^ {0,3}(?:>|[-*+](?=[ \t]|$)|\d{1,9}[.)](?=[ \t]|$))[ \
 const delimiter = /\*+|~+|(?<![\p{L}\p{N}])_+|_+(?![\p{L}\p{N}])|\[/gu;
 /** Inline raw HTML that reads to its closer: unclosed, each reads to the paragraph's end. */
 const htmlOpener = /<[!?]/g;
+/** Indented past 16 columns, a tab being four: nested lists by indent cost most in a long text. */
+const deepIndent = /^(?: {4}| {0,3}\t){4}[ \t]/;
 
-/** The fence a line opens or closes, or undefined. */
-function fenceOf(line: string) {
+/**
+ * The fence open after `line` (its backtick or tilde run), given the one
+ * open before it: a fence closes at a run of its character at least as
+ * long, without an info string. The line is code when either is open.
+ */
+function fenceAfter(fence: string | undefined, line: string) {
   const match = fenceLine.exec(line);
-  return match ? { char: match[1][0], size: match[1].length, info: match[2].trim() } : undefined;
+  if (!fence) return match?.[1];
+  return match && match[1][0] === fence[0] && match[1].length >= fence.length && !match[2].trim() ? undefined : fence;
 }
 
 /** Whether `text` is beyond what the GFM parser reads quickly (see markdownLimits). */
 export function markdownTooHeavy(text: string): boolean {
   if (text.length > markdownLimits.chars) return true;
-  let fence: { char: string; size: number } | undefined;
+  let fence: string | undefined;
   let lines = 0;
   let inContainer = false;
   let lazy = 0;
   let delimiters = 0;
   for (const line of text.split("\n")) {
-    const marker = fenceOf(line);
-    if (fence) {
-      if (marker && marker.char === fence.char && marker.size >= fence.size && !marker.info) fence = undefined;
-      continue;
-    }
-    if (marker) {
-      fence = marker;
-      continue;
-    }
+    const open = fence;
+    fence = fenceAfter(fence, line);
+    if (open || fence) continue;
     if (!line.trim()) {
       inContainer = false;
       lazy = 0;
@@ -65,6 +68,10 @@ export function markdownTooHeavy(text: string): boolean {
       continue;
     }
     if (++lines > markdownLimits.lines) return true;
+    // Over 12,000 characters (the size limit at first): a line indented past 16 columns (a tab is four), or
+    // a run of over 2,000 characters without a space (a dotted word or dashes cost most).
+    if (text.length > 12_000 && (deepIndent.test(line) || line.split(/\s/).some((word) => word.length > 2_000)))
+      return true;
     let rest = line;
     let depth = 0;
     for (let match = containerMarker.exec(rest); match && match[0]; match = containerMarker.exec(rest)) {
@@ -73,15 +80,11 @@ export function markdownTooHeavy(text: string): boolean {
     }
     if (depth) inContainer = true;
     else if (inContainer && !/^[ \t]{2}/.test(line) && ++lazy > markdownLimits.lazyLines) return true;
-    delimiters += (rest.match(delimiter)?.length ?? 0) + 5 * (rest.match(htmlOpener)?.length ?? 0);
+    // Each split adds one piece more than the openers it splits at.
+    delimiters += rest.split(delimiter).length + 5 * rest.split(htmlOpener).length - 6;
     if (delimiters > markdownLimits.delimiters) return true;
   }
   return false;
-}
-
-/** Spaces in place of `text[start..end)`, line breaks kept, so line numbers still match. */
-function blank(chars: string[], start: number, end: number) {
-  for (let index = start; index < end; index++) if (chars[index] !== "\n") chars[index] = " ";
 }
 
 /**
@@ -93,36 +96,25 @@ function blank(chars: string[], start: number, end: number) {
  */
 export function roughProse(markdown: string): string[] {
   const chars = markdown.split("");
-  // Closed HTML comments: each "<!--" up to the first "-->" after it.
+  // Closed HTML comments: each "<!--" up to the first "-->" after it, as spaces with the line breaks kept.
   for (let start = markdown.indexOf("<!--"); start >= 0; ) {
-    const end = markdown.indexOf("-->", start + 4);
-    if (end < 0) break;
-    blank(chars, start, end + 3);
-    start = markdown.indexOf("<!--", end + 3);
+    const end = markdown.indexOf("-->", start + 4) + 3;
+    if (end < 3) break;
+    for (let index = start; index < end; index++) if (chars[index] !== "\n") chars[index] = " ";
+    start = markdown.indexOf("<!--", end);
   }
   const original = markdown.split("\n");
-  let fence: { char: string; size: number } | undefined;
+  let fence: string | undefined;
   return chars
     .join("")
     .split("\n")
     .map((line, index) => {
-      const marker = fenceOf(original[index]);
-      if (fence) {
-        if (marker && marker.char === fence.char && marker.size >= fence.size && !marker.info) fence = undefined;
-        return "";
-      }
-      if (marker) {
-        fence = marker;
-        return "";
-      }
-      const prose = codeSpansBlanked(line);
+      const open = fence;
+      fence = fenceAfter(fence, original[index]);
+      if (open || fence) return "";
+      // Code spans blanked: a backtick run up to the next run of the same length, as far as the next
+      // backtick allows (linear: a span never scans past a backtick), roughly as GFM reads them.
+      const prose = line.replace(/(`+)[^`]*?\1/g, (span) => " ".repeat(span.length));
       return prose.trim() ? prose : "";
     });
 }
-
-/**
- * A line with its code spans blanked: a backtick run up to the next run
- * of the same length, as far as the next backtick allows (linear: a span
- * never scans past a backtick), roughly as GFM reads them.
- */
-const codeSpansBlanked = (line: string) => line.replace(/(`+)[^`]*?\1/g, (span) => " ".repeat(span.length));

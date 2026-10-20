@@ -49,6 +49,44 @@ test("no hostile Markdown of 128 K blocks the draft checks for 200 ms, and none 
   }
 });
 
+test("every hostile shape at the size limit is guarded or checked under 200 ms", () => {
+  /** Lines indented `step` more each, up to `most`, each holding `text`. */
+  const staircase = (step: string, most: number, text: string) => (size: number) => {
+    const lines: string[] = [];
+    for (let index = 0; lines.join("\n").length < size && lines.length < 990; index++) lines.push(`${step.repeat(Math.min(index, most))}- ${text}`);
+    return lines.join("\n");
+  };
+  const shapes: Record<string, (size: number) => string> = {
+    ...hostile,
+    "intra-word underscores": (size) => "_a".repeat(size / 2),
+    "dotted words in runs": (size) => `${"a.".repeat(1000)} `.repeat(size / 2001),
+    "dashes in runs": (size) => `research${"-".repeat(1990)} `.repeat(size / 1999),
+    "inline raw HTML": (size) => `a ${"<? ".repeat(size / 3)}`,
+    "inline raw HTML in prose": (size) => `a ${"<? ".repeat(100)}${"word ".repeat((size - 302) / 5)}`,
+    "e-mail addresses": (size) => "a@b.c ".repeat(size / 6),
+    "lists nested by tabs": staircase("\t", 64, "a"),
+    "lists nested by 16 columns of e-mail addresses": staircase("  ", 8, "a@b.c a@b.c"),
+    "a table of e-mail addresses": (size) => `| h | h | h | h |\n|---|---|---|---|\n${"| a@b.c | a@b.c | a@b.c | a@b.c |\n".repeat(Math.min(990, size / 36))}`,
+  };
+  for (const [name, make] of Object.entries(shapes)) {
+    const body = make(markdownLimits.chars).slice(0, markdownLimits.chars);
+    for (const [check, run] of [
+      ["prose", () => markdownProse(body)],
+      ["disclosure", () => hasAiDisclosure(body)],
+      ["denial", () => assistanceDenial(body)],
+    ] as const) {
+      // The best of three, so another process on a busy machine does not count.
+      const ms = Math.min(
+        ...[0, 1, 2].map(() => {
+          markdownProse("warm up");
+          return blocked(run);
+        }),
+      );
+      assert.ok(ms < 200, `${name}, ${check}: ${ms.toFixed(0)} ms`);
+    }
+  }
+});
+
 test("deep nesting and dense emphasis under the size limit are guarded too", () => {
   for (const [name, text] of [
     ["2,000 nested quotes", `${"> ".repeat(2000)}a`],
