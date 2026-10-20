@@ -89,6 +89,11 @@ function trimLines(value: string) {
     .join("");
 }
 
+/** Appends one by one: spreading into a call throws past about 100,000 items. */
+function append(target: Child[], items: Child[]) {
+  for (const item of items) target.push(item);
+}
+
 /** Whether a list's items are separated by blank lines. */
 const listLoose = (parent: Parents) =>
   parent.type === "list" &&
@@ -223,7 +228,7 @@ function toTree(tree: Root) {
         const children: Child[] = [];
         results.forEach((child, index) => {
           if (loose || index || !isParagraph(child)) children.push(text("\n"));
-          if (isParagraph(child) && !loose) children.push(...child.children);
+          if (isParagraph(child) && !loose) append(children, child.children);
           else children.push(child);
         });
         const tail = results[results.length - 1];
@@ -282,8 +287,8 @@ function toTree(tree: Root) {
       const last = tail.children[tail.children.length - 1];
       if (last?.type === "text") last.value += " ";
       else tail.children.push(text(" "));
-      tail.children.push(...backReferences);
-    } else content.push(...backReferences);
+      append(tail.children, backReferences);
+    } else append(content, backReferences);
     items.push(element("li", { id: `user-content-fn-${safeId}` }, wrap(content, true)));
   }
   if (items.length)
@@ -304,21 +309,24 @@ interface Options {
   components: MarkdownComponents;
 }
 
-/** Raw HTML and empty text render nothing, so they are left out. */
+/**
+ * Raw HTML and empty text render nothing, so they are left out. Elements are
+ * keyed by position, as they were by hast-util-to-jsx-runtime.
+ */
 const toReactChildren = (children: Child[], options: Options) =>
   children
     .filter((child) => child.type === "element" || (child.type === "text" && child.value))
-    .map((child) => toReact(child, options));
+    .map((child, index) => toReact(child, options, index));
 
-function toReact(child: Child, options: Options): ReactNode {
+function toReact(child: Child, options: Options, key: number): ReactNode {
   if (child.type !== "element") return child.type === "text" ? child.value : null;
-  const props = { ...child.properties };
+  const props: Props = { ...child.properties, key };
   if (child.tagName === "a") props.href = options.urlTransform(String(props.href));
-  return createElement(
-    options.components[child.tagName] ?? child.tagName,
-    props,
-    ...toReactChildren(child.children, options),
-  );
+  // One child as itself (a code block's text stays a string), several as an
+  // array, never spread into the call.
+  const children = toReactChildren(child.children, options);
+  if (children.length) props.children = children.length > 1 ? children : children[0];
+  return createElement(options.components[child.tagName] ?? child.tagName, props);
 }
 
 /**
@@ -335,9 +343,5 @@ export function Markdown({
     extensions: [gfm()],
     mdastExtensions: [gfmFromMarkdown()],
   });
-  return createElement(
-    Fragment,
-    null,
-    ...toReactChildren(toTree(tree), { urlTransform, components }),
-  );
+  return createElement(Fragment, null, toReactChildren(toTree(tree), { urlTransform, components }));
 }

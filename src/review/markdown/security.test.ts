@@ -74,3 +74,19 @@ test("a long run of spaces or tabs renders in linear time, kept inside a line an
   assert.ok(performance.now() - started < 3_000, "rendering took too long");
   assert.equal(html, `<div class="markdown-content"><p>a${run}b\nc\nd</p></div>`);
 });
+
+test("a block with more children than a function call takes still renders", () => {
+  // 150,000 children (a hard break and a line break after each line):
+  // react-markdown rendered them in a paragraph (though not in a tight list
+  // item), and spreading them into one call throws a RangeError, which
+  // would take down the view.
+  const lines = 50_000;
+  for (const [html, open, close] of [
+    [render(`${"a\\\n".repeat(lines)}end`), "<p>", "</p>"],
+    [render(`- ${"a\\\n  ".repeat(lines)}end`), "<ul>\n<li>", "</li>\n</ul>"],
+  ]) {
+    assert.equal(html.match(/<br\/>/g)?.length, lines);
+    assert.ok(html.startsWith(`<div class="markdown-content">${open}a<br/>\na<br/>`));
+    assert.ok(html.endsWith(`a<br/>\nend${close}</div>`));
+  }
+});
