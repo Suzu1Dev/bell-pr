@@ -203,6 +203,24 @@ them:
 | JS a first visit loads (English) | 229.4 kB in 3 files | 203.9 kB in 4 files |
 | CSS a first visit loads | 32.9 kB | 41.4 kB |
 
+The Markdown pass (wave N1B) replaced react-markdown's unified pipeline
+with a renderer of the tree that `mdast-util-from-markdown` already parses
+(`src/review/markdown/render.ts`). `src/review/markdown/corpus.test.ts`
+holds 551 texts (GFM samples, untrusted input, request text and the
+sample project's long strings) with the HTML react-markdown rendered for
+each in both languages, and fails when one renders differently:
+
+| Figure | Before | After |
+| --- | --- | --- |
+| Packed size | 1.17 MB | 1.14 MB |
+| Unpacked size | 3.89 MB | 3.81 MB |
+| Entries | 83 | 83 |
+| Largest JS chunk (startup) | 94.3 kB | 94.3 kB |
+| All JS | 442.4 kB in 42 files | 424.6 kB in 42 files |
+| Markdown chunk (loaded on demand) | 42.9 kB | 23.5 kB |
+| `MarkdownContent` chunk (loaded on demand) | 0.8 kB | 2.4 kB |
+| All CSS | 41.4 kB in 1 file | 41.4 kB in 1 file |
+
 ## Test and tool variables
 
 These variables are for BELL PR's own tests and tools, not for using the
