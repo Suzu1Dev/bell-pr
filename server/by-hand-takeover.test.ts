@@ -270,6 +270,37 @@ test("history rewritten with a force push is refused and moves nothing", async (
   assert.equal(f.run.followUps, undefined);
 });
 
+test("a fetch that fails on the way moves nothing: a notice on the feedback read, the refusal before a sync", async (t) => {
+  const f = await published(t);
+  const pushedByBell = f.run.publishCommit!;
+  const mine = await f.commit("export const attempts = 3;\n", "Retry three times");
+  // GitHub answers ls-remote, then the network drops during the fetch.
+  const flaky = path.join(f.directory, "flaky-bin");
+  await mkdir(flaky);
+  await writeFile(
+    path.join(flaky, "git"),
+    `#!/bin/sh\nfor arg in "$@"; do [ "$arg" = fetch ] && { echo "fatal: unable to access the repository" >&2; exit 128; }; done\nexec ${JSON.stringify(path.join(f.directory, "fake-bin", "git"))} "$@"\n`,
+    { mode: 0o700 },
+  );
+  const previous = process.env.PATH;
+  process.env.PATH = `${flaky}${path.delimiter}${previous}`;
+  t.after(() => {
+    process.env.PATH = previous;
+  });
+  await en(() => f.workbench.fetchPrFeedback(f.run.id));
+  assert.ok(f.run.prFeedback?.fetchedAt);
+  assert.equal(f.run.logs.at(-2)?.kind, "notice");
+  assert.match(f.run.logs.at(-2)?.message ?? "", /unable to access the repository/);
+  await assert.rejects(en(() => f.workbench.syncRun(f.run.id)), (error) => error instanceof AppError && /unable to access/.test(error.message));
+  assert.equal(f.run.publishCommit, pushedByBell);
+  assert.equal(await f.head(), mine);
+  assert.equal(f.run.followUps, undefined);
+  // Back online, it is taken over.
+  process.env.PATH = previous;
+  await en(() => f.workbench.fetchPrFeedback(f.run.id));
+  assert.equal(f.run.publishCommit, mine);
+});
+
 test("a run whose folder was removed reads its feedback as before, with no takeover and no notice", async (t) => {
   const f = await published(t);
   await git(f.repo.path, ["worktree", "remove", "--force", f.run.worktreePath]);
