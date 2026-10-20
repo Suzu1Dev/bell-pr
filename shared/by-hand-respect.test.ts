@@ -178,17 +178,21 @@ test("a by-hand-rules confirm from the decision renders as one confirm with ever
     "Maintainers decide what their rules cover; BELL PR only quotes them. If you're not sure, ask the project's people.",
     `CONTRIBUTING.md:7: "${qemu}"`,
     `The same rules say: CONTRIBUTING.md:297: "${qemuCarveOut}"`,
-    `The same rules say: CONTRIBUTING.md:325: "${other.quote}"`,
-    `Fitted at the start, the guide offered only explanations, answers, and test help. ${claim} You used: explanations, answers, and reviews.`,
-    "BELL PR can't see other tools you used, such as editor autocomplete.",
+    // Another AI rule of the same document (DESIGN v1.2 F12): "They also say", never read as a carve-out.
+    `They also say: CONTRIBUTING.md:325: "${other.quote}"`,
+    // The help record without the claim and without what BELL can't see: the record beside the confirm says both, once.
+    "Fitted at the start, the guide offered only explanations, answers, and test help. You used: explanations, answers, and reviews.",
   ]);
+  assert.ok(!confirms[0].details.some((detail) => detail.includes(claim)));
+  const zh = respectChecks({ body: "Fixes the cap.", rules: rulesWith(finding), learnByHand: { ...learnByHand, helpLock } }, "zh-TW").find((check) => check.id === "by-hand-rules")!;
+  assert.deepEqual(zh.details.slice(2, 4).map((detail) => detail.replace(/：.*$/s, "")), ["同一份規範也說", "這份規範還寫著"]);
   // The reserved-issue variant, and a checked-list finding's source line.
   const listed = { ...area(matplotlib), source: { registry: "bell", url: "https://example.org/policy", checkedOn: "2026-10-19" } };
   byHandRulesDecisionInTests(() => ({ blocked: [], confirmable: [{ finding: listed, allows: [], others: [] }] }));
   const reserved = checksFor(rulesWith(listed), learnByHand, goodFirstIssue).find((check) => check.id === "by-hand-rules")!;
   assert.match(reserved.message, /^The project closes AI-generated pull requests for issues like this one, and its own text/);
   assert.match(reserved.details[1], /^BELL PR's checked list, .*2026, https:\/\/example\.org\/policy: "pull requests that are AI generated will be closed\."$/);
-  assert.equal(reserved.details[2], `${claim} You used: explanations, answers, and reviews.`);
+  assert.equal(reserved.details[2], "You used: explanations, answers, and reviews.");
 });
 
 test("while any finding is blocked, no confirm appears and the passing ones stay quoted in their block", (t) => {

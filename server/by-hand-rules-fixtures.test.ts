@@ -303,16 +303,17 @@ test("matplotlib's good first issues (output wording, 'Acceptable uses' in the s
   assert.deepEqual(confirmed.agent, ["area-reserved:block", "project-rules:confirm"]);
   const confirm = confirmed.lbhChecks[0];
   assert.match(confirm.message, /^The project closes AI-generated pull requests for issues like this one/);
-  // The carve-outs, then the same file's other AI rules ("others"). Its
-  // "Solving topics that you wouldn't be able to solve yourself without AI"
-  // is a list item the classifier finds no rule in, so it is not quoted here.
+  // The carve-outs ("The same rules say"), then the same file's other AI
+  // rules ("They also say", DESIGN v1.2 F12). Its "Solving topics that you
+  // wouldn't be able to solve yourself without AI" is a list item the
+  // classifier finds no rule in, so it is not quoted here.
   assert.deepEqual(
-    confirm.details.filter((detail) => detail.startsWith("The same rules say: ")).map((detail) => detail.replace(/: ".*$/, "")),
+    confirm.details.filter((detail) => /^(?:The same rules|They also) say: /.test(detail)).map((detail) => detail.replace(/: ".*$/, "")),
     [
       "The same rules say: doc/devel/contribute.rst:20",
       "The same rules say: doc/devel/contribute.rst:21",
-      "The same rules say: doc/devel/contribute.rst:29",
-      "The same rules say: doc/devel/contribute.rst:38",
+      "They also say: doc/devel/contribute.rst:29",
+      "They also say: doc/devel/contribute.rst:38",
     ],
   );
   const reviewed = row(rules, ["explain", "answer", "review"], { learning: true });

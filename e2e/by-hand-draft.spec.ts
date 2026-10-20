@@ -226,8 +226,7 @@ test("a fitted run's quoted confirm stands beside the record, with no reason fie
       "Maintainers decide what their rules cover; BELL PR only quotes them. If you're not sure, ask the project's people.",
       `docs/devel/code-provenance.rst:3: "${rule}"`,
       `The same rules say: docs/devel/code-provenance.rst:9: "${carveOut}"`,
-      "Fitted at the start, the guide offered only explanations, answers, and test help. BELL PR's agents had no write access and gave you no code for this change. You used: explanations and answers.",
-      "BELL PR can't see other tools you used, such as editor autocomplete.",
+      "Fitted at the start, the guide offered only explanations, answers, and test help. You used: explanations and answers.",
     ],
   };
   const project = await startRealProject({
@@ -590,6 +589,10 @@ test("against the real server: a run fitted to a QEMU-shaped project's carve-out
     const confirm = rules.locator("label", { hasText: "its own text says some uses of AI are fine" });
     await expect(confirm).toContainText(`${file}:6: "${findings[0].quote}"`);
     await expect(confirm).toContainText(`${file}:10: "${findings[0].allows![0].quote}"`);
+    // The record and the confirm's help record together say the claim once, and once what BELL can't see.
+    const times = async (words: string) => ((await dialog.textContent()) ?? "").split(words).length - 1;
+    expect(await times(record.claim)).toBe(1);
+    expect(await times("can't see other tools")).toBe(1);
     await expect(dialog.locator("textarea")).toHaveCount(0);
     // Every other confirm ticked (the issue's comes with the facts read at approval): Submit still
     // waits for the quoted one, and the server refuses without it.

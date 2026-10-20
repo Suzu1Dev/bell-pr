@@ -502,12 +502,11 @@ export function respectChecks(
         bh.why,
         ...decision!.confirmable.flatMap((entry) => [
           sourced(entry.finding),
-          ...[...entry.allows, ...entry.others.slice(0, 2)].map((other) =>
-            bh.sameRules({ path: entry.finding.path, line: other.line, quote: other.quote }),
-          ),
+          ...entry.allows.map((allowance) => bh.sameRules({ path: entry.finding.path, line: allowance.line, quote: allowance.quote })),
+          ...entry.others.slice(0, 2).map((other) => bh.alsoSay({ path: entry.finding.path, line: other.line, quote: other.quote })),
         ]),
+        // The record beside it in the publish dialog says the claim and what BELL can't see, once.
         bh.helpRecord({ ...(lock ? { fitted: kindList(lock.kinds) } : {}), used }),
-        bh.otherTools,
       ],
     });
   }
@@ -577,7 +576,7 @@ export function respectChecks(
       id: "disclosure-accuracy",
       kind: "confirm",
       message: bh.denial({ line: denial, kinds: used }),
-      details: [bh.helpRecord({ used }), bh.otherTools],
+      details: [bh.helpRecord({ used })],
     });
 
   // The description is still BELL's suggestion: a block where the project

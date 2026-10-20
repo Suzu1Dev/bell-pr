@@ -163,10 +163,10 @@ const messages: Translation<typeof en> = {
       rulesConfirm: ({ area }) =>
         `${area ? "專案會關閉這類 issue 上由 AI 產生的 Pull Request" : "專案不接受 AI 產生的貢獻"}，而它自己的文字說某些 AI 用法可以。${product.name} 只是引用專案的文字，不替專案決定：你的變更是否符合，由維護者決定。`,
       sameRules: ({ path, line, quote }) => `同一份規範也說：${path}:${line}：「${quote}」`,
+      alsoSay: ({ path, line, quote }) => `這份規範還寫著：${path}:${line}：「${quote}」`,
       helpRecord: ({ fitted, used }) =>
-        `${fitted ? `開始時就配合了那段文字，嚮導只提供${fitted}。` : ""}${claim}你用到的協助：${used}。`,
+        `${fitted ? `開始時就配合了那段文字，嚮導只提供${fitted}。` : ""}你用到的協助：${used}。`,
       noHelp: "沒有",
-      otherTools: `${product.name} 看不到你用過的其他工具，例如編輯器的自動完成。`,
       denial: ({ line, kinds }) =>
         `你的文字寫著「${line}」。在這個工作裡，${product.name} 的嚮導給了你${kinds}。如果那句話指的是別的事，請確認；否則請改寫。`,
     },

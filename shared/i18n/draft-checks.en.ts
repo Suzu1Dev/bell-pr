@@ -245,13 +245,16 @@ const messages = {
       /** The `by-hand-rules` confirm, for a ban or a reserved issue. */
       rulesConfirm: ({ area }: { area: boolean }) =>
         `The project ${area ? "closes AI-generated pull requests for issues like this one" : "declines AI-generated contributions"}, and its own text says some uses of AI are fine. ${product.name} is quoting the project, not deciding for it: the maintainers decide whether your change fits.`,
-      /** A carve-out or another AI rule of the same document. */
+      /** A carve-out of the same document. */
       sameRules: ({ path, line, quote }: { path: string; line: number; quote: string }) =>
         `The same rules say: ${path}:${line}: "${quote}"`,
+      /** Another AI rule of the same document, quoted beside the confirm (never a condition). */
+      alsoSay: ({ path, line, quote }: { path: string; line: number; quote: string }) =>
+        `They also say: ${path}:${line}: "${quote}"`,
+      /** The help this run used; the record beside the confirm states the claim and what BELL can't see. */
       helpRecord: ({ fitted, used }: { fitted?: string; used: string }) =>
-        `${fitted ? `Fitted at the start, the guide offered only ${fitted}. ` : ""}${claim} You used: ${used}.`,
+        `${fitted ? `Fitted at the start, the guide offered only ${fitted}. ` : ""}You used: ${used}.`,
       noHelp: "none",
-      otherTools: `${product.name} can't see other tools you used, such as editor autocomplete.`,
       /** disclosure-accuracy: the person's line, quoted; never called true or false. */
       denial: ({ line, kinds }: { line: string; kinds: string }) =>
         `Your text says "${line}". In this run ${product.name}'s guide gave you ${kinds}. If that line means something else, confirm; otherwise reword it.`,

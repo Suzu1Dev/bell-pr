@@ -48,10 +48,8 @@ test("a Learn-by-hand run the guide helped with gets one confirm that quotes the
       kind: "confirm",
       message:
         'Your text says "No AI tools were used.". In this run BELL PR\'s guide gave you explanations and reviews. If that line means something else, confirm; otherwise reword it.',
-      details: [
-        "BELL PR's agents had no write access and gave you no code for this change. You used: explanations and reviews.",
-        "BELL PR can't see other tools you used, such as editor autocomplete.",
-      ],
+      // The record it stands next to says the claim and what BELL can't see.
+      details: ["You used: explanations and reviews."],
     },
   ]);
   const [zh] = accuracy(body, helped, "zh-TW");
