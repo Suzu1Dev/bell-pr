@@ -1325,14 +1325,28 @@ test("a Learn-by-hand record loads and saves unchanged, and a restart clears its
 
 /** A repository that carries every field v1.2 adds to a repository. */
 function repositoryWithV12Fields(): Repository {
-  return {
+  const repo: Repository = {
     ...JSON.parse(JSON.stringify(repositoryWithV11Fields)),
     testCommand: { command: "npm test -- hello", confirmedAt: "2026-10-20T00:00:00.000Z" },
   };
+  repo.contributionRules!.channels = [
+    { label: "Zulip", url: "https://example.zulipchat.com/", path: "CONTRIBUTING.md", line: 3 },
+    { label: "GitHub Discussions", url: "https://github.com/acme/widgets/discussions" },
+  ];
+  return repo;
+}
+
+/** The repository read schema with one field of its contribution rules left out. */
+function withoutRulesField(field: string) {
+  const rules = repositoryReadSchema.shape.contributionRules.removeCatch().unwrap();
+  return repositoryReadSchema.extend({
+    contributionRules: rules.omit({ [field]: true } as never).optional().catch(undefined),
+  });
 }
 
 const v12RepositorySchemas: Record<string, z.ZodTypeAny> = {
   testCommand: repositoryReadSchema.omit({ testCommand: true }),
+  "contributionRules.channels": withoutRulesField("channels"),
 };
 
 for (const [field, older] of Object.entries(v12RepositorySchemas))

@@ -110,6 +110,12 @@ const contributionRulesSchema = loose({
     .optional(),
   orgDefaults: text.optional(),
   unknown: list.optional(),
+  // v1.2: the project's human help channels.
+  channels: later(
+    z
+      .array(loose({ label: text.max(80), url: text.max(300), path: text.optional(), line: count.optional() }))
+      .max(5),
+  ),
 });
 
 const debriefSchema = loose({

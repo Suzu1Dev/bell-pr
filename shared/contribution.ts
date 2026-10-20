@@ -97,6 +97,22 @@ export interface ContributionRules {
    * is one of `unknownReasonCodes`, or the words an older build stored.
    */
   unknown?: string[];
+  /**
+   * The project's own human help channels found in its contributing files
+   * (chat, forum, mailing list, Discussions), at most 5, with where each is
+   * named. Absent when none was found or the rules were read before v1.2.
+   */
+  channels?: HelpChannel[];
+}
+
+/** A place to ask the project's people, quoted from its files (`ContributionRules.channels`). */
+export interface HelpChannel {
+  /** At most 80 characters. */
+  label: string;
+  /** At most 300 characters. */
+  url: string;
+  path?: string;
+  line?: number;
 }
 
 /** Another pull request on the linked issue. */
