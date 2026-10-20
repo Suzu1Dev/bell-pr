@@ -565,7 +565,8 @@ reaches you before you write a line. Then:
   assumptions, the scope and missing tests. It is told never to give you
   its own plan.
 - **This is my plan** confirms it (it needs at least one step you wrote)
-  and takes you to **Code changes**. Your answers are then read-only, but
+  and takes you to **Code changes**; when BELL PR can't confirm it, the
+  plan says why. Your answers are then read-only, but
   you can still edit your steps while you write, until you mark the change
   ready for review.
 
@@ -586,7 +587,9 @@ your first step's change, save, and come back." BELL PR reads the diff again whe
 the window (2 seconds after it gets the focus, one read at a time) and
 when a test run ends; **Refresh the diff** works too. You don't need to
 commit: when you publish, BELL PR makes one commit of the files you
-reviewed.
+reviewed. While you write, **Code changes** shows no review progress and
+no **Reviewed** ticks, and the footer reads **Your turn**; they come back
+once you mark the change ready, for the version you marked.
 
 Beside the diff, **The guide** panel shows your steps with **Done** and
 **Park**, and, while the run's history is clean, "BELL PR's agents can't
