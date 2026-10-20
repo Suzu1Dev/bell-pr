@@ -39,8 +39,8 @@ const plans: Translation<typeof en> = {
       limit: "計畫最多修訂 3 次",
     },
     learnByHand: {
-      label: "親手學：修改由你自己寫；嚮導陪你規劃、給不含程式碼的提示，並在你準備好時審查你的修改",
-      limit: `${product.name} 會執行你的測試；這類工作裡，它的 agent 無法修改你的檔案`,
+      label: "親手學：修改由你自己寫；嚮導陪你規劃、給不含程式碼的提示，並在你要求時審查你的修改",
+      limit: `你按下執行時，${product.name} 才會執行你確認過的測試指令；這類工作裡，它的 agent 無法修改你的檔案`,
     },
     review: {
       label: "差異審查、解說、先試著答的提問、追問對話、筆記與建議審查順序",
