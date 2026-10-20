@@ -38,6 +38,7 @@ import { log } from "./log.js";
 import { logged, parseAgentOutput } from "./run-events.js";
 import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
 import { walkthroughKeyPrefix } from "./walkthroughs.js";
+import { takeOverOwnCommits } from "./by-hand-takeover.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 const now = () => new Date().toISOString();
@@ -197,6 +198,8 @@ async function syncPublishedRun(ctx: WorkbenchContext, run: Run) {
     throw new AppError((m) => m.run.sync.roundOpen, 409);
   if (runBusy(ctx, run.id, { walkthroughs: false }))
     throw new AppError((m) => m.run.sync.busy, 409);
+  // Learn by hand: commits the person pushed from the run's folder are taken over first.
+  if (run.learnByHand) await takeOverOwnCommits(ctx, run, { refuse: true });
   const head = (
     await git(run.worktreePath, ["rev-parse", "HEAD"])
   ).stdout.trim();

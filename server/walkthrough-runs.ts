@@ -23,6 +23,10 @@ import {
   walkthroughKeyPrefix,
 } from "./walkthroughs.js";
 import type { WorkbenchContext } from "./workbench.js";
+import type { CodeReference, FileWalkthrough } from "../shared/walkthroughs.js";
+import { readyNow } from "../shared/by-hand.js";
+import { assertReaderView, changeFilter, recordStoredHelp } from "./learning.js";
+import { checkoutPaths, filteredError } from "./by-hand.js";
 
 const now = () => new Date().toISOString();
 
@@ -59,14 +63,23 @@ export async function walkthrough(
   const run = ctx.run(id);
   if (!readableStatuses.includes(run.status) || run.publishing)
     throw new AppError((m) => m.run.walkthrough.tooEarly, 409);
+  // Learn by hand: after Ready, and after the file's own Explain-it-back answer (F10).
+  if (run.learnByHand) {
+    const files = await ctx.lock(id, () => ctx.diff(id));
+    if (!files.some((entry) => entry.path === filePath))
+      throw new AppError((m) => m.run.review.fileNotFound, 404);
+    assertReaderView(run, files, filePath, ctx.store.data.repos.find((repo) => repo.id === run.repoId));
+  }
   const key = `${id}\0${filePath}`;
   const existing = ctx.walkthroughJobs.get(key);
   if (existing) await existing;
   else {
-    const file = (await ctx.lock(id, () => ctx.diff(id))).find(
-      (entry) => entry.path === filePath,
-    );
+    const files = await ctx.lock(id, () => ctx.diff(id));
+    const file = files.find((entry) => entry.path === filePath);
     if (!file) throw new AppError((m) => m.run.review.fileNotFound, 404);
+    // Learn by hand: the version walked through is the one checked, never one edited since (F5, F10).
+    if (run.learnByHand)
+      assertReaderView(run, files, filePath, ctx.store.data.repos.find((repo) => repo.id === run.repoId));
     // With no job for this file, "generating" was left by a job that
     // stopped without a result: it is made again, like a pending one.
     const wanted =
@@ -136,26 +149,33 @@ async function generateWalkthrough(
       const content = parseAgentOutput(run, "walkthrough", () =>
         parseWalkthrough(answer, lineCount, addedLines(file.patch)),
       );
-      const current = (await readDiff(run)).find(
-        (entry) => entry.path === file.path,
-      );
+      const files = await readDiff(run);
+      const current = files.find((entry) => entry.path === file.path);
       // The file changed while the agent read it, or a changed premise
       // verdict asked for the walkthroughs again: the next diff asks again.
+      // In Learn by hand any edit since Ready counts, as the agent read the
+      // other files too (F5).
       if (
         current?.fingerprint !== file.fingerprint ||
         current.blocked ||
-        !generating(run, file)
+        !generating(run, file) ||
+        (run.learnByHand && !readyNow(run, files))
       )
         return;
+      // Learn by hand: filtered (F7) and recorded as help before it is stored.
+      const filtered = run.learnByHand ? await filterWalkthrough(run, files, file.path, content) : undefined;
+      if (filtered) recordStoredHelp(run, "walkthrough", filtered.removed);
       run.walkthroughs![file.path] = {
         fingerprint: file.fingerprint,
         status: "ready",
-        content,
+        content: filtered?.value ?? content,
         generatedAt: now(),
       };
     });
-  } catch (error) {
+  } catch (failure) {
     const stored = run.walkthroughs?.[file.path];
+    // Learn by hand: what the agent may have written in its error is filtered (F7).
+    const error = run.learnByHand ? filteredError(failure) : failure;
     const message = controller.signal.aborted
       ? sm().run.walkthrough.stopped
       : redact(
@@ -175,4 +195,36 @@ async function generateWalkthrough(
     if (temporary) await rm(temporary, { recursive: true, force: true });
     await ctx.store.save();
   }
+}
+
+/**
+ * A walkthrough of the person's change, filtered (F7): every text field,
+ * names included, and a reference keeps its path (and line) only when the
+ * path is in the checkout, since a "path" is agent text too.
+ */
+async function filterWalkthrough(run: Run, files: readonly DiffFile[], filePath: string, content: FileWalkthrough) {
+  const named = content.functions.flatMap((unit) => [...unit.callers, ...unit.callees].map((ref) => ref.path));
+  const known = await checkoutPaths(run, named);
+  const filter = await changeFilter(run, files, [filePath, ...named.filter((file) => known.has(file))]);
+  const reference = (ref: CodeReference): CodeReference => {
+    const kept = known.has(ref.path);
+    return { name: filter.text(ref.name), path: kept ? ref.path : "", line: kept ? ref.line : null, note: filter.text(ref.note) };
+  };
+  const value: FileWalkthrough = {
+    ...content,
+    functions: content.functions.map((unit) => ({
+      ...unit,
+      name: filter.text(unit.name),
+      kind: filter.text(unit.kind),
+      summary: filter.text(unit.summary),
+      change: filter.text(unit.change),
+      steps: unit.steps.map((step) => ({ ...step, explanation: filter.text(step.explanation) })),
+      callers: unit.callers.map(reference),
+      callees: unit.callees.map(reference),
+      analogy: filter.text(unit.analogy),
+      selfCheck: { question: filter.text(unit.selfCheck.question), answer: filter.text(unit.selfCheck.answer) },
+    })),
+    ...(content.newUnits ? { newUnits: content.newUnits.map(filter.text) } : {}),
+  };
+  return { value, removed: filter.removed };
 }

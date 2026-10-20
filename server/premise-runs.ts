@@ -2,13 +2,18 @@
  * Checks a finished run's premise again, or for the first time on a run
  * made before premise checks: one read-only lead turn reads the code and
  * treats the team's plan and reports as claims to confirm. A changed
- * verdict has the run's walkthroughs, and the explanations the person has
- * not answered from, made again.
+ * verdict has the run's walkthroughs and explanations the person has not
+ * answered from made again. In a Learn-by-hand run it waits for Ready, and
+ * what the agent wrote is filtered before it is stored.
  */
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { practiceKey } from "../shared/practice.js";
+import { keepAnsweredWalkthroughs } from "../shared/understanding.js";
+import { assertHelpAllowed } from "./by-hand-record.js";
+import { assertReady, filteredError } from "./by-hand.js";
+import { changeFilter, recordStoredHelp } from "./learning.js";
 import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
 import { premiseCheckPrompt } from "./prompts/premise.js";
 import { contributionContext } from "./prompts/team.js";
@@ -73,6 +78,9 @@ export async function checkPremise(ctx: WorkbenchContext, id: string) {
   let temporary: string | undefined;
   try {
     const files = await ctx.lock(id, () => ctx.diff(id));
+    // Learn by hand: nothing is checked before Ready (F5); the premise is `explain` help.
+    assertReady(run, files);
+    if (run.learnByHand) assertHelpAllowed(run, "explain");
     temporary = await mkdtemp(path.join(os.tmpdir(), "bell-premise-"));
     const outputSchema = path.join(temporary, "premise-schema.json");
     await writeFile(
@@ -106,7 +114,10 @@ export async function checkPremise(ctx: WorkbenchContext, id: string) {
         true,
         // Isolated: offline, out of the team inbox and the reports; it still reads this checkout.
         { outputSchema, isolated: true },
-      );
+      ).catch((error) => {
+        // Learn by hand: what the agent may have written in its error is filtered (F7).
+        throw run.learnByHand ? filteredError(error) : error;
+      });
       let value: unknown;
       try {
         value = JSON.parse(jsonText(answer));
@@ -116,6 +127,19 @@ export async function checkPremise(ctx: WorkbenchContext, id: string) {
       return premiseCheck((value as { premise?: unknown } | null)?.premise);
     });
     return await ctx.lock(id, async () => {
+      // Learn by hand: the agent read the checkout, so a version edited
+      // since Ready gets nothing (F5); its statement and evidence are
+      // filtered (F7) and recorded as help.
+      if (run.learnByHand) {
+        const read = await ctx.diff(id);
+        assertReady(run, read);
+        if (premise) {
+          const filter = await changeFilter(run, read);
+          premise.statement = filter.text(premise.statement);
+          premise.evidence = filter.text(premise.evidence);
+          recordStoredHelp(run, "premise", filter.removed);
+        }
+      }
       // Only the verdict counts: an agent rarely words its evidence the same
       // way twice, and the new wording is stored either way.
       const changed =
@@ -123,9 +147,10 @@ export async function checkPremise(ctx: WorkbenchContext, id: string) {
       if (premise) team.premise = premise;
       else delete team.premise;
       if (changed) {
-        // Made with the old verdict, or none; they are made again with this one.
+        // Made with the old verdict, or none; they are made again with this
+        // one, except what the person already answered from.
         dropUnansweredExplanations(run);
-        delete run.walkthroughs;
+        keepAnsweredWalkthroughs(run);
         for (const [key, walkthrough] of ctx.controllers)
           if (key.startsWith(walkthroughKeyPrefix) && key.endsWith(`:${id}`))
             walkthrough.abort();

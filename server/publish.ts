@@ -39,6 +39,7 @@ import {
 import { assertRemoteHead, prHasCommit, remoteBranchHead } from "./pr-branch.js";
 import { assertConflictsResolved } from "./sync-runs.js";
 import { applyAiDisclosure } from "./drafts.js";
+import { assertReady } from "./by-hand.js";
 import { assertGitIdentity, githubTokenScopes } from "./doctor.js";
 import { setupError } from "./cli-errors.js";
 import type { WorkbenchContext } from "./workbench.js";
@@ -212,7 +213,7 @@ export async function saveDraft(
     const run = ctx.run(id);
     editable(run);
     // Turning the AI disclosure on or off adds or removes BELL's line.
-    const draft = applyAiDisclosure(run.draft, edited);
+    const draft = applyAiDisclosure(run.draft, edited, { learnByHand: run.learnByHand });
     if (
       activeFollowUp(run.followUps) &&
       (draft.title !== run.draft.title || draft.body !== run.draft.body)
@@ -290,6 +291,17 @@ export async function approve(
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     editable(run);
+    // Learn by hand: never while BELL runs the person's tests, and only the
+    // version the person marked ready is approved (DESIGN v1.2 F5, F9),
+    // from the one read of the change that was checked.
+    let ready: DiffFile[] | undefined;
+    if (run.learnByHand) {
+      const tests = `tests:${id}`;
+      if (ctx.byHandJobs.has(tests) || ctx.controllers.has(tests))
+        throw new AppError((m) => m.byHand.flow.testsRunning, 409);
+      ready = await ctx.diff(id);
+      assertReady(run, ready);
+    }
     if (
       displayedDraft.title !== run.draft.title ||
       displayedDraft.body !== run.draft.body ||
@@ -299,7 +311,7 @@ export async function approve(
         (run.draft.publishBranch ?? "")
     )
       throw new AppError((m) => m.run.publish.draftChanged, 409);
-    const files = await ctx.diff(id);
+    const files = ready ?? (await ctx.diff(id));
     if (
       !files.length ||
       files.some(
