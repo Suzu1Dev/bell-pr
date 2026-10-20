@@ -167,6 +167,14 @@ const aiNoun = String.raw`(?:AI|LLMs?|large\s+language\s+models?|language\s+mode
  * it is defined.
  */
 const refusalTerms: RegExp[] = [];
+/**
+ * A sentence that reports what other projects refuse ("Unlike Zig, …",
+ * "Some projects say …"): no rule of this project, so the refusal wordings
+ * don't read it. A project's own name can't tell which is meant, so it
+ * isn't such a marker.
+ */
+const othersRule =
+  /\bunlike\b|\b(?:some|many|most|other|several|certain)\s+(?:other\s+)?(?:projects?|communities|organi[sz]ations|foundations|ecosystems|distributions)\b|\bprojects?\s+(?:such\s+as|like)\b/i;
 
 /** Words that refuse something. */
 const prohibition = new RegExp(
@@ -605,7 +613,14 @@ function nearAssistance(
   rule: RegExp,
   sentenceOf: (span: Span) => Span,
 ) {
-  const terms = [...assistanceSpans(text), ...refusalTerms.flatMap((term) => allMatches(term, text))];
+  const reported = (span: Span) => {
+    const sentence = sentenceOf(span);
+    return othersRule.test(text.slice(sentence.start, sentence.end));
+  };
+  const terms = [
+    ...assistanceSpans(text),
+    ...refusalTerms.flatMap((term) => allMatches(term, text)).filter((span) => !reported(span)),
+  ];
   const pairs: { phrase: Span; span: Span; term: Span }[] = [];
   for (const phrase of allMatches(rule, text)) {
     const sentence = sentenceOf(phrase);
