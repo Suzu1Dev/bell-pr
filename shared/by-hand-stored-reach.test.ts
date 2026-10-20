@@ -88,3 +88,28 @@ test("a Learn-by-hand run's block copy says the stored reach", () => {
   const agent = (finding: PolicyFinding) => respectChecks({ body: "Fixes the timer.", rules: rulesOf(finding) }, "en");
   assert.deepEqual(agent(withStoredReach(ban())), agent({ ...ban(), reach: "assistance" }));
 });
+
+test("a ban without contribution context that stops the quoted confirm is quoted in the Learn-by-hand block it causes", () => {
+  const stored = withStoredReach(ban());
+  const fitted = caseOf(rulesOf(stored));
+  const lock: HelpLock = { ...(fitted as Extract<typeof fitted, { case: "fitted" }>).lock, at: createdAt };
+  const stopper = withStoredReach({ kind: "ban", path: "CONTRIBUTING.md", line: 40, quote: refusal, contribution: false });
+  const rules = rulesOf(stored, stopper);
+  const learnByHand = { helps: ["explain" as const], helpLock: lock, createdAt, now };
+  const quoted = `CONTRIBUTING.md:40: "${refusal}"`;
+  const checks = respectChecks({ body: "Fixes the timer.", rules, learnByHand }, "en");
+  const block = checks.find((check) => check.id === "ai-ban");
+  assert.equal(block?.kind, "block");
+  assert.equal(checks.find((check) => check.id === "by-hand-rules"), undefined);
+  assert.match(block!.message, /restricts AI help itself, or BELL PR can't tell what it covers/);
+  assert.deepEqual(block!.details.slice(1), [`docs/devel/code-provenance.rst:6: "${qemu}"`, quoted]);
+  // A reserved issue it blocks quotes it too.
+  const area: PolicyFinding = { ...stored, kind: "area", line: 12, quote: "Pull requests that are AI generated will be closed.", reach: "output" };
+  const facts = { issue: { state: "OPEN", labels: ["good first issue"] } } as never;
+  const reserved = respectChecks({ body: "Fixes #1.", rules: rulesOf(area, stopper), facts, learnByHand }, "en").find((check) => check.id === "area-reserved");
+  assert.equal(reserved?.details.at(-1), quoted);
+  // Without the stopper the run gets its quoted confirm; an agent run's block never changes.
+  assert.ok(respectChecks({ body: "Fixes the timer.", rules: rulesOf(stored), learnByHand }, "en").some((check) => check.id === "by-hand-rules"));
+  const agent = respectChecks({ body: "Fixes the timer.", rules }, "en").find((check) => check.id === "ai-ban");
+  assert.deepEqual(agent?.details.slice(1), [`docs/devel/code-provenance.rst:6: "${qemu}"`]);
+});

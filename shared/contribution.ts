@@ -21,7 +21,7 @@ import zhTW from "./i18n/draft-checks.zh-TW.js";
 import { formatters, type Locale } from "./i18n/locale.js";
 import { assistanceDenial, disclosureRule, hasAiDisclosure } from "./project-policy.js";
 import type { HelpKind } from "./by-hand.js";
-import { byHandRulesDecision, type ByHandBlockReason } from "./by-hand-rules.js";
+import { byHandRulesDecision, helpRefused, type ByHandBlockReason } from "./by-hand-rules.js";
 import type { AreaReach, BanReach } from "./policy-reach.js";
 
 /** Rule kinds the classifier finds (shared/project-policy.ts); stored as text, frozen. */
@@ -488,6 +488,10 @@ export function respectChecks(
     finding.source
       ? bh.registryQuote({ date: fmt.date(finding.source.checkedOn), url: finding.source.url, quote: finding.quote })
       : quote(finding);
+  // A ban elsewhere in the rules, without contribution context, that refuses AI help itself (or whose reach
+  // BELL can't tell) stops the confirm: the block it causes quotes it too (a contribution ban is there already).
+  const stopper = decision && helpRefused(input.rules!);
+  const stopped = stopper && !stopper.contribution ? [sourced(stopper)] : [];
   if (confirmed) {
     const lock = byHand!.helpLock;
     confirms.push({
@@ -542,7 +546,7 @@ export function respectChecks(
       message: bh.aiBan(
         reach === "assistance" ? {} : { condition: reach === "output" ? condition(first) : bh.clauses.reach },
       ),
-      details: [bh.why, ...bans.map(sourced)],
+      details: [bh.why, ...bans.map(sourced), ...stopped],
     });
   }
 
@@ -648,7 +652,7 @@ export function respectChecks(
       message: bh.areaReserved(
         reach === "output" || reach === "automate" ? { condition: condition(first) } : {},
       ),
-      details: [m.why.areaReserved, m.learningLabels({ labels: learning }), ...areas.map(sourced)],
+      details: [m.why.areaReserved, m.learningLabels({ labels: learning }), ...areas.map(sourced), ...stopped],
     });
   }
 

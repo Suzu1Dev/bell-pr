@@ -159,7 +159,7 @@ function restrictsOutput(finding: PolicyFinding) {
  * is not accepted."): no quoted confirm while it stands. The server marks
  * it (`stopsConfirm`); a ban stored without a reach counts too.
  */
-const helpRefused = (rules: ContributionRules) => rules.findings.find((finding) => finding.kind === "ban" && (finding.stopsConfirm || !finding.reach));
+export const helpRefused = (rules: ContributionRules) => rules.findings.find((finding) => finding.kind === "ban" && (finding.stopsConfirm || !finding.reach));
 
 /** The kinds a finding's carve-outs name, together. */
 const namedKinds = (finding: PolicyFinding) =>
