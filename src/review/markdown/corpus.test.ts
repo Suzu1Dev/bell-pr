@@ -6,9 +6,9 @@
  *
  *   BELLPR_RECORD_MARKDOWN_CORPUS=1 npx tsx --import ./test/css-stub.mjs --test src/review/markdown/corpus.test.ts
  *
- * It was first recorded with react-markdown 10.1.0, the renderer the
- * component had before; a renderer change must leave it byte for byte as
- * it is.
+ * It was first recorded with the renderer the component had before, a
+ * unified pipeline (remark-parse, remark-rehype, hast-util-to-jsx-runtime);
+ * a renderer change must leave it byte for byte as it is.
  */
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";

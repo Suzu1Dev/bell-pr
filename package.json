@@ -87,6 +87,7 @@
     "eslint-plugin-react-hooks": "~7.1.1",
     "globals": "~17.12.0",
     "lucide-react": "^0.468.0",
+    "micromark-util-sanitize-uri": "~2.0.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
