@@ -806,8 +806,7 @@ export function useRunActions({
       ...previous,
       [key]: (previous[key] || 0) + 1,
     }));
-    const targetRun = run.id;
-    const targetFile = file;
+    const [targetRun, targetFile] = [run.id, file];
     setMessages((previous) => ({
       ...previous,
       [key]: [
@@ -839,6 +838,7 @@ export function useRunActions({
             },
           ],
         }));
+      if (run.learnByHand && !demo) void reloadRun(targetRun); // The guide's answer is a help event the PR draft tab counts.
     } catch (error) {
       setMessages((previous) => ({
         ...previous,

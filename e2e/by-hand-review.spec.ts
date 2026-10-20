@@ -295,3 +295,28 @@ test("at the ready version, Run the review again offers the Tests card, so a tes
     await close();
   }
 });
+
+test("after the guide answers in the Ask tab, the run is read again, so the PR draft tab counts that help", async ({ browser }) => {
+  const { page, close } = await open(browser, `#/runs/${runs.ready}/changes?file=${encodeURIComponent(source)}`);
+  try {
+    const { run } = await (await page.request.get(`/api/runs/${runs.ready}`)).json();
+    // The chat route as W2A/W2B answer it: the answer, and a help event on the run (the response carries only the answer).
+    await page.route(`**/api/runs/${runs.ready}/chat`, async (route) => {
+      await page.route(`**/api/runs/${runs.ready}`, (read) =>
+        read.fulfill({ json: { run: { ...run, byHand: { ...run.byHand, events: [{ at: "2099-01-01T00:00:00.000Z", kind: "answer", source: "chat" }] } } } }),
+      );
+      await route.fulfill({ json: { answer: "The cap is read once, at the top of the file." } });
+    });
+    await page.getByRole("tab", { name: "Ask" }).click();
+    const box = page.getByPlaceholder("Which part do you want to explore?");
+    await box.fill("Where is the cap read?");
+    const read = page.waitForRequest((request) => new URL(request.url()).pathname === `/api/runs/${runs.ready}` && request.method() === "GET");
+    await box.press("Enter");
+    await expect(page.getByText("The cap is read once, at the top of the file.")).toBeVisible();
+    await read;
+    await page.locator("#workspace-tab-draft").click();
+    await expect(page.getByRole("region", { name: /^Your words/ }).getByText(/Help you used: answers \(1\)\./)).toBeVisible();
+  } finally {
+    await close();
+  }
+});
