@@ -1312,3 +1312,23 @@ test("a Learn-by-hand record loads and saves unchanged, and a restart clears its
   assert.equal(read.data.byHand?.helpLock?.kinds.length, 3);
   assert.equal(read.data.byHand?.agentWrites, 0);
 });
+
+/** A repository that carries every field v1.2 adds to a repository. */
+function repositoryWithV12Fields(): Repository {
+  return {
+    ...JSON.parse(JSON.stringify(repositoryWithV11Fields)),
+    testCommand: { command: "npm test -- hello", confirmedAt: "2026-10-20T00:00:00.000Z" },
+  };
+}
+
+const v12RepositorySchemas: Record<string, z.ZodTypeAny> = {
+  testCommand: repositoryReadSchema.omit({ testCommand: true }),
+};
+
+for (const [field, older] of Object.entries(v12RepositorySchemas))
+  test(`a build that predates the repository's ${field} (v1.2) still reads a repository that has it`, () => {
+    const written = JSON.parse(JSON.stringify(repositoryWithV12Fields()));
+    const read = lenientRead(older).safeParse(written);
+    assert.ok(read.success, read.success ? "" : read.error.message);
+    assert.deepEqual(read.data, written);
+  });

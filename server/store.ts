@@ -430,6 +430,8 @@ export const repositoryReadSchema = loose({
     updatedAt: text.optional(),
     contributionRules: later(contributionRulesSchema),
     debriefs: later(z.array(debriefSchema).max(5)),
+    // v1.2 (Learn by hand).
+    testCommand: later(loose({ command: text.max(300), confirmedAt: text })),
 });
 
 const repositorySchema = lenientRead(repositoryReadSchema);

@@ -54,6 +54,12 @@ export interface Repository {
   contributionRules?: ContributionRules;
   /** Pro coach debriefs for this project, newest last, at most 5; readable on every plan. GET /api/repos leaves them out. */
   debriefs?: CoachDebrief[];
+  /**
+   * The test command the person confirmed for this project, in a request of
+   * its own (Learn by hand runs it only when they click Run). Any change is
+   * a new confirmation; absent until the first one.
+   */
+  testCommand?: { command: string; confirmedAt: string };
 }
 
 export interface Agent {
