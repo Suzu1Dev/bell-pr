@@ -209,16 +209,25 @@ function startJob(ctx: WorkbenchContext, run: Run, input: ByHandTestInput, start
   ctx.controllers.set(key, controller);
   lives(ctx).set(run.id, live);
   (run.byHand ??= {}).busy = { kind: "tests", since: start.at };
+  /**
+   * Ends the job's registration. The job calls it under the run's lock as
+   * it clears `busy`, so a run that shows its result and no busy mark
+   * takes the next request at once; it runs again, as a no-op, when the
+   * job settles.
+   */
+  const release = () => {
+    if (ctx.controllers.get(key) === controller) ctx.controllers.delete(key);
+    if (lives(ctx).get(run.id) === live) lives(ctx).delete(run.id);
+    if (ctx.byHandJobs.get(key) === job) ctx.byHandJobs.delete(key);
+  };
   // Background work of the run: its log line uses the run's locale.
-  const job: Promise<void> = withRunLocale(run, () => execute(ctx, run, input, start, controller.signal, live))
+  const job: Promise<void> = withRunLocale(run, () =>
+    execute(ctx, run, input, start, { signal: controller.signal, live, release }),
+  )
     // Nothing awaits this job until Stop, cancel or shutdown; a failed save
     // must not become an unhandled rejection that stops the server.
     .catch((error) => log.error("Learn-by-hand test run failed", { runId: run.id, error: String(error) }))
-    .finally(() => {
-      if (ctx.controllers.get(key) === controller) ctx.controllers.delete(key);
-      if (lives(ctx).get(run.id) === live) lives(ctx).delete(run.id);
-      if (ctx.byHandJobs.get(key) === job) ctx.byHandJobs.delete(key);
-    });
+    .finally(release);
   ctx.byHandJobs.set(key, job);
 }
 
@@ -239,8 +248,7 @@ async function execute(
   run: Run,
   input: ByHandTestInput,
   start: TestStart,
-  signal: AbortSignal,
-  live: LiveJob,
+  { signal, live, release }: { signal: AbortSignal; live: LiveJob; release: () => void },
 ) {
   const clock = Date.now();
   let outcome: TestOutcome;
@@ -304,6 +312,7 @@ async function execute(
       log.info("by-hand.tests.finished", { runId: run.id, outcome, ms });
     } finally {
       if (run.byHand?.busy?.kind === "tests") delete run.byHand.busy;
+      release();
       await ctx.store.save();
     }
   });

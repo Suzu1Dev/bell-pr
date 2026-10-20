@@ -385,6 +385,26 @@ test("a 3 MB output is not cut at 2 MB; past the output limit the run is an erro
   assert.equal(f.run.logs.at(-1)?.message, "Your tests wrote more than 1 MB of output, so BELL PR stopped them. The end of the output is kept.");
 });
 
+test("a new run starts at once when the last one shows its result and the run is no longer busy", async (t) => {
+  const f = await fixture(t);
+  await f.confirm(`node -e "process.exit(1)"`);
+  // A slow disk: the job's last save takes a while after the result shows.
+  const save = f.store.save.bind(f.store);
+  f.store.save = async () => {
+    await sleep(200);
+    return save();
+  };
+  for (let index = 1; index <= 3; index++) {
+    // As the Tests card does: Run again as soon as the result shows and busy is gone.
+    await en(() => f.byHand.runTests(f.run.id, {}));
+    while ((f.run.byHand?.tests?.length ?? 0) < index || f.run.byHand?.busy) await sleep(5);
+  }
+  assert.deepEqual(
+    f.run.byHand?.tests?.map((test) => test.outcome),
+    ["failed", "failed", "failed"],
+  );
+});
+
 test("three identical failures in a row hash alike, even when their timings differ", async (t) => {
   const f = await fixture(t);
   await f.confirm(
