@@ -27,6 +27,7 @@ export function StartConfirm({
   byHand?: boolean;
 }) {
   const t = useT("mission").startConfirm;
+  const m = useT("discovery").byHand;
   const [locale] = useLocale();
   const id = useId().replaceAll(":", "");
   const heading = useRef<HTMLHeadingElement>(null);
@@ -40,7 +41,7 @@ export function StartConfirm({
         : reason.id === "learning"
           ? t.lesson
           : isByHandReason(reason)
-            ? byHandReasonText(reason, t.byHand, locale)
+            ? byHandReasonText(reason, m, locale)
             : t.practise[reason.id],
   );
   // A Learn-by-hand run that can publish through the quoted confirm only informs.
@@ -48,7 +49,7 @@ export function StartConfirm({
   return (
     <section className="start-confirm" aria-labelledby={`start-confirm-${id}`}>
       <h3 id={`start-confirm-${id}`} ref={heading} tabIndex={-1}>
-        <TriangleAlert size={16} aria-hidden="true" /> {byHand ? t.titleByHand : t.title}
+        <TriangleAlert size={16} aria-hidden="true" /> {byHand ? m.title : t.title}
       </h3>
       <ul>
         {lines.map((line) => (
@@ -61,7 +62,7 @@ export function StartConfirm({
         </button>
         <button type="button" className="button primary" onClick={onConfirm}>
           <Play size={15} aria-hidden="true" />
-          {practise ? (byHand ? t.practiseByHand : t.practiseLocally) : t.startAnyway}
+          {practise ? (byHand ? m.practise : t.practiseLocally) : t.startAnyway}
         </button>
       </div>
     </section>

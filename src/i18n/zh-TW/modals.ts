@@ -75,18 +75,6 @@ const m: Translation<typeof en> = {
     saveDemo: "播放示範團隊",
     planFirst: "產生團隊計畫",
     start: "啟動 Agent team",
-    byHand: {
-      legend: "誰來寫程式碼？",
-      agents: "Agent 團隊來寫",
-      hand: "你自己寫（親手學）",
-      handText: `嚮導和你一起規劃、給提示，並在你要求時審查你的修改。這個任務裡，${product.name} 的 agent 無法修改你的檔案。送出之前，你要在沒有協助的情況下把修改解釋一遍。`,
-      sample: "示範專案只示範 agent 團隊。親手學請用你自己的專案。",
-      start: "和嚮導一起規劃",
-      fit: "讓嚮導配合專案規範",
-      full: "所有協助都要，只在本機練習",
-      fullNote: `${product.name} 不會在這裡發布那個任務。`,
-      practice: "嚮導仍然提供所有協助。",
-    },
   },
 };
 

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { ContributionFacts, ContributionRules } from "../../shared/contribution";
 import { getDemo } from "../demo";
-import en from "../i18n/en/mission";
-import zhTW from "../i18n/zh-TW/mission";
+import discoveryEn from "../i18n/en/discovery";
+import discoveryZh from "../i18n/zh-TW/discovery";
 import { assertNoHan } from "../test-utils/render";
 import {
   byHandReasonText,
@@ -221,18 +221,18 @@ test("a fitted case names the kinds of help and quotes the first carve-out", () 
     },
   });
   assert.deepEqual(reason, { id: "by-hand-fitted", kinds: ["explain", "answer"], quote: carveOut });
-  const m = en.startConfirm.byHand;
+  const m = discoveryEn.byHand;
   const text = byHandReasonText(reason!, m, "en");
   assertNoHan(text);
   assert.equal(
     text,
     `BELL PR can publish a learn-by-hand run here only if the guide stays within what the project's own text says is fine (explanations and answers: "${carveOut}"), and only after you confirm the project's quoted rule. The maintainers decide whether your change fits.`,
   );
-  assert.match(byHandReasonText(reason!, zhTW.startConfirm.byHand, "zh-TW"), /解說和回答/);
+  assert.match(byHandReasonText(reason!, discoveryZh.byHand, "zh-TW"), /解說和回答/);
 });
 
 test("the reasons a learn-by-hand run won't publish are worded by the rule's reach and the failed condition", () => {
-  const m = en.startConfirm.byHand;
+  const m = discoveryEn.byHand;
   const ban = (reach: "assistance" | "output" | "unknown", reason: "reach" | "no-carve-out") =>
     byHandReasonText({ id: "by-hand-ban", reach, reason }, m, "en");
   assert.equal(
@@ -256,7 +256,7 @@ test("the reasons a learn-by-hand run won't publish are worded by the rule's rea
     "BELL PR won't publish a learn-by-hand run for this issue: the project closes AI-generated pull requests for issues like it, and its text doesn't say which uses of AI are fine.",
   );
   for (const reach of ["assistance", "output", "unknown"] as const)
-    assert.ok(byHandReasonText({ id: "by-hand-ban", reach, reason: "reach" }, zhTW.startConfirm.byHand, "zh-TW").length > 0);
+    assert.ok(byHandReasonText({ id: "by-hand-ban", reach, reason: "reach" }, discoveryZh.byHand, "zh-TW").length > 0);
 });
 
 test("Learn by hand is suggested only on projects whose rules neither ban AI nor reserve issues", () => {

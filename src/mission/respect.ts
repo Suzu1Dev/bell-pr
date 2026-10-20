@@ -258,10 +258,10 @@ export function helpKindList(kinds: readonly string[], locale: Locale) {
   return formatters(locale).list(kinds.map((kind) => names[kind] ?? kind));
 }
 
-/** The sentence of a Learn-by-hand start reason, in `locale` (`m`: mission.startConfirm.byHand). */
+/** The sentence of a Learn-by-hand start reason, in `locale` (`m`: the `discovery.byHand` messages). */
 export function byHandReasonText(
   reason: ByHandStartReason,
-  m: Messages["mission"]["startConfirm"]["byHand"],
+  m: Pick<Messages["discovery"]["byHand"], "ban" | "area" | "fitted">,
   locale: Locale,
 ) {
   if (reason.id === "by-hand-fitted")

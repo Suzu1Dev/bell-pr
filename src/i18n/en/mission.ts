@@ -442,7 +442,6 @@ const mission = {
     planApproval: {
       label: "Let me approve the plan before development",
       help: "Review the split, scope and acceptance checks first; implementation starts once you approve.",
-      byHand: "Always on in Learn by hand: you confirm your own plan before you write.",
     },
   },
   /** Project analysis loading and saving, shown where the action failed. */
@@ -474,8 +473,6 @@ const mission = {
     kicker: "THE PROJECT'S OWN RULES",
     title: "Before you contribute",
     lead: `What this project asks of contributors, quoted from its own files, and what ${product.name} does about each rule when you publish.`,
-    /** A rule from BELL's owner-signed list of rules projects publish outside their repositories (DESIGN v1.2 F14). */
-    registry: ({ date }: { date: string }) => `From ${product.name}'s checked list · checked on ${date}`,
     door: {
       open: "Pull requests: open to you",
       collaborators:
@@ -617,19 +614,6 @@ const mission = {
     practiseLocally: "Start and practise locally",
     startAnyway: "Start anyway",
     back: "Back",
-    /** Learn by hand (DESIGN v1.2 F12): said before the first line is written. */
-    titleByHand: "Before you start",
-    practiseByHand: "Practise by hand locally",
-    byHand: {
-      ban: ({ reach, condition }: { reach: string; condition: string }) =>
-        `${product.name} won't publish a learn-by-hand run here: ${reach === "assistance" ? "the project's rules restrict AI help itself, not only AI-written code" : reach === "output" ? `the project's rules decline AI-generated content, and ${condition}` : `${product.name} can't tell from the project's rule what it covers`}.`,
-      area: ({ reach, condition }: { reach: string; condition: string }) =>
-        reach === "output" || reach === "automate"
-          ? `${product.name} won't publish a learn-by-hand run for this issue: the project closes AI-generated pull requests for issues like it, and ${condition}.`
-          : `${product.name} won't publish a learn-by-hand run for this issue: the project keeps it for people learning without AI tools.`,
-      fitted: ({ kinds, quote }: { kinds: string; quote: string }) =>
-        `${product.name} can publish a learn-by-hand run here only if the guide stays within what the project's own text says is fine (${kinds}: "${quote}"), and only after you confirm the project's quoted rule. The maintainers decide whether your change fits.`,
-    },
   },
 };
 

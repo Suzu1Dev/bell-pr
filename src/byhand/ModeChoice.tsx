@@ -2,8 +2,8 @@
  * "Who writes the code?" in the task dialog (DESIGN v1.2 F1): the agent
  * team (the default) or Learn by hand, with the fitted or full-help choice
  * when the project's rules allow the quoted confirm (F12), and the reason
- * when BELL won't publish a learn-by-hand run there. Strings in `modals`;
- * the case lines are the task dialog's start reasons (`mission`).
+ * when BELL won't publish a learn-by-hand run there. Its copy is in the
+ * deferred `discovery` namespace, so it adds nothing to the startup chunk.
  */
 import { useId } from "react";
 import { Bot, Hand } from "lucide-react";
@@ -41,12 +41,11 @@ export function ModeChoice({
   sample = false,
   disabled = false,
 }: ModeChoiceProps) {
-  const t = useT("modals").newTask.byHand;
-  const reasons = useT("mission").startConfirm.byHand;
+  const t = useT("discovery").byHand;
   const [locale] = useLocale();
   const id = useId();
   const reason = mode === "hand" && !sample ? byHandStartReason(rulesCase) : undefined;
-  const line = reason && byHandReasonText(reason, reasons, locale);
+  const line = reason && byHandReasonText(reason, t, locale);
   // Every carve-out the run would be fitted to, verbatim.
   const quotes =
     rulesCase?.case === "fitted"

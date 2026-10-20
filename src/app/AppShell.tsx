@@ -130,7 +130,7 @@ const LearningPage = lazy(() =>
 // The task and model dialogs carry the direction and model pickers, which
 // load with the dialog that needs them.
 const NewTaskModal = lazy(() =>
-  import("../modals/NewTaskModal").then((module) => ({ default: module.NewTaskModal })),
+  withMessages(import("../modals/NewTaskModal")).then((module) => ({ default: module.NewTaskModal })),
 );
 const ModelSettingsModal = lazy(() =>
   withMessages(import("../settings/ModelSettingsModal")).then((module) => ({

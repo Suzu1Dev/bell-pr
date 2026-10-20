@@ -85,19 +85,6 @@ const modals = {
     saveDemo: "Play the sample team",
     planFirst: "Generate the team plan",
     start: "Start the agent team",
-    /** Who writes the change (DESIGN v1.2 F1, F12); the case lines come from `mission.startConfirm.byHand`. */
-    byHand: {
-      legend: "Who writes the code?",
-      agents: "The agent team writes it",
-      hand: "You write it (Learn by hand)",
-      handText: `The guide plans with you, gives hints and reviews your change when you ask. ${product.name}'s agents can't edit your files in this run. You'll explain the change back without help before you send it.`,
-      sample: "The sample shows the agent team. Learn by hand works on your own projects.",
-      start: "Plan with the guide",
-      fit: "Fit the guide to the project's rules",
-      full: "Every kind of help, practise locally",
-      fullNote: `${product.name} won't publish that run here.`,
-      practice: "The guide still gives every kind of help.",
-    },
   },
 };
 

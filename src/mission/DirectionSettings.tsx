@@ -129,6 +129,7 @@ export function DirectionSettings({
   byHand = false,
 }: DirectionSettingsProps) {
   const { directions, settings: t } = useT("mission");
+  const byHandText = useT("discovery").byHand;
   const { reasoningEffort: efforts, reasoningEffortWithId } = useT("common");
   const id = useId();
   const presentation = usePresentation();
@@ -620,7 +621,7 @@ export function DirectionSettings({
                   <Settings2 size={16} />
                   {t.planApproval.label}
                 </strong>
-                <small>{byHand ? t.planApproval.byHand : t.planApproval.help}</small>
+                <small>{byHand ? byHandText.planApproval : t.planApproval.help}</small>
               </span>
             </label>
           </div>

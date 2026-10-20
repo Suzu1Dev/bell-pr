@@ -72,6 +72,8 @@ export function NewTaskModal({
   maskUser,
 }: NewTaskModalProps) {
   const t = useT("modals").newTask;
+  // The mode choice's copy is in a deferred namespace: the dialog waits for it once.
+  const modeText = useT("discovery").byHand;
   const common = useT("common");
   const [locale] = useLocale();
   const demoRepo = getDemo(locale).repo;
@@ -314,7 +316,7 @@ export function NewTaskModal({
             {demo
               ? t.saveDemo
               : mode === "hand"
-                ? t.byHand.start
+                ? modeText.start
                 : contributionSettings.requirePlanApproval
                 ? t.planFirst
                 : t.start}
