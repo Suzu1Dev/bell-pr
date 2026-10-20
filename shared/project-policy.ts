@@ -402,8 +402,12 @@ refusalTerms.push(useRefused);
  * PRs and AI generated commit messages are not allowed" refuses two.
  */
 const partBoundary = /[,;:]|\s(?:and|or|nor)\s/gi;
-/** Words that carry a refusal on to things a part doesn't name ("…, nor are small ones"). */
-const refusalCarried = /\b(?:nor|neither|either|regardless|no\s+matter)\b/i;
+/**
+ * Words that carry a refusal on to things a part doesn't name ("…, nor are
+ * small ones", "…, even small ones", "of any size").
+ */
+const refusalCarried =
+  /\b(?:nor|neither|either|regardless|no\s+matter)\b|\beven\s+(?:the\s+)?(?:small|smaller|tiny|short|minor|trivial)\b|\bany\s+size\b|\b(?:large|big)\s+or\s+small\b|\bsmall\s+or\s+(?:large|big)\b/i;
 
 /**
  * The parts of a sentence (see `partBoundary`), Markdown link targets left
@@ -804,7 +808,7 @@ function weighedFor(search: string, sentence: Span, term: Span) {
     aboutConversation: conversation.test(words) && !changeObject.test(words),
     // "Do not use AI to generate substantial pieces of code": how much is
     // too much is the person's call.
-    sized: sizeQualifier.test(words) && !unsizedAiChange(words),
+    sized: sizeQualifier.test(words) && !unsizedAiChange(words) && !refusalCarried.test(words),
     // "Listing AI tooling as a co-author … is not allowed": how AI help
     // is credited, not whether it may help; each refused thing counts.
     credited: weighedRefusal(words),
