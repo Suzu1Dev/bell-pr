@@ -202,8 +202,9 @@ export const looks: Record<string, Record<string, TakeLook>> = {
     },
     answer: {
       state: "v-quiz-attempt",
-      // The answer types out inside the push, then "Think so" and "Show answer" (before the reveal's scroll at 4.37 s).
-      clipFrom: 1.2,
+      // The answer types out inside the push, then "Think so" and "Show answer", pressed 15 frames before the cut so the
+      // pointer stays on it (src/look/pointer.ts); held on the pressed frame (4.07 s) before the reveal replaces the card.
+      clipFrom: 1.66,
       rate: 1.25,
       clipTo: 4.08,
       keys: [
@@ -214,9 +215,9 @@ export const looks: Record<string, Record<string, TakeLook>> = {
     },
     reveal: {
       state: "v-quiz-attempt",
-      // After the scroll to the grades: the AI-written reference, then "Got it" (held before the card collapses and
-      // the panel's notice under it slides behind the sticky footer, 6.15 s).
-      clipFrom: 5.05,
+      // After the scroll to the grades: the AI-written reference, then "Got it", pressed 15 frames before the cut (held
+      // before the card collapses and the panel's notice under it slides behind the sticky footer, 6.15 s).
+      clipFrom: 5.367,
       clipTo: 6.13,
       macro: true,
       keys: [
@@ -242,9 +243,9 @@ export const looks: Record<string, Record<string, TakeLook>> = {
   "s7-taste": {
     guess: {
       state: "v-road-choice",
-      // The guess finishes typing; "Show the alternative" is pressed on the take's last frames (the reveal's
-      // scroll starts at 3.63 s).
-      clipFrom: 1.75,
+      // The guess, typed (2.37 s); "Show the alternative" is pressed 17 frames before the cut and held on its pressed
+      // frame (3.17 s: the revealed alternative replaces the card on the next one).
+      clipFrom: 2.37,
       rate: 1.2,
       clipTo: 3.18,
       keys: [
@@ -297,8 +298,9 @@ export const looks: Record<string, Record<string, TakeLook>> = {
   "s8-ask": {
     select: {
       state: "v-line-ask",
-      // The second click selects lines 10-15, then "Explain this code" in the selection bar is pressed.
-      clipFrom: 1.45,
+      // Lines 10-15 selected (the second click, 1.57 s, is just before the cut), then "Explain this code" in the
+      // selection bar is pressed, 15 frames before the cut.
+      clipFrom: 1.767,
       keys: [
         { at: 0, view: push(756, 627, 1.56, { bottom: 172 }) },
         { at: 2, view: push(756, 627, 1.62, { bottom: 168 }) },
@@ -376,8 +378,10 @@ export const looks: Record<string, Record<string, TakeLook>> = {
     },
     partly: {
       state: "v-check",
-      // After the reveal's scroll: the question, the answer, the AI-written reference beside it, and "Partly".
-      clipFrom: 8.75,
+      // After the reveal's scroll: the question, the answer, the AI-written reference beside it, and "Partly", pressed
+      // 15 frames before the cut; held before the scroll to the correction (10.20 s).
+      clipFrom: 9.1,
+      clipTo: 10.17,
       macro: true,
       keys: [
         { at: 0, view: panel(445, 2.06, 450) },
@@ -476,9 +480,10 @@ export const looks: Record<string, Record<string, TakeLook>> = {
     dialog: {
       state: "v-publish",
       // After the dialog's scroll to its checks: the pacing line, "Every check passes.", the click on "Open the sample
-      // Draft PR" on the last frames (the dialog closes at 3.83 s, after the cut). The preview above them, whose last
-      // line its own scroll box cuts, drops back.
-      clipFrom: 2.3,
+      // Draft PR" on the beat before the bar-31 crash, held on its pressed frame (3.80 s) to the cut (the dialog closes
+      // at 3.83 s). The preview above them, whose last line its own scroll box cuts, drops back.
+      clipFrom: 2.642,
+      clipTo: 3.8,
       rate: 0.625,
       macro: true,
       keys: [
@@ -501,8 +506,10 @@ export const looks: Record<string, Record<string, TakeLook>> = {
     waiting: {
       state: "v-forecast-vs-reality",
       // The draft waiting for the review: "Maintainer feedback" with "Read feedback", and the saved forecast beside the
-      // empty "What the maintainers said"; "Read feedback" is pressed just before the cut to what they said.
-      clipFrom: 0,
+      // empty "What the maintainers said"; "Read feedback" is pressed 15 frames before the cut, the first comment comes
+      // in beside the forecast, and the take holds before the page scrolls to what they said (1.03 s).
+      clipFrom: 0.275,
+      clipTo: 1.0,
       rate: 0.75,
       keys: [
         { at: 0, view: push(834, 674, 1.56, { bottom: 84 }) },

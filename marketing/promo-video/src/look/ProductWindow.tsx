@@ -16,7 +16,7 @@ import { Img } from "remotion";
 import { CAPTURE } from "../footage.ts";
 import { corners, PERSPECTIVE, PERSPECTIVE_ORIGIN, viewTransform, type View } from "./camera.ts";
 import { LIFT_SCALE, SOFT_BLUR, VEIL, type Lift } from "./dof.ts";
-import type { PointerState } from "./pointer.ts";
+import { POINTER, type PointerState } from "./pointer.ts";
 
 /**
  * The light studio's shadow stack, tinted with the token hue (STYLE-GUIDE
@@ -226,55 +226,53 @@ const Lifted: React.FC<{ lift: Lift; on: number; src: string; layout: number; sh
 };
 
 /**
- * The neutral round pointer on the light UI: an ink disc (70%) with a white
- * ring and a soft shadow, drawn beside its hotspot like an arrow's body
- * beside its tip (by default 9 capture px right of and 11 below it; per
- * click, wherever the footage leaves it off every glyph, scripts/
- * pointer-spots.mjs), so it never sits on the text it clicks; a thin green
- * ring round the disc where it clicks.
+ * The neutral round pointer on the light UI (lookdev STYLE-GUIDE §5.5: 24 px,
+ * white, a thin ink ring, a soft shadow; never an OS arrow), centred on its
+ * hotspot so it sits on what it clicks: a white ring between two ink
+ * hairlines that reads on white UI and on a filled button alike, round a
+ * light ink tint that leaves the label under it legible. On the press it
+ * shrinks and darkens a little and a ring spreads from the hotspot. The
+ * shadow is round (no offset), so the pointer's centre is its hotspot in
+ * the pixels too (scripts/check-pointer.mjs measures it).
  */
-export const POINTER_OFFSET = { x: 9, y: 11 } as const;
-
 const Pointer: React.FC<{ state: PointerState; layout: number; k: number }> = ({ state, layout, k }) => {
-  if (state.opacity <= 0.001 && state.ripple === undefined) return null;
-  const size = 20 * k * (1 - 0.18 * state.press);
-  const offset = state.offset ?? POINTER_OFFSET;
-  const disc = { x: (state.x + offset.x) * layout, y: (state.y + offset.y) * layout };
+  if (state.opacity <= 0.001) return null;
+  const radius = POINTER.RADIUS * k * (1 - 0.16 * state.press);
   const ring = state.ripple;
+  const ringRadius = ring === undefined ? 0 : (POINTER.RADIUS + POINTER.RIPPLE_GROWTH * (1 - (1 - ring) ** 2)) * k;
+  const ringAlpha = ring === undefined ? 0 : 1 - ring;
   return (
-    <>
-      {ring === undefined ? null : (
+    <div style={{ position: "absolute", left: 0, top: 0, opacity: state.opacity }}>
+      {ring === undefined || !state.rippleAt ? null : (
         <div
           style={{
             position: "absolute",
-            // Round the disc, not the hotspot: the hotspot is on the label clicked, and a ring there crossed its glyphs.
-            left: ((state.rippleAt?.x ?? state.x) + offset.x) * layout,
-            top: ((state.rippleAt?.y ?? state.y) + offset.y) * layout,
-            width: (22 + 26 * ring) * k,
-            height: (22 + 26 * ring) * k,
-            marginLeft: (-(22 + 26 * ring) * k) / 2,
-            marginTop: (-(22 + 26 * ring) * k) / 2,
+            left: state.rippleAt.x * layout - ringRadius,
+            top: state.rippleAt.y * layout - ringRadius,
+            width: ringRadius * 2,
+            height: ringRadius * 2,
+            boxSizing: "border-box",
             borderRadius: "50%",
-            border: `${px(2 * k)} solid rgba(31,109,80,${(0.55 * (1 - ring)).toFixed(3)})`,
+            border: `${px(2 * k)} solid rgba(255,255,255,${(0.9 * ringAlpha).toFixed(3)})`,
+            boxShadow: `0 0 0 ${px(k)} rgba(17,26,21,${(0.4 * ringAlpha).toFixed(3)}), inset 0 0 0 ${px(k)} rgba(17,26,21,${(0.25 * ringAlpha).toFixed(3)})`,
           }}
         />
       )}
       <div
         style={{
           position: "absolute",
-          left: disc.x,
-          top: disc.y,
-          width: size,
-          height: size,
-          marginLeft: -size / 2,
-          marginTop: -size / 2,
+          left: state.x * layout - radius,
+          top: state.y * layout - radius,
+          width: radius * 2,
+          height: radius * 2,
+          boxSizing: "border-box",
           borderRadius: "50%",
-          background: "rgba(17,26,21,0.7)",
-          boxShadow: `0 0 0 ${px(2 * k)} rgba(255,255,255,0.95), 0 ${px(2 * k)} ${px(8 * k)} rgba(17,26,21,0.3)`,
-          opacity: state.opacity,
+          background: `rgba(17,26,21,${(0.16 + 0.14 * state.press).toFixed(3)})`,
+          border: `${px(2.5 * k)} solid rgba(255,255,255,0.95)`,
+          boxShadow: `0 0 0 ${px(k)} rgba(17,26,21,0.5), inset 0 0 0 ${px(k)} rgba(17,26,21,0.3), 0 0 ${px(6 * k)} rgba(17,26,21,0.3)`,
         }}
       />
-    </>
+    </div>
   );
 };
 

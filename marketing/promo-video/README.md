@@ -56,6 +56,7 @@ npm run render:draft    # a quick 1x preview, out/draft-1080p.mp4 (not a deliver
 npm run check           # check every output (`-- --web-only` for the 1080p files only)
 npm run review          # QA frames, index, contact sheet, the per-frame scans and the depth-of-field check (exit 1 on a finding)
 npm run moments         # the bell's landing and hand-off, and the end card's lines, measured in rendered frames (exit 1 on a finding)
+npm run pointer         # the drawn pointer measured in the web MP4: every click on target, no pop (exit 1 on a finding; `-- --strips=<dir>` writes the frame strips)
 node scripts/measure-bell.mjs   # where the app's own bell is in the capture the bell lands on
 npm run stills -- 291 1011 2452   # quick stills of chosen frames
 npm run site            # copy the 1080p web files into site/media/
@@ -95,8 +96,9 @@ states against the existing product build.
    product's brand SVGs, pre-dithered stage plates (`scripts/make-stage.mjs`:
    no CSS gradient for a large slow ramp, so no banding after x264), the
    sound effects, the DPR 2 footage proxy for shots that need no more
-   (`scripts/make-proxies.mjs`), and where the pointer's disc sits beside
-   each click the film shows, off every glyph (`scripts/pointer-spots.mjs`).
+   (`scripts/make-proxies.mjs`); then every click the film shows is checked
+   against the footage: inside its recorded target, and that target where
+   the footage shows the control (`scripts/pointer-spots.mjs`).
 3. **The cut** (`src/timeline.ts`) lays the 14 shots on the music's events
    from `music/track.analysis.json` with the flex rules of VIDEO.md §3, in
    seconds: shot cuts on bar lines (else half-bars, else a beat), takes on
@@ -122,7 +124,11 @@ states against the existing product build.
    drops back, blurred 3.5 px under a veil of the studio's colour
    (`src/look/dof.ts`; `scripts/check-dof.mjs` checks every box against the
    footage). Every camera leaves its cut moving and drifts to the next one
-   (`src/takes.ts`); pushes are flat. The climax opens with a bar of display
+   (`src/takes.ts`); pushes are flat. The drawn pointer (`src/look/pointer.ts`:
+   a neutral ring centred on its hotspot, never an OS arrow) fades in just
+   outside what it clicks, travels on one eased path, presses on the
+   capture's own click point in the plane of the lifted component, stays half
+   a second and fades out; `npm run pointer` measures it in the rendered film. The climax opens with a bar of display
    type on the dark stage; captions (DM Sans 56 px, bottom-left or top-left)
    sit on a frosted glass card over a soft pool of light, never on a lifted
    component. Moves use `transform` only; a push never exceeds 2.0 output
@@ -154,6 +160,7 @@ In `out/` (gitignored):
 | `captions.en.vtt`, `captions.en.srt` | the captions, the same cues as the film |
 | `review/`, `contact-sheet.png` | the QA frames, their index and `review/scans.tsv` (`npm run review`) |
 | `review/moments.tsv`, `review/moments/` | the bell's landing and hand-off and the end card's lines, measured (`npm run moments`) |
+| `review/pointer.tsv`, `review/pointer-opacity.tsv` | every click's hotspot against the click point, and the pointer's opacity on every frame, measured (`npm run pointer`) |
 | `capture.log` | the capture's privacy and badge checks |
 
 `npm run site` copies the 1080p web files to `site/media/bell-pr-promo.mp4`,

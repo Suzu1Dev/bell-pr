@@ -20,6 +20,7 @@
     "stills": "node scripts/stills.mjs",
     "review": "node scripts/review-frames.mjs",
     "moments": "node scripts/check-moments.mjs",
+    "pointer": "node scripts/check-pointer.mjs",
     "site": "node scripts/copy-to-site.mjs",
     "test": "tsx --test \"src/**/*.test.ts\" \"scripts/**/*.test.mjs\"",
     "typecheck": "tsc --noEmit"
