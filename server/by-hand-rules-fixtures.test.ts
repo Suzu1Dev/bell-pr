@@ -26,7 +26,7 @@ import type { ByHandPreflightInput, DraftCheck } from "../shared/draft-checks.js
 import { policyFindings, type PolicyDocument } from "./contribution-policy.js";
 import { readDiff } from "./git.js";
 import { withLocale } from "./i18n/index.js";
-import { mergeRegistryFindings } from "./policy-registry.js";
+import { mergeRegistryFindings, policyRegistry, registryFindings, type RegistryEntry } from "./policy-registry.js";
 import { git } from "./process.js";
 import { publishChecks } from "./publish.js";
 import { Store } from "./store.js";
@@ -289,6 +289,40 @@ test("matplotlib's good first issues (output wording, 'Acceptable uses' in the s
   assert.deepEqual([reviewed.reasons, reviewed.lbh], [["kind-not-named:review"], ["area-reserved:block", "project-rules:confirm"]]);
   assert.ok(message(reviewed.lbhChecks, "area-reserved").endsWith(`and ${clause("kind-not-named", ["review"])}.`));
   assert.deepEqual(reviewed.agent, ["area-reserved:block", "project-rules:confirm"]);
+});
+
+const rustEntry = policyRegistry.find((entry) => entry.key === "rust-lang/rust")!;
+/** Rust's rules as BELL reads them for rust-lang/rust: its checked-list entry (rust-forge llm-usage.md). */
+const rustRules = (entry: RegistryEntry) => readRules([], registryFindings("rust-lang/rust", readAt, [entry]));
+
+test("Rust (a signed checked-list entry): the quoted confirm for every kind its text names", async () => {
+  const rules = await rustRules({ ...rustEntry, signedOff: rustEntry.checkedOn });
+  const result = row(rules, ["explain", "answer", "review", "plan"]);
+  assert.equal(result.case, "fitted:explain,answer,plan,review");
+  assert.deepEqual([result.lbh, result.reasons, result.agent], [["by-hand-rules:confirm"], [], ["ai-ban:block"]]);
+  assert.match(result.lbhChecks[0].details[1], /^BELL PR's checked list, .*, https:\/\/forge\.rust-lang\.org\/policies\/llm-usage\.html: "But not to \*\*create\*\*\."$/);
+  // A kind its text doesn't name (test help) blocks.
+  assert.deepEqual(row(rules, ["explain", "answer", "test"]).reasons, ["kind-not-named:test"]);
+});
+
+test("Rust, an entry checked 91 days before now: it still blocks and never lifts", async () => {
+  // Checked on 2026-07-21, 91 days before the suite's now (2026-10-20).
+  const rules = await rustRules({ ...rustEntry, checkedOn: "2026-07-21", signedOff: "2026-07-22" });
+  const result = row(rules, ["explain", "answer"]);
+  assert.deepEqual([result.case, result.lbh, result.reasons, result.agent], [
+    "blocked:registry-stale",
+    ["ai-ban:block"],
+    ["registry-stale"],
+    ["ai-ban:block"],
+  ]);
+  assert.match(message(result.lbhChecks, "ai-ban"), /checked list entry is more than 90 days old \(Jul 21, 2026\)\.$/);
+});
+
+test("Rust, the entry unsigned (as shipped): no finding at all", async () => {
+  const rules = await rustRules(rustEntry);
+  assert.deepEqual(rules.findings, []);
+  const result = row(rules, ["explain", "answer"]);
+  assert.deepEqual([result.case, result.lbh, result.agent], ["none", [], []]);
 });
 
 test("a project with no AI rule: no confirm and no block in either run", async () => {

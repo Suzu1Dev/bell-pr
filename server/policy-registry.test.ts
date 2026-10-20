@@ -27,6 +27,7 @@ import { policyFindings } from "./contribution-policy.js";
 import {
   checkRegistry,
   mergeRegistryFindings,
+  policyRegistry,
   registryFindings,
   registryKeyMatches,
   type RegistryEntry,
@@ -409,4 +410,55 @@ test("the registry check script exits 0 with warnings, and 1 on a malformed entr
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("the shipped entries are well formed, and every one awaits the owner's sign-off", () => {
+  const report = checkRegistry(policyRegistry, now);
+  assert.deepEqual(report.errors, []);
+  assert.deepEqual(report.awaiting, policyRegistry.map((entry) => entry.key));
+  assert.ok(policyRegistry.every((entry) => entry.signedOff === undefined));
+  // Unsigned, none of them is read.
+  for (const entry of policyRegistry) assert.deepEqual(registryFindings(entry.key.replace("/*", "/any"), now), [], entry.key);
+  assert.deepEqual(
+    policyRegistry.map((entry) => entry.key),
+    [
+      "gentoo/*",
+      "asahilinux/*",
+      "ziglang/*",
+      "servo/servo",
+      "rust-lang/rust",
+      "rust-lang/cargo",
+      "rust-lang/rust-clippy",
+      "rust-lang/rustfmt",
+      "rust-lang/rustlings",
+      "rust-lang/mdbook",
+      "kubernetes/*",
+      "bevyengine/bevy",
+      "godotengine/godot",
+    ],
+  );
+});
+
+/** A shipped entry as it would be once the owner signs it on its check date. */
+const signedOn = (entry: RegistryEntry): RegistryEntry => ({ ...entry, signedOff: entry.checkedOn });
+
+test("signed, each shipped entry makes every outcome of both run kinds at least as strict", async () => {
+  await assertOnlyStricter(policyRegistry.map(signedOn), now);
+});
+
+test("signed, Servo's entry blocks an agent-written run on servo/servo", () => {
+  const entry = policyRegistry.find((candidate) => candidate.key === "servo/servo")!;
+  const rules: ContributionRules = { checkedAt: now, findings: registryFindings("servo/servo", now, [signedOn(entry)]), filesRead: [] };
+  assert.deepEqual(
+    respectChecks({ body: "Fixes the cap.", rules }, "en").map((check) => `${check.id}:${check.kind}`),
+    ["ai-ban:block"],
+  );
+  // The assistance bans block Learn-by-hand runs too; Servo's output ban only lifts for what its text names.
+  for (const key of ["gentoo/*", "asahilinux/*", "ziglang/*"]) {
+    const listed = registryFindings(key.replace("/*", "/any"), now, [signedOn(policyRegistry.find((candidate) => candidate.key === key)!)]);
+    const banned: ContributionRules = { checkedAt: now, findings: listed, filesRead: [] };
+    assert.equal(byHandRulesCase(banned, { learningIssue: false, now }).case, "blocked", key);
+  }
+  const fitted = byHandRulesCase(rules, { learningIssue: false, now });
+  assert.deepEqual(fitted.case === "fitted" && fitted.kinds, ["explain", "answer"]);
 });
