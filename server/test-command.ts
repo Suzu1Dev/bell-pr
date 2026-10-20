@@ -88,8 +88,8 @@ async function onPath(name: string, env: NodeJS.ProcessEnv) {
  * DESIGN F9's order: `scripts.test` in package.json gives `npm test`
  * (`pnpm test` with pnpm-lock.yaml, `yarn test` with yarn.lock);
  * pyproject.toml, pytest.ini or tox.ini give `python -m pytest`, or
- * `python3 -m pytest` when `env`'s PATH (the tests run with it) has
- * python3 and no python; Cargo.toml gives `cargo test`; go.mod gives
+ * `python3 -m pytest` when `env`'s PATH (pass the tests' environment,
+ * testEnvironment) has python3 and no python; Cargo.toml gives `cargo test`; go.mod gives
  * `go test ./...`; a `test` target in the Makefile gives `make test`.
  * Empty when nothing fits.
  */

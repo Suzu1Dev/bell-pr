@@ -158,7 +158,9 @@ export async function testCommand(ctx: WorkbenchContext, id: string): Promise<Te
   const run = ctx.run(id);
   const confirmed = ctx.repo(run.repoId).testCommand;
   const suggestion =
-    run.workspaceRemovedAt || !run.worktreePath ? "" : await suggestTestCommand(run.worktreePath);
+    run.workspaceRemovedAt || !run.worktreePath
+      ? ""
+      : await suggestTestCommand(run.worktreePath, testEnvironment(process.env));
   return {
     suggestion,
     ...(confirmed ? { confirmed: { command: confirmed.command, confirmedAt: confirmed.confirmedAt } } : {}),

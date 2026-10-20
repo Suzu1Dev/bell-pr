@@ -460,6 +460,32 @@ test("started by npx, BELL runs npm test as the person's terminal would: no npx 
   assert.doesNotMatch(result.outputTail ?? "", /other project/);
 });
 
+test("the suggestion looks for python on the PATH the tests get, without npx's folders", async (t) => {
+  const f = await fixture(t);
+  await writeFile(path.join(f.repository, "pyproject.toml"), "[tool.pytest.ini_options]\n");
+  // npx put a folder with a python in front of PATH; the tests' PATH has only python3.
+  const npxBin = path.join(f.directory, "elsewhere", "node_modules", ".bin");
+  const own = path.join(f.directory, "bin");
+  await mkdir(npxBin, { recursive: true });
+  await mkdir(own);
+  await writeFile(path.join(npxBin, "python"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  await writeFile(path.join(own, "python3"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  const chain: string[] = [];
+  for (let folder = path.join(f.directory, "elsewhere"); ; folder = path.dirname(folder)) {
+    chain.push(path.join(folder, "node_modules", ".bin"));
+    if (folder === path.dirname(folder)) break;
+  }
+  const saved = { PATH: process.env.PATH, npm_lifecycle_event: process.env.npm_lifecycle_event };
+  t.after(() => {
+    for (const [name, value] of Object.entries(saved))
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+  });
+  process.env.PATH = [...chain, "/usr/share/nodejs/@npmcli/run-script/lib/node-gyp-bin", own].join(path.delimiter);
+  process.env.npm_lifecycle_event = "npx";
+  assert.deepEqual(await f.byHand.testCommand(f.run.id), { suggestion: "python3 -m pytest" });
+});
+
 test("runs are refused with 409 without a confirmed command, while one runs, outside review and on agent runs", async (t) => {
   const f = await fixture(t);
   const refused = (message: string) => (error: AppError) => error.statusCode === 409 && error.message === message;
