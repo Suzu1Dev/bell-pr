@@ -30,6 +30,7 @@ import { realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import {
   byHandLimits as limits,
+  helpAllowed,
   needsWhy,
   readyNow,
   type ByHandCheckInInput,
@@ -101,8 +102,10 @@ export async function planByHand(
       .filter(({ path: file, startLine, endLine }) => known.get(file) === "file" && startLine <= endLine && endLine <= (sources.base[file]?.length ?? 0))
       .map((range) => ({ ...range, why: clean(range.why) }));
     const summary = clean(outline.summary);
-    const steps = outline.steps.map((step) => ({ title: clean(step.title), files: step.files.filter((file) => known.has(file)) }));
-    const dropped = named.length - readFirst.length - steps.flatMap((step) => step.files).length;
+    const files = (step: { files: string[] }) => step.files.filter((file) => known.has(file));
+    const dropped = named.length - readFirst.length - outline.steps.flatMap(files).length;
+    // The step names are `plan` help: a run fitted to rules that don't name it gets none of them (F12).
+    const steps = helpAllowed(run, "plan") ? outline.steps.map((step) => ({ title: clean(step.title), files: files(step) })) : [];
     const premise = outline.premise && {
       verdict: outline.premise.verdict,
       statement: clean(outline.premise.statement),

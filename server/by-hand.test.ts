@@ -191,6 +191,25 @@ test("the outline keeps only paths of the checkout: a pattern, a folder's lines 
   assert.equal(outline.dropped, 5);
 });
 
+test("a run fitted to rules that don't name planning help keeps none of the outline's step names, also when it plans again", async (t) => {
+  const f = await fixture(t);
+  const run = await f.create();
+  // The help set createRun fixes from the project's carve-out (the QEMU case); a retry runs the orientation again.
+  run.byHand!.helpLock = { kinds: ["explain", "answer", "test"], at: run.createdAt, rulesCheckedAt: run.createdAt, rules: [] };
+  delete run.byHand!.guidePlan;
+  run.status = "failed";
+  await en(() => f.workbench.retryTeam(run.id));
+  await f.waitFor(() => !["queued", "running"].includes(run.status));
+  assert.equal(run.status, "awaiting_plan", run.error);
+  assert.equal(f.calls.length, 2);
+  const outline = (run as Run).byHand?.guidePlan;
+  assert.deepEqual(outline?.steps, []);
+  assert.match(outline?.summary ?? "", /^A GET that meets a 503 fails at once\./);
+  assert.deepEqual(outline?.readFirst?.map((range) => range.path), ["src/retry.ts"]);
+  // Nowhere in what the run detail sends: not in the record, the log or the team.
+  assert.doesNotMatch(JSON.stringify(run), /Find where the request fails|Decide how often to try again/);
+});
+
 test("an orientation without a premise records no help, and planByHand leaves team.tasks and the agent cards as they are", async (t) => {
   const f = await fixture(t, { lead: orientation(null) });
   const run = await f.create();
