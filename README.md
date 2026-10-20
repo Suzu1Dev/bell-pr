@@ -145,24 +145,25 @@ Choose **You write it (Learn by hand)** in the task dialog, and you write
 every line of the change yourself, in your own editor. BELL PR's agents
 only read in these runs, and the Lead becomes **the guide**. It reads the
 project first; then you write the steps of your own plan, and the guide's
-outline stays folded until you have saved a step of your own. While you
-write, ask the guide about your setup, the project or a concept, or ask
-for the next hint on a step: **Where to look**, **What applies**,
-**Options**, then **An example in this project**. After the first hint on
-a step, the next one needs an attempt first (a new edit, a test run or a
-few words on what you tried), and **I'm stuck** offers ways out, starting
-with asking the project's people.
-No hint holds code: the guide shows code only as quotes that BELL PR cuts
-from the project or from your own edits, and BELL PR removes code from
-anything else the guide writes before you see it.
+outline stays folded until you have saved a step of your own, unless you
+ask to see it sooner. While you write, ask the guide about your setup,
+the project or a concept, or ask for the next hint on a step: **Where to
+look**, **What applies**, **Options**, then **An example in this
+project**. After the first hint on a step, the next one needs an attempt
+first (a new edit, a test run or a few words on what you tried), and
+**I'm stuck** offers ways out, starting with asking the project's people.
+No hint holds code the guide wrote: the guide shows code only as quotes
+that BELL PR cuts from the project or from your own edits, and BELL PR's
+filter removes the code it finds in anything else the guide writes
+before you see it.
 
 BELL PR runs your project's tests with the command you confirmed, only
-when you click, and you can predict the result first. Nothing is
-explained or reviewed until you mark the change **Ready for review**;
-then the guide can review it, with up to three problems, each with its
-evidence, and never the fix. The understanding check (on by default) asks why you wrote
-each file this way and what would break if it were wrong, with the guide
-hidden. The pull request's title and description are yours: BELL PR
+when you click, and you can predict the result first. The guide doesn't
+review your change, and BELL PR writes no explanation of it, until you
+mark it **Ready for review**; then the guide can review it, with up to
+three problems, each with its evidence, and never the fix. The
+understanding check (on by default) asks why you wrote each file this way
+and what would break if it were wrong, with the guide hidden. The pull request's title and description are yours: BELL PR
 doesn't draft them in Learn by hand.
 
 The publish dialog shows the run's record: the kinds of help you used and
@@ -422,8 +423,8 @@ policy in [PRIVACY.md](PRIVACY.md).
   rights, and every run that used one carries a **Ran without sandbox**
   badge.
 - **Learn by hand.** BELL PR's agents get no write turn in a
-  Learn-by-hand run, and the run's record withdraws its claim when an agent
-  even tried to change a file. BELL PR runs your project's tests only when
+  Learn-by-hand run, and when BELL PR sees an agent change a file anyway,
+  the run's record withdraws its claim. BELL PR runs your project's tests only when
   you click, and only the command you confirmed: as you, in the run's
   folder, without the variables that hold BELL PR's, GitHub's or the AI
   providers' keys (removed by name) and without an operating-system
