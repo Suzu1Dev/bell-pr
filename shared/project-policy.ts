@@ -1003,7 +1003,7 @@ export function refusesAiHelp(quote: string) {
  * scope", "is fine", "are acceptable".
  */
 const permission =
-  /\b(?:does|do)\s+not\s+apply\s+to\b|\bit(?:['’]s|\s+is)\s+fine\s+to\b|\bnot\s+prohibited\b|\bout\s+of\s+scope\b|\b(?:is|are)\s+(?:acceptable|fine|permitted|allowed)\b/gi;
+  /\b(?:does|do)\s+not\s+apply\s+to\b|\bit(?:['’]s|\s+is)\s+fine\s+to\b|\bnot\s+prohibited\b|\bout\s+of\s+scope\b(?!\s+(?:for|of|in)\s+(?:this|the|these)\s+(?:guides?|documents?|docs?|pages?|sections?|FAQs?|tutorials?|checklists?|README|chapters?|articles?|discussions?|issues?|trackers?|repositor(?:y|ies)|repos?|projects?|channels?|forums?)\b)|\b(?:is|are)\s+(?:acceptable|fine|permitted|allowed)\b/gi;
 /** Where the words a permission covers end: a condition, a contrast or a duty. */
 const permissionEnd =
   /;|\b(?:but|provided|as\s+long\s+as|so\s+long\s+as|if|unless|except|however|although|though|whereas|while|when|should|must|needs?|ha(?:ve|s)\s+to|expected|required)\b/gi;
@@ -1012,14 +1012,16 @@ const permissionNegated =
   /\b(?:not|no|never|neither|nor|without|cannot|forbid\w*|prohibit\w*|ban(?:s|ned)?|disallow\w*|unacceptable|avoid\w*|other\s+than|apart\s+from|aside\s+from|besides|excluding|instead\s+of|rather\s+than|beyond)\b|n['’]t\b/i;
 /** A permission for some people only ("only for maintainers") is no carve-out for the person. */
 const permissionScoped =
-  /\b(?:only|solely|exclusively|maintainers?|committers?|core|staff|employees?|team\s+members?)\b/i;
+  /\b(?:only|solely|exclusively|maintainers?|committers?|core|staff|employees?|team\s+members?|unless|except)\b/i;
 /** A permission that waits for somebody's approval, anywhere in its sentence ("if a maintainer approves"). */
 const othersApproval = /\b(?:approv\w*|permission|consent|sign[- ]?off|agree\w*|ask(?:s|ed)?\s+(?:you|for)|invit\w*)\b/i;
 /** A contrast right after the permission that takes it back: "fine in your fork, but not in this repository". */
 const contrastTakesBack = /^\W*(?:but\s+)?(?:not|never|no)\b/i;
 /** Somebody else's view, a rule of the past or one not decided: never the project's permission. */
 const notTheProjects =
-  /\b(?:no\s+longer|anymore|used\s+to|previously|formerly|until\s+recently|in\s+the\s+past|whether|myths?|misconceptions?|(?:some|many|other)\s+(?:people|contributors|users|folks|projects)|people\s+(?:often\s+|sometimes\s+)?(?:think|believe|say|claim|assume)|(?:you|they|others)\s+(?:may|might)\s+(?:think|believe|hear|have\s+heard)|(?:it\s+is|it['’]s)\s+(?:often\s+|commonly\s+|widely\s+|sometimes\s+)?(?:said|claimed|believed|assumed|thought))\b/i;
+  /\b(?:no\s+longer|anymore|used\s+to|previously|formerly|until\s+recently|in\s+the\s+past|whether|myths?|misconceptions?|(?:some|many|other)\s+(?:people|contributors|users|folks|projects)|people\s+(?:often\s+|sometimes\s+)?(?:think|believe|say|claim|assume)|(?:you|they|others)\s+(?:may|might)\s+(?:think|believe|hear|have\s+heard)|(?:it\s+is|it['’]s)\s+(?:often\s+|commonly\s+|widely\s+|sometimes\s+)?(?:said|claimed|believed|assumed|thought))\b|\b(?:says?|said|writes?|wrote)\s+(?!(?:that\s+)?(?:it['’]?s|it\s+is|using|the\s+use|you|we|our)\b)\w|\bputs\s+it\b|\baccording\s+to\s+(?!(?:our|this|these|the\s+(?:policy|rules|guidelines|text|section)\b))/i;
+/** A condition that the words after it are part of: "If …", "When …". */
+const subordinate = /\b(?:if|when|whenever|whether|once|until)\b[^,;]*$/i;
 /** The next sentence takes it back: "Just kidding: it is not." */
 const takenBack =
   /^\W*(?:(?:actually|however|but|well|update|edit|correction|wait)\b\W*)?(?:just\s+kidding|kidding|not\s+really|nope|no\s*[,:;.!]|not\s+anymore|(?:it|that|this)\s+(?:is|was)(?:\s+not|n['’]t)\b|(?:it|that|this)\s+no\s+longer\b)/i;
@@ -1220,6 +1222,11 @@ function readCarveOuts(path: string, document: string): PolicyAllowance[] {
         const qualified = `${words.slice(covered.start, Math.max(covered.start, phrase.start))} ${words.slice(phrase.end, covered.clause)}`;
         if (permissionNegated.test(qualified)) continue;
         if (contrastTakesBack.test(words.slice(covered.clause).replace(/^\s*;/, ""))) continue;
+        // A permission inside a condition: "If using AI to debug is fine with your reviewer, …".
+        if (subordinate.test(words.slice(0, Math.min(phrase.start, covered.start)))) continue;
+        // Taken back in its own sentence: "…, but changes made that way are not accepted."
+        const after = words.slice(covered.clause);
+        if (/^\W*but\b/i.test(after) && prohibition.test(after)) continue;
         // A role or somebody's approval anywhere after the permitted words, conditions included.
         const rest = words.slice(covered.start);
         if (permissionScoped.test(rest) || othersApproval.test(rest)) continue;
