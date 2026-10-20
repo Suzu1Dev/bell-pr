@@ -348,8 +348,9 @@ export function needsWhy(step: Pick<ByHandStep, "maxRung">) {
 
 /**
  * The same failure three BELL test runs in a row: the latest three runs BELL
- * ran (not reported ones) failed with the same exit code and the same hash
- * of their last 40 output lines.
+ * ran (not reported ones) failed with the same exit code, or with none (a
+ * crash loop: a signal BELL did not send), and the same hash of their last
+ * 40 output lines. Timeouts, stops and errors are not failures here.
  */
 export function repeatFailure(tests: readonly TestRun[] | undefined) {
   const latest = (tests ?? [])
@@ -360,8 +361,7 @@ export function repeatFailure(tests: readonly TestRun[] | undefined) {
   const [first] = latest;
   return latest.every(
     (test) =>
-      test.outcome !== "passed" &&
-      test.exitCode !== undefined &&
+      test.outcome === "failed" &&
       test.exitCode === first.exitCode &&
       !!test.tailHash &&
       test.tailHash === first.tailHash,

@@ -172,6 +172,27 @@ test("repeatFailure needs the same exit code and output three BELL runs in a row
   assert.equal(repeatFailure(undefined), false);
 });
 
+test("repeatFailure fires for a crash loop with no exit code, never for timeouts, stops or errors", () => {
+  // A signal BELL did not send ends a run `failed` with no exit code (W2C).
+  const run = (at: string, overrides: Partial<TestRun> = {}): TestRun => ({
+    at,
+    command: "npm test",
+    changeFingerprint: "0123456789abcdef",
+    outcome: "failed",
+    ms: 1000,
+    tailHash: "h1",
+    ...overrides,
+  });
+  const crashes = [run("2026-10-20T01:00:00Z"), run("2026-10-20T02:00:00Z"), run("2026-10-20T03:00:00Z")];
+  assert.equal(repeatFailure(crashes), true);
+  assert.equal(repeatFailure([...crashes.slice(0, 2), run("2026-10-20T03:00:00Z", { exitCode: 1 })]), false);
+  assert.equal(repeatFailure([...crashes.slice(0, 2), run("2026-10-20T03:00:00Z", { tailHash: "h2" })]), false);
+  for (const outcome of ["timeout", "stopped", "error"]) {
+    assert.equal(repeatFailure(crashes.map((test) => ({ ...test, outcome }))), false, outcome);
+    assert.equal(repeatFailure(crashes.map((test) => ({ ...test, outcome, exitCode: 1 }))), false, outcome);
+  }
+});
+
 test("byHandSummary counts help per request and only the first prediction after each change", () => {
   const entry = (kind: string, rung: number | undefined, stepId: string, removed = 0) => ({
     id: `${kind}-${stepId}-${rung}`,
