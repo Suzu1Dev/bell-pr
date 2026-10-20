@@ -181,8 +181,11 @@ three ways:
   Code (whose read-only turns have no shell), stops the turn: "BELL PR
   stopped an agent that tried to change files in a Learn-by-hand run."
   Codex runs its read commands inside its read-only sandbox, so a Codex
-  command is not counted. A change the sandbox refused counts too: BELL
-  PR withdraws the claim when an agent even tried to change a file.
+  command is not counted. Codex reports a patch even when its sandbox
+  refused it, and that counts too, so the canary errs toward withdrawing
+  the claim. It sees only what the CLIs report: a Codex command that tried
+  to write and failed in the read-only sandbox, or a Claude Code edit the
+  CLI refused, changed nothing and is not counted.
 - **The clean-run check.** The claim in the run's record, "BELL PR's
   agents had no write access and gave you no code for this change.",
   comes from the run's own history, not from the build that shows it: no
@@ -193,14 +196,16 @@ three ways:
   [Upgrading](upgrading.md#learn-by-hand-runs-and-older-versions)), the
   record says why it makes no claim.
 
-BELL PR filters what the guide writes before it stores it. Code reaches
-you only as quotes that BELL PR cuts itself from the project's base
-commit or from your own files; BELL PR removes other code (code blocks,
-inline code it can't find in those files, code inside links, editing
-commands) from every answer, review, explanation and walkthrough of the
-run. Prose can still describe an edit: the guide's instructions forbid
-it, and the guide eval measures how often it happens (see
-[Development](development.md#the-guide-eval)). BELL PR never quotes the
+BELL PR filters what the guide writes before it stores it. The guide
+shows code only as quotes that BELL PR cuts itself from the project's
+base commit or from your own files; BELL PR removes the other code it
+finds (code blocks, inline code it can't find in those files, code inside
+links, editing commands) from every answer, review, explanation and
+walkthrough of the run. The filter goes by how the text looks, so it can
+miss some code, for example code written with look-alike Unicode
+characters, and prose can still describe an edit: the guide's
+instructions forbid both, and the guide eval measures how often they
+happen (see [Development](development.md#the-guide-eval)). BELL PR never quotes the
 files the review holds back (`.env` files, keys, credentials and similar
 files), files reached through a symbolic link, or a working file that
 holds a credential: it drops such quotes from the guide's answers. The
@@ -282,9 +287,9 @@ project's code, so it is limited:
   it with credentials masked; a confirmation made while tests run applies
   to the next run.
 - **Only on a click.** BELL PR never runs tests by itself. Only **Run the
-  tests** starts them, in a Learn-by-hand run that waits for your review,
-  never while it publishes, one test run per run at a time, and not while
-  the guide works on the run.
+  tests** starts them, in a Learn-by-hand run after you confirmed your
+  plan and before it is approved, never while it publishes, one test run
+  per run at a time, and not while the guide works on the run.
 - **As you, without a sandbox.** BELL PR runs `/bin/sh -c <command>` in
   the run's folder with your user's permissions, in its own process group
   and session, with standard input closed. There is no operating-system
