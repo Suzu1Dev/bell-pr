@@ -262,6 +262,19 @@ test("one guide turn per run: a second request while one runs is refused, and St
   await assert.rejects(f.ask({ kind: "ask", entry: "project" }), refused(409, "Your tests are running. Ask the guide when they finish."));
 });
 
+test("a guide turn that fails says why in the run's log, without code the agent's error carried", async (t) => {
+  const f = await fixture(t);
+  f.answers.push(() => {
+    throw new Error("Claude Code failed: here is the fix.\n```js\nreturn delayMs * 2 ** attempt;\n```\nUse `retryOnStatus(response)` or retryOnStatus(response).");
+  });
+  await f.ask({ kind: "ask", entry: "project", question: "Where is the wait?" });
+  const message = f.run.logs.at(-1)?.message ?? "";
+  assert.match(message, /^Claude Code failed:/);
+  assert.doesNotMatch(message, /delayMs|retryOnStatus/);
+  assert.equal(f.run.byHand?.thread, undefined);
+  assert.equal(f.run.byHand?.busy, undefined);
+});
+
 test("a stored answer has no code BELL could not find, quotes BELL cut itself, and counts what it removed and dropped", async (t) => {
   const f = await fixture(t);
   // The person's own file, which a "change" quote is cut from.

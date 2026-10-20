@@ -18,7 +18,7 @@
 import { randomUUID } from "node:crypto";
 import { attemptSince, byHandLimits, helpKindOf, helpAllowed, nextRungAllowed, repeatFailure } from "../shared/by-hand.js";
 import type { AskEntry, ByHandGuideInput, ByHandReview, ByHandStep, GuideEntry, GuideKind, HelpSource } from "../shared/by-hand.js";
-import type { FilteredGuideOutput, Filtered } from "../shared/by-hand-filter.js";
+import { filterAgentText, type FilteredGuideOutput, type Filtered } from "../shared/by-hand-filter.js";
 import { changeFingerprint } from "../shared/change-fingerprint.js";
 import { filterGuideAnswer, filterStoredText, turnFiles } from "./by-hand-filter.js";
 import { assertHelpAllowed, recordHelp } from "./by-hand-record.js";
@@ -228,7 +228,9 @@ function startGuideJob(ctx: WorkbenchContext, run: Run, request: GuideRequest) {
       const entry = await runGuideTurn(ctx, run, request, controller.signal);
       await ctx.lock(run.id, async () => storeAnswer(ctx.run(run.id), request, entry));
     } catch (error) {
-      ctx.log(run, "lead", error instanceof Error ? error.message : String(error), { kind: "notice" });
+      // An agent's error can carry its own text, so the reason is logged filtered too (F7).
+      const reason = filterAgentText(error instanceof Error ? error.message : String(error), { base: {}, worktree: {} });
+      ctx.log(run, "lead", reason.value, { kind: "notice" });
     } finally {
       if (run.byHand?.busy?.kind === "guide") delete run.byHand.busy;
       if (ctx.controllers.get(key) === controller) ctx.controllers.delete(key);
