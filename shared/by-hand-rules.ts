@@ -1,48 +1,48 @@
 /**
  * The quoted confirm's policy for Learn-by-hand runs (DESIGN v1.2 F12,
- * owner answer 2 of 2026-10-20). STUB: W1A froze these signatures; W2G
- * fills the bodies and owns their tests. Until then the stub keeps the W1
- * behaviour: every Learn-by-hand block stays a block, and no run is fitted.
+ * owner answer 2 of 2026-10-20). W1A froze these signatures; W2G filled
+ * them. A ban or a reserved issue stays a hard block unless every
+ * condition holds; nothing here is an override, and an agent run never
+ * reaches it.
  *
  * `respectChecks` (shared/contribution.ts), `createRun`
  * (server/new-run.ts), the respect mirrors and, in W2, the task dialog and
- * the GuidePanel call these three functions and nothing else, so W2G fills
- * this module without touching another file. Everything here is pure,
- * deterministic and non-persisted.
+ * the GuidePanel call the case reader and the decision. The carve-out
+ * reader (`attachCarveOuts` in shared/project-policy.ts) calls
+ * `carveOutKinds` when the server reads a project's rules; no client
+ * module imports either, so the word table stays out of the client.
+ * Everything here is pure, deterministic and non-persisted; the only
+ * clock is the `now` the caller passes.
  *
- * Final signatures:
- *
- * - `carveOutKinds(text): HelpKind[]`: the help kinds one carve-out
- *   sentence of a project's text names, by the F12 word table
- *   (understand/explain/learning aid, research, questions: explain and
- *   answer; debug: test; review of your own code: review; possible
- *   solutions or solution ideas: plan). Any other word names none. Used
- *   by the carve-out reader when rules are read. Stub: `[]`.
+ * - `carveOutKinds(text)`: the help kinds the permitted part of one
+ *   carve-out names, by the F12 word table (understanding the code,
+ *   explaining, a learning aid, research and questions about the code:
+ *   explain and answer; debugging: test; a private review of your own
+ *   code: review; possible solutions or solution ideas: plan). Any other
+ *   word names none: "static analysis", "find bugs", "analyze" and
+ *   "suggest" included.
  *
  * - `byHandRulesCase(rules, { learningIssue, now })`: which case applies
  *   before a run exists. `none` when no contribution ban applies and no
  *   `area` finding applies (area findings count only with
  *   `learningIssue`); `blocked` with the first failing finding, its reach
- *   and the reason; `fitted` when every applicable finding passes F12 (a)
- *   and (b) for the kinds its carve-outs name, with the intersection of
- *   those kinds (always explain and answer, else `too-few-kinds`) and the
- *   lock to store (`HelpLock` without `at`, which createRun sets). Stub:
- *   `blocked` with reason `reach` when any `ban` has contribution context,
- *   or when `learningIssue` and any `area` finding exists; otherwise
- *   `none`; never `fitted`.
+ *   and the reason ((a) reach, (b) no carve-out or a stale checked-list
+ *   entry, then `too-few-kinds`); `fitted` when every applicable finding
+ *   passes (a) and (b), with the intersection of the kinds their
+ *   carve-outs name (always explain and answer) and the lock to store
+ *   (`HelpLock` without `at`, which createRun sets).
  *
  * - `byHandRulesDecision({ bans, areas, rules }, learnByHand)`: at
  *   approve and publish, for the contribution `ban` findings and the
  *   applicable `area` findings of a clean Learn-by-hand run (the preflight
- *   input), which stay blocked, each with the first failed condition
- *   (and, for `kind-not-named`, the kinds the text doesn't name), and
- *   which pass all of F12 (a)-(e), each with its carve-outs and up to two
- *   other AI rules of the same document. The caller shows the
- *   `by-hand-rules` confirm only when none is blocked. Stub: every finding
- *   blocked, reason `reach` for an assistance or unknown ban and a "use"
- *   or unknown reservation, `no-carve-out` otherwise.
+ *   input; condition (c) is the caller's), which stay blocked, each with
+ *   the first failed condition (and, for `kind-not-named`, the kinds the
+ *   text doesn't name), and which pass all of F12 (a), (b), (d) and (e),
+ *   each with its carve-outs and up to two other AI rules of the same
+ *   document. The caller shows the `by-hand-rules` confirm only when none
+ *   is blocked, and publish needs it acknowledged (f).
  */
-import type { HelpKind, HelpLock } from "./by-hand.js";
+import { allHelpKinds, type HelpKind, type HelpLock, type HelpLockRule } from "./by-hand.js";
 import type { ContributionRules, PolicyAllowance, PolicyFinding } from "./contribution.js";
 import type { ByHandPreflightInput } from "./draft-checks.js";
 import { areaReach, banReach, type AreaReach, type BanReach } from "./policy-reach.js";
@@ -91,45 +91,185 @@ export interface ByHandRulesDecision {
   }[];
 }
 
-/** The help kinds a carve-out sentence names (the F12 word table). Stub: none. */
+/** The help kinds a carve-out's permitted words name (the F12 word table). Stub until the reader lands: none. */
 export function carveOutKinds(text: string): HelpKind[] {
   void text;
   return [];
 }
 
-/** Which case applies before a run exists (see the module header). Stub: never `fitted`. */
+const dayMs = 24 * 60 * 60 * 1000;
+
+/** Days after its quotes were last checked that a checked-list entry may still lift a block. */
+export const registryFreshDays = 90;
+
+/**
+ * A checked-list entry checked more than 90 days before `now`, or with a
+ * date BELL can't read: it still applies and blocks, but never lifts.
+ */
+export function registryStale(checkedOn: string, now: string) {
+  return !(Date.parse(now) - Date.parse(checkedOn) <= registryFreshDays * dayMs);
+}
+
+/** A lock holds at most this many rules (the `HelpLock.rules` cap). */
+const maxLockRules = 4;
+
+/** Kinds of the AI rules a document can state (the classifier's AI findings). */
+const aiRuleKinds: readonly string[] = ["ban", "area", "agent", "disclose"];
+
+type RuleText = { kind: string; path: string; quote: string };
+const sameRule = (a: RuleText, b: RuleText) =>
+  a.kind === b.kind && a.path === b.path && a.quote === b.quote;
+
+const reachOf = (finding: PolicyFinding) =>
+  finding.kind === "area" ? areaReach(finding.quote) : banReach(finding.quote);
+
+/**
+ * Condition (a): an output-only ban, or a reservation worded around
+ * AI-generated or automated pull requests. A checked-list finding's quote
+ * is read the same way; the registry check refuses an entry whose signed
+ * reach the quote doesn't read as.
+ */
+function restrictsOutput(finding: PolicyFinding) {
+  const reach = reachOf(finding);
+  return finding.kind === "area" ? reach === "output" || reach === "automate" : reach === "output";
+}
+
+/** The kinds a finding's carve-outs name, together. */
+const namedKinds = (finding: PolicyFinding) =>
+  new Set(finding.allows?.flatMap((allowance) => allowance.kinds) ?? []);
+
+/** Conditions (a) and (b) without the help used: the rule's reach, a carve-out, a fresh checked-list entry. */
+function textCondition(finding: PolicyFinding, now: string): ByHandBlockReason | undefined {
+  if (!restrictsOutput(finding)) return "reach";
+  if (!finding.allows?.length) return "no-carve-out";
+  if (finding.source && registryStale(finding.source.checkedOn, now)) return "registry-stale";
+  return undefined;
+}
+
+/** The lock's copy of a finding: what the run is fitted to, quoted when it starts. */
+function lockRule(finding: PolicyFinding): HelpLockRule {
+  return {
+    kind: finding.kind,
+    path: finding.path,
+    line: finding.line,
+    quote: finding.quote,
+    allows: (finding.allows ?? []).map((allowance) => ({
+      line: allowance.line,
+      quote: allowance.quote,
+      kinds: [...allowance.kinds],
+    })),
+    ...(finding.source ? { source: { ...finding.source } } : {}),
+  };
+}
+
+/** Which case applies before a run exists (see the module header). */
 export function byHandRulesCase(
   rules: ContributionRules | undefined,
   options: { learningIssue: boolean; now: string },
 ): ByHandRulesCase {
-  const findings = rules?.findings ?? [];
-  const ban = findings.find((finding) => finding.kind === "ban" && finding.contribution);
-  if (ban) return { case: "blocked", finding: ban, reach: banReach(ban.quote), reason: "reach" };
-  const area = options.learningIssue
-    ? findings.find((finding) => finding.kind === "area")
-    : undefined;
-  if (area)
-    return { case: "blocked", finding: area, reach: areaReach(area.quote), reason: "reach" };
-  return { case: "none" };
+  const applicable = (rules?.findings ?? []).filter(
+    (finding) =>
+      (finding.kind === "ban" && finding.contribution) ||
+      (options.learningIssue && finding.kind === "area"),
+  );
+  if (!rules || !applicable.length) return { case: "none" };
+  const blocked = (finding: PolicyFinding, reason: ByHandBlockReason): ByHandRulesCase => ({
+    case: "blocked",
+    finding,
+    reach: reachOf(finding),
+    reason,
+  });
+  for (const finding of applicable) {
+    const reason = textCondition(finding, options.now);
+    if (reason) return blocked(finding, reason);
+  }
+  const named = applicable.map(namedKinds);
+  // The orientation turn and the first hint explain and answer: a run
+  // fitted to a text that doesn't name both could not start.
+  const short = applicable.find((_, index) => !named[index].has("explain") || !named[index].has("answer"));
+  if (short) return blocked(short, "too-few-kinds");
+  if (applicable.length > maxLockRules) return blocked(applicable[maxLockRules], "not-fitted");
+  const kinds = allHelpKinds.filter((kind) => named.every((set) => set.has(kind)));
+  return {
+    case: "fitted",
+    kinds,
+    lock: { kinds: [...kinds], rulesCheckedAt: rules.checkedAt, rules: applicable.map(lockRule) },
+  };
 }
 
-/** The quoted confirm's decision at approve and publish (see the module header). Stub: all blocked. */
+/** The first condition a clean run's finding fails, with the kinds the text doesn't name. */
+function failedCondition(
+  finding: PolicyFinding,
+  rules: ContributionRules,
+  input: ByHandPreflightInput,
+): { reason: ByHandBlockReason; kinds?: HelpKind[] } | undefined {
+  if (!restrictsOutput(finding)) return { reason: "reach" };
+  const lock = input.helpLock;
+  const locked = lock?.rules.find((rule) => sameRule(rule, finding));
+  // (e), the drift guard first for the rule the run was fitted to: a
+  // carve-out quote it was fitted to is gone from the rules read now.
+  if (
+    locked?.allows.some(
+      (allowance) => !finding.allows?.some((current) => current.quote === allowance.quote),
+    )
+  )
+    return { reason: "rules-changed" };
+  // (b) the project's own text names every kind of help the run used.
+  const text = textCondition(finding, input.now);
+  if (text) return { reason: text };
+  const named = namedKinds(finding);
+  const unnamed = input.helps.filter((kind) => !named.has(kind));
+  if (unnamed.length) return { reason: "kind-not-named", kinds: unnamed };
+  // (d) the rules were read during the run, where publishing is checked.
+  if (input.createdAt !== undefined && !(Date.parse(rules.checkedAt) >= Date.parse(input.createdAt)))
+    return { reason: "rules-unread" };
+  // (e) the help set was fixed at the start, for this very rule.
+  if (!lock) return { reason: "not-fitted" };
+  if (!locked)
+    return {
+      reason: lock.rules.some((rule) => !rules.findings.some((current) => sameRule(rule, current)))
+        ? "rules-changed"
+        : "not-fitted",
+    };
+  const outside = input.helps.filter((kind) => !lock.kinds.includes(kind));
+  if (outside.length) return { reason: "kind-not-named", kinds: outside };
+  return undefined;
+}
+
+/**
+ * Up to two other AI rules of the finding's document (or of its
+ * checked-list entry), in reading order: quoted with the confirm, never
+ * a condition.
+ */
+function otherRules(finding: PolicyFinding, all: readonly PolicyFinding[], decided: readonly PolicyFinding[]) {
+  return all
+    .filter(
+      (other) =>
+        other.path === finding.path &&
+        other.source?.url === finding.source?.url &&
+        aiRuleKinds.includes(other.kind) &&
+        !decided.some((entry) => sameRule(entry, other)),
+    )
+    .sort((a, b) => a.line - b.line)
+    .slice(0, 2);
+}
+
+/** The quoted confirm's decision at approve and publish (see the module header). */
 export function byHandRulesDecision(
   findings: { bans: PolicyFinding[]; areas: PolicyFinding[]; rules: ContributionRules },
   learnByHand: ByHandPreflightInput,
 ): ByHandRulesDecision {
-  void learnByHand;
-  const banBlock = (finding: PolicyFinding) => ({
-    finding,
-    reason: (banReach(finding.quote) === "output" ? "no-carve-out" : "reach") as ByHandBlockReason,
-  });
-  const areaBlock = (finding: PolicyFinding) => {
-    const reach = areaReach(finding.quote);
-    const output = reach === "output" || reach === "automate";
-    return { finding, reason: (output ? "no-carve-out" : "reach") as ByHandBlockReason };
-  };
-  return {
-    blocked: [...findings.bans.map(banBlock), ...findings.areas.map(areaBlock)],
-    confirmable: [],
-  };
+  const decided = [...findings.bans, ...findings.areas];
+  const decision: ByHandRulesDecision = { blocked: [], confirmable: [] };
+  for (const finding of decided) {
+    const failed = failedCondition(finding, findings.rules, learnByHand);
+    if (failed) decision.blocked.push({ finding, ...failed });
+    else
+      decision.confirmable.push({
+        finding,
+        allows: finding.allows ?? [],
+        others: otherRules(finding, findings.rules.findings, decided),
+      });
+  }
+  return decision;
 }
