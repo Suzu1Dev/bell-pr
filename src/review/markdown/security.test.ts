@@ -66,8 +66,9 @@ test("an image inside a link shows as the image note inside the link, never as a
 });
 
 test("a long run of spaces or tabs renders in linear time, kept inside a line and trimmed at its ends", () => {
-  // react-markdown took about 40 ms for 200,000 spaces; a backtracking
-  // trim of line ends took seconds, quadratic in the run's length.
+  // The earlier unified pipeline took about 40 ms for 200,000 spaces; a
+  // backtracking trim of line ends took seconds, quadratic in the run's
+  // length.
   const run = " \t".repeat(100_000);
   const started = performance.now();
   const html = render(`a${run}b\nc${run}\n${run}d`);
@@ -76,10 +77,10 @@ test("a long run of spaces or tabs renders in linear time, kept inside a line an
 });
 
 test("a block with more children than a function call takes still renders", () => {
-  // 150,000 children (a hard break and a line break after each line):
-  // react-markdown rendered them in a paragraph (though not in a tight list
-  // item), and spreading them into one call throws a RangeError, which
-  // would take down the view.
+  // 150,000 children (a hard break and a line break after each line): the
+  // earlier unified pipeline rendered them in a paragraph (though not in a
+  // tight list item), and spreading them into one call throws a
+  // RangeError, which would take down the view.
   const lines = 50_000;
   for (const [html, open, close] of [
     [render(`${"a\\\n".repeat(lines)}end`), "<p>", "</p>"],
