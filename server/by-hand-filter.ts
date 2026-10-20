@@ -1,11 +1,13 @@
 /**
  * The code filter's file access (DESIGN v1.2 F7; the rules are in
  * shared/by-hand-filter.ts). A reader serves one turn: it reads a file at
- * the run's base commit through `git show <baseSha>:<path>` and in the
- * person's worktree, at most 10 files per answer, each once per
- * `(sha, path)` for the turn. Paths come from agent output, so a path that
- * is absolute, climbs out with "..", or leads outside the worktree through
- * a link is never read.
+ * the run's base commit through `git cat-file blob <baseSha>:<path>` and in
+ * the person's worktree, at most 10 files per answer, each once per
+ * `(sha, path)` for the turn. Paths come from agent output, so only a
+ * normalised repository path is read (never absolute, with "." or ".."
+ * parts, a backslash or a control character); a folder, a missing path
+ * (`git show` would read one with *, ? or [ as a pattern and print
+ * nothing), a binary file or a link out of the worktree has no lines.
  */
 import { readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
@@ -25,13 +27,14 @@ const maxFiles = 10;
 /** A larger file is not read: no quote is cut from it. */
 const maxFileBytes = 1_000_000;
 
-/** A repository-relative path BELL may read: no absolute path, no "..", no option-like start. */
+/** A normalised repository-relative path BELL may read: no absolute path, ".", "..", option-like start, backslash or control character. */
 function safePath(file: string) {
-  if (!file || file.includes("\0") || path.isAbsolute(file) || file.startsWith("-")) return false;
-  return !path.posix.normalize(file).split("/").some((part) => part === ".." || part === "");
+  if (!file || /[\u0000-\u001f\u007f\\]/.test(file) || path.isAbsolute(file) || file.startsWith("-")) return false;
+  return path.posix.normalize(file) === file && !file.split("/").some((part) => part === ".." || part === "." || part === "");
 }
 
-const lines = (text: string) => text.replace(/\r\n/g, "\n").replace(/\n$/, "").split("\n");
+/** A text file's lines; a binary file (a NUL byte) has none. */
+const lines = (text: string) => (text.includes("\0") ? undefined : text.replace(/\r\n/g, "\n").replace(/\n$/, "").split("\n"));
 
 /** Reads the files of one turn, each once. */
 export function turnFiles(run: Pick<Run, "baseSha" | "worktreePath">) {
@@ -46,7 +49,8 @@ export function turnFiles(run: Pick<Run, "baseSha" | "worktreePath">) {
   };
   const base = (file: string) =>
     once(`${run.baseSha}\0${file}`, async () => {
-      const { stdout } = await git(run.worktreePath, ["show", `${run.baseSha}:${file}`], { maxBytes: maxFileBytes });
+      // A blob only: no pathspec, no folder listing, and a missing path fails.
+      const { stdout } = await git(run.worktreePath, ["cat-file", "blob", `${run.baseSha}:${file}`], { maxBytes: maxFileBytes });
       return lines(stdout);
     });
   const worktree = (file: string) =>
@@ -54,7 +58,8 @@ export function turnFiles(run: Pick<Run, "baseSha" | "worktreePath">) {
       const root = await realpath(run.worktreePath);
       const full = await realpath(path.join(root, file));
       if (full !== root && !full.startsWith(`${root}${path.sep}`)) return undefined;
-      if ((await stat(full)).size > maxFileBytes) return undefined;
+      const info = await stat(full);
+      if (!info.isFile() || info.size > maxFileBytes) return undefined;
       return lines(await readFile(full, "utf8"));
     });
   return {

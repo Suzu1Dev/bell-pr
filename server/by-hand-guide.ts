@@ -25,7 +25,6 @@ import { assertHelpAllowed, recordHelp } from "./by-hand-record.js";
 import { guideAnswerJsonSchema, guideAnswerSchema, parseByHandAnswer, reviewerAnswerJsonSchema, reviewerAnswerSchema, withSchemaFile } from "./by-hand-schemas.js";
 import { readDiff } from "./git.js";
 import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
-import { git } from "./process.js";
 import { byHandReviewerPrompt, byHandTesterPrompt, guidePrompt, latestTest, planQuestionsPrompt, stepDiff, testTail, type GuidePromptInput } from "./prompts/by-hand.js";
 import { runAgent, runIndependentReview } from "./run-executor.js";
 import { reviewDiffContext } from "./team.js";
@@ -145,23 +144,20 @@ const changeOf = (files: readonly DiffFile[]) => {
 };
 
 /**
- * The paths an agent named that are files (or folders) of the checkout: in
- * the worktree, or at base by `git cat-file`, since `git show <sha>:<path>`
- * reads a missing path with *, ? or [ in it as a pattern and succeeds. A
- * path is agent text: any other one is dropped, never stored.
+ * The paths an agent named that are text files of the checkout, at base or
+ * in the worktree (the reader reads a blob only, never a pattern or a
+ * folder). A path is agent text: any other one is dropped, never stored.
  */
-async function checkoutPaths(run: GuideRun, reader: ReturnType<typeof turnFiles>, paths: readonly string[]) {
+async function checkoutPaths(reader: ReturnType<typeof turnFiles>, paths: readonly string[]) {
   const sources = await reader.sources(paths);
-  const atBase = (file: string) => git(run.worktreePath, ["cat-file", "-e", `${run.baseSha}:${file}`]).then(() => true, () => false);
-  const found = await Promise.all(paths.map(async (file) => !!sources.worktree[file] || (!!sources.base[file] && (await atBase(file)))));
-  return new Set(paths.filter((_file, index) => found[index]));
+  return new Set(paths.filter((file) => !!sources.worktree[file] || !!sources.base[file]));
 }
 
 /** One guide answer as BELL stores it (DESIGN v1.2 F7): parsed strictly, its paths checked, quotes cut by BELL, prose filtered. */
 export async function storedGuideAnswer(run: GuideRun, request: GuideRequest, answer: string) {
   const output = parseByHandAnswer(guideAnswerSchema, answer);
   const reader = turnFiles(run);
-  const known = await checkoutPaths(run, reader, [...output.refs, ...output.quotes].map((value) => value.path));
+  const known = await checkoutPaths(reader, [...output.refs, ...output.quotes].map((value) => value.path));
   const [refs, quotes] = [output.refs.filter((ref) => known.has(ref.path)), output.quotes.filter((quote) => known.has(quote.path))];
   const unknown = output.refs.length + output.quotes.length - refs.length - quotes.length;
   const change = { ...changeOf(request.files), stepFiles: request.step?.files };
@@ -440,7 +436,7 @@ export async function storedReview(run: GuideRun, files: DiffFile[], input: Retu
     return filtered.value;
   };
   // A finding stays only at a path of the checkout, and its evidence keeps a path only when it is one.
-  const known = await checkoutPaths(run, reader, answer.findings.flatMap((finding) => [finding.path, finding.evidence.path ?? ""]));
+  const known = await checkoutPaths(reader, answer.findings.flatMap((finding) => [finding.path, finding.evidence.path ?? ""]));
   const isFile = (file?: string | null) => !!file && known.has(file);
   const findings: ByHandReview["findings"] = [];
   for (const finding of answer.findings.filter((value) => isFile(value.path))) {
