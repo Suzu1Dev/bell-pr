@@ -1,7 +1,8 @@
 /**
  * PR draft suggestions: at most one preparation job per run, started by the
  * run after the review or by the person. A suggestion never replaces a draft
- * the person already edited.
+ * the person already edited. A Learn-by-hand run gets none: its PR text is
+ * the person's own.
  */
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -45,6 +46,9 @@ export async function prepareRunDraft(
   options: DraftOptions = {},
 ) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
+  // Learn by hand: the pull request text is the person's own (DESIGN v1.2 F11).
+  if (ctx.run(id).learnByHand)
+    throw new AppError((m) => m.byHand.flow.draftRefused, 409);
   let pending: Promise<void> | undefined;
   await ctx.lock(id, async () => {
     if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
@@ -129,7 +133,7 @@ async function generateDraft(
     );
     const context = preparation.context;
     const proposal = parseAgentOutput(run, "draft", () =>
-      parseDraftProposal(answer, context),
+      parseDraftProposal(answer, context, { learnByHand: run.learnByHand }),
     );
     await ctx.lock(run.id, async () => {
       const currentFiles = await readDiff(run);

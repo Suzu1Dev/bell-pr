@@ -10,10 +10,11 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { aiDisclosureLine } from "../shared/drafts.js";
 import { changeFingerprint } from "../shared/understanding.js";
 import { readDiff } from "./git.js";
 import { byHandReviewInTests } from "./by-hand.js";
-import { setAlwaysDiscloseAiSource } from "./drafts.js";
+import { applyAiDisclosure, parseDraftProposal, setAlwaysDiscloseAiSource } from "./drafts.js";
 import { withLocale } from "./i18n/index.js";
 import { git } from "./process.js";
 import { Store } from "./store.js";
@@ -469,6 +470,38 @@ test("approval needs the version the person marked ready, and waits for BELL's t
   f.ctx.controllers.set(`tests:${run.id}`, new AbortController());
   assert.equal((await en(() => f.workbench.approve(run.id, { ...run.draft }))).status, "approved");
   f.ctx.controllers.delete(`tests:${run.id}`);
+});
+
+test("no AI PR text in Learn by hand: no draft, and BELL's AI line is never added, even with Always add on", async (t) => {
+  const f = await fixture(t);
+  const run = await f.writing();
+  await assert.rejects(
+    en(() => f.workbench.prepareDraft(run.id)),
+    refused(409, /^In Learn by hand, the pull request text is yours; BELL PR doesn't draft it\./),
+  );
+  setAlwaysDiscloseAiSource(() => true);
+  const saved = await en(() => f.workbench.draft(run.id, { title: "Retry a GET twice", body: "I wrote the retry.", aiDisclosure: true }));
+  assert.equal(saved.draft.body, "I wrote the retry.");
+  assert.ok(!saved.draft.body.includes(aiDisclosureLine));
+  const previous = { title: "T", body: "Mine.", aiDisclosure: false };
+  assert.equal(applyAiDisclosure(previous, { title: "T", body: "Mine.", aiDisclosure: true }, { learnByHand: true }).body, "Mine.");
+  // An agent run's choice still adds the line.
+  assert.ok(applyAiDisclosure(previous, { title: "T", body: "Mine.", aiDisclosure: true }).body.includes(aiDisclosureLine));
+  // The proposal path: a draft BELL's agents propose never gets the line in a Learn-by-hand run.
+  const proposal = JSON.stringify({
+    title: "Retry a GET twice",
+    body: "Retries a GET after a 503.",
+    policy: "linux",
+    summary: "Adds one retry.",
+    rules: [],
+    checklist: [],
+    templateSourceId: "",
+    commitMessageSuggestion: null,
+  });
+  const context = { sources: [], warnings: [], checkedAt: new Date().toISOString(), baseSha: run.baseSha };
+  assert.ok(!parseDraftProposal(proposal, context, { learnByHand: true }).body.includes(aiDisclosureLine));
+  assert.ok(parseDraftProposal(proposal, context).body.includes(aiDisclosureLine));
+  assert.equal(f.calls.length, 1);
 });
 
 test("the PR template comes verbatim from the run's folder: at most three, none over 20 kB", async (t) => {

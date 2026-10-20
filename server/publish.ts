@@ -213,7 +213,7 @@ export async function saveDraft(
     const run = ctx.run(id);
     editable(run);
     // Turning the AI disclosure on or off adds or removes BELL's line.
-    const draft = applyAiDisclosure(run.draft, edited);
+    const draft = applyAiDisclosure(run.draft, edited, { learnByHand: run.learnByHand });
     if (
       activeFollowUp(run.followUps) &&
       (draft.title !== run.draft.title || draft.body !== run.draft.body)

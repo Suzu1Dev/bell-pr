@@ -122,9 +122,14 @@ export function alwaysDiscloseAi() {
  * is removed when they turn it off. A draft without the field keeps the
  * saved choice (older clients do not send it). While the choice stays the
  * same the description is saved exactly as written, so the line can be
- * reworded or deleted like any other text.
+ * reworded or deleted like any other text. In a Learn-by-hand run BELL's
+ * line is never added (DESIGN v1.2 F11): the person writes their own note.
  */
-export function applyAiDisclosure(previous: RunDraft, next: RunDraft): RunDraft {
+export function applyAiDisclosure(
+  previous: RunDraft,
+  next: RunDraft,
+  options: { learnByHand?: boolean } = {},
+): RunDraft {
   const before = previous.aiDisclosure ?? alwaysDiscloseAi();
   const chosen = next.aiDisclosure ?? previous.aiDisclosure;
   const after = chosen ?? alwaysDiscloseAi();
@@ -132,7 +137,9 @@ export function applyAiDisclosure(previous: RunDraft, next: RunDraft): RunDraft 
     after === before
       ? next.body
       : after
-        ? withAiDisclosure(next.body)
+        ? options.learnByHand
+          ? next.body
+          : withAiDisclosure(next.body)
         : withoutAiDisclosure(next.body);
   const draft: RunDraft = { ...next, body };
   if (chosen === undefined) delete draft.aiDisclosure;
@@ -216,6 +223,7 @@ function headings(markdown: string) {
 export function parseDraftProposal(
   answer: string,
   context: DraftContext,
+  options: { learnByHand?: boolean } = {},
 ): DraftProposal {
   let proposal: DraftProposal;
   try {
@@ -317,8 +325,10 @@ export function parseDraftProposal(
         3000,
       );
   }
-  // The model never mentions AI; the person's standing choice adds BELL's line.
-  if (alwaysDiscloseAi()) proposal.body = withAiDisclosure(proposal.body);
+  // The model never mentions AI; the person's standing choice adds BELL's
+  // line, except in a Learn-by-hand run, whose AI note is the person's own.
+  if (alwaysDiscloseAi() && !options.learnByHand)
+    proposal.body = withAiDisclosure(proposal.body);
   return proposal;
 }
 
