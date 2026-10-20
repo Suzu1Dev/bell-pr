@@ -227,16 +227,18 @@ its own line of 459.5 kB all JS, without a raise. Its views load in one
 chunk on demand (`src/byhand/lazy.ts`); the gzip figures, in bytes from W2
 on:
 
-| Figure | Before N1A | After N1A | After N1B | After W2 | After W3B |
+| Figure | Before N1A | After N1A | After N1B | After W2 | After W3 |
 | --- | --- | --- | --- | --- | --- |
-| Largest JS chunk (startup) | 112.1 kB | 94.3 kB | 94.3 kB | 95,360 B | 95,508 B |
-| All JS | 458.3 kB in 50 files | 442.4 kB in 42 files | 424.7 kB in 42 files | 457,831 B in 43 files | 459,460 B in 44 files |
-| Learn-by-hand chunk (loaded on demand) | – | – | – | 17,297 B | 17,337 B |
+| Largest JS chunk (startup) | 112.1 kB | 94.3 kB | 94.3 kB | 95,360 B | 95,499 B |
+| All JS | 458.3 kB in 50 files | 442.4 kB in 42 files | 424.7 kB in 42 files | 457,831 B in 43 files | 459,323 B in 44 files |
+| Learn-by-hand chunk (loaded on demand) | – | – | – | 17,297 B | 17,335 B |
 | All CSS | 45.0 kB in 7 files | 41.4 kB in 1 file | 41.4 kB in 1 file | 41,788 B in 1 file | 41,801 B in 1 file |
 
-W3B's share is the guard before every Markdown parse
+W3's share is W3B's guard before every Markdown parse
 (`shared/markdown-guard.ts`, 756 B in a chunk of its own, plus the
-plain-text view and error boundary in `MarkdownContent`) and its fix-ups.
+plain-text view and error boundary in `MarkdownContent`) and its fix-ups
+(459,460 B all JS after W3B); `server/secrets.ts` then kept the secret
+shapes that never block a patch out of the client (−103 B).
 The headroom items of the sample (base lines offline, the refuted-premise
 toggle) did not fit and are not shipped.
 
