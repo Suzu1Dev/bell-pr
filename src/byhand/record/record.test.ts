@@ -110,6 +110,8 @@ test("only a run fitted to the project's rules says so, with the help set it sta
   assert.ok(fitted.includes("This run was fitted to the project&#x27;s rules when it started: the guide offered only explanations, answers, and test help."));
   const unfitted = renderEn(createElement(ByHandRecord, { run: byHandRun(), place: "publish" }));
   assert.ok(!unfitted.includes("fitted"));
+  // zh-TW says 任務, as the writing UI does.
+  assert.ok(renderZh(createElement(ByHandRecord, { run: byHandRun({ helpLock: lock }), place: "publish" })).includes("這個任務開始時就依專案規範調整過"));
 });
 
 test("the Draft tab's checklist row opens the record; an agent run has none", () => {
