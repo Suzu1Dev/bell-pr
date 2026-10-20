@@ -40,7 +40,7 @@ test("a newcomer issue offers to start learning by hand next to opening it", () 
 });
 
 test("an issue the project keeps for people learning without AI tools never offers it, and quotes the rule", () => {
-  const html = renderEn(footer(card({ byHandReserved: true })));
+  const html = renderEn(footer(card({ byHandReserved: true, byHandReservedQuote: llvm })));
   assertNoHan(html);
   assert.doesNotMatch(html, /Start learning by hand/);
   assert.match(

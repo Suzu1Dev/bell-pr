@@ -177,6 +177,7 @@ const opportunitySchema = z
     // Derived from the evidence by the server after parsing (v1.2).
     byHandReserved: z.literal(true).optional(),
     byHandReservedOutput: z.literal(true).optional(),
+    byHandReservedQuote: z.string().max(600).optional(),
   })
   .strict();
 const resultSchema = z
@@ -342,12 +343,13 @@ export function parseDiscoveryResult(
       forks: number(repo.forks),
     };
     // Learning-labelled issues are for the person to write by hand. The
-    // reservation flags come only from the evidence below: the agent's own
-    // are dropped first.
+    // reservation flags and quote come only from the evidence below: the
+    // agent's own are dropped first.
     const {
       learnByHand,
       byHandReserved: _agentReserved,
       byHandReservedOutput: _agentOutput,
+      byHandReservedQuote: _agentQuote,
       ...rest
     } = opportunity;
     const byHand =
@@ -365,11 +367,15 @@ export function parseDiscoveryResult(
               ? sources[index].title
               : "evidence.md",
             evidence.quote,
-          ).filter((finding) => finding.kind === "area"),
+          )
+            .filter((finding) => finding.kind === "area")
+            .map((finding) => ({ finding, quote: evidence.quote })),
         )
       : [];
-    const outputOnly = reservations.every((finding) =>
-      ["output", "automate"].includes(areaReach(finding.quote)),
+    // The first reservation that isn't only about AI-generated or automated
+    // pull requests: the card quotes its evidence (plan README §18.10).
+    const kept = reservations.find(
+      ({ finding }) => !["output", "automate"].includes(areaReach(finding.quote)),
     );
     opportunities.push({
       ...rest,
@@ -378,7 +384,8 @@ export function parseDiscoveryResult(
         : messages.popularityWithoutPush(counts),
       ...(byHand ? { learnByHand: true } : {}),
       ...(reservations.length ? { byHandReserved: true } : {}),
-      ...(reservations.length && outputOnly ? { byHandReservedOutput: true } : {}),
+      ...(reservations.length && !kept ? { byHandReservedOutput: true } : {}),
+      ...(kept ? { byHandReservedQuote: kept.quote } : {}),
     });
   }
   if (excluded) warnings.push(messages.skippedDifficulty({ count: excluded }));

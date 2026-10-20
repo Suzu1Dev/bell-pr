@@ -624,7 +624,7 @@ test("discovery never offers to start by hand on an issue kept for people learni
     sample: false,
     opportunities: [
       { ...base, id: "plain", title: "A newcomer issue", learnByHand: true },
-      { ...base, id: "use", title: "An issue kept for people learning", learnByHand: true, byHandReserved: true, evidence: [quote(llvm)] },
+      { ...base, id: "use", title: "An issue kept for people learning", learnByHand: true, byHandReserved: true, byHandReservedQuote: llvm, evidence: [quote(llvm)] },
       { ...base, id: "output", title: "An issue that closes AI pull requests", learnByHand: true, byHandReserved: true, byHandReservedOutput: true },
     ],
   };

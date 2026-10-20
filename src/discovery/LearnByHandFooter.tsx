@@ -1,6 +1,5 @@
 import { ArrowUpRight, Hand, Loader2 } from "lucide-react";
 import type { ContributionOpportunity } from "../../shared/discovery";
-import { classifyPolicy } from "../../shared/project-policy";
 import { useT } from "../i18n";
 
 /**
@@ -28,12 +27,8 @@ export function LearnByHandFooter({
 }) {
   const { card: t, byHand } = useT("discovery");
   const reserved = item.byHandReserved === true && item.byHandReservedOutput !== true;
-  // The evidence quote the reservation comes from, by the same classifier.
-  const quote = reserved
-    ? item.evidence.find((evidence) =>
-        classifyPolicy("discovery", evidence.quote).some((finding) => finding.kind === "area"),
-      )?.quote
-    : undefined;
+  // The evidence quote the reservation comes from, as the server marked it.
+  const quote = reserved ? item.byHandReservedQuote : undefined;
   return (
     <footer>
       <div className="by-hand">

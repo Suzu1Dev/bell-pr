@@ -90,6 +90,14 @@ export interface ContributionOpportunity {
    * may still reach the quoted confirm there. Absent means false.
    */
   byHandReservedOutput?: true;
+  /**
+   * Beside `byHandReserved` without `byHandReservedOutput`: the evidence
+   * quote whose reservation is worded around using AI (or BELL can't tell),
+   * which the card quotes. Derived by the server with the flags (plan
+   * README §18.10), so the card needs no classifier; never taken from the
+   * agent's answer. Absent otherwise.
+   */
+  byHandReservedQuote?: string;
 }
 
 export interface DiscoveryJob {
