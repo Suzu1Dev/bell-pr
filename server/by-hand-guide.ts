@@ -339,20 +339,25 @@ export async function planQuestions(ctx: WorkbenchContext, id: string): Promise<
 /** A run of at least `min` backticks, longer than any inside `text`, so none of them ends its code. */
 const ticks = (text: string, min: number) => "`".repeat(Math.max(min, ...[...text.matchAll(/`+/g)].map(([run]) => run.length + 1)));
 const fenced = (text: string) => `${ticks(text, 3)}\n${text}\n${ticks(text, 3)}`;
+/** Agent prose in BELL's Markdown: its fence markers stay literal, so it never opens a code block that swallows what follows. */
+const literalFences = (text: string) =>
+  text.replace(/^([ \t>]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?)(`{3,}|~{3,})/gm, (_line, prefix: string, fence: string) => prefix + fence.replace(/./g, "\\$&"));
+/** Agent prose on one line of BELL's Markdown (a review's list). */
+const oneLine = (text: string) => literalFences(text).replace(/\s*\n\s*/g, " ");
 
 /** A chat answer as the conversation stores it: the prose, the guide's question, BELL's quotes. */
 function chatText(entry: GuideEntry) {
   const messages = sm().byHand.guide;
   const unnamed = (entry.refs ?? []).filter((ref) => !entry.text.includes(`${ref.path}:${ref.line}`));
   return [
-    entry.text,
+    literalFences(entry.text),
     ...(unnamed.length ? [pointers(unnamed)] : []),
     ...(entry.quotes ?? []).map((quote) => {
       const place = `${quote.path}:${quote.startLine}-${quote.endLine}`;
       const header = quote.from === "change" ? messages.fromChange({ place }) : messages.fromBase({ place });
       return `${header}\n${fenced(quote.text)}`;
     }),
-    ...(entry.ask ? [entry.ask] : []),
+    ...(entry.ask ? [literalFences(entry.ask)] : []),
     ...(entry.removed ? [messages.removedFromAnswer] : []),
   ]
     .filter((part) => part.trim())
@@ -403,11 +408,11 @@ export function reviewMarkdown(review: ByHandReview) {
       evidence.type === "none" || !(evidence.type in words.evidence) || !(evidence.path || evidence.quote)
         ? words.mayBeWrong
         : `${words.evidence[evidence.type as keyof typeof words.evidence]}: ${[place(evidence.path, evidence.line), evidence.quote ? inlineCode(evidence.quote) : ""].filter(Boolean).join(" ")}`;
-    return `${index + 1}. ${place(finding.path, finding.line)}: ${finding.observed}\n   - ${shown}\n   - ${words.why}: ${finding.why}\n   - ${words.question}: ${finding.question}`;
+    return `${index + 1}. ${place(finding.path, finding.line)}: ${oneLine(finding.observed)}\n   - ${shown}\n   - ${words.why}: ${oneLine(finding.why)}\n   - ${words.question}: ${oneLine(finding.question)}`;
   });
   return [
-    `**${words.verified}**\n\n${review.verified}`,
-    `**${words.checked}**\n\n${review.checked.map((item) => `- ${item}`).join("\n")}`,
+    `**${words.verified}**\n\n${oneLine(review.verified)}`,
+    `**${words.checked}**\n\n${review.checked.map((item) => `- ${oneLine(item)}`).join("\n")}`,
     `**${words.findings}**\n\n${findings.length ? findings.join("\n") : words.noFindings}`,
     words.advice,
   ].join("\n\n");

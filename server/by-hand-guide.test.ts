@@ -665,6 +665,45 @@ test("after Ready, the per-file chat answers through the guide, filtered, with B
   assert.equal(f.run.byHand?.thread, undefined);
 });
 
+test("a code fence the agent leaves open never turns BELL's quote headers or the rest of a review into code", async (t) => {
+  const f = await fixture(t);
+  await f.edit(clientSource.replace("  return response.json();", "  if (response.status === 503) return null;\n  return response.json();"));
+  // A fence opener on the last line has no block to remove, so the filter leaves it.
+  f.answers.push(
+    answer({
+      text: "Your line returns null. Here is the shape:\n```",
+      question: "What should the caller see?\n~~~~",
+      quotes: [{ path: "src/client.js", startLine: 6, endLine: 6, from: "change", anchor: "503" }],
+      topic: "change",
+    }),
+    JSON.stringify({
+      verified: "No test run at this version.\n```",
+      checked: ["src/client.js\n~~~"],
+      findings: [
+        {
+          path: "src/client.js",
+          line: 6,
+          observed: "A 503 returns null.\n```",
+          evidence: { type: "none", path: null, line: null, quote: null },
+          why: "Callers read null as an answer.",
+          question: "What should the caller see?",
+          dimension: null,
+        },
+      ],
+    }),
+    "The tests did not run.",
+  );
+  /** Lines that open or close a code block in Markdown. */
+  const fences = (markdown: string) => markdown.split("\n").filter((line) => /^ {0,3}(`{3,}|~{3,})/.test(line));
+  const text = await withLocale("en", () => chat(f.ctx, f.run, "src/client.js", "Is returning null fine?", new AbortController().signal));
+  // Only BELL's own fences around its quote are left.
+  assert.deepEqual(fences(text), ["```", "```"]);
+  assert.match(text, /\n\nFrom your change, src\/client\.js:6-6:\n```\n {2}if \(response\.status === 503\) return null;\n```\n\n/);
+  await withLocale("en", () => review(f.ctx, f.run, {}, new AbortController().signal));
+  assert.deepEqual(fences(f.run.reports!.reviewer), []);
+  assert.match(f.run.reports!.reviewer, /\n- src\/client\.js \\~\\~\\~\n/);
+});
+
 test("no guide turn asks for write access, and none starts while the server stops", async (t) => {
   const f = await fixture(t);
   await f.ask({ kind: "ask", entry: "concept", question: "What is idempotent?" });
