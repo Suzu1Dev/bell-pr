@@ -4,8 +4,10 @@
 // byHandRulesCase), and a clean run in review then goes through the
 // preflight, "Check again", Ready, approve and publish routes with the real
 // byHandRulesDecision: publishing is refused (422) until `by-hand-rules`
-// is acknowledged, an override with that id is a 400, and acknowledged it
-// publishes. An assistance ban stays a block with no confirm. A local bare
+// is acknowledged with the digest of the words the preflight showed (other
+// or changed words are refused), an override with that id is a 400, and
+// acknowledged it publishes. An assistance ban stays a block with no
+// confirm; an agent run's checks carry no digest. A local bare
 // repository stands in for GitHub (fake git and gh); agent turns never run.
 import test, { after, before, type TestContext } from "node:test";
 import assert from "node:assert/strict";
@@ -16,6 +18,7 @@ import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { changeFingerprint } from "../shared/change-fingerprint.js";
+import { byHandRulesCase } from "../shared/by-hand-rules.js";
 import { byHandBlockClause } from "../shared/contribution.js";
 import { defaultContributionSettings } from "../shared/insights.js";
 import type { DraftCheck } from "../shared/draft-checks.js";
@@ -244,8 +247,8 @@ test("a QEMU-shaped project: the fitted run's quoted confirm, required at publis
   const override = await publish({ acknowledged: confirms, overrides: [{ id: "by-hand-rules", reason: "The maintainers said it fits." }] });
   assert.equal(override.status, 400);
   assert.equal(run.status, "approved");
-  // Ticked: published.
-  const published = await publish({ acknowledged: confirms });
+  // Ticked for the words read: published.
+  const published = await publish({ acknowledged: confirms, rulesDigest: quoted.digest });
   assert.equal(published.status, 200, JSON.stringify(published.body));
   assert.equal(published.body.run.status, "published");
   assert.match(published.body.run.prUrl, /^https:\/\/github\.com\/test-owner\/example\/pull\/\d+$/);
@@ -278,4 +281,120 @@ test("an assistance ban: no fitted run, the block stands with no confirm, approv
   assert.equal((await publish({ acknowledged: ["by-hand-rules"], overrides: [{ id: "ai-ban", reason: "The maintainers said it fits." }] })).status, 400);
   assert.equal((await publish({ acknowledged: ["by-hand-rules"] })).status, 409);
   assert.equal(run.status, "review");
+});
+
+/** A fitted, clean run in review on the QEMU-shaped project, its rules read during the run; approved. */
+async function fittedAndApproved(t: TestContext) {
+  const qemu = await readFile(path.join(import.meta.dirname, "fixtures", "policy", "real", "qemu-code-provenance.rst"), "utf8");
+  const f = await serve(t, { [qemuPath]: qemu });
+  const created = await f.call("POST", "/runs", {
+    repoId: f.repo.id,
+    prompt,
+    settings: defaultContributionSettings,
+    learnByHand: true,
+    byHandFit: { learningIssue: false },
+  });
+  assert.equal(created.status, 202, JSON.stringify(created.body));
+  await f.workbench.cancel(created.body.run.id);
+  const run = await reviewRun(f, { createdAt: created.body.run.createdAt, helpLock: created.body.run.byHand.helpLock });
+  assert.equal((await f.call("POST", `/repos/${f.repo.id}/contribution-rules/refresh`, {})).status, 200);
+  const approved = await f.call("POST", `/runs/${run.id}/approve`, { draft: run.draft });
+  assert.equal(approved.status, 200, JSON.stringify(approved.body));
+  const fingerprint = approved.body.run.approvedFingerprint as string;
+  const publish = (body: Record<string, unknown>) => f.call("POST", `/runs/${run.id}/publish`, { fingerprint, ...body });
+  return { f, qemu, run, publish };
+}
+
+test("the quoted confirm's tick is bound to its words: missing, other or changed words are refused", async (t) => {
+  const { f, qemu, run, publish } = await fittedAndApproved(t);
+  const read = await preflight(f, run);
+  const quoted = read.find((check) => check.id === "by-hand-rules")!;
+  assert.match(quoted.digest ?? "", /^[a-f0-9]{64}$/);
+  // Only the quoted confirm carries its words' digest.
+  assert.deepEqual(read.filter((check) => check.digest).map((check) => check.id), ["by-hand-rules"]);
+  const confirms = read.filter((check) => check.kind === "confirm").map((check) => check.id);
+  // The tick alone, or with words the server never showed: refused, naming the confirm.
+  for (const body of [{}, { rulesDigest: "0".repeat(64) }]) {
+    const refused = await publish({ acknowledged: confirms, ...body });
+    assert.equal(refused.status, 422, JSON.stringify(refused.body));
+    assert.match(refused.body.error, /its own text says some uses of AI are fine/);
+  }
+  // Another tab: the project's rules file changed and "Check again" read it, so the quoted lines moved.
+  await git(f.repo.path, ["config", "user.name", "BELL Test"]);
+  await git(f.repo.path, ["config", "user.email", "test@example.invalid"]);
+  await writeFile(path.join(f.repo.path, qemuPath), `.. _code-provenance:\n\n${qemu}`);
+  await git(f.repo.path, ["commit", "-qam", "Label the provenance section"]);
+  assert.equal((await f.call("POST", `/repos/${f.repo.id}/contribution-rules/refresh`, {})).status, 200);
+  const reread = (await preflight(f, run)).find((check) => check.id === "by-hand-rules")!;
+  assert.ok(reread.details.includes(`${qemuPath}:8: "${qemuBan}"`), reread.details.join("\n"));
+  assert.notEqual(reread.digest, quoted.digest);
+  // This tab's tick was for the words it read: refused, nothing sent.
+  const stale = await publish({ acknowledged: confirms, rulesDigest: quoted.digest });
+  assert.equal(stale.status, 422, JSON.stringify(stale.body));
+  assert.match(stale.body.error, /its own text says some uses of AI are fine/);
+  assert.equal(f.store.data.runs.find((value) => value.id === run.id)!.status, "approved");
+  // Ticked for the words the server shows now: published.
+  const published = await publish({ acknowledged: confirms, rulesDigest: reread.digest });
+  assert.equal(published.status, 200, JSON.stringify(published.body));
+  assert.equal(published.body.run.status, "published");
+});
+
+test("a quoted confirm whose checked-list entry passes 90 days between the read and the publish is refused", async (t) => {
+  const day = 24 * 60 * 60 * 1000;
+  const checkedOn = "2026-07-01";
+  // A minute before the entry is 90 days old.
+  t.mock.timers.enable({ apis: ["Date"], now: Date.parse(checkedOn) + 90 * day - 60_000 });
+  const f = await serve(t, {});
+  const label = "rust-lang/rust (rust-forge llm-usage.md)";
+  const finding = {
+    kind: "ban" as const,
+    path: label,
+    line: 12,
+    quote: "But not to create.",
+    contribution: true,
+    reach: "output" as const,
+    source: { registry: "rust-lang/rust", url: "https://forge.rust-lang.org/policies/llm-usage.html", checkedOn },
+    allows: [
+      { line: 8, quote: "Asking an LLM questions about an existing codebase", kinds: ["explain" as const, "answer" as const] },
+      { line: 9, quote: "Using an LLM to help with debugging", kinds: ["test" as const] },
+    ],
+  };
+  const createdAt = new Date(Date.now() - 60 * 60_000).toISOString();
+  f.repo.contributionRules = { checkedAt: new Date(Date.now() - 30 * 60_000).toISOString(), findings: [finding], filesRead: [] };
+  const fitted = byHandRulesCase(f.repo.contributionRules, { learningIssue: false, now: createdAt });
+  assert.equal(fitted.case, "fitted");
+  const run = await reviewRun(f, { createdAt, helpLock: fitted.case === "fitted" ? { ...fitted.lock, at: createdAt } : undefined });
+  const read = await preflight(f, run);
+  assert.deepEqual(rulesRows(read), ["by-hand-rules:confirm"]);
+  const quoted = read.find((check) => check.id === "by-hand-rules")!;
+  const approved = await f.call("POST", `/runs/${run.id}/approve`, { draft: run.draft });
+  assert.equal(approved.status, 200, JSON.stringify(approved.body));
+  const confirms = read.filter((check) => check.kind === "confirm").map((check) => check.id);
+  // Two minutes later the entry is more than 90 days old: it blocks, and the tick for the words read counts for nothing.
+  t.mock.timers.setTime(Date.parse(checkedOn) + 90 * day + 60_000);
+  const refused = await f.call("POST", `/runs/${run.id}/publish`, {
+    fingerprint: approved.body.run.approvedFingerprint,
+    acknowledged: confirms,
+    rulesDigest: quoted.digest,
+  });
+  assert.equal(refused.status, 422, JSON.stringify(refused.body));
+  assert.match(refused.body.error, /more than 90 days old/);
+  assert.equal(f.store.data.runs.find((value) => value.id === run.id)!.status, "approved");
+});
+
+test("an agent run's checks carry no digest and its confirms publish as before", async (t) => {
+  const f = await serve(t, {});
+  const run = await reviewRun(f, { createdAt: new Date(Date.now() - 60_000).toISOString() });
+  delete run.learnByHand;
+  delete run.byHand;
+  const checks = await preflight(f, run);
+  assert.equal(checks.some((check) => "digest" in check), false);
+  const approved = await f.call("POST", `/runs/${run.id}/approve`, { draft: run.draft });
+  assert.equal(approved.status, 200, JSON.stringify(approved.body));
+  const published = await f.call("POST", `/runs/${run.id}/publish`, {
+    fingerprint: approved.body.run.approvedFingerprint,
+    acknowledged: checks.filter((check) => check.kind === "confirm").map((check) => check.id),
+  });
+  assert.equal(published.status, 200, JSON.stringify(published.body));
+  assert.equal(published.body.run.status, "published");
 });

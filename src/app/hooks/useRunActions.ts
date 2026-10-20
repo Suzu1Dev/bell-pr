@@ -953,10 +953,9 @@ export function useRunActions({
       setBusy(false);
     }
   }
-  async function publish() {
+  async function publish(rulesDigest?: string) {
     if (demo) {
-      // The sample "opens" its Draft PR without a request: the draft tab
-      // shows it as published, with the sample card.
+      // The sample "opens" its Draft PR without a request: the draft tab shows it as published.
       closeModal();
       if (!sampleApproval()) return;
       setTab("draft");
@@ -982,6 +981,7 @@ export function useRunActions({
         send("POST", {
           fingerprint: run.approvedFingerprint,
           acknowledged,
+          rulesDigest,
           ...(overrides.length ? { overrides } : {}),
         }),
       );

@@ -604,13 +604,15 @@ export class Workbench {
   /**
    * Publishes the first commit and PR, or pushes an open round
    * (publish.ts). `overrides` lift a block with the person's reason
-   * (only `issue-has-pr`), recorded on the run.
+   * (only `issue-has-pr`), recorded on the run; `rulesDigest` binds the
+   * quoted confirm's tick to the words read.
    */
   async publish(
     id: string,
     displayedFingerprint: string,
     acknowledged: string[] = [],
     overrides: Pick<GuardOverride, "id" | "reason">[] = [],
+    rulesDigest?: string,
   ) {
     const round = activeFollowUp(this.run(id).followUps);
     return logged(
@@ -623,6 +625,7 @@ export class Workbench {
           displayedFingerprint,
           acknowledged,
           overrides,
+          rulesDigest,
         ),
     );
   }

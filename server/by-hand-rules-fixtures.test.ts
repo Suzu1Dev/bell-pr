@@ -457,9 +457,10 @@ test("through Workbench: the confirm never blocks approval, publish needs it ack
   const confirmFirst = (error: AppError) =>
     error.statusCode === 422 && error.message.includes("its own text says some uses of AI are fine");
   await assert.rejects(withLocale("en", () => f.workbench.publish(f.run.id, f.run.approvedFingerprint!, ["facts-unknown"])), confirmFirst);
-  // Acknowledged, publishing goes past the checks (and stops at the fake gh).
+  // Acknowledged for the words the preflight showed, publishing goes past the checks (and stops at the fake gh).
+  const digest = (await publishChecks(f.run, await readDiff(f.run), f.store.directory, "en", { repo: f.repo })).find((check) => check.id === "by-hand-rules")!.digest;
   await assert.rejects(
-    withLocale("en", () => f.workbench.publish(f.run.id, f.run.approvedFingerprint!, ["facts-unknown", "by-hand-rules"])),
+    withLocale("en", () => f.workbench.publish(f.run.id, f.run.approvedFingerprint!, ["facts-unknown", "by-hand-rules"], [], digest)),
     (error: AppError) => !confirmFirst(error) && /\bgh\b/.test(error.message),
   );
 });

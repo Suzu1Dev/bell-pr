@@ -152,11 +152,13 @@ export function registerReviewRoutes(
     res.json({ run: await workbench.fetchPrFeedback(req.params.id) });
   });
   app.post("/api/runs/:id/publish", async (req, res) => {
-    const { fingerprint, acknowledged, overrides } = z
+    const { fingerprint, acknowledged, overrides, rulesDigest } = z
       .object({
         fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
         // Preflight item ids the person confirmed in the publish dialog.
         acknowledged: z.array(z.string().max(40)).max(16).optional(),
+        // The digest of the quoted confirm's words (`by-hand-rules`) the person ticked.
+        rulesDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
         // Blocks lifted with the person's own reason; only someone else's
         // pull request for the same issue can be lifted.
         overrides: z
@@ -182,6 +184,7 @@ export function registerReviewRoutes(
         fingerprint,
         acknowledged,
         overrides,
+        rulesDigest,
       ),
     });
   });

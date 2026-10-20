@@ -306,6 +306,13 @@ export interface DraftCheck {
   kind: "block" | "confirm";
   message: string;
   details: string[];
+  /**
+   * The `by-hand-rules` confirm's words as the server showed them (a
+   * SHA-256 of its message and details; not persisted): publishing takes
+   * its tick only with this digest, so a tick never counts for words that
+   * changed after the person read them (DESIGN v1.2 F12 f).
+   */
+  digest?: string;
 }
 
 /**

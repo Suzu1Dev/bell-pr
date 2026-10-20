@@ -155,7 +155,7 @@ export async function publishChecks(
   } catch {
     /* Not created yet. */
   }
-  return draftPreflight(
+  const checks = draftPreflight(
     {
       title: run.draft.title,
       body: run.draft.body,
@@ -179,7 +179,13 @@ export async function publishChecks(
     },
     locale,
   );
+  // The quoted confirm carries a digest of its words, which publish() wants back with its tick.
+  return checks.map((check) => (check.id === "by-hand-rules" ? { ...check, digest: checkDigest(check) } : check));
 }
+
+/** A digest of a check's words: its message and details, as shown. */
+const checkDigest = (check: DraftCheck) =>
+  createHash("sha256").update(JSON.stringify([check.message, ...check.details])).digest("hex");
 
 /** GitHub only lets a token with the `workflow` scope push changes to these files. */
 const workflowPath = /^\.github\/workflows\//;
@@ -380,7 +386,9 @@ export async function approve(
 /**
  * `acknowledged` lists the preflight items the person confirmed in the
  * publish dialog. They are recomputed here from the saved draft, so a stale
- * or partial list is rejected before anything is pushed.
+ * or partial list is rejected before anything is pushed. The quoted
+ * confirm's tick counts only with `rulesDigest`, the digest of the words
+ * the dialog showed, when it matches the words the server shows now.
  */
 export async function publish(
   ctx: WorkbenchContext,
@@ -388,6 +396,7 @@ export async function publish(
   displayedFingerprint: string,
   acknowledged: string[] = [],
   overrides: Pick<GuardOverride, "id" | "reason">[] = [],
+  rulesDigest?: string,
 ) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
@@ -478,7 +487,10 @@ export async function publish(
         422,
       );
     const unconfirmed = checks.filter(
-      (check) => check.kind === "confirm" && !acknowledged.includes(check.id),
+      (check) =>
+        check.kind === "confirm" &&
+        (!acknowledged.includes(check.id) ||
+          (check.id === "by-hand-rules" && rulesDigest !== check.digest)),
     );
     if (unconfirmed.length)
       throw new AppError(

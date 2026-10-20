@@ -399,16 +399,18 @@ test("a quoted confirm whose words change is never sent ticked, not even by a cl
   test.setTimeout(120_000);
   const rule = "We decline AI-generated contributions.";
   const helpLock = { kinds: ["explain", "answer"], at, rulesCheckedAt: at, rules: [{ kind: "ban", path: "CONTRIBUTING.md", line: 3, quote: rule, allows: [] }] };
-  const quoted: DraftCheck = { id: "by-hand-rules", kind: "confirm", message: "The project declines AI-generated contributions.", details: ["Why.", `CONTRIBUTING.md:3: "${rule}"`] };
-  const requoted: DraftCheck = { ...quoted, details: ["Why.", `CONTRIBUTING.md:4: "${rule} Rewritten."`] };
+  const quoted: DraftCheck = { id: "by-hand-rules", kind: "confirm", message: "The project declines AI-generated contributions.", details: ["Why.", `CONTRIBUTING.md:3: "${rule}"`], digest: "a".repeat(64) };
+  const requoted: DraftCheck = { ...quoted, details: ["Why.", `CONTRIBUTING.md:4: "${rule} Rewritten."`], digest: "b".repeat(64) };
   const project = await startRealProject({ reviewed: true, appSettings: { skipUnderstandingCheck: true }, run: byHandRun({}, { helpLock }) });
   const { context, page } = await open(browser, project);
   try {
     let changed = false;
     await page.route(`**/api/runs/${runId}/preflight`, (route) => route.fulfill({ json: { checks: [changed ? requoted : quoted] } }));
-    const sent: string[][] = [];
+    // The tick and the digest of the words it was for (the server refuses a tick for other words).
+    const sent: [string[], string?][] = [];
     await page.route(`**/api/runs/${runId}/publish`, async (route) => {
-      sent.push((route.request().postDataJSON() as { acknowledged: string[] }).acknowledged);
+      const { acknowledged, rulesDigest } = route.request().postDataJSON() as { acknowledged: string[]; rulesDigest?: string };
+      sent.push([acknowledged, rulesDigest]);
       await route.fulfill({ status: 409, json: { error: "Not now." } });
     });
     const reads = openingReads(page);
@@ -433,7 +435,7 @@ test("a quoted confirm whose words change is never sent ticked, not even by a cl
     await expect(dialog.getByRole("checkbox", { name: quoted.message })).not.toBeChecked();
     // Only the first request carried the tick: the one for the words the person read.
     await page.waitForTimeout(500);
-    expect(sent).toEqual([["by-hand-rules"]]);
+    expect(sent).toEqual([[["by-hand-rules"], quoted.digest]]);
   } finally {
     await context.close();
     await project.stop();

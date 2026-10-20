@@ -175,9 +175,15 @@ test("the quoted confirm never blocks approval and is required in acknowledged a
     withLocale("en", () => f.workbench.publish(f.run.id, f.run.approvedFingerprint!, ["facts-unknown"])),
     confirmFirst,
   );
-  // Acknowledged, publishing goes past the checks (and stops at the fake gh).
+  // Acknowledged without the digest of the words read: still refused.
   await assert.rejects(
     withLocale("en", () => f.workbench.publish(f.run.id, f.run.approvedFingerprint!, ["facts-unknown", "by-hand-rules"])),
+    confirmFirst,
+  );
+  // Acknowledged for the words read, publishing goes past the checks (and stops at the fake gh).
+  const digest = preflight.find((check) => check.id === "by-hand-rules")!.digest;
+  await assert.rejects(
+    withLocale("en", () => f.workbench.publish(f.run.id, f.run.approvedFingerprint!, ["facts-unknown", "by-hand-rules"], [], digest)),
     (error: AppError) => !confirmFirst(error) && /\bgh\b/.test(error.message),
   );
 });

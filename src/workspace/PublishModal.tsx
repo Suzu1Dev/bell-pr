@@ -203,7 +203,8 @@ interface PublishModalProps {
     | "overrides"
     | "setOverrides"
   >;
-  publish: () => void;
+  /** Sends the quoted confirm's digest (DraftCheck.digest) with its tick. */
+  publish: (rulesDigest?: string) => void;
   closeModal: () => void;
   setTab: Dispatch<SetStateAction<Tab>>;
   /** A useDoctor() state to share; the dialog loads its own otherwise. */
@@ -334,7 +335,8 @@ export function PublishModal({
   // A quoted confirm whose words changed in a later read (or that couldn't be read) is unticked:
   // the person confirms what they read (F12 f). Until then its tick counts for nothing, not even
   // for the one frame before the untick, so no click can send it for words that came after it.
-  const quoted = JSON.stringify(checks?.find((check) => check.id === "by-hand-rules") ?? null);
+  const rulesConfirm = checks?.find((check) => check.id === "by-hand-rules");
+  const quoted = JSON.stringify(rulesConfirm ?? null);
   const [confirmed, setConfirmed] = useState(quoted);
   useEffect(() => {
     if (confirmed === quoted) return;
@@ -510,7 +512,7 @@ export function PublishModal({
             blocks.length > 0 ||
             confirms.some((check) => !ticked.includes(check.id))
           }
-          onClick={publish}
+          onClick={() => publish(rulesConfirm?.digest)}
         >
           {busy ? (
             <Loader2 className="spin" size={16} />
