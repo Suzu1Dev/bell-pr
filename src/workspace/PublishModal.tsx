@@ -344,12 +344,12 @@ export function PublishModal({
     setConfirmed(quoted);
   }, [confirmed, quoted, setAcknowledged]);
   const ticked = confirmed === quoted ? acknowledged : acknowledged.filter((id) => id !== "by-hand-rules");
-  // Sending disables Submit, which had the focus; in a Learn-by-hand run's dialog a refused or
-  // failed publish puts it on the reason, so it stays in the dialog.
+  // Sending disables Submit, which had the focus; a refused or failed publish puts it on the reason,
+  // so it stays in the dialog.
   const refusal = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
-    if (formError && byHand && document.activeElement === document.body) refusal.current?.focus();
-  }, [formError, byHand]);
+    if (formError && document.activeElement === document.body) refusal.current?.focus();
+  }, [formError]);
   const reason = overrides.find((override) => override.id === "issue-has-pr")?.reason ?? "";
   const blocks = (checks ?? []).filter(
     (check) => check.kind === "block" && !(check.id === "issue-has-pr" && validReason(reason)),
@@ -489,7 +489,7 @@ export function PublishModal({
         />
       )}
       {formError && (
-        <p role="alert" className="inline-error" ref={refusal} tabIndex={byHand ? -1 : undefined}>
+        <p role="alert" className="inline-error" ref={refusal} tabIndex={-1}>
           {mask(formError)}
         </p>
       )}

@@ -52,6 +52,17 @@ async function open(browser: Browser, project: RealProject) {
   return { context, page: await context.newPage() };
 }
 
+/** Opens the publish dialog of an approved run from the Draft tab's footer; approval answers with the run as it is. */
+async function publishDialog(page: Page) {
+  await page.route(`**/api/runs/${runId}/approve`, async (route) => route.fulfill({ json: await (await page.request.get(`/api/runs/${runId}`)).json() }));
+  await page.goto(`/#/runs/${runId}/draft?locale=en`);
+  await page.locator(".review-footer").getByRole("button", { name: workspace.footer.approvePr }).click();
+  const dialog = page.getByRole("dialog", { name: workspace.publish.title });
+  await expect(dialog).toBeVisible({ timeout: 30_000 });
+  await expect(dialog.getByText(workspace.publish.factsLoading)).toHaveCount(0, { timeout: 30_000 });
+  return dialog;
+}
+
 const readRun = async (page: Page, id = runId) =>
   ((await (await page.request.get(`/api/runs/${id}`)).json()) as { run: Run }).run;
 
@@ -106,6 +117,27 @@ test.describe("the fix-ups a browser shows (README v1.2 §18.11)", () => {
       await page.evaluate(() => window.dispatchEvent(new Event("focus")));
       await expect(notice).toBeVisible({ timeout: 15_000 });
       expect(await region!.textContent()).toBe(workspace.byHand.changed);
+    } finally {
+      await context.close();
+      await project.stop();
+    }
+  });
+
+  test("a refused publish of an agent run keeps the focus in the dialog, on why it was refused", async ({ browser }) => {
+    test.setTimeout(120_000);
+    const project = await startRealProject({ reviewed: true, appSettings: { skipUnderstandingCheck: true }, run: { status: "approved", approvedFingerprint: "e2e-approved" } });
+    const { context, page } = await open(browser, project);
+    try {
+      await page.route(`**/api/runs/${runId}/preflight`, (route) => route.fulfill({ json: { checks: [] } }));
+      await page.route(`**/api/runs/${runId}/publish`, (route) => route.fulfill({ status: 409, json: { error: "Not now." } }));
+      const dialog = await publishDialog(page);
+      await dialog.getByRole("button", { name: workspace.publish.submit }).click();
+      const refusal = dialog.locator(".inline-error[role=alert]");
+      await expect(refusal).toHaveText("Not now.");
+      // Sending disabled Submit, which had the focus: it moves to the refusal, never to the page.
+      await expect(refusal).toBeFocused();
+      await page.keyboard.press("Tab");
+      expect(await page.evaluate(() => !!document.activeElement?.closest("[role=dialog]"))).toBe(true);
     } finally {
       await context.close();
       await project.stop();
