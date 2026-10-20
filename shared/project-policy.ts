@@ -105,6 +105,15 @@ const asWritten = (match: string) =>
 const madeWith = String.raw`(?:(?:generat\w*|written|wr[io]te|produced|created|authored|assisted|made|drafted|output|code|text|content|suggestions?)\s+(?:by|with|using|through|via|from)|us(?:e|es|ed|ing)(?:\s+of)?|usage\s+of|help\s+(?:from|of))\s+(?:an?\s+|the\s+)?(?:(?:AI\s+)?tools?\s+(?:like|such\s+as)\s+)?`;
 /** What a model or tool makes, said after its name: "LLM-generated", "LLM output", "Copilot suggestions". */
 const madeBy = String.raw`[- ](?:generat\w*|assist\w*|written|authored|produced|output|suggestions?|tools?|tooling|assistants?|agents?|use|usage)\b`;
+/**
+ * Work that must be written by humans only: "Contributions must be
+ * entirely human-authored", "All code must be written by humans". A rule
+ * (`prohibition`) and its AI help (`refusalTerms`) in one, since it names
+ * AI only by leaving it out. Only work a contribution holds counts (not
+ * commit messages, which are credit, or "decisions"), and not
+ * "human-readable", "by hand" or "reviewed by a human".
+ */
+const humanOnly = String.raw`(?<=\b(?:contributions?|code|patch(?:es)?|pull\s+requests?|PRs?|merge\s+requests?|commits|changes|submissions?|work|content|documentation|docs|tests?)\s+)(?:must|shall|should|(?:are|is)\s+required\s+to|ha(?:ve|s)\s+to|needs?\s+to)\s+(?:only\s+)?be\s+(?:(?:entirely|fully|completely|wholly|solely|exclusively|purely|only|100\s*%)\s+)?(?:human[- ](?:authored|written|made|created|produced|crafted)|(?:authored|written|made|created|produced|crafted)\s+(?:(?:entirely|only|solely|exclusively|wholly|fully)\s+)?by\s+(?:a\s+|real\s+)?(?:humans?|human\s+beings?))\b`;
 /** A model or tool as a part of the software ("LLM providers", "the Claude integration"), not as help. */
 const featureNoun = String.raw`(?!\s+(?:APIs?|providers?|integrations?|backends?|clients?|SDKs?|features?|support|calls?|endpoints?|prompts?|extensions?|plugins?|librar(?:y|ies)|bindings?|adapters?|modules?)\b)`;
 
@@ -182,6 +191,7 @@ const prohibition = new RegExp(
     String.raw`\b(?:do|does|will|shall|should|must|may|can)\s*(?:not|n't)\s+(?:\w+\s+){0,3}?(?:accept|allow|permit|use|submit|merge|commit|includ|contain|review|consider|welcome|take|contribut)\w*`,
     String.raw`\b(?:won't|cannot|can't|never)\s+(?:\w+\s+){0,3}?(?:accept|allow|permit|use|submit|merge|commit|includ|contain|review|consider|welcome|take|contribut)\w*`,
     String.raw`\bnot\s+(?:be\s+)?(?:accepted|allowed|permitted|welcome|tolerated|merged|committed|included|reviewed|considered)\b`,
+    humanOnly,
     String.raw`\b(?:prohibited|forbidden|forbids?|banned|disallowed|unacceptable|declined?)\b`,
     String.raw`\bno\s+(?:AI|LLM|machine)[\w-]*`,
     String.raw`\b(?:will|shall|may)\s+be\s+(?:closed|rejected|refused|declined)\b`,
@@ -415,6 +425,8 @@ const reservation = new RegExp(
   String.raw`\b(?:reserved|meant|intended|kept)\s+for\b|\bare\s+for\s+(?:human\s+|new\s+)?(?:contributors|newcomers|people|humans)\b`,
   flags,
 );
+// Human-only work is its own AI help: what it leaves out (see `humanOnly`).
+refusalTerms.push(new RegExp(humanOnly, flags));
 
 /** Text addressed to AI agents themselves. */
 const addressedToAgents = new RegExp(
