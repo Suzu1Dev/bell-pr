@@ -171,7 +171,8 @@ export default function BeforeYouStart({
   const chips: { key: string; tone: Tone; text: string; title?: string }[] = [];
   const door = knownDoor(facts, rules);
   if (door && doorClosed(door)) chips.push({ key: "door", tone: "bad", text: t.doorClosed });
-  if (rules?.findings.some((finding) => finding.kind === "ban" && finding.contribution))
+  // Learn by hand: the mode choice says the project's case by its rule's reach (fitted or blocked), never "AI-assisted".
+  if (!byHand && rules?.findings.some((finding) => finding.kind === "ban" && finding.contribution))
     chips.push({ key: "ban", tone: "bad", text: t.ban });
   const issue = facts?.issue;
   const login = door?.login;

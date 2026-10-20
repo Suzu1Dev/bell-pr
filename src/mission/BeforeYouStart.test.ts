@@ -192,3 +192,19 @@ test("the sample reads nothing from the server", async () => {
     await mounted.unmount();
   }
 });
+
+test("in Learn by hand the ban chip gives way to the mode choice, which words the project's case by its rule's reach", async () => {
+  stubFetch(() => ({ status: 200, body: { rules } }));
+  for (const byHand of [false, true]) {
+    const mounted = await mount(view({ byHand }));
+    try {
+      await settle();
+      const text = mounted.text();
+      assertNoHan(text);
+      // An output ban would be fitted or blocked by reach in the mode choice; "AI-assisted" is only an agent run's case.
+      assert.equal(text.includes("The project's rules don't accept AI-assisted contributions"), !byHand, String(byHand));
+    } finally {
+      await mounted.unmount();
+    }
+  }
+});
