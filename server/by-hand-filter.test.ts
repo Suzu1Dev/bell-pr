@@ -6,8 +6,9 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { filterGuideAnswer, filterStoredCode, filterStoredText, turnFiles } from "./by-hand-filter.js";
+import { filteredError, filterGuideAnswer, filterStoredCode, filterStoredText, turnFiles } from "./by-hand-filter.js";
 import { git } from "./process.js";
+import { AppError } from "./types.js";
 
 async function repository(t: TestContext) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-by-hand-filter-"));
@@ -72,4 +73,20 @@ test("an answer is filtered against its cited files and the changed ones", async
   const report = await filterStoredText(files, "Use `retryLater(attempts)` here.", { changed: ["src/retry.ts"] });
   assert.deepEqual(report, { value: "Use … here.", removed: 1, dropped: 0 });
   assert.equal((await filterStoredCode(files, "export const attempts = 9;", { changed: ["src/retry.ts"] })).dropped, 1);
+});
+
+test("filteredError: one helper filters an agent turn's error and keeps BELL's own messages whole", () => {
+  const fix = { label: "Sign in", command: "codex login" };
+  const leaked = new AppError("codex failed: change it to\n```ts\nexport const attempts = retryBudget();\n```", 422, { fixes: [fix] });
+  const filtered = filteredError(leaked);
+  assert.ok(filtered instanceof AppError);
+  assert.doesNotMatch(filtered.message, /retryBudget|```/);
+  assert.equal((filtered as AppError).statusCode, 422);
+  assert.deepEqual((filtered as AppError).fixes, [fix]);
+  assert.doesNotMatch(filteredError(new Error("```ts\nreturn retry(fn);\n```")).message, /retry\(fn\)/);
+  // Nothing to remove: the same error. A timeout (504) or a setup error (with a code) stays whole.
+  const plain = new AppError("The guide could not start.", 422);
+  assert.equal(filteredError(plain), plain);
+  const timeout = new AppError("```ts\nreturn retry(fn);\n```", 504);
+  assert.equal(filteredError(timeout), timeout);
 });

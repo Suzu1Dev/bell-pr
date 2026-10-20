@@ -37,10 +37,10 @@ import type { WorkbenchContext } from "./workbench.js";
 import { filterAgentText, filterCodeField } from "../shared/by-hand-filter.js";
 import type { ChangeExplanation } from "../shared/explanations.js";
 import * as guide from "./by-hand-guide.js";
-import { turnFiles } from "./by-hand-filter.js";
+import { filteredError, turnFiles } from "./by-hand-filter.js";
 import { assertHelpAllowed, recordHelp } from "./by-hand-record.js";
 import { takeOverOwnCommits } from "./by-hand-takeover.js";
-import { assertReady, countRemoved, filteredError, reviewAgain } from "./by-hand.js";
+import { assertReady, countRemoved, reviewAgain } from "./by-hand.js";
 import { planUnderstanding, understandingRequired } from "./understanding.js";
 
 const now = () => new Date().toISOString();

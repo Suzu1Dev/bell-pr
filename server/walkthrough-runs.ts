@@ -26,7 +26,8 @@ import type { WorkbenchContext } from "./workbench.js";
 import type { CodeReference, FileWalkthrough } from "../shared/walkthroughs.js";
 import { readyNow } from "../shared/by-hand.js";
 import { assertReaderView, changeFilter, recordStoredHelp } from "./learning.js";
-import { checkoutPaths, filteredError } from "./by-hand.js";
+import { checkoutPaths } from "./by-hand.js";
+import { filteredError } from "./by-hand-filter.js";
 
 const now = () => new Date().toISOString();
 

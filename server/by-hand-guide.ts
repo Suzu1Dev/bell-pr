@@ -18,9 +18,9 @@
 import { randomUUID } from "node:crypto";
 import { attemptSince, byHandLimits, helpKindOf, helpAllowed, nextRungAllowed, readyNow, repeatFailure } from "../shared/by-hand.js";
 import type { AskEntry, ByHandGuideInput, ByHandReview, ByHandStep, GuideEntry, GuideKind, HelpSource } from "../shared/by-hand.js";
-import { filterAgentText, type FilteredGuideOutput, type Filtered } from "../shared/by-hand-filter.js";
+import type { FilteredGuideOutput, Filtered } from "../shared/by-hand-filter.js";
 import { changeFingerprint } from "../shared/change-fingerprint.js";
-import { filterGuideAnswer, filterStoredText, turnFiles } from "./by-hand-filter.js";
+import { filterGuideAnswer, filteredError, filterStoredText, turnFiles } from "./by-hand-filter.js";
 import { assertHelpAllowed, recordHelp } from "./by-hand-record.js";
 import { guideAnswerJsonSchema, guideAnswerSchema, parseByHandAnswer, reviewerAnswerJsonSchema, reviewerAnswerSchema, withSchemaFile } from "./by-hand-schemas.js";
 import { readDiff } from "./git.js";
@@ -163,15 +163,6 @@ export async function storedGuideAnswer(run: GuideRun, request: GuideRequest, an
   const change = { ...changeOf(request.files), stepFiles: request.step?.files };
   const filtered = await filterGuideAnswer(reader, { ...output, refs, quotes }, change);
   return answerEntry(run, request, { ...filtered, dropped: filtered.dropped + unknown });
-}
-
-/** An agent turn's error, filtered (F7): a CLI's failure can quote the agent. BELL's timeout and setup messages stay whole (as server/by-hand.ts's). */
-function filteredError(error: unknown): Error {
-  if (error instanceof AppError && (error.statusCode === 504 || error.code)) return error;
-  const message = error instanceof Error ? error.message : String(error);
-  const { value, removed } = filterAgentText(message, { base: {}, worktree: {} });
-  if (!removed) return error instanceof Error ? error : new Error(message);
-  return error instanceof AppError ? new AppError(value, error.statusCode, { params: error.params, fixes: error.fixes }) : new Error(value);
 }
 
 /** One guide turn (DESIGN v1.2 F6, F7): read-only and isolated, under the guide's schema; the caller records it. */

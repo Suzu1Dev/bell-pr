@@ -15,7 +15,8 @@
  * - `ready`: Ready for review at the current fingerprint, and the job
  *   `review:<id>` of the guide's review (F8) when asked; `reviewAgain`.
  * - `assertReady`: nothing is explained or reviewed before Ready (F5).
- * - `filteredError`, `checkoutPaths`: agent text in errors and paths (F7).
+ * - `checkoutPaths`: the agent-named paths that are in the checkout (F7);
+ *   agent errors go through `filteredError` (server/by-hand-filter.ts).
  */
 import { randomUUID } from "node:crypto";
 import { realpath, stat } from "node:fs/promises";
@@ -43,7 +44,7 @@ import { filterAgentText } from "../shared/by-hand-filter.js";
 import type { Locale } from "../shared/i18n/locale.js";
 import { changeFingerprint, understandingWords } from "../shared/understanding.js";
 import * as guide from "./by-hand-guide.js";
-import { turnFiles } from "./by-hand-filter.js";
+import { filteredError, turnFiles } from "./by-hand-filter.js";
 import { assertHelpAllowed, recordHelp } from "./by-hand-record.js";
 import { orientationJsonSchema, orientationSchema, parseByHandAnswer, withSchemaFile } from "./by-hand-schemas.js";
 import * as tests from "./by-hand-tests.js";
@@ -132,15 +133,6 @@ export async function planByHand(
 /** Adds what the filter removed to the run's total. */
 export function countRemoved(run: Run, removed: number) {
   if (removed) (run.byHand ??= {}).removedTotal = (run.byHand.removedTotal ?? 0) + removed;
-}
-
-/** An agent turn's error, filtered (F7): a CLI's failure can quote the agent. BELL's timeout and setup messages stay whole. */
-export function filteredError(error: unknown): Error {
-  if (error instanceof AppError && (error.statusCode === 504 || error.code)) return error;
-  const message = error instanceof Error ? error.message : String(error);
-  const { value, removed } = filterAgentText(message, { base: {}, worktree: {} });
-  if (!removed) return error instanceof Error ? error : new Error(message);
-  return error instanceof AppError ? new AppError(value, error.statusCode, { params: error.params, fixes: error.fixes }) : new Error(value);
 }
 
 /**

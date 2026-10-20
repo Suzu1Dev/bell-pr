@@ -135,6 +135,21 @@ const noFiles: FilterSources = { base: {}, worktree: {} };
 /** A Learn-by-hand agent's text for the run log, the agent card or an error (DESIGN v1.2 F7): filtered against no file. */
 export const byHandLogText = (text: string) => filterAgentText(text, noFiles).value;
 
+/**
+ * A Learn-by-hand agent turn's error for the person (F7), the one helper
+ * the flow (server/by-hand.ts and its callers) and the guide
+ * (server/by-hand-guide.ts) use: a CLI's failure can quote the agent, so
+ * its message is filtered against no file. BELL's timeout (504) and setup
+ * messages (with an error code) stay whole.
+ */
+export function filteredError(error: unknown): Error {
+  if (error instanceof AppError && (error.statusCode === 504 || error.code)) return error;
+  const message = error instanceof Error ? error.message : String(error);
+  const { value, removed } = filterAgentText(message, noFiles);
+  if (!removed) return error instanceof Error ? error : new Error(message);
+  return error instanceof AppError ? new AppError(value, error.statusCode, { params: error.params, fixes: error.fixes }) : new Error(value);
+}
+
 /** Read tools whose plain arguments the run log may show as the agent ran them. */
 const readTool = /^(?:rg|grep|ls|cat|head|tail|wc|nl|find|tree|stat|file|sed -n|git (?:grep|log|show|diff|status|blame|ls-files))(?= |$)/;
 /** A flag, a word, a number or a path: never a quote, an operator, a glob or an escape. */
