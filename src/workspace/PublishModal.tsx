@@ -15,6 +15,7 @@ import {
   GitBranch,
   GitPullRequest,
   Loader2,
+  RefreshCw,
   UserRound,
 } from "lucide-react";
 import type { ContributionFacts } from "../../shared/contribution";
@@ -37,7 +38,8 @@ import {
   type Requirement,
 } from "../setup/ReadinessNotice";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
-import { MarkdownContent } from "./draftMounts";
+import { useRulesRecheck } from "../draft/rulesRecheck";
+import { ByHandRecord, Deferred, MarkdownContent } from "./draftMounts";
 
 /** Publishing commits with the Git identity and pushes with the GitHub CLI. */
 const publishRequirements: readonly Requirement[] = ["git-identity", "gh"];
@@ -130,14 +132,15 @@ const checkTopics = {
 } as const satisfies Record<string, readonly DraftCheck["id"][]>;
 type CheckTopic = keyof typeof checkTopics;
 
-/** `checks` by topic, in the dialog's order; a check of no topic joins the rules. */
+/** `checks` by topic, in the dialog's order; a check of no topic joins the rules, led by Learn by hand's quoted confirm. */
 export function groupChecks(checks: readonly DraftCheck[]) {
   const topicOf = (id: DraftCheck["id"]): CheckTopic =>
     (Object.keys(checkTopics) as CheckTopic[]).find((topic) =>
       (checkTopics[topic] as readonly string[]).includes(id),
     ) ?? "rules";
+  const quoted = (check: DraftCheck) => (check.id === "by-hand-rules" ? 0 : 1);
   return (Object.keys(checkTopics) as CheckTopic[])
-    .map((topic) => ({ topic, checks: checks.filter((check) => topicOf(check.id) === topic) }))
+    .map((topic) => ({ topic, checks: checks.filter((check) => topicOf(check.id) === topic).sort((a, b) => quoted(a) - quoted(b)) }))
     .filter((group) => group.checks.length);
 }
 
@@ -148,6 +151,7 @@ const respectIds = new Set<string>([
   ...checkTopics.pacing,
   "pr-closed",
   "ai-ban",
+  "by-hand-rules",
   "ai-disclosure",
   "project-rules",
   "own-words",
@@ -193,6 +197,7 @@ interface PublishModalProps {
     | "setAcknowledged"
     | "followUp"
     | "publishChecks"
+    | "serverChecksRead"
     | "loadPublishChecks"
     | "overrides"
     | "setOverrides"
@@ -238,6 +243,7 @@ export function PublishModal({
     setAcknowledged,
     followUp,
     publishChecks,
+    serverChecksRead,
     loadPublishChecks,
     overrides,
     setOverrides,
@@ -308,11 +314,14 @@ export function PublishModal({
     () => sample && respect?.samplePublishChecks(sample, run, files, locale, settings.off),
     [sample, respect, run, files, locale, settings.off],
   );
+  // A Learn-by-hand run's checks wait for the server's list (DESIGN v1.2 F12).
+  const byHand = !!run.learnByHand && !sample && !followUp;
   const checks: DraftCheck[] | undefined = followUp
     ? []
     : sample
       ? sampleChecks
-      : draftChecks && publishChecks;
+      : draftChecks && (serverChecksRead || !byHand) ? publishChecks : undefined;
+  const checkRules = useRulesRecheck(byHand ? run : undefined, currentRepo?.contributionRules, checks, loadPublishChecks);
   const reason = overrides.find((override) => override.id === "issue-has-pr")?.reason ?? "";
   const blocks = (checks ?? []).filter(
     (check) => check.kind === "block" && !(check.id === "issue-has-pr" && validReason(reason)),
@@ -425,6 +434,14 @@ export function PublishModal({
             setOverrides(value ? [{ id: "issue-has-pr", reason: value }] : [])
           }
           mask={mask}
+          record={
+            byHand && (
+              <Deferred resetKey={run.id} fallback={<Loader2 className="spin" size={16} aria-hidden="true" />}>
+                <ByHandRecord run={run} place="publish" />
+              </Deferred>
+            )
+          }
+          checkRules={checkRules}
           loop={
             demo ? undefined : (
               <LoopRuns
@@ -486,6 +503,7 @@ export function PublishModal({
  * reviewability, and safety. A block names why maintainers care and where
  * it comes from; only "someone else's PR fixes this issue" can be lifted,
  * with a reason. GitHub facts that could not be read say so and never pass.
+ * Learn by hand's record stands right before its quoted confirm (F12 f).
  */
 export function PublishChecks({
   checks,
@@ -498,6 +516,8 @@ export function PublishChecks({
   onReason,
   mask,
   loop,
+  record,
+  checkRules,
 }: {
   /** Undefined while the checks load. */
   checks: DraftCheck[] | undefined;
@@ -512,9 +532,14 @@ export function PublishChecks({
   mask(text: string): string;
   /** Links to the person's other published runs, for the pacing check. */
   loop?: ReactNode;
+  record?: ReactNode;
+  /** "Check again" on a block that names the rules unread since the run started. */
+  checkRules?: { checking: boolean; onCheck(): Promise<void> };
 }) {
   const t = useT("workspace").publish;
+  const rulesCard = useT("mission").rules;
   const confirms = (checks ?? []).filter((check) => check.kind === "confirm");
+  const recordFirst = !checks?.some((check) => check.id === "by-hand-rules");
   return (
     <section className="publish-checks" aria-labelledby="publish-checks-title">
       <h3 id="publish-checks-title">{t.checksTitle}</h3>
@@ -539,9 +564,11 @@ export function PublishChecks({
         </p>
       )}
       {confirms.length > 0 && <p className="publish-fact">{t.confirmLegend}</p>}
+      {recordFirst && record}
       {groupChecks(checks ?? []).map((group) => (
         <fieldset key={group.topic} className="publish-confirmations">
           <legend>{t.groups[group.topic]}</legend>
+          {!recordFirst && group.checks[0].id === "by-hand-rules" && record}
           {group.checks.map((check) => {
             const [why, ...sources] = respectIds.has(check.id) ? check.details : [undefined, ...check.details];
             const text = (
@@ -557,6 +584,11 @@ export function PublishChecks({
               return (
                 <div key={check.id} className="publish-block" role="alert">
                   {text}
+                  {checkRules && ["ai-ban", "area-reserved"].includes(check.id) && (
+                    <button type="button" className="button secondary" disabled={checkRules.checking} onClick={() => void checkRules.onCheck()}>
+                      <RefreshCw size={14} aria-hidden="true" /> {checkRules.checking ? rulesCard.checking : rulesCard.checkAgain}
+                    </button>
+                  )}
                   {check.id === "issue-has-pr" && (
                     <label className="publish-override">
                       {t.overrideLabel}

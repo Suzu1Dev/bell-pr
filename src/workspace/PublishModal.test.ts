@@ -76,6 +76,7 @@ const element = (props: Partial<Props> = {}, draft: Partial<Props["draft"]> = {}
       draft: {
         draftChecks,
         publishChecks: [],
+        serverChecksRead: true,
         async loadPublishChecks() {},
         overrides: [],
         setOverrides() {},
@@ -544,4 +545,77 @@ test("the sample's checks all pass, with its pace shown, in English", () => {
   assert.match(html, /Your open PRs here: 0 of 1 \(first contribution here\)/);
   assert.doesNotMatch(html, /<fieldset/);
   assertNoHan(html);
+});
+
+/** The quoted confirm as respectChecks words it (shared/contribution.ts), every detail visible. */
+const quotedConfirm: DraftCheck = {
+  id: "by-hand-rules",
+  kind: "confirm",
+  message: "The project declines AI-generated contributions, and its own text says some uses of AI are fine.",
+  details: [
+    "Maintainers decide what their rules cover; BELL PR only quotes them.",
+    'docs/devel/code-provenance.rst:3: "DECLINE any contributions which are believed to include or derive from AI generated content"',
+    'The same rules say: docs/devel/code-provenance.rst:9: "This policy does not apply to other uses of AI, such as researching APIs or algorithms"',
+    "You used: explanations and answers.",
+  ],
+};
+
+test("the quoted confirm stands right after the run's record, with a checkbox and no reason or override", () => {
+  const record = createElement("section", { id: "the-record" });
+  const others: DraftCheck[] = [
+    { id: "pr-closed", kind: "block", message: "Closed.", details: ["why", "GitHub has_pull_requests: false"] },
+    { id: "project-rules", kind: "confirm", message: "Rules to read.", details: ["why"] },
+  ];
+  const html = renderEn(checksElement({ checks: [...others, quotedConfirm], record }));
+  assertNoHan(html);
+  const group = /<fieldset class="publish-confirmations"><legend>The project&#x27;s rules<\/legend>([\s\S]*?)<\/fieldset>/.exec(html)?.[1] ?? "";
+  // The record, then the quoted confirm, then the rules' other checks.
+  assert.match(group, /^<section id="the-record"><\/section><label><input type="checkbox"\/><span>The project declines AI-generated contributions/);
+  assert.ok(group.indexOf("Rules to read.") > group.indexOf("You used: explanations and answers."));
+  // Every detail is on the page, none folded away.
+  for (const detail of quotedConfirm.details.slice(1)) assert.ok(group.includes(`<small>${detail.replace(/"/g, "&quot;")}</small>`), detail);
+  assert.match(group, /<small class="publish-why">Maintainers decide what their rules cover/);
+  assert.doesNotMatch(html, /<details|<textarea|Why publish anyway/);
+  assert.equal(html.split("the-record").length - 1, 1);
+  // Without the quoted confirm, the record leads the checks.
+  const alone = renderEn(checksElement({ checks: others, record }));
+  assert.ok(alone.indexOf("the-record") < alone.indexOf("<fieldset"));
+});
+
+test("a Learn-by-hand run's dialog waits for the server's list, then publishes only once the quoted confirm is ticked", () => {
+  const byHand: Run = { ...run, learnByHand: true, agents: run.agents.filter((agent) => agent.id === "lead") };
+  const send = /<button class="button primary"( disabled="")?>/;
+  const waiting = renderEn(element({ run: byHand }, { serverChecksRead: false }));
+  assertNoHan(waiting);
+  assert.equal(send.exec(waiting)?.[1], ' disabled=""');
+  // An agent run keeps the local checks until the server's arrive.
+  assert.equal(send.exec(renderEn(element({}, { serverChecksRead: false })))?.[1], undefined);
+  const unticked = renderEn(element({ run: byHand }, { publishChecks: [quotedConfirm] }));
+  assert.equal(send.exec(unticked)?.[1], ' disabled=""');
+  assert.match(unticked, /<label><input type="checkbox"\/><span>The project declines AI-generated contributions/);
+  const ticked = renderEn(element({ run: byHand }, { publishChecks: [quotedConfirm], acknowledged: ["by-hand-rules"] }));
+  assert.equal(send.exec(ticked)?.[1], undefined);
+  // The record loads with the byhand chunk, beside the confirm.
+  assert.match(ticked, /<legend>The project&#x27;s rules<\/legend><svg[^>]*lucide-loader-circle/);
+});
+
+test("Check again on a block calls the rules card's Check again, and says it is checking", () => {
+  const ban: DraftCheck = { id: "ai-ban", kind: "block", message: "Not published here.", details: ["why", "docs/policy.md:4"] };
+  // The block offers the rules card's Check again, which reads the rules again.
+  const html = renderEn(checksElement({ checks: [ban], checkRules: { checking: false, async onCheck() {} } }));
+  assertNoHan(html);
+  assert.match(html, /<div class="publish-block" role="alert"><span>Blocks publishing: Not published here\.[\s\S]*?<\/span><button type="button" class="button secondary">[\s\S]*?Check again<\/button><\/div>/);
+  assert.match(renderEn(checksElement({ checks: [ban], checkRules: { checking: true, async onCheck() {} } })), /disabled="">[\s\S]*?Checking…<\/button>/);
+  assert.doesNotMatch(renderEn(checksElement({ checks: [ban] })), /Check again/);
+});
+
+test("the quoted confirm leads the project's rules", () => {
+  const check = (id: DraftCheck["id"], kind: DraftCheck["kind"] = "confirm"): DraftCheck => ({ id, kind, message: id, details: [] });
+  assert.deepEqual(
+    groupChecks([check("pr-closed", "block"), check("project-rules"), check("by-hand-rules")]).map((group) => [
+      group.topic,
+      group.checks.map((item) => item.id),
+    ]),
+    [["rules", ["by-hand-rules", "pr-closed", "project-rules"]]],
+  );
 });

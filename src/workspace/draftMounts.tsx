@@ -34,10 +34,10 @@ export const MarkdownContent = lazy(() =>
 );
 
 /** A panel that loads on demand; a chunk that fails to load leaves the tab as it is. */
-export function Deferred({ resetKey, children }: { resetKey?: string; children: ReactNode }) {
+export function Deferred({ resetKey, children, fallback = null }: { resetKey?: string; children: ReactNode; fallback?: ReactNode }) {
   return (
     <ErrorBoundary resetKey={resetKey}>
-      <Suspense fallback={null}>{children}</Suspense>
+      <Suspense fallback={fallback}>{children}</Suspense>
     </ErrorBoundary>
   );
 }
