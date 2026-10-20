@@ -22,7 +22,7 @@ import type { Database, Repository, Run } from "./types.js";
 import { withLocale } from "./i18n/index.js";
 import { z } from "zod";
 import { lenientRead } from "./persisted-schema.js";
-import { repositoryReadSchema, runReadSchema } from "./store.js";
+import { persistedDatabaseSchema, repositoryReadSchema, runReadSchema } from "./store.js";
 
 async function dataDirectory() {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-store-test-"));
@@ -1413,4 +1413,68 @@ test("a carve-out this build cannot read is left out, and the rest of the findin
     lenientRead(repositoryReadSchema).parse(repo).contributionRules!.findings.find((entry) => entry.line === 293)!.allows,
     finding.allows,
   );
+});
+
+/**
+ * A state.json with a Learn-by-hand run in review (server/fixtures/
+ * state-v1.2-by-hand.json): every part of the record, the help set fixed
+ * when the run started, a walkthrough answer, and a repository whose rules
+ * carry a checked-list finding with carve-outs, help channels and a
+ * confirmed test command.
+ */
+const v12State = () =>
+  readFile(path.join(import.meta.dirname, "fixtures", "state-v1.2-by-hand.json"), "utf8");
+
+test("a v1.2 state with a Learn-by-hand run loads and saves unchanged, its busy mark cleared", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const written = await v12State();
+  const expected = JSON.parse(written) as Database;
+  // The read schema itself changes nothing, the fitted help set included.
+  assert.deepEqual(persistedDatabaseSchema.parse(JSON.parse(written)), expected);
+  const [run] = expected.runs;
+  assert.equal(run.learnByHand, true);
+  assert.deepEqual(run.byHand?.helpLock?.kinds, ["explain", "answer", "plan", "review"]);
+  assert.ok(expected.repos[0].contributionRules?.findings.some((finding) => finding.allows?.length));
+  await writeFile(path.join(directory, "state.json"), written);
+  const store = new Store(directory);
+  await store.initialize();
+  assert.equal(store.recovery, undefined);
+  // A restart ends whatever was busy; nothing else changes.
+  delete run.byHand!.busy;
+  assert.deepEqual(store.data, expected);
+  await store.save();
+  const reopened = new Store(directory);
+  await reopened.initialize();
+  assert.deepEqual(reopened.data, expected);
+});
+
+test("a v1.1 build, whose schema has none of the v1.2 fields, still loads the v1.2 state", async () => {
+  const state = JSON.parse(await v12State()) as Database;
+  const rules = repositoryReadSchema.shape.contributionRules.removeCatch().unwrap();
+  const finding = rules.shape.findings.element.omit({ source: true, allows: true });
+  const olderRepository = repositoryReadSchema.omit({ testCommand: true }).extend({
+    contributionRules: rules
+      .omit({ channels: true })
+      .extend({ findings: z.array(finding).max(30) })
+      .optional()
+      .catch(undefined),
+  });
+  const olderRun = runReadSchema.omit({ learnByHand: true, byHand: true }).extend({
+    attempts: z
+      .record(runReadSchema.shape.attempts.removeCatch().unwrap().valueSchema.omit({ walkthroughs: true }))
+      .optional()
+      .catch(undefined),
+  });
+  const older = z
+    .object({
+      version: z.literal(1),
+      repos: z.array(lenientRead(olderRepository)),
+      runs: z.array(lenientRead(olderRun)),
+    })
+    .passthrough();
+  const read = older.safeParse(state);
+  assert.ok(read.success, read.success ? "" : read.error.message);
+  // Unknown fields pass through, so an older build's save keeps them.
+  assert.deepEqual(read.data, state);
 });
