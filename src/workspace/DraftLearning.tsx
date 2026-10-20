@@ -103,8 +103,8 @@ export function Reviewability({
       weakened={snapshot.weakened}
       reasons={run.reviewability?.testReasons ?? {}}
       onSaveReasons={onSaveReasons}
-      // The sample has no agent to ask.
-      onAskSplit={demo ? undefined : onAskSplit}
+      // The sample has no agent to ask; a run fitted to rules that don't name planning help isn't offered it.
+      onAskSplit={demo || run.byHand?.helpLock?.kinds.includes("plan") === false ? undefined : onAskSplit}
     />
   );
 }

@@ -402,3 +402,26 @@ test("a run fitted to rules that don't name AI review offers no Run the review a
   assert.equal(typeof rerun(["explain", "answer", "review"]), "function");
   assert.equal(typeof rerun(), "function");
 });
+
+test("a run fitted to rules that don't name planning help offers no Ask-tab starter about other ways to do it", () => {
+  const demoFile = { ...getDemo("en").files.find((entry) => entry.path === "src/client.ts")!, fingerprint: file.fingerprint };
+  const ask = (lock?: string[]) =>
+    renderEn(
+      createElement(ExplanationPanel, {
+        file: demoFile,
+        messages: [],
+        loading: false,
+        onAsk() {},
+        demo: false,
+        chatRequestId: 1,
+        byHandReview: {
+          ...reader(check([`fallback:${file.path}`])),
+          run: { logs: [], byHand: lock ? { helpLock: { kinds: lock, at: "2026-10-20T09:00:00.000Z", rulesCheckedAt: "2026-10-20T09:00:00.000Z", rules: [] } } : {} },
+        } as ByHandReader,
+      }),
+    );
+  const alternatives = /What other ways could this be done/;
+  assert.doesNotMatch(ask(["explain", "answer", "test"]), alternatives);
+  assert.match(ask(["explain", "answer", "plan"]), alternatives);
+  assert.match(ask(), alternatives);
+});

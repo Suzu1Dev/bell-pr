@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { getDemo } from "../demo";
 import { assertNoHan, renderEn } from "../test-utils/render";
 import type { Repo, Run } from "../types";
-import { DraftGuide } from "./DraftLearning";
+import { DraftGuide, Reviewability } from "./DraftLearning";
 
 test("the Draft tab's guide passes a Learn-by-hand run to the panel, which shows its helpers instead of a suggestion", () => {
   const demo = getDemo("en");
@@ -48,4 +48,27 @@ test("the Draft tab's guide passes a Learn-by-hand run to the panel, which shows
   const agent = guide({ run: { ...demo.run, contributionFacts: undefined } });
   assert.match(agent, /draft-guidance-generate/);
   assert.match(agent, /AI agents wrote this change/);
+});
+
+test("a run fitted to rules that don't name planning help offers no question on how to split it", () => {
+  const demo = getDemo("en");
+  const lock = (kinds: string[]) => ({ kinds, at: "2026-10-20T09:00:00.000Z", rulesCheckedAt: "2026-10-20T09:00:00.000Z", rules: [] });
+  const card = (byHand?: Run["byHand"]) =>
+    renderEn(
+      createElement(Reviewability, {
+        run: { ...demo.run, learnByHand: true, byHand },
+        files: demo.files,
+        repo: demo.repo,
+        demo: false,
+        onAskSplit() {},
+      }),
+    );
+  const fitted = card({ helpLock: lock(["explain", "answer", "test"]) });
+  assertNoHan(fitted);
+  assert.doesNotMatch(fitted, /Ask how to split it/);
+  // The same card with planning help in the run's help set, or with every kind of help, keeps the question.
+  assert.match(card({ helpLock: lock(["explain", "answer", "plan"]) }), /Ask how to split it/);
+  assert.match(card({}), /Ask how to split it/);
+  // Whoever answers (the agent or the guide), the card names no agent.
+  assert.doesNotMatch(card({}), /ask the agent/);
 });

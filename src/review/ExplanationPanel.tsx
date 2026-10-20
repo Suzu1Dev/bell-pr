@@ -419,7 +419,7 @@ export function ExplanationPanel({
     t.presets.why,
     t.presets.risks,
     t.presets.test,
-    ...(explanation ? [t.presets.elsewhere, t.presets.alternatives] : []),
+    ...(explanation ? [t.presets.elsewhere, ...(byHandReview?.run?.byHand?.helpLock?.kinds.includes("plan") === false ? [] : [t.presets.alternatives])] : []),
     ...(isTestFile ? [t.presets.testFile] : []),
     ...(feedback.length ? [t.presets.feedback] : []),
   ];

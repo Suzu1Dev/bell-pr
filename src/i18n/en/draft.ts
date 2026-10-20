@@ -325,7 +325,7 @@ const draft = {
     mergedNone: "The sizes of the project's recent merged pull requests were not read.",
     split: "Is this one logical change?",
     splitLead:
-      "A change that a maintainer can review in one sitting gets reviewed sooner. If this one does several things, ask the agent how it could be split.",
+      "A change that a maintainer can review in one sitting gets reviewed sooner. If this one does several things, ask how it could be split.",
     askSplit: "Ask how to split it",
     weakened: "Weakened tests",
     weakenedLead:

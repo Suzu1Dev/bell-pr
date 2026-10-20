@@ -234,7 +234,7 @@ const m: Translation<typeof en> = {
       `#${number}：${fmt.number(files)} 個檔案 +${fmt.number(additions)} −${fmt.number(deletions)}`,
     mergedNone: "沒有讀到專案最近合併的 Pull Request 規模。",
     split: "這是一個合乎邏輯的單一變更嗎？",
-    splitLead: "維護者能一次看完的變更，會比較快得到審查。如果這份變更做了好幾件事，可以問 agent 怎麼拆開。",
+    splitLead: "維護者能一次看完的變更，會比較快得到審查。如果這份變更做了好幾件事，可以問問怎麼拆開。",
     askSplit: "問問怎麼拆開",
     weakened: "被削弱的測試",
     weakenedLead: "每一個被跳過、刪除或放寬的測試，發布前都需要一行理由：為什麼這樣改是對的？",
