@@ -184,7 +184,8 @@ async function seed(dataDir: string) {
                 kind: "ask",
                 entry: "project",
                 question: "Where is the limit read?",
-                text: "It is a constant at the top of the file.",
+                // Two lines, as the guide wrote them.
+                text: "It is a constant at the top of the file.\nWhat should a fourth attempt do?",
                 quotes: [{ path: source, startLine: 1, endLine: 1, from: "base", text: "export const maxRetries = Infinity;" }],
                 removed: 1,
               },
@@ -282,6 +283,10 @@ test("while the person writes, the guide's panel, its thread, the Tests card and
     // The thread, newest first: the quote BELL cut under its header, and the filter's note.
     await expect(guide.locator("figcaption", { hasText: t.thread.base })).toContainText(`${source}:1-1`);
     await expect(guide).toContainText(t.thread.removed);
+    // The guide's lines stay lines.
+    expect(await guide.locator(".by-hand-thread p", { hasText: "a constant at the top" }).innerText()).toBe(
+      "It is a constant at the top of the file.\nWhat should a fourth attempt do?",
+    );
     await expect(guide.getByRole("button", { name: t.guide.next({ rung: t.guide.rungs[2] }) })).toBeDisabled();
     await expect(guide).toContainText(t.guide.tryFirst);
     // The Tests card: the last run at this version, with the prediction.
