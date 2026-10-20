@@ -7,6 +7,7 @@
 // starts is stopped by the test.
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 import { command, setSpawnObserver } from "./process.js";
 import { AppError } from "./types.js";
@@ -33,11 +34,14 @@ async function gone(pid: number, timeoutMs = 5_000) {
   return true;
 }
 
-/** Stops whatever a test left behind, by pid (never by name). */
+/**
+ * Stops whatever a test left behind: by pid, and only while its command
+ * line is still the test's own script (Linux).
+ */
 function cleanup(pids: number[]) {
   for (const pid of pids)
     try {
-      process.kill(pid, "SIGKILL");
+      if (readFileSync(`/proc/${pid}/cmdline`, "utf8").includes("setInterval")) process.kill(pid, "SIGKILL");
     } catch {
       // Already gone.
     }
