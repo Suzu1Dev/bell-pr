@@ -1,24 +1,19 @@
 /**
- * Learn by hand: the guide's turns (DESIGN v1.2 F3, F6-F8). The façade in
- * server/by-hand.ts has already refused a run that is not Learn by hand.
- * Every turn is read-only and isolated, never sees the guide's outline, is
- * filtered (F7) before it is stored and recorded through `recordHelp`, and
- * is checked with `assertHelpAllowed` before it starts, so a run fitted to
- * a project's rules gets only the help its `byHand.helpLock` names (409
- * `m.byHand.helpOutsideFit`). One guide job runs per run at a time (409
- * `m.byHand.busy`), as `guide:<id>` in `ctx.byHandJobs` and
- * `ctx.controllers`, so Stop, cancel() and shutdown() abort it.
+ * Learn by hand: the guide's turns (DESIGN v1.2 F3, F6-F8), for runs the
+ * façade (server/by-hand.ts) found to be Learn by hand. Every turn is
+ * read-only and isolated, never sees the guide's outline, is checked with
+ * `assertHelpAllowed` before it starts (a fitted run gets only the help its
+ * `byHand.helpLock` names), and is filtered (F7) and recorded through
+ * `recordHelp` before it is stored. One guide job per run (409 busy), as
+ * `guide:<id>` in `ctx.byHandJobs` and `ctx.controllers`, so Stop,
+ * cancel() and shutdown() abort it.
  *
- * - `guide(ctx, id, input)`: POST …/by-hand/guide (202): an ask by entry
- *   ("My change" goes to the lowest unused rung the run allows), a hint
- *   rung R1-R4 behind the attempt gate, or "Explain this failure".
- * - `planQuestions(ctx, id)`: POST …/by-hand/plan/questions (202): one
- *   turn on the person's plan; at most 3 per run.
- * - `review(ctx, run, input, signal)`: the structured review at Ready
- *   (F8); `ready()` in server/by-hand.ts runs it as the job `review:<id>`
- *   and clears `busy`.
- * - `chat(ctx, run, filePath, question, signal)`: after Ready, the per-file
- *   Ask tab's answer, which the caller stores in `run.conversations`.
+ * - `guide`: POST …/by-hand/guide (202): an ask ("My change" goes to the
+ *   lowest unused rung the run allows), a hint R1-R4 behind the attempt
+ *   gate, or "Explain this failure". `planQuestions`: POST
+ *   …/by-hand/plan/questions (202), at most 3 per run.
+ * - `review`: the structured review at Ready (F8), run by `ready()` as
+ *   `review:<id>`. `chat`: the per-file Ask tab's answer after Ready.
  */
 import { randomUUID } from "node:crypto";
 import { attemptSince, byHandLimits, helpKindOf, helpAllowed, nextRungAllowed, repeatFailure } from "../shared/by-hand.js";
@@ -27,12 +22,10 @@ import type { FilteredGuideOutput, Filtered } from "../shared/by-hand-filter.js"
 import { changeFingerprint } from "../shared/change-fingerprint.js";
 import { filterGuideAnswer, filterStoredText, turnFiles } from "./by-hand-filter.js";
 import { assertHelpAllowed, recordHelp } from "./by-hand-record.js";
-import { guideAnswerJsonSchema, guideAnswerSchema, parseByHandAnswer, withSchemaFile } from "./by-hand-schemas.js";
-import { reviewerAnswerJsonSchema, reviewerAnswerSchema } from "./by-hand-schemas.js";
+import { guideAnswerJsonSchema, guideAnswerSchema, parseByHandAnswer, reviewerAnswerJsonSchema, reviewerAnswerSchema, withSchemaFile } from "./by-hand-schemas.js";
 import { readDiff } from "./git.js";
 import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
-import { byHandReviewerPrompt, byHandTesterPrompt, guidePrompt, planQuestionsPrompt } from "./prompts/by-hand.js";
-import { latestTest, stepDiff, testTail, type GuidePromptInput } from "./prompts/by-hand.js";
+import { byHandReviewerPrompt, byHandTesterPrompt, guidePrompt, latestTest, planQuestionsPrompt, stepDiff, testTail, type GuidePromptInput } from "./prompts/by-hand.js";
 import { runAgent, runIndependentReview } from "./run-executor.js";
 import { reviewDiffContext } from "./team.js";
 import { AppError, withRunLocale, type DiffFile, type Run } from "./types.js";
@@ -55,8 +48,8 @@ export interface GuideRequest {
   rung?: number;
   entry?: AskEntry;
   step?: ByHandStep;
-  question?: string;
-  tried?: string;
+  /** The person's question and "what I tried". */
+  question?: string; tried?: string;
   /** Every changed file when it was asked; the filter checks code against them. */
   files: DiffFile[];
   /** The files whose diff the guide sees: the step's, or the chat's one file; all when absent. */
@@ -65,9 +58,8 @@ export interface GuideRequest {
   /** When it was asked: the hint state's time. */
   at: string;
   selection?: { path: string; startLine: number; endLine: number };
-  file?: string;
-  history?: GuideEntry[];
-  findings?: ByHandReview["findings"];
+  /** A chat's file, its earlier turns, and the review's findings on it. */
+  file?: string; history?: GuideEntry[]; findings?: ByHandReview["findings"];
 }
 
 /** `path:line` or `path:line-endLine`, one per line. */
@@ -158,10 +150,7 @@ export async function storedGuideAnswer(run: GuideRun, request: GuideRequest, an
   return answerEntry(run, request, await filterGuideAnswer(turnFiles(run), output, change));
 }
 
-/**
- * One guide turn (DESIGN v1.2 F6, F7): a read-only isolated turn under the
- * guide's schema, then the stored answer. The caller records it.
- */
+/** One guide turn (DESIGN v1.2 F6, F7): read-only and isolated, under the guide's schema; the caller records it. */
 export async function runGuideTurn(ctx: WorkbenchContext, run: Run, request: GuideRequest, signal: AbortSignal) {
   const prompt = await guideTurnPrompt(run, request, currentLocale());
   const answer = await withSchemaFile(guideAnswerJsonSchema, (outputSchema) =>
@@ -234,9 +223,7 @@ function startGuideJob(ctx: WorkbenchContext, run: Run, request: GuideRequest) {
 /** The step a hint or a "My change" question is about: the one named, else the first open one. */
 function stepOf(run: Run, stepId: string | undefined) {
   const steps = run.byHand?.plan?.steps ?? [];
-  const step = stepId
-    ? steps.find((value) => value.id === stepId)
-    : steps.find((value) => !value.doneAt && !value.parkedAt);
+  const step = steps.find((value) => (stepId ? value.id === stepId : !value.doneAt && !value.parkedAt));
   if (!step) throw new AppError((m) => m.byHand.guide.pickStep, 409);
   return step;
 }
@@ -292,10 +279,8 @@ export async function guide(ctx: WorkbenchContext, id: string, input: ByHandGuid
       if (!attemptSince(state, tried) && !(rung === 4 && repeatFailure(tests)))
         throw new AppError((m) => m.byHand.attemptFirst, 409);
     }
-    const selection =
-      input.path && input.startLine
-        ? { path: input.path, startLine: input.startLine, endLine: Math.max(input.endLine ?? input.startLine, input.startLine) }
-        : undefined;
+    const { path, startLine } = input;
+    const selection = path && startLine ? { path, startLine, endLine: Math.max(input.endLine ?? startLine, startLine) } : undefined;
     startGuideJob(ctx, run, {
       kind,
       ...(rung !== undefined ? { rung } : {}),
@@ -330,11 +315,9 @@ export async function planQuestions(ctx: WorkbenchContext, id: string): Promise<
   });
 }
 
-/** Code fenced so no backtick run inside closes it. */
-const fenced = (text: string) => {
-  const fence = "`".repeat(Math.max(3, ...[...text.matchAll(/`+/g)].map(([run]) => run.length + 1)));
-  return `${fence}\n${text}\n${fence}`;
-};
+/** A run of at least `min` backticks, longer than any inside `text`, so none of them ends its code. */
+const ticks = (text: string, min: number) => "`".repeat(Math.max(min, ...[...text.matchAll(/`+/g)].map(([run]) => run.length + 1)));
+const fenced = (text: string) => `${ticks(text, 3)}\n${text}\n${ticks(text, 3)}`;
 
 /** A chat answer as the conversation stores it: the prose, the guide's question, BELL's quotes. */
 function chatText(entry: GuideEntry) {
@@ -382,17 +365,12 @@ export async function chat(ctx: WorkbenchContext, run: Run, filePath: string, qu
 async function verbatimQuote(files: ReturnType<typeof turnFiles>, quote: string, cited: string[], tail?: string) {
   const sources = await files.sources(cited);
   const text = quote.trim();
-  const known = [...Object.values(sources.base), ...Object.values(sources.worktree)].some((lines) =>
-    lines?.join("\n").includes(text),
-  );
-  return text && (known || tail?.includes(text)) ? text.slice(0, 300) : undefined;
+  const inFile = [...Object.values(sources.base), ...Object.values(sources.worktree)].some((lines) => lines?.join("\n").includes(text));
+  return text && (inFile || tail?.includes(text)) ? text.slice(0, 300) : undefined;
 }
 
-/** Inline code for a verbatim quote, with a backtick run longer than any inside it. */
-const inlineCode = (text: string) => {
-  const ticks = "`".repeat(Math.max(1, ...[...text.matchAll(/`+/g)].map(([run]) => run.length + 1)));
-  return `${ticks} ${text.replace(/\s*\n\s*/g, " ")} ${ticks}`;
-};
+/** Inline code for a verbatim quote. */
+const inlineCode = (text: string) => `${ticks(text, 1)} ${text.replace(/\s*\n\s*/g, " ")} ${ticks(text, 1)}`;
 
 /** The structured review as the Reports tab shows it (Markdown, the run's language). */
 export function reviewMarkdown(review: ByHandReview) {
@@ -474,13 +452,9 @@ export async function review(ctx: WorkbenchContext, run: Run, input: { leastSure
     const files = await readDiff(run);
     const turn = reviewInput(run, files, input.leastSure);
     const locale = currentLocale();
+    const [reviewerPrompt, testerPrompt] = [byHandReviewerPrompt(locale, turn.prompt), byHandTesterPrompt(locale, turn.prompt)];
     const reports = await withSchemaFile(reviewerAnswerJsonSchema, (reviewerSchema) =>
-      runIndependentReview(ctx, run, files, undefined, signal, {
-        reviewerPrompt: byHandReviewerPrompt(locale, turn.prompt),
-        testerPrompt: byHandTesterPrompt(locale, turn.prompt),
-        reviewerSchema,
-        isolated: true,
-      }),
+      runIndependentReview(ctx, run, files, undefined, signal, { reviewerPrompt, testerPrompt, reviewerSchema, isolated: true }),
     );
     const { review: stored, tester } = await storedReview(run, files, turn, reports);
     // Stored together, after every await: the help event first, as it refuses a kind outside the lock.
