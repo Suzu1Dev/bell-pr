@@ -444,6 +444,33 @@ test("Ready for review binds the current fingerprint; a stale one and an empty c
   assert.deepEqual(f.calls.filter((call) => !call.readonly), []);
 });
 
+test("another review of the same version needs a test run made since the last review", async (t) => {
+  const f = await fixture(t);
+  const run = await f.writing();
+  const version = await f.fingerprint(run);
+  t.after(() => byHandReviewInTests());
+  // W2B's review turn stores the review; this stand-in stores one the same way.
+  byHandReviewInTests(async (_ctx, reviewed) => {
+    const review = { at: new Date().toISOString(), changeFingerprint: version, verified: "The tests passed.", checked: ["The count"], findings: [] };
+    reviewed.byHand!.reviews = [...(reviewed.byHand!.reviews ?? []), review];
+  });
+  const testRun = (at: number) => ({ at: new Date(at).toISOString(), command: "npm test", changeFingerprint: version, outcome: "passed", ms: 5, reported: true as const });
+  // Tested, then reviewed.
+  run.byHand!.tests = [testRun(Date.now() - 60_000)];
+  await en(() => f.workbench.byHand.ready(run.id, { changeFingerprint: version, review: true }));
+  await f.waitFor(() => !f.ctx.byHandJobs.size);
+  assert.equal(run.byHand!.reviews?.length, 1);
+  // The test run the review already saw doesn't buy a second review of the same version.
+  const testFirst = refused(409, /^Run your tests on this version first; the tests are the judge\./);
+  await assert.rejects(en(() => f.workbench.byHand.ready(run.id, { changeFingerprint: version, review: true })), testFirst);
+  await assert.rejects(en(() => f.workbench.rerunReview(run.id)), testFirst);
+  // A test run after the review does.
+  run.byHand!.tests.push(testRun(Date.now() + 1000));
+  await en(() => f.workbench.byHand.ready(run.id, { changeFingerprint: version, review: true }));
+  await f.waitFor(() => !f.ctx.byHandJobs.size);
+  assert.equal(run.byHand!.reviews?.length, 2);
+});
+
 test("the review job runs the guide's review turn, owns its busy slot and log, and Stop ends it", async (t) => {
   const f = await fixture(t);
   const run = await f.writing();

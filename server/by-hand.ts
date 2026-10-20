@@ -318,9 +318,10 @@ export async function ready(
     const fingerprint = changeFingerprint(files);
     if (input.changeFingerprint !== fingerprint) throw refuse((m) => m.byHand.flow.changed);
     const record = (run.byHand ??= {});
-    // Tests are the judge: another review needs a test run (or a reported one) of this version.
-    if (input.review && record.reviews?.length && !record.tests?.some((test) => test.changeFingerprint === fingerprint))
-      throw refuse((m) => m.byHand.testFirst);
+    // Tests are the judge: another review needs a test run (or a reported one) of this version since the last review.
+    const since = Date.parse(record.reviews?.at(-1)?.at ?? "");
+    const tested = record.tests?.some((test) => test.changeFingerprint === fingerprint && !(Date.parse(test.at) <= since));
+    if (input.review && record.reviews?.length && !tested) throw refuse((m) => m.byHand.testFirst);
     if (record.ready) {
       const { at, changeFingerprint: version, review } = record.ready;
       record.readyHistory = [...(record.readyHistory ?? []), { at, changeFingerprint: version, review }].slice(-limits.readyHistory);
