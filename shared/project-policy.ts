@@ -157,6 +157,17 @@ function assistanceSpans(text: string): Span[] {
     .filter((span) => asWritten(text.slice(span.start, span.end)));
 }
 
+/** Models and AI named as such, as a rule names what it refuses: "AI", "LLMs", "generative AI tools". */
+const aiNoun = String.raw`(?:AI|LLMs?|large\s+language\s+models?|language\s+models?|chatbots?|generative\s+AI|gen[- ]?AI)(?:\s+(?:tools?|models?|assistants?))?`;
+
+/**
+ * Wordings of a refusal that name AI help in ways the assistance terms
+ * don't, such as "No LLMs for patches": the classifier's rules only, so
+ * the disclosure checks never read them. Each wording adds itself where
+ * it is defined.
+ */
+const refusalTerms: RegExp[] = [];
+
 /** Words that refuse something. */
 const prohibition = new RegExp(
   [
@@ -577,8 +588,11 @@ const gap = (a: Span, b: Span) => Math.max(0, b.start - a.end, a.start - b.end);
  * named for what it must not be used on is AI help too (DESIGN v1.2 F14,
  * Zig's README). The classifier's rules only; disclosure checks don't use it.
  */
-const noAiFor =
-  /\bno\s+(?:AI|LLMs?|large\s+language\s+models?|language\s+models?|chatbots?|generative\s+AI|gen[- ]?AI)(?:\s+(?:tools?|models?|assistants?))?\s+for\s+(?:patch(?:es)?|pull\s+requests?|PRs?|issues?|comments?|contributions?)\b/i;
+const noAiFor = new RegExp(
+  String.raw`\bno\s+${aiNoun}\s+for\s+(?:patch(?:es)?|pull\s+requests?|PRs?|issues?|comments?|contributions?)\b`,
+  "i",
+);
+refusalTerms.push(noAiFor);
 
 /**
  * Each rule phrase with the nearest AI-assistance term, when one is close
@@ -591,7 +605,7 @@ function nearAssistance(
   rule: RegExp,
   sentenceOf: (span: Span) => Span,
 ) {
-  const terms = [...assistanceSpans(text), ...allMatches(noAiFor, text)];
+  const terms = [...assistanceSpans(text), ...refusalTerms.flatMap((term) => allMatches(term, text))];
   const pairs: { phrase: Span; span: Span; term: Span }[] = [];
   for (const phrase of allMatches(rule, text)) {
     const sentence = sentenceOf(phrase);
