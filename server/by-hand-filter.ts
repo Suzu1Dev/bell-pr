@@ -9,6 +9,11 @@
  * parts, a backslash or a control character); a folder, a missing path
  * (`git show` would read one with *, ? or [ as a pattern and print
  * nothing), a binary file or a link out of the worktree has no lines.
+ * What the review holds back is never read either: a file at a sensitive
+ * path (`sensitivePath`, such as .env.local), a worktree path that is a
+ * link or goes through one (a tracked link to an ignored .env), and a
+ * worktree file holding a credential (`secretInPatch`), so no secret
+ * reaches the guide's thread, the stored run, a chat answer or an export.
  */
 import { readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
@@ -19,8 +24,10 @@ import {
   type FilterSources,
   type GuideOutput,
 } from "../shared/by-hand-filter.js";
+import { sensitivePath } from "./git.js";
 import { sm } from "./i18n/index.js";
 import { git } from "./process.js";
+import { secretInPatch } from "./secrets.js";
 import { AppError, type Run } from "./types.js";
 
 /** Files read for one answer. */
@@ -59,12 +66,13 @@ export function turnFiles(run: Pick<Run, "baseSha" | "worktreePath">) {
       // Only a file Git tracks or would track (untracked, not ignored): never .env, node_modules or build output.
       const listed = await git(run.worktreePath, ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", file]);
       if (!listed.stdout.split("\0").includes(file)) return undefined;
-      const root = await realpath(run.worktreePath);
-      const full = await realpath(path.join(root, file));
-      if (full !== root && !full.startsWith(`${root}${path.sep}`)) return undefined;
-      const info = await stat(full);
+      // Only a file at its own path: a link (or a linked folder) could lead to an ignored .env.
+      const own = path.join(await realpath(run.worktreePath), file);
+      if ((await realpath(own)) !== own) return undefined;
+      const info = await stat(own);
       if (!info.isFile() || info.size > maxFileBytes) return undefined;
-      return lines(await readFile(full, "utf8"));
+      const text = await readFile(own, "utf8");
+      return secretInPatch(text) ? undefined : lines(text);
     });
   return {
     /**
@@ -75,7 +83,7 @@ export function turnFiles(run: Pick<Run, "baseSha" | "worktreePath">) {
       files: readonly string[],
       extra: { diff?: string; protectedFiles?: readonly string[] } = {},
     ): Promise<FilterSources> {
-      const chosen = [...new Set(files)].filter(safePath).slice(0, maxFiles);
+      const chosen = [...new Set(files)].filter((file) => safePath(file) && !sensitivePath(file)).slice(0, maxFiles);
       const read = await Promise.all(
         chosen.map(async (file) => [file, await base(file), await worktree(file)] as const),
       );
