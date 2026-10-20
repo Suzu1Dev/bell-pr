@@ -84,6 +84,9 @@ const workspace = {
     turn: "Your turn",
     ready: "Ready for review",
     writeFirst: "Write a change first",
+    /** Code changes before the first change: the guide's first read, then the person's own plan (DESIGN v1.2 F3). */
+    reading: "The guide is reading the code",
+    planFirst: "Write your own plan in Agent activity first; then you write the change.",
     /** The footer while the PR title or description is empty: approval needs both, in the person's words (DESIGN v1.2 F11). */
     writePr: "Write the PR title and description first",
     reviewing: "The guide is reviewing",
