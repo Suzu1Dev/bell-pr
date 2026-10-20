@@ -46,7 +46,7 @@ export function recordLines(m: typeof en, fmt: Formatters, run: Run | undefined,
   const tests = run?.byHand?.tests ?? [];
   const runs = tests.filter((test) => !test.reported).length;
   return {
-    claim: clean?.clean ? `${m.claim} ${m.quotes}` : "",
+    claim: clean?.clean ? m.claimed({ claim: m.claim, quotes: m.quotes }) : "",
     lines: [
       ...(clean && !clean.clean ? [m.unclean({ reason: m.reasons[clean.reason] })] : []),
       ...(summary.removedAnswers ? [m.removed({ count: summary.removedAnswers })] : []),

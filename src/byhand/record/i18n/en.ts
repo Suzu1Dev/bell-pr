@@ -7,6 +7,7 @@ const en = {
   badge: "Learn by hand",
   claim: `${product.name}'s agents had no write access and gave you no code for this change.`,
   quotes: "The guide showed only quotes of the project's code and of your own edits.",
+  claimed: ({ claim, quotes }: { claim: string; quotes: string }) => `${claim} ${quotes}`,
   unclean: ({ reason }: { reason: string }) => `${product.name} makes no Learn-by-hand claim for this run: ${reason}.`,
   reasons: {
     "agent-writes": "an agent tried to change files",

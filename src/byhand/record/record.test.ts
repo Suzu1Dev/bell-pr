@@ -233,3 +233,11 @@ test("the test line counts one prediction in the singular", () => {
   const html = renderEn(createElement(ByHandRecord, { run: byHandRun({ tests }), place: "publish" }));
   assert.ok(html.includes("BELL PR ran your tests once; your first prediction after each change was right 1 of 1 time."));
 });
+
+test("the claim and the quote line read as one paragraph in each language's own spacing", () => {
+  const english = renderEn(createElement(ByHandRecord, { run: byHandRun(), place: "publish" }));
+  assert.ok(english.includes(`<p class="byhand-record-claim">${escape(en.claim)} ${escape(en.quotes)}</p>`));
+  const chinese = renderZh(createElement(ByHandRecord, { run: byHandRun(), place: "publish" }));
+  assert.ok(chinese.includes(`<p class="byhand-record-claim">${zhTW.claim}${zhTW.quotes}</p>`));
+  assert.doesNotMatch(chinese, /。 /);
+});

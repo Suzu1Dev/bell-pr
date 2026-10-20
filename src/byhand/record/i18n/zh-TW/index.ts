@@ -7,6 +7,7 @@ const m: Translation<typeof en> = {
   badge: "親手學",
   claim: `${product.name} 的 agent 沒有寫入權限，也沒有給你這份變更的任何程式碼。`,
   quotes: "嚮導只顯示專案程式碼和你自己修改內容的引文。",
+  claimed: ({ claim, quotes }) => `${claim}${quotes}`,
   unclean: ({ reason }) => `${product.name} 不為這個工作做親手學的聲明：${reason}。`,
   reasons: {
     "agent-writes": "有 agent 試圖修改檔案",
