@@ -137,7 +137,9 @@ export function countRemoved(run: Run, removed: number) {
 
 /**
  * The agent-named paths that are files or folders of the checkout: at base by `git cat-file` (`git show`
- * prints nothing for a missing path with *, ? or [), else in the worktree. Others are text, never paths.
+ * prints nothing for a missing path with *, ? or [), else in the worktree, where only a file Git tracks or
+ * would track (untracked, not ignored) counts, or a folder holding one, as turnFiles reads them: never
+ * .env, node_modules or build output. Others are text, never paths.
  */
 export async function checkoutPaths(run: Pick<Run, "baseSha" | "worktreePath">, paths: readonly string[]) {
   const found = new Map<string, "file" | "folder">();
@@ -145,10 +147,16 @@ export async function checkoutPaths(run: Pick<Run, "baseSha" | "worktreePath">, 
   if (!asked.length) return found;
   const input = asked.map((file) => `${run.baseSha}:${file}\n`).join("");
   const types = (await git(run.worktreePath, ["cat-file", "--batch-check=%(objecttype)"], { input })).stdout.split("\n");
+  const atBase = (index: number) => types[index] === "blob" || types[index] === "tree";
+  const rest = asked.filter((_, index) => !atBase(index));
+  const listed = rest.length
+    ? (await git(run.worktreePath, ["--literal-pathspecs", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...rest])).stdout.split("\0")
+    : [];
+  const tracked = (file: string) => listed.some((entry) => entry === file || entry.startsWith(file.endsWith("/") ? file : `${file}/`));
   const root = await realpath(run.worktreePath);
   for (const [index, file] of asked.entries()) {
-    if (types[index] === "blob" || types[index] === "tree") found.set(file, types[index] === "blob" ? "file" : "folder");
-    const full = found.has(file) ? "" : await realpath(path.join(root, file)).catch(() => "");
+    if (atBase(index)) found.set(file, types[index] === "blob" ? "file" : "folder");
+    const full = found.has(file) || !tracked(file) ? "" : await realpath(path.join(root, file)).catch(() => "");
     const info = full.startsWith(`${root}${path.sep}`) ? await stat(full).catch(() => undefined) : undefined;
     if (info?.isFile() || info?.isDirectory()) found.set(file, info.isFile() ? "file" : "folder");
   }
