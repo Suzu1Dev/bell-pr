@@ -16,8 +16,9 @@ import {
   type FilterSources,
   type GuideOutput,
 } from "../shared/by-hand-filter.js";
+import { sm } from "./i18n/index.js";
 import { git } from "./process.js";
-import type { Run } from "./types.js";
+import { AppError, type Run } from "./types.js";
 
 /** Files read for one answer. */
 const maxFiles = 10;
@@ -121,4 +122,46 @@ export async function filterStoredCode(
 ) {
   const sources = await files.sources([...(change.cited ?? []), ...change.changed]);
   return filterCodeField(value, sources);
+}
+
+/** No file: agent text checked on its own, so every invented name and code shape goes. */
+const noFiles: FilterSources = { base: {}, worktree: {} };
+
+/** A Learn-by-hand agent's text for the run log, the agent card or an error (DESIGN v1.2 F7): filtered against no file. */
+export const byHandLogText = (text: string) => filterAgentText(text, noFiles).value;
+
+/** Read tools whose plain arguments the run log may show as the agent ran them. */
+const readTool = /^(?:rg|grep|ls|cat|head|tail|wc|nl|find|tree|stat|file|sed -n|git (?:grep|log|show|diff|status|blame|ls-files))(?= |$)/;
+/** A flag, a word, a number or a path: never a quote, an operator, a glob or an escape. */
+const plainArgument = /^(?:-{1,2}[A-Za-z][\w-]*(?:=[\w./:,@-]+)?|[\w./:,@-]+)$/;
+
+/**
+ * A command a Learn-by-hand agent ran, as the run log shows it: as written
+ * when it is a known read tool with plain arguments the filter leaves
+ * alone, else undefined and the log only says that the guide ran a
+ * read-only command (a search pattern can spell the fix).
+ */
+export function byHandCommandLine(command: string | undefined) {
+  if (!command || !readTool.test(command) || !command.split(/\s+/).every((part) => plainArgument.test(part))) return undefined;
+  return filterAgentText(command, noFiles).removed ? undefined : command;
+}
+
+/**
+ * A Learn-by-hand agent turn's error (DESIGN v1.2 F7): a CLI that exited
+ * with an error is reported with the end of its stderr, filtered, never
+ * with its stdout, which holds the agent's own text; any other message and
+ * the stderr in its details are filtered too. The same error when nothing
+ * changes.
+ */
+export function byHandAgentError(error: unknown, executable?: string): unknown {
+  if (!(error instanceof Error)) return error;
+  const details = error instanceof AppError ? error.details : undefined;
+  const stderr = typeof details?.stderr === "string" ? details.stderr : undefined;
+  const exited = !!executable && error instanceof AppError && error.statusCode === 422 && !error.code && stderr !== undefined;
+  const output = byHandLogText((stderr || `exit ${String(details?.exitCode ?? "?")}`).slice(-1800));
+  const message = exited ? sm().run.command.failed({ executable: executable!, output }) : byHandLogText(error.message);
+  const filtered = stderr === undefined ? details : { ...details, stderr: byHandLogText(stderr) };
+  if (message === error.message && filtered?.stderr === stderr) return error;
+  if (!(error instanceof AppError)) return new Error(message);
+  return new AppError(message, error.statusCode, { code: error.code, params: error.params, fixes: error.fixes, details: filtered });
 }
