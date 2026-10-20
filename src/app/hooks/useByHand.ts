@@ -72,7 +72,8 @@ export function useByHand(
   }, [id]);
   /** A request of this run's; a refusal shows the server's message and rejects. */
   const call = (path: string, method = "POST", then?: () => void) => async (body?: unknown) => {
-    const from = path === "ready" ? path : path.startsWith("plan") ? "plan" : "guide";
+    // While the Ready dialog is open (modal), its own requests (Mark it ready, the Tests card) answer in it.
+    const from = path === "ready" || readyOpen ? "ready" : path.startsWith("plan") ? "plan" : "guide";
     setState({ busy: true, error: "", from });
     try {
       const result = await api<{ run?: Run }>(path.startsWith("/") ? path : `${runPath(id)}/by-hand/${path}`, send(method, body));
@@ -146,6 +147,12 @@ export function useByHand(
   }, [id, testing, setFiles]);
 
   const view = (from: string) => ({ busy: state.busy, error: state.from === from ? state.error : "" });
+  const tests = {
+    onConfirmTestCommand: (command: string) => call(`/repos/${encodeURIComponent(run.repoId)}/test-command`, "PUT")({ command }),
+    onRunTests: call("tests"),
+    onStopTests: call("tests/stop"),
+    onReportTests: call("tests/report"),
+  };
   return {
     /** The person writes: an LBH run in review whose change isn't the version marked ready. */
     writing: open && !ready,
@@ -172,14 +179,12 @@ export function useByHand(
       onGuide: call("guide", "POST", () => setSelection(undefined)),
       onStep: (stepId: string, input: object) => call(`steps/${encodeURIComponent(stepId)}`, "PATCH")(input),
       onCheckIn: call("check-ins"),
-      onConfirmTestCommand: (command: string) => call(`/repos/${encodeURIComponent(run.repoId)}/test-command`, "PUT")({ command }),
-      onRunTests: call("tests"),
-      onStopTests: call("tests/stop"),
-      onReportTests: call("tests/report"),
+      ...tests,
       onLeave: call("leave", "POST", handBack),
     },
     readyDialog: {
       ...view("ready"),
+      tests,
       onReady: call("ready", "POST", () => setReadyOpen(false)),
       // A rule about AI (a ban, disclosure, reserved area or one addressed to agents, or one whose words name AI) asks for care before an AI review.
       aiRules: (repo?.contributionRules?.findings ?? []).some((finding) => ["ban", "disclose", "area", "agent"].includes(finding.kind) || /\b(?:AI|LLMs?|GPT|Copilot)\b|artificial intelligence|language model/i.test(finding.quote)),

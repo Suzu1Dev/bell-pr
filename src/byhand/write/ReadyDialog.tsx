@@ -9,6 +9,7 @@ import { useFormat, useT } from "../../i18n";
 import { Modal } from "../../modals/Modal";
 import type { DiffFile, Run } from "../../types";
 import { focusAfterReady, useFocusHome } from "./focus";
+import { TestsCard } from "./TestsCard";
 import { ago, useWriteText } from "./text";
 import "./byhand.css";
 
@@ -21,12 +22,14 @@ export interface ReadyDialogProps {
   onReady(input: ByHandReadyInput): Promise<void>;
   /** The project's rules have an AI-related finding: one line before asking for a review. */
   aiRules?: boolean;
+  /** The Tests card's requests: at the ready version a second review waits for a test there, and the guide's panel isn't shown. */
+  tests?: Pick<Parameters<typeof TestsCard>[0], "onConfirmTestCommand" | "onRunTests" | "onStopTests" | "onReportTests">;
   busy?: boolean;
   /** The server's message for a refused request, shown as it is. */
   error?: string;
 }
 
-export function ReadyDialog({ run, files, open, onClose, onReady, aiRules = false, busy = false, error }: ReadyDialogProps) {
+export function ReadyDialog({ run, files, open, onClose, onReady, aiRules = false, tests, busy = false, error }: ReadyDialogProps) {
   const text = useWriteText();
   const t = text.ready;
   const cancel = useT("common").actions.cancel;
@@ -68,6 +71,7 @@ export function ReadyDialog({ run, files, open, onClose, onReady, aiRules = fals
                 <small>{testFirst ? t.testFirst : t.reviewText}</small>
               </span>
             </label>
+            {testFirst && tests && record.ready?.changeFingerprint === fingerprint && <TestsCard runId={run.id} record={record} busy={busy} {...tests} />}
             {aiRules && <p className="by-hand-note">{t.aiRules}</p>}
             {asked && <p className="field-help">{t.cost}</p>}
           </>

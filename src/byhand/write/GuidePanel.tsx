@@ -68,19 +68,15 @@ export function GuidePanel(props: GuidePanelProps) {
   const steps = record.plan?.steps ?? [];
   const step = steps.find((item) => !item.doneAt && !item.parkedAt);
   const lock = record.helpLock;
-  // Read here: the test command, and the stored rules for the case of a run that won't publish there.
-  const [read, setRead] = useState<{ rules?: ContributionRules; command?: TestCommandView }>({});
-  const runPath = `/runs/${encodeURIComponent(run.id)}/by-hand`;
+  // Read here: the stored rules for the case of a run that won't publish there (the Tests card reads the test command).
+  const [rules, setRules] = useState<ContributionRules>();
   useEffect(() => {
     let live = true;
-    const keep = (value: typeof read) => live && setRead((current) => ({ ...current, ...value }));
-    api<TestCommandView>(`${runPath}/test-command`).then((command) => keep({ command }), quiet);
-    api<unknown>(`/repos/${encodeURIComponent(run.repoId)}/contribution-rules`).then((body) => keep({ rules: rulesFrom(body) }), quiet);
+    api<unknown>(`/repos/${encodeURIComponent(run.repoId)}/contribution-rules`).then((body) => live && setRules(rulesFrom(body)), quiet);
     return () => void (live = false);
-  }, [runPath, run.repoId]);
-  const testCommand = props.testCommand ?? read.command;
+  }, [run.repoId]);
   const learningIssue = (run.contributionFacts?.issue?.labels ?? []).some(learningLabel);
-  const rulesCase = props.rulesCase ?? (read.rules && byHandRulesCase(read.rules, { learningIssue, now: new Date().toISOString() }));
+  const rulesCase = props.rulesCase ?? (rules && byHandRulesCase(rules, { learningIssue, now: new Date().toISOString() }));
   const fingerprint = changeFingerprint(files.map(({ path, fingerprint }) => ({ path, fingerprint: fingerprint ?? "" })));
   const clean = byHandClean(run);
   // A run with every kind of help where it could have been fitted won't publish there either.
@@ -221,9 +217,8 @@ export function GuidePanel(props: GuidePanelProps) {
       {(error || typeof ended === "string") && <p className="inline-error" role="alert">{error || t.failed({ reason: typeof ended === "string" ? ended : "" })}</p>}
       <GuideExits runId={run.id} step={step} tests={record.tests ?? []} fingerprint={fingerprint} issueUrl={props.issueUrl}
         channels={props.channels} onStep={onStep} onCheckIn={props.onCheckIn} onLeave={props.onLeave} busy={working} />
-      <TestsCard runId={run.id} record={record} testCommand={testCommand} onRunTests={props.onRunTests} onReportTests={props.onReportTests} onStopTests={props.onStopTests}
-        onConfirmTestCommand={(command) => props.onConfirmTestCommand(command).then(() => setRead((current) => ({ ...current, command: { suggestion: testCommand?.suggestion ?? "", confirmed: { command, confirmedAt: new Date().toISOString() } } })))}
-        onExplain={() => send({ kind: "test" })} busy={working} />
+      <TestsCard runId={run.id} record={record} testCommand={props.testCommand} onRunTests={props.onRunTests} onReportTests={props.onReportTests} onStopTests={props.onStopTests}
+        onConfirmTestCommand={props.onConfirmTestCommand} onExplain={() => send({ kind: "test" })} busy={working} />
       <GuideThread entries={record.thread ?? []} steps={steps} onStep={onStep} busy={working} />
       <p className="field-help">{t.wrong}</p>
     </div>

@@ -9,7 +9,8 @@
 import { execFileSync } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { expect, test, type Browser } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test, type Browser, type Page } from "@playwright/test";
 import { changeFingerprint } from "../shared/change-fingerprint";
 import { readDiff } from "../server/git";
 import byHandText from "../src/byhand/write/i18n/en";
@@ -172,6 +173,15 @@ test.afterAll(async () => {
   await server?.stop();
 });
 
+/** No serious or critical axe issue, color contrast included, within `selector`. */
+async function expectAccessible(page: Page, selector: string) {
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForTimeout(300);
+  const results = await new AxeBuilder({ page }).options({ rules: { "color-contrast": { enabled: true } } }).include(selector).analyze();
+  const serious = results.violations.filter((violation) => violation.impact === "serious" || violation.impact === "critical");
+  expect(serious.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(" ")).join(", ")}`)).toEqual([]);
+}
+
 async function open(browser: Browser, hash: string) {
   const context = await browser.newContext({
     baseURL: server.baseURL,
@@ -253,6 +263,34 @@ test("the same failure three times is checked in once per step and failing run, 
     await expect(guide).toContainText(t.talk.repeat);
     await page.waitForTimeout(1500);
     expect(posts).toHaveLength(1);
+  } finally {
+    await close();
+  }
+});
+
+test("at the ready version, Run the review again offers the Tests card, so a test result enables the second review", async ({ browser }) => {
+  const { page, close } = await open(browser, `#/runs/${runs.ready}/changes?file=${encodeURIComponent(source)}`);
+  try {
+    const { run } = await (await page.request.get(`/api/runs/${runs.ready}`)).json();
+    const reported = { at: "2099-01-01T00:00:00.000Z", command: "npm test", changeFingerprint: run.byHand.ready.changeFingerprint, outcome: "passed", ms: 0, reported: true };
+    await page.route(`**/api/runs/${runs.ready}/by-hand/tests/report`, (route) =>
+      route.fulfill({ json: { run: { ...run, byHand: { ...run.byHand, tests: [...run.byHand.tests, reported] } } } }),
+    );
+    await page.getByRole("tab", { name: "Reviews" }).click();
+    await page.getByRole("button", { name: "Run the review again" }).click();
+    const dialog = page.getByRole("dialog", { name: t.ready.title });
+    const review = dialog.getByRole("checkbox", { name: new RegExp(t.ready.review) });
+    await expect(review).toBeDisabled();
+    await expect(dialog).toContainText(t.ready.testFirst);
+    // The way out is right here: the Tests card, with Record my result for a run in the person's own terminal.
+    const tests = dialog.getByRole("region", { name: t.tests.title });
+    await expect(tests).toBeVisible();
+    await expectAccessible(page, "[role=dialog]");
+    await tests.getByText(t.live.record).click();
+    await tests.getByRole("radio", { name: t.live.passed }).check();
+    await tests.getByRole("button", { name: "Save" }).click();
+    await expect(review).toBeEnabled();
+    await expect(review).toBeChecked();
   } finally {
     await close();
   }
