@@ -219,6 +219,17 @@ const maintainerPermission = new RegExp(
   flags,
 );
 
+/**
+ * A refusal whose object is a trailer, a co-author listing or co-signing
+ * ("… co-signing commits using an AI tool, or using the `assisted-by`,
+ * `co-developed` or similar commit trailer is not allowed"): a rule about
+ * how AI help is credited, which the person weighs, not a ban of the help
+ * (DESIGN v1.2 F14, Kubernetes). Only words between the AI term and the
+ * refusal count, so "AI-generated code is not accepted; …trailer…" stays a
+ * ban.
+ */
+const creditObject = /\b(?:trailer|co-?author\w*|co-?sign\w*|Co-authored-by|Assisted-by|Generated-by)\b/i;
+
 /** What a rule restricts when it is about talking to people rather than the change. */
 const conversation = new RegExp(
   String.raw`\b(?:descriptions?|comments?|messages?|repl(?:y|ies)|respon(?:d|ds|ding|ses?)|discussions?|conversations?|communicat\w*)\b`,
@@ -591,6 +602,9 @@ export function classifyPolicy(path: string, text: string): PolicyFinding[] {
       // "Do not use AI to generate substantial pieces of code": how much is
       // too much is the person's call.
       const sized = sizeQualifier.test(words);
+      // "Listing AI tooling as a co-author … is not allowed": how AI help
+      // is credited, not whether it may help.
+      const credited = creditObject.test(search.slice(span.start, span.end));
       // A long sentence about good first issues that refuses AI-generated
       // pull requests at its end still reserves the learning issues.
       if (learningIssues.test(words)) add("area", block, search, span);
@@ -604,7 +618,7 @@ export function classifyPolicy(path: string, text: string): PolicyFinding[] {
           block,
           search,
           span,
-          permitted || conditional || aboutConversation || sized,
+          permitted || conditional || aboutConversation || sized || credited,
         );
     }
     for (const match of allMatches(addressedToAgents, search))

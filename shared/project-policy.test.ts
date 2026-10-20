@@ -120,6 +120,21 @@ test("a refusal with a condition the contributor meets is ambiguous, never a blo
   );
 });
 
+test("a refusal of AI as a co-author, a co-signer or a trailer is a rule the person weighs, not a ban", () => {
+  // Kubernetes contributors/guide/pull-requests.md (plan research/policies.md).
+  const kubernetes =
+    "Listing AI tooling as a co-author, co-signing commits using an AI tool, or using the `assisted-by`, `co-developed` or similar commit trailer is not allowed.";
+  assert.deepEqual(kinds("CONTRIBUTING.md", kubernetes), [["ban", false]]);
+  assert.deepEqual(kinds("CONTRIBUTING.md", "Using AI tools to write a commit trailer is not allowed."), [["ban", false]]);
+  // A ban of AI-generated code stays a ban, also next to a rule about trailers.
+  for (const text of [
+    "AI-generated code is not accepted; do not add a Co-authored-by trailer for the AI either.",
+    "Do not submit AI-generated code or add a Co-authored-by trailer.",
+    "We do not accept pull requests that contain AI-generated code.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [["ban", true]], text);
+});
+
 test("a rule about the description or comments is not a ban of AI-assisted changes", () => {
   for (const text of [
     "The PR description and comments must be written by the contributor, with no AI assistance beyond grammar or English translations.",

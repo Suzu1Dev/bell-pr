@@ -64,6 +64,19 @@ const realExpectations: Record<string, readonly (readonly [string, boolean?])[]>
   ],
   // A real ban, under a reStructuredText "~~~" heading.
   "qemu-code-provenance.rst": [["ban", true]],
+  // AI help is fine with disclosure; listing AI as a co-author or in a
+  // trailer is a rule about credit, which the person weighs. "[Large AI
+  // generated] PRs and AI generated commit messages are not allowed." and
+  // "Do not leave the first review of AI generated changes to the
+  // reviewers." still read as bans.
+  "kubernetes-pull-requests.md": [
+    ["disclose"],
+    ["ban", false],
+    ["ban", true],
+    ["ban", true],
+    ["ban", false],
+    ["understand"],
+  ],
   "godot-CONTRIBUTING.md": [["agent"]],
   "godot-PULL_REQUEST_TEMPLATE.md": [["disclose"]],
   // "substantial pieces of code" and "if you do not have the knowledge" are
@@ -102,6 +115,7 @@ test("real projects' policies yield the expected kinds, quoted verbatim, and con
  * each classifier fix can add or drop its own (DESIGN v1.2 F14).
  */
 const blocksAgentRuns = [
+  "kubernetes-pull-requests.md",
   "gentoo-ai-policy.txt",
   "netbsd-commit-guidelines.txt",
   "qemu-code-provenance.rst",
@@ -227,6 +241,8 @@ test("each policy fixture yields exactly its findings, read locally at the commi
   const expected: Record<string, (readonly [string, string, number, boolean])[]> = {
     // A root AI_POLICY.md that refuses AI-generated code; the README is not a rules file.
     "ai-policy-ban": [["ban", "AI_POLICY.md", 5, true]],
+    // A ban of AI-generated code stays a ban next to a rule about trailers.
+    "trailer-ban": [["ban", "CONTRIBUTING.md", 3, true]],
     // CONTRIBUTE.md, reached by name and by the link from CONTRIBUTING, and
     // a linked page that no name rule would find.
     "contribute-link": [

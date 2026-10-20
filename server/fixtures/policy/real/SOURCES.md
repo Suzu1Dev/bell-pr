@@ -16,6 +16,7 @@ contribution rules) are quoted as their text, without markup.
 | `llvm-AIToolPolicy.md` | https://github.com/llvm/llvm-project/blob/main/llvm/docs/AIToolPolicy.md (lines 1-62) |
 | `ghostty-AI_POLICY.md` | https://github.com/ghostty-org/ghostty/blob/main/AI_POLICY.md (lines 1-35) |
 | `qemu-code-provenance.rst` | https://gitlab.com/qemu-project/qemu/-/blob/master/docs/devel/code-provenance.rst (lines 288-300) |
+| `kubernetes-pull-requests.md` | https://github.com/kubernetes/community/blob/master/contributors/guide/pull-requests.md (section "AI Guidance", lines 626-646; fetched read-only 2026-10-20, matching the quotes BELL's policy research checked on 2026-10-19; trailing spaces removed) |
 | `godot-CONTRIBUTING.md` | https://github.com/godotengine/godot/blob/master/CONTRIBUTING.md (lines 1-14) |
 | `godot-PULL_REQUEST_TEMPLATE.md` | https://github.com/godotengine/godot/blob/master/.github/PULL_REQUEST_TEMPLATE.md |
 | `godot-contribution-rules.md` | https://contributing.godotengine.org/en/latest/development/contribution_rules.html ("For contributors") |

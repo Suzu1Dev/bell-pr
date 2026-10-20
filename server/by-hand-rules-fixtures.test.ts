@@ -151,6 +151,35 @@ test("NetBSD (output, no carve-out): blocked because the text says no use of AI 
   assert.ok(message(result.lbhChecks, "ai-ban").endsWith(`and ${clause("no-carve-out")}.`));
 });
 
+test("Kubernetes' trailer rule is no AI ban for either run: a project-rules confirm", async () => {
+  // The section's first two paragraphs (lines 626-633): disclosure, and the trailer rule.
+  const section = await readFile(path.join(fixtures, "real/kubernetes-pull-requests.md"), "utf8");
+  const trailer = section.split("\n").slice(0, 8).join("\n");
+  const rules: ContributionRules = {
+    checkedAt: readAt,
+    findings: policyFindings([{ path: "contributors/guide/pull-requests.md", kind: "contributing", content: trailer }]),
+    filesRead: ["contributors/guide/pull-requests.md"],
+  };
+  for (const helps of [[], ["explain", "answer"]] as HelpKind[][]) {
+    const result = row(rules, helps);
+    assert.equal(result.case, "none");
+    // The disclosure rule stands until the description says how AI helped.
+    assert.deepEqual(result.lbh, ["ai-disclosure:block", "project-rules:confirm"]);
+    assert.deepEqual(result.agent, ["ai-disclosure:block", "project-rules:confirm"]);
+  }
+  // The whole section still blocks: two other sentences read as bans
+  // (lines 638 and 640), outside the approved fixes.
+  const whole = row(await readRules([["contributors/guide/pull-requests.md", "real/kubernetes-pull-requests.md"]]), ["explain", "answer"]);
+  assert.deepEqual(whole.agent.filter((id) => id.endsWith(":block")), ["ai-ban:block", "ai-disclosure:block"]);
+  assert.deepEqual(
+    whole.lbhChecks.find((check) => check.id === "ai-ban")!.details.slice(1),
+    [
+      'contributors/guide/pull-requests.md:638: "[Large AI generated](#large-or-automatic-edits) PRs and AI generated commit messages are not allowed."',
+      'contributors/guide/pull-requests.md:640: "Do not leave the first review of AI generated changes to the reviewers."',
+    ].map((line) => line.replace(/:(\d+):/, (_, at) => `:${Number(at) - 625}:`)),
+  );
+});
+
 const qemuRules = () => readRules([[qemuPath, "real/qemu-code-provenance.rst"]]);
 
 test("QEMU (in-repo carve-out): the quoted confirm only when every help used is named", async () => {
