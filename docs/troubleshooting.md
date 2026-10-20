@@ -639,9 +639,10 @@ rule covers:
 | its rules changed since this run started | The quotes this run was fitted to are no longer in the project's rules. Check the rules again; if they changed for good, start a new fitted run. |
 | another of its AI rules applies | This rule could lead to the confirm, but another AI rule of the project blocks; its own block says why. |
 
-A run whose history isn't clean (BELL PR saw an agent write to its files,
-or a teammate, a team task, an AI follow-up round or an agent conflict
-resolution joined it) gets the agent run's checks and words. See
+A run whose history isn't clean (BELL PR saw a file change from an agent
+or a shell command from Claude Code, or a teammate, a team task, an AI
+follow-up round or an agent conflict resolution joined it) gets the agent
+run's checks and words. See
 [Contributing
 responsibly](contributing-responsibly.md#when-the-projects-own-text-says-some-uses-of-ai-are-fine)
 for every condition of the quoted confirm.

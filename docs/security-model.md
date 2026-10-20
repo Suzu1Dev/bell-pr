@@ -179,7 +179,8 @@ three ways:
 - **The canary.** While a turn runs, BELL PR watches the events the CLI
   reports. A file change from either CLI, or a shell command from Claude
   Code (whose read-only turns have no shell), stops the turn: "BELL PR
-  stopped an agent that tried to change files in a Learn-by-hand run."
+  stopped an agent that ran a shell command or changed a file in a
+  Learn-by-hand run."
   Codex runs its read commands inside its read-only sandbox, so a Codex
   command is not counted. Codex reports a patch even when its sandbox
   refused it, and that counts too, so the canary errs toward withdrawing
@@ -189,10 +190,11 @@ three ways:
 - **The clean-run check.** The claim in the run's record, "BELL PR's
   agents had no write access and gave you no code for this change.",
   comes from the run's own history, not from the build that shows it: no
-  agent write the canary saw, no agent besides the guide, the reviewer
-  and the test analyst, no team tasks, no AI follow-up round and no agent
-  conflict resolution. When any of them happened, for example because an
-  older version of BELL PR opened the run (see
+  file change or shell command that the canary counted, no agent besides
+  the guide, the reviewer and the test analyst, no team tasks, no AI
+  follow-up round and no agent conflict resolution. When any of them
+  happened, for example because an older version of BELL PR opened the
+  run (see
   [Upgrading](upgrading.md#learn-by-hand-runs-and-older-versions)), the
   record says why it makes no claim.
 

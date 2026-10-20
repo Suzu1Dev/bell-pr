@@ -196,9 +196,9 @@ learning without AI tools.
 The publish dialog shows the run's record: the kinds of help you used and
 how often, BELL PR's runs of your tests and your predictions, and how many
 answers BELL PR removed code from. When the run's history is clean (BELL
-PR saw no agent write to its files, and no teammate, team task, AI
-follow-up round or agent conflict resolution ever joined the run), the
-record says:
+PR saw no file change from an agent and no shell command from Claude
+Code, and no teammate, team task, AI follow-up round or agent conflict
+resolution ever joined the run), the record says:
 
 > BELL PR's agents had no write access and gave you no code for this
 > change. The guide showed only quotes of the project's code and of your
