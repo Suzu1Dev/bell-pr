@@ -22,6 +22,7 @@ import { GuideExits } from "./GuideExits";
 import { GuideThread } from "./GuideThread";
 import { TestsCard } from "./TestsCard";
 import { RepeatFailure, TalkItThrough } from "./TalkItThrough";
+import { useTestCommand } from "./testCommand";
 import { useWriteText } from "./text";
 import "./byhand.css";
 
@@ -68,7 +69,8 @@ export function GuidePanel(props: GuidePanelProps) {
   const steps = record.plan?.steps ?? [];
   const step = steps.find((item) => !item.doneAt && !item.parkedAt);
   const lock = record.helpLock;
-  // Read here: the stored rules for the case of a run that won't publish there (the Tests card reads the test command).
+  // Read here: the test command, and the stored rules for the case of a run that won't publish there.
+  const tests = useTestCommand(run.id, props.onConfirmTestCommand);
   const [rules, setRules] = useState<ContributionRules>();
   useEffect(() => {
     let live = true;
@@ -217,8 +219,8 @@ export function GuidePanel(props: GuidePanelProps) {
       {(error || typeof ended === "string") && <p className="inline-error" role="alert">{error || t.failed({ reason: typeof ended === "string" ? ended : "" })}</p>}
       <GuideExits runId={run.id} step={step} tests={record.tests ?? []} fingerprint={fingerprint} issueUrl={props.issueUrl}
         channels={props.channels} onStep={onStep} onCheckIn={props.onCheckIn} onLeave={props.onLeave} busy={working} />
-      <TestsCard runId={run.id} record={record} testCommand={props.testCommand} onRunTests={props.onRunTests} onReportTests={props.onReportTests} onStopTests={props.onStopTests}
-        onConfirmTestCommand={props.onConfirmTestCommand} onExplain={() => send({ kind: "test" })} busy={working} />
+      <TestsCard runId={run.id} record={record} testCommand={props.testCommand ?? tests.testCommand} onRunTests={props.onRunTests} onReportTests={props.onReportTests} onStopTests={props.onStopTests}
+        onConfirmTestCommand={tests.onConfirmTestCommand} onExplain={() => send({ kind: "test" })} busy={working} />
       <GuideThread entries={record.thread ?? []} steps={steps} onStep={onStep} busy={working} />
       <p className="field-help">{t.wrong}</p>
     </div>

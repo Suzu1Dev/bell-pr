@@ -268,13 +268,17 @@ test("the same failure three times is checked in once per step and failing run, 
   }
 });
 
-test("at the ready version, Run the review again offers the Tests card, so a test result enables the second review", async ({ browser }) => {
+test("at the ready version, Run the review again offers the Tests card, so a test run enables the second review", async ({ browser }) => {
   const { page, close } = await open(browser, `#/runs/${runs.ready}/changes?file=${encodeURIComponent(source)}`);
   try {
     const { run } = await (await page.request.get(`/api/runs/${runs.ready}`)).json();
-    const reported = { at: "2099-01-01T00:00:00.000Z", command: "npm test", changeFingerprint: run.byHand.ready.changeFingerprint, outcome: "passed", ms: 0, reported: true };
-    await page.route(`**/api/runs/${runs.ready}/by-hand/tests/report`, (route) =>
-      route.fulfill({ json: { run: { ...run, byHand: { ...run.byHand, tests: [...run.byHand.tests, reported] } } } }),
+    // The tests route as W2C answers it, once the run ended: a pass at this version (the card's other way, Record my result, is cut K3's).
+    const passed = { at: "2099-01-01T00:00:00.000Z", command: "npm test", changeFingerprint: run.byHand.ready.changeFingerprint, outcome: "passed", exitCode: 0, ms: 900 };
+    await page.route(`**/api/runs/${runs.ready}/by-hand/test-command`, (route) =>
+      route.fulfill({ json: { suggestion: "npm test", confirmed: { command: "npm test", confirmedAt: at } } }),
+    );
+    await page.route(`**/api/runs/${runs.ready}/by-hand/tests`, (route) =>
+      route.fulfill({ json: { run: { ...run, byHand: { ...run.byHand, tests: [...run.byHand.tests, passed] } } } }),
     );
     await page.getByRole("tab", { name: "Reviews" }).click();
     await page.getByRole("button", { name: "Run the review again" }).click();
@@ -282,13 +286,11 @@ test("at the ready version, Run the review again offers the Tests card, so a tes
     const review = dialog.getByRole("checkbox", { name: new RegExp(t.ready.review) });
     await expect(review).toBeDisabled();
     await expect(dialog).toContainText(t.ready.testFirst);
-    // The way out is right here: the Tests card, with Record my result for a run in the person's own terminal.
+    // The way out is right here: the Tests card, with the confirmed command.
     const tests = dialog.getByRole("region", { name: t.tests.title });
-    await expect(tests).toBeVisible();
+    await expect(tests.locator("strong", { hasText: t.tests.confirmed({ command: "npm test" }) })).toBeVisible();
     await expectAccessible(page, "[role=dialog]");
-    await tests.getByText(t.live.record).click();
-    await tests.getByRole("radio", { name: t.live.passed }).check();
-    await tests.getByRole("button", { name: "Save" }).click();
+    await tests.getByRole("button", { name: t.tests.run }).click();
     await expect(review).toBeEnabled();
     await expect(review).toBeChecked();
   } finally {

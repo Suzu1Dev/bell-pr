@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CircleStop, FlaskConical, Loader2, Play } from "lucide-react";
 import {
   helpAllowed,
@@ -9,7 +9,6 @@ import {
   type TestCommandView,
   type TestPrediction,
 } from "../../../shared/by-hand";
-import { api } from "../../api";
 import { useFormat } from "../../i18n";
 import { ago, useWriteText } from "./text";
 import { LiveTail, RecordResult } from "./TestsLive";
@@ -18,11 +17,19 @@ import { LiveTail, RecordResult } from "./TestsLive";
  * The Tests card (DESIGN v1.2 F9): BELL suggests a command, the person
  * edits and confirms it in a request of its own, predicts, then runs it.
  * Never automatic. The result says what was predicted, names new files
- * the run wrote, and keeps the output folded. The command is read here
- * unless given, so the card works in the guide's panel and in the Ready
- * dialog alike.
+ * the run wrote, and keeps the output folded.
  */
-export function TestsCard({ runId, record, testCommand: given, onConfirmTestCommand, onRunTests, onStopTests, onReportTests, onExplain, busy }: {
+export function TestsCard({
+  runId,
+  record,
+  testCommand,
+  onConfirmTestCommand,
+  onRunTests,
+  onStopTests,
+  onReportTests,
+  onExplain,
+  busy,
+}: {
   runId: string;
   record: ByHandRecord;
   testCommand?: TestCommandView;
@@ -37,9 +44,6 @@ export function TestsCard({ runId, record, testCommand: given, onConfirmTestComm
 }) {
   const t = useWriteText().tests;
   const fmt = useFormat();
-  const [read, setRead] = useState<TestCommandView>();
-  useEffect(() => void (given || api<TestCommandView>(`/runs/${encodeURIComponent(runId)}/by-hand/test-command`).then(setRead, () => undefined)), [runId, given]);
-  const testCommand = read ?? given;
   const confirmed = testCommand?.confirmed?.command;
   const [command, setCommand] = useState<string>();
   const shown = command ?? confirmed ?? testCommand?.suggestion ?? "";
@@ -57,7 +61,7 @@ export function TestsCard({ runId, record, testCommand: given, onConfirmTestComm
       <div className="by-hand-row">
         <input id="by-hand-command" className="text-input" maxLength={300} placeholder={t.none} value={shown} onChange={(event) => setCommand(event.target.value)} />
         <button type="button" className="button secondary" disabled={busy || !shown.trim() || shown.trim() === confirmed}
-          onClick={() => void onConfirmTestCommand(shown.trim()).then(() => (setCommand(undefined), setRead({ suggestion: testCommand?.suggestion ?? "", confirmed: { command: shown.trim(), confirmedAt: new Date().toISOString() } })), () => undefined)}>{t.use}</button>
+          onClick={() => void onConfirmTestCommand(shown.trim()).then(() => setCommand(undefined), () => undefined)}>{t.use}</button>
       </div>
       {confirmed && <p><strong>{t.confirmed({ command: confirmed })}</strong></p>}
       {confirmed && edited && <p className="field-help">{t.edited}</p>}
