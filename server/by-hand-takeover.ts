@@ -8,14 +8,14 @@
  * field or value), which never changes `byHandClean` or the help record.
  * BELL takes the commits over; it doesn't check or review them.
  *
- * Nothing happens unless the checkout is clean and its HEAD is past the
- * last pushed commit. BELL adopts only when that HEAD builds on the last
- * push and is exactly the PR branch's head on GitHub (the person pushed),
- * so its reset to the fetched head moves nothing. It never resets local
- * commits away: unpushed commits, a branch that moved on without them, a
- * dirty checkout or rewritten history leave everything as it is, with a
- * notice on the feedback read, or a refusal before a sync. Agent runs are
- * never touched.
+ * Nothing happens unless the run's folder is still there, clean, and its
+ * HEAD is past the last pushed commit. BELL adopts only when that HEAD
+ * builds on the last push and is exactly the PR branch's head on GitHub
+ * (the person pushed), so its reset to the fetched head moves nothing. It
+ * never resets local commits away: unpushed commits, a branch that moved
+ * on without them, a dirty checkout or rewritten history leave everything
+ * as it is, with a notice on the feedback read, or a refusal before a
+ * sync. Agent runs are never touched.
  */
 import { activeFollowUp } from "../shared/followups.js";
 import { sm } from "./i18n/index.js";
@@ -37,7 +37,7 @@ async function contains(run: Run, ancestor: string, commit: string) {
 
 /** Looks at the run's checkout and GitHub's PR branch, and adopts only what the person pushed. */
 async function takeOver(ctx: WorkbenchContext, run: Run): Promise<TakeoverOutcome> {
-  if (!run.learnByHand || run.status !== "published" || run.publishing) return "none";
+  if (!run.learnByHand || run.status !== "published" || run.publishing || run.workspaceRemovedAt) return "none";
   if (!run.publishCommit || !run.headRepository || activeFollowUp(run.followUps)) return "none";
   const head = (await git(run.worktreePath, ["rev-parse", "HEAD"])).stdout.trim();
   if (head === run.publishCommit) return "none";

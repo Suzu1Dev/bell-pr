@@ -270,6 +270,18 @@ test("history rewritten with a force push is refused and moves nothing", async (
   assert.equal(f.run.followUps, undefined);
 });
 
+test("a run whose folder was removed reads its feedback as before, with no takeover and no notice", async (t) => {
+  const f = await published(t);
+  await git(f.repo.path, ["worktree", "remove", "--force", f.run.worktreePath]);
+  f.run.workspaceRemovedAt = new Date().toISOString();
+  const logged = f.run.logs.length;
+  await en(() => f.workbench.fetchPrFeedback(f.run.id));
+  assert.ok(f.run.prFeedback?.fetchedAt);
+  // Only the feedback read's own line.
+  assert.equal(f.run.logs.length, logged + 1);
+  assert.equal(f.run.followUps, undefined);
+});
+
 test("an agent run's checkout is never taken over: the feedback read and the sync behave as before", async (t) => {
   const f = await published(t, { agent: true });
   const pushedByBell = f.run.publishCommit!;
