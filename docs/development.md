@@ -242,7 +242,7 @@ node scripts/eval-guide.mjs --score <review-sheet.md> [--baseline <last accepted
   turn, before and after BELL PR's filter) and `review-sheet.md` (the
   items a person rates) to `--out`, a new temporary directory by default.
   The model calls count against your own CLI accounts. Without `--real`
-  the script calls no CLI and refuses to run.
+  the script calls no CLI.
 - A person rates the sheet; `--score` then prints pass or fail for each
   threshold, compared with the last accepted sheet when you give one with
   `--baseline`. It exits with 0 when every threshold passes, 1 when one
