@@ -196,6 +196,8 @@ const prohibition = new RegExp(
     String.raw`\bnot\s+(?:be\s+)?(?:accepted|allowed|permitted|welcome|tolerated|merged|committed|included|reviewed|considered)\b`,
     humanOnly,
     String.raw`\b(?:prohibited|forbidden|forbids?|banned|disallowed|unacceptable|declined?)\b`,
+    // "Please refrain from using AI tools …"
+    String.raw`\brefrain\s+from\s+(?:\w+\s+)?(?:us(?:e|ing)|submitt?ing|contributing|includ(?:e|ing)|posting|pasting|sending|relying)\b`,
     String.raw`\bno\s+(?:AI|LLM|machine)[\w-]*`,
     String.raw`\b(?:will|shall|may)\s+be\s+(?:closed|rejected|refused|declined)\b`,
     // "must be written without any help from AI tools" (the AI after "without" is its help)
@@ -375,6 +377,19 @@ const changeObject = new RegExp(
   String.raw`\b(?:code(?!\s+of\s+conduct)|patch(?:es|sets?)?|contributions?|implementations?|diffs?|commits?(?!\s+messages?))\b|(?<!\b(?:on|in|to|under|for)\s+(?:your|the|a|their|each|every|this)\s+)\b(?:PRs?|pull[- ]requests?|merge\s+requests?)\b(?!\s+(?:descriptions?|titles?|bod(?:y|ies)|text|comments?|messages?|templates?|reviews?))`,
   flags,
 );
+/**
+ * Using AI, refused said other ways: "Using AI is not permitted", "The
+ * use of AI is forbidden", "code written with the help of AI"; never "If
+ * use of AI is suspected" or "Using AI for ranking is not supported".
+ */
+const useRefused = new RegExp(
+  [
+    String.raw`(?:^|(?<=[^\w\s]\s*)|(?<=\b(?:the|any|all)\s+))(?:using|use\s+of|usage\s+of)\s+(?:any\s+)?(?:generative\s+)?(?:AI|LLMs?)(?:\s+(?:tools?|models?|assistants?))?(?=\s+(?:is|are)\s+(?:(?:strictly|expressly|completely|entirely|totally|absolutely)\s+)?(?:banned|forbidden|prohibited|disallowed|unacceptable|not\s+(?:allowed|permitted|accepted|welcome|tolerated))\b)`,
+    String.raw`\b(?:with|using|through)\s+(?:the\s+)?(?:help|aid|assistance)\s+of\s+(?:an?\s+|any\s+)?(?:generative\s+)?(?:AI|LLMs?|chatbots?)\b`,
+  ].join("|"),
+  flags,
+);
+refusalTerms.push(useRefused);
 
 /**
  * Where one refused thing ends and the next begins: "Large AI generated
