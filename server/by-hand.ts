@@ -26,6 +26,8 @@
  *   Ready (F5); the reading routes in server/learning.ts call it.
  */
 import { randomUUID } from "node:crypto";
+import { realpath, stat } from "node:fs/promises";
+import path from "node:path";
 import {
   byHandLimits as limits,
   needsWhy,
@@ -55,7 +57,7 @@ import * as tests from "./by-hand-tests.js";
 import { template } from "./draft-jobs.js";
 import { shuttingDown, sm, type ServerMessages } from "./i18n/index.js";
 import { log } from "./log.js";
-import { redact } from "./process.js";
+import { git, redact } from "./process.js";
 import { byHandPlanPrompt } from "./prompts/by-hand.js";
 import { enterPhase, parseAgentOutput } from "./run-events.js";
 import { runAgent } from "./run-executor.js";
@@ -64,8 +66,6 @@ import type { WorkbenchContext } from "./workbench.js";
 
 const now = () => new Date().toISOString();
 const refuse = (message: (m: ServerMessages) => string, status = 409) => new AppError(message, status);
-/** A path the outline may list: one line, no backtick. */
-const plainPath = (file: string) => !/[`\p{Cc}]/u.test(file);
 
 /** executeRun's Learn-by-hand branch: the orientation turn and the outline (F3). */
 export async function planByHand(
@@ -86,23 +86,23 @@ export async function planByHand(
       runAgent(ctx, run, "lead", byHandPlanPrompt(locale, run), signal, true, { outputSchema, isolated: true }),
     );
     const outline = parseAgentOutput(run, "by-hand-orientation", () => parseByHandAnswer(orientationSchema, answer));
-    const sources = await turnFiles(run).sources([
-      ...outline.readFirst.map((range) => range.path),
-      ...outline.steps.flatMap((step) => step.files),
-    ]);
+    const named = [...outline.readFirst.map((range) => range.path), ...outline.steps.flatMap((step) => step.files)];
+    // A path is agent text too: only the checkout's own are kept, the others are dropped and counted.
+    const known = await checkoutPaths(run, named);
+    const sources = await turnFiles(run).sources(named.filter((file) => known.has(file)));
     let removed = 0;
     const clean = (text: string) => {
       const filtered = filterAgentText(text, sources);
       removed += filtered.removed;
       return filtered.value;
     };
-    // Read-first ranges must exist at the base commit; the others are dropped and counted.
+    // Read-first ranges must be lines of a file at the base commit.
     const readFirst = outline.readFirst
-      .filter(({ path: file, startLine, endLine }) => startLine <= endLine && endLine <= (sources.base[file]?.length ?? 0))
+      .filter(({ path: file, startLine, endLine }) => known.get(file) === "file" && startLine <= endLine && endLine <= (sources.base[file]?.length ?? 0))
       .map((range) => ({ ...range, why: clean(range.why) }));
-    const dropped = outline.readFirst.length - readFirst.length;
     const summary = clean(outline.summary);
-    const steps = outline.steps.map((step) => ({ title: clean(step.title), files: step.files.filter(plainPath) }));
+    const steps = outline.steps.map((step) => ({ title: clean(step.title), files: step.files.filter((file) => known.has(file)) }));
+    const dropped = named.length - readFirst.length - steps.flatMap((step) => step.files).length;
     const premise = outline.premise && {
       verdict: outline.premise.verdict,
       statement: clean(outline.premise.statement),
@@ -135,6 +135,28 @@ export async function planByHand(
 /** Adds what the filter removed to the run's total. */
 export function countRemoved(run: Run, removed: number) {
   if (removed) (run.byHand ??= {}).removedTotal = (run.byHand.removedTotal ?? 0) + removed;
+}
+
+/**
+ * The paths an agent named that are in the checkout, as files or folders:
+ * at the base commit by `git cat-file` (`git show <sha>:<path>` prints
+ * nothing for a missing path with *, ? or [ in it, as for an empty file),
+ * else in the worktree. Any other "path" is agent text, never stored as one.
+ */
+export async function checkoutPaths(run: Pick<Run, "baseSha" | "worktreePath">, paths: readonly string[]) {
+  const found = new Map<string, "file" | "folder">();
+  const asked = [...new Set(paths)].filter((file) => file && !/\p{Cc}/u.test(file) && !path.isAbsolute(file) && !file.split(/[\\/]/).includes(".."));
+  if (!asked.length) return found;
+  const input = asked.map((file) => `${run.baseSha}:${file}\n`).join("");
+  const types = (await git(run.worktreePath, ["cat-file", "--batch-check=%(objecttype)"], { input })).stdout.split("\n");
+  const root = await realpath(run.worktreePath);
+  for (const [index, file] of asked.entries()) {
+    if (types[index] === "blob" || types[index] === "tree") found.set(file, types[index] === "blob" ? "file" : "folder");
+    const full = found.has(file) ? "" : await realpath(path.join(root, file)).catch(() => "");
+    const info = full.startsWith(`${root}${path.sep}`) ? await stat(full).catch(() => undefined) : undefined;
+    if (info?.isFile() || info?.isDirectory()) found.set(file, info.isFile() ? "file" : "folder");
+  }
+  return found;
 }
 
 /** A step id not in use. */

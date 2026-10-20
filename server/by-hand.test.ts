@@ -168,6 +168,29 @@ test("the guide's orientation turn stores a filtered outline outside team.tasks,
   assert.equal(run.status !== "awaiting_plan" || !run.team?.tasks.length, true);
 });
 
+test("the outline keeps only paths of the checkout: a pattern, a folder's lines or code named as a path is dropped and counted", async (t) => {
+  const f = await fixture(t, {
+    lead: JSON.stringify({
+      summary: "A GET that meets a 503 fails at once.",
+      steps: [{ title: "Find where the request fails", files: ["src/retry.ts", "src", "return retryTwice(getPage);", "src/*.ts"] }],
+      readFirst: [
+        { path: "src/retry.ts", startLine: 1, endLine: 1, why: "The count." },
+        // git show <sha>:<path> prints nothing for a missing path with * in it, as for an empty file.
+        { path: "src/*.ts", startLine: 1, endLine: 1, why: "A pattern." },
+        { path: "if (failed) { return attempts * 2; }", startLine: 1, endLine: 1, why: "Code." },
+        { path: "src", startLine: 1, endLine: 1, why: "A folder." },
+      ],
+      premise: null,
+    }),
+  });
+  const run = await f.create();
+  assert.equal(run.status, "awaiting_plan", run.error);
+  const outline = run.byHand!.guidePlan!;
+  assert.deepEqual(outline.readFirst?.map((range) => range.path), ["src/retry.ts"]);
+  assert.deepEqual(outline.steps[0].files, ["src/retry.ts", "src"]);
+  assert.equal(outline.dropped, 5);
+});
+
 test("an orientation without a premise records no help, and planByHand leaves team.tasks and the agent cards as they are", async (t) => {
   const f = await fixture(t, { lead: orientation(null) });
   const run = await f.create();
