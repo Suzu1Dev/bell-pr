@@ -607,6 +607,8 @@ test("the test command view: BELL's suggestion from the run's folder and the per
     "go test\u2028./...",
     "go test \u202e/... ./",
     "go\u200btest",
+    // A lone surrogate is shown as a replacement character and run as another.
+    "go\ud800test",
     "   ",
     "x".repeat(301),
   ])
