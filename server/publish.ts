@@ -292,12 +292,15 @@ export async function approve(
     const run = ctx.run(id);
     editable(run);
     // Learn by hand: never while BELL runs the person's tests, and only the
-    // version the person marked ready is approved (DESIGN v1.2 F5, F9).
+    // version the person marked ready is approved (DESIGN v1.2 F5, F9),
+    // from the one read of the change that was checked.
+    let ready: DiffFile[] | undefined;
     if (run.learnByHand) {
       const tests = `tests:${id}`;
       if (ctx.byHandJobs.has(tests) || ctx.controllers.has(tests))
         throw new AppError((m) => m.byHand.flow.testsRunning, 409);
-      assertReady(run, await ctx.diff(id));
+      ready = await ctx.diff(id);
+      assertReady(run, ready);
     }
     if (
       displayedDraft.title !== run.draft.title ||
@@ -308,7 +311,7 @@ export async function approve(
         (run.draft.publishBranch ?? "")
     )
       throw new AppError((m) => m.run.publish.draftChanged, 409);
-    const files = await ctx.diff(id);
+    const files = ready ?? (await ctx.diff(id));
     if (
       !files.length ||
       files.some(

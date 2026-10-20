@@ -12,7 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { aiDisclosureLine } from "../shared/drafts.js";
 import { changeFingerprint } from "../shared/understanding.js";
-import { readDiff } from "./git.js";
+import { readDiff, reviewFingerprint } from "./git.js";
 import { byHandReviewInTests } from "./by-hand.js";
 import { applyAiDisclosure, parseDraftProposal, setAlwaysDiscloseAiSource } from "./drafts.js";
 import { withLocale } from "./i18n/index.js";
@@ -537,6 +537,33 @@ test("approval needs the version the person marked ready, and waits for BELL's t
   f.ctx.controllers.set(`tests:${run.id}`, new AbortController());
   assert.equal((await en(() => f.workbench.approve(run.id, { ...run.draft }))).status, "approved");
   f.ctx.controllers.delete(`tests:${run.id}`);
+});
+
+test("approval approves the very version it found ready, also when a file is reverted while it checks", async (t) => {
+  skipUnderstandingCheckInTests(true);
+  const f = await fixture(t);
+  const run = await f.writing();
+  await git(run.worktreePath, ["config", "user.name", "BELL Test"]);
+  await git(run.worktreePath, ["config", "user.email", "test@example.invalid"]);
+  const template = ".github/pull_request_template.md";
+  await writeFile(path.join(run.worktreePath, template), "## What changed\n\n## How I tested it\n\n## Notes\n");
+  run.draft = { title: "Retry a GET twice", body: "Retries a GET twice after a 503." };
+  const atReady = await readDiff(run);
+  assert.equal(atReady.length, 2);
+  for (const file of atReady) await f.workbench.review(run.id, file.path, true, file.fingerprint);
+  await en(() => f.workbench.byHand.ready(run.id, { changeFingerprint: changeFingerprint(atReady), review: false }));
+  const diff = f.ctx.diff;
+  t.after(() => {
+    f.ctx.diff = diff;
+  });
+  let reads = 0;
+  f.ctx.diff = async (id) => {
+    // The person reverts one file right after approval read the change.
+    if (++reads === 2) await git(run.worktreePath, ["checkout", "--", template]);
+    return diff(id);
+  };
+  assert.equal((await en(() => f.workbench.approve(run.id, { ...run.draft }))).status, "approved");
+  assert.equal(run.approvedFingerprint, reviewFingerprint(atReady, run.draft));
 });
 
 test("no AI PR text in Learn by hand: no draft, and BELL's AI line is never added, even with Always add on", async (t) => {
