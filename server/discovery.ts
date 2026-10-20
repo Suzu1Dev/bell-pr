@@ -19,6 +19,8 @@ import {
   type DiscoveryPreferences,
 } from "../shared/discovery.js";
 import { ponytailModes, type EfficiencyMetrics } from "../shared/efficiency.js";
+import { areaReach } from "../shared/policy-reach.js";
+import { classifyPolicy } from "../shared/project-policy.js";
 import {
   addEfficiency,
   applyPonytail,
@@ -339,17 +341,44 @@ export function parseDiscoveryResult(
       stars: number(repo.stars),
       forks: number(repo.forks),
     };
-    // Learning-labelled issues are for the person to write by hand.
-    const { learnByHand, ...rest } = opportunity;
+    // Learning-labelled issues are for the person to write by hand. The
+    // reservation flags come only from the evidence below: the agent's own
+    // are dropped first.
+    const {
+      learnByHand,
+      byHandReserved: _agentReserved,
+      byHandReservedOutput: _agentOutput,
+      ...rest
+    } = opportunity;
     const byHand =
       learnByHand === true ||
       sources.some((source) => source.kind === "issue" && learning.has(source.id));
+    // An evidence quote that reserves issues like this one for people
+    // learning without AI (an `area` rule, DESIGN v1.2 F12). Worded only
+    // around AI-generated or automated pull requests, a Learn-by-hand run
+    // may still reach the quoted confirm there; a "use" wording (LLVM's
+    // "AI tools must not be used to fix") never.
+    const reservations = byHand
+      ? opportunity.evidence.flatMap((evidence, index) =>
+          classifyPolicy(
+            sources[index].kind === "contributing" || sources[index].kind === "template"
+              ? sources[index].title
+              : "evidence.md",
+            evidence.quote,
+          ).filter((finding) => finding.kind === "area"),
+        )
+      : [];
+    const outputOnly = reservations.every((finding) =>
+      ["output", "automate"].includes(areaReach(finding.quote)),
+    );
     opportunities.push({
       ...rest,
       popularity: repo.pushedAt
         ? messages.popularity({ ...counts, pushedAt: repo.pushedAt.slice(0, 10) })
         : messages.popularityWithoutPush(counts),
       ...(byHand ? { learnByHand: true } : {}),
+      ...(reservations.length ? { byHandReserved: true } : {}),
+      ...(reservations.length && outputOnly ? { byHandReservedOutput: true } : {}),
     });
   }
   if (excluded) warnings.push(messages.skippedDifficulty({ count: excluded }));

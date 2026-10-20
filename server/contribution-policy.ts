@@ -10,8 +10,8 @@
  * (`markdownProse`), so only this card sees what comments say.
  */
 import path from "node:path";
-import type { PolicyFinding, PolicyKind } from "../shared/contribution.js";
-import { classifyPolicy } from "../shared/project-policy.js";
+import type { HelpChannel, PolicyFinding, PolicyKind } from "../shared/contribution.js";
+import { attachCarveOuts, classifyPolicy, rawProse, stopsQuotedConfirm } from "../shared/project-policy.js";
 import {
   accountDefaults,
   defaultsKind,
@@ -139,9 +139,13 @@ export function generatedPatterns(content: string): string[] {
   return patterns.slice(0, policyLimits.generated);
 }
 
-/** What the card keeps first when a project states more than 30 rules. */
-const weight = (finding: PolicyFinding) =>
-  finding.kind === "ban" && finding.contribution
+/**
+ * What the card keeps first when a project states more than 30 rules:
+ * contribution bans and the bans that stop the quoted confirm, then the
+ * rest by kind.
+ */
+export const findingWeight = (finding: PolicyFinding) =>
+  finding.kind === "ban" && (finding.contribution || stopsQuotedConfirm(finding))
     ? 0
     : ((
         {
@@ -155,27 +159,107 @@ const weight = (finding: PolicyFinding) =>
         } satisfies Record<PolicyKind, number>
       )[finding.kind] ?? 8);
 
+/** A quote as the card stores it: checked for credentials, 300 characters or fewer. */
+const storedQuote = (quote: string) => redact(quote).slice(0, 300);
+
 /**
  * The rules of the documents, in reading order, each quote checked for
- * credentials. Over 30, the ones that block publishing stay (explicit
- * bans, reserved areas, disclosures) and the rest make room.
+ * credentials. A ban or reserved-issue rule carries the carve-outs of its
+ * own document (`attachCarveOuts`, DESIGN v1.2 F12). Over 30, the ones
+ * that block publishing stay (explicit bans, reserved areas, disclosures)
+ * and the rest make room.
  */
 export function policyFindings(documents: readonly PolicyDocument[]): PolicyFinding[] {
   const all = documents.flatMap((document) =>
-    classifyPolicy(document.path, document.content).map((finding) => ({
-      ...finding,
-      quote: redact(finding.quote).slice(0, 300),
-    })),
+    attachCarveOuts(document.path, document.content, classifyPolicy(document.path, document.content)).map(
+      (finding) => ({
+        ...finding,
+        quote: storedQuote(finding.quote),
+        ...(finding.allows
+          ? { allows: finding.allows.map((allowance) => ({ ...allowance, quote: storedQuote(allowance.quote) })) }
+          : {}),
+      }),
+    ),
   );
   if (all.length <= policyLimits.findings) return all;
   const kept = new Set(
     all
       .map((finding, index) => ({ finding, index }))
-      .sort((a, b) => weight(a.finding) - weight(b.finding) || a.index - b.index)
+      .sort((a, b) => findingWeight(a.finding) - findingWeight(b.finding) || a.index - b.index)
       .slice(0, policyLimits.findings)
       .map(({ index }) => index),
   );
   return all.filter((_, index) => kept.has(index));
+}
+
+/** At most this many of the project's help channels are kept (`ContributionRules.channels`). */
+const maxChannels = 5;
+
+/**
+ * Where the project's people talk, by address: Zulip, Discord invites,
+ * Discourse forums (a `discourse.` host or a `/c/` category path),
+ * Matrix, mailing lists (`lists.` hosts, Mailman, Google Groups), Gitter,
+ * and the repository's own GitHub Discussions.
+ */
+function channelAddress(url: URL, repository?: string) {
+  const host = url.hostname.toLowerCase();
+  const pathname = url.pathname.toLowerCase();
+  const path = pathname.replace(/\/+$/, "");
+  return (
+    host.endsWith(".zulipchat.com") ||
+    (/^(?:www\.)?discord\.gg$/.test(host) && path.length > 1) ||
+    (/^(?:www\.)?discord(?:app)?\.com$/.test(host) && /^\/invite\/[^/]+/.test(path)) ||
+    host.startsWith("discourse.") ||
+    pathname.startsWith("/c/") ||
+    host === "matrix.to" ||
+    host.startsWith("lists.") ||
+    `${host}${pathname}`.includes("mailman") ||
+    host === "groups.google.com" ||
+    host === "gitter.im" ||
+    host === "app.gitter.im" ||
+    (!!repository &&
+      /^(?:www\.)?github\.com$/.test(host) &&
+      path.startsWith(`/${repository.toLowerCase()}/discussions`))
+  );
+}
+
+/** Characters that end a bare address in prose: closing brackets and quotes are not part of it. */
+const addressPattern = /https?:\/\/[^\s<>()[\]"'`*]+/gi;
+
+/**
+ * The project's own human help channels in the files the card read (DESIGN
+ * v1.2 F14), in reading order: at most 5, each with the file and line
+ * that names it, and the words the file links it with (else its host and
+ * path). Fenced code is left out. `repository` (owner/name) lets the
+ * repository's own GitHub Discussions count.
+ */
+export function channelLinks(documents: readonly PolicyDocument[], repository?: string): HelpChannel[] {
+  const channels: HelpChannel[] = [];
+  for (const document of documents)
+    for (const { line, text } of rawProse(document.content))
+      for (const match of text.matchAll(addressPattern)) {
+        const address = match[0].replace(/[.,;:!?]+$/, "");
+        let url: URL;
+        try {
+          url = new URL(address);
+        } catch {
+          continue;
+        }
+        if (!channelAddress(url, repository) || address.length > 300) continue;
+        const key = address.replace(/\/+$/, "").toLowerCase();
+        if (channels.some((channel) => channel.url.replace(/\/+$/, "").toLowerCase() === key)) continue;
+        // "[the forum](https://…)" or "`the forum <https://…>`_": the file's own words for it.
+        const before = text.slice(0, match.index);
+        const named =
+          /\[([^\]]{1,120})\]\(\s*<?$/.exec(before)?.[1] ?? /`([^`<]{1,120}?)\s*<$/.exec(before)?.[1];
+        const label = (named ?? `${url.host}${url.pathname.replace(/\/+$/, "")}`)
+          .replace(/[*_`]+/g, "")
+          .trim()
+          .slice(0, 80);
+        channels.push({ label: label || url.host, url: address, path: document.path, line });
+        if (channels.length >= maxChannels) return channels;
+      }
+  return channels;
 }
 
 export interface LocalPolicy {

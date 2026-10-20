@@ -11,7 +11,10 @@
  */
 import { markdownProse, type DraftRuleQuote } from "./draft-checks.js";
 import { aiDisclosureLine, type DraftSource } from "./drafts.js";
-import type { PolicyFinding, PolicyKind } from "./contribution.js";
+import type { HelpKind } from "./by-hand.js";
+import { carveOutKinds } from "./by-hand-rules.js";
+import { banReach } from "./policy-reach.js";
+import type { PolicyAllowance, PolicyFinding, PolicyKind } from "./contribution.js";
 
 /** One line of a document outside fenced code, with its 1-based line number. */
 export interface ProseLine {
@@ -103,6 +106,15 @@ const asWritten = (match: string) =>
 const madeWith = String.raw`(?:(?:generat\w*|written|wr[io]te|produced|created|authored|assisted|made|drafted|output|code|text|content|suggestions?)\s+(?:by|with|using|through|via|from)|us(?:e|es|ed|ing)(?:\s+of)?|usage\s+of|help\s+(?:from|of))\s+(?:an?\s+|the\s+)?(?:(?:AI\s+)?tools?\s+(?:like|such\s+as)\s+)?`;
 /** What a model or tool makes, said after its name: "LLM-generated", "LLM output", "Copilot suggestions". */
 const madeBy = String.raw`[- ](?:generat\w*|assist\w*|written|authored|produced|output|suggestions?|tools?|tooling|assistants?|agents?|use|usage)\b`;
+/**
+ * Work that must be written by humans only: "Contributions must be
+ * entirely human-authored", "All code must be written by humans". A rule
+ * (`prohibition`) and its AI help (`refusalTerms`) in one, since it names
+ * AI only by leaving it out. Only work a contribution holds counts (not
+ * commit messages, which are credit, or "decisions"), and not
+ * "human-readable", "by hand" or "reviewed by a human".
+ */
+const humanOnly = String.raw`(?<=\b(?:contributions?|code|patch(?:es)?|pull\s+requests?|PRs?|merge\s+requests?|commits|changes|submissions?|work|content|documentation|docs|tests?)\s+)(?:must|shall|should|(?:are|is)\s+required\s+to|ha(?:ve|s)\s+to|needs?\s+to)\s+(?:only\s+)?be\s+(?:(?:entirely|fully|completely|wholly|solely|exclusively|purely|only|100\s*%)\s+)?(?:human[- ](?:authored|written|made|created|produced|crafted)|(?:authored|written|made|created|produced|crafted)\s+(?:(?:entirely|only|solely|exclusively|wholly|fully)\s+)?by\s+(?:a\s+|real\s+)?(?:humans?|human\s+beings?))\b`;
 /** A model or tool as a part of the software ("LLM providers", "the Claude integration"), not as help. */
 const featureNoun = String.raw`(?!\s+(?:APIs?|providers?|integrations?|backends?|clients?|SDKs?|features?|support|calls?|endpoints?|prompts?|extensions?|plugins?|librar(?:y|ies)|bindings?|adapters?|modules?)\b)`;
 
@@ -155,21 +167,70 @@ function assistanceSpans(text: string): Span[] {
     .filter((span) => asWritten(text.slice(span.start, span.end)));
 }
 
+/** Models and AI named as such, as a rule names what it refuses: "AI", "LLMs", "generative AI tools". */
+const aiNoun = String.raw`(?:AI|LLMs?|large\s+language\s+models?|language\s+models?|chatbots?|generative\s+AI|gen[- ]?AI)(?:\s+(?:tools?|models?|assistants?))?`;
+
+/**
+ * Wordings of a refusal that name AI help in ways the assistance terms
+ * don't, such as "No LLMs for patches": the classifier's rules only, so
+ * the disclosure checks never read them. Each wording adds itself where
+ * it is defined.
+ */
+const refusalTerms: RegExp[] = [];
+/**
+ * A sentence that reports what other projects refuse ("Unlike Zig, …",
+ * "Some projects say …"): no rule of this project, so the refusal wordings
+ * don't read it. A project's own name can't tell which is meant, so it
+ * isn't such a marker.
+ */
+const othersRule =
+  /\bunlike\b|\b(?:some|many|most|other|several|certain)\s+(?:other\s+)?(?:projects?|communities|organi[sz]ations|foundations|ecosystems|distributions)\b|\bprojects?\s+(?:such\s+as|like)\b/i;
+
 /** Words that refuse something. */
 const prohibition = new RegExp(
   [
     String.raw`\b(?:do|does|will|shall|should|must|may|can)\s*(?:not|n't)\s+(?:\w+\s+){0,3}?(?:accept|allow|permit|use|submit|merge|commit|includ|contain|review|consider|welcome|take|contribut)\w*`,
     String.raw`\b(?:won't|cannot|can't|never)\s+(?:\w+\s+){0,3}?(?:accept|allow|permit|use|submit|merge|commit|includ|contain|review|consider|welcome|take|contribut)\w*`,
+    // "must not involve AI", "may not be involved" (Mesa's word, see `aiInvolved`)
+    String.raw`\b(?:(?:do|does|must|may|shall|should|can|will)\s*(?:not|n't)|cannot|never)\s+(?:be\s+)?involv(?:e|ed)\b`,
     String.raw`\bnot\s+(?:be\s+)?(?:accepted|allowed|permitted|welcome|tolerated|merged|committed|included|reviewed|considered)\b`,
-    String.raw`\b(?:prohibited|forbidden|banned|disallowed|unacceptable|declined?)\b`,
+    humanOnly,
+    String.raw`\b(?:prohibited|forbidden|forbids?|banned|disallowed|unacceptable|declined?)\b`,
+    // "Please refrain from using AI tools …"
+    String.raw`\brefrain\s+from\s+(?:\w+\s+)?(?:us(?:e|ing)|submitt?ing|contributing|includ(?:e|ing)|posting|pasting|sending|relying)\b`,
     String.raw`\bno\s+(?:AI|LLM|machine)[\w-]*`,
     String.raw`\b(?:will|shall|may)\s+be\s+(?:closed|rejected|refused|declined)\b`,
+    // "must be written without any help from AI tools" (the AI after "without" is its help)
+    String.raw`\b(?:must|shall|should|(?:are|is)\s+required\s+to|ha(?:ve|s)\s+to|needs?\s+to)\s+(?:only\s+)?be\s+(?:(?:entirely|fully|completely|wholly)\s+)?(?:written|made|created|authored|produced|done|developed|prepared|crafted)\s+(?:(?:entirely|fully|completely|wholly)\s+)?without\b`,
     // "we will flag and reject …"
     String.raw`\b(?:will|shall|must|we)\s+(?:\w+\s+){0,2}?(?:reject|refuse)\w*`,
     String.raw`\bzero[- ]tolerance\b`,
+    // "a strict no-AI policy" (see `noAiPolicy`)
+    String.raw`\bno-(?:AI|LLMs?)\b`,
   ].join("|"),
   flags,
 );
+
+/**
+ * Where a contribution is made: at any stage, at all, in its creation, for
+ * patches, when contributing. Not what AI makes ("AI should not be used to
+ * author code", Godot's rule about authoring, which the person weighs).
+ */
+const madeWhere = String.raw`(?:at\s+all|at\s+any\s+(?:stage|point|time|step)|in\s+any\s+(?:way|form|part|stage|step|capacity|manner)|(?:in|during)\s+(?:the\s+)?(?:creation|making|writing|development|preparation|production|authoring)\b|(?:in|for|on|with)\s+(?:(?:your|any|a|an|the|their|this|these|our)\s+)?(?:contribut\w*|patch(?:es)?|pull\s+requests?|PRs?|merge\s+requests?|code(?!\s+reviews?)|commits?|submissions?|changes)\b|(?:when|while)\s+(?:contributing|writing|creating|preparing|submitting)\b|to\s+contribute\b)`;
+/**
+ * AI as what must not be used, or was used, in making the contribution:
+ * "LLMs must not be used at any stage of a contribution", "contributions
+ * where an LLM was used". A "must not be used" says where (`madeWhere`) or
+ * ends the sentence, so "AI must not be used to rank results" (a feature)
+ * is no rule; "was used" counts in a clause about the refused thing
+ * ("where", "in which", "if"), never in "whether AI was used"; "the AI",
+ * "our AI" or "the enemy AI" are the software's.
+ */
+const aiUsed = new RegExp(
+  String.raw`(?<!\b(?:the|our|its|their|this|that|enemy|game|npc|opponent|computer|chess)\s+)\b${aiNoun}\s+(?:(?:(?:must|may|should|shall|can|will)\s*(?:not|n't)|(?:must|may|should|shall|can|will)\s+never|cannot)\s+(?:ever\s+)?be\s+used\b(?=\s*(?:[.!;)]|$)|\s+${madeWhere})|(?<=\b(?:where|wherever|in\s+which|for\s+which|if|when|whenever|that|which)\s+(?:(?:an?|any)\s+)?${aiNoun}\s+)(?:was|were|has\s+been|have\s+been|had\s+been)\s+(?:ever\s+)?used\b)`,
+  flags,
+);
+refusalTerms.push(aiUsed);
 
 /**
  * A refusal of AI help for "substantial pieces of code" or "large changes"
@@ -182,6 +243,34 @@ const sizeQualifier = new RegExp(
 );
 
 /**
+ * A size said of the pull request or change a part refuses ("Large AI
+ * generated PRs", "substantial AI-assisted changes"), as `sizeQualifier`
+ * is for the code; read per refused part (`weighedPart`), so "We do not
+ * accept large or AI-generated pull requests" still refuses the
+ * AI-generated ones.
+ */
+const largeChange = new RegExp(
+  String.raw`\b(?:substantial|significant|large|major|non[- ]?trivial)\s+(?:[\w'-]+\s+){0,2}?(?:PRs?|pull[- ]requests?|merge\s+requests?|changes?|patch(?:es)?)\b`,
+  flags,
+);
+/**
+ * AI involved in the contribution, refused: "Contributions must not
+ * involve AI in any way", "AI may not be involved", "any AI involvement",
+ * "patches where AI was involved"; never AI features or modules involved,
+ * nor "whether AI was involved".
+ */
+const aiInvolved = new RegExp(
+  [
+    String.raw`\binvolv(?:e|es|ed|ing)\s+(?:any\s+)?${aiNoun}\b(?=\s*(?:[.!;,)]|$)|\s+(?:in|at|for|with|on|during|whatsoever|will|shall|are|is|get|gets|must|may|can|should)\b)`,
+    String.raw`\b(?:AI|LLM)[- ]involvement\b`,
+    String.raw`\b${aiNoun}\s+(?:(?:must|may|should|shall|can|will)\s*(?:not|n't)|cannot)\s+be\s+involved\b`,
+    String.raw`(?<=\b(?:where|wherever|in\s+which|for\s+which|if|when|that|which)\s+(?:(?:an?|any)\s+)?)${aiNoun}\s+(?:was|were|has\s+been|have\s+been|had\s+been)\s+involved\b`,
+  ].join("|"),
+  flags,
+);
+refusalTerms.push(aiInvolved);
+
+/**
  * Words that let contributors use AI ("You may use AI tools, but do not
  * submit code you do not understand"): a refusal in the same sentence is
  * about something else, so it is never a clear ban.
@@ -190,6 +279,27 @@ const aiPermission = new RegExp(
   String.raw`\b(?:may|can|are\s+(?:welcome|free|allowed)\s+to|feel\s+free\s+to)\s+use\s+`,
   flags,
 );
+
+/** In a contribution: at all, at any stage, for or in patches, pull requests or code, when contributing. */
+const inContributing = String.raw`(?:at\s+all|whatsoever|at\s+any\s+(?:stage|point|time|step)|in\s+any\s+(?:way|form|part|stage|step|capacity|manner)|(?:for|in|on|with)\s+(?:(?:your|any|a|an|the|their|this|these|our)\s+)?(?:contribut\w*|patch(?:es)?|pull\s+requests?|PRs?|merge\s+requests?|code(?!\s+reviews?)|commits?|submissions?|changes)\b|(?:when|while)\s+contributing\b|to\s+contribute\b)`;
+/**
+ * Using AI itself, refused to the contributor: "Please do not use AI at
+ * all when contributing", "You may not use AI for contributions", "Using
+ * AI for contributions is forbidden", "the use of AI in contributions".
+ * The plain "AI" counts only as what the person (or the contribution) is
+ * told not to use, or as a use in a contribution (`inContributing`), and
+ * only with nothing but where it is used after it, so "Do not use AI
+ * opponents", "we don't use AI for code review", "If you don't use AI, …"
+ * or "You don't have to use AI" are no rules.
+ */
+const useAi = new RegExp(
+  [
+    String.raw`(?<=(?<!\b(?:if|when|whenever|whether|unless|once|in\s+case)\s+(?:you\s+|contributors?\s+)?)\b(?:(?:please\s+)?(?:do\s+not|don't|never|avoid|refrain\s+from)|(?:you|contributors?|contributions?|patches|pull\s+requests?|PRs?|submissions?)\s+(?:(?:must|may|should|shall|can|will)\s*(?:not|n't)|(?:must|may|should|shall|can|will)\s+never|cannot|are\s+not\s+(?:allowed|permitted)\s+to))\s+(?:(?:ever|even|any|just|simply|really|please)\s+)?)us(?:e|ing)\s+(?:any\s+)?AI\b(?=\s*(?:[.!;,)]|$)|\s+${inContributing})`,
+    String.raw`(?:^|(?<=[^\w\s]\s*)|(?<=\b(?:the|any|all)\s+))(?:using|use\s+of|usage\s+of)\s+(?:any\s+)?AI\s+${inContributing}`,
+  ].join("|"),
+  flags,
+);
+refusalTerms.push(useAi);
 
 /**
  * A condition the contributor meets by their own conduct ("unless you have
@@ -211,22 +321,157 @@ const conductCondition = new RegExp(
   ].join("|"),
   flags,
 );
+/**
+ * Plain AI as what a contribution must be made without: "Patches must be
+ * made without AI", "without the help of AI", "without using an LLM"
+ * (the refusal is in `prohibition`); never "without AI jargon".
+ */
+const withoutAi = new RegExp(
+  String.raw`\bwithout\s+(?:the\s+)?(?:any\s+)?(?:(?:help|aid|assistance|use|input|involvement)\s+(?:of|from|by)\s+|using\s+|relying\s+on\s+)?(?:an?\s+|any\s+)?${aiNoun}\b(?=\s*(?:[.!;,)]|$)|\s+(?:or|and|nor|of|in|for|at|whatsoever|whatever)\b)`,
+  flags,
+);
+refusalTerms.push(withoutAi);
 /** Permission only maintainers give ("unless approved by core") keeps a refusal a ban. */
 const maintainerPermission = new RegExp(
   String.raw`\b(?:prior|explicit|express|written|advance)\s+(?:written\s+)?(?:approval|permission|consent|agreement|authori[sz]ation)\b|\b(?:approved|permitted|authori[sz]ed|allowed|agreed|requested|invited)\s+(?:by|in\s+advance|beforehand)\b|\b(?:approval|permission|consent)\s+(?:of|by|from)\b`,
   flags,
 );
 
+/**
+ * AI itself refused outright: "AI is banned from this project", "LLMs are
+ * not allowed in pull requests", "AI use is prohibited". Only AI as the
+ * rule's subject, refused here, in the project or in its contributions
+ * (or at the sentence's end): not "the/our/enemy AI", "AI features", "AI
+ * is not allowed to cheat", or AI in ranked games.
+ */
+const aiRefused = new RegExp(
+  String.raw`(?<!\b(?:the|our|its|their|this|that|enemy|game|npc|opponent|computer|chess|with|by|using|from|of|via|through)\s+(?:(?:an?|any)\s+)?)\b${aiNoun}(?:\s+(?:use|usage|assistance|help))?\s+(?:is|are)\s+(?:(?:strictly|expressly|completely|entirely|totally|absolutely)\s+)?(?:banned|forbidden|prohibited|disallowed|unacceptable|not\s+(?:allowed|permitted|accepted|welcome|tolerated))\b(?=\s*(?:[.!;,)]|$)|\s+(?:here|anywhere)\b|\s+(?:from|in|for|on|within|with)\s+(?:(?:this|our|the|any|all|your)\s+)?(?:project|repo(?:sitory)?|codebase|contribut\w*|patch(?:es)?|pull\s+requests?|PRs?|merge\s+requests?|code|commits?|submissions?|changes)\b)`,
+  flags,
+);
+refusalTerms.push(aiRefused);
+
+/**
+ * A refusal whose object is a trailer, a co-author listing or co-signing
+ * ("… co-signing commits using an AI tool, or using the `assisted-by`,
+ * `co-developed` or similar commit trailer is not allowed"): a rule about
+ * how AI help is credited, which the person weighs, not a ban of the help
+ * (DESIGN v1.2 F14, Kubernetes). Each thing the sentence refuses counts
+ * (`weighedRefusal`), so "AI-generated code and Co-authored-by trailers
+ * are not allowed" stays a ban.
+ */
+const creditObject =
+  /\b(?:trailer|co-?author\w*|co-?sign\w*|Co-authored-by|Assisted-by|Generated-by|commit\s+messages?)\b/i;
+/**
+ * The credit itself, with the commits or code it is on: "co-signing
+ * commits", "a co-author on code you submit", "commit messages for your
+ * patches" (Kubernetes: "AI generated commit messages are not allowed").
+ */
+const creditPhrase =
+  /\b(?:co-?sign\w*|co-?author\w*|commit\s+messages?)(?:\s+(?:on|of|in|for|to))?\s+(?:(?:the|your|their|a|an|any|all|each|every)\s+)?(?:commits?|code|patch(?:es)?|changes?|contributions?|PRs?|pull[- ]requests?)\b|\bcommits?\s+trailers?\b|\b(?:trailer|co-?author\w*|co-?sign\w*|Co-authored-by|Assisted-by|Generated-by|commit\s+messages?)\b/gi;
+
 /** What a rule restricts when it is about talking to people rather than the change. */
 const conversation = new RegExp(
   String.raw`\b(?:descriptions?|comments?|messages?|repl(?:y|ies)|respon(?:d|ds|ding|ses?)|discussions?|conversations?|communicat\w*)\b`,
   flags,
 );
+/** A project's no-AI policy: "We have a strict no-AI policy", "follows a no-LLM policy"; not "no AI policy yet". */
+const noAiPolicy =
+  /(?<=\b(?:a|an|our|the|this|its|their|strict)\s+(?:(?:strict|firm|hard|clear)\s+)?)no[- ](?:AI|LLMs?|gen[- ]?AI|generative[- ]AI)[- ]polic(?:y|ies)\b/i;
+refusalTerms.push(noAiPolicy);
 /** The change itself: its code, commits or patches, or a pull request as a whole. */
 const changeObject = new RegExp(
   String.raw`\b(?:code(?!\s+of\s+conduct)|patch(?:es|sets?)?|contributions?|implementations?|diffs?|commits?(?!\s+messages?))\b|(?<!\b(?:on|in|to|under|for)\s+(?:your|the|a|their|each|every|this)\s+)\b(?:PRs?|pull[- ]requests?|merge\s+requests?)\b(?!\s+(?:descriptions?|titles?|bod(?:y|ies)|text|comments?|messages?|templates?|reviews?))`,
   flags,
 );
+/**
+ * Using AI, refused said other ways: "Using AI is not permitted", "The
+ * use of AI is forbidden", "code written with the help of AI"; never "If
+ * use of AI is suspected" or "Using AI for ranking is not supported".
+ */
+const useRefused = new RegExp(
+  [
+    String.raw`(?:^|(?<=[^\w\s]\s*)|(?<=\b(?:the|any|all)\s+))(?:using|use\s+of|usage\s+of)\s+(?:any\s+)?(?:generative\s+)?(?:AI|LLMs?)(?:\s+(?:tools?|models?|assistants?))?(?=\s+(?:is|are)\s+(?:(?:strictly|expressly|completely|entirely|totally|absolutely)\s+)?(?:banned|forbidden|prohibited|disallowed|unacceptable|not\s+(?:allowed|permitted|accepted|welcome|tolerated))\b)`,
+    String.raw`\b(?:with|using|through)\s+(?:the\s+)?(?:help|aid|assistance)\s+of\s+(?:an?\s+|any\s+)?(?:generative\s+)?(?:AI|LLMs?|chatbots?)\b`,
+  ].join("|"),
+  flags,
+);
+refusalTerms.push(useRefused);
+
+/**
+ * Where one refused thing ends and the next begins: "Large AI generated
+ * PRs and AI generated commit messages are not allowed" refuses two, and
+ * so does "AI-generated code (including large AI-generated PRs) …".
+ */
+const partBoundary = /[,;:()]|\s(?:and|or|nor)\s/gi;
+/**
+ * Words that carry a refusal on to things a part doesn't name ("…, nor are
+ * small ones", "…, even small ones", "of any size").
+ */
+const refusalCarried =
+  /\b(?:nor|neither|either|regardless|no\s+matter)\b|\beven\s+(?:the\s+)?(?:small|smaller|tiny|short|minor|trivial)\b|\bany\s+size\b|\b(?:large|big)\s+or\s+small\b|\bsmall\s+or\s+(?:large|big)\b/i;
+
+/**
+ * The parts of a sentence (see `partBoundary`), Markdown link targets left
+ * out ("[Large AI generated](#large-edits) PRs" reads "Large AI generated
+ * PRs"), each with whether it names AI at all (`aiMention`, wider than the
+ * assistance terms, so more parts must pass).
+ */
+function refusedParts(words: string) {
+  const plain = words.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+  let start = 0;
+  return [...allMatches(partBoundary, plain), { start: plain.length, end: plain.length }].map((bound) => {
+    const text = plain.slice(start, bound.start);
+    start = bound.end;
+    return { text, ai: aiMention.test(text) };
+  });
+}
+
+/**
+ * "Do not leave the first review of AI generated changes to the
+ * reviewers": "review" is what the person does first, not a refusal of
+ * the change (Kubernetes).
+ */
+const reviewLeftToReviewers =
+  /\b(?:do\s+not|don't|never|should\s+not|shouldn't|must\s+not)\s+leave\s+(?:[\w'-]+\s+){0,3}?reviews?\b[^,;:]*?\bto\s+(?:the\s+)?(?:reviewers?|maintainers?)\b/i;
+
+/** One refused thing that is a rule the person weighs, not a ban of AI help. */
+function weighedPart(part: string) {
+  // A review the person owes before the reviewers see the change (Kubernetes).
+  if (reviewLeftToReviewers.test(part)) return true;
+  // How AI help is credited, with nothing else of the change (Kubernetes).
+  if (creditObject.test(part) && !changeObject.test(part.replace(creditPhrase, " "))) return true;
+  // "Large AI generated PRs": how large is too large is the person's call (Kubernetes).
+  if (largeChange.test(part)) return true;
+  return false;
+}
+
+/**
+ * A part that refuses AI-made code or changes with no size of its own
+ * ("AI-generated code is not accepted, and large changes must be discussed
+ * first"): the sentence's size is said of something else, so it is no
+ * size rule (`sizeQualifier`).
+ */
+function unsizedAiChange(words: string) {
+  return refusedParts(words).some(
+    (part) => part.ai && changeObject.test(part.text) && !sizeQualifier.test(part.text) && !weighedPart(part.text),
+  );
+}
+
+/**
+ * A refusal the person weighs for what it refuses (DESIGN v1.2 F14): a
+ * part that names AI help is such a rule (`weighedPart`), and no part
+ * refuses the change itself otherwise. "AI-generated code and
+ * Co-authored-by trailers are not allowed" still refuses the code.
+ */
+function weighedRefusal(words: string) {
+  if (refusalCarried.test(words)) return false;
+  let weighed = false;
+  for (const part of refusedParts(words)) {
+    if (weighedPart(part.text)) weighed ||= part.ai;
+    else if (changeObject.test(part.text) || (part.ai && !conversation.test(part.text))) return false;
+  }
+  return weighed;
+}
 
 /** Issues set aside for people who are learning. */
 const learningIssues = new RegExp(
@@ -237,6 +482,8 @@ const reservation = new RegExp(
   String.raw`\b(?:reserved|meant|intended|kept)\s+for\b|\bare\s+for\s+(?:human\s+|new\s+)?(?:contributors|newcomers|people|humans)\b`,
   flags,
 );
+// Human-only work is its own AI help: what it leaves out (see `humanOnly`).
+refusalTerms.push(new RegExp(humanOnly, flags));
 
 /** Text addressed to AI agents themselves. */
 const addressedToAgents = new RegExp(
@@ -301,10 +548,11 @@ const issueFirstRule = new RegExp(
 /**
  * A sentence that is about a contribution: a PR, a patch, a commit, code or
  * changes, or what goes into this project ("Code generated by a language
- * model is not welcome in this project").
+ * model is not welcome in this project") or is banned from it ("AI is
+ * banned from this project").
  */
 const contributionContext = new RegExp(
-  String.raw`\b(?:PRs?|pull[- ]requests?|merge\s+requests?|patch(?:es|sets?)?|contribut\w*|commit\w*|merged?|submi(?:t|ts|tted|tting|ssions?)|code(?!\s+of\s+conduct)|changes)\b|\b(?:in|to|into|for)\s+(?:this|our)\s+(?:project|repo(?:sitory)?|codebase)\b(?!['’]s)`,
+  String.raw`\b(?:PRs?|pull[- ]requests?|merge\s+requests?|patch(?:es|sets?)?|contribut\w*|commit\w*|merged?|submi(?:t|ts|tted|tting|ssions?)|code(?!\s+of\s+conduct)|changes)\b|\b(?:in|to|into|for)\s+(?:this|our)\s+(?:project|repo(?:sitory)?|codebase)\b(?!['’]s)|\b(?:banned|barred|excluded)\s+from\s+(?:this|our)\s+(?:project|repo(?:sitory)?|codebase)\b(?!['’]s)`,
   flags,
 );
 
@@ -377,9 +625,14 @@ const quotedWords = /^\s*(?:(?:Assisted|Generated)-by:?|[\w\s'’-]*\bgood[- ]fi
  * Text to search, positions kept: inline code and comment delimiters
  * blanked, emphasis markers too; what a reStructuredText role or link shows
  * (":ref:`AI generated <target>`", "`text <url>`_") stays readable.
+ * Typographic apostrophes and hyphens read as typed ones ("don’t",
+ * "AI‑generated"), one character for one, so a rule written with them is
+ * found; quotes keep the file's own characters.
  */
 function searchable(text: string) {
   return text
+    .replace(/[\u2018\u2019\u02bc\u2032]/g, "'")
+    .replace(/[\u2010\u2011]/g, "-")
     .replace(
       /:[\w.+-]+:`([^`]*)`|`([^`<]*?)\s*<[^`>]*>`_{1,2}/g,
       (whole: string, role: string | undefined, link: string | undefined) => {
@@ -390,9 +643,20 @@ function searchable(text: string) {
     .replace(/`([^`]*)`/g, (code, inside: string) =>
       quotedWords.test(inside) ? keepOnly(code, 1, inside) : blank(code),
     )
+    .replace(markdownLink, (whole: string, label: string) => keepOnly(whole, whole.indexOf("[") + 1, label))
+    .replace(inlineTag, blank)
+    .replace(/&(?:nbsp|#160|#x[aA]0);/g, (entity: string) => ` ${blank(entity.slice(1))}`)
+    .replace(/&(?:#8208|#8209|#x201[01]|#45|hyphen|dash);/gi, (entity: string) => `-${blank(entity.slice(1))}`)
     .replace(/<!--|-->/g, blank)
     .replace(/\*\*|__|(?<![\w*])\*(?=\w)|(?<=\w)\*(?![\w*])|(?<![\w_])_(?=\w)|(?<=\w)_(?![\w_])/g, blank);
 }
+
+/** A Markdown link or image, inline or by reference: what it shows is read, not where it leads. */
+const markdownLink =
+  /!?\[([^\]\n]*)\](?:\((?:[^()\s]|\([^()\s]*\))*(?:\s+(?:"[^"]*"|'[^']*'))?\)|\[[^\]\n]*\])/g;
+/** Inline HTML a policy writes words in ("<b>AI-generated</b>", "<em>not</em>"), and line breaks. */
+const inlineTag =
+  /<\/?(?:a|abbr|b|big|cite|code|del|em|font|i|ins|kbd|mark|q|s|small|span|strike|strong|sub|sup|tt|u)\b[^<>]*>|<br\s*\/?>/gi;
 
 /**
  * Where sentences end: after . ! or ? (and any closing bracket, quote or
@@ -464,6 +728,24 @@ function allMatches(pattern: RegExp, text: string): Span[] {
 const gap = (a: Span, b: Span) => Math.max(0, b.start - a.end, a.start - b.end);
 
 /**
+ * "No LLMs for patches / pull requests.", "No AI for issues.": a model
+ * named for what it must not be used on is AI help too (DESIGN v1.2 F14,
+ * Zig's README). The classifier's rules only; disclosure checks don't use it.
+ */
+const noAiFor = new RegExp(
+  String.raw`\bno\s+${aiNoun}\s+for\s+(?:patch(?:es)?|pull\s+requests?|PRs?|issues?|comments?|contributions?)\b`,
+  "i",
+);
+refusalTerms.push(noAiFor);
+/**
+ * A compound split by blanked markup: "AI-**generated**", "**AI**-generated"
+ * or "AI&nbsp;tools" read "AI-  generated", "  AI  -generated", "AI      tools".
+ */
+refusalTerms.push(
+  /\b(?:AI|LLMs?|large\s+language\s+models?|language\s+models?)(?:\s+-\s*|\s*-\s+|\s{2,})(?:generat\w*|assist\w*|written|authored|produced|tools?|tooling|agents?|code|coding)\b/i,
+);
+
+/**
  * Each rule phrase with the nearest AI-assistance term, when one is close
  * enough and in the same sentence to make them one rule; the span covers
  * both. A refusal in one sentence and an AI term in the next ("We do not
@@ -474,7 +756,14 @@ function nearAssistance(
   rule: RegExp,
   sentenceOf: (span: Span) => Span,
 ) {
-  const terms = assistanceSpans(text);
+  const reported = (span: Span) => {
+    const sentence = sentenceOf(span);
+    return othersRule.test(text.slice(sentence.start, sentence.end));
+  };
+  const terms = [
+    ...assistanceSpans(text),
+    ...refusalTerms.flatMap((term) => allMatches(term, text)).filter((span) => !reported(span)),
+  ];
   const pairs: { phrase: Span; span: Span; term: Span }[] = [];
   for (const phrase of allMatches(rule, text)) {
     const sentence = sentenceOf(phrase);
@@ -498,6 +787,42 @@ function nearAssistance(
   }
   return pairs;
 }
+
+/**
+ * What makes a refusal of AI help in `sentence` a rule the person weighs
+ * rather than a ban (see classifyPolicy), each by its own words.
+ */
+function weighedFor(search: string, sentence: Span, term: Span) {
+  const words = search.slice(sentence.start, sentence.end);
+  return {
+    // "You may use AI tools, but …": the AI use itself is allowed.
+    permitted: allMatches(aiPermission, words).some(
+      (match) =>
+        sentence.start + match.end <= term.start &&
+        term.start - (sentence.start + match.end) <= 20,
+    ),
+    // "… unless you have reviewed every line": a rule about how AI is used.
+    conditional: conductCondition.test(words) && !maintainerPermission.test(words),
+    // "Write the PR description and comments without AI": a rule about
+    // the conversation, not the change; for the description it is the
+    // project's own-words rule.
+    aboutConversation: conversation.test(words) && !changeObject.test(words),
+    // "Do not use AI to generate substantial pieces of code": how much is
+    // too much is the person's call.
+    sized: sizeQualifier.test(words) && !unsizedAiChange(words) && !refusalCarried.test(words),
+    // "Listing AI tooling as a co-author … is not allowed": how AI help
+    // is credited, not whether it may help; each refused thing counts.
+    credited: weighedRefusal(words),
+  };
+}
+
+/**
+ * A document as a reader sees it: without soft hyphens, zero-width spaces
+ * and joiners, word joiners or byte-order marks, which would hide a rule's
+ * words from the patterns ("AI-gen\u00aderated", "Un\u200bacceptable
+ * uses"). Lines stay where they are; quotes leave these characters out.
+ */
+const visibleText = (text: string) => text.replace(/[\u00ad\u200b-\u200d\u2060\ufeff]/g, "");
 
 /**
  * The rules a project document states, by kind, each with a verbatim
@@ -524,7 +849,8 @@ function nearAssistance(
  * contribution context, which never blocks. A refusal about the
  * description is an `own-words` rule.
  */
-export function classifyPolicy(path: string, text: string): PolicyFinding[] {
+export function classifyPolicy(path: string, document: string): PolicyFinding[] {
+  const text = visibleText(document);
   const findings: PolicyFinding[] = [];
   const seen = new Set<string>();
   const add = (
@@ -572,23 +898,7 @@ export function classifyPolicy(path: string, text: string): PolicyFinding[] {
       decided.add(sentence.start);
       const words = search.slice(sentence.start, sentence.end);
       const agentTerm = /agent|bot/i.test(search.slice(term.start, term.end));
-      // "You may use AI tools, but …": the AI use itself is allowed.
-      const permitted = allMatches(aiPermission, words).some(
-        (match) =>
-          sentence.start + match.end <= term.start &&
-          term.start - (sentence.start + match.end) <= 20,
-      );
-      // "… unless you have reviewed every line": a rule about how AI is used.
-      const conditional =
-        conductCondition.test(words) && !maintainerPermission.test(words);
-      // "Write the PR description and comments without AI": a rule about
-      // the conversation, not the change; for the description it is the
-      // project's own-words rule.
-      const aboutConversation =
-        conversation.test(words) && !changeObject.test(words);
-      // "Do not use AI to generate substantial pieces of code": how much is
-      // too much is the person's call.
-      const sized = sizeQualifier.test(words);
+      const { permitted, conditional, aboutConversation, sized, credited } = weighedFor(search, sentence, term);
       // A long sentence about good first issues that refuses AI-generated
       // pull requests at its end still reserves the learning issues.
       if (learningIssues.test(words)) add("area", block, search, span);
@@ -602,7 +912,7 @@ export function classifyPolicy(path: string, text: string): PolicyFinding[] {
           block,
           search,
           span,
-          permitted || conditional || aboutConversation || sized,
+          permitted || conditional || aboutConversation || sized || credited,
         );
     }
     for (const match of allMatches(addressedToAgents, search))
@@ -619,9 +929,320 @@ export function classifyPolicy(path: string, text: string): PolicyFinding[] {
     ] as const)
       for (const match of allMatches(rule, search)) add(kind, block, search, match);
   }
-  return findings
-    .sort((a, b) => a.line - b.line)
-    .slice(0, 30);
+  const ordered = findings.sort((a, b) => a.line - b.line);
+  if (ordered.length <= maxFindings) return ordered;
+  // Over 30, the rules that block publishing stay, then the rest in reading order.
+  const kept = new Set(
+    ordered
+      .map((finding, index) => ({ blocking: blocksPublishing(finding), index }))
+      .sort((a, b) => Number(b.blocking) - Number(a.blocking) || a.index - b.index)
+      .slice(0, maxFindings)
+      .map(({ index }) => index),
+  );
+  return ordered.filter((_, index) => kept.has(index));
+}
+
+/** A document's rules kept at most (`ContributionRules.findings` holds 30). */
+const maxFindings = 30;
+/**
+ * The rules that can block publishing: contribution bans, reserved
+ * learning issues, disclosure, and a ban that stops the quoted confirm.
+ */
+const blocksPublishing = (finding: PolicyFinding) =>
+  (finding.kind === "ban" && finding.contribution) ||
+  finding.kind === "area" ||
+  finding.kind === "disclose" ||
+  stopsQuotedConfirm(finding);
+
+/**
+ * A ban that refuses AI help itself or whose reach BELL can't tell
+ * (`refusesAiHelp`), contribution named or not: while it stands, no
+ * Learn-by-hand run gets the quoted confirm (shared/by-hand-rules.ts), so
+ * no cap of the stored rules may leave it out.
+ */
+export function stopsQuotedConfirm(finding: PolicyFinding) {
+  return finding.kind === "ban" && banReach(finding.quote) !== "output" && refusesAiHelp(finding.quote);
+}
+
+/** The project's own practice, not a rule for contributors: "We do not use AI tools in our release process". */
+const ownPractice =
+  /^\W*(?:we|maintainers?|reviewers?|the\s+(?:team|maintainers|reviewers|project|core\s+team)|this\s+project|our\s+(?:team|maintainers|reviewers|project|CI|bots?))\s+(?:(?:do|does|will)\s*(?:not|n't)|never)\s+(?:\w+\s+)?use\b/i;
+/** An exception that is the contributor's own conduct: "unless you have reviewed every line". */
+const conductException =
+  /\b(?:unless|except)\b[^.;:]{0,60}?\b(?:review|understand|disclos|declar|attribut|label|mention|test|verif|check|explain|edit)\w*/i;
+
+/**
+ * Whether a ban's quote, read alone, refuses AI help as such: a ban with
+ * nothing to weigh but whether it names a contribution ("AI assistance of
+ * any kind is not accepted."). Not when it lets contributors use AI, makes
+ * an exception for their own review, understanding, disclosure or testing,
+ * is about the conversation, a size or the credit, or states the
+ * project's own practice ("We do not use AI tools in our own release
+ * process."); "except for translations" is no such exception. A quote
+ * BELL can't read as a refusal refuses (the strict reading). Such a rule,
+ * anywhere in a project's rules, stops the quoted confirm
+ * (shared/by-hand-rules.ts).
+ */
+export function refusesAiHelp(quote: string) {
+  const search = searchable(visibleText(quote));
+  const whole = { start: 0, end: search.length };
+  const pair = nearAssistance(search, prohibition, () => whole)[0];
+  if (!pair) return true;
+  if (ownPractice.test(search)) return false;
+  const why = weighedFor(search, whole, pair.term);
+  // A bare "unless" or "except" is no condition the person meets by their own conduct.
+  const conduct =
+    (conductCondition.test(search.replace(/\b(?:unless|except)\b/gi, blank)) || conductException.test(search)) &&
+    !maintainerPermission.test(search);
+  return !(why.permitted || conduct || why.aboutConversation || why.sized || why.credited);
+}
+
+/**
+ * A permission: what follows "does not apply to", "it's fine to", or "is
+ * allowed to"/"not prohibited to", or what comes before "is out of
+ * scope", "is fine", "are acceptable".
+ */
+const permission =
+  /\b(?:does|do)\s+not\s+apply\s+to\b|\bit(?:['’]s|\s+is)\s+fine\s+to\b|\bnot\s+prohibited\b|\bout\s+of\s+scope\b(?!\s+(?:for|of|in)\s+(?:this|the|these)\s+(?:guides?|documents?|docs?|pages?|sections?|FAQs?|tutorials?|checklists?|README|chapters?|articles?|discussions?|issues?|trackers?|repositor(?:y|ies)|repos?|projects?|channels?|forums?)\b)|\b(?:is|are)\s+(?:acceptable|fine|permitted|allowed)\b/gi;
+/** Where the words a permission covers end: a condition, a contrast or a duty. */
+const permissionEnd =
+  /;|\b(?:but|provided|as\s+long\s+as|so\s+long\s+as|if|unless|except|however|although|though|whereas|while|when|should|must|needs?|ha(?:ve|s)\s+to|expected|required)\b/gi;
+/** A negation or an exception among the permitted words drops the permission ("for anything other than debugging"). */
+const permissionNegated =
+  /\b(?:not|no|never|neither|nor|without|cannot|forbid\w*|prohibit\w*|ban(?:s|ned)?|disallow\w*|unacceptable|avoid\w*|other\s+than|apart\s+from|aside\s+from|besides|excluding|instead\s+of|rather\s+than|beyond)\b|n['’]t\b/i;
+/** A permission for some people only ("only for maintainers") is no carve-out for the person. */
+const permissionScoped =
+  /\b(?:only|solely|exclusively|maintainers?|committers?|core|staff|employees?|team\s+members?|unless|except)\b/i;
+/** A permission that waits for somebody's approval, anywhere in its sentence ("if a maintainer approves"). */
+const othersApproval = /\b(?:approv\w*|permission|consent|sign[- ]?off|agree\w*|ask(?:s|ed)?\s+(?:you|for)|invit\w*)\b/i;
+/** A contrast right after the permission that takes it back: "fine in your fork, but not in this repository". */
+const contrastTakesBack = /^\W*(?:but\s+)?(?:not|never|no)\b/i;
+/** Somebody else's view, a rule of the past or one not decided or adopted: never the project's permission. */
+const notTheProjects =
+  /\b(?:no\s+longer|anymore|used\s+to|previously|formerly|until\s+recently|in\s+the\s+past|whether|myths?|misconceptions?|(?:some|many|other)\s+(?:people|contributors|users|folks|projects)|people\s+(?:often\s+|sometimes\s+)?(?:think|believe|say|claim|assume)|(?:you|they|others)\s+(?:may|might)\s+(?:think|believe|hear|have\s+heard)|(?:it\s+is|it['’]s)\s+(?:often\s+|commonly\s+|widely\s+|sometimes\s+)?(?:said|claimed|believed|assumed|thought))\b|\b(?:says?|said|writes?|wrote)\s+(?!(?:that\s+)?(?:it['’]?s|it\s+is|using|the\s+use|you|we|our)\b)\w|\bputs\s+it\b|\baccording\s+to\s+(?!(?:our|this|these|the\s+(?:policy|rules|guidelines|text|section)\b))|\b(?:propos(?:ed|als?)|drafts?|pending|tentative|considering|under\s+discussion|still\s+discussing|not\s+yet\s+(?:adopted|agreed|decided|final|approved|in\s+effect)|RFC|TODO|TBD|WIP)\b/i;
+/** A condition that the words after it are part of: "If …", "When …". */
+const subordinate = /\b(?:if|when|whenever|whether|once|until)\b[^,;]*$/i;
+/** The next sentence takes it back: "Just kidding: it is not." */
+const takenBack =
+  /^\W*(?:(?:actually|however|but|well|update|edit|correction|wait)\b\W*)?(?:just\s+kidding|kidding|not\s+really|nope|no\s*[,:;.!]|not\s+anymore|(?:it|that|this)\s+(?:is|was)(?:\s+not|n['’]t)\b|(?:it|that|this)\s+no\s+longer\b)/i;
+/** A sentence about AI help, as carve-outs are. */
+const aiMention =
+  /\b(?:AI|LLMs?|large\s+language\s+models?|language\s+models?|generative|chatbots?|ChatGPT|Copilot|Claude|Codex|Gemini|machine[- ]learning|artificial\s+intelligence)\b/i;
+/** A heading or lead-in naming uses that are fine, or ones that are not. */
+const acceptableHeading = /(?<![\w-])(?:acceptable|allowed|permitted|fine|ok|okay)\b/i;
+const headingTopic = /\b(?:uses?|usage|AI|LLMs?|tools?)\b/i;
+const refusingHeading =
+  /\b(?:unacceptable|not\s+(?:\w+\s+)?(?:acceptable|allowed|permitted|ok|okay|fine)|disallowed|forbidden|prohibited|banned|never|don['’]t|do\s+not|avoid)\b/i;
+/** A "Yes" that answers a question about using AI, unless it says "but please don't". */
+const yesAnswer = /^\W*yes\b/i;
+/** A "no", a "not", an exception or a "please don't" in a Yes answer or the sentence after it. */
+const yesButDont =
+  /\b(?:no|not|never|nope|don['’]t|do\s+not|avoid\w*|refrain\w*|except\w*|unless|instead|rather\s+than)\b|n['’]t\b/i;
+/** A Yes that says nothing more, or only points to a caveat: the question's kinds stand. */
+const plainYes = /^\W*yes\b[\s,.!;:-]*(?:$|(?:but\s+)?(?:see|note|remember|keep\s+in\s+mind|be\s+(?:aware|careful))\b)/i;
+/** A question about the person asking using AI ("Can I use …?", "Is it OK to …?"), not about others. */
+const askerUsesAi =
+  /^\W*(?:(?:can|may|could)\s+(?:I|we|you|one|contributors?|newcomers?)\b|(?:is\s+it|it['’]s)\s+(?:ok|okay|fine|acceptable|allowed|permitted|alright)\b|(?:am\s+I|are\s+(?:we|you|contributors?|newcomers?))\s+(?:allowed|permitted)\b)/i;
+/** Where a question's condition starts. */
+const questionCondition = /\b(?:if|when|once|after|unless|provided|as\s+long\s+as|so\s+long\s+as|while|but)\b/i;
+const listItem = /^\s*(?:[-*+]|\d{1,9}[.)])\s+/;
+
+/**
+ * The words of a sentence that a permission at `phrase` covers (`start`
+ * to `end`): up to the next condition after "does not apply to", "fine
+ * to" or "allowed to", else back to the previous one. `clause` ends the
+ * clause the permission is in.
+ */
+function permittedWords(words: string, phrase: Span): Span & { clause: number } {
+  const ends = allMatches(permissionEnd, words);
+  const clause = ends.find((end) => end.start >= phrase.end)?.start ?? words.length;
+  if (/to$/i.test(words.slice(phrase.start, phrase.end)) || /^\s+to\b/i.test(words.slice(phrase.end)))
+    return { start: phrase.end, end: clause, clause };
+  const start = ends.filter((end) => end.end <= phrase.start).at(-1)?.end ?? 0;
+  return { start, end: phrase.start, clause };
+}
+
+/**
+ * Carve-outs of a project's AI rules (DESIGN v1.2 F12): what the same
+ * document says some uses of AI are fine for, read deterministically and
+ * conservatively, each with the help kinds the F12 word table finds in it
+ * (`carveOutKinds`; nothing else counts). A sentence about AI counts in a
+ * permission context ("does not apply to", "out of scope", "is fine",
+ * "it's fine to", "not prohibited") for the words the permission covers
+ * only, and a question about using AI counts when it is answered "Yes"
+ * (never "Yes, but please don't"); a list item counts under a heading or
+ * lead-in that names acceptable or allowed uses. Nothing counts under an
+ * "unacceptable" or "not allowed" heading, and a sentence that is itself
+ * a ban or a reserved-issue rule never does. Each `ban` and `area`
+ * finding of the document gets the first three as `allows`; agent runs
+ * never read them. Server only: the rules card calls it when it reads
+ * the rules, and no client module does, so the word table stays out of
+ * the client.
+ */
+export function attachCarveOuts(path: string, text: string, findings: PolicyFinding[]): PolicyFinding[] {
+  const ruled = (finding: PolicyFinding) => finding.kind === "ban" || finding.kind === "area";
+  const rules = findings.filter(ruled);
+  if (!rules.length) return findings;
+  // A sentence that is itself a ban or a reserved-issue rule is never its carve-out.
+  const allows = readCarveOuts(path, text)
+    .filter(
+      (carveOut) =>
+        !rules.some((rule) => rule.quote.includes(carveOut.quote) || carveOut.quote.includes(rule.quote)),
+    )
+    .slice(0, 3);
+  if (!allows.length) return findings;
+  return findings.map((finding) =>
+    ruled(finding)
+      ? { ...finding, allows: allows.map((allowance) => ({ ...allowance, kinds: [...allowance.kinds] })) }
+      : finding,
+  );
+}
+
+/**
+ * Text no reader sees as the project's permission, blanked with its lines
+ * kept: HTML comments and, in reStructuredText, comments (".. " lines that
+ * are no directive or target, with their indented lines).
+ */
+function withoutComments(text: string, rest: boolean) {
+  const blankLines = (part: string) => part.replace(/[^\n]/g, " ");
+  if (!rest) return text.replace(/<!--[\s\S]*?(?:-->|$)/g, blankLines);
+  let comment: number | undefined;
+  return text
+    .split("\n")
+    .map((line) => {
+      const indent = line.length - line.trimStart().length;
+      if (comment !== undefined && (!line.trim() || indent > comment)) return blankLines(line);
+      comment = /^\s*\.\.(?:\s|$)(?!\s*(?:[\w.+-]+::|_|\[|\|))/.test(line) ? indent : undefined;
+      return comment === undefined ? line : blankLines(line);
+    })
+    .join("\n");
+}
+/** A lead-in that quotes or shows somebody else's text: "LLVM's policy says:", "for comparison", "an example policy". */
+const reportedLead =
+  /\b(?:says?|said|states?|stated|writes?|wrote|puts\s+it)\b\W*$|\bfor\s+comparison\b|\b(?:example|sample|template)\s+(?:polic(?:y|ies)|text|wording|rules?)\b/i;
+/** A quote's attribution: "> — from another project's guide". */
+const attribution = /(?:^|\s)(?:\u2014|\u2015|--)\s*\S/;
+/** A list item marked as not fine: "❌ …", "No: …", "Not …". */
+const markedNo = /^\s*(?:[-*+]|\d{1,9}[.)])\s+(?:\[[ xX]\]\s+)?(?:\u274c|\u2717|\u2718|\u2716|\u{1f6ab}|\u26d4|:x:|:no_entry(?:_sign)?:|(?:no|not|never|don['’]t|avoid)\b)/iu;
+
+/** Every carve-out of a document, in reading order (see attachCarveOuts). */
+function readCarveOuts(path: string, document: string): PolicyAllowance[] {
+  const rest = /\.rst$/i.test(path);
+  const text = withoutComments(visibleText(document), rest);
+  const raw = text.split(/\r?\n/);
+  const all = blocks(rest ? restProse(text) : rawProse(text));
+  // A Markdown indented code block: four spaces in, after a block that is no list item.
+  const indentedCode = (index: number) =>
+    !rest && /^(?: {4}|\t)/.test(raw[all[index].starts[0].line - 1] ?? "") && !(index && listItem.test(all[index - 1].text));
+  // A heading, a bold line or a lead-in ending in ":" (not a directive), or a reStructuredText title.
+  const headingOf = (block: Block) => {
+    const plain = block.text.replace(/:[\w.+-]+:`[^`]*`/g, "").trim();
+    const last = block.starts.at(-1)!.line;
+    const heading =
+      /^#{1,6}\s/.test(plain) ||
+      /^(?:\*\*|__)[^*_]+(?:\*\*|__)$/.test(plain) ||
+      (plain.endsWith(":") && plain.length <= 160 && !listItem.test(block.text) && !/^\.\.\s/.test(plain)) ||
+      (rest && restAdornment.test(raw[last] ?? ""));
+    return heading && plain.length <= 160 ? searchable(plain) : undefined;
+  };
+  const nearestHeading = (index: number, skip: (block: Block) => boolean) => {
+    for (let at = index - 1; at >= 0; at--) {
+      const heading = headingOf(all[at]);
+      if (heading !== undefined) return heading;
+      if (!skip(all[at])) return undefined;
+    }
+    return undefined;
+  };
+  const found: PolicyAllowance[] = [];
+  const add = (block: Block, quote: { quote: string; offset: number }, kinds: HelpKind[]) => {
+    if (kinds.length && quote.quote.trim() && !found.some((other) => other.quote === quote.quote))
+      found.push({ line: lineAt(block, quote.offset), quote: quote.quote, kinds });
+  };
+  // The lead-in of a list item: a list item ending in ":" before it ("Not acceptable:"), else the heading.
+  const leadOf = (index: number) => {
+    for (let at = index - 1; at >= 0 && listItem.test(all[at].text); at--)
+      if (all[at].text.trim().endsWith(":")) return searchable(all[at].text.replace(listItem, ""));
+    return nearestHeading(index, (other) => listItem.test(other.text));
+  };
+  all.forEach((block, index) => {
+    const under = nearestHeading(index, () => true);
+    if (under !== undefined && (refusingHeading.test(under) || notTheProjects.test(under) || reportedLead.test(under))) return;
+    if (indentedCode(index) || (/^\s*>/.test(block.text) && attribution.test(block.text))) return;
+    const search = searchable(block.text);
+    // A list item under "Acceptable uses" (only list items between them), unless marked as not fine.
+    const lead = listItem.test(block.text) && !markedNo.test(block.text) ? leadOf(index) : undefined;
+    const whole = { start: 0, end: block.text.length };
+    if (
+      lead !== undefined &&
+      !refusingHeading.test(lead) &&
+      acceptableHeading.test(lead) &&
+      headingTopic.test(lead) &&
+      !permissionScoped.test(lead) &&
+      block.text.length <= 300 &&
+      !permissionNegated.test(search) &&
+      !permissionScoped.test(search) &&
+      !notTheProjects.test(search)
+    )
+      add(block, quoteOf(block.text, whole, whole), carveOutKinds(search));
+    const sentences = splitSentences(block.text);
+    sentences.forEach((sentence, at) => {
+      const words = search.slice(sentence.start, sentence.end);
+      if (!aiMention.test(words)) return;
+      // A question about the person using AI, answered "Yes" in the next sentence or block.
+      if (/\?\W*$/.test(words)) {
+        if (!askerUsesAi.test(words) || permissionScoped.test(words) || othersApproval.test(words) || notTheProjects.test(words))
+          return;
+        // What is asked ends at its condition: "… to write the code if I then debug it myself?"
+        const asked = words.slice(0, questionCondition.exec(words)?.index ?? words.length);
+        const following = all[index + 1];
+        const next = sentences[at + 1]
+          ? { block, sentence: sentences[at + 1] }
+          : following && { block: following, sentence: splitSentences(following.text)[0] };
+        if (!next?.sentence) return;
+        const answered = searchable(next.block.text);
+        const answer = answered.slice(next.sentence.start, next.sentence.end);
+        // The answer and the sentence after it: "Yes. But please don't." is no Yes.
+        const after = splitSentences(next.block.text).find((other) => other.start >= next.sentence.end);
+        const said = answered.slice(next.sentence.start, after?.end ?? next.sentence.end);
+        if (!yesAnswer.test(answer) || yesButDont.test(said) || permissionScoped.test(said)) return;
+        // "Yes, for understanding the code": only what the answer names too.
+        const kinds = carveOutKinds(asked).filter((kind) => plainYes.test(answer) || carveOutKinds(answer).includes(kind));
+        const question = quoteOf(block.text, sentence, sentence);
+        const yes = quoteOf(next.block.text, next.sentence, next.sentence);
+        const quote = `${question.quote} ${yes.quote}`;
+        if (quote.length <= 300) add(block, { quote, offset: question.offset }, kinds);
+        return;
+      }
+      // Somebody else's view, a past or undecided rule, or one the next sentence takes back.
+      const following = sentences[at + 1];
+      if (notTheProjects.test(words) || (following && takenBack.test(search.slice(following.start, following.end)))) return;
+      for (const phrase of allMatches(permission, words)) {
+        const covered = permittedWords(words, phrase);
+        // The permitted words and what qualifies them up to the condition, the permission's own words left out.
+        const qualified = `${words.slice(covered.start, Math.max(covered.start, phrase.start))} ${words.slice(phrase.end, covered.clause)}`;
+        if (permissionNegated.test(qualified)) continue;
+        if (contrastTakesBack.test(words.slice(covered.clause).replace(/^\s*;/, ""))) continue;
+        // A permission inside a condition: "If using AI to debug is fine with your reviewer, …".
+        if (subordinate.test(words.slice(0, Math.min(phrase.start, covered.start)))) continue;
+        // Taken back in its own sentence: "…, but changes made that way are not accepted."
+        const after = words.slice(covered.clause);
+        if (/^\W*but\b/i.test(after) && prohibition.test(after)) continue;
+        // A role or somebody's approval anywhere after the permitted words, conditions included.
+        const rest = words.slice(covered.start);
+        if (permissionScoped.test(rest) || othersApproval.test(rest)) continue;
+        const quote = quoteOf(block.text, sentence, {
+          start: sentence.start + Math.min(phrase.start, covered.start),
+          end: sentence.start + Math.max(phrase.end, covered.end),
+        });
+        // A sentence over 300 characters is quoted around the permission: only its quoted words count.
+        const from = Math.max(sentence.start + covered.start, quote.offset);
+        const to = Math.min(sentence.start + covered.end, quote.offset + quote.quote.length);
+        const kinds = to > from ? carveOutKinds(search.slice(from, to)) : [];
+        if (kinds.length) return add(block, quote, kinds);
+      }
+    });
+  });
+  return found;
 }
 
 /** The sentences of a text, split after . ! or ? and at comment delimiters. */
@@ -641,7 +1262,7 @@ function splitSentences(text: string): Span[] {
 const aiTerm =
   "(?:AI|LLMs?|large language models?|generative|gen[- ]?AI|artificial intelligence|machine[- ]generated|Copilot|ChatGPT|Claude|Codex)\\b";
 const discloseVerb =
-  "(?:disclos\\w*|declar\\w*|mention|indicate|state|tell us|let us know)";
+  "(?:disclos\\w*|declar\\w*|mention|indicate|state|convey|tell us|let us know)";
 const disclosedPassive =
   "(?:disclosed|declared|mentioned|indicated|stated|labell?ed|marked|flagged|noted)";
 
@@ -665,10 +1286,11 @@ const disclosurePattern = new RegExp(
  * The patterns above also fit lines about an AI feature ("state whether
  * the AI module changed", "let us know if you need help with the AI
  * backend"), so a line counts only when it is about using AI to make the
- * contribution.
+ * contribution: also AI "involved in" making it (Mesa) or the content
+ * "made with the help of" AI (Forgejo), never AI "involved in" a crash.
  */
 const aiUse =
-  /\b(?:us(?:e|es|ed|ing|age)|assist\w*|generated|wr(?:ote|itten)|authored|produced)\b/i;
+  /\b(?:us(?:e|es|ed|ing|age)|assist\w*|generated|wr(?:ote|itten)|authored|produced)\b|\binvolved\s+in\s+(?:the\s+)?(?:creative|making|writing|creating|coming|authoring|developing|preparing|producing|designing)\b|\b(?:made|created|written|prepared|done)\s+with\s+(?:the\s+)?help\s+of\b/i;
 
 /** A template heading or checkbox: "## AI disclosure", "[ ] AI usage disclosed". */
 const disclosureHeading =
@@ -676,7 +1298,7 @@ const disclosureHeading =
 
 /** "Do not mention AI" and the like are not disclosure rules. */
 const negated =
-  /\b(?:do not|don't|never|no need to|not required to)\s+(?:\w+\s+){0,2}(?:disclos|declar|mention|state|indicate|say so)/i;
+  /\b(?:do not|don't|never|no need to|not required to)\s+(?:\w+\s+){0,2}(?:disclos|declar|mention|state|indicate|convey|say so)/i;
 
 /**
  * A request to name the tool in a trailer: "use a commit message trailer

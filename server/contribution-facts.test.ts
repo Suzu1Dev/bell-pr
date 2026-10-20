@@ -178,6 +178,33 @@ test("a GitHub import reads the project's rules, its door and the size reference
   }
 });
 
+test("reading the rules stores the project's help channels from its files", async () => {
+  const f = await githubProject({}, {
+    "CONTRIBUTING.md": [
+      "# Contributing",
+      "",
+      "Questions? Ask on [Zulip](https://example.zulipchat.com/) or in",
+      "https://github.com/test-owner/example/discussions before you open a pull request.",
+    ].join("\n"),
+  });
+  try {
+    assert.deepEqual(f.repo.contributionRules?.channels, [
+      { label: "Zulip", url: "https://example.zulipchat.com/", path: "CONTRIBUTING.md", line: 3 },
+      {
+        label: "github.com/test-owner/example/discussions",
+        url: "https://github.com/test-owner/example/discussions",
+        path: "CONTRIBUTING.md",
+        line: 4,
+      },
+    ]);
+    const saved = new Store(f.store.directory);
+    await saved.initialize();
+    assert.deepEqual(saved.data.repos[0].contributionRules?.channels, f.repo.contributionRules?.channels);
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test("a local-folder import reads the project's files and runs no gh at all", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-facts-local-"));
   // The fake's gh records every call, so a call would show.
