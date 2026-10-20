@@ -332,14 +332,14 @@ function toReact(child: Child, options: Options, key: number): ReactNode {
 /**
  * Renders Markdown as React elements. Raw HTML never renders, `urlTransform`
  * rewrites every link's target, and `components` replace elements by tag
- * name.
+ * name. Anything but a string renders nothing, as with the earlier pipeline.
  */
 export function Markdown({
   children,
   urlTransform,
   components,
 }: Options & { children: string }) {
-  const tree = fromMarkdown(children, {
+  const tree = fromMarkdown(typeof children === "string" ? children : "", {
     extensions: [gfm()],
     mdastExtensions: [gfmFromMarkdown()],
   });

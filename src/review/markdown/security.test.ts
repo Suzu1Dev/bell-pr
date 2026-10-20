@@ -91,3 +91,13 @@ test("a block with more children than a function call takes still renders", () =
     assert.ok(html.endsWith(`a<br/>\nend${close}</div>`));
   }
 });
+
+test("children that are not a string render an empty container instead of throwing", () => {
+  // As the earlier pipeline did in a production build: a null or other
+  // value read from a stored run must not take down the view.
+  for (const children of [null, undefined, 0, 42, ["a", "b"], { a: 1 }])
+    assert.equal(
+      renderEn(createElement(MarkdownContent, { children: children as unknown as string })),
+      '<div class="markdown-content"></div>',
+    );
+});
