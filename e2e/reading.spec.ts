@@ -276,13 +276,13 @@ test.describe("the commits of a published real run", () => {
 test.describe("a Learn-by-hand run in review, marked ready", () => {
   test.describe.configure({ mode: "serial" });
   let project: RealProject;
+  let ready: string;
   const open = opener(() => project);
   test.beforeAll(async () => {
     // A file's fingerprint depends only on its path and patch, so the
     // seeded project's change has the same fingerprint on every start: read
     // it from a first one, and mark that version ready on the second.
     const first = await startRealProject();
-    let ready: string;
     try {
       const api = await request.newContext({ baseURL: first.baseURL, storageState: first.storageState });
       const { files: diff } = (await (await api.get(`/api/runs/${runId}/diff`)).json()) as {
@@ -361,6 +361,49 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
       await axe(page, ".understanding-check");
     } finally {
       await close();
+    }
+  });
+
+  // MERGE-STEP: as above, once the Changes tab passes byHandReview; with
+  // the check off in Settings the file may be explained at once (DESIGN
+  // v1.2 F10), and W2A's server takes one file per request.
+  test.fixme("with the check off, Show how a reader sees it asks for this file only and keeps focus in the panel", async ({ browser }) => {
+    const checkOff = await startRealProject({
+      appSettings: { skipUnderstandingCheck: true },
+      run: {
+        learnByHand: true,
+        explanations: {},
+        byHand: { ready: { at: "2026-10-14T10:00:00.000Z", changeFingerprint: ready, review: false } },
+      },
+    });
+    const { page, close } = await opener(() => checkOff)(browser);
+    const asked: { path: string; body: unknown }[] = [];
+    page.on("request", (sent) => {
+      const { pathname } = new URL(sent.url());
+      if (sent.method() === "POST" && /^\/api\/runs\/[^/]+\/(explanations|walkthroughs)$/.test(pathname))
+        asked.push({ path: pathname.split("/").pop()!, body: sent.postDataJSON() });
+    });
+    try {
+      await page.goto(`/#/runs/${runId}/changes?file=${files.greeting}&locale=en`);
+      const panel = page.locator(".explain-panel");
+      const show = panel.getByRole("button", { name: panelStrings.reader.show });
+      await expect(show).toBeEnabled();
+      await expect(panel).not.toContainText(panelStrings.reader.answerFirst);
+      await show.focus();
+      await page.keyboard.press("Enter");
+      await expect(show).toHaveCount(0);
+      // The button gave way to the progress; focus stays in the tab panel.
+      await expect(panel.getByRole("tabpanel")).toBeFocused();
+      await expect.poll(() => asked.length).toBe(2);
+      expect(asked).toEqual(
+        expect.arrayContaining([
+          { path: "explanations", body: { retry: true, filePath: files.greeting } },
+          { path: "walkthroughs", body: { filePath: files.greeting, retry: true } },
+        ]),
+      );
+    } finally {
+      await close();
+      await checkOff.stop();
     }
   });
 });
