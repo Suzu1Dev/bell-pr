@@ -339,7 +339,8 @@ test("a fitted run names its help set and offers no planning help or review", as
     await page.locator("#workspace-tab-activity").click();
     const plan = page.getByRole("region", { name: t.plan.title });
     await expect(plan).toContainText(t.plan.closed);
-    for (const name of [t.plan.noIdea, t.plan.names, t.questions.title, t.compare.action])
+    // Literal names: the last two belong to cuts K2 and K4, which may be reverted alone.
+    for (const name of [t.plan.noIdea, t.plan.names, "Questions on my plan", "Compare with the guide's steps"])
       await expect(plan.getByRole("button", { name })).toHaveCount(0);
   } finally {
     await close();
