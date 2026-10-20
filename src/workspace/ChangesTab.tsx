@@ -332,7 +332,8 @@ export function ChangesTab({
         )}
       </div>
     )}
-    {run.byHand?.ready && writing && <p className="by-hand-note" role="status">{workspace.byHand.changed}</p>}
+    {/* There before the change, so a screen reader announces the notice when it comes (DESIGN v1.2 F5). */}
+    {run.learnByHand && <p className={run.byHand?.ready && writing ? "by-hand-note" : "visually-hidden"} role="status">{run.byHand?.ready && writing ? workspace.byHand.changed : ""}</p>}
     <div
       ref={reviewGridRef}
       className={`review-grid ${!showFiles ? "files-hidden" : ""} ${!showExplanation ? "explanation-hidden" : ""}`}

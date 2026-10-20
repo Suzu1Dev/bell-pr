@@ -6,9 +6,13 @@
 // that log their arguments); the three publishing paths of the owner's
 // answer 2 (blocked, confirmed, allowed) on real-shaped rules; and the
 // fix-ups of README v1.2 §18.11 that only a browser shows.
+import { appendFile } from "node:fs/promises";
+import path from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { changeFingerprint } from "../shared/change-fingerprint";
 import type { Run } from "../src/types";
 import byHandText from "../src/byhand/write/i18n/en";
+import workspace from "../src/i18n/en/workspace";
 import { runId, startRealProject, type RealProject } from "./helpers/real-project";
 
 const at = "2026-10-20T09:00:00.000Z";
@@ -70,6 +74,38 @@ test.describe("the fix-ups a browser shows (README v1.2 §18.11)", () => {
       await expect(page.locator(".toast")).toHaveCount(0);
       // Nothing moved: the person is still planning.
       expect((await readRun(page)).status).toBe("awaiting_plan");
+    } finally {
+      await context.close();
+      await project.stop();
+    }
+  });
+
+  test("the changed-after-Ready notice comes into a status region that was there before, so it is announced", async ({ browser }) => {
+    test.setTimeout(120_000);
+    const project = await startRealProject({ run: byHandRun("review", "complete") });
+    const { context, page } = await open(browser, project);
+    try {
+      // Marked ready at the current version, through the real route.
+      const { files } = (await (await page.request.get(`/api/runs/${runId}/diff`)).json()) as { files: { path: string; fingerprint: string }[] };
+      const ready = await page.request.post(`/api/runs/${runId}/by-hand/ready`, { data: { changeFingerprint: changeFingerprint(files), review: false } });
+      expect(ready.ok()).toBe(true);
+      await page.goto(`/#/runs/${runId}/changes?locale=en`);
+      await expect(page.locator(".file-item").first()).toBeVisible();
+      // The live region (just above the files and the diff) is on the page, empty, while the
+      // change is the version marked ready.
+      const notice = page.getByRole("status").filter({ hasText: workspace.byHand.changed });
+      await expect(notice).toHaveCount(0);
+      const live = page.locator('p[role="status"]:has(+ .review-grid)');
+      await expect(live).toHaveCount(1);
+      const region = await live.elementHandle();
+      expect(region).not.toBeNull();
+      expect(await region!.textContent()).toBe("");
+      // The person edits a file; back in BELL, the diff is read again and the same region speaks.
+      const { worktreePath } = await readRun(page);
+      await appendFile(path.join(worktreePath!, "src/format.ts"), "\nexport const late = true;\n");
+      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+      await expect(notice).toBeVisible({ timeout: 15_000 });
+      expect(await region!.textContent()).toBe(workspace.byHand.changed);
     } finally {
       await context.close();
       await project.stop();
