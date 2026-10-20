@@ -605,6 +605,14 @@ function nearAssistance(
 }
 
 /**
+ * A document as a reader sees it: without soft hyphens, zero-width spaces
+ * and joiners, word joiners or byte-order marks, which would hide a rule's
+ * words from the patterns ("AI-gen\u00aderated", "Un\u200bacceptable
+ * uses"). Lines stay where they are; quotes leave these characters out.
+ */
+const visibleText = (text: string) => text.replace(/[\u00ad\u200b-\u200d\u2060\ufeff]/g, "");
+
+/**
  * The rules a project document states, by kind, each with a verbatim
  * quote (300 characters or fewer) and its 1-based line:
  * - `ban`: AI-assisted contributions refused. `contribution` is true when
@@ -629,7 +637,8 @@ function nearAssistance(
  * contribution context, which never blocks. A refusal about the
  * description is an `own-words` rule.
  */
-export function classifyPolicy(path: string, text: string): PolicyFinding[] {
+export function classifyPolicy(path: string, document: string): PolicyFinding[] {
+  const text = visibleText(document);
   const findings: PolicyFinding[] = [];
   const seen = new Set<string>();
   const add = (
@@ -830,7 +839,8 @@ export function attachCarveOuts(path: string, text: string, findings: PolicyFind
 }
 
 /** Every carve-out of a document, in reading order (see attachCarveOuts). */
-function readCarveOuts(path: string, text: string): PolicyAllowance[] {
+function readCarveOuts(path: string, document: string): PolicyAllowance[] {
+  const text = visibleText(document);
   const rest = /\.rst$/i.test(path);
   const raw = text.split(/\r?\n/);
   const all = blocks(rest ? restProse(text) : rawProse(text));

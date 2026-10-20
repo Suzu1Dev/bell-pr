@@ -417,6 +417,23 @@ test("a refusal in a sentence that lets contributors use AI is ambiguous, never 
   );
 });
 
+test("characters a reader doesn't see neither hide a ban nor turn an unacceptable heading into an acceptable one", () => {
+  for (const text of [
+    "AI-gen\u00aderated code is not accepted.",
+    "We do not accept AI\u200b-generated code.",
+    "We don\u200b't accept AI-generated code.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [["ban", true]], JSON.stringify(text));
+  // A soft hyphen or a zero-width space inside "Unacceptable".
+  for (const mark of ["\u00ad", "\u200b", "\u2060"]) {
+    const text = `We do not accept AI-generated pull requests.\n\n## Un${mark}acceptable uses of AI\n\n- Debugging failing tests\n- Understanding the code base\n`;
+    const findings = attachCarveOuts("CONTRIBUTING.md", text, classifyPolicy("CONTRIBUTING.md", text));
+    assert.deepEqual(findings.map((finding) => finding.allows), [undefined], JSON.stringify(mark));
+  }
+  // The quote leaves them out and keeps the rest of the line as written.
+  assert.equal(classifyPolicy("CONTRIBUTING.md", "AI-gen\u00aderated code is not accepted.")[0].quote, "AI-generated code is not accepted.");
+});
+
 test("models and assistants by name count next to a word of help", () => {
   for (const text of [
     "Do not use Copilot to write pull requests.",
