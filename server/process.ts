@@ -329,8 +329,14 @@ export async function command(
         }
         if (options.onLine) {
           pending[stream] += text;
+          // What is pending holds no newline, so only a chunk with one ends
+          // a line; searching a long unfinished line again for every chunk
+          // took time quadratic in its length.
           let end: number;
-          while ((end = pending[stream].indexOf("\n")) >= 0) {
+          while (
+            text.includes("\n") &&
+            (end = pending[stream].indexOf("\n")) >= 0
+          ) {
             options.onLine(pending[stream].slice(0, end), stream);
             pending[stream] = pending[stream].slice(end + 1);
           }

@@ -280,3 +280,18 @@ test("endGroup: a command a signal ends that command() did not send rejects nami
   setTimeout(() => controller.abort(), 200);
   await assert.rejects(stopped, (error: AppError) => error.statusCode === 409 && error.details === undefined);
 });
+
+test("onLine: a 40 MB line without a newline is read in time linear in its size and reaches onLine whole", async () => {
+  // Each chunk used to search the whole unfinished line for a newline again.
+  const lines: number[] = [];
+  const started = Date.now();
+  const result = await command(
+    process.execPath,
+    ["-e", "const b = Buffer.alloc(1024 * 1024, 97); for (let i = 0; i < 40; i++) process.stdout.write(b); process.stdout.write('\\nend')"],
+    { maxBytes: 50 * 1024 * 1024, discardOutput: true, onLine: (line) => lines.push(line.length) },
+  );
+  const elapsed = Date.now() - started;
+  assert.equal(result.code, 0);
+  assert.deepEqual(lines, [40 * 1024 * 1024, 3]);
+  assert.ok(elapsed < 4_000, `${elapsed} ms`);
+});
