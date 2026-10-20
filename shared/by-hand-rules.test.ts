@@ -16,6 +16,7 @@ import {
 } from "./by-hand-rules.js";
 import type { ContributionRules, PolicyAllowance, PolicyFinding } from "./contribution.js";
 import type { ByHandPreflightInput } from "./draft-checks.js";
+import { withStoredReach } from "./project-policy.js";
 
 const qemuBan =
   "Current QEMU project policy is to DECLINE any contributions which are believed to include or derive from AI generated content.";
@@ -30,14 +31,16 @@ const unclear = "We do not accept AI contributions.";
 const rust = "But not to **create**.";
 
 const qemuAllows: PolicyAllowance[] = [{ line: 10, quote: qemuCarveOut, kinds: ["explain", "answer", "test"] }];
-const finding = (kind: "ban" | "area", quote: string, extra: Partial<PolicyFinding> = {}): PolicyFinding => ({
-  kind,
-  path: "docs/devel/code-provenance.rst",
-  line: 6,
-  quote,
-  contribution: true,
-  ...extra,
-});
+/** A finding as the server stores it, with the reach of its quote (`withStoredReach`). */
+const finding = (kind: "ban" | "area", quote: string, extra: Partial<PolicyFinding> = {}): PolicyFinding =>
+  withStoredReach({
+    kind,
+    path: "docs/devel/code-provenance.rst",
+    line: 6,
+    quote,
+    contribution: true,
+    ...extra,
+  });
 const qemu = () => finding("ban", qemuBan, { allows: qemuAllows.map((allowance) => ({ ...allowance })) });
 const rulesOf = (...findings: PolicyFinding[]): ContributionRules => ({
   checkedAt: "2026-10-20T10:00:00.000Z",

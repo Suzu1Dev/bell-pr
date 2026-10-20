@@ -21,7 +21,7 @@ import {
 import en from "../../shared/i18n/draft-checks.en";
 import zhTW from "../../shared/i18n/draft-checks.zh-TW";
 import { formatters, type Locale } from "../../shared/i18n/locale";
-import { areaReach, banReach, type AreaReach, type BanReach } from "../../shared/policy-reach";
+import type { AreaReach, BanReach } from "../../shared/policy-reach";
 import { classifyPolicy } from "../../shared/project-policy";
 import type { DemoContent } from "../demo/types";
 import type { Messages } from "../i18n";
@@ -255,15 +255,18 @@ export function byHandStartReason(rulesCase?: ByHandRulesCase): ByHandStartReaso
 /**
  * What Start says for a Learn-by-hand run: on a project a run could be
  * fitted to, "Every kind of help" makes a run BELL won't publish there,
- * so the fitted case reads as that block (the help set wasn't fixed).
+ * so the fitted case reads as that block (the help set wasn't fixed). A
+ * rule a run can be fitted to restricts only what AI generated (condition
+ * (a)), so its block reads with the "output" copy (a reservation about
+ * automating fixes reads the same).
  */
 export function byHandStartReasons(reasons: StartReason[], rulesCase: ByHandRulesCase | undefined, fitted: boolean) {
   if (fitted || rulesCase?.case !== "fitted") return reasons;
   const [rule] = rulesCase.lock.rules;
   const block: ByHandStartReason =
     rule.kind === "area"
-      ? { id: "by-hand-area", reach: areaReach(rule.quote), reason: "not-fitted" }
-      : { id: "by-hand-ban", reach: banReach(rule.quote), reason: "not-fitted" };
+      ? { id: "by-hand-area", reach: "output", reason: "not-fitted" }
+      : { id: "by-hand-ban", reach: "output", reason: "not-fitted" };
   return reasons.map((reason) => (reason.id === "by-hand-fitted" ? block : reason));
 }
 

@@ -31,8 +31,7 @@
 import { allHelpKinds, type HelpKind, type HelpLock, type HelpLockRule } from "./by-hand.js";
 import type { ContributionRules, PolicyAllowance, PolicyFinding } from "./contribution.js";
 import type { ByHandPreflightInput } from "./draft-checks.js";
-import { areaReach, banReach, type AreaReach, type BanReach } from "./policy-reach.js";
-import { stopsQuotedConfirm } from "./project-policy.js";
+import type { AreaReach, BanReach } from "./policy-reach.js";
 
 /**
  * Why a finding stays blocked, or why a run can't be fitted (not
@@ -141,8 +140,8 @@ type RuleText = { kind: string; path: string; quote: string };
 const sameRule = (a: RuleText, b: RuleText) =>
   a.kind === b.kind && a.path === b.path && a.quote === b.quote;
 
-const reachOf = (finding: PolicyFinding) =>
-  finding.kind === "area" ? areaReach(finding.quote) : banReach(finding.quote);
+/** The reach the server stored with the rule (`withStoredReach`); none reads as "unknown", the strict reading. */
+const reachOf = (finding: PolicyFinding): BanReach | AreaReach => finding.reach ?? "unknown";
 
 /**
  * Condition (a): an output-only ban, or a reservation worded around
@@ -157,9 +156,10 @@ function restrictsOutput(finding: PolicyFinding) {
 /**
  * A ban anywhere in the rules, contribution named or not, that refuses AI
  * help itself or whose reach BELL can't tell ("AI assistance of any kind
- * is not accepted."): no quoted confirm while it stands.
+ * is not accepted."): no quoted confirm while it stands. The server marks
+ * it (`stopsConfirm`); a ban stored without a reach counts too.
  */
-const helpRefused = (rules: ContributionRules) => rules.findings.find(stopsQuotedConfirm);
+const helpRefused = (rules: ContributionRules) => rules.findings.find((finding) => finding.kind === "ban" && (finding.stopsConfirm || !finding.reach));
 
 /** The kinds a finding's carve-outs name, together. */
 const namedKinds = (finding: PolicyFinding) =>

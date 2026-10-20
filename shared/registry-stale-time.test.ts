@@ -25,6 +25,8 @@ test("rules read at the run's own instant count as read during it; a moment befo
     quote: "AI-generated contributions are declined.",
     contribution: true,
     allows: [{ line: 3, quote: "It is fine to use AI to understand the code.", kinds: ["explain", "answer"] }],
+    // The reach the server stores with the rule.
+    reach: "output",
   };
   const lock = {
     kinds: ["explain" as const, "answer" as const],

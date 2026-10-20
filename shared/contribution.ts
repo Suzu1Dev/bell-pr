@@ -22,7 +22,7 @@ import { formatters, type Locale } from "./i18n/locale.js";
 import { assistanceDenial, disclosureRule, hasAiDisclosure } from "./project-policy.js";
 import type { HelpKind } from "./by-hand.js";
 import { byHandRulesDecision, type ByHandBlockReason } from "./by-hand-rules.js";
-import { areaReach, banReach, type AreaReach, type BanReach } from "./policy-reach.js";
+import type { AreaReach, BanReach } from "./policy-reach.js";
 
 /** Rule kinds the classifier finds (shared/project-policy.ts); stored as text, frozen. */
 export const policyKinds = [
@@ -534,7 +534,8 @@ export function respectChecks(
     blocks.push({ id: "ai-ban", kind: "block", message: m.aiBan, details: [m.why.aiBan, ...bans.map(quote)] });
   else if (bans.length && !confirmed) {
     const first = bans.find(blockOf) ?? bans[0];
-    const reach = banReach(first.quote);
+    // The reach the server stored with the rule; none reads as unknown.
+    const reach = first.reach ?? "unknown";
     blocks.push({
       id: "ai-ban",
       kind: "block",
@@ -640,7 +641,7 @@ export function respectChecks(
     });
   else if (areas.length && !confirmed) {
     const first = areas.find(blockOf) ?? areas[0];
-    const reach = areaReach(first.quote);
+    const reach = first.reach ?? "unknown";
     blocks.push({
       id: "area-reserved",
       kind: "block",

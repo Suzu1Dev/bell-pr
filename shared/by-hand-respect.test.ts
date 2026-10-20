@@ -17,6 +17,7 @@ import {
   type PolicyFinding,
 } from "./contribution.js";
 import type { ByHandPreflightInput, DraftCheck } from "./draft-checks.js";
+import { withStoredReach } from "./project-policy.js";
 
 const disclosureRules: ContributionRules = {
   checkedAt: "2026-10-20T00:00:00.000Z",
@@ -54,15 +55,18 @@ const llvm = 'Using AI tools to fix issues labelled as "good first issues" is fo
 const matplotlib = "pull requests that are AI generated will be closed.";
 const claim = "BELL PR's agents had no write access and gave you no code for this change.";
 
-const ban = (quote: string, extra: Partial<PolicyFinding> = {}): PolicyFinding => ({
-  kind: "ban",
-  path: "CONTRIBUTING.md",
-  line: 7,
-  quote,
-  contribution: true,
-  ...extra,
-});
-const area = (quote: string): PolicyFinding => ({ kind: "area", path: "docs/contribute.md", line: 20, quote, contribution: true });
+/** Findings as the server stores them, with the reach of their quotes (`withStoredReach`). */
+const ban = (quote: string, extra: Partial<PolicyFinding> = {}): PolicyFinding =>
+  withStoredReach({
+    kind: "ban",
+    path: "CONTRIBUTING.md",
+    line: 7,
+    quote,
+    contribution: true,
+    ...extra,
+  });
+const area = (quote: string): PolicyFinding =>
+  withStoredReach({ kind: "area", path: "docs/contribute.md", line: 20, quote, contribution: true });
 const rulesWith = (...findings: PolicyFinding[]): ContributionRules => ({
   checkedAt: "2026-10-20T08:00:00.000Z",
   findings,
