@@ -491,6 +491,20 @@ test("the command a run records stays within 300 characters after masking", asyn
   assert.ok(reported.command.length <= 300, `${reported.command.length} characters`);
 });
 
+test("the live tail starts at a whole line, so a credential cut at its start is not shown in part", async (t) => {
+  const f = await fixture(t);
+  // 65,556 characters: a 64 KiB window from the end starts inside the token.
+  await f.confirm(
+    `node -e "console.log('token ghp_' + 'A'.repeat(30)); for (let i = 0; i < 655; i++) console.log('x'.repeat(99)); console.log('y'.repeat(14) + ' done'); setInterval(() => {}, 1000)"`,
+  );
+  await en(() => f.byHand.runTests(f.run.id, {}));
+  const { live } = await f.liveMatch(/(done)$/m);
+  assert.doesNotMatch(live.tail, /A{8}/);
+  assert.match(live.tail, /^x{99}$/m);
+  const { run } = await en(() => f.byHand.stopTests(f.run.id));
+  assert.doesNotMatch(run.byHand?.tests?.at(-1)?.outputTail ?? "", /A{8}/);
+});
+
 test("new untracked files the command created are listed; ignored and earlier files are not", async (t) => {
   const f = await fixture(t);
   await writeFile(path.join(f.repository, "notes.txt"), "mine\n");

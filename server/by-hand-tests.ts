@@ -69,6 +69,18 @@ function lives(ctx: WorkbenchContext) {
   return jobs;
 }
 
+/**
+ * The last `liveTailChars` of the output, from the first whole line in
+ * them, so a cut never leaves the end of a credential without the prefix
+ * that redact() recognises. One line longer than that is cut anyway.
+ */
+function tailWindow(text: string) {
+  if (text.length <= liveTailChars) return text;
+  const cut = text.length - liveTailChars;
+  const newline = text.indexOf("\n", cut - 1);
+  return newline >= 0 && newline < text.length - 1 ? text.slice(newline + 1) : text.slice(cut);
+}
+
 /** One output line as a terminal leaves it: no escape sequences, only the text after the last carriage return. */
 function cleanLine(line: string) {
   const text = stripVTControlCharacters(line).replace(/\r+$/, "");
@@ -283,7 +295,7 @@ async function execute(
       discardOutput: true,
       onLine: (line) => {
         live.tail += `${cleanLine(line)}\n`;
-        if (live.tail.length > 2 * liveTailChars) live.tail = live.tail.slice(-liveTailChars);
+        if (live.tail.length > 2 * liveTailChars) live.tail = tailWindow(live.tail);
       },
     });
     exitCode = result.code;
@@ -307,7 +319,7 @@ async function execute(
     try {
       // Credentials are masked over the whole live tail first, so a cut
       // never leaves part of one in the kept end.
-      const output = cleanOutput(live.tail.slice(-liveTailChars));
+      const output = cleanOutput(tailWindow(live.tail));
       const expect = input.expect?.trim().slice(0, byHandLimits.expectChars);
       appendTestRun(run, {
         at: now(),
@@ -338,7 +350,7 @@ export async function liveTests(ctx: WorkbenchContext, id: string): Promise<Live
   ctx.run(id);
   const live = lives(ctx).get(id);
   if (!live || !ctx.byHandJobs.has(jobKey(id))) return { running: false, tail: "" };
-  return { running: true, tail: redact(live.tail.slice(-liveTailChars)), startedAt: live.startedAt };
+  return { running: true, tail: redact(tailWindow(live.tail)), startedAt: live.startedAt };
 }
 
 /** POST /api/runs/:id/by-hand/tests/stop */
