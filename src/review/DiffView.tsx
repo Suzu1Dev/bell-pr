@@ -50,7 +50,8 @@ const expandStep = 20;
 export interface DiffViewProps {
   file: DiffFile;
   reviewed: boolean;
-  onReview: () => void;
+  /** Ticks the file Reviewed; without it (a Learn-by-hand run while the person writes) there is no tick. */
+  onReview?: () => void;
   onAsk: (question: string) => void;
   view: "unified" | "split";
   /** When given and false, a soft hint invites a learner note; it never blocks the checkbox. */
@@ -561,7 +562,7 @@ export function DiffView({
           {hasNote === false && !reviewed && !file.blocked && (
             <span className="rv-note-hint">{t.diff.noteHint}</span>
           )}
-          <label className={`rv-reviewed ${reviewed ? "rv-reviewed-yes" : ""}`}>
+          {onReview && <label className={`rv-reviewed ${reviewed ? "rv-reviewed-yes" : ""}`}>
             <input
               type="checkbox"
               checked={reviewed}
@@ -572,7 +573,7 @@ export function DiffView({
               {reviewed && <Check size={11} strokeWidth={3} />}
             </span>
             {t.diff.reviewed}
-          </label>
+          </label>}
         </div>
       </div>
       {baseError && (

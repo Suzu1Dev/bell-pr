@@ -25,6 +25,9 @@ export default {
     running: ({ cli }: { cli: string }) => `Running ${cli}…`,
     waitingForSlot: ({ queued }: { queued: number }) =>
       `Waiting for other agents to finish (${queued} queued)`,
+    /** A Learn-by-hand run's guide, reviewer or test analyst waiting for an agent CLI process. */
+    guideWaitingForSlot: ({ queued }: { queued: number }) =>
+      `Waiting for a free agent CLI process (${queued} queued)`,
     complete: "Done; the report is ready to read",
     failed: "Stopped or failed",
     rerunWaiting: "Waiting to review again…",
@@ -88,6 +91,9 @@ export default {
       `${name} started. Model: ${model ?? `${cli} CLI default (not recorded)`}; reasoning effort: ${effort ?? "model default"}${web ? "; web access allowed" : ""}${timeout ? `; ${timeout}` : ""}.${inbox ? ` ${count(inbox, "team message", "team messages")} arrived at the start of this turn.` : ""}`,
     waitingForSlot: ({ queued }: { queued: number }) =>
       `Waiting for other agents to finish (${queued} queued).`,
+    /** The same line in a Learn-by-hand run, which has no agent team. */
+    guideWaitingForSlot: ({ queued }: { queued: number }) =>
+      `The guide waits for a free agent CLI process (${queued} queued).`,
     structuredResult:
       "Structured result returned; checking its sources and content.",
     checkFinished: ({ outcome }: { outcome: string }) =>
@@ -512,6 +518,8 @@ export default {
       "A follow-up round is in progress on this PR; finish or discard it before you sync.",
     prCheckoutDiffers:
       "The working directory differs from the pushed PR; undo the changes in it before you sync.",
+    /** A file was saved in the checkout while a sync wrote its result there; nothing moved. */
+    savedMeanwhile: `A file in the run's folder changed while ${product.name} was syncing, so nothing moved. Sync again.`,
     prUpToDate: ({ branch }: { branch: string }) =>
       `Checked: the PR already contains the latest ${branch}.`,
     nothingToMerge: ({ branch }: { branch: string }) =>
@@ -608,6 +616,9 @@ export default {
       `The PR branch ${branch} on GitHub has commits from outside ${product.name} (for example a suggestion applied on GitHub, a maintainer's push or an updated branch). ${product.name} does not overwrite them and cannot continue the round; handle it on GitHub or discard the round.`,
     remoteMissing: ({ branch }: { branch: string }) =>
       `The PR branch ${branch} is not on GitHub, so the round cannot be pushed.`,
+    /** Taking over pushed commits stopped by `reset --keep`: a saved change sits in a file they change. */
+    keepRefused: ({ branch }: { branch: string }) =>
+      `Changes saved in the run's folder touch files that the new commits on ${branch} change, so nothing moved. Commit or discard those changes first.`,
     historyRewritten: ({ branch }: { branch: string }) =>
       `The PR branch ${branch} on GitHub rewrote history that ${product.name} pushed (for example with a force push), so ${product.name} cannot continue; handle it on GitHub.`,
     adoptedReport: ({ commits }: { commits: number }) =>

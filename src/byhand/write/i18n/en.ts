@@ -49,7 +49,7 @@ const en = {
     clean: `${name}'s agents can't edit files in this run.`,
     // The record's words (src/byhand/record/i18n), so a run says it one way everywhere.
     unclean: ({ reason }: { reason: string }) => `${name} makes no Learn-by-hand claim for this run: ${reason}.`,
-    reasons: { "agent-writes": "an agent tried to change files", agents: "agents other than the guide, the reviewer and the test analyst joined it",
+    reasons: { "agent-writes": "an agent ran a shell command or changed a file", agents: "agents other than the guide, the reviewer and the test analyst joined it",
       tasks: "it was planned as team tasks", rounds: "an AI follow-up round ran on it", resolutions: "an agent resolved its merge conflicts" } as Record<string, string>,
     fitted: ({ kinds }: { kinds: string }) =>
       `This run is fitted to the project's rules: the guide offers only ${kinds}. Publishing asks you to confirm the project's quoted rule.`,
@@ -151,7 +151,7 @@ const en = {
     aiRules: "This project has rules about AI use. Check them before asking for an AI review.",
     noReview: "The project's text this run is fitted to doesn't name AI review, so the guide doesn't review here; your tests are the judge.",
     cost: "The review takes about 2 agent turns.",
-    quiet: "Nothing is explained or reviewed until you say it's ready.",
+    quiet: "Your change isn't explained or reviewed until you say it's ready.",
     confirm: "Mark it ready",
   },
 };

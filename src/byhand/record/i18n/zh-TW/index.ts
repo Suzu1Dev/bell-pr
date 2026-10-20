@@ -8,9 +8,9 @@ const m: Translation<typeof en> = {
   claim: `${product.name} 的 agent 沒有寫入權限，也沒有給你這份變更的任何程式碼。`,
   quotes: "嚮導只顯示專案程式碼和你自己修改內容的引文。",
   claimed: ({ claim, quotes }) => `${claim}${quotes}`,
-  unclean: ({ reason }) => `${product.name} 不為這個工作做親手學的聲明：${reason}。`,
+  unclean: ({ reason }) => `${product.name} 不為這個任務做親手學的聲明：${reason}。`,
   reasons: {
-    "agent-writes": "有 agent 試圖修改檔案",
+    "agent-writes": "有 agent 執行了 shell 指令或修改了檔案",
     agents: "嚮導、審查者和測試分析師以外的 agent 參與過",
     tasks: "它曾被規劃成團隊任務",
     rounds: "跑過 AI 後續修改",
@@ -23,7 +23,7 @@ const m: Translation<typeof en> = {
   noHelp: "嚮導沒有提供協助。",
   tests: ({ runs, more, right, judged }) =>
     `${product.name} 幫你跑了${more ? "至少 " : " "}${runs} 次測試${judged ? `；每次修改後你的第一個預測，${judged} 次中對了 ${right} 次` : ""}。`,
-  fitted: ({ kinds }) => `這個工作開始時就依專案規範調整過：嚮導只提供${kinds}。`,
+  fitted: ({ kinds }) => `這個任務開始時就依專案規範調整過：嚮導只提供${kinds}。`,
   otherTools: `${product.name} 看不到你用過的其他工具，例如編輯器的自動完成或其他聊天工具。`,
   forYou: "這份紀錄是給你自己看的，不能證明程式碼是誰寫的。",
   helpers: `你自己的話：${product.name} 不會替親手學的 PR 起草。`,

@@ -164,9 +164,10 @@ test("blocking checks and unconfirmed items keep Send disabled", () => {
 });
 
 test("a publish error stays in the dialog", () => {
+  // It can take the focus after a refused publish (in every run's dialog).
   assert.match(
     render({ formError: "推送失敗" }),
-    /<p role="alert" class="inline-error">推送失敗<\/p>/,
+    /<p role="alert" class="inline-error" tabindex="-1">推送失敗<\/p>/,
   );
 });
 

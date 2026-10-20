@@ -18,6 +18,7 @@ const m: Translation<typeof en> = {
     memberRetry: "等待重新認領任務，使用新的獨立工作目錄",
     running: ({ cli }) => `正在執行 ${cli}…`,
     waitingForSlot: ({ queued }) => `等待其他 Agent 完成（${queued} 個排隊中）`,
+    guideWaitingForSlot: ({ queued }) => `等待空出的 Agent CLI 程序（${queued} 個排隊中）`,
     complete: "已完成，報告可供審閱",
     failed: "執行中斷或失敗",
     rerunWaiting: "等待重新審查…",
@@ -51,8 +52,9 @@ const m: Translation<typeof en> = {
   team: {
     guideName: "嚮導",
     started: ({ name, cli, model, effort, web, timeout, inbox }) =>
-      `${name} 開始工作。模型：${model ?? `${cli} CLI 預設（未記錄模型）`}；推理：${effort ?? "模型預設"}${web ? "；已允許上網" : ""}${timeout ? `；${timeout}` : ""}。${inbox ? ` 已在回合起點收到 ${inbox} 則團隊訊息。` : ""}`,
+      `${name}${/\p{Script=Han}$/u.test(name) ? "" : " "}開始工作。模型：${model ?? `${cli} CLI 預設（未記錄模型）`}；推理：${effort ?? "模型預設"}${web ? "；已允許上網" : ""}${timeout ? `；${timeout}` : ""}。${inbox ? ` 已在回合起點收到 ${inbox} 則團隊訊息。` : ""}`,
     waitingForSlot: ({ queued }) => `等待其他 Agent 完成（${queued} 個排隊中）。`,
+    guideWaitingForSlot: ({ queued }) => `嚮導正在等待空出的 Agent CLI 程序（${queued} 個排隊中）。`,
     structuredResult: "結構化結果已回傳，正在驗證來源與內容。",
     checkFinished: ({ outcome }) => `執行檢查完成（${outcome}）。`,
     fileUpdated: ({ path }) => `已更新 ${path}。`,
@@ -303,6 +305,7 @@ const m: Translation<typeof en> = {
     roundOpen: "這個 PR 已有一輪修正在進行；完成或放棄後再同步。",
     prCheckoutDiffers:
       "工作目錄和已推送的 PR 內容不一致；請先還原工作目錄裡的修改再同步。",
+    savedMeanwhile: `${product.name} 同步時，工作目錄裡有檔案被修改，所以沒有變動任何東西。請再同步一次。`,
     prUpToDate: ({ branch }) => `已確認 PR 已包含 ${branch} 的最新版本。`,
     nothingToMerge: ({ branch }) =>
       `${branch} 已經包含這個 PR 的全部修改，合併後沒有差異，所以沒有同步；PR 沒有變動，可以考慮關閉它。`,
@@ -361,6 +364,8 @@ const m: Translation<typeof en> = {
       `GitHub 上的 PR 分支 ${branch} 已有 ${product.name} 以外的提交（例如在 GitHub 上套用建議、維護者推送或更新分支），${product.name} 不會覆蓋，也無法接續修正；請在 GitHub 上處理，或放棄這輪修正。`,
     remoteMissing: ({ branch }) =>
       `GitHub 上找不到 PR 分支 ${branch}，無法推送修正。`,
+    keepRefused: ({ branch }) =>
+      `工作目錄裡已儲存的修改動到了 ${branch} 上新 commit 也改到的檔案，所以沒有變動任何東西。請先 commit 或捨棄那些修改。`,
     historyRewritten: ({ branch }) =>
       `GitHub 上的 PR 分支 ${branch} 改寫了 ${product.name} 推送過的歷史（例如 force push），${product.name} 無法接續；請在 GitHub 上處理。`,
     adoptedReport: ({ commits }) =>

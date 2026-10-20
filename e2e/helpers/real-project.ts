@@ -8,23 +8,25 @@
 // Around the stand-in, gh also answers the environment check as a
 // signed-in CLI and, when a spec sets them, the maintainer feedback of a
 // pull request; codex and claude answer the environment check only, and
-// codex answers an agent turn only with the text a spec sets
-// (setAgentAnswer), after holdAgent(false) when a spec holds it, so no
-// real agent can run.
+// codex answers an agent turn only with the text a spec sets (setAgentAnswer,
+// or setAgentAnswers by the words of the turn's prompt), after
+// holdAgent(false) when a spec holds it, so no real agent can run. Both log
+// the arguments of every call (agentCalls), so a spec can check that no
+// turn had write access.
 //
 // The project's clone holds CONTRIBUTING.md, two source files and a test,
 // and one run in review whose worktree changes all three (the test's
 // assertion is loosened), with an explanation of each file, so the
 // understanding check asks two file questions and what was not tested.
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { FakeFacts, FakeGitHub } from "../../test/fake-github";
 import { fakeGitHub } from "../../test/fake-github";
 import { readDiff } from "../../server/git";
 import { launchServer, type LaunchedServer } from "../start-server.mjs";
-import { readyStandIns, startTrial } from "./ready-server";
+import { startTrial } from "./ready-server";
 
 export const owner = "e2e-org";
 export const name = "widgets";
@@ -283,6 +285,19 @@ function reviewRun(
   };
 }
 
+/** One call of the stand-in codex or claude: its arguments, and for a codex turn the start of its prompt. */
+export interface AgentCall {
+  cli: "codex" | "claude";
+  args: string[];
+  prompt?: string;
+}
+
+/** An answer of the stand-in codex for a turn whose prompt contains `when` (the first that matches wins). */
+export interface AgentAnswer {
+  when: string;
+  text: string;
+}
+
 export interface RealProject extends LaunchedServer {
   github: FakeGitHub;
   /** Sets what gh answers about the door, the issue and the pace. */
@@ -293,6 +308,10 @@ export interface RealProject extends LaunchedServer {
   setPrFeedback(response: unknown): Promise<void>;
   /** What codex answers an agent turn: the JSON text of its last message. */
   setAgentAnswer(text: string): Promise<void>;
+  /** Answers by the words of the turn's prompt; a turn none matches gets setAgentAnswer's text. */
+  setAgentAnswers(answers: AgentAnswer[]): Promise<void>;
+  /** Every call of the stand-in codex and claude so far, in order. */
+  agentCalls(): Promise<AgentCall[]>;
   /** While held, an agent turn waits before codex answers (a turn still running). */
   holdAgent(held: boolean): Promise<void>;
 }
@@ -304,6 +323,14 @@ export interface RealProjectOptions {
   appSettings?: Record<string, unknown>;
   /** Fields that replace the seeded run's. */
   run?: Record<string, unknown>;
+  /** No run at all: the project only, for a run started from the task dialog. */
+  withoutRun?: boolean;
+  /** Fields that replace the seeded repository's, for example its stored contributionRules or testCommand. */
+  repo?: Record<string, unknown>;
+  /** The project's files, replacing the defaults by path (null leaves one out), for example CONTRIBUTING.md. */
+  files?: Record<string, string | null>;
+  /** Writes more files into the data dir after state.json, before the server starts (discovery.json, say). */
+  seedData?(dataDir: string): Promise<void>;
   /** Starts the 14-day trial. */
   trial?: boolean;
   /**
@@ -335,14 +362,17 @@ export async function startRealProject(options: RealProjectOptions = {}): Promis
     const github = await fakeGitHub(temp, {
       owner,
       name,
-      files: {
-        "README.md": "# widgets\n",
-        "CONTRIBUTING.md": contributing,
-        [files.greeting]: greetingBefore,
-        [files.format]: formatBefore,
-        [files.test]: testBody('expect(greeting("Ada")).toBe("Hello, Ada!");'),
-        ...Object.fromEntries((options.extraFiles ?? []).map((file) => [file.path, file.before])),
-      },
+      files: Object.fromEntries(
+        Object.entries({
+          "README.md": "# widgets\n",
+          "CONTRIBUTING.md": contributing,
+          [files.greeting]: greetingBefore,
+          [files.format]: formatBefore,
+          [files.test]: testBody('expect(greeting("Ada")).toBe("Hello, Ada!");'),
+          ...Object.fromEntries((options.extraFiles ?? []).map((file) => [file.path, file.before])),
+          ...options.files,
+        }).filter((entry): entry is [string, string] => entry[1] !== null),
+      ),
     });
     // The stand-in put its bin first on this process's PATH; only the server uses it.
     github.restore();
@@ -352,7 +382,12 @@ export async function startRealProject(options: RealProjectOptions = {}): Promis
     await mkdir(readyBin, { recursive: true });
     const feedbackFile = path.join(temp, "pr-feedback.json");
     const answerFile = path.join(temp, "agent-answer.txt");
+    const answersFile = path.join(temp, "agent-answers.json");
+    const callsFile = path.join(temp, "agent-calls.jsonl");
     const holdFile = path.join(temp, "agent-hold");
+    /** Appends this call's arguments (and a codex turn's prompt start) to the calls log. */
+    const logCall = (cli: string) =>
+      `require("node:fs").appendFileSync(${JSON.stringify(callsFile)}, JSON.stringify({ cli: ${JSON.stringify(cli)}, args: process.argv.slice(2), ...(prompt ? { prompt: prompt.slice(0, 2000) } : {}) }) + "\\n");`;
     await writeFile(
       path.join(readyBin, "gh"),
       `#!/bin/sh
@@ -371,21 +406,40 @@ exec "${path.join(fakeBin, "gh")}" "$@"
 `,
       { mode: 0o755 },
     );
-    await writeFile(path.join(readyBin, "claude"), `#!/bin/sh\n${readyStandIns.claude}\n`, { mode: 0o755 });
+    await writeFile(
+      path.join(readyBin, "claude"),
+      `#!${process.execPath}
+const prompt = undefined;
+${logCall("claude")}
+const args = process.argv.slice(2);
+if (args[0] === "--version") console.log("2.1.292 (Claude Code)");
+else if (args[0] === "auth") console.log('{"loggedIn": true, "authMethod": "claude.ai", "apiProvider": "firstParty", "subscriptionType": "pro"}');
+else process.exit(1);
+`,
+      { mode: 0o755 },
+    );
+    // codex exec reads its prompt on stdin; an answer whose words appear in it is given, else the default one.
     await writeFile(
       path.join(readyBin, "codex"),
-      `#!/bin/sh
-case "$1" in
-  --version) echo "codex-cli 0.159.0" ;;
-  login) echo "Logged in using ChatGPT" ;;
-  exec)
-    cat > /dev/null
-    while [ -f "${holdFile}" ]; do sleep 0.2; done
-    if [ -f "${answerFile}" ]; then
-      ${JSON.stringify(process.execPath)} -e 'process.stdout.write(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: require("node:fs").readFileSync(process.argv[1], "utf8") } }) + "\\n")' "${answerFile}"
-    else exit 1; fi ;;
-  *) exit 1 ;;
-esac
+      `#!${process.execPath}
+const fs = require("node:fs");
+const args = process.argv.slice(2);
+const prompt = args[0] === "exec" ? fs.readFileSync(0, "utf8") : undefined;
+${logCall("codex")}
+if (args[0] === "--version") console.log("codex-cli 0.159.0");
+else if (args[0] === "login") console.log("Logged in using ChatGPT");
+else if (args[0] !== "exec") process.exit(1);
+else {
+  const answer = () => {
+    if (fs.existsSync(${JSON.stringify(holdFile)})) return setTimeout(answer, 200);
+    const answers = fs.existsSync(${JSON.stringify(answersFile)}) ? JSON.parse(fs.readFileSync(${JSON.stringify(answersFile)}, "utf8")) : [];
+    const matched = answers.find((entry) => prompt.includes(entry.when));
+    const text = matched ? matched.text : fs.existsSync(${JSON.stringify(answerFile)}) ? fs.readFileSync(${JSON.stringify(answerFile)}, "utf8") : undefined;
+    if (text === undefined) process.exit(1);
+    process.stdout.write(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text } }) + "\\n");
+  };
+  answer();
+}
 `,
       { mode: 0o755 },
     );
@@ -453,9 +507,10 @@ esac
                 path: checkout,
                 defaultBranch: "main",
                 url: repoUrl,
+                ...options.repo,
               },
             ],
-            runs: [
+            runs: options.withoutRun ? [] : [
               reviewRun(worktreePath, baseSha, prints, {
                 ...(options.reviewed
                   ? {
@@ -474,6 +529,7 @@ esac
         );
         if (options.appSettings)
           await writeFile(path.join(dataDir, "app-settings.json"), JSON.stringify(options.appSettings));
+        await options.seedData?.(dataDir);
       },
     });
     if (options.trial) await startTrial(server);
@@ -485,6 +541,12 @@ esac
       ghCalls: async () => (await github.calls()).filter((call) => call[0] === "gh"),
       setPrFeedback: (response) => writeFile(feedbackFile, JSON.stringify(response)),
       setAgentAnswer: (text) => writeFile(answerFile, text),
+      setAgentAnswers: (answers) => writeFile(answersFile, JSON.stringify(answers)),
+      agentCalls: async () =>
+        (await readFile(callsFile, "utf8").catch(() => ""))
+          .split("\n")
+          .filter(Boolean)
+          .map((line) => JSON.parse(line) as AgentCall),
       holdAgent: (held) => (held ? writeFile(holdFile, "") : rm(holdFile, { force: true })),
       stop: async () => {
         await stop();

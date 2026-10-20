@@ -74,7 +74,7 @@ const m: Translation<typeof en> = {
     allReviewed: "每一個檔案都已審閱。",
     passed: "你已用自己的話講過一遍，可以核准了。",
     checkOff: "每一個檔案都已審閱 · 理解檢查已關閉。核准只需要你的審閱勾選。",
-    learning: "不只是 review，也是一次 code learning。",
+    learning: "不只是審查，也是一堂程式課。",
     hint: "選取程式碼，就能向 agent 追問。",
     hintByHand: "選取程式碼，就能向嚮導提問。",
     reviewed: ({ reviewed, total }) => `${reviewed} / ${total} 已審閱`,

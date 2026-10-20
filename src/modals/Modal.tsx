@@ -9,6 +9,7 @@ export function Modal({
   onClose,
   wide = false,
   mark,
+  focusTitle = false,
 }: {
   title: string;
   subtitle?: string;
@@ -17,6 +18,8 @@ export function Modal({
   wide?: boolean;
   /** The picture above the title; a pull request icon by default. */
   mark?: ReactNode;
+  /** Opens on the title instead of the first field, when what comes before that field must be read first. */
+  focusTitle?: boolean;
 }) {
   const t = useT("modals");
   const panel = useRef<HTMLDivElement>(null);
@@ -24,11 +27,13 @@ export function Modal({
   // render does not move the focus back to the first field each time.
   const close = useRef(onClose);
   close.current = onClose;
+  // Read once, when the dialog opens.
+  const titleFirst = useRef(focusTitle);
   useEffect(() => {
     const before = document.activeElement as HTMLElement;
     // Land on the first real field or action; the close button is the
     // panel's first <button>, so it is only the fallback.
-    const first =
+    const first = titleFirst.current ? panel.current?.querySelector<HTMLElement>("#modal-title") :
       panel.current?.querySelector<HTMLElement>(
         "input:not(:disabled), textarea:not(:disabled), select:not(:disabled), button:not(.modal-close):not(:disabled), a[href]",
       ) ?? panel.current?.querySelector<HTMLElement>(".modal-close");
@@ -83,7 +88,7 @@ export function Modal({
         <div className="modal-mark">
           {mark ?? <GitPullRequest size={23} />}
         </div>
-        <h2 id="modal-title">{title}</h2>
+        <h2 id="modal-title" tabIndex={focusTitle ? -1 : undefined}>{title}</h2>
         {subtitle && <p className="modal-subtitle">{subtitle}</p>}
         {children}
       </div>

@@ -199,8 +199,10 @@ export async function runAgent(
     retryable = false;
     if (ctx.agentSlots.active >= ctx.agentSlots.limit) {
       const queued = ctx.agentSlots.waiting + 1;
-      if (agent) agent.detail = sm().run.agents.waitingForSlot({ queued });
-      ctx.log(run, role, sm().run.team.waitingForSlot({ queued }), {
+      // A Learn-by-hand run has no agent team to wait for (DESIGN v1.2 §12).
+      const { agents, team } = sm().run;
+      if (agent) agent.detail = (byHandRun ? agents.guideWaitingForSlot : agents.waitingForSlot)({ queued });
+      ctx.log(run, role, (byHandRun ? team.guideWaitingForSlot : team.waitingForSlot)({ queued }), {
         kind: "status",
       });
     }

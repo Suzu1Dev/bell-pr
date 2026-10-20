@@ -94,15 +94,24 @@ function append(target: Child[], items: Child[]) {
   for (const item of items) target.push(item);
 }
 
-/** Whether a list's items are separated by blank lines. */
-const listLoose = (parent: Parents) =>
-  parent.type === "list" &&
-  (Boolean(parent.spread) ||
-    parent.children.some((item) =>
-      item.spread === null || item.spread === undefined
-        ? item.children.length > 1
-        : item.spread,
-    ));
+/** Lists already read: their looseness, so each item doesn't read every item again (quadratic in long lists). */
+const looseness = new WeakMap<Parents, boolean>();
+
+/** Whether a list's items are separated by blank lines; read once per list. */
+export function listLoose(parent: Parents) {
+  const known = looseness.get(parent);
+  if (known !== undefined) return known;
+  const loose =
+    parent.type === "list" &&
+    (Boolean(parent.spread) ||
+      parent.children.some((item) =>
+        item.spread === null || item.spread === undefined
+          ? item.children.length > 1
+          : item.spread,
+      ));
+  looseness.set(parent, loose);
+  return loose;
+}
 
 function toTree(tree: Root) {
   const definitions = new Map<string, Definition>();

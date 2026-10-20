@@ -32,6 +32,7 @@ import {
   sensitivePath,
 } from "./git.js";
 import { agentEnvironment, command, git, redact } from "./process.js";
+import { redactSecretPatterns } from "./secrets.js";
 import { Store } from "./store.js";
 import { writeDurable } from "./fs-atomic.js";
 import { log } from "./log.js";
@@ -445,7 +446,8 @@ function validateAnalysis<
   }
   // Checked on the complete answer: a dropped recommendation is still model output that was seen.
   const serialized = JSON.stringify(value);
-  if (secretInPatch(serialized) || redact(serialized) !== serialized)
+  // The shapes redact() only masks (an Authorization header, a local database URL) never reject one.
+  if (secretInPatch(serialized) || redactSecretPatterns(serialized) !== serialized)
     throw new AppError((m) => m.analysis.insights.sensitiveAnswer, 422);
   const source = new Map(sourceFiles.map((file) => [file.path, file.content]));
   const known = new Set(tree);

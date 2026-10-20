@@ -14,6 +14,7 @@ const messages: Translation<typeof en> = {
   guide: "嚮導",
   ask: { tab: "追問嚮導", label: "問嚮導的問題" },
   reviewFailed: "嚮導的審查沒有完成。請再執行一次審查。",
+  plainText: "內容太長或巢狀太深，無法排版顯示，以純文字呈現。",
   checkYourself: "考考自己",
   walkthroughFull: `這個檔案的程式碼解說作答已達 ${product.name} 保留的上限，這一題不會存下。`,
 };

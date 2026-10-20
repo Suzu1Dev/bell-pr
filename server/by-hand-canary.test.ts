@@ -100,7 +100,7 @@ async function fixture(t: TestContext, provider: "codex" | "claude", execute?: E
 const stopped = (error: unknown) =>
   error instanceof AppError &&
   error.statusCode === 409 &&
-  error.message === "BELL PR stopped an agent that tried to change files in a Learn-by-hand run.";
+  error.message === "BELL PR stopped an agent that ran a shell command or changed a file in a Learn-by-hand run.";
 
 test("a Codex file_change in a Learn-by-hand turn stops it and withdraws the claim", async (t) => {
   const f = await fixture(t, "codex");
@@ -111,7 +111,7 @@ test("a Codex file_change in a Learn-by-hand turn stops it and withdraws the cla
   assert.equal(f.run.agents[0].status, "failed");
   assert.ok(
     f.run.logs.some(
-      (entry) => entry.kind === "notice" && entry.message === "BELL PR stopped an agent that tried to change files in a Learn-by-hand run.",
+      (entry) => entry.kind === "notice" && entry.message === "BELL PR stopped an agent that ran a shell command or changed a file in a Learn-by-hand run.",
     ),
   );
 });

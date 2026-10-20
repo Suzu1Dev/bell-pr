@@ -524,19 +524,19 @@ export function WorkspacePage({
             <span className="footer-spark">
               <Sparkles size={15} />
             </span>
-            <span>{t.footer[footer.status]}</span>
+            <span>{byHand.writing ? t.byHand.turn : t.footer[footer.status]}</span>
             {prTextMissing && !byHand.writing && !reviewing && run.status !== "published" ? (
               <button type="button" className="mission-text-button" onClick={() => setTab("draft")}>{t.byHand.writePr}</button>
             ) : <span className="footer-hint">{run.learnByHand ? t.footer.hintByHand : t.footer.hint}</span>}
           </div>
           <div>
-            <span className="footer-reviewed">
+            {!byHand.writing && <span className="footer-reviewed">
               <CheckCheck size={15} />
               {t.footer.reviewed({
                 reviewed: reviewedCount,
                 total: files.length,
               })}
-            </span>
+            </span>}
             {/* The sample PR exists nowhere: its button just stays off. */}
             {run.status === "published" && run.prUrl && !demo ? (
               <a

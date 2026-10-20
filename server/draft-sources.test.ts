@@ -731,3 +731,32 @@ test("AI policies and CONTRIBUTE files are contributing guidance; GitHub's accou
     await f.cleanup();
   }
 });
+
+test("a project's docs with a local setup's credentials stay a draft source; only the shapes that always dropped one drop it", async () => {
+  // redact() also masks these since README v1.2 §18.11 item 3, but masking is not a reason to lose the project's rules.
+  const setup = [
+    "Base instructions: include a reproducer.",
+    "",
+    "    DATABASE_URL=postgres://postgres:postgres@localhost:5432/app_dev",
+    "    SECRET_KEY_BASE=insecure-dev-key",
+    "    curl -H 'Authorization: Basic dXNlcjpwYXNzd29yZA==' http://localhost:3000/health",
+  ].join("\n");
+  const f = await fixture({
+    "CONTRIBUTING.md": setup,
+    "docs/SUBMITTING-PATCHES.rst": 'Set password = "hunter2hunter2" in your local config.',
+  });
+  try {
+    const context = await withLocale("en", () =>
+      collectDraftContext(f.repo, f.run, { execute: stubGithub(() => metadata()).execute }),
+    );
+    assert.equal(context.sources.find((source) => source.path === "CONTRIBUTING.md")?.content, setup);
+    // A shape 1f16ec9's redact() knew still drops its source, as before.
+    assert.equal(context.sources.some((source) => source.path === "docs/SUBMITTING-PATCHES.rst"), false);
+    assert.deepEqual(
+      context.warnings.filter((warning) => /sensitive/i.test(warning)).length,
+      1,
+    );
+  } finally {
+    await f.cleanup();
+  }
+});

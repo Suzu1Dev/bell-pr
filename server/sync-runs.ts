@@ -138,6 +138,8 @@ async function syncRunLocked(ctx: WorkbenchContext, id: string) {
         (m) => m.run.sync.unmarkedRun({ files: unmarked }),
         409,
       );
+    // The files first: a file saved since the snapshot is never overwritten, and a refusal moves nothing.
+    await checkoutTreeOnto(run.worktreePath, merged.tree, target, snapshot);
     // Keeps the snapshot reachable for undo, outside every branch.
     await git(run.worktreePath, [
       "update-ref",
@@ -150,7 +152,6 @@ async function syncRunLocked(ctx: WorkbenchContext, id: string) {
       target,
       head,
     ]);
-    await checkoutTreeOnto(run.worktreePath, merged.tree, target);
     await labelConflictMarkers(run.worktreePath, merged.conflicts, {
       [target]: `latest ${run.baseBranch} (${target.slice(0, 7)})`,
       [snapshot]: "this contribution",
@@ -205,7 +206,9 @@ async function syncPublishedRun(ctx: WorkbenchContext, run: Run) {
   ).stdout.trim();
   if (head !== run.publishCommit || (await worktreeDirty(run)))
     throw new AppError((m) => m.run.sync.prCheckoutDiffers, 409);
-  await adoptRemoteCommits(ctx, run);
+  // Clean when looked at, but the person may save meanwhile: GitHub's new commits move HEAD only with
+  // `reset --keep`, never over a saved change.
+  await adoptRemoteCommits(ctx, run, { expectedHead: head });
   assertRemoteHead(run, await remoteBranchHead(run), run.publishCommit);
   const repo = ctx.repo(run.repoId);
   const target = await ctx.lock(`repository:${repo.id}`, () =>
@@ -248,7 +251,8 @@ async function syncPublishedRun(ctx: WorkbenchContext, run: Run) {
   // HEAD stays at the PR head, the parent of the merge commit. The index
   // holds the target branch, the new base the diff is read from, so files
   // the target added are not taken for files this PR deletes.
-  await checkoutTreeOnto(run.worktreePath, merged.tree, target);
+  // Only files that still hold the PR head are written; a change saved since stays (or refuses the sync).
+  await checkoutTreeOnto(run.worktreePath, merged.tree, target, run.publishCommit);
   await labelConflictMarkers(run.worktreePath, merged.conflicts, {
     [run.publishCommit]: "this pull request",
     [target]: `latest ${run.baseBranch} (${target.slice(0, 7)})`,

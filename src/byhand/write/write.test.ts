@@ -234,11 +234,12 @@ test("a run whose history withdrew the claim says why instead of the in-run line
   const text = html(guide({ agentWrites: 1 }));
   assert.doesNotMatch(text, /agents can&#x27;t edit files/);
   // The record's own words (src/byhand/record), so the run says it one way everywhere.
-  assert.ok(text.includes("BELL PR makes no Learn-by-hand claim for this run: an agent tried to change files."));
+  // The canary counts any shell command of a Claude turn, not only a write (DESIGN v1.2 F2).
+  assert.ok(text.includes("BELL PR makes no Learn-by-hand claim for this run: an agent ran a shell command or changed a file."));
   assert.ok(html(guide({}, {}, { agents: [{ id: "a1", name: "Ada", role: "teammate", status: "complete", detail: "" }] as Run["agents"] })).includes(
     "BELL PR makes no Learn-by-hand claim for this run: agents other than the guide, the reviewer and the test analyst joined it.",
   ));
-  assert.ok(renderZh(guide({ agentWrites: 1 })).includes("BELL PR 不為這個工作做親手學的聲明：有 agent 試圖修改檔案。"));
+  assert.ok(renderZh(guide({ agentWrites: 1 })).includes("BELL PR 不為這個任務做親手學的聲明：有 agent 執行了 shell 指令或修改了檔案。"));
 });
 
 test("a fitted run names its help set and offers no hint, test help or review outside it", () => {
@@ -324,7 +325,9 @@ test("Ready for review states the version's facts and offers the guide's review"
   assert.ok(text.includes("Not run since your last edit."));
   assert.match(text, /<input type="checkbox" checked=""\/><span class="mission-plan-copy"><strong>Ask the guide to review it<\/strong><small>The guide reads your change/);
   assert.ok(text.includes("The review takes about 2 agent turns."));
-  assert.ok(text.includes(apostrophes("Nothing is explained or reviewed until you say it's ready.")));
+  // Only the change waits for Ready: hints and "Explain this failure" explain while the person writes.
+  assert.ok(text.includes(apostrophes("Your change isn't explained or reviewed until you say it's ready.")));
+  assert.ok(renderZh(ready({})).includes("在你說可以之前，不會解說或審查你的改動。"));
   assert.equal(renderEn(ready({}, { open: false })), "");
   assert.match(html(ready({}, { aiRules: true })), /This project has rules about AI use\./);
   // zh-TW: the time leads, so a number never runs into the words before it.

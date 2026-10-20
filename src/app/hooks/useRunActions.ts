@@ -486,7 +486,8 @@ export function useRunActions({
       // The open-run poll and the next action report connection problems.
     }
   }
-  async function approveTeamPlan() {
+  /** With `inView`, a refusal rejects for the view to show (Learn by hand's plan) instead of a toast. */
+  async function approveTeamPlan(inView?: boolean) {
     if (demo) {
       playback.current?.player.approvePlan();
       return;
@@ -498,6 +499,7 @@ export function useRunActions({
       // Learn by hand: the person's turn to write starts in the Changes tab.
       if (runIdRef.current === result.run.id && result.run.learnByHand) setTab("changes");
     } catch (error) {
+      if (inView === true) throw error;
       notify((error as Error).message, "error");
     } finally {
       setBusy(false);

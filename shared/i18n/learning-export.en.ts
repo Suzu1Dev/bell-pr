@@ -153,7 +153,7 @@ export default messages;
 export const byHand = {
   title: "Learn by hand",
   claim: `${product.name}'s agents had no write access and gave you no code for this change.`,
-  withdrawn: `${product.name} saw agent edits in this run, so it makes no Learn-by-hand claim for it.`,
+  withdrawn: `${product.name} saw an agent change files or run commands in this run, so it makes no Learn-by-hand claim for it.`,
   fitted: ({ kinds }: { kinds: string }) =>
     `Fitted to the project's rules when it started: the guide offered only ${kinds}.`,
   helps: ({ helps }: { helps: string }) => `- Help from the guide: ${helps}`,

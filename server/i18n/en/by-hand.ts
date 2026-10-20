@@ -16,7 +16,7 @@ const byHand = {
   /** The write guard in runAgent: a write turn of a Learn-by-hand run. */
   noWriteTurn: `${product.name}'s agents have no write access in a Learn-by-hand run, so ${product.name} did not start this turn.`,
   /** The canary stopped a turn (DESIGN v1.2 F2). */
-  agentWrite: `${product.name} stopped an agent that tried to change files in a Learn-by-hand run.`,
+  agentWrite: `${product.name} stopped an agent that ran a shell command or changed a file in a Learn-by-hand run.`,
   /** A Learn-by-hand part this build does not have yet. */
   notYet: "This part of Learn by hand is not available in this build yet.",
   /** A Learn-by-hand route called on an agent run. */

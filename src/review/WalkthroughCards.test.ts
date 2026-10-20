@@ -65,6 +65,17 @@ test("waiting, failed, unavailable and empty walkthroughs each explain themselve
   assert.match(english, /The sample has a code walkthrough for <span><code>src\/client\.ts<\/code><\/span> only/);
 });
 
+test("the empty walkthrough's pointer to the Ask tab fits a Learn-by-hand run, whose tab names the guide", () => {
+  const empty: DiffFile = { ...client, walkthroughStatus: "ready", walkthrough: { functions: [] } };
+  for (const byHand of [true, false]) {
+    const html = render(empty, { byHand });
+    assert.match(html, /沒有找到包住這些變更的函式/);
+    assert.match(html, /追問分頁/);
+    // 追問 Agent is the agent run's tab; a Learn-by-hand run's is 追問嚮導.
+    assert.doesNotMatch(html, /追問 Agent/);
+  }
+});
+
 test("new code is named and sent to the change explanation instead of being walked through", () => {
   const base: DiffFile = { ...client, walkthroughStatus: "ready" };
   const onlyNew = render({ ...base, walkthrough: { functions: [], newUnits: ["a_reloaded_interview_keeps_the_id"] } });

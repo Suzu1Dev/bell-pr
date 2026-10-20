@@ -89,15 +89,13 @@ export function useByHand(
     setSelection(undefined);
     setReadyOpen(false);
   }, [id]);
-  /** A request of this run's; a refusal shows the server's message and rejects. */
-  const call = (path: string, method = "POST", then?: () => void) => async (body?: unknown) => {
-    // While the Ready dialog is open (modal), its own requests (Mark it ready, the Tests card) answer in it.
-    const from = path === "ready" || readyOpen ? "ready" : path.startsWith("plan") ? "plan" : "guide";
+  /** A request of this run's, from a view; a refusal shows the server's message there and rejects. */
+  const attempt = async (from: string, request: () => Promise<{ run?: Run } | void>, then?: () => void) => {
     setState({ busy: true, error: "", from });
     try {
-      const result = await api<{ run?: Run }>(path.startsWith("/") ? path : `${runPath(id)}/by-hand/${path}`, send(method, body));
+      const result = await request();
       // A read begun before this answer (back from the editor, a poll) mustn't bring the older run back.
-      if (result.run && shown.current === id) {
+      if (result?.run && shown.current === id) {
         actions.setRun(result.run);
         draftMutationEpoch.current++;
       }
@@ -108,6 +106,10 @@ export function useByHand(
       throw cause;
     }
   };
+  const call = (path: string, method = "POST", then?: () => void) => (body?: unknown) =>
+    // While the Ready dialog is open (modal), its own requests (Mark it ready, the Tests card) answer in it.
+    attempt(path === "ready" || readyOpen ? "ready" : path.startsWith("plan") ? "plan" : "guide",
+      () => api<{ run?: Run }>(path.startsWith("/") ? path : `${runPath(id)}/by-hand/${path}`, send(method, body)), then);
 
   // Back from the editor: one read of the diff and the run (an explanation
   // asked for meanwhile shows when it is ready), 2 s after the last focus or
@@ -188,7 +190,8 @@ export function useByHand(
       onSave: call("plan", "PUT"),
       onReveal: (mode: "names" | "compare") => call("plan/reveal")({ mode }),
       onAskQuestions: call("plan/questions"),
-      onConfirm: actions.approveTeamPlan,
+      // A refused "This is my plan" shows in the plan, not as a toast.
+      onConfirm: () => attempt("plan", () => actions.approveTeamPlan(true)),
     },
     guide: {
       ...view("guide"),

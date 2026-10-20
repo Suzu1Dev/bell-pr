@@ -43,8 +43,8 @@ const m: Translation<typeof en> = {
   guide: {
     title: "嚮導",
     clean: `這個任務裡，${name} 的 agent 無法修改檔案。`,
-    unclean: ({ reason }) => `${name} 不為這個工作做親手學的聲明：${reason}。`,
-    reasons: { "agent-writes": "有 agent 試圖修改檔案", agents: "嚮導、審查者和測試分析師以外的 agent 參與過", tasks: "它曾被規劃成團隊任務",
+    unclean: ({ reason }) => `${name} 不為這個任務做親手學的聲明：${reason}。`,
+    reasons: { "agent-writes": "有 agent 執行了 shell 指令或修改了檔案", agents: "嚮導、審查者和測試分析師以外的 agent 參與過", tasks: "它曾被規劃成團隊任務",
       rounds: "跑過 AI 後續修改", resolutions: "有 agent 解決過它的合併衝突" },
     fitted: ({ kinds }) => `這個任務配合專案規範：嚮導只提供${kinds}。發布時，你要確認專案被引用的規範。`,
     blocked: ({ clause }) => `${name} 不會在這裡發布這個任務：${clause}。儘管放心練習。`,
@@ -142,7 +142,7 @@ const m: Translation<typeof en> = {
     aiRules: "這個專案有關於 AI 使用的規範。請求 AI 審查之前，先看一下規範。",
     noReview: "這個任務配合的專案原文沒有提到 AI 審查，所以嚮導不在這裡審查；測試才是裁判。",
     cost: "審查大約需要 2 個 agent 回合。",
-    quiet: "在你說可以之前，不會解說或審查任何東西。",
+    quiet: "在你說可以之前，不會解說或審查你的改動。",
     confirm: "標記為可以審查",
   },
 };

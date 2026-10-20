@@ -332,7 +332,8 @@ export function ChangesTab({
         )}
       </div>
     )}
-    {run.byHand?.ready && writing && <p className="by-hand-note" role="status">{workspace.byHand.changed}</p>}
+    {/* There before the change, so a screen reader announces the notice when it comes (DESIGN v1.2 F5). */}
+    {run.learnByHand && <p className={run.byHand?.ready && writing ? "by-hand-note" : "visually-hidden"} role="status">{run.byHand?.ready && writing ? workspace.byHand.changed : ""}</p>}
     <div
       ref={reviewGridRef}
       className={`review-grid ${!showFiles ? "files-hidden" : ""} ${!showExplanation ? "explanation-hidden" : ""}`}
@@ -461,7 +462,8 @@ export function ChangesTab({
               </p>
             )}
           </div>
-          <div className="review-progress">
+          {/* Review chrome waits until the person's change is ready (Learn by hand). */}
+          {!writing && <div className="review-progress">
             <div>
               <span>{t.progress}</span>
               <strong>
@@ -483,7 +485,7 @@ export function ChangesTab({
                   ? t.allReviewed
                   : t.allReviewedDone}
             </small>
-          </div>
+          </div>}
         </aside>
       )}
       <section className="diff-panel">
@@ -594,7 +596,7 @@ export function ChangesTab({
             key={`${run.id}:${file.path}:${run.baseSha ?? ""}`}
             file={file}
             reviewed={run.reviewedFiles.includes(file.path)}
-            onReview={reviewFile}
+            onReview={writing ? undefined : reviewFile}
             onAsk={checking ? () => setAskWaiting(true) : writing ? (question) => byHand?.ask(file, question) : ask}
             view={diffView}
             hasNote={Boolean(run.notes?.[file.path]?.text)}

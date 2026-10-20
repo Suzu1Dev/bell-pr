@@ -331,7 +331,7 @@ export function PublishModal({
     : sample
       ? sampleChecks
       : draftChecks && (serverChecksRead || !byHand) ? publishChecks : undefined;
-  const checkRules = useRulesRecheck(byHand ? run : undefined, currentRepo?.contributionRules, checks, loadPublishChecks);
+  const checkRules = useRulesRecheck(byHand ? run : undefined, checks, loadPublishChecks);
   // A quoted confirm whose words changed in a later read (or that couldn't be read) is unticked:
   // the person confirms what they read (F12 f). Until then its tick counts for nothing, not even
   // for the one frame before the untick, so no click can send it for words that came after it.
@@ -344,12 +344,12 @@ export function PublishModal({
     setConfirmed(quoted);
   }, [confirmed, quoted, setAcknowledged]);
   const ticked = confirmed === quoted ? acknowledged : acknowledged.filter((id) => id !== "by-hand-rules");
-  // Sending disables Submit, which had the focus; in a Learn-by-hand run's dialog a refused or
-  // failed publish puts it on the reason, so it stays in the dialog.
+  // Sending disables Submit, which had the focus; a refused or failed publish puts it on the reason,
+  // so it stays in the dialog.
   const refusal = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
-    if (formError && byHand && document.activeElement === document.body) refusal.current?.focus();
-  }, [formError, byHand]);
+    if (formError && document.activeElement === document.body) refusal.current?.focus();
+  }, [formError]);
   const reason = overrides.find((override) => override.id === "issue-has-pr")?.reason ?? "";
   const blocks = (checks ?? []).filter(
     (check) => check.kind === "block" && !(check.id === "issue-has-pr" && validReason(reason)),
@@ -377,6 +377,8 @@ export function PublishModal({
               : t.subtitle
       }
       onClose={closeModal}
+      // A Learn-by-hand run's record comes before its first confirm: reading starts at the top.
+      focusTitle={byHand}
     >
       <div className="publish-summary">
         <span>
@@ -489,7 +491,7 @@ export function PublishModal({
         />
       )}
       {formError && (
-        <p role="alert" className="inline-error" ref={refusal} tabIndex={byHand ? -1 : undefined}>
+        <p role="alert" className="inline-error" ref={refusal} tabIndex={-1}>
           {mask(formError)}
         </p>
       )}

@@ -5,13 +5,21 @@
 // tab's maintainer checklist, the sample's code walkthrough with a range
 // marked in the diff, its commit history with a commit open on a file's
 // diff, the brief of a real run whose premise was refuted, and the publish
-// dialog's groups of checks on a real run. Each view opens its route, then
+// dialog's groups of checks on a real run; and Learn by hand's views on a
+// real run (v1.2): the plan with the guide, the guide's panel with a thread
+// and the Tests card while the person writes, the Ready dialog, and the
+// publish dialog's run record. Each view opens its route, then
 // drive() takes it to the state; `include` names the part of the page the
 // view is about.
 import { expect, type Page } from "@playwright/test";
+import { changeFingerprint } from "../../shared/change-fingerprint";
 import type { Locale } from "../../shared/i18n/locale";
+import recordEn from "../../src/byhand/record/i18n/en";
+import recordZh from "../../src/byhand/record/i18n/zh-TW";
+import writeEn from "../../src/byhand/write/i18n/en";
+import writeZh from "../../src/byhand/write/i18n/zh-TW";
 import { getDemo } from "../../src/demo/all";
-import { issueNode, otherPr, runId, welcomeFacts, type RealProjectOptions } from "./real-project";
+import { files, issueNode, otherPr, runId, welcomeFacts, type RealProjectOptions } from "./real-project";
 import { messages } from "./sample-states";
 
 export interface StateView {
@@ -94,6 +102,81 @@ async function checkForecast(page: Page, locale: Locale) {
 }
 
 const checkRoute = "#/runs/demo-run/changes?panel=check";
+
+const write = { en: writeEn, "zh-TW": writeZh } as const;
+const runRecord = { en: recordEn, "zh-TW": recordZh } as const;
+
+/** A clean Learn-by-hand run of the real project (src/greeting.ts and the rest changed by the person), at `status`. */
+function byHandRun(status: string, phase: string, byHand: Record<string, unknown>, extra: Record<string, unknown> = {}) {
+  const at = "2026-10-14T09:00:00.000Z";
+  const agent = (id: string, name: string) => ({ id, name, role: name, status: "complete", detail: "" });
+  return {
+    status,
+    learnByHand: true,
+    agents: [agent("lead", "Guide"), agent("reviewer", "Reviewer"), agent("tester", "Test analyst")],
+    explanations: {},
+    draft: { title: "", body: "" },
+    team: {
+      config: { maxTeammates: 2, requirePlanApproval: true, provider: "codex", protocol: "bell-shared-tasks", messageDelivery: "between-turns" },
+      phase,
+      planSummary: "Greetings are always in English, so people who read another language get one they don't read.",
+      tasks: [],
+      messages: [],
+    },
+    byHand: {
+      guidePlan: {
+        summary: "Greetings are always in English, so people who read another language get one they don't read.",
+        steps: [{ title: "Read how the greeting is built", files: [files.greeting] }, { title: "Look the greeting up by language", files: [files.greeting] }],
+        readFirst: [{ path: files.greeting, startLine: 1, endLine: 3, why: "Where the greeting is built." }],
+        at,
+      },
+      ...byHand,
+    },
+    ...extra,
+  };
+}
+
+const steps = [
+  { id: "s1", title: "Read how the greeting is built", files: [files.greeting], doneAt: "2026-10-14T09:10:00.000Z" },
+  { id: "s2", title: "Look the greeting up by language, with English when a language has none", files: [files.greeting] },
+];
+/** A run in review while the person writes: a thread of answers, a failing test run, a confirmed command. */
+const writingRun: RealProjectOptions = {
+  repo: { testCommand: { command: "npx vitest run test/greeting.test.ts", confirmedAt: "2026-10-14T09:00:00.000Z" } },
+  run: byHandRun("review", "developing", {
+    plan: { steps, savedAt: "2026-10-14T09:05:00.000Z", confirmedAt: "2026-10-14T09:05:00.000Z", outlineAt: "2026-10-14T09:02:00.000Z" },
+    hints: { s2: { rung: 1, at: "2026-10-14T09:20:00.000Z", fingerprint: "0000000000000000" } },
+    thread: [
+      {
+        id: "e1",
+        at: "2026-10-14T09:15:00.000Z",
+        kind: "ask",
+        entry: "project",
+        question: "Where does the greeting text come from?",
+        text: "It is built in one place.\nWhat should a language without a greeting get?",
+        quotes: [{ path: files.greeting, startLine: 1, endLine: 2, from: "base", text: "export function greeting(name: string) {\n  return `Hello, ${name}!`;" }],
+        removed: 1,
+      },
+      { id: "e2", at: "2026-10-14T09:20:00.000Z", kind: "hint", stepId: "s2", rung: 1, text: "Look where the name is put into the text.", refs: [{ path: files.greeting, line: 2 }] },
+    ],
+    tests: [
+      { at: "2026-10-14T09:25:00.000Z", command: "npx vitest run test/greeting.test.ts", changeFingerprint: "0000000000000000", outcome: "failed", exitCode: 1, ms: 1800, prediction: "fail", outputTail: "FAIL test/greeting.test.ts > greets\nexpected 'Hello, Ada!'" },
+    ],
+    events: [
+      { at: "2026-10-14T09:15:00.000Z", kind: "answer", source: "ask" },
+      { at: "2026-10-14T09:20:00.000Z", kind: "answer", source: "hint", rung: 1 },
+    ],
+    removedTotal: 1,
+  }),
+};
+
+/** Marks the run's current version ready through its route, as "Mark it ready" does, and reads the page again. */
+async function markReady(page: Page) {
+  const { files: changed } = (await (await page.request.get(`/api/runs/${runId}/diff`)).json()) as { files: { path: string; fingerprint: string }[] };
+  const ready = await page.request.post(`/api/runs/${runId}/by-hand/ready`, { data: { changeFingerprint: changeFingerprint(changed), review: false } });
+  expect(ready.ok()).toBe(true);
+  await page.reload();
+}
 
 export const stateViews: StateView[] = [
   { name: "check-explain", route: checkRoute, drive: checkExplained, include: ".understanding-check" },
@@ -192,6 +275,75 @@ export const stateViews: StateView[] = [
     async drive(page, locale) {
       const t = messages[locale].mission.brief;
       await expect(page.locator(".mission-after .mission-premise-tag")).toHaveText(t.premiseRefuted);
+    },
+  },
+  {
+    // Learn by hand: the person's plan, before they confirm it.
+    name: "byhand-plan",
+    route: `#/runs/${runId}/activity`,
+    include: ".by-hand",
+    real: {
+      run: byHandRun("awaiting_plan", "awaiting_approval", { plan: { steps: [{ id: "s1", title: "Read how the greeting is built", files: [files.greeting] }], savedAt: "2026-10-14T09:05:00.000Z" } }),
+    },
+    async drive(page, locale) {
+      await expect(page.getByRole("region", { name: write[locale].plan.title })).toBeVisible();
+      await expect(page.getByRole("button", { name: write[locale].plan.confirm })).toBeEnabled();
+    },
+  },
+  {
+    // …the guide's panel while the person writes: its thread and the Tests card.
+    name: "byhand-writing",
+    route: `#/runs/${runId}/changes`,
+    include: ".guide-panel",
+    real: writingRun,
+    async drive(page, locale) {
+      const guide = page.locator(".guide-panel");
+      await expect(guide.locator(".by-hand-thread")).toContainText(write[locale].thread.removed);
+      await expect(guide.getByRole("region", { name: write[locale].tests.title })).toContainText("npx vitest run test/greeting.test.ts");
+    },
+  },
+  {
+    // …the Ready for review dialog.
+    name: "byhand-ready",
+    route: `#/runs/${runId}/changes`,
+    include: '[role="dialog"]',
+    real: writingRun,
+    async drive(page, locale) {
+      await page.locator(".review-footer").getByRole("button", { name: messages[locale].workspace.byHand.ready }).click();
+      await expect(page.getByRole("dialog", { name: write[locale].ready.title })).toBeVisible();
+    },
+  },
+  {
+    // …and the publish dialog with the run record, on a clean run marked ready and approved.
+    name: "byhand-publish-record",
+    route: `#/runs/${runId}/draft`,
+    include: '[role="dialog"]',
+    real: {
+      reviewed: true,
+      appSettings: { skipUnderstandingCheck: true },
+      run: byHandRun(
+        "review",
+        "complete",
+        {
+          plan: { steps, savedAt: "2026-10-14T09:05:00.000Z", confirmedAt: "2026-10-14T09:05:00.000Z" },
+          events: [
+            { at: "2026-10-14T09:15:00.000Z", kind: "explain", source: "premise" },
+            { at: "2026-10-14T09:20:00.000Z", kind: "answer", source: "hint", rung: 1 },
+          ],
+          tests: [{ at: "2026-10-14T09:25:00.000Z", command: "npm test", changeFingerprint: "0000000000000000", outcome: "passed", ms: 900, prediction: "pass" }],
+          removedTotal: 1,
+        },
+        { draft: { title: "Greet people in their own language", body: "Greetings come from a table of languages, with English when a language has none. I wrote and tested it myself." } },
+      ),
+    },
+    async drive(page, locale) {
+      await markReady(page);
+      const t = messages[locale].workspace;
+      await page.locator(".review-footer").getByRole("button", { name: t.footer.approvePr }).click();
+      const dialog = page.getByRole("dialog", { name: t.publish.title });
+      await expect(dialog).toBeVisible({ timeout: 30_000 });
+      await expect(dialog.getByText(t.publish.factsLoading)).toHaveCount(0, { timeout: 30_000 });
+      await expect(dialog.getByRole("region", { name: runRecord[locale].title })).toContainText(runRecord[locale].claim);
     },
   },
   {

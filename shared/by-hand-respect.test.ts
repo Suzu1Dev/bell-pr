@@ -214,6 +214,45 @@ test("while any finding is blocked, no confirm appears and the passing ones stay
   assert.deepEqual(ids(checksFor(rulesWith(passing, failing), learnByHand, goodFirstIssue)), ["ai-ban:block", "area-reserved:block"]);
 });
 
+test("a Learn-by-hand block carries the condition its copy names as its reason; the confirm and an agent run's checks carry none", (t) => {
+  const carveOut: NonNullable<PolicyFinding["allows"]> = [{ line: 297, quote: qemuCarveOut, kinds: ["explain", "answer", "test"] }];
+  const fitted = ban(qemu, { allows: carveOut });
+  const lock: HelpLock = {
+    ...helpLock,
+    rules: [{ kind: "ban", path: "CONTRIBUTING.md", line: 7, quote: qemu, allows: carveOut }],
+  };
+  const used = { helps: ["explain", "answer"] as ByHandPreflightInput["helps"], now: learnByHand.now };
+  const reasonOf = (checks: DraftCheck[], id: DraftCheck["id"]) => checks.find((check) => check.id === id)?.reason;
+  // Fitted and clean, rules read before the run started: the publish dialog's check names (d).
+  const started = { ...used, helpLock: lock, createdAt: "2026-10-20T09:00:00.000Z" };
+  assert.equal(reasonOf(checksFor(rulesWith(fitted), started), "ai-ban"), "rules-unread");
+  // Read again during the run: the confirm, which has no failed condition.
+  const reread = { ...rulesWith(fitted), checkedAt: "2026-10-20T10:00:00.000Z" };
+  const confirmed = checksFor(reread, started);
+  assert.deepEqual(ids(confirmed), ["by-hand-rules:confirm"]);
+  assert.equal(confirmed[0].reason, undefined);
+  // Not fitted at the start, rules read during the run, and the other conditions.
+  assert.equal(reasonOf(checksFor(reread, { ...used, createdAt: started.createdAt }), "ai-ban"), "not-fitted");
+  assert.equal(reasonOf(checksFor(rulesWith(ban(gentoo)), started), "ai-ban"), "reach");
+  assert.equal(reasonOf(checksFor(rulesWith(ban(qemu)), started), "ai-ban"), "rules-changed");
+  assert.equal(reasonOf(checksFor(rulesWith(ban(qemu)), { ...used, createdAt: started.createdAt }), "ai-ban"), "no-carve-out");
+  assert.equal(reasonOf(checksFor(rulesWith(area(matplotlib)), started, goodFirstIssue), "area-reserved"), "no-carve-out");
+  assert.equal(reasonOf(checksFor(rulesWith(area(llvm)), started, goodFirstIssue), "area-reserved"), "reach");
+  // A passing finding held in its block by another rule.
+  const failing = area(matplotlib);
+  byHandRulesDecisionInTests(() => ({
+    blocked: [{ finding: failing, reason: "kind-not-named", kinds: ["review"] }],
+    confirmable: [{ finding: fitted, allows: carveOut, others: [] }],
+  }));
+  t.after(() => byHandRulesDecisionInTests());
+  const held = checksFor(rulesWith(fitted, failing), learnByHand, goodFirstIssue);
+  assert.deepEqual(held.map((check) => check.reason), ["held", "kind-not-named"]);
+  byHandRulesDecisionInTests();
+  // An agent run (and an unclean Learn-by-hand run, which gets no input) has no reason on any check.
+  const agent = checksFor(rulesWith(ban(gentoo), area(llvm)), undefined, goodFirstIssue);
+  assert.deepEqual(agent.map((check) => check.reason), [undefined, undefined]);
+});
+
 test("the Learn-by-hand copy of the rules to decide on and of a required disclosure", () => {
   const checks = checksFor(
     rulesWith(

@@ -2,7 +2,8 @@
 // workspace tabs, and on the v1.1 views that take a few steps to reach
 // (each step of the Explain-it-back panel, Settings → Learning with its
 // dialog open, the Practice view, the rules card, the Draft checklist and
-// the publish dialog's groups; e2e/helpers/views.ts), in both languages,
+// the publish dialog's groups; Learn by hand's plan, guide panel, Ready
+// dialog and run record on a real run; e2e/helpers/views.ts), in both languages,
 // on a desktop and a phone screen. Serious and critical issues
 // fail, color contrast included. Known issues are excluded only through
 // the per-workstream allowlists in e2e/a11y/allowlist.<5A..5F>.json: each

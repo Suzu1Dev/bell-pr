@@ -9,9 +9,9 @@ import { fakeGitHub } from "../test/fake-github.js";
 import { createApp } from "./index.js";
 import { git } from "./process.js";
 import { Store } from "./store.js";
-import { Workbench } from "./workbench.js";
+import { Workbench, type WorkbenchContext } from "./workbench.js";
 import { readDiff } from "./git.js";
-import { filesWithConflictMarkers, labelConflictMarkers } from "./sync.js";
+import { checkoutTreeOnto, filesWithConflictMarkers, labelConflictMarkers, mergeCommits, snapshotCheckout } from "./sync.js";
 import { AppError, type Run } from "./types.js";
 import type { TeamAgentRunner } from "./team.js";
 import { outputLanguage, respondIn } from "./prompt-language.js";
@@ -783,6 +783,140 @@ test("commits pushed to the PR branch on GitHub are taken over before a round; r
       /改寫了 BELL PR 推送過的歷史/,
     );
     assert.equal(f.run.status, "published");
+  } finally {
+    await f.cleanup();
+  }
+});
+
+/**
+ * Runs `edit` once, right after the next repository lock a sync takes (the
+ * fetch of the target branch, or of the PR branch's new commits): a change
+ * the person saves in the run's folder after the sync's clean check.
+ */
+function savedAfterCleanCheck(f: Awaited<ReturnType<typeof publishedRun>>, edit: () => Promise<void>) {
+  const ctx = (f.workbench as unknown as { context: WorkbenchContext }).context;
+  const lock = ctx.lock.bind(ctx);
+  let pending: (() => Promise<void>) | undefined = edit;
+  ctx.lock = (async (key: string, task: () => Promise<unknown>) => {
+    const result = await lock(key, task);
+    if (key.startsWith("repository:") && pending) {
+      const saved = pending;
+      pending = undefined;
+      await saved();
+    }
+    return result;
+  }) as WorkbenchContext["lock"];
+}
+
+const indexDiffers = async (cwd: string) => (await git(cwd, ["diff", "--cached", "--quiet"], { allowedCodes: [0, 1] })).code === 1;
+
+test("a PR sync never overwrites a change saved in the run's folder after its clean check", async () => {
+  const f = await publishedRun();
+  try {
+    await f.github.upstreamCommit({ "other.ts": "other, upstream\n" });
+    // A file the merge leaves as it is: the sync goes on, and the saved change stays for review.
+    const later = "line one\nline two, mine and later\nline three\n";
+    savedAfterCleanCheck(f, () => f.write("hello.ts", later));
+    assert.equal((await f.workbench.syncRun(f.run.id)).updated, true);
+    assert.equal(await f.read("hello.ts"), later);
+    assert.equal(await f.read("other.ts"), "other, upstream\n");
+  } finally {
+    await f.cleanup();
+  }
+  const g = await publishedRun();
+  try {
+    await g.github.upstreamCommit({ "other.ts": "other, upstream\n" });
+    // A file the merge changes: nothing moves, and the saved change stays.
+    savedAfterCleanCheck(g, () => g.write("other.ts", "other, mine\n"));
+    const rounds = g.run.followUps?.length ?? 0;
+    const head = (await git(g.run.worktreePath, ["rev-parse", "HEAD"])).stdout.trim();
+    await assert.rejects(
+      withLocale("en", () => g.workbench.syncRun(g.run.id)),
+      (error: unknown) => error instanceof AppError && error.statusCode === 409 && /^A file in the run's folder changed while BELL PR was syncing/.test(error.message),
+    );
+    assert.equal(await g.read("other.ts"), "other, mine\n");
+    assert.equal(g.run.followUps?.length ?? 0, rounds);
+    assert.equal(g.run.status, "published");
+    assert.equal((await git(g.run.worktreePath, ["rev-parse", "HEAD"])).stdout.trim(), head);
+    assert.equal(await indexDiffers(g.run.worktreePath), false);
+  } finally {
+    await g.cleanup();
+  }
+});
+
+test("commits pushed on GitHub are taken over before a PR sync only from HEAD, never over a change saved meanwhile", async () => {
+  const f = await publishedRun();
+  try {
+    const pushed = await f.github.pushToBranch("fix/sync0001", { "hello.ts": "line one\nline two, suggested\nline three\n" });
+    const mine = "line one\nline two, mine and saved\nline three\n";
+    savedAfterCleanCheck(f, () => f.write("hello.ts", mine));
+    const before = f.run.publishCommit;
+    await assert.rejects(
+      withLocale("en", () => f.workbench.syncRun(f.run.id)),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 409 &&
+        // The person's words, never git's ("error: Entry … would be overwritten").
+        /^Changes saved in the run's folder touch files that the new commits on fix\/sync0001 change/.test(error.message) &&
+        !/error:|fatal:|Entry/.test(error.message),
+    );
+    assert.equal(await f.read("hello.ts"), mine);
+    assert.equal(f.run.publishCommit, before);
+    assert.notEqual((await git(f.run.worktreePath, ["rev-parse", "HEAD"])).stdout.trim(), pushed);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("writing a merged tree onto a checkout keeps a file saved after its snapshot, or refuses and moves nothing", async () => {
+  const f = await unpublishedRun();
+  try {
+    await f.write("hello.ts", "line one\nline two, mine\nline three\n");
+    const target = await f.github.upstreamCommit({ "other.ts": "other, upstream\n" });
+    await git(f.repo.path, ["fetch", "-q", "origin"]);
+    const snapshot = await snapshotCheckout(f.run.worktreePath, path.join(f.directory, "sync-index"));
+    const merged = await mergeCommits(f.run.worktreePath, target, snapshot, f.run.baseSha);
+    // Saved after the snapshot, in a file the merge changes: refused, with the checkout and its index as they were.
+    await f.write("other.ts", "other, mine\n");
+    await assert.rejects(
+      checkoutTreeOnto(f.run.worktreePath, merged.tree, target, snapshot),
+      (error: unknown) => error instanceof AppError && error.statusCode === 409,
+    );
+    assert.equal(await f.read("other.ts"), "other, mine\n");
+    assert.equal(await f.read("hello.ts"), "line one\nline two, mine\nline three\n");
+    assert.equal(await indexDiffers(f.run.worktreePath), false);
+    // Saved in a file the merge leaves alone: written, and the saved change stays.
+    await git(f.run.worktreePath, ["checkout", "--", "other.ts"]);
+    await f.write("hello.ts", "line one\nline two, mine and later\nline three\n");
+    await checkoutTreeOnto(f.run.worktreePath, merged.tree, target, snapshot);
+    assert.equal(await f.read("other.ts"), "other, upstream\n");
+    assert.equal(await f.read("hello.ts"), "line one\nline two, mine and later\nline three\n");
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a sync goes through as before when Git left unmerged entries in the run's folder index", async () => {
+  // A `git stash pop` or merge that stopped on a conflict in the run's folder leaves stages 1-3 in its index.
+  const f = await unpublishedRun();
+  try {
+    await f.write("hello.ts", "line one\nline two, mine\nline three\n");
+    const blob = (await git(f.run.worktreePath, ["hash-object", "-w", "hello.ts"])).stdout.trim();
+    await git(f.run.worktreePath, ["update-index", "--index-info"], {
+      input: `0 ${"0".repeat(40)}\thello.ts\n${[1, 2, 3].map((stage) => `100644 ${blob} ${stage}\thello.ts`).join("\n")}\n`,
+    });
+    assert.notEqual((await git(f.run.worktreePath, ["ls-files", "-u"])).stdout.trim(), "");
+    const upstream = await f.github.upstreamCommit({ "other.ts": "other, upstream\n" });
+    assert.equal((await f.workbench.syncRun(f.run.id)).updated, true);
+    assert.equal(f.run.baseSha, upstream);
+    assert.equal(await f.read("hello.ts"), "line one\nline two, mine\nline three\n");
+    assert.equal(await f.read("other.ts"), "other, upstream\n");
+    // The index holds the new base, as every sync leaves it.
+    assert.equal((await git(f.run.worktreePath, ["ls-files", "-u"])).stdout.trim(), "");
+    assert.equal(await indexDiffers(f.run.worktreePath), false);
+    await f.workbench.undoSync(f.run.id);
+    assert.equal(await f.read("other.ts"), "other\n");
+    assert.equal(await f.read("hello.ts"), "line one\nline two, mine\nline three\n");
   } finally {
     await f.cleanup();
   }
