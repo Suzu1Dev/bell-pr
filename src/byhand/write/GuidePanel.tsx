@@ -8,24 +8,8 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Check, CircleMinus, Hand, Lightbulb, Loader2, MessageSquare } from "lucide-react";
-import {
-  allHelpKinds,
-  askEntries,
-  attemptSince,
-  byHandClean,
-  helpAllowed,
-  helpKindOf,
-  needsWhy,
-  repeatFailure,
-  type AskEntry,
-  type ByHandCheckInInput,
-  type ByHandGuideInput,
-  type ByHandStepInput,
-  type ByHandTestInput,
-  type ByHandTestReportInput,
-  type LiveTests,
-  type TestCommandView,
-} from "../../../shared/by-hand";
+import { allHelpKinds, askEntries, attemptSince, byHandClean, helpAllowed, helpKindOf, needsWhy, repeatFailure } from "../../../shared/by-hand";
+import type { AskEntry, ByHandCheckInInput, ByHandGuideInput, ByHandStepInput, ByHandTestInput, ByHandTestReportInput, LiveTests, TestCommandView } from "../../../shared/by-hand";
 import { byHandRulesCase, type ByHandRulesCase } from "../../../shared/by-hand-rules";
 import { changeFingerprint } from "../../../shared/change-fingerprint";
 import { byHandBlockClause, learningLabel, type ContributionRules, type HelpChannel } from "../../../shared/contribution";
