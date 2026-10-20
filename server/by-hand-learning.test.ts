@@ -11,7 +11,7 @@ import { request } from "node:http";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { buildLearningExport } from "../shared/learning-export.js";
+import { buildLearningExport, buildSampleLearningExport } from "../shared/learning-export.js";
 import { assertNoHan } from "../src/test-utils/render.js";
 import { createApp } from "./index.js";
 import { fixedLicense } from "./license.js";
@@ -131,4 +131,16 @@ test("the complete export gains a Learn by hand section, with the claim only for
   assert.ok(fitted.includes("## 親手學"));
   assert.ok(fitted.includes("開始時就配合了專案的規範：嚮導只提供解說和回答。"));
   assert.ok(!buildLearningExport(run("agent"), repo, "en").includes("## Learn by hand"));
+});
+
+test("the sample's export is the complete export without the Learn by hand section", () => {
+  for (const locale of ["en", "zh-TW"] as const) {
+    const agent = run("agent");
+    assert.equal(buildSampleLearningExport(agent, repo, locale), buildLearningExport(agent, repo, locale));
+    const lbh = run("lbh", { learnByHand: true, byHand });
+    const full = buildLearningExport(lbh, repo, locale);
+    const sample = buildSampleLearningExport(lbh, repo, locale);
+    assert.ok(full.length > sample.length && !sample.includes(locale === "en" ? "## Learn by hand" : "## 親手學"));
+    assert.equal(full.replace(/## (?:Learn by hand|親手學)\n[\s\S]*?\n\n(?=## )/, ""), sample);
+  }
 });

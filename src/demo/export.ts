@@ -1,6 +1,6 @@
 import type { ChatMessage } from "../../shared/chat";
 import type { Locale } from "../../shared/i18n/locale";
-import { buildLearningExport } from "../../shared/learning-export";
+import { buildSampleLearningExport } from "../../shared/learning-export";
 import type { DiffFile, Repo, Run } from "../types";
 
 /**
@@ -38,7 +38,7 @@ export function demoLearningExport(
       };
   }
   const { prUrl: _prUrl, ...record } = run;
-  return buildLearningExport(
+  return buildSampleLearningExport(
     { ...record, explanations, conversations },
     repo,
     locale,
