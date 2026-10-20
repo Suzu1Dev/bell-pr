@@ -1,6 +1,7 @@
 /** Free/Pro table copy (Traditional Chinese, Taiwan); typed against the English copy. */
 import type { Translation } from "./locale.js";
 import type en from "./plans.en.js";
+import { product } from "../product.js";
 
 const plans: Translation<typeof en> = {
   columns: { feature: "功能", tier: "方案", limit: "限制" },
@@ -36,6 +37,10 @@ const plans: Translation<typeof en> = {
     planApproval: {
       label: "計畫核准與修訂、團隊收件匣、重試失敗的子任務",
       limit: "計畫最多修訂 3 次",
+    },
+    learnByHand: {
+      label: "親手學：修改由你自己寫；嚮導陪你規劃、給不含程式碼的提示，並在你準備好時審查你的修改",
+      limit: `${product.name} 會執行你的測試；這類工作裡，它的 agent 無法修改你的檔案`,
     },
     review: {
       label: "差異審查、解說、先試著答的提問、追問對話、筆記與建議審查順序",

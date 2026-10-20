@@ -78,8 +78,8 @@ test("re-running the review is Free and Pro-only efforts are real efforts", () =
   for (const effort of proOnlyEfforts) assert.ok(reasoningEfforts.includes(effort));
 });
 
-test("the plan table has the 26 rows in order, and every Pro feature gates one row", () => {
-  assert.equal(planFeatureIds.length, 26);
+test("the plan table has the 27 rows in order, and every Pro feature gates one row", () => {
+  assert.equal(planFeatureIds.length, 27);
   assert.deepEqual(planFeatureTable.map((row) => row.id), [...planFeatureIds]);
   for (const feature of proFeatures) {
     const rows = planFeatureTable.filter((row) => row.feature === feature);
@@ -146,6 +146,9 @@ test("the understanding check, the respect checks, feedback reading and practice
   assert.equal(after("learningNotes"), "practice");
   assert.equal(after("learningExport"), "coachDebrief");
   assert.equal(after("maintainerFeedback"), "prFeedback");
+  // Learn by hand is Free, with no feature gate (DESIGN v1.2 P1).
+  assert.equal(after("planApproval"), "learnByHand");
+  assert.deepEqual(row("learnByHand"), { id: "learnByHand", tier: "free" });
   assert.equal(en.features.parallelRuns.label, "Work on more than one contribution at a time");
   assert.match(en.features.parallelRuns.limit, /Publishing is paced the same on every plan\.$/);
   assert.equal(en.features.prFeedback.label, "AI follow-up rounds on maintainer feedback");
