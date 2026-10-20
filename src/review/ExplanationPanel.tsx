@@ -35,8 +35,13 @@ import { useTablistKeys } from "../a11y/useTablistKeys";
 import { scrollBehavior } from "../app/presentation";
 import { useFormat, useLocale, useT } from "../i18n";
 import type { ChatMessage, DiffFile, Run } from "../types";
+import { MaintainerFeedback } from "./MaintainerFeedback";
+import { inPanel } from "./focus";
+import { usePanelStrings } from "./i18n";
 import { MarkdownContent } from "./MarkdownContent";
 import { QuizAttempt } from "./QuizAttempt";
+import { unasked } from "./reader";
+import { ReaderView, type ByHandReader } from "./ReaderView";
 import { RoadChoice } from "./RoadChoice";
 import { currentAttempt, demoSamples } from "./try-first";
 import { WalkthroughCards, type LineRange } from "./WalkthroughCards";
@@ -73,17 +78,18 @@ export interface ExplanationPanelProps {
   /** The person's try-first attempt on this file (`run.attempts[path]`). */
   attempt?: FileAttempt;
   /**
-   * Saves the quiz answer before the reveal, its grade, or the road choice
-   * (PATCH /api/runs/:id/attempts). It rejects when the save failed (on a
-   * 409 after reloading the run): the reference stays hidden until it
-   * resolves. Pass it only while the run takes attempts (review or
-   * approved, not publishing): every other save answers 409, so no
-   * reference would show. Without it, an attempt lasts while its card is
-   * on screen.
+   * Saves the quiz answer before the reveal, its grade, the road choice or
+   * a walkthrough unit's answer (PATCH /api/runs/:id/attempts). It rejects
+   * when the save failed (on a 409 after reloading the run): the reference
+   * stays hidden until it resolves. Pass it only while the run takes
+   * attempts (review or approved, not publishing): every other save
+   * answers 409, so no reference would show. Without it, an attempt lasts
+   * while its card is on screen.
    */
   onAttempt?(input: {
     quiz?: FileAttemptInput["quiz"];
     road?: FileAttemptInput["road"];
+    walkthrough?: FileAttemptInput["walkthrough"];
   }): Promise<void>;
   /** Shows the try-first prompts; false brings back the plain reveal (Settings → Learning). */
   tryFirst?: boolean;
@@ -98,8 +104,12 @@ export interface ExplanationPanelProps {
   /** The tab to open on; the panel remounts per file, so the caller keeps the reader's choice. */
   initialTab?: PanelTab;
   onTabChange?: (tab: PanelTab) => void;
-  /** A Learn-by-hand run's review at Ready: "Run the review again" opens the Ready dialog (W2E). */
-  byHandReview?: { onReviewAgain: () => void };
+  /**
+   * A Learn-by-hand run (the Changes tab passes it): "Run the review again"
+   * opens the Ready dialog, and ReaderView stands in for an explanation or
+   * walkthrough of the file that nobody asked for yet.
+   */
+  byHandReview?: ByHandReader;
 }
 
 /** The learning panel's tabs. */
@@ -146,46 +156,6 @@ const reportKeys = ["implementer", "reviewer", "tester"] as const;
 /** Paragraphs (split on blank lines) that mention the path or its basename. */
 export { reportMentionCount };
 
-/** Thread comments on the current file, shown as plain text: other people's words, not Markdown to trust. */
-export function MaintainerFeedback({ items }: { items: PrFeedbackItem[] }) {
-  const t = useT("review");
-  if (!items.length) return null;
-  return (
-    <section className="explain-card explain-card-report">
-      <h3>
-        <MessageCircle size={15} />
-        {t.feedback.title}
-        <span className="explain-report-author">
-          {t.feedback.count({ count: items.length })}
-        </span>
-      </h3>
-      <p className="explain-report-meta">
-        <span className="explain-report-badge">{t.feedback.badge}</span>
-        <span>{t.feedback.replyNote}</span>
-      </p>
-      <ul className="explain-feedback-list">
-        {items.map((item) => (
-          <li key={item.url}>
-            <div className="explain-feedback-head">
-              <strong>{item.author}</strong>
-              <span>{item.authorAssociation}</span>
-              {typeof item.line === "number" && (
-                <span>{t.feedback.line({ line: item.line })}</span>
-              )}
-              {item.isResolved && <span>{t.feedback.resolved}</span>}
-              <a href={item.url} target="_blank" rel="noopener noreferrer">
-                {t.feedback.open}
-                <ArrowUpRight size={12} />
-              </a>
-            </div>
-            <p>{item.body}</p>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 export function ReviewReports({
   file,
   reports,
@@ -193,6 +163,7 @@ export function ReviewReports({
   feedback = [],
   onRerunReview,
   reviewBusy = false,
+  byHand,
 }: {
   file: DiffFile;
   reports?: Run["reports"];
@@ -200,8 +171,11 @@ export function ReviewReports({
   feedback?: PrFeedbackItem[];
   onRerunReview?: () => void;
   reviewBusy?: boolean;
+  /** A Learn-by-hand run: the guide wrote the review, and Run the review again opens Ready for review. */
+  byHand?: boolean;
 }) {
   const t = useT("review");
+  const guide = usePanelStrings().guide;
   const available = reportKeys.filter((key) => reports?.[key]?.trim());
   // Demo reports are fixed text, so there is nothing to re-run there.
   const rerun = onRerunReview && !demo && (
@@ -220,7 +194,7 @@ export function ReviewReports({
         )}
         {reviewBusy ? t.reports.rerunBusy : t.reports.rerun}
       </button>
-      <small className="explain-empty-note">{t.reports.rerunNote}</small>
+      {!byHand && <small className="explain-empty-note">{t.reports.rerunNote}</small>}
     </div>
   );
   const reviewOrder = parseReviewOrder(reports?.implementer ?? "");
@@ -231,7 +205,7 @@ export function ReviewReports({
         <div className="explain-empty">
           <Eye size={28} />
           <h3>{t.reports.emptyTitle}</h3>
-          <p>{t.reports.emptyBody}</p>
+          {!byHand && <p>{t.reports.emptyBody}</p>}
           {rerun}
         </div>
       </>
@@ -271,7 +245,7 @@ export function ReviewReports({
             <h3>
               <Eye size={15} />
               {section.title}
-              <span className="explain-report-author">{section.author}</span>
+              <span className="explain-report-author">{byHand ? guide : section.author}</span>
             </h3>
             <p className="explain-report-meta">
               <span className="explain-report-badge">
@@ -322,6 +296,7 @@ export function ExplanationPanel({
   walkthroughBusy,
   initialTab = "explain",
   onTabChange,
+  byHandReview,
 }: ExplanationPanelProps) {
   const t = useT("review");
   const fmt = useFormat();
@@ -448,6 +423,16 @@ export function ExplanationPanel({
     ...(isTestFile ? [t.presets.testFile] : []),
     ...(feedback.length ? [t.presets.feedback] : []),
   ];
+  // Learn by hand: a file is explained only on a click, after its own check answer (DESIGN v1.2 F10).
+  const reader = byHandReview && (
+    <ReaderView
+      file={file}
+      reader={byHandReview}
+      busy={explanationBusy || Boolean(walkthroughBusy)}
+      onExplain={onRetryExplanation}
+      onWalkthrough={onRetryWalkthrough}
+    />
+  );
 
   return (
     <aside className="explain-panel" aria-label={t.panel.label}>
@@ -624,7 +609,7 @@ export function ExplanationPanel({
                           className="explain-retry"
                           type="button"
                           disabled={explanationBusy}
-                          onClick={onRetryExplanation}
+                          onClick={inPanel(onRetryExplanation)}
                         >
                           <RotateCcw size={14} />
                           {explanationBusy
@@ -721,6 +706,7 @@ export function ExplanationPanel({
                     onSave={onAttempt && ((quiz) => onAttempt({ quiz }))}
                     sample={samples?.quiz}
                     demo={demo}
+                    byHand={!!byHandReview}
                   />
                 )}
                 {explanation.selfCheck && !prompts && (
@@ -767,7 +753,7 @@ export function ExplanationPanel({
                     className="explain-retry"
                     type="button"
                     disabled={explanationBusy}
-                    onClick={onRetryExplanation}
+                    onClick={inPanel(onRetryExplanation)}
                   >
                     <RotateCcw size={14} />
                     {explanationBusy ? t.explain.retryBusy : t.explain.retry}
@@ -777,6 +763,8 @@ export function ExplanationPanel({
                   {t.explain.failedNote}
                 </span>
               </div>
+            ) : reader && unasked(file, "explanation") ? (
+              reader
             ) : (
               <div
                 className="explain-generating"
@@ -864,6 +852,8 @@ export function ExplanationPanel({
               </section>
             )}
           </>
+        ) : tab === "walkthrough" && reader && unasked(file, "walkthrough") ? (
+          reader
         ) : tab === "walkthrough" ? (
           <WalkthroughCards
             file={file}
@@ -872,6 +862,10 @@ export function ExplanationPanel({
             onHighlight={onHighlight}
             onRetry={onRetryWalkthrough}
             busy={walkthroughBusy}
+            tryFirst={prompts}
+            attempts={fileAttempt?.walkthroughs}
+            onAttempt={onAttempt && ((walkthrough) => onAttempt({ walkthrough }))}
+            byHand={!!byHandReview}
           />
         ) : tab === "reports" ? (
           <ReviewReports
@@ -879,8 +873,9 @@ export function ExplanationPanel({
             reports={reports}
             demo={demo}
             feedback={feedback}
-            onRerunReview={onRerunReview}
+            onRerunReview={onRerunReview && (byHandReview?.onReviewAgain ?? onRerunReview)}
             reviewBusy={reviewBusy}
+            byHand={!!byHandReview}
           />
         ) : (
           <div

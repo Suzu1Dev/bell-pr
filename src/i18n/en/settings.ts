@@ -168,7 +168,7 @@ const settings = {
     tryFirst: {
       title: "Try first",
       label: "Try-first prompts during review",
-      help: "On by default: in each file's explanation, you answer its question and guess another way to make the change before the answer and the alternatives show. When this is off, they show behind a plain reveal button, with nothing to fill in.",
+      help: "On by default: in each file's explanation you answer its question and guess another way to make the change, and in its code walkthrough you answer each Check yourself question, before the answers and the alternatives show. When this is off, they show behind a plain reveal, with nothing to fill in.",
     },
   },
   performance: {

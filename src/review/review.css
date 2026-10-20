@@ -2050,6 +2050,10 @@
   font-size: var(--text-xs);
   line-height: 1.7;
 }
+/* Tried first, "Check yourself" closes its unit's card as the fold does. */
+.walkthrough-card > .tf-card {
+  margin: var(--space-3) 0 0;
+}
 .walkthrough-check summary {
   cursor: pointer;
   color: var(--color-text-secondary);

@@ -35,6 +35,14 @@ export interface QuizAttemptProps {
   /** Demo only: the sample answer "Fill with the sample answer" types. */
   sample?: string;
   demo: boolean;
+  /** The card's title; "Quiz yourself" (the explanation's quiz) by default. */
+  title?: string;
+  /** Shows the saved attempt with nothing to answer or grade (a run that takes no attempts). */
+  readOnly?: boolean;
+  /** A confident miss comes back in the practice deck (the default: the deck asks each file's quiz again). */
+  practised?: boolean;
+  /** A Learn-by-hand run, whose check takes no quiz answer: no hint says this one can count. */
+  byHand?: boolean;
 }
 
 /** The step being saved. */
@@ -46,8 +54,9 @@ type FocusTarget = "grades" | "graded" | "reference";
 /**
  * The "Quiz yourself" card, tried first: an answer and a confidence before
  * the reference shows, then a self-grade. Show answer with the field empty
- * is a one-click skip. It never gates anything; a graded answer at the
- * file's current version counts toward the understanding check.
+ * is a one-click skip. It never gates anything; in an agent run a graded
+ * answer at the file's current version counts toward the understanding
+ * check.
  */
 export function QuizAttempt({
   question,
@@ -56,6 +65,10 @@ export function QuizAttempt({
   onSave,
   sample,
   demo,
+  title,
+  readOnly,
+  practised,
+  byHand,
 }: QuizAttemptProps) {
   const t = useT("review").tryFirst;
   const [answer, setAnswer] = useState(saved?.answer ?? "");
@@ -118,6 +131,10 @@ export function QuizAttempt({
       reference={reference}
       demo={demo}
       sample={sample}
+      title={title}
+      readOnly={readOnly}
+      practised={practised}
+      byHand={byHand}
       answer={answer}
       confidence={confidence}
       record={record}
@@ -142,6 +159,10 @@ export interface QuizAttemptViewProps {
   reference: string;
   demo: boolean;
   sample?: string;
+  title?: string;
+  readOnly?: boolean;
+  practised?: boolean;
+  byHand?: boolean;
   /** The answer being written. */
   answer: string;
   confidence?: Confidence;
@@ -166,6 +187,10 @@ export function QuizAttemptView({
   reference,
   demo,
   sample,
+  title,
+  readOnly,
+  practised = true,
+  byHand,
   answer,
   confidence,
   record,
@@ -183,8 +208,9 @@ export function QuizAttemptView({
   const review = useT("review");
   const t = review.tryFirst;
   const id = useId();
-  const gradable = record && !record.skipped && !record.grade;
+  const gradable = !readOnly && record && !record.skipped && !record.grade;
   const confidentMiss =
+    practised &&
     record?.grade &&
     record.confidence &&
     isConfidentMiss({ grade: record.grade, confidence: record.confidence });
@@ -195,13 +221,13 @@ export function QuizAttemptView({
     >
       <h3>
         <HelpCircle size={15} aria-hidden="true" />
-        {review.explain.cards.selfCheck}
+        {title ?? review.explain.cards.selfCheck}
         <span className="tf-badge">{t.badge}</span>
       </h3>
       <div id={`${id}-question`}>
         <MarkdownContent>{question}</MarkdownContent>
       </div>
-      {!record && (
+      {!record && !readOnly && (
         <div className="tf-form">
           <label className="tf-label" htmlFor={`${id}-answer`}>
             {t.quiz.answerLabel}
@@ -237,7 +263,7 @@ export function QuizAttemptView({
               </label>
             ))}
           </div>
-          {answer.trim() && !confidence && (
+          {answer.trim() && !confidence && !byHand && (
             <p className="tf-hint">{t.quiz.confidenceHint}</p>
           )}
           <div className="tf-actions">

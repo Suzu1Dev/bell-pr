@@ -24,6 +24,16 @@ interface ExplanationsOptions {
 }
 
 /**
+ * Whether a run's explanations and walkthroughs are asked for on their
+ * own: once a real run stops, and never in a Learn-by-hand run, whose
+ * files are asked for one by one on a click after Ready (DESIGN v1.2 F5,
+ * F10).
+ */
+export function asksOnItsOwn(run: Pick<Run, "learnByHand">, demo: boolean, active: boolean) {
+  return !demo && !active && !run.learnByHand;
+}
+
+/**
  * Loads the plain-language explanations of the open run's changed files:
  * on its own once the run stops, and again when the reader retries a file.
  */
@@ -114,10 +124,10 @@ export function useExplanations({
     [draftMutationEpoch, runIdRef, setFiles, setRun],
   );
 
+  const { learnByHand } = run;
   useEffect(() => {
     if (
-      demo ||
-      active ||
+      !asksOnItsOwn({ learnByHand }, demo, active) ||
       !files.some(
         (value) =>
           !value.blocked &&
@@ -129,6 +139,6 @@ export function useExplanations({
     )
       return;
     void prepareExplanations(run.id);
-  }, [run.id, demo, active, files, prepareExplanations]);
+  }, [run.id, learnByHand, demo, active, files, prepareExplanations]);
   return { explanationRequests, prepareExplanations };
 }

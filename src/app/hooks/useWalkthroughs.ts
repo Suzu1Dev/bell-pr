@@ -9,6 +9,7 @@ import {
 } from "react";
 import { api, send } from "../../api";
 import type { DiffFile, Run } from "../../types";
+import { asksOnItsOwn } from "./useExplanations";
 
 interface WalkthroughsOptions {
   run: Run;
@@ -119,11 +120,12 @@ export function useWalkthroughs({
     [draftMutationEpoch, runIdRef, setFiles, setRun],
   );
 
+  const { learnByHand } = run;
   useEffect(() => {
-    if (demo || active || walkthroughBusy) return;
+    if (!asksOnItsOwn({ learnByHand }, demo, active) || walkthroughBusy) return;
     const next = nextWalkthrough(files, selectedPath);
     if (next) void requestWalkthrough(run.id, next.path);
-  }, [run.id, demo, active, files, selectedPath, walkthroughBusy, requestWalkthrough]);
+  }, [run.id, learnByHand, demo, active, files, selectedPath, walkthroughBusy, requestWalkthrough]);
 
   return { walkthroughBusy, requestWalkthrough };
 }
