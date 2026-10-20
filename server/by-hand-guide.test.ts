@@ -302,6 +302,31 @@ test("a stored answer has no code BELL could not find, quotes BELL cut itself, a
   );
 });
 
+test("a ref or a quote whose path is code, not a file, is dropped even when Git would read it as a pattern", async (t) => {
+  const f = await fixture(t);
+  // `git show <sha>:<path>` reads a missing path with *, ? or [ as a pattern that matches nothing, and succeeds.
+  f.answers.push(
+    answer({
+      text: "Look at the loop.",
+      refs: [
+        { path: "await sleep(delayMs * 2 ** attempt);", line: 1, endLine: null },
+        { path: "src/retry.js", line: 4, endLine: null },
+      ],
+      quotes: [{ path: "items[index + 1] ?? fallback", startLine: 1, endLine: 1, from: "base", anchor: null }],
+    }),
+    answer({ text: "```js\nretry();\n```", refs: [{ path: "return delayMs * attempt;", line: 1, endLine: null }] }),
+  );
+  await f.ask({ kind: "ask", entry: "project", question: "Where is the wait?" });
+  await f.ask({ kind: "ask", entry: "project", question: "And then?" });
+  const [entry, fallback] = f.run.byHand!.thread!;
+  assert.deepEqual(entry.refs, [{ path: "src/retry.js", line: 4 }]);
+  assert.equal(entry.quotes, undefined);
+  assert.equal(entry.dropped, 2);
+  // The pointer-only fallback has no code path to point to either.
+  assert.match(fallback.text, /^BELL PR removed code from this answer/);
+  assert.doesNotMatch(JSON.stringify(f.run.byHand), /delayMs|index \+ 1/);
+});
+
 test("an answer with nothing left but removed code points to its refs, or says BELL removed it", async (t) => {
   const f = await fixture(t);
   f.answers.push(
@@ -549,6 +574,40 @@ test("the structured review at Ready stores filtered findings, renders them for 
   // A fitted run whose lock lacks review never starts one.
   f.run.byHand!.helpLock = lock;
   await assert.rejects(withLocale("en", () => review(f.ctx, f.run, {}, new AbortController().signal)), refused(409, /^Not offered in this run/));
+});
+
+test("a review finding or its evidence that names no file of the checkout keeps no path, so no agent text hides in one", async (t) => {
+  const f = await fixture(t);
+  await f.edit(clientSource.replace("  return response.json();", "  if (response.status === 503) return null;\n  return response.json();"));
+  const finding = (fields: Record<string, unknown>) => ({
+    path: "src/client.js",
+    line: 6,
+    observed: "A 503 returns null.",
+    evidence: { type: "pattern", path: "src/retry.js", line: 8, quote: null },
+    why: "Callers read null as an answer.",
+    question: "What should the caller see?",
+    dimension: null,
+    ...fields,
+  });
+  f.answers.push(
+    JSON.stringify({
+      verified: "No test run at this version.",
+      checked: ["src/client.js"],
+      findings: [
+        finding({ path: "if (response.status === 503) return retryOnStatus(response);" }),
+        finding({ evidence: { type: "pattern", path: "await sleep(delayMs * 2 ** attempt);", line: 3, quote: null } }),
+        finding({ path: "../outside.js" }),
+      ],
+    }),
+    "The tests did not run at this version.",
+  );
+  await withLocale("en", () => review(f.ctx, f.run, {}, new AbortController().signal));
+  const [stored] = f.run.byHand!.reviews!;
+  assert.deepEqual(stored.findings.map((value) => [value.path, value.evidence]), [["src/client.js", { type: "pattern" }]]);
+  assert.doesNotMatch(JSON.stringify(f.run.byHand), /retryOnStatus|delayMs|outside/);
+  assert.doesNotMatch(f.run.reports!.reviewer, /retryOnStatus|delayMs|outside/);
+  // Evidence with nothing left to show reads as a question.
+  assert.match(f.run.reports!.reviewer, /1\. src\/client\.js:6: A 503 returns null\.\n {3}- I may be wrong about this; your tests decide\.\n/);
 });
 
 test("after Ready, the per-file chat answers through the guide, filtered, with BELL's quotes", async (t) => {
