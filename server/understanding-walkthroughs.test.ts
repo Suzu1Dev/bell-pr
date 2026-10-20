@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { changeFingerprint } from "../shared/understanding.js";
 import { readDiff } from "./git.js";
+import { withLocale } from "./i18n/index.js";
 import { git } from "./process.js";
 import { attemptSchema } from "./routes/understanding.js";
 import { Store } from "./store.js";
@@ -97,6 +98,39 @@ async function fixture(t: TestContext) {
   };
   return { workbench, run, files };
 }
+
+test("once an answer is on record, a second tab can't change it before the grade (quiz and walkthrough unit)", async (t) => {
+  const f = await fixture(t);
+  delete f.run.learnByHand;
+  const [file] = f.files;
+  const save = (input: Omit<Parameters<typeof f.workbench.understanding.saveAttempt>[1], "filePath" | "fingerprint">) =>
+    withLocale("en", () => f.workbench.understanding.saveAttempt(f.run.id, { filePath: file.path, fingerprint: file.fingerprint, ...input }));
+  const answered = (error: AppError) =>
+    error.statusCode === 409 && /^Your answer is already saved/.test(error.message);
+  // Tab A answers and sees the reference; tab B, still open on the question, then sends something else.
+  await save({ quiz: { answer: "It exports forty constants", confidence: "think" } });
+  await assert.rejects(save({ quiz: { answer: "Each constant equals its line number" } }), answered);
+  await assert.rejects(save({ quiz: { answer: "It exports forty constants", confidence: "sure" } }), answered);
+  await assert.rejects(save({ quiz: { skipped: true } }), answered);
+  // The same answer sent again is fine, and so is the grade.
+  await save({ quiz: { answer: " It exports forty constants ", confidence: "think" } });
+  await save({ quiz: { grade: "got" } });
+  assert.deepEqual(
+    { ...f.run.attempts?.[file.path]?.quiz, at: "" },
+    { answer: "It exports forty constants", confidence: "think", grade: "got", at: "" },
+  );
+  // A walkthrough unit the same way (D1).
+  await save({ walkthrough: { unit: "a0:1", answer: "It exports the first constant", confidence: "guess" } });
+  await assert.rejects(save({ walkthrough: { unit: "a0:1", answer: "It exports a0, which is 0" } }), answered);
+  await assert.rejects(save({ walkthrough: { unit: "a0:1", confidence: "sure" } }), answered);
+  await assert.rejects(save({ walkthrough: { unit: "a0:1", skipped: true } }), answered);
+  await save({ walkthrough: { unit: "a0:1", answer: "It exports the first constant", confidence: "guess" } });
+  await save({ walkthrough: { unit: "a0:1", grade: "partly" } });
+  const unit = f.run.attempts?.[file.path]?.walkthroughs?.["a0:1"];
+  assert.deepEqual([unit?.answer, unit?.confidence, unit?.grade], ["It exports the first constant", "guess", "partly"]);
+  // Another unit is its own question.
+  await save({ walkthrough: { unit: "a1:2", answer: "It exports a1", confidence: "sure" } });
+});
 
 test("a walkthrough unit's answer is stored with the file's attempt, final once graded (D1)", async (t) => {
   const f = await fixture(t);

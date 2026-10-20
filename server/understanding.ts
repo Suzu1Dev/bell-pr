@@ -554,15 +554,10 @@ export function understandingFacade(
           if (quiz.skipped && quiz.answer?.trim())
             throw new AppError((m) => m.understanding.attemptSkipped, 422);
           const prior = attempt.quiz;
-          // A graded or skipped quiz is final: the answer came before the reveal.
-          if (
-            prior &&
-            (prior.grade || prior.skipped) &&
-            (["answer", "confidence", "skipped"] as const).some(
-              (key) => quiz[key] !== undefined && (quiz[key] ?? "") !== (prior[key] ?? ""),
-            )
-          )
-            throw new AppError((m) => m.understanding.attemptLocked, 409);
+          // An answer on record is final: it came before the reveal, so a
+          // tab still open on the question can't rewrite it after the reference showed.
+          if (prior && changesAnswer(quiz, prior))
+            throw new AppError((m) => (prior.grade || prior.skipped ? m.understanding.attemptLocked : m.understanding.attemptAnswered), 409);
           if (prior?.grade && quiz.grade && quiz.grade !== prior.grade)
             throw new AppError((m) => m.understanding.attemptLocked, 409);
           attempt.quiz = {
@@ -580,13 +575,11 @@ export function understandingFacade(
           const { unit, ...answer } = input.walkthrough;
           const units = (attempt.walkthroughs ??= {});
           const prior = units[unit];
-          // As the quiz: a graded or skipped answer is final.
+          // As the quiz: an answer on record is final, and so is a grade.
           if (prior && (prior.grade || prior.skipped) && (answer.grade ?? prior.grade) !== prior.grade)
             throw new AppError((m) => m.understanding.attemptLocked, 409);
-          if (prior && (prior.grade || prior.skipped) && (["answer", "confidence", "skipped"] as const).some(
-            (key) => answer[key] !== undefined && (answer[key] ?? "") !== (prior[key] ?? ""),
-          ))
-            throw new AppError((m) => m.understanding.attemptLocked, 409);
+          if (prior && changesAnswer(answer, prior))
+            throw new AppError((m) => (prior.grade || prior.skipped ? m.understanding.attemptLocked : m.understanding.attemptAnswered), 409);
           if (answer.skipped && answer.answer?.trim())
             throw new AppError((m) => m.understanding.attemptSkipped, 422);
           if (!prior && Object.keys(units).length >= understandingLimits.walkthroughUnits)
@@ -617,6 +610,17 @@ export function understandingFacade(
       });
     },
   };
+}
+
+/** Whether a quiz or walkthrough save would change the answer, confidence or skip on record (the answer as stored, trimmed). */
+function changesAnswer(
+  input: { answer?: string; confidence?: string; skipped?: boolean },
+  prior: { answer?: string; confidence?: string; skipped?: boolean },
+) {
+  return (["answer", "confidence", "skipped"] as const).some((key) => {
+    const value = key === "answer" ? input.answer?.trim() : input[key];
+    return value !== undefined && (value ?? "") !== (prior[key] ?? "");
+  });
 }
 
 /** The fields of `value` that are set. */

@@ -38,6 +38,7 @@ const understanding: Translation<typeof en> = {
   alreadyPassed: "你已經用自己的話講過這個版本的變更。要修改答案，請重新開始檢查。",
   noSummary: "還沒有可以確認的說明。請先鎖定答案。",
   attemptLocked: "這次作答已經評分或略過，會維持你當時的回答。",
+  attemptAnswered: "你的答案已經儲存，會維持你在看到參考答案前的回答。請重新載入查看。",
   attemptSkipped: "略過的作答沒有答案。",
   attemptEmpty: "請送出測驗答案或做法選擇。",
   notImplemented: "這個版本的 BELL PR 還沒有這項功能。",

@@ -60,6 +60,8 @@ const understanding = {
     "There is no explanation to confirm yet. Lock your answers first.",
   attemptLocked:
     "This attempt is already graded or skipped, and it stays as you answered it.",
+  attemptAnswered:
+    "Your answer is already saved, and it stays as you answered it before the reference showed. Reload to see it.",
   attemptSkipped: "A skipped attempt has no answer.",
   attemptEmpty: "Send a quiz answer or a road choice.",
   /** A learning-loop feature this build does not have yet. */
