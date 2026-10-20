@@ -68,8 +68,26 @@ function wrap(children: Child[], loose = false) {
   return result;
 }
 
-/** Spaces and tabs around each line ending go; the first line's start and the last line's end stay. */
-const trimLines = (value: string) => value.replace(/[ \t]*(\r?\n|\r)[ \t]*/g, "$1");
+const isSpace = (character: string | undefined) => character === " " || character === "\t";
+
+/**
+ * Spaces and tabs around each line ending go; the first line's start and the
+ * last line's end stay. In linear time, as trim-lines did: one pattern for
+ * both sides backtracks over a long run of spaces, in quadratic time.
+ */
+function trimLines(value: string) {
+  const parts = value.split(/(\r?\n|\r)/);
+  return parts
+    .map((part, index) => {
+      if (index % 2) return part;
+      let start = 0;
+      let end = part.length;
+      if (index > 0) while (start < end && isSpace(part[start])) start++;
+      if (index < parts.length - 1) while (end > start && isSpace(part[end - 1])) end--;
+      return part.slice(start, end);
+    })
+    .join("");
+}
 
 /** Whether a list's items are separated by blank lines. */
 const listLoose = (parent: Parents) =>

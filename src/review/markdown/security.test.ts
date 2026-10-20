@@ -64,3 +64,13 @@ test("an image inside a link shows as the image note inside the link, never as a
     /<a href="https:\/\/example.com\/ci" target="_blank" rel="noopener noreferrer"><span class="markdown-image-note">Image omitted: badge<\/span><\/a> <span><span class="markdown-image-note">Image omitted<\/span><\/span>/,
   );
 });
+
+test("a long run of spaces or tabs renders in linear time, kept inside a line and trimmed at its ends", () => {
+  // react-markdown took about 40 ms for 200,000 spaces; a backtracking
+  // trim of line ends took seconds, quadratic in the run's length.
+  const run = " \t".repeat(100_000);
+  const started = performance.now();
+  const html = render(`a${run}b\nc${run}\n${run}d`);
+  assert.ok(performance.now() - started < 3_000, "rendering took too long");
+  assert.equal(html, `<div class="markdown-content"><p>a${run}b\nc\nd</p></div>`);
+});
