@@ -5,14 +5,11 @@
  * condition holds; nothing here is an override, and an agent run never
  * reaches it.
  *
- * `respectChecks` (shared/contribution.ts), `createRun`
- * (server/new-run.ts), the respect mirrors and, in W2, the task dialog and
- * the GuidePanel call the case reader and the decision. The carve-out
- * reader (`attachCarveOuts` in shared/project-policy.ts) calls
- * `carveOutKinds` when the server reads a project's rules; no client
- * module imports either, so the word table stays out of the client.
- * Everything here is pure, deterministic and non-persisted; the only
- * clock is the `now` the caller passes.
+ * `respectChecks`, `createRun`, the respect mirrors, the task dialog and
+ * the GuidePanel call the case reader and the decision. Only the server's
+ * carve-out reader (`attachCarveOuts`, shared/project-policy.ts) calls
+ * `carveOutKinds`, so the word table stays out of the client. All of it
+ * is pure and non-persisted; the only clock is the `now` passed in.
  *
  * - `carveOutKinds(text)`: the help kinds the permitted part of one
  *   carve-out names, by the F12 word table (understanding the code,
@@ -91,10 +88,36 @@ export interface ByHandRulesDecision {
   }[];
 }
 
-/** The help kinds a carve-out's permitted words name (the F12 word table). Stub until the reader lands: none. */
+/**
+ * The F12 word table, and nothing else: each pattern with the kinds of
+ * help it names. Understanding and questions count only about the code,
+ * a review only of the person's own work or in private.
+ */
+const carveOutTable: readonly (readonly [RegExp, readonly HelpKind[]])[] = [
+  [
+    /\bunderstand(?:ing)?\b(?:\W+\w+){0,4}?\W+(?:code(?:base)?|source|project|repository|internals|APIs?|algorithms?)\b/i,
+    ["explain", "answer"],
+  ],
+  [/\bexplain(?:s|ing)?\b|\bexplanations?\b|\blearning\s+aids?\b/i, ["explain", "answer"]],
+  [/\bresearch(?:ing)?\b/i, ["explain", "answer"]],
+  [
+    /\banswer(?:s|ing)?\s+(?:\w+\s+){0,2}?questions\b|\bquestions?\b(?:\W+\w+){0,3}?\W+(?:about|on|regarding)\b(?:\W+\w+){0,3}?\W+(?:code(?:base)?|source|project|repository|internals|APIs?)\b/i,
+    ["explain", "answer"],
+  ],
+  [/\bdebug(?:ging)?\b/i, ["test"]],
+  [
+    /\bprivate(?:ly)?\s+review\w*|\bself[- ]review\w*|\breview(?:s|ing)?\s+(?:of\s+)?(?:your|my|their)\s+own\b|\breview(?:s|ing)?\s+your\s+(?:code|changes?|work|patch(?:es)?|prose)\b/i,
+    ["review"],
+  ],
+  [/\bpossible\s+solutions?\b|\bsolution\s+ideas?\b/i, ["plan"]],
+];
+
+/** The help kinds a carve-out's permitted words name (the F12 word table), in vocabulary order. */
 export function carveOutKinds(text: string): HelpKind[] {
-  void text;
-  return [];
+  const named = new Set(
+    carveOutTable.flatMap(([pattern, kinds]) => (pattern.test(text) ? kinds : [])),
+  );
+  return allHelpKinds.filter((kind) => named.has(kind));
 }
 
 const dayMs = 24 * 60 * 60 * 1000;

@@ -5,6 +5,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { aiDisclosureLine } from "./drafts.js";
 import {
+  attachCarveOuts,
   classifyPolicy,
   disclosureRule,
   hasAiDisclosure,
@@ -371,4 +372,184 @@ test("without help verbs, as for every agent run, explaining or reviewing is no 
   assert.ok(!hasAiDisclosure("Fixes the cap.\n\nClaude reviewed this."));
   assert.ok(!hasAiDisclosure("Fixes the cap.\n\nClaude reviewed this.", "", {}));
   assert.ok(hasAiDisclosure("Fixes the cap.\n\nI used Claude Code through BELL PR to explain the parser."));
+});
+
+/** The carve-outs attached to a document's rules, each `line: quote [kinds]`, verbatim and on their line. */
+function carveOuts(text: string, path = "CONTRIBUTING.md") {
+  const findings = attachCarveOuts(path, text, classifyPolicy(path, text));
+  const lines = text.split("\n");
+  const flat = text.replace(/\s*\n\s*/g, " ");
+  const allows = findings.find((finding) => finding.allows)?.allows ?? [];
+  for (const allowance of allows) {
+    assert.ok(allowance.quote.length <= 300, allowance.quote);
+    assert.ok(lines[allowance.line - 1].includes(allowance.quote.split(" ").slice(0, 2).join(" ")), allowance.quote);
+    // A question and its "Yes" may sit in two blocks, joined by one space.
+    assert.ok(flat.replace(/(\?)\s+#*\s*/g, "$1 ").includes(allowance.quote), allowance.quote);
+  }
+  // Every ban and area finding of the document carries the same ones; nothing else does.
+  for (const finding of findings)
+    assert.deepEqual(finding.allows, finding.kind === "ban" || finding.kind === "area" ? (allows.length ? allows : undefined) : undefined);
+  return allows.map((allowance) => `${allowance.line}: ${allowance.quote} [${allowance.kinds.join(", ")}]`);
+}
+const ban = "We do not accept AI-generated pull requests.";
+
+test("a carve-out sentence in a permission context names only what the permission covers", () => {
+  // QEMU docs/devel/code-provenance.rst (plan research/policies.md): "static analysis" names nothing.
+  assert.deepEqual(
+    carveOuts(`${ban}\n\nThis policy does not apply to other uses of AI, such as researching APIs or algorithms, static analysis, or debugging, provided their output is not included in contributions.`),
+    ["3: This policy does not apply to other uses of AI, such as researching APIs or algorithms, static analysis, or debugging, provided their output is not included in contributions. [explain, answer, test]"],
+  );
+  // Before "is out of scope" (nixpkgs' wording), after "it's fine to" and "is allowed to".
+  assert.deepEqual(
+    carveOuts(`${ban}\n\nUse of AI tools for research, testing, debugging, or private review is out of scope, if no substantial amount of their output is included in the resulting contribution.`),
+    ["3: Use of AI tools for research, testing, debugging, or private review is out of scope, if no substantial amount of their output is included in the resulting contribution. [explain, answer, review, test]"],
+  );
+  assert.deepEqual(carveOuts(`${ban} It's fine to use LLMs to answer questions, analyze, distill, refine, check, suggest, review.`), [
+    "1: It's fine to use LLMs to answer questions, analyze, distill, refine, check, suggest, review. [explain, answer]",
+  ]);
+  assert.deepEqual(carveOuts(`${ban} Contributors are allowed to use AI tools for researching the codebase.`), [
+    "1: Contributors are allowed to use AI tools for researching the codebase. [explain, answer]",
+  ]);
+  // The words after the condition are the person's duty, not a permitted use (GNOME's wording).
+  assert.deepEqual(
+    carveOuts(`${ban}\n\nWhile it is not prohibited to use AI as a learning aid or a development tool (i.e. code completions), extension developers should be able to justify and explain the code they submit`),
+    ["3: While it is not prohibited to use AI as a learning aid or a development tool (i.e. code completions), extension developers should be able to justify and explain the code they submit [explain, answer]"],
+  );
+  assert.deepEqual(carveOuts(`${ban} Debugging with AI is fine, but research is not.`), [
+    "1: Debugging with AI is fine, but research is not. [test]",
+  ]);
+});
+
+test("no carve-out without a permission, under a negation, for some people only, or about AI help at all", () => {
+  for (const text of [
+    "It's fine to use AI tools, but you must be able to explain your code.",
+    "Neither research nor debugging with AI is allowed.",
+    "The research exemption does not apply to AI tools.",
+    "Using AI to explain code is not acceptable.",
+    "AI tools can sometimes answer questions you may have about the code, but these answers are often incorrect.",
+    "Explaining code with AI is allowed for maintainers only.",
+    "Research is fine for this project.",
+    "Using AI for static analysis or to find bugs is fine.",
+    "Copilot is allowed in your editor.",
+  ])
+    assert.deepEqual(carveOuts(`${ban}\n\n${text}`), [], text);
+  // Without a ban or a reserved-issue rule in the document, nothing is attached.
+  const text = "This policy does not apply to other uses of AI, such as research.";
+  assert.deepEqual(attachCarveOuts("CONTRIBUTING.md", text, classifyPolicy("CONTRIBUTING.md", text)), []);
+});
+
+test("a question about using AI answered Yes is a carve-out, never 'Yes, but please don't' or No", () => {
+  // Servo's book, src/policy/ai-usage.md (plan research/policies.md), as headings and answers.
+  const servo = [
+    "Contributions must not include content generated by large language models or other probabilistic tools.",
+    "",
+    "### Can I use an AI tool to help me understand Servo's codebase better?",
+    "",
+    "Yes, but see the earlier warning about these tools' reliability.",
+    "",
+    "### Can I use an AI review tool for my pull request?",
+    "",
+    "Yes, but please don't. The results are unreliable and noisy.",
+    "",
+    "### Can I use AI to debug my patch?",
+    "",
+    "No.",
+  ].join("\n");
+  assert.deepEqual(carveOuts(servo), [
+    "3: Can I use an AI tool to help me understand Servo's codebase better? Yes, but see the earlier warning about these tools' reliability. [explain, answer]",
+  ]);
+  assert.deepEqual(carveOuts(`${ban} Can I use an LLM to debug my patch? Yes.`), ["1: Can I use an LLM to debug my patch? Yes. [test]"]);
+  assert.deepEqual(carveOuts(`${ban} Can I use an LLM to debug my patch? Yes, but do not paste its output.`), []);
+  assert.deepEqual(carveOuts(`${ban} Can I use AI to research the codebase? Yes, but only maintainers may.`), []);
+});
+
+test("a list under a heading or lead-in naming acceptable uses counts; never under an unacceptable one", () => {
+  // matplotlib doc/devel/contribute.rst: a grid with a bold heading per list, and the
+  // whole word "acceptable" (not the one inside "Unacceptable").
+  const grid = [
+    "Some examples of acceptable and unacceptable AI uses are:",
+    "",
+    ".. grid:: 1 1 2 2",
+    "",
+    "  .. grid-item::",
+    "",
+    "    :octicon:`check;1em;sd-text-success` **Acceptable uses**",
+    "",
+    "    - Gaining understanding of the existing code",
+    "    - Getting solution ideas",
+    "",
+    "  .. grid-item::",
+    "",
+    "    :octicon:`x;1em;sd-text-danger`  **Unacceptable uses**",
+    "",
+    "    - Solving topics that you wouldn't be able to solve yourself without AI",
+    "    - Researching the codebase for someone else",
+    "",
+    "Good first issues are reserved for newcomers; pull requests that are AI generated will be closed.",
+  ].join("\n");
+  assert.deepEqual(carveOuts(grid, "doc/devel/contribute.rst"), [
+    "9: Gaining understanding of the existing code [explain, answer]",
+    "10: Getting solution ideas [plan]",
+  ]);
+  // Markdown headings and a lead-in; the nearest heading decides.
+  const markdown = [
+    "# AI policy",
+    "",
+    ban,
+    "",
+    "## Acceptable uses of AI",
+    "",
+    "- Understanding the code base",
+    "- Debugging failing tests",
+    "- Static analysis",
+    "",
+    "## Unacceptable uses",
+    "",
+    "- Researching APIs for a patch",
+    "",
+    "Using AI for research is fine.",
+    "",
+    "## Not allowed",
+    "",
+    "Debugging with AI is fine.",
+    "",
+    "The following uses of AI are allowed:",
+    "",
+    "1. reviewing your own code privately",
+    "",
+    "AI tools are allowed for these:",
+    "",
+    "- Explaining the code, if you are a maintainer only",
+  ].join("\n");
+  assert.deepEqual(carveOuts(markdown), [
+    "7: Understanding the code base [explain, answer]",
+    "8: Debugging failing tests [test]",
+    "23: reviewing your own code privately [review]",
+  ]);
+  // A list right after a plain paragraph is not under the heading.
+  assert.deepEqual(carveOuts(`${ban}\n\n## Acceptable uses\n\nSome notes.\n\n- Debugging with AI`), []);
+});
+
+test("a sentence that is itself the ban is never its carve-out, and at most three are kept", () => {
+  assert.deepEqual(carveOuts("It's fine to use AI for research, but AI-generated code is not accepted in pull requests."), []);
+  const many = [
+    ban,
+    "",
+    "Researching the code with AI is fine.",
+    "",
+    "Debugging with AI is fine.",
+    "",
+    "Asking AI questions about the codebase is fine.",
+    "",
+    "Getting solution ideas from AI is fine.",
+  ].join("\n");
+  assert.deepEqual(carveOuts(many), [
+    "3: Researching the code with AI is fine. [explain, answer]",
+    "5: Debugging with AI is fine. [test]",
+    "7: Asking AI questions about the codebase is fine. [explain, answer]",
+  ]);
+  // A reserved-issue rule gets them as a ban does; a long sentence is quoted around its permission.
+  const long = `Good first issues are reserved for newcomers without AI tools.\n\nThis policy, which the steering committee adopted after a long discussion about copyright, provenance, licensing, reviewer workload and the many other concerns raised on the mailing list during the spring, does not apply to other uses of AI, such as researching APIs or algorithms, or debugging, provided their output is not included in contributions and the contributor understands every line.`;
+  const [carveOut] = carveOuts(long);
+  assert.match(carveOut, /^3: .*does not apply to other uses of AI, such as researching APIs or algorithms, or debugging.* \[explain, answer, test\]$/);
 });

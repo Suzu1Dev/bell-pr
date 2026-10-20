@@ -9,8 +9,8 @@ import assert from "node:assert/strict";
 import { cp, mkdtemp, readFile, readdir, rename, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { PolicyFinding } from "../shared/contribution.js";
-import { classifyPolicy, hasAiDisclosure } from "../shared/project-policy.js";
+import { respectChecks, type PolicyFinding } from "../shared/contribution.js";
+import { attachCarveOuts, classifyPolicy, hasAiDisclosure } from "../shared/project-policy.js";
 import { draftPreflight } from "../shared/draft-checks.js";
 import {
   generatedPatterns,
@@ -111,6 +111,47 @@ test("only the projects that ban AI-generated contributions outright block an ag
     "netbsd-commit-guidelines.txt",
     "qemu-code-provenance.rst",
   ]);
+});
+
+test("carve-outs of the real policies: QEMU's research and debugging, matplotlib's acceptable uses", async () => {
+  const allowsOf = async (file: string) => {
+    const text = await readFile(path.join(fixtures, "real", file), "utf8");
+    return attachCarveOuts(file, text, classifyPolicy(file, text)).flatMap((finding) =>
+      finding.allows ? [[finding.kind, finding.line, finding.allows.map((allowance) => [allowance.line, allowance.kinds.join(" ")])]] : [],
+    );
+  };
+  assert.deepEqual(await allowsOf("qemu-code-provenance.rst"), [["ban", 6, [[10, "explain answer test"]]]]);
+  // Its only ban is conditional, so the carve-outs are shown and never act.
+  assert.deepEqual(await allowsOf("matplotlib-contribute-generative-ai.rst"), [
+    ["ban", 38, [[20, "explain answer"], [21, "plan"]]],
+  ]);
+  for (const file of Object.keys(realExpectations).filter((name) => !/^(?:qemu|matplotlib-contribute-generative)/.test(name)))
+    assert.deepEqual(await allowsOf(file), [], file);
+});
+
+test("an agent run's checks never read carve-outs: every real policy gives the same checks with and without them", async () => {
+  for (const file of Object.keys(realExpectations)) {
+    const text = await readFile(path.join(fixtures, "real", file), "utf8");
+    const findings = attachCarveOuts(file, text, classifyPolicy(file, text));
+    const bare = findings.map(({ allows: _allows, ...finding }) => finding);
+    for (const facts of [undefined, { checkedAt: "2026-10-20T00:00:00.000Z", issue: { url: "https://github.com/acme/widgets/issues/1", state: "OPEN", labels: ["good first issue"] } }]) {
+      const checks = (rules: PolicyFinding[]) =>
+        respectChecks({ body: "Fixes the cap.", rules: { checkedAt: "2026-10-20T00:00:00.000Z", findings: rules, filesRead: [file] }, ...(facts ? { facts } : {}) }, "en");
+      assert.deepEqual(checks(findings), checks(bare), file);
+    }
+  }
+});
+
+test("a carve-out counts only in its own document, and its quote is checked for credentials", () => {
+  const findings = policyFindings([
+    { path: "CONTRIBUTING.md", kind: "contributing", content: "We do not accept AI-generated pull requests." },
+    { path: "docs/ai.md", kind: "documentation", content: "We do not accept AI-generated patches.\n\nDebugging with AI is fine, with the token ghp_abcdefghijklmnopqrstuvwxyz0123456789 removed." },
+  ]);
+  assert.deepEqual(findings.map((finding) => [finding.path, finding.allows?.map((allowance) => allowance.kinds)]), [
+    ["CONTRIBUTING.md", undefined],
+    ["docs/ai.md", [["test"]]],
+  ]);
+  assert.doesNotMatch(findings[1].allows![0].quote, /ghp_abcdefghijklmnopqrstuvwxyz0123456789/);
 });
 
 test("a Godot-style refusal of AI for substantial code is quoted as a rule the person weighs", () => {

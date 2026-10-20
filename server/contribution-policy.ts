@@ -11,7 +11,7 @@
  */
 import path from "node:path";
 import type { PolicyFinding, PolicyKind } from "../shared/contribution.js";
-import { classifyPolicy } from "../shared/project-policy.js";
+import { attachCarveOuts, classifyPolicy } from "../shared/project-policy.js";
 import {
   accountDefaults,
   defaultsKind,
@@ -155,17 +155,27 @@ const weight = (finding: PolicyFinding) =>
         } satisfies Record<PolicyKind, number>
       )[finding.kind] ?? 8);
 
+/** A quote as the card stores it: checked for credentials, 300 characters or fewer. */
+const storedQuote = (quote: string) => redact(quote).slice(0, 300);
+
 /**
  * The rules of the documents, in reading order, each quote checked for
- * credentials. Over 30, the ones that block publishing stay (explicit
- * bans, reserved areas, disclosures) and the rest make room.
+ * credentials. A ban or reserved-issue rule carries the carve-outs of its
+ * own document (`attachCarveOuts`, DESIGN v1.2 F12). Over 30, the ones
+ * that block publishing stay (explicit bans, reserved areas, disclosures)
+ * and the rest make room.
  */
 export function policyFindings(documents: readonly PolicyDocument[]): PolicyFinding[] {
   const all = documents.flatMap((document) =>
-    classifyPolicy(document.path, document.content).map((finding) => ({
-      ...finding,
-      quote: redact(finding.quote).slice(0, 300),
-    })),
+    attachCarveOuts(document.path, document.content, classifyPolicy(document.path, document.content)).map(
+      (finding) => ({
+        ...finding,
+        quote: storedQuote(finding.quote),
+        ...(finding.allows
+          ? { allows: finding.allows.map((allowance) => ({ ...allowance, quote: storedQuote(allowance.quote) })) }
+          : {}),
+      }),
+    ),
   );
   if (all.length <= policyLimits.findings) return all;
   const kept = new Set(

@@ -10,6 +10,7 @@ import type { HelpKind, HelpLock } from "./by-hand.js";
 import {
   byHandRulesCase,
   byHandRulesDecision,
+  carveOutKinds,
   registryStale,
   type ByHandBlockReason,
 } from "./by-hand-rules.js";
@@ -263,4 +264,55 @@ test("the decision is pure: the same input gives the same answer and nothing it 
   const second = byHandRulesDecision({ bans: rules.findings, areas: [], rules }, byHand);
   assert.deepEqual(first, second);
   assert.equal(JSON.stringify([rules, byHand]), before);
+});
+
+test("the carve-out word table: each row names its kinds, and nothing else names any", () => {
+  for (const [text, kinds] of [
+    // understand, understanding (of the existing code), explain, learning aid
+    ["help me understand Servo's codebase better", ["explain", "answer"]],
+    ["Gaining understanding of the existing code", ["explain", "answer"]],
+    ["to explain the code", ["explain", "answer"]],
+    ["explanations of the parser", ["explain", "answer"]],
+    ["to use AI as a learning aid", ["explain", "answer"]],
+    // research, researching
+    ["research", ["explain", "answer"]],
+    ["researching APIs or algorithms", ["explain", "answer"]],
+    // questions (about the code or codebase), answer questions
+    ["Asking an LLM questions about an existing codebase", ["explain", "answer"]],
+    ["to answer questions", ["explain", "answer"]],
+    // debug, debugging
+    ["debugging", ["test"]],
+    ["to debug a failing test", ["test"]],
+    // review (of your own code, privately)
+    ["Asking an LLM to privately review your code or prose", ["review"]],
+    ["private review", ["review"]],
+    ["reviewing your own code", ["review"]],
+    // possible solutions, solution ideas
+    ["generate possible solutions to an issue", ["plan"]],
+    ["Getting solution ideas", ["plan"]],
+    // Several rows at once, in vocabulary order.
+    ["researching APIs or algorithms, static analysis, or debugging", ["explain", "answer", "test"]],
+  ] as const)
+    assert.deepEqual(carveOutKinds(text), kinds, text);
+  for (const text of [
+    "static analysis",
+    "find bugs",
+    "finding bugs",
+    "analyze",
+    "analyze, distill, refine, check",
+    "suggest",
+    "suggestions",
+    "review",
+    "an AI review tool for my pull request",
+    "understand the output",
+    "questions",
+    "solutions",
+    "brainstorming",
+    "code completions",
+    "translation",
+    "researchers",
+    "debugger",
+    "",
+  ])
+    assert.deepEqual(carveOutKinds(text), [], text);
 });

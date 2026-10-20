@@ -11,7 +11,9 @@
  */
 import { markdownProse, type DraftRuleQuote } from "./draft-checks.js";
 import { aiDisclosureLine, type DraftSource } from "./drafts.js";
-import type { PolicyFinding, PolicyKind } from "./contribution.js";
+import type { HelpKind } from "./by-hand.js";
+import { carveOutKinds } from "./by-hand-rules.js";
+import type { PolicyAllowance, PolicyFinding, PolicyKind } from "./contribution.js";
 
 /** One line of a document outside fenced code, with its 1-based line number. */
 export interface ProseLine {
@@ -622,6 +624,170 @@ export function classifyPolicy(path: string, text: string): PolicyFinding[] {
   return findings
     .sort((a, b) => a.line - b.line)
     .slice(0, 30);
+}
+
+/**
+ * A permission: what follows "does not apply to", "it's fine to", or "is
+ * allowed to"/"not prohibited to", or what comes before "is out of
+ * scope", "is fine", "are acceptable".
+ */
+const permission =
+  /\b(?:does|do)\s+not\s+apply\s+to\b|\bit(?:['’]s|\s+is)\s+fine\s+to\b|\bnot\s+prohibited\b|\bout\s+of\s+scope\b|\b(?:is|are)\s+(?:acceptable|fine|permitted|allowed)\b/gi;
+/** Where the words a permission covers end: a condition, a contrast or a duty. */
+const permissionEnd =
+  /;|\b(?:but|provided|as\s+long\s+as|so\s+long\s+as|if|unless|except|however|although|though|whereas|while|when|should|must|needs?|ha(?:ve|s)\s+to|expected|required)\b/gi;
+/** A negation among the permitted words drops the permission. */
+const permissionNegated =
+  /\b(?:not|no|never|neither|nor|without|cannot|forbid\w*|prohibit\w*|ban(?:s|ned)?|disallow\w*|unacceptable|avoid\w*)\b|n['’]t\b/i;
+/** A permission for some people only ("only for maintainers") is no carve-out for the person. */
+const permissionScoped =
+  /\b(?:only|solely|exclusively|maintainers?|committers?|core|staff|employees?|team\s+members?)\b/i;
+/** A sentence about AI help, as carve-outs are. */
+const aiMention =
+  /\b(?:AI|LLMs?|large\s+language\s+models?|language\s+models?|generative|chatbots?|ChatGPT|Copilot|Claude|Codex|Gemini|machine[- ]learning|artificial\s+intelligence)\b/i;
+/** A heading or lead-in naming uses that are fine, or ones that are not. */
+const acceptableHeading = /(?<![\w-])(?:acceptable|allowed|permitted|fine|ok|okay)\b/i;
+const headingTopic = /\b(?:uses?|usage|AI|LLMs?|tools?)\b/i;
+const refusingHeading =
+  /\b(?:unacceptable|not\s+(?:\w+\s+)?(?:acceptable|allowed|permitted|ok|okay|fine)|disallowed|forbidden|prohibited|banned|never|don['’]t|do\s+not|avoid)\b/i;
+/** A "Yes" that answers a question about using AI, unless it says "but please don't". */
+const yesAnswer = /^\W*yes\b/i;
+const yesButDont = /\b(?:don['’]t|do\s+not|please\s+(?:avoid|refrain))\b/i;
+const listItem = /^\s*(?:[-*+]|\d{1,9}[.)])\s+/;
+
+/**
+ * The words of a sentence that a permission at `phrase` covers (`start`
+ * to `end`): up to the next condition after "does not apply to", "fine
+ * to" or "allowed to", else back to the previous one. `clause` ends the
+ * clause the permission is in.
+ */
+function permittedWords(words: string, phrase: Span): Span & { clause: number } {
+  const ends = allMatches(permissionEnd, words);
+  const clause = ends.find((end) => end.start >= phrase.end)?.start ?? words.length;
+  if (/to$/i.test(words.slice(phrase.start, phrase.end)) || /^\s+to\b/i.test(words.slice(phrase.end)))
+    return { start: phrase.end, end: clause, clause };
+  const start = ends.filter((end) => end.end <= phrase.start).at(-1)?.end ?? 0;
+  return { start, end: phrase.start, clause };
+}
+
+/**
+ * Carve-outs of a project's AI rules (DESIGN v1.2 F12): what the same
+ * document says some uses of AI are fine for, read deterministically and
+ * conservatively, each with the help kinds the F12 word table finds in it
+ * (`carveOutKinds`; nothing else counts). A sentence about AI counts in a
+ * permission context ("does not apply to", "out of scope", "is fine",
+ * "it's fine to", "not prohibited") for the words the permission covers
+ * only, and a question about using AI counts when it is answered "Yes"
+ * (never "Yes, but please don't"); a list item counts under a heading or
+ * lead-in that names acceptable or allowed uses. Nothing counts under an
+ * "unacceptable" or "not allowed" heading, and a sentence that is itself
+ * a ban or a reserved-issue rule never does. Each `ban` and `area`
+ * finding of the document gets the first three as `allows`; agent runs
+ * never read them. Server only: the rules card calls it when it reads
+ * the rules, and no client module does, so the word table stays out of
+ * the client.
+ */
+export function attachCarveOuts(path: string, text: string, findings: PolicyFinding[]): PolicyFinding[] {
+  const ruled = (finding: PolicyFinding) => finding.kind === "ban" || finding.kind === "area";
+  const rules = findings.filter(ruled);
+  if (!rules.length) return findings;
+  // A sentence that is itself a ban or a reserved-issue rule is never its carve-out.
+  const allows = readCarveOuts(path, text)
+    .filter(
+      (carveOut) =>
+        !rules.some((rule) => rule.quote.includes(carveOut.quote) || carveOut.quote.includes(rule.quote)),
+    )
+    .slice(0, 3);
+  if (!allows.length) return findings;
+  return findings.map((finding) =>
+    ruled(finding)
+      ? { ...finding, allows: allows.map((allowance) => ({ ...allowance, kinds: [...allowance.kinds] })) }
+      : finding,
+  );
+}
+
+/** Every carve-out of a document, in reading order (see attachCarveOuts). */
+function readCarveOuts(path: string, text: string): PolicyAllowance[] {
+  const rest = /\.rst$/i.test(path);
+  const raw = text.split(/\r?\n/);
+  const all = blocks(rest ? restProse(text) : rawProse(text));
+  // A heading, a bold line or a lead-in ending in ":" (not a directive), or a reStructuredText title.
+  const headingOf = (block: Block) => {
+    const plain = block.text.replace(/:[\w.+-]+:`[^`]*`/g, "").trim();
+    const last = block.starts.at(-1)!.line;
+    const heading =
+      /^#{1,6}\s/.test(plain) ||
+      /^(?:\*\*|__)[^*_]+(?:\*\*|__)$/.test(plain) ||
+      (plain.endsWith(":") && plain.length <= 160 && !listItem.test(block.text) && !/^\.\.\s/.test(plain)) ||
+      (rest && restAdornment.test(raw[last] ?? ""));
+    return heading && plain.length <= 160 ? searchable(plain) : undefined;
+  };
+  const nearestHeading = (index: number, skip: (block: Block) => boolean) => {
+    for (let at = index - 1; at >= 0; at--) {
+      const heading = headingOf(all[at]);
+      if (heading !== undefined) return heading;
+      if (!skip(all[at])) return undefined;
+    }
+    return undefined;
+  };
+  const found: PolicyAllowance[] = [];
+  const add = (block: Block, quote: { quote: string; offset: number }, kinds: HelpKind[]) => {
+    if (kinds.length && quote.quote.trim() && !found.some((other) => other.quote === quote.quote))
+      found.push({ line: lineAt(block, quote.offset), quote: quote.quote, kinds });
+  };
+  all.forEach((block, index) => {
+    const under = nearestHeading(index, () => true);
+    if (under !== undefined && refusingHeading.test(under)) return;
+    const search = searchable(block.text);
+    // A list item under "Acceptable uses" (only list items between them).
+    const lead = listItem.test(block.text) ? nearestHeading(index, (other) => listItem.test(other.text)) : undefined;
+    const whole = { start: 0, end: block.text.length };
+    if (
+      lead !== undefined &&
+      acceptableHeading.test(lead) &&
+      headingTopic.test(lead) &&
+      !permissionScoped.test(lead) &&
+      block.text.length <= 300 &&
+      !permissionNegated.test(search) &&
+      !permissionScoped.test(search)
+    )
+      add(block, quoteOf(block.text, whole, whole), carveOutKinds(search));
+    const sentences = splitSentences(block.text);
+    sentences.forEach((sentence, at) => {
+      const words = search.slice(sentence.start, sentence.end);
+      if (!aiMention.test(words)) return;
+      // A question about using AI, answered "Yes" in the next sentence or block.
+      if (/\?\W*$/.test(words)) {
+        const following = all[index + 1];
+        const next = sentences[at + 1]
+          ? { block, sentence: sentences[at + 1] }
+          : following && { block: following, sentence: splitSentences(following.text)[0] };
+        if (!next?.sentence) return;
+        const answer = searchable(next.block.text).slice(next.sentence.start, next.sentence.end);
+        if (!yesAnswer.test(answer) || yesButDont.test(answer) || permissionScoped.test(answer)) return;
+        const asked = quoteOf(block.text, sentence, sentence);
+        const said = quoteOf(next.block.text, next.sentence, next.sentence);
+        const quote = `${asked.quote} ${said.quote}`;
+        if (quote.length <= 300) add(block, { quote, offset: asked.offset }, carveOutKinds(words));
+        return;
+      }
+      for (const phrase of allMatches(permission, words)) {
+        const covered = permittedWords(words, phrase);
+        if (permissionNegated.test(words.slice(covered.start, covered.end))) continue;
+        if (permissionScoped.test(words.slice(covered.start, covered.clause))) continue;
+        const quote = quoteOf(block.text, sentence, {
+          start: sentence.start + Math.min(phrase.start, covered.start),
+          end: sentence.start + Math.max(phrase.end, covered.end),
+        });
+        // A sentence over 300 characters is quoted around the permission: only its quoted words count.
+        const from = Math.max(sentence.start + covered.start, quote.offset);
+        const to = Math.min(sentence.start + covered.end, quote.offset + quote.quote.length);
+        const kinds = to > from ? carveOutKinds(search.slice(from, to)) : [];
+        if (kinds.length) return add(block, quote, kinds);
+      }
+    });
+  });
+  return found;
 }
 
 /** The sentences of a text, split after . ! or ? and at comment delimiters. */
