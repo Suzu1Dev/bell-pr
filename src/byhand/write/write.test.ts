@@ -103,7 +103,7 @@ test("after a first draft the guide's step names can be shown, and an early reve
 
 test("a run fitted to rules that don't name planning help keeps the outline closed", () => {
   const fitted = html(plan({ guidePlan, helpLock: lock }, {}, { status: "awaiting_plan" }));
-  assert.ok(fitted.includes(apostrophes("which don't name planning help, so the guide's outline and questions stay closed.")));
+  assert.ok(fitted.includes(apostrophes("doesn't name planning help: the guide's outline stays closed.")));
   assert.doesNotMatch(fitted, /I don&#x27;t know where to start|step names/);
 });
 

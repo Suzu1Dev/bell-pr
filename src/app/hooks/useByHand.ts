@@ -120,6 +120,7 @@ export function useByHand(
       ...state,
       selection,
       issueUrl: run.contributionSettings?.issueUrl,
+      channels: repo?.contributionRules?.channels,
       onGuide: call("guide", "POST", () => setSelection(undefined)),
       onStep: (stepId: string, input: object) => call(`steps/${encodeURIComponent(stepId)}`, "PATCH")(input),
       onCheckIn: call("check-ins"),

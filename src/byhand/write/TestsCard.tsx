@@ -5,6 +5,7 @@ import {
   testPredictions,
   type ByHandRecord,
   type ByHandTestInput,
+  type ByHandTestReportInput,
   type TestCommandView,
   type TestPrediction,
 } from "../../../shared/by-hand";
@@ -26,11 +27,14 @@ export function TestsCard({
   onExplain,
   busy,
 }: {
+  runId: string;
   record: ByHandRecord;
   testCommand?: TestCommandView;
   onConfirmTestCommand(command: string): Promise<void>;
   onRunTests(input: ByHandTestInput): Promise<void>;
   onStopTests(): Promise<void>;
+  /** "Record my result" from the person's own terminal. */
+  onReportTests(input: ByHandTestReportInput): Promise<void>;
   /** "Explain this failure" (a guide turn of kind `test`); absent where it isn't offered. */
   onExplain?: () => void;
   busy: boolean;

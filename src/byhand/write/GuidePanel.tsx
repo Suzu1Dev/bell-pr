@@ -232,8 +232,8 @@ export function GuidePanel(props: GuidePanelProps) {
         </p>
       )}
       <GuideExits runId={run.id} step={step} tests={record.tests ?? []} fingerprint={fingerprint} issueUrl={props.issueUrl}
-        onStep={onStep} onCheckIn={props.onCheckIn} onLeave={props.onLeave} busy={working} />
-      <TestsCard record={record} testCommand={testCommand} onRunTests={props.onRunTests}
+        channels={props.channels} onStep={onStep} onCheckIn={props.onCheckIn} onLeave={props.onLeave} busy={working} />
+      <TestsCard runId={run.id} record={record} testCommand={testCommand} onRunTests={props.onRunTests} onReportTests={props.onReportTests}
         onConfirmTestCommand={(command) =>
           props.onConfirmTestCommand(command).then(() =>
             setRead((current) => ({ ...current, command: { suggestion: testCommand?.suggestion ?? "", confirmed: { command, confirmedAt: new Date().toISOString() } } })),

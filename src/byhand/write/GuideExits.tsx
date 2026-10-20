@@ -1,10 +1,21 @@
 import { useState } from "react";
 import { CircleHelp, CircleMinus, ListOrdered, UserRound, Users } from "lucide-react";
 import type { ByHandCheckInInput, ByHandStep, ByHandStepInput, ExitKind, TestRun } from "../../../shared/by-hand";
+import type { HelpChannel } from "../../../shared/contribution";
 import { useT } from "../../i18n";
 import { serializeRoute } from "../../navigation/route";
 import { CopyRef } from "./CopyRef";
 import { useWriteText } from "./text";
+
+/** R0's deterministic checks (DESIGN v1.2 F6), from BELL's own test runs. */
+export function talkChecks(tests: readonly TestRun[], fingerprint: string, t: ReturnType<typeof useWriteText>["exits"]) {
+  const last = [...tests].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).at(-1);
+  return [
+    ...(last?.changeFingerprint === fingerprint ? [] : [t.checks.tests]),
+    ...(last && last.outcome !== "passed" ? [t.checks.failing] : []),
+    t.checks.small,
+  ];
+}
 
 /**
  * "I'm stuck" and the exits (DESIGN v1.2 F6), in this order: ask a human,
@@ -30,6 +41,8 @@ export function GuideExits({
   /** The current change's fingerprint. */
   fingerprint: string;
   issueUrl?: string;
+  /** The project's own places to ask people (`ContributionRules.channels`). */
+  channels?: HelpChannel[];
   onStep(stepId: string, input: ByHandStepInput): Promise<void>;
   onCheckIn(input: ByHandCheckInInput): Promise<void>;
   onLeave(): Promise<void>;
@@ -40,12 +53,7 @@ export function GuideExits({
   const [open, setOpen] = useState(false);
   const [exit, setExit] = useState<ExitKind>();
   const [note, setNote] = useState(t.note);
-  const last = [...tests].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).at(-1);
-  const checks = [
-    ...(last?.changeFingerprint === fingerprint ? [] : [t.checks.tests]),
-    ...(last && last.outcome !== "passed" ? [t.checks.failing] : []),
-    t.checks.small,
-  ];
+  const checks = talkChecks(tests, fingerprint, t);
   const stuck = () => {
     setOpen(true);
     if (step) void onStep(step.id, { talked: true }).catch(() => undefined);
