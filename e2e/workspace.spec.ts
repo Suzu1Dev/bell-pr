@@ -7,7 +7,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { aiDisclosureLine } from "../shared/drafts";
-import { getDemo } from "../src/demo";
+import { getDemo } from "../src/demo/all";
 import security from "../server/i18n/en/security";
 import draftEn from "../src/i18n/en/draft";
 import license from "../src/i18n/en/license";

@@ -2,7 +2,13 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { parsePresentationFlags } from "./app/presentation";
-import { LocaleProvider, initialLocale, loadLocale } from "./i18n";
+import {
+  addLocaleResource,
+  LocaleProvider,
+  initialLocale,
+  loadLocale,
+} from "./i18n";
+import { loadDemo } from "./locales";
 import { adoptViewSearch } from "./navigation/view-url";
 import { defaultLocale, type Locale } from "../shared/i18n/locale";
 import "./styles.css";
@@ -23,6 +29,9 @@ function render(locale: Locale) {
 // An address an upstream BELL build wrote (?run=…&tab=…, ?project=…,
 // ?page=…) opens the same place through the hash route.
 adoptViewSearch(window);
+
+// The sample project's text in a locale loads with its dictionary.
+addLocaleResource(loadDemo);
 
 // The dictionary loads before the first render, so the UI never flashes in
 // another language. If it cannot load, the app still starts in English.

@@ -396,11 +396,8 @@
   color: var(--color-text-muted);
 }
 .command-palette-spin {
-  animation: command-palette-spin 1s linear infinite;
+  animation: spin 1s linear infinite;
   flex-shrink: 0;
-}
-@keyframes command-palette-spin {
-  to { transform: rotate(360deg); }
 }
 @media (max-width: 600px) {
   .command-palette {

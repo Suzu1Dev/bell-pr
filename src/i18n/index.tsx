@@ -7,9 +7,18 @@
  * are plain strings or functions of one parameter object; the zh-TW
  * dictionary is typed against the English one, so `tsc` reports a missing key
  * or a mismatched parameter.
+ *
+ * Only the English namespaces the startup chunk uses (`./en/core`) are
+ * bundled. The ones only lazily loaded views use (`./en/deferred`: Settings,
+ * discovery, the learning page, onboarding, About...) load the first time
+ * `useT` asks for one; the view waits for them like for its own code,
+ * inside the Suspense boundary that loads it. zh-TW loads as one chunk:
+ * split the same way, its text would compress worse by more than the
+ * deferred part weighs.
  */
 import {
   createContext,
+  use,
   useContext,
   useEffect,
   useMemo,
@@ -26,7 +35,8 @@ import {
   type Locale,
   type Translation,
 } from "../../shared/i18n/locale";
-import en from "./en";
+import type en from "./en";
+import englishCore from "./en/core";
 
 export type Messages = Translation<typeof en>;
 export type Namespace = keyof Messages;
@@ -51,21 +61,34 @@ export interface LocaleState {
   messages: Messages;
 }
 
+// English as bundled: the core namespaces. loadDeferred() adds the deferred
+// ones to this same object, so every holder of it sees them.
+const english = { ...englishCore } as Messages;
+
 /** Without a provider, components render English. */
 export const LocaleContext = createContext<LocaleState>({
   locale: defaultLocale,
-  messages: en,
+  messages: english,
 });
 
 // Dictionaries that are ready to use. English is bundled with the app.
-const loaded = new Map<Locale, Messages>([["en", en]]);
+const loaded = new Map<Locale, Messages>([["en", english]]);
 const loaders: Record<Exclude<Locale, "en">, () => Promise<Messages>> = {
-  "zh-TW": () => import("./zh-TW/index").then((module) => module.default),
+  "zh-TW": () => import("../locales/zh-TW").then((module) => module.messages),
 };
+// The deferred namespaces of a locale whose dictionary comes without them.
+const deferredLoaders: Partial<
+  Record<Locale, () => Promise<{ default: Partial<Messages> }>>
+> = {
+  en: () => import("./en/deferred"),
+};
+// One load of the deferred namespaces per locale; a failed one is forgotten,
+// so the next render tries again.
+const deferredLoads = new Map<Locale, Promise<void>>();
 
 // The active locale for module getters and for app-mode providers. Replaced,
 // never mutated, so the object itself is the store snapshot.
-let active: LocaleState = { locale: defaultLocale, messages: en };
+let active: LocaleState = { locale: defaultLocale, messages: english };
 const listeners = new Set<() => void>();
 // Only the latest locale change applies when loads finish out of order.
 let latestChange = 0;
@@ -97,20 +120,74 @@ export function getCurrentLocale(): Locale {
   return active.locale;
 }
 
-/** The active dictionary, for code outside React such as the API client. */
+/**
+ * The active dictionary, for code outside React such as the API client. Its
+ * deferred namespaces (`./en/deferred`) are there only once a view needed
+ * them; code outside React reads core namespaces only.
+ */
 export function getCurrentMessages(): Messages {
   return active.messages;
 }
 
+// What a locale needs besides its dictionary before it shows, such as the
+// sample project's text; main.tsx adds it (addLocaleResource).
+const resources: ((locale: Locale) => Promise<void>)[] = [];
+
+/** Adds a load that `loadLocale` waits for along with each dictionary. */
+export function addLocaleResource(load: (locale: Locale) => Promise<void>) {
+  resources.push(load);
+}
+
 /**
- * Loads a locale's dictionary so it can be shown; English is always loaded.
- * It does not change the active locale.
+ * Loads a locale's dictionary, and what `addLocaleResource` added, so it
+ * can be shown; the English dictionary is always loaded. It does not
+ * change the active locale.
  */
 export async function loadLocale(locale: Locale): Promise<void> {
-  if (loaded.has(locale)) return;
-  const load = loaders[locale as Exclude<Locale, "en">];
-  if (!load) throw new Error(`Unsupported locale: ${String(locale)}`);
-  loaded.set(locale, await load());
+  const load = loaded.has(locale)
+    ? undefined
+    : loaders[locale as Exclude<Locale, "en">];
+  if (!loaded.has(locale) && !load)
+    throw new Error(`Unsupported locale: ${String(locale)}`);
+  const [messages] = await Promise.all([
+    load?.(),
+    ...resources.map((resource) => resource(locale)),
+  ]);
+  // The first dictionary loaded stays: loadDeferred() adds to that object.
+  if (messages && !loaded.has(locale)) loaded.set(locale, messages);
+}
+
+/**
+ * Adds the deferred namespaces (`./en/deferred`) to a locale's dictionary;
+ * zh-TW's comes with them. `useT` calls it for a view that needs one of
+ * them; a locale change waits for it once a view did.
+ */
+function loadDeferred(locale: Locale): Promise<void> {
+  let load = deferredLoads.get(locale);
+  if (!load) {
+    const deferred = deferredLoaders[locale];
+    load = Promise.all([loadLocale(locale), deferred?.()]).then(
+      ([, module]) => {
+        if (module) Object.assign(loaded.get(locale)!, module.default);
+      },
+    );
+    load.catch(() => deferredLoads.delete(locale));
+    deferredLoads.set(locale, load);
+  }
+  return load;
+}
+
+/**
+ * Loads a lazily loaded view's code together with the deferred namespaces
+ * it reads, so the view shows in one step:
+ * `lazy(() => withMessages(import("./View")).then(...))`. Without it the
+ * view would wait a second time, for its copy, and React reveals each wait
+ * on a timer, which a paused clock (captures, some e2e tests) never runs.
+ */
+export function withMessages<T>(load: Promise<T>): Promise<T> {
+  return Promise.all([load, loadDeferred(active.locale)]).then(
+    ([module]) => module,
+  );
 }
 
 function readStoredLocale(): Locale | undefined {
@@ -153,6 +230,9 @@ function applyToDocument({ locale }: LocaleState) {
 async function changeLocale(locale: Locale, remember: boolean) {
   const change = ++latestChange;
   await loadLocale(locale);
+  // A view that needed the deferred namespaces may still show; it keeps
+  // them in the new locale instead of waiting for them again.
+  if (deferredLoads.size) await loadDeferred(locale);
   if (change !== latestChange) return;
   const previous = active.locale;
   activate(locale);
@@ -240,9 +320,14 @@ export function useLocale(): [Locale, (locale: Locale) => void] {
   return [useContext(LocaleContext).locale, requestLocale];
 }
 
-/** The messages of one namespace in the current locale. */
+/**
+ * The messages of one namespace in the current locale. A deferred namespace
+ * that has not loaded yet suspends the view until it has.
+ */
 export function useT<NS extends Namespace>(ns: NS): Messages[NS] {
-  return useContext(LocaleContext).messages[ns];
+  const { locale, messages } = useContext(LocaleContext);
+  if (!(ns in messages)) use(loadDeferred(locale));
+  return messages[ns];
 }
 
 /** Number, date, list and plural formatters for the current locale. */

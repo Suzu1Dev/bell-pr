@@ -4,9 +4,9 @@ import type {
   DiscoveryCandidate,
 } from "../../shared/discovery";
 import { ErrorBoundary } from "../app/ErrorBoundary";
-import { useT } from "../i18n";
+import { useT, withMessages } from "../i18n";
 
-const DiscoveryPanel = lazy(() => import("../discovery/DiscoveryPanel"));
+const DiscoveryPanel = lazy(() => withMessages(import("../discovery/DiscoveryPanel")));
 
 interface DiscoveryPageProps {
   chooseOpportunity: (

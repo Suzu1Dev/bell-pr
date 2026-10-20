@@ -1,6 +1,6 @@
 import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
 import { getDemo } from "../demo";
-import { useLocale, useT, type Messages } from "../i18n";
+import { useLocale, useT, withMessages, type Messages } from "../i18n";
 import type { Repo, Run } from "../types";
 import type { useProjectInsights } from "../mission/useProjectInsights";
 import type {
@@ -9,12 +9,12 @@ import type {
 } from "../../shared/insights";
 import type { Tab } from "../app/AppShell";
 import { ErrorBoundary } from "../app/ErrorBoundary";
-import { runSetupNeeds, SetupNeeds } from "../team/SetupNeeds";
 
-// The overview is the largest view in the app; it loads with its first visit.
-const ProjectOverview = lazy(() =>
-  import("../mission/ProjectOverview").then((module) => ({
-    default: module.ProjectOverview,
+// The overview is the largest view in the app; it loads with its first
+// visit, with the setup needs a few runs report.
+const OverviewPanel = lazy(() =>
+  withMessages(import("./OverviewPanel")).then((module) => ({
+    default: module.OverviewPanel,
   })),
 );
 
@@ -68,23 +68,14 @@ export function OverviewTab({
   checkingPremise,
 }: OverviewTabProps) {
   const t = useT("workspace");
-  const setupMessages = useT("team").setupNeeds;
   const [locale] = useLocale();
   return (
     <>
-    {/* What the agents could not run here: the person installs it. */}
-    <SetupNeeds
-      needs={runSetupNeeds(
-        run,
-        (number) => setupMessages.round({ number }),
-        (name, id) => setupMessages.agent({ name, id }),
-      )}
-    />
     {/* A chunk that fails to load stops at this tab; the draft and the
         review keep what the person typed. */}
     <ErrorBoundary resetKey={run.id}>
     <Suspense fallback={null}>
-    <ProjectOverview
+    <OverviewPanel
       repo={currentRepo}
       run={run}
       insights={intelligence.insights}

@@ -6,7 +6,7 @@
 // Saving the attempts and finding them again after a reload need the
 // workspace's onAttempt (L2D); the merge step checks those.
 import { expect, test, type Page } from "@playwright/test";
-import { getDemo } from "../src/demo";
+import { getDemo } from "../src/demo/all";
 import en from "../src/i18n/en";
 import { typewriterStepMs } from "../src/review/try-first";
 import { expectNoOverflow } from "./helpers/overflow";

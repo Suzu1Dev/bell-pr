@@ -1,6 +1,6 @@
 import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
 import { Target } from "lucide-react";
-import { useT } from "../i18n";
+import { useT, withMessages } from "../i18n";
 import type { Repo } from "../types";
 import type { useProjectInsights } from "../mission/useProjectInsights";
 import type { ContributionRecommendation } from "../../shared/insights";
@@ -9,7 +9,7 @@ import { ErrorBoundary } from "../app/ErrorBoundary";
 
 // The overview is the largest view in the app; it loads with its first visit.
 const ProjectOverview = lazy(() =>
-  import("../mission/ProjectOverview").then((module) => ({
+  withMessages(import("../mission/ProjectOverview")).then((module) => ({
     default: module.ProjectOverview,
   })),
 );

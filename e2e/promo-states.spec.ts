@@ -28,7 +28,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 import checkMessages from "../shared/i18n/draft-checks.en";
 import type { Locale } from "../shared/i18n/locale";
-import { getDemo } from "../src/demo";
+import { getDemo } from "../src/demo/all";
 import { assertNoHan } from "../src/test-utils/render";
 import { expectNoOverflow } from "./helpers/overflow";
 import { startReadyServer } from "./helpers/ready-server";
@@ -490,7 +490,9 @@ test.describe.configure({ mode: "parallel" });
 // thread, each frame drawn only after every compositor stage ran, draws it
 // the same every time, so a changed hash is the app's. (Without the last
 // flag, the task dialog's edges came out in either of two versions in about
-// one film in three.)
+// one film in three.) With it, v-before-you-start filmed the same frames in
+// 32 of 32 runs, 24 of them with every core of the machine busy, and in
+// three whole runs of this file under that load.
 test.use({
   launchOptions: {
     ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE

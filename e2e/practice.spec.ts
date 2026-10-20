@@ -9,7 +9,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { htmlLang, locales } from "../shared/i18n/locale";
 import type { PracticeItem } from "../shared/practice";
-import { getDemo } from "../src/demo";
+import { getDemo } from "../src/demo/all";
 import app from "../src/i18n/en/app";
 import learning from "../src/i18n/en/learning";
 import { assertNoHan } from "../src/test-utils/render";

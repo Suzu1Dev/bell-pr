@@ -1658,12 +1658,7 @@
   font-size: var(--text-xs);
 }
 .mission-spin {
-  animation: mission-spin 1.3s linear infinite;
-}
-@keyframes mission-spin {
-  to {
-    transform: rotate(360deg);
-  }
+  animation: spin 1.3s linear infinite;
 }
 @media (min-width: 1600px) {
   .mission-overview {

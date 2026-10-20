@@ -21,13 +21,13 @@ import type { ReviewabilitySnapshot } from "./reviewability.js";
 // The secret shapes and the safety-check messages have one source each,
 // kept with the server; both modules are plain data and load in the browser.
 import { secretInPatch } from "../server/secrets.js";
-import securityEn from "../server/i18n/en/security.js";
-import securityZhTW from "../server/i18n/zh-TW/security.js";
+import safetyEn from "../server/i18n/en/security-draft-checks.js";
+import safetyZhTW from "../server/i18n/zh-TW/security-draft-checks.js";
 
 const dictionaries: Record<Locale, typeof en> = { en, "zh-TW": zhTW };
-const safetyDictionaries: Record<Locale, typeof securityEn> = {
-  en: securityEn,
-  "zh-TW": securityZhTW,
+const safetyDictionaries: Record<Locale, typeof safetyEn> = {
+  en: safetyEn,
+  "zh-TW": safetyZhTW,
 };
 
 /**
@@ -407,7 +407,7 @@ export function draftPreflight(
   locale: Locale = "en",
 ): DraftCheck[] {
   const m = dictionaries[locale];
-  const safety = safetyDictionaries[locale].draftChecks;
+  const safety = safetyDictionaries[locale];
   const sources = input.sources ?? [];
   const checks: DraftCheck[] = [];
   const fields = (["title", "body", "commitMessage"] as const).filter(

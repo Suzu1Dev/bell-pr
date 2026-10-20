@@ -2,15 +2,24 @@ import type { Locale } from "../../shared/i18n/locale";
 import type { DiffFile } from "../types";
 import en from "./en";
 import type { DemoContent } from "./types";
-import zhTW from "./zh-TW";
 
 export type { DemoAnswer, DemoAnswerTopic, DemoContent } from "./types";
 
-const demos: Record<Locale, DemoContent> = { en, "zh-TW": zhTW };
+// The sample is the app's first state, so its English text comes with the
+// app, as the English dictionary does. Another locale's text comes in the
+// same file as that locale's dictionary (src/locales).
+const demos: Partial<Record<Locale, DemoContent>> = { en };
 
-/** The sample project, run and fixtures in one locale. */
+/** Makes the sample available in a locale whose text has loaded. */
+export function registerDemo(locale: Locale, content: DemoContent) {
+  demos[locale] = content;
+}
+
+/** The sample project, run and fixtures in one locale, once its text has loaded. */
 export function getDemo(locale: Locale): DemoContent {
-  return demos[locale];
+  const demo = demos[locale];
+  if (!demo) throw new Error(`The ${locale} sample has not loaded (src/locales).`);
+  return demo;
 }
 
 /**

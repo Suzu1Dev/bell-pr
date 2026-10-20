@@ -8,7 +8,7 @@ import path from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { locales } from "../shared/i18n/locale";
 import { eulaVersion, product } from "../shared/product";
-import { getDemo } from "../src/demo";
+import { getDemo } from "../src/demo/all";
 import { localeStorageKey } from "../src/i18n";
 import about from "../src/i18n/en/about";
 import app from "../src/i18n/en/app";
