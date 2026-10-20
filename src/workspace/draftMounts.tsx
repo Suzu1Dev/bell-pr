@@ -22,6 +22,10 @@ export const Reviewability = lazy(() =>
   import("./DraftLearning").then((module) => ({ default: module.Reviewability })),
 );
 export const ForecastCompare = lazy(() => import("../draft/ForecastCompare"));
+/** Learn by hand's record, from the one byhand chunk (DESIGN v1.2 F13). */
+export const ByHandRecord = lazy(() =>
+  import("../byhand/lazy").then((module) => ({ default: module.ByHandRecord })),
+);
 /** Shared with the publish dialog, so the Markdown renderer loads once. */
 export const MarkdownContent = lazy(() =>
   import("../review/MarkdownContent").then((module) => ({

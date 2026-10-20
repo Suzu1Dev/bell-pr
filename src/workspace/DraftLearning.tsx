@@ -8,6 +8,7 @@
 import type { ComponentProps } from "react";
 import type { RunUnderstanding } from "../../shared/understanding";
 import { getDemo } from "../demo";
+import { ByHandHelpers } from "../draft/ByHandHelpers";
 import { DraftGuidancePanel } from "../draft/DraftGuidancePanel";
 import ReviewabilitySnapshot from "../draft/ReviewabilitySnapshot";
 import YourWordsCard from "../draft/YourWordsCard";
@@ -35,9 +36,10 @@ export function DraftGuide({
   repo,
   demo,
   check,
+  onDraftBody,
   ...panel
 }: Omit<ComponentProps<typeof DraftGuidancePanel>, "rules" | "facts" | "understanding" | "changes"> &
-  RunFacts & { check: { required: boolean; passed: boolean; off: boolean } }) {
+  RunFacts & { check: { required: boolean; passed: boolean; off: boolean } } & Pick<ComponentProps<typeof ByHandHelpers>, "onDraftBody">) {
   const sample = useSample(demo);
   const facts = run.contributionFacts ?? sample?.contributionFacts;
   const rules = rulesOf(repo, sample);
@@ -50,6 +52,7 @@ export function DraftGuide({
       understanding={check}
       changes={changesOf(run, files, repo, sample)}
       byHandRun={run}
+      helpers={run.learnByHand && <ByHandHelpers run={run} rules={rules} alwaysDiscloseAi={panel.alwaysDiscloseAi} disabled={panel.readOnly || panel.disabled} onDraftBody={onDraftBody} />}
     />
   );
 }

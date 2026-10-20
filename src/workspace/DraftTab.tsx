@@ -37,6 +37,7 @@ import type { Understanding } from "../app/hooks/useUnderstanding";
 import { FollowUpRounds } from "../draft/FollowUpRounds";
 import { SyncPanel } from "../draft/SyncPanel";
 import {
+  ByHandRecord,
   Deferred,
   DraftGuide,
   ForecastCompare,
@@ -349,7 +350,7 @@ export function DraftTab({
             </div>
           ) : (
             <textarea
-              className="draft-textarea"
+              className="draft-textarea" id="pr-body"
               aria-label={t.draft.bodyLabel}
               value={draftBody}
               onChange={(e) => setDraftBody(e.target.value)}
@@ -482,6 +483,7 @@ export function DraftTab({
             </span>
           </div>
           {understanding && <UnderstandingRow run={run} check={understanding} />}
+          {run.learnByHand && <Deferred resetKey={run.id}><ByHandRecord run={run} place="draft" /></Deferred>}
           <div
             className={
               !draftDirty
@@ -633,7 +635,7 @@ export function DraftTab({
             }
             aiDisclosure={run.draft.aiDisclosure}
             alwaysDiscloseAi={alwaysDiscloseAi}
-            draftBody={draftBody}
+            draftBody={draftBody} onDraftBody={setDraftBody}
             onAiDisclosureChange={(on) => void setAiDisclosure(on)}
             // A Learn-by-hand run's rule rows wait for the server's list (DESIGN v1.2 F12).
             checks={checkable && draftChecks && (draft.serverChecksRead || !run.learnByHand) ? publishChecks : undefined}
