@@ -25,6 +25,9 @@ export default {
     running: ({ cli }: { cli: string }) => `Running ${cli}…`,
     waitingForSlot: ({ queued }: { queued: number }) =>
       `Waiting for other agents to finish (${queued} queued)`,
+    /** A Learn-by-hand run's guide, reviewer or test analyst waiting for an agent CLI process. */
+    guideWaitingForSlot: ({ queued }: { queued: number }) =>
+      `Waiting for a free agent CLI process (${queued} queued)`,
     complete: "Done; the report is ready to read",
     failed: "Stopped or failed",
     rerunWaiting: "Waiting to review again…",
@@ -88,6 +91,9 @@ export default {
       `${name} started. Model: ${model ?? `${cli} CLI default (not recorded)`}; reasoning effort: ${effort ?? "model default"}${web ? "; web access allowed" : ""}${timeout ? `; ${timeout}` : ""}.${inbox ? ` ${count(inbox, "team message", "team messages")} arrived at the start of this turn.` : ""}`,
     waitingForSlot: ({ queued }: { queued: number }) =>
       `Waiting for other agents to finish (${queued} queued).`,
+    /** The same line in a Learn-by-hand run, which has no agent team. */
+    guideWaitingForSlot: ({ queued }: { queued: number }) =>
+      `The guide waits for a free agent CLI process (${queued} queued).`,
     structuredResult:
       "Structured result returned; checking its sources and content.",
     checkFinished: ({ outcome }: { outcome: string }) =>

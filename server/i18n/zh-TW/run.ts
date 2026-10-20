@@ -18,6 +18,7 @@ const m: Translation<typeof en> = {
     memberRetry: "等待重新認領任務，使用新的獨立工作目錄",
     running: ({ cli }) => `正在執行 ${cli}…`,
     waitingForSlot: ({ queued }) => `等待其他 Agent 完成（${queued} 個排隊中）`,
+    guideWaitingForSlot: ({ queued }) => `等待空出的 Agent CLI 程序（${queued} 個排隊中）`,
     complete: "已完成，報告可供審閱",
     failed: "執行中斷或失敗",
     rerunWaiting: "等待重新審查…",
@@ -53,6 +54,7 @@ const m: Translation<typeof en> = {
     started: ({ name, cli, model, effort, web, timeout, inbox }) =>
       `${name}${/\p{Script=Han}$/u.test(name) ? "" : " "}開始工作。模型：${model ?? `${cli} CLI 預設（未記錄模型）`}；推理：${effort ?? "模型預設"}${web ? "；已允許上網" : ""}${timeout ? `；${timeout}` : ""}。${inbox ? ` 已在回合起點收到 ${inbox} 則團隊訊息。` : ""}`,
     waitingForSlot: ({ queued }) => `等待其他 Agent 完成（${queued} 個排隊中）。`,
+    guideWaitingForSlot: ({ queued }) => `嚮導正在等待空出的 Agent CLI 程序（${queued} 個排隊中）。`,
     structuredResult: "結構化結果已回傳，正在驗證來源與內容。",
     checkFinished: ({ outcome }) => `執行檢查完成（${outcome}）。`,
     fileUpdated: ({ path }) => `已更新 ${path}。`,

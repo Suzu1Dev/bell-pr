@@ -32,8 +32,8 @@ after(async () => {
   await rm(fakeBin, { recursive: true, force: true });
 });
 
-/** The first log line of one read-only lead turn, in `locale`. */
-async function startedLine(t: TestContext, learnByHand: boolean, locale: "en" | "zh-TW" = "en") {
+/** The first log line of one read-only lead turn, in `locale`; with `waits`, the line after it, as the turn waits for an agent process. */
+async function startedLine(t: TestContext, learnByHand: boolean, locale: "en" | "zh-TW" = "en", waits = false) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-by-hand-name-"));
   const worktree = path.join(directory, "worktree");
   await mkdir(worktree, { recursive: true });
@@ -66,8 +66,14 @@ async function startedLine(t: TestContext, learnByHand: boolean, locale: "en" | 
   };
   store.data.runs.push(run);
   const ctx = (workbench as unknown as { context: WorkbenchContext }).context;
+  if (waits) {
+    // Every agent process is busy until the turn has said it waits.
+    ctx.agentSlots.setLimit(1);
+    const release = await ctx.agentSlots.acquire();
+    const freed = setInterval(() => run.logs.length > 1 && (clearInterval(freed), release()), 5);
+  }
   await withLocale(locale, () => runAgent(ctx, run, "lead", "Where is the retry loop?", new AbortController().signal, true, { isolated: true }));
-  return run.logs[0]?.message ?? "";
+  return run.logs[waits ? 1 : 0]?.message ?? "";
 }
 
 test("a Learn-by-hand guide turn starts its log as the guide, an agent run's as Atlas", async (t) => {
@@ -80,6 +86,12 @@ test("a Learn-by-hand guide turn starts its log as the guide, an agent run's as 
 test("in zh-TW the guide's first log line has no space between 嚮導 and the verb; a Latin name keeps it", async (t) => {
   assert.match(await startedLine(t, true, "zh-TW"), /^嚮導開始工作。模型：/);
   assert.match(await startedLine(t, false, "zh-TW"), /^Atlas 開始工作。模型：/);
+});
+
+test("a Learn-by-hand turn waiting for an agent process says the guide waits; an agent run's line is unchanged", async (t) => {
+  assert.equal(await startedLine(t, true, "en", true), "The guide waits for a free agent CLI process (1 queued).");
+  assert.equal(await startedLine(t, true, "zh-TW", true), "嚮導正在等待空出的 Agent CLI 程序（1 個排隊中）。");
+  assert.equal(await startedLine(t, false, "en", true), "Waiting for other agents to finish (1 queued).");
 });
 
 // The name is a server string of its own (en and zh-TW).
