@@ -107,9 +107,9 @@ const editing = /\bsed\s+(?:-\w*\s+)*-\w*i|\bperl\s+(?:-\w*\s+)*-\w*[pi]\w*i|\bp
  * like code (ending in ; { or }, or with an arrow), naming no identifier
  * the project's files don't have, and editing no changed or step file.
  */
-function safeCommand(span: string, sources: FilterSources, occurs: (code: string) => boolean) {
+function safeCommand(span: string, sources: FilterSources, isWord: (word: string) => boolean) {
   if (span.includes("\n") || span.length > 120 || /[;{}]\s*$|=>/.test(span)) return false;
-  if ([...span.matchAll(identifier)].some(([word]) => !occurs(word))) return false;
+  if ([...span.matchAll(identifier)].some(([word]) => !isWord(word))) return false;
   const touches = (sources.protectedFiles ?? []).some(
     (file) => span.includes(file) || span.includes(file.split("/").pop() ?? file),
   );
@@ -224,6 +224,9 @@ export function filterAgentText(
 ): Filtered<string> {
   const known = corpus(sources);
   const occurs = (code: string) => known.some((source) => source.includes(code));
+  // An identifier counts as a whole word of the sources: "wait" is not one because "await" is.
+  const words = new Set(known.flatMap((source) => source.match(/[A-Za-z_$][\w$]*/g) ?? []));
+  const isWord = (word: string) => words.has(word);
   // Single lines of the files and of the person's diff (without its +, - or space), for diff lines.
   const lines = new Set([
     ...allFiles(sources).flatMap((file) => file.map((line) => line.trim())),
@@ -256,11 +259,11 @@ export function filterAgentText(
   value = value
     .replace(inline, (span, _ticks: string, body: string) => {
       const code = body.trim();
-      return code && (occurs(code) || (options.tooling && safeCommand(code, sources, occurs))) ? hold(span) : remove();
+      return code && (occurs(code) || (options.tooling && safeCommand(code, sources, isWord))) ? hold(span) : remove();
     })
     .replace(/\bhttps?:\/\/\S+/g, hold)
     .replace(expression, (code) => (occurs(code.replace(/[.,;:]+$/, "")) ? code : remove()))
-    .replace(identifier, (word) => (occurs(word) ? word : remove()));
+    .replace(identifier, (word) => (isWord(word) ? word : remove()));
   value = value.replace(/\uE000(\d+)\uE000/g, (_match, index: string) => held[Number(index)]);
   if (removed && options.refs?.length && !/[\p{L}\p{N}]/u.test(value.replaceAll(removedMark, "")))
     value = options.refs.map(pointer).join("\n");

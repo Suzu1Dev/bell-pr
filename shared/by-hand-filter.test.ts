@@ -252,3 +252,9 @@ test("code in other Markdown shapes goes too: indented blocks, prefixed fences, 
   ])
     assert.equal(filterAgentText(text, sources).removed, 0, text);
 });
+
+test("an identifier counts only as a whole word of the sources, not as part of a longer one", () => {
+  // "wait" is part of "await", "tempt" of "attempt": neither is a word the project has.
+  assert.equal(filterAgentText("Then return wait(attempt) from tempt_next.", sources).value, "Then return …(attempt) from ….");
+  assert.equal(filterAgentText("Keep retry(fn, attempts) as it is.", sources).removed, 0);
+});
