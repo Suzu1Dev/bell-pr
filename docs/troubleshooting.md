@@ -765,7 +765,8 @@ round's: …" asks you to move them first.
   board.
 - **Agents wait for each other**: every agent is one CLI process, and
   **Settings → Performance** limits how many run at once across all runs,
-  analyses and discovery (3 by default).
+  analyses and discovery (3 by default). In a Learn-by-hand run the run
+  log says "The guide waits for a free agent CLI process (… queued)."
 - **"The changes cover more than 150 files"** or **"… larger than 2 MB"**:
   make the task smaller and run it again.
 - **A file is held back from the pull request**: binary files, symbolic
