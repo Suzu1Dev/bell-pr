@@ -84,8 +84,10 @@ export function TestsCard({
         </button>
         {running && <button type="button" className="button secondary" onClick={() => void onStopTests().catch(() => undefined)}><CircleStop size={15} aria-hidden="true" /> {t.stop}</button>}
       </div>
+      {/* Always there, so a screen reader hears the result when a run ends. */}
+      <p role="status" className="visually-hidden">{last && !running ? t.result({ predicted: last.prediction && t.predictions[last.prediction], outcome: outcome ?? "" }) : ""}</p>
       {last && !running && (
-        <div role="status">
+        <div>
           <p>
             {t.result({ predicted: last.prediction && t.predictions[last.prediction], outcome: outcome ?? "" })}{" "}
             <code>{last.command}</code> {last.exitCode !== undefined && `(${last.exitCode})`} {ago(fmt, last.at)}{" "}

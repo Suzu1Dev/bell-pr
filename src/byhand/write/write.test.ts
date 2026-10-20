@@ -194,7 +194,21 @@ test("the guide's turn is announced from a status line that is always there", ()
   assert.ok(html(guide({})).includes('<p role="status" class="visually-hidden"></p>'));
   const busy = html(guide({ busy: { kind: "guide", since: at } }));
   assert.ok(busy.includes('<p role="status" class="visually-hidden">The guide is answering…</p>'));
-  assert.equal(busy.match(/role="status"/g)?.length, 1);
+  assert.equal(busy.match(/The guide is answering…/g)?.length, 2);
+  assert.equal(busy.match(/role="status" class="visually-hidden">The guide/g)?.length, 1);
+  // The review at Ready and the person's tests turn the guide's buttons off too: the line says why.
+  const reviewing = html(guide({ busy: { kind: "review", since: at } }));
+  assert.ok(reviewing.includes('<p role="status" class="visually-hidden">The guide is reviewing</p>'));
+  assert.match(reviewing, /<p aria-hidden="true"><svg[^>]*spin[\s\S]*?<\/svg> The guide is reviewing<\/p>/);
+  assert.ok(html(guide({ busy: { kind: "tests", since: at } })).includes('<p role="status" class="visually-hidden">Running your tests…</p>'));
+});
+
+test("the Tests card says a run's result from a status line that is there before the run ends", () => {
+  const confirmed = { testCommand: { suggestion: "npm test", confirmed: { command: "npm test", confirmedAt: at } } };
+  const running = html(guide({ busy: { kind: "tests", since: at }, tests: [{ at, command: "npm test", changeFingerprint: fingerprint, outcome: "failed", exitCode: 1, ms: 9 }] }, confirmed));
+  assert.match(running, /Stop<\/button><\/div><p role="status" class="visually-hidden"><\/p>/);
+  const ended = html(guide({ tests: [{ at, command: "npm test", changeFingerprint: fingerprint, outcome: "failed", exitCode: 1, ms: 9, prediction: "pass" }] }, confirmed));
+  assert.ok(ended.includes('<p role="status" class="visually-hidden">You predicted Pass; it failed.</p><div><p>You predicted Pass; it failed.'));
 });
 
 test("with no rung left on the step, \"My change\" isn't offered either", () => {

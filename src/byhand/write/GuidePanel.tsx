@@ -14,7 +14,7 @@ import { byHandRulesCase, type ByHandRulesCase } from "../../../shared/by-hand-r
 import { changeFingerprint } from "../../../shared/change-fingerprint";
 import { byHandBlockClause, learningLabel, type ContributionRules, type HelpChannel } from "../../../shared/contribution";
 import { api } from "../../api";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 import { helpKindList, rulesFrom } from "../../mission/respect";
 import type { DiffFile, Run } from "../../types";
 import { useFocusHome } from "./focus";
@@ -63,6 +63,7 @@ export function GuidePanel(props: GuidePanelProps) {
   const text = useWriteText();
   const t = text.guide;
   const [locale] = useLocale();
+  const reviewing = useT("workspace").byHand.reviewing;
   const record = run.byHand ?? {};
   const steps = record.plan?.steps ?? [];
   const step = steps.find((item) => !item.doneAt && !item.parkedAt);
@@ -91,6 +92,8 @@ export function GuidePanel(props: GuidePanelProps) {
     : blocked && t.blocked({ clause: byHandBlockClause(blocked.reason, locale, { checkedOn: blocked.finding?.source?.checkedOn }) });
   const missing = lock ? allHelpKinds.filter((kind) => !lock.kinds.includes(kind)) : [];
   const thinking = record.busy?.kind === "guide" || record.busy?.kind === "plan";
+  // Why the guide's buttons are off: its answer, the review at Ready or the person's tests (said by the Tests card too).
+  const doing = thinking ? t.working : { review: reviewing, tests: text.tests.running }[record.busy?.kind ?? ""] ?? "";
   const working = busy || !!record.busy;
 
   const [entry, setEntry] = useState<AskEntry>("project");
@@ -200,15 +203,11 @@ export function GuidePanel(props: GuidePanelProps) {
         </div>
         {step && (offered ? !attempt && <p className="field-help">{t.tryFirst}</p> : <p className="field-help">{t.noRung}</p>)}
         {/* Always there, so a screen reader hears the guide start and finish an answer. */}
-        <p role="status" className="visually-hidden">{thinking ? t.working : ""}</p>
+        <p role="status" className="visually-hidden">{doing}</p>
       </form>
       {step && <TalkItThrough step={step} tests={record.tests ?? []} fingerprint={fingerprint} onStep={onStep} />}
       <RepeatFailure key={step?.id} step={step} tests={record.tests ?? []} onCheckIn={props.onCheckIn} />
-      {thinking && (
-        <p aria-hidden="true">
-          <Loader2 size={14} className="spin" /> {t.working}
-        </p>
-      )}
+      {doing && record.busy?.kind !== "tests" && <p aria-hidden="true"><Loader2 size={14} className="spin" /> {doing}</p>}
       {error && <p className="inline-error" role="alert">{error}</p>}
       <GuideExits runId={run.id} step={step} tests={record.tests ?? []} fingerprint={fingerprint} issueUrl={props.issueUrl}
         channels={props.channels} onStep={onStep} onCheckIn={props.onCheckIn} onLeave={props.onLeave} busy={working} />
