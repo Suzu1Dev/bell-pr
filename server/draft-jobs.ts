@@ -2,14 +2,17 @@
  * PR draft suggestions: at most one preparation job per run, started by the
  * run after the review or by the person. A suggestion never replaces a draft
  * the person already edited. A Learn-by-hand run gets none: its PR text is
- * the person's own.
+ * the person's own, and it may start from the project's PR template
+ * (`template`, the façade's GET …/by-hand/template).
  */
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { redact } from "./process.js";
+import { git, redact } from "./process.js";
 import { readDiff } from "./git.js";
-import { collectDraftContext } from "./draft-sources.js";
+import { collectDraftContext, documentKind } from "./draft-sources.js";
+import { assertWorkspacePresent } from "./cleanup.js";
+import type { ByHandTemplate } from "../shared/by-hand.js";
 import {
   draftFingerprint,
   draftJsonSchema,
@@ -186,4 +189,34 @@ async function generateDraft(
     if (temporary) await rm(temporary, { recursive: true, force: true });
     await ctx.store.save();
   }
+}
+
+/** At most three templates, each at most 20 kB; a larger one is left out rather than cut. */
+const templateLimits = { files: 3, bytes: 20_000 };
+
+/** GET /api/runs/:id/by-hand/template: the project's PR templates from the run's folder, verbatim (F11). */
+export async function template(
+  ctx: WorkbenchContext,
+  id: string,
+): Promise<{ templates: ByHandTemplate[] }> {
+  const run = ctx.run(id);
+  assertWorkspacePresent(run);
+  const { stdout } = await git(run.worktreePath, [
+    "ls-files", "-z", "--", ":(glob,icase)**/pull_request_template*", ":(glob,icase)**/pull_request_template/**",
+  ]);
+  // The draft sources' own detection; single templates first, then a folder of them.
+  const found = stdout.split("\0").filter((file) => file && documentKind(file) === "template");
+  const depth = (file: string) => file.split("/").length;
+  found.sort((a, b) => depth(a) - depth(b) || a.localeCompare(b));
+  const root = await realpath(run.worktreePath);
+  const templates: ByHandTemplate[] = [];
+  for (const file of found) {
+    if (templates.length >= templateLimits.files) break;
+    const full = await realpath(path.join(root, file)).catch(() => "");
+    if (!full.startsWith(`${root}${path.sep}`)) continue;
+    const info = await stat(full);
+    if (!info.isFile() || info.size > templateLimits.bytes) continue;
+    templates.push({ path: file, content: await readFile(full, "utf8") });
+  }
+  return { templates };
 }

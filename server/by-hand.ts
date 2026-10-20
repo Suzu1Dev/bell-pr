@@ -20,13 +20,12 @@
  *   the job `review:<id>` that runs the guide's structured review (F8,
  *   server/by-hand-guide.ts) when asked; `reviewAgain` is "Run the review
  *   again" for the ready version.
- * - `template(ctx, id)`: the project's PR templates, verbatim.
+ * - The façade's `template` is server/draft-jobs.ts: the project's PR
+ *   templates, verbatim.
  * - `assertReady(run, files)`: nothing is explained or reviewed before
  *   Ready (F5); the reading routes in server/learning.ts call it.
  */
 import { randomUUID } from "node:crypto";
-import { readFile, realpath, stat } from "node:fs/promises";
-import path from "node:path";
 import {
   byHandLimits as limits,
   needsWhy,
@@ -53,11 +52,10 @@ import { turnFiles } from "./by-hand-filter.js";
 import { assertHelpAllowed, recordHelp } from "./by-hand-record.js";
 import { orientationJsonSchema, orientationSchema, parseByHandAnswer, withSchemaFile } from "./by-hand-schemas.js";
 import * as tests from "./by-hand-tests.js";
-import { assertWorkspacePresent } from "./cleanup.js";
-import { documentKind } from "./draft-sources.js";
+import { template } from "./draft-jobs.js";
 import { shuttingDown, sm, type ServerMessages } from "./i18n/index.js";
 import { log } from "./log.js";
-import { git, redact } from "./process.js";
+import { redact } from "./process.js";
 import { byHandPlanPrompt } from "./prompts/by-hand.js";
 import { enterPhase, parseAgentOutput } from "./run-events.js";
 import { runAgent } from "./run-executor.js";
@@ -378,36 +376,6 @@ export async function leave(ctx: WorkbenchContext, id: string): Promise<{ run: R
     await ctx.store.save();
     return { run };
   });
-}
-
-/** At most three templates, each at most 20 kB; a larger one is left out rather than cut. */
-const templateLimits = { files: 3, bytes: 20_000 };
-
-/** GET /api/runs/:id/by-hand/template: the project's PR templates from the run's folder, verbatim (F11). */
-export async function template(
-  ctx: WorkbenchContext,
-  id: string,
-): Promise<{ templates: ByHandTemplate[] }> {
-  const run = ctx.run(id);
-  assertWorkspacePresent(run);
-  const { stdout } = await git(run.worktreePath, [
-    "ls-files", "-z", "--", ":(glob,icase)**/pull_request_template*", ":(glob,icase)**/pull_request_template/**",
-  ]);
-  // The draft sources' own detection; single templates first, then a folder of them.
-  const found = stdout.split("\0").filter((file) => file && documentKind(file) === "template");
-  const depth = (file: string) => file.split("/").length;
-  found.sort((a, b) => depth(a) - depth(b) || a.localeCompare(b));
-  const root = await realpath(run.worktreePath);
-  const templates: ByHandTemplate[] = [];
-  for (const file of found) {
-    if (templates.length >= templateLimits.files) break;
-    const full = await realpath(path.join(root, file)).catch(() => "");
-    if (!full.startsWith(`${root}${path.sep}`)) continue;
-    const info = await stat(full);
-    if (!info.isFile() || info.size > templateLimits.bytes) continue;
-    templates.push({ path: file, content: await readFile(full, "utf8") });
-  }
-  return { templates };
 }
 
 /** What the routes call (server/routes/by-hand.ts): `Workbench.byHand`. */
