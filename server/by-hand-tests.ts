@@ -81,10 +81,17 @@ function tailWindow(text: string) {
   return newline >= 0 && newline < text.length - 1 ? text.slice(newline + 1) : text.slice(cut);
 }
 
-/** One output line as a terminal leaves it: no escape sequences, only the text after the last carriage return. */
+/**
+ * One output line as a terminal leaves it: no escape sequences, only the
+ * text after the last carriage return that has text after it. Scanned
+ * once from the end: a pattern for the trailing returns took time
+ * quadratic in their number on the server's only thread.
+ */
 function cleanLine(line: string) {
-  const text = stripVTControlCharacters(line).replace(/\r+$/, "");
-  return text.slice(text.lastIndexOf("\r") + 1);
+  const text = stripVTControlCharacters(line);
+  let end = text.length;
+  while (end > 0 && text.charCodeAt(end - 1) === 13) end--;
+  return text.slice(text.lastIndexOf("\r", end - 1) + 1, end);
 }
 
 /** A command as the record keeps it: credentials masked, within the record's cap (masking can lengthen it). */
@@ -98,13 +105,15 @@ function cleanOutput(text: string) {
 /**
  * The hash of the last 40 output lines (`repeatFailure`), with durations
  * and clock times masked so the same failure hashes alike on every run.
+ * A duration starts at the first digit of a number: tried at every digit,
+ * a long number took time quadratic in its length.
  */
 function tailHash(output: string) {
   const lines = output
     .split("\n")
     .slice(-byHandLimits.tailHashLines)
     .join("\n")
-    .replace(/\d+(?:[.,]\d+)?\s?(?:ns|µs|μs|us|ms|s|secs?|seconds?|m|mins?|minutes?|h)\b/gi, "<time>")
+    .replace(/(?<!\d)\d+(?:[.,]\d+)?\s?(?:ns|µs|μs|us|ms|s|secs?|seconds?|m|mins?|minutes?|h)\b/gi, "<time>")
     .replace(/\d{1,2}:\d{2}:\d{2}(?:[.,]\d+)?/g, "<time>");
   return createHash("sha256").update(lines).digest("hex").slice(0, 16);
 }

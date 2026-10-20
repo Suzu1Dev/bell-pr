@@ -617,6 +617,25 @@ test("a 3 MB output is not cut at 2 MB; past the output limit the run is an erro
   assert.equal(f.run.logs.at(-1)?.message, "Your tests wrote more than 1 MB of output, so BELL PR stopped them. The end of the output is kept.");
 });
 
+test("long runs of carriage returns or digits in the output keep BELL responsive", async (t) => {
+  const f = await fixture(t);
+  // A runaway progress line and a long number: each took seconds of the server's one thread.
+  await f.confirm(`node -e "process.stdout.write('7'.repeat(60000) + '\\n' + '\\r'.repeat(131072) + 'done\\n')"`);
+  let gap = 0;
+  let last = Date.now();
+  const timer = setInterval(() => {
+    gap = Math.max(gap, Date.now() - last);
+    last = Date.now();
+  }, 10);
+  t.after(() => clearInterval(timer));
+  const result = await f.runOnce();
+  clearInterval(timer);
+  assert.equal(result.outcome, "passed");
+  assert.ok(result.outputTail?.endsWith("7777\ndone"), result.outputTail?.slice(-20));
+  assert.match(result.tailHash ?? "", /^[0-9a-f]{16}$/);
+  assert.ok(gap < 1_500, `BELL's event loop stood still for ${gap} ms`);
+});
+
 test("a new run starts at once when the last one shows its result and the run is no longer busy", async (t) => {
   const f = await fixture(t);
   await f.confirm(`node -e "process.exit(1)"`);
