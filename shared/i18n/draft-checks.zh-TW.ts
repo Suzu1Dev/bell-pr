@@ -5,6 +5,9 @@ import type en from "./draft-checks.en.js";
 
 const fmt = formatters("zh-TW");
 
+/** The Learn-by-hand claim (DESIGN v1.2 §15), word for word wherever this copy states it. */
+const claim = `${product.name} 的 agent 沒有寫入權限，也沒有給你這份變更的任何程式碼。`;
+
 const messages: Translation<typeof en> = {
   placeholder: ({ count }) =>
     `PR 說明還有 ${count} 處待填寫的內容。這段文字會原樣送到 GitHub；請改成目前的事實或刪除，待辦事項留在核對清單。若是在描述 TODO 註解或檔案本身，請用反引號包起來，例如 \`TODO\`。`,
@@ -122,6 +125,48 @@ const messages: Translation<typeof en> = {
       "not-an-issue": "這個連結不是 GitHub issue。",
       "files-unreadable": "無法在專案目前的 commit 讀取它的檔案。",
       "folder-import": "從資料夾匯入專案時不會讀取這項資料。按「再確認一次」即可從 GitHub 讀取。",
+    },
+    byHand: {
+      claim,
+      why: `規範涵蓋什麼由維護者決定；${product.name} 只引用。不確定的話，請問問專案的人。`,
+      kinds: {
+        explain: "解說",
+        answer: "回答",
+        plan: "規劃協助",
+        review: "審查",
+        test: "測試協助",
+      },
+      clauses: {
+        reach: `它的規則限制 AI 協助本身，或 ${product.name} 看不出它涵蓋什麼`,
+        "no-carve-out": "它的文字沒有說哪些 AI 用法可以",
+        "kind-not-named": ({ kinds }) => `它的文字沒有提到${kinds}`,
+        "registry-stale": ({ date }) => `${product.name} 檢查清單上的這一項已超過 90 天（${date}）`,
+        "rules-unread": "這個工作開始後還沒讀過它的規範（請重新檢查）",
+        "not-fitted": "這個工作開始時沒有配合它的規範",
+        "rules-changed": "這個工作開始後，它的規範改過了",
+        "too-few-kinds": "它的文字沒有提到解說與回答",
+        held: "它的另一條 AI 規則也適用",
+      },
+      registryQuote: ({ date, url, quote }) => `${product.name} 的檢查清單，${date}，${url}：「${quote}」`,
+      aiBan: ({ condition }) =>
+        condition
+          ? `專案的規範不接受 AI 產生的內容。${claim}${product.name} 只依據專案自己的文字在這裡發布，而${condition}。`
+          : `專案的規範限制 AI 協助本身，所以 ${product.name} 不會發布嚮導幫過忙的工作。`,
+      areaReserved: ({ condition }) =>
+        condition
+          ? `專案會關閉這類 issue 上由 AI 產生的 Pull Request。${product.name} 只依據專案自己的文字發布它們，而${condition}。`
+          : `專案把這個 issue 留給不靠 AI 工具學習的人，所以 ${product.name} 不會發布嚮導幫過忙的工作。`,
+      ambiguousBan: ({ path, line, quote, kinds }) =>
+        `${path}:${line}：「${quote}」（可能涵蓋你用到的協助：${kinds}）`,
+      agent: ({ path, line, quote }) => `${path}:${line}：「${quote}」（寫給 AI agent 的話。${claim}）`,
+      aiDisclosure: ({ kinds }) => `專案要求說明怎麼使用 AI。這個工作用了 ${product.name} 的嚮導：${kinds}。`,
+      rulesConfirm: ({ area }) =>
+        `${area ? "專案會關閉這類 issue 上由 AI 產生的 Pull Request" : "專案不接受 AI 產生的貢獻"}，而它自己的文字說某些 AI 用法可以。${product.name} 只是引用專案的文字，不替專案決定：你的變更是否符合，由維護者決定。`,
+      sameRules: ({ path, line, quote }) => `同一份規範也說：${path}:${line}：「${quote}」`,
+      helpRecord: ({ fitted, used }) =>
+        `${fitted ? `開始時就配合了那段文字，嚮導只提供${fitted}。` : ""}${claim}你用到的協助：${used}。`,
+      noHelp: "沒有",
+      otherTools: `${product.name} 看不到你用過的其他工具，例如編輯器的自動完成。`,
     },
   },
 };

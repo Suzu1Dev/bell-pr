@@ -21,6 +21,8 @@ import zhTW from "./i18n/draft-checks.zh-TW.js";
 import { formatters, type Locale } from "./i18n/locale.js";
 import { disclosureRule, hasAiDisclosure } from "./project-policy.js";
 import type { HelpKind } from "./by-hand.js";
+import { byHandRulesDecision, type ByHandBlockReason } from "./by-hand-rules.js";
+import { areaReach, banReach } from "./policy-reach.js";
 
 /** Rule kinds the classifier finds (shared/project-policy.ts); stored as text, frozen. */
 export const policyKinds = [
@@ -366,6 +368,42 @@ function unknownParts(entries: readonly string[], locale: Locale) {
   });
 }
 
+/** The quoted confirm's decision; a test double replaces it only in tests. */
+let decideByHand = byHandRulesDecision;
+
+/**
+ * Tests only: replaces the quoted confirm's decision
+ * (shared/by-hand-rules.ts) with a test double, or restores it without an
+ * argument. A grep test checks that only test files call it, so nothing
+ * in the product can change the decision.
+ */
+export function byHandRulesDecisionInTests(decide?: typeof byHandRulesDecision) {
+  decideByHand = decide ?? byHandRulesDecision;
+}
+
+/**
+ * Why a Learn-by-hand run can't publish through the quoted confirm, as the
+ * clause the block copy and createRun's refusal use (DESIGN v1.2 F12):
+ * `kinds` are the help kinds the project's text doesn't name, `checkedOn`
+ * the checked-list entry's date. `held`: the finding passes, and another
+ * of the project's AI rules blocks.
+ */
+export function byHandBlockClause(
+  reason: ByHandBlockReason | "held",
+  locale: Locale,
+  facts: { kinds?: readonly string[]; checkedOn?: string } = {},
+) {
+  const m = dictionaries[locale].respect.byHand;
+  const fmt = formatters(locale);
+  if (reason === "kind-not-named")
+    return m.clauses["kind-not-named"]({
+      kinds: fmt.list((facts.kinds ?? []).map((kind) => m.kinds[kind as HelpKind] ?? kind)),
+    });
+  if (reason === "registry-stale")
+    return m.clauses["registry-stale"]({ date: facts.checkedOn ? fmt.date(facts.checkedOn) : "?" });
+  return m.clauses[reason];
+}
+
 /**
  * The respect checks (DESIGN §5.4), computed from what the input carries:
  * the project's quoted rules, the GitHub facts, the reviewability
@@ -394,6 +432,65 @@ export function respectChecks(
   const issue = facts?.issue;
   const login = door?.login;
 
+  // A clean Learn-by-hand run (DESIGN v1.2 F12): its contribution bans and
+  // applicable reserved-issue rules go to the quoted confirm's decision.
+  // Their blocks stand, with the copy for their reach and the failed
+  // condition, unless every one of them passes; then one `by-hand-rules`
+  // confirm quotes them instead. An agent run's checks never change.
+  const byHand = input.learnByHand;
+  const bh = m.byHand;
+  const kindList = (kinds: readonly string[]) =>
+    fmt.list(kinds.map((kind) => bh.kinds[kind as HelpKind] ?? kind));
+  const used = byHand?.helps.length ? kindList(byHand.helps) : bh.noHelp;
+  const learning = (issue?.labels ?? []).filter(learningLabel);
+  const bans = found("ban").filter((finding) => finding.contribution);
+  const areas = learning.length ? found("area") : [];
+  const decision =
+    byHand && input.rules && (bans.length || areas.length)
+      ? decideByHand({ bans, areas, rules: input.rules }, byHand)
+      : undefined;
+  const same = (finding: PolicyFinding) => (entry: { finding: PolicyFinding }) =>
+    entry.finding.path === finding.path &&
+    entry.finding.line === finding.line &&
+    entry.finding.quote === finding.quote;
+  const blockOf = (finding: PolicyFinding) => decision?.blocked.find(same(finding));
+  // A finding the decision names neither way stays blocked.
+  const confirmed =
+    !!decision &&
+    [...bans, ...areas].every(
+      (finding) => !blockOf(finding) && decision.confirmable.some(same(finding)),
+    );
+  const condition = (finding: PolicyFinding) => {
+    const entry = blockOf(finding);
+    return byHandBlockClause(entry?.reason ?? "held", locale, {
+      kinds: entry?.kinds ?? byHand?.helps,
+      checkedOn: finding.source?.checkedOn,
+    });
+  };
+  const sourced = (finding: PolicyFinding) =>
+    finding.source
+      ? bh.registryQuote({ date: fmt.date(finding.source.checkedOn), url: finding.source.url, quote: finding.quote })
+      : quote(finding);
+  if (confirmed) {
+    const lock = byHand!.helpLock;
+    confirms.push({
+      id: "by-hand-rules",
+      kind: "confirm",
+      message: bh.rulesConfirm({ area: !bans.length }),
+      details: [
+        bh.why,
+        ...decision!.confirmable.flatMap((entry) => [
+          sourced(entry.finding),
+          ...[...entry.allows, ...entry.others.slice(0, 2)].map((other) =>
+            bh.sameRules({ path: entry.finding.path, line: other.line, quote: other.quote }),
+          ),
+        ]),
+        bh.helpRecord({ ...(lock ? { fitted: kindList(lock.kinds) } : {}), used }),
+        bh.otherTools,
+      ],
+    });
+  }
+
   // The door: pull requests closed, archived, or for collaborators only.
   if (door) {
     const sources: string[] = [];
@@ -416,9 +513,20 @@ export function respectChecks(
   }
 
   // An explicit ban of AI-assisted contributions; an ambiguous one is a confirm below.
-  const bans = found("ban").filter((finding) => finding.contribution);
-  if (bans.length)
+  if (bans.length && !byHand)
     blocks.push({ id: "ai-ban", kind: "block", message: m.aiBan, details: [m.why.aiBan, ...bans.map(quote)] });
+  else if (bans.length && !confirmed) {
+    const first = bans.find(blockOf) ?? bans[0];
+    const reach = banReach(first.quote);
+    blocks.push({
+      id: "ai-ban",
+      kind: "block",
+      message: bh.aiBan(
+        reach === "assistance" ? {} : { condition: reach === "output" ? condition(first) : bh.clauses.reach },
+      ),
+      details: [bh.why, ...bans.map(sourced)],
+    });
+  }
 
   // A disclosure the project requires, enforced at publish. The guide's
   // help verbs (explain, review, …) count only for a clean Learn-by-hand run.
@@ -431,7 +539,7 @@ export function respectChecks(
     blocks.push({
       id: "ai-disclosure",
       kind: "block",
-      message: m.aiDisclosure,
+      message: byHand ? bh.aiDisclosure({ kinds: used }) : m.aiDisclosure,
       details: [
         m.why.aiDisclosure,
         ...(disclosures.length
@@ -496,15 +604,25 @@ export function respectChecks(
         ...competing.map((pr) => m.otherPr({ number: pr.number, author: pr.author ?? "?" })),
       ],
     });
-  const learning = (issue?.labels ?? []).filter(learningLabel);
-  const areas = found("area");
-  if (learning.length && areas.length)
+  if (areas.length && !byHand)
     blocks.push({
       id: "area-reserved",
       kind: "block",
       message: m.areaReserved,
       details: [m.why.areaReserved, m.learningLabels({ labels: learning }), ...areas.map(quote)],
     });
+  else if (areas.length && !confirmed) {
+    const first = areas.find(blockOf) ?? areas[0];
+    const reach = areaReach(first.quote);
+    blocks.push({
+      id: "area-reserved",
+      kind: "block",
+      message: bh.areaReserved(
+        reach === "output" || reach === "automate" ? { condition: condition(first) } : {},
+      ),
+      details: [m.why.areaReserved, m.learningLabels({ labels: learning }), ...areas.map(sourced)],
+    });
+  }
 
   // Weakened tests need a reason each.
   const unexplained = (input.changes?.weakened ?? []).filter(
@@ -560,9 +678,11 @@ export function respectChecks(
   const ruleDetails = [
     ...found("ban")
       .filter((finding) => !finding.contribution)
-      .map((finding) => m.ambiguousBan(finding)),
+      .map((finding) =>
+        byHand ? bh.ambiguousBan({ ...finding, kinds: used }) : m.ambiguousBan(finding),
+      ),
     ...(input.understandingOff ? found("understand").map((finding) => m.understandOff(finding)) : []),
-    ...found("agent").map((finding) => m.agent(finding)),
+    ...found("agent").map((finding) => (byHand ? bh.agent(finding) : m.agent(finding))),
     ...(!input.issueUrl?.trim() ? found("issue-first").map((finding) => m.issueFirst(finding)) : []),
   ];
   if (ruleDetails.length)

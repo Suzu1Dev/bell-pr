@@ -46,6 +46,7 @@ import { currentLocale, sm } from "./i18n/index.js";
 import { secretInPatch } from "./secrets.js";
 import { assertUnderstood, understandingRequired } from "./understanding.js";
 import { reviewabilitySnapshot } from "../shared/reviewability.js";
+import { byHandPreflight } from "../shared/by-hand.js";
 import type {
   ContributionFacts,
   GuardOverride,
@@ -172,6 +173,8 @@ export async function publishChecks(
       // with the check turned off asks about a rule on explaining a change.
       understandingOff: !understandingRequired() && !run.understanding?.passedAt,
       issueUrl: run.contributionSettings?.issueUrl,
+      // A clean Learn-by-hand run; "rules read during this run" is checked here, where publishing is.
+      learnByHand: byHandPreflight(run, now(), { createdAt: true }),
     },
     locale,
   );
@@ -338,6 +341,7 @@ export async function approve(
           rules: repo?.contributionRules,
           changes: changesOf(run, files, repo),
           testReasons: run.reviewability?.testReasons,
+          learnByHand: byHandPreflight(run, now()),
         },
         currentLocale(),
       ).find((check) => check.kind === "block");

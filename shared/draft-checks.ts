@@ -296,7 +296,10 @@ export interface DraftCheck {
     | "issue-state"
     | "reviewability"
     | "pacing"
-    | "facts-unknown";
+    | "facts-unknown"
+    // The quoted confirm of a clean Learn-by-hand run (DESIGN v1.2 F12);
+    // never an override, never a typed reason.
+    | "by-hand-rules";
   /** block stops approval and publishing; confirm needs the person's acknowledgement before publishing. */
   kind: "block" | "confirm";
   message: string;

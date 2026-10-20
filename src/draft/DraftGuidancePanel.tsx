@@ -29,6 +29,7 @@ import {
   type ContributionRules,
 } from "../../shared/contribution";
 import type { ReviewabilitySnapshot } from "../../shared/reviewability";
+import { byHandPreflight, type ByHandRunFacts } from "../../shared/by-hand";
 import {
   aiDisclosureLine,
   linuxContributionUrl,
@@ -99,6 +100,12 @@ interface Props {
   /** The understanding check's state: required, passed, or turned off. */
   understanding?: { required: boolean; passed: boolean; off: boolean };
   changes?: ReviewabilitySnapshot;
+  /**
+   * The run, so a clean Learn-by-hand run's live checklist follows the
+   * server's rule (byHandPreflight); an agent run and an unclean one get
+   * the agent run's checks.
+   */
+  byHandRun?: ByHandRunFacts;
 }
 
 const statusIcons: Record<ChecklistStatus, typeof CircleCheck> = {
@@ -169,6 +176,7 @@ export function DraftGuidancePanel({
   facts,
   understanding,
   changes,
+  byHandRun,
 }: Props) {
   const draftMessages = useT("draft");
   const t = draftMessages.guidance;
@@ -243,6 +251,7 @@ export function DraftGuidancePanel({
               understanding &&
               !understanding.passed &&
               (understanding.off || !understanding.required),
+            learnByHand: byHandRun && byHandPreflight(byHandRun, new Date().toISOString()),
           },
           locale,
         )

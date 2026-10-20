@@ -7,6 +7,9 @@ import { product } from "../product.js";
 
 const fmt = formatters("en");
 
+/** The Learn-by-hand claim (DESIGN v1.2 §15), word for word wherever this copy states it. */
+const claim = `${product.name}'s agents had no write access and gave you no code for this change.`;
+
 const messages = {
   placeholder: ({ count }: { count: number }) =>
     `The PR description still has ${fmt.plural(count) === "one" ? "1 unfinished spot" : `${count} unfinished spots`}. This text is sent to GitHub exactly as written: replace it with the current facts or delete it, and keep to-dos in the checklist. If you are describing a TODO comment or file itself, wrap it in backticks, for example \`TODO\`.`,
@@ -188,6 +191,67 @@ const messages = {
       "not-an-issue": "The link is not a GitHub issue.",
       "files-unreadable": "The project's files could not be read at its current commit.",
       "folder-import": "It isn't read when a project is imported from a folder. Choose Check again to read it from GitHub.",
+    },
+    /**
+     * A clean Learn-by-hand run (DESIGN v1.2 F12): the block copy by the
+     * rule's reach, the failed condition of the quoted confirm, and the
+     * `by-hand-rules` confirm. BELL quotes the project; the maintainers
+     * decide.
+     */
+    byHand: {
+      claim,
+      why: `Maintainers decide what their rules cover; ${product.name} only quotes them. If you're not sure, ask the project's people.`,
+      /** The kinds of help, as lists name them. */
+      kinds: {
+        explain: "explanations",
+        answer: "answers",
+        plan: "planning help",
+        review: "reviews",
+        test: "test help",
+      },
+      /** Why the quoted confirm doesn't apply: the failed condition. */
+      clauses: {
+        reach: `its rule restricts AI help itself, or ${product.name} can't tell what it covers`,
+        "no-carve-out": "its text doesn't say which uses of AI are fine",
+        "kind-not-named": ({ kinds }: { kinds: string }) => `its text doesn't name ${kinds}`,
+        "registry-stale": ({ date }: { date: string }) =>
+          `${product.name}'s checked list entry is more than 90 days old (${date})`,
+        "rules-unread": "its rules weren't read since this run started (check them again)",
+        "not-fitted": "this run wasn't fitted to its rules when it started",
+        "rules-changed": "its rules changed since this run started",
+        "too-few-kinds": "its text doesn't name explanations and answers",
+        /** A finding that passes while another rule of the project blocks. */
+        held: "another of its AI rules applies",
+      },
+      /** A rule from BELL's checked list of off-repository rules. */
+      registryQuote: ({ date, url, quote }: { date: string; url: string; quote: string }) =>
+        `${product.name}'s checked list, ${date}, ${url}: "${quote}"`,
+      /** ai-ban: a ban on AI help itself, or one on AI output with the failed condition. */
+      aiBan: ({ condition }: { condition?: string }) =>
+        condition
+          ? `The project's rules decline AI-generated content. ${claim} ${product.name} publishes here only through the project's own text, and ${condition}.`
+          : `The project's rules restrict AI help itself, so ${product.name} won't publish a run its guide helped with.`,
+      /** area-reserved: worded around AI-generated pull requests with the failed condition, or around using AI. */
+      areaReserved: ({ condition }: { condition?: string }) =>
+        condition
+          ? `The project closes AI-generated pull requests for issues like this one. ${product.name} publishes them only through the project's own text, and ${condition}.`
+          : `The project keeps this issue for people learning without AI tools, so ${product.name} won't publish a run its guide helped with.`,
+      ambiguousBan: ({ path, line, quote, kinds }: { path: string; line: number; quote: string; kinds: string }) =>
+        `${path}:${line}: "${quote}" (it may cover the help you used: ${kinds})`,
+      agent: ({ path, line, quote }: { path: string; line: number; quote: string }) =>
+        `${path}:${line}: "${quote}" (addressed to AI agents. ${claim})`,
+      aiDisclosure: ({ kinds }: { kinds: string }) =>
+        `The project asks you to say how you used AI. This run used ${product.name}'s guide: ${kinds}.`,
+      /** The `by-hand-rules` confirm, for a ban or a reserved issue. */
+      rulesConfirm: ({ area }: { area: boolean }) =>
+        `The project ${area ? "closes AI-generated pull requests for issues like this one" : "declines AI-generated contributions"}, and its own text says some uses of AI are fine. ${product.name} is quoting the project, not deciding for it: the maintainers decide whether your change fits.`,
+      /** A carve-out or another AI rule of the same document. */
+      sameRules: ({ path, line, quote }: { path: string; line: number; quote: string }) =>
+        `The same rules say: ${path}:${line}: "${quote}"`,
+      helpRecord: ({ fitted, used }: { fitted?: string; used: string }) =>
+        `${fitted ? `Fitted at the start, the guide offered only ${fitted}. ` : ""}${claim} You used: ${used}.`,
+      noHelp: "none",
+      otherTools: `${product.name} can't see other tools you used, such as editor autocomplete.`,
     },
   },
 };
