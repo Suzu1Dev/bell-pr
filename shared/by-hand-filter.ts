@@ -16,7 +16,9 @@
  *    does not combine a changed or step file with an editing command or a
  *    redirection; otherwise it becomes "…". An identifier the guide
  *    invents in its prose (one that occurs in none of those) becomes "…"
- *    too, and so does an expression it writes into prose.
+ *    too, and so does an expression it writes into prose, with spaces or
+ *    without ("delay * 2", "delay*2", "x=y", "a&&b", "arr[i]", "i++",
+ *    "retry(fn, 2)"), also across a line break Markdown shows as a space.
  * 3. A code field (an explanation's example.before/after and the like) is
  *    kept only when it is verbatim in base or worktree; otherwise it is
  *    dropped.
@@ -155,13 +157,66 @@ const holdMark = "\uE000";
 const inline = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g;
 /**
  * An expression written into prose: operands joined by code operators with
- * spaces around them on one line ("delayMs * 2 ** attempt;", "x => y"). A
+ * spaces around them ("delayMs * 2 ** attempt;", "x => y", "a ?? b"). A
  * spaced hyphen or slash is a dash or "or" in prose, not an operator, and
  * a "*" or "+" that starts a line is a list item.
  */
-const expression = /[\w$.()[\]'"]+(?:[ \t]+(?:=>|===|!==|==|!=|\*\*|&&|\|\||[-+*/%]=|<=|>=|[<>*%+=])[ \t]+[\w$.()[\]'"]+)+;?/g;
-/** Identifier-like words of prose: camelCase, snake_case and calls such as `retry(`; never part of a path. */
-const identifier = /(?<![\w$./-])(?:[a-z][a-z0-9]*[A-Z][A-Za-z0-9]*|[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+|[A-Za-z_$][\w$]*(?=\())(?![\w$/]|\.\w)/g;
+const expression = /[\w$.()[\]'"]+(?:[ \t]+(?:\?\?|<<=?|>>>?=?|[&|^]=|=>|===|!==|==|!=|\*\*|&&|\|\||[-+*/%]=|<=|>=|[<>*%+=])[ \t]+[\w$.()[\]'"]+)+;?/g;
+/** Identifier-like words of prose: camelCase, snake_case and calls such as `retry(` (not "file(s)"); never part of a path. */
+const identifier = /(?<![\w$./-])(?:[a-z][a-z0-9]*[A-Z][A-Za-z0-9]*|[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+|[A-Za-z_$][\w$]*(?=\((?!(?:s|es|ies)\))))(?![\w$/]|\.\w)/g;
+/** Faces that look like names: "o_O", "xD". */
+const emoticon = /^(?:[oO]_[oO]|[xX]_[xX]|T_T|xD|XD)$/;
+/**
+ * A keyboard shortcut ("Ctrl+C", "Cmd+Shift+P"), prose with a "+" in it:
+ * key names and single capitals or digits.
+ */
+const keyChord =
+  /^(?:(?:Ctrl|Control|Cmd|Command|Alt|Option|Opt|Shift|Meta|Super|Win|Fn|Esc|Enter|Return|Tab|Space|Backspace|Delete|Del|Home|End|PgUp|PgDn|Up|Down|Left|Right|F\d{1,2}|[A-Z0-9])\+)+(?:[A-Za-z][a-z]*\d*|\d|[^\w\s+])$/;
+/** A run of text without spaces, where code written without spaces lives (CJK text around it splits it too). */
+const word = /[!-~]+/g;
+/**
+ * Code written without spaces: a name, number or string, a code operator
+ * and another operand ("delay*2", "x=y", "a&&b", "x=>y", "a?.b", "a::b",
+ * "Vec<u8>"). "C++", "e-mail", "and/or", "24/7", "10:30" and "3:1" have
+ * none: a lone "-", "/", ":", "&", "|" or "^" is no operator here.
+ */
+const compactOperator =
+  /[\w$'")\]](?:===|!==|==|!=|<=|>=|=>|&&|\|\||\?\?|\?\.|\*\*=?|<<=?|>>>?=?|::|[-+*/%&|^]=|[=*%<>+])(?=[\w$'"([{!-])/;
+/** Other shapes of code without spaces: "i++", "++i", "arr[i]", "x?1:2", "{retries:3}". */
+const compactShapes = [
+  /(?<![\w$+])(?![cCgG]\+\+)[A-Za-z_$][\w$.]*(?:\+\+|--)(?![\w$+-])/,
+  /(?<![\w$+])\+\+[A-Za-z_$]/,
+  /(?<![\w$])[A-Za-z_$][\w$]*\[[^\]\s]*\]/,
+  /[\w$)\]]\?[\w$("'-][^\s?:]*:[\w$("'-]/,
+  /\{[^{}\s]*[:;=,(][^{}]*\}/,
+];
+/** Whether a run of text without spaces is code (a CLI flag such as "--max-count=5" and a shortcut are not). */
+const compactCode = (run: string) =>
+  !keyChord.test(run) &&
+  !/^-{1,2}[A-Za-z][\w-]*(?:=[\w./:,@-]*)?$/.test(run) &&
+  ((/[A-Za-z_$"']/.test(run) && compactOperator.test(run)) || compactShapes.some((shape) => shape.test(run)));
+/** A call with arguments, or a member call ("retry(fn, 2)", "Math.max(a, b)"); "file(s)" is prose. */
+const call = /(?<![\w$.])[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\((?!(?:s|es|ies)\))[^()\n]{0,120}\)/g;
+/** A line break Markdown shows as a space: not before a blank line, a list item, a quote, a heading, a table row or a fence. */
+const softBreak = /\n(?![ \t]*(?:\n|$|[-*+][ \t]|\d{1,9}[.)][ \t]|>|#|\||`{3}|~{3}))/g;
+
+/**
+ * Replaces the matches of `pattern` found in the text as Markdown shows it,
+ * with each soft line break read as a space (the offsets stay the same), so
+ * code split over two lines is found; `replace` returns undefined to keep
+ * the original text.
+ */
+function replaceShown(text: string, pattern: RegExp, replace: (match: string) => string | undefined) {
+  let out = "";
+  let last = 0;
+  for (const match of text.replace(softBreak, " ").matchAll(pattern)) {
+    const next = replace(match[0]);
+    if (next === undefined) continue;
+    out += text.slice(last, match.index) + next;
+    last = match.index + match[0].length;
+  }
+  return out + text.slice(last);
+}
 
 /**
  * The lines of a diff: each hunk (a header and its lines) is kept only when
@@ -277,9 +332,22 @@ export function filterAgentText(
       return code && (occurs(code) || (options.tooling && safeCommand(code, sources, isWord))) ? hold(span) : remove();
     })
     .replace(/\bhttps?:\/\/\S+/g, (url) => ([...url.matchAll(encodedRun)].some(([run]) => payload(run)) ? remove() : hold(url)))
-    .replace(encodedRun, (run) => (payload(run) ? remove() : run))
-    .replace(expression, (code) => (occurs(code.replace(/[.,;:]+$/, "")) ? code : remove()))
-    .replace(identifier, (word) => (isWord(word) ? word : remove()));
+    .replace(encodedRun, (run) => (payload(run) ? remove() : run));
+  value = replaceShown(value, expression, (code) =>
+    occurs(code.replace(/[.,;:]+$/, "")) || keyChord.test(code.replace(/\s+/g, "")) ? undefined : remove(),
+  );
+  // Code without spaces goes with the run of text it is in, sentence punctuation aside.
+  value = value.replace(word, (run) => {
+    const code = run.replace(/[.,:!?]+$/, "");
+    const bare = code.replace(/^[(["']+|[)\]"';]+$/g, "");
+    return !compactCode(code) || occurs(code) || (!!bare && occurs(bare)) ? run : remove() + run.slice(code.length);
+  });
+  value = value.replace(identifier, (name) => (isWord(name) || emoticon.test(name) ? name : remove()));
+  // A call is kept only as the files have it, or as a bare mention of a name they have ("retry()").
+  value = replaceShown(value, call, (code) => {
+    const bare = /^([\w$.]+)\(\s*\)$/.exec(code);
+    return occurs(code) || (bare && bare[1].split(".").every(isWord)) ? undefined : remove();
+  });
   value = value.replace(new RegExp(`${holdMark}(\\d+)${holdMark}`, "g"), (_match, index: string) => held[Number(index)]);
   if (removed && options.refs?.length && !/[\p{L}\p{N}]/u.test(value.replaceAll(removedMark, "")))
     value = options.refs.map(pointer).join("\n");
