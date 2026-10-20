@@ -223,9 +223,9 @@ export function ChangesTab({
   // The check replaces the reader view whose button opens it, so the focus moves into the check (its close button).
   const checkWrap = useRef<HTMLDivElement>(null);
   const openCheck = () => (openCheckPanel(run.id), focusWhenShown(() => checkWrap.current?.querySelector<HTMLElement>(".check-header button")));
-  // At the ready version: "Run the review again" opens the Ready dialog, and the reader view's check (W2E ByHandReader).
+  // At the ready version: "Run the review again" opens the Ready dialog, the reader view's check, and a review that failed (W2E ByHandReader).
   const byHandReview = run.learnByHand && byHand
-    ? { onReviewAgain: byHand.openReady, check: understanding?.view, checkError: understanding?.error, onOpenCheck: openCheck, onRetryCheck: () => understanding?.refresh() }
+    ? { onReviewAgain: byHand.openReady, check: understanding?.view, checkError: understanding?.error, onOpenCheck: openCheck, onRetryCheck: () => understanding?.refresh(), run }
     : undefined;
   useEffect(() => {
     if (!checking) {

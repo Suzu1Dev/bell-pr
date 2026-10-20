@@ -11,7 +11,7 @@ import { WalkthroughAttempt } from "./WalkthroughAttempt";
 import { WalkthroughCards } from "./WalkthroughCards";
 import en from "./i18n/en";
 import zhTW from "./i18n/zh-TW";
-import { readerAllowed, readerRequests, unasked } from "./reader";
+import { readerAllowed, readerRequests, reviewFailure, unasked } from "./reader";
 import { ReaderView, type ByHandReader } from "./ReaderView";
 
 /** A file of a Learn-by-hand run in review: nothing asked for yet. */
@@ -347,4 +347,34 @@ test("a failed explanation's or walkthrough's Retry keeps focus in the panel as 
   // Reading the check again: its Try again gives way to the request once the check arrives.
   press(shallow(ReaderView, { file, busy: false, reader: { ...reader(undefined), checkError: "Down.", onRetryCheck: () => calls.push("read the check") } }));
   assert.deepEqual(calls.splice(0), ["focus the tab panel", "read the check"]);
+});
+
+test("a review asked for at Ready that ended without one says why in the run log's words", () => {
+  const ready = { at: "2026-10-20T10:00:00.000Z", changeFingerprint: "c".repeat(16), review: true };
+  const failedLine = "The guide's review didn't finish: codex exited with 1.";
+  const logs = [
+    { time: "2026-10-20T09:59:00.000Z", agent: "system", message: "Earlier." },
+    { time: "2026-10-20T10:00:00.000Z", agent: "user", message: "You marked your change ready for review." },
+    { time: "2026-10-20T10:01:00.000Z", agent: "system", message: failedLine },
+  ];
+  const runOf = (byHand: object, entries = logs) => ({ byHand: { ready, ...byHand }, logs: entries }) as never;
+  assert.equal(reviewFailure(runOf({})), failedLine);
+  // While it runs, once it stored a review, or when none was asked: nothing.
+  assert.equal(reviewFailure(runOf({ busy: { kind: "review", since: ready.at } })), undefined);
+  assert.equal(reviewFailure(runOf({ reviews: [{ at: "2026-10-20T10:02:00.000Z" }] })), undefined);
+  assert.equal(reviewFailure(runOf({ ready: { ...ready, review: false } })), undefined);
+  // A review that never logged its end (the server stopped): no line, still said.
+  assert.equal(reviewFailure(runOf({}, logs.slice(0, 2))), "");
+  // The Reports tab shows it next to Run the review again, in both locales.
+  const tab = (failed: string | undefined, render = renderEn) =>
+    render(createElement(ReviewReports, { file, demo: false, onRerunReview() {}, byHand: true, failed }));
+  assert.match(tab(failedLine), new RegExp(`<p class="inline-error" role="alert">${failedLine.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/'/g, "&#x27;")}</p>`));
+  assert.ok(tab("").includes(`role="alert">${en.reviewFailed.replace(/'/g, "&#x27;")}</p>`));
+  assert.ok(tab("", renderZh).includes(zhTW.reviewFailed));
+  assert.doesNotMatch(tab(undefined), /role="alert"/);
+  // The panel reads it from the Learn-by-hand run it is given.
+  const failedOf = (props: Partial<ExplanationPanelProps>) =>
+    find(shallow(ExplanationPanel, { file, messages: [], loading: false, onAsk() {}, demo: false, initialTab: "reports", ...props }), ReviewReports)!.props.failed;
+  assert.equal(failedOf({ byHandReview: { ...reader(check([])), run: runOf({}) } }), failedLine);
+  assert.equal(failedOf({}), undefined);
 });

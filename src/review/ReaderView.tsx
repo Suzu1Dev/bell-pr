@@ -1,7 +1,7 @@
 import { Eye, PenLine, RotateCcw } from "lucide-react";
 import type { UnderstandingView } from "../../shared/understanding";
 import { useT } from "../i18n";
-import type { DiffFile } from "../types";
+import type { DiffFile, Run } from "../types";
 import { focusPanel, inPanel } from "./focus";
 import { usePanelStrings } from "./i18n";
 import { readerAllowed, readerRequests } from "./reader";
@@ -18,6 +18,8 @@ export interface ByHandReader {
   onOpenCheck: () => void;
   /** Reads the check again (`useUnderstanding().refresh`). */
   onRetryCheck: () => void;
+  /** The run, for a review at Ready that ended without one (reviewFailure). */
+  run?: Pick<Run, "byHand" | "logs">;
 }
 
 /**

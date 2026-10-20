@@ -40,7 +40,7 @@ import { inPanel } from "./focus";
 import { usePanelStrings } from "./i18n";
 import { MarkdownContent } from "./MarkdownContent";
 import { QuizAttempt } from "./QuizAttempt";
-import { unasked } from "./reader";
+import { reviewFailure, unasked } from "./reader";
 import { ReaderView, type ByHandReader } from "./ReaderView";
 import { RoadChoice } from "./RoadChoice";
 import { currentAttempt, demoSamples } from "./try-first";
@@ -164,6 +164,7 @@ export function ReviewReports({
   onRerunReview,
   reviewBusy = false,
   byHand,
+  failed,
 }: {
   file: DiffFile;
   reports?: Run["reports"];
@@ -173,9 +174,11 @@ export function ReviewReports({
   reviewBusy?: boolean;
   /** A Learn-by-hand run: the guide wrote the review, and Run the review again opens Ready for review. */
   byHand?: boolean;
+  /** Why its review at Ready ended without one (reviewFailure); "" when the run log doesn't say. */
+  failed?: string;
 }) {
   const t = useT("review");
-  const guide = usePanelStrings().guide;
+  const { guide, reviewFailed } = usePanelStrings();
   const available = reportKeys.filter((key) => reports?.[key]?.trim());
   // Demo reports are fixed text, so there is nothing to re-run there.
   const rerun = onRerunReview && !demo && (
@@ -187,14 +190,11 @@ export function ReviewReports({
         disabled={reviewBusy}
         aria-busy={reviewBusy}
       >
-        {reviewBusy ? (
-          <LoaderCircle size={14} className="spin" />
-        ) : (
-          <RotateCcw size={14} />
-        )}
+        {reviewBusy ? <LoaderCircle size={14} className="spin" /> : <RotateCcw size={14} />}
         {reviewBusy ? t.reports.rerunBusy : t.reports.rerun}
       </button>
       {!byHand && <small className="explain-empty-note">{t.reports.rerunNote}</small>}
+      {failed !== undefined && <p className="inline-error" role="alert">{failed || reviewFailed}</p>}
     </div>
   );
   const reviewOrder = parseReviewOrder(reports?.implementer ?? "");
@@ -876,6 +876,7 @@ export function ExplanationPanel({
             onRerunReview={onRerunReview && (byHandReview?.onReviewAgain ?? onRerunReview)}
             reviewBusy={reviewBusy}
             byHand={!!byHandReview}
+            failed={byHandReview?.run && reviewFailure(byHandReview.run)}
           />
         ) : (
           <div

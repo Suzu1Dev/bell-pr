@@ -1,6 +1,6 @@
 /** The rules behind "How a reader sees your change" (ReaderView): what is asked for, and when. */
 import type { UnderstandingView } from "../../shared/understanding";
-import type { DiffFile } from "../types";
+import type { DiffFile, Run } from "../types";
 
 /** Nobody asked for the file's explanation or walkthrough yet; a held-back file gets neither. */
 export function unasked(file: DiffFile, part: "explanation" | "walkthrough") {
@@ -30,4 +30,18 @@ export function readerAllowed(check: UnderstandingView | undefined, file: Pick<D
     !check.missing.some((part) => part.part === "answer" && part.itemId === id);
   const own = check.plan.find((item) => item.path === file.path);
   return own ? answered(own.id) : check.plan.every((item) => answered(item.id));
+}
+
+/**
+ * Why the guide's review asked for at Ready ended without one (DESIGN v1.2
+ * F8): the run log's line the review job wrote when it ended, "" when there
+ * is none (the server stopped during it); undefined while it runs, once a
+ * review of that Ready is stored, or when none was asked for.
+ */
+export function reviewFailure(run: Pick<Run, "byHand" | "logs">) {
+  const record = run.byHand;
+  const ready = record?.ready;
+  if (!ready?.review || record?.busy?.kind === "review") return undefined;
+  if (record?.reviews?.some((review) => review.at >= ready.at)) return undefined;
+  return run.logs.find((log) => log.agent === "system" && log.time >= ready.at)?.message ?? "";
 }
