@@ -343,3 +343,32 @@ test("a disclosure in the person's own words or a filled-in template field count
   assert.ok(!hasAiDisclosure("Fixes the cap.\n\nUse of AI: none"));
   assert.ok(!hasAiDisclosure("This helps the enemy AI agents find paths."));
 });
+
+test("with help verbs, a clean Learn-by-hand run's honest account of the guide is a disclosure", () => {
+  const helpVerbs = { helpVerbs: true };
+  for (const body of [
+    "Claude Code explained the parser and pointed out problems in my draft.",
+    "I used Claude Code through BELL PR to explain the parser.",
+    "Codex answered my questions about the retry loop.",
+    "Claude reviewed my change and hinted at the missing test.",
+    "The parser was not mine to change, so Claude Code guided me through it.",
+  ])
+    assert.ok(hasAiDisclosure(`Fixes the cap.\n\n${body}`, "", helpVerbs), body);
+  // Denials and negated help stay no disclosure.
+  for (const body of [
+    "No AI tools were used.",
+    "Not reviewed by AI.",
+    "This was not explained or reviewed by AI.",
+    "AI never reviewed this.",
+    "I didn't have Claude review it.",
+  ])
+    assert.ok(!hasAiDisclosure(`Fixes the cap.\n\n${body}`, "", helpVerbs), body);
+});
+
+test("without help verbs, as for every agent run, explaining or reviewing is no disclosure", () => {
+  // Today's result, kept for good: in an agent run the agents wrote the change.
+  assert.ok(!hasAiDisclosure("Fixes the cap.\n\nClaude Code explained the parser and pointed out problems in my draft."));
+  assert.ok(!hasAiDisclosure("Fixes the cap.\n\nClaude reviewed this."));
+  assert.ok(!hasAiDisclosure("Fixes the cap.\n\nClaude reviewed this.", "", {}));
+  assert.ok(hasAiDisclosure("Fixes the cap.\n\nI used Claude Code through BELL PR to explain the parser."));
+});

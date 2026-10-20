@@ -420,13 +420,14 @@ export function respectChecks(
   if (bans.length)
     blocks.push({ id: "ai-ban", kind: "block", message: m.aiBan, details: [m.why.aiBan, ...bans.map(quote)] });
 
-  // A disclosure the project requires, enforced at publish.
+  // A disclosure the project requires, enforced at publish. The guide's
+  // help verbs (explain, review, …) count only for a clean Learn-by-hand run.
   const disclosures = found("disclose");
   const disclosureSource = disclosureRule(input.sources ?? []);
-  if (
-    (disclosures.length || disclosureSource) &&
-    !hasAiDisclosure(input.body, input.commitMessage)
-  )
+  const disclosed = input.learnByHand
+    ? hasAiDisclosure(input.body, input.commitMessage, { helpVerbs: true })
+    : hasAiDisclosure(input.body, input.commitMessage);
+  if ((disclosures.length || disclosureSource) && !disclosed)
     blocks.push({
       id: "ai-disclosure",
       kind: "block",
