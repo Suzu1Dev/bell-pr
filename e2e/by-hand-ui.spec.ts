@@ -426,6 +426,33 @@ test("the person can ask, mark a step done with its why and mark the change read
   }
 });
 
+test("after Mark it ready, the focus goes to Explain it back, not to the page", async ({ browser }) => {
+  const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`);
+  try {
+    // The Ready route as W2A answers it (a stub in this build): ready at this version, the review started.
+    const { run } = await (await page.request.get(`/api/runs/${runs.writing}`)).json();
+    const { files } = await (await page.request.get(`/api/runs/${runs.writing}/diff`)).json();
+    const ready = {
+      ...run,
+      team: { ...run.team, phase: "complete" },
+      byHand: { ...run.byHand, ready: { at, changeFingerprint: changeFingerprint(files), review: true }, busy: { kind: "review", since: at } },
+    };
+    await page.route(`**/api/runs/${runs.writing}/by-hand/ready`, (route) => route.fulfill({ json: { run: ready } }));
+    await page.route(`**/api/runs/${runs.writing}`, (route) => route.fulfill({ json: { run: ready } }));
+    const footer = page.locator(".review-footer").getByRole("button", { name: workspace.byHand.ready });
+    await footer.focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog", { name: t.ready.title });
+    await dialog.getByRole("button", { name: t.ready.confirm }).focus();
+    await page.keyboard.press("Enter");
+    await expect(dialog).toHaveCount(0);
+    await expect(page.locator(".review-footer").getByRole("button", { name: workspace.byHand.reviewing })).toBeDisabled();
+    await expect(page.getByRole("button", { name: workspace.changes.takeCheck })).toBeFocused();
+  } finally {
+    await close();
+  }
+});
+
 test("back from the editor, the diff is read again once", async ({ browser }) => {
   const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`);
   try {

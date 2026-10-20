@@ -1,4 +1,5 @@
 import { useEffect, useRef, type FocusEvent } from "react";
+import { focusWhenShown } from "../../app/hooks/useByHand";
 
 /** The fields the focus can come back to: never a read-only one. */
 const fields = "textarea:not([readonly]), input.text-input:not([readonly])";
@@ -27,3 +28,14 @@ export function useFocusHome<T extends HTMLElement>() {
     onFocus: (event: FocusEvent<T>) => void (had.current = { control: event.target, part: event.target.closest("section, form, [role=group]") }),
   };
 }
+
+/**
+ * After Mark it ready the Ready dialog and the footer's button give way (the
+ * footer waits while the guide reviews): the focus goes to what comes next,
+ * Explain it back ("Take the check now"), else to the run's title, once the
+ * dialog has gone.
+ */
+export const focusAfterReady = () =>
+  focusWhenShown(() =>
+    document.querySelector("[role=dialog]") ? null : (document.querySelector<HTMLElement>(".check-link") ?? document.querySelector<HTMLElement>(".title-row h1")),
+  );

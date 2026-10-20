@@ -10,7 +10,7 @@ import { changeFingerprint } from "../../../shared/change-fingerprint";
 import { useFormat, useT } from "../../i18n";
 import { Modal } from "../../modals/Modal";
 import type { DiffFile, Run } from "../../types";
-import { useFocusHome } from "./focus";
+import { focusAfterReady, useFocusHome } from "./focus";
 import { ago, useWriteText } from "./text";
 import "./byhand.css";
 
@@ -80,7 +80,7 @@ export function ReadyDialog({ run, files, open, onClose, onReady, aiRules = fals
         <div className="modal-actions">
           <button type="button" className="button secondary" onClick={onClose}>{cancel}</button>
           <button type="button" className="button primary" disabled={busy || !files.length}
-            onClick={() => void onReady({ changeFingerprint: fingerprint, ...(leastSure.trim() ? { leastSure: leastSure.trim() } : {}), review: asked }).catch(() => undefined)}>
+            onClick={() => void onReady({ changeFingerprint: fingerprint, ...(leastSure.trim() ? { leastSure: leastSure.trim() } : {}), review: asked }).then(focusAfterReady, () => undefined)}>
             <CheckCheck size={16} aria-hidden="true" /> {t.confirm}
           </button>
         </div>
