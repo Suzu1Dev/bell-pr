@@ -67,7 +67,7 @@ export function ReaderView({
   const review = useT("review");
   const t = usePanelStrings().reader;
   const checkTitle = useT("workspace").check.title;
-  const ownQuestion = !reader.check || reader.check.plan.some((item) => item.path === file.path);
+  const ownQuestion = reader.check?.plan.some((item) => item.path === file.path);
   function show(event: { currentTarget: HTMLElement }) {
     event.currentTarget.closest<HTMLElement>("[role=tabpanel]")?.focus();
     const wanted = readerRequests(file);
@@ -78,10 +78,10 @@ export function ReaderView({
     <div className="explain-empty">
       <Eye size={28} aria-hidden="true" />
       <h3>{t.title}</h3>
-      {readerAllowed(reader.check, file) ? (
+      {!reader.check || readerAllowed(reader.check, file) ? (
         <>
           <p>{t.intro}</p>
-          <button type="button" className="explain-retry" disabled={busy} onClick={show}>
+          <button type="button" className="explain-retry" disabled={busy || !reader.check} onClick={show}>
             <Eye size={14} aria-hidden="true" />
             {busy ? review.explain.retryBusy : t.show}
           </button>

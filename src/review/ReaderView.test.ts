@@ -126,6 +126,12 @@ test("the reader view says to answer first, then offers the request, in English"
   assert.doesNotMatch(ready, /Explain it back first/);
   const busy = renderEn(createElement(ReaderView, { file, reader: reader(check([`fallback:${file.path}`])), busy: true }));
   assert.match(busy, /<button type="button" class="explain-retry" disabled="">.*Preparing other explanations…<\/button>/);
+  // While the check loads nothing says to answer first (it may be off, or answered): the request waits.
+  const loading = renderEn(createElement(ReaderView, { file, reader: reader(undefined), busy: false }));
+  assertNoHan(loading);
+  assert.match(loading, /It takes up to two agent turns\./);
+  assert.match(loading, /<button type="button" class="explain-retry" disabled="">.*Show how a reader sees it<\/button>/);
+  assert.doesNotMatch(loading, /Explain it back/);
   const zh = renderZh(createElement(ReaderView, { file, reader: reader(check([])), busy: false }));
   assert.match(zh, /讀者會怎麼看你的改動/);
   assert.match(zh, />用自己的話講一遍<\/button>/);
