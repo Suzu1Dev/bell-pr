@@ -767,6 +767,16 @@ round's: …" asks you to move them first.
   **Settings → Performance** limits how many run at once across all runs,
   analyses and discovery (3 by default). In a Learn-by-hand run the run
   log says "The guide waits for a free agent CLI process (… queued)."
+- **"Too long or too deeply nested to show formatted, so it shows as
+  plain text."**: BELL PR shows a text without its Markdown formatting
+  when it is longer than 24,000 characters, has more than 1,000 lines of
+  text outside code blocks, nests quotes or lists more than 16 levels
+  deep, or packs too much formatting into one paragraph; between 12,000
+  and 24,000 characters, also when a line is indented past 16 columns or
+  holds more than 2,000 characters without a space. This keeps the page
+  responsive with an agent's long report or a long PR description. The
+  whole text is still shown, and BELL PR's checks of a PR description
+  still read it.
 - **"The changes cover more than 150 files"** or **"… larger than 2 MB"**:
   make the task smaller and run it again.
 - **A file is held back from the pull request**: binary files, symbolic
