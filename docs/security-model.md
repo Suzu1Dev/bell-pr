@@ -200,10 +200,13 @@ inline code it can't find in those files, code inside links, editing
 commands) from every answer, review, explanation and walkthrough of the
 run. Prose can still describe an edit: the guide's instructions forbid
 it, and the guide eval measures how often it happens (see
-[Development](development.md#the-guide-eval)). The guide never reads the
+[Development](development.md#the-guide-eval)). BELL PR never quotes the
 files the review holds back (`.env` files, keys, credentials and similar
 files), files reached through a symbolic link, or a working file that
-holds a credential; BELL PR drops quotes of them. In the run log, a
+holds a credential: it drops such quotes from the guide's answers. The
+guide's CLI can still open files of the run's folder, as every read-only
+agent can, and what it opens goes to your AI provider (see the limits
+below). In the run log, a
 command the guide ran shows only when it is a plain read ("The guide ran
 a read-only command." otherwise), and a failed turn shows the CLI's
 filtered error message, never its output.

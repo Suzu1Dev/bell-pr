@@ -37,9 +37,9 @@ provider you set it up for). It receives:
   the guide's last answers on that step, along with the project files the
   guide opens. For a review you ask for at **Ready for review**: your
   change, your plan, your "least sure" line and your last test run at
-  that version. The guide never opens the files the review holds back
-  (`.env` files, keys and similar), and BELL PR's agents can't edit your
-  files in these runs;
+  that version. BELL PR never quotes the files it holds back from review
+  (`.env` files, keys and similar) in the guide's answers, and BELL PR's
+  agents can't edit your files in these runs;
 - for a follow-up round (Pro), the review comments you selected, with your
   restatement of each one;
 - for a coach debrief (Pro, only when you ask for one), your own records
