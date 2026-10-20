@@ -81,6 +81,9 @@ export const understandingLimits = {
   items: 6,
   /** Passed checks kept in `history`. */
   history: 20,
+  /** Walkthrough units answered per file, and the length of a unit's key. */
+  walkthroughUnits: 12,
+  walkthroughKeyChars: 300,
 } as const;
 
 /**
@@ -195,6 +198,23 @@ export interface FileAttempt {
     why?: string;
     at: string;
   };
+  /**
+   * The walkthrough's "Check yourself" answers, one per unit, keyed
+   * `name:startLine` (at most `walkthroughKeyChars`, at most
+   * `walkthroughUnits` of them), answered before the reveal as the quiz is.
+   * Absent until one is answered.
+   */
+  walkthroughs?: Record<string, WalkthroughAnswer>;
+}
+
+/** One walkthrough unit's "Check yourself" answer (`FileAttempt.walkthroughs`). */
+export interface WalkthroughAnswer {
+  answer?: string;
+  confidence?: Confidence;
+  grade?: SelfGrade;
+  /** "Show answer" with an empty field. */
+  skipped?: boolean;
+  at: string;
 }
 
 /** The person's tag on one piece of maintainer feedback (`run.feedbackTags[url]`). */

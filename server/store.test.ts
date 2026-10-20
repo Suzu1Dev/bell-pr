@@ -1268,6 +1268,10 @@ function runWithV12Fields(): Run {
   run.id = "run-v12-by-hand";
   run.learnByHand = true;
   run.byHand = byHandRecord();
+  run.attempts!["hello.ts"].walkthroughs = {
+    "greeting:1": { answer: "It returns the greeting with the name", confidence: "think", grade: "partly", at: "2026-10-20T00:55:00.000Z" },
+    "main:4": { skipped: true, at: "2026-10-20T00:56:00.000Z" },
+  };
   return run;
 }
 
@@ -1277,6 +1281,12 @@ const v12RunSchemas: Record<string, z.ZodTypeAny> = {
   // The help set fixed at the start, a part of the record (DESIGN §7).
   "byHand.helpLock": runReadSchema.extend({
     byHand: runReadSchema.shape.byHand.removeCatch().unwrap().omit({ helpLock: true }).optional().catch(undefined),
+  }),
+  "attempts[].walkthroughs": runReadSchema.extend({
+    attempts: z
+      .record(runReadSchema.shape.attempts.removeCatch().unwrap().valueSchema.omit({ walkthroughs: true }))
+      .optional()
+      .catch(undefined),
   }),
 };
 

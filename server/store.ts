@@ -197,6 +197,19 @@ const attemptSchema = loose({
     why: text.max(300).optional(),
     at: text,
   }).optional(),
+  // v1.2: walkthrough units' "Check yourself" answers, keyed name:startLine (12 at most).
+  walkthroughs: later(
+    z.record(
+      text.max(300),
+      loose({
+        answer: text.max(1000).optional(),
+        confidence: text.optional(),
+        grade: text.optional(),
+        skipped: z.boolean().optional(),
+        at: text,
+      }),
+    ),
+  ),
 });
 
 /**
