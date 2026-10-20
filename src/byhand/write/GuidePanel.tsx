@@ -212,7 +212,7 @@ export function GuidePanel(props: GuidePanelProps) {
         <p role="status" className="visually-hidden">{doing || (ended === true ? t.answered : "")}</p>
       </form>
       {step && <TalkItThrough step={step} tests={record.tests ?? []} fingerprint={fingerprint} onStep={onStep} />}
-      <RepeatFailure key={step?.id} step={step} tests={record.tests ?? []} onCheckIn={props.onCheckIn} />
+      <RepeatFailure key={step?.id} step={step} tests={record.tests ?? []} checkIns={record.checkIns} onCheckIn={props.onCheckIn} />
       {thinking && (
         <p aria-hidden="true">
           <Loader2 size={14} className="spin" /> {doing}

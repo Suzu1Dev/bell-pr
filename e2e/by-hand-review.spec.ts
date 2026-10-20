@@ -17,7 +17,7 @@ import { startReadyServer } from "./helpers/ready-server";
 import type { LaunchedServer } from "./start-server.mjs";
 
 const repoId = "7d8c3a41-2e7f-4a01-9c3d-4e5f6a7b8c9d";
-const runs = { planning: "e2e-review-plan", writing: "e2e-review-write", ready: "e2e-review-ready" } as const;
+const runs = { planning: "e2e-review-plan", writing: "e2e-review-write", repeat: "e2e-review-repeat", ready: "e2e-review-ready" } as const;
 const source = "src/retry.ts";
 const at = "2026-10-20T09:00:00.000Z";
 const t = byHandText;
@@ -32,7 +32,7 @@ const git = (cwd: string, ...args: string[]) =>
 const retryBase = "export const maxRetries = Infinity;\n\nexport function shouldRetry(attempt: number) {\n  return attempt < maxRetries;\n}\n";
 const retryAfter = retryBase.replace("Infinity", "3");
 
-/** One project and three Learn-by-hand runs: planning, writing (with an R3 answer and a failure three times), and marked ready. */
+/** One project and four Learn-by-hand runs: planning, writing (with an R3 answer), writing after the same failure three times, and marked ready after a review. */
 async function seed(dataDir: string) {
   const checkout = path.join(dataDir, "projects", "widgets");
   await mkdir(path.join(checkout, "src"), { recursive: true });
@@ -49,6 +49,7 @@ async function seed(dataDir: string) {
     return { worktreePath, fingerprint: changeFingerprint(files.map((file) => ({ path: file.path, fingerprint: file.fingerprint }))) };
   };
   const writing = await worktree(runs.writing);
+  const repeat = await worktree(runs.repeat);
   const ready = await worktree(runs.ready);
   const steps = [
     { id: "s1", title: "Find where retries are counted", doneAt: at },
@@ -137,7 +138,15 @@ async function seed(dataDir: string) {
                 ],
               },
             ],
-            tests: [failing(1, writing.fingerprint), failing(2, writing.fingerprint), failing(3, writing.fingerprint)],
+            tests: [failing(1, writing.fingerprint)],
+          },
+        }),
+        run(runs.repeat, "review", "developing", {
+          worktreePath: repeat.worktreePath,
+          byHand: {
+            guidePlan,
+            plan: { steps, savedAt: at, confirmedAt: at, outlineAt: at },
+            tests: [failing(1, repeat.fingerprint), failing(2, repeat.fingerprint), failing(3, repeat.fingerprint)],
           },
         }),
         run(runs.ready, "review", "complete", {
@@ -220,6 +229,30 @@ test("a guide answer is announced, and the focus goes to it at the top of the an
     await expect(guide.locator("form p[role=status]")).toHaveText("The guide answered.");
     await expect(newest).toBeFocused();
     await expect(newest).toBeInViewport();
+  } finally {
+    await close();
+  }
+});
+
+test("the same failure three times is checked in once per step and failing run, however often the panel shows", async ({ browser }) => {
+  const { page, close } = await open(browser, `#/runs/${runs.repeat}/changes`);
+  try {
+    const posts: unknown[] = [];
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname === `/api/runs/${runs.repeat}/by-hand/check-ins` && request.method() === "POST") posts.push(request.postDataJSON());
+    });
+    const guide = page.locator(".guide-panel");
+    await expect(guide).toContainText(t.talk.repeat);
+    await expect.poll(() => posts.length).toBe(1);
+    expect(posts[0]).toEqual({ stepId: "s2", signal: "repeat-failure" });
+    // The panel mounts again (another tab, then back; a reload): the run keeps the check-in, so none is sent again.
+    await page.locator("#workspace-tab-overview").click();
+    await page.locator("#workspace-tab-changes").click();
+    await expect(guide).toContainText(t.talk.repeat);
+    await page.reload();
+    await expect(guide).toContainText(t.talk.repeat);
+    await page.waitForTimeout(1500);
+    expect(posts).toHaveLength(1);
   } finally {
     await close();
   }
