@@ -553,6 +553,151 @@ test.describe("a real Learn-by-hand run, end to end", () => {
   });
 });
 
+test.describe("the rest of the guide's, the exits' and the Tests card's requests, on the real routes", () => {
+  test.use({ actionTimeout: 30_000 });
+  test("plan questions, an R3 option and its why, Talk it through, I'm stuck and its exits, a repeated failure, the live tail and Stop, Record my result, the template and handing back", async ({ browser }) => {
+    test.setTimeout(300_000);
+    const at = new Date().toISOString();
+    const template = "## What this changes\n\n## How I tested it\n";
+    const project = await startRealProject({
+      files: { "src/retry.js": retrySource, "test.js": testSource, ".github/pull_request_template.md": template },
+      run: {
+        ...byHandRun("awaiting_plan", "awaiting_approval", {
+          guidePlan: { ...guidePlan, steps: [{ title: "Read the greeting", files: ["src/greeting.ts"] }, { title: "Look the greeting up by language", files: ["src/greeting.ts"] }] },
+          plan: { steps: [{ id: "s1", title: "Read how the greeting is built" }, { id: "s2", title: "Add the table of languages" }], savedAt: at },
+        }),
+        createdAt: at,
+      },
+    });
+    await project.setAgentAnswers(answers(guideAnswer("Which language should a missing greeting fall back to?\nWhere is the name inserted?")));
+    const { context, page } = await open(browser, project);
+    const log = requestLog(page);
+    const call = (method: string, pathname: RegExp) => log.requests.filter((request) => request.method === method && pathname.test(request.path));
+    try {
+      await test.step("Questions on my plan, then This is my plan", async () => {
+        await page.goto(`/#/runs/${runId}/activity?locale=en`);
+        const plan = page.getByRole("region", { name: byHandText.plan.title });
+        const questions = plan.getByRole("region", { name: byHandText.questions.title });
+        await questions.getByRole("button", { name: byHandText.questions.title }).click();
+        await expect(questions).toContainText(byHandText.questions.left({ left: 2, max: 3 }), { timeout: 30_000 });
+        await expect(plan).toContainText("Which language should a missing greeting fall back to?");
+        await plan.getByRole("button", { name: byHandText.plan.confirm }).click();
+        await runWhen(page, runId, (run) => run.status === "review");
+      });
+
+      const guide = page.locator(".guide-panel");
+      await test.step("R1, R2 and R3 on the first step, each after an attempt the person describes; the person picks an option and says why", async () => {
+        await page.goto(`/#/runs/${runId}/changes?locale=en`);
+        await page.reload();
+        const next = (rung: number) => guide.getByRole("button", { name: byHandText.guide.next({ rung: byHandText.guide.rungs[rung] }) });
+        await next(1).click();
+        await expect(guide.locator(".by-hand-thread")).toContainText("Where is the name inserted?", { timeout: 30_000 });
+        const tried = guide.getByRole("textbox", { name: byHandText.guide.tried });
+        await guide.locator("summary", { hasText: byHandText.guide.tried }).click();
+        await tried.fill("I read greeting and found where the name goes in.");
+        await next(2).click();
+        await expect(next(3)).toBeVisible({ timeout: 30_000 });
+        await project.setAgentAnswers(answers(guideAnswer("Two ways fit this project.", {
+          options: [{ name: "A table of languages", tradeoff: "One place to add a language." }, { name: "A switch per language", tradeoff: "New code for every language." }],
+        })));
+        // The fold is still open from the last attempt.
+        await tried.fill("I wrote a table but the fallback still says Hello.");
+        await next(3).click();
+        // Each option's Choose is named by its option (aria-describedby).
+        const choose = guide.getByRole("button", { name: byHandText.thread.choose, description: "A table of languages" });
+        await expect(choose).toBeVisible({ timeout: 30_000 });
+        await choose.click();
+        const why = guide.getByRole("textbox", { name: byHandText.thread.chooseWhy });
+        await why.fill("One place to add a language keeps it small.");
+        await choose.click();
+        await expect(guide).toContainText(byHandText.thread.chosen);
+        // Done after Options asks the person's own why first.
+        await guide.locator("li", { hasText: "Read how the greeting is built" }).getByRole("button", { name: byHandText.guide.done }).click();
+        const stepWhy = guide.getByRole("textbox", { name: byHandText.guide.why });
+        await stepWhy.fill("The table gives every language one line to read.");
+        await stepWhy.press("Enter");
+        const run = await runWhen(page, runId, (value) => !!value.byHand?.plan?.steps[0].doneAt);
+        expect(run.byHand?.plan?.steps[0]).toMatchObject({ maxRung: 3, why: "The table gives every language one line to read.", chosen: { option: 0, why: "One place to add a language keeps it small." } });
+      });
+
+      await test.step("Talk it through, I'm stuck, Ask a human and Park on the second step", async () => {
+        await guide.getByRole("button", { name: byHandText.talk.label }).first().click();
+        await expect(guide.getByRole("group", { name: byHandText.talk.label })).toBeVisible();
+        await guide.getByRole("button", { name: byHandText.exits.stuck }).click();
+        const card = guide.getByRole("group", { name: byHandText.exits.title });
+        await card.getByRole("button", { name: byHandText.exits.human }).click();
+        await expect(card).toContainText(byHandText.exits.humanText);
+        await card.getByRole("button", { name: byHandText.exits.park }).click();
+        const run = await runWhen(page, runId, (value) => !!value.byHand?.plan?.steps[1].parkedAt);
+        expect(run.byHand?.talks?.map((talk) => talk.stepId)).toEqual(["s2", "s2"]);
+        expect(run.byHand?.checkIns?.map((entry) => [entry.signal, entry.choice])).toEqual([["button", "human"], ["button", "park"]]);
+        expect(run.byHand?.exits?.map((entry) => entry.exit)).toEqual(["human", "park"]);
+      });
+
+      const tests = guide.getByRole("region", { name: byHandText.tests.title });
+      const confirmCommand = async (command: string) => {
+        await tests.getByRole("textbox", { name: byHandText.tests.command }).fill(command);
+        await tests.getByRole("button", { name: byHandText.tests.use }).click();
+        await expect(tests).toContainText(byHandText.tests.confirmed({ command }));
+      };
+      await test.step("the same failure three runs in a row: the repeated-failure card, recorded once", async () => {
+        await confirmCommand(`node -e "console.error('greeting broke'); process.exit(3)"`);
+        for (let index = 0; index < 3; index++) {
+          await tests.getByRole("button", { name: byHandText.tests.run }).click();
+          await expect.poll(async () => (await readRun(page, runId)).byHand?.tests?.length ?? 0, { timeout: 30_000 }).toBe(index + 1);
+          await expect(tests.getByRole("button", { name: byHandText.tests.run })).toBeEnabled();
+        }
+        await expect(guide.getByRole("status").filter({ hasText: byHandText.talk.repeat })).toBeVisible();
+        await expect.poll(async () => (await readRun(page, runId)).byHand?.checkIns?.filter((entry) => entry.signal === "repeat-failure").length).toBe(1);
+      });
+
+      await test.step("a long run: its output so far, then Stop; then a result from the person's own terminal", async () => {
+        await confirmCommand(`node -e "console.log('still working'); setInterval(() => {}, 1000)"`);
+        await tests.getByRole("button", { name: byHandText.tests.run }).click();
+        await expect(tests.locator("details", { hasText: byHandText.live.tail }).locator("pre")).toContainText("still working", { timeout: 30_000 });
+        await tests.getByRole("button", { name: byHandText.tests.stop }).click();
+        await expect(tests).toContainText(byHandText.tests.result({ outcome: byHandText.tests.outcomes.stopped }), { timeout: 30_000 });
+        await tests.locator("summary", { hasText: byHandText.live.record }).click();
+        await tests.getByRole("radio", { name: byHandText.live.passed }).check();
+        await tests.getByRole("textbox", { name: byHandText.live.output }).fill("12 passed");
+        await tests.getByRole("button", { name: "Save" }).click();
+        await expect(tests.locator("em", { hasText: byHandText.tests.reported })).toBeVisible();
+        const run = await runWhen(page, runId, (value) => !!value.byHand?.tests?.at(-1)?.reported);
+        expect(run.byHand?.tests?.slice(-2).map((test) => [test.outcome, !!test.reported])).toEqual([["stopped", false], ["passed", true]]);
+        expect(call("GET", /\/by-hand\/tests\/live$/).length).toBeGreaterThan(0);
+      });
+
+      await test.step("the project's PR template, inserted into the person's empty description", async () => {
+        await page.locator("#workspace-tab-draft").click();
+        await page.getByRole("button", { name: record.template }).click();
+        await expect(page.getByRole("textbox", { name: workspace.draft.bodyLabel })).toHaveValue(template);
+        expect(call("GET", /\/by-hand\/template$/).length).toBe(1);
+      });
+
+      await test.step("Hand this task to the agent team: recorded, and the task dialog opens with the task", async () => {
+        await page.locator("#workspace-tab-changes").click();
+        await guide.getByRole("button", { name: byHandText.exits.stuck }).click();
+        const card = guide.getByRole("group", { name: byHandText.exits.title });
+        await card.getByRole("button", { name: byHandText.exits.leave }).click();
+        await card.getByRole("button", { name: byHandText.exits.leaveGo }).click();
+        const dialog = page.getByRole("dialog");
+        await expect(dialog.locator("#task-prompt")).toHaveValue(/Greet people in their own language/);
+        await expect(dialog.getByRole("radio", { name: discovery.byHand.agents })).toBeChecked();
+        const run = await readRun(page, runId);
+        expect(run.byHand?.leftAt).toBeTruthy();
+        expect(run.byHand?.exits?.at(-1)?.exit).toBe("leave");
+        // The run itself stays a clean Learn-by-hand run.
+        expect(run.learnByHand).toBe(true);
+        expect(run.team?.tasks ?? []).toEqual([]);
+      });
+      readOnly(await project.agentCalls());
+    } finally {
+      await context.close();
+      await project.stop();
+    }
+  });
+});
+
 // The three publishing paths of the owner's answer 2 (DESIGN v1.2 F12), on
 // real-shaped rules read by the server from the project's own files.
 const gentoo =
