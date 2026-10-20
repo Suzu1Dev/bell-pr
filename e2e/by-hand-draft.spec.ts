@@ -7,7 +7,9 @@
 // claude and gh first on PATH. The approval request answers with the
 // seeded approved run, so the dialog opens on it as it is; the PR template
 // and, for the quoted confirm, the server's checks are stubbed (the
-// template route and the confirm's decision are W2A's and W2G's).
+// template route and the confirm's decision are W2A's and W2G's). The
+// "against the real server" tests stub nothing: the last one approves and
+// publishes a fitted run with the real quoted-confirm decision.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import type { DraftCheck } from "../shared/draft-checks";
@@ -21,7 +23,11 @@ import common from "../src/i18n/en/common";
 import draft from "../src/i18n/en/draft";
 import mission from "../src/i18n/en/mission";
 import workspace from "../src/i18n/en/workspace";
-import { runId, startRealProject, type RealProject } from "./helpers/real-project";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { byHandRulesCase } from "../shared/by-hand-rules";
+import { attachCarveOuts, classifyPolicy } from "../shared/project-policy";
+import { repoId, runId, startRealProject, type RealProject } from "./helpers/real-project";
 
 const at = "2026-10-20T09:00:00.000Z";
 const agent = (id: string, role: string) => ({ id, name: role, role, status: "complete", detail: "" });
@@ -506,3 +512,81 @@ test("against the real server: no AI draft or AI line, a PR title of the person'
     await project.stop();
   }
 });
+
+test("against the real server: a run fitted to a QEMU-shaped project's carve-out gets the quoted confirm, and publishes only with its tick", async ({ browser }) => {
+  test.setTimeout(180_000);
+  // QEMU's rule and carve-out in the project; the run was fitted to them when it started (as createRun fixes the help set).
+  const file = "docs/devel/code-provenance.rst";
+  const qemu = readFileSync(path.join(import.meta.dirname, "../server/fixtures/policy/real/qemu-code-provenance.rst"), "utf8");
+  const findings = attachCarveOuts(file, qemu, classifyPolicy(file, qemu));
+  const started = new Date(Date.now() - 60 * 60_000).toISOString();
+  const fitted = byHandRulesCase({ checkedAt: started, findings, filesRead: [file] }, { learningIssue: false, now: started });
+  expect(fitted.case).toBe("fitted");
+  const project = await startRealProject({
+    reviewed: true,
+    appSettings: { skipUnderstandingCheck: true },
+    extraFiles: [{ path: file, before: qemu, after: qemu }],
+    run: {
+      learnByHand: true,
+      createdAt: started,
+      agents: [agent("lead", "Guide"), agent("reviewer", "Reviewer"), agent("tester", "Test analyst")],
+      draft: { title: "Greet people in their own language", body: "Greetings come from a table of languages; I wrote and tested it myself." },
+      byHand: {
+        helpLock: fitted.case === "fitted" ? { ...fitted.lock, at: started } : undefined,
+        events: [
+          { at: started, kind: "explain", source: "premise" },
+          { at: started, kind: "answer", source: "ask" },
+        ],
+      },
+    },
+  });
+  const context = await browser.newContext({
+    baseURL: project.baseURL,
+    storageState: project.storageState,
+    viewport: { width: 1440, height: 900 },
+    locale: "en-US",
+    timezoneId: "UTC",
+  });
+  const page = await context.newPage();
+  try {
+    // The person marks the change ready, and "Check again" reads the project's rules after the run started.
+    const { files } = (await (await page.request.get(`/api/runs/${runId}/diff`)).json()) as { files: { path: string; fingerprint: string }[] };
+    expect((await page.request.post(`/api/runs/${runId}/by-hand/ready`, { data: { changeFingerprint: changeFingerprint(files), review: false } })).ok()).toBe(true);
+    expect((await page.request.post(`/api/repos/${repoId}/contribution-rules/refresh`, { data: {} })).ok()).toBe(true);
+    await page.goto(`/#/runs/${runId}/draft?locale=en`);
+    // Approved on the real server; the dialog shows the server's quoted confirm after the record.
+    const dialog = await publishDialog(page);
+    const rules = dialog.locator("fieldset", { has: page.locator("legend", { hasText: workspace.publish.groups.rules }) });
+    await expect(rules.locator(":scope > section.byhand-record")).toContainText(record.fitted({ kinds: "explanations, answers, and test help" }));
+    const confirm = rules.locator("label", { hasText: "its own text says some uses of AI are fine" });
+    await expect(confirm).toContainText(`${file}:6: "${findings[0].quote}"`);
+    await expect(confirm).toContainText(`${file}:10: "${findings[0].allows![0].quote}"`);
+    await expect(dialog.locator("textarea")).toHaveCount(0);
+    // Every other confirm ticked (the issue's comes with the facts read at approval): Submit still
+    // waits for the quoted one, and the server refuses without it.
+    const submit = dialog.getByRole("button", { name: workspace.publish.submit });
+    await expect(dialog.getByRole("group", { name: workspace.publish.groups.issue })).toBeVisible();
+    for (const box of await dialog.getByRole("checkbox").all())
+      if (!(await box.evaluate((input) => !!input.closest("label")?.textContent?.includes("its own text says some uses of AI are fine")))) await box.check();
+    await expect(submit).toBeDisabled();
+    const { checks } = (await (await page.request.get(`/api/runs/${runId}/preflight`)).json()) as { checks: DraftCheck[] };
+    const { run } = (await (await page.request.get(`/api/runs/${runId}`)).json()) as { run: { approvedFingerprint: string } };
+    const others = checks.filter((check) => check.kind === "confirm" && check.id !== "by-hand-rules").map((check) => check.id);
+    const refused = await page.request.post(`/api/runs/${runId}/publish`, {
+      headers: { "x-bell-locale": "en" },
+      data: { fingerprint: run.approvedFingerprint, acknowledged: others },
+    });
+    expect(refused.status()).toBe(422);
+    expect(((await refused.json()) as { error: string }).error).toContain("its own text says some uses of AI are fine");
+    // Ticked, it publishes through the stand-in for GitHub.
+    await confirm.getByRole("checkbox").check();
+    await expect(submit).toBeEnabled();
+    await submit.click();
+    await expect(dialog).toHaveCount(0, { timeout: 30_000 });
+    await expect.poll(async () => ((await (await page.request.get(`/api/runs/${runId}`)).json()) as { run: { status: string } }).run.status, { timeout: 30_000 }).toBe("published");
+  } finally {
+    await context.close();
+    await project.stop();
+  }
+});
+
