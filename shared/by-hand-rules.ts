@@ -59,12 +59,7 @@ export type ByHandBlockReason =
 /** Which F12 case applies to a project's rules before a run exists. */
 export type ByHandRulesCase =
   | { case: "none" }
-  | {
-      case: "blocked";
-      finding: PolicyFinding;
-      reach: BanReach | AreaReach;
-      reason: ByHandBlockReason;
-    }
+  | { case: "blocked"; finding: PolicyFinding; reach: BanReach | AreaReach; reason: ByHandBlockReason }
   | { case: "fitted"; kinds: HelpKind[]; lock: Omit<HelpLock, "at"> };
 
 /** What the respect checks do with a clean Learn-by-hand run's ban and area findings. */
@@ -102,11 +97,24 @@ const carveOutTable: readonly (readonly [RegExp, readonly HelpKind[]])[] = [
   [/\bpossible\s+solutions?\b|\bsolution\s+ideas?\b/i, ["plan"]],
 ];
 
-/** The help kinds a carve-out's permitted words name (the F12 word table), in vocabulary order. */
+/**
+ * Help the person does themselves, not AI: "code that you then debug
+ * yourself", "code you can explain", "research the APIs yourself"; never
+ * help AI gives the person ("help you debug", "so you can understand").
+ */
+const personBefore = /\b(?:you|I|we|they|contributors?)\s+(?:(?:then|later|still|first|also|can|could|must|should|will|may|need\s+to|have\s+to)\s+){0,2}$/i;
+const helpedBefore = /\b(?:help(?:s|ed|ing)?|let(?:s|ting)?|allow(?:s|ing)?|enabl(?:e|es|ing)|so(?:\s+that)?)\s+(?:you|me|us|them|contributors?)\s+(?:(?:to|can|could|better)\s+)?$/i;
+const personAfter = /^\W*(?:[\w'-]+\s+){0,3}?(?:yourself|yourselves|on\s+your\s+own|by\s+yourself|by\s+hand|manually)\b/i;
+function byPerson(text: string, at: number, end: number) {
+  const before = text.slice(Math.max(0, at - 60), at);
+  return (personBefore.test(before) && !helpedBefore.test(before)) || personAfter.test(text.slice(end));
+}
+
+/** The help kinds a carve-out's permitted words name (the F12 word table) where AI gives that help, in vocabulary order. */
 export function carveOutKinds(text: string): HelpKind[] {
-  const named = new Set(
-    carveOutTable.flatMap(([pattern, kinds]) => (pattern.test(text) ? kinds : [])),
-  );
+  const byAi = (pattern: RegExp) =>
+    [...text.matchAll(new RegExp(pattern.source, "gi"))].some((match) => !byPerson(text, match.index, match.index + match[0].length));
+  const named = new Set(carveOutTable.flatMap(([pattern, kinds]) => (byAi(pattern) ? kinds : [])));
   return allHelpKinds.filter((kind) => named.has(kind));
 }
 
@@ -231,11 +239,7 @@ function failedCondition(
   const locked = lock?.rules.find((rule) => sameRule(rule, finding));
   // (e), the drift guard first for the rule the run was fitted to: a
   // carve-out quote it was fitted to is gone from the rules read now.
-  if (
-    locked?.allows.some(
-      (allowance) => !finding.allows?.some((current) => current.quote === allowance.quote),
-    )
-  )
+  if (locked?.allows.some((allowance) => !finding.allows?.some((current) => current.quote === allowance.quote)))
     return { reason: "rules-changed" };
   // (b) the project's own text names every kind of help the run used.
   const text = textCondition(finding, input.now);
@@ -259,11 +263,7 @@ function failedCondition(
   return undefined;
 }
 
-/**
- * Up to two other AI rules of the finding's document (or of its
- * checked-list entry), in reading order: quoted with the confirm, never
- * a condition.
- */
+/** Up to two other AI rules of the finding's document (or checked-list entry), in reading order: quoted, never a condition. */
 function otherRules(finding: PolicyFinding, all: readonly PolicyFinding[], decided: readonly PolicyFinding[]) {
   return all
     .filter(
