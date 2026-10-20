@@ -10,6 +10,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { practiceKey } from "../shared/practice.js";
+import { keepAnsweredWalkthroughs } from "../shared/understanding.js";
 import { assertHelpAllowed } from "./by-hand-record.js";
 import { assertReady } from "./by-hand.js";
 import { changeFilter, recordStoredHelp } from "./learning.js";
@@ -137,9 +138,10 @@ export async function checkPremise(ctx: WorkbenchContext, id: string) {
       if (premise) team.premise = premise;
       else delete team.premise;
       if (changed) {
-        // Made with the old verdict, or none; they are made again with this one.
+        // Made with the old verdict, or none; they are made again with this
+        // one, except what the person already answered from.
         dropUnansweredExplanations(run);
-        delete run.walkthroughs;
+        keepAnsweredWalkthroughs(run);
         for (const [key, walkthrough] of ctx.controllers)
           if (key.startsWith(walkthroughKeyPrefix) && key.endsWith(`:${id}`))
             walkthrough.abort();

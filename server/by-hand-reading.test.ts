@@ -285,6 +285,31 @@ test("after Ready the premise check filters its evidence and records explain hel
   assert.deepEqual(f.calls.map((call) => [call.role, call.readonly]), [["premise", true]]);
 });
 
+test("a changed premise verdict keeps the walkthroughs whose units were answered and drops the rest", async (t) => {
+  const f = await fixture(t, {
+    premise: JSON.stringify({ premise: { verdict: "refuted", statement: "A 503 fails at once.", evidence: "It retries." } }),
+  });
+  // An agent run, which D1's answered walkthrough units belong to.
+  delete f.run.learnByHand;
+  f.run.team!.premise = { verdict: "holds", statement: "A 503 fails at once.", evidence: "It throws." };
+  const [notes, retry] = await f.files();
+  const walkthrough = (fingerprint: string) => ({
+    fingerprint,
+    status: "ready" as const,
+    content: { functions: [], newUnits: [] },
+    generatedAt: new Date().toISOString(),
+  });
+  f.run.walkthroughs = { [retry.path]: walkthrough(retry.fingerprint), [notes.path]: walkthrough(notes.fingerprint) };
+  f.run.attempts = {
+    [retry.path]: { fingerprint: retry.fingerprint, walkthroughs: { "getPage:3": { skipped: true, at: new Date().toISOString() } } },
+  };
+  await en(() => f.workbench.checkPremise(f.run.id));
+  assert.equal(f.run.team?.premise?.verdict, "refuted");
+  // The answered one is kept as it was; the other is made again with the new verdict.
+  assert.equal(f.run.walkthroughs?.[retry.path]?.status, "ready");
+  assert.notEqual(f.run.walkthroughs?.[notes.path]?.status, "ready");
+});
+
 test("Run the review again on the ready version is the guide's review, never the team's prompts", async (t) => {
   const f = await fixture(t);
   const reviewed: string[] = [];
