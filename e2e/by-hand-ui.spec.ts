@@ -438,6 +438,26 @@ test("the person can ask, mark a step done with its why and mark the change read
   }
 });
 
+test("a guide turn that ends with no answer says why, and gives the question back", async ({ browser }) => {
+  const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`);
+  try {
+    // The guide route as W2B answers it (a stub in this build): accepted, then the turn fails and the run log says why.
+    const { run } = await (await page.request.get(`/api/runs/${runs.writing}`)).json();
+    const failure = { time: "2099-01-01T00:00:00.000Z", agent: "lead", kind: "notice", message: "codex failed: the CLI timed out." };
+    await page.route(`**/api/runs/${runs.writing}/by-hand/guide`, async (route) => {
+      await page.route(`**/api/runs/${runs.writing}`, (read) => read.fulfill({ json: { run: { ...run, logs: [...run.logs, failure] } } }));
+      await route.fulfill({ status: 202, json: { run: { ...run, byHand: { ...run.byHand, busy: { kind: "guide", since: at } } } } });
+    });
+    const guide = page.locator(".guide-panel");
+    await guide.getByRole("textbox", { name: t.guide.question }).fill("Where is the limit read?");
+    await guide.getByRole("button", { name: t.guide.ask, exact: true }).click();
+    await expect(guide.getByRole("alert")).toHaveText(t.guide.failed({ reason: failure.message }), { timeout: 15_000 });
+    await expect(guide.getByRole("textbox", { name: t.guide.question })).toHaveValue("Where is the limit read?");
+  } finally {
+    await close();
+  }
+});
+
 test("after Mark it ready, the focus goes to Explain it back, not to the page", async ({ browser }) => {
   const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`);
   try {

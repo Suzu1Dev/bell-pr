@@ -69,6 +69,7 @@ const en = {
     tryFirst: "Try something first: change the code, run the tests, or say what you tried.",
     noRung: "No hint left on this step; the exits are below.",
     working: "The guide is answering…",
+    failed: ({ reason }: { reason: string }) => (reason ? `The guide couldn't answer: ${reason}` : "The guide couldn't answer. Try again."),
     reviewAsk: ({ at, observed }: { at: string; observed: string }) => `About the review's point at ${at}: "${observed}" `,
     aboutReview: "Ask the guide about the review",
   },

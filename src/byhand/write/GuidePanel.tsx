@@ -68,9 +68,7 @@ export function GuidePanel(props: GuidePanelProps) {
   const steps = record.plan?.steps ?? [];
   const step = steps.find((item) => !item.doneAt && !item.parkedAt);
   const lock = record.helpLock;
-  // What the workspace didn't pass, read here (both local reads): the test
-  // command, and the project's stored rules for the case of a run that
-  // won't publish there (a fitted run says its own help set instead).
+  // Read here: the test command, and the stored rules for the case of a run that won't publish there.
   const [read, setRead] = useState<{ rules?: ContributionRules; command?: TestCommandView }>({});
   const runPath = `/runs/${encodeURIComponent(run.id)}/by-hand`;
   useEffect(() => {
@@ -102,16 +100,8 @@ export function GuidePanel(props: GuidePanelProps) {
   const [why, setWhy] = useState<{ stepId: string; text: string }>();
   const box = useRef<HTMLTextAreaElement>(null);
   const home = useFocusHome<HTMLDivElement>();
-  const ask = (prefill: string) => {
-    setQuestion((current) => `${prefill}${current}`);
-    box.current?.focus();
-  };
-  useEffect(() => {
-    if (!selection) return;
-    const { path, startLine, endLine } = selection;
-    setQuestion((current) => `${startLine ? `${path}:${startLine}-${endLine}` : path} ${current}`);
-    box.current?.focus();
-  }, [selection]);
+  const ask = (prefill: string) => (setQuestion((current) => `${prefill}${current}`), box.current?.focus());
+  useEffect(() => void (selection && ask(`${selection.startLine ? `${selection.path}:${selection.startLine}-${selection.endLine}` : selection.path} `)), [selection]);
 
   // The ladder of the step the person is on: the next rung after the
   // highest so far, if the run offers its kind, behind the attempt gate.
@@ -125,8 +115,24 @@ export function GuidePanel(props: GuidePanelProps) {
   const entries = askEntries.filter((value) => value !== "change" || offered);
   const asked = entries.includes(entry) ? entry : "project";
   const review = record.reviews?.at(-1);
-  const send = (input: ByHandGuideInput) =>
+  // A turn that ends with no answer (the CLI failed, timed out) says so in the run log's words and gives the question back.
+  const turn = useRef<{ last?: string; log?: string; question: string; started?: boolean }>(undefined);
+  const [failed, setFailed] = useState<string>();
+  const answering = record.busy?.kind === "guide";
+  useEffect(() => {
+    const sent = turn.current;
+    if (sent && answering) sent.started = true;
+    if (!sent?.started || answering) return;
+    turn.current = undefined;
+    if (record.thread?.at(-1)?.id !== sent.last) return;
+    setFailed([...run.logs].reverse().find((log) => log.agent === "lead" && log.kind === "notice" && log.time > (sent.log ?? ""))?.message ?? "");
+    setQuestion((now) => now || sent.question);
+  }, [answering]); // eslint-disable-line react-hooks/exhaustive-deps -- once per turn, when it ends
+  const send = (input: ByHandGuideInput) => {
+    setFailed(undefined);
+    turn.current = { last: record.thread?.at(-1)?.id, log: run.logs.at(-1)?.time, question };
     void onGuide({ ...input, ...(step ? { stepId: step.id } : {}), ...(tried.trim() ? { tried: tried.trim() } : {}) }).then(() => (setQuestion(""), setTried("")), quiet);
+  };
   // After R3 or R4, Done first asks why the change works: the field takes the focus, and Enter sends it.
   const done = (id: string, why?: string) =>
     why === undefined && needsWhy(steps.find((item) => item.id === id) ?? {}) ? setWhy({ stepId: id, text: "" }) : void onStep(id, { done: true, ...(why === undefined ? {} : { why: why.trim() }) }).then(() => setWhy(undefined), quiet);
@@ -212,7 +218,7 @@ export function GuidePanel(props: GuidePanelProps) {
           <Loader2 size={14} className="spin" /> {doing}
         </p>
       )}
-      {error && <p className="inline-error" role="alert">{error}</p>}
+      {(error || failed !== undefined) && <p className="inline-error" role="alert">{error || t.failed({ reason: failed ?? "" })}</p>}
       <GuideExits runId={run.id} step={step} tests={record.tests ?? []} fingerprint={fingerprint} issueUrl={props.issueUrl}
         channels={props.channels} onStep={onStep} onCheckIn={props.onCheckIn} onLeave={props.onLeave} busy={working} />
       <TestsCard runId={run.id} record={record} testCommand={testCommand} onRunTests={props.onRunTests} onReportTests={props.onReportTests} onStopTests={props.onStopTests}
