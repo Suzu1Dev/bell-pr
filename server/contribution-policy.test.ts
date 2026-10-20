@@ -78,6 +78,9 @@ const realExpectations: Record<string, readonly (readonly [string, boolean?])[]>
     ["understand"],
   ],
   "godot-CONTRIBUTING.md": [["agent"]],
+  // "No LLMs for patches / pull requests." refuses AI for the change; the
+  // issue and comment rules are not about it.
+  "zig-README.md": [["ban", false], ["ban", true], ["ban", false]],
   "godot-PULL_REQUEST_TEMPLATE.md": [["disclose"]],
   // "substantial pieces of code" and "if you do not have the knowledge" are
   // the person's call; the communication rule is not about the change.
@@ -117,6 +120,7 @@ test("real projects' policies yield the expected kinds, quoted verbatim, and con
 const blocksAgentRuns = [
   "kubernetes-pull-requests.md",
   "gentoo-ai-policy.txt",
+  "zig-README.md",
   "netbsd-commit-guidelines.txt",
   "qemu-code-provenance.rst",
 ];
@@ -257,6 +261,8 @@ test("each policy fixture yields exactly its findings, read locally at the commi
     ],
     // Game AI and AI features are not about AI help: no ban.
     "game-ai": [],
+    // "No AI for the enemies": a model named for something other than a contribution.
+    "no-ai-for-enemies": [],
     "ai-features": [],
     // A note to agents in a comment.
     "agent-note": [["agent", "CONTRIBUTING.md", 4, true]],

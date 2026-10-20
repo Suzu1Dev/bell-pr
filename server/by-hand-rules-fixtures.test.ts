@@ -123,6 +123,15 @@ test("Gentoo (assistance): blocked by reach, with no lock, for both run kinds", 
   assert.equal(message(result.lbhChecks, "ai-ban"), assistanceCopy);
 });
 
+test("Zig's README (assistance): blocked by reach for both run kinds", async () => {
+  const rules = await readRules([["README.md", "real/zig-README.md"]]);
+  const result = row(rules, ["explain", "answer"]);
+  assert.deepEqual([result.case, result.reasons], ["blocked:reach", ["reach"]]);
+  assert.deepEqual(result.lbh, ["ai-ban:block", "project-rules:confirm"]);
+  assert.deepEqual(result.agent, ["ai-ban:block", "project-rules:confirm"]);
+  assert.equal(message(result.lbhChecks, "ai-ban"), assistanceCopy);
+});
+
 test("an unclear-reach ban (synthetic: no verified text has one) stays blocked by reach", async () => {
   const rules = await readRules([["CONTRIBUTING.md", "by-hand/unclear-reach.md"]]);
   const result = row(rules, ["explain", "answer"]);

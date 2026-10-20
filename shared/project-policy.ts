@@ -477,6 +477,14 @@ function allMatches(pattern: RegExp, text: string): Span[] {
 const gap = (a: Span, b: Span) => Math.max(0, b.start - a.end, a.start - b.end);
 
 /**
+ * "No LLMs for patches / pull requests.", "No AI for issues.": a model
+ * named for what it must not be used on is AI help too (DESIGN v1.2 F14,
+ * Zig's README). The classifier's rules only; disclosure checks don't use it.
+ */
+const noAiFor =
+  /\bno\s+(?:AI|LLMs?|large\s+language\s+models?|language\s+models?|chatbots?|generative\s+AI|gen[- ]?AI)(?:\s+(?:tools?|models?|assistants?))?\s+for\s+(?:patch(?:es)?|pull\s+requests?|PRs?|issues?|comments?|contributions?)\b/i;
+
+/**
  * Each rule phrase with the nearest AI-assistance term, when one is close
  * enough and in the same sentence to make them one rule; the span covers
  * both. A refusal in one sentence and an AI term in the next ("We do not
@@ -487,7 +495,7 @@ function nearAssistance(
   rule: RegExp,
   sentenceOf: (span: Span) => Span,
 ) {
-  const terms = assistanceSpans(text);
+  const terms = [...assistanceSpans(text), ...allMatches(noAiFor, text)];
   const pairs: { phrase: Span; span: Span; term: Span }[] = [];
   for (const phrase of allMatches(rule, text)) {
     const sentence = sentenceOf(phrase);

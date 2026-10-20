@@ -183,6 +183,23 @@ test("a rule inside an HTML comment of a pull request template is found", () => 
   );
 });
 
+test("'No LLMs for patches' and the like refuse AI help for that kind of contribution", () => {
+  // Zig's README (plan research/policies.md): patches and pull requests are the change.
+  assert.deepEqual(kinds("README.md", "No LLMs for patches / pull requests."), [["ban", true]]);
+  assert.deepEqual(kinds("CONTRIBUTING.md", "No AI for contributions."), [["ban", true]]);
+  // Issues and comments are not the change: rules the person weighs.
+  assert.deepEqual(kinds("README.md", "No LLMs for issues."), [["ban", false]]);
+  assert.deepEqual(kinds("README.md", "No LLMs for comments on the bug tracker, including translation."), [["ban", false]]);
+  // A model named for something else is not AI help.
+  for (const text of [
+    "No AI for the enemies in level 3 yet: they follow scripted paths.",
+    "There is no LLM for the chatbot NPC; pull requests that add one are welcome.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [], text);
+  // The disclosure checks are unchanged by it.
+  assert.ok(!hasAiDisclosure("Fixes the cap.\n\nNo LLMs for patches were used."));
+});
+
 test("AI on good first issues is a reserved learning area, not a ban", () => {
   const text =
     "Using AI tools to fix issues labelled as good first issues is forbidden: those issues are meant for people who are learning the codebase.";
