@@ -502,11 +502,11 @@ hand: you confirm your own plan before you write.") and names the dialog
 and its start button **Plan with the guide**. The choice holds for the
 whole run: the run carries a **Learn by hand** badge, the sidebar and the
 contributions list mark it with a hand, and its status reads **Your
-turn** until you first mark the change ready. The
-dialog starts on Learn by hand when you came from discovery's **Start
-learning by hand** or the linked issue is labelled for newcomers, but
-never before BELL PR has read the project's rules, and never on a project
-whose rules ban AI-assisted contributions or keep issues for newcomers.
+turn** until you first mark the change ready. The dialog starts on Learn
+by hand when you came from discovery's **Start learning by hand** or the
+linked issue is labelled for newcomers, but never before BELL PR has read
+the project's rules, and never on a project whose rules ban AI-assisted
+contributions or keep issues for newcomers.
 
 Before you write a line, the dialog says what the project's rules mean
 for publishing a learn-by-hand run, and **Before you start** asks once:
@@ -564,15 +564,16 @@ Until you confirm your plan, **Code changes** says that the guide is
 reading the code, then that you write your own plan in **Agent activity**
 first. In a fitted run whose project text doesn't name planning help, the
 guide's step names and **Questions on my plan** stay closed (you still see
-its summary and the ranges to read first); your own plan works as usual. "Send back with feedback" is not offered: the plan is
-yours. A retry before you confirm the plan takes the run back to planning
-with the guide.
+its summary and the ranges to read first); your own plan works as usual.
+"Send back with feedback" is not offered: the plan is yours. A retry
+before you confirm the plan takes the run back to planning with the
+guide.
 
 ### Your turn
 
-On **Code changes**, **Your turn** shows the run's folder with a copy
-button: "Open this folder in your editor, make your first step's change,
-save, and come back." BELL PR reads the diff again when you come back to
+Before your first change, **Code changes** shows **Your turn** with the
+run's folder and a copy button: "Open this folder in your editor, make
+your first step's change, save, and come back." BELL PR reads the diff again when you come back to
 the window (2 seconds after it gets the focus, one read at a time) and
 when a test run ends; **Refresh the diff** works too. Don't commit: BELL
 PR commits the reviewed files when you publish.
@@ -594,15 +595,14 @@ rules and which kinds of help the guide offers.
   in this project**. There is no rung with code. After the first hint on a
   step, the next one waits for an attempt: a new edit, a test run BELL PR
   ran, or at least five words on what you tried that differ from last
-  time.
-  Otherwise: "Try something first: change the code, run the tests, or say
-  what you tried." After **Options** or an example, **Done** on that step
-  asks "Why does your change for this step work?"
+  time. Otherwise: "Try something first: change the code, run the tests,
+  or say what you tried." After **Options** or an example, **Done** on
+  that step asks "Why does your change for this step work?"
 - **Answers**, newest first: each points to `path:line` and shows code
   only as quotes labelled **From the repository** or **From your change**,
   which BELL PR cuts from the files itself; a pointer to a file that isn't
-  in the run's checkout is dropped. When BELL PR removed code from
-  an answer, it says "BELL PR removed code from this answer." The panel
+  in the run's checkout is dropped. When BELL PR removed code from an
+  answer, it says "BELL PR removed code from this answer." The panel
   reminds you: "The guide can be wrong. Check its pointers against the
   code and your tests." When a turn fails, it says "The guide couldn't
   answer: …" and gives your question back.
@@ -625,10 +625,10 @@ only when you click. The **Tests** card suggests a command from the
 project's files (`npm test`, `pnpm test` or `yarn test` from
 `package.json`; `python -m pytest`, or `python3 -m pytest` when only
 `python3` is installed; `cargo test`; `go test ./...`; `make test`), which
-you edit and confirm with **Use this command**. It
-stays confirmed for the project; every change is a new confirmation. Pick
-a prediction (**Pass**, **Fail** or **Not sure**), optionally name the
-test you expect to fail, and choose **Run the tests**. **Output so far**
+you edit and confirm with **Use this command**. It stays confirmed for
+the project; every change is a new confirmation. Pick a prediction
+(**Pass**, **Fail** or **Not sure**), optionally name the test you expect
+to fail, and choose **Run the tests**. **Output so far**
 follows the run, **Stop** ends it, and the result reads, for example, "You
 predicted Fail; it failed." Files your tests created are named, because
 they change the diff.
@@ -656,15 +656,14 @@ three problems, each with its evidence, as a question when it has none,
 while a test analyst names in words what your tests might not catch.
 Neither writes the fix. "The review takes about 2 agent turns." When the
 project's rules say something about AI, the dialog reminds you to check
-them before you ask for an AI review. A second
-review needs a test run, or a result you recorded, at this version since
-the last review: "Run your tests on this version first; the tests are the
-judge." In a fitted run whose project text doesn't name AI review, the
-dialog has no review box and says why, and **Run the review again** isn't
-shown; without planning help, the Draft tab doesn't offer **Ask how to
-split it**. **Mark it ready** records the
-version you declared ready; the footer reads "The guide is reviewing"
-while it does.
+them before you ask for an AI review. A second review needs a test run,
+or a result you recorded, at this version since the last review: "Run
+your tests on this version first; the tests are the judge." In a fitted
+run whose project text doesn't name AI review, the dialog has no review
+box and says why, and **Run the review again** isn't shown; without
+planning help, the Draft tab doesn't offer **Ask how to split it**.
+**Mark it ready** records the version you declared ready; the footer
+reads "The guide is reviewing" while the guide reviews it.
 
 The review appears in **Reviews**, under the name "The guide". If you
 change the code afterwards, a notice says so, and the review and the check
@@ -737,24 +736,25 @@ the guide helped with, is quoted beside your help record under **Your
 words and reviewability**, for you to confirm or reword. When BELL PR
 can't read its checks for the run, the dialog says so and offers **Try
 again**, and **Submit Draft PR** stays off. The learning page shows the
-run with a **Learn by hand**
-badge and the same counts, never the claim; the complete learning record
-export (Pro) has a Learn-by-hand section.
+run with a **Learn by hand** badge and the same counts, never the claim;
+the complete learning record export (Pro) has a Learn-by-hand section.
 
 ### After publishing
 
 Reading maintainer feedback works as in every run. When a fitted run was
 published through the quoted confirm, the Draft tab's rules row says "You
 confirmed the project's quoted rule when you published. The maintainers
-decide whether your change fits." AI follow-up rounds
-aren't offered: push follow-up commits from the run's folder with your own
-Git; BELL PR takes them over at the next feedback read. Taking over means
-BELL PR records them as the pull request's commits; it doesn't check or
-review them. It does so only when the run's folder has no uncommitted
-changes, is on the run's own branch, and its latest commit is the head of
-the pull request's branch on GitHub. Otherwise the feedback is still read,
-nothing in the folder moves (also when GitHub can't be reached, or the
-folder was freed), and the run log says what to do first:
+decide whether your change fits."
+
+AI follow-up rounds aren't offered: push follow-up commits from the run's
+folder with your own Git; BELL PR takes them over at the next feedback
+read. Taking over means BELL PR records them as the pull request's
+commits; it doesn't check or review them. It does so only when the run's
+folder has no uncommitted changes, is on the run's own branch, and its
+latest commit is the head of the pull request's branch on GitHub.
+Otherwise nothing in the folder moves and the feedback is still read;
+when GitHub can't be reached, the run log says so, and in the other cases
+it says what to do first:
 
 - "Push your commits first; BELL PR takes them over once they are on the
   pull request's branch."
@@ -770,7 +770,6 @@ as it does for every run. Conflicts are yours to resolve: there is no
 conflict agent. "Resolve the markers by hand; BELL PR re-checks them when
 you refresh the diff on the Code changes tab." Approval waits until every
 marker is gone, and changed files need another review.
-
 
 ## Keep learning
 
