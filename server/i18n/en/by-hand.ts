@@ -32,6 +32,8 @@ const byHand = {
   resolveByHand: `In Learn by hand, resolve the conflict markers by hand in the run's folder; ${product.name} finds the ones left each time it reads the change.`,
   /** Explanations, walkthroughs, the premise check and the review before Ready. */
   notReady: "Mark your changes ready for review first.",
+  /** A Learn-by-hand agent answer not in its schema's form; nothing is stored. */
+  badAnswer: "The guide's answer was not in the expected form, so nothing was stored. Try again.",
   /** One guide turn or test job per run at a time. */
   busy: "The guide is already working on this run. Wait for it to finish, or stop it.",
   /** The attempt gate of the hint ladder. */

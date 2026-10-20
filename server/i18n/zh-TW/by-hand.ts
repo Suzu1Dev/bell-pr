@@ -18,6 +18,7 @@ const byHand: Translation<typeof en> = {
   followUpRefused: `在親手學裡，後續的 commit 請在這個工作的資料夾用你自己的 Git 推送；${product.name} 會在下次讀取回饋時接手。`,
   resolveByHand: `在親手學裡，請在這個工作的資料夾親手解決衝突標記；${product.name} 每次讀取變更時都會找出還沒解決的。`,
   notReady: "請先把你的變更標成可以審查了。",
+  badAnswer: "嚮導的回答格式不符，所以沒有儲存任何內容。請再試一次。",
   busy: "嚮導正在處理這個工作。請等它完成，或先停止它。",
   attemptFirst: "先試試看：改一下程式、跑一次測試，或說說你試了什麼。",
   whyFirst: "標成完成之前，請用一句話說明你在這個步驟的修改為什麼可行。",
