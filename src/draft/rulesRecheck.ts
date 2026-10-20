@@ -1,11 +1,10 @@
 /**
  * "Check again" in the publish dialog of a Learn-by-hand run (DESIGN v1.2
- * F12 condition d): when a block stands while the project's rules were
- * read before the run started, the person reads them again from the
+ * F12 condition d): when a block stands because the project's rules were
+ * not read since the run started, the person reads them again from the
  * dialog, which then reads the server's checks again.
  */
 import { useState } from "react";
-import { byHandPreflight } from "../../shared/by-hand";
 import type { ContributionRules } from "../../shared/contribution";
 import type { DraftCheck } from "../../shared/draft-checks";
 import { api, send } from "../api";
@@ -13,21 +12,13 @@ import { useFormat, useT } from "../i18n";
 import type { Run } from "../types";
 
 /**
- * Whether reading the rules again is due for a Learn-by-hand block in the
- * server's list: a clean run fitted to the project's rules when it started
- * passed conditions (a) and (b) then, and with the rules read before it
- * started, (d) fails too. The block may still name an earlier condition
- * (an outdated checked-list entry, changed rules), so nothing here says
- * which one it names; it is never read from the block's text.
+ * Whether reading the rules again is due: a block whose reason (the
+ * condition its copy names, set by the server for a clean Learn-by-hand
+ * run) is rules not read during the run, fitted or not. Never read from
+ * the block's text.
  */
-export function namesRulesUnread(run: Run, rules: ContributionRules | undefined, checks: readonly DraftCheck[]) {
-  return (
-    !!run.byHand?.helpLock &&
-    !!byHandPreflight(run, run.createdAt) &&
-    !!rules &&
-    Date.parse(rules.checkedAt) < Date.parse(run.createdAt) &&
-    checks.some((check) => check.kind === "block" && ["ai-ban", "area-reserved"].includes(check.id))
-  );
+export function rulesUnread(checks: readonly DraftCheck[]) {
+  return checks.some((check) => check.kind === "block" && check.reason === "rules-unread");
 }
 
 /**
@@ -39,14 +30,13 @@ export function namesRulesUnread(run: Run, rules: ContributionRules | undefined,
  */
 export function useRulesRecheck(
   run: Run | undefined,
-  stored: ContributionRules | undefined,
   checks: readonly DraftCheck[] | undefined,
   reload: (id: string, fingerprint?: string) => Promise<void>,
 ) {
   const t = useT("mission").rules;
   const fmt = useFormat();
   const [state, setState] = useState<{ checking: boolean; rules?: ContributionRules; error?: string; read?: true }>({ checking: false });
-  const offer = !!run && namesRulesUnread(run, state.rules ?? stored, checks ?? []);
+  const offer = !!run && rulesUnread(checks ?? []);
   if (!run || (!offer && !state.read)) return undefined;
   const checkedAt = state.rules && new Date(state.rules.checkedAt);
   return {

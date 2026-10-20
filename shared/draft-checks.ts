@@ -19,6 +19,7 @@ import {
 } from "./contribution.js";
 import type { ReviewabilitySnapshot } from "./reviewability.js";
 import type { HelpKind, HelpLock } from "./by-hand.js";
+import type { ByHandBlockReason } from "./by-hand-rules.js";
 // The secret shapes and the safety-check messages have one source each,
 // kept with the server; both modules are plain data and load in the browser.
 import { secretInPatch } from "../server/secrets.js";
@@ -313,6 +314,13 @@ export interface DraftCheck {
    * changed after the person read them (DESIGN v1.2 F12 f).
    */
   digest?: string;
+  /**
+   * A clean Learn-by-hand run's `ai-ban` or `area-reserved` block: the
+   * condition its copy names (DESIGN v1.2 F12), or `held` when another of
+   * the project's AI rules keeps it (not persisted). The UI reads it, never
+   * the block's text; agent runs and the confirm have none.
+   */
+  reason?: ByHandBlockReason | "held";
 }
 
 /**

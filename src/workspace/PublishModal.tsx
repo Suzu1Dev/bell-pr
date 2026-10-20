@@ -331,7 +331,7 @@ export function PublishModal({
     : sample
       ? sampleChecks
       : draftChecks && (serverChecksRead || !byHand) ? publishChecks : undefined;
-  const checkRules = useRulesRecheck(byHand ? run : undefined, currentRepo?.contributionRules, checks, loadPublishChecks);
+  const checkRules = useRulesRecheck(byHand ? run : undefined, checks, loadPublishChecks);
   // A quoted confirm whose words changed in a later read (or that couldn't be read) is unticked:
   // the person confirms what they read (F12 f). Until then its tick counts for nothing, not even
   // for the one frame before the untick, so no click can send it for words that came after it.

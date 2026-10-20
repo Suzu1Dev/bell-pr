@@ -477,13 +477,12 @@ export function respectChecks(
     [...bans, ...areas].every(
       (finding) => !blockOf(finding) && decision.confirmable.some(same(finding)),
     );
-  const condition = (finding: PolicyFinding) => {
-    const entry = blockOf(finding);
-    return byHandBlockClause(entry?.reason ?? "held", locale, {
-      kinds: entry?.kinds ?? byHand?.helps,
+  const reasonOf = (finding: PolicyFinding) => blockOf(finding)?.reason ?? "held";
+  const condition = (finding: PolicyFinding) =>
+    byHandBlockClause(reasonOf(finding), locale, {
+      kinds: blockOf(finding)?.kinds ?? byHand?.helps,
       checkedOn: finding.source?.checkedOn,
     });
-  };
   const sourced = (finding: PolicyFinding) =>
     finding.source
       ? bh.registryQuote({ date: fmt.date(finding.source.checkedOn), url: finding.source.url, quote: finding.quote })
@@ -546,6 +545,7 @@ export function respectChecks(
         reach === "assistance" ? {} : { condition: reach === "output" ? condition(first) : bh.clauses.reach },
       ),
       details: [bh.why, ...bans.map(sourced), ...stopped],
+      reason: reasonOf(first),
     });
   }
 
@@ -652,6 +652,7 @@ export function respectChecks(
         reach === "output" || reach === "automate" ? { condition: condition(first) } : {},
       ),
       details: [m.why.areaReserved, m.learningLabels({ labels: learning }), ...areas.map(sourced), ...stopped],
+      reason: reasonOf(first),
     });
   }
 

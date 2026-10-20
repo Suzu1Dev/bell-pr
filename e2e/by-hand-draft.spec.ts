@@ -339,8 +339,8 @@ test("Check again reads the rules again from the dialog, says when it couldn't, 
         ? route.fulfill({ status: 502, json: { error: "GitHub didn't answer." } })
         : route.fulfill({ json: { rules: rules(new Date().toISOString()) } }),
     );
-    // The server's checks: a block while the rules are unread since the run started, then the quoted confirm.
-    const ban: DraftCheck = { id: "ai-ban", kind: "block", message: "BELL PR won't publish this run here yet.", details: ["Why.", `CONTRIBUTING.md:3: "${rule}"`] };
+    // The server's checks: a block whose reason is the rules unread since the run started, then the quoted confirm.
+    const ban: DraftCheck = { id: "ai-ban", kind: "block", message: "BELL PR won't publish this run here yet.", details: ["Why.", `CONTRIBUTING.md:3: "${rule}"`], reason: "rules-unread" };
     const quoted: DraftCheck = { id: "by-hand-rules", kind: "confirm", message: "The project declines AI-generated contributions, and its own text says some uses of AI are fine.", details: ["Why.", `CONTRIBUTING.md:3: "${rule}"`] };
     await page.route(`**/api/runs/${runId}/preflight`, (route) => route.fulfill({ json: { checks: refreshed > 1 ? [quoted] : [ban] } }));
     await page.goto(`/#/runs/${runId}/draft?locale=en`);
