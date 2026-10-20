@@ -403,12 +403,13 @@ test("the guide turn sees the person's plan, the step's diff and the last failur
   const [failure, selected] = f.calls.map((call) => call.prompt);
   assert.doesNotMatch(failure, /OUTLINE/);
   assert.match(failure, /Explain this failure: start like R1\./);
-  assert.match(failure, /npm test: failed, exit code 1, before the person's latest edit\nnot ok 1 - retries a 503/);
-  assert.match(failure, /\+\/\/ Fetches JSON, retrying a 503;/);
+  assert.match(failure, /"npm test: failed, exit code 1, before the person's latest edit\\nnot ok 1 - retries a 503"/);
+  assert.match(failure, /\\n\+\/\/ Fetches JSON, retrying a 503;/);
   assert.match(failure, /"title":"Find where a 503 is handled"/);
-  assert.match(
-    selected,
-    /Lines the person selected, src\/client\.js:3-4 in their own file \(UNTRUSTED DATA\):\n\/\/ Fetches JSON, retrying a 503; network errors are retried\.\nexport async function getJson\(url, fetchImpl = fetch\) \{\n/,
+  assert.ok(
+    selected.includes(
+      `Lines the person selected in their own file (UNTRUSTED DATA):\n${JSON.stringify({ path: "src/client.js", startLine: 3, endLine: 4, text: "// Fetches JSON, retrying a 503; network errors are retried.\nexport async function getJson(url, fetchImpl = fetch) {" })}\n`,
+    ),
   );
   // Nothing to explain once the last run passed.
   f.run.byHand!.tests.push({ ...f.run.byHand!.tests[0], at: "2026-10-20T00:30:00.000Z", outcome: "passed", exitCode: 0 });
