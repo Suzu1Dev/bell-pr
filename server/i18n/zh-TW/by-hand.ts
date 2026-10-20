@@ -10,7 +10,7 @@ const byHand: Translation<typeof en> = {
   guide,
   tests,
   noWriteTurn: `在親手學的工作裡，${product.name} 的 agent 沒有寫入權限，所以 ${product.name} 沒有開始這一輪。`,
-  agentWrite: `${product.name} 在親手學的工作裡攔下了一個想修改檔案的 agent。`,
+  agentWrite: `${product.name} 在親手學的工作裡攔下了一個執行 shell 指令或修改檔案的 agent。`,
   notYet: "這個版本還沒有親手學的這個部分。",
   notByHand: "這只適用於親手學的工作。",
   retryRefused: "親手學的工作是從你自己的修改接著做，沒有 agent 的工作可以重試。要從頭開始，請建立新的工作。",

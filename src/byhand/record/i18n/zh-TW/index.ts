@@ -10,7 +10,7 @@ const m: Translation<typeof en> = {
   claimed: ({ claim, quotes }) => `${claim}${quotes}`,
   unclean: ({ reason }) => `${product.name} 不為這個工作做親手學的聲明：${reason}。`,
   reasons: {
-    "agent-writes": "有 agent 試圖修改檔案",
+    "agent-writes": "有 agent 執行了 shell 指令或修改了檔案",
     agents: "嚮導、審查者和測試分析師以外的 agent 參與過",
     tasks: "它曾被規劃成團隊任務",
     rounds: "跑過 AI 後續修改",

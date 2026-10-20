@@ -10,7 +10,7 @@ const en = {
   claimed: ({ claim, quotes }: { claim: string; quotes: string }) => `${claim} ${quotes}`,
   unclean: ({ reason }: { reason: string }) => `${product.name} makes no Learn-by-hand claim for this run: ${reason}.`,
   reasons: {
-    "agent-writes": "an agent tried to change files",
+    "agent-writes": "an agent ran a shell command or changed a file",
     agents: "agents other than the guide, the reviewer and the test analyst joined it",
     tasks: "it was planned as team tasks",
     rounds: "an AI follow-up round ran on it",

@@ -101,7 +101,7 @@ export default messages;
 export const byHand: Translation<typeof enByHand> = {
   title: "親手學",
   claim: `${product.name} 的 agent 沒有寫入權限，也沒有給你這份變更的任何程式碼。`,
-  withdrawn: `${product.name} 在這個工作裡看到 agent 修改過檔案，所以不為它做親手學的聲明。`,
+  withdrawn: `${product.name} 在這個任務裡看到 agent 修改檔案或執行指令，所以不為它做親手學的聲明。`,
   fitted: ({ kinds }) => `開始時就配合了專案的規範：嚮導只提供${kinds}。`,
   helps: ({ helps }) => `- 嚮導的協助：${helps}`,
   predictions: ({ right, judged, unsure }) => `- 每次修改後的第一個預測，${judged} 次中對了 ${right} 次；不確定 ${unsure} 次`,
