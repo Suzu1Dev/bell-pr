@@ -6,10 +6,15 @@
 // that log their arguments); the three publishing paths of the owner's
 // answer 2 (blocked, confirmed, allowed) on real-shaped rules; and the
 // fix-ups of README v1.2 §18.11 that only a browser shows.
-import { appendFile, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { appendFile, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { changeFingerprint } from "../shared/change-fingerprint";
+import { defaultDiscoveryPreferences, type DiscoveryCandidate } from "../shared/discovery";
+import { parseDiscoveryResult } from "../server/discovery";
+import { withLocale } from "../server/i18n/index";
+import mission from "../src/i18n/en/mission";
 import type { DraftCheck } from "../shared/draft-checks";
 import type { Run } from "../src/types";
 import record from "../src/byhand/record/i18n/en";
@@ -18,7 +23,7 @@ import discovery from "../src/i18n/en/discovery";
 import panelText from "../src/review/i18n/en";
 import review from "../src/i18n/en/review";
 import workspace from "../src/i18n/en/workspace";
-import { repoId, runId, startRealProject, welcomeFacts, type AgentCall, type RealProject } from "./helpers/real-project";
+import { issueNode, issueUrl, repoId, repoUrl, runId, startRealProject, welcomeFacts, type AgentCall, type RealProject } from "./helpers/real-project";
 
 const at = "2026-10-20T09:00:00.000Z";
 const agent = (id: string, role: string) => ({ id, name: role, role, status: "complete", detail: "" });
@@ -516,6 +521,10 @@ test.describe("a real Learn-by-hand run, end to end", () => {
         // No block, no quoted confirm: a project without AI rules publishes as an agent run does.
         await expect(dialog.locator(".publish-block")).toHaveCount(0);
         await expect(dialog.getByText(/quoting the project/)).toHaveCount(0);
+        // The server's confirms (the project's rules to read, the change's size) shown, then ticked.
+        const confirms = (await preflight(page, id)).filter((check) => check.kind === "confirm");
+        expect(confirms.map((check) => check.id)).not.toContain("by-hand-rules");
+        await expect(dialog.getByRole("checkbox")).toHaveCount(confirms.length);
         for (const box of await dialog.getByRole("checkbox").all()) await box.check();
         const publishing = page.waitForResponse((response) => new URL(response.url()).pathname === `/api/runs/${id}/publish`, { timeout: 60_000 });
         await dialog.getByRole("button", { name: workspace.publish.submit }).click();
@@ -543,3 +552,349 @@ test.describe("a real Learn-by-hand run, end to end", () => {
     }
   });
 });
+
+// The three publishing paths of the owner's answer 2 (DESIGN v1.2 F12), on
+// real-shaped rules read by the server from the project's own files.
+const gentoo =
+  "It is expressly forbidden to contribute to Gentoo any content that has been created with the assistance of Natural Language Processing artificial intelligence tools.";
+const llvm = 'Using AI tools to fix issues labelled as "good first issues" is forbidden.';
+const qemuPolicy = readFile(path.join(import.meta.dirname, "..", "server", "fixtures", "policy", "real", "qemu-code-provenance.rst"), "utf8");
+const goodFirstIssue = { ...welcomeFacts, issues: { 7: issueNode({ labels: { nodes: [{ name: "good first issue" }] } }) } };
+
+/** The server reads the project's rules from its files ("Check again"). */
+async function readRules(page: Page) {
+  const response = await page.request.post(`/api/repos/${repoId}/contribution-rules/refresh`, { data: {} });
+  expect(response.ok()).toBe(true);
+}
+
+/** Records every API request with its body; `overrides` lists the ones any publish carried. */
+function requestLog(page: Page) {
+  const requests: { method: string; path: string; body?: unknown }[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.startsWith("/api/")) requests.push({ method: request.method(), path: url.pathname, body: request.postDataJSON() ?? undefined });
+  });
+  return {
+    requests,
+    overrides: () =>
+      requests.flatMap((request) => (request.path.endsWith("/publish") ? ((request.body as { overrides?: { id: string }[] }).overrides ?? []) : [])),
+  };
+}
+
+/** Starts a run from the task dialog; resolves with its id once the guide has read the project. */
+async function startFromDialog(page: Page, dialog: Awaited<ReturnType<typeof taskDialog>>, confirm?: string) {
+  const created = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/runs" && response.request().method() === "POST");
+  await dialog.getByRole("button", { name: discovery.byHand.start }).click();
+  if (confirm) {
+    const asked = dialog.locator(".start-confirm");
+    await expect(asked.getByRole("heading", { name: discovery.byHand.title })).toBeVisible();
+    await asked.getByRole("button", { name: confirm }).click();
+  }
+  const response = await created;
+  expect(response.status()).toBe(202);
+  const id = ((await response.json()) as { run: Run }).run.id;
+  return { id, body: response.request().postDataJSON() as Record<string, unknown>, run: await runWhen(page, id, (run) => run.status === "awaiting_plan") };
+}
+
+/** A run brought to approval through its own routes: the person's plan, an edit, Ready, the ticks and the PR text. */
+async function toApproval(page: Page, id: string, { ready = true } = {}) {
+  expect((await page.request.put(`/api/runs/${id}/by-hand/plan`, { data: { steps: [{ title: "Retry the GET three times after a 503" }] } })).ok()).toBe(true);
+  expect((await page.request.post(`/api/runs/${id}/plan/approve`, { data: {} })).ok()).toBe(true);
+  const run = await readRun(page, id);
+  await writeFile(path.join(run.worktreePath!, "src/retry.js"), handEdit(3));
+  const { files } = (await (await page.request.get(`/api/runs/${id}/diff`)).json()) as { files: { path: string; fingerprint: string }[] };
+  if (ready) expect((await page.request.post(`/api/runs/${id}/by-hand/ready`, { data: { changeFingerprint: changeFingerprint(files), review: false } })).ok()).toBe(true);
+  for (const file of files)
+    expect((await page.request.post(`/api/runs/${id}/review`, { data: { filePath: file.path, reviewed: true, fingerprint: file.fingerprint } })).ok()).toBe(true);
+  const draft = { title: "Retry a GET three times after a 503", body: "Retries a GET after a 503, up to three times. I wrote and tested it myself." };
+  expect((await page.request.patch(`/api/runs/${id}/draft`, { data: draft })).ok()).toBe(true);
+  return files;
+}
+
+/** The server's checks for publishing the run, as the publish dialog reads them. */
+const preflight = async (page: Page, id: string) =>
+  ((await (await page.request.get(`/api/runs/${id}/preflight`, { headers: { "x-bell-locale": "en" } })).json()) as { checks: DraftCheck[] }).checks;
+
+test.describe("the three publishing paths of a Learn-by-hand run (owner answer 2)", () => {
+  test.use({ actionTimeout: 30_000 });
+  test("blocked: a project whose rules ban AI help itself never offers the fitted guide or a confirm", async ({ browser }) => {
+    test.setTimeout(240_000);
+    const project = await startRealProject({
+      withoutRun: true,
+      files: { "src/retry.js": retrySource, "test.js": testSource, "CONTRIBUTING.md": `# Contributing\n\n${gentoo}\n` },
+      appSettings: { skipUnderstandingCheck: true },
+    });
+    await project.setAgentAnswers(answers(guideAnswer("Look where the status is checked.")));
+    const { context, page } = await open(browser, project);
+    const log = requestLog(page);
+    try {
+      await readRules(page);
+      await page.goto("/#/home?locale=en");
+      await page.getByRole("button", { name: "New task" }).first().click();
+      const dialog = page.getByRole("dialog");
+      await dialog.locator("#task-repo").selectOption(repoId);
+      // A banning project is never a reason to preselect Learn by hand.
+      await expect(dialog.getByRole("radio", { name: discovery.byHand.agents })).toBeChecked();
+      await dialog.getByText(discovery.byHand.hand).click();
+      const reason = discovery.byHand.ban({ reach: "assistance", condition: "" });
+      await expect(dialog.locator(".mode-case")).toContainText(reason);
+      await expect(dialog.getByRole("radio", { name: discovery.byHand.fit })).toHaveCount(0);
+      await dialog.locator("#task-prompt").fill("Retry a GET twice after a 503, so a flaky server stops breaking the page.");
+      const { id, body, run } = await startFromDialog(page, dialog, discovery.byHand.practise);
+      expect(body.learnByHand).toBe(true);
+      expect(body).not.toHaveProperty("byHandFit");
+      // Every kind of help: no help set fixed at the start.
+      expect(run.byHand?.helpLock).toBeUndefined();
+
+      // While the person writes, the guide says it won't publish here, and gives every kind of help.
+      await toApproval(page, id, { ready: false });
+      await page.goto(`/#/runs/${id}/changes?locale=en`);
+      const guide = page.locator(".guide-panel");
+      await expect(guide.locator(".by-hand-note")).toHaveText(/won't publish this run here: .+\. Practise freely\.$/);
+      await expect(guide.getByRole("button", { name: byHandText.guide.next({ rung: byHandText.guide.rungs[1] }) })).toBeEnabled();
+      const { files } = (await (await page.request.get(`/api/runs/${id}/diff`)).json()) as { files: { path: string; fingerprint: string }[] };
+      expect((await page.request.post(`/api/runs/${id}/by-hand/ready`, { data: { changeFingerprint: changeFingerprint(files), review: false } })).ok()).toBe(true);
+
+      // Approval is refused by ai-ban in Learn-by-hand words: no confirm, no reason to type.
+      await page.goto(`/#/runs/${id}/draft?locale=en`);
+      await page.reload();
+      const approving = page.waitForResponse((response) => new URL(response.url()).pathname === `/api/runs/${id}/approve`);
+      await page.locator(".review-footer").getByRole("button", { name: workspace.footer.approvePr }).click();
+      const refused = await approving;
+      expect(refused.status()).toBe(422);
+      const message = ((await refused.json()) as { error: string }).error;
+      expect(message).toContain("The project's rules restrict AI help itself, so BELL PR won't publish a run its guide helped with.");
+      expect(message).toContain(gentoo);
+      expect(message).not.toContain("AI agents wrote this change");
+      await expect(page.getByRole("dialog", { name: workspace.publish.title })).toHaveCount(0);
+      const checks = await preflight(page, id);
+      expect(checks.filter((check) => check.kind === "block").map((check) => [check.id, check.reason])).toEqual([["ai-ban", "reach"]]);
+      expect(checks.some((check) => check.id === "by-hand-rules")).toBe(false);
+      expect(log.overrides()).toEqual([]);
+      readOnly(await project.agentCalls());
+    } finally {
+      await context.close();
+      await project.stop();
+    }
+  });
+
+  test("blocked: an issue kept for people learning without AI tools (LLVM's words) offers no Start learning by hand, and publishing blocks", async ({ browser }) => {
+    test.setTimeout(240_000);
+    const contributing = `# Contributing\n\n${llvm}\n`;
+    // The discovery job as the server stores it: its own derivation from the evidence (server/discovery.ts).
+    const candidate: DiscoveryCandidate = {
+      fullName: "e2e-org/widgets",
+      url: repoUrl,
+      description: "Widgets.",
+      language: "TypeScript",
+      stars: 120,
+      forks: 8,
+      pushedAt: "2026-10-01T00:00:00Z",
+      openIssues: 3,
+      warnings: [],
+      sources: [
+        { id: "issue-7", kind: "issue", title: "#7 Greet people in their own language", url: issueUrl, content: "Greet people in their own language.\nLabels: good first issue" },
+        { id: "contributing", kind: "contributing", title: "CONTRIBUTING.md", url: `${repoUrl}/blob/main/CONTRIBUTING.md`, content: contributing },
+      ],
+    };
+    const answer = JSON.stringify({
+      opportunities: [
+        {
+          id: "greet",
+          repository: "e2e-org/widgets",
+          title: "Greet people in their own language",
+          summary: "Greetings are always in English.",
+          userNeed: "People read a greeting in their language.",
+          contributionRules: llvm,
+          popularity: "120 stars",
+          feasibility: "Small.",
+          difficulty: "beginner",
+          effort: "An afternoon.",
+          firstSteps: ["Read src/greeting.ts."],
+          acceptanceChecks: ["A greeting test per language."],
+          risks: ["None."],
+          evidence: [
+            { sourceId: "issue-7", quote: "Greet people in their own language.", reason: "The issue." },
+            { sourceId: "contributing", quote: llvm, reason: "The project's rule." },
+          ],
+          learnByHand: true,
+        },
+      ],
+    });
+    const { opportunities } = await withLocale("en", async () => parseDiscoveryResult(answer, [candidate], defaultDiscoveryPreferences, new Set(["issue-7"])));
+    expect(opportunities.map((item) => [item.byHandReserved, item.byHandReservedOutput])).toEqual([[true, undefined]]);
+    const now = new Date().toISOString();
+    const project = await startRealProject({
+      trial: true,
+      // Its loosened test assertion has its reason written, as the person would.
+      reviewed: true,
+      files: { "CONTRIBUTING.md": contributing },
+      facts: goodFirstIssue,
+      appSettings: { skipUnderstandingCheck: true },
+      run: {
+        learnByHand: true,
+        createdAt: now,
+        agents: [agent("lead", "Guide"), agent("reviewer", "Reviewer"), agent("tester", "Test analyst")],
+        team: team("developing"),
+        draft: { title: "Greet people in their own language", body: "Greetings come from a table of languages; I wrote and tested it myself." },
+        byHand: { guidePlan, plan: { steps: [{ id: "s1", title: "Look greetings up in a table" }], savedAt: now, confirmedAt: now } },
+      },
+      async seedData(dataDir) {
+        const job = { id: randomUUID(), status: "ready", phase: "complete", message: "", preferences: defaultDiscoveryPreferences, createdAt: now, completedAt: now, candidates: [candidate], opportunities, warnings: [], locale: "en" };
+        await writeFile(path.join(dataDir, "discovery.json"), JSON.stringify({ version: 1, job }));
+      },
+    });
+    const { context, page } = await open(browser, project);
+    const log = requestLog(page);
+    try {
+      // The discovery card: no Start learning by hand on this issue; the project's words say why.
+      await page.goto("/#/discover?locale=en");
+      const card = page.locator(".discovery-opportunity", { has: page.getByRole("heading", { name: "Greet people in their own language" }) });
+      await expect(card).toBeVisible();
+      await expect(card.getByRole("button", { name: discovery.card.startByHand })).toHaveCount(0);
+      await expect(card.locator(".by-hand-note")).toHaveText(discovery.byHand.area({ reach: "use", condition: "" }));
+      await expect(card.locator("footer blockquote")).toHaveText(llvm);
+
+      // A Learn-by-hand run on that issue: approved, the publish dialog blocks area-reserved in Learn-by-hand words.
+      const { files } = (await (await page.request.get(`/api/runs/${runId}/diff`)).json()) as { files: { path: string; fingerprint: string }[] };
+      expect((await page.request.post(`/api/runs/${runId}/by-hand/ready`, { data: { changeFingerprint: changeFingerprint(files), review: false } })).ok()).toBe(true);
+      for (const file of files)
+        await page.request.post(`/api/runs/${runId}/review`, { data: { filePath: file.path, reviewed: true, fingerprint: file.fingerprint } });
+      await page.goto(`/#/runs/${runId}/draft?locale=en`);
+      await page.reload();
+      // Approval goes ahead: a reserved issue is enforced where publishing is.
+      const approving = page.waitForResponse((response) => new URL(response.url()).pathname === `/api/runs/${runId}/approve`);
+      await page.locator(".review-footer").getByRole("button", { name: workspace.footer.approvePr }).click();
+      const approved = await approving;
+      expect(approved.status(), await approved.text()).toBe(200);
+      const dialog = page.getByRole("dialog", { name: workspace.publish.title });
+      await expect(dialog).toBeVisible({ timeout: 30_000 });
+      const block = dialog.locator(".publish-block", { hasText: "keeps this issue for people learning without AI tools" });
+      await expect(block).toContainText("The project keeps this issue for people learning without AI tools, so BELL PR won't publish a run its guide helped with.", { timeout: 30_000 });
+      await expect(block).toContainText(llvm);
+      await expect(block.getByRole("textbox")).toHaveCount(0);
+      await expect(dialog.getByRole("button", { name: workspace.publish.submit })).toBeDisabled();
+      await expect(dialog.getByText(/quoting the project/)).toHaveCount(0);
+      const blocks = (await preflight(page, runId)).filter((check) => check.kind === "block");
+      expect(blocks.map((check) => [check.id, check.reason])).toEqual([["area-reserved", "reach"]]);
+      expect(log.overrides()).toEqual([]);
+    } finally {
+      await context.close();
+      await project.stop();
+    }
+  });
+
+  test("confirmed: an output ban with the project's own carve-out (QEMU's words), on a repository that takes pull requests", async ({ browser }) => {
+    test.setTimeout(300_000);
+    const project = await startRealProject({
+      withoutRun: true,
+      files: { "src/retry.js": retrySource, "test.js": testSource, "docs/devel/code-provenance.rst": await qemuPolicy },
+      appSettings: { skipUnderstandingCheck: true },
+    });
+    await project.setAgentAnswers(answers(guideAnswer("Look where the status is checked.")));
+    const { context, page } = await open(browser, project);
+    const log = requestLog(page);
+    try {
+      await readRules(page);
+      const dialog = await taskDialog(page);
+      // The fitted guide, preselected, with the kinds the carve-out names and its words.
+      const fit = dialog.getByRole("radio", { name: discovery.byHand.fit });
+      await expect(fit).toBeChecked();
+      await expect(dialog.locator(".mode-fit")).toContainText("explanations, answers, and test help");
+      await expect(dialog.locator(".mode-fit")).toContainText("researching APIs or algorithms");
+      const { id, body, run } = await startFromDialog(page, dialog, mission.startConfirm.startAnyway);
+      expect(body).toMatchObject({ learnByHand: true, byHandFit: { learningIssue: false } });
+      expect(run.byHand?.helpLock?.kinds).toEqual(["explain", "answer", "test"]);
+
+      // The plan: the guide's outline stays closed, and there are no questions on the plan.
+      await page.goto(`/#/runs/${id}/activity?locale=en`);
+      const plan = page.getByRole("region", { name: byHandText.plan.title });
+      await expect(plan).toContainText(byHandText.plan.closed);
+      await expect(plan.getByRole("button", { name: byHandText.plan.noIdea })).toHaveCount(0);
+      await expect(plan.getByRole("button", { name: byHandText.questions.title })).toHaveCount(0);
+      await plan.getByRole("textbox", { name: byHandText.plan.step({ number: 1 }) }).fill("Retry the GET three times after a 503");
+      await plan.getByRole("button", { name: byHandText.plan.confirm }).click();
+      await runWhen(page, id, (value) => value.status === "review");
+      const worktree = (await readRun(page, id)).worktreePath!;
+      await writeFile(path.join(worktree, "src/retry.js"), handEdit(3));
+      await page.goto(`/#/runs/${id}/changes?locale=en`);
+      await page.reload();
+      // The guide: the fitted banner, what isn't offered, R1 and no review at Ready.
+      const guide = page.locator(".guide-panel");
+      await expect(guide).toContainText(byHandText.guide.fitted({ kinds: "explanations, answers, and test help" }));
+      await expect(guide).toContainText(byHandText.guide.notOffered({ kinds: "planning help and reviews" }));
+      await expect(guide.getByRole("button", { name: byHandText.guide.next({ rung: byHandText.guide.rungs[1] }) })).toBeVisible();
+      await page.locator(".review-footer").getByRole("button", { name: workspace.byHand.ready }).click();
+      const ready = page.getByRole("dialog", { name: byHandText.ready.title });
+      await expect(ready).toContainText(byHandText.ready.noReview);
+      await expect(ready.getByRole("checkbox", { name: new RegExp(byHandText.ready.review) })).toHaveCount(0);
+      await ready.getByRole("button", { name: byHandText.ready.confirm }).click();
+      await expect(ready).toHaveCount(0);
+      await toApprovalTicks(page, id);
+
+      // Approved; publishing first asks to read the rules again, then quotes them for a confirm.
+      await page.goto(`/#/runs/${id}/draft?locale=en`);
+      await page.reload();
+      await page.locator(".review-footer").getByRole("button", { name: workspace.footer.approvePr }).click();
+      const publish = page.getByRole("dialog", { name: workspace.publish.title });
+      await expect(publish).toBeVisible({ timeout: 30_000 });
+      const block = publish.locator(".publish-block", { hasText: "decline AI-generated content" });
+      await expect(block).toContainText("weren't read since this run started", { timeout: 30_000 });
+      await block.getByRole("button", { name: mission.rules.checkAgain }).click();
+      await expect(block).toHaveCount(0, { timeout: 30_000 });
+      const rules = publish.locator("fieldset", { has: page.locator("legend", { hasText: workspace.publish.groups.rules }) });
+      const confirm = rules.locator("label", { hasText: "its own text says some uses of AI are fine" });
+      await expect(confirm).toContainText("DECLINE any contributions");
+      await expect(confirm).toContainText("researching APIs or algorithms");
+      await expect(confirm).toContainText("explanations, answers, and test help");
+      // The record beside it, the claim once; no field for a reason anywhere.
+      await expect(rules.locator(":scope > section.byhand-record")).toContainText(record.claim);
+      await expect(publish.locator("textarea")).toHaveCount(0);
+      const submit = publish.getByRole("button", { name: workspace.publish.submit });
+      for (const box of await publish.getByRole("checkbox").all())
+        if (!(await box.evaluate((input) => !!input.closest("label")?.textContent?.includes("its own text says some uses of AI are fine")))) await box.check();
+      await expect(submit).toBeDisabled();
+      await confirm.getByRole("checkbox").check();
+      await expect(submit).toBeEnabled();
+      const publishing = page.waitForResponse((response) => new URL(response.url()).pathname === `/api/runs/${id}/publish`, { timeout: 60_000 });
+      await submit.click();
+      const answer = await publishing;
+      expect(answer.status(), await answer.text()).toBeLessThan(300);
+      const published = await runWhen(page, id, (value) => value.status === "published");
+      expect(published.prUrl).toMatch(/\/pull\/1$/);
+      expect((await project.ghCalls()).some((call) => call[1] === "pr" && call[2] === "create" && call.includes("--draft"))).toBe(true);
+      // The tick went with the confirm's words, never as an override.
+      const sentPublish = log.requests.filter((request) => request.path.endsWith("/publish") && request.method === "POST").at(-1)!.body as { acknowledged: string[]; rulesDigest?: string };
+      expect(sentPublish.acknowledged).toContain("by-hand-rules");
+      expect(sentPublish.rulesDigest).toMatch(/^[0-9a-f]{64}$/);
+      expect(log.overrides()).toEqual([]);
+
+      // The same project, a run started with every kind of help: it ends at the ai-ban block naming not-fitted.
+      const full = await page.request.post("/api/runs", {
+        data: { repoId, prompt: "Retry a GET twice after a 503, so a flaky server stops breaking the page.", title: "Retry twice", learnByHand: true },
+      });
+      expect(full.status()).toBe(202);
+      const fullId = ((await full.json()) as { run: Run }).run.id;
+      await runWhen(page, fullId, (value) => value.status === "awaiting_plan");
+      await readRules(page);
+      const checks = await preflight(page, fullId);
+      const ban = checks.find((check) => check.id === "ai-ban");
+      expect([ban?.kind, ban?.reason]).toEqual(["block", "not-fitted"]);
+      expect(ban?.message).toContain("this run wasn't fitted to its rules when it started");
+      expect(checks.some((check) => check.id === "by-hand-rules")).toBe(false);
+      readOnly(await project.agentCalls());
+    } finally {
+      await context.close();
+      await project.stop();
+    }
+  });
+});
+
+/** The ticks and the PR text of a run already marked ready. */
+async function toApprovalTicks(page: Page, id: string) {
+  const { files } = (await (await page.request.get(`/api/runs/${id}/diff`)).json()) as { files: { path: string; fingerprint: string }[] };
+  for (const file of files)
+    expect((await page.request.post(`/api/runs/${id}/review`, { data: { filePath: file.path, reviewed: true, fingerprint: file.fingerprint } })).ok()).toBe(true);
+  const draft = { title: "Retry a GET three times after a 503", body: "Retries a GET after a 503, up to three times. I wrote and tested it myself." };
+  expect((await page.request.patch(`/api/runs/${id}/draft`, { data: draft })).ok()).toBe(true);
+}

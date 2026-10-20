@@ -329,6 +329,8 @@ export interface RealProjectOptions {
   repo?: Record<string, unknown>;
   /** The project's files, replacing the defaults by path (null leaves one out), for example CONTRIBUTING.md. */
   files?: Record<string, string | null>;
+  /** Writes more files into the data dir after state.json, before the server starts (discovery.json, say). */
+  seedData?(dataDir: string): Promise<void>;
   /** Starts the 14-day trial. */
   trial?: boolean;
   /**
@@ -527,6 +529,7 @@ else {
         );
         if (options.appSettings)
           await writeFile(path.join(dataDir, "app-settings.json"), JSON.stringify(options.appSettings));
+        await options.seedData?.(dataDir);
       },
     });
     if (options.trial) await startTrial(server);
