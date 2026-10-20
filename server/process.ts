@@ -198,6 +198,8 @@ interface CommandOptions {
    * reached.
    */
   endGroup?: { settleAfterExitMs: number };
+  /** Off by default: the output reaches only `onLine`; the result's stdout and stderr stay empty. */
+  discardOutput?: boolean;
 }
 
 /** How much of a failed command's stderr its error keeps in `details.stderr`. */
@@ -318,8 +320,10 @@ export async function command(
           return;
         }
         const text = buffer.toString("utf8");
-        if (stream === "stdout") stdout += text;
-        else stderr += text;
+        if (!options.discardOutput) {
+          if (stream === "stdout") stdout += text;
+          else stderr += text;
+        }
         if (options.onLine) {
           pending[stream] += text;
           let end: number;

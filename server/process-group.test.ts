@@ -1,7 +1,8 @@
-// command()'s default-off `endGroup` option, used for the person's test
-// command (server/by-hand-tests.ts): the whole process group ends with the
-// command, the command settles on its own process's exit, and the group is
-// recorded for the crash reaper until it is gone.
+// command()'s default-off `endGroup` and `discardOutput` options, used for
+// the person's test command (server/by-hand-tests.ts): the whole process
+// group ends with the command, the command settles on its own process's
+// exit, the group is recorded for the crash reaper until it is gone, and
+// the output reaches only onLine.
 // Every command is a harmless `node -e` script; every process a test
 // starts is stopped by the test.
 import test from "node:test";
@@ -242,4 +243,15 @@ test("endGroup: a command that cannot start still rejects, and nothing is record
   } finally {
     setSpawnObserver();
   }
+});
+
+test("discardOutput: lines reach onLine, and the result keeps no output", async () => {
+  const lines: string[] = [];
+  const result = await command(
+    process.execPath,
+    ["-e", "console.log('a'); console.error('b'); process.stdout.write('c')"],
+    { discardOutput: true, onLine: (line, stream) => lines.push(`${stream} ${line}`) },
+  );
+  assert.deepEqual({ ...result }, { stdout: "", stderr: "", code: 0 });
+  assert.deepEqual(lines.sort(), ["stderr b", "stdout a", "stdout c"]);
 });
