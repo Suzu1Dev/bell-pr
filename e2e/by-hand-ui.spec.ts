@@ -12,7 +12,7 @@ import { execFileSync } from "node:child_process";
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Page, type Route } from "@playwright/test";
 import { changeFingerprint } from "../shared/change-fingerprint";
 import type { DiscoveryJob } from "../shared/discovery";
 import type { Locale } from "../shared/i18n/locale";
@@ -244,6 +244,9 @@ async function open(browser: Browser, hash: string, { locale = "en", width = 144
   return { page, close: () => context.close() };
 }
 
+/** A refusal in the server's words for every request but reads, with or without W2A-W2C's routes in the build. */
+const refuse = (route: Route) => (route.request().method() === "GET" ? route.continue() : route.fulfill({ status: 409, json: { error: notYet } }));
+
 /** No serious or critical axe issue, color contrast included, within `selector`. */
 async function expectAccessible(page: Page, selector: string) {
   await page.evaluate(() => document.fonts.ready);
@@ -259,6 +262,7 @@ async function expectAccessible(page: Page, selector: string) {
 test("the person plans first: their steps, read-first ranges and the guide's outline folded", async ({ browser }) => {
   const { page, close } = await open(browser, `#/runs/${runs.planning}/activity`);
   try {
+    await page.route(`**/api/runs/${runs.planning}/by-hand/plan`, refuse);
     const plan = page.getByRole("region", { name: t.plan.title });
     await expect(plan).toBeVisible();
     await expect(plan).toContainText(t.plan.intro);
@@ -272,7 +276,7 @@ test("the person plans first: their steps, read-first ranges and the guide's out
     await expect(page.getByRole("button", { name: "Approve the plan and start development" })).toHaveCount(0);
     await expectAccessible(page, ".by-hand");
     // A written step enables the confirmation; leaving the field saves it,
-    // and the stub route's refusal shows as the server words it.
+    // and a refusal shows as the server words it.
     const saved = page.waitForRequest((request) => request.url().endsWith(`/api/runs/${runs.planning}/by-hand/plan`) && request.method() === "PUT");
     await plan.getByRole("textbox", { name: t.plan.step({ number: 1 }) }).fill("Find where retries are counted");
     await expect(confirm).toBeEnabled();
@@ -328,6 +332,7 @@ test("the plan saves what changed, once, and This is my plan takes one click rig
 test("while the person writes, the guide's panel, its thread, the Tests card and Ready for review show", async ({ browser }) => {
   const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`);
   try {
+    await page.route(`**/api/runs/${runs.writing}/by-hand/ready`, refuse);
     await expect(page.locator(".workspace-heading .status-badge", { hasText: workspace.byHand.badge })).toBeVisible();
     await expect(page.getByText(workspace.byHand.changed)).toBeVisible();
     const guide = page.locator(".guide-panel");
@@ -369,6 +374,7 @@ test("the Tests card runs only the confirmed command, and a refused command show
     await page.route(`**/api/runs/${runs.writing}/by-hand/test-command`, (route) =>
       route.fulfill({ json: { suggestion: "npm test", confirmed: { command: "npm test", confirmedAt: at } } }),
     );
+    await page.route(`**/api/repos/*/test-command`, refuse);
     await page.reload();
     const tests = page.locator(".guide-panel").getByRole("region", { name: t.tests.title });
     await expect(tests.locator("strong", { hasText: t.tests.confirmed({ command: "npm test" }) })).toBeVisible();
@@ -392,6 +398,9 @@ test("the Tests card runs only the confirmed command, and a refused command show
 test("the person can ask, mark a step done with its why and mark the change ready from the keyboard alone", async ({ browser }) => {
   const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`);
   try {
+    // Every request here is refused in the server's words.
+    await page.route(`**/api/runs/${runs.writing}/by-hand/**`, refuse);
+    await page.route(`**/api/repos/*/test-command`, refuse);
     const guide = page.locator(".guide-panel");
     const sent = (route: string, method = "POST") =>
       page.waitForRequest((request) => new URL(request.url()).pathname === `/api/runs/${runs.writing}/by-hand/${route}` && request.method() === method);
