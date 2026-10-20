@@ -5,7 +5,8 @@ import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { DiffFile, Run } from "../types";
 import { maskPath } from "../app/presentation";
 import { closeCheckPanel, openCheckPanel, type Understanding } from "../app/hooks/useUnderstanding";
-import { ChangesTab, WorktreeHint } from "./ChangesTab";
+import { ChangesTab } from "./ChangesTab";
+import { WorktreeHint } from "./WorktreeHint";
 
 type Props = Parameters<typeof ChangesTab>[0];
 

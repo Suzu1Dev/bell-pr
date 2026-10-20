@@ -12,7 +12,6 @@ import {
   CircleCheck,
   Code2,
   Columns2,
-  Copy,
   FolderGit2,
   GitBranch,
   ListTree,
@@ -54,6 +53,7 @@ import {
   useCheckPanel,
   type Understanding,
 } from "../app/hooks/useUnderstanding";
+import { WorktreeHint } from "./WorktreeHint";
 
 const ExplanationPanel = lazy(() =>
   import("../review/ExplanationPanel").then((module) => ({
@@ -771,45 +771,5 @@ export function ChangesTab({
       )}
     </div>
     </>
-  );
-}
-
-/**
- * Where the run's checkout is, for editing files by hand. While presenting
- * the path loses its folders (maskPath) and cannot be copied.
- */
-export function WorktreeHint({
-  path,
-  presenting,
-  maskPath,
-  onCopy,
-}: {
-  path: string;
-  presenting: boolean;
-  maskPath: (path: string) => string;
-  onCopy: () => void;
-}) {
-  const t = useT("workspace").changes;
-  // The editing hint is the tooltip; screen readers read it with the path.
-  return (
-    <div className="worktree-hint" title={t.worktreeHint}>
-      <FolderGit2 size={14} aria-hidden="true" />
-      <span>{t.worktreeLabel}</span>
-      <span className="visually-hidden">{t.worktreeHint}</span>
-      <code>
-        <span>{maskPath(path)}</span>
-      </code>
-      {!presenting && (
-        <button
-          type="button"
-          className="icon-button"
-          aria-label={t.copyWorktree}
-          title={t.copyWorktree}
-          onClick={onCopy}
-        >
-          <Copy size={13} />
-        </button>
-      )}
-    </div>
   );
 }
