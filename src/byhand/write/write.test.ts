@@ -187,6 +187,13 @@ test("after the same failure three test runs in a row, R4 needs no other attempt
   assert.doesNotMatch(text, /disabled=""><svg(?:(?!<button)[\s\S])*?<\/svg> Next hint/);
 });
 
+test("the guide's turn is announced from a status line that is always there", () => {
+  assert.ok(html(guide({})).includes('<p role="status" class="visually-hidden"></p>'));
+  const busy = html(guide({ busy: { kind: "guide", since: at } }));
+  assert.ok(busy.includes('<p role="status" class="visually-hidden">The guide is answering…</p>'));
+  assert.equal(busy.match(/role="status"/g)?.length, 1);
+});
+
 test("with no rung left on the step, \"My change\" isn't offered either", () => {
   assert.doesNotMatch(html(guide({ plan: { steps, savedAt: at }, hints: { s2: { rung: 4, at, fingerprint } } })), /My change/);
 });

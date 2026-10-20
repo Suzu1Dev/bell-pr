@@ -71,7 +71,8 @@ async function seed(dataDir: string) {
 
   const steps = [
     { id: "s1", title: "Find where retries are counted", doneAt: at },
-    { id: "s2", title: "Cap the retries at three", files: [source] },
+    // R3 was given on this step: marking it done asks why the change works.
+    { id: "s2", title: "Cap the retries at three", files: [source], maxRung: 3 },
   ];
   const testRun = (fingerprint: string) => ({
     at,
@@ -322,6 +323,45 @@ test("the Tests card runs only the confirmed command, and a refused command show
     await field.fill("npm test");
     await expect(run).toBeEnabled();
     await expect(tests).not.toContainText(t.tests.edited);
+  } finally {
+    await close();
+  }
+});
+
+test("the person can ask, mark a step done with its why and mark the change ready from the keyboard alone", async ({ browser }) => {
+  const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`);
+  try {
+    const guide = page.locator(".guide-panel");
+    const sent = (route: string, method = "POST") =>
+      page.waitForRequest((request) => new URL(request.url()).pathname === `/api/runs/${runs.writing}/by-hand/${route}` && request.method() === method);
+    // Done on a step that had Options: the why field takes the focus, and Enter sends it.
+    await guide.locator("li", { hasText: "Cap the retries at three" }).getByRole("button", { name: t.guide.done }).focus();
+    await page.keyboard.press("Enter");
+    const why = guide.getByRole("textbox", { name: t.guide.why });
+    await expect(why).toBeFocused();
+    await page.keyboard.type("The cap stops the loop after three tries.");
+    const step = sent("steps/s2", "PATCH");
+    await page.keyboard.press("Enter");
+    expect((await step).postDataJSON()).toEqual({ done: true, why: "The cap stops the loop after three tries." });
+    // A question, sent with Tab and Enter.
+    await guide.getByRole("textbox", { name: t.guide.question }).focus();
+    await page.keyboard.type("Where is the limit read?");
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    await expect(guide.getByRole("button", { name: t.guide.ask, exact: true })).toBeFocused();
+    const asked = sent("guide");
+    await page.keyboard.press("Enter");
+    expect((await asked).postDataJSON()).toMatchObject({ kind: "ask", entry: "project", question: "Where is the limit read?", stepId: "s2" });
+    await expect(guide.getByRole("alert")).toHaveText(notYet);
+    // Ready for review: the dialog takes the focus, and Escape gives it back to the footer.
+    const ready = page.locator(".review-footer").getByRole("button", { name: workspace.byHand.ready });
+    await ready.focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog", { name: t.ready.title });
+    await expect(dialog.getByRole("textbox", { name: t.ready.leastSure })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(ready).toBeFocused();
   } finally {
     await close();
   }

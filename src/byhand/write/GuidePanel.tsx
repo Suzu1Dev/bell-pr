@@ -92,9 +92,7 @@ export function GuidePanel(props: GuidePanelProps) {
     const keep = (value: typeof read) => live && setRead((current) => ({ ...current, ...value }));
     api<TestCommandView>(`${runPath}/test-command`).then((command) => keep({ command }), quiet);
     api<unknown>(`/repos/${encodeURIComponent(run.repoId)}/contribution-rules`).then((body) => keep({ rules: rulesFrom(body) }), quiet);
-    return () => {
-      live = false;
-    };
+    return () => void (live = false);
   }, [runPath, run.repoId]);
   const testCommand = props.testCommand ?? read.command;
   const learningIssue = (run.contributionFacts?.issue?.labels ?? []).some(learningLabel);
@@ -139,10 +137,10 @@ export function GuidePanel(props: GuidePanelProps) {
   const asked = entries.includes(entry) ? entry : "project";
   const review = record.reviews?.at(-1);
   const send = (input: ByHandGuideInput) =>
-    void onGuide({ ...input, ...(step ? { stepId: step.id } : {}), ...(tried.trim() ? { tried: tried.trim() } : {}) }).then(() => {
-      setQuestion("");
-      setTried("");
-    }, quiet);
+    void onGuide({ ...input, ...(step ? { stepId: step.id } : {}), ...(tried.trim() ? { tried: tried.trim() } : {}) }).then(() => (setQuestion(""), setTried("")), quiet);
+  // After R3 or R4, Done first asks why the change works: the field takes the focus, and Enter sends it.
+  const done = (id: string, why?: string) =>
+    why === undefined && needsWhy(steps.find((item) => item.id === id) ?? {}) ? setWhy({ stepId: id, text: "" }) : void onStep(id, { done: true, ...(why === undefined ? {} : { why: why.trim() }) }).then(() => setWhy(undefined), quiet);
   const where = selection?.startLine ? { path: selection.path, startLine: selection.startLine, endLine: selection.endLine } : {};
   return (
     <div className="by-hand guide-panel">
@@ -160,15 +158,14 @@ export function GuidePanel(props: GuidePanelProps) {
                 <span>{item.title}</span>
                 {!item.doneAt && (
                   <span className="by-hand-row">
-                    {/* After R3 or R4, Done first asks why the change works. */}
-                    <button type="button" className="mission-text-button" disabled={working}
-                      onClick={() => (needsWhy(item) && why?.stepId !== item.id ? setWhy({ stepId: item.id, text: "" }) : void onStep(item.id, { done: true, ...(why?.stepId === item.id ? { why: why.text.trim() } : {}) }).then(() => setWhy(undefined), quiet))}>
+                    <button type="button" className="mission-text-button" disabled={working} onClick={() => done(item.id, why?.stepId === item.id ? why.text : undefined)}>
                       {t.done}
                     </button>
                     {!item.parkedAt && <button type="button" className="mission-text-button" disabled={working} onClick={() => void onStep(item.id, { parked: true }).catch(quiet)}>{t.park}</button>}
                   </span>
                 )}
-                {why?.stepId === item.id && <input className="text-input" aria-label={t.why} placeholder={t.why} maxLength={300} value={why.text} onChange={(event) => setWhy({ stepId: item.id, text: event.target.value })} />}
+                {why?.stepId === item.id && <input className="text-input" aria-label={t.why} placeholder={t.why} maxLength={300} value={why.text} autoFocus
+                  onChange={(event) => setWhy({ stepId: item.id, text: event.target.value })} onKeyDown={(event) => event.key === "Enter" && done(item.id, why.text)} />}
               </li>
             ))}
           </ol>
@@ -216,12 +213,14 @@ export function GuidePanel(props: GuidePanelProps) {
           )}
         </div>
         {step && (offered ? !attempt && <p className="field-help">{t.tryFirst}</p> : <p className="field-help">{t.noRung}</p>)}
+        {/* Always there, so a screen reader hears the guide start and finish an answer. */}
+        <p role="status" className="visually-hidden">{thinking ? t.working : ""}</p>
       </form>
       {step && <TalkItThrough step={step} tests={record.tests ?? []} fingerprint={fingerprint} onStep={onStep} />}
       <RepeatFailure key={step?.id} step={step} tests={record.tests ?? []} onCheckIn={props.onCheckIn} />
       {thinking && (
-        <p role="status">
-          <Loader2 size={14} className="spin" aria-hidden="true" /> {t.working}
+        <p aria-hidden="true">
+          <Loader2 size={14} className="spin" /> {t.working}
         </p>
       )}
       {error && <p className="inline-error" role="alert">{error}</p>}
