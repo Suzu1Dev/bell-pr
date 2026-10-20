@@ -363,3 +363,46 @@ test("an agent run's dialog leaves the focus where it is when the server's check
     await project.stop();
   }
 });
+
+test("a quoted confirm whose words change is never sent ticked, not even by a click as they appear", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const rule = "We decline AI-generated contributions.";
+  const helpLock = { kinds: ["explain", "answer"], at, rulesCheckedAt: at, rules: [{ kind: "ban", path: "CONTRIBUTING.md", line: 3, quote: rule, allows: [] }] };
+  const quoted: DraftCheck = { id: "by-hand-rules", kind: "confirm", message: "The project declines AI-generated contributions.", details: ["Why.", `CONTRIBUTING.md:3: "${rule}"`] };
+  const requoted: DraftCheck = { ...quoted, details: ["Why.", `CONTRIBUTING.md:4: "${rule} Rewritten."`] };
+  const project = await startRealProject({ reviewed: true, appSettings: { skipUnderstandingCheck: true }, run: byHandRun({}, { helpLock }) });
+  const { context, page } = await open(browser, project);
+  try {
+    let changed = false;
+    await page.route(`**/api/runs/${runId}/preflight`, (route) => route.fulfill({ json: { checks: [changed ? requoted : quoted] } }));
+    const sent: string[][] = [];
+    await page.route(`**/api/runs/${runId}/publish`, async (route) => {
+      sent.push((route.request().postDataJSON() as { acknowledged: string[] }).acknowledged);
+      await route.fulfill({ status: 409, json: { error: "Not now." } });
+    });
+    await page.goto(`/#/runs/${runId}/draft?locale=en`);
+    const dialog = await publishDialog(page);
+    await dialog.getByRole("checkbox", { name: quoted.message }).check();
+    // The moment the new words are on the page, before anything else runs, a click lands on Submit.
+    await page.evaluate((words) => {
+      const dialog = document.querySelector("[role=dialog]")!;
+      const observer = new MutationObserver(() => {
+        if (!dialog.textContent?.includes(words)) return;
+        observer.disconnect();
+        (dialog.querySelector(".modal-actions .button.primary") as HTMLButtonElement).click();
+      });
+      observer.observe(dialog, { subtree: true, childList: true, characterData: true });
+    }, requoted.details[1]);
+    changed = true;
+    // A refused publish reads the checks again, which bring the new words.
+    await dialog.getByRole("button", { name: workspace.publish.submit }).click();
+    await expect(dialog).toContainText(requoted.details[1]);
+    await expect(dialog.getByRole("checkbox", { name: quoted.message })).not.toBeChecked();
+    // Only the first request carried the tick: the one for the words the person read.
+    await page.waitForTimeout(500);
+    expect(sent).toEqual([["by-hand-rules"]]);
+  } finally {
+    await context.close();
+    await project.stop();
+  }
+});

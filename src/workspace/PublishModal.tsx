@@ -332,13 +332,16 @@ export function PublishModal({
       : draftChecks && (serverChecksRead || !byHand) ? publishChecks : undefined;
   const checkRules = useRulesRecheck(byHand ? run : undefined, currentRepo?.contributionRules, checks, loadPublishChecks);
   // A quoted confirm whose words changed in a later read (or that couldn't be read) is unticked:
-  // the person confirms what they read (F12 f).
+  // the person confirms what they read (F12 f). Until then its tick counts for nothing, not even
+  // for the one frame before the untick, so no click can send it for words that came after it.
   const quoted = JSON.stringify(checks?.find((check) => check.id === "by-hand-rules") ?? null);
-  const confirmed = useRef(quoted);
+  const [confirmed, setConfirmed] = useState(quoted);
   useEffect(() => {
-    if (confirmed.current !== quoted) setAcknowledged((previous) => previous.filter((id) => id !== "by-hand-rules"));
-    confirmed.current = quoted;
-  }, [quoted, setAcknowledged]);
+    if (confirmed === quoted) return;
+    setAcknowledged((previous) => previous.filter((id) => id !== "by-hand-rules"));
+    setConfirmed(quoted);
+  }, [confirmed, quoted, setAcknowledged]);
+  const ticked = confirmed === quoted ? acknowledged : acknowledged.filter((id) => id !== "by-hand-rules");
   const reason = overrides.find((override) => override.id === "issue-has-pr")?.reason ?? "";
   const blocks = (checks ?? []).filter(
     (check) => check.kind === "block" && !(check.id === "issue-has-pr" && validReason(reason)),
@@ -444,7 +447,7 @@ export function PublishModal({
           facts={facts}
           pacing={pacing}
           checkOff={checkOff}
-          acknowledged={acknowledged}
+          acknowledged={ticked}
           setAcknowledged={setAcknowledged}
           reason={reason}
           onReason={(value) =>
@@ -499,7 +502,7 @@ export function PublishModal({
             (!demo && !ready) ||
             !checks ||
             blocks.length > 0 ||
-            confirms.some((check) => !acknowledged.includes(check.id))
+            confirms.some((check) => !ticked.includes(check.id))
           }
           onClick={publish}
         >
