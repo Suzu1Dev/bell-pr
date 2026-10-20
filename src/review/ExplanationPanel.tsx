@@ -860,7 +860,7 @@ export function ExplanationPanel({
             reports={reports}
             demo={demo}
             feedback={feedback}
-            onRerunReview={onRerunReview}
+            onRerunReview={onRerunReview && (byHandReview?.onReviewAgain ?? onRerunReview)}
             reviewBusy={reviewBusy}
           />
         ) : (

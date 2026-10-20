@@ -5,7 +5,7 @@ import type { UnderstandingView } from "../../shared/understanding";
 import { getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { DiffFile } from "../types";
-import { ExplanationPanel, type ExplanationPanelProps } from "./ExplanationPanel";
+import { ExplanationPanel, ReviewReports, type ExplanationPanelProps } from "./ExplanationPanel";
 import en from "./i18n/en";
 import zhTW from "./i18n/zh-TW";
 import { ReaderView, readerAllowed, readerRequests, unasked, type ByHandReader } from "./ReaderView";
@@ -190,4 +190,28 @@ test("the reader view's buttons open the check, or ask for this file's explanati
   // With the explanation already written, only the walkthrough is asked for.
   press(check([`fallback:${file.path}`]), { ...file, explanationStatus: "ready", explanation: getDemo("en").files[0].explanation });
   assert.deepEqual(calls.splice(0), ["walkthrough"]);
+});
+
+test("Run the review again opens the Ready dialog in a Learn-by-hand run and reruns the review in an agent run", () => {
+  const calls: string[] = [];
+  const rerun = (props: Partial<ExplanationPanelProps>) =>
+    find(
+      shallow(ExplanationPanel, {
+        file,
+        messages: [],
+        loading: false,
+        onAsk() {},
+        demo: false,
+        initialTab: "reports",
+        ...props,
+      }),
+      ReviewReports,
+    )!.props.onRerunReview as (() => void) | undefined;
+  const byHandReview = { ...reader(check([])), onReviewAgain: () => calls.push("ready dialog") };
+  rerun({ onRerunReview: () => calls.push("rerun"), byHandReview })!();
+  assert.deepEqual(calls.splice(0), ["ready dialog"]);
+  rerun({ onRerunReview: () => calls.push("rerun") })!();
+  assert.deepEqual(calls.splice(0), ["rerun"]);
+  // A run that takes no rerun now (published, say) shows no button in either mode.
+  assert.equal(rerun({ byHandReview }), undefined);
 });
