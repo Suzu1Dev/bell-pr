@@ -455,6 +455,8 @@ export async function runIndependentReview(
   files: Awaited<ReturnType<typeof readDiff>>,
   leadReport: string | undefined,
   signal: AbortSignal,
+  // Learn by hand (DESIGN v1.2 F8): its own prompts and reviewer schema, isolated turns.
+  options: { reviewerPrompt?: string; testerPrompt?: string; reviewerSchema?: string; isolated?: true } = {},
 ) {
   const reviewContext = independentReviewContext(run, files, leadReport);
   // Both callers run under the run's locale (withRunLocale).
@@ -464,20 +466,26 @@ export async function runIndependentReview(
       ctx,
       run,
       "reviewer",
-      reviewerPrompt(reviewContext, locale),
+      options.reviewerPrompt ?? reviewerPrompt(reviewContext, locale),
       signal,
+      true,
+      { outputSchema: options.reviewerSchema, isolated: options.isolated },
     ),
     runAgent(
       ctx,
       run,
       "tester",
-      testerPrompt(reviewContext, run.team, locale),
+      options.testerPrompt ?? testerPrompt(reviewContext, run.team, locale),
       signal,
+      true,
+      { isolated: options.isolated },
     ),
   ]);
   const failure = results.find((result) => result.status === "rejected");
   if (failure?.status === "rejected") throw failure.reason;
   if (signal.aborted) throw new AppError(cancelled(), 409);
+  const [reviewer, tester] = results as PromiseFulfilledResult<string>[];
+  return { reviewer: reviewer.value, tester: tester.value };
 }
 
 async function executeTeamTask(
