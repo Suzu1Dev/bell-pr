@@ -155,10 +155,12 @@ help-wanted issues for the agent team and marks newcomer issues "Learn by
 hand: write this one yourself", with **Start learning by hand**: you
 write the fix, with the guide. The task dialog explains this when you
 link such an issue. Publishing is blocked when the project's own rules
-reserve those issues, for a learn-by-hand run too, unless the rule is
-only about AI-generated pull requests and the project's own text names
-every kind of help the run used (see [the previous
-question](#does-learn-by-hand-make-my-pr-welcome-where-ai-is-banned)).
+reserve those issues, for a learn-by-hand run too. Only when the rule is
+about AI-generated pull requests and the project's own text names every
+kind of help the run used can a learn-by-hand run fitted to that text
+end in the quoted confirm instead (see [Does Learn by hand make my PR
+welcome where AI is
+banned?](#does-learn-by-hand-make-my-pr-welcome-where-ai-is-banned)).
 Where the rule is about using AI tools at all, discovery doesn't offer
 the start.
 
