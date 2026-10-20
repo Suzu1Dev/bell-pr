@@ -258,3 +258,33 @@ test("secrets: redact takes time linear in the text's length, also on crafted te
   const elapsed = Date.now() - started;
   assert.ok(elapsed < 1_000, `${elapsed} ms`);
 });
+
+test("secrets: redact leaves code that reads a credential and the placeholders of documentation in assignments", () => {
+  // Agent answers, explanations and the guide's quotes show such lines from the project's files; masking them
+  // corrupted the code shown and made a guide's anchor miss its file, so BELL dropped the quote.
+  const kept = [
+    "const githubToken = process.env.GITHUB_TOKEN ?? '';",
+    "password_hash = bcrypt.hash(password)",
+    "tokenCount = countTokens(prompt)",
+    "auth_token = request.headers.get('X-Auth')",
+    "const csrfToken = document.querySelector('meta').content;",
+    "  secretKey: getSecretKey(options),",
+    "refresh_token: Optional[str] = None",
+    "session_token = os.environ['SESSION_TOKEN']",
+    'headers.Authorization = "Bearer " + token;',
+    "export GITHUB_TOKEN=<your-github-token>",
+    "export GITHUB_TOKEN=$GITHUB_TOKEN",
+    "NPM_TOKEN=${NPM_TOKEN} npm publish",
+    "export NPM_TOKEN=YOUR_NPM_TOKEN",
+  ];
+  for (const line of kept) assert.equal(redact(line), line);
+  // Values are still masked: literals, quoted ones that look like code, and passwords with $ or * inside.
+  const masked: [string, string][] = [
+    ['{"session_token": "this.looks.like.code"}', '{"session_token": "[REDACTED]"}'],
+    ["DB_PASSWORD=correct.horse.battery", "DB_PASSWORD=[REDACTED]"],
+    ["DB_PASSWORD=Sup3r$ecret*pass", "DB_PASSWORD=[REDACTED]"],
+    ["auth_token = abcdef0123456789", "auth_token = [REDACTED]"],
+    ["Authorization: Bearer abcdef0123456789abcdef", "Authorization: Bearer [REDACTED]"],
+  ];
+  for (const [input, output] of masked) assert.equal(redact(input), output, input);
+});

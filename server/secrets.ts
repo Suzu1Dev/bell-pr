@@ -72,8 +72,22 @@ function secretName(name: string) {
   return words.length > 1 && (words.some((word) => secretWords.has(word)) || secretPairs.has(words.slice(-2).join(" ")));
 }
 
-/** Where documentation shows a credential goes, never one: <token>, $TOKEN, ${TOKEN}, `…`, YOUR_TOKEN_HERE, ****. */
-const placeholder = (value: string) => /[<>${}`*]/.test(value) || /^[A-Z_]+\W*$/.test(value);
+/**
+ * Where documentation shows a credential goes, never one: <token>, $TOKEN,
+ * ${TOKEN}, `…`, YOUR_TOKEN_HERE, ****. Only its start counts: a password
+ * may hold a $ or a * further on.
+ */
+const placeholder = (value: string) => /^(?:[<$`]|\*+\W*$|[A-Z_]+\W*$)/.test(value);
+
+/**
+ * Code that reads a credential, never one: a call or an index
+ * (`getToken(`, `os.environ[`, `Optional[`) or a member of a code object
+ * (`process.env.TOKEN`, `config.apiKey`). Only an unquoted value can be
+ * code; a quoted one is a literal.
+ */
+const codeRead = (value: string) =>
+  /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*[([]/.test(value) ||
+  /^(?:process|import|os|env|config|settings|options|opts|props|self|this|request|req|response|res|ctx|context|params|args|document|window)\.[A-Za-z_$]/.test(value);
 
 /**
  * More credential shapes, masked but never blocking (test output first
@@ -88,7 +102,9 @@ const placeholder = (value: string) => /[<>${}`*]/.test(value) || /^[A-Z_]+\W*$/
 const maskedShapes: readonly [RegExp, (...match: string[]) => string][] = [
   [
     /\b((?:proxy-)?authorization["']?\s*[:=]\s*["']?(?:(?:bearer|basic|token|digest|bot)\s+)?)([^\s"',;]{6,})/gi,
-    (match, prefix, value) => (placeholder(value) ? match : `${prefix}[REDACTED]`),
+    // A scheme alone ("Bearer " + token) is code that builds the header.
+    (match, prefix, value) =>
+      placeholder(value) || /^(?:bearer|basic|token|digest|bot)$/i.test(value) ? match : `${prefix}[REDACTED]`,
   ],
   [/\b(bearer\s+)([A-Za-z0-9._~+/=-]{16,})/gi, (match, prefix, value) => (placeholder(value) ? match : `${prefix}[REDACTED]`)],
   [/\b([a-z][a-z0-9+.-]{0,30}:\/\/)[^\s/@:]*:[^\s/@]+@/gi, (_match, scheme) => `${scheme}[REDACTED]@`],
@@ -98,7 +114,10 @@ const maskedShapes: readonly [RegExp, (...match: string[]) => string][] = [
   ],
   [
     /(?<![\w.-])([\w.-]{1,100})(["']?\s*[:=]\s*["']?)([^\s"',;]{8,})/g,
-    (match, name, separator) => (secretName(name) ? `${name}${separator}[REDACTED]` : match),
+    (match, name, separator, value) =>
+      secretName(name) && !placeholder(value) && (/["']$/.test(separator) || !codeRead(value))
+        ? `${name}${separator}[REDACTED]`
+        : match,
   ],
   [/^(?:[A-Za-z0-9+/=]{1,100}\r?\n)+-----END (?:[A-Z]+ )?PRIVATE KEY-----/, () => "[REDACTED]"],
 ];
