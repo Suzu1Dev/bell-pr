@@ -430,8 +430,12 @@ export async function storedReview(run: GuideRun, files: DiffFile[], input: Retu
   const { lastTest, leastSure } = input.prompt;
   const reader = turnFiles(run);
   let removed = 0;
-  const prose = async (text: string, cited: string[] = []) => {
-    const filtered = await filterStoredText(reader, text, { ...changeOf(files), cited });
+  const prose = async (text: string, cited: string[] = [], lines = false) => {
+    const change = { ...changeOf(files), cited };
+    let filtered = await filterStoredText(reader, text, change);
+    // The Reports tab shows a reviewer's field on one line (reviewMarkdown): code that forms when its lines join goes too.
+    const joined = lines ? undefined : await filterStoredText(reader, filtered.value.replace(/\s*\n\s*/g, " "), change);
+    if (joined?.removed) filtered = { ...joined, removed: filtered.removed + joined.removed };
     removed += filtered.removed;
     return filtered.value;
   };
@@ -459,7 +463,7 @@ export async function storedReview(run: GuideRun, files: DiffFile[], input: Retu
   const verified = (await prose(answer.verified)).slice(0, limits.reviewVerifiedChars);
   const checked: string[] = [];
   for (const item of answer.checked) checked.push((await prose(item)).slice(0, 300));
-  const tester = await prose(reports.tester);
+  const tester = await prose(reports.tester, [], true);
   const review: ByHandReview = { at: now(), changeFingerprint: input.fingerprint, verified, checked, findings };
   if (leastSure) review.leastSure = leastSure;
   if (lastTest) review.testRunAt = lastTest.at;
