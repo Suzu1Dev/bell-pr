@@ -602,11 +602,27 @@ test("a Learn-by-hand run's dialog waits for the server's list, then publishes o
 test("Check again on a block calls the rules card's Check again, and says it is checking", () => {
   const ban: DraftCheck = { id: "ai-ban", kind: "block", message: "Not published here.", details: ["why", "docs/policy.md:4"] };
   // The block offers the rules card's Check again, which reads the rules again.
-  const html = renderEn(checksElement({ checks: [ban], checkRules: { checking: false, async onCheck() {} } }));
+  const html = renderEn(checksElement({ checks: [ban], checkRules: { offer: true, checking: false, async onCheck() {} } }));
   assertNoHan(html);
-  assert.match(html, /<div class="publish-block" role="alert"><span>Blocks publishing: Not published here\.[\s\S]*?<\/span><button type="button" class="button secondary">[\s\S]*?Check again<\/button><\/div>/);
-  assert.match(renderEn(checksElement({ checks: [ban], checkRules: { checking: true, async onCheck() {} } })), /disabled="">[\s\S]*?Checking…<\/button>/);
+  assert.match(html, /<div class="publish-block" role="alert"><span>Blocks publishing: Not published here\.[\s\S]*?<\/span><button type="button" class="button secondary" aria-disabled="false">[\s\S]*?Check again<\/button><\/div>/);
+  // While it reads, the button stays focusable (aria-disabled), so the focus stays in the dialog.
+  assert.match(
+    renderEn(checksElement({ checks: [ban], checkRules: { offer: true, checking: true, async onCheck() {} } })),
+    /<button type="button" class="button secondary" aria-disabled="true">[\s\S]*?Checking…<\/button>/,
+  );
   assert.doesNotMatch(renderEn(checksElement({ checks: [ban] })), /Check again/);
+});
+
+test("after Check again the block says what it found: when the rules were read, or why they couldn't be", () => {
+  const ban: DraftCheck = { id: "ai-ban", kind: "block", message: "Not published here.", details: ["why", "docs/policy.md:4"] };
+  // A failed read leaves the button and says why, inside the block's alert.
+  const failed = renderEn(checksElement({ checks: [ban], checkRules: { offer: true, checking: false, note: "Couldn't check: GitHub didn't answer.", async onCheck() {} } }));
+  assertNoHan(failed);
+  assert.match(failed, /role="alert">[\s\S]*?Check again<\/button><small>Couldn&#x27;t check: GitHub didn&#x27;t answer\.<\/small><\/div>/);
+  // Read again: no button, and the block, if it stands, says when.
+  const read = renderEn(checksElement({ checks: [ban], checkRules: { offer: false, checking: false, note: "Checked 10/20/2026", async onCheck() {} } }));
+  assert.doesNotMatch(read, /Check again/);
+  assert.match(read, /role="alert">[\s\S]*?<small>Checked 10\/20\/2026<\/small><\/div>/);
 });
 
 test("the quoted confirm leads the project's rules", () => {

@@ -549,8 +549,8 @@ export function PublishChecks({
   /** Links to the person's other published runs, for the pacing check. */
   loop?: ReactNode;
   record?: ReactNode;
-  /** "Check again" on a block that names the rules unread since the run started. */
-  checkRules?: { checking: boolean; onCheck(): Promise<void> };
+  /** "Check again" on a Learn-by-hand block while the rules were read before the run started, and what it found. */
+  checkRules?: { offer: boolean; checking: boolean; note?: string; onCheck(): Promise<void> };
 }) {
   const t = useT("workspace").publish;
   const rulesCard = useT("mission").rules;
@@ -559,7 +559,7 @@ export function PublishChecks({
   // A read that removes the focused button (Try again, Check again) leaves the focus in the dialog, on the heading.
   const title = useRef<HTMLHeadingElement>(null);
   const shown = useRef<string>(undefined);
-  const now = `${checks?.map((check) => check.id + check.kind).join() ?? "-"}${checkRules ? "+" : ""}`;
+  const now = `${checks?.map((check) => check.id + check.kind).join() ?? "-"}${checkRules?.offer ? "+" : ""}`;
   useEffect(() => {
     if (shown.current !== undefined && shown.current !== now && document.activeElement === document.body) title.current?.focus();
     shown.current = now;
@@ -608,11 +608,13 @@ export function PublishChecks({
               return (
                 <div key={check.id} className="publish-block" role="alert">
                   {text}
-                  {checkRules && ["ai-ban", "area-reserved"].includes(check.id) && (
-                    <button type="button" className="button secondary" disabled={checkRules.checking} onClick={() => void checkRules.onCheck()}>
+                  {checkRules?.offer && ["ai-ban", "area-reserved"].includes(check.id) && (
+                    // aria-disabled while it reads, so the focus stays on it.
+                    <button type="button" className="button secondary" aria-disabled={checkRules.checking} onClick={() => !checkRules.checking && void checkRules.onCheck()}>
                       <RefreshCw size={14} aria-hidden="true" /> {checkRules.checking ? rulesCard.checking : rulesCard.checkAgain}
                     </button>
                   )}
+                  {checkRules?.note && ["ai-ban", "area-reserved"].includes(check.id) && <small>{mask(checkRules.note)}</small>}
                   {check.id === "issue-has-pr" && (
                     <label className="publish-override">
                       {t.overrideLabel}
