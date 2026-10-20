@@ -8,12 +8,12 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { ListChecks, Loader2, Play, Plus, Trash2 } from "lucide-react";
+import { useFocusHome } from "./focus";
 import { byHandLimits, helpAllowed, type ByHandPlanInput } from "../../../shared/by-hand";
 import { PremiseNotice } from "../../team/PremiseNotice";
 import { PlanCompare } from "./PlanCompare";
 import type { Run } from "../../types";
 import { CopyRef } from "./CopyRef";
-import { useFocusHome } from "./focus";
 import { PlanQuestions } from "./PlanQuestions";
 import { useWriteText } from "./text";
 import "./byhand.css";
@@ -62,10 +62,7 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
   const saved = record.plan;
   const outline = record.guidePlan;
   const [drafts, setDrafts] = useState<Draft[]>(() =>
-    saved?.steps.length
-      ? saved.steps.map((step) => ({ id: step.id, title: step.title, files: (step.files ?? []).join(", "), how: step.how ?? "" }))
-      : [{ title: "", files: "", how: "" }],
-  );
+    saved?.steps.length ? saved.steps.map((step) => ({ id: step.id, title: step.title, files: (step.files ?? []).join(", "), how: step.how ?? "" })) : [{ title: "", files: "", how: "" }]);
   const [tests, setTests] = useState(saved?.tests ?? "");
   const [unsure, setUnsure] = useState(saved?.unsure ?? "");
   const [prediction, setPrediction] = useState(saved?.prediction ?? "");
@@ -178,7 +175,11 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
         </div>
       )}
       {planHelp && drafted && <PlanCompare run={run} onReveal={() => save().then(() => (revealed ? undefined : onReveal("compare")))} busy={busy} />}
-      {error && <p className="inline-error" role="alert">{error}</p>}
+      {error && (
+        <p className="inline-error" role="alert">
+          {error}
+        </p>
+      )}
       {!confirmed && (
         <div className="by-hand-row">
           <button type="button" className="button primary" disabled={busy || !drafted} onClick={action(onConfirm)}>

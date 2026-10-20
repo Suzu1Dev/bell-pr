@@ -91,9 +91,9 @@ export function GuidePanel(props: GuidePanelProps) {
     ? t.fitted({ kinds: helpKindList(lock.kinds, locale) })
     : blocked && t.blocked({ clause: byHandBlockClause(blocked.reason, locale, { checkedOn: blocked.finding?.source?.checkedOn }) });
   const missing = lock ? allHelpKinds.filter((kind) => !lock.kinds.includes(kind)) : [];
-  const thinking = record.busy?.kind === "guide" || record.busy?.kind === "plan";
-  // Why the guide's buttons are off: its answer, the review at Ready or the person's tests (said by the Tests card too).
-  const doing = thinking ? t.working : { review: reviewing, tests: text.tests.running }[record.busy?.kind ?? ""] ?? "";
+  // Why the guide's buttons are off: its answer, the review at Ready (both shown) or the person's tests (the Tests card shows those).
+  const thinking = !!record.busy && record.busy.kind !== "tests";
+  const doing = { review: reviewing, tests: text.tests.running }[record.busy?.kind ?? ""] ?? (thinking ? t.working : "");
   const working = busy || !!record.busy;
 
   const [entry, setEntry] = useState<AskEntry>("project");
@@ -207,7 +207,11 @@ export function GuidePanel(props: GuidePanelProps) {
       </form>
       {step && <TalkItThrough step={step} tests={record.tests ?? []} fingerprint={fingerprint} onStep={onStep} />}
       <RepeatFailure key={step?.id} step={step} tests={record.tests ?? []} onCheckIn={props.onCheckIn} />
-      {doing && record.busy?.kind !== "tests" && <p aria-hidden="true"><Loader2 size={14} className="spin" /> {doing}</p>}
+      {thinking && (
+        <p aria-hidden="true">
+          <Loader2 size={14} className="spin" /> {doing}
+        </p>
+      )}
       {error && <p className="inline-error" role="alert">{error}</p>}
       <GuideExits runId={run.id} step={step} tests={record.tests ?? []} fingerprint={fingerprint} issueUrl={props.issueUrl}
         channels={props.channels} onStep={onStep} onCheckIn={props.onCheckIn} onLeave={props.onLeave} busy={working} />

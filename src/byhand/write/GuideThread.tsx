@@ -10,12 +10,7 @@ import { useWriteText } from "./text";
  * note when the filter removed code, and R3's options to choose one with a
  * line on why.
  */
-export function GuideThread({ entries, steps, onStep, busy }: {
-  entries: GuideEntry[];
-  steps: ByHandStep[];
-  onStep(stepId: string, input: ByHandStepInput): Promise<void>;
-  busy: boolean;
-}) {
+export function GuideThread({ entries, steps, onStep, busy }: { entries: GuideEntry[]; steps: ByHandStep[]; onStep(stepId: string, input: ByHandStepInput): Promise<void>; busy: boolean }) {
   const text = useWriteText();
   const t = text.thread;
   const [picking, setPicking] = useState<{ entryId: string; option: number; why: string }>();
