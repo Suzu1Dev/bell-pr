@@ -397,11 +397,26 @@ test("the person can ask, mark a step done with its why and mark the change read
     await page.keyboard.press("Enter");
     expect((await asked).postDataJSON()).toMatchObject({ kind: "ask", entry: "project", question: "Where is the limit read?", stepId: "s2" });
     await expect(guide.getByRole("alert")).toHaveText(notYet);
+    // The button that turned itself off while asking leaves the focus in the question, not on the page.
+    await expect(guide.getByRole("textbox", { name: t.guide.question })).toBeFocused();
+    // The same in the Tests card: Use this command leaves it in the command.
+    const tests = guide.getByRole("region", { name: t.tests.title });
+    await tests.getByRole("textbox", { name: t.tests.command }).fill("npm test -- retry");
+    await page.keyboard.press("Tab");
+    await expect(tests.getByRole("button", { name: t.tests.use })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(guide.getByRole("alert")).toHaveText(notYet);
+    await expect(tests.getByRole("textbox", { name: t.tests.command })).toBeFocused();
     // Ready for review: the dialog takes the focus, and Escape gives it back to the footer.
     const ready = page.locator(".review-footer").getByRole("button", { name: workspace.byHand.ready });
     await ready.focus();
     await page.keyboard.press("Enter");
     const dialog = page.getByRole("dialog", { name: t.ready.title });
+    await expect(dialog.getByRole("textbox", { name: t.ready.leastSure })).toBeFocused();
+    // A refused Mark it ready keeps the focus in the dialog.
+    await dialog.getByRole("button", { name: t.ready.confirm }).focus();
+    await page.keyboard.press("Enter");
+    await expect(dialog.getByRole("alert")).toHaveText(notYet);
     await expect(dialog.getByRole("textbox", { name: t.ready.leastSure })).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);

@@ -10,6 +10,7 @@ import { changeFingerprint } from "../../../shared/change-fingerprint";
 import { useFormat, useT } from "../../i18n";
 import { Modal } from "../../modals/Modal";
 import type { DiffFile, Run } from "../../types";
+import { useFocusHome } from "./focus";
 import { ago, useWriteText } from "./text";
 import "./byhand.css";
 
@@ -34,6 +35,7 @@ export function ReadyDialog({ run, files, open, onClose, onReady, aiRules = fals
   const fmt = useFormat();
   const [leastSure, setLeastSure] = useState("");
   const [review, setReview] = useState(true);
+  const home = useFocusHome<HTMLDivElement>();
   if (!open) return null;
   const record = run.byHand ?? {};
   const fingerprint = changeFingerprint(files.map(({ path, fingerprint }) => ({ path, fingerprint: fingerprint ?? "" })));
@@ -47,7 +49,7 @@ export function ReadyDialog({ run, files, open, onClose, onReady, aiRules = fals
   const total = (key: "additions" | "deletions") => files.reduce((sum, file) => sum + file[key], 0);
   return (
     <Modal title={t.title} subtitle={t.quiet} onClose={onClose} mark={<CheckCheck size={22} aria-hidden="true" />}>
-      <div className="by-hand">
+      <div className="by-hand" {...home}>
         <ul>
           <li>{t.facts({ n: files.length, additions: total("additions"), deletions: total("deletions") })}</li>
           <li>

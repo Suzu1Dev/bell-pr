@@ -13,6 +13,7 @@ import { PremiseNotice } from "../../team/PremiseNotice";
 import { PlanCompare } from "./PlanCompare";
 import type { Run } from "../../types";
 import { CopyRef } from "./CopyRef";
+import { useFocusHome } from "./focus";
 import { PlanQuestions } from "./PlanQuestions";
 import { useWriteText } from "./text";
 import "./byhand.css";
@@ -56,6 +57,7 @@ export function withSavedIds<T extends Pick<Draft, "id" | "title">>(drafts: T[],
 export function PlanWithGuide(props: PlanWithGuideProps) {
   const { run, onSave, onReveal, onConfirm, busy: requesting = false, error } = props;
   const t = useWriteText().plan;
+  const home = useFocusHome<HTMLElement>();
   const record = run.byHand ?? {};
   const saved = record.plan;
   const outline = record.guidePlan;
@@ -113,7 +115,7 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
     </label>
   );
   return (
-    <section className="by-hand" aria-labelledby={`${run.id}-plan`} onBlur={() => void save().catch(ignore)}>
+    <section className="by-hand" aria-labelledby={`${run.id}-plan`} onBlur={() => void save().catch(ignore)} {...home}>
       <h3 id={`${run.id}-plan`}>
         <ListChecks size={17} aria-hidden="true" /> {t.title}
       </h3>

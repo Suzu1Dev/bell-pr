@@ -17,6 +17,7 @@ import { api } from "../../api";
 import { useLocale } from "../../i18n";
 import { helpKindList, rulesFrom } from "../../mission/respect";
 import type { DiffFile, Run } from "../../types";
+import { useFocusHome } from "./focus";
 import { GuideExits } from "./GuideExits";
 import { GuideThread } from "./GuideThread";
 import { TestsCard } from "./TestsCard";
@@ -97,6 +98,7 @@ export function GuidePanel(props: GuidePanelProps) {
   const [tried, setTried] = useState("");
   const [why, setWhy] = useState<{ stepId: string; text: string }>();
   const box = useRef<HTMLTextAreaElement>(null);
+  const home = useFocusHome<HTMLDivElement>();
   const ask = (prefill: string) => {
     setQuestion((current) => `${prefill}${current}`);
     box.current?.focus();
@@ -127,7 +129,7 @@ export function GuidePanel(props: GuidePanelProps) {
     why === undefined && needsWhy(steps.find((item) => item.id === id) ?? {}) ? setWhy({ stepId: id, text: "" }) : void onStep(id, { done: true, ...(why === undefined ? {} : { why: why.trim() }) }).then(() => setWhy(undefined), quiet);
   const where = selection?.startLine ? { path: selection.path, startLine: selection.startLine, endLine: selection.endLine } : {};
   return (
-    <div className="by-hand guide-panel">
+    <div className="by-hand guide-panel" {...home}>
       <h3><Hand size={17} aria-hidden="true" /> {t.title}</h3>
       {banner && <p className="by-hand-note">{banner}</p>}
       <p className="field-help">{clean.clean ? t.clean : t.unclean({ reason: t.reasons[clean.reason] ?? clean.reason })}</p>
