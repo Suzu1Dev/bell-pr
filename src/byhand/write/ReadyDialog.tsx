@@ -1,7 +1,5 @@
 /**
- * Ready for review (DESIGN v1.2 F5, F8): the facts of this version, the
- * last test run at it, "What are you least sure about?" and "Ask the guide
- * to review it". Nothing is explained or reviewed before it.
+ * Ready for review (DESIGN v1.2 F5, F8): the facts of this version, the last test run at it, "What are you least sure about?" and "Ask the guide to review it". Nothing is explained or reviewed before it.
  */
 import { useState } from "react";
 import { CheckCheck } from "lucide-react";

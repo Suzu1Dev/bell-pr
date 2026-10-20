@@ -4,11 +4,7 @@ import { CopyRef } from "./CopyRef";
 import { useWriteText } from "./text";
 
 /**
- * The guide's answers, newest first (DESIGN v1.2 F6, F7): each move with
- * copyable `path:line` refs, the quotes BELL cut itself under their
- * `path:lines` header ("From the repository" or "From your change"), the
- * note when the filter removed code, and R3's options to choose one with a
- * line on why.
+ * The guide's answers, newest first (DESIGN v1.2 F6, F7): each move with copyable `path:line` refs, the quotes BELL cut itself under their `path:lines` header ("From the repository" or "From your change"), the note when the filter removed code, and R3's options to choose one with a line on why.
  */
 export function GuideThread({ entries, steps, onStep, busy }: { entries: GuideEntry[]; steps: ByHandStep[]; onStep(stepId: string, input: ByHandStepInput): Promise<void>; busy: boolean }) {
   const text = useWriteText();

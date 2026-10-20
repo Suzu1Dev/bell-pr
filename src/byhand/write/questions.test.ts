@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
+import { mount } from "../../mission/test-dom";
 import { assertNoHan, renderEn, renderZh } from "../../test-utils/render";
 import type { Run } from "../../types";
 import { PlanQuestions } from "./PlanQuestions";
@@ -35,4 +36,26 @@ test("once the plan is confirmed, the questions asked stay and no new one is off
   assert.ok(html.includes("<p>Which test shows the cap holds?</p>"));
   assert.doesNotMatch(html, /<button|role="status"/);
   assert.equal(renderEn(element({}, "review")), "");
+});
+
+test("a turn on the plan that ends with no new question says why in the run log's words", async () => {
+  const at = "2026-10-20T09:00:00.000Z";
+  const notice = { time: "2026-10-20T09:05:00.000Z", agent: "lead", kind: "notice" as const, message: "codex exited with 1." };
+  const state = (byHand: Run["byHand"], logs: Run["logs"] = []) =>
+    createElement(PlanQuestions, { run: { ...run(byHand), logs } as Run, onAsk: async () => {}, busy: false });
+  const guide = { kind: "guide", since: at };
+  const mounted = await mount(state({ busy: guide }, [{ time: at, agent: "user", message: "Asked." }]));
+  try {
+    assert.match(mounted.text(), /The guide is reading your plan…/);
+    await mounted.rerender(state({}, [{ time: at, agent: "user", message: "Asked." }, notice]));
+    assert.match(mounted.text(), /The guide couldn't answer: codex exited with 1\./);
+    // The next turn clears it; one that adds a question says nothing.
+    await mounted.rerender(state({ busy: guide }, [notice]));
+    assert.doesNotMatch(mounted.text(), /couldn't answer/);
+    await mounted.rerender(state({ planQuestions: [{ id: "q1", at, kind: "plan", text: "Which test shows the cap holds?" }] }, [notice]));
+    assert.doesNotMatch(mounted.text(), /couldn't answer/);
+    assert.match(mounted.text(), /2 of 3 left/);
+  } finally {
+    await mounted.unmount();
+  }
 });

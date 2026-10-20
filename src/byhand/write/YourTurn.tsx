@@ -1,7 +1,4 @@
-/**
- * Your turn (DESIGN v1.2 F4): in the Changes tab while the diff is empty,
- * the run's folder to open in the person's editor and the first open step.
- */
+/** Your turn (DESIGN v1.2 F4): in the Changes tab while the diff is empty, the run's folder to open in the person's editor and the first open step. */
 import { SquarePen } from "lucide-react";
 import { usePresentation } from "../../app/presentation";
 import type { Run } from "../../types";
