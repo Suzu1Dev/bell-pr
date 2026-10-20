@@ -7,13 +7,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
-import { AgentRegistry, readChildren, reapOrphanedAgents, writeChildren } from "./agent-registry.js";
+import { AgentRegistry, childSchema, readChildren, reapOrphanedAgents, writeChildren } from "./agent-registry.js";
+import { lenientRead } from "./persisted-schema.js";
 import { command } from "./process.js";
 
 const posix = process.platform !== "win32";
@@ -165,6 +166,69 @@ await command("/bin/sh", ["-c", "trap '' TERM; echo ready $$; while :; do sleep 
     assert.deepEqual(readChildren(file), []);
   } finally {
     if (bell.exitCode === null && bell.signalCode === null) bell.kill("SIGKILL");
+    endOwnGroup(pgid);
+    await cleanup();
+  }
+});
+
+/** The start of a process in clock ticks after boot (Linux), as /proc/<pid>/stat gives it. */
+function startTicks(pid: number) {
+  const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+  return Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19]);
+}
+
+test("a recorded test run's pid that now leads a group BELL PR did not start is never stopped, even moments after the record", { skip: !posix }, async () => {
+  const { file, cleanup } = await temp();
+  // Another program's group got the pid of a test run whose shell has exited
+  // (a small pid_max, or a restarted container with the same data folder).
+  const unrelated = orphan("sleep 300");
+  try {
+    await sleep(200);
+    // BELL PR recorded that test run 10 s before this group's leader started.
+    const recordedAt = new Date(Date.now() - 10_000).toISOString();
+    const records = [{ pgid: unrelated.pid!, executable: "sh", startedAt: recordedAt }];
+    if (process.platform === "linux")
+      // With the start of its own shell, 10 s (1,000 ticks) before this one's.
+      records.push({ ...records[0], startTicks: startTicks(unrelated.pid!) - 1_000 } as (typeof records)[0]);
+    for (const record of records) {
+      writeChildren(file, [record]);
+      const result = await reapOrphanedAgents(file, { graceMs: 300 });
+      assert.deepEqual(result.terminated, [], JSON.stringify(record));
+      assert.deepEqual(result.skipped.map((child) => child.pgid), [unrelated.pid]);
+      assert.equal(groupAlive(unrelated.pid!), true);
+    }
+  } finally {
+    endOwnGroup(unrelated.pid);
+    await cleanup();
+  }
+});
+
+test("a test run's group is recorded with its first process's start in clock ticks on Linux, and an older build reads the file", { skip: !posix }, async () => {
+  const { file, cleanup } = await temp();
+  const registry = new AgentRegistry(file);
+  registry.start();
+  let pgid: number | undefined;
+  try {
+    let printed = () => {};
+    const ready = new Promise<void>((resolve) => (printed = resolve));
+    const run = command("/bin/sh", ["-c", "echo $$; sleep 1"], {
+      endGroup: { settleAfterExitMs: 2_000 },
+      onLine: (line) => {
+        pgid = Number(line);
+        printed();
+      },
+    });
+    await ready;
+    const [recorded] = readChildren(file);
+    if (process.platform === "linux") assert.equal(recorded.startTicks, startTicks(pgid!));
+    else assert.equal(recorded.startTicks, undefined);
+    // An older build, whose schema has no startTicks, still reads the entry.
+    const older = lenientRead(childSchema.omit({ startTicks: true }));
+    const parsed = older.parse({ ...recorded, startTicks: 123 });
+    assert.deepEqual(parsed, { pgid, executable: "sh", startedAt: recorded.startedAt });
+    await run;
+  } finally {
+    registry.stop();
     endOwnGroup(pgid);
     await cleanup();
   }

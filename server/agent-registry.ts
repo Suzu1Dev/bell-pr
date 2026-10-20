@@ -30,7 +30,9 @@ import {
 /**
  * One recorded process group. Like every persisted file, every field but
  * the group id is optional, and the file is read leniently, so a newer
- * build's file still loads. This build always writes all of them.
+ * build's file still loads. This build always writes all of them but
+ * `startTicks`, which only a group command() asked to record has, on
+ * Linux.
  */
 export const childSchema = z.object({
   /** The process group, which is the pid of the detached agent CLI. */
@@ -42,6 +44,12 @@ export const childSchema = z.object({
   executable: z.string().min(1).max(200).optional(),
   /** When BELL PR started it (ISO). */
   startedAt: z.string().min(1).max(40).optional(),
+  /**
+   * Linux, a group command() asked to record (a test run): when its first
+   * process started, in clock ticks after boot (/proc/<pid>/stat), which
+   * with the pid names that one process.
+   */
+  startTicks: z.number().int().nonnegative().optional(),
 });
 const childrenSchema = z.object({
   version: z.number().int().positive().optional(),
@@ -51,7 +59,8 @@ const childrenSchema = z.object({
 const childReadSchema = lenientRead(childSchema);
 const childrenReadSchema = lenientRead(childrenSchema);
 
-export type AgentChild = Required<z.infer<typeof childSchema>>;
+export type AgentChild = Required<Omit<z.infer<typeof childSchema>, "startTicks">> &
+  Pick<z.infer<typeof childSchema>, "startTicks">;
 type RecordedChild = z.infer<typeof childSchema>;
 
 const agentExecutable = /^(codex|claude)(\.exe|\.cmd)?$/i;
@@ -124,10 +133,13 @@ export class AgentRegistry implements SpawnObserver {
 
   onSpawn(pid: number, executable: string, details?: SpawnDetails): void {
     if (!isAgentExecutable(executable) && !details?.recordGroup) return;
+    // The child is not reaped before this returns, so /proc still has it.
+    const ticks = details?.recordGroup ? startTicks(pid) : undefined;
     this.children.set(pid, {
       pgid: pid,
       executable: path.basename(executable),
       startedAt: new Date().toISOString(),
+      ...(ticks === undefined ? {} : { startTicks: ticks }),
     });
     this.persist();
   }
@@ -153,6 +165,25 @@ interface GroupProcess {
   argv: string[];
   /** When the process started (ms since the epoch), where known. */
   startedAt?: number;
+  /** Linux: when the process started, in clock ticks after boot. */
+  startTicks?: number;
+}
+
+/** Field 22 of /proc/<pid>/stat: when the process started, in clock ticks after boot. */
+function statStartTicks(stat: string): number | undefined {
+  // "pid (comm) state ppid pgrp ..."; comm may contain spaces and parentheses.
+  const ticks = Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19]);
+  return Number.isSafeInteger(ticks) && ticks >= 0 ? ticks : undefined;
+}
+
+/** Linux: when process `pid` started, in clock ticks after boot; undefined elsewhere or when unreadable. */
+function startTicks(pid: number): number | undefined {
+  if (process.platform !== "linux") return undefined;
+  try {
+    return statStartTicks(readFileSync(`/proc/${pid}/stat`, "utf8"));
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -210,12 +241,14 @@ function processGroups(): Map<number, GroupProcess[]> {
           .filter(Boolean);
         // Field 22, starttime, in clock ticks after boot.
         const ticks = Number(fields[19]);
+        const exact = statStartTicks(stat);
         add(Number(fields[2]), {
           pid: Number(entry),
           argv,
           ...(bootTime !== undefined && Number.isFinite(ticks)
             ? { startedAt: bootTime + (ticks * 1000) / clockTicksPerSecond }
             : {}),
+          ...(exact === undefined ? {} : { startTicks: exact }),
         });
       } catch {
         // The process exited while we looked.
@@ -259,6 +292,24 @@ function signalGroup(pgid: number, signal: NodeJS.Signals): boolean {
  * this only absorbs clock rounding.
  */
 const reusedAfterMs = 30_000;
+/**
+ * The same for a test run's group without `startTicks` (not Linux): its
+ * record is written in the same tick as the spawn, and ps gives whole
+ * seconds, rounded down.
+ */
+const requestedReusedAfterMs = 2_000;
+
+/**
+ * Whether a test run's group still has the first process BELL PR started:
+ * on Linux the very process (the pid and its start in clock ticks; a test
+ * run may run any program, so no command line tells), elsewhere one that
+ * started no later than the record allows.
+ */
+function sameTestRun(child: RecordedChild, startedAt: number, leader?: GroupProcess) {
+  if (child.startTicks !== undefined && leader?.startTicks !== undefined)
+    return leader.startTicks === child.startTicks;
+  return leader?.startedAt !== undefined && leader.startedAt <= startedAt + requestedReusedAfterMs;
+}
 
 export interface ReapResult {
   /** Groups sent SIGTERM. */
@@ -280,9 +331,10 @@ export interface ReapResult {
  * this process, it was recorded during the current boot, and its first
  * process did not start after it was recorded, so a reused pid is not hit.
  * A group recorded at command()'s request (a test run, which may run any
- * program) needs its first process instead: still there, with a known
- * start no later than the record. A test run whose first process has
- * exited is left alone. Clears the file afterwards.
+ * program) needs its first process instead: still there and, on Linux,
+ * the very process recorded (its start in clock ticks), elsewhere one
+ * that started at most 2 s after the record. A test run whose first
+ * process has exited is left alone. Clears the file afterwards.
  */
 export async function reapOrphanedAgents(
   file: string,
@@ -315,7 +367,7 @@ export async function reapOrphanedAgents(
       (leader?.startedAt !== undefined && leader.startedAt > startedAt + reusedAfterMs) ||
       members.some((member) => member.pid === process.pid) ||
       (requested
-        ? leader?.startedAt === undefined
+        ? !sameTestRun(child, startedAt, leader)
         : !members.some((member) => isAgentCommand(member.argv)))
     ) {
       result.skipped.push(child);
