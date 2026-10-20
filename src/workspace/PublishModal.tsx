@@ -37,7 +37,7 @@ import {
   type Requirement,
 } from "../setup/ReadinessNotice";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
-import { MarkdownContent } from "./DraftTab";
+import { MarkdownContent } from "./draftMounts";
 
 /** Publishing commits with the Git identity and pushes with the GitHub CLI. */
 const publishRequirements: readonly Requirement[] = ["git-identity", "gh"];

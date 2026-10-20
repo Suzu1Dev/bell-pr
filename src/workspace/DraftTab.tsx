@@ -1,5 +1,4 @@
 import {
-  lazy,
   Suspense,
   useEffect,
   type Dispatch,
@@ -41,18 +40,12 @@ import {
   Deferred,
   DraftGuide,
   ForecastCompare,
+  MarkdownContent,
   Restatements,
   Reviewability,
   UnderstandingRow,
   YourWords,
 } from "./draftMounts";
-
-/** Shared with the publish dialog, so the Markdown renderer loads once. */
-export const MarkdownContent = lazy(() =>
-  import("../review/MarkdownContent").then((module) => ({
-    default: module.MarkdownContent,
-  })),
-);
 
 interface DraftTabProps {
   run: Run;

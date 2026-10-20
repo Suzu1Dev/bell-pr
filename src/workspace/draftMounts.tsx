@@ -22,6 +22,12 @@ export const Reviewability = lazy(() =>
   import("./DraftLearning").then((module) => ({ default: module.Reviewability })),
 );
 export const ForecastCompare = lazy(() => import("../draft/ForecastCompare"));
+/** Shared with the publish dialog, so the Markdown renderer loads once. */
+export const MarkdownContent = lazy(() =>
+  import("../review/MarkdownContent").then((module) => ({
+    default: module.MarkdownContent,
+  })),
+);
 
 /** A panel that loads on demand; a chunk that fails to load leaves the tab as it is. */
 export function Deferred({ resetKey, children }: { resetKey?: string; children: ReactNode }) {
