@@ -517,7 +517,7 @@ contributions or keep issues for newcomers.
 
 Before you write a line, the dialog says what the project's rules mean
 for publishing a learn-by-hand run, and when you start, **Before you
-start** says it once more:
+write** says it once more:
 
 - When no AI rule of the project applies, there is nothing to say:
   publishing runs the usual checks.
@@ -525,7 +525,7 @@ start** says it once more:
   what a rule covers, or the linked issue is kept for people learning
   without AI tools, the dialog says "BELL PR won't publish a learn-by-hand
   run here: …" and "The guide still gives every kind of help.", and
-  **Before you start** offers **Practise by hand locally**.
+  **Before you write** offers **Practise by hand locally**.
 - When the project declines AI-generated content and its own text says
   which uses of AI are fine, you choose between **Fit the guide to the
   project's rules** (preselected) and **Every kind of help, practise
@@ -533,9 +533,9 @@ start** says it once more:
   names, for the whole run, and publishing asks you to confirm the
   project's quoted rule ([Contributing
   responsibly](contributing-responsibly.md#when-the-projects-own-text-says-some-uses-of-ai-are-fine)
-  lists every condition); **Before you start** says so and offers
+  lists every condition); **Before you write** says so and offers
   **Start anyway**. A run with every kind of help won't be published
-  there, and **Before you start** offers **Practise by hand locally**. If the project's rules changed since the dialog read
+  there, and **Before you write** offers **Practise by hand locally**. If the project's rules changed since the dialog read
   them, starting a fitted run is refused: "BELL PR can't fit this run to
   the project's rules any more: …". Check the rules again, or start with
   every kind of help.
