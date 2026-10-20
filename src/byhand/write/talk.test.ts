@@ -26,20 +26,3 @@ test("the same failure three runs in a row shows one card pointing at the exits"
   assert.equal(card([failing(1), failing(2)]), "");
   assert.equal(card([failing(1), failing(2), { ...failing(3), tailHash: "other" }]), "");
 });
-
-test("the repeated failure is checked in once per step and failing run, also across mounts and reloads", async () => {
-  const { claimCheckIn, repeatCheckIn } = await import("./checkIns");
-  const three = [failing(1), failing(2), failing(3)];
-  assert.equal(repeatCheckIn("s1", [failing(1), failing(2)]), undefined);
-  // The run already holds this step's check-in since the last failing run (a reload): nothing to send.
-  assert.equal(repeatCheckIn("s1", three, [{ stepId: "s1", signal: "repeat-failure", at: at(4) }]), undefined);
-  // An older check-in, or one for another step, doesn't count.
-  const due = repeatCheckIn("s1", three, [{ stepId: "s1", signal: "repeat-failure", at: at(2) }, { stepId: "s2", signal: "repeat-failure", at: at(5) }]);
-  assert.ok(due);
-  assert.equal(claimCheckIn(due), true);
-  // Sent from this tab: the card mounting again sends nothing more.
-  assert.equal(claimCheckIn(due), false);
-  assert.equal(repeatCheckIn("s1", three), undefined);
-  // A fourth failing run is a new one.
-  assert.ok(repeatCheckIn("s1", [...three, failing(4)]));
-});

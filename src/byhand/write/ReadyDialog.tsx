@@ -10,7 +10,7 @@ import { Modal } from "../../modals/Modal";
 import type { DiffFile, Run } from "../../types";
 import { focusAfterReady, useFocusHome } from "./focus";
 import { TestsCard } from "./TestsCard";
-import { useTestCommand } from "./testCommand";
+import { useTestCommand } from "./reads";
 import { ago, useWriteText } from "./text";
 import "./byhand.css";
 

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { MessageCircle, X } from "lucide-react";
-import { repeatFailure, type ByHandCheckInInput, type ByHandRecord, type ByHandStep, type ByHandStepInput, type TestRun } from "../../../shared/by-hand";
-import { claimCheckIn, repeatCheckIn } from "./checkIns";
+import { repeatFailure, type ByHandCheckInInput, type ByHandStep, type ByHandStepInput, type TestRun } from "../../../shared/by-hand";
 import { useT } from "../../i18n";
 import { talkChecks } from "./GuideExits";
 import { useWriteText } from "./text";
@@ -45,19 +44,22 @@ export function TalkItThrough({ step, tests, fingerprint, onStep }: {
   );
 }
 
-/** The same failure three BELL test runs in a row (cut K6): one non-modal card pointing at the exits, checked in once per step and failing run. */
-export function RepeatFailure({ step, tests, checkIns, onCheckIn }: {
+/**
+ * The same failure three BELL test runs in a row (cut K6): one non-modal
+ * card, once per step, pointing at the exits; recorded as a check-in.
+ */
+export function RepeatFailure({ step, tests, onCheckIn }: {
   step?: ByHandStep;
-  tests: readonly TestRun[]; checkIns?: ByHandRecord["checkIns"];
+  tests: readonly TestRun[];
   onCheckIn(input: ByHandCheckInInput): Promise<void>;
 }) {
   const t = useWriteText().talk;
   const close = useT("common").actions.close;
   const [shown, setShown] = useState(true);
-  const repeated = repeatFailure([...tests]), due = repeatCheckIn(step?.id, tests, checkIns);
+  const repeated = repeatFailure([...tests]);
   useEffect(() => {
-    if (due && claimCheckIn(due)) void onCheckIn({ ...(step ? { stepId: step.id } : {}), signal: "repeat-failure" }).catch(() => undefined);
-  }, [due]); // eslint-disable-line react-hooks/exhaustive-deps -- once per step and failing run
+    if (repeated) void onCheckIn({ ...(step ? { stepId: step.id } : {}), signal: "repeat-failure" }).catch(() => undefined);
+  }, [repeated]); // eslint-disable-line react-hooks/exhaustive-deps -- once per step (the parent keys it by step)
   if (!repeated || !shown) return null;
   return (
     <p className="by-hand-note" role="status">

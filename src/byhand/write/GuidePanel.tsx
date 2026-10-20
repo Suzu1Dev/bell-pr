@@ -12,17 +12,16 @@ import { allHelpKinds, askEntries, attemptSince, byHandClean, helpAllowed, helpK
 import type { AskEntry, ByHandCheckInInput, ByHandGuideInput, ByHandStepInput, ByHandTestInput, ByHandTestReportInput, LiveTests, TestCommandView } from "../../../shared/by-hand";
 import { byHandRulesCase, type ByHandRulesCase } from "../../../shared/by-hand-rules";
 import { changeFingerprint } from "../../../shared/change-fingerprint";
-import { byHandBlockClause, learningLabel, type ContributionRules, type HelpChannel } from "../../../shared/contribution";
-import { api } from "../../api";
+import { byHandBlockClause, learningLabel, type HelpChannel } from "../../../shared/contribution";
 import { useLocale, useT } from "../../i18n";
-import { helpKindList, rulesFrom } from "../../mission/respect";
+import { helpKindList } from "../../mission/respect";
 import type { DiffFile, Run } from "../../types";
 import { focusAnswer, useFocusHome } from "./focus";
+import { useStoredRules, useTestCommand } from "./reads";
 import { GuideExits } from "./GuideExits";
 import { GuideThread } from "./GuideThread";
 import { TestsCard } from "./TestsCard";
 import { RepeatFailure, TalkItThrough } from "./TalkItThrough";
-import { useTestCommand } from "./testCommand";
 import { useWriteText } from "./text";
 import "./byhand.css";
 
@@ -71,12 +70,7 @@ export function GuidePanel(props: GuidePanelProps) {
   const lock = record.helpLock;
   // Read here: the test command, and the stored rules for the case of a run that won't publish there.
   const tests = useTestCommand(run.id, props.onConfirmTestCommand);
-  const [rules, setRules] = useState<ContributionRules>();
-  useEffect(() => {
-    let live = true;
-    api<unknown>(`/repos/${encodeURIComponent(run.repoId)}/contribution-rules`).then((body) => live && setRules(rulesFrom(body)), quiet);
-    return () => void (live = false);
-  }, [run.repoId]);
+  const rules = useStoredRules(run.repoId);
   const learningIssue = (run.contributionFacts?.issue?.labels ?? []).some(learningLabel);
   const rulesCase = props.rulesCase ?? (rules && byHandRulesCase(rules, { learningIssue, now: new Date().toISOString() }));
   const fingerprint = changeFingerprint(files.map(({ path, fingerprint }) => ({ path, fingerprint: fingerprint ?? "" })));
@@ -210,7 +204,7 @@ export function GuidePanel(props: GuidePanelProps) {
         <p role="status" className="visually-hidden">{doing || (ended === true ? t.answered : "")}</p>
       </form>
       {step && <TalkItThrough step={step} tests={record.tests ?? []} fingerprint={fingerprint} onStep={onStep} />}
-      <RepeatFailure key={step?.id} step={step} tests={record.tests ?? []} checkIns={record.checkIns} onCheckIn={props.onCheckIn} />
+      <RepeatFailure key={step?.id} step={step} tests={record.tests ?? []} onCheckIn={props.onCheckIn} />
       {thinking && (
         <p aria-hidden="true">
           <Loader2 size={14} className="spin" /> {doing}
