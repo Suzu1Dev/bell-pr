@@ -40,18 +40,18 @@ export function GuideThread({ entries, steps, onStep, busy }: { entries: GuideEn
                 <ol>
                   {entry.options.map((option, index) => {
                     const chosen = step.chosen?.entryId === entry.id && step.chosen.option === index;
-                    const open = picking?.entryId === entry.id && picking.option === index;
+                    const open = picking?.entryId === entry.id && picking.option === index, name = `${entry.id}-option-${index}`;
                     return (
                       <li key={option.name}>
-                        <strong>{option.name}</strong> {option.tradeoff}{" "}
+                        <strong id={name}>{option.name}</strong> {option.tradeoff}{" "}
                         {chosen ? <em>{t.chosen}</em> : open ? (
                           <span className="by-hand-row">
-                            <input className="text-input" aria-label={t.chooseWhy} placeholder={t.chooseWhy} maxLength={300} value={picking.why}
+                            <input className="text-input" aria-label={t.chooseWhy} aria-describedby={name} placeholder={t.chooseWhy} maxLength={300} value={picking.why} autoFocus
                               onChange={(event) => setPicking({ ...picking, why: event.target.value })} />
-                            <button type="button" className="button secondary" disabled={busy || !picking.why.trim()}
+                            <button type="button" className="button secondary" aria-describedby={name} disabled={busy || !picking.why.trim()}
                               onClick={() => void onStep(step.id, { chosen: { ...picking, why: picking.why.trim() } }).then(() => setPicking(undefined), () => undefined)}>{t.choose}</button>
                           </span>
-                        ) : <button type="button" className="mission-text-button" onClick={() => setPicking({ entryId: entry.id, option: index, why: "" })}>{t.choose}</button>}
+                        ) : <button type="button" className="mission-text-button" aria-describedby={name} onClick={() => setPicking({ entryId: entry.id, option: index, why: "" })}>{t.choose}</button>}
                       </li>
                     );
                   })}
