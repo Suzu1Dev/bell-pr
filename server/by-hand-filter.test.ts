@@ -90,3 +90,29 @@ test("filteredError: one helper filters an agent turn's error and keeps BELL's o
   const timeout = new AppError("```ts\nreturn retry(fn);\n```", 504);
   assert.equal(filteredError(timeout), timeout);
 });
+
+test("a turn reads only worktree files Git tracks or would track, never ignored ones such as .env or node_modules", async (t) => {
+  const { run } = await repository(t);
+  const root = run.worktreePath;
+  await writeFile(path.join(root, ".gitignore"), ".env\nnode_modules/\nbuild/\n");
+  await writeFile(path.join(root, ".env"), "API_TOKEN=abc\n");
+  await mkdir(path.join(root, "node_modules", "retry-kit"), { recursive: true });
+  await writeFile(path.join(root, "node_modules", "retry-kit", "index.js"), "export const retryBudget = () => 3;\n");
+  await mkdir(path.join(root, "build"), { recursive: true });
+  await writeFile(path.join(root, "build", "kept.js"), "export const kept = 1;\n");
+  // A file the person added and Git would track, and an ignored one the project tracks anyway.
+  await writeFile(path.join(root, "src", "backoff.ts"), "export const backoff = 100;\n");
+  await git(root, ["add", "--force", "--", "build/kept.js"]);
+  const sources = await turnFiles(run).sources([".env", "node_modules/retry-kit/index.js", "src/backoff.ts", "build/kept.js", "src/retry.ts"]);
+  assert.equal(sources.worktree[".env"], undefined);
+  assert.equal(sources.worktree["node_modules/retry-kit/index.js"], undefined);
+  assert.deepEqual(sources.worktree["src/backoff.ts"], ["export const backoff = 100;"]);
+  assert.deepEqual(sources.worktree["build/kept.js"], ["export const kept = 1;"]);
+  assert.deepEqual(sources.worktree["src/retry.ts"], ["export const attempts = 2;", "export const delay = 0;"]);
+  // So a "change" quote or verbatim code from an ignored file is never kept.
+  const kept = await filterStoredCode(turnFiles(run), "export const retryBudget = () => 3;", {
+    changed: ["src/retry.ts"],
+    cited: ["node_modules/retry-kit/index.js"],
+  });
+  assert.deepEqual(kept, { value: undefined, removed: 0, dropped: 1 });
+});

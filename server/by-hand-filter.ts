@@ -2,8 +2,9 @@
  * The code filter's file access (DESIGN v1.2 F7; the rules are in
  * shared/by-hand-filter.ts). A reader serves one turn: it reads a file at
  * the run's base commit through `git cat-file blob <baseSha>:<path>` and in
- * the person's worktree, at most 10 files per answer, each once per
- * `(sha, path)` for the turn. Paths come from agent output, so only a
+ * the person's worktree (only a file Git tracks or would track, never an
+ * ignored one such as .env or node_modules), at most 10 files per answer,
+ * each once per `(sha, path)` for the turn. Paths come from agent output, so only a
  * normalised repository path is read (never absolute, with "." or ".."
  * parts, a backslash or a control character); a folder, a missing path
  * (`git show` would read one with *, ? or [ as a pattern and print
@@ -55,6 +56,9 @@ export function turnFiles(run: Pick<Run, "baseSha" | "worktreePath">) {
     });
   const worktree = (file: string) =>
     once(`worktree\0${file}`, async () => {
+      // Only a file Git tracks or would track (untracked, not ignored): never .env, node_modules or build output.
+      const listed = await git(run.worktreePath, ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", file]);
+      if (!listed.stdout.split("\0").includes(file)) return undefined;
       const root = await realpath(run.worktreePath);
       const full = await realpath(path.join(root, file));
       if (full !== root && !full.startsWith(`${root}${path.sep}`)) return undefined;
