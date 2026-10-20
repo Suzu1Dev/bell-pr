@@ -6,7 +6,7 @@
  * read-first ranges, the outline folded until a first draft, questions on
  * the plan, and "This is my plan".
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ListChecks, Loader2, Play, Plus, Trash2 } from "lucide-react";
 import { byHandLimits, helpAllowed, type ByHandPlanInput } from "../../../shared/by-hand";
 import { PremiseNotice } from "../../team/PremiseNotice";
@@ -54,7 +54,7 @@ export function withSavedIds<T extends Pick<Draft, "id" | "title">>(drafts: T[],
 }
 
 export function PlanWithGuide(props: PlanWithGuideProps) {
-  const { run, onSave, onReveal, onConfirm, busy = false, error } = props;
+  const { run, onSave, onReveal, onConfirm, busy: requesting = false, error } = props;
   const t = useWriteText().plan;
   const record = run.byHand ?? {};
   const saved = record.plan;
@@ -81,14 +81,21 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
     // An emptied answer is sent empty, so the server drops it rather than keeping the last one.
     return { steps, tests: tests.trim(), unsure: unsure.trim(), prediction: prediction.trim() };
   };
-  const [last, setLast] = useState("");
-  /** Saves what changed since the last save; the caller shows a refusal. */
-  const save = async () => {
+  // What was saved or is on its way, the ids the server gives aside: a blur that changed nothing sends nothing,
+  // and a save on blur leaves the buttons on, so the click that took the focus still counts.
+  const keyOf = (value = plan()) => JSON.stringify(value ?? null, (name, field) => (name === "id" ? undefined : field));
+  const sent = useRef<{ key: string; done?: Promise<void> }>({ key: keyOf() });
+  const busy = requesting && !sent.current.done;
+  /** Saves what changed since the last save (a refusal rejects, and the next blur tries again). */
+  const save = () => {
     const value = plan();
-    const key = JSON.stringify(value ?? null);
-    if (!value || key === last) return;
-    await onSave(value);
-    setLast(key);
+    if (!value || keyOf(value) === sent.current.key) return sent.current.done ?? Promise.resolve();
+    const done: Promise<void> = onSave(value).then(
+      () => void (sent.current.done === done && delete sent.current.done),
+      (cause) => ((sent.current = { key: "" }), Promise.reject(cause)),
+    );
+    sent.current = { key: keyOf(value), done };
+    return done;
   };
   const edit = (index: number, change: Partial<Draft>) =>
     setDrafts((list) => list.map((draft, at) => (at === index ? { ...draft, ...change } : draft)));
@@ -169,11 +176,7 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
         </div>
       )}
       {planHelp && drafted && <PlanCompare run={run} onReveal={() => save().then(() => (revealed ? undefined : onReveal("compare")))} busy={busy} />}
-      {error && (
-        <p className="inline-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <p className="inline-error" role="alert">{error}</p>}
       {!confirmed && (
         <div className="by-hand-row">
           <button type="button" className="button primary" disabled={busy || !drafted} onClick={action(onConfirm)}>

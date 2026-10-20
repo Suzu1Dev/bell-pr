@@ -272,6 +272,42 @@ test("the person plans first: their steps, read-first ranges and the guide's out
   }
 });
 
+test("the plan saves what changed, once, and This is my plan takes one click right after typing", async ({ browser }) => {
+  const { page, close } = await open(browser, `#/runs/${runs.planning}/activity`);
+  try {
+    // The plan route as W2A answers it (a stub in this build): the run back, its new steps with ids in the order sent.
+    const { run } = await (await page.request.get(`/api/runs/${runs.planning}`)).json();
+    const saves: unknown[] = [];
+    await page.route(`**/api/runs/${runs.planning}/by-hand/plan`, async (route) => {
+      const body = route.request().postDataJSON();
+      saves.push(body);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const steps = body.steps.map((step: object, index: number) => ({ id: `p${index + 1}`, ...step }));
+      await route.fulfill({ json: { run: { ...run, byHand: { ...run.byHand, plan: { ...body, steps, savedAt: at } } } } });
+    });
+    const approved = page.waitForRequest((request) => request.url().endsWith(`/api/runs/${runs.planning}/plan/approve`));
+    await page.route(`**/api/runs/${runs.planning}/plan/approve`, (route) => route.fulfill({ status: 409, json: { error: notYet } }));
+    const plan = page.getByRole("region", { name: t.plan.title });
+    await plan.getByRole("textbox", { name: t.plan.step({ number: 1 }) }).fill("Find where retries are counted");
+    await plan.getByRole("textbox", { name: t.plan.unsure }).click();
+    await expect.poll(() => saves.length).toBe(1);
+    await page.waitForTimeout(600);
+    // Moving between fields without a change sends nothing more, the ids the server gave included.
+    await plan.getByRole("textbox", { name: t.plan.tests }).click();
+    await plan.getByRole("textbox", { name: t.plan.unsure }).click();
+    await page.waitForTimeout(600);
+    expect(saves).toHaveLength(1);
+    // Typing, then one click on This is my plan: it saves, then confirms.
+    await plan.getByRole("textbox", { name: t.plan.unsure }).fill("Whether three is enough");
+    await plan.getByRole("button", { name: t.plan.confirm }).click();
+    await approved;
+    expect(saves).toHaveLength(2);
+    expect(saves[1]).toMatchObject({ steps: [{ id: "p1", title: "Find where retries are counted" }], unsure: "Whether three is enough" });
+  } finally {
+    await close();
+  }
+});
+
 test("while the person writes, the guide's panel, its thread, the Tests card and Ready for review show", async ({ browser }) => {
   const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`);
   try {
