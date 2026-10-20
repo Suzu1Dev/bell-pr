@@ -39,9 +39,8 @@ export function ReadyDialog({ run, files, open, onClose, onReady, aiRules = fals
   const fingerprint = changeFingerprint(files.map(({ path, fingerprint }) => ({ path, fingerprint: fingerprint ?? "" })));
   // The last test run at this version, BELL's or one the person reported.
   const last = (record.tests ?? []).filter((test) => test.changeFingerprint === fingerprint).sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).at(-1);
-  // A second review waits for a test run at the new version.
-  const reviewedBefore = !!record.reviews?.length || !!record.ready?.review || !!record.readyHistory?.some((ready) => ready.review);
-  const testFirst = reviewedBefore && !last;
+  // Another review waits for a test run (or a reported result) at this version since the last review, as the server asks.
+  const testFirst = !!record.reviews?.length && !(Date.parse(last?.at ?? "") > Date.parse(record.reviews.at(-1)!.at));
   const offered = helpAllowed(run, "review");
   const asked = offered && review && !testFirst;
   const predicted = last?.prediction && text.tests.predictions[last.prediction];

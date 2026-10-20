@@ -255,6 +255,13 @@ test("a second review waits for a test run at the new version, and a fitted run 
   const tested = html(ready({ reviews: [], ready: { at, changeFingerprint: "older", review: true }, tests: [{ at, command: "npm test", changeFingerprint: fingerprint, outcome: "passed", ms: 5, prediction: "pass" }] }));
   assert.match(tested, /Your tests passed [^<]+; you predicted Pass\./);
   assert.match(tested, /<input type="checkbox" checked=""\/>/);
+  // A test at this version from before the last review doesn't count; one after it does.
+  const review = { at: "2026-10-20T10:00:00.000Z", changeFingerprint: fingerprint, verified: "", checked: ["x"], findings: [] };
+  const test = (time: string) => ({ at: time, command: "npm test", changeFingerprint: fingerprint, outcome: "passed", ms: 5 });
+  assert.match(html(ready({ reviews: [review], tests: [test(at)] })), /<input type="checkbox" disabled=""\/>/);
+  assert.match(html(ready({ reviews: [review], tests: [test("2026-10-20T11:00:00.000Z")] })), /<input type="checkbox" checked=""\/>/);
+  // A review that was asked for but never stored isn't a review yet.
+  assert.match(html(ready({ ready: { at, changeFingerprint: fingerprint, review: true } })), /<input type="checkbox" checked=""\/>/);
   const fitted = html(ready({ helpLock: lock }));
   assert.doesNotMatch(fitted, /Ask the guide to review it/);
   assert.ok(fitted.includes(apostrophes("doesn't name AI review, so the guide doesn't review here; your tests are the judge.")));
