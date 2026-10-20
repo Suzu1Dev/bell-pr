@@ -187,7 +187,9 @@ export async function createRun(
       },
     ],
     logs: [],
-    draft: { title: title || prompt.slice(0, 72), body: "" },
+    // Learn by hand (DESIGN v1.2 F11): the PR text is the person's, so the
+    // title doesn't start from the task's (often an AI recommendation's).
+    draft: { title: byHand ? "" : title || prompt.slice(0, 72), body: "" },
     reviewedFiles: [],
     reviewedFingerprints: {},
     reports: {},

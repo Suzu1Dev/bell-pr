@@ -320,3 +320,25 @@ test("a run fitted to the project's rules (explain, answer, test) is refused eve
   assert.deepEqual(f.calls.filter((call) => !call.readonly), []);
   assert.deepEqual(byHandClean(run), { clean: true });
 });
+
+test("a Learn-by-hand run starts with no PR title, so approval asks the person for theirs; an agent run keeps the task's", async (t) => {
+  skipUnderstandingCheckInTests(true);
+  const f = await fixture(t);
+  // The task dialog fills the title from an AI recommendation or a discovery idea: never the person's PR title.
+  const run = await f.create();
+  assert.equal(run.title, "Retry twice");
+  assert.equal(run.draft.title, "");
+  await en(() => f.workbench.byHand.savePlan(run.id, { steps: [{ title: "Retry the GET" }] }));
+  await en(() => f.workbench.approvePlan(run.id));
+  await f.edit(run, 3);
+  await en(async () => f.workbench.byHand.ready(run.id, { changeFingerprint: await f.current(run), review: false }));
+  for (const file of await readDiff(run)) await f.workbench.review(run.id, file.path, true, file.fingerprint);
+  run.draft.body = "Retries a GET after a 503; I wrote it in Learn by hand.";
+  await assert.rejects(
+    en(() => f.workbench.approve(run.id, { ...run.draft })),
+    refused(422, /^Fill in the PR title and description first\./),
+  );
+  // An agent run's PR title starts from the task's, as before.
+  const agent = await en(() => f.workbench.createRun(f.repo.id, "Retry a GET twice after a 503.", "Retry twice"));
+  assert.equal(agent.draft.title, "Retry twice");
+});
