@@ -438,16 +438,48 @@ test("after Mark it ready, the focus goes to Explain it back, not to the page", 
       byHand: { ...run.byHand, ready: { at, changeFingerprint: changeFingerprint(files), review: true }, busy: { kind: "review", since: at } },
     };
     await page.route(`**/api/runs/${runs.writing}/by-hand/ready`, (route) => route.fulfill({ json: { run: ready } }));
-    await page.route(`**/api/runs/${runs.writing}`, (route) => route.fulfill({ json: { run: ready } }));
     const footer = page.locator(".review-footer").getByRole("button", { name: workspace.byHand.ready });
     await footer.focus();
     await page.keyboard.press("Enter");
     const dialog = page.getByRole("dialog", { name: t.ready.title });
+    // From here the run reads as marked ready while the guide reviews (the poll that follows included).
+    await page.route(`**/api/runs/${runs.writing}`, (route) => route.fulfill({ json: { run: ready } }));
     await dialog.getByRole("button", { name: t.ready.confirm }).focus();
     await page.keyboard.press("Enter");
     await expect(dialog).toHaveCount(0);
     await expect(page.locator(".review-footer").getByRole("button", { name: workspace.byHand.reviewing })).toBeDisabled();
     await expect(page.getByRole("button", { name: workspace.changes.takeCheck })).toBeFocused();
+  } finally {
+    await close();
+  }
+});
+
+test("a read begun before Mark it ready never undoes it", async ({ browser }) => {
+  const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`);
+  try {
+    const { run } = await (await page.request.get(`/api/runs/${runs.writing}`)).json();
+    const { files } = await (await page.request.get(`/api/runs/${runs.writing}/diff`)).json();
+    const ready = { ...run, team: { ...run.team, phase: "complete" }, byHand: { ...run.byHand, ready: { at, changeFingerprint: changeFingerprint(files), review: false } } };
+    await page.route(`**/api/runs/${runs.writing}/by-hand/ready`, (route) => route.fulfill({ json: { run: ready } }));
+    await expect(page.locator(".guide-panel")).toBeVisible();
+    await page.waitForTimeout(2500);
+    // Back from the editor: the read of the run and its diff starts 2 s later, and its diff takes a while.
+    let slow = 1;
+    await page.route(`**/api/runs/${runs.writing}/diff`, async (route) => {
+      if (slow-- > 0) await new Promise((resolve) => setTimeout(resolve, 2500));
+      await route.continue();
+    });
+    const reading = page.waitForRequest((request) => request.url().endsWith(`/api/runs/${runs.writing}/diff`));
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await reading;
+    // Meanwhile the person marks the change ready.
+    await page.locator(".review-footer").getByRole("button", { name: workspace.byHand.ready }).click();
+    await page.getByRole("dialog", { name: t.ready.title }).getByRole("button", { name: t.ready.confirm }).click();
+    const status = page.locator(".title-row .status-badge").first();
+    await expect(status).toHaveText("Ready for your review");
+    // The read that began before ends: the run stays marked ready.
+    await page.waitForTimeout(3000);
+    await expect(status).toHaveText("Ready for your review");
   } finally {
     await close();
   }

@@ -48,7 +48,7 @@ export function useByHand(
     /** This tab asks for an explanation or a walkthrough of the run right now. */
     requesting?: boolean;
     repo?: Repo;
-    /** Bumped by draft saves; a read begun before a save keeps the newer run. */
+    /** Bumped by draft saves and by these requests' answers; a read begun before one keeps the newer run. */
     draftMutationEpoch: RefObject<number>;
     actions: Pick<RunActions, "setRun" | "setFiles" | "approveTeamPlan">;
     /** Opens the task dialog with this run's task, for the agent team. */
@@ -76,7 +76,11 @@ export function useByHand(
     setState({ busy: true, error: "", from });
     try {
       const result = await api<{ run?: Run }>(path.startsWith("/") ? path : `${runPath(id)}/by-hand/${path}`, send(method, body));
-      if (result.run && shown.current === id) actions.setRun(result.run);
+      // A read begun before this answer (back from the editor, a poll) mustn't bring the older run back.
+      if (result.run && shown.current === id) {
+        actions.setRun(result.run);
+        draftMutationEpoch.current++;
+      }
       setState({ busy: false, error: "", from });
       then?.();
     } catch (cause) {
