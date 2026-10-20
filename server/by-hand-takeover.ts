@@ -19,8 +19,11 @@
  * or a detached HEAD, or rewritten history leave everything as it is, with
  * a notice on the feedback read, or a refusal before a sync. Agent runs are
  * never touched.
+ *
+ * `byHandDiscardable` guards discarding a round of a Learn-by-hand run the
+ * same way: it never drops the person's commits or deletes their files.
  */
-import { activeFollowUp } from "../shared/followups.js";
+import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
 import { sm } from "./i18n/index.js";
 import { adoptRemoteCommits, remoteBranchHead, worktreeDirty } from "./pr-branch.js";
 import { git, redact } from "./process.js";
@@ -122,4 +125,34 @@ export async function takeOverOwnCommits(
   if (message && options.refuse) throw new AppError(message, 409);
   if (message) ctx.log(run, "system", message, { kind: "notice" });
   return outcome;
+}
+
+/** Paths a git command lists NUL-separated. */
+const listedPaths = async (cwd: string, args: string[]) => (await git(cwd, args)).stdout.split("\0").filter(Boolean);
+
+/** Untracked files Git would track (not ignored) in the run's folder. */
+export const untrackedPaths = (run: Run) => listedPaths(run.worktreePath, ["ls-files", "-z", "--others", "--exclude-standard"]);
+
+/**
+ * Before a round of a Learn-by-hand run is discarded (its reset to the
+ * round's parent and the cleanup): HEAD must be the round's parent or its
+ * own commit, so no commit the person made in the run's folder is dropped,
+ * and every file in the folder that Git tracks or would track must be one
+ * the round's commits (its parent, the merged-in target, its own commit)
+ * hold, so none of the person's files is deleted. Otherwise a 409 says
+ * why, and nothing moves. Returns those paths: the only ones the cleanup
+ * may delete.
+ */
+export async function byHandDiscardable(run: Run, round: FollowUpRound) {
+  const cwd = run.worktreePath;
+  const head = (await git(cwd, ["rev-parse", "HEAD"])).stdout.trim();
+  if (head !== round.parentCommit && head !== round.commit)
+    throw new AppError((m) => m.byHand.flow.discard.committed, 409);
+  const roundFiles = new Set<string>();
+  for (const commit of [round.parentCommit, round.mergeParent, round.commit])
+    if (commit) for (const file of await listedPaths(cwd, ["ls-tree", "-r", "-z", "--name-only", commit])) roundFiles.add(file);
+  const present = await listedPaths(cwd, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
+  const theirs = present.filter((file) => !roundFiles.has(file));
+  if (theirs.length) throw new AppError((m) => m.byHand.flow.discard.ownFiles({ files: theirs.slice(0, 10) }), 409);
+  return roundFiles;
 }

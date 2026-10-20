@@ -494,3 +494,39 @@ test("adoptRemoteCommits without expectedHead takes over as before; with it, onl
   assert.equal(await f.head(), forced);
   assert.equal(f.run.followUps?.at(-1)?.adopted, true);
 });
+
+test("discarding a sync round of a Learn-by-hand run never drops the person's commits or deletes their files", async (t) => {
+  const f = await published(t);
+  const parent = f.run.publishCommit!;
+  await f.github.upstreamCommit({ "README.md": "# Example, upstream\n", "docs/upstream.md": "From main.\n" });
+  assert.equal((await en(() => f.workbench.syncRun(f.run.id))).updated, true);
+  const round = f.run.followUps!.at(-1)!;
+  assert.deepEqual([round.kind, round.status, round.parentCommit], ["sync", "review", parent]);
+  const exists = (file: string) => readFile(path.join(f.run.worktreePath, file), "utf8").then(() => true, () => false);
+  // A file of the person's own, which the round did not create: refused, and the file stays.
+  await mkdir(path.join(f.run.worktreePath, "notes"));
+  await f.write("notes/mine.md", "My notes.\n");
+  await assert.rejects(
+    en(() => f.workbench.discardFollowUp(f.run.id)),
+    refused(/^These files in the run's folder aren't this round's: notes\/mine\.md\./),
+  );
+  assert.equal(await exists("notes/mine.md"), true);
+  assert.deepEqual([round.status, f.run.status], ["review", "review"]);
+  await rm(path.join(f.run.worktreePath, "notes"), { recursive: true });
+  // A commit the person made after the round started: refused, and it stays on the branch.
+  await git(f.run.worktreePath, ["commit", "-q", "--allow-empty", "-m", "My own commit"]);
+  const mine = await f.head();
+  await assert.rejects(
+    en(() => f.workbench.discardFollowUp(f.run.id)),
+    refused(/^You committed in the run's folder after this round started/),
+  );
+  assert.equal(await f.head(), mine);
+  assert.equal(round.status, "review");
+  // Back at the round's parent, the round is discarded and only its own files go.
+  await git(f.run.worktreePath, ["update-ref", `refs/heads/${branch}`, parent]);
+  await en(() => f.workbench.discardFollowUp(f.run.id));
+  assert.deepEqual([round.status, f.run.status], ["discarded", "published"]);
+  assert.equal(await f.head(), parent);
+  assert.equal(await exists("docs/upstream.md"), false);
+  assert.equal(await readFile(path.join(f.run.worktreePath, "README.md"), "utf8"), "# Example\n");
+});

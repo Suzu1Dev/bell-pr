@@ -7,6 +7,7 @@ import { formatters } from "../../../shared/i18n/locale.js";
 import { product } from "../../../shared/product.js";
 
 const fmt = formatters("en");
+const list = (items: readonly string[]) => fmt.list(items, { type: "unit" });
 
 const flow = {
   /** The log line when the person confirms their plan. */
@@ -62,6 +63,13 @@ const flow = {
     pullFirst: `The pull request's branch has commits the run's folder doesn't have yet. Pull them into the run's folder first; ${product.name} takes your commits over once the folder matches the branch.`,
     adopted: ({ commits }: { commits: number }) =>
       `Took over ${fmt.number(commits)} ${fmt.plural(commits) === "one" ? "commit" : "commits"} you pushed from the run's folder to the pull request's branch.`,
+  },
+  /** Discarding a round of a published Learn-by-hand run, refused rather than losing the person's work. */
+  discard: {
+    committed:
+      "You committed in the run's folder after this round started, and discarding the round would drop those commits. Keep the round, or move your commits off the run's branch with your own Git first.",
+    ownFiles: ({ files }: { files: string[] }) =>
+      `These files in the run's folder aren't this round's: ${list(files)}. ${product.name} never deletes them; move them out of the run's folder first, then discard the round.`,
   },
 };
 

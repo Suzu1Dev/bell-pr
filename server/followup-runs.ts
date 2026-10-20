@@ -31,6 +31,7 @@ import {
   worktreeDirty,
 } from "./pr-branch.js";
 import { runAgent } from "./run-executor.js";
+import { byHandDiscardable, untrackedPaths } from "./by-hand-takeover.js";
 import { feedbackForAgent } from "./explanations.js";
 import { contributionContext } from "./prompts/team.js";
 import { followUpPrompt } from "./prompts/followups.js";
@@ -370,6 +371,8 @@ export async function discardFollowUp(ctx: WorkbenchContext, id: string) {
       !["review", "approved"].includes(run.status)
     )
       throw new AppError((m) => m.run.followUp.nothingToDiscard, 409);
+    // Learn by hand: refused rather than dropping the person's commits or deleting their files.
+    const roundFiles = run.learnByHand ? await byHandDiscardable(run, round) : undefined;
     if (round.commit) {
       // A commit is only safe to drop when the PR on GitHub does not have it.
       if (await prHasCommit(ctx, run, round.commit))
@@ -382,8 +385,14 @@ export async function discardFollowUp(ctx: WorkbenchContext, id: string) {
       delete round.commit;
     }
     await git(run.worktreePath, ["reset", "--hard", round.parentCommit]);
-    // Ignored files such as build output stay; only the round's new files go.
-    await git(run.worktreePath, ["clean", "-fd"]);
+    if (roundFiles) {
+      // Only files the round's commits hold go; a file saved meanwhile stays where the person left it.
+      const leftovers = (await untrackedPaths(run)).filter((file) => roundFiles.has(file));
+      if (leftovers.length) await git(run.worktreePath, ["clean", "-f", "--", ...leftovers]);
+    } else {
+      // Ignored files such as build output stay; only the round's new files go.
+      await git(run.worktreePath, ["clean", "-fd"]);
+    }
     if (round.previousBase) run.baseSha = round.previousBase;
     await restoreParentMessage(run, round);
     round.status = "discarded";

@@ -1,6 +1,8 @@
-import type { Translation } from "../../../shared/i18n/locale.js";
+import { formatters, type Translation } from "../../../shared/i18n/locale.js";
 import { product } from "../../../shared/product.js";
 import type en from "../en/by-hand-flow.js";
+
+const list = (items: readonly string[]) => formatters("zh-TW").list(items, { type: "unit" });
 
 const flow: Translation<typeof en> = {
   yourTurn: "換你寫：動手改程式吧。",
@@ -32,6 +34,10 @@ const flow: Translation<typeof en> = {
     switchBack: ({ branch }) => `這個工作的資料夾目前不在它的分支 ${branch} 上。請先切換回這個分支；${product.name} 只接手這個分支上的 commit。`,
     pullFirst: `Pull Request 的分支上有這個工作的資料夾還沒有的 commit。請先把它們拉進這個工作的資料夾；資料夾和分支一致之後，${product.name} 就會接手你的 commit。`,
     adopted: ({ commits }) => `已接手你從這個工作的資料夾推送到 Pull Request 分支的 ${commits} 個 commit。`,
+  },
+  discard: {
+    committed: "這一輪開始之後，你在這個工作的資料夾建立了 commit；放棄這一輪會讓這些 commit 消失。請保留這一輪，或先用你自己的 Git 把這些 commit 移出這個工作的分支。",
+    ownFiles: ({ files }) => `這個工作的資料夾裡有不屬於這一輪的檔案：${list(files)}。${product.name} 不會刪除它們；請先把它們移出這個工作的資料夾，再放棄這一輪。`,
   },
 };
 
