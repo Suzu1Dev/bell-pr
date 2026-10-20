@@ -80,6 +80,18 @@ const doorSchema = loose({
   login: text.optional(),
 });
 
+/** Carve-out quotes of a project rule and the help kinds each names (PolicyFinding.allows). */
+const allowsSchema = z
+  .array(loose({ line: count, quote: text.max(300), kinds: list.max(5) }))
+  .max(3);
+/** A finding from BELL's checked list of off-repository rules (PolicyFinding.source). */
+const registrySourceSchema = loose({
+  registry: text.max(60),
+  url: text.max(300),
+  version: text.max(80).optional(),
+  checkedOn: text,
+});
+
 const contributionRulesSchema = loose({
   baseSha: text.optional(),
   checkedAt: text,
@@ -92,6 +104,8 @@ const contributionRulesSchema = loose({
         line: count,
         quote: text.max(300),
         contribution: z.boolean(),
+        // v1.2: a finding from BELL's checked list of off-repository rules.
+        source: later(registrySourceSchema),
       }),
     )
     .max(30),
@@ -244,17 +258,6 @@ const guideEntrySchema = loose({
   dropped: count.optional(),
   changeFingerprint: text.optional(),
   model: text.optional(),
-});
-/** Carve-out quotes of a project rule and the help kinds each names (PolicyFinding.allows). */
-const allowsSchema = z
-  .array(loose({ line: count, quote: text.max(300), kinds: list.max(5) }))
-  .max(3);
-/** A finding from BELL's checked list of off-repository rules (PolicyFinding.source). */
-const registrySourceSchema = loose({
-  registry: text.max(60),
-  url: text.max(300),
-  version: text.max(80).optional(),
-  checkedOn: text,
 });
 const helpLockSchema = loose({
   kinds: list.max(5),

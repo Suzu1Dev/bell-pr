@@ -44,6 +44,25 @@ export interface PolicyFinding {
   quote: string;
   /** The same sentence names a PR, patch, contribution, commit or submitted code. */
   contribution: boolean;
+  /**
+   * Where a finding from BELL's checked list of off-repository rules comes
+   * from (an owner-signed entry): the list, the source URL, its version and
+   * when the quote was last checked against it. Absent on findings read
+   * from the repository.
+   */
+  source?: PolicySource;
+}
+
+/** The checked-list entry a finding comes from (`PolicyFinding.source`). */
+export interface PolicySource {
+  /** At most 60 characters. */
+  registry: string;
+  /** At most 300 characters. */
+  url: string;
+  /** A commit or revision date, at most 80 characters. */
+  version?: string;
+  /** When the quote was last verified against the source (a date). */
+  checkedOn: string;
 }
 
 /**

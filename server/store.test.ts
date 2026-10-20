@@ -1329,11 +1329,36 @@ function repositoryWithV12Fields(): Repository {
     ...JSON.parse(JSON.stringify(repositoryWithV11Fields)),
     testCommand: { command: "npm test -- hello", confirmedAt: "2026-10-20T00:00:00.000Z" },
   };
+  repo.contributionRules!.findings.push({
+    kind: "ban",
+    path: "src/policies/llm-usage.md",
+    line: 24,
+    quote: "But not to **create**.",
+    contribution: true,
+    source: {
+      registry: "bell",
+      url: "https://github.com/rust-lang/rust-forge/blob/main/src/policies/llm-usage.md",
+      version: "67096ec0a6",
+      checkedOn: "2026-10-19",
+    },
+  });
   repo.contributionRules!.channels = [
     { label: "Zulip", url: "https://example.zulipchat.com/", path: "CONTRIBUTING.md", line: 3 },
     { label: "GitHub Discussions", url: "https://github.com/acme/widgets/discussions" },
   ];
   return repo;
+}
+
+/** The repository read schema with one field of each contribution-rules finding left out. */
+function withoutFindingField(field: string) {
+  const rules = repositoryReadSchema.shape.contributionRules.removeCatch().unwrap();
+  const finding = rules.shape.findings.element;
+  return repositoryReadSchema.extend({
+    contributionRules: rules
+      .extend({ findings: z.array(finding.omit({ [field]: true } as never)).max(30) })
+      .optional()
+      .catch(undefined),
+  });
 }
 
 /** The repository read schema with one field of its contribution rules left out. */
@@ -1347,6 +1372,7 @@ function withoutRulesField(field: string) {
 const v12RepositorySchemas: Record<string, z.ZodTypeAny> = {
   testCommand: repositoryReadSchema.omit({ testCommand: true }),
   "contributionRules.channels": withoutRulesField("channels"),
+  "contributionRules.findings[].source": withoutFindingField("source"),
 };
 
 for (const [field, older] of Object.entries(v12RepositorySchemas))
