@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { redact, secretInPatch } from "./secrets.js";
+import { cutQuote } from "../shared/by-hand-filter.js";
 
 interface Row {
   name: string;
@@ -287,4 +288,15 @@ test("secrets: redact leaves code that reads a credential and the placeholders o
     ["Authorization: Bearer abcdef0123456789abcdef", "Authorization: Bearer [REDACTED]"],
   ];
   for (const [input, output] of masked) assert.equal(redact(input), output, input);
+});
+
+test("secrets: a guide's quote anchored on code that reads a credential is still cut from its file", () => {
+  // A guide's answer passes through redact() before BELL cuts its quotes: a masked anchor matched no line.
+  const file = ["export async function getPage(url: string) {", "  const githubToken = process.env.GITHUB_TOKEN ?? '';", "}"];
+  const anchor = "const githubToken = process.env.GITHUB_TOKEN ?? '';";
+  const answer = JSON.parse(redact(JSON.stringify({ quotes: [{ startLine: 1, endLine: 2, anchor }] }))) as {
+    quotes: { startLine: number; endLine: number; anchor: string }[];
+  };
+  assert.equal(answer.quotes[0].anchor, anchor);
+  assert.equal(cutQuote(file, answer.quotes[0])?.text, file.slice(0, 2).join("\n"));
 });
