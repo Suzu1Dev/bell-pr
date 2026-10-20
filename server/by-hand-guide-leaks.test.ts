@@ -201,14 +201,14 @@ test("the review covers only the version marked ready: an edit after Ready, befo
   const editing = byRole(async () => (await f.edit(`${retrySource}// and another\n`), reviewerAnswer));
   f.answers.splice(0, f.answers.length, editing, editing);
   await assert.rejects(withLocale("en", () => review(f.ctx, f.run, {}, new AbortController().signal)), notReady);
-  assert.equal(f.run.byHand?.reviews, undefined);
-  assert.equal(f.run.reports?.reviewer, undefined);
-  assert.equal(f.run.byHand?.events, undefined);
+  // Read through a call, so the checks below don't narrow the run's fields for the last one.
+  const stored = () => ({ reviews: f.run.byHand?.reviews, reviewer: f.run.reports?.reviewer, events: f.run.byHand?.events });
+  assert.deepEqual(stored(), { reviews: undefined, reviewer: undefined, events: undefined });
   // At the ready version the review is stored.
   await f.ready();
   f.answers.push(byRole(() => reviewerAnswer), byRole(() => reviewerAnswer));
   await withLocale("en", () => review(f.ctx, f.run, {}, new AbortController().signal));
-  assert.equal(f.run.byHand?.reviews?.length, 1);
+  assert.equal(stored().reviews?.length, 1);
 });
 
 test("BELL's own timeout message stays whole in a Learn-by-hand turn's error", async (t) => {
