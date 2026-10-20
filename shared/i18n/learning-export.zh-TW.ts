@@ -1,6 +1,7 @@
 /** Learning record export copy (Traditional Chinese, Taiwan); typed against the English copy. */
 import { formatters, type Translation } from "./locale.js";
 import type en from "./learning-export.en.js";
+import { product } from "../product.js";
 
 const fmt = formatters("zh-TW");
 
@@ -25,6 +26,23 @@ const messages: Translation<typeof en> = {
     forecast: "你的預測",
     feedbackTags: "你標記的維護者回饋",
     overrides: "你略過的檢查與理由",
+    byHand: "親手學",
+  },
+  byHand: {
+    claim: `${product.name} 的 agent 沒有寫入權限，也沒有給你這份變更的任何程式碼。`,
+    withdrawn: `${product.name} 在這個工作裡看到 agent 修改過檔案，所以不為它做親手學的聲明。`,
+    fitted: ({ kinds }) => `開始時就配合了專案的規範：嚮導只提供${kinds}。`,
+    helps: ({ helps }) => `- 嚮導的協助：${helps}`,
+    predictions: ({ right, judged, unsure }) => `- 每次修改後的第一個預測，${judged} 次中對了 ${right} 次；不確定 ${unsure} 次`,
+    removed: ({ count }) => `- ${product.name} 在你看到之前，從 ${count} 則回答中移除了程式碼`,
+    kinds: {
+      explain: "解說",
+      answer: "回答",
+      plan: "規劃協助",
+      review: "審查",
+      test: "測試協助",
+    },
+    notProof: `${product.name} 看不到你用過的其他工具，例如編輯器的自動完成。這份紀錄是給你自己看的，不能證明程式碼是誰寫的。`,
   },
   noPullRequest: "尚未送出 PR。",
   noExplanations: "尚未產生解說。",

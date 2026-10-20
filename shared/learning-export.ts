@@ -1,4 +1,5 @@
-import type { Locale } from "./i18n/locale.js";
+import { byHandClean, byHandSummary } from "./by-hand.js";
+import { formatters, type Locale } from "./i18n/locale.js";
 import en from "./i18n/learning-export.en.js";
 import zhTW from "./i18n/learning-export.zh-TW.js";
 import type { Repository, RunCore } from "./types.js";
@@ -33,6 +34,7 @@ export function buildLearningExport(
     section(m.sections.conversations, conversationSection(m, run)),
     section(m.sections.notes, notesSection(run)),
     section(m.sections.explainBack, explainBackSection(m, run)),
+    section(m.sections.byHand, byHandSection(m, run, locale)),
     section(m.sections.roads, roadsSection(m, run)),
     section(m.sections.forecast, forecastSection(m, run)),
     section(m.sections.feedbackTags, feedbackTagsSection(m, run)),
@@ -186,6 +188,33 @@ function explainBackSection(m: Messages, run: RunCore) {
         .join("\n"),
     );
   return parts.join("\n\n");
+}
+
+/**
+ * A Learn-by-hand run's record: the claim only while the run's history
+ * backs it (byHandClean), the help set it was fitted to, the help used
+ * and plain counts, and what BELL can't see.
+ */
+function byHandSection(m: Messages, run: RunCore, locale: Locale) {
+  if (!run.learnByHand) return "";
+  const fmt = formatters(locale);
+  const b = m.byHand;
+  const summary = byHandSummary(run);
+  const kinds = (values: readonly string[]) => fmt.list(values.map((kind) => b.kinds[kind] ?? kind));
+  const helps = Object.entries(summary.helps).map(([kind, count]) => `${b.kinds[kind] ?? kind} ${fmt.number(count)}`);
+  const { judged, right, unsure } = summary.predictions;
+  return [
+    byHandClean(run).clean ? b.claim : b.withdrawn,
+    ...(summary.fittedKinds ? [b.fitted({ kinds: kinds(summary.fittedKinds) })] : []),
+    [
+      ...(helps.length ? [b.helps({ helps: fmt.list(helps, { type: "unit" }) })] : []),
+      ...(judged + unsure ? [b.predictions({ right, judged, unsure })] : []),
+      ...(summary.removedAnswers ? [b.removed({ count: summary.removedAnswers })] : []),
+    ].join("\n"),
+    b.notProof,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function roadsSection(m: Messages, run: RunCore) {

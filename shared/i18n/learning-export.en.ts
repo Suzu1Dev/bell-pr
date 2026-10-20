@@ -3,6 +3,7 @@
  * the Markdown from it on the server and for the client-side demo export.
  */
 import { formatters } from "./locale.js";
+import { product } from "../product.js";
 
 const fmt = formatters("en");
 
@@ -30,6 +31,26 @@ const messages = {
     forecast: "Your forecast",
     feedbackTags: "Maintainer feedback you tagged",
     overrides: "Checks you overrode, with your reasons",
+    byHand: "Learn by hand",
+  },
+  /** A Learn-by-hand run's record (DESIGN v1.2 F13): facts and plain counts, never a score. */
+  byHand: {
+    claim: `${product.name}'s agents had no write access and gave you no code for this change.`,
+    withdrawn: `${product.name} saw agent edits in this run, so it makes no Learn-by-hand claim for it.`,
+    fitted: ({ kinds }: { kinds: string }) =>
+      `Fitted to the project's rules when it started: the guide offered only ${kinds}.`,
+    helps: ({ helps }: { helps: string }) => `- Help from the guide: ${helps}`,
+    predictions: ({ right, judged, unsure }: { right: number; judged: number; unsure: number }) =>
+      `- Your first prediction after each change was right ${right} of ${judged} times; Not sure ${unsure}`,
+    removed: ({ count }: { count: number }) => `- ${product.name} removed code from ${count} answers before you saw them`,
+    kinds: {
+      explain: "explanations",
+      answer: "answers",
+      plan: "planning help",
+      review: "reviews",
+      test: "test help",
+    } as Record<string, string>,
+    notProof: `${product.name} can't see other tools you used, such as editor autocomplete. This record is for you; it isn't proof of who wrote the code.`,
   },
   noPullRequest: "No pull request has been opened yet.",
   noExplanations: "No explanations have been generated yet.",

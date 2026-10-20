@@ -6,11 +6,17 @@
  * write access and gave you no code for this change.") shows only while
  * `byHandClean(run)` holds, which reads the run's history, not the build.
  */
-import { changeFingerprint, understandingWords, type CheckFile } from "./understanding.js";
+// Plain modules only: the learning export loads this one (shared/learning-export.ts).
+import { changeFingerprint } from "./change-fingerprint.js";
+import type { CheckFile } from "./understanding.js";
 
-// The vocabularies below are stored as text in state.json and frozen at
-// these values: a later build may add a field, never a value. Readers
-// ignore a value they do not know.
+/** Words as draftProseWords counts plain text: one CJK character is one word. */
+const cjk = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu;
+const proseWords = (text: string) =>
+  (text.match(cjk)?.length ?? 0) + (text.replace(cjk, " ").match(/[\p{L}\p{N}][\p{L}\p{N}'’_.-]*/gu)?.length ?? 0);
+
+// Vocabularies stored as text in state.json, frozen at these values (a later
+// build may add a field, never a value); readers ignore a value they don't know.
 
 /** A guide turn: a question, a hint rung, a test failure, plan questions, chat. */
 export const guideKinds = ["ask", "hint", "test", "plan", "chat"] as const;
@@ -43,7 +49,7 @@ export type ExitKind = (typeof exitKinds)[number];
 /** What `byHand.busy` waits for. */
 export const busyKinds = ["plan", "guide", "review", "tests"] as const;
 export type BusyKind = (typeof busyKinds)[number];
-/** Hint rungs: R0 is local (no model call); there is no code rung. */
+/** Hint rungs, integers: R0 is local (no model call); there is no code rung. */
 export const hintRungs = [0, 1, 2, 3, 4] as const;
 
 /**
@@ -255,16 +261,13 @@ export function byHandClean(run: ByHandRunFacts): { clean: true } | { clean: fal
   if (run.agents.some((agent) => !roster.includes(agent.id))) return unclean("agents");
   if (run.team?.tasks.length) return unclean("tasks");
   if ((run.followUps ?? []).some((round) => round.kind !== "sync")) return unclean("rounds");
-  const resolved = [run.sync, ...(run.followUps ?? [])].some((holder) => holder?.resolutions !== undefined);
-  if (resolved) return unclean("resolutions");
+  if ([run.sync, ...(run.followUps ?? [])].some((holder) => holder?.resolutions !== undefined))
+    return unclean("resolutions");
   return { clean: true };
 }
 
 /** True when the run is an LBH run and its current change is the version marked ready (DESIGN §4). */
-export function readyNow(
-  run: Pick<ByHandRunFacts, "learnByHand" | "byHand">,
-  files: readonly Pick<CheckFile, "path" | "fingerprint">[],
-) {
+export function readyNow(run: Pick<ByHandRunFacts, "learnByHand" | "byHand">, files: readonly Pick<CheckFile, "path" | "fingerprint">[]) {
   return !!run.learnByHand && run.byHand?.ready?.changeFingerprint === changeFingerprint(files);
 }
 
@@ -328,7 +331,7 @@ export function attemptSince(
     return true;
   const tried = input.tried?.trim() ?? "";
   return (
-    understandingWords(tried) >= byHandLimits.attemptWords &&
+    proseWords(tried) >= byHandLimits.attemptWords &&
     !sameWords(tried, input.previousTried ?? hintState.tried)
   );
 }
@@ -391,16 +394,14 @@ export function byHandSummary(run: Pick<ByHandRunFacts, "byHand">): ByHandSummar
     const kind = allHelpKinds.find((known) => known === event.kind);
     if (kind) helps[kind] = (helps[kind] ?? 0) + 1;
   }
-  const hints = (record.thread ?? []).filter((entry) => entry.kind === "hint");
-  const talks = record.talks ?? [];
+  const [hints, talks] = [(record.thread ?? []).filter((entry) => entry.kind === "hint"), record.talks ?? []];
   const highest = new Map<string, number>();
   const raise = (stepId: string | undefined, rung: number | undefined) => {
     if (stepId && rung !== undefined && rung > (highest.get(stepId) ?? -1)) highest.set(stepId, rung);
   };
   for (const entry of hints) raise(entry.stepId, entry.rung);
   for (const step of record.plan?.steps ?? []) raise(step.id, step.maxRung);
-  // Only the first prediction after each new change counts: re-runs at the
-  // same version are nearly free to predict.
+  // Only the first prediction after each new change counts (re-runs are free to predict).
   const predictions = { judged: 0, right: 0, unsure: 0 };
   let namedTests = 0;
   const predicted = new Set<string>();
@@ -422,8 +423,7 @@ export function byHandSummary(run: Pick<ByHandRunFacts, "byHand">): ByHandSummar
     hintRequests: talks.length + hints.length,
     lowRungRequests: talks.length + hints.filter((entry) => (entry.rung ?? 1) <= 1).length,
     highestRungs: [...highest].map(([stepId, rung]) => ({ stepId, rung })),
-    predictions,
-    namedTests,
+    predictions, namedTests,
     readyVersions: new Set([...(record.readyHistory ?? []), ...(record.ready ? [record.ready] : [])]
       .map((ready) => ready.changeFingerprint)).size,
     reviewFindings: (record.reviews ?? []).map((review) => review.findings.length),
@@ -432,8 +432,7 @@ export function byHandSummary(run: Pick<ByHandRunFacts, "byHand">): ByHandSummar
       (record.reviews ?? []).filter((review) => (review.removed ?? 0) > 0).length,
     removedTotal: record.removedTotal ?? 0,
     outlineBeforeDraft: !!record.plan?.outlineBeforeDraft,
-    exits: (record.exits ?? []).length,
-    left: !!record.leftAt,
+    exits: (record.exits ?? []).length, left: !!record.leftAt,
     ...(record.helpLock ? { fittedKinds: [...record.helpLock.kinds] } : {}),
   };
 }
@@ -457,8 +456,7 @@ export function byHandPreflight(run: ByHandRunFacts, now: string, options: { cre
   };
 }
 
-// The bodies of the Learn-by-hand routes, which server/routes/by-hand.ts
-// checks strictly, and what its reads answer.
+// The bodies of the Learn-by-hand routes (strict in server/routes/by-hand.ts) and what its reads answer.
 /** PUT /api/runs/:id/by-hand/plan */
 export type ByHandPlanInput = {
   steps: { id?: string; title: string; files?: string[]; how?: string }[];

@@ -8,6 +8,7 @@ import {
 } from "../../shared/explanations";
 import type { RunStatus } from "../../shared/types";
 import type { RunUnderstanding } from "../../shared/understanding";
+import type { ByHandSummary } from "../../shared/by-hand";
 import { api } from "../api";
 import { getDemo } from "../demo";
 import { useFormat, useLocale, useT } from "../i18n";
@@ -43,6 +44,9 @@ export interface LearningRun {
   understanding?: RunUnderstanding;
   /** Approved with the understanding check off. */
   understandingCheckOff?: boolean;
+  /** A Learn-by-hand run, and its record's plain counts (DESIGN v1.2 F13). */
+  learnByHand?: true;
+  byHandSummary?: ByHandSummary;
 }
 
 /** One page of the learning record: 20 runs, newest first. */
