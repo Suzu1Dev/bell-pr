@@ -755,9 +755,9 @@ test("a learn-by-hand run plans with the guide instead of approving a team plan,
   assertNoHan(planning);
   // The premise check shows once, first in the plan panel (loading here), not on the board too.
   assert.doesNotMatch(planning, /Retries never stop\./);
-  // No team reads messages here: nothing can be queued for one, and no delivery is promised.
-  assert.match(planning, /<textarea aria-label="Team message"[^>]*disabled=""/);
-  assert.match(planning, /<p class="team-delivery-note" hidden="">/);
+  // No agent team here: no team header, flow, task lanes or team conversation, only the plan and the run's details.
+  assert.doesNotMatch(planning, /Shared tasks and team messages|Build together|Teammates work in parallel|team-kanban|Team conversation|Team message/);
+  assert.match(planning, /Run details/);
   // The plan panel loads with the byhand chunk; no team approval or "send back".
   assert.match(planning, /<svg[^>]*lucide-loader-circle[^>]*spin/);
   assert.doesNotMatch(planning, /Approve the plan and start development|Send back with feedback/);
@@ -777,4 +777,9 @@ test("a learn-by-hand run plans with the guide instead of approving a team plan,
     renderEn(createElement(TeamBoard, { run: byHand("review", "complete"), demo: false, onApprove() {}, async onRevise() {}, async onMessage() {}, busy: false, entitlements: freeEntitlements, byHand: { ...plan, writing } }));
   assert.match(after(true), panel);
   assert.doesNotMatch(after(false), panel);
+  // An agent run keeps its board.
+  assert.match(
+    renderEn(createElement(TeamBoard, { run: { ...sample.run, team: sample.team }, demo: false, onApprove() {}, async onRevise() {}, async onMessage() {}, busy: false, entitlements: freeEntitlements })),
+    /aria-label="Shared tasks and team messages"[\s\S]*Teammates work in parallel[\s\S]*team-kanban[\s\S]*Team conversation/,
+  );
 });

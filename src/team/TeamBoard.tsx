@@ -132,8 +132,7 @@ export function TeamBoard({
     !demo &&
     !["all", "lead"].includes(recipient) &&
     !team.tasks.some((task) => task.id === recipient && canReceive(task));
-  // Nothing reads team messages in a Learn-by-hand run: the guide has no team.
-  const messagingDisabled = !demo && (finished || team.phase === "planning" || !!run.learnByHand);
+  const messagingDisabled = !demo && (finished || team.phase === "planning");
   const done = team.tasks.filter((task) => task.status === "complete").length;
   const revisions = team.planRevisions ?? [];
   const revisionsLeft = revisions.length < maxPlanRevisions;
@@ -193,8 +192,9 @@ export function TeamBoard({
   // A long task description opens to its first lines in the narrow lanes.
   const longDescription = 180;
   return (
-    <section className="team-board" aria-label={t.boardLabel}>
-      <div className="team-board-header">
+    <section className="team-board" aria-label={run.learnByHand ? undefined : t.boardLabel}>
+      {/* Learn by hand: no agent team to describe, split work for or talk to; the plan and the run's details stay. */}
+      {!run.learnByHand && <div className="team-board-header">
         <div>
           <span className="eyebrow">{t.eyebrow}</span>
           <h2>{t.title}</h2>
@@ -221,7 +221,7 @@ export function TeamBoard({
             )}
           </span>
         </div>
-      </div>
+      </div>}
       <details className="team-run-details">
         <summary>
           <strong>{t.runDetails.title}</strong>
@@ -239,7 +239,7 @@ export function TeamBoard({
           />
         </div>
       </details>
-      <div className="team-flow">
+      {!run.learnByHand && <div className="team-flow">
         <span {...step("plan")}>
           <ListChecks size={18} aria-hidden="true" />
           {t.flow.plan}
@@ -261,7 +261,7 @@ export function TeamBoard({
           <GitMerge size={18} aria-hidden="true" />
           {t.flow.integrate}
         </span>
-      </div>
+      </div>}
       <div
         className={`team-plan ${team.phase === "awaiting_approval" ? "needs-approval" : ""}`}
       >
@@ -468,6 +468,7 @@ export function TeamBoard({
           </form>
         )}
       </div>
+      {!run.learnByHand && <>
       <div className="team-board-content">
         <div
           className={`team-kanban ${team.tasks.length ? "has-tasks" : ""}`}
@@ -626,7 +627,7 @@ export function TeamBoard({
             </h3>
             <span>{team.messages.length}</span>
           </div>
-          <p className="team-delivery-note" hidden={run.learnByHand}>
+          <p className="team-delivery-note">
             {team.phase === "planning"
               ? t.mailbox.delivery.planning
               : recipient === "lead"
@@ -780,6 +781,7 @@ export function TeamBoard({
           {t.protocolNote({ provider: providerLabels[team.config.provider] })}
         </p>
       </details>
+      </>}
     </section>
   );
 }
