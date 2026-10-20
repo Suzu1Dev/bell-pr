@@ -154,19 +154,17 @@ export function byHandCommandLine(command: string | undefined) {
 /**
  * A Learn-by-hand agent turn's error (DESIGN v1.2 F7): a CLI that exited
  * with an error is reported with the end of its stderr, filtered, never
- * with its stdout, which holds the agent's own text; any other message and
- * the stderr in its details are filtered too. The same error when nothing
- * changes.
+ * with its stdout, which holds the agent's own text; the stderr in any
+ * error's details is filtered. BELL's own messages (a timeout, a setup
+ * problem, a cancellation) stay whole; the error itself when it has no
+ * stderr.
  */
 export function byHandAgentError(error: unknown, executable?: string): unknown {
-  if (!(error instanceof Error)) return error;
   const details = error instanceof AppError ? error.details : undefined;
-  const stderr = typeof details?.stderr === "string" ? details.stderr : undefined;
-  const exited = !!executable && error instanceof AppError && error.statusCode === 422 && !error.code && stderr !== undefined;
-  const output = byHandLogText((stderr || `exit ${String(details?.exitCode ?? "?")}`).slice(-1800));
-  const message = exited ? sm().run.command.failed({ executable: executable!, output }) : byHandLogText(error.message);
-  const filtered = stderr === undefined ? details : { ...details, stderr: byHandLogText(stderr) };
-  if (message === error.message && filtered?.stderr === stderr) return error;
-  if (!(error instanceof AppError)) return new Error(message);
-  return new AppError(message, error.statusCode, { code: error.code, params: error.params, fixes: error.fixes, details: filtered });
+  if (!(error instanceof AppError) || typeof details?.stderr !== "string") return error;
+  const stderr = details.stderr;
+  const exited = !!executable && error.statusCode === 422 && !error.code;
+  const output = byHandLogText((stderr || `exit ${String(details.exitCode ?? "?")}`).slice(-1800));
+  const message = exited ? sm().run.command.failed({ executable: executable!, output }) : error.message;
+  return new AppError(message, error.statusCode, { code: error.code, params: error.params, fixes: error.fixes, details: { ...details, stderr: byHandLogText(stderr) } });
 }

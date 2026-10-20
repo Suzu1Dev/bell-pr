@@ -165,11 +165,13 @@ export async function storedGuideAnswer(run: GuideRun, request: GuideRequest, an
   return answerEntry(run, request, { ...filtered, dropped: filtered.dropped + unknown });
 }
 
-/** An agent turn's error, its message filtered (F7): the CLI's error can carry the agent's own text. */
-function filteredError(error: unknown): never {
-  const { value, removed } = filterAgentText(error instanceof Error ? error.message : String(error), { base: {}, worktree: {} });
-  if (!removed) throw error;
-  throw error instanceof AppError ? new AppError(value, error.statusCode, { code: error.code, params: error.params, fixes: error.fixes }) : new Error(value);
+/** An agent turn's error, filtered (F7): a CLI's failure can quote the agent. BELL's timeout and setup messages stay whole (as server/by-hand.ts's). */
+function filteredError(error: unknown): Error {
+  if (error instanceof AppError && (error.statusCode === 504 || error.code)) return error;
+  const message = error instanceof Error ? error.message : String(error);
+  const { value, removed } = filterAgentText(message, { base: {}, worktree: {} });
+  if (!removed) return error instanceof Error ? error : new Error(message);
+  return error instanceof AppError ? new AppError(value, error.statusCode, { params: error.params, fixes: error.fixes }) : new Error(value);
 }
 
 /** One guide turn (DESIGN v1.2 F6, F7): read-only and isolated, under the guide's schema; the caller records it. */
@@ -177,7 +179,7 @@ export async function runGuideTurn(ctx: WorkbenchContext, run: Run, request: Gui
   const prompt = await guideTurnPrompt(run, request, currentLocale());
   const answer = await withSchemaFile(guideAnswerJsonSchema, (outputSchema) =>
     runAgent(ctx, run, "lead", prompt, signal, true, { isolated: true, outputSchema }),
-  ).catch(filteredError);
+  ).catch((error) => { throw filteredError(error); });
   return storedGuideAnswer(run, request, answer);
 }
 
@@ -481,7 +483,7 @@ export async function review(ctx: WorkbenchContext, run: Run, input: { leastSure
     const [reviewerPrompt, testerPrompt] = [byHandReviewerPrompt(locale, turn.prompt), byHandTesterPrompt(locale, turn.prompt)];
     const reports = await withSchemaFile(reviewerAnswerJsonSchema, (reviewerSchema) =>
       runIndependentReview(ctx, run, files, undefined, signal, { reviewerPrompt, testerPrompt, reviewerSchema, isolated: true }),
-    ).catch(filteredError);
+    ).catch((error) => { throw filteredError(error); });
     const { review: stored, tester } = await storedReview(run, files, turn, reports);
     // Stored together, after every await: the help event first, as it refuses a kind outside the lock.
     recordHelp(run, { source: "review", removed: stored.removed });

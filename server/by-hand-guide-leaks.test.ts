@@ -16,7 +16,7 @@ import { withLocale } from "./i18n/index.js";
 import { git } from "./process.js";
 import { Store } from "./store.js";
 import type { TeamAgentInput } from "./team.js";
-import type { Run } from "./types.js";
+import { AppError, type Run } from "./types.js";
 import { Workbench, type WorkbenchContext } from "./workbench.js";
 
 const previousPath = process.env.PATH;
@@ -171,4 +171,15 @@ test("a link can't carry code in its path, query or fragment", async (t) => {
   const answer = await withLocale("en", () => chat(f.ctx, f.run, "src/retry.js", "Where do I read about timers?", new AbortController().signal));
   assert.doesNotMatch(answer, /fix=|attempt%2B|a%3D%3Db/, answer);
   assert.match(answer, /https:\/\/developer\.mozilla\.org\/en-US\/docs\/Web\/API\/setTimeout/);
+});
+
+test("BELL's own timeout message stays whole in a Learn-by-hand turn's error", async (t) => {
+  const f = await fixture(t);
+  f.answers.push(() => {
+    throw new AppError((m) => m.run.agentCli.timedOut({ executable: "codex", minutes: 10 }), 504);
+  });
+  await assert.rejects(
+    withLocale("en", () => chat(f.ctx, f.run, "src/retry.js", "How do I back off?", new AbortController().signal)),
+    (error: unknown) => error instanceof AppError && error.statusCode === 504 && /raise BELLPR_AGENT_TIMEOUT_SCALE\.$/.test(error.message),
+  );
 });

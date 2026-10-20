@@ -183,3 +183,18 @@ test("agent runs log and fail exactly as before", async (t) => {
   assert.ok(claude.run.logs.some((entry) => entry.message === `I could not finish. The fix is ${code}`));
   assert.ok(claude.run.logs.some((entry) => entry.kind === "notice" && entry.message.includes(`Grep for ${code}`)));
 });
+
+test("an isolated Learn-by-hand turn filters Claude Code's failed result too, and keeps BELL's timeout message whole", async (t) => {
+  const f = await fixture(t, { learnByHand: true, provider: "claude", execute: claudeFailure });
+  let failure: unknown;
+  await f.turn("Where is the retry loop?", true).catch((error: unknown) => (failure = error));
+  assert.ok(failure instanceof AppError && noCode(failure.message), String(failure));
+  assert.ok(noCode(visible(f.run)), visible(f.run));
+  // The CLI ran out of time: BELL's message names the setting to raise.
+  const timedOut: Execute = (async (executable: string) => {
+    throw new AppError((m) => m.run.command.timedOut({ executable }), 504);
+  }) as Execute;
+  const slow = await fixture(t, { learnByHand: true, provider: "claude", execute: timedOut });
+  await assert.rejects(slow.turn("Where is the retry loop?", true), (error: unknown) =>
+    error instanceof AppError && error.statusCode === 504 && /raise BELLPR_AGENT_TIMEOUT_SCALE\.$/.test(error.message));
+});
