@@ -16,6 +16,7 @@ import {
   helpAllowed,
   helpKindOf,
   needsWhy,
+  repeatFailure,
   type AskEntry,
   type ByHandCheckInInput,
   type ByHandGuideInput,
@@ -131,7 +132,8 @@ export function GuidePanel(props: GuidePanelProps) {
   const rungs = [1, 2, 3, 4].filter((rung) => helpAllowed(run, helpKindOf("hint", rung)));
   const next = (hintState?.rung ?? 0) + 1;
   const offered = !!step && rungs.includes(next);
-  const attempt = attemptSince(hintState, { fingerprint, tests: record.tests, tried });
+  // As on the server, R4 also follows the same failure three test runs in a row.
+  const attempt = attemptSince(hintState, { fingerprint, tests: record.tests, tried }) || (next === 4 && repeatFailure(record.tests));
   // "My change" goes to that next rung, so it is offered only with it.
   const entries = askEntries.filter((value) => value !== "change" || offered);
   const asked = entries.includes(entry) ? entry : "project";

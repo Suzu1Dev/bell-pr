@@ -178,6 +178,14 @@ test("the guide says the agents can't edit files, lists the steps, and offers th
   assert.match(renderZh(guide({ plan: { steps, savedAt: at } })), /我卡住了/);
 });
 
+test("after the same failure three test runs in a row, R4 needs no other attempt, as the server allows", () => {
+  const failed = (minute: number) => ({ at: `2026-10-20T08:0${minute}:00.000Z`, command: "npm test", changeFingerprint: fingerprint, outcome: "failed", exitCode: 1, tailHash: "h1", ms: 9 });
+  // R3 given at this version after the three runs: no change, no test and no "what I tried" since.
+  const text = html(guide({ plan: { steps, savedAt: at }, hints: { s2: { rung: 3, at, fingerprint } }, tests: [failed(1), failed(2), failed(3)] }));
+  assert.doesNotMatch(text, /Try something first/);
+  assert.doesNotMatch(text, /disabled=""><svg(?:(?!<button)[\s\S])*?<\/svg> Next hint/);
+});
+
 test("with no rung left on the step, \"My change\" isn't offered either", () => {
   assert.doesNotMatch(html(guide({ plan: { steps, savedAt: at }, hints: { s2: { rung: 4, at, fingerprint } } })), /My change/);
 });
