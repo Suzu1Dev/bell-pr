@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { htmlLang, locales } from "../../shared/i18n/locale";
+import { byHandTurn } from "../app/byHandStatus";
 import { useLocale, useT } from "../i18n";
 import { chooseLocale } from "../i18n/LanguageSwitcher";
 import type { Repo, RunSummary } from "../types";
@@ -75,7 +76,7 @@ export function CommandPalette({
   const filteredRuns = useMemo(() => {
     const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
     return repoRuns.filter((run) => {
-      const text = `${run.title} ${run.branch} ${run.learnByHand && run.status === "awaiting_plan" ? yourTurn : statusLabels[run.status]}`.toLocaleLowerCase();
+      const text = `${run.title} ${run.branch} ${byHandTurn(run) ? yourTurn : statusLabels[run.status]}`.toLocaleLowerCase();
       return terms.every((term) => text.includes(term));
     });
   }, [repoRuns, query, statusLabels, yourTurn]);
@@ -315,7 +316,7 @@ export function CommandPalette({
                 <span className="command-palette-run-icon"><GitPullRequest size={18} aria-hidden="true" /></span>
                 <span className="command-palette-run-detail">
                   <strong>{run.title}</strong>
-                  <span><i aria-hidden="true" />{run.learnByHand && run.status === "awaiting_plan" ? yourTurn : statusLabels[run.status]}<small title={run.branch}>{run.branch}</small></span>
+                  <span><i aria-hidden="true" />{byHandTurn(run) ? yourTurn : statusLabels[run.status]}<small title={run.branch}>{run.branch}</small></span>
                 </span>
                 {run.id === currentRunId ? <span className="command-palette-current"><Check size={12} aria-hidden="true" />{t.current}</span> : <ArrowUpRight size={15} className="command-palette-open-icon" aria-hidden="true" />}
               </button>

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { productLink } from "../../shared/product";
 import type { LicenseSummary } from "../../shared/plans";
+import { ByHandChip, byHandTurn } from "../app/byHandStatus";
 import { Logo } from "../brand/Logo";
 import { useT } from "../i18n";
 import { PlanChip } from "../license/PlanChip";
@@ -80,7 +81,7 @@ export function HomePage({
 }: HomePageProps) {
   const t = useT("home");
   const statusLabels = useT("common").runStatus;
-  const yourTurn = useT("workspace").byHand.turn;
+  const { turn: yourTurn, badge: byHandBadge } = useT("workspace").byHand;
   const recent = recentRuns(runs, lastRunId);
   // A link while the owner has published pricing; the dialog otherwise.
   const upgradeUrl = productLink("pricingUrl") ?? productLink("purchaseUrl");
@@ -191,10 +192,11 @@ export function HomePage({
                       {t.continue.detail({
                         repo:
                           repos.find((repo) => repo.id === run.repoId)?.fullName ?? "",
-                        status: run.learnByHand && run.status === "awaiting_plan" ? yourTurn : statusLabels[run.status],
+                        status: byHandTurn(run) ? yourTurn : statusLabels[run.status],
                       })}
                     </small>
                   </span>
+                  {run.learnByHand && <ByHandChip label={byHandBadge} />}
                   {run.id === lastRunId && (
                     <span className="home-run-last">{t.continue.lastOpened}</span>
                   )}
