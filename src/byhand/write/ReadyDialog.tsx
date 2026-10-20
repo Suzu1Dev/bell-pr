@@ -38,41 +38,26 @@ export function ReadyDialog({ run, files, open, onClose, onReady, aiRules = fals
   const record = run.byHand ?? {};
   const fingerprint = changeFingerprint(files.map(({ path, fingerprint }) => ({ path, fingerprint: fingerprint ?? "" })));
   // The last test run at this version, BELL's or one the person reported.
-  const last = (record.tests ?? [])
-    .filter((test) => test.changeFingerprint === fingerprint)
-    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
-    .at(-1);
+  const last = (record.tests ?? []).filter((test) => test.changeFingerprint === fingerprint).sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).at(-1);
   // A second review waits for a test run at the new version.
   const reviewedBefore = !!record.reviews?.length || !!record.ready?.review || !!record.readyHistory?.some((ready) => ready.review);
   const testFirst = reviewedBefore && !last;
   const offered = helpAllowed(run, "review");
   const asked = offered && review && !testFirst;
   const predicted = last?.prediction && text.tests.predictions[last.prediction];
+  const total = (key: "additions" | "deletions") => files.reduce((sum, file) => sum + file[key], 0);
   return (
     <Modal title={t.title} subtitle={t.quiet} onClose={onClose} mark={<CheckCheck size={22} aria-hidden="true" />}>
       <div className="by-hand">
         <ul>
+          <li>{t.facts({ n: files.length, additions: total("additions"), deletions: total("deletions") })}</li>
           <li>
-            {t.facts({
-              n: files.length,
-              additions: files.reduce((sum, file) => sum + file.additions, 0),
-              deletions: files.reduce((sum, file) => sum + file.deletions, 0),
-            })}
+            {last ? t.tested({ outcome: text.tests.outcomes[last.outcome] ?? last.outcome, when: ago(fmt, last.at), predicted })
+              : <span className="by-hand-note">{t.untested}</span>}
           </li>
-          <li>
-            {last ? (
-              t.tested({ outcome: text.tests.outcomes[last.outcome] ?? last.outcome, when: ago(fmt, last.at), predicted })
-            ) : (
-              <span className="by-hand-note">{t.untested}</span>
-            )}
-          </li>
-          {!!last?.newFiles?.length && (
-            <li>{text.tests.newFiles({ n: last.newFiles.length, list: fmt.list(last.newFiles, { type: "unit" }) })}</li>
-          )}
+          {!!last?.newFiles?.length && <li>{text.tests.newFiles({ n: last.newFiles.length, list: fmt.list(last.newFiles, { type: "unit" }) })}</li>}
         </ul>
-        <label className="field-label" htmlFor="by-hand-least-sure">
-          {t.leastSure}
-        </label>
+        <label className="field-label" htmlFor="by-hand-least-sure">{t.leastSure}</label>
         <textarea id="by-hand-least-sure" className="text-input" rows={2} maxLength={byHandLimits.leastSureChars} value={leastSure}
           onChange={(event) => setLeastSure(event.target.value)} />
         {offered ? (
@@ -90,15 +75,9 @@ export function ReadyDialog({ run, files, open, onClose, onReady, aiRules = fals
         ) : (
           <p className="field-help">{t.noReview}</p>
         )}
-        {error && (
-          <p className="inline-error" role="alert">
-            {error}
-          </p>
-        )}
+        {error && <p className="inline-error" role="alert">{error}</p>}
         <div className="modal-actions">
-          <button type="button" className="button secondary" onClick={onClose}>
-            {cancel}
-          </button>
+          <button type="button" className="button secondary" onClick={onClose}>{cancel}</button>
           <button type="button" className="button primary" disabled={busy || !files.length}
             onClick={() => void onReady({ changeFingerprint: fingerprint, ...(leastSure.trim() ? { leastSure: leastSure.trim() } : {}), review: asked }).catch(() => undefined)}>
             <CheckCheck size={16} aria-hidden="true" /> {t.confirm}

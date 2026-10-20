@@ -10,12 +10,7 @@ import { useWriteText } from "./text";
  * note when the filter removed code, and R3's options to choose one with a
  * line on why.
  */
-export function GuideThread({
-  entries,
-  steps,
-  onStep,
-  busy,
-}: {
+export function GuideThread({ entries, steps, onStep, busy }: {
   entries: GuideEntry[];
   steps: ByHandStep[];
   onStep(stepId: string, input: ByHandStepInput): Promise<void>;
@@ -40,19 +35,13 @@ export function GuideThread({
               {entry.ask && <p>{entry.ask}</p>}
               {!!entry.refs?.length && (
                 <div className="by-hand-row">
-                  {entry.refs.map((ref) => (
-                    <CopyRef key={`${ref.path}:${ref.line}`} text={`${ref.path}:${ref.line}${ref.endLine ? `-${ref.endLine}` : ""}`} />
-                  ))}
+                  {entry.refs.map((ref) => <CopyRef key={`${ref.path}:${ref.line}`} text={`${ref.path}:${ref.line}${ref.endLine ? `-${ref.endLine}` : ""}`} />)}
                 </div>
               )}
               {entry.quotes?.map((quote) => (
                 <figure key={`${quote.path}:${quote.startLine}`}>
-                  <figcaption>
-                    <code>{`${quote.path}:${quote.startLine}-${quote.endLine}`}</code> {quote.from === "change" ? t.change : t.base}
-                  </figcaption>
-                  <pre>
-                    <code>{quote.text}</code>
-                  </pre>
+                  <figcaption><code>{`${quote.path}:${quote.startLine}-${quote.endLine}`}</code> {quote.from === "change" ? t.change : t.base}</figcaption>
+                  <pre><code>{quote.text}</code></pre>
                 </figure>
               ))}
               {(entry.removed ?? 0) > 0 && <p className="by-hand-note">{t.removed}</p>}
@@ -64,22 +53,14 @@ export function GuideThread({
                     return (
                       <li key={option.name}>
                         <strong>{option.name}</strong> {option.tradeoff}{" "}
-                        {chosen ? (
-                          <em>{t.chosen}</em>
-                        ) : open ? (
+                        {chosen ? <em>{t.chosen}</em> : open ? (
                           <span className="by-hand-row">
                             <input className="text-input" aria-label={t.chooseWhy} placeholder={t.chooseWhy} maxLength={300} value={picking.why}
                               onChange={(event) => setPicking({ ...picking, why: event.target.value })} />
                             <button type="button" className="button secondary" disabled={busy || !picking.why.trim()}
-                              onClick={() => void onStep(step.id, { chosen: { ...picking, why: picking.why.trim() } }).then(() => setPicking(undefined), () => undefined)}>
-                              {t.choose}
-                            </button>
+                              onClick={() => void onStep(step.id, { chosen: { ...picking, why: picking.why.trim() } }).then(() => setPicking(undefined), () => undefined)}>{t.choose}</button>
                           </span>
-                        ) : (
-                          <button type="button" className="mission-text-button" onClick={() => setPicking({ entryId: entry.id, option: index, why: "" })}>
-                            {t.choose}
-                          </button>
-                        )}
+                        ) : <button type="button" className="mission-text-button" onClick={() => setPicking({ entryId: entry.id, option: index, why: "" })}>{t.choose}</button>}
                       </li>
                     );
                   })}

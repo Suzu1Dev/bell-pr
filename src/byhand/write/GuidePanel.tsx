@@ -139,9 +139,7 @@ export function GuidePanel(props: GuidePanelProps) {
   const where = selection?.startLine ? { path: selection.path, startLine: selection.startLine, endLine: selection.endLine } : {};
   return (
     <div className="by-hand guide-panel">
-      <h3>
-        <Hand size={17} aria-hidden="true" /> {t.title}
-      </h3>
+      <h3><Hand size={17} aria-hidden="true" /> {t.title}</h3>
       {banner && <p className="by-hand-note">{banner}</p>}
       <p className="field-help">{clean.clean ? t.clean : t.unclean({ reason: t.reasons[clean.reason] ?? clean.reason })}</p>
       {missing.length > 0 && <p className="field-help">{t.notOffered({ kinds: helpKindList(missing, locale) })}</p>}
@@ -155,20 +153,15 @@ export function GuidePanel(props: GuidePanelProps) {
                 <span>{item.title}</span>
                 {!item.doneAt && (
                   <span className="by-hand-row">
+                    {/* After R3 or R4, Done first asks why the change works. */}
                     <button type="button" className="mission-text-button" disabled={working}
                       onClick={() => (needsWhy(item) && why?.stepId !== item.id ? setWhy({ stepId: item.id, text: "" }) : void onStep(item.id, { done: true, ...(why?.stepId === item.id ? { why: why.text.trim() } : {}) }).then(() => setWhy(undefined), quiet))}>
                       {t.done}
                     </button>
-                    {!item.parkedAt && (
-                      <button type="button" className="mission-text-button" disabled={working} onClick={() => void onStep(item.id, { parked: true }).catch(quiet)}>
-                        {t.park}
-                      </button>
-                    )}
+                    {!item.parkedAt && <button type="button" className="mission-text-button" disabled={working} onClick={() => void onStep(item.id, { parked: true }).catch(quiet)}>{t.park}</button>}
                   </span>
                 )}
-                {why?.stepId === item.id && (
-                  <input className="text-input" aria-label={t.why} placeholder={t.why} maxLength={300} value={why.text} onChange={(event) => setWhy({ stepId: item.id, text: event.target.value })} />
-                )}
+                {why?.stepId === item.id && <input className="text-input" aria-label={t.why} placeholder={t.why} maxLength={300} value={why.text} onChange={(event) => setWhy({ stepId: item.id, text: event.target.value })} />}
               </li>
             ))}
           </ol>
@@ -179,10 +172,7 @@ export function GuidePanel(props: GuidePanelProps) {
           {review.findings.map((finding) => (
             <li key={`${finding.path}:${finding.line}`}>
               {finding.observed}{" "}
-              <button type="button" className="mission-text-button"
-                onClick={() => ask(t.reviewAsk({ at: `${finding.path}${finding.line ? `:${finding.line}` : ""}`, observed: finding.observed }))}>
-                {t.aboutReview}
-              </button>
+              <button type="button" className="mission-text-button" onClick={() => ask(t.reviewAsk({ at: `${finding.path}${finding.line ? `:${finding.line}` : ""}`, observed: finding.observed }))}>{t.aboutReview}</button>
             </li>
           ))}
         </ul>
@@ -194,9 +184,7 @@ export function GuidePanel(props: GuidePanelProps) {
           if (question.trim()) send({ kind: "ask", entry, question: question.trim(), ...where });
         }}
       >
-        <h3>
-          <MessageSquare size={16} aria-hidden="true" /> {t.ask}
-        </h3>
+        <h3><MessageSquare size={16} aria-hidden="true" /> {t.ask}</h3>
         <fieldset className="by-hand-row" aria-label={t.ask}>
           {askEntries.map((value) => (
             <label key={value} className="by-hand-chip">
@@ -229,20 +217,12 @@ export function GuidePanel(props: GuidePanelProps) {
           <Loader2 size={14} className="spin" aria-hidden="true" /> {t.working}
         </p>
       )}
-      {error && (
-        <p className="inline-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <p className="inline-error" role="alert">{error}</p>}
       <GuideExits runId={run.id} step={step} tests={record.tests ?? []} fingerprint={fingerprint} issueUrl={props.issueUrl}
         channels={props.channels} onStep={onStep} onCheckIn={props.onCheckIn} onLeave={props.onLeave} busy={working} />
-      <TestsCard runId={run.id} record={record} testCommand={testCommand} onRunTests={props.onRunTests} onReportTests={props.onReportTests}
-        onConfirmTestCommand={(command) =>
-          props.onConfirmTestCommand(command).then(() =>
-            setRead((current) => ({ ...current, command: { suggestion: testCommand?.suggestion ?? "", confirmed: { command, confirmedAt: new Date().toISOString() } } })),
-          )
-        }
-        onStopTests={props.onStopTests} onExplain={() => send({ kind: "test" })} busy={working} />
+      <TestsCard runId={run.id} record={record} testCommand={testCommand} onRunTests={props.onRunTests} onReportTests={props.onReportTests} onStopTests={props.onStopTests}
+        onConfirmTestCommand={(command) => props.onConfirmTestCommand(command).then(() => setRead((current) => ({ ...current, command: { suggestion: testCommand?.suggestion ?? "", confirmed: { command, confirmedAt: new Date().toISOString() } } })))}
+        onExplain={() => send({ kind: "test" })} busy={working} />
       <GuideThread entries={record.thread ?? []} steps={steps} onStep={onStep} busy={working} />
       <p className="field-help">{t.wrong}</p>
     </div>

@@ -54,16 +54,12 @@ export function TestsCard({
   const outcome = last && (t.outcomes[last.outcome] ?? last.outcome);
   return (
     <section aria-labelledby="by-hand-tests">
-      <h3 id="by-hand-tests">
-        <FlaskConical size={16} aria-hidden="true" /> {t.title}
-      </h3>
+      <h3 id="by-hand-tests"><FlaskConical size={16} aria-hidden="true" /> {t.title}</h3>
       <label htmlFor="by-hand-command">{t.command}</label>
       <div className="by-hand-row">
         <input id="by-hand-command" className="text-input" maxLength={300} placeholder={t.none} value={shown} onChange={(event) => setCommand(event.target.value)} />
         <button type="button" className="button secondary" disabled={busy || !shown.trim() || shown.trim() === confirmed}
-          onClick={() => void onConfirmTestCommand(shown.trim()).then(() => setCommand(undefined), () => undefined)}>
-          {t.use}
-        </button>
+          onClick={() => void onConfirmTestCommand(shown.trim()).then(() => setCommand(undefined), () => undefined)}>{t.use}</button>
       </div>
       {confirmed && <p>{t.confirmed({ command: confirmed })}</p>}
       <p className="field-help">{t.honesty}</p>
@@ -83,11 +79,7 @@ export function TestsCard({
           {running ? <Loader2 size={15} className="spin" /> : <Play size={15} aria-hidden="true" />}
           {running ? t.running : t.run}
         </button>
-        {running && (
-          <button type="button" className="button secondary" onClick={() => void onStopTests().catch(() => undefined)}>
-            <CircleStop size={15} aria-hidden="true" /> {t.stop}
-          </button>
-        )}
+        {running && <button type="button" className="button secondary" onClick={() => void onStopTests().catch(() => undefined)}><CircleStop size={15} aria-hidden="true" /> {t.stop}</button>}
       </div>
       {last && !running && (
         <div role="status">

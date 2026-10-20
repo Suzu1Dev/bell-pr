@@ -22,9 +22,7 @@ export function YourTurn({ run, worktreePath, presenting = false }: YourTurnProp
   const first = run.byHand?.plan?.steps.find((step) => !step.doneAt && !step.parkedAt);
   return (
     <div className="empty-state by-hand">
-      <div className="empty-icon">
-        <SquarePen />
-      </div>
+      <div className="empty-icon"><SquarePen /></div>
       <h3>{t.title}</h3>
       {/* While presenting the path loses its folders and is not copied. */}
       {presenting ? <code>{maskPath(worktreePath)}</code> : <CopyRef text={worktreePath} />}
