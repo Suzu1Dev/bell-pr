@@ -5,7 +5,7 @@
 // links, file names, times, ratios and emoticons.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { filterAgentText, type FilterSources } from "./by-hand-filter.js";
+import { filterAgentText, filterGuideOutput, type FilterSources } from "./by-hand-filter.js";
 
 const base = [
   "export async function retry(fn, attempts) {",
@@ -174,4 +174,20 @@ test(`${code.length} samples of code written into prose lose it`, () => {
 test("code that quotes the files exactly stays, with or without spaces", () => {
   for (const text of ["It waits delay*attempt between tries.", "The loop runs while attempt <= attempts.", "It calls retry(fn, attempts) once.", "The loop ends on attempt++ each time."])
     assert.equal(filterAgentText(text, sources).removed, 0, text);
+});
+
+test("a tooling answer's command can't carry code in an inline program or a quoted argument", () => {
+  const tooling = (text: string) =>
+    filterGuideOutput({ text, question: null, refs: [], quotes: [], options: null, topic: "tooling", askedForCode: false }, sources).value.text;
+  for (const text of [
+    'Run `node -e "console.log(delay*2**attempt)"` to check.',
+    "Run `node --print 'retry(fn, 2)'` to check.",
+    "Run `bash -c 'x=y'` first.",
+    "Run `node scripts/check.js 'delay * 2 ** attempt'` to check.",
+    "Run `npm test -- --grep 'attempt+1'` to check.",
+    "Run `echo delay*2` to see it.",
+  ])
+    assert.match(tooling(text), /^Run … /, text);
+  for (const text of ["Run `npm ci && npm test` first.", "Run `npx jest -t 'retries a 503'` only.", "Run `git log -p src/retry.ts` to read its history.", "Run `npm test -- retry > out.log` to keep the output."])
+    assert.equal(tooling(text), text);
 });

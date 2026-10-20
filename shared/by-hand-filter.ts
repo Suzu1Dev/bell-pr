@@ -104,13 +104,21 @@ const corpus = (sources: FilterSources) => [
 /** Commands and redirections that edit a file. */
 const editing = /\bsed\s+(?:-\w*\s+)*-\w*i|\bperl\s+(?:-\w*\s+)*-\w*[pi]\w*i|\bpatch\b|\bgit\s+apply\b|\btee\b|>{1,2}|\bawk\s+(?:-\w+\s+)*-i\b|\bed\b/;
 
+/** An interpreter given its program on the command line ("node -e", "python -c", "bash -c"). */
+const inlineProgram = /\b(?:node|deno|bun|python3?|ruby|perl|php|bash|sh|zsh|Rscript|lua)\s+(?:-\S+\s+)*(?:-[ecpEr]|--eval|--print|--command|eval)(?=\s|=|$)/;
+
 /**
  * A tooling answer's one-line command: at most 120 characters, not shaped
- * like code (ending in ; { or }, or with an arrow), naming no identifier
- * the project's files don't have, and editing no changed or step file.
+ * like code (ending in ; { or }, with an arrow, an inline program or code
+ * in an argument), naming no identifier the project's files don't have,
+ * and editing no changed or step file.
  */
 function safeCommand(span: string, sources: FilterSources, isWord: (word: string) => boolean) {
-  if (span.includes("\n") || span.length > 120 || /[;{}]\s*$|=>/.test(span)) return false;
+  if (span.includes("\n") || span.length > 120 || /[;{}]\s*$|=>/.test(span) || inlineProgram.test(span)) return false;
+  // An argument, quoted or not, is no expression, call or code without spaces; a path or a test id ("a.py::test") is no code.
+  const argument = ([, single, double, bare]: string[]) =>
+    bare === undefined ? hasCode(single ?? double) : !/[/:]/.test(bare) && compactCode(bare);
+  if ([...span.matchAll(/'([^']*)'|"([^"]*)"|(\S+)/g)].some(argument)) return false;
   if ([...span.matchAll(identifier)].some(([word]) => !isWord(word))) return false;
   const touches = (sources.protectedFiles ?? []).some(
     (file) => span.includes(file) || span.includes(file.split("/").pop() ?? file),
