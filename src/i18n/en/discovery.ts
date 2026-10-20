@@ -205,7 +205,6 @@ const discovery = {
     openIssue: "Open the issue",
     /** Learn by hand (DESIGN v1.2 F1, F12): the task dialog then shows the project's case. */
     startByHand: "Start learning by hand",
-    reservedUse: `${product.name} won't publish a learn-by-hand run for this issue: the project keeps it for people learning without AI tools.`,
     reservedOutput: `This project closes AI-generated pull requests for issues like this one. ${product.name} can publish a learn-by-hand run for it only if the project's own text names each kind of help the guide gives, and only after you confirm the quoted rule; the task dialog shows which.`,
   },
   /**

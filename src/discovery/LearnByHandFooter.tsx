@@ -26,7 +26,7 @@ export function LearnByHandFooter({
   disabled: boolean;
   onStart(): void;
 }) {
-  const t = useT("discovery").card;
+  const { card: t, byHand } = useT("discovery");
   const reserved = item.byHandReserved === true && item.byHandReservedOutput !== true;
   // The evidence quote the reservation comes from, by the same classifier.
   const quote = reserved
@@ -39,7 +39,7 @@ export function LearnByHandFooter({
       <div className="by-hand">
         <p>{t.learnByHandHint}</p>
         {(reserved || item.byHandReservedOutput) && (
-          <p className="by-hand-note">{reserved ? t.reservedUse : t.reservedOutput}</p>
+          <p className="by-hand-note">{reserved ? byHand.area({ reach: "use", condition: "" }) : t.reservedOutput}</p>
         )}
         {quote && <blockquote>{quote}</blockquote>}
       </div>

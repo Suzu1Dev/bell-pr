@@ -49,6 +49,7 @@ const m: Translation<typeof en> = {
   humanReview: "人工審查",
   byHand: {
     badge: "親手學",
+    turn: "換你寫",
     ready: "可以審查了",
     writeFirst: "請先寫一點修改",
     reviewing: "嚮導正在審查",

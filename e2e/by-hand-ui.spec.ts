@@ -557,7 +557,7 @@ test("discovery never offers to start by hand on an issue kept for people learni
     await expect(card("A newcomer issue").getByRole("button", { name: discovery.card.startByHand })).toBeVisible();
     const kept = card("An issue kept for people learning");
     await expect(kept.getByRole("button", { name: discovery.card.startByHand })).toHaveCount(0);
-    await expect(kept.locator(".by-hand-note")).toHaveText(discovery.card.reservedUse);
+    await expect(kept.locator(".by-hand-note")).toHaveText(discovery.byHand.area({ reach: "use", condition: "" }));
     await expect(kept.locator("footer blockquote")).toHaveText(llvm);
     const output = card("An issue that closes AI pull requests");
     await expect(output.getByRole("button", { name: discovery.card.startByHand })).toBeVisible();

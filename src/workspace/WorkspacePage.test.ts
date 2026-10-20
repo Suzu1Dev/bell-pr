@@ -6,6 +6,7 @@ import {
   proEntitlements,
   type Entitlements,
 } from "../../shared/plans";
+import { changeFingerprint } from "../../shared/change-fingerprint";
 import { getDemo } from "../demo";
 import type { EntitlementsState } from "../license/useEntitlements";
 import { setCheckSettingsForTests } from "../app/hooks/useUnderstanding";
@@ -279,6 +280,12 @@ test("a learn-by-hand run carries its badge, and while the person writes the foo
   assert.match(html, /<span class="status-badge"><svg[^>]*lucide-hand[\s\S]*?<\/svg>Learn by hand<\/span>/);
   assert.match(html, /<button class="button primary"><svg[^>]*lucide-check-check[\s\S]*?<\/svg>Ready for review<svg/);
   assert.doesNotMatch(html, /Approve and prepare the PR/);
+  // While the person writes, the run's status says so; at the version marked ready, it waits for their review.
+  assert.match(html, /<span class="status-badge "><span><\/span>Your turn<\/span>/);
+  assert.doesNotMatch(html, /Ready for your review/);
+  const ready = { ...byHand, byHand: { ready: { at: byHand.createdAt, changeFingerprint: changeFingerprint(changed), review: false } } };
+  assert.match(renderEn(element({ run: ready, files: changed, tab: "overview" })), /<span class="status-badge "><span><\/span>Ready for your review<\/span>/);
+  assert.match(renderZh(element({ run: byHand, files: changed, tab: "overview" })), /<\/span>換你寫<\/span>/);
   // An empty diff: nothing to mark ready yet.
   assert.match(
     renderEn(element({ run: byHand, files: [], tab: "overview" })),

@@ -64,6 +64,8 @@ const workspace = {
   /** Learn by hand (DESIGN v1.2 F4, F5): what shows before the byhand chunk loads. */
   byHand: {
     badge: "Learn by hand",
+    /** The run's status while the person writes (its status is `review`, but nothing waits for a review yet). */
+    turn: "Your turn",
     ready: "Ready for review",
     writeFirst: "Write a change first",
     reviewing: "The guide is reviewing",

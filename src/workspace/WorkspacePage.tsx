@@ -256,7 +256,7 @@ export function WorkspacePage({
             className={`status-badge ${run.status === "failed" ? "error" : ""}`}
           >
             <span />
-            {statusLabels[run.status]}
+            {byHand.writing ? t.byHand.turn : statusLabels[run.status]}
           </span>
           {run.unsandboxed === true && <UnsandboxedBadge />}
           {run.learnByHand && <span className="status-badge"><Hand size={13} aria-hidden="true" />{t.byHand.badge}</span>}
