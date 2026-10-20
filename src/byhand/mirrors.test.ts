@@ -37,7 +37,13 @@ function byHandRun(clean: boolean): Run {
 }
 
 test("the sample's publish checks follow the clean-run rule", () => {
-  const sample = { ...getDemo("en"), contributingText: `# Contributing\n\n${qemu}\n` };
+  const text = `# Contributing\n\n${qemu}\n`;
+  // Its rules as the server reads them: the client runs no classifier.
+  const sample = {
+    ...getDemo("en"),
+    contributingText: text,
+    contributingFindings: attachCarveOuts("CONTRIBUTING.md", text, classifyPolicy("CONTRIBUTING.md", text)),
+  };
   const banOf = (run: Run) =>
     samplePublishChecks(sample, run, sample.files, "en").find((check) => check.id === "ai-ban");
   assert.ok(banOf(byHandRun(true))!.message.startsWith(byHandCopy));

@@ -12,6 +12,7 @@ import type { CoachDebrief, CoachDrill } from "../../shared/coach";
 import type {
   ContributionFacts,
   MergedPrSize,
+  PolicyFinding,
 } from "../../shared/contribution";
 import type { FollowUpRestatement } from "../../shared/followups";
 import type { PracticeItem } from "../../shared/practice";
@@ -157,10 +158,17 @@ export interface DemoContent {
   >;
   /**
    * The fictional project's CONTRIBUTING.md, the same file the
-   * `demo-contributing` draft source holds. The demo classifies it with the
-   * real classifier (sampleRules in src/mission/respect.ts).
+   * `demo-contributing` draft source holds. Its rules are what the real
+   * classifier finds in it, precomputed (sampleFindings in
+   * src/mission/respect.ts, pinned by its test).
    */
   contributingText?: string;
+  /**
+   * The rules of a `contributingText` other than the shipped one, as the
+   * server stores them; absent for the shipped sample, whose rules are
+   * `sampleFindings`. No classifier runs in the client to read the text.
+   */
+  contributingFindings?: PolicyFinding[];
   /** The sample's GitHub facts: PRs open, issue #42 open and free, no PR of yours here yet. */
   contributionFacts?: ContributionFacts;
   /** The sample project's last three merged pull requests, as the size reference. */

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ContributionFacts, ContributionRules } from "../../shared/contribution";
+import { attachCarveOuts, classifyPolicy } from "../../shared/project-policy";
 import { getDemo } from "../demo";
 import discoveryEn from "../i18n/en/discovery";
 import discoveryZh from "../i18n/zh-TW/discovery";
@@ -15,6 +16,7 @@ import {
   issueNumber,
   knownDoor,
   rulesFrom,
+  sampleFindings,
   sampleRules,
   startReasons,
   suggestedMode,
@@ -160,6 +162,16 @@ test("the sample's rules come from its CONTRIBUTING.md, its door and its merged 
     assert.deepEqual(built.filesRead, ["CONTRIBUTING.md", ".github/PULL_REQUEST_TEMPLATE.md"], locale);
     assert.deepEqual(built.findings.map((finding) => finding.kind), ["issue-first", "understand", "disclose"], locale);
   }
+});
+
+test("the sample's precomputed rules are what the classifier finds in its CONTRIBUTING.md, as the server stores them", () => {
+  for (const locale of ["en", "zh-TW"] as const) {
+    const text = getDemo(locale).contributingText ?? "";
+    assert.deepEqual(sampleFindings, classifyPolicy("CONTRIBUTING.md", text), locale);
+    assert.deepEqual(sampleRules(getDemo(locale)).findings, attachCarveOuts("CONTRIBUTING.md", text, classifyPolicy("CONTRIBUTING.md", text)), locale);
+  }
+  // Each call gets its own copies.
+  assert.notEqual(sampleRules(demo).findings[0], sampleFindings[0]);
 });
 
 // Learn by hand (DESIGN v1.2 F1, F12): the case of the project's rules,

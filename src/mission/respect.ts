@@ -17,12 +17,12 @@ import {
   type ContributionFacts,
   type ContributionRules,
   type DoorFacts,
+  type PolicyFinding,
 } from "../../shared/contribution";
 import en from "../../shared/i18n/draft-checks.en";
 import zhTW from "../../shared/i18n/draft-checks.zh-TW";
 import { formatters, type Locale } from "../../shared/i18n/locale";
 import type { AreaReach, BanReach } from "../../shared/policy-reach";
-import { classifyPolicy } from "../../shared/project-policy";
 import type { DemoContent } from "../demo/types";
 import type { Messages } from "../i18n";
 
@@ -289,20 +289,32 @@ export function byHandReasonText(
 }
 
 /**
- * The sample project's "Before you contribute" facts: its fictional
- * CONTRIBUTING.md through the real classifier, its door and its merged
- * sizes. The one source for the rules card, the task dialog, the Draft tab
- * and the publish dialog (src/workspace/respect.ts uses it too). It lives
+ * The rules the classifier finds in the sample's fictional CONTRIBUTING.md
+ * (`contributingText`, the same in both locales), as the server would store
+ * them. Precomputed, so no classifier ships to the client (plan README
+ * §18.10); respect.test.ts pins them to `classifyPolicy` of that text.
+ */
+export const sampleFindings: readonly PolicyFinding[] = [
+  { kind: "issue-first", path: "CONTRIBUTING.md", line: 5, quote: "Open an issue before changing behavior.", contribution: false },
+  { kind: "understand", path: "CONTRIBUTING.md", line: 7, quote: "You must be able to explain your change in review.", contribution: false },
+  { kind: "disclose", path: "CONTRIBUTING.md", line: 9, quote: "If you used AI tools, say so in the PR description.", contribution: true },
+];
+
+/**
+ * The sample project's "Before you contribute" facts: the rules of its
+ * fictional CONTRIBUTING.md (`sampleFindings`, or the content's own
+ * `contributingFindings`), its door and its merged sizes. The one source
+ * for the rules card, the task dialog, the Draft tab and the publish
+ * dialog (src/workspace/respect.ts uses it too). It lives
  * here, in a module only lazy views load, because every module under
- * src/demo/ joins the demo chunk that loads at startup, and the classifier
- * would bring the PR-check tooling into it.
+ * src/demo/ joins the demo chunk that loads at startup.
  */
 export function sampleRules(demo: DemoContent): ContributionRules {
   const context = demo.draftPreparation.context;
   return {
     checkedAt: context?.checkedAt ?? "",
     ...(demo.contributionFacts?.door ? { door: { ...demo.contributionFacts.door } } : {}),
-    findings: classifyPolicy("CONTRIBUTING.md", demo.contributingText ?? ""),
+    findings: (demo.contributingFindings ?? sampleFindings).map((finding) => ({ ...finding })),
     filesRead: (context?.sources ?? []).flatMap((source) => (source.path ? [source.path] : [])),
     ...(demo.mergedSizes ? { mergedSizes: demo.mergedSizes.map((size) => ({ ...size })) } : {}),
   };
