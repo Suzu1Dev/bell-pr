@@ -123,6 +123,7 @@ export function TeamBoard({
       </div>
     );
   const finished = ["complete", "failed", "cancelled"].includes(team.phase);
+  const byHandPlan = run.learnByHand && byHand && ["awaiting_approval", "developing"].includes(team.phase);
   const canReceive = (task: TeamTask) =>
     ["pending", "ready", "running"].includes(task.status) &&
     task.acceptsMessages !== false;
@@ -295,7 +296,8 @@ export function TeamBoard({
             {planOpen ? t.plan.showLess : t.plan.showAll}
           </button>
         )}
-        <PremiseNotice premise={team.premise} />
+        {/* Learn by hand: the plan panel below shows the premise check first. */}
+        {!byHandPlan && <PremiseNotice premise={team.premise} />}
         {revisions.length > 0 && (
           <ol className="team-plan-revisions" aria-label={t.revisions.label}>
             {revisions.map((revision, index) => (
@@ -326,7 +328,7 @@ export function TeamBoard({
             ))}
           </ol>
         )}
-        {run.learnByHand && byHand && ["awaiting_approval", "developing"].includes(team.phase) && (
+        {byHandPlan && (
           <ErrorBoundary resetKey={`${run.id}:plan`}>
             <Suspense fallback={<Loader2 size={18} className="spin" />}><PlanWithGuide run={run} {...byHand} /></Suspense>
           </ErrorBoundary>

@@ -1,13 +1,15 @@
 /**
  * Plan with the guide (DESIGN v1.2 F3), in the team board while the run
  * waits in `awaiting_plan` (and, to split a step, while the person
- * writes), under the board's premise notice and the guide's summary: the
- * person's steps first, read-first ranges, the outline folded until a
- * first draft, questions on the plan, and "This is my plan".
+ * writes), under the guide's summary on the board: the premise check
+ * (the board leaves it to this panel), the person's steps first,
+ * read-first ranges, the outline folded until a first draft, questions on
+ * the plan, and "This is my plan".
  */
 import { useEffect, useState } from "react";
 import { ListChecks, Loader2, Play, Plus, Trash2 } from "lucide-react";
 import { byHandLimits, helpAllowed, type ByHandPlanInput } from "../../../shared/by-hand";
+import { PremiseNotice } from "../../team/PremiseNotice";
 import { PlanCompare } from "./PlanCompare";
 import type { Run } from "../../types";
 import { CopyRef } from "./CopyRef";
@@ -108,6 +110,7 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
       <h3 id={`${run.id}-plan`}>
         <ListChecks size={17} aria-hidden="true" /> {t.title}
       </h3>
+      <PremiseNotice premise={run.team?.premise} />
       <p>{t.intro}</p>
       <ol className="by-hand-steps">
         {drafts.map((draft, index) => (

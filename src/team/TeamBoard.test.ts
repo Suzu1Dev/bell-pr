@@ -750,8 +750,11 @@ test("a learn-by-hand run plans with the guide instead of approving a team plan,
       entitlements: freeEntitlements,
       byHand: { onSave: async () => {}, onReveal: async () => {}, onAskQuestions: async () => {}, onConfirm: async () => {} },
     });
-  const planning = renderEn(element(byHand("awaiting_plan", "awaiting_approval")));
+  const premise = { verdict: "refuted" as const, statement: "Retries never stop.", evidence: "src/retry.ts:3 caps them." };
+  const planning = renderEn(element(byHand("awaiting_plan", "awaiting_approval", { team: { ...sample.team, phase: "awaiting_approval", tasks: [], planSummary: "", messages: [], premise } })));
   assertNoHan(planning);
+  // The premise check shows once, first in the plan panel (loading here), not on the board too.
+  assert.doesNotMatch(planning, /Retries never stop\./);
   // The plan panel loads with the byhand chunk; no team approval or "send back".
   assert.match(planning, /<svg[^>]*lucide-loader-circle[^>]*spin/);
   assert.doesNotMatch(planning, /Approve the plan and start development|Send back with feedback/);
