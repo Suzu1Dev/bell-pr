@@ -13,6 +13,7 @@ import { respectChecks, type PolicyFinding } from "../shared/contribution.js";
 import { attachCarveOuts, classifyPolicy, hasAiDisclosure } from "../shared/project-policy.js";
 import { draftPreflight } from "../shared/draft-checks.js";
 import {
+  channelLinks,
   generatedPatterns,
   linkedPaths,
   policyFile,
@@ -366,4 +367,72 @@ test("more than 30 rules keep the ones that block publishing", () => {
   assert.ok(findings.some((finding) => finding.kind === "ban" && finding.contribution));
   // Still in reading order.
   assert.equal(findings.at(-1)?.path, "AI_POLICY.md");
+});
+
+test("the project's help channels: each kind of address, with its file, line and words", () => {
+  const content = [
+    "# Contributing",
+    "",
+    "Ask questions on [our Zulip](https://servo.zulipchat.com/#narrow/stream/263398-general).",
+    "Chat with us on Discord: https://discord.gg/abc123.",
+    "Or the old invite <https://discord.com/invite/xyz789>, the forum https://discourse.llvm.org/ and",
+    "`the core-dev category <https://discuss.python.org/c/core-dev/23>`_.",
+    "",
+    "```sh",
+    "curl https://lists.example.org/should-not-count",
+    "```",
+    "",
+    "Matrix: https://matrix.to/#/#project:matrix.org",
+  ].join("\n");
+  assert.deepEqual(channelLinks([{ path: "CONTRIBUTING.md", kind: "contributing", content }]), [
+    { label: "our Zulip", url: "https://servo.zulipchat.com/#narrow/stream/263398-general", path: "CONTRIBUTING.md", line: 3 },
+    { label: "discord.gg/abc123", url: "https://discord.gg/abc123", path: "CONTRIBUTING.md", line: 4 },
+    { label: "discord.com/invite/xyz789", url: "https://discord.com/invite/xyz789", path: "CONTRIBUTING.md", line: 5 },
+    { label: "discourse.llvm.org", url: "https://discourse.llvm.org/", path: "CONTRIBUTING.md", line: 5 },
+    { label: "the core-dev category", url: "https://discuss.python.org/c/core-dev/23", path: "CONTRIBUTING.md", line: 6 },
+  ]);
+  const lists = [
+    "Mailing lists: https://lists.example.org/listinfo/dev, https://mail.python.org/mailman3/lists/python-dev.python.org/,",
+    "https://groups.google.com/g/project-dev and [Gitter](https://gitter.im/project/community).",
+    "Also https://app.gitter.im/#/room/#project:gitter.im.",
+  ].join("\n");
+  assert.deepEqual(
+    channelLinks([{ path: "docs/CONTRIBUTE.md", kind: "contributing", content: lists }]).map((channel) => [channel.url, channel.line]),
+    [
+      ["https://lists.example.org/listinfo/dev", 1],
+      ["https://mail.python.org/mailman3/lists/python-dev.python.org/", 1],
+      ["https://groups.google.com/g/project-dev", 2],
+      ["https://gitter.im/project/community", 2],
+      ["https://app.gitter.im/#/room/#project:gitter.im", 3],
+    ],
+  );
+  assert.deepEqual(
+    channelLinks([{ path: "CONTRIBUTING.md", kind: "contributing", content: "Matrix: https://matrix.to/#/#project:matrix.org" }]).map((channel) => channel.label),
+    ["matrix.to"],
+  );
+});
+
+test("help channels: only the repository's own Discussions, no other address, no repeats, at most 5", () => {
+  const content = [
+    "See https://github.com/acme/widgets/discussions and https://github.com/Acme/Widgets/discussions/categories/q-a.",
+    "Not https://github.com/other/repo/discussions, https://github.com/acme/widgets/issues,",
+    "https://example.org/docs, https://discord.com/channels/1/2 or https://discord.gg/.",
+    "Repeats: https://discord.gg/abc123 and https://discord.gg/abc123/ again.",
+  ].join("\n");
+  const documents = [{ path: "CONTRIBUTING.md", kind: "contributing" as const, content }];
+  assert.deepEqual(channelLinks(documents, "acme/widgets").map((channel) => channel.url), [
+    "https://github.com/acme/widgets/discussions",
+    "https://github.com/Acme/Widgets/discussions/categories/q-a",
+    "https://discord.gg/abc123",
+  ]);
+  // Without the repository's name, Discussions can't be told apart.
+  assert.deepEqual(channelLinks(documents).map((channel) => channel.url), ["https://discord.gg/abc123"]);
+  const many = Array.from({ length: 8 }, (_, index) => `Room ${index}: https://matrix.to/#/#room${index}:example.org`).join("\n");
+  const capped = channelLinks([
+    { path: "CONTRIBUTING.md", kind: "contributing", content: many },
+    { path: "docs/more.md", kind: "documentation", content: "https://discord.gg/later" },
+  ]);
+  assert.equal(capped.length, 5);
+  assert.deepEqual(capped.map((channel) => channel.line), [1, 2, 3, 4, 5]);
+  assert.deepEqual(channelLinks([]), []);
 });

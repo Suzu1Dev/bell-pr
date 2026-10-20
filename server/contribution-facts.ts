@@ -24,6 +24,7 @@ import {
 import { draftProseWords } from "../shared/draft-checks.js";
 import { weakenedTests } from "../shared/reviewability.js";
 import {
+  channelLinks,
   policyFindings,
   policyLimits,
   readAccountPolicy,
@@ -329,6 +330,9 @@ export async function refreshRepositoryRules(
       unknown.push(unknownEntry("orgDefaults", unknownReason(account.reason)));
   }
   rules.findings = policyFindings(documents);
+  // v1.2: the project's own human help channels, for the guide's "Ask a human".
+  const channels = channelLinks(documents, remote?.fullName);
+  if (channels.length) rules.channels = channels;
   rules.filesRead = documents.map((document) => document.path).slice(0, policyLimits.filesRead);
   if (unknown.length) rules.unknown = unknown;
   if (rules.unknown?.some((entry) => !unread || entry.split(":")[0] !== "door"))
