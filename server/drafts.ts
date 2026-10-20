@@ -123,7 +123,9 @@ export function alwaysDiscloseAi() {
  * saved choice (older clients do not send it). While the choice stays the
  * same the description is saved exactly as written, so the line can be
  * reworded or deleted like any other text. In a Learn-by-hand run BELL's
- * line is never added (DESIGN v1.2 F11): the person writes their own note.
+ * line is never added and never kept (DESIGN v1.2 F11): an older client
+ * adds it to the body itself, and it says agents prepared the change. The
+ * person writes their own note; a reworded line is theirs and stays.
  */
 export function applyAiDisclosure(
   previous: RunDraft,
@@ -133,13 +135,12 @@ export function applyAiDisclosure(
   const before = previous.aiDisclosure ?? alwaysDiscloseAi();
   const chosen = next.aiDisclosure ?? previous.aiDisclosure;
   const after = chosen ?? alwaysDiscloseAi();
-  const body =
-    after === before
+  const body = options.learnByHand
+    ? withoutAiDisclosure(next.body)
+    : after === before
       ? next.body
       : after
-        ? options.learnByHand
-          ? next.body
-          : withAiDisclosure(next.body)
+        ? withAiDisclosure(next.body)
         : withoutAiDisclosure(next.body);
   const draft: RunDraft = { ...next, body };
   if (chosen === undefined) delete draft.aiDisclosure;

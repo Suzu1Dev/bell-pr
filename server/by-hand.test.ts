@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { aiDisclosureLine } from "../shared/drafts.js";
+import { aiDisclosureLine, withAiDisclosure } from "../shared/drafts.js";
 import { changeFingerprint } from "../shared/understanding.js";
 import { readDiff, reviewFingerprint } from "./git.js";
 import { byHandReviewInTests } from "./by-hand.js";
@@ -623,6 +623,30 @@ test("no AI PR text in Learn by hand: no draft, and BELL's AI line is never adde
   assert.ok(!parseDraftProposal(proposal, context, { learnByHand: true }).body.includes(aiDisclosureLine));
   assert.ok(parseDraftProposal(proposal, context).body.includes(aiDisclosureLine));
   assert.equal(f.calls.length, 1);
+});
+
+test("BELL's AI line never stays in a Learn-by-hand draft, also from an older client that adds it itself", async (t) => {
+  const f = await fixture(t);
+  const run = await f.writing();
+  t.after(() => setAlwaysDiscloseAiSource(() => false));
+  for (const always of [false, true]) {
+    setAlwaysDiscloseAiSource(() => always);
+    // An older client turns the AI note on: it puts BELL's line into the body and sends the choice.
+    const saved = await en(() =>
+      f.workbench.draft(run.id, { title: "Retry a GET twice", body: withAiDisclosure("I wrote the retry."), aiDisclosure: true }),
+    );
+    assert.equal(saved.draft.body, "I wrote the retry.");
+    // Its next plain save sends the line back from its editor.
+    const again = await en(() => f.workbench.draft(run.id, { title: "Retry a GET twice", body: withAiDisclosure("I wrote the retry. Tested by hand.") }));
+    assert.equal(again.draft.body, "I wrote the retry. Tested by hand.");
+  }
+  // The person's own words about AI stay, as written.
+  const own = "I asked BELL PR's guide where the retry lives; I wrote the change myself.";
+  assert.equal((await en(() => f.workbench.draft(run.id, { title: "Retry a GET twice", body: own }))).draft.body, own);
+  // An agent run keeps the line it adds or that the person keeps.
+  const previous = { title: "T", body: "Mine.", aiDisclosure: false };
+  assert.ok(applyAiDisclosure(previous, { title: "T", body: withAiDisclosure("Mine."), aiDisclosure: true }).body.includes(aiDisclosureLine));
+  assert.ok(applyAiDisclosure({ ...previous, aiDisclosure: true }, { title: "T", body: withAiDisclosure("Mine.") }).body.includes(aiDisclosureLine));
 });
 
 test("the PR template comes verbatim from the run's folder: at most three, none over 20 kB", async (t) => {
