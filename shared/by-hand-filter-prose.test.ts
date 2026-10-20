@@ -209,3 +209,22 @@ test("no-break spaces, carriage returns and invisible characters can't split cod
   for (const text of ["It took 2\u00A0seconds.", "Read the loop.\nThen run the tests.", "請先看 src/retry.ts:12\u3000的迴圈。"])
     assert.deepEqual(filterAgentText(text, sources), { value: text, removed: 0, dropped: 0 }, text);
 });
+
+test("an operator spaced on one side only is code too, while emphasis, +1 and <3 stay prose", () => {
+  for (const [text, piece] of [
+    ["Then x =y in the loop.", "x =y"],
+    ["Then x= y in the loop.", "x= y"],
+    ["Guard it with a&& b first.", "a&& b"],
+    ["Use a ??b instead.", "a ??b"],
+    ["Write return delay *2; there.", "delay *2"],
+    ["Write return delay* 2; there.", "delay* 2"],
+    ["Add attempt +=1 at the end.", "attempt +=1"],
+    ["Check x !==y first.", "x !==y"],
+    ["Use fn(x) =>x there.", "=>x"],
+  ]) {
+    const filtered = filterAgentText(text, sources);
+    assert.ok(filtered.removed >= 1 && !filtered.value.includes(piece), `${text} → ${filtered.value}`);
+  }
+  for (const text of ["This is *really* small, **Step 2** first.", "I'd say +1 to that.", "Love it <3 and **Note:** read it.", "Keep it at 50 %; that's fine."])
+    assert.deepEqual(filterAgentText(text, sources), { value: text, removed: 0, dropped: 0 }, text);
+});

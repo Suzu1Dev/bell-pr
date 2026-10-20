@@ -165,12 +165,16 @@ const holdMark = "\uE000";
 const inline = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g;
 /**
  * An expression written into prose: operands joined by code operators with
- * spaces around them, no-break ones too ("delayMs * 2 ** attempt;", "x => y", "a ?? b"). A
- * spaced hyphen or slash is a dash or "or" in prose, not an operator, and
- * a "*" or "+" that starts a line is a list item.
+ * spaces around them, no-break ones too ("delayMs * 2 ** attempt;", "a ?? b"),
+ * or on one side only for an operator prose never uses ("x =y", "a&& b",
+ * "delay *2"). A spaced hyphen or slash is a dash or "or", a "*" or "+" that
+ * starts a line is a list item, and "*word*", "**Note**", "+1" and "<3" stay.
  */
-const expression =
-  /[\w$.()[\]'"]+(?:[ \t\u00A0\u2000-\u200A\u202F\u205F\u3000]+(?:\?\?|<<=?|>>>?=?|[&|^]=|=>|===|!==|==|!=|\*\*|&&|\|\||[-+*/%]=|<=|>=|[<>*%+=])[ \t\u00A0\u2000-\u200A\u202F\u205F\u3000]+[\w$.()[\]'"]+)+;?/g;
+const [space, strong] = [String.raw`[ \t\u00A0\u2000-\u200A\u202F\u205F\u3000]`, String.raw`\?\?|<<=?|>>>?=?|[-+*/%&|^]=|=>|===?|!==?|<=|>=|&&|\|\||=`];
+const expression = new RegExp(
+  String.raw`[\w$.()[\]'"]+(?:(?:${space}+(?:${strong}|\*\*|[<>*%+])${space}+|${space}+(?:${strong})|(?:${strong})${space}+|${space}+\*(?=\d)|\*${space}+(?=\d))[\w$.()[\]'"]+)+;?`,
+  "g",
+);
 /** Identifier-like words of prose: camelCase, snake_case and calls such as `retry(` (not "file(s)"); never part of a path. */
 const identifier = /(?<![\w$./-])(?:[a-z][a-z0-9]*[A-Z][A-Za-z0-9]*|[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+|[A-Za-z_$][\w$]*(?=\((?!(?:s|es|ies)\))))(?![\w$/]|\.\w)/g;
 /** Faces that look like names: "o_O", "xD". */
