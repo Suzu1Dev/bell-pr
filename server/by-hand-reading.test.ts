@@ -455,3 +455,29 @@ test("the Ask tab never displaces a running guide job, so Stop still ends it", a
   assert.equal(f.calls.length, 0);
   assert.equal(f.run.conversations?.["src/retry.ts"], undefined);
 });
+
+test("the Ask tab takes the guide's slot under the run lock, so a guide job asked for meanwhile is refused and Stop ends the question", async (t) => {
+  const f = await fixture(t);
+  await f.markReady();
+  const key = `guide:${f.run.id}`;
+  t.after(() => {
+    f.ctx.controllers.delete(key);
+  });
+  const asked = en(() => f.workbench.chat(f.run.id, "src/retry.ts", "Why three?"));
+  // A guide job asked for right after the question: it waits for the lock, then checks the slot as the guide does.
+  const guideJob = f.workbench.lock(f.run.id, async () => {
+    if (f.ctx.controllers.has(key) || f.ctx.byHandJobs.has(key)) return "refused";
+    f.ctx.controllers.set(key, new AbortController());
+    return "started";
+  });
+  assert.equal(await guideJob, "refused");
+  // The guide's chat is still W1A's stub on this branch: the question ends with its 501 and gives the slot back.
+  await assert.rejects(asked, refused(501, /./));
+  assert.equal(f.ctx.controllers.has(key), false);
+  // A second question while one holds the slot waits its turn.
+  f.ctx.controllers.set(key, new AbortController());
+  await assert.rejects(
+    en(() => f.workbench.chat(f.run.id, "src/retry.ts", "Why three?")),
+    refused(409, /^The guide is already working on this run/),
+  );
+});

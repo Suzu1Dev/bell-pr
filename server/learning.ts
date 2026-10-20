@@ -598,10 +598,13 @@ export function assertReaderView(run: Run, files: readonly DiffFile[], filePath:
  * guide's chat (server/by-hand-guide.ts) instead of the mentor; it filters
  * the answer and records its help event. The run lock is held to read the
  * change and to save, never across the turn, and the answer is stored in
- * `run.conversations` as an agent run's answer is. A guide job of the run
- * is never displaced: its Stop keeps working.
+ * `run.conversations` as an agent run's answer is. It takes the guide's
+ * one slot (`guide:<id>`) under the lock, so a guide job is never
+ * displaced and Stop ends whichever turn holds it.
  */
 async function chatByHand(ctx: WorkbenchContext, id: string, filePath: string, question: string) {
+  const key = `guide:${id}`;
+  const controller = new AbortController();
   const { run, file } = await ctx.lock(id, async () => {
     const run = ctx.run(id);
     if (!readableStatuses.includes(run.status)) throw new AppError((m) => m.run.review.chatTooEarly, 409);
@@ -610,12 +613,12 @@ async function chatByHand(ctx: WorkbenchContext, id: string, filePath: string, q
     const file = files.find((value) => value.path === filePath);
     if (!file || file.blocked) throw new AppError((m) => m.run.review.chatUnavailable, 422);
     assertHelpAllowed(run, "answer");
-    if (ctx.byHandJobs.has(`guide:${id}`)) throw new AppError((m) => m.byHand.busy, 409);
+    // One guide turn at a time: a guide job or another question holds the key.
+    if (ctx.byHandJobs.has(key) || ctx.controllers.has(key)) throw new AppError((m) => m.byHand.busy, 409);
+    // Taken under the lock, so a guide job asked for meanwhile waits for it and Stop ends this turn.
+    ctx.controllers.set(key, controller);
     return { run, file };
   });
-  const controller = new AbortController();
-  const key = `guide:${id}`;
-  if (!ctx.controllers.has(key)) ctx.controllers.set(key, controller);
   let answer: string;
   try {
     answer = await guide.chat(ctx, run, filePath, question, controller.signal);
