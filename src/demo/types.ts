@@ -179,6 +179,12 @@ export interface DemoContent {
    * English in every locale.
    */
   commitHistory?: { commits: CommitSummary[]; details: Record<string, CommitDetail> };
+  /**
+   * Each sample file's base lines, appended after its one hunk so the
+   * unchanged code around a change reads offline (DESIGN v1.2 headroom
+   * item 3, W3B). Absent until then.
+   */
+  baseLines?: Partial<Record<DemoFilePath, string[]>>;
 }
 
 /**

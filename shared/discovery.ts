@@ -75,6 +75,21 @@ export interface ContributionOpportunity {
    * Absent means false.
    */
   learnByHand?: boolean;
+  /**
+   * An evidence quote reserves issues like this one for people learning
+   * without AI (an `area` rule), so BELL won't publish a Learn-by-hand run
+   * for it unless the rule is worded around AI-generated or automated pull
+   * requests (`byHandReservedOutput`). Derived by the server, never taken
+   * from the agent's answer; absent means false.
+   */
+  byHandReserved?: true;
+  /**
+   * Beside `byHandReserved`: the reservation is worded around AI-generated
+   * or automated pull requests (matplotlib's "pull requests that are AI
+   * generated will be closed"), not around using AI, so a Learn-by-hand run
+   * may still reach the quoted confirm there. Absent means false.
+   */
+  byHandReservedOutput?: true;
 }
 
 export interface DiscoveryJob {

@@ -1,4 +1,5 @@
 import type { Translation } from "../../../shared/i18n/locale.js";
+import { product } from "../../../shared/product.js";
 import type en from "../en/understanding.js";
 
 const understanding: Translation<typeof en> = {
@@ -6,6 +7,17 @@ const understanding: Translation<typeof en> = {
   fallbackQuestion: ({ path }) =>
     `用一句話說明：對 ${path} 的變更做了什麼？為什麼這樣改？`,
   untestedQuestion: "你沒有測試哪些情況？為什麼？",
+  byHandQuestion: ({ path }) => `你寫了 \`${path}\` 的修改。為什麼這樣寫、不用別的做法？如果寫錯了，什麼會壞掉？`,
+  byHandTestRun: ({ command, outcome }) => `你在這個版本最後一次跑的測試：${command}（${outcome}）。`,
+  byHandFinding: ({ observed, why }) => `嚮導的審查：${observed} ${why}`,
+  testOutcomes: {
+    passed: "通過",
+    failed: "失敗",
+    timeout: "逾時",
+    stopped: "已停止",
+    error: "無法執行",
+  },
+  walkthroughFull: `這個檔案的逐段解說作答已達 ${product.name} 保留的上限。`,
   notOpen: "工作等待你審閱或核准時才能進行理解檢查；執行中或發布中不行。",
   changed: "你打開檢查後，變更又更新了。請重新載入，看看最新版本的問題。",
   unknownQuestion: "有一個答案不屬於目前檢查的問題。請重新載入檢查後再回答。",

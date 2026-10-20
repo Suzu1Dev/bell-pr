@@ -2,6 +2,8 @@
  * The Explain-it-back check (server/understanding.ts) and its routes. The
  * questions are saved with the run, in the run's language.
  */
+import { product } from "../../../shared/product.js";
+
 const understanding = {
   /** The setting's name in "comes from the … environment variable" messages. */
   settingName: "Ask me to explain each change back before approval",
@@ -9,6 +11,23 @@ const understanding = {
   fallbackQuestion: ({ path }: { path: string }) =>
     `In one sentence, what does the change to ${path} do, and why?`,
   untestedQuestion: "What did you not test, and why?",
+  /** A Learn-by-hand run's question for every file: the person wrote the change. */
+  byHandQuestion: ({ path }: { path: string }) =>
+    `You wrote the change to \`${path}\`. Why this way rather than another, and what would break if it were wrong?`,
+  /** A Learn-by-hand reference for the not-tested question: the last test run BELL ran at the ready version. */
+  byHandTestRun: ({ command, outcome }: { command: string; outcome: string }) =>
+    `Your last test run of this version: ${command} (${outcome}).`,
+  /** A finding of the guide's review, in a Learn-by-hand reference. */
+  byHandFinding: ({ observed, why }: { observed: string; why: string }) => `The guide's review: ${observed} ${why}`,
+  testOutcomes: {
+    passed: "passed",
+    failed: "failed",
+    timeout: "timed out",
+    stopped: "stopped",
+    error: "could not run",
+  } as Record<string, string>,
+  /** A walkthrough answer past the units a file keeps. */
+  walkthroughFull: `This file already has the most walkthrough answers ${product.name} keeps.`,
   notOpen:
     "The understanding check can be taken while the run waits for your review or approval, not while it runs or publishes.",
   changed:

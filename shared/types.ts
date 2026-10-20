@@ -22,6 +22,7 @@ import type {
   GuardOverride,
 } from "./contribution.js";
 import type { CoachDebrief } from "./coach.js";
+import type { ByHandRecord } from "./by-hand.js";
 
 export type RunStatus =
   | "queued"
@@ -53,6 +54,12 @@ export interface Repository {
   contributionRules?: ContributionRules;
   /** Pro coach debriefs for this project, newest last, at most 5; readable on every plan. GET /api/repos leaves them out. */
   debriefs?: CoachDebrief[];
+  /**
+   * The test command the person confirmed for this project, in a request of
+   * its own (Learn by hand runs it only when they click Run). Any change is
+   * a new confirmation; absent until the first one.
+   */
+  testCommand?: { command: string; confirmedAt: string };
 }
 
 export interface Agent {
@@ -178,4 +185,18 @@ export interface RunCore {
   guardOverrides?: GuardOverride[];
   /** The person's one-line reason for each weakened-test item, keyed by its id. */
   reviewability?: { testReasons?: Record<string, string> };
+  /**
+   * True for a Learn-by-hand run: the person writes every line and BELL's
+   * agents only read. Set only by createRun from the request and never
+   * changed; absent on agent runs. Not a detail field, so the run list
+   * shows it.
+   */
+  learnByHand?: true;
+  /**
+   * A Learn-by-hand run's record (shared/by-hand.ts): the person's plan, the
+   * guide's answers, BELL's test runs, the help used and, for a run fitted
+   * to a project's rules, the help set fixed when it started. Absent on
+   * agent runs and until the run records something.
+   */
+  byHand?: ByHandRecord;
 }

@@ -18,7 +18,10 @@ import { currentLocale, sm } from "./i18n/index.js";
 import { resolveModelExecution } from "./models.js";
 import { logRunQueued } from "./run-events.js";
 import { enforceAgentSandbox } from "./sandbox.js";
-import { AppError, withRunLocale, type Run } from "./types.js";
+import { AppError, withRunLocale, type Repository, type Run } from "./types.js";
+import type { HelpLock } from "../shared/by-hand.js";
+import { byHandRulesCase } from "../shared/by-hand-rules.js";
+import { byHandBlockClause } from "../shared/contribution.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 const now = () => new Date().toISOString();
@@ -28,6 +31,18 @@ const newId = () => randomUUID();
  * What createRun() reads through the Workbench, so that a test that
  * replaces one of these Workbench methods also changes what a new run sees.
  */
+/**
+ * How a new run works, from POST /api/runs (never stored as given):
+ * `learnByHand` makes it a Learn-by-hand run, for good; `byHandFit`, only
+ * with it, fixes the run's help set to the project's carve-out
+ * (`byHand.helpLock`, DESIGN v1.2 F12), with whether the linked issue
+ * carries a learning label in the task dialog's facts.
+ */
+export interface NewRunMode {
+  learnByHand?: boolean;
+  byHandFit?: { learningIssue: boolean };
+}
+
 export interface NewRunSources {
   models(provider?: AgentProvider): Promise<ModelCatalog>;
   /** Which agent CLIs are installed and signed in. */
@@ -45,6 +60,7 @@ export interface NewRunSources {
 async function assertProviderReady(
   sources: NewRunSources,
   provider: AgentProvider,
+  access: "read" | "write",
 ) {
   const capability = await sources.status();
   if (provider === "claude") {
@@ -58,8 +74,8 @@ async function assertProviderReady(
         code: "claude_unauthenticated",
         fixes: setupError("claude_unauthenticated").fixes,
       });
-    // Every contribution run has agents that edit files.
-    await enforceAgentSandbox("claude", "write");
+    // An agent run's teammates edit files; a Learn-by-hand run's agents only read.
+    await enforceAgentSandbox("claude", access);
   } else {
     if (!capability.codex)
       throw new AppError((m) => m.run.queue.codexMissing, 503, {
@@ -74,6 +90,30 @@ async function assertProviderReady(
   }
 }
 
+/**
+ * The help set of a run fitted to the project's rules, fixed now (DESIGN
+ * v1.2 F12 condition e), from the rules BELL stored; 409 when the case is
+ * no longer `fitted` (the rules changed since the task dialog read them).
+ */
+function fitHelpLock(
+  repo: Repository,
+  fit: { learningIssue: boolean },
+  at: string,
+): HelpLock {
+  const fitted = byHandRulesCase(repo.contributionRules, { learningIssue: fit.learningIssue, now: at });
+  if (fitted.case === "fitted") return { ...fitted.lock, at };
+  throw new AppError(
+    (m) =>
+      m.byHand.fitUnavailable({
+        reason:
+          fitted.case === "blocked"
+            ? byHandBlockClause(fitted.reason, currentLocale(), { checkedOn: fitted.finding.source?.checkedOn })
+            : m.byHand.fitNothing,
+      }),
+    409,
+  );
+}
+
 export async function createRun(
   ctx: WorkbenchContext,
   sources: NewRunSources,
@@ -81,14 +121,22 @@ export async function createRun(
   prompt: string,
   title?: string,
   settings?: ContributionSettings,
+  mode: NewRunMode = {},
 ) {
   const repo = ctx.repo(repoId);
+  const byHand = mode.learnByHand === true;
   const modelExecution = resolveModelExecution(
     settings ?? {},
     await sources.models(settings?.provider),
   );
-  await assertProviderReady(sources, modelExecution.provider ?? "codex");
+  await assertProviderReady(
+    sources,
+    modelExecution.provider ?? "codex",
+    byHand ? "read" : "write",
+  );
   ctx.assertQueueCapacity();
+  const createdAt = now();
+  const helpLock = byHand && mode.byHandFit ? fitHelpLock(repo, mode.byHandFit, createdAt) : undefined;
   // The plan decides how many teammates a new run gets; runs created
   // before keep their recorded team.
   const requested = {
@@ -112,7 +160,7 @@ export async function createRun(
     baseBranch: repo.defaultBranch,
     baseSha: "",
     worktreePath: path.join(ctx.store.directory, "worktrees", id),
-    createdAt: now(),
+    createdAt,
     // The request's locale; the run's background work and agents use it.
     locale: currentLocale(),
     agents: [
@@ -147,10 +195,13 @@ export async function createRun(
       ? { ...settings, maxTeammates: allowed.maxTeammates }
       : undefined,
     modelExecution,
+    ...(byHand ? { learnByHand: true as const } : {}),
+    ...(helpLock ? { byHand: { helpLock } } : {}),
     team: {
       config: {
         maxTeammates: allowed.maxTeammates,
-        requirePlanApproval: settings?.requirePlanApproval ?? true,
+        // The person's own plan comes first in Learn by hand: always on.
+        requirePlanApproval: byHand || (settings?.requirePlanApproval ?? true),
         provider: modelExecution.provider ?? "codex",
         protocol: "bell-shared-tasks",
         messageDelivery: "between-turns",

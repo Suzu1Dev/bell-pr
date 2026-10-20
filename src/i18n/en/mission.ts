@@ -603,7 +603,7 @@ const mission = {
       "issue-closed": `You can practise this locally; ${product.name} won't publish it while the linked issue is closed.`,
       door: `You can practise this locally; ${product.name} won't publish it while this repository doesn't take pull requests from you.`,
       ban: `You can practise this locally; ${product.name} won't publish it while the project's rules don't accept AI-assisted contributions.`,
-      area: `You can practise this locally; ${product.name} won't publish it while the project keeps issues labelled for newcomers for people who write the fix by hand.`,
+      area: `You can practise this locally; ${product.name} won't publish it while the project keeps issues labelled for newcomers for people learning without AI tools.`,
     },
     otherPr: ({ author, number }: { author: string; number: number }) =>
       `You can practise this locally; ${product.name} won't publish it while @${author}'s pull request #${number} would close the same issue, unless you give your reason when you publish.`,

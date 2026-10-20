@@ -88,10 +88,21 @@ export const attemptSchema = z
       })
       .strict()
       .optional(),
+    // A walkthrough unit's "Check yourself" (D1), by its key name:startLine.
+    walkthrough: z
+      .object({
+        unit: z.string().min(1).max(understandingLimits.walkthroughKeyChars),
+        answer: z.string().max(understandingLimits.answerChars).optional(),
+        confidence: z.enum(confidences).optional(),
+        grade: z.enum(selfGrades).optional(),
+        skipped: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .refine(
-    (input) => input.quiz || input.road,
+    (input) => input.quiz || input.road || input.walkthrough,
     () => ({ message: sm().understanding.attemptEmpty }),
   );
 

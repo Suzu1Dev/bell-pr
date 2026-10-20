@@ -172,6 +172,9 @@ const opportunitySchema = z
       .max(12),
     // Practice for the person, not work for the agent team (shared/discovery.ts).
     learnByHand: z.boolean().optional(),
+    // Derived from the evidence by the server after parsing (v1.2).
+    byHandReserved: z.literal(true).optional(),
+    byHandReservedOutput: z.literal(true).optional(),
   })
   .strict();
 const resultSchema = z

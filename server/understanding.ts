@@ -14,6 +14,7 @@ import { parseLocale } from "../shared/i18n/locale.js";
 import {
   cardTexts,
   changeFingerprint,
+  creditedQuiz,
   looksCopied,
   planCheck,
   recordPass,
@@ -103,12 +104,66 @@ export function planUnderstanding(
       reports: run.reports,
       generated: repo?.contributionRules?.generated,
       record: run.understanding,
-      questions: {
-        fallback: (path) => messages.fallbackQuestion({ path }),
-        untested: messages.untestedQuestion,
-      },
+      ...(run.learnByHand
+        ? {
+            byHand: byHandReferences(run, files),
+            questions: {
+              fallback: (path) => messages.byHandQuestion({ path }),
+              untested: messages.untestedQuestion,
+            },
+          }
+        : {
+            walkthroughs: run.walkthroughs,
+            questions: {
+              fallback: (path) => messages.fallbackQuestion({ path }),
+              untested: messages.untestedQuestion,
+            },
+          }),
     });
   });
+}
+
+/**
+ * A Learn-by-hand run's references (DESIGN v1.2 F10): for a file, the
+ * person's own words (the titles, "what you'll do here" and the why of the
+ * steps that list it, or of every step when none does) and, as the
+ * AI-written part, the guide's review findings on it; for the not-tested
+ * question, the last BELL test run at the ready version and the test
+ * analyst's report. Only the AI-written part is checked for near-copies.
+ */
+function byHandReferences(run: Run, files: readonly DiffFile[]) {
+  const messages = sm().understanding;
+  const record = run.byHand ?? {};
+  const ready = record.ready?.changeFingerprint ?? changeFingerprint(files);
+  const steps = record.plan?.steps ?? [];
+  const review =
+    [...(record.reviews ?? [])].reverse().find((entry) => entry.changeFingerprint === ready) ??
+    record.reviews?.at(-1);
+  const test = [...(record.tests ?? [])]
+    .reverse()
+    .find((entry) => entry.changeFingerprint === ready && !entry.reported);
+  const words = (step: (typeof steps)[number]) => [step.title, step.how, step.why];
+  const join = (parts: (string | undefined)[]) =>
+    parts.filter((part): part is string => !!part?.trim()).join("\n") || undefined;
+  return {
+    reference: (path: string) => {
+      const listed = steps.filter((step) => step.files?.includes(path));
+      return {
+        own: join((listed.length ? listed : steps).flatMap(words)),
+        ai: join(
+          (review?.findings ?? [])
+            .filter((finding) => finding.path === path)
+            .map((finding) => messages.byHandFinding(finding)),
+        ),
+      };
+    },
+    untested: {
+      own: test
+        ? messages.byHandTestRun({ command: test.command, outcome: messages.testOutcomes[test.outcome] ?? test.outcome })
+        : undefined,
+      ai: run.reports?.tester?.trim() || undefined,
+    },
+  };
 }
 
 function evaluate(run: Run, files: readonly DiffFile[], repo?: Repository) {
@@ -327,7 +382,9 @@ export function understandingFacade(
               (m) => m.understanding.answerShort({ min: understandingLimits.answerMinWords }),
               422,
             );
-          if (planned.reference && looksCopied(item.answer, [planned.reference]))
+          // In a Learn-by-hand run only the AI-written part of a reference is a copy.
+          const copied = planned.copyReference ?? planned.reference;
+          if (copied && looksCopied(item.answer, [copied]))
             throw new AppError((m) => m.understanding.answerCopied, 422);
         }
         const credited = plan.filter(
@@ -338,7 +395,7 @@ export function understandingFacade(
           throw new AppError((m) => m.understanding.alreadyLocked, 409);
         const added: UnderstandingItem[] = [
           ...credited.flatMap((planned): UnderstandingItem[] => {
-            const quiz = run.attempts?.[planned.path!]?.quiz;
+            const quiz = creditedQuiz(run, planned.path!);
             if (!quiz?.confidence || !quiz.grade) return [];
             return [
               {
@@ -515,6 +572,32 @@ export function understandingFacade(
               confidence: quiz.confidence,
               grade: quiz.grade,
               skipped: quiz.skipped,
+            }),
+            at,
+          };
+        }
+        if (input.walkthrough) {
+          const { unit, ...answer } = input.walkthrough;
+          const units = (attempt.walkthroughs ??= {});
+          const prior = units[unit];
+          // As the quiz: a graded or skipped answer is final.
+          if (prior && (prior.grade || prior.skipped) && (answer.grade ?? prior.grade) !== prior.grade)
+            throw new AppError((m) => m.understanding.attemptLocked, 409);
+          if (prior && (prior.grade || prior.skipped) && (["answer", "confidence", "skipped"] as const).some(
+            (key) => answer[key] !== undefined && (answer[key] ?? "") !== (prior[key] ?? ""),
+          ))
+            throw new AppError((m) => m.understanding.attemptLocked, 409);
+          if (answer.skipped && answer.answer?.trim())
+            throw new AppError((m) => m.understanding.attemptSkipped, 422);
+          if (!prior && Object.keys(units).length >= understandingLimits.walkthroughUnits)
+            throw new AppError((m) => m.understanding.walkthroughFull, 409);
+          units[unit] = {
+            ...prior,
+            ...defined({
+              answer: answer.answer?.trim(),
+              confidence: answer.confidence,
+              grade: answer.grade,
+              skipped: answer.skipped,
             }),
             at,
           };

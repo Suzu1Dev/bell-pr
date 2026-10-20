@@ -205,6 +205,7 @@ test("sm() and the shared helpers return the current locale's messages", () => {
 test("every server namespace is registered for both locales", () => {
   const namespaces = [
     "analysis",
+    "byHand",
     "cli",
     "common",
     "contribution",

@@ -11,6 +11,7 @@ import {
   type ContributionFacts,
 } from "../../shared/contribution";
 import { draftPreflight, type DraftCheck } from "../../shared/draft-checks";
+import { byHandPreflight } from "../../shared/by-hand";
 import type { Locale } from "../../shared/i18n/locale";
 import { reviewabilitySnapshot } from "../../shared/reviewability";
 import type { DemoContent } from "../demo";
@@ -67,6 +68,8 @@ export function samplePublishChecks(
       testReasons: run.reviewability?.testReasons,
       issueUrl: run.contributionSettings?.issueUrl,
       understandingOff: understandingOff && !run.understanding?.passedAt,
+      // As on the server; the sample is never a Learn-by-hand run.
+      learnByHand: byHandPreflight(run, new Date().toISOString()),
     },
     locale,
   );

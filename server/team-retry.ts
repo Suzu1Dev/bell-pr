@@ -31,6 +31,7 @@ export async function retryTeam(
     if (!["failed", "cancelled"].includes(run.status) || !team)
       throw new AppError((m) => m.run.team.retryNotAllowed, 409);
     assertWorkspacePresent(run);
+    if (run.learnByHand) return retryByHand(ctx, run, team, message);
     if (!team.tasks.length) return retryPlanning(ctx, run, team, message);
     if (!run.baseSha) throw new AppError((m) => m.run.team.retryNotAllowed, 409);
     // A cancelled run keeps its controller until the worker has exited; the
@@ -102,6 +103,38 @@ export async function retryTeam(
     ctx.enqueue(id);
     return run;
   });
+}
+
+/**
+ * A Learn-by-hand run has no agent work to retry (DESIGN v1.2 F2). Without
+ * the guide's outline it plans again through the same re-queue (the queue
+ * reaches executeRun's Learn-by-hand branch, a read-only turn); with an
+ * outline and no confirmed plan it returns to the person's plan with no
+ * agent turn. Anything later is refused. The caller holds the run lock.
+ */
+async function retryByHand(
+  ctx: WorkbenchContext,
+  run: Run,
+  team: NonNullable<Run["team"]>,
+  message?: string,
+) {
+  // An older build planned (or ran) this run as a team run. Re-planning
+  // would take its teammates off the run's cards, the history that
+  // withdraws the claim (byHandClean), so there is nothing to retry.
+  if (team.tasks.length) throw new AppError((m) => m.byHand.retryRefused, 409);
+  if (!run.byHand?.guidePlan) return retryPlanning(ctx, run, team, message);
+  if (run.byHand.plan?.confirmedAt)
+    throw new AppError((m) => m.byHand.retryRefused, 409);
+  if (ctx.controllers.has(run.id))
+    throw new AppError((m) => m.run.team.stillStopping, 409);
+  delete run.error;
+  team.phase = "awaiting_approval";
+  run.status = "awaiting_plan";
+  for (const agent of run.agents)
+    if (agent.status === "failed" || agent.status === "running") agent.status = "waiting";
+  ctx.log(run, "user", sm().byHand.backToPlan);
+  await ctx.store.save();
+  return run;
 }
 
 /**

@@ -18,6 +18,9 @@ import {
   isTestPath,
   whitespaceOnlyPatch,
 } from "./reviewability.js";
+import { changeFingerprint } from "./change-fingerprint.js";
+
+export { changeFingerprint };
 
 // The vocabularies below are stored as text in state.json and frozen at
 // these values: a later build may add a field, never a value.
@@ -81,6 +84,9 @@ export const understandingLimits = {
   items: 6,
   /** Passed checks kept in `history`. */
   history: 20,
+  /** Walkthrough units answered per file, and the length of a unit's key. */
+  walkthroughUnits: 12,
+  walkthroughKeyChars: 300,
 } as const;
 
 /**
@@ -195,6 +201,23 @@ export interface FileAttempt {
     why?: string;
     at: string;
   };
+  /**
+   * The walkthrough's "Check yourself" answers, one per unit, keyed
+   * `name:startLine` (at most `walkthroughKeyChars`, at most
+   * `walkthroughUnits` of them), answered before the reveal as the quiz is.
+   * Absent until one is answered.
+   */
+  walkthroughs?: Record<string, WalkthroughAnswer>;
+}
+
+/** One walkthrough unit's "Check yourself" answer (`FileAttempt.walkthroughs`). */
+export interface WalkthroughAnswer {
+  answer?: string;
+  confidence?: Confidence;
+  grade?: SelfGrade;
+  /** "Show answer" with an empty field. */
+  skipped?: boolean;
+  at: string;
 }
 
 /** The person's tag on one piece of maintainer feedback (`run.feedbackTags[url]`). */
@@ -228,6 +251,13 @@ export interface PlannedItem {
   question: string;
   /** AI-written; absent when there is none ("compare with the diff yourself"). */
   reference?: string;
+  /**
+   * The AI-written part of the reference, the only text an answer may not
+   * nearly copy (not persisted). Set in a Learn-by-hand run, whose
+   * reference also holds the person's own words; absent means the whole
+   * reference.
+   */
+  copyReference?: string;
 }
 
 export type MissingPart =
@@ -297,6 +327,14 @@ export interface FileAttemptInput {
     skipped?: boolean;
   };
   road?: { guess?: string; choice?: RoadChoice; why?: string };
+  /** A walkthrough unit's "Check yourself", by its key `name:startLine` (D1). */
+  walkthrough?: {
+    unit: string;
+    answer?: string;
+    confidence?: Confidence;
+    grade?: SelfGrade;
+    skipped?: boolean;
+  };
 }
 
 /**
@@ -345,31 +383,6 @@ export function needsUntestedQuestion(
       !isDocsPath(file.path) &&
       !isTestPath(file.path),
   );
-}
-
-const fnvOffset = 0xcbf29ce484222325n;
-const fnvPrime = 0x100000001b3n;
-const mask64 = 0xffffffffffffffffn;
-
-/**
- * The fingerprint of the whole change: FNV-1a 64-bit, as 16 hex digits, of
- * the sorted `path:fingerprint` lines. Synchronous so the client, the demo
- * and the server compute it alike; it identifies a version of the change
- * and is not security-relevant.
- */
-export function changeFingerprint(
-  files: readonly Pick<CheckFile, "path" | "fingerprint">[],
-) {
-  const text = files
-    .map((file) => `${file.path}:${file.fingerprint}`)
-    .sort()
-    .join("\n");
-  let hash = fnvOffset;
-  for (const byte of new TextEncoder().encode(text)) {
-    hash ^= BigInt(byte);
-    hash = (hash * fnvPrime) & mask64;
-  }
-  return hash.toString(16).padStart(16, "0");
 }
 
 /** Paragraphs (split on blank lines) of a report that mention the path or its basename. */
@@ -440,6 +453,93 @@ export interface CheckExplanation {
   content?: ChangeExplanation;
 }
 
+/** What the check reads of a stored walkthrough (`RunCore.walkthroughs`). */
+export interface CheckWalkthrough {
+  fingerprint?: string;
+  status?: string;
+  content?: {
+    functions: { name: string; startLine: number; selfCheck?: { question: string; answer: string } }[];
+  };
+}
+
+/** A walkthrough unit's key in `FileAttempt.walkthroughs`. */
+export function walkthroughUnitKey(unit: { name: string; startLine: number }) {
+  return `${unit.name}:${unit.startLine}`;
+}
+
+/** The units of a file's walkthrough that ask "Check yourself", when it is ready for this version. */
+function walkthroughChecks(stored: CheckWalkthrough | undefined, fingerprint?: string) {
+  if (stored?.status !== "ready" || !stored.content) return [];
+  if (fingerprint && stored.fingerprint && stored.fingerprint !== fingerprint) return [];
+  return stored.content.functions.flatMap((unit) =>
+    unit.selfCheck?.question
+      ? [{ unit: walkthroughUnitKey(unit), question: unit.selfCheck.question, answer: unit.selfCheck.answer }]
+      : [],
+  );
+}
+
+/**
+ * The answer that may fill a file's `attempt:` slot: the card's quiz once
+ * graded (and not skipped), else the first graded walkthrough unit answer
+ * by key (D1). planCheck and creditedQuiz choose alike.
+ */
+function slotAnswer(attempt: FileAttempt | undefined): { quiz: WalkthroughAnswer; unit?: string } | undefined {
+  const quiz = attempt?.quiz;
+  if (quiz?.grade && !quiz.skipped) return { quiz };
+  const [unit, answer] =
+    Object.entries(attempt?.walkthroughs ?? {})
+      .sort(([a], [b]) => a.localeCompare(b))
+      .find(([, value]) => value.grade && !value.skipped) ?? [];
+  return unit && answer ? { quiz: answer, unit } : undefined;
+}
+
+/**
+ * The quiz answer behind a file's `attempt:` check item, the five readers
+ * share it: the card's quiz, or a walkthrough unit's answer with the
+ * unit's question and reference when its walkthrough is ready for the
+ * attempt's version.
+ */
+export function creditedQuiz(
+  run: {
+    attempts?: Record<string, FileAttempt | undefined>;
+    walkthroughs?: Record<string, CheckWalkthrough | undefined>;
+  },
+  path: string,
+): (WalkthroughAnswer & { unit?: string; question?: string; reference?: string }) | undefined {
+  const attempt = run.attempts?.[path];
+  const slot = slotAnswer(attempt);
+  if (!slot) return attempt?.quiz;
+  if (!slot.unit) return slot.quiz;
+  const check = walkthroughChecks(run.walkthroughs?.[path], attempt?.fingerprint).find(
+    (entry) => entry.unit === slot.unit,
+  );
+  return { ...slot.quiz, unit: slot.unit, ...(check ? { question: check.question, reference: check.answer } : {}) };
+}
+
+/**
+ * Keeps the walkthroughs whose units the person answered at their file's
+ * version and drops the rest, as a changed premise verdict does with
+ * explanations (`dropUnansweredExplanations`): a remade walkthrough would
+ * put new questions in place of the ones answered. W2A calls it from
+ * server/premise-runs.ts instead of deleting every walkthrough.
+ */
+export function keepAnsweredWalkthroughs(run: {
+  walkthroughs?: Record<string, CheckWalkthrough>;
+  attempts?: Record<string, FileAttempt | undefined>;
+}) {
+  const stored = run.walkthroughs;
+  if (!stored) return;
+  for (const [file, walkthrough] of Object.entries(stored)) {
+    const attempt = run.attempts?.[file];
+    const answered =
+      !!attempt &&
+      attempt.fingerprint === walkthrough.fingerprint &&
+      Object.keys(attempt.walkthroughs ?? {}).length > 0;
+    if (!answered) delete stored[file];
+  }
+  if (!Object.keys(stored).length) delete run.walkthroughs;
+}
+
 /** The file's explanation card, when it is ready for this version of the file. */
 function readyCard(
   file: CheckFile,
@@ -505,22 +605,51 @@ export function planCheck({
   files,
   explanations,
   attempts,
+  walkthroughs,
   reports,
   reviewOrder,
   generated,
   record,
   questions,
+  byHand,
 }: {
   files: readonly CheckFile[];
   explanations?: Record<string, CheckExplanation | undefined>;
   attempts?: Record<string, FileAttempt | undefined>;
+  /**
+   * The stored walkthroughs (D1, agent runs only): a unit's "Check
+   * yourself" is the file's question when its card has none, and a graded
+   * unit answer can fill the file's slot as a credited attempt.
+   */
+  walkthroughs?: Record<string, CheckWalkthrough | undefined>;
   reports?: Reports;
   reviewOrder?: readonly string[];
   generated?: readonly string[];
   record?: RunUnderstanding;
   /** The run's language: the fallback question for a file, and the not-tested question. */
   questions: { fallback: (path: string) => string; untested: string };
+  /**
+   * A Learn-by-hand run (DESIGN v1.2 F10): explanations, attempts and
+   * walkthrough credit are ignored and every file asks `questions.fallback`
+   * (the fixed "why this way, what would break" question). Each reference
+   * is the person's own words (`own`) and the AI-written part (`ai`); only
+   * `ai` is checked for near-copies (`copyReference`).
+   */
+  byHand?: {
+    reference(path: string): { own?: string; ai?: string };
+    untested: { own?: string; ai?: string };
+  };
 }): PlannedItem[] {
+  if (byHand) {
+    explanations = undefined;
+    attempts = undefined;
+    walkthroughs = undefined;
+  }
+  /** The reference of a Learn-by-hand slot, with its AI-written part for the copy check. */
+  const byHandReference = ({ own, ai }: { own?: string; ai?: string }) => {
+    const reference = [own, ai].filter((text) => text?.trim()).join("\n\n");
+    return { ...(reference ? { reference } : {}), copyReference: ai?.trim() ?? "" };
+  };
   const scope = checkScope(files, record);
   const slots = checkQuestionCount(changedLines(scope, generated));
   const ranked = pickCheckFiles({ files: scope, reports, reviewOrder, generated });
@@ -539,13 +668,23 @@ export function planCheck({
   const plan: PlannedItem[] = ranked
     .filter((file) => picked.includes(file))
     .map((file) => {
+      const base = { path: file.path, fingerprint: file.fingerprint };
+      const kept = keep.includes(file) ? locked.get(file.path) : undefined;
+      if (byHand)
+        return {
+          ...base,
+          id: kept?.id ?? `fallback:${file.path}`,
+          source: kept?.source ?? "fallback",
+          question: kept?.question ?? questions.fallback(file.path),
+          ...byHandReference(byHand.reference(file.path)),
+        };
       const card = readyCard(file, explanations);
-      const check = card?.selfCheck;
+      // A walkthrough unit's check stands in for a card without one (D1).
+      const units = walkthroughChecks(walkthroughs?.[file.path], file.fingerprint);
+      const check = card?.selfCheck ?? units[0];
       const fallbackReference = card
         ? `${card.summary}\n\n${card.reason}`
         : undefined;
-      const base = { path: file.path, fingerprint: file.fingerprint };
-      const kept = keep.includes(file) ? locked.get(file.path) : undefined;
       if (kept)
         return {
           ...base,
@@ -553,15 +692,24 @@ export function planCheck({
           source: kept.source,
           question: kept.question,
           reference:
-            kept.source === "fallback" ? fallbackReference : check?.answer,
+            kept.source === "fallback"
+              ? fallbackReference
+              : [card?.selfCheck, ...units].find((entry) => entry?.question === kept.question)?.answer ??
+                check?.answer,
         };
-      if (check && creditedAttempt(attempts?.[file.path], file, check.answer))
+      const slot = slotAnswer(attempts?.[file.path]);
+      const credit = slot?.unit ? units.find((unit) => unit.unit === slot.unit) : card?.selfCheck;
+      if (
+        slot &&
+        credit &&
+        creditedAttempt({ fingerprint: attempts![file.path]!.fingerprint, quiz: slot.quiz }, file, credit.answer)
+      )
         return {
           ...base,
           id: `attempt:${file.path}`,
           source: "attempt",
-          question: check.question,
-          reference: check.answer,
+          question: credit.question,
+          reference: credit.answer,
         };
       if (check)
         return {
@@ -586,7 +734,7 @@ export function planCheck({
       id: "untested",
       source: "untested",
       question: kept?.question ?? questions.untested,
-      ...(tester ? { reference: tester } : {}),
+      ...(byHand ? byHandReference(byHand.untested) : tester ? { reference: tester } : {}),
     });
   }
   return plan;
@@ -746,7 +894,7 @@ export function understandingStatus({
     const item = record?.items?.find((entry) => entry.id === planned.id);
     const fresh =
       !item?.path || fingerprints.get(item.path) === item.fingerprint;
-    if (!item || !fresh || !validAnswer(item, planned.reference)) {
+    if (!item || !fresh || !validAnswer(item, planned.copyReference ?? planned.reference)) {
       missing.push({ part: "answer", itemId: planned.id });
       continue;
     }

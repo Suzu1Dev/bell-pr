@@ -23,6 +23,7 @@ import {
 } from "../shared/practice.js";
 import {
   confidences,
+  creditedQuiz,
   effectiveGrade,
   isConfidentMiss,
   selfGrades,
@@ -98,11 +99,13 @@ function readyCard(run: Run, path: string | undefined, fingerprint?: string) {
  */
 function checkReference(run: Run, item: UnderstandingItem) {
   const card = readyCard(run, item.path, item.fingerprint);
-  if (!card) return undefined;
-  if (item.source === "fallback") return `${card.summary}\n\n${card.reason}`;
-  return card.selfCheck?.question === item.question
-    ? card.selfCheck.answer
-    : undefined;
+  if (item.source === "fallback") return card ? `${card.summary}\n\n${card.reason}` : undefined;
+  if (card?.selfCheck?.question === item.question) return card.selfCheck.answer;
+  // A walkthrough unit's "Check yourself" asked for a file without one (D1).
+  const walkthrough = item.path ? run.walkthroughs?.[item.path] : undefined;
+  if (walkthrough?.status !== "ready" || walkthrough.fingerprint !== item.fingerprint) return undefined;
+  return walkthrough.content?.functions.find((unit) => unit.selfCheck?.question === item.question)?.selfCheck
+    .answer;
 }
 
 /** True once the run reached approval, so its explanations describe a finished change. */
@@ -208,14 +211,19 @@ export function practiceCandidates(
     // stored once the file's explanation moved on (a later round changed
     // the file).
     for (const [path, attempt] of Object.entries(run.attempts ?? {})) {
-      const quiz = attempt.quiz;
+      const quiz = creditedQuiz(run, path);
       if (!quiz || quiz.skipped) continue;
       const credited = items.find(
         (item) => item.id === `attempt:${path}` && item.fingerprint === attempt.fingerprint,
       );
       const grade = credited ? effectiveGrade(credited) : quiz.grade;
       const confidence = credited?.confidence ?? quiz.confidence;
-      const check = readyCard(run, path, attempt.fingerprint)?.selfCheck;
+      // A walkthrough unit's answer is practised with the unit's own question (D1).
+      const check = quiz.unit
+        ? quiz.question
+          ? { question: quiz.question, answer: quiz.reference }
+          : undefined
+        : readyCard(run, path, attempt.fingerprint)?.selfCheck;
       const question = check?.question ?? credited?.question;
       if (!missed(grade) || !question) continue;
       add(

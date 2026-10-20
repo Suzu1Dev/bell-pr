@@ -4,6 +4,7 @@
  * render this copy, so keep it customer-facing.
  */
 import type { PlanFeatureId, PlanTier } from "../plans.js";
+import { product } from "../product.js";
 
 const plans = {
   columns: { feature: "Feature", tier: "Plan", limit: "Limits" },
@@ -39,6 +40,11 @@ const plans = {
     planApproval: {
       label: "Plan approval and revision, team inbox, retry of failed subtasks",
       limit: "Up to 3 plan revisions",
+    },
+    learnByHand: {
+      label:
+        "Learn by hand: you write the change; the guide plans with you, gives hints without code and reviews your change when you're ready",
+      limit: `${product.name} runs your tests; its agents can't edit your files in these runs`,
     },
     review: {
       label:

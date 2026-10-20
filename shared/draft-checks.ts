@@ -18,6 +18,7 @@ import {
   type GuardOverride,
 } from "./contribution.js";
 import type { ReviewabilitySnapshot } from "./reviewability.js";
+import type { HelpKind, HelpLock } from "./by-hand.js";
 // The secret shapes and the safety-check messages have one source each,
 // kept with the server; both modules are plain data and load in the browser.
 import { secretInPatch } from "../server/secrets.js";
@@ -295,7 +296,12 @@ export interface DraftCheck {
     | "issue-state"
     | "reviewability"
     | "pacing"
-    | "facts-unknown";
+    | "facts-unknown"
+    // The quoted confirm of a clean Learn-by-hand run (DESIGN v1.2 F12);
+    // never an override, never a typed reason.
+    | "by-hand-rules"
+    // Headroom item 2 (DESIGN v1.2 F13): a line that says no AI helped.
+    | "disclosure-accuracy";
   /** block stops approval and publishing; confirm needs the person's acknowledgement before publishing. */
   kind: "block" | "confirm";
   message: string;
@@ -390,6 +396,24 @@ export interface DraftPreflightInput {
   understandingOff?: boolean;
   /** The issue the run is for (`contributionSettings.issueUrl`); empty or absent means none. */
   issueUrl?: string;
+  /**
+   * A Learn-by-hand run whose history is clean (`byHandPreflight` in
+   * shared/by-hand.ts, the same at both server callers and both client
+   * mirrors): the kinds of help it used, the help set fixed when it
+   * started, when it started (only where publishing is checked) and the
+   * time of the check. Absent for agent runs and for a Learn-by-hand run
+   * whose history withdrew the claim; both get the agent run's checks. Not
+   * persisted.
+   */
+  learnByHand?: ByHandPreflightInput;
+}
+
+/** `DraftPreflightInput.learnByHand`. */
+export interface ByHandPreflightInput {
+  helps: HelpKind[];
+  helpLock?: HelpLock;
+  createdAt?: string;
+  now: string;
 }
 
 /**

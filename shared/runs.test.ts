@@ -109,6 +109,7 @@ test("every detail field is left out", () => {
     [...runDetailFields].sort(),
     [
       "attempts",
+      "byHand",
       "contributionFacts",
       "conversations",
       "draftPreparation",
@@ -132,4 +133,10 @@ test("every detail field is left out", () => {
 test("the list keeps the understanding-check-off mark, which its badge needs", () => {
   const summary = summarizeRun({ ...run, understandingCheckOff: true });
   assert.equal(summary.understandingCheckOff, true);
+});
+
+test("the list keeps the Learn-by-hand mark, which its chip needs, and leaves the record out", () => {
+  const summary = summarizeRun({ ...run, learnByHand: true, byHand: { agentWrites: 0 } });
+  assert.equal(summary.learnByHand, true);
+  assert.equal("byHand" in summary, false);
 });

@@ -1,12 +1,14 @@
-import type { Locale } from "./i18n/locale.js";
-import en from "./i18n/learning-export.en.js";
-import zhTW from "./i18n/learning-export.zh-TW.js";
+import { byHandClean, byHandSummary } from "./by-hand.js";
+import { formatters, type Locale } from "./i18n/locale.js";
+import en, { byHand as enByHand } from "./i18n/learning-export.en.js";
+import zhTW, { byHand as zhTWByHand } from "./i18n/learning-export.zh-TW.js";
 import type { Repository, RunCore } from "./types.js";
 // Types only: the builder loads nothing but plain modules of shared/.
 import type { UnderstandingItem } from "./understanding.js";
 
 type Messages = typeof en;
 const dictionaries: Record<Locale, Messages> = { en, "zh-TW": zhTW };
+const byHandCopy: Record<Locale, typeof enByHand> = { en: enByHand, "zh-TW": zhTWByHand };
 
 /**
  * Markdown learning record for one run: what was asked, how the team planned
@@ -15,7 +17,7 @@ const dictionaries: Record<Locale, Messages> = { en, "zh-TW": zhTW };
  * tags on maintainer feedback, the blocks they lifted with a reason, the PR
  * and the provider-reported usage. The person's own sections are left out
  * when empty. Pure: it only reads the run and repository, so the server
- * export and the client-side demo export share it. `locale` chooses the
+ * export and the client-side demo export (buildSampleLearningExport) share it. `locale` chooses the
  * record's own headings and labels; the run's text is copied as it was
  * written.
  */
@@ -24,6 +26,24 @@ export function buildLearningExport(
   repo: Repository | undefined,
   locale: Locale,
 ): string {
+  return compose(run, repo, locale, byHandSection(run, locale));
+}
+
+/**
+ * The sample's record, built in the browser: the same record without the
+ * Learn-by-hand section, since the sample is never a Learn-by-hand run
+ * (DESIGN v1.2 §13). Leaving it out keeps that section's code and copy out
+ * of the browser bundle.
+ */
+export function buildSampleLearningExport(
+  run: RunCore,
+  repo: Repository | undefined,
+  locale: Locale,
+): string {
+  return compose(run, repo, locale, "");
+}
+
+function compose(run: RunCore, repo: Repository | undefined, locale: Locale, byHand: string) {
   const m = dictionaries[locale];
   const sections = [
     header(m, run, repo),
@@ -33,6 +53,7 @@ export function buildLearningExport(
     section(m.sections.conversations, conversationSection(m, run)),
     section(m.sections.notes, notesSection(run)),
     section(m.sections.explainBack, explainBackSection(m, run)),
+    byHand,
     section(m.sections.roads, roadsSection(m, run)),
     section(m.sections.forecast, forecastSection(m, run)),
     section(m.sections.feedbackTags, feedbackTagsSection(m, run)),
@@ -186,6 +207,36 @@ function explainBackSection(m: Messages, run: RunCore) {
         .join("\n"),
     );
   return parts.join("\n\n");
+}
+
+/**
+ * A Learn-by-hand run's record: the claim only while the run's history
+ * backs it (byHandClean), the help set it was fitted to, the help used
+ * and plain counts, and what BELL can't see.
+ */
+function byHandSection(run: RunCore, locale: Locale) {
+  if (!run.learnByHand) return "";
+  const fmt = formatters(locale);
+  const b = byHandCopy[locale];
+  const summary = byHandSummary(run);
+  const kinds = (values: readonly string[]) => fmt.list(values.map((kind) => b.kinds[kind] ?? kind));
+  const helps = Object.entries(summary.helps).map(([kind, count]) => `${b.kinds[kind] ?? kind} ${fmt.number(count)}`);
+  const { judged, right, unsure } = summary.predictions;
+  return section(
+    b.title,
+    [
+      byHandClean(run).clean ? b.claim : b.withdrawn,
+      ...(summary.fittedKinds ? [b.fitted({ kinds: kinds(summary.fittedKinds) })] : []),
+      [
+        ...(helps.length ? [b.helps({ helps: fmt.list(helps, { type: "unit" }) })] : []),
+        ...(judged + unsure ? [b.predictions({ right, judged, unsure })] : []),
+        ...(summary.removedAnswers ? [b.removed({ count: summary.removedAnswers })] : []),
+      ].join("\n"),
+      b.notProof,
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+  );
 }
 
 function roadsSection(m: Messages, run: RunCore) {

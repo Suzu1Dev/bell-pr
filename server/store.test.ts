@@ -22,7 +22,7 @@ import type { Database, Repository, Run } from "./types.js";
 import { withLocale } from "./i18n/index.js";
 import { z } from "zod";
 import { lenientRead } from "./persisted-schema.js";
-import { repositoryReadSchema, runReadSchema } from "./store.js";
+import { persistedDatabaseSchema, repositoryReadSchema, runReadSchema } from "./store.js";
 
 async function dataDirectory() {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-store-test-"));
@@ -1113,4 +1113,368 @@ test("a walkthrough a restart interrupted is failed in the run's language, and c
   assert.equal(loaded.status, "failed");
   // runWithV11Fields is an English run.
   assert.match(loaded.error!, /^The service restarted, so the code walkthrough stopped/);
+});
+
+// Fields added in v1.2 (Learn by hand), under the same rules: optional, and
+// readable by a build whose schema lacks them (AGENTS.md).
+
+/** Every part of a Learn-by-hand record (shared/by-hand.ts), the fitted help set included. */
+function byHandRecord(): NonNullable<Run["byHand"]> {
+  const entry = {
+    id: "entry-1",
+    at: "2026-10-20T00:20:00.000Z",
+    kind: "hint",
+    stepId: "step-1",
+    rung: 1,
+    tried: "I printed the greeting for an empty name",
+    text: "Look at how the greeting falls back to a default.",
+    ask: "What does the function return for an empty string?",
+    refs: [{ path: "hello.ts", line: 2 }],
+    quotes: [{ path: "hello.ts", startLine: 1, endLine: 3, from: "base", text: "export function greeting(name: string) {" }],
+    removed: 1,
+    changeFingerprint: "0123456789abcdef",
+    model: "gpt-5.5",
+  };
+  return {
+    guidePlan: {
+      summary: "An empty name prints a dangling comma.",
+      steps: [{ title: "Find the greeting", files: ["hello.ts"] }],
+      readFirst: [{ path: "hello.ts", startLine: 1, endLine: 3, why: "The greeting is built here." }],
+      at: "2026-10-20T00:01:00.000Z",
+      removed: 0,
+      dropped: 1,
+    },
+    plan: {
+      steps: [
+        {
+          id: "step-1",
+          title: "Fall back to world for an empty name",
+          files: ["hello.ts"],
+          how: "Check the name before building the text.",
+          doneAt: "2026-10-20T00:40:00.000Z",
+          maxRung: 3,
+          why: "An empty string is falsy, so the default applies to it too.",
+          chosen: { entryId: "entry-2", option: 1, why: "It keeps the function small." },
+        },
+        { id: "step-2", title: "Test the empty name", parkedAt: "2026-10-20T00:41:00.000Z" },
+      ],
+      tests: "A test that greets an empty name.",
+      unsure: "Whether whitespace counts as empty.",
+      prediction: "greeting, because it builds the text.",
+      savedAt: "2026-10-20T00:05:00.000Z",
+      confirmedAt: "2026-10-20T00:10:00.000Z",
+      outlineAt: "2026-10-20T00:06:00.000Z",
+      outlineBeforeDraft: true,
+    },
+    planQuestions: [
+      {
+        id: "question-1",
+        at: "2026-10-20T00:08:00.000Z",
+        kind: "plan",
+        text: "Your plan has no step for the test.",
+        ask: "How will you know the empty name works?",
+      },
+    ],
+    thread: [
+      entry,
+      {
+        ...entry,
+        id: "entry-2",
+        rung: 3,
+        options: [
+          { name: "A default parameter", tradeoff: "Short, but misses the empty string." },
+          { name: "An explicit check", tradeoff: "One more line, and clear." },
+        ],
+      },
+    ],
+    hints: { "step-1": { rung: 3, at: "2026-10-20T00:30:00.000Z", fingerprint: "0123456789abcdef", testRunAt: "2026-10-20T00:25:00.000Z", tried: "I added a check" } },
+    talks: [{ stepId: "step-1", at: "2026-10-20T00:15:00.000Z" }],
+    tests: [
+      {
+        at: "2026-10-20T00:25:00.000Z",
+        command: "npm test",
+        changeFingerprint: "0123456789abcdef",
+        outcome: "failed",
+        exitCode: 1,
+        ms: 1200,
+        prediction: "fail",
+        expect: "greets an empty name",
+        outputTail: "not ok 2 - greets an empty name",
+        tailHash: "9f86d081884c7d65",
+        newFiles: ["coverage/lcov.info"],
+      },
+      { at: "2026-10-20T00:45:00.000Z", command: "npm test", changeFingerprint: "fedcba9876543210", outcome: "passed", ms: 900, reported: true },
+    ],
+    ready: { at: "2026-10-20T00:50:00.000Z", changeFingerprint: "fedcba9876543210", leastSure: "The whitespace case.", review: true },
+    readyHistory: [{ at: "2026-10-20T00:35:00.000Z", changeFingerprint: "0123456789abcdef", review: false }],
+    reviews: [
+      {
+        at: "2026-10-20T00:52:00.000Z",
+        changeFingerprint: "fedcba9876543210",
+        leastSure: "The whitespace case.",
+        testRunAt: "2026-10-20T00:45:00.000Z",
+        verified: "Your last run passed; the diff covers both steps.",
+        checked: ["tests", "the empty-name path"],
+        findings: [
+          {
+            path: "hello.ts",
+            line: 2,
+            observed: "A name of spaces still prints a comma.",
+            evidence: { type: "pattern", path: "hello.ts", line: 2, quote: "name || \"world\"" },
+            why: "Users paste names with spaces.",
+            question: "What should a name of spaces print?",
+            dimension: "tests",
+          },
+        ],
+        removed: 0,
+      },
+    ],
+    events: [
+      { at: "2026-10-20T00:01:00.000Z", kind: "explain", source: "premise", model: "gpt-5.5", cli: "codex" },
+      { at: "2026-10-20T00:20:00.000Z", kind: "answer", source: "hint", rung: 1, stepId: "step-1", model: "gpt-5.5", cli: "codex", removed: 1 },
+    ],
+    agentWrites: 0,
+    removedTotal: 1,
+    checkIns: [{ stepId: "step-1", signal: "button", choice: "talk", at: "2026-10-20T00:14:00.000Z" }],
+    exits: [{ stepId: "step-1", exit: "talk", at: "2026-10-20T00:14:30.000Z" }],
+    leftAt: "2026-10-20T01:00:00.000Z",
+    busy: { kind: "review", since: "2026-10-20T00:51:00.000Z" },
+    helpLock: {
+      kinds: ["explain", "answer", "test"],
+      at: "2026-10-20T00:00:00.000Z",
+      rulesCheckedAt: "2026-10-19T23:59:00.000Z",
+      rules: [
+        {
+          kind: "ban",
+          path: "docs/devel/code-provenance.rst",
+          line: 293,
+          quote: "Current QEMU project policy is to DECLINE any contributions which are believed to include or derive from AI generated content.",
+          allows: [
+            {
+              line: 297,
+              quote: "This policy does not apply to other uses of AI, such as researching APIs or algorithms, static analysis, or debugging, provided their output is not included in contributions.",
+              kinds: ["explain", "answer", "test"],
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
+
+/** A Learn-by-hand run in review that carries every field v1.2 adds to a run. */
+function runWithV12Fields(): Run {
+  const run = runWithUpstreamFields();
+  run.id = "run-v12-by-hand";
+  run.learnByHand = true;
+  run.byHand = byHandRecord();
+  run.attempts!["hello.ts"].walkthroughs = {
+    "greeting:1": { answer: "It returns the greeting with the name", confidence: "think", grade: "partly", at: "2026-10-20T00:55:00.000Z" },
+    "main:4": { skipped: true, at: "2026-10-20T00:56:00.000Z" },
+  };
+  return run;
+}
+
+const v12RunSchemas: Record<string, z.ZodTypeAny> = {
+  learnByHand: runReadSchema.omit({ learnByHand: true }),
+  byHand: runReadSchema.omit({ byHand: true }),
+  // The help set fixed at the start, a part of the record (DESIGN §7).
+  "byHand.helpLock": runReadSchema.extend({
+    byHand: runReadSchema.shape.byHand.removeCatch().unwrap().omit({ helpLock: true }).optional().catch(undefined),
+  }),
+  "attempts[].walkthroughs": runReadSchema.extend({
+    attempts: z
+      .record(runReadSchema.shape.attempts.removeCatch().unwrap().valueSchema.omit({ walkthroughs: true }))
+      .optional()
+      .catch(undefined),
+  }),
+};
+
+for (const [field, older] of Object.entries(v12RunSchemas))
+  test(`a build that predates the run's ${field} (v1.2) still reads a run that has it`, () => {
+    const written = JSON.parse(JSON.stringify(runWithV12Fields()));
+    const read = lenientRead(older).safeParse(written);
+    assert.ok(read.success, read.success ? "" : read.error.message);
+    // state.json passes unknown fields through, so the field survives a save.
+    assert.deepEqual(read.data, written);
+  });
+
+test("a Learn-by-hand record loads and saves unchanged, and a restart clears its busy mark", async (t) => {
+  const run = runWithV12Fields();
+  const { directory, cleanup } = await stateWith([run]);
+  t.after(cleanup);
+  const store = new Store(directory);
+  await store.initialize();
+  assert.equal(store.recovery, undefined);
+  const { busy: _busy, ...rest } = run.byHand!;
+  assert.deepEqual(store.data.runs[0], { ...run, byHand: rest });
+  assert.equal("busy" in store.data.runs[0].byHand!, false);
+  // The run list leaves the record out and keeps the mark.
+  const summary = summarizeRun(store.data.runs[0]);
+  assert.equal("byHand" in summary, false);
+  assert.equal(summary.learnByHand, true);
+  // A part this build cannot read is left out, the rest of the record stays.
+  const odd = runWithV12Fields();
+  (odd.byHand as unknown as Record<string, unknown>).thread = "not a list";
+  const read = lenientRead(runReadSchema).safeParse(JSON.parse(JSON.stringify(odd)));
+  assert.ok(read.success);
+  assert.equal(read.data.byHand?.thread, undefined);
+  assert.equal(read.data.byHand?.helpLock?.kinds.length, 3);
+  assert.equal(read.data.byHand?.agentWrites, 0);
+});
+
+/** A repository that carries every field v1.2 adds to a repository. */
+function repositoryWithV12Fields(): Repository {
+  const repo: Repository = {
+    ...JSON.parse(JSON.stringify(repositoryWithV11Fields)),
+    testCommand: { command: "npm test -- hello", confirmedAt: "2026-10-20T00:00:00.000Z" },
+  };
+  repo.contributionRules!.findings.push({
+    kind: "ban",
+    path: "docs/devel/code-provenance.rst",
+    line: 293,
+    quote: "Current QEMU project policy is to DECLINE any contributions which are believed to include or derive from AI generated content.",
+    contribution: true,
+    allows: [
+      {
+        line: 297,
+        quote: "This policy does not apply to other uses of AI, such as researching APIs or algorithms, static analysis, or debugging, provided their output is not included in contributions.",
+        kinds: ["explain", "answer", "test"],
+      },
+    ],
+  });
+  repo.contributionRules!.findings.push({
+    kind: "ban",
+    path: "src/policies/llm-usage.md",
+    line: 24,
+    quote: "But not to **create**.",
+    contribution: true,
+    source: {
+      registry: "bell",
+      url: "https://github.com/rust-lang/rust-forge/blob/main/src/policies/llm-usage.md",
+      version: "67096ec0a6",
+      checkedOn: "2026-10-19",
+    },
+  });
+  repo.contributionRules!.channels = [
+    { label: "Zulip", url: "https://example.zulipchat.com/", path: "CONTRIBUTING.md", line: 3 },
+    { label: "GitHub Discussions", url: "https://github.com/acme/widgets/discussions" },
+  ];
+  return repo;
+}
+
+/** The repository read schema with one field of each contribution-rules finding left out. */
+function withoutFindingField(field: string) {
+  const rules = repositoryReadSchema.shape.contributionRules.removeCatch().unwrap();
+  const finding = rules.shape.findings.element;
+  return repositoryReadSchema.extend({
+    contributionRules: rules
+      .extend({ findings: z.array(finding.omit({ [field]: true } as never)).max(30) })
+      .optional()
+      .catch(undefined),
+  });
+}
+
+/** The repository read schema with one field of its contribution rules left out. */
+function withoutRulesField(field: string) {
+  const rules = repositoryReadSchema.shape.contributionRules.removeCatch().unwrap();
+  return repositoryReadSchema.extend({
+    contributionRules: rules.omit({ [field]: true } as never).optional().catch(undefined),
+  });
+}
+
+const v12RepositorySchemas: Record<string, z.ZodTypeAny> = {
+  testCommand: repositoryReadSchema.omit({ testCommand: true }),
+  "contributionRules.channels": withoutRulesField("channels"),
+  "contributionRules.findings[].source": withoutFindingField("source"),
+  "contributionRules.findings[].allows": withoutFindingField("allows"),
+};
+
+for (const [field, older] of Object.entries(v12RepositorySchemas))
+  test(`a build that predates the repository's ${field} (v1.2) still reads a repository that has it`, () => {
+    const written = JSON.parse(JSON.stringify(repositoryWithV12Fields()));
+    const read = lenientRead(older).safeParse(written);
+    assert.ok(read.success, read.success ? "" : read.error.message);
+    assert.deepEqual(read.data, written);
+  });
+
+test("a carve-out this build cannot read is left out, and the rest of the finding stays", () => {
+  const repo = JSON.parse(JSON.stringify(repositoryWithV12Fields())) as Repository;
+  const finding = repo.contributionRules!.findings.find((entry) => entry.allows)!;
+  (finding as unknown as Record<string, unknown>).allows = "not a list";
+  const read = lenientRead(repositoryReadSchema).safeParse(repo);
+  assert.ok(read.success);
+  const kept = read.data.contributionRules!.findings.find((entry) => entry.line === 293)!;
+  assert.equal(kept.allows, undefined);
+  assert.equal(kept.quote, finding.quote);
+  // Kinds are text: a kind a later build adds still loads.
+  finding.allows = [{ line: 297, quote: "x", kinds: ["explain", "later-kind" as never] }];
+  assert.deepEqual(
+    lenientRead(repositoryReadSchema).parse(repo).contributionRules!.findings.find((entry) => entry.line === 293)!.allows,
+    finding.allows,
+  );
+});
+
+/**
+ * A state.json with a Learn-by-hand run in review (server/fixtures/
+ * state-v1.2-by-hand.json): every part of the record, the help set fixed
+ * when the run started, a walkthrough answer, and a repository whose rules
+ * carry a checked-list finding with carve-outs, help channels and a
+ * confirmed test command.
+ */
+const v12State = () =>
+  readFile(path.join(import.meta.dirname, "fixtures", "state-v1.2-by-hand.json"), "utf8");
+
+test("a v1.2 state with a Learn-by-hand run loads and saves unchanged, its busy mark cleared", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const written = await v12State();
+  const expected = JSON.parse(written) as Database;
+  // The read schema itself changes nothing, the fitted help set included.
+  assert.deepEqual(persistedDatabaseSchema.parse(JSON.parse(written)), expected);
+  const [run] = expected.runs;
+  assert.equal(run.learnByHand, true);
+  assert.deepEqual(run.byHand?.helpLock?.kinds, ["explain", "answer", "plan", "review"]);
+  assert.ok(expected.repos[0].contributionRules?.findings.some((finding) => finding.allows?.length));
+  await writeFile(path.join(directory, "state.json"), written);
+  const store = new Store(directory);
+  await store.initialize();
+  assert.equal(store.recovery, undefined);
+  // A restart ends whatever was busy; nothing else changes.
+  delete run.byHand!.busy;
+  assert.deepEqual(store.data, expected);
+  await store.save();
+  const reopened = new Store(directory);
+  await reopened.initialize();
+  assert.deepEqual(reopened.data, expected);
+});
+
+test("a v1.1 build, whose schema has none of the v1.2 fields, still loads the v1.2 state", async () => {
+  const state = JSON.parse(await v12State()) as Database;
+  const rules = repositoryReadSchema.shape.contributionRules.removeCatch().unwrap();
+  const finding = rules.shape.findings.element.omit({ source: true, allows: true });
+  const olderRepository = repositoryReadSchema.omit({ testCommand: true }).extend({
+    contributionRules: rules
+      .omit({ channels: true })
+      .extend({ findings: z.array(finding).max(30) })
+      .optional()
+      .catch(undefined),
+  });
+  const olderRun = runReadSchema.omit({ learnByHand: true, byHand: true }).extend({
+    attempts: z
+      .record(runReadSchema.shape.attempts.removeCatch().unwrap().valueSchema.omit({ walkthroughs: true }))
+      .optional()
+      .catch(undefined),
+  });
+  const older = z
+    .object({
+      version: z.literal(1),
+      repos: z.array(lenientRead(olderRepository)),
+      runs: z.array(lenientRead(olderRun)),
+    })
+    .passthrough();
+  const read = older.safeParse(state);
+  assert.ok(read.success, read.success ? "" : read.error.message);
+  // Unknown fields pass through, so an older build's save keeps them.
+  assert.deepEqual(read.data, state);
 });

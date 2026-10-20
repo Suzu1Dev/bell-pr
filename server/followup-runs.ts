@@ -99,6 +99,8 @@ export async function startFollowUp(
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
+    // No AI round in Learn by hand (until v1.2.1): the person pushes with their own Git.
+    if (run.learnByHand) throw new AppError((m) => m.byHand.followUpRefused, 409);
     if (activeFollowUp(run.followUps))
       throw new AppError((m) => m.run.followUp.inProgress, 409);
     // A round that just ended may still be cleaning up outside the lock.

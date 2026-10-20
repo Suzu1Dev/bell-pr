@@ -733,6 +733,23 @@ const disclosureTool = [
 ];
 const disclosureVerb =
   /\b(?:us(?:e|ed|es|ing)|assist\w*|generat\w*|wr(?:ote|itten)|drafted|helped|help\s+(?:from|of))\b/i;
+/**
+ * The help a Learn-by-hand guide gives: explain, answer, review, point
+ * out, hint and guide, in all their forms. They count as disclosure verbs
+ * only for a clean Learn-by-hand run (`hasAiDisclosure`'s `helpVerbs`):
+ * in an agent run "Claude reviewed this" must not pass a disclosure rule
+ * while the agents wrote the change (lead decision 2026-10-20).
+ */
+const helpVerb =
+  /\b(?:explain(?:s|ed|ing)?|answer(?:s|ed|ing)?|review(?:s|ed|ing)?|point(?:s|ed|ing)?\s+out|hint(?:s|ed|ing)?|guid(?:e|es|ed|ing))\b/gi;
+/** A negation among the three words before a help verb: "not reviewed", "never explained", "not explained or reviewed". */
+const helpNegation = /\b(?:not|never|no|nor|without)\b|n't\b/i;
+/** A help verb of the clause that no negation comes just before. */
+const namesHelp = (clause: string) =>
+  [...clause.matchAll(helpVerb)].some(
+    (match) =>
+      !helpNegation.test(clause.slice(0, match.index).trim().split(/\s+/).slice(-3).join(" ")),
+  );
 const namesAssistance = (text: string) =>
   assistanceSpans(text).length > 0 || disclosureTool.some((term) => term.test(text));
 
@@ -768,8 +785,17 @@ const deniedField = /^(?:no|none|n\/?a|nothing)\b/i;
  * used, assisted, generated, wrote, drafted or helped. A field answered
  * "NO" is not a disclosure, and text in comments or code does not count:
  * maintainers would not see it.
+ *
+ * With `helpVerbs` (only for a clean Learn-by-hand run, which
+ * `respectChecks` decides), explain, answer, review, point out, hint and
+ * guide count too, unless a negation comes just before them ("Not
+ * reviewed by AI." stays no disclosure). The default is false for good.
  */
-export function hasAiDisclosure(body: string, commitMessage = "") {
+export function hasAiDisclosure(
+  body: string,
+  commitMessage = "",
+  options: { helpVerbs?: boolean } = {},
+) {
   if (body.includes(aiDisclosureLine)) return true;
   if (toolTrailer.test(commitMessage)) return true;
   const lines = markdownProse(body);
@@ -796,9 +822,39 @@ export function hasAiDisclosure(body: string, commitMessage = "") {
       .split(/;|:\s|\bbut\b/i)
       .some(
         (clause) =>
-          disclosureVerb.test(clause) &&
+          (disclosureVerb.test(clause) || (!!options.helpVerbs && namesHelp(clause))) &&
           namesAssistance(clause) &&
           !deniesAssistance.test(clause),
       ),
   );
+}
+
+const mentionsAi = new RegExp(String.raw`\b${aiTerm}`, "i");
+
+/**
+ * Headroom item 2 (DESIGN v1.2 F13): the first line of the PR text that
+ * says no AI helped, quoted as written: BELL's agent disclosure line, a
+ * disclosure field answered "no", or a sentence with a clause that
+ * `deniesAssistance` matches, names AI and names none of the guide's help.
+ * A Learn-by-hand run asks whether it means something else; nothing here
+ * judges it true or false.
+ */
+export function assistanceDenial(body: string, commitMessage = "") {
+  if (body.includes(aiDisclosureLine)) return aiDisclosureLine;
+  for (const text of [body, commitMessage]) {
+    const lines = markdownProse(text);
+    const field = lines.find((line) => deniedField.test(disclosureField.exec(line)?.[1].trim() ?? ""));
+    if (field) return field.trim();
+    for (const block of blocks(lines.map((line, index) => ({ line: index + 1, text: line })))) {
+      const visible = block.text.replace(/^\s*(?:[-*+>]|\d+[.)])\s+/, "");
+      const denial = splitSentences(visible).find(({ start, end }) =>
+        visible
+          .slice(start, end)
+          .split(/;|:\s|\bbut\b/i)
+          .some((clause) => deniesAssistance.test(clause) && mentionsAi.test(clause) && !namesHelp(clause)),
+      );
+      if (denial) return visible.slice(denial.start, denial.end).trim();
+    }
+  }
+  return undefined;
 }

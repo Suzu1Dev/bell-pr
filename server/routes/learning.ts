@@ -12,6 +12,7 @@
 import type { Express } from "express";
 import { z } from "zod";
 import type { LearnerNote, StoredExplanation } from "../../shared/explanations.js";
+import { byHandSummary, type ByHandSummary } from "../../shared/by-hand.js";
 import {
   confidences,
   selfGrades,
@@ -44,6 +45,9 @@ export interface LearningRun {
   understanding?: RunUnderstanding;
   /** Approved with the understanding check off. */
   understandingCheckOff?: boolean;
+  /** A Learn-by-hand run, and its record's plain counts (DESIGN v1.2 F13). */
+  learnByHand?: true;
+  byHandSummary?: ByHandSummary;
 }
 
 /** Newest first; the id breaks ties so the order is total. */
@@ -61,7 +65,9 @@ function learningRun(run: Run): LearningRun | undefined {
   const notes = Object.fromEntries(
     Object.entries(run.notes ?? {}).filter(([, note]) => !!note.text?.trim()),
   );
-  if (!Object.keys(explanations).length && !Object.keys(notes).length)
+  // A Learn-by-hand run is listed for its record: its explanations come only on request.
+  const byHand = run.learnByHand && run.byHand;
+  if (!Object.keys(explanations).length && !Object.keys(notes).length && !byHand)
     return undefined;
   return {
     id: run.id,
@@ -75,6 +81,8 @@ function learningRun(run: Run): LearningRun | undefined {
     notes,
     ...(run.understanding ? { understanding: run.understanding } : {}),
     ...(run.understandingCheckOff ? { understandingCheckOff: true } : {}),
+    ...(run.learnByHand ? { learnByHand: true as const } : {}),
+    ...(byHand ? { byHandSummary: byHandSummary(run) } : {}),
   };
 }
 

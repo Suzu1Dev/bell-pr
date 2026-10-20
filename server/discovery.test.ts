@@ -1167,6 +1167,58 @@ test("a build that predates learnByHand still reads an opportunity that has it",
   );
 });
 
+/** A discovery job whose one opportunity carries the v1.2 reservation flags. */
+function reservedJob() {
+  return {
+    id: "00000000-0000-4000-8000-000000000002",
+    status: "ready",
+    phase: "complete",
+    message: "Done.",
+    preferences: { ...defaultDiscoveryPreferences },
+    createdAt: "2026-10-20T00:00:00.000Z",
+    candidates: [],
+    opportunities: [
+      {
+        id: "plot-good-first",
+        repository: "matplotlib/matplotlib",
+        title: "Fix the legend's padding",
+        summary: "The legend padding ignores the font size.",
+        userNeed: "Legends overlap the axes at large font sizes.",
+        contributionRules: "Good first issues: pull requests that are AI generated will be closed.",
+        popularity: "Sample snapshot.",
+        feasibility: "One function and its test.",
+        difficulty: "beginner",
+        effort: "An afternoon.",
+        firstSteps: ["Read the legend layout code."],
+        acceptanceChecks: ["The padding scales with the font."],
+        risks: ["None known."],
+        evidence: [
+          { sourceId: "matplotlib/matplotlib:doc/devel/contribute.rst", quote: "pull requests that are AI generated will be closed.", reason: "The project's rule." },
+        ],
+        learnByHand: true,
+        byHandReserved: true,
+        byHandReservedOutput: true,
+      },
+    ],
+    warnings: [],
+  };
+}
+
+for (const field of ["byHandReserved", "byHandReservedOutput"] as const)
+  test(`a build that predates ${field} still reads an opportunity that has it`, () => {
+    const job = reservedJob();
+    const older = lenientRead(
+      discoveryJobSchema.extend({
+        opportunities: discoveryJobSchema.shape.opportunities.element.omit({ [field]: true } as never).array().max(6),
+      }),
+    ).parse(job) as { opportunities: Record<string, unknown>[] };
+    assert.equal(older.opportunities.length, 1);
+    assert.equal(field in older.opportunities[0], false);
+    assert.equal(older.opportunities[0].title, job.opportunities[0].title);
+    // This build keeps it on read.
+    assert.equal(lenientRead(discoveryJobSchema).parse(job).opportunities[0][field], true);
+  });
+
 test("the discovery prompt keeps good first issues away from the agent team and offers them as practice", () => {
   const prompt = discoveryPrompt([candidate], defaultDiscoveryPreferences);
   assert.match(

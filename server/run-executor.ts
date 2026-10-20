@@ -75,6 +75,8 @@ import {
   webBoundaries,
 } from "./prompts/team.js";
 import type { WorkbenchContext } from "./workbench.js";
+import { turnCanary } from "./by-hand-canary.js";
+import * as byHand from "./by-hand.js";
 
 const now = () => new Date().toISOString();
 const newId = () => randomUUID();
@@ -116,6 +118,8 @@ export async function runAgent(
     timeout?: Extract<AgentTimeoutKind, "explanations" | "draft">;
   } = {},
 ) {
+  // Learn by hand: BELL's agents never get a write turn (DESIGN v1.2 F2).
+  if (run.learnByHand && !readonly) throw new AppError((m) => m.byHand.noWriteTurn, 409);
   const modelExecution = run.modelExecution ?? {
     source: "cli-default" as const,
   };
@@ -178,6 +182,7 @@ export async function runAgent(
   const answerLimit = context.outputSchema ? 80_000 : 24_000;
   const cwd = context.cwd ?? run.worktreePath;
   const execute = ctx.dependencies.command ?? command;
+  const canary = turnCanary(ctx, run, role, signal);
   let completed = false;
   let answer = "";
   let terminalFailure: string | undefined;
@@ -233,7 +238,7 @@ export async function runAgent(
       await execute(cli.executable, cli.args, {
         input: fullPrompt,
         cwd,
-        signal,
+        signal: canary.signal,
         timeoutMs,
         maxBytes: 8_000_000,
         env: agentEnvironment(modelExecution.provider ?? "codex"),
@@ -243,6 +248,7 @@ export async function runAgent(
             const event = JSON.parse(line);
             call.observe(event);
             for (const item of read(event)) {
+              canary.observe(item);
               // A notice (retry, rate limit, denied tool) replaces the status line until the agent is seen working again.
               if (agent && item.kind !== "notice" && item.kind !== "session" && item.kind !== "usage-by-model")
                 agent.detail = running;
@@ -359,7 +365,7 @@ export async function runAgent(
   try {
     await ctx.store.save();
     await retryTransientAuth(invoke, {
-      signal,
+      signal: canary.signal,
       sleep: ctx.dependencies.sleep,
       onRetry: (notice) => {
         recordEfficiency(false);
@@ -367,6 +373,7 @@ export async function runAgent(
         ctx.log(run, role, notice, { kind: "notice" });
       },
     });
+    canary.assertNoHit();
     if (signal.aborted) throw new AppError(cancelled(), 409);
     if (terminalFailure) throw new AppError(terminalFailure, 422);
     if (!answer.trim())
@@ -386,7 +393,7 @@ export async function runAgent(
       agent.status = "failed";
       agent.detail = sm().run.agents.failed;
     }
-    throw error;
+    throw canary.failure(error);
   } finally {
     recordEfficiency(completed);
     await ctx.store.save();
@@ -452,6 +459,8 @@ export async function runIndependentReview(
   files: Awaited<ReturnType<typeof readDiff>>,
   leadReport: string | undefined,
   signal: AbortSignal,
+  // Learn by hand (DESIGN v1.2 F8): its own prompts and reviewer schema, isolated turns.
+  options: { reviewerPrompt?: string; testerPrompt?: string; reviewerSchema?: string; isolated?: true } = {},
 ) {
   const reviewContext = independentReviewContext(run, files, leadReport);
   // Both callers run under the run's locale (withRunLocale).
@@ -461,20 +470,26 @@ export async function runIndependentReview(
       ctx,
       run,
       "reviewer",
-      reviewerPrompt(reviewContext, locale),
+      options.reviewerPrompt ?? reviewerPrompt(reviewContext, locale),
       signal,
+      true,
+      { outputSchema: options.reviewerSchema, isolated: options.isolated },
     ),
     runAgent(
       ctx,
       run,
       "tester",
-      testerPrompt(reviewContext, run.team, locale),
+      options.testerPrompt ?? testerPrompt(reviewContext, run.team, locale),
       signal,
+      true,
+      { isolated: options.isolated },
     ),
   ]);
   const failure = results.find((result) => result.status === "rejected");
   if (failure?.status === "rejected") throw failure.reason;
   if (signal.aborted) throw new AppError(cancelled(), 409);
+  const [reviewer, tester] = results as PromiseFulfilledResult<string>[];
+  return { reviewer: reviewer.value, tester: tester.value };
 }
 
 async function executeTeamTask(
@@ -701,6 +716,8 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
     const locale = currentLocale();
     const team = run.team;
     if (!team) throw new AppError((m) => m.run.team.legacyRun, 409);
+    // Learn by hand: the guide's read-only orientation and the outline, never a team task.
+    if (run.learnByHand) return await byHand.planByHand(ctx, run, locale, signal);
     if (!team.tasks.length) {
       enterPhase(run, team, "planning");
       const revisions = team.planRevisions ?? [];
