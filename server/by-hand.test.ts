@@ -420,15 +420,15 @@ test("Ready for review binds the current fingerprint; a stale one and an empty c
   assert.equal(run.team?.phase, "complete");
   assert.equal(f.ctx.byHandJobs.size, 0);
   assert.equal(f.calls.length, 1);
-  // A review at the next version: the job runs the guide's review turn, which on this
-  // branch is still W1A's stub (W2B fills it), so the job ends with that refusal logged.
+  // A review at the next version: the job runs the guide's review turn (W2B); this
+  // fixture's runner has no reviewer answer, so the job ends with that failure logged.
   await f.write(run, retrySource.replace("attempts = 1", "attempts = 3"));
   const second = await f.fingerprint(run);
   await en(() => f.workbench.byHand.ready(run.id, { changeFingerprint: second, review: true }));
   assert.deepEqual(run.byHand!.readyHistory?.map((entry) => entry.changeFingerprint), [first]);
   await f.waitFor(() => !f.ctx.byHandJobs.size);
   assert.equal(run.byHand!.busy, undefined);
-  assert.equal(run.logs.at(-1)?.message, "The guide's review didn't finish: This part of Learn by hand is not available in this build yet.");
+  assert.equal(run.logs.at(-1)?.message, "The guide's review didn't finish: no answer for reviewer");
   assert.deepEqual(run.reports, {});
   // Once a review is stored, another one needs a test run of this version.
   run.byHand!.reviews = [{ at: new Date().toISOString(), changeFingerprint: second, verified: "No test run.", checked: ["The count"], findings: [] }];

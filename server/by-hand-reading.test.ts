@@ -76,6 +76,17 @@ function explanationAnswer(input: TeamAgentInput) {
   });
 }
 
+/** The guide's answer to the per-file Ask tab, in the guide schema's form (W2B). */
+const guideChatAnswer = JSON.stringify({
+  text: "The count is set in src/retry.ts:1. What does a second 503 do?",
+  question: null,
+  refs: [{ path: "src/retry.ts", line: 1, endLine: null }],
+  quotes: [],
+  options: null,
+  topic: "project",
+  askedForCode: false,
+});
+
 const walkthroughAnswer = JSON.stringify({
   functions: [
     {
@@ -415,27 +426,29 @@ test("a changed premise verdict keeps the walkthroughs whose units were answered
   assert.notEqual(f.run.walkthroughs?.[notes.path]?.status, "ready");
 });
 
-test("after Ready the Ask tab goes to the guide; until the guide's turn exists nothing is stored; agent runs keep the mentor", async (t) => {
-  const f = await fixture(t);
+test("after Ready the Ask tab goes to the guide, which records one help event; agent runs keep the mentor", async (t) => {
+  const f = await fixture(t, { lead: guideChatAnswer });
   await f.markReady();
-  // The guide's chat is W2B's; on this branch it still answers 501, and nothing is stored or recorded.
-  await assert.rejects(
-    en(() => f.workbench.chat(f.run.id, "src/retry.ts", "Why three attempts?")),
-    refused(501, /^This part of Learn by hand is not available in this build yet\./),
-  );
+  // The guide's chat (W2B): a read-only lead turn, filtered and recorded once, stored as an agent run's answer is.
+  const guided = await en(() => f.workbench.chat(f.run.id, "src/retry.ts", "Why three attempts?"));
+  assert.match(guided, /^The count is set in src\/retry\.ts:1\./);
   const conversation = () => f.run.conversations?.["src/retry.ts"];
-  assert.equal(conversation(), undefined);
-  assert.deepEqual(f.run.byHand?.events ?? [], []);
-  assert.equal(f.calls.length, 0);
+  assert.deepEqual(
+    conversation()?.messages.map((message) => [message.role, message.content]),
+    [["user", "Why three attempts?"], ["assistant", guided]],
+  );
+  assert.deepEqual(f.run.byHand?.events?.map((event) => [event.kind, event.source]), [["answer", "chat"]]);
+  assert.deepEqual(f.calls.map((call) => [call.role, call.readonly]), [["lead", true]]);
   // An agent run's question goes to the mentor and is stored as before.
   delete f.run.learnByHand;
   const answer = await en(() => f.workbench.chat(f.run.id, "src/retry.ts", "Why three attempts?"));
   assert.equal(answer, "The retry count is in src/retry.ts:1.");
-  assert.deepEqual(f.calls.map((call) => call.role), ["guide"]);
+  assert.deepEqual(f.calls.map((call) => call.role), ["lead", "guide"]);
   assert.deepEqual(
     conversation()?.messages.map((message) => message.role),
-    ["user", "assistant"],
+    ["user", "assistant", "user", "assistant"],
   );
+  assert.equal(f.run.byHand?.events?.length, 1);
 });
 
 test("Run the review again on the ready version is the guide's review, never the team's prompts", async (t) => {
@@ -491,7 +504,7 @@ test("the Ask tab never displaces a running guide job, so Stop still ends it", a
 });
 
 test("the Ask tab takes the guide's slot under the run lock, so a guide job asked for meanwhile is refused and Stop ends the question", async (t) => {
-  const f = await fixture(t);
+  const f = await fixture(t, { lead: guideChatAnswer });
   await f.markReady();
   const key = `guide:${f.run.id}`;
   t.after(() => {
@@ -505,8 +518,8 @@ test("the Ask tab takes the guide's slot under the run lock, so a guide job aske
     return "started";
   });
   assert.equal(await guideJob, "refused");
-  // The guide's chat is still W1A's stub on this branch: the question ends with its 501 and gives the slot back.
-  await assert.rejects(asked, refused(501, /./));
+  // The guide's chat (W2B) answers, and the question gives the slot back.
+  assert.match(await asked, /^The count is set in src\/retry\.ts:1\./);
   assert.equal(f.ctx.controllers.has(key), false);
   // A second question while one holds the slot waits its turn.
   f.ctx.controllers.set(key, new AbortController());
