@@ -140,3 +140,9 @@ test("the runs to continue start with the one opened last, then the newest", () 
   assert.match(html, /<strong>Retry timeouts<\/strong><small>[^<]*<\/small><\/span><span class="home-run-last">Last opened<\/span>/);
   assert.doesNotMatch(renderEn(element()), /home-continue-heading/);
 });
+
+test("a learn-by-hand run waiting for the person's own plan reads as their turn on Home", () => {
+  const waiting = (learnByHand: boolean) => ({ ...run("run-9", "Cap retries", "2026-10-04T00:00:00Z"), status: "awaiting_plan", learnByHand }) as RunSummary;
+  assert.match(renderEn(element({ runs: [waiting(true)] })), /<small>octo\/widgets · Your turn<\/small>/);
+  assert.match(renderEn(element({ runs: [waiting(false)] })), /<small>octo\/widgets · Awaiting plan approval<\/small>/);
+});

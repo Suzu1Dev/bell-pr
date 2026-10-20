@@ -321,7 +321,7 @@ export function ChangesTab({
         file list, so the way from the files to the explanation stays short. */}
     {(run.team?.premise || showWorktree) && (
       <div className="diff-context-bar">
-        <PremiseNotice premise={run.team?.premise} compact />
+        <PremiseNotice premise={run.team?.premise} compact guide={run.learnByHand} />
         {showWorktree && (
           <WorktreeHint
             path={run.worktreePath!}

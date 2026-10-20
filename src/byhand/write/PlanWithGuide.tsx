@@ -116,7 +116,7 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
       <h3 id={`${run.id}-plan`}>
         <ListChecks size={17} aria-hidden="true" /> {t.title}
       </h3>
-      <PremiseNotice premise={run.team?.premise} />
+      <PremiseNotice premise={run.team?.premise} guide />
       <p>{t.intro}</p>
       <ol className="by-hand-steps">
         {drafts.map((draft, index) => (

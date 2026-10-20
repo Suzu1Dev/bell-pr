@@ -605,6 +605,9 @@ test("the task dialog says why BELL won't publish a learn-by-hand run on a banni
     await dialog.locator("#task-repo").selectOption(repoId);
     await dialog.getByText(mode.hand).click();
     await expect(dialog.locator(".mode-case")).toHaveCount(0);
+    // The usage line says the guide uses the CLI and the person writes; nothing "finishes" and waits for review.
+    await expect(dialog.locator("p.field-help", { hasText: /^The guide runs with the \S+ CLI signed in on this computer/ })).toContainText("You write the change yourself, in your own editor.");
+    await expect(dialog).not.toContainText("When it finishes, it waits for your review.");
     const created = page.waitForRequest((request) => new URL(request.url()).pathname === "/api/runs" && request.method() === "POST");
     await dialog.getByRole("button", { name: mode.start }).click();
     const body = (await created).postDataJSON() as Record<string, unknown>;

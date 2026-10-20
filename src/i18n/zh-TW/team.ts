@@ -153,6 +153,7 @@ const m: Translation<typeof en> = {
       unclear: "無法確認假設",
     },
     source: "由 Lead 閱讀程式碼得出，可對照引用的位置確認。",
+    sourceGuide: "由嚮導閱讀程式碼得出，可對照引用的位置確認。",
   },
   setupNeeds: {
     title: "需要你在這台機器準備的環境",

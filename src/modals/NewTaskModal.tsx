@@ -256,7 +256,7 @@ export function NewTaskModal({
         <p className="field-help task-team-limit">{t.teamLimit}</p>
         </>}
         <p className="field-help">
-          {t.usage({
+          {(mode === "hand" ? modeText.usage : t.usage)({
             provider: providerLabels[contributionSettings.provider ?? "codex"],
           })}
         </p>

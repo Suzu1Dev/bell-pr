@@ -14,6 +14,7 @@ const m: Translation<typeof en> = {
   steps: {
     define: { title: "定義任務", description: "設定你的貢獻目標" },
     build: { title: "協作開發", description: "Agent team 分工完成" },
+    buildByHand: { title: "親手寫", description: "嚮導和你一起規劃、給提示" },
     review: { title: "理解與審查", description: "讀懂它，再用自己的話講一遍" },
     submit: { title: "送出貢獻", description: "你的下一個 Pull Request" },
   },

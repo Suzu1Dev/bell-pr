@@ -37,3 +37,11 @@ test("the premise check reads in English, and a verdict word from a later build 
   assert.match(later, /無法確認假設/);
 });
 
+
+test("in a Learn-by-hand run the premise check says the guide found it", () => {
+  const english = renderEn(createElement(PremiseNotice, { premise, guide: true }));
+  assert.match(english, /Found by the guide reading the code; check it against the cited lines\./);
+  assert.doesNotMatch(english, /the lead/);
+  assert.match(renderEn(createElement(PremiseNotice, { premise, compact: true, guide: true })), /Found by the guide reading the code/);
+  assert.match(renderZh(createElement(PremiseNotice, { premise, guide: true })), /由嚮導閱讀程式碼得出/);
+});

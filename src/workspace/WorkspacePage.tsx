@@ -256,7 +256,7 @@ export function WorkspacePage({
             className={`status-badge ${run.status === "failed" ? "error" : ""}`}
           >
             <span />
-            {byHand.writing ? t.byHand.turn : statusLabels[run.status]}
+            {byHand.writing || (run.learnByHand && run.status === "awaiting_plan") ? t.byHand.turn : statusLabels[run.status]}
           </span>
           {run.unsandboxed === true && <UnsandboxedBadge />}
           {run.learnByHand && <span className="status-badge"><Hand size={13} aria-hidden="true" />{t.byHand.badge}</span>}
@@ -285,7 +285,7 @@ export function WorkspacePage({
       <section className="workflow-strip" aria-label={t.progress}>
         {[
           { n: "01", ...t.steps.define, icon: FileText },
-          { n: "02", ...t.steps.build, icon: Bot },
+          { n: "02", ...(run.learnByHand ? t.steps.buildByHand : t.steps.build), icon: run.learnByHand ? Hand : Bot },
           { n: "03", ...t.steps.review, icon: Code2 },
           { n: "04", ...t.steps.submit, icon: GitPullRequest },
         ].map((step, index) => {

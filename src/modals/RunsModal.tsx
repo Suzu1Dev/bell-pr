@@ -52,6 +52,7 @@ export function RunsModal({
   const t = useT("modals").runs;
   const common = useT("common");
   const statusLabels = common.runStatus;
+  const yourTurn = useT("workspace").byHand.turn;
   const [locale] = useLocale();
   const demoRun = getDemo(locale).run;
   const [pending, setPending] = useState<Pending | null>(null);
@@ -112,7 +113,7 @@ export function RunsModal({
                 {job.workspaceRemovedAt && (
                   <span className="run-files-removed">{t.filesRemoved}</span>
                 )}
-                <em>{statusLabels[job.status]}</em>
+                <em>{job.learnByHand && job.status === "awaiting_plan" ? yourTurn : statusLabels[job.status]}</em>
                 <ChevronRight size={15} />
               </button>
               {own && (freeRunSpace || deleteRun) && (

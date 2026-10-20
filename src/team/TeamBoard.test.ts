@@ -784,3 +784,33 @@ test("a learn-by-hand run plans with the guide instead of approving a team plan,
     /aria-label="Shared tasks and team messages"[\s\S]*Teammates work in parallel[\s\S]*team-kanban[\s\S]*Team conversation/,
   );
 });
+
+test("a learn-by-hand run's plan heading says what the guide and the person do, never an agent team", () => {
+  const sample = getDemo("en");
+  const board = (phase: AgentTeam["phase"], status: Run["status"], mode: "hand" | "agents" = "hand", render = renderEn) =>
+    render(
+      createElement(TeamBoard, {
+        run: { ...sample.run, status, ...(mode === "hand" ? { learnByHand: true as const } : {}), team: { ...sample.team, phase, tasks: [], planSummary: "", messages: [] } },
+        demo: false,
+        onApprove() {},
+        async onRevise() {},
+        async onMessage() {},
+        busy: false,
+        entitlements: freeEntitlements,
+        byHand: { onSave: async () => {}, onReveal: async () => {}, onAskQuestions: async () => {}, onConfirm: async () => {} },
+      }),
+    );
+  const heading = (html: string) => html.match(/<div class="team-plan-heading"><h3>(?:<svg[\s\S]*?<\/svg>)?([^<]*)<\/h3>/)?.[1];
+  const reading = board("planning", "running");
+  assert.equal(heading(reading), "The guide is reading the code");
+  assert.match(reading, /The guide reads the project first; then you write your own steps\./);
+  assert.doesNotMatch(reading, /The lead|lead is planning|scopes and dependencies/);
+  assert.equal(heading(board("awaiting_approval", "awaiting_plan")), "Your turn: write your plan");
+  assert.equal(heading(board("developing", "review")), "Your turn: write the change");
+  assert.equal(heading(board("complete", "review")), "You marked it ready for review");
+  assert.equal(heading(board("cancelled", "cancelled")), "The run was stopped");
+  assert.equal(heading(board("planning", "running", "hand", renderZh)), "嚮導正在閱讀程式碼");
+  // An agent run's board keeps the lead's words.
+  assert.equal(heading(board("planning", "running", "agents")), "The lead is planning");
+  assert.equal(heading(board("awaiting_approval", "awaiting_plan", "agents")), "Waiting for you to approve the plan");
+});

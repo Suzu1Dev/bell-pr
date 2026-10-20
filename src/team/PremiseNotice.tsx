@@ -16,18 +16,22 @@ export function knownVerdict(verdict: string): PremiseVerdict {
 
 /**
  * The lead's check of the request's assumption, made by reading the
- * repository. Compact keeps the evidence folded under a one-line summary,
- * for places read file after file such as the code changes tab.
+ * repository (in a Learn-by-hand run, `guide`: the guide's). Compact keeps
+ * the evidence folded under a one-line summary, for places read file after
+ * file such as the code changes tab.
  */
 export function PremiseNotice({
   premise,
   compact = false,
+  guide = false,
 }: {
   premise?: PremiseCheck;
   compact?: boolean;
+  guide?: boolean;
 }) {
   const t = useT("team").premise;
   if (!premise) return null;
+  const source = guide ? t.sourceGuide : t.source;
   const verdict = knownVerdict(premise.verdict);
   const Icon = icons[verdict];
   const heading = (
@@ -48,14 +52,14 @@ export function PremiseNotice({
             <span>{premise.statement}</span>
           </summary>
           {premise.evidence && <p>{premise.evidence}</p>}
-          <small>{t.source}</small>
+          <small>{source}</small>
         </details>
       ) : (
         <>
           <h3>{heading}</h3>
           <p className="premise-statement">{premise.statement}</p>
           {premise.evidence && <p>{premise.evidence}</p>}
-          <small>{t.source}</small>
+          <small>{source}</small>
         </>
       )}
     </section>

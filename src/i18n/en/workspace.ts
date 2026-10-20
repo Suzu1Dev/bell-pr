@@ -19,6 +19,8 @@ const workspace = {
   steps: {
     define: { title: "Define the task", description: "Set your contribution goal" },
     build: { title: "Build together", description: "The agent team splits the work" },
+    /** A Learn-by-hand run's second step. */
+    buildByHand: { title: "Write it yourself", description: "The guide plans with you and gives hints" },
     review: { title: "Understand and review", description: "Read it, then explain it back" },
     submit: { title: "Submit", description: "Your next pull request" },
   },

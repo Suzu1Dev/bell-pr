@@ -478,7 +478,7 @@ function Brief({
           <Target size={20} />
         </span>
       </div>
-      <PremiseNotice premise={premise} />
+      <PremiseNotice premise={premise} guide={run.learnByHand} />
       {premise && checkButton && (
         <div className="mission-premise-recheck">
           {checkButton}

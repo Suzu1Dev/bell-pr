@@ -300,3 +300,23 @@ test("a learn-by-hand run carries its badge, and while the person writes the foo
   assert.doesNotMatch(renderEn(element({ files: changed, tab: "overview" })), /Learn by hand|Ready for review/);
   assert.match(renderZh(element({ run: byHand, files: changed, tab: "overview" })), /可以審查了/);
 });
+
+test("a learn-by-hand run waiting for the person's plan says it's their turn, and its second step is theirs to write", () => {
+  const byHand: Run = {
+    ...realRun,
+    status: "awaiting_plan",
+    learnByHand: true,
+    agents: realRun.agents.filter((agent) => agent.id === "lead"),
+    team: realRun.team && { ...realRun.team, phase: "awaiting_approval", tasks: [] },
+  };
+  const html = renderEn(element({ run: byHand, files: [], tab: "overview" }));
+  assertNoHan(html);
+  assert.match(html, /<span class="status-badge "><span><\/span>Your turn<\/span>/);
+  assert.doesNotMatch(html, /Awaiting plan approval|Build together|The agent team splits the work/);
+  assert.match(html, /title="02 Write it yourself: The guide plans with you and gives hints"><span class="step-icon"><svg[^>]*lucide-hand/);
+  assert.match(renderZh(element({ run: byHand, files: [], tab: "overview" })), /title="02 親手寫：嚮導和你一起規劃、給提示"/);
+  // An agent run waiting for its plan's approval is as it was.
+  const agent = renderEn(element({ run: { ...realRun, status: "awaiting_plan" }, files: [], tab: "overview" }));
+  assert.match(agent, /<span><\/span>Awaiting plan approval<\/span>/);
+  assert.match(agent, /title="02 Build together: The agent team splits the work"/);
+});

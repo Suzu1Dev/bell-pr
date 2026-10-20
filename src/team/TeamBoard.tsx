@@ -123,6 +123,8 @@ export function TeamBoard({
       </div>
     );
   const finished = ["complete", "failed", "cancelled"].includes(team.phase);
+  // Learn by hand: the guide reads, then the person plans and writes; no agent team works.
+  const phases: Partial<typeof t.phase> = run.learnByHand ? byHandText.board : {};
   // The plan stays open to split a step whenever the person writes, also after a Ready (then the phase is complete).
   const byHandPlan = run.learnByHand && byHand && (["awaiting_approval", "developing"].includes(team.phase) || byHand.writing);
   const canReceive = (task: TeamTask) =>
@@ -272,7 +274,7 @@ export function TeamBoard({
             ) : (
               <Layers3 size={18} aria-hidden="true" />
             )}
-            {queued ? t.queued : t.phase[team.phase]}
+            {queued ? t.queued : (phases[team.phase] ?? t.phase[team.phase])}
           </h3>
           {team.tasks.length > 0 && (
             <span>{t.progress({ done, total: team.tasks.length })}</span>
@@ -286,7 +288,9 @@ export function TeamBoard({
                 ? t.plan.none
                 : revisions.length
                   ? t.plan.replanning
-                  : t.plan.reading)}
+                  : run.learnByHand
+                    ? byHandText.boardReading
+                    : t.plan.reading)}
         </p>
         {foldPlan && (
           <button
@@ -299,7 +303,7 @@ export function TeamBoard({
           </button>
         )}
         {/* Learn by hand: the plan panel below shows the premise check first. */}
-        {!byHandPlan && <PremiseNotice premise={team.premise} />}
+        {!byHandPlan && <PremiseNotice premise={team.premise} guide={run.learnByHand} />}
         {revisions.length > 0 && (
           <ol className="team-plan-revisions" aria-label={t.revisions.label}>
             {revisions.map((revision, index) => (

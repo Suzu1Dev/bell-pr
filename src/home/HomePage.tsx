@@ -80,6 +80,7 @@ export function HomePage({
 }: HomePageProps) {
   const t = useT("home");
   const statusLabels = useT("common").runStatus;
+  const yourTurn = useT("workspace").byHand.turn;
   const recent = recentRuns(runs, lastRunId);
   // A link while the owner has published pricing; the dialog otherwise.
   const upgradeUrl = productLink("pricingUrl") ?? productLink("purchaseUrl");
@@ -190,7 +191,7 @@ export function HomePage({
                       {t.continue.detail({
                         repo:
                           repos.find((repo) => repo.id === run.repoId)?.fullName ?? "",
-                        status: statusLabels[run.status],
+                        status: run.learnByHand && run.status === "awaiting_plan" ? yourTurn : statusLabels[run.status],
                       })}
                     </small>
                   </span>

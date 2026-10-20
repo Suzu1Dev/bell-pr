@@ -7,6 +7,7 @@ import type {
 import type { PonytailMode } from "../../../shared/efficiency";
 import { formatters, type Locale } from "../../../shared/i18n/locale";
 import { product } from "../../../shared/product";
+import type { AgentTeam } from "../../../shared/team";
 
 const fmt = formatters("en");
 
@@ -238,6 +239,19 @@ const discovery = {
       `${product.name} can publish a learn-by-hand run here only if the guide stays within what the project's own text says is fine (${kinds}: "${quote}"), and only after you confirm the project's quoted rule. The maintainers decide whether your change fits.`,
     /** A rule from BELL's owner-signed list of rules projects publish outside their repositories (F14). */
     registry: ({ date }: { date: string }) => `From ${product.name}'s checked list · checked on ${date}`,
+    /** The Agent activity tab's plan heading in a Learn-by-hand run, by team phase (no agent team works in it). */
+    board: {
+      planning: "The guide is reading the code",
+      awaiting_approval: "Your turn: write your plan",
+      developing: "Your turn: write the change",
+      complete: "You marked it ready for review",
+      cancelled: "The run was stopped",
+    } satisfies Partial<Record<AgentTeam["phase"], string>>,
+    /** Under the heading while the guide reads, before its summary. */
+    boardReading: "The guide reads the project first; then you write your own steps.",
+    /** The task dialog's usage line for a Learn-by-hand run. */
+    usage: ({ provider }: { provider: string }) =>
+      `The guide runs with the ${provider} CLI signed in on this computer and counts against that account's usage. You write the change yourself, in your own editor.`,
     /** The rules card in a Learn-by-hand run fitted to this rule when it started (F12). */
     rulesFitted: "This run was fitted to it, so publishing can ask you to confirm the quoted rule instead of blocking. The maintainers decide whether your change fits.",
     retry: "A retry takes this run back to planning with the guide.",
