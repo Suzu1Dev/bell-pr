@@ -180,16 +180,22 @@ test("the reader view's buttons open the check, or ask for this file's explanati
     onExplain: () => calls.push("explain"),
     onWalkthrough: () => calls.push("walkthrough"),
   };
+  // The pressed button, inside the panel's tab panel.
+  const panelElement = { focus: () => calls.push("focus the tab panel") };
+  const event = {
+    currentTarget: { closest: (selector: string) => (selector === "[role=tabpanel]" ? panelElement : null) },
+  };
   const press = (view: UnderstandingView, target = file) =>
     (find(shallow(ReaderView, { ...props, file: target, reader: { ...reader(view), onOpenCheck: () => calls.push("check") } }), "button")!
-      .props.onClick as () => void)();
+      .props.onClick as (pressed: typeof event) => void)(event);
   press(check([]));
   assert.deepEqual(calls.splice(0), ["check"]);
+  // The button gives way to the progress, so focus moves to the panel rather than to the page.
   press(check([`fallback:${file.path}`]));
-  assert.deepEqual(calls.splice(0), ["explain", "walkthrough"]);
+  assert.deepEqual(calls.splice(0), ["focus the tab panel", "explain", "walkthrough"]);
   // With the explanation already written, only the walkthrough is asked for.
   press(check([`fallback:${file.path}`]), { ...file, explanationStatus: "ready", explanation: getDemo("en").files[0].explanation });
-  assert.deepEqual(calls.splice(0), ["walkthrough"]);
+  assert.deepEqual(calls.splice(0), ["focus the tab panel", "walkthrough"]);
 });
 
 test("Run the review again opens the Ready dialog in a Learn-by-hand run and reruns the review in an agent run", () => {

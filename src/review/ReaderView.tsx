@@ -45,10 +45,10 @@ export function readerAllowed(check: UnderstandingView | undefined, file: Pick<D
 }
 
 /**
- * "How a reader sees your change" in a Learn-by-hand run, where a file's
- * explanation or walkthrough would otherwise wait: the way to its own
- * question in Explain it back, then a button that asks for this file's
- * explanation and walkthrough only, after the person's own answer.
+ * "How a reader sees your change" in a Learn-by-hand run, for a file whose
+ * explanation or walkthrough nobody asked for: the way to its own question
+ * in Explain it back, then a button that asks for this file's explanation
+ * and walkthrough only (its progress replaces it; focus moves to the panel).
  */
 export function ReaderView({
   file,
@@ -67,9 +67,9 @@ export function ReaderView({
   const review = useT("review");
   const t = usePanelStrings().reader;
   const checkTitle = useT("workspace").check.title;
-  const { check } = reader;
-  const ownQuestion = !check || check.plan.some((item) => item.path === file.path);
-  function show() {
+  const ownQuestion = !reader.check || reader.check.plan.some((item) => item.path === file.path);
+  function show(event: { currentTarget: HTMLElement }) {
+    event.currentTarget.closest<HTMLElement>("[role=tabpanel]")?.focus();
     const wanted = readerRequests(file);
     if (wanted.explanation) onExplain?.();
     if (wanted.walkthrough) onWalkthrough?.();
@@ -78,7 +78,7 @@ export function ReaderView({
     <div className="explain-empty">
       <Eye size={28} aria-hidden="true" />
       <h3>{t.title}</h3>
-      {readerAllowed(check, file) ? (
+      {readerAllowed(reader.check, file) ? (
         <>
           <p>{t.intro}</p>
           <button type="button" className="explain-retry" disabled={busy} onClick={show}>
