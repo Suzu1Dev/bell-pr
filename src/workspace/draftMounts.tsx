@@ -96,6 +96,11 @@ export function UnderstandingRow({
   );
 }
 
+/** Learn by hand has no AI rounds (until v1.2.1): the person pushes follow-up commits with their own Git. */
+export function OwnGitRounds() {
+  return <p className="field-help">{useT("draft").followUps.ownGit}</p>;
+}
+
 /**
  * Before an AI round: one line per selected comment, in the person's own
  * words. The agent gets these as its task and the comments only as data.

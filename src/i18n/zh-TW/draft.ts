@@ -322,6 +322,7 @@ const m: Translation<typeof en> = {
     allResolved: "衝突標記都已移除；改過的檔案仍要逐檔審閱。",
     resolving: "Agent 正在解衝突…",
     resolve: "請 Agent 解決衝突",
+    byHand: `請親手解決衝突標記；你到「程式碼變更」重新整理差異時，${product.name} 會再檢查一次。`,
   },
   followUps: {
     title: "依 review 修正的紀錄",
@@ -348,6 +349,7 @@ const m: Translation<typeof en> = {
     pushed: ({ commit, date }) => `${commit} 已推送 ${date}`,
     notPushed: ({ commit }) => `${commit} 已建立，尚未確認推送`,
     discard: "放棄這輪修改",
+    ownGit: `請在這個工作的資料夾裡用你自己的 Git 推送後續的 commit；${product.name} 會在下次讀取回饋時接手。`,
   },
 };
 

@@ -41,6 +41,7 @@ import {
   DraftGuide,
   ForecastCompare,
   MarkdownContent,
+  OwnGitRounds,
   Restatements,
   Reviewability,
   UnderstandingRow,
@@ -294,7 +295,7 @@ export function DraftTab({
             </div>
           )}
           {!demo &&
-            !followUp &&
+            !followUp && !run.learnByHand &&
             run.status !== "published" &&
             !draftBody.trim() &&
             !preparingDraft && (
@@ -775,7 +776,7 @@ export function DraftTab({
                       {group.items.map((item, itemIndex) => (
                         <li key={item.url}>
                           <div className="pr-feedback-item-head">
-                            {!followUp && (
+                            {!followUp && !run.learnByHand && (
                               <input
                                 type="checkbox"
                                 aria-label={t.feedback.include({
@@ -841,7 +842,7 @@ export function DraftTab({
                   </div>
                 ),
               )}
-              {!followUp && (
+              {!followUp && (run.learnByHand ? <OwnGitRounds /> : (
                 <div className="follow-up-start">
                   <h3>
                     {t.followUp.title}
@@ -907,7 +908,7 @@ export function DraftTab({
                       : t.followUp.startNote}
                   </button>
                 </div>
-              )}
+              ))}
             </>
           ) : (
             <p className="muted">{t.feedback.notFetched}</p>

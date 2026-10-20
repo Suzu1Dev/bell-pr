@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import {
   ArrowDownToLine,
   ArrowUpRight,
@@ -106,6 +106,8 @@ interface Props {
    * the agent run's checks.
    */
   byHandRun?: ByHandRunFacts;
+  /** A Learn-by-hand run's drafting helpers, where an agent run gets a suggestion and the AI line (DESIGN v1.2 F11). */
+  helpers?: ReactNode;
 }
 
 const statusIcons: Record<ChecklistStatus, typeof CircleCheck> = {
@@ -177,12 +179,14 @@ export function DraftGuidancePanel({
   understanding,
   changes,
   byHandRun,
+  helpers,
 }: Props) {
   const draftMessages = useT("draft");
   const t = draftMessages.guidance;
   const fmt = useFormat();
   const [locale] = useLocale();
   const prefix = useId().replaceAll(":", "");
+  const byHand = !!byHandRun?.learnByHand;
   // Read once per visit, then counted, so the sentences fold on a later one.
   const [whySeen] = useState(readWhySeen);
   useEffect(countWhySeen, []);
@@ -385,7 +389,7 @@ export function DraftGuidancePanel({
                 : t.policy.linux}
             </span>
           )}
-          {!readOnly && (
+          {!readOnly && !byHand && (
             <button
               type="button"
               className="button secondary draft-guidance-generate"
@@ -427,7 +431,7 @@ export function DraftGuidancePanel({
         </div>
       )}
 
-      {!preparation && !readOnly && (
+      {byHand ? helpers : !preparation && !readOnly && (
         <div className="draft-guidance-empty">
           <span>
             <FileText size={16} /> {t.empty.rules}
@@ -456,7 +460,7 @@ export function DraftGuidancePanel({
         </div>
       )}
 
-      {proposal && (
+      {proposal && !byHand && (
         <>
           <p className="draft-guidance-summary">{proposal.summary}</p>
           <div className="draft-guidance-columns">
@@ -638,7 +642,7 @@ export function DraftGuidancePanel({
         </>
       )}
 
-      {!proposal && onAiDisclosureChange && disclosure}
+      {!proposal && onAiDisclosureChange && !byHand && disclosure}
 
       {checks && (
         <section

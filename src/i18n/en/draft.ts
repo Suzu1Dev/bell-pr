@@ -433,6 +433,8 @@ const draft = {
       "All conflict markers are removed; changed files still need a file-by-file review.",
     resolving: "The agent is resolving the conflicts…",
     resolve: "Ask the agent to resolve the conflicts",
+    /** A Learn-by-hand run has no conflict agent (DESIGN v1.2 F2). */
+    byHand: `Resolve the markers by hand; ${product.name} re-checks them when you refresh the diff on the Code changes tab.`,
   },
   /** FollowUpRounds: the rounds of changes after maintainer review. */
   followUps: {
@@ -466,6 +468,8 @@ const draft = {
     notPushed: ({ commit }: { commit: string }) =>
       `${commit} created; the push is not confirmed yet`,
     discard: "Discard this round",
+    /** Instead of the AI-rounds form in a Learn-by-hand run, until v1.2.1. */
+    ownGit: `Push follow-up commits from the run's folder with your own Git; ${product.name} takes them over at the next feedback read.`,
   },
 };
 

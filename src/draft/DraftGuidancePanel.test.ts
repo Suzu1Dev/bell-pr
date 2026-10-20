@@ -7,6 +7,7 @@ import { DraftGuidancePanel, whyShownTimes } from "./DraftGuidancePanel";
 import { draftPreflight, type DraftCheck } from "../../shared/draft-checks";
 import { reviewabilitySnapshot } from "../../shared/reviewability";
 import { sampleRules as buildSampleRules } from "../mission/respect";
+import type { ByHandRunFacts } from "../../shared/by-hand";
 import type { ContributionFacts, ContributionRules } from "../../shared/contribution";
 import {
   aiDisclosureLine,
@@ -655,4 +656,40 @@ test("an unlinked description under an issue rule asks to confirm in the issue r
   // Once in the row's sources, once in the source document's own text.
   assert.doesNotMatch(checklistRow(html, "issue"), /draft-guidance-issue-rule/);
   assert.match(html, /The checks on the text are clear\. The maintainer checklist below shows the rest\./);
+});
+
+/** A Learn-by-hand run whose history is clean (shared/by-hand.ts byHandClean), or not. */
+const byHandRun = (clean = true): ByHandRunFacts => ({
+  learnByHand: true,
+  createdAt: "2026-10-20T09:00:00.000Z",
+  agents: [{ id: "lead" }, ...(clean ? [] : [{ id: "member-1" }])],
+  byHand: { events: [{ at: "2026-10-20T09:05:00.000Z", kind: "explain", source: "premise" }] },
+});
+
+test("a Learn-by-hand run gets no generate button, no suggestion and no AI line, even with Always add on", () => {
+  const options = { alwaysDiscloseAi: true, draftBody: "My own words.", onAiDisclosureChange: () => {} };
+  const agent = renderEn(panel(getDemo("en").draftPreparation, options));
+  assert.ok(agent.includes("draft-guidance-generate"));
+  assert.ok(agent.includes(aiDisclosureLine));
+  assert.ok(agent.includes('role="switch"'));
+  for (const preparation of [undefined, getDemo("en").draftPreparation]) {
+    const html = renderEn(
+      createElement(DraftGuidancePanel, {
+        ...options,
+        preparation,
+        busy: false,
+        onGenerate: () => {},
+        onApply: () => {},
+        byHandRun: byHandRun(),
+        helpers: createElement("p", { id: "by-hand-helpers" }, "Helpers"),
+      }),
+    );
+    assertNoHan(html);
+    assert.ok(!html.includes("draft-guidance-generate"));
+    assert.ok(!html.includes(aiDisclosureLine));
+    assert.ok(!html.includes('role="switch"'));
+    // The helpers stand where an agent run is offered a suggestion.
+    assert.ok(html.includes('<p id="by-hand-helpers">Helpers</p>'));
+    assert.ok(!html.includes("draft-guidance-empty") && !html.includes("draft-guidance-apply"));
+  }
 });
