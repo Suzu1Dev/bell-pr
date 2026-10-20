@@ -43,7 +43,7 @@ const free: LicenseSummary = { plan: "free", source: "none", status: "none" };
 
 test("the sidebar lists every page and marks the open one", () => {
   const html = render();
-  for (const label of ["首頁", "貢獻工作台", "Repositories", "探索貢獻", "Agent team", "學習筆記", "連線與設定", "使用指南"])
+  for (const label of ["首頁", "貢獻工作台", "Repositories", "探索貢獻", "Agent 團隊", "學習筆記", "連線與設定", "使用指南"])
     assert.ok(html.includes(`<span>${label}</span>`), label);
   assert.match(html, /<nav aria-label="主要導覽">/);
   assert.match(html, /class="nav-item active" title="貢獻工作台" aria-current="page"/);

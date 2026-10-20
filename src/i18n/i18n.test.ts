@@ -358,3 +358,9 @@ test("a translation missing a key or taking other parameters does not compile", 
   assert.equal(complete.changed({ count: 2 }), "2 個檔案有變更");
   assert.ok(missing && otherParameter);
 });
+
+test("zh-TW names the agent team page and the review footer line in Chinese, not half in English", () => {
+  // Lead addition c (W3B): they read 「Agent team」 and 「不只是 review，也是一次 code learning。」.
+  assert.equal(zhTW.app.pages.team, "Agent 團隊");
+  assert.doesNotMatch(zhTW.workspace.footer.learning, /\b(?:review|code|learning)\b/i);
+});

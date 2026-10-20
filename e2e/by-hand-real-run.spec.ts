@@ -13,6 +13,7 @@ import { changeFingerprint } from "../shared/change-fingerprint";
 import type { DraftCheck } from "../shared/draft-checks";
 import type { Run } from "../src/types";
 import byHandText from "../src/byhand/write/i18n/en";
+import review from "../src/i18n/en/review";
 import workspace from "../src/i18n/en/workspace";
 import { runId, startRealProject, type RealProject } from "./helpers/real-project";
 
@@ -118,6 +119,32 @@ test.describe("the fix-ups a browser shows (README v1.2 §18.11)", () => {
       await page.evaluate(() => window.dispatchEvent(new Event("focus")));
       await expect(notice).toBeVisible({ timeout: 15_000 });
       expect(await region!.textContent()).toBe(workspace.byHand.changed);
+    } finally {
+      await context.close();
+      await project.stop();
+    }
+  });
+
+  test("while the person writes, the Changes tab shows no review progress, Reviewed ticks or review footer", async ({ browser }) => {
+    test.setTimeout(120_000);
+    const project = await startRealProject({ run: byHandRun("review", "developing") });
+    const { context, page } = await open(browser, project);
+    try {
+      await page.goto(`/#/runs/${runId}/changes?locale=en`);
+      await expect(page.locator(".file-item").first()).toBeVisible();
+      await expect(page.locator(".review-footer")).toContainText(workspace.byHand.turn);
+      await expect(page.getByText(workspace.changes.progress, { exact: true })).toHaveCount(0);
+      await expect(page.getByText(workspace.changes.reviewHint)).toHaveCount(0);
+      await expect(page.getByRole("checkbox", { name: review.diff.reviewed })).toHaveCount(0);
+      await expect(page.locator(".review-footer")).not.toContainText(workspace.footer.learning);
+      await expect(page.locator(".review-footer .footer-reviewed")).toHaveCount(0);
+      // Marked ready, it is the person's review: the progress, the ticks and the footer come back.
+      const { files } = (await (await page.request.get(`/api/runs/${runId}/diff`)).json()) as { files: { path: string; fingerprint: string }[] };
+      expect((await page.request.post(`/api/runs/${runId}/by-hand/ready`, { data: { changeFingerprint: changeFingerprint(files), review: false } })).ok()).toBe(true);
+      await page.reload();
+      await expect(page.getByText(workspace.changes.progress, { exact: true })).toBeVisible();
+      await expect(page.getByRole("checkbox", { name: review.diff.reviewed })).toHaveCount(1);
+      await expect(page.locator(".review-footer .footer-reviewed")).toBeVisible();
     } finally {
       await context.close();
       await project.stop();

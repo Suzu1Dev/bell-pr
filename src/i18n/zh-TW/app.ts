@@ -16,7 +16,7 @@ const m: Translation<typeof en> = {
     repos: "Repositories",
     explore: "專案全貌",
     discovery: "探索貢獻",
-    team: "Agent team",
+    team: "Agent 團隊",
     learning: "學習筆記",
     settings: "連線與設定",
   },
