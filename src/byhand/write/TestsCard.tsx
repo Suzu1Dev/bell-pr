@@ -47,6 +47,8 @@ export function TestsCard({
   const confirmed = testCommand?.confirmed?.command;
   const [command, setCommand] = useState<string>();
   const shown = command ?? confirmed ?? testCommand?.suggestion ?? "";
+  // Run runs only the confirmed command, so it waits while the field shows another one.
+  const edited = shown.trim() !== confirmed;
   const [prediction, setPrediction] = useState<TestPrediction>();
   const [expect, setExpect] = useState("");
   const running = record.busy?.kind === "tests";
@@ -61,7 +63,8 @@ export function TestsCard({
         <button type="button" className="button secondary" disabled={busy || !shown.trim() || shown.trim() === confirmed}
           onClick={() => void onConfirmTestCommand(shown.trim()).then(() => setCommand(undefined), () => undefined)}>{t.use}</button>
       </div>
-      {confirmed && <p>{t.confirmed({ command: confirmed })}</p>}
+      {confirmed && <p><strong>{t.confirmed({ command: confirmed })}</strong></p>}
+      {confirmed && edited && <p className="field-help">{t.edited}</p>}
       <p className="field-help">{t.honesty}</p>
       <fieldset className="by-hand-row">
         <legend>{t.predict}</legend>
@@ -74,7 +77,7 @@ export function TestsCard({
       </fieldset>
       <input className="text-input" aria-label={t.expect} placeholder={t.expect} maxLength={200} value={expect} onChange={(event) => setExpect(event.target.value)} />
       <div className="by-hand-row">
-        <button type="button" className="button primary" disabled={busy || running || !confirmed}
+        <button type="button" className="button primary" disabled={busy || running || !confirmed || edited}
           onClick={() => void onRunTests({ ...(prediction ? { prediction } : {}), ...(expect.trim() ? { expect: expect.trim() } : {}) }).catch(() => undefined)}>
           {running ? <Loader2 size={15} className="spin" /> : <Play size={15} aria-hidden="true" />}
           {running ? t.running : t.run}
@@ -88,6 +91,7 @@ export function TestsCard({
             <code>{last.command}</code> {last.exitCode !== undefined && `(${last.exitCode})`} {ago(fmt, last.at)}{" "}
             {last.reported && <em>{t.reported}</em>}
           </p>
+          {last.outcome === "error" && <p className="field-help">{t.error}</p>}
           {!!last.newFiles?.length && <p>{t.newFiles({ n: last.newFiles.length, list: fmt.list(last.newFiles, { type: "unit" }) })}</p>}
           {last.outputTail && (
             <details>

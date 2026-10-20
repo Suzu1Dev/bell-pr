@@ -227,12 +227,22 @@ test("the Tests card runs only a confirmed command and folds the output", () => 
       { testCommand: { suggestion: "npm test", confirmed: { command: "npm test", confirmedAt: at } } },
     ),
   );
-  assert.ok(ran.includes("Confirmed: npm test"));
+  assert.ok(ran.includes("<p><strong>Confirmed: npm test</strong></p>"));
+  assert.doesNotMatch(ran, /runs only the command you confirmed/);
   assert.match(ran, /<button type="button" class="button primary"><svg[\s\S]*?<\/svg>Run the tests<\/button>/);
   assert.ok(ran.includes("You predicted Fail; it passed."));
   assert.ok(ran.includes("BELL PR sees 1 new file your tests wrote: coverage/lcov.info"));
   assert.ok(ran.includes("<details><summary>Output</summary><pre>1 passing</pre></details>"));
   assert.doesNotMatch(ran, /Explain this failure/);
+});
+
+test("a test run that did not finish says why it may have stopped, never that the suite didn't run", () => {
+  const confirmed = { testCommand: { suggestion: "npm test", confirmed: { command: "npm test", confirmedAt: at } } };
+  const text = html(guide({ tests: [{ at, command: "npm test", changeFingerprint: fingerprint, outcome: "error", ms: 9 }] }, confirmed));
+  assert.ok(text.includes("It did not finish."));
+  assert.ok(text.includes("BELL PR stopped them for too much output, or the command could not start; the run log in Agent activity says which."));
+  assert.doesNotMatch(text, /could not run/);
+  assert.match(renderZh(guide({ tests: [{ at, command: "npm test", changeFingerprint: fingerprint, outcome: "error", ms: 9 }] }, confirmed)), /結果沒有跑完。/);
 });
 
 const ready = (record: ByHandRecord, props: Partial<ReadyDialogProps> = {}) =>

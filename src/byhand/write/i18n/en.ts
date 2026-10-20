@@ -111,6 +111,7 @@ const en = {
     none: "No suggestion; type the command you run in your terminal.",
     use: "Use this command",
     confirmed: ({ command }: { command: string }) => `Confirmed: ${command}`,
+    edited: `${name} runs only the command you confirmed: choose Use this command first.`,
     honesty: `${name} runs the command you confirmed in the run's folder, as you, without ${name}'s or the AI providers' keys in its environment. Your tests can still read files in your home folder: read the command before you run it.`,
     predict: "Your prediction",
     predictions: { pass: "Pass", fail: "Fail", unsure: "Not sure" } as Record<string, string>,
@@ -118,13 +119,14 @@ const en = {
     run: "Run the tests",
     running: "Running your tests…",
     stop: "Stop",
-    outcomes: { passed: "passed", failed: "failed", timeout: "timed out", stopped: "was stopped", error: "could not run" } as Record<string, string>,
+    outcomes: { passed: "passed", failed: "failed", timeout: "timed out", stopped: "was stopped", error: "did not finish" } as Record<string, string>,
     result: ({ predicted, outcome }: { predicted?: string; outcome: string }) =>
       predicted ? `You predicted ${predicted}; it ${outcome}.` : `It ${outcome}.`,
     reported: "reported by you",
     newFiles: ({ n, list }: { n: number; list: string }) => `${name} sees ${count(n, "new file")} your tests wrote: ${list}`,
     output: "Output",
     explain: "Explain this failure",
+    error: `${name} stopped them for too much output, or the command could not start; the run log in Agent activity says which.`,
   },
   live: {
     tail: "Output so far",

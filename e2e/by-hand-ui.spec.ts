@@ -301,6 +301,32 @@ test("while the person writes, the guide's panel, its thread, the Tests card and
   }
 });
 
+test("the Tests card runs only the confirmed command, and a refused command shows the server's own words", async ({ browser }) => {
+  const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`);
+  try {
+    await page.route(`**/api/runs/${runs.writing}/by-hand/test-command`, (route) =>
+      route.fulfill({ json: { suggestion: "npm test", confirmed: { command: "npm test", confirmedAt: at } } }),
+    );
+    await page.reload();
+    const tests = page.locator(".guide-panel").getByRole("region", { name: t.tests.title });
+    await expect(tests.locator("strong", { hasText: t.tests.confirmed({ command: "npm test" }) })).toBeVisible();
+    const run = tests.getByRole("button", { name: t.tests.run });
+    await expect(run).toBeEnabled();
+    // An edited, unconfirmed command next to Run: Run waits for the confirmation.
+    const field = tests.getByRole("textbox", { name: t.tests.command });
+    await field.fill("npm test -- retry");
+    await expect(run).toBeDisabled();
+    await expect(tests).toContainText(t.tests.edited);
+    await tests.getByRole("button", { name: t.tests.use }).click();
+    await expect(page.locator(".guide-panel").getByRole("alert")).toHaveText(notYet);
+    await field.fill("npm test");
+    await expect(run).toBeEnabled();
+    await expect(tests).not.toContainText(t.tests.edited);
+  } finally {
+    await close();
+  }
+});
+
 test("back from the editor, the diff is read again once", async ({ browser }) => {
   const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`);
   try {
