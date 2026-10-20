@@ -36,6 +36,7 @@ import { parseAgentOutput } from "./run-events.js";
 import type { WorkbenchContext } from "./workbench.js";
 import { filterAgentText, filterCodeField } from "../shared/by-hand-filter.js";
 import type { ChangeExplanation } from "../shared/explanations.js";
+import { understandingStatus } from "../shared/understanding.js";
 import * as guide from "./by-hand-guide.js";
 import { filteredError, turnFiles } from "./by-hand-filter.js";
 import { assertHelpAllowed, recordHelp } from "./by-hand-record.js";
@@ -577,17 +578,18 @@ export function recordStoredHelp(run: Run, source: "explanation" | "walkthrough"
  * "How a reader sees your change" (F10): after Ready, one file per
  * request, and only when that file's Explain-it-back question has an
  * answer at its current version, or the file has no question and every
- * question is answered, or the check is off.
+ * question is answered, or the check is off. "Answered" is the check's
+ * own rule (understandingStatus: a valid answer at the file's current
+ * version), the one the client's reader view (src/review/reader.ts) reads.
  */
 export function assertReaderView(run: Run, files: readonly DiffFile[], filePath: string | undefined, repo?: Repository) {
   assertReady(run, files);
   if (!filePath) throw refuse((m) => m.byHand.flow.oneFile);
   assertHelpAllowed(run, "explain");
   if (!understandingRequired()) return;
-  const saved = run.understanding?.items ?? [];
-  const answered = (item: { id: string; path?: string; fingerprint?: string }) =>
-    saved.some((entry) => entry.id === item.id && entry.path === item.path && (!item.path || entry.fingerprint === item.fingerprint));
   const plan = planUnderstanding(run, files, repo);
+  const { missing } = understandingStatus({ record: run.understanding, plan, files, required: true });
+  const answered = (item: { id: string }) => !missing.some((part) => part.part === "answer" && part.itemId === item.id);
   const own = plan.find((item) => item.path === filePath);
   if (own ? answered(own) : plan.every(answered)) return;
   throw refuse((m) => m.byHand.flow.answerFirst);

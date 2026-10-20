@@ -21,6 +21,7 @@ import type { TeamAgentInput } from "./team.js";
 import { AppError, type Run } from "./types.js";
 import { byHandReviewInTests } from "./by-hand.js";
 import { planUnderstanding, skipUnderstandingCheckInTests } from "./understanding.js";
+import { readerAllowed } from "../src/review/reader.js";
 import { Workbench, type WorkbenchContext } from "./workbench.js";
 
 const previousPath = process.env.PATH;
@@ -250,6 +251,48 @@ test("after Ready an explanation comes one file at a time, after that file's own
   for (const item of plan) if (item.id !== slotted.id) await f.answer(item.id);
   await en(() => f.workbench.explanations(f.run.id, { filePath: other.path }));
   assert.equal(f.calls.length, 2);
+});
+
+test("the reader view counts a file's answer as the check and the client do: one that now reads as a copy of the guide's review is not answered", async (t) => {
+  skipUnderstandingCheckInTests(false);
+  const f = await fixture(t);
+  await f.markReady();
+  const slotted = planUnderstanding(f.run, await f.files(), f.repo).find((item) => item.path === "src/retry.ts");
+  assert.ok(slotted, "src/retry.ts has a question");
+  await f.answer(slotted.id);
+  // Answered at the current version: the client offers the reader view and the server serves it.
+  assert.equal(readerAllowed(await f.workbench.understanding.status(f.run.id), { path: "src/retry.ts" }), true);
+  // The guide's review of this version, written after the answer, says the same words: the check
+  // no longer counts the answer (understandingStatus), so the client asks for a new one first.
+  f.run.byHand!.reviews = [
+    {
+      at: new Date().toISOString(),
+      changeFingerprint: changeFingerprint(await f.files()),
+      verified: "The retry count.",
+      checked: [],
+      findings: [
+        {
+          path: "src/retry.ts",
+          observed: "Three attempts because the server recovers within seconds.",
+          evidence: { type: "diff" },
+          why: "A flaky server needs the room.",
+          question: "What if it does not recover?",
+        },
+      ],
+    },
+  ];
+  const view = await f.workbench.understanding.status(f.run.id);
+  assert.ok(view.missing.some((part) => part.part === "answer" && part.itemId === slotted.id));
+  assert.equal(readerAllowed(view, { path: "src/retry.ts" }), false);
+  await assert.rejects(
+    en(() => f.workbench.explanations(f.run.id, { filePath: "src/retry.ts" })),
+    refused(409, /^Answer this file's Explain-it-back question first/),
+  );
+  await assert.rejects(
+    en(() => f.workbench.walkthrough(f.run.id, "src/retry.ts")),
+    refused(409, /^Answer this file's Explain-it-back question first/),
+  );
+  assert.equal(f.calls.length, 0);
 });
 
 test("with the understanding check off, an explanation after Ready needs no answer first", async (t) => {
