@@ -20,7 +20,7 @@ import panelStringsZh from "../src/review/i18n/zh-TW";
 import { typewriterStepMs } from "../src/review/try-first";
 import { switchLocale } from "./fixtures";
 import { expectNoOverflow } from "./helpers/overflow";
-import { files, runId, startRealProject, type RealProject } from "./helpers/real-project";
+import { explanations, files, runId, startRealProject, type RealProject } from "./helpers/real-project";
 
 const t = en.review.tryFirst;
 const demo = getDemo("en");
@@ -350,4 +350,49 @@ test.describe("the walkthrough's Check yourself on a real agent run", () => {
       await close();
     }
   });
+});
+
+test("a tab still open on the question can't change the answer another tab saved, and shows that one", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const project = await startRealProject();
+  const context = await browser.newContext({
+    baseURL: project.baseURL,
+    storageState: project.storageState,
+    viewport: { width: 1440, height: 900 },
+    locale: "en-US",
+    timezoneId: "UTC",
+    reducedMotion: "reduce",
+  });
+  try {
+    // Two tabs on the same file's quiz, both before any answer is saved.
+    const tabs = [await context.newPage(), await context.newPage()];
+    for (const tab of tabs) {
+      await tab.goto(`/#/runs/${runId}/changes?file=${files.greeting}&locale=en`);
+      await expect(tab.locator(".file-item.selected")).toHaveAttribute("title", files.greeting);
+      await expect(quizCard(tab).getByRole("textbox", { name: t.quiz.answerLabel })).toBeVisible();
+    }
+    const [first, stale] = tabs.map(quizCard);
+    const answer = "The English greeting, because a missing language falls back to greetings.en.";
+    const later = "Something else entirely, written after reading the reference.";
+    await first.getByRole("textbox", { name: t.quiz.answerLabel }).fill(answer);
+    await first.getByRole("radio", { name: t.confidences.sure }).check();
+    await first.getByRole("button", { name: t.quiz.reveal }).click();
+    await expect(first.locator(".tf-yours")).toContainText(answer);
+    // The other tab still asks; the server keeps the answer on record (409) and the card says so,
+    // then shows the saved answer with the reference instead of the one it was sent.
+    await stale.getByRole("textbox", { name: t.quiz.answerLabel }).fill(later);
+    await stale.getByRole("radio", { name: t.confidences.sure }).check();
+    await stale.getByRole("button", { name: t.quiz.reveal }).click();
+    await expect(stale.getByRole("alert")).toHaveText(t.fileChanged);
+    await expect(stale.locator(".tf-yours")).toContainText(answer);
+    await expect(stale).not.toContainText(later);
+    await expect(stale.locator(".tf-reference")).toContainText(explanations[files.greeting].selfCheck.answer.slice(0, 40));
+    const { run } = (await (await tabs[1].request.get(`/api/runs/${runId}`)).json()) as {
+      run: { attempts: Record<string, { quiz?: { answer?: string } }> };
+    };
+    expect(run.attempts[files.greeting].quiz?.answer).toBe(answer);
+  } finally {
+    await context.close();
+    await project.stop();
+  }
 });
