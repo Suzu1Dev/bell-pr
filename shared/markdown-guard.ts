@@ -117,25 +117,9 @@ export function roughProse(markdown: string): string[] {
     });
 }
 
-/** A line with its code spans blanked: a backtick run up to the next run of the same length. */
-function codeSpansBlanked(line: string) {
-  const runs = [...line.matchAll(/`+/g)].map((match) => ({ at: match.index, size: match[0].length }));
-  // The next run of the same length after each run, found from the end in one pass.
-  const next = new Array<number>(runs.length).fill(-1);
-  const seen = new Map<number, number>();
-  for (let index = runs.length - 1; index >= 0; index--) {
-    next[index] = seen.get(runs[index].size) ?? -1;
-    seen.set(runs[index].size, index);
-  }
-  const chars = line.split("");
-  for (let index = 0; index < runs.length; ) {
-    const close = next[index];
-    if (close < 0) {
-      index++;
-      continue;
-    }
-    blank(chars, runs[index].at, runs[close].at + runs[close].size);
-    index = close + 1;
-  }
-  return chars.join("");
-}
+/**
+ * A line with its code spans blanked: a backtick run up to the next run
+ * of the same length, as far as the next backtick allows (linear: a span
+ * never scans past a backtick), roughly as GFM reads them.
+ */
+const codeSpansBlanked = (line: string) => line.replace(/(`+)[^`]*?\1/g, (span) => " ".repeat(span.length));
