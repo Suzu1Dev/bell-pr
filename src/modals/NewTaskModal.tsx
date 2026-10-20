@@ -54,10 +54,7 @@ interface NewTaskModalProps {
   maskUser?: (value: string) => string;
 }
 
-/**
- * Sets up a contribution task for a repository and starts its agent team,
- * or a run the person writes by hand (DESIGN v1.2 F1).
- */
+/** Sets up a contribution task and starts its agent team, or a run the person writes by hand. */
 export function NewTaskModal({
   setup,
   repos,
@@ -99,8 +96,7 @@ export function NewTaskModal({
   const [asking, setAsking] = useState(false);
   const accepted = useRef("");
   const reasonsKey = startReasonsKey(startCheck.reasons);
-  // Who writes it: the person's choice, else the suggestion; the sample
-  // shows the agent team only. The fitted help set is preselected.
+  // Who writes it (DESIGN v1.2 F1): the person's choice, else the suggestion; the fitted help set is preselected.
   const [modeChoice, setModeChoice] = useState<RunMode>();
   const [fitChoice, setFitChoice] = useState<boolean>();
   const { rules, rulesCase, learningIssue = false } = startCheck;
@@ -243,15 +239,8 @@ export function NewTaskModal({
           required
           minLength={10}
         />
-        <ModeChoice
-          mode={mode}
-          onModeChange={setModeChoice}
-          rulesCase={rulesCase}
-          fitted={fitted}
-          onFittedChange={setFitChoice}
-          sample={demo}
-          disabled={busy}
-        />
+        <ModeChoice mode={mode} onModeChange={setModeChoice} rulesCase={rulesCase} fitted={fitted}
+          onFittedChange={setFitChoice} sample={demo} disabled={busy} />
         {mode === "agents" && <>
         <div className="task-team-preview">
           <Bot size={16} />

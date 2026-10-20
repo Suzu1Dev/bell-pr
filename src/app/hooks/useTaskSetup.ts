@@ -155,9 +155,8 @@ export function useTaskSetup({
   const [settingsReady, setSettingsReady] = useState(false);
   const [settingsNotice, setSettingsNotice] = useState("");
   const settingsSaveButton = useRef<HTMLButtonElement>(null);
-  // Who writes the next run (DESIGN v1.2 F1): a request field, never saved
-  // with the direction. Discovery's "Start learning by hand" prefers Learn
-  // by hand, leaving one prefers the agent team; the dialog decides.
+  // Who writes the next run (DESIGN v1.2 F1), never saved with the direction: discovery
+  // can prefer Learn by hand, leaving one prefers the agent team; the dialog decides.
   const [preferredMode, setPreferredMode] = useState<RunMode>();
   /** The mode fields of POST /api/runs, set by the task dialog as it submits. */
   const runRequest = useRef<{ learnByHand?: true; byHandFit?: { learningIssue: boolean } }>({});
