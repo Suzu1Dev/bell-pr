@@ -358,3 +358,11 @@ test("a learn-by-hand run's approval waits for the person's PR title and descrip
     setCheckSettingsForTests(undefined);
   }
 });
+
+test("a learn-by-hand run's footer hint asks the guide, not the agent", () => {
+  const byHand: Run = { ...realRun, learnByHand: true, agents: realRun.agents.filter((agent) => agent.id === "lead") };
+  const html = renderEn(element({ run: byHand, tab: "overview" }));
+  assert.match(html, /<span class="footer-hint">Select code to ask the guide about it\.<\/span>/);
+  assert.match(renderZh(element({ run: byHand, tab: "overview" })), /<span class="footer-hint">選取程式碼，就能向嚮導提問。<\/span>/);
+  assert.match(renderEn(element({ tab: "overview" })), /<span class="footer-hint">Select code to ask the agent about it\.<\/span>/);
+});

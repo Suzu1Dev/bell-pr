@@ -527,7 +527,7 @@ export function WorkspacePage({
             <span>{t.footer[footer.status]}</span>
             {prTextMissing && !byHand.writing && !reviewing && run.status !== "published" ? (
               <button type="button" className="mission-text-button" onClick={() => setTab("draft")}>{t.byHand.writePr}</button>
-            ) : <span className="footer-hint">{t.footer.hint}</span>}
+            ) : <span className="footer-hint">{run.learnByHand ? t.footer.hintByHand : t.footer.hint}</span>}
           </div>
           <div>
             <span className="footer-reviewed">

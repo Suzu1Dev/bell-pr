@@ -425,3 +425,29 @@ test("a run fitted to rules that don't name planning help offers no Ask-tab star
   assert.match(ask(["explain", "answer", "plan"]), alternatives);
   assert.match(ask(), alternatives);
 });
+
+test("a Learn-by-hand run's Ask tab names the guide, never an agent or a learning assistant", () => {
+  const chat = (props: Partial<ExplanationPanelProps>, render = renderEn) =>
+    render(
+      createElement(ExplanationPanel, {
+        file,
+        messages: [{ role: "user", content: "Why a cap?" }, { role: "assistant", content: "Because a timeout loops." }],
+        loading: false,
+        onAsk() {},
+        demo: false,
+        chatRequestId: 1,
+        ...props,
+      }),
+    );
+  const html = chat({ byHandReview: reader(check([])) });
+  assertNoHan(html);
+  assert.match(html, /<\/svg>The guide<\/div>|<\/span>The guide</);
+  assert.match(html, /aria-label="Question for the guide"/);
+  assert.doesNotMatch(html, /Learning assistant|Question for the agent/);
+  const zh = chat({ byHandReview: reader(check([])) }, renderZh);
+  assert.match(zh, /追問嚮導/);
+  assert.doesNotMatch(zh, /追問 Agent|學習助理/);
+  // An agent run's tab is as it was.
+  assert.match(chat({}), /Learning assistant/);
+  assert.match(chat({}, renderZh), /追問 Agent/);
+});

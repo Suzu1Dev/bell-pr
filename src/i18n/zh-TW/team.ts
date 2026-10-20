@@ -152,6 +152,7 @@ const m: Translation<typeof en> = {
     round: ({ number }) => `修正第 ${number} 輪`,
     agent: ({ name, id }) => `${name}（${id}）`,
   },
+  guide: "嚮導",
   howItWorks: "運作方式",
   protocolNote: ({ provider }) =>
     `${product.name} 使用共享任務、獨立工作目錄及回合間訊息協作。這是由 ${provider} 逐回合驅動的 ${product.name} 實作，並非 Claude Code 原生 Agent Teams。`,

@@ -22,7 +22,7 @@ const OverviewPanel = lazy(() =>
  * The run's contribution brief, built from the settings it started with;
  * `defaults` fills what the settings leave open.
  */
-function contributionBrief(
+export function contributionBrief(
   value: Run,
   defaults: Messages["workspace"]["brief"],
 ): ContributionBrief | undefined {
@@ -32,7 +32,7 @@ function contributionBrief(
     problem: value.prompt,
     motivation: settings.outcome || defaults.motivation,
     beneficiaries: settings.targetUser ? [settings.targetUser] : [],
-    before: defaults.before,
+    before: value.learnByHand ? defaults.beforeByHand : defaults.before,
     after: settings.outcome || defaults.after,
     validation: settings.acceptance.split("\n").filter(Boolean),
     risks: settings.constraints ? [settings.constraints] : [defaults.risk],

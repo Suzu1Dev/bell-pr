@@ -74,6 +74,7 @@ const m: Translation<typeof en> = {
     checkOff: "每一個檔案都已審閱 · 理解檢查已關閉。核准只需要你的審閱勾選。",
     learning: "不只是 review，也是一次 code learning。",
     hint: "選取程式碼，就能向 agent 追問。",
+    hintByHand: "選取程式碼，就能向嚮導提問。",
     reviewed: ({ reviewed, total }) => `${reviewed} / ${total} 已審閱`,
     viewPullRequest: "查看 Pull Request",
     needsReview: "請先逐一勾選所有檔案的「已審閱」",
@@ -248,6 +249,7 @@ const m: Translation<typeof en> = {
   brief: {
     motivation: "這次貢獻的價值仍需由任務需求與驗收結果確認。",
     before: "目前存在任務描述中的問題，實際影響範圍由團隊在規劃時確認。",
+    beforeByHand: "目前存在任務描述中的問題，實際影響範圍由你和嚮導在規劃時確認。",
     after: "依任務需求改善現有行為，尚未驗證是否達成。",
     risk: "在送出前確認相容性、回歸測試與使用者行為。",
   },

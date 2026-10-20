@@ -207,6 +207,8 @@ const team = {
     agent: ({ name, id }: { name: string; id: string }) => `${name} (${id})`,
   },
   /** The disclosure holding the protocol note. */
+  /** A Learn-by-hand run's log names its one agent role so (DESIGN v1.2 §12). */
+  guide: "The guide",
   howItWorks: "How it works",
   protocolNote: ({ provider }: { provider: string }) =>
     `${product.name} coordinates the team with shared tasks, separate working directories and messages between turns. This is ${product.name}'s own implementation, driven turn by turn by ${provider}; it is not Claude Code's native Agent Teams.`,

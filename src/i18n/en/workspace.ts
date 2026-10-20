@@ -96,6 +96,7 @@ const workspace = {
       "Every file reviewed · Understanding check off. Approval needs your reviewed ticks only.",
     learning: "Not just a review: a lesson in code, too.",
     hint: "Select code to ask the agent about it.",
+    hintByHand: "Select code to ask the guide about it.",
     reviewed: ({ reviewed, total }: { reviewed: number; total: number }) =>
       `${reviewed} / ${total} reviewed`,
     viewPullRequest: "View pull request",
@@ -302,6 +303,8 @@ const workspace = {
       "The value of this contribution still has to be confirmed by the task's needs and its acceptance results.",
     before:
       "The problem in the task description exists today; the team confirms how far it reaches while planning.",
+    beforeByHand:
+      "The problem in the task description exists today; you and the guide find how far it reaches while you plan.",
     after:
       "Improve the current behavior as the task asks; not yet verified to be achieved.",
     risk: "Before submitting, check compatibility, regression tests and user-facing behavior.",

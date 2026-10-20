@@ -299,6 +299,7 @@ export function ExplanationPanel({
   byHandReview,
 }: ExplanationPanelProps) {
   const t = useT("review");
+  const panel = usePanelStrings(); // A Learn-by-hand run's Ask tab names the guide, who answers it (DESIGN v1.2 F8).
   const fmt = useFormat();
   const [locale] = useLocale();
   const [tab, setTab] = useState<PanelTab>(
@@ -504,7 +505,7 @@ export function ExplanationPanel({
           onClick={() => setTab("chat")}
         >
           <MessageCircle size={14} />
-          {t.panel.tabs.chat}
+          {byHandReview ? panel.ask.tab : t.panel.tabs.chat}
           {questionCount > 0 && (
             <span className="explain-message-count">{questionCount}</span>
           )}
@@ -931,7 +932,7 @@ export function ExplanationPanel({
                             <Sparkles size={12} />
                           )}
                         </span>
-                        {failed ? t.chat.failed : t.chat.assistant}
+                        {failed ? t.chat.failed : byHandReview ? panel.guide : t.chat.assistant}
                         {demo && (
                           <span className="explain-inline-demo">
                             {t.panel.demoBadge}
@@ -993,7 +994,7 @@ export function ExplanationPanel({
             }}
           >
             <textarea
-              aria-label={t.chat.inputLabel}
+              aria-label={byHandReview ? panel.ask.label : t.chat.inputLabel}
               placeholder={
                 file.blocked ? t.chat.placeholderBlocked : t.chat.placeholder
               }
