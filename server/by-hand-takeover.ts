@@ -11,11 +11,12 @@
  * Nothing happens unless the run's folder is still there, clean, and its
  * HEAD is past the last pushed commit. BELL adopts only when that HEAD
  * builds on the last push and is exactly the PR branch's head on GitHub
- * (the person pushed), so its reset to the fetched head moves nothing. It
- * never resets local commits away: unpushed commits, a branch that moved
- * on without them, a dirty checkout or rewritten history leave everything
- * as it is, with a notice on the feedback read, or a refusal before a
- * sync. Agent runs are never touched.
+ * (the person pushed), and the fetched head must still hold that HEAD, so
+ * its reset to the fetched head moves nothing. It never resets local
+ * commits away: unpushed commits, a branch that moved on without them
+ * (also while BELL looked), a dirty checkout or rewritten history leave
+ * everything as it is, with a notice on the feedback read, or a refusal
+ * before a sync. Agent runs are never touched.
  */
 import { activeFollowUp } from "../shared/followups.js";
 import { sm } from "./i18n/index.js";
@@ -36,7 +37,7 @@ async function contains(run: Run, ancestor: string, commit: string) {
 }
 
 /** Looks at the run's checkout and GitHub's PR branch, and adopts only what the person pushed. */
-async function takeOver(ctx: WorkbenchContext, run: Run): Promise<TakeoverOutcome> {
+async function takeOver(ctx: WorkbenchContext, run: Run, again = false): Promise<TakeoverOutcome> {
   if (!run.learnByHand || run.status !== "published" || run.publishing || run.workspaceRemovedAt) return "none";
   if (!run.publishCommit || !run.headRepository || activeFollowUp(run.followUps)) return "none";
   const head = (await git(run.worktreePath, ["rev-parse", "HEAD"])).stdout.trim();
@@ -46,7 +47,15 @@ async function takeOver(ctx: WorkbenchContext, run: Run): Promise<TakeoverOutcom
   if (!(await contains(run, run.publishCommit, head)))
     // A force push that rewrote what BELL pushed; a local rewrite not pushed is left alone.
     return remote === head ? "rewritten" : "none";
-  if (remote === head) return (await adoptRemoteCommits(ctx, run)) ? "adopted" : "none";
+  if (remote === head)
+    try {
+      return (await adoptRemoteCommits(ctx, run, { expectedHead: head })) ? "adopted" : "none";
+    } catch (error) {
+      // GitHub's branch moved while BELL looked, and nothing moved here: what it holds now
+      // decides, once.
+      if (again || !(error instanceof AppError && error.statusCode === 409)) throw error;
+      return takeOver(ctx, run, true);
+    }
   if (!remote) return "unpushed";
   // The folder only adds commits to what GitHub's branch has: they wait for a push. Otherwise the
   // branch has commits the folder lacks (a pull comes first).

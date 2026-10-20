@@ -16,12 +16,13 @@ import { changeFingerprint } from "../shared/understanding.js";
 import { fakeGitHub } from "../test/fake-github.js";
 import { readDiff } from "./git.js";
 import { withLocale } from "./i18n/index.js";
+import { adoptRemoteCommits } from "./pr-branch.js";
 import { git } from "./process.js";
 import { publishChecks } from "./publish.js";
 import { Store } from "./store.js";
 import { AppError, type Run } from "./types.js";
 import { skipUnderstandingCheckInTests } from "./understanding.js";
-import { Workbench } from "./workbench.js";
+import { Workbench, type WorkbenchContext } from "./workbench.js";
 
 const previousPath = process.env.PATH;
 let fakeBin: string;
@@ -49,6 +50,7 @@ const pushFirst = /^Push your commits first; BELL PR takes them over once they a
 const commitFirst = /^Commit or discard your changes in the run's folder first\./;
 const pullFirst = /^The pull request's branch has commits the run's folder doesn't have yet\./;
 const rewritten = /rewrote history that BELL PR pushed/;
+const remoteMoved = /^The PR branch fix\/lbh0001 on GitHub has commits from outside BELL PR/;
 
 /** What the fake gh answers to the feedback read: an open PR with no feedback yet. */
 const feedback = {
@@ -166,6 +168,56 @@ process.exit(spawnSync(${JSON.stringify(path.join(directory, "fake-bin", "gh"))}
   };
   const head = async () => (await git(worktreePath, ["rev-parse", "HEAD"])).stdout.trim();
   return { directory, github, store, workbench, repo, run, write, commit, head };
+}
+
+type Published = Awaited<ReturnType<typeof published>>;
+
+/**
+ * Runs `script` (sh) once, as BELL's next fetch starts: GitHub's branch
+ * moving, or the person saving or committing in the run's folder, while
+ * BELL looks. `$GIT` is the fake GitHub's git; `$BARE` its repository.
+ */
+async function onNextFetch(t: TestContext, f: Published, script: string) {
+  const bin = await mkdtemp(path.join(f.directory, "on-fetch-"));
+  const marker = path.join(bin, "done");
+  await writeFile(
+    path.join(bin, "git"),
+    [
+      "#!/bin/sh",
+      `GIT=${JSON.stringify(path.join(f.directory, "fake-bin", "git"))}`,
+      `BARE=${JSON.stringify(f.github.bare)}`,
+      'for arg in "$@"; do',
+      `  if [ "$arg" = fetch ] && [ ! -e ${JSON.stringify(marker)} ]; then`,
+      `    : > ${JSON.stringify(marker)}`,
+      `    ${script}`,
+      "    break",
+      "  fi",
+      "done",
+      'exec "$GIT" "$@"',
+      "",
+    ].join("\n"),
+    { mode: 0o700 },
+  );
+  const previous = process.env.PATH;
+  process.env.PATH = `${bin}${path.delimiter}${previous}`;
+  t.after(() => {
+    process.env.PATH = previous;
+  });
+}
+
+/** A commit made from `files` on `parent` in the run's folder, which stays where it was; on GitHub only under `refs/heads/side`. */
+async function sideCommit(f: Published, parent: string, files: Record<string, string>, message: string) {
+  const worktree = f.run.worktreePath;
+  const before = await f.head();
+  await git(worktree, ["checkout", "-q", "--detach", parent]);
+  for (const [file, content] of Object.entries(files)) await f.write(file, content);
+  await git(worktree, ["add", "--", ...Object.keys(files)]);
+  await git(worktree, ["commit", "-q", "-m", message]);
+  const commit = await f.head();
+  await git(worktree, ["checkout", "-q", branch]);
+  assert.equal(await f.head(), before);
+  await git(worktree, ["push", "-q", "--force", f.github.url, `${commit}:refs/heads/side`]);
+  return commit;
 }
 
 test("commits pushed from the run's folder are taken over at the feedback read, and a sync then works", async (t) => {
@@ -327,4 +379,48 @@ test("an agent run's checkout is never taken over: the feedback read and the syn
     refused(/^The working directory differs from the pushed PR/),
   );
   assert.equal(f.run.followUps, undefined);
+});
+
+test("a force push while BELL looks, which keeps BELL's push but drops the person's commits, moves nothing", async (t) => {
+  const f = await published(t);
+  const pushedByBell = f.run.publishCommit!;
+  const mine = await f.commit("export const attempts = 3;\n", "Retry three times");
+  // Between BELL's look (the branch is the folder's HEAD) and its fetch, the branch is forced to
+  // a commit on BELL's push that the person's commit isn't in.
+  const forced = await sideCommit(f, pushedByBell, { "NOTES.md": "Rewritten on GitHub.\n" }, "Rewritten on GitHub");
+  const force = `"$GIT" --git-dir="$BARE" update-ref refs/heads/${branch} ${forced}`;
+  await onNextFetch(t, f, force);
+  await en(() => f.workbench.fetchPrFeedback(f.run.id));
+  assert.ok(f.run.prFeedback?.fetchedAt);
+  assert.equal(await f.head(), mine);
+  assert.equal(f.run.publishCommit, pushedByBell);
+  assert.equal(f.run.followUps, undefined);
+  // What the branch holds now decides the notice: it has a commit the folder lacks.
+  assert.match(f.run.logs.at(-2)?.message ?? "", pullFirst);
+  // The same race before a sync is refused, and nothing moves either.
+  await git(f.run.worktreePath, ["push", "-q", "--force", f.github.url, `${mine}:refs/heads/${branch}`]);
+  await onNextFetch(t, f, force);
+  await assert.rejects(en(() => f.workbench.syncRun(f.run.id)), refused(pullFirst));
+  assert.equal(await f.head(), mine);
+  assert.equal(f.run.publishCommit, pushedByBell);
+  assert.equal(f.run.followUps, undefined);
+  assert.deepEqual(byHandClean(f.run), { clean: true });
+});
+
+test("adoptRemoteCommits without expectedHead takes over as before; with it, only a head that still holds it", async (t) => {
+  const f = await published(t, { agent: true });
+  const ctx = (f.workbench as unknown as { context: WorkbenchContext }).context;
+  const pushedByBell = f.run.publishCommit!;
+  // A force push that keeps BELL's push: an agent run's sync still takes it over.
+  const forced = await sideCommit(f, pushedByBell, { "NOTES.md": "Rewritten on GitHub.\n" }, "Rewritten on GitHub");
+  await git(f.run.worktreePath, ["push", "-q", "--force", f.github.url, `${forced}:refs/heads/${branch}`]);
+  const elsewhere = await sideCommit(f, pushedByBell, { "OTHER.md": "Somewhere else.\n" }, "Somewhere else");
+  await assert.rejects(en(() => adoptRemoteCommits(ctx, f.run, { expectedHead: elsewhere })), refused(remoteMoved));
+  assert.equal(f.run.publishCommit, pushedByBell);
+  assert.equal(await f.head(), pushedByBell);
+  assert.equal(f.run.followUps, undefined);
+  assert.equal(await en(() => adoptRemoteCommits(ctx, f.run)), true);
+  assert.equal(f.run.publishCommit, forced);
+  assert.equal(await f.head(), forced);
+  assert.equal(f.run.followUps?.at(-1)?.adopted, true);
 });
