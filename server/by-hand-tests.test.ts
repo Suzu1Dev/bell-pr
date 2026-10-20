@@ -8,7 +8,7 @@ import test, { after, before, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
@@ -415,6 +415,54 @@ test("runs are refused with 409 without a confirmed command, while one runs, out
   delete f.run.learnByHand;
   await assert.rejects(en(() => f.byHand.runTests(f.run.id, {})), refused("This is only for Learn-by-hand runs."));
   assert.equal(f.run.byHand?.tests?.length, 1);
+});
+
+test("byHand.busy: the tests take the slot only when it is free and clear only their own mark, on every end", async (t) => {
+  const f = await fixture(t);
+  const busy = () => f.run.byHand?.busy;
+  const since = new Date().toISOString();
+  // Another job holds the slot: no run starts, and its mark stays.
+  await f.confirm(`node -e "process.exit(0)"`);
+  for (const kind of ["guide", "review"]) {
+    (f.run.byHand ??= {}).busy = { kind, since };
+    await assert.rejects(en(() => f.byHand.runTests(f.run.id, {})), (error: AppError) => error.statusCode === 409);
+    assert.deepEqual(busy(), { kind, since });
+  }
+  delete f.run.byHand!.busy;
+  // Passed and failed (each waits until the mark is gone).
+  assert.equal((await f.runOnce()).outcome, "passed");
+  await f.confirm(`node -e "process.exit(1)"`);
+  assert.equal((await f.runOnce()).outcome, "failed");
+  // The shell cannot start: the run's folder vanished after the change was read.
+  const moved = `${f.repository}-moved`;
+  const diff = f.workbench.diff.bind(f.workbench);
+  f.workbench.diff = async (id) => {
+    const files = await diff(id);
+    await rename(f.repository, moved);
+    return files;
+  };
+  try {
+    const failed = await f.runOnce();
+    assert.equal(failed.outcome, "error");
+    assert.match(f.run.logs.at(-1)?.message ?? "", /^Your test command could not start: /);
+  } finally {
+    f.workbench.diff = diff;
+    await rename(moved, f.repository);
+  }
+  assert.equal(busy(), undefined);
+  // Stop on the run (cancel) clears the mark.
+  await f.confirm(`node -e "setInterval(() => {}, 1000)"`);
+  await en(() => f.byHand.runTests(f.run.id, {}));
+  assert.equal(busy()?.kind, "tests");
+  await f.workbench.cancel(f.run.id);
+  assert.equal(f.run.byHand?.tests?.at(-1)?.outcome, "stopped");
+  assert.equal(busy(), undefined);
+  // A mark of another kind is never cleared by the tests' end.
+  await en(() => f.byHand.runTests(f.run.id, {}));
+  f.run.byHand!.busy = { kind: "guide", since };
+  await f.byHand.stopTests(f.run.id);
+  assert.equal(f.run.byHand?.tests?.at(-1)?.outcome, "stopped");
+  assert.deepEqual(busy(), { kind: "guide", since });
 });
 
 test("the stored tail is ANSI-stripped, keeps what a terminal shows of progress lines, and masks credentials", async (t) => {
