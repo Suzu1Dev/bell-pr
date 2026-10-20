@@ -16,7 +16,7 @@
  *   `review:<id>`. `chat`: the per-file Ask tab's answer after Ready.
  */
 import { randomUUID } from "node:crypto";
-import { attemptSince, byHandLimits, helpKindOf, helpAllowed, nextRungAllowed, repeatFailure } from "../shared/by-hand.js";
+import { attemptSince, byHandLimits, helpKindOf, helpAllowed, nextRungAllowed, readyNow, repeatFailure } from "../shared/by-hand.js";
 import type { AskEntry, ByHandGuideInput, ByHandReview, ByHandStep, GuideEntry, GuideKind, HelpSource } from "../shared/by-hand.js";
 import { filterAgentText, type FilteredGuideOutput, type Filtered } from "../shared/by-hand-filter.js";
 import { changeFingerprint } from "../shared/change-fingerprint.js";
@@ -473,17 +473,21 @@ export async function storedReview(run: GuideRun, files: DiffFile[], input: Retu
   return { review, tester };
 }
 
-/** The structured review at Ready (F8); `ready()` runs it as the job `review:<id>`. */
+/** The structured review at Ready (F8) of the version marked ready, never a later edit (409 otherwise); `ready()` runs it as `review:<id>`. */
 export async function review(ctx: WorkbenchContext, run: Run, input: { leastSure?: string }, signal: AbortSignal): Promise<void> {
   assertHelpAllowed(run, helpKindOf("review"));
   await withRunLocale(run, async () => {
     const files = await readDiff(run);
+    const moved = (current: DiffFile[]) => !!run.byHand?.ready && !readyNow(run, current);
+    if (moved(files)) throw new AppError((m) => m.byHand.notReady, 409);
     const turn = reviewInput(run, files, input.leastSure);
     const locale = currentLocale();
     const [reviewerPrompt, testerPrompt] = [byHandReviewerPrompt(locale, turn.prompt), byHandTesterPrompt(locale, turn.prompt)];
     const reports = await withSchemaFile(reviewerAnswerJsonSchema, (reviewerSchema) =>
       runIndependentReview(ctx, run, files, undefined, signal, { reviewerPrompt, testerPrompt, reviewerSchema, isolated: true }),
     ).catch((error) => { throw filteredError(error); });
+    // An edit saved while the agents read is not the version marked ready: nothing is stored.
+    if (moved(await readDiff(run))) throw new AppError((m) => m.byHand.notReady, 409);
     const { review: stored, tester } = await storedReview(run, files, turn, reports);
     // Stored together, after every await: the help event first, as it refuses a kind outside the lock.
     recordHelp(run, { source: "review", removed: stored.removed });

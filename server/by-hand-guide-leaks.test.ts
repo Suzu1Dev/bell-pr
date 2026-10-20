@@ -1,17 +1,20 @@
-// Red-team cases for the guide's stored text (DESIGN v1.2 F7, F8): code must
-// not reach the person as the product shows it, after every transformation.
-// The review is rendered on one line per finding for the Reports tab, so the
-// filter reads it that way; Markdown decodes escapes and character
-// references and hides invisible characters, so the filter reads prose as
-// shown; a link's query is shown too. The agent runner is a fake; fake
-// codex, claude and gh come first on PATH.
+// Red-team cases for the guide's stored text (DESIGN v1.2 F5, F7, F8): code
+// must not reach the person as the product shows it, after every
+// transformation. The review is rendered on one line per finding for the
+// Reports tab, so the filter reads it that way; Markdown decodes escapes and
+// character references and hides invisible characters, so the filter reads
+// prose as shown; a link's query is shown too. The review covers only the
+// version marked ready, and BELL's own timeout message stays whole. The
+// agent runner is a fake; fake codex, claude and gh come first on PATH.
 import test, { after, before, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fromMarkdown } from "mdast-util-from-markdown";
+import { changeFingerprint } from "../shared/change-fingerprint.js";
 import { chat, review } from "./by-hand-guide.js";
+import { readDiff } from "./git.js";
 import { withLocale } from "./i18n/index.js";
 import { git } from "./process.js";
 import { Store } from "./store.js";
@@ -47,7 +50,7 @@ const retrySource = [
   "",
 ].join("\n");
 
-type Answer = string | ((input: TeamAgentInput) => string);
+type Answer = string | ((input: TeamAgentInput) => string | Promise<string>);
 
 async function fixture(t: TestContext) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-by-hand-leaks-"));
@@ -111,7 +114,12 @@ async function fixture(t: TestContext) {
   };
   store.data.runs.push(run);
   const ctx = (workbench as unknown as { context: WorkbenchContext }).context;
-  return { run, ctx, answers };
+  /** Marks the current change ready for review, as Ready does. */
+  const ready = async () => {
+    run.byHand!.ready = { at: "2026-10-20T01:00:00.000Z", changeFingerprint: changeFingerprint(await readDiff(run)), review: true };
+  };
+  const edit = (text: string) => writeFile(path.join(repository, "src", "retry.js"), text);
+  return { run, ctx, answers, ready, edit };
 }
 
 /** The text a reader sees of Markdown: every text node, soft line breaks as spaces (code blocks are BELL's quotes). */
@@ -148,6 +156,7 @@ test("a review is filtered as the Reports tab shows it: lines a list marker spli
     }),
     "The tests did not run at this version.",
   );
+  await f.ready();
   await withLocale("en", () => review(f.ctx, f.run, {}, new AbortController().signal));
   const reviewer = f.run.reports!.reviewer;
   assert.doesNotMatch(shown(reviewer), fix, reviewer);
@@ -171,6 +180,35 @@ test("a link can't carry code in its path, query or fragment", async (t) => {
   const answer = await withLocale("en", () => chat(f.ctx, f.run, "src/retry.js", "Where do I read about timers?", new AbortController().signal));
   assert.doesNotMatch(answer, /fix=|attempt%2B|a%3D%3Db/, answer);
   assert.match(answer, /https:\/\/developer\.mozilla\.org\/en-US\/docs\/Web\/API\/setTimeout/);
+});
+
+const reviewerAnswer = JSON.stringify({ verified: "No test run at this version.", checked: ["src/retry.js"], findings: [] });
+/** The reviewer's and the test analyst's answers, by role (they run side by side). */
+const byRole = (reviewer: () => string | Promise<string>) => (input: TeamAgentInput) => (input.role === "reviewer" ? reviewer() : "No tests ran.");
+const notReady = (error: unknown) => error instanceof AppError && error.statusCode === 409 && error.message === "Mark your changes ready for review first.";
+
+test("the review covers only the version marked ready: an edit after Ready, before or during the turn, stores nothing", async (t) => {
+  const f = await fixture(t);
+  await f.ready();
+  // Saved right after Ready, before the review job starts: no turn at all.
+  await f.edit(`${retrySource}// one more line\n`);
+  let calls = 0;
+  f.answers.push(byRole(() => (calls++, reviewerAnswer)), byRole(() => (calls++, reviewerAnswer)));
+  await assert.rejects(withLocale("en", () => review(f.ctx, f.run, {}, new AbortController().signal)), notReady);
+  assert.equal(calls, 0);
+  // Saved while the reviewer reads: the turn's answer is not stored.
+  await f.ready();
+  const editing = byRole(async () => (await f.edit(`${retrySource}// and another\n`), reviewerAnswer));
+  f.answers.splice(0, f.answers.length, editing, editing);
+  await assert.rejects(withLocale("en", () => review(f.ctx, f.run, {}, new AbortController().signal)), notReady);
+  assert.equal(f.run.byHand?.reviews, undefined);
+  assert.equal(f.run.reports?.reviewer, undefined);
+  assert.equal(f.run.byHand?.events, undefined);
+  // At the ready version the review is stored.
+  await f.ready();
+  f.answers.push(byRole(() => reviewerAnswer), byRole(() => reviewerAnswer));
+  await withLocale("en", () => review(f.ctx, f.run, {}, new AbortController().signal));
+  assert.equal(f.run.byHand?.reviews?.length, 1);
 });
 
 test("BELL's own timeout message stays whole in a Learn-by-hand turn's error", async (t) => {
