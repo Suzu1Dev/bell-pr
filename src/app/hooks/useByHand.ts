@@ -109,6 +109,14 @@ export function useByHand(
     };
   }, [id, open, setFiles, setRun, draftMutationEpoch]);
 
+  // A test run can write new files, which change the version: read the diff once it ends.
+  const testing = byHand && run.byHand?.busy?.kind === "tests";
+  const tested = useRef(testing);
+  useEffect(() => {
+    if (tested.current && !testing) readRunFiles(id).then((next) => shown.current === id && setFiles(next), () => undefined);
+    tested.current = testing;
+  }, [id, testing, setFiles]);
+
   return {
     /** The person writes: an LBH run in review whose change isn't the version marked ready. */
     writing: open && !ready,

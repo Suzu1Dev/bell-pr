@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { act, createElement, useState } from "react";
 import { selectionQuestion, parseDiff } from "../../review/diff";
 import en from "../../i18n/en/review";
-import type { DiffFile } from "../../types";
-import { selectionOf } from "./useByHand";
+import { mount } from "../../mission/test-dom";
+import type { DiffFile, Run } from "../../types";
+import { selectionOf, useByHand } from "./useByHand";
 
 const file: DiffFile = {
   path: "src/retry.ts",
@@ -25,4 +27,41 @@ test("a diff selection's question gives the guide its lines as path:start-end", 
   assert.deepEqual(selectionOf(file, ask(2, 3)), { path: "src/retry.ts", startLine: 11, endLine: 11 });
   // Lines the patch doesn't hold (read from the base) give the path alone.
   assert.deepEqual(selectionOf(file, "Explain this:\n\n```diff\n+not in the patch\n```"), { path: "src/retry.ts", startLine: 0, endLine: 0 });
+});
+
+test("when a test run ends, the diff is read once: the tests may have written new files", async () => {
+  const requests: string[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    requests.push(String(input));
+    return new Response(JSON.stringify({ files: [file] }), { headers: { "Content-Type": "application/json" } });
+  }) as typeof fetch;
+  const run = (busy?: { kind: string; since: string }) =>
+    ({ id: "run-1", repoId: "repo-1", status: "approved", learnByHand: true, agents: [], byHand: busy ? { busy } : {} }) as unknown as Run;
+  function Probe({ value }: { value: Run }) {
+    const [files, setFiles] = useState<DiffFile[]>([]);
+    useByHand(value, files, {
+      demo: false,
+      draftMutationEpoch: { current: 0 },
+      actions: { setRun() {}, setFiles, approveTeamPlan: async () => {} },
+      handBack() {},
+    });
+    return createElement("span", null, String(files.length));
+  }
+  const mounted = await mount(createElement(Probe, { value: run({ kind: "tests", since: "2026-10-20T09:00:00.000Z" }) }));
+  try {
+    assert.deepEqual(requests, []);
+    // The guide's turns never touch the files: only the end of a test run reads them.
+    await mounted.rerender(createElement(Probe, { value: run({ kind: "guide", since: "2026-10-20T09:01:00.000Z" }) }));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
+    assert.equal(requests.length, 1);
+    assert.match(requests[0], /\/runs\/run-1\/diff$/);
+    assert.equal(mounted.text(), "1");
+    await mounted.rerender(createElement(Probe, { value: run() }));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
+    assert.equal(requests.length, 1);
+  } finally {
+    await mounted.unmount();
+    globalThis.fetch = realFetch;
+  }
 });
