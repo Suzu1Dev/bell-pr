@@ -190,7 +190,7 @@ test("each step's buttons and fields say which step they belong to", () => {
   assert.match(text, /<span id="run-1-on-s2">Cap the retries at three<\/span>/);
   assert.match(text, /<button type="button" class="mission-text-button" aria-describedby="run-1-on-s2">Done<\/button>/);
   assert.match(text, /<button type="button" class="mission-text-button" aria-describedby="run-1-on-s2">Park<\/button>/);
-  const findings = html(guide({ reviews: [{ at, changeFingerprint: "older", verified: "", checked: ["a"], findings: [{ path: "src/a.ts", line: 1, observed: "A bare number.", evidence: { type: "pattern", path: null, line: null, quote: null }, why: "w", question: "q", dimension: null }] }] } as ByHandRecord));
+  const findings = html(guide({ reviews: [{ at, changeFingerprint: "older", verified: "", checked: ["a"], findings: [{ path: "src/a.ts", line: 1, observed: "A bare number.", evidence: { type: "pattern" }, why: "w", question: "q" }] }] }));
   assert.match(findings, /<span id="run-1-finding-0">A bare number\.<\/span> <button type="button" class="mission-text-button" aria-describedby="run-1-finding-0">/);
   const planned = html(plan({ guidePlan, plan: { steps, savedAt: at } }, {}, { status: "awaiting_plan" }));
   assert.match(planned, /<label id="run-1-step-1-name" for="run-1-step-1">Step 2<\/label>/);
