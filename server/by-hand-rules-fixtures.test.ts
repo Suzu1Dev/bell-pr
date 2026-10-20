@@ -167,7 +167,7 @@ test("NetBSD (output, no carve-out): blocked because the text says no use of AI 
   assert.ok(message(result.lbhChecks, "ai-ban").endsWith(`and ${clause("no-carve-out")}.`));
 });
 
-test("Kubernetes' trailer rule is no AI ban for either run: a project-rules confirm", async () => {
+test("Kubernetes' AI Guidance gives neither run an AI ban: its rules are quoted to weigh", async () => {
   // The section's first two paragraphs (lines 626-633): disclosure, and the trailer rule.
   const section = await readFile(path.join(fixtures, "real/kubernetes-pull-requests.md"), "utf8");
   const trailer = section.split("\n").slice(0, 8).join("\n");
@@ -183,17 +183,46 @@ test("Kubernetes' trailer rule is no AI ban for either run: a project-rules conf
     assert.deepEqual(result.lbh, ["ai-disclosure:block", "project-rules:confirm"]);
     assert.deepEqual(result.agent, ["ai-disclosure:block", "project-rules:confirm"]);
   }
-  // The whole section still blocks: two other sentences read as bans
-  // (lines 638 and 640), outside the approved fixes.
+  // The whole section (lines 626-646): each other AI sentence, by its source
+  // line, with whether it still reads as a contribution ban; a rule that
+  // doesn't is quoted in the project-rules confirm for the person to weigh.
+  const sectionBans = new Map<number, boolean>([
+    // "[Large AI generated](#large-or-automatic-edits) PRs and AI generated commit messages are not allowed."
+    [638, true],
+    // "Do not leave the first review of AI generated changes to the reviewers."
+    [640, true],
+  ]);
   const whole = row(await readRules([["contributors/guide/pull-requests.md", "real/kubernetes-pull-requests.md"]]), ["explain", "answer"]);
-  assert.deepEqual(whole.agent.filter((id) => id.endsWith(":block")), ["ai-ban:block", "ai-disclosure:block"]);
-  assert.deepEqual(
-    whole.lbhChecks.find((check) => check.id === "ai-ban")!.details.slice(1),
-    [
-      'contributors/guide/pull-requests.md:638: "[Large AI generated](#large-or-automatic-edits) PRs and AI generated commit messages are not allowed."',
-      'contributors/guide/pull-requests.md:640: "Do not leave the first review of AI generated changes to the reviewers."',
-    ].map((line) => line.replace(/:(\d+):/, (_, at) => `:${Number(at) - 625}:`)),
-  );
+  const blocking = [...sectionBans].filter(([, ban]) => ban).map(([line]) => line);
+  const weighed = [...sectionBans].filter(([, ban]) => !ban).map(([line]) => line);
+  // The source line of each rule a check quotes (the excerpt starts at line 626).
+  const lines = (check: DraftCheck | undefined) =>
+    (check?.details ?? []).flatMap((detail) => {
+      const at = /^contributors\/guide\/pull-requests\.md:(\d+):/.exec(detail);
+      return at ? [Number(at[1]) + 625] : [];
+    });
+  for (const checks of [whole.lbhChecks, respectChecks({ body, rules: await readRules([["contributors/guide/pull-requests.md", "real/kubernetes-pull-requests.md"]]) }, "en")]) {
+    assert.deepEqual(checks.filter((check) => check.kind === "block").map((check) => check.id), [...(blocking.length ? ["ai-ban"] : []), "ai-disclosure"]);
+    assert.deepEqual(lines(checks.find((check) => check.id === "ai-ban")), blocking);
+    const toWeigh = lines(checks.find((check) => check.id === "project-rules"));
+    for (const line of weighed) assert.ok(toWeigh.includes(line), `line ${line} is a rule to weigh`);
+  }
+});
+
+test("AI bans next to the words of the Kubernetes fixes stay bans for both run kinds", async () => {
+  const text = await readFile(path.join(fixtures, "by-hand/bans-kept.md"), "utf8");
+  const sentences = text.split("\n").filter((line) => line && !line.startsWith("#"));
+  assert.equal(sentences.length, 17);
+  for (const sentence of sentences) {
+    const rules: ContributionRules = {
+      checkedAt: readAt,
+      findings: policyFindings([{ path: "CONTRIBUTING.md", kind: "contributing", content: sentence }]),
+      filesRead: ["CONTRIBUTING.md"],
+    };
+    assert.deepEqual(rules.findings.map((finding) => [finding.kind, finding.contribution]), [["ban", true]], sentence);
+    const result = row(rules, ["explain", "answer"]);
+    assert.deepEqual([result.agent, result.lbh], [["ai-ban:block"], ["ai-ban:block"]], sentence);
+  }
 });
 
 const qemuRules = () => readRules([[qemuPath, "real/qemu-code-provenance.rst"]]);

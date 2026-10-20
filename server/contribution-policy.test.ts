@@ -69,14 +69,14 @@ const realExpectations: Record<string, readonly (readonly [string, boolean?])[]>
   // A real ban, under a reStructuredText "~~~" heading.
   "qemu-code-provenance.rst": [["ban", true]],
   // AI help is fine with disclosure; listing AI as a co-author or in a
-  // trailer is a rule about credit, which the person weighs. "[Large AI
-  // generated] PRs and AI generated commit messages are not allowed." and
-  // "Do not leave the first review of AI generated changes to the
-  // reviewers." still read as bans.
+  // trailer is a rule about credit, which the person weighs. Each sentence
+  // of the AI Guidance section has its own line below.
   "kubernetes-pull-requests.md": [
     ["disclose"],
     ["ban", false],
+    // Line 13 (source 638): large AI generated PRs and AI generated commit messages.
     ["ban", true],
+    // Line 15 (source 640): the first review of AI generated changes, left to the reviewers.
     ["ban", true],
     ["ban", false],
     ["understand"],
@@ -124,7 +124,6 @@ test("real projects' policies yield the expected kinds, quoted verbatim, and con
  * each classifier fix can add or drop its own (DESIGN v1.2 F14).
  */
 const blocksAgentRuns = [
-  "kubernetes-pull-requests.md",
   "gentoo-ai-policy.txt",
   "zig-README.md",
   "netbsd-commit-guidelines.txt",
@@ -133,17 +132,36 @@ const blocksAgentRuns = [
   "forgejo-AIAgreement.md",
 ];
 
+/**
+ * Kubernetes' AI Guidance, sentence by sentence: whether each that read as
+ * a contribution ban still does, apart so each fix flips its own (plan
+ * README §18.10). The file blocks an agent-written change while one does.
+ */
+const kubernetesBans = new Map<number, boolean>([
+  // Line 13 (source 638): large AI generated PRs and AI generated commit messages.
+  [13, true],
+  // Line 15 (source 640): the first review of AI generated changes, left to the reviewers.
+  [15, true],
+]);
+
 test("only the projects that ban AI-generated contributions outright block an agent-written change", async () => {
   const blocked: string[] = [];
   for (const file of Object.keys(realExpectations)) {
     const text = await readFile(path.join(fixtures, "real", file), "utf8");
+    const findings = classifyPolicy(file, text);
     const checks = draftPreflight({
       body: "Fixes the cap.\n\nAssisted-by: Codex CLI",
-      rules: { checkedAt: "2026-10-15T00:00:00.000Z", findings: classifyPolicy(file, text), filesRead: [file] },
+      rules: { checkedAt: "2026-10-15T00:00:00.000Z", findings, filesRead: [file] },
     });
     if (checks.some((check) => check.id === "ai-ban")) blocked.push(file);
+    if (file === "kubernetes-pull-requests.md")
+      assert.deepEqual(
+        findings.filter((finding) => finding.kind === "ban" && finding.contribution).map((finding) => finding.line),
+        [...kubernetesBans].filter(([, ban]) => ban).map(([line]) => line),
+      );
   }
-  assert.deepEqual(blocked.sort(), [...blocksAgentRuns].sort());
+  const kubernetes = [...kubernetesBans.values()].some(Boolean) ? ["kubernetes-pull-requests.md"] : [];
+  assert.deepEqual(blocked.sort(), [...blocksAgentRuns, ...kubernetes].sort());
 });
 
 test("carve-outs of the real policies: QEMU's research and debugging, matplotlib's acceptable uses", async () => {
