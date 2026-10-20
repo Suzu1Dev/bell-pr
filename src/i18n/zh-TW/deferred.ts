@@ -13,6 +13,7 @@ import legal from "./legal";
 import models from "./models";
 import onboarding from "./onboarding";
 import settings from "./settings";
+import team from "./team";
 
 const messages: Translation<typeof en> = {
   settings,
@@ -23,6 +24,7 @@ const messages: Translation<typeof en> = {
   onboarding,
   about,
   legal,
+  team,
 };
 
 export default messages;

@@ -5,6 +5,7 @@
  */
 import { formatters } from "../../../shared/i18n/locale";
 import { product } from "../../../shared/product";
+import type { PremiseVerdict } from "../../../shared/team";
 
 const { plural } = formatters("en");
 
@@ -63,6 +64,19 @@ const workspace = {
   },
   sampleReview: "Sample review",
   humanReview: "Human review",
+  /** The lead's check of the request's assumption, made by reading the code. */
+  premise: {
+    label: "Premise check",
+    heading: ({ verdict }: { verdict: string }) => `Premise check: ${verdict}`,
+    verdicts: {
+      holds: "the assumption holds",
+      refuted: "the assumption does not hold",
+      unclear: "the assumption could not be confirmed",
+    } satisfies Record<PremiseVerdict, string>,
+    source: "Found by the lead reading the code; check it against the cited lines.",
+    /** A Learn-by-hand run's premise check, from the guide's first read (DESIGN v1.2 F3). */
+    sourceGuide: "Found by the guide reading the code; check it against the cited lines.",
+  },
   /** Learn by hand (DESIGN v1.2 F4, F5): what shows before the byhand chunk loads. */
   byHand: {
     badge: "Learn by hand",

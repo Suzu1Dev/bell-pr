@@ -5,7 +5,7 @@
  */
 import type { Plan } from "../../../shared/plans";
 import { product } from "../../../shared/product";
-import type { AgentTeam, PremiseVerdict } from "../../../shared/team";
+import type { AgentTeam } from "../../../shared/team";
 import type { TeamLaneId } from "../../team/lanes";
 
 const taskCount = (count: number) =>
@@ -191,19 +191,6 @@ const team = {
       `${input} input · ${output} output tokens${partial ? " (partly reported)" : ""}`,
     /** Calls ran but none reported usage: unknown, not zero. */
     unreported: "usage not reported",
-  },
-  /** The lead's check of the request's assumption, made by reading the code. */
-  premise: {
-    label: "Premise check",
-    heading: ({ verdict }: { verdict: string }) => `Premise check: ${verdict}`,
-    verdicts: {
-      holds: "the assumption holds",
-      refuted: "the assumption does not hold",
-      unclear: "the assumption could not be confirmed",
-    } satisfies Record<PremiseVerdict, string>,
-    source: "Found by the lead reading the code; check it against the cited lines.",
-    /** A Learn-by-hand run's premise check, from the guide's first read (DESIGN v1.2 F3). */
-    sourceGuide: "Found by the guide reading the code; check it against the cited lines.",
   },
   /**
    * What agents could not run because this machine lacks something, on the
