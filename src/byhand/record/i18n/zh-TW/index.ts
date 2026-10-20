@@ -32,6 +32,7 @@ const m: Translation<typeof en> = {
   cli: ({ cli, model }) => `嚮導用的是 ${cli}；${model ? `CLI 回報的模型是 ${model}` : "CLI 沒有回報它的模型"}。`,
   rule: ({ path, line, quote }) => `專案要求揭露：${path}:${line}：「${quote}」`,
   ownWords: "請用你自己的話寫 AI 說明。",
+  unchecked: `${product.name} 無法依專案規範檢查這份草稿，所以還不能送出。`,
 };
 
 export default m;

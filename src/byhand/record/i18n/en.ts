@@ -33,6 +33,7 @@ const en = {
   cli: ({ cli, model }: { cli: string; model?: string }) => `The guide ran on ${cli}; ${model ? `model ${model}, as the CLI reported it` : "the CLI didn't report its model"}.`,
   rule: ({ path, line, quote }: { path: string; line: number; quote: string }) => `The project asks for a disclosure: ${path}:${line}: "${quote}"`,
   ownWords: "Write your AI note in your own words.",
+  unchecked: `${product.name} couldn't check this draft against the project's rules, so it can't publish it yet.`,
 };
 
 export default en;

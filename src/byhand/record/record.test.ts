@@ -208,3 +208,22 @@ test("with Always add on, the helpers ask for an AI note in the person's own wor
   assert.ok(zh.includes("請用你自己的話寫 AI 說明。"));
   assert.equal(renderEn(createElement(DraftHelpers, { run: getDemo("en").run, onUseTemplate: () => {} })), "");
 });
+
+test("the publish dialog's record says when the server's checks couldn't be read, with a retry that keeps the focus", () => {
+  const record = (unchecked?: { checking: boolean; failed: boolean }) =>
+    renderEn(createElement(ByHandRecord, { run: byHandRun(), place: "publish", ...(unchecked ? { unchecked: { ...unchecked, onRetry() {} } } : {}) }));
+  // An unknown is never a pass: first it reads, then it says so, with a retry.
+  const reading = record({ checking: true, failed: false });
+  assertNoHan(reading);
+  assert.match(reading, /^<p class="publish-fact" role="status"><svg[^>]*lucide-loader-circle spin[^>]*>.*<\/svg> Checking…<\/p><section/);
+  const failed = record({ checking: false, failed: true });
+  assertNoHan(failed);
+  assert.match(
+    failed,
+    /^<div class="publish-block" role="alert"><span>BELL PR couldn&#x27;t check this draft against the project&#x27;s rules, so it can&#x27;t publish it yet\.<\/span><button type="button" class="button secondary" aria-disabled="false"><svg[^>]*lucide-refresh-cw[^>]*>.*<\/svg> Try again<\/button><\/div><section/,
+  );
+  // While it reads again the button stays, so the focus stays on it.
+  assert.match(record({ checking: true, failed: true }), /<button type="button" class="button secondary" aria-disabled="true"><svg[^>]*spin[^>]*>.*<\/svg> Try again<\/button>/);
+  assert.doesNotMatch(record(), /role="(alert|status)"/);
+  assert.ok(renderZh(createElement(ByHandRecord, { run: byHandRun(), place: "publish", unchecked: { checking: false, failed: true, onRetry() {} } })).includes(zhTW.unchecked));
+});

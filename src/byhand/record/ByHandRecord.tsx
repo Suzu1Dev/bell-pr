@@ -5,10 +5,10 @@
  * publish dialog next to the `by-hand-rules` confirm, in the Draft tab's
  * checklist and on the learning page. An agent run has no record.
  */
-import { Hand } from "lucide-react";
+import { Hand, LoaderCircle, RefreshCw } from "lucide-react";
 import { allHelpKinds, byHandClean, byHandSummary, type ByHandSummary } from "../../../shared/by-hand";
 import type { Formatters } from "../../../shared/i18n/locale";
-import { useFormat, useLocale } from "../../i18n";
+import { useFormat, useLocale, useT } from "../../i18n";
 import type { Run } from "../../types";
 import en from "./i18n/en";
 import zhTW from "./i18n/zh-TW";
@@ -20,6 +20,8 @@ export interface ByHandRecordProps {
   /** The learning page's counts (LearningRun.byHandSummary), without the full run. */
   summary?: ByHandSummary;
   place: "publish" | "draft" | "learning";
+  /** Publish dialog: the server's checks are being read, or couldn't be (`failed`; its retry stays focusable). Never a pass (F12). */
+  unchecked?: { checking: boolean; failed: boolean; onRetry(): void };
 }
 
 /** The test runs `byHand.tests` keeps (byHandLimits.tests): with that many, older ones may be gone. */
@@ -58,9 +60,10 @@ export function recordLines(m: typeof en, fmt: Formatters, run: Run | undefined,
   };
 }
 
-export function ByHandRecord({ run, summary: counts, place }: ByHandRecordProps) {
+export function ByHandRecord({ run, summary: counts, place, unchecked }: ByHandRecordProps) {
   const m = useRecordMessages();
   const fmt = useFormat();
+  const [checking, retry] = [useT("mission").rules.checking, useT("workspace").check.retry];
   const summary = counts ?? (run?.learnByHand ? byHandSummary(run) : undefined);
   if (!summary || (run && !run.learnByHand)) return null;
   const { claim, lines } = recordLines(m, fmt, run, summary);
@@ -92,9 +95,22 @@ export function ByHandRecord({ run, summary: counts, place }: ByHandRecordProps)
       </details>
     </div>
   ) : (
-    <section className="byhand-record draft-guidance-disclosure" aria-label={m.title}>
-      <h3><Hand size={15} aria-hidden="true" /> {m.title}</h3>
-      {body}
-    </section>
+    <>
+      {unchecked &&
+        (unchecked.failed ? (
+          <div className="publish-block" role="alert">
+            <span>{m.unchecked}</span>
+            <button type="button" className="button secondary" aria-disabled={unchecked.checking} onClick={() => !unchecked.checking && unchecked.onRetry()}>
+              {unchecked.checking ? <LoaderCircle className="spin" size={14} aria-hidden="true" /> : <RefreshCw size={14} aria-hidden="true" />} {retry}
+            </button>
+          </div>
+        ) : (
+          <p className="publish-fact" role="status"><LoaderCircle className="spin" size={14} aria-hidden="true" /> {checking}</p>
+        ))}
+      <section className="byhand-record draft-guidance-disclosure" aria-label={m.title}>
+        <h3><Hand size={15} aria-hidden="true" /> {m.title}</h3>
+        {body}
+      </section>
+    </>
   );
 }

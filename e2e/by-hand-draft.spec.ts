@@ -237,3 +237,32 @@ test("a fitted run's quoted confirm stands beside the record, with no reason fie
     await project.stop();
   }
 });
+
+test("a Learn-by-hand run's dialog says when the server's checks couldn't be read, and reads them again", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const project = await startRealProject({ reviewed: true, appSettings: { skipUnderstandingCheck: true }, run: byHandRun() });
+  const { context, page } = await open(browser, project);
+  try {
+    // The server's checks can't be read until `failing` is turned off.
+    let failing = true;
+    await page.route(`**/api/runs/${runId}/preflight`, (route) =>
+      failing ? route.fulfill({ status: 500, json: { error: "The checks failed." } }) : route.continue(),
+    );
+    await page.goto(`/#/runs/${runId}/draft?locale=en`);
+    const dialog = await publishDialog(page);
+    // An unknown is never a pass: the dialog says so, and Submit stays off.
+    const alert = dialog.getByRole("alert").filter({ hasText: record.unchecked });
+    await expect(alert).toBeVisible();
+    await expect(dialog.getByRole("button", { name: workspace.publish.submit })).toBeDisabled();
+    await expectAccessible(page, "[role=dialog]");
+    failing = false;
+    await alert.getByRole("button", { name: workspace.check.retry }).click();
+    await expect(alert).toHaveCount(0);
+    await expect(dialog.getByRole("region", { name: record.title })).toContainText(record.claim);
+    // The retry button is gone; the focus stays in the dialog.
+    await expect(dialog.locator("#publish-checks-title")).toBeFocused();
+  } finally {
+    await context.close();
+    await project.stop();
+  }
+});

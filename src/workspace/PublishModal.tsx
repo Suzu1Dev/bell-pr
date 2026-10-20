@@ -1,5 +1,6 @@
 import {
   Suspense,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -273,6 +274,14 @@ export function PublishModal({
   const [facts, setFacts] = useState<{ loading: boolean; facts?: ContributionFacts; error?: string }>(
     { loading: reads },
   );
+  // The server's checks as this dialog reads them (`done` reads so far); a
+  // Learn-by-hand run waits for them (F12) and says when they couldn't be read.
+  const [reading, setReading] = useState({ now: reads, done: 0 });
+  const readChecks = useCallback(async () => {
+    setReading((previous) => ({ ...previous, now: true }));
+    await loadPublishChecks(run.id, run.approvedFingerprint);
+    setReading((previous) => ({ now: false, done: previous.done + 1 }));
+  }, [loadPublishChecks, run.id, run.approvedFingerprint]);
   useEffect(() => {
     setOverrides([]);
     if (!reads) return;
@@ -298,16 +307,16 @@ export function PublishModal({
       )
       .finally(async () => {
         await rules;
-        if (!cancelled) void loadPublishChecks(run.id, run.approvedFingerprint);
+        if (!cancelled) void readChecks();
       });
     return () => {
       cancelled = true;
     };
-  }, [reads, run.id, run.approvedFingerprint, loadPublishChecks, setOverrides, t.factsMissing]);
+  }, [reads, run.id, readChecks, setOverrides, t.factsMissing]);
   // A refused publish may have read new facts: the checks it names show up.
   useEffect(() => {
-    if (formError && reads) void loadPublishChecks(run.id, run.approvedFingerprint);
-  }, [formError, reads, loadPublishChecks, run.id, run.approvedFingerprint]);
+    if (formError && reads) void readChecks();
+  }, [formError, reads, readChecks]);
   const checkOff = showsCheckOffLine(run, settings.off);
   // The sample's checks come from its fixtures, as the server's would.
   const sampleChecks = useMemo(
@@ -437,7 +446,14 @@ export function PublishModal({
           record={
             byHand && (
               <Deferred resetKey={run.id} fallback={<Loader2 className="spin" size={16} aria-hidden="true" />}>
-                <ByHandRecord run={run} place="publish" />
+                <ByHandRecord
+                  run={run}
+                  place="publish"
+                  // An unknown is never a pass: the dialog says the checks couldn't be read, with a retry.
+                  {...(!serverChecksRead && !facts.loading
+                    ? { unchecked: { checking: reading.now, failed: reading.done > 0, onRetry: () => void readChecks() } }
+                    : {})}
+                />
               </Deferred>
             )
           }
@@ -540,9 +556,17 @@ export function PublishChecks({
   const rulesCard = useT("mission").rules;
   const confirms = (checks ?? []).filter((check) => check.kind === "confirm");
   const recordFirst = !checks?.some((check) => check.id === "by-hand-rules");
+  // A read that removes the focused button (Try again, Check again) leaves the focus in the dialog, on the heading.
+  const title = useRef<HTMLHeadingElement>(null);
+  const shown = useRef<string>(undefined);
+  const now = `${checks?.map((check) => check.id + check.kind).join() ?? "-"}${checkRules ? "+" : ""}`;
+  useEffect(() => {
+    if (shown.current !== undefined && shown.current !== now && document.activeElement === document.body) title.current?.focus();
+    shown.current = now;
+  }, [now]);
   return (
     <section className="publish-checks" aria-labelledby="publish-checks-title">
-      <h3 id="publish-checks-title">{t.checksTitle}</h3>
+      <h3 id="publish-checks-title" ref={title} tabIndex={-1}>{t.checksTitle}</h3>
       {facts.loading && (
         <p className="publish-fact" role="status">
           <Loader2 className="spin" size={14} aria-hidden="true" /> {t.factsLoading}
