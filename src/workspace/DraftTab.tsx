@@ -414,7 +414,7 @@ export function DraftTab({
               {publishBranchError}
             </p>
           )}
-          {commitMessageSuggestion && !followUp && (
+          {commitMessageSuggestion && !followUp && !run.learnByHand && (
             <div className="commit-suggestion">
               <div>
                 <strong>{t.draft.suggestionTitle}</strong>

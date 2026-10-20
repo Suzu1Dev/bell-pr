@@ -538,3 +538,14 @@ test("an empty description of a Learn-by-hand run is never pointed at a suggeste
   assertNoHan(html);
   assert.doesNotMatch(html, /suggested draft/);
 });
+
+test("a Learn-by-hand run never offers an agent's commit message, even one an older build suggested", () => {
+  const review: Run = { ...published, status: "review", prUrl: undefined, followUps: [], prFeedback: undefined };
+  const suggestion = { message: "fix: greet the world\n\nAgent-written body.", rationale: "The project's rules ask for a prefix.", sources: [] };
+  const agent = renderEn(element({ run: review }, { commitMessageSuggestion: suggestion }));
+  assert.match(agent, /Agent-written body\./);
+  assert.match(agent, />Use suggestion</);
+  const html = renderEn(element({ run: { ...review, learnByHand: true } }, { commitMessageSuggestion: suggestion }));
+  assertNoHan(html);
+  assert.doesNotMatch(html, /Agent-written body|Use suggestion|suggested by the project/);
+});
