@@ -21,8 +21,8 @@
 // with the sample's own words, as a person who just passed it sees it.
 //
 // The `run-by-hand-*` views are a Learn-by-hand run of a real (not sample)
-// project, seeded with startRealProject({ run }) on a server of their own:
-// the plan, Code changes while the person writes, the Ready for review
+// project, seeded with startRealProject({ run, repo }) on a server of their
+// own: the plan, Code changes while the person writes, the Ready for review
 // dialog, the publish dialog's record and a fitted run's quoted confirm.
 import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -590,7 +590,11 @@ for (const locale of locales)
     });
 
     test(`run-by-hand-your-turn and run-by-hand-ready in ${locale}: the guide's panel, then the Ready dialog`, async ({ browser }) => {
-      const project = await startRealProject({ run: writingRun(locale, fingerprint) });
+      // The project's test command is confirmed, as it is once the person has run their tests from the Tests card.
+      const project = await startRealProject({
+        repo: { testCommand: { command: "npm test", confirmedAt: byHandAt(30) } },
+        run: writingRun(locale, fingerprint),
+      });
       try {
         await captureByHand(browser, project, locale, {
           name: "run-by-hand-your-turn",
