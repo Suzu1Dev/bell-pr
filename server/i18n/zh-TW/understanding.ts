@@ -1,4 +1,5 @@
 import type { Translation } from "../../../shared/i18n/locale.js";
+import { product } from "../../../shared/product.js";
 import type en from "../en/understanding.js";
 
 const understanding: Translation<typeof en> = {
@@ -16,7 +17,7 @@ const understanding: Translation<typeof en> = {
     stopped: "已停止",
     error: "無法執行",
   },
-  walkthroughFull: "這個檔案的逐段解說作答已達 BELL 保留的上限。",
+  walkthroughFull: `這個檔案的逐段解說作答已達 ${product.name} 保留的上限。`,
   notOpen: "工作等待你審閱或核准時才能進行理解檢查；執行中或發布中不行。",
   changed: "你打開檢查後，變更又更新了。請重新載入，看看最新版本的問題。",
   unknownQuestion: "有一個答案不屬於目前檢查的問題。請重新載入檢查後再回答。",

@@ -2,6 +2,8 @@
  * The Explain-it-back check (server/understanding.ts) and its routes. The
  * questions are saved with the run, in the run's language.
  */
+import { product } from "../../../shared/product.js";
+
 const understanding = {
   /** The setting's name in "comes from the … environment variable" messages. */
   settingName: "Ask me to explain each change back before approval",
@@ -25,7 +27,7 @@ const understanding = {
     error: "could not run",
   } as Record<string, string>,
   /** A walkthrough answer past the units a file keeps. */
-  walkthroughFull: "This file already has the most walkthrough answers BELL keeps.",
+  walkthroughFull: `This file already has the most walkthrough answers ${product.name} keeps.`,
   notOpen:
     "The understanding check can be taken while the run waits for your review or approval, not while it runs or publishes.",
   changed:
