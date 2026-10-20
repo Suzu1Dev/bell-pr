@@ -12,11 +12,13 @@ import { expect, request, test, type Browser, type Page } from "@playwright/test
 import { readyNow } from "../shared/by-hand";
 import { changeFingerprint } from "../shared/change-fingerprint";
 import panelStrings from "../src/review/i18n/en";
+import panelStringsZh from "../src/review/i18n/zh-TW";
 import { expectNoOverflow } from "./helpers/overflow";
 import { files, prUrl, runId, startRealProject, type RealProject } from "./helpers/real-project";
 import { messages } from "./helpers/sample-states";
 
 const t = messages.en;
+const zh = messages["zh-TW"];
 const tablePath = "src/table.ts";
 const rows = Array.from({ length: 50 }, (_, index) => `export const row${index + 1} = ${index + 1};`);
 /** total() and 50 rows: the change edits line 3 and row 40 (line 46). */
@@ -359,6 +361,68 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
       await panel.getByRole("button", { name: t.workspace.check.title }).click();
       await expect(page.locator(".understanding-check")).toBeVisible();
       await axe(page, ".understanding-check");
+    } finally {
+      await close();
+    }
+  });
+
+  // MERGE-STEP: as above, once the Changes tab passes byHandReview.
+  for (const width of [1440, 390])
+    test.fixme(`in zh-TW the reader view fits at ${width} px and names its parts for a screen reader`, async ({ browser }) => {
+      const { page, close } = await open(browser);
+      try {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto(`/#/runs/${runId}/changes?file=${files.greeting}&locale=zh-TW`);
+        const panel = page.locator(".explain-panel");
+        for (const tab of [zh.review.panel.tabs.explain, zh.review.panel.tabs.walkthrough]) {
+          await panel.getByRole("tab", { name: tab }).click();
+          await expect(panel.getByRole("heading", { name: panelStringsZh.reader.title })).toBeVisible();
+          await expect(panel).toContainText(panelStringsZh.reader.answerFirst);
+          await expect(panel.getByRole("button", { name: zh.workspace.check.title })).toBeVisible();
+          await page.evaluate(() => document.fonts.ready);
+          await expectNoOverflow(page, [".explain-panel"]);
+          await axe(page, ".explain-panel");
+        }
+      } finally {
+        await close();
+      }
+    });
+
+  // MERGE-STEP: as above, once the Changes tab passes byHandReview with
+  // checkError and onRetryCheck (useUnderstanding's error and refresh).
+  test.fixme("when the check can't be read, the reader view says why, and Try again reads it again", async ({ browser }) => {
+    const { page, close } = await open(browser);
+    const message = "The check is not available right now.";
+    await page.route(`**/api/runs/${runId}/understanding`, (route) =>
+      route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: message }) }),
+    );
+    try {
+      await page.goto(`/#/runs/${runId}/changes?file=${files.greeting}&locale=en`);
+      const panel = page.locator(".explain-panel");
+      await expect(panel.getByRole("alert")).toHaveText(t.workspace.check.loadFailed({ message }));
+      await expect(panel.getByRole("button", { name: panelStrings.reader.show })).toHaveCount(0);
+      await page.unroute(`**/api/runs/${runId}/understanding`);
+      await panel.getByRole("button", { name: t.workspace.check.retry }).click();
+      await expect(panel).toContainText(panelStrings.reader.answerFirst);
+      await expect(panel.getByRole("alert")).toHaveCount(0);
+      // The button gave way; focus stayed in the tab panel.
+      await expect(panel.getByRole("tabpanel")).toBeFocused();
+    } finally {
+      await close();
+    }
+  });
+
+  // MERGE-STEP: as above, once the Changes tab passes byHandReview.
+  test.fixme("the Reports tab names the guide and makes no promise about the agent team", async ({ browser }) => {
+    const { page, close } = await open(browser);
+    try {
+      await page.goto(`/#/runs/${runId}/changes?file=${files.greeting}&locale=en`);
+      const panel = page.locator(".explain-panel");
+      await panel.getByRole("tab", { name: t.review.panel.tabs.reports }).click();
+      await expect(panel.locator(".explain-report-author")).toHaveText([panelStrings.guide]);
+      await expect(panel).not.toContainText(t.review.reports.sections.tester.author);
+      await expect(panel).not.toContainText(t.review.reports.rerunNote);
+      await axe(page, ".explain-panel");
     } finally {
       await close();
     }
