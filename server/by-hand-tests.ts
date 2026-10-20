@@ -134,12 +134,12 @@ export async function testCommand(ctx: WorkbenchContext, id: string): Promise<Te
   };
 }
 
-/** Line breaks, NUL and the other control characters; a tab is allowed. */
-const hasControlCharacter = (text: string) =>
-  [...text].some((character) => {
-    const code = character.codePointAt(0)!;
-    return (code < 0x20 && character !== "\t") || code === 0x7f;
-  });
+/**
+ * Line breaks, NUL and the other control characters (a tab is allowed),
+ * and invisible formatting such as bidirectional overrides, which could
+ * make the command on screen differ from the one that runs.
+ */
+const hasControlCharacter = (text: string) => /[^\P{Cc}\t]|[\p{Cf}\p{Zl}\p{Zp}]/u.test(text);
 
 /** PUT /api/repos/:id/test-command */
 export async function confirmTestCommand(

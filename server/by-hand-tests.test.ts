@@ -453,7 +453,18 @@ test("the test command view: BELL's suggestion from the run's folder and the per
   const again = (await f.confirm("go test ./retry/...")).repo.testCommand!;
   assert.ok(Date.parse(again.confirmedAt) > Date.parse(first));
   // One line, no control characters, 1-300 characters.
-  for (const command of ["go test\nrm -rf ~", "go\rtest", "go\0test", "go \x1b[2Jtest", "   ", "x".repeat(301)])
+  for (const command of [
+    "go test\nrm -rf ~",
+    "go\rtest",
+    "go\0test",
+    "go \x1b[2Jtest",
+    "go test\u0085./...",
+    "go test\u2028./...",
+    "go test \u202e/... ./",
+    "go\u200btest",
+    "   ",
+    "x".repeat(301),
+  ])
     await assert.rejects(
       f.confirm(command),
       (error: AppError) =>
