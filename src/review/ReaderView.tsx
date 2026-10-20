@@ -3,6 +3,7 @@ import type { UnderstandingView } from "../../shared/understanding";
 import { useT } from "../i18n";
 import type { DiffFile } from "../types";
 import { usePanelStrings } from "./i18n";
+import { readerAllowed, readerRequests } from "./reader";
 
 /** What ExplanationPanel needs of a Learn-by-hand run; the Changes tab passes it as `byHandReview`. */
 export interface ByHandReader {
@@ -12,36 +13,6 @@ export interface ByHandReader {
   check: UnderstandingView | undefined;
   /** Opens the check next to the diff (`openCheckPanel(run.id)`). */
   onOpenCheck: () => void;
-}
-
-/** Nobody asked for the file's explanation or walkthrough yet; a held-back file gets neither. */
-export function unasked(file: DiffFile, part: "explanation" | "walkthrough") {
-  const status = part === "explanation" ? file.explanationStatus : file.walkthroughStatus;
-  return !file.blocked && !file[part] && (!status || status === "pending");
-}
-
-/** What "Show how a reader sees it" asks for: what this file still lacks, and nothing for another file. */
-export function readerRequests(file: DiffFile) {
-  const status = file.explanationStatus ?? "";
-  return {
-    explanation: !file.explanation && !["generating", "unavailable"].includes(status),
-    walkthrough: unasked(file, "walkthrough"),
-  };
-}
-
-/**
- * Whether the file may be explained now, by the server's rule (DESIGN v1.2
- * F10): the check is off in Settings, or the file's own question has an
- * answer saved at the file's current version, or the file has no question
- * and every question has one. Not while the check is still loading.
- */
-export function readerAllowed(check: UnderstandingView | undefined, file: Pick<DiffFile, "path">) {
-  if (!check) return false;
-  if (!check.required) return true;
-  const answered = (id: string) =>
-    !check.missing.some((part) => part.part === "answer" && part.itemId === id);
-  const own = check.plan.find((item) => item.path === file.path);
-  return own ? answered(own.id) : check.plan.every((item) => answered(item.id));
 }
 
 /**

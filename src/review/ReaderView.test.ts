@@ -8,7 +8,8 @@ import type { DiffFile } from "../types";
 import { ExplanationPanel, ReviewReports, type ExplanationPanelProps } from "./ExplanationPanel";
 import en from "./i18n/en";
 import zhTW from "./i18n/zh-TW";
-import { ReaderView, readerAllowed, readerRequests, unasked, type ByHandReader } from "./ReaderView";
+import { readerAllowed, readerRequests, unasked } from "./reader";
+import { ReaderView, type ByHandReader } from "./ReaderView";
 
 /** A file of a Learn-by-hand run in review: nothing asked for yet. */
 const file: DiffFile = {
