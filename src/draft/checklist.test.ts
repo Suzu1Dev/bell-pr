@@ -264,3 +264,22 @@ test("the issue-link and brevity text checks show on the issue and words rows, w
   assert.match(byId.words.lines[0], /suggested text, unrevised/);
   assert.deepEqual(byId.words.sources, ['CONTRIBUTING.md: "Keep descriptions short and in your own words."']);
 });
+
+test("the quoted confirm of Learn by hand is the rules row, and rows awaiting the server's list wait", () => {
+  const quoted = { id: "by-hand-rules" as const, kind: "confirm" as const, message: "Quoted.", details: ["Why.", "docs/policy.md:4: \"…\"", "You used: answers."] };
+  assert.ok(checklistCheck(quoted));
+  const byId = Object.fromEntries(rows({ ...full, checks: [...preflight(), quoted] }).map((row) => [row.id, row]));
+  assert.equal(byId.rules.status, "confirm");
+  assert.deepEqual(byId.rules.lines, ["Quoted."]);
+  assert.deepEqual(byId.rules.sources, ["docs/policy.md:4: \"…\"", "You used: answers."]);
+  // Before the server's list, a row whose check only the server decides waits,
+  // whatever else fired in it; the other rows read as before.
+  const waiting = Object.fromEntries(
+    rows({ ...full, checks: undefined, awaiting: ["ai-ban", "area-reserved"] }).map((row) => [row.id, row]),
+  );
+  for (const id of ["rules", "issue"] as const) {
+    assert.equal(waiting[id].status, "unknown");
+    assert.deepEqual(waiting[id].lines, [en.draft.guidance.checklist.draftUnknown]);
+  }
+  assert.equal(waiting.door.status, "ok");
+});

@@ -40,6 +40,8 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
   const t = useT("draft").sync;
   const fmt = useFormat();
   const published = !!run.prUrl;
+  // A Learn-by-hand run has no conflict agent: the person resolves the markers.
+  const byHand = !!run.learnByHand;
   const round = activeFollowUp(run.followUps);
   const syncRound = round?.kind === "sync" ? round : undefined;
   const holder = published ? syncRound : run.sync;
@@ -148,9 +150,8 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
           {open.length > 0 && (
             <p>
               {rich(
-                published
-                  ? t.conflictHelp.published
-                  : t.conflictHelp.unpublished,
+                // A Learn-by-hand run's help has no conflict agent to offer.
+                (byHand ? t.byHand : t.conflictHelp)[published ? "published" : "unpublished"],
                 {
                   latest: <code>latest {run.baseBranch}</code>,
                   ours: (
@@ -174,7 +175,7 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
               ))}
             </ul>
           )}
-          {(open.length > 0 || running) && (
+          {(running || (open.length > 0 && !byHand)) && (
             <button
               type="button"
               className="button primary"

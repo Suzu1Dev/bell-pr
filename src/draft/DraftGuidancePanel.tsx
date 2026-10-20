@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import {
   ArrowDownToLine,
   ArrowUpRight,
@@ -106,7 +106,12 @@ interface Props {
    * the agent run's checks.
    */
   byHandRun?: ByHandRunFacts;
+  /** A Learn-by-hand run's drafting helpers, where an agent run gets a suggestion and the AI line (DESIGN v1.2 F11). */
+  helpers?: ReactNode;
 }
+
+/** A clean Learn-by-hand run's rows only the server decides: they hang on when the rules were read (DESIGN v1.2 F12 d). */
+const serverOnly = new Set<DraftCheck["id"]>(["ai-ban", "area-reserved", "by-hand-rules"]);
 
 const statusIcons: Record<ChecklistStatus, typeof CircleCheck> = {
   ok: CircleCheck,
@@ -177,12 +182,16 @@ export function DraftGuidancePanel({
   understanding,
   changes,
   byHandRun,
+  helpers,
 }: Props) {
   const draftMessages = useT("draft");
   const t = draftMessages.guidance;
   const fmt = useFormat();
   const [locale] = useLocale();
   const prefix = useId().replaceAll(":", "");
+  const byHand = !!byHandRun?.learnByHand;
+  // A clean Learn-by-hand run's input: then the server's list decides some rows.
+  const learnByHand = byHandRun && byHandPreflight(byHandRun, new Date().toISOString());
   // Read once per visit, then counted, so the sentences fold on a later one.
   const [whySeen] = useState(readWhySeen);
   useEffect(countWhySeen, []);
@@ -251,20 +260,21 @@ export function DraftGuidancePanel({
               understanding &&
               !understanding.passed &&
               (understanding.off || !understanding.required),
-            learnByHand: byHandRun && byHandPreflight(byHandRun, new Date().toISOString()),
+            learnByHand,
           },
           locale,
         )
       : undefined;
+  const mirror = learnByHand ? local?.filter((check) => !serverOnly.has(check.id)) : local;
   const respect = checks
     ? withFactChecks(
         checks,
         // Without the editor's text, the disclosure is the saved draft's to say.
         draftBody === undefined
-          ? local?.filter((check) => check.id !== "ai-disclosure")
-          : local,
+          ? mirror?.filter((check) => check.id !== "ai-disclosure")
+          : mirror,
       )
-    : local;
+    : mirror;
   const rows = checklistRows(
     {
       checks: respect,
@@ -275,6 +285,8 @@ export function DraftGuidancePanel({
       issueUrl,
       disclosureRule: disclosureRequirement,
       suggestion: !!proposal?.body.trim(),
+      // Until the server's list arrives, those rows wait for it; a published run's never comes.
+      awaiting: checks || readOnly ? [] : local?.filter((check) => !mirror?.includes(check)).map((check) => check.id),
     },
     t.checklist,
     fmt,
@@ -385,7 +397,7 @@ export function DraftGuidancePanel({
                 : t.policy.linux}
             </span>
           )}
-          {!readOnly && (
+          {!readOnly && !byHand && (
             <button
               type="button"
               className="button secondary draft-guidance-generate"
@@ -427,7 +439,7 @@ export function DraftGuidancePanel({
         </div>
       )}
 
-      {!preparation && !readOnly && (
+      {byHand ? helpers : !preparation && !readOnly && (
         <div className="draft-guidance-empty">
           <span>
             <FileText size={16} /> {t.empty.rules}
@@ -456,7 +468,7 @@ export function DraftGuidancePanel({
         </div>
       )}
 
-      {proposal && (
+      {proposal && !byHand && (
         <>
           <p className="draft-guidance-summary">{proposal.summary}</p>
           <div className="draft-guidance-columns">
@@ -638,7 +650,7 @@ export function DraftGuidancePanel({
         </>
       )}
 
-      {!proposal && onAiDisclosureChange && disclosure}
+      {!proposal && onAiDisclosureChange && !byHand && disclosure}
 
       {checks && (
         <section

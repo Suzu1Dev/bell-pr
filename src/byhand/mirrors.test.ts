@@ -6,7 +6,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import type { ContributionRules } from "../../shared/contribution";
+import { byHandPreflight } from "../../shared/by-hand";
+import { respectChecks, type ContributionRules } from "../../shared/contribution";
+import type { DraftCheck } from "../../shared/draft-checks";
 import { getDemo } from "../demo";
 import { DraftGuidancePanel } from "../draft/DraftGuidancePanel";
 import { assertNoHan, renderEn } from "../test-utils/render";
@@ -45,7 +47,7 @@ test("the Draft tab's live checklist follows the clean-run rule", () => {
     findings: [{ kind: "ban", path: "CONTRIBUTING.md", line: 3, quote: qemu, contribution: true }],
     filesRead: ["CONTRIBUTING.md"],
   };
-  const render = (run?: Run) =>
+  const render = (run?: Run, checks?: DraftCheck[]) =>
     renderEn(
       createElement(DraftGuidancePanel, {
         preparation: undefined,
@@ -55,10 +57,21 @@ test("the Draft tab's live checklist follows the clean-run rule", () => {
         draftBody: "Fixes the cap.",
         rules,
         ...(run ? { byHandRun: run } : {}),
+        ...(checks ? { checks } : {}),
       }),
     );
   const escape = (text: string) => text.replace(/'/g, "&#x27;").replace(/"/g, "&quot;");
-  const clean = render(byHandRun(true));
+  // A clean run's rule rows come from the server's list (W2F): until it
+  // arrives they wait, and then they say what the server says.
+  const waiting = render(byHandRun(true));
+  assertNoHan(waiting);
+  assert.ok(waiting.includes("The saved draft hasn&#x27;t been checked yet."));
+  assert.ok(!waiting.includes(escape(byHandCopy)) && !waiting.includes(escape(agentCopy)));
+  const server = respectChecks(
+    { body: "Fixes the cap.", rules, learnByHand: byHandPreflight(byHandRun(true), rules.checkedAt, { createdAt: true }) },
+    "en",
+  );
+  const clean = render(byHandRun(true), server);
   assertNoHan(clean);
   assert.ok(clean.includes(escape(byHandCopy)));
   assert.ok(!clean.includes(escape(agentCopy)));

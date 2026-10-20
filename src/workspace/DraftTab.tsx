@@ -1,5 +1,4 @@
 import {
-  lazy,
   Suspense,
   useEffect,
   type Dispatch,
@@ -38,21 +37,17 @@ import type { Understanding } from "../app/hooks/useUnderstanding";
 import { FollowUpRounds } from "../draft/FollowUpRounds";
 import { SyncPanel } from "../draft/SyncPanel";
 import {
+  ByHandRecord,
   Deferred,
   DraftGuide,
   ForecastCompare,
+  MarkdownContent,
+  OwnGitRounds,
   Restatements,
   Reviewability,
   UnderstandingRow,
   YourWords,
 } from "./draftMounts";
-
-/** Shared with the publish dialog, so the Markdown renderer loads once. */
-export const MarkdownContent = lazy(() =>
-  import("../review/MarkdownContent").then((module) => ({
-    default: module.MarkdownContent,
-  })),
-);
 
 interface DraftTabProps {
   run: Run;
@@ -95,6 +90,7 @@ interface DraftTabProps {
     | "setAiDisclosure"
     | "alwaysDiscloseAi"
     | "publishChecks"
+    | "serverChecksRead"
     | "loadPublishChecks"
   >;
   actions: Pick<RunActions, "feedbackLoading" | "fetchPrFeedback">;
@@ -301,7 +297,7 @@ export function DraftTab({
             </div>
           )}
           {!demo &&
-            !followUp &&
+            !followUp && !run.learnByHand &&
             run.status !== "published" &&
             !draftBody.trim() &&
             !preparingDraft && (
@@ -354,7 +350,7 @@ export function DraftTab({
             </div>
           ) : (
             <textarea
-              className="draft-textarea"
+              className="draft-textarea" id="pr-body"
               aria-label={t.draft.bodyLabel}
               value={draftBody}
               onChange={(e) => setDraftBody(e.target.value)}
@@ -418,7 +414,7 @@ export function DraftTab({
               {publishBranchError}
             </p>
           )}
-          {commitMessageSuggestion && !followUp && (
+          {commitMessageSuggestion && !followUp && !run.learnByHand && (
             <div className="commit-suggestion">
               <div>
                 <strong>{t.draft.suggestionTitle}</strong>
@@ -487,6 +483,7 @@ export function DraftTab({
             </span>
           </div>
           {understanding && <UnderstandingRow run={run} check={understanding} />}
+          {run.learnByHand && <Deferred resetKey={run.id}><ByHandRecord run={run} place="draft" /></Deferred>}
           <div
             className={
               !draftDirty
@@ -638,9 +635,10 @@ export function DraftTab({
             }
             aiDisclosure={run.draft.aiDisclosure}
             alwaysDiscloseAi={alwaysDiscloseAi}
-            draftBody={draftBody}
+            draftBody={draftBody} onDraftBody={setDraftBody}
             onAiDisclosureChange={(on) => void setAiDisclosure(on)}
-            checks={checkable && draftChecks ? publishChecks : undefined}
+            // A Learn-by-hand run's rule rows wait for the server's list (DESIGN v1.2 F12).
+            checks={checkable && draftChecks && (draft.serverChecksRead || !run.learnByHand) ? publishChecks : undefined}
             readOnly={run.status === "published"}
           />
         </Suspense>
@@ -782,7 +780,7 @@ export function DraftTab({
                       {group.items.map((item, itemIndex) => (
                         <li key={item.url}>
                           <div className="pr-feedback-item-head">
-                            {!followUp && (
+                            {!followUp && !run.learnByHand && (
                               <input
                                 type="checkbox"
                                 aria-label={t.feedback.include({
@@ -848,7 +846,7 @@ export function DraftTab({
                   </div>
                 ),
               )}
-              {!followUp && (
+              {!followUp && (run.learnByHand ? <OwnGitRounds /> : (
                 <div className="follow-up-start">
                   <h3>
                     {t.followUp.title}
@@ -914,7 +912,7 @@ export function DraftTab({
                       : t.followUp.startNote}
                   </button>
                 </div>
-              )}
+              ))}
             </>
           ) : (
             <p className="muted">{t.feedback.notFetched}</p>

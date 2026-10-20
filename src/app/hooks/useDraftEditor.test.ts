@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { DraftCheck } from "../../../shared/draft-checks";
-import { mergePublishChecks } from "./useDraftEditor";
+import { aiDisclosureLine } from "../../../shared/drafts";
+import { mergePublishChecks, savedDisclosure } from "./useDraftEditor";
 
 const check = (id: DraftCheck["id"], message: string = id): DraftCheck => ({
   id,
@@ -33,4 +34,16 @@ test("the publish dialog asks for the confirmations only the server can check", 
   );
   // An empty server list still keeps what the editor found itself.
   assert.deepEqual(mergePublishChecks(local, []), local);
+});
+
+test("turning the AI line on adds it to an agent run's description, never to a Learn-by-hand run's", () => {
+  const body = "## Summary\n\nRetries GET requests.";
+  const agent = savedDisclosure(body, true);
+  assert.equal(agent.choice, true);
+  assert.ok(agent.body.endsWith(aiDisclosureLine));
+  assert.deepEqual(savedDisclosure(`${body}\n\n${aiDisclosureLine}`, false), { body, choice: false });
+  // The person's text is theirs: no line, and no choice that the server would act on.
+  for (const choice of [true, false, undefined])
+    assert.deepEqual(savedDisclosure(body, choice, true), { body });
+  assert.deepEqual(savedDisclosure(body, undefined), { body });
 });

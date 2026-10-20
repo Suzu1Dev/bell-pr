@@ -1,5 +1,6 @@
 import {
   Suspense,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -15,6 +16,7 @@ import {
   GitBranch,
   GitPullRequest,
   Loader2,
+  RefreshCw,
   UserRound,
 } from "lucide-react";
 import type { ContributionFacts } from "../../shared/contribution";
@@ -37,7 +39,8 @@ import {
   type Requirement,
 } from "../setup/ReadinessNotice";
 import { useDoctor, type DoctorState } from "../setup/useDoctor";
-import { MarkdownContent } from "./DraftTab";
+import { useRulesRecheck } from "../draft/rulesRecheck";
+import { ByHandRecord, Deferred, MarkdownContent } from "./draftMounts";
 
 /** Publishing commits with the Git identity and pushes with the GitHub CLI. */
 const publishRequirements: readonly Requirement[] = ["git-identity", "gh"];
@@ -130,14 +133,15 @@ const checkTopics = {
 } as const satisfies Record<string, readonly DraftCheck["id"][]>;
 type CheckTopic = keyof typeof checkTopics;
 
-/** `checks` by topic, in the dialog's order; a check of no topic joins the rules. */
+/** `checks` by topic, in the dialog's order; a check of no topic joins the rules, led by Learn by hand's quoted confirm. */
 export function groupChecks(checks: readonly DraftCheck[]) {
   const topicOf = (id: DraftCheck["id"]): CheckTopic =>
     (Object.keys(checkTopics) as CheckTopic[]).find((topic) =>
       (checkTopics[topic] as readonly string[]).includes(id),
     ) ?? "rules";
+  const quoted = (check: DraftCheck) => (check.id === "by-hand-rules" ? 0 : 1);
   return (Object.keys(checkTopics) as CheckTopic[])
-    .map((topic) => ({ topic, checks: checks.filter((check) => topicOf(check.id) === topic) }))
+    .map((topic) => ({ topic, checks: checks.filter((check) => topicOf(check.id) === topic).sort((a, b) => quoted(a) - quoted(b)) }))
     .filter((group) => group.checks.length);
 }
 
@@ -148,6 +152,7 @@ const respectIds = new Set<string>([
   ...checkTopics.pacing,
   "pr-closed",
   "ai-ban",
+  "by-hand-rules",
   "ai-disclosure",
   "project-rules",
   "own-words",
@@ -193,6 +198,7 @@ interface PublishModalProps {
     | "setAcknowledged"
     | "followUp"
     | "publishChecks"
+    | "serverChecksRead"
     | "loadPublishChecks"
     | "overrides"
     | "setOverrides"
@@ -238,6 +244,7 @@ export function PublishModal({
     setAcknowledged,
     followUp,
     publishChecks,
+    serverChecksRead,
     loadPublishChecks,
     overrides,
     setOverrides,
@@ -267,6 +274,14 @@ export function PublishModal({
   const [facts, setFacts] = useState<{ loading: boolean; facts?: ContributionFacts; error?: string }>(
     { loading: reads },
   );
+  // The server's checks as this dialog reads them (`done` reads so far); a
+  // Learn-by-hand run waits for them (F12) and says when they couldn't be read.
+  const [reading, setReading] = useState({ now: reads, done: 0 });
+  const readChecks = useCallback(async () => {
+    setReading((previous) => ({ ...previous, now: true }));
+    await loadPublishChecks(run.id, run.approvedFingerprint);
+    setReading((previous) => ({ now: false, done: previous.done + 1 }));
+  }, [loadPublishChecks, run.id, run.approvedFingerprint]);
   useEffect(() => {
     setOverrides([]);
     if (!reads) return;
@@ -292,27 +307,47 @@ export function PublishModal({
       )
       .finally(async () => {
         await rules;
-        if (!cancelled) void loadPublishChecks(run.id, run.approvedFingerprint);
+        if (!cancelled) void readChecks();
       });
     return () => {
       cancelled = true;
     };
-  }, [reads, run.id, run.approvedFingerprint, loadPublishChecks, setOverrides, t.factsMissing]);
+  }, [reads, run.id, readChecks, setOverrides, t.factsMissing]);
   // A refused publish may have read new facts: the checks it names show up.
   useEffect(() => {
-    if (formError && reads) void loadPublishChecks(run.id, run.approvedFingerprint);
-  }, [formError, reads, loadPublishChecks, run.id, run.approvedFingerprint]);
+    if (formError && reads) void readChecks();
+  }, [formError, reads, readChecks]);
   const checkOff = showsCheckOffLine(run, settings.off);
   // The sample's checks come from its fixtures, as the server's would.
   const sampleChecks = useMemo(
     () => sample && respect?.samplePublishChecks(sample, run, files, locale, settings.off),
     [sample, respect, run, files, locale, settings.off],
   );
+  // A Learn-by-hand run's checks wait for the server's list (DESIGN v1.2 F12).
+  const byHand = !!run.learnByHand && !sample && !followUp;
   const checks: DraftCheck[] | undefined = followUp
     ? []
     : sample
       ? sampleChecks
-      : draftChecks && publishChecks;
+      : draftChecks && (serverChecksRead || !byHand) ? publishChecks : undefined;
+  const checkRules = useRulesRecheck(byHand ? run : undefined, currentRepo?.contributionRules, checks, loadPublishChecks);
+  // A quoted confirm whose words changed in a later read (or that couldn't be read) is unticked:
+  // the person confirms what they read (F12 f). Until then its tick counts for nothing, not even
+  // for the one frame before the untick, so no click can send it for words that came after it.
+  const quoted = JSON.stringify(checks?.find((check) => check.id === "by-hand-rules") ?? null);
+  const [confirmed, setConfirmed] = useState(quoted);
+  useEffect(() => {
+    if (confirmed === quoted) return;
+    setAcknowledged((previous) => previous.filter((id) => id !== "by-hand-rules"));
+    setConfirmed(quoted);
+  }, [confirmed, quoted, setAcknowledged]);
+  const ticked = confirmed === quoted ? acknowledged : acknowledged.filter((id) => id !== "by-hand-rules");
+  // Sending disables Submit, which had the focus; in a Learn-by-hand run's dialog a refused or
+  // failed publish puts it on the reason, so it stays in the dialog.
+  const refusal = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (formError && byHand && document.activeElement === document.body) refusal.current?.focus();
+  }, [formError, byHand]);
   const reason = overrides.find((override) => override.id === "issue-has-pr")?.reason ?? "";
   const blocks = (checks ?? []).filter(
     (check) => check.kind === "block" && !(check.id === "issue-has-pr" && validReason(reason)),
@@ -418,13 +453,28 @@ export function PublishModal({
           facts={facts}
           pacing={pacing}
           checkOff={checkOff}
-          acknowledged={acknowledged}
+          acknowledged={ticked}
           setAcknowledged={setAcknowledged}
           reason={reason}
           onReason={(value) =>
             setOverrides(value ? [{ id: "issue-has-pr", reason: value }] : [])
           }
           mask={mask}
+          record={
+            byHand && (
+              <Deferred resetKey={run.id} fallback={<Loader2 className="spin" size={16} aria-hidden="true" />}>
+                <ByHandRecord
+                  run={run}
+                  place="publish"
+                  // An unknown is never a pass: the dialog says the checks couldn't be read, with a retry.
+                  {...(!serverChecksRead && !facts.loading
+                    ? { unchecked: { checking: reading.now, failed: reading.done > 0, onRetry: () => void readChecks() } }
+                    : {})}
+                />
+              </Deferred>
+            )
+          }
+          checkRules={checkRules}
           loop={
             demo ? undefined : (
               <LoopRuns
@@ -437,7 +487,7 @@ export function PublishModal({
         />
       )}
       {formError && (
-        <p role="alert" className="inline-error">
+        <p role="alert" className="inline-error" ref={refusal} tabIndex={byHand ? -1 : undefined}>
           {mask(formError)}
         </p>
       )}
@@ -458,7 +508,7 @@ export function PublishModal({
             (!demo && !ready) ||
             !checks ||
             blocks.length > 0 ||
-            confirms.some((check) => !acknowledged.includes(check.id))
+            confirms.some((check) => !ticked.includes(check.id))
           }
           onClick={publish}
         >
@@ -486,6 +536,7 @@ export function PublishModal({
  * reviewability, and safety. A block names why maintainers care and where
  * it comes from; only "someone else's PR fixes this issue" can be lifted,
  * with a reason. GitHub facts that could not be read say so and never pass.
+ * Learn by hand's record stands right before its quoted confirm (F12 f).
  */
 export function PublishChecks({
   checks,
@@ -498,6 +549,8 @@ export function PublishChecks({
   onReason,
   mask,
   loop,
+  record,
+  checkRules,
 }: {
   /** Undefined while the checks load. */
   checks: DraftCheck[] | undefined;
@@ -512,12 +565,26 @@ export function PublishChecks({
   mask(text: string): string;
   /** Links to the person's other published runs, for the pacing check. */
   loop?: ReactNode;
+  record?: ReactNode;
+  /** "Check again" on a Learn-by-hand block while the rules were read before the run started, and what it found. */
+  checkRules?: { offer: boolean; checking: boolean; note?: string; onCheck(): Promise<void> };
 }) {
   const t = useT("workspace").publish;
+  const rulesCard = useT("mission").rules;
   const confirms = (checks ?? []).filter((check) => check.kind === "confirm");
+  const recordFirst = !checks?.some((check) => check.id === "by-hand-rules");
+  // In a Learn-by-hand run's dialog (the one with a record), a read that removes the focused
+  // button (Try again, Check again) leaves the focus in the dialog, on the heading.
+  const title = useRef<HTMLHeadingElement>(null);
+  const shown = useRef<string>(undefined);
+  const now = `${checks?.map((check) => check.id + check.kind).join() ?? "-"}${checkRules?.offer ? "+" : ""}`;
+  useEffect(() => {
+    if (record && shown.current !== undefined && shown.current !== now && document.activeElement === document.body) title.current?.focus();
+    shown.current = now;
+  }, [now, record]);
   return (
     <section className="publish-checks" aria-labelledby="publish-checks-title">
-      <h3 id="publish-checks-title">{t.checksTitle}</h3>
+      <h3 id="publish-checks-title" ref={title} tabIndex={-1}>{t.checksTitle}</h3>
       {facts.loading && (
         <p className="publish-fact" role="status">
           <Loader2 className="spin" size={14} aria-hidden="true" /> {t.factsLoading}
@@ -539,9 +606,11 @@ export function PublishChecks({
         </p>
       )}
       {confirms.length > 0 && <p className="publish-fact">{t.confirmLegend}</p>}
+      {recordFirst && record}
       {groupChecks(checks ?? []).map((group) => (
         <fieldset key={group.topic} className="publish-confirmations">
           <legend>{t.groups[group.topic]}</legend>
+          {!recordFirst && group.checks[0].id === "by-hand-rules" && record}
           {group.checks.map((check) => {
             const [why, ...sources] = respectIds.has(check.id) ? check.details : [undefined, ...check.details];
             const text = (
@@ -557,6 +626,13 @@ export function PublishChecks({
               return (
                 <div key={check.id} className="publish-block" role="alert">
                   {text}
+                  {checkRules?.offer && ["ai-ban", "area-reserved"].includes(check.id) && (
+                    // aria-disabled while it reads, so the focus stays on it.
+                    <button type="button" className="button secondary" aria-disabled={checkRules.checking} onClick={() => !checkRules.checking && void checkRules.onCheck()}>
+                      <RefreshCw size={14} aria-hidden="true" /> {checkRules.checking ? rulesCard.checking : rulesCard.checkAgain}
+                    </button>
+                  )}
+                  {checkRules?.note && ["ai-ban", "area-reserved"].includes(check.id) && <small>{mask(checkRules.note)}</small>}
                   {check.id === "issue-has-pr" && (
                     <label className="publish-override">
                       {t.overrideLabel}

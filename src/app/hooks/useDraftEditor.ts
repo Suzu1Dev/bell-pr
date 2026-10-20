@@ -22,6 +22,13 @@ import type { OverridableCheckId } from "../../../shared/contribution";
 import { activeFollowUp } from "../../../shared/followups";
 import type { Notify } from "../AppShell";
 
+/** The description and AI-assistance choice a save sends; never BELL's line for a Learn-by-hand run (DESIGN v1.2 F11). */
+export function savedDisclosure(body: string, aiDisclosure: boolean | undefined, learnByHand?: boolean) {
+  const choice = learnByHand ? undefined : aiDisclosure;
+  if (choice === undefined) return { body };
+  return { body: choice ? withAiDisclosure(body) : withoutAiDisclosure(body), choice };
+}
+
 /** The draft checks bring a Markdown parser, so they load beside the first screen. */
 type DraftChecks = typeof import("../../../shared/draft-checks");
 
@@ -161,6 +168,9 @@ export function useDraftEditor({
     !!followUp &&
     (!draftCommitMessage.trim() ||
       !!draftChecks?.findDraftPlaceholders(draftCommitMessage).length);
+  // The server's list for this run and approval has been read.
+  const serverChecksRead =
+    serverChecks?.runId === run.id && serverChecks.fingerprint === run.approvedFingerprint;
   const publishChecks: DraftCheck[] = followUp
     ? []
     : mergePublishChecks(
@@ -172,10 +182,7 @@ export function useDraftEditor({
           },
           locale,
         ) ?? [],
-        serverChecks?.runId === run.id &&
-          serverChecks.fingerprint === run.approvedFingerprint
-          ? serverChecks.checks
-          : undefined,
+        serverChecksRead ? serverChecks.checks : undefined,
       );
   const publishBlocked = publishChecks.find((check) => check.kind === "block");
   const publishConfirmations = publishChecks.filter(
@@ -285,12 +292,7 @@ export function useDraftEditor({
    * removing it (the server does the same).
    */
   async function persistDraft(aiDisclosure?: boolean) {
-    const body =
-      aiDisclosure === undefined
-        ? draftBody
-        : aiDisclosure
-          ? withAiDisclosure(draftBody)
-          : withoutAiDisclosure(draftBody);
+    const { body, choice } = savedDisclosure(draftBody, aiDisclosure, run.learnByHand);
     if (!draftTitle.trim() || !body.trim()) {
       notify(t.draftRequired, "error");
       return;
@@ -307,7 +309,7 @@ export function useDraftEditor({
       let open = true;
       if (demo)
         setRun((previous) => {
-          const chosen = aiDisclosure ?? previous.draft.aiDisclosure;
+          const chosen = choice ?? previous.draft.aiDisclosure;
           return {
             ...previous,
             draft: {
@@ -328,7 +330,7 @@ export function useDraftEditor({
             body,
             commitMessage,
             publishBranch,
-            ...(aiDisclosure !== undefined ? { aiDisclosure } : {}),
+            ...(choice !== undefined ? { aiDisclosure: choice } : {}),
           }),
         );
         open = runIdRef.current === updated.id;
@@ -376,6 +378,7 @@ export function useDraftEditor({
     followUp,
     commitMessageUnfinished,
     publishChecks,
+    serverChecksRead,
     publishBlocked,
     publishConfirmations,
     loadPublishChecks,

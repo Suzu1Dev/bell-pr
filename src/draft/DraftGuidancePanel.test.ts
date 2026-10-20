@@ -7,7 +7,12 @@ import { DraftGuidancePanel, whyShownTimes } from "./DraftGuidancePanel";
 import { draftPreflight, type DraftCheck } from "../../shared/draft-checks";
 import { reviewabilitySnapshot } from "../../shared/reviewability";
 import { sampleRules as buildSampleRules } from "../mission/respect";
-import type { ContributionFacts, ContributionRules } from "../../shared/contribution";
+import type { ByHandRunFacts } from "../../shared/by-hand";
+import {
+  byHandRulesDecisionInTests,
+  type ContributionFacts,
+  type ContributionRules,
+} from "../../shared/contribution";
 import {
   aiDisclosureLine,
   withAiDisclosure,
@@ -655,4 +660,121 @@ test("an unlinked description under an issue rule asks to confirm in the issue r
   // Once in the row's sources, once in the source document's own text.
   assert.doesNotMatch(checklistRow(html, "issue"), /draft-guidance-issue-rule/);
   assert.match(html, /The checks on the text are clear\. The maintainer checklist below shows the rest\./);
+});
+
+/** A Learn-by-hand run whose history is clean (shared/by-hand.ts byHandClean), or not. */
+const byHandRun = (clean = true): ByHandRunFacts => ({
+  learnByHand: true,
+  createdAt: "2026-10-20T09:00:00.000Z",
+  agents: [{ id: "lead" }, ...(clean ? [] : [{ id: "member-1" }])],
+  byHand: { events: [{ at: "2026-10-20T09:05:00.000Z", kind: "explain", source: "premise" }] },
+});
+
+test("a Learn-by-hand run gets no generate button, no suggestion and no AI line, even with Always add on", () => {
+  const options = { alwaysDiscloseAi: true, draftBody: "My own words.", onAiDisclosureChange: () => {} };
+  const agent = renderEn(panel(getDemo("en").draftPreparation, options));
+  assert.ok(agent.includes("draft-guidance-generate"));
+  assert.ok(agent.includes(aiDisclosureLine));
+  assert.ok(agent.includes('role="switch"'));
+  for (const preparation of [undefined, getDemo("en").draftPreparation]) {
+    const html = renderEn(
+      createElement(DraftGuidancePanel, {
+        ...options,
+        preparation,
+        busy: false,
+        onGenerate: () => {},
+        onApply: () => {},
+        byHandRun: byHandRun(),
+        helpers: createElement("p", { id: "by-hand-helpers" }, "Helpers"),
+      }),
+    );
+    assertNoHan(html);
+    assert.ok(!html.includes("draft-guidance-generate"));
+    assert.ok(!html.includes(aiDisclosureLine));
+    assert.ok(!html.includes('role="switch"'));
+    // The helpers stand where an agent run is offered a suggestion.
+    assert.ok(html.includes('<p id="by-hand-helpers">Helpers</p>'));
+    assert.ok(!html.includes("draft-guidance-empty") && !html.includes("draft-guidance-apply"));
+  }
+});
+
+test("a clean Learn-by-hand run's rule rows come only from the server's checks, never from the mirror", () => {
+  const rules: ContributionRules = {
+    checkedAt: "2026-10-20T08:00:00.000Z",
+    findings: [{ kind: "ban", path: "docs/policy.md", line: 4, quote: "We decline AI-generated contributions.", contribution: true }],
+    filesRead: ["docs/policy.md"],
+  };
+  const quoted: DraftCheck = { id: "by-hand-rules", kind: "confirm", message: "Quoted confirm from the server.", details: ["Why.", "docs/policy.md:4"] };
+  const ban: DraftCheck = { id: "ai-ban", kind: "block", message: "Ban from the server.", details: ["Why.", "docs/policy.md:4"] };
+  const render = (checks: DraftCheck[] | undefined, run = byHandRun()) =>
+    renderEn(
+      createElement(DraftGuidancePanel, {
+        preparation: undefined,
+        busy: false,
+        onGenerate: () => {},
+        onApply: () => {},
+        draftBody: "My own words.",
+        rules,
+        byHandRun: run,
+        ...(checks ? { checks } : {}),
+      }),
+    );
+  // The mirror would confirm where the server blocks, and the reverse.
+  for (const [decision, server, shown, hidden] of [
+    ["confirm", [ban], "Ban from the server.", "BELL PR is quoting the project"],
+    ["block", [quoted], "Quoted confirm from the server.", "publishes here only through"],
+  ] as const) {
+    byHandRulesDecisionInTests((findings) =>
+      decision === "confirm"
+        ? { blocked: [], confirmable: findings.bans.map((finding) => ({ finding, allows: [], others: [] })) }
+        : { blocked: findings.bans.map((finding) => ({ finding, reason: "rules-unread" as const })), confirmable: [] },
+    );
+    try {
+      const html = render([...server]);
+      assertNoHan(html);
+      const row = checklistRow(html, "rules");
+      assert.ok(row.includes(shown), decision);
+      assert.ok(!html.includes(hidden), decision);
+      // The quoted confirm is a row of the checklist, not a line of the preflight list.
+      assert.equal(html.split("Quoted confirm from the server.").length - 1, decision === "block" ? 1 : 0);
+      // Until the server's list arrives, the row waits.
+      const waiting = checklistRow(render(undefined), "rules");
+      assert.match(waiting, /is-unknown/);
+      assert.ok(waiting.includes("The saved draft hasn&#x27;t been checked yet."));
+      // An unclean run gets the agent run's check, the same here as on the server.
+      assert.ok(checklistRow(render(undefined, byHandRun(false)), "rules").includes("AI agents wrote this change"));
+    } finally {
+      byHandRulesDecisionInTests();
+    }
+  }
+});
+
+test("a published Learn-by-hand run's rules row quotes the rules instead of waiting for checks that never come", () => {
+  const rules: ContributionRules = {
+    checkedAt: "2026-10-20T08:00:00.000Z",
+    findings: [{ kind: "ban", path: "docs/policy.md", line: 4, quote: "We decline AI-generated contributions.", contribution: true }],
+    filesRead: ["docs/policy.md"],
+  };
+  const render = (readOnly: boolean) =>
+    renderEn(
+      createElement(DraftGuidancePanel, {
+        preparation: undefined,
+        busy: false,
+        onGenerate: () => {},
+        onApply: () => {},
+        draftBody: "My own words.",
+        rules,
+        byHandRun: byHandRun(),
+        readOnly,
+      }),
+    );
+  // In review the row waits for the server's list (the Draft tab reads it).
+  assert.ok(checklistRow(render(false), "rules").includes("The saved draft hasn&#x27;t been checked yet."));
+  // Published, nothing reads it again: the row quotes the project's rules, and neither the mirror's block nor a wait.
+  const html = render(true);
+  assertNoHan(html);
+  const row = checklistRow(html, "rules");
+  assert.ok(!row.includes("hasn&#x27;t been checked") && !/is-unknown|is-block/.test(row), row);
+  assert.ok(row.includes("We decline AI-generated contributions."));
+  assert.ok(!html.includes("BELL PR won") && !html.includes("AI agents wrote this change"));
 });

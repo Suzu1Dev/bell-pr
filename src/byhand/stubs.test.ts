@@ -3,7 +3,7 @@
 // builds it. Each new UI file renders in English with no Han characters.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createElement, type FunctionComponent } from "react";
+import { createElement, type FunctionComponent, type ReactNode } from "react";
 import { getDemo } from "../demo";
 import { assertNoHan, renderEn } from "../test-utils/render";
 import * as lazy from "./lazy";
@@ -25,7 +25,7 @@ test("the lazy chunk's entry has every Learn-by-hand component", () => {
 });
 
 test("each Learn-by-hand stub renders in English, with no Han characters", () => {
-  const stubs: [(props: never) => null, object][] = [
+  const stubs: [(props: never) => ReactNode, object][] = [
     [ModeChoice, { mode: "agents", onModeChange: () => {}, fitted: false, onFittedChange: () => {} }],
     [lazy.PlanWithGuide, { run, onSave: noop, onReveal: noop, onAskQuestions: noop, onConfirm: noop }],
     [lazy.YourTurn, { run, worktreePath: "/tmp/run" }],

@@ -22,12 +22,22 @@ export const Reviewability = lazy(() =>
   import("./DraftLearning").then((module) => ({ default: module.Reviewability })),
 );
 export const ForecastCompare = lazy(() => import("../draft/ForecastCompare"));
+/** Learn by hand's record, from the one byhand chunk (DESIGN v1.2 F13). */
+export const ByHandRecord = lazy(() =>
+  import("../byhand/lazy").then((module) => ({ default: module.ByHandRecord })),
+);
+/** Shared with the publish dialog, so the Markdown renderer loads once. */
+export const MarkdownContent = lazy(() =>
+  import("../review/MarkdownContent").then((module) => ({
+    default: module.MarkdownContent,
+  })),
+);
 
 /** A panel that loads on demand; a chunk that fails to load leaves the tab as it is. */
-export function Deferred({ resetKey, children }: { resetKey?: string; children: ReactNode }) {
+export function Deferred({ resetKey, children, fallback = null }: { resetKey?: string; children: ReactNode; fallback?: ReactNode }) {
   return (
     <ErrorBoundary resetKey={resetKey}>
-      <Suspense fallback={null}>{children}</Suspense>
+      <Suspense fallback={fallback}>{children}</Suspense>
     </ErrorBoundary>
   );
 }
@@ -88,6 +98,11 @@ export function UnderstandingRow({
       </span>
     </div>
   );
+}
+
+/** Learn by hand has no AI rounds (until v1.2.1): the person pushes follow-up commits with their own Git. */
+export function OwnGitRounds() {
+  return <p className="field-help">{useT("draft").followUps.ownGit}</p>;
 }
 
 /**

@@ -121,6 +121,7 @@ const element = (
         async setAiDisclosure() {},
         alwaysDiscloseAi: undefined,
         publishChecks: [],
+        serverChecksRead: true,
         async loadPublishChecks() {},
         ...draft,
       },
@@ -509,4 +510,42 @@ test("a real published PR offers to close it yourself; the sample, which has non
     /<p class="pr-feedback-cant"><a href="https:\/\/github\.com\/acme\/widgets\/pull\/3" target="_blank" rel="noreferrer">Can&#x27;t continue\? Close the pull request yourself on GitHub, with a short note in your own words\.<\/a><\/p>/,
   );
   assertNoHan(html);
+});
+
+test("a published Learn-by-hand PR offers no AI round: its feedback says to push with your own Git", () => {
+  const byHand: Run = { ...published, learnByHand: true, followUps: [] };
+  const agent = renderEn(element());
+  assert.match(agent, /class="follow-up-start"/);
+  assert.match(agent, /<input type="checkbox" aria-label=/);
+  const html = renderEn(element({ run: byHand }));
+  assertNoHan(html);
+  // The feedback reads as before; nothing picks it for an agent.
+  assert.match(html, /<p id="pr-feedback-body-1-0">Rename it\.<\/p>/);
+  assert.doesNotMatch(html, /class="follow-up-start"|follow-up-note|<input type="checkbox" aria-label=/);
+  assert.ok(
+    html.includes(
+      "Push follow-up commits from the run&#x27;s folder with your own Git; BELL PR takes them over at the next feedback read.",
+    ),
+  );
+  assert.match(renderZh(element({ run: byHand })), /用你自己的 Git 推送後續的 commit/);
+});
+
+test("an empty description of a Learn-by-hand run is never pointed at a suggested draft", () => {
+  const review: Run = { ...published, status: "review", prUrl: undefined, followUps: [], prFeedback: undefined };
+  const agent = renderEn(element({ run: review }, { draftBody: "" }));
+  assert.match(agent, /Generate and apply a suggested draft below/);
+  const html = renderEn(element({ run: { ...review, learnByHand: true } }, { draftBody: "" }));
+  assertNoHan(html);
+  assert.doesNotMatch(html, /suggested draft/);
+});
+
+test("a Learn-by-hand run never offers an agent's commit message, even one an older build suggested", () => {
+  const review: Run = { ...published, status: "review", prUrl: undefined, followUps: [], prFeedback: undefined };
+  const suggestion = { message: "fix: greet the world\n\nAgent-written body.", rationale: "The project's rules ask for a prefix.", sources: [] };
+  const agent = renderEn(element({ run: review }, { commitMessageSuggestion: suggestion }));
+  assert.match(agent, /Agent-written body\./);
+  assert.match(agent, />Use suggestion</);
+  const html = renderEn(element({ run: { ...review, learnByHand: true } }, { commitMessageSuggestion: suggestion }));
+  assertNoHan(html);
+  assert.doesNotMatch(html, /Agent-written body|Use suggestion|suggested by the project/);
 });

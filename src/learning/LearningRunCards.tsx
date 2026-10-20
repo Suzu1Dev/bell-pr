@@ -1,12 +1,14 @@
 import { useT } from "../i18n";
 import type { Repo } from "../types";
+import { ByHandRecord, Deferred } from "../workspace/draftMounts";
 import type { LearningRun } from "./LearningNotes";
 
 /**
  * The person's own explanation of each contribution, written in the
  * understanding check, above the file notes; and the "Understanding check
- * off" mark, for good, on runs approved without the check. The notes'
- * filters apply: the chosen contribution and the keyword.
+ * off" mark, for good, on runs approved without the check; and a
+ * Learn-by-hand run's record. The notes' filters apply: the chosen
+ * contribution and the keyword.
  */
 export function LearningRunCards({
   runs,
@@ -26,7 +28,7 @@ export function LearningRunCards({
     repos.find((repo) => repo.id === run.repoId)?.fullName || run.repoId;
   const shown = runs.filter((run) => {
     const summary = run.understanding?.summary?.text?.trim() ?? "";
-    if (!summary && !run.understandingCheckOff) return false;
+    if (!summary && !run.understandingCheckOff && !run.byHandSummary) return false;
     if (runId && run.id !== runId) return false;
     return (
       !keyword ||
@@ -47,13 +49,18 @@ export function LearningRunCards({
               {run.understandingCheckOff && (
                 <span className="learning-check-off">{t.checkOff}</span>
               )}
+              {run.byHandSummary && (
+                <Deferred resetKey={run.id}>
+                  <ByHandRecord summary={run.byHandSummary} place="learning" />
+                </Deferred>
+              )}
               {summary ? (
                 <div className="learning-own-note">
                   <strong>{t.summary}</strong>
                   <p>{summary}</p>
                 </div>
               ) : (
-                <p className="learning-run-text">{t.checkOffText}</p>
+                run.understandingCheckOff && <p className="learning-run-text">{t.checkOffText}</p>
               )}
             </article>
           );

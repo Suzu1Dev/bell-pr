@@ -205,3 +205,47 @@ test("the conflict count reads naturally for one file, all files and some files"
     "All conflict markers are removed; changed files still need a file-by-file review.",
   );
 });
+
+test("a Learn-by-hand run has no conflict agent: the person resolves the markers by hand", () => {
+  const sync = {
+    at: "2026-10-13T01:00:00Z",
+    from: "b".repeat(40),
+    to: "a".repeat(40),
+    snapshot: "c".repeat(40),
+    conflicts: ["src/hello.ts"],
+  };
+  const agent = renderEn(panel({ ...base, sync }));
+  assert.equal(button(agent, "Ask the agent to resolve the conflicts"), "enabled");
+  const html = renderEn(panel({ ...base, learnByHand: true, sync }));
+  assertNoHan(html);
+  assert.equal(button(html, "Ask the agent to resolve the conflicts"), "absent");
+  assert.ok(!/ask the agent/i.test(html));
+  assert.ok(html.includes("Resolve the markers by hand; BELL PR re-checks them when you refresh the diff on the Code changes tab."));
+  // The published PR's sync round reads the same way, in Traditional Chinese too.
+  const published = renderZh(
+    panel({
+      ...base,
+      learnByHand: true,
+      status: "published",
+      prUrl: "https://github.com/o/r/pull/1",
+      followUps: [
+        { id: "s", kind: "sync", requestedAt: sync.at, feedbackUrls: [], status: "review", parentCommit: "d".repeat(40), conflicts: ["src/hello.ts"] },
+      ],
+    }),
+  );
+  assert.match(published, /請親手解決衝突標記/);
+  assert.equal(button(published, "請 Agent 解決衝突"), "absent");
+});
+
+test("a Learn-by-hand run's conflict help still says which side is which and that approval waits for the markers", () => {
+  const sync = { at: "2026-10-13T01:00:00Z", from: "b".repeat(40), to: "a".repeat(40), snapshot: "c".repeat(40), conflicts: ["src/hello.ts"] };
+  const html = renderEn(panel({ ...base, learnByHand: true, sync }));
+  assertNoHan(html);
+  assert.match(html, /the side marked <code>latest main<\/code> is the target branch&#x27;s current content/);
+  assert.match(html, /You cannot approve until every conflict marker is removed/);
+  assert.match(html, /Changed files still need a file-by-file review/);
+  assert.ok(!/ask the agent/i.test(html));
+  const zh = renderZh(panel({ ...base, learnByHand: true, sync }));
+  assert.match(zh, /衝突標記全部移除前不能核准/);
+  assert.doesNotMatch(zh, /請 Agent 解決/);
+});
