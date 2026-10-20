@@ -38,6 +38,7 @@ import type { ChatMessage, DiffFile, Run } from "../types";
 import { MaintainerFeedback } from "./MaintainerFeedback";
 import { MarkdownContent } from "./MarkdownContent";
 import { QuizAttempt } from "./QuizAttempt";
+import { ReaderView, unasked, type ByHandReader } from "./ReaderView";
 import { RoadChoice } from "./RoadChoice";
 import { currentAttempt, demoSamples } from "./try-first";
 import { WalkthroughCards, type LineRange } from "./WalkthroughCards";
@@ -99,8 +100,12 @@ export interface ExplanationPanelProps {
   /** The tab to open on; the panel remounts per file, so the caller keeps the reader's choice. */
   initialTab?: PanelTab;
   onTabChange?: (tab: PanelTab) => void;
-  /** A Learn-by-hand run's review at Ready: "Run the review again" opens the Ready dialog (W2E). */
-  byHandReview?: { onReviewAgain: () => void };
+  /**
+   * A Learn-by-hand run (the Changes tab passes it): "Run the review again"
+   * opens the Ready dialog, and ReaderView stands in for an explanation or
+   * walkthrough of the file that nobody asked for yet.
+   */
+  byHandReview?: ByHandReader;
 }
 
 /** The learning panel's tabs. */
@@ -283,6 +288,7 @@ export function ExplanationPanel({
   walkthroughBusy,
   initialTab = "explain",
   onTabChange,
+  byHandReview,
 }: ExplanationPanelProps) {
   const t = useT("review");
   const fmt = useFormat();
@@ -409,6 +415,16 @@ export function ExplanationPanel({
     ...(isTestFile ? [t.presets.testFile] : []),
     ...(feedback.length ? [t.presets.feedback] : []),
   ];
+  // Learn by hand: a file is explained only on a click, after its own check answer (DESIGN v1.2 F10).
+  const reader = byHandReview && (
+    <ReaderView
+      file={file}
+      reader={byHandReview}
+      busy={explanationBusy || Boolean(walkthroughBusy)}
+      onExplain={onRetryExplanation}
+      onWalkthrough={onRetryWalkthrough}
+    />
+  );
 
   return (
     <aside className="explain-panel" aria-label={t.panel.label}>
@@ -738,6 +754,8 @@ export function ExplanationPanel({
                   {t.explain.failedNote}
                 </span>
               </div>
+            ) : reader && unasked(file, "explanation") ? (
+              reader
             ) : (
               <div
                 className="explain-generating"
@@ -825,6 +843,8 @@ export function ExplanationPanel({
               </section>
             )}
           </>
+        ) : tab === "walkthrough" && reader && unasked(file, "walkthrough") ? (
+          reader
         ) : tab === "walkthrough" ? (
           <WalkthroughCards
             file={file}
