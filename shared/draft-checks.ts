@@ -8,6 +8,7 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfm } from "micromark-extension-gfm";
 import { withoutAiDisclosure, type DraftSource } from "./drafts.js";
+import { markdownTooHeavy, roughProse } from "./markdown-guard.js";
 import en from "./i18n/draft-checks.en.js";
 import zhTW from "./i18n/draft-checks.zh-TW.js";
 import type { Locale } from "./i18n/locale.js";
@@ -41,6 +42,11 @@ const safetyDictionaries: Record<Locale, typeof safetyEn> = {
  */
 export function markdownProse(markdown: string) {
   if (markdown === lastProse.markdown) return lastProse.lines;
+  // Too long or too nested for the parser to read quickly: read in linear time instead (shared/markdown-guard.ts).
+  if (markdownTooHeavy(markdown)) {
+    lastProse = { markdown, lines: roughProse(markdown) };
+    return lastProse.lines;
+  }
   const hidden = markdown.split("");
   const visit = (node: MdastNode) => {
     const hide =

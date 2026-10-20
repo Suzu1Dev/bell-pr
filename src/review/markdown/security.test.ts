@@ -3,12 +3,21 @@ import test from "node:test";
 import { createElement } from "react";
 import { assertNoHan, renderEn } from "../../test-utils/render";
 import { MarkdownContent } from "../MarkdownContent";
+import { Markdown } from "./render";
 
 const render = (children: string) => {
   const html = renderEn(createElement(MarkdownContent, { children }));
   assertNoHan(html);
   return html;
 };
+
+/**
+ * The renderer itself, without MarkdownContent's guard, which shows text
+ * this long as plain text (shared/markdown-guard.ts): for its own
+ * linear-time behaviour on huge input.
+ */
+const renderUnguarded = (children: string) =>
+  renderEn(createElement("div", { className: "markdown-content" }, createElement(Markdown, { children, urlTransform: (url) => url, components: {} })));
 
 /** Markup that would run code, load something or reach a non-web scheme. */
 const unsafe = /<script|<img|<style|<details|onerror|onclick|javascript:|data:|vbscript:|tracker\.example/i;
@@ -71,7 +80,7 @@ test("a long run of spaces or tabs renders in linear time, kept inside a line an
   // length.
   const run = " \t".repeat(100_000);
   const started = performance.now();
-  const html = render(`a${run}b\nc${run}\n${run}d`);
+  const html = renderUnguarded(`a${run}b\nc${run}\n${run}d`);
   assert.ok(performance.now() - started < 3_000, "rendering took too long");
   assert.equal(html, `<div class="markdown-content"><p>a${run}b\nc\nd</p></div>`);
 });
@@ -83,8 +92,8 @@ test("a block with more children than a function call takes still renders", () =
   // RangeError, which would take down the view.
   const lines = 50_000;
   for (const [html, open, close] of [
-    [render(`${"a\\\n".repeat(lines)}end`), "<p>", "</p>"],
-    [render(`- ${"a\\\n  ".repeat(lines)}end`), "<ul>\n<li>", "</li>\n</ul>"],
+    [renderUnguarded(`${"a\\\n".repeat(lines)}end`), "<p>", "</p>"],
+    [renderUnguarded(`- ${"a\\\n  ".repeat(lines)}end`), "<ul>\n<li>", "</li>\n</ul>"],
   ]) {
     assert.equal(html.match(/<br\/>/g)?.length, lines);
     assert.ok(html.startsWith(`<div class="markdown-content">${open}a<br/>\na<br/>`));

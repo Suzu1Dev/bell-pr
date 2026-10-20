@@ -1621,6 +1621,15 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* Markdown too long or too nested to format (shared/markdown-guard.ts): the text as it is, wrapped. */
+.markdown-content .markdown-plain {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.markdown-content .markdown-plain-note {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
 /* A fenced diff block, such as the lines a question is about. */
 .markdown-content .markdown-diff-added {
   color: var(--color-diff-add-fg);
