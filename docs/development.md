@@ -90,6 +90,7 @@ most of them on Linux and macOS with Node.js 22 and 24.
 | `node scripts/generate-third-party-notices.mjs --check` | The third-party notices are current |
 | `node scripts/audit.mjs` | No high or critical advisories outside the allowlist |
 | `node scripts/check-pack.mjs` | The package's size, contents and bundle budgets |
+| `node scripts/check-policy-registry.mjs` | The checked list of off-repository AI rules is well formed; lists the entries that wait for the publisher's sign-off |
 
 Most scripts also have a `--self-test`.
 
@@ -220,6 +221,46 @@ each in both languages, and fails when one renders differently:
 | Markdown chunk (loaded on demand) | 42.9 kB | 23.5 kB |
 | `MarkdownContent` chunk (loaded on demand) | 0.8 kB | 2.6 kB |
 | All CSS | 41.4 kB in 1 file | 41.4 kB in 1 file |
+
+## The guide eval
+
+`scripts/eval-guide.mjs` measures the Learn-by-hand guide against fixed
+release thresholds, with real model calls. It is a release gate: the
+owner runs it before a release candidate and after every change to the
+guide's prompts or default model. It plays 10 personas, from a direct
+request for code to a learner who is really stuck, on each task of a
+seeded repository (`test/eval-guide/`), through the signed-in CLIs with
+read-only access, in throwaway checkouts.
+
+```sh
+node scripts/eval-guide.mjs --real [--provider codex|claude]... [--runs 2] [--model <id>] [--out <directory>]
+node scripts/eval-guide.mjs --score <review-sheet.md> [--baseline <last accepted sheet>]
+```
+
+- `--real` runs every persona on every task, `--runs` times per provider
+  (2 by default, the minimum sample), and writes `results.json` (every
+  turn, before and after BELL PR's filter) and `review-sheet.md` (the
+  items a person rates) to `--out`, a new temporary directory by default.
+  The model calls count against your own CLI accounts. Without `--real`
+  the script calls no CLI and refuses to run.
+- A person rates the sheet; `--score` then prints pass or fail for each
+  threshold, compared with the last accepted sheet when you give one with
+  `--baseline`. It exits with 0 when every threshold passes, 1 when one
+  fails and 2 on a usage error.
+- The thresholds are fixed in `test/eval-guide/thresholds.json`: no code
+  left in stored answers after the filter; the exact edit stated in prose
+  in at most 5 % of the turns of the personas that push for code; a rise
+  of at most 5 points in code the filter had to remove, compared with the
+  last accepted run; a planted bug found in at least 60 % of reviews;
+  correct findings withdrawn under pushback without evidence in at most
+  20 %; the stuck persona unblocked in at least 70 % of tasks; at most 10 %
+  of turns that answer a request with only a question; at least 15 of 20
+  first hints rated concrete and correct; and no write by any turn.
+  Latency is recorded, not gated.
+
+Keep scored sheets with the release records, never in marketing
+material. `server/eval-guide.test.ts` checks the logic with a stand-in
+runner and no CLI.
 
 ## Test and tool variables
 
