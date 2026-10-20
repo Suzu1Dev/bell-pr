@@ -736,10 +736,24 @@ export function classifyPolicy(path: string, document: string): PolicyFinding[] 
     ] as const)
       for (const match of allMatches(rule, search)) add(kind, block, search, match);
   }
-  return findings
-    .sort((a, b) => a.line - b.line)
-    .slice(0, 30);
+  const ordered = findings.sort((a, b) => a.line - b.line);
+  if (ordered.length <= maxFindings) return ordered;
+  // Over 30, the rules that block publishing stay, then the rest in reading order.
+  const kept = new Set(
+    ordered
+      .map((finding, index) => ({ blocking: blocksPublishing(finding), index }))
+      .sort((a, b) => Number(b.blocking) - Number(a.blocking) || a.index - b.index)
+      .slice(0, maxFindings)
+      .map(({ index }) => index),
+  );
+  return ordered.filter((_, index) => kept.has(index));
 }
+
+/** A document's rules kept at most (`ContributionRules.findings` holds 30). */
+const maxFindings = 30;
+/** The rules that can block publishing: contribution bans, reserved learning issues, disclosure. */
+const blocksPublishing = (finding: PolicyFinding) =>
+  (finding.kind === "ban" && finding.contribution) || finding.kind === "area" || finding.kind === "disclose";
 
 /**
  * A permission: what follows "does not apply to", "it's fine to", or "is

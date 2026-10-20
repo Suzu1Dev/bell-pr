@@ -499,6 +499,15 @@ test("long sentences are quoted within 300 characters around the rule", () => {
   assert.match(finding.quote, /AI-generated code are not accepted/);
 });
 
+test("a document with more than 30 rules keeps the ones that block publishing, in reading order", () => {
+  const filler = Array.from({ length: 31 }, (_, index) => `- Open an issue before you start on area ${index}.`).join("\n");
+  const text = `# Contributing\n\n${filler}\n\nPlease disclose any use of AI assistance.\n\nWe do not accept AI-generated pull requests.\n`;
+  const findings = classifyPolicy("CONTRIBUTING.md", text);
+  assert.equal(findings.length, 30);
+  assert.deepEqual(findings.slice(-2).map((finding) => [finding.kind, finding.line]), [["disclose", 35], ["ban", 37]]);
+  assert.deepEqual(findings.map((finding) => finding.line), findings.map((finding) => finding.line).sort((a, b) => a - b));
+});
+
 test("a description discloses AI help with BELL's line, a tool trailer or a visible sentence", () => {
   assert.ok(hasAiDisclosure(`Fixes the cap.\n\n${aiDisclosureLine}`));
   assert.ok(hasAiDisclosure("Fixes the cap.", "Fix the cap\n\nAssisted-by: Claude Code"));
