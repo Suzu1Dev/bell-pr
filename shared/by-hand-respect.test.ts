@@ -3,6 +3,8 @@
 // only for a clean Learn-by-hand run (byHandPreflight), and an agent run's
 // checks never change.
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
 import type { HelpLock } from "./by-hand.js";
 import {
@@ -248,4 +250,21 @@ test("byHandBlockClause names each failed condition in both locales", () => {
     "BELL PR's checked list entry is more than 90 days old (Jul 1, 2026)",
   );
   assert.equal(byHandBlockClause("kind-not-named", "en", { kinds: ["plan", "review"] }), "its text doesn't name planning help and reviews");
+});
+
+test("only test files call byHandRulesDecisionInTests, so nothing in the product swaps the decision", () => {
+  const root = path.join(import.meta.dirname, "..");
+  const found: string[] = [];
+  const visit = (directory: string) => {
+    for (const entry of readdirSync(path.join(root, directory), { withFileTypes: true })) {
+      const relative = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        if (!["node_modules", "fixtures"].includes(entry.name)) visit(relative);
+      } else if (/\.tsx?$/.test(entry.name) && readFileSync(path.join(root, relative), "utf8").includes("byHandRulesDecisionInTests"))
+        found.push(relative.split(path.sep).join("/"));
+    }
+  };
+  for (const directory of ["server", "shared", "src"]) visit(directory);
+  assert.deepEqual(found.filter((file) => !/\.test\.tsx?$/.test(file)), ["shared/contribution.ts"]);
+  assert.equal(readFileSync(path.join(root, "shared/contribution.ts"), "utf8").match(/byHandRulesDecisionInTests/g)?.length, 1);
 });
