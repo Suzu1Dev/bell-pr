@@ -76,6 +76,7 @@ import {
 } from "./prompts/team.js";
 import type { WorkbenchContext } from "./workbench.js";
 import { turnCanary } from "./by-hand-canary.js";
+import { byHandAgentError, byHandCommandLine, byHandLogText } from "./by-hand-filter.js";
 import * as byHand from "./by-hand.js";
 
 const now = () => new Date().toISOString();
@@ -183,6 +184,9 @@ export async function runAgent(
   const cwd = context.cwd ?? run.worktreePath;
   const execute = ctx.dependencies.command ?? command;
   const canary = turnCanary(ctx, run, role, signal);
+  // Learn by hand (DESIGN v1.2 F7): agent text reaches the log, the agent card and errors only filtered.
+  const byHandRun = !!run.learnByHand;
+  const shown = (text: string) => (byHandRun ? byHandLogText(text) : text);
   let completed = false;
   let answer = "";
   let terminalFailure: string | undefined;
@@ -259,7 +263,7 @@ export async function runAgent(
                   ctx.log(
                     run,
                     role,
-                    context.isolated
+                    context.isolated || byHandRun
                       ? sm().run.team.structuredResult
                       : text,
                   );
@@ -278,15 +282,19 @@ export async function runAgent(
                 ctx.log(
                   run,
                   role,
-                  item.command ??
-                    sm().run.team.checkFinished({ outcome: item.outcome }),
+                  byHandRun
+                    ? (byHandCommandLine(item.command) ?? sm().byHand.guide.ranCommand)
+                    : (item.command ??
+                        sm().run.team.checkFinished({ outcome: item.outcome })),
                   { kind: "command", detail: item.outcome },
                 );
               } else if (item.kind === "file-change") {
                 const edited =
-                  item.path && path.isAbsolute(item.path)
-                    ? path.relative(cwd, item.path)
-                    : item.path;
+                  item.path && shown(
+                    path.isAbsolute(item.path)
+                      ? path.relative(cwd, item.path)
+                      : item.path,
+                  );
                 ctx.log(
                   run,
                   role,
@@ -301,13 +309,13 @@ export async function runAgent(
                   run,
                   role,
                   item.action === "search"
-                    ? sm().run.team.webSearch({ detail: item.detail })
-                    : sm().run.team.webFetch({ detail: item.detail }),
-                  { kind: "status", detail: item.detail },
+                    ? sm().run.team.webSearch({ detail: shown(item.detail) })
+                    : sm().run.team.webFetch({ detail: shown(item.detail) }),
+                  { kind: "status", detail: shown(item.detail) },
                 );
               } else if (item.kind === "notice") {
                 // Retries, rate limits and denied tools are visible before the timeout, not failures.
-                const notice = redact(item.message);
+                const notice = shown(redact(item.message));
                 if (agent) agent.detail = notice;
                 ctx.log(run, role, notice, { kind: "notice" });
               } else if (
@@ -331,10 +339,10 @@ export async function runAgent(
                   );
               } else if (item.kind === "error") {
                 if (item.terminal) {
-                  terminalFailure = redact(item.message);
+                  terminalFailure = shown(redact(item.message));
                   retryable = item.retryable === true;
                 }
-                ctx.log(run, role, redact(item.message));
+                ctx.log(run, role, shown(redact(item.message)));
               }
             }
             if (Date.now() - lastSave > 1500) {
@@ -351,7 +359,7 @@ export async function runAgent(
         // (flushed before the rejection) already classified the attempt as retryable.
         if (!retryable)
           throw withAgentTimeoutHint(
-            error,
+            byHandRun ? byHandAgentError(error, cli.executable) : error,
             cli.executable,
             timeoutMs,
             terminalFailure,
@@ -382,7 +390,7 @@ export async function runAgent(
       agent.status = "complete";
       agent.detail = sm().run.agents.complete;
     }
-    if (!context.isolated) {
+    if (!context.isolated && !byHandRun) {
       run.reports ??= {};
       run.reports[role] = answer;
     }
@@ -393,7 +401,7 @@ export async function runAgent(
       agent.status = "failed";
       agent.detail = sm().run.agents.failed;
     }
-    throw canary.failure(error);
+    throw canary.failure(byHandRun ? byHandAgentError(error) : error);
   } finally {
     recordEfficiency(completed);
     await ctx.store.save();

@@ -16,7 +16,9 @@
  *    does not combine a changed or step file with an editing command or a
  *    redirection; otherwise it becomes "…". An identifier the guide
  *    invents in its prose (one that occurs in none of those) becomes "…"
- *    too, and so does an expression it writes into prose.
+ *    too, and so does an expression it writes into prose, with spaces or
+ *    without ("delay * 2", "delay*2", "x=y", "a&&b", "arr[i]", "i++",
+ *    "retry(fn, 2)"), also across a line break Markdown shows as a space.
  * 3. A code field (an explanation's example.before/after and the like) is
  *    kept only when it is verbatim in base or worktree; otherwise it is
  *    dropped.
@@ -102,13 +104,21 @@ const corpus = (sources: FilterSources) => [
 /** Commands and redirections that edit a file. */
 const editing = /\bsed\s+(?:-\w*\s+)*-\w*i|\bperl\s+(?:-\w*\s+)*-\w*[pi]\w*i|\bpatch\b|\bgit\s+apply\b|\btee\b|>{1,2}|\bawk\s+(?:-\w+\s+)*-i\b|\bed\b/;
 
+/** An interpreter given its program on the command line ("node -e", "python -c", "bash -c"). */
+const inlineProgram = /\b(?:node|deno|bun|python3?|ruby|perl|php|bash|sh|zsh|Rscript|lua)\s+(?:-\S+\s+)*(?:-[ecpEr]|--eval|--print|--command|eval)(?=\s|=|$)/;
+
 /**
  * A tooling answer's one-line command: at most 120 characters, not shaped
- * like code (ending in ; { or }, or with an arrow), naming no identifier
- * the project's files don't have, and editing no changed or step file.
+ * like code (ending in ; { or }, with an arrow, an inline program or code
+ * in an argument), naming no identifier the project's files don't have,
+ * and editing no changed or step file.
  */
 function safeCommand(span: string, sources: FilterSources, isWord: (word: string) => boolean) {
-  if (span.includes("\n") || span.length > 120 || /[;{}]\s*$|=>/.test(span)) return false;
+  if (span.includes("\n") || span.length > 120 || /[;{}]\s*$|=>/.test(span) || inlineProgram.test(span)) return false;
+  // An argument, quoted or not, is no expression, call or code without spaces; a path or a test id ("a.py::test") is no code.
+  const argument = ([, single, double, bare]: string[]) =>
+    bare === undefined ? hasCode(single ?? double) : !/[/:]/.test(bare) && compactCode(bare);
+  if ([...span.matchAll(/'([^']*)'|"([^"]*)"|(\S+)/g)].some(argument)) return false;
   if ([...span.matchAll(identifier)].some(([word]) => !isWord(word))) return false;
   const touches = (sources.protectedFiles ?? []).some(
     (file) => span.includes(file) || span.includes(file.split("/").pop() ?? file),
@@ -155,13 +165,107 @@ const holdMark = "\uE000";
 const inline = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g;
 /**
  * An expression written into prose: operands joined by code operators with
- * spaces around them on one line ("delayMs * 2 ** attempt;", "x => y"). A
- * spaced hyphen or slash is a dash or "or" in prose, not an operator, and
- * a "*" or "+" that starts a line is a list item.
+ * spaces around them, no-break ones too ("delayMs * 2 ** attempt;", "a ?? b"),
+ * or on one side only for an operator prose never uses ("x =y", "a&& b",
+ * "delay *2"). A spaced hyphen or slash is a dash or "or", a "*" or "+" that
+ * starts a line is a list item, and "*word*", "**Note**", "+1" and "<3" stay.
  */
-const expression = /[\w$.()[\]'"]+(?:[ \t]+(?:=>|===|!==|==|!=|\*\*|&&|\|\||[-+*/%]=|<=|>=|[<>*%+=])[ \t]+[\w$.()[\]'"]+)+;?/g;
-/** Identifier-like words of prose: camelCase, snake_case and calls such as `retry(`; never part of a path. */
-const identifier = /(?<![\w$./-])(?:[a-z][a-z0-9]*[A-Z][A-Za-z0-9]*|[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+|[A-Za-z_$][\w$]*(?=\())(?![\w$/]|\.\w)/g;
+const [space, strong] = [String.raw`[ \t\u00A0\u2000-\u200A\u202F\u205F\u3000]`, String.raw`\?\?|<<=?|>>>?=?|[-+*/%&|^]=|=>|===?|!==?|<=|>=|&&|\|\||=`];
+const expression = new RegExp(
+  String.raw`[\w$.()[\]'"]+(?:(?:${space}+(?:${strong}|\*\*|[<>*%+])${space}+|${space}+(?:${strong})|(?:${strong})${space}+|${space}+\*(?=\d)|\*${space}+(?=\d))[\w$.()[\]'"]+)+;?`,
+  "g",
+);
+/** Identifier-like words of prose: camelCase, snake_case and calls such as `retry(` (not "file(s)"); never part of a path. */
+const identifier = /(?<![\w$./-])(?:[a-z][a-z0-9]*[A-Z][A-Za-z0-9]*|[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+|[A-Za-z_$][\w$]*(?=\((?!(?:s|es|ies)\))))(?![\w$/]|\.\w)/g;
+/** Faces that look like names: "o_O", "xD". */
+const emoticon = /^(?:[oO]_[oO]|[xX]_[xX]|T_T|xD|XD)$/;
+/**
+ * A keyboard shortcut ("Ctrl+C", "Cmd+Shift+P"), prose with a "+" in it:
+ * key names and single capitals or digits.
+ */
+const keyChord =
+  /^(?:(?:Ctrl|Control|Cmd|Command|Alt|Option|Opt|Shift|Meta|Super|Win|Fn|Esc|Enter|Return|Tab|Space|Backspace|Delete|Del|Home|End|PgUp|PgDn|Up|Down|Left|Right|F\d{1,2}|[A-Z0-9])\+)+(?:[A-Za-z][a-z]*\d*|\d|[^\w\s+])$/;
+/** A run of text without spaces, where code written without spaces lives (CJK text around it splits it too). */
+const word = /[!-~]+/g;
+/**
+ * Code written without spaces: a name, number or string, a code operator
+ * and another operand ("delay*2", "x=y", "a&&b", "x=>y", "a?.b", "a::b",
+ * "Vec<u8>"). "C++", "e-mail", "and/or", "24/7", "10:30" and "3:1" have
+ * none: a lone "-", "/", ":", "&", "|" or "^" is no operator here.
+ */
+const compactOperator =
+  /[\w$'")\]](?:===|!==|==|!=|<=|>=|=>|&&|\|\||\?\?|\?\.|\*\*=?|<<=?|>>>?=?|::|[-+*/%&|^]=|[=*%<>+])(?=[\w$'"([{!-])/;
+/** Other shapes of code without spaces: "i++", "++i", "arr[i]", "x?1:2", "{retries:3}". */
+const compactShapes = [
+  /(?<![\w$+])(?![cCgG]\+\+)[A-Za-z_$][\w$.]*(?:\+\+|--)(?![\w$+-])/,
+  /(?<![\w$+])\+\+[A-Za-z_$]/,
+  /(?<![\w$])[A-Za-z_$][\w$]*\[[^\]\s]*\]/,
+  /[\w$)\]]\?[\w$("'-][^\s?:]*:[\w$("'-]/,
+  /\{[^{}\s]*[:;=,(][^{}]*\}/,
+];
+/** Whether a run of text without spaces is code (a CLI flag such as "--max-count=5" and a shortcut are not). */
+const compactCode = (run: string) =>
+  !keyChord.test(run) &&
+  !/^-{1,2}[A-Za-z][\w-]*(?:=[\w./:,@-]*)?$/.test(run) &&
+  ((/[A-Za-z_$"']/.test(run) && compactOperator.test(run)) || compactShapes.some((shape) => shape.test(run)));
+/** A call with arguments, or a member call ("retry(fn, 2)", "Math.max(a, b)"); "file(s)" is prose. */
+const call = /(?<![\w$.])[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\((?!(?:s|es|ies)\))[^()\n]{0,120}\)/g;
+/** Whether a piece of text has code in it, read without the files (a link's path or query). */
+const hasCode = (text: string) =>
+  new RegExp(expression.source).test(text) || (text.match(word) ?? []).some(compactCode) || new RegExp(call.source).test(text);
+/** Whether a link's path, query or fragment, decoded, spells code ("?fix=return+delay*2**attempt"). */
+function linkCode(url: string) {
+  let rest = url.replace(/^https?:\/\/[^/?#]*/, "").replace(/\+/g, " ");
+  try {
+    rest = decodeURIComponent(rest);
+  } catch {
+    // A malformed escape is read as written.
+  }
+  return rest.split(/[/?&#]/).some((part) => hasCode(part.replace(/^[\w.-]*=/, "")));
+}
+/** Characters a reader never sees: zero-width spaces and joiners, invisible operators, fillers, soft hyphen, byte-order mark, direction marks. */
+const invisible = /\u034F|[\u00AD\u115F\u1160\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\u3164\uFEFF\uFFA0]/g;
+/** ASCII punctuation by its HTML entity name, which Markdown decodes. */
+const entityNames: Record<string, string> = {
+  lt: "<", gt: ">", amp: "&", quot: '"', apos: "'", ast: "*", midast: "*", lowast: "*", equals: "=", plus: "+",
+  minus: "-", lpar: "(", rpar: ")", lsqb: "[", rsqb: "]", lbrack: "[", rbrack: "]", lcub: "{", rcub: "}",
+  lbrace: "{", rbrace: "}", semi: ";", colon: ":", excl: "!", percnt: "%", Hat: "^", vert: "|", verbar: "|",
+  lowbar: "_", grave: "`", num: "#", dollar: "$", period: ".", comma: ",", quest: "?", commat: "@", sol: "/", bsol: "\\",
+};
+/**
+ * Prose as Markdown shows it, so code can't hide behind an escape
+ * ("delay\\*2"), a character reference ("delay&#42;2") or an invisible
+ * character; never BELL's own placeholder character.
+ */
+const asShown = (text: string) =>
+  text
+    .replace(invisible, "")
+    .replace(/&(?:#(\d{1,7})|#[xX]([\da-fA-F]{1,6})|([A-Za-z]+));/g, (entity, decimal?: string, hex?: string, name?: string) => {
+      const point = decimal ? Number(decimal) : hex ? parseInt(hex, 16) : undefined;
+      if (point === undefined) return entityNames[name!] ?? entity;
+      return point > 0 && point <= 0x10ffff && point !== 0xe000 ? String.fromCodePoint(point).replace(invisible, "") : entity;
+    })
+    .replace(/\\([!-/:-@[-`{-~])/g, "$1");
+/** A line break Markdown shows as a space: not before a blank line, a list item, a quote, a heading, a table row or a fence. */
+const softBreak = /\n(?![ \t]*(?:\n|$|[-*+][ \t]|\d{1,9}[.)][ \t]|>|#|\||`{3}|~{3}))/g;
+
+/**
+ * Replaces the matches of `pattern` found in the text as Markdown shows it,
+ * with each soft line break read as a space (the offsets stay the same), so
+ * code split over two lines is found; `replace` returns undefined to keep
+ * the original text.
+ */
+function replaceShown(text: string, pattern: RegExp, replace: (match: string) => string | undefined) {
+  let out = "";
+  let last = 0;
+  for (const match of text.replace(softBreak, " ").matchAll(pattern)) {
+    const next = replace(match[0]);
+    if (next === undefined) continue;
+    out += text.slice(last, match.index) + next;
+    last = match.index + match[0].length;
+  }
+  return out + text.slice(last);
+}
 
 /**
  * The lines of a diff: each hunk (a header and its lines) is kept only when
@@ -259,7 +363,8 @@ export function filterAgentText(
   /** A code block stays when its lines, as written or without their margin, are a run of a file's lines. */
   const block = (whole: string, ...readings: string[][]) =>
     readings.some((rows) => verbatimLines(rows, sources)) ? hold(whole) : remove();
-  let value = text.replaceAll(holdMark, "").replace(fence, (whole, prefix: string, _fence: string, body: string) => {
+  // A carriage return ends a line in Markdown, as a line feed does.
+  let value = text.replaceAll(holdMark, "").replace(/\r\n?/g, "\n").replace(fence, (whole, prefix: string, _fence: string, body: string) => {
     const quoted = /^(?:[ \t]*>[ \t]?)*/;
     const margin = prefix.replace(quoted, "").length;
     const rows = body.split("\n");
@@ -276,10 +381,24 @@ export function filterAgentText(
       const code = body.trim();
       return code && (occurs(code) || (options.tooling && safeCommand(code, sources, isWord))) ? hold(span) : remove();
     })
-    .replace(/\bhttps?:\/\/\S+/g, (url) => ([...url.matchAll(encodedRun)].some(([run]) => payload(run)) ? remove() : hold(url)))
-    .replace(encodedRun, (run) => (payload(run) ? remove() : run))
-    .replace(expression, (code) => (occurs(code.replace(/[.,;:]+$/, "")) ? code : remove()))
-    .replace(identifier, (word) => (isWord(word) ? word : remove()));
+    .replace(/\bhttps?:\/\/\S+/g, (url) => ([...url.matchAll(encodedRun)].some(([run]) => payload(run)) || linkCode(url) ? remove() : hold(url)));
+  // From here on the rules read prose as Markdown shows it.
+  value = asShown(value).replace(encodedRun, (run) => (payload(run) ? remove() : run));
+  value = replaceShown(value, expression, (code) =>
+    occurs(code.replace(/[.,;:]+$/, "")) || keyChord.test(code.replace(/\s+/g, "")) ? undefined : remove(),
+  );
+  // Code without spaces goes with the run of text it is in, sentence punctuation aside.
+  value = value.replace(word, (run) => {
+    const code = run.replace(/[.,:!?]+$/, "");
+    const bare = code.replace(/^[(["']+|[)\]"';]+$/g, "");
+    return !compactCode(code) || occurs(code) || (!!bare && occurs(bare)) ? run : remove() + run.slice(code.length);
+  });
+  value = value.replace(identifier, (name) => (isWord(name) || emoticon.test(name) ? name : remove()));
+  // A call is kept only as the files have it, or as a bare mention of a name they have ("retry()").
+  value = replaceShown(value, call, (code) => {
+    const bare = /^([\w$.]+)\(\s*\)$/.exec(code);
+    return occurs(code) || (bare && bare[1].split(".").every(isWord)) ? undefined : remove();
+  });
   value = value.replace(new RegExp(`${holdMark}(\\d+)${holdMark}`, "g"), (_match, index: string) => held[Number(index)]);
   if (removed && options.refs?.length && !/[\p{L}\p{N}]/u.test(value.replaceAll(removedMark, "")))
     value = options.refs.map(pointer).join("\n");
