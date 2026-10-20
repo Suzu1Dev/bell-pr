@@ -39,6 +39,8 @@ export interface QuizAttemptProps {
   title?: string;
   /** Shows the saved attempt with nothing to answer or grade (a run that takes no attempts). */
   readOnly?: boolean;
+  /** A confident miss comes back in the practice deck (the default: the deck asks each file's quiz again). */
+  practised?: boolean;
 }
 
 /** The step being saved. */
@@ -62,6 +64,7 @@ export function QuizAttempt({
   demo,
   title,
   readOnly,
+  practised,
 }: QuizAttemptProps) {
   const t = useT("review").tryFirst;
   const [answer, setAnswer] = useState(saved?.answer ?? "");
@@ -126,6 +129,7 @@ export function QuizAttempt({
       sample={sample}
       title={title}
       readOnly={readOnly}
+      practised={practised}
       answer={answer}
       confidence={confidence}
       record={record}
@@ -152,6 +156,7 @@ export interface QuizAttemptViewProps {
   sample?: string;
   title?: string;
   readOnly?: boolean;
+  practised?: boolean;
   /** The answer being written. */
   answer: string;
   confidence?: Confidence;
@@ -178,6 +183,7 @@ export function QuizAttemptView({
   sample,
   title,
   readOnly,
+  practised = true,
   answer,
   confidence,
   record,
@@ -197,6 +203,7 @@ export function QuizAttemptView({
   const id = useId();
   const gradable = !readOnly && record && !record.skipped && !record.grade;
   const confidentMiss =
+    practised &&
     record?.grade &&
     record.confidence &&
     isConfidentMiss({ grade: record.grade, confidence: record.confidence });

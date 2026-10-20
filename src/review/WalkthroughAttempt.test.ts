@@ -4,6 +4,7 @@ import { createElement, isValidElement, type ReactElement, type ReactNode } from
 import { understandingLimits, type FileAttempt } from "../../shared/understanding";
 import { api, send } from "../api";
 import { getDemo } from "../demo";
+import en from "../i18n/en";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { DiffFile } from "../types";
 import { ExplanationPanel, type ExplanationPanelProps } from "./ExplanationPanel";
@@ -95,6 +96,19 @@ test("a saved unit answer shows beside its answer, then one line once graded", (
   });
   assert.match(graded, /Your grade: Got it\./);
   assert.doesNotMatch(graded, /How did your answer compare\?/);
+});
+
+test("a confidently missed unit promises no practice deck: the deck asks one answer per file, the explanation's quiz first", () => {
+  const promise = en.review.tryFirst.quiz.confidentMiss;
+  for (const grade of ["partly", "missed"] as const) {
+    const html = cards({
+      tryFirst: true,
+      onAttempt: save,
+      attempts: { [key]: { answer: "It builds the URL from baseURL.", confidence: "sure", grade, at } },
+    });
+    assert.match(html, new RegExp(`Your grade: ${grade === "partly" ? "Partly" : "Missed"}\\.`));
+    assert.ok(!html.includes(promise), grade);
+  }
 });
 
 test("a run that takes no attempts shows a saved unit answer read-only and folds an unanswered one", () => {

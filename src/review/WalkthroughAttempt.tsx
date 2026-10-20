@@ -19,9 +19,11 @@ export type WalkthroughInput = NonNullable<FileAttemptInput["walkthrough"]>;
  * graded answer can fill the file's check question (the server decides);
  * in a Learn-by-hand run it credits nothing. Without `onAttempt` (a run
  * that takes no attempts, such as a published one) the saved answer shows
- * read-only. Once the file has the most unit answers the server keeps at
- * this version (a walkthrough made again brings new units), a new unit is
- * still tried first but stays on the page, since its save would be refused.
+ * read-only. A confident miss promises no practice deck: the deck asks one
+ * answer per file, its explanation's quiz before any unit. Once the file
+ * has the most unit answers the server keeps at this version (a
+ * walkthrough made again brings new units), a new unit is still tried
+ * first but stays on the page, since its save would be refused.
  */
 export function WalkthroughAttempt({
   unit,
@@ -48,6 +50,7 @@ export function WalkthroughAttempt({
         saved={saved}
         onSave={onAttempt && !full ? (quiz) => onAttempt({ unit: key, ...quiz }) : undefined}
         readOnly={!onAttempt}
+        practised={false}
         demo={demo}
       />
       {onAttempt && full && <p className="tf-hint">{t.walkthroughFull}</p>}
