@@ -15,7 +15,7 @@ any payment is taken (owner gate G4). Both are pending.
 | Document | Claims | Owner placeholders | EULA version |
 | --- | --- | --- | --- |
 | LICENSE.md (EULA) | EULA-01 to EULA-66 | 5 | `1.0-draft-2026-10-14` (`shared/product.ts` `eulaVersion`) |
-| PRIVACY.md | PRIV-01 to PRIV-58 | 4 | |
+| PRIVACY.md | PRIV-01 to PRIV-64 | 4 | |
 | TERMS.md | TERMS-01 to TERMS-34 | 4 | |
 | REFUND.md | REFUND-01 to REFUND-19 | 5 | |
 | SECURITY.md | SEC-01 to SEC-37 | 1 | |
@@ -100,6 +100,16 @@ or incomplete against the shipped code and are corrected in the documents:
 - **Refunded seats (REFUND-14).** A revocation covers a whole key
   (`server/license-keys.ts:19`), so a key that also holds kept seats is
   replaced.
+- **Learn by hand (v1.2: PRIV-13 and PRIV-34 amended, PRIV-59 to
+  PRIV-64 new).** The privacy policy now names code walkthroughs, premise
+  checks and the Learn-by-hand guide among the features that use the AI
+  CLI, what a guide answer and a review at Ready send, the test command
+  BELL PR runs as the person and what it keeps of its output, the run's
+  record, the setup needs agents report, and the checked list of
+  off-repository AI rules (read only for entries the publisher signed
+  off). These rows are drafts that wait for the owner's sign-off and
+  counsel's review; none is signed off. The `path:line` references that
+  v1.2 moved are re-pointed.
 
 ## Findings for the product lead
 
@@ -263,7 +273,7 @@ Commands run on the tree of this review, test files excluded:
 | PRIV-10 | BELL PR does not store the tools' passwords and tokens, and only asks the tools whether the person is signed in | `server/process.ts:163`, `server/agent-cli.ts:219`, `server/doctor.ts:299` |
 | PRIV-11 | Providers' own terms decide what they keep and train on | Owner decision: statement about third parties (G4, G5) |
 | PRIV-12 | The tools may send their own usage data; BELL PR neither adds nor removes it, passes only the variables each CLI needs plus the person's usage-data opt-outs (`DO_NOT_TRACK` to both, Claude Code's documented ones to Claude Code), and starts each Codex agent without its `config.toml`, so an opt-out made only there does not reach the agents | `server/process.ts:88`, `server/process.ts:146`, `server/process.ts:147`, `server/process.ts:163` (only listed variables are passed; none is set or removed), `server/agent-cli.ts:191` (`--ignore-user-config`); see finding 7 |
-| PRIV-13 | Which features use the AI CLI, and which providers Claude Code may use | `server/agent-cli.ts:149`, `server/sync-runs.ts:419` (conflict resolution), `server/coach.ts:404` (coach debrief), `server/process.ts:108`, `server/process.ts:114` |
+| PRIV-13 | Which features use the AI CLI, and which providers Claude Code may use | `server/agent-cli.ts:149`, `server/sync-runs.ts:419` (conflict resolution), `server/coach.ts:404` (coach debrief), `server/process.ts:108`, `server/process.ts:114`; v1.2: `server/walkthrough-runs.ts:131` (code walkthroughs), `server/premise-runs.ts:99` (premise checks), `server/by-hand-guide.ts:172` (Learn-by-hand guide answers), `server/by-hand-guide.ts:479` (the guide's review at Ready) |
 | PRIV-14 | BELL PR's instructions, the direction and the approved plan are sent | `server/run-executor.ts:732`, `server/run-executor.ts:792` |
 | PRIV-15 | Repository files, analysis excerpts, diffs, rules and templates are sent | `server/insights.ts:1220`, `server/drafts.ts:395`, `server/learning.ts:252` |
 | PRIV-16 | Output of the agents' commands is sent | `server/agent-cli.ts:54` (write roles run commands through the CLI, which returns the output to its model) |
@@ -284,7 +294,7 @@ Commands run on the tree of this review, test files excluded:
 | PRIV-31 | Agents are told not to put contents or secrets in queries | `server/prompts/team.ts:40` |
 | PRIV-32 | One data directory: `~/.bellpr`, `--data-dir` or `BELLPR_DATA_DIR` | `server/config.ts:97`, `server/config.ts:105` |
 | PRIV-33 | The data directory is 0700 and BELL PR's files are private to the user | `server/store.ts:797`, `server/store.ts:802`, `server/index.ts:330` |
-| PRIV-34 | The data inventory table | `server/store.ts:37`, `server/store.ts:38`, `server/store.ts:844`, `server/store.ts:985`, `server/repositories.ts:289`, `server/new-run.ts:162`, `server/run-executor.ts:526`, `server/insights.ts:695`, `server/insights.ts:747`, `server/discovery.ts:489`, `server/license.ts:348`, `server/app-settings.ts:150`, `server/publish.ts:67`, `server/config.ts:114`, `server/config.ts:116`, `server/config.ts:120`, `server/log.ts:15`, `server/log.ts:305`, `server/log.ts:306`, `server/cli.ts:242`; the v1.1 learning records and GitHub facts in `state.json`: `server/store.ts:460`, `server/store.ts:461`, `server/store.ts:549`, `server/store.ts:573`, `server/store.ts:575`, `server/store.ts:576`, `server/store.ts:586`, `server/store.ts:597`, `server/store.ts:598`, `server/store.ts:601`, the links to the person's waiting pull requests `server/store.ts:437`, practice answers never stored `server/practice.ts:5` |
+| PRIV-34 | The data inventory table | `server/store.ts:37`, `server/store.ts:38`, `server/store.ts:844`, `server/store.ts:985`, `server/repositories.ts:289`, `server/new-run.ts:162`, `server/run-executor.ts:526`, `server/insights.ts:695`, `server/insights.ts:747`, `server/discovery.ts:489`, `server/license.ts:348`, `server/app-settings.ts:150`, `server/publish.ts:67`, `server/config.ts:114`, `server/config.ts:116`, `server/config.ts:120`, `server/log.ts:15`, `server/log.ts:305`, `server/log.ts:306`, `server/cli.ts:242`; the v1.1 learning records and GitHub facts in `state.json`: `server/store.ts:460`, `server/store.ts:461`, `server/store.ts:549`, `server/store.ts:573`, `server/store.ts:575`, `server/store.ts:576`, `server/store.ts:586`, `server/store.ts:597`, `server/store.ts:598`, `server/store.ts:601`, the links to the person's waiting pull requests `server/store.ts:437`, practice answers never stored `server/practice.ts:5`; v1.2: walkthrough answers `server/store.ts:228` and walkthroughs `server/store.ts:512`, each Learn-by-hand run's record `server/store.ts:286`, `server/store.ts:327` (the guide's answers), `server/store.ts:340` (test runs and the end of their output), `server/store.ts:399` (the kinds of help used), `server/store.ts:604`, `shared/runs.ts:30`, the quoted rules a fitted run was fitted to `server/store.ts:269`, the confirmed test command `server/store.ts:463`, carve-out quotes and checked-list rules in the stored rules `server/store.ts:110`, `server/store.ts:111`, the places a project's people talk `server/store.ts:135`, test runs in `children.json` `server/agent-registry.ts:136` |
 | PRIV-35 | Temporary index files are deleted when done or at the next start | `server/sync.ts:40`, `server/cleanup.ts:153`, `server/janitor.ts:13` |
 | PRIV-36 | What the browser keeps, and the 30-day cookie | `src/i18n/index.tsx:45`, `src/app/AppShell.tsx:157`, `src/app/AppShell.tsx:541`, `src/app/AppShell.tsx:559`, `src/app/hooks/demoStorage.ts:15`, `src/app/ErrorBoundary.tsx:118`, `server/http-guard.ts:80` |
 | PRIV-37 | `BELLPR_LICENSE_KEY` holds the key wherever it is set | `server/index.ts:512` |
@@ -309,6 +319,12 @@ Commands run on the tree of this review, test files excluded:
 | PRIV-56 | Not directed at children | Owner decision: counsel review (G4) |
 | PRIV-57 | Each release ships its policy version | Owner decision: release process; `scripts/generate-third-party-notices.mjs:52` copies the policy into each build |
 | PRIV-58 | A coach debrief, asked for by the person, sends their own records for one project: run titles and PR outcomes, explanations, check answers with confidence, grades and corrections, approaches chosen and why, forecasts, and maintainers' and tagged comments with their authors and the person's tags and lessons | `server/routes/learning.ts:201`, `server/coach.ts:67`, `server/coach.ts:101`, `server/coach.ts:404`, `server/prompts/coach.ts:11` |
+| PRIV-59 | Code walkthroughs and premise checks send the task, the change and the plan and reports they check, and the repository files the agent reads, as explanations do | `server/walkthrough-runs.ts:131`, `server/prompts/walkthroughs.ts:20`, `server/prompts/walkthroughs.ts:33` (the file's diff and the task), `server/premise-runs.ts:99`, `server/prompts/premise.ts:21`, `server/prompts/premise.ts:30` (the task, the team's plan and reports, the diff); the agents read the checkout read-only, `server/agent-cli.ts:60` |
+| PRIV-60 | Setup needs that agents report are stored in `state.json`, shown, and never run | `server/store.ts:429` (stored with tasks and rounds), `src/team/SetupNeeds.tsx:41` (shown with a copy of each command), `src/i18n/en/team.ts:202` (an agent's suggestion to check before you run it); no code runs them |
+| PRIV-61 | What a Learn-by-hand guide answer and a review at Ready send; the agents cannot edit files in these runs | `server/by-hand-guide.ts:123` (one turn's input), `server/by-hand-guide.ts:135` (the last 4 answers on the step), `server/prompts/by-hand.ts:106` (the change, at most 40 kB), `server/prompts/by-hand.ts:107` and `server/prompts/by-hand.ts:140` (the end of the last test output, at most 4 kB), `server/prompts/by-hand.ts:149` (the person's plan), `server/by-hand-guide.ts:172` (read-only turn), `server/prompts/by-hand.ts:293` (the review: task, plan, least-sure line, last test run, the change), `server/run-executor.ts:123` (no write turn in a Learn-by-hand run), `server/by-hand-filter.ts:48` (held-back files are never quoted) |
+| PRIV-62 | The test command runs only on a click and only as confirmed, on the computer, in the run's folder, with the person's permissions, without the token and key variables (by name), and can read the home folder; the last 4,000 characters are kept, masked, and leave the computer only in a guide answer or review | `server/routes/by-hand.ts:139` (confirmed in its own request), `server/routes/by-hand.ts:142` (run on a click), `server/by-hand-tests.ts:222` (only the confirmed command), `server/by-hand-tests.ts:313` (`/bin/sh -c` in the run's folder, no sandbox), `server/test-command.ts:180` (variables removed by name), `server/by-hand-tests.ts:366` and `shared/by-hand.ts:75` (the last 4,000 characters), `server/test-command.ts:241` (masked), `server/prompts/by-hand.ts:140` (sent only inside a guide turn) |
+| PRIV-63 | The Learn-by-hand record stays in `state.json` and leaves the computer only in a guide answer or review, or when copied or exported | `server/by-hand-record.ts:39` (help events with the model and CLI), `server/store.ts:286`, `shared/by-hand.ts:390` (counts shown locally), `shared/learning-export.ts:217` (the export, on request) |
+| PRIV-64 | BELL PR ships a dated list of off-repository AI rules, reads an entry only after the publisher signed it off, and sends nothing to read it | `server/policy-registry.ts:285` (an entry is read only with its sign-off date), `server/policy-registry.ts:306`, `server/contribution-facts.ts:338` (merged into the rules read locally); the list is data in the package, no network module; `scripts/check-policy-registry.mjs` lists unsigned entries |
 
 ## TERMS.md
 
