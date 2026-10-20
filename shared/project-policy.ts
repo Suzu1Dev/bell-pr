@@ -205,6 +205,8 @@ const prohibition = new RegExp(
     // "we will flag and reject …"
     String.raw`\b(?:will|shall|must|we)\s+(?:\w+\s+){0,2}?(?:reject|refuse)\w*`,
     String.raw`\bzero[- ]tolerance\b`,
+    // "a strict no-AI policy" (see `noAiPolicy`)
+    String.raw`\bno-(?:AI|LLMs?)\b`,
   ].join("|"),
   flags,
 );
@@ -372,6 +374,10 @@ const conversation = new RegExp(
   String.raw`\b(?:descriptions?|comments?|messages?|repl(?:y|ies)|respon(?:d|ds|ding|ses?)|discussions?|conversations?|communicat\w*)\b`,
   flags,
 );
+/** A project's no-AI policy: "We have a strict no-AI policy", "follows a no-LLM policy"; not "no AI policy yet". */
+const noAiPolicy =
+  /(?<=\b(?:a|an|our|the|this|its|their|strict)\s+(?:(?:strict|firm|hard|clear)\s+)?)no[- ](?:AI|LLMs?|gen[- ]?AI|generative[- ]AI)[- ]polic(?:y|ies)\b/i;
+refusalTerms.push(noAiPolicy);
 /** The change itself: its code, commits or patches, or a pull request as a whole. */
 const changeObject = new RegExp(
   String.raw`\b(?:code(?!\s+of\s+conduct)|patch(?:es|sets?)?|contributions?|implementations?|diffs?|commits?(?!\s+messages?))\b|(?<!\b(?:on|in|to|under|for)\s+(?:your|the|a|their|each|every|this)\s+)\b(?:PRs?|pull[- ]requests?|merge\s+requests?)\b(?!\s+(?:descriptions?|titles?|bod(?:y|ies)|text|comments?|messages?|templates?|reviews?))`,
