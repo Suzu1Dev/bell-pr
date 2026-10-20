@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
 import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
-import type { FileAttempt } from "../../shared/understanding";
+import { understandingLimits, type FileAttempt } from "../../shared/understanding";
 import { api, send } from "../api";
 import { getDemo } from "../demo";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
@@ -142,6 +142,40 @@ test("the panel passes the try-first switch, this version's unit answers and the
   // Answers made on an earlier version of the file start over.
   assert.equal(props({ file: { ...client, fingerprint: "b".repeat(64) } }).attempts, undefined);
   assert.equal(props({ onAttempt: undefined }).onAttempt, undefined);
+});
+
+test("once the file has the most unit answers kept, a new unit still asks first but is not sent, and says so", () => {
+  // A walkthrough made again at the same version brings units with new
+  // keys; the server keeps at most walkthroughUnits answers per file
+  // version and refuses one more (409 walkthroughFull), which would leave
+  // the unit's answer hidden behind a save that can never succeed.
+  const answered = (count: number) =>
+    Object.fromEntries(
+      Array.from({ length: count }, (_, index) => [
+        `earlier${index}:${index + 1}`,
+        { answer: "An earlier answer.", confidence: "think" as const, at },
+      ]),
+    );
+  const limit = understandingLimits.walkthroughUnits;
+  const props = { unit, demo: false, onAttempt: save };
+  const full = find(shallow(WalkthroughAttempt, { ...props, attempts: answered(limit) }), QuizAttempt)!;
+  assert.equal(full.props.onSave, undefined);
+  assert.equal(full.props.readOnly, false);
+  const html = renderEn(createElement(WalkthroughAttempt, { ...props, attempts: answered(limit) }));
+  assertNoHan(html);
+  assert.match(html, /<textarea/);
+  assert.match(html, /This file already has the most walkthrough answers BELL PR keeps, so this one stays on this page and isn&#x27;t saved\./);
+  assert.match(
+    renderZh(createElement(WalkthroughAttempt, { ...props, attempts: answered(limit) })),
+    /這個檔案的程式碼解說作答已達 BELL PR 保留的上限/,
+  );
+  // One fewer, or this unit's own answer among them: saved as usual, with no note.
+  const room = renderEn(createElement(WalkthroughAttempt, { ...props, attempts: answered(limit - 1) }));
+  assert.doesNotMatch(room, /most walkthrough answers/);
+  assert.equal(typeof find(shallow(WalkthroughAttempt, { ...props, attempts: answered(limit - 1) }), QuizAttempt)!.props.onSave, "function");
+  const own = { ...answered(limit - 1), [key]: { answer: "It builds the URL.", confidence: "think" as const, at } };
+  assert.equal(typeof find(shallow(WalkthroughAttempt, { ...props, attempts: own }), QuizAttempt)!.props.onSave, "function");
+  assert.doesNotMatch(renderEn(createElement(WalkthroughAttempt, { ...props, attempts: own })), /most walkthrough answers/);
 });
 
 test("a unit's answer is saved through PATCH /attempts before its answer is revealed", async () => {

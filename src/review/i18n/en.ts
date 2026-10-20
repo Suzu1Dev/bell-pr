@@ -1,3 +1,5 @@
+import { product } from "../../../shared/product";
+
 /**
  * The review panel's v1.2 strings (English): "How a reader sees your
  * change" and the walkthrough's answer-first card. Module-local, so they
@@ -17,6 +19,8 @@ const messages = {
   },
   /** The title of a walkthrough unit's answer-first card (try first, D1). */
   checkYourself: "Check yourself",
+  /** Under a unit's card once the file has the most unit answers the server keeps (409 walkthroughFull). */
+  walkthroughFull: `This file already has the most walkthrough answers ${product.name} keeps, so this one stays on this page and isn't saved.`,
 };
 
 export default messages;

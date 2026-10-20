@@ -1,4 +1,9 @@
-import { walkthroughUnitKey, type FileAttempt, type FileAttemptInput } from "../../shared/understanding";
+import {
+  understandingLimits,
+  walkthroughUnitKey,
+  type FileAttempt,
+  type FileAttemptInput,
+} from "../../shared/understanding";
 import type { FunctionWalkthrough } from "../../shared/walkthroughs";
 import { usePanelStrings } from "./i18n";
 import { QuizAttempt } from "./QuizAttempt";
@@ -14,7 +19,9 @@ export type WalkthroughInput = NonNullable<FileAttemptInput["walkthrough"]>;
  * graded answer can fill the file's check question (the server decides);
  * in a Learn-by-hand run it credits nothing. Without `onAttempt` (a run
  * that takes no attempts, such as a published one) the saved answer shows
- * read-only.
+ * read-only. Once the file has the most unit answers the server keeps at
+ * this version (a walkthrough made again brings new units), a new unit is
+ * still tried first but stays on the page, since its save would be refused.
  */
 export function WalkthroughAttempt({
   unit,
@@ -29,15 +36,21 @@ export function WalkthroughAttempt({
 }) {
   const t = usePanelStrings();
   const key = walkthroughUnitKey(unit);
+  const saved = attempts?.[key];
+  const full =
+    !saved && Object.keys(attempts ?? {}).length >= understandingLimits.walkthroughUnits;
   return (
-    <QuizAttempt
-      title={t.checkYourself}
-      question={unit.selfCheck.question}
-      reference={unit.selfCheck.answer}
-      saved={attempts?.[key]}
-      onSave={onAttempt && ((quiz) => onAttempt({ unit: key, ...quiz }))}
-      readOnly={!onAttempt}
-      demo={demo}
-    />
+    <>
+      <QuizAttempt
+        title={t.checkYourself}
+        question={unit.selfCheck.question}
+        reference={unit.selfCheck.answer}
+        saved={saved}
+        onSave={onAttempt && !full ? (quiz) => onAttempt({ unit: key, ...quiz }) : undefined}
+        readOnly={!onAttempt}
+        demo={demo}
+      />
+      {onAttempt && full && <p className="tf-hint">{t.walkthroughFull}</p>}
+    </>
   );
 }

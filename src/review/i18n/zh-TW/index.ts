@@ -1,5 +1,6 @@
 /** The review panel's v1.2 strings (Traditional Chinese, Taiwan); see ../en.ts. */
 import type { Translation } from "../../../../shared/i18n/locale";
+import { product } from "../../../../shared/product";
 import type en from "../en";
 
 const messages: Translation<typeof en> = {
@@ -11,6 +12,7 @@ const messages: Translation<typeof en> = {
     answerAll: "這個檔案沒有自己的問題：請先在「用自己的話講一遍」回答其中的問題。",
   },
   checkYourself: "考考自己",
+  walkthroughFull: `這個檔案的程式碼解說作答已達 ${product.name} 保留的上限，所以這一題的作答只留在這個頁面，不會存下。`,
 };
 
 export default messages;
