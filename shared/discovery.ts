@@ -83,6 +83,13 @@ export interface ContributionOpportunity {
    * from the agent's answer; absent means false.
    */
   byHandReserved?: true;
+  /**
+   * Beside `byHandReserved`: the reservation is worded around AI-generated
+   * or automated pull requests (matplotlib's "pull requests that are AI
+   * generated will be closed"), not around using AI, so a Learn-by-hand run
+   * may still reach the quoted confirm there. Absent means false.
+   */
+  byHandReservedOutput?: true;
 }
 
 export interface DiscoveryJob {

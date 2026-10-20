@@ -174,6 +174,7 @@ const opportunitySchema = z
     learnByHand: z.boolean().optional(),
     // Derived from the evidence by the server after parsing (v1.2).
     byHandReserved: z.literal(true).optional(),
+    byHandReservedOutput: z.literal(true).optional(),
   })
   .strict();
 const resultSchema = z

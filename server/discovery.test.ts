@@ -1197,13 +1197,14 @@ function reservedJob() {
         ],
         learnByHand: true,
         byHandReserved: true,
+        byHandReservedOutput: true,
       },
     ],
     warnings: [],
   };
 }
 
-for (const field of ["byHandReserved"] as const)
+for (const field of ["byHandReserved", "byHandReservedOutput"] as const)
   test(`a build that predates ${field} still reads an opportunity that has it`, () => {
     const job = reservedJob();
     const older = lenientRead(
