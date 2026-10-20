@@ -479,6 +479,18 @@ test("the stored tail is ANSI-stripped, keeps what a terminal shows of progress 
   assert.doesNotMatch(JSON.stringify(f.run.byHand), /ghp_B|ghp_D|\\u001b/);
 });
 
+test("the command a run records stays within 300 characters after masking", async (t) => {
+  const f = await fixture(t);
+  // Masking a short password makes it longer ("[REDACTED]" is 10 characters).
+  const command = `node -e "process.exit(0)" # password=12345678 ${"x".repeat(260)}`.slice(0, 300);
+  await f.confirm(command);
+  const ran = await f.runOnce();
+  assert.match(ran.command, /password=\[REDACTED\]/);
+  assert.ok(ran.command.length <= 300, `${ran.command.length} characters`);
+  const reported = (await f.byHand.reportTests(f.run.id, { outcome: "passed" })).run.byHand!.tests!.at(-1)!;
+  assert.ok(reported.command.length <= 300, `${reported.command.length} characters`);
+});
+
 test("new untracked files the command created are listed; ignored and earlier files are not", async (t) => {
   const f = await fixture(t);
   await writeFile(path.join(f.repository, "notes.txt"), "mine\n");

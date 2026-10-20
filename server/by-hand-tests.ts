@@ -75,6 +75,9 @@ function cleanLine(line: string) {
   return text.slice(text.lastIndexOf("\r") + 1);
 }
 
+/** A command as the record keeps it: credentials masked, within the record's cap (masking can lengthen it). */
+const recordedCommand = (text: string) => redact(text).slice(0, byHandLimits.commandChars);
+
 /** Text the person pasted or a tail kept: cleaned line by line, credentials masked, trailing space dropped. */
 function cleanOutput(text: string) {
   return redact(text.split("\n").map(cleanLine).join("\n")).trimEnd();
@@ -309,7 +312,7 @@ async function execute(
       appendTestRun(run, {
         at: now(),
         // The record masks a credential written into the command, as in the output.
-        command: redact(start.command),
+        command: recordedCommand(start.command),
         changeFingerprint: start.changeFingerprint,
         outcome,
         ...(exitCode === undefined ? {} : { exitCode }),
@@ -364,7 +367,7 @@ export async function reportTests(
     appendTestRun(run, {
       at: now(),
       // The confirmed command, or none: BELL can't see what the person ran.
-      command: redact(ctx.repo(run.repoId).testCommand?.command ?? ""),
+      command: recordedCommand(ctx.repo(run.repoId).testCommand?.command ?? ""),
       changeFingerprint: changeFingerprint(files),
       outcome: input.outcome,
       ms: 0,
