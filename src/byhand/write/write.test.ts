@@ -78,9 +78,11 @@ const guidePlan = {
 };
 
 test("Plan with the guide asks for the person's steps first and keeps the outline folded", () => {
-  const first = html(plan({ guidePlan }, {}, { status: "awaiting_plan" }));
+  const premise = { verdict: "refuted" as const, statement: "Retries never stop.", evidence: "src/retry.ts:3 caps them." };
+  const first = html(plan({ guidePlan }, {}, { status: "awaiting_plan", team: { ...run().team!, planSummary: guidePlan.summary, premise } }));
   assert.ok(first.includes("Write your own steps first."));
-  assert.ok(first.includes("<summary>What the guide read</summary><p>Requests retry forever after a timeout.</p>"));
+  // The team board above it shows the guide's summary and the premise check once.
+  assert.doesNotMatch(first, /Requests retry forever after a timeout\.|Retries never stop\./);
   assert.match(first, /<code>src\/retry\.ts:10-24<\/code>/);
   assert.ok(first.includes("Folded until you save a step of your own."));
   assert.ok(first.includes(apostrophes("I don't know where to start")));
