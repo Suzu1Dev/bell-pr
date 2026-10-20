@@ -248,6 +248,13 @@ export interface PlannedItem {
   question: string;
   /** AI-written; absent when there is none ("compare with the diff yourself"). */
   reference?: string;
+  /**
+   * The AI-written part of the reference, the only text an answer may not
+   * nearly copy (not persisted). Set in a Learn-by-hand run, whose
+   * reference also holds the person's own words; absent means the whole
+   * reference.
+   */
+  copyReference?: string;
 }
 
 export type MissingPart =
@@ -626,6 +633,7 @@ export function planCheck({
   generated,
   record,
   questions,
+  byHand,
 }: {
   files: readonly CheckFile[];
   explanations?: Record<string, CheckExplanation | undefined>;
@@ -642,7 +650,28 @@ export function planCheck({
   record?: RunUnderstanding;
   /** The run's language: the fallback question for a file, and the not-tested question. */
   questions: { fallback: (path: string) => string; untested: string };
+  /**
+   * A Learn-by-hand run (DESIGN v1.2 F10): explanations, attempts and
+   * walkthrough credit are ignored and every file asks `questions.fallback`
+   * (the fixed "why this way, what would break" question). Each reference
+   * is the person's own words (`own`) and the AI-written part (`ai`); only
+   * `ai` is checked for near-copies (`copyReference`).
+   */
+  byHand?: {
+    reference(path: string): { own?: string; ai?: string };
+    untested: { own?: string; ai?: string };
+  };
 }): PlannedItem[] {
+  if (byHand) {
+    explanations = undefined;
+    attempts = undefined;
+    walkthroughs = undefined;
+  }
+  /** The reference of a Learn-by-hand slot, with its AI-written part for the copy check. */
+  const byHandReference = ({ own, ai }: { own?: string; ai?: string }) => {
+    const reference = [own, ai].filter((text) => text?.trim()).join("\n\n");
+    return { ...(reference ? { reference } : {}), copyReference: ai?.trim() ?? "" };
+  };
   const scope = checkScope(files, record);
   const slots = checkQuestionCount(changedLines(scope, generated));
   const ranked = pickCheckFiles({ files: scope, reports, reviewOrder, generated });
@@ -663,6 +692,14 @@ export function planCheck({
     .map((file) => {
       const base = { path: file.path, fingerprint: file.fingerprint };
       const kept = keep.includes(file) ? locked.get(file.path) : undefined;
+      if (byHand)
+        return {
+          ...base,
+          id: kept?.id ?? `fallback:${file.path}`,
+          source: kept?.source ?? "fallback",
+          question: kept?.question ?? questions.fallback(file.path),
+          ...byHandReference(byHand.reference(file.path)),
+        };
       const card = readyCard(file, explanations);
       // A walkthrough unit's check stands in for a card without one (D1).
       const units = walkthroughChecks(walkthroughs?.[file.path], file.fingerprint);
@@ -719,7 +756,7 @@ export function planCheck({
       id: "untested",
       source: "untested",
       question: kept?.question ?? questions.untested,
-      ...(tester ? { reference: tester } : {}),
+      ...(byHand ? byHandReference(byHand.untested) : tester ? { reference: tester } : {}),
     });
   }
   return plan;
@@ -879,7 +916,7 @@ export function understandingStatus({
     const item = record?.items?.find((entry) => entry.id === planned.id);
     const fresh =
       !item?.path || fingerprints.get(item.path) === item.fingerprint;
-    if (!item || !fresh || !validAnswer(item, planned.reference)) {
+    if (!item || !fresh || !validAnswer(item, planned.copyReference ?? planned.reference)) {
       missing.push({ part: "answer", itemId: planned.id });
       continue;
     }

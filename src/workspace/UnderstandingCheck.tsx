@@ -368,7 +368,7 @@ export default function UnderstandingCheck({
       if (!confidence) reasons.push(t.confidenceMissing);
       else if (!draft.dontKnow && understandingWords(draft.answer) < understandingLimits.answerMinWords)
         reasons.push(t.answerShort({ min: understandingLimits.answerMinWords }));
-      else if (!validAnswer({ answer: draft.dontKnow ? "" : draft.answer, dontKnow: draft.dontKnow, confidence }, item.reference))
+      else if (!validAnswer({ answer: draft.dontKnow ? "" : draft.answer, dontKnow: draft.dontKnow, confidence }, item.copyReference ?? item.reference))
         reasons.push(t.copied);
     }
     if (reasons.length) {
