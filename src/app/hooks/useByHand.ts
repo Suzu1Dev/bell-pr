@@ -36,8 +36,10 @@ export function selectionOf(file: DiffFile, question: string): GuideSelection {
 export function useByHand(
   run: Run,
   files: DiffFile[],
-  { demo, repo, actions, handBack, draftMutationEpoch }: {
+  { demo, repo, actions, handBack, draftMutationEpoch, requesting = false }: {
     demo: boolean;
+    /** This tab asks for an explanation or a walkthrough of the run right now. */
+    requesting?: boolean;
     repo?: Repo;
     /** Bumped by draft saves; a read begun before a save keeps the newer run. */
     draftMutationEpoch: RefObject<number>;
@@ -110,6 +112,19 @@ export function useByHand(
       document.removeEventListener("visibilitychange", back);
     };
   }, [id, open, setFiles, setRun, draftMutationEpoch]);
+
+  // An explanation or a walkthrough asked for before a reload is still written: read the diff
+  // (a GET, never a request for one) every 3 s until it settles, unless this tab asks itself.
+  const generating = byHand && !requesting && files.some((file) => file.explanationStatus === "generating" || file.walkthroughStatus === "generating");
+  useEffect(() => {
+    if (!generating) return;
+    const timer = setInterval(() => {
+      if (reading.current) return;
+      reading.current = true;
+      readRunFiles(id).then((next) => shown.current === id && setFiles(next), () => undefined).finally(() => (reading.current = false));
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [id, generating, setFiles]);
 
   // A test run can write new files, which change the version: read the diff once it ends.
   const testing = byHand && run.byHand?.busy?.kind === "tests";

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { mock } from "node:test";
 import { act, createElement, useState } from "react";
 import { selectionQuestion, parseDiff } from "../../review/diff";
 import en from "../../i18n/en/review";
@@ -98,6 +98,54 @@ test("a refused request shows the server's message in the view that asked, and n
     assert.equal(latest!.readyDialog.error, "");
   } finally {
     await mounted.unmount();
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("an explanation asked for before a reload is followed by reading the diff until it is written, never by asking again", async () => {
+  const requests: string[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    requests.push(`${init?.method ?? "GET"} ${String(input)}`);
+    return new Response(JSON.stringify({ files: [{ ...file, explanationStatus: "ready" }] }), { headers: { "Content-Type": "application/json" } });
+  }) as typeof fetch;
+  mock.timers.enable({ apis: ["setInterval"] });
+  const value = { id: "run-1", repoId: "repo-1", status: "approved", learnByHand: true, agents: [], byHand: {} } as unknown as Run;
+  let shown: DiffFile[] = [];
+  function Probe({ requesting }: { requesting: boolean }) {
+    const [files, setFiles] = useState<DiffFile[]>([{ ...file, explanationStatus: "generating" }]);
+    shown = files;
+    useByHand(value, files, {
+      demo: false,
+      requesting,
+      draftMutationEpoch: { current: 0 },
+      actions: { setRun() {}, setFiles, approveTeamPlan: async () => {} },
+      handBack() {},
+    });
+    return null;
+  }
+  const flush = () => act(async () => new Promise((resolve) => setImmediate(resolve)));
+  // While this tab asks for it itself, its own request brings the result.
+  const asking = await mount(createElement(Probe, { requesting: true }));
+  mock.timers.tick(9000);
+  await flush();
+  assert.deepEqual(requests, []);
+  await asking.unmount();
+  const mounted = await mount(createElement(Probe, { requesting: false }));
+  try {
+    mock.timers.tick(3000);
+    await flush();
+    await flush();
+    assert.equal(requests.length, 1);
+    assert.match(requests[0], /^GET .*\/runs\/run-1\/diff$/);
+    assert.equal(shown[0].explanationStatus, "ready");
+    // Written: no more reads.
+    mock.timers.tick(9000);
+    await flush();
+    assert.equal(requests.length, 1);
+  } finally {
+    await mounted.unmount();
+    mock.timers.reset();
     globalThis.fetch = realFetch;
   }
 });

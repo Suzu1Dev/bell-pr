@@ -185,7 +185,8 @@ export function WorkspacePage({
   const understanding = useUnderstanding(run, files, { demo, setRun: actions.setRun });
   const premise = usePremiseCheck(run, actions);
   const handBack = () => beginContribution(run.repoId, run);
-  const byHand = useByHand(run, files, { demo, repo: currentRepo, actions, handBack, draftMutationEpoch: draft.draftMutationEpoch });
+  const requesting = explanationRequests.has(run.id) || !!walkthroughs?.walkthroughBusy;
+  const byHand = useByHand(run, files, { demo, repo: currentRepo, actions, handBack, draftMutationEpoch: draft.draftMutationEpoch, requesting });
   const reviewing = !!run.learnByHand && run.byHand?.busy?.kind === "review";
   const records = useRunRecords(run, files, { demo, setRun: actions.setRun, notify: actions.notify, file, ask: actions.ask, setSelectedPath, setTab });
   // The sample's playback queues for a moment behind nothing.
