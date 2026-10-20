@@ -347,10 +347,9 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
     }
   });
 
-  // MERGE-STEP: the reader view shows once the Changes tab passes
-  // byHandReview to ExplanationPanel (W2D's mount, with the check view and
-  // openCheckPanel); then this test runs as written.
-  test.fixme("the reader view says to answer the file's question first and opens the check", async ({ browser }) => {
+  // The reader view shows because the Changes tab passes byHandReview to
+  // ExplanationPanel (W2D's mount, with the check view and openCheckPanel).
+  test("the reader view says to answer the file's question first and opens the check", async ({ browser }) => {
     const { page, close } = await open(browser);
     try {
       await page.goto(`/#/runs/${runId}/changes?file=${files.greeting}&locale=en`);
@@ -366,9 +365,8 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
     }
   });
 
-  // MERGE-STEP: as above, once the Changes tab passes byHandReview.
   for (const width of [1440, 390])
-    test.fixme(`in zh-TW the reader view fits at ${width} px and names its parts for a screen reader`, async ({ browser }) => {
+    test(`in zh-TW the reader view fits at ${width} px and names its parts for a screen reader`, async ({ browser }) => {
       const { page, close } = await open(browser);
       try {
         await page.setViewportSize({ width, height: 900 });
@@ -388,9 +386,8 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
       }
     });
 
-  // MERGE-STEP: as above, once the Changes tab passes byHandReview with
-  // checkError and onRetryCheck (useUnderstanding's error and refresh).
-  test.fixme("when the check can't be read, the reader view says why, and Try again reads it again", async ({ browser }) => {
+  // byHandReview carries checkError and onRetryCheck (useUnderstanding's error and refresh).
+  test("when the check can't be read, the reader view says why, and Try again reads it again", async ({ browser }) => {
     const { page, close } = await open(browser);
     const message = "The check is not available right now.";
     await page.route(`**/api/runs/${runId}/understanding`, (route) =>
@@ -412,8 +409,7 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
     }
   });
 
-  // MERGE-STEP: as above, once the Changes tab passes byHandReview.
-  test.fixme("the Reports tab names the guide and makes no promise about the agent team", async ({ browser }) => {
+  test("the Reports tab names the guide and makes no promise about the agent team", async ({ browser }) => {
     const { page, close } = await open(browser);
     try {
       await page.goto(`/#/runs/${runId}/changes?file=${files.greeting}&locale=en`);
@@ -428,10 +424,9 @@ test.describe("a Learn-by-hand run in review, marked ready", () => {
     }
   });
 
-  // MERGE-STEP: as above, once the Changes tab passes byHandReview; with
-  // the check off in Settings the file may be explained at once (DESIGN
-  // v1.2 F10), and W2A's server takes one file per request.
-  test.fixme("with the check off, Show how a reader sees it asks for this file only and keeps focus in the panel", async ({ browser }) => {
+  // With the check off in Settings the file may be explained at once
+  // (DESIGN v1.2 F10), and W2A's server takes one file per request.
+  test("with the check off, Show how a reader sees it asks for this file only and keeps focus in the panel", async ({ browser }) => {
     const checkOff = await startRealProject({
       appSettings: { skipUnderstandingCheck: true },
       run: {
