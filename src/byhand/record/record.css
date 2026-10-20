@@ -1,0 +1,28 @@
+/* The Learn-by-hand record and drafting helpers (src/byhand/record). */
+.byhand-record h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 550;
+  color: var(--color-text);
+}
+.byhand-record > * + h3 {
+  margin-top: 12px;
+}
+.byhand-record-claim {
+  margin: 8px 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.7;
+}
+.byhand-record summary {
+  cursor: pointer;
+  color: var(--color-text);
+}
+.byhand-template {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
