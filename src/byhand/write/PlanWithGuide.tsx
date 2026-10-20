@@ -10,6 +10,7 @@ import { byHandLimits, helpAllowed, type ByHandPlanInput } from "../../../shared
 import { PremiseNotice } from "../../team/PremiseNotice";
 import type { Run } from "../../types";
 import { CopyRef } from "./CopyRef";
+import { PlanQuestions } from "./PlanQuestions";
 import { useWriteText } from "./text";
 import "./byhand.css";
 
@@ -126,6 +127,7 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
       {field("tests", t.tests, tests, setTests, byHandLimits.planTestsChars)}
       {field("unsure", t.unsure, unsure, setUnsure, byHandLimits.planUnsureChars)}
       {field("prediction", t.prediction, prediction, setPrediction, byHandLimits.predictionChars)}
+      <PlanQuestions run={run} onAsk={() => save().then(props.onAskQuestions)} busy={busy} />
       {!!outline?.readFirst?.length && (
         <>
           <h4>{t.readFirst}</h4>

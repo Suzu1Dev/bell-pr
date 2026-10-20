@@ -27,6 +27,11 @@ const m: Translation<typeof en> = {
     closed: "這個任務配合的專案原文沒有提到規劃協助：嚮導的大綱不開放。",
     confirm: "這就是我的計畫",
   },
+  questions: {
+    title: "對我的計畫提問",
+    left: ({ left, max }) => `還剩 ${left} 次（共 ${max} 次）`,
+    reading: "嚮導正在讀你的計畫…",
+  },
   turn: {
     title: "換你寫",
     open: "在你的編輯器打開這個資料夾，完成第一步的修改並存檔，再回到這裡。",
