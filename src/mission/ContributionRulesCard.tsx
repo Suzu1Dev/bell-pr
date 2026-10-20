@@ -224,7 +224,14 @@ export default function ContributionRulesCard({
                   <figure key={`${finding.path}:${finding.line}:${index}`}>
                     <blockquote>{finding.quote}</blockquote>
                     <figcaption>
-                      <code>{`${finding.path}:${finding.line}`}</code>
+                      {finding.source ? (
+                        <>
+                          <span>{t.registry({ date: fmt.date(finding.source.checkedOn) })}</span>
+                          <a href={finding.source.url} target="_blank" rel="noreferrer">{finding.source.url}</a>
+                        </>
+                      ) : (
+                        <code>{`${finding.path}:${finding.line}`}</code>
+                      )}
                       <span className={`rules-card-effect is-${effect}`}>
                         <Icon size={13} aria-hidden="true" />
                         {t.effects[effect]}

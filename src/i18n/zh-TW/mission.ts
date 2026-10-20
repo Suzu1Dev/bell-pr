@@ -345,6 +345,7 @@ const m: Translation<typeof en> = {
     kicker: "THE PROJECT'S OWN RULES",
     title: "貢獻之前",
     lead: `這個專案對貢獻者的要求，原文引自專案自己的檔案，並說明發布時 ${product.name} 會怎麼處理每一條規範。`,
+    registry: ({ date }) => `出自 ${product.name} 的檢查清單 · 查核於 ${date}`,
     door: {
       open: "Pull Request：對你開放",
       collaborators: "Pull Request：只限協作者（你可以在這裡練習，但不能發布）",

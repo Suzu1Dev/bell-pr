@@ -474,6 +474,8 @@ const mission = {
     kicker: "THE PROJECT'S OWN RULES",
     title: "Before you contribute",
     lead: `What this project asks of contributors, quoted from its own files, and what ${product.name} does about each rule when you publish.`,
+    /** A rule from BELL's owner-signed list of rules projects publish outside their repositories (DESIGN v1.2 F14). */
+    registry: ({ date }: { date: string }) => `From ${product.name}'s checked list · checked on ${date}`,
     door: {
       open: "Pull requests: open to you",
       collaborators:
