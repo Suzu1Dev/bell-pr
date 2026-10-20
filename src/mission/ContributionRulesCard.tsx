@@ -10,7 +10,10 @@ import {
   RefreshCw,
   Scale,
 } from "lucide-react";
+import { byHandClean } from "../../shared/by-hand";
+import { byHandRulesCase } from "../../shared/by-hand-rules";
 import {
+  learningLabel,
   policyKinds,
   unknownReasonText,
   type ContributionRules,
@@ -20,7 +23,8 @@ import type { Locale } from "../../shared/i18n/locale";
 import { api, send } from "../api";
 import { getDemo } from "../demo";
 import { useFormat, useLocale, useT, type Messages } from "../i18n";
-import { doorState, rulesFrom, sampleRules, unknownParts } from "./respect";
+import type { Run } from "../types";
+import { byHandReasonText, byHandStartReason, doorState, rulesFrom, sampleRules, unknownParts } from "./respect";
 import "./mission.css";
 
 export interface ContributionRulesCardProps {
@@ -31,6 +35,8 @@ export interface ContributionRulesCardProps {
   demo: boolean;
   /** "Check again" through the parent, which then passes the new rules. */
   onRefresh?(): Promise<void>;
+  /** The open Learn-by-hand run, whose own case its AI rules state (DESIGN v1.2 F12). */
+  byHandRun?: Run;
 }
 
 type Effect = "block" | "confirm" | "info";
@@ -79,6 +85,36 @@ function effectText(t: Messages["mission"]["rules"], finding: PolicyFinding) {
 }
 
 /**
+ * What publishing does with a rule in a clean Learn-by-hand run, where
+ * BELL's agents write nothing (DESIGN v1.2 F12): a rule the run was fitted
+ * to when it started can take the quoted confirm; any other contribution
+ * ban gives the reason the run won't publish here. Undefined otherwise
+ * (an unclean run gets the agent run's line, as its checks do).
+ */
+function byHandEffect(
+  run: Run,
+  rules: ContributionRules,
+  finding: PolicyFinding,
+  m: Messages["discovery"]["byHand"],
+  locale: Locale,
+): { effect: Effect; text: string } | undefined {
+  if (!byHandClean(run).clean) return undefined;
+  const same = (rule: { kind: string; path: string; quote: string }) =>
+    rule.kind === finding.kind && rule.path === finding.path && rule.quote === finding.quote;
+  if (run.byHand?.helpLock?.rules.some(same)) return { effect: "confirm", text: m.rulesFitted };
+  if (finding.kind !== "ban" || !finding.contribution) return undefined;
+  const learningIssue = (run.contributionFacts?.issue?.labels ?? []).some(learningLabel);
+  const rulesCase = byHandRulesCase(rules, { learningIssue, now: new Date().toISOString() });
+  // A project the run could have been fitted to, but wasn't: its rule reads as output only.
+  const reason = byHandStartReason(rulesCase.case === "blocked" ? rulesCase : undefined) ?? {
+    id: "by-hand-ban" as const,
+    reach: "output" as const,
+    reason: "not-fitted" as const,
+  };
+  return { effect: "block", text: byHandReasonText(reason, m, locale) };
+}
+
+/**
  * "Before you contribute" (DESIGN F7), at the top of the project overview:
  * whether pull requests are open to the person, then the project's rules
  * quoted with `path:line` and what publishing does about each, in one of
@@ -90,6 +126,7 @@ export default function ContributionRulesCard({
   rules: storedRules,
   demo,
   onRefresh,
+  byHandRun,
 }: ContributionRulesCardProps) {
   const t = useT("mission").rules;
   const byHand = useT("discovery").byHand;
@@ -219,7 +256,8 @@ export default function ContributionRulesCard({
             <section key={group.kind} className="rules-card-group">
               <h3>{t.kinds[group.kind]}</h3>
               {group.items.map((finding, index) => {
-                const effect = findingEffect(finding);
+                const lbh = byHandRun && byHandEffect(byHandRun, rules, finding, byHand, locale);
+                const effect = lbh?.effect ?? findingEffect(finding);
                 const Icon = effectIcons[effect];
                 return (
                   <figure key={`${finding.path}:${finding.line}:${index}`}>
@@ -237,7 +275,7 @@ export default function ContributionRulesCard({
                         <Icon size={13} aria-hidden="true" />
                         {t.effects[effect]}
                       </span>
-                      <span>{effectText(t, finding)}</span>
+                      <span>{lbh?.text ?? effectText(t, finding)}</span>
                     </figcaption>
                   </figure>
                 );

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
 import { createElement } from "react";
+import type { HelpKind } from "../../shared/by-hand";
 import type { ContributionRules, PolicyFinding } from "../../shared/contribution";
+import type { Run } from "../types";
 import { getDemo } from "../demo";
 import { sampleRules as buildSampleRules } from "./respect";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
@@ -247,4 +249,36 @@ test("a rule from BELL's checked list says so, with the date it was checked and 
   // A rule from the repository keeps its path:line.
   assert.match(html, /<code>docs\/AI_POLICY\.md:12<\/code>/);
   assert.match(renderZh(card({ rules: { ...stored, findings: [listed] } })), /出自 BELL PR 的檢查清單/);
+});
+
+test("in a Learn-by-hand run, a contribution ban never says that agents write every change", () => {
+  const carveOut = "Asking an AI questions about the existing code is fine.";
+  const ban: PolicyFinding = {
+    ...finding("ban"),
+    quote: "We decline AI-generated contributions.",
+    reach: "output",
+    allows: [{ line: 14, quote: carveOut, kinds: ["explain", "answer"] }],
+  };
+  const rules: ContributionRules = { ...stored, findings: [ban, finding("disclose")] };
+  const at = "2026-10-10T09:00:00.000Z";
+  const lock = { kinds: ["explain", "answer"] as HelpKind[], at, rulesCheckedAt: at, rules: [{ kind: "ban", path: ban.path, line: ban.line, quote: ban.quote, allows: ban.allows! }] };
+  const run = (byHand: Run["byHand"], agents = ["lead", "reviewer", "tester"]) =>
+    ({ id: "run-1", learnByHand: true, agents: agents.map((id) => ({ id, name: id, role: id, status: "complete", detail: "" })), byHand }) as unknown as Run;
+  const agentLine = /agents write every change/;
+  // Fitted to the rule when it started: publishing can ask for the quoted confirm.
+  const fitted = english({ rules, byHandRun: run({ helpLock: lock }) });
+  assert.doesNotMatch(fitted, agentLine);
+  assert.match(fitted, /<span class="rules-card-effect is-confirm">[\s\S]*?Asks you to confirm<\/span><span>This run was fitted to it, so publishing can ask you to confirm the quoted rule instead of blocking\. The maintainers decide whether your change fits\.<\/span>/);
+  // Started with every kind of help where it could have been fitted: the run's reason.
+  const full = english({ rules, byHandRun: run({}) });
+  assert.doesNotMatch(full, agentLine);
+  assert.match(full, /<span class="rules-card-effect is-block">[\s\S]*?Blocks publishing<\/span><span>BELL PR won&#x27;t publish a learn-by-hand run here: the project&#x27;s rules decline AI-generated content, and this run wasn&#x27;t fitted to its rules when it started\.<\/span>/);
+  // A rule that restricts AI help itself: that reason.
+  const assistance = english({ rules: { ...rules, findings: [{ ...ban, reach: "assistance", allows: undefined }] }, byHandRun: run({}) });
+  assert.match(assistance, /won&#x27;t publish a learn-by-hand run here: the project&#x27;s rules restrict AI help itself, not only AI-written code\./);
+  // Rules that aren't about who writes keep their line; an unclean run (a teammate joined) and an agent run keep the agent line.
+  assert.match(fitted, /Publishing waits until the description says that AI helped\./);
+  assert.match(english({ rules, byHandRun: run({ helpLock: lock }, ["lead", "member-1"]) }), agentLine);
+  assert.match(english({ rules }), agentLine);
+  assert.match(renderZh(card({ rules, byHandRun: run({ helpLock: lock }) })), /這個任務開始時就配合了這條規則/);
 });

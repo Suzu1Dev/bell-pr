@@ -181,6 +181,7 @@ const m: Translation<typeof en> = {
     fitted: ({ kinds, quote }) =>
       `只有嚮導始終待在專案原文說可以的範圍內（${kinds}：「${quote}」），而且你確認過專案被引用的規範之後，${product.name} 才能在這裡發布親手學的任務。你的修改是否合適，由維護者決定。`,
     registry: ({ date }) => `出自 ${product.name} 的檢查清單 · 查核於 ${date}`,
+    rulesFitted: "這個任務開始時就配合了這條規則，所以發布時可以改為請你確認被引用的規則，而不是直接擋下。你的修改是否合適，由維護者決定。",
     retry: "重試會讓這個任務回到和嚮導一起規劃的階段。",
   },
   runtime: {

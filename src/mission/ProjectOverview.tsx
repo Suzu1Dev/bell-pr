@@ -1169,7 +1169,7 @@ export function ProjectOverview({
       )}
 
       <Suspense fallback={null}>
-        <ContributionRulesCard repoId={repo.id} rules={repo.contributionRules} demo={sampleRepo} />
+        <ContributionRulesCard repoId={repo.id} rules={repo.contributionRules} demo={sampleRepo} byHandRun={run?.learnByHand ? run : undefined} />
       </Suspense>
 
       {!insights ? (
