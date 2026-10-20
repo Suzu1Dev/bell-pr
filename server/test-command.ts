@@ -86,13 +86,20 @@ export async function suggestTestCommand(worktree: string): Promise<string> {
 
 /** Names that hold a secret by their ending (case-insensitive). */
 const secretEnding = /(?:TOKEN|SECRET|PASSWORD|API_KEY|ACCESS_KEY|PRIVATE_KEY|CREDENTIALS)$/i;
+/**
+ * Names with TOKEN, SECRET or PASSWORD as a word of their own anywhere
+ * (case-insensitive): AWS_BEARER_TOKEN_BEDROCK, which Claude Code reads,
+ * and SECRET_KEY, DJANGO_SECRET_KEY, SECRET_KEY_BASE.
+ */
+const secretWord = /(?:^|_)(?:TOKEN|SECRET|PASSWORD)(?:_|$)/i;
 /** BELL's own settings and the variables of GitHub, the GitHub CLI and the AI CLIs (case-insensitive). */
 const ownedPrefix = /^(?:BELLPR_|GH_|GITHUB_|ANTHROPIC_|OPENAI_|CODEX_|CLAUDE_)/i;
 
 /**
  * The environment BELL runs the person's tests with: BELL's own
  * environment minus every variable whose name ends in TOKEN, SECRET,
- * PASSWORD, API_KEY, ACCESS_KEY, PRIVATE_KEY or CREDENTIALS, or starts with
+ * PASSWORD, API_KEY, ACCESS_KEY, PRIVATE_KEY or CREDENTIALS, holds TOKEN,
+ * SECRET or PASSWORD as a word between underscores, or starts with
  * BELLPR_, GH_, GITHUB_, ANTHROPIC_, OPENAI_, CODEX_ or CLAUDE_, ignoring
  * case; everything else stays (PATH, HOME, JAVA_HOME, VIRTUAL_ENV,
  * GOPATH…), as in the person's terminal; plus CI=1 and NO_COLOR=1. The
@@ -102,7 +109,8 @@ const ownedPrefix = /^(?:BELLPR_|GH_|GITHUB_|ANTHROPIC_|OPENAI_|CODEX_|CLAUDE_)/
 export function testEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const result: NodeJS.ProcessEnv = {};
   for (const [name, value] of Object.entries(env)) {
-    if (value === undefined || secretEnding.test(name) || ownedPrefix.test(name)) continue;
+    if (value === undefined || secretEnding.test(name) || secretWord.test(name) || ownedPrefix.test(name))
+      continue;
     result[name] = value;
   }
   return { ...result, CI: "1", NO_COLOR: "1" };

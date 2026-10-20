@@ -160,3 +160,30 @@ test("the test environment drops secrets and BELL's and the CLIs' variables by n
   // The caller's environment is left as it was.
   assert.deepEqual(source, before);
 });
+
+test("the test environment also drops names that hold TOKEN, SECRET or PASSWORD as a word, such as Bedrock's bearer token", () => {
+  const env = testEnvironment({
+    // Claude Code reads it, and BELL passes it to the agent CLI.
+    AWS_BEARER_TOKEN_BEDROCK: "x",
+    SECRET_KEY: "x",
+    DJANGO_SECRET_KEY: "x",
+    SECRET_KEY_BASE: "x",
+    stripe_secret_key: "x",
+    PASSWORD_FILE: "x",
+    // Kept: the word is part of a longer one, or the name holds no secret.
+    TOKENIZERS_PARALLELISM: "false",
+    GIT_ASKPASS: "/usr/bin/askpass",
+    SECRETS_DIR: "/run/secrets",
+    AWS_ACCESS_KEY_ID: "AKIDEXAMPLE",
+    AWS_PROFILE: "dev",
+  });
+  assert.deepEqual(env, {
+    TOKENIZERS_PARALLELISM: "false",
+    GIT_ASKPASS: "/usr/bin/askpass",
+    SECRETS_DIR: "/run/secrets",
+    AWS_ACCESS_KEY_ID: "AKIDEXAMPLE",
+    AWS_PROFILE: "dev",
+    CI: "1",
+    NO_COLOR: "1",
+  });
+});
