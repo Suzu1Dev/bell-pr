@@ -75,6 +75,7 @@ import {
   webBoundaries,
 } from "./prompts/team.js";
 import type { WorkbenchContext } from "./workbench.js";
+import { turnCanary } from "./by-hand-canary.js";
 import * as byHand from "./by-hand.js";
 
 const now = () => new Date().toISOString();
@@ -181,6 +182,7 @@ export async function runAgent(
   const answerLimit = context.outputSchema ? 80_000 : 24_000;
   const cwd = context.cwd ?? run.worktreePath;
   const execute = ctx.dependencies.command ?? command;
+  const canary = turnCanary(ctx, run, role, signal);
   let completed = false;
   let answer = "";
   let terminalFailure: string | undefined;
@@ -236,7 +238,7 @@ export async function runAgent(
       await execute(cli.executable, cli.args, {
         input: fullPrompt,
         cwd,
-        signal,
+        signal: canary.signal,
         timeoutMs,
         maxBytes: 8_000_000,
         env: agentEnvironment(modelExecution.provider ?? "codex"),
@@ -246,6 +248,7 @@ export async function runAgent(
             const event = JSON.parse(line);
             call.observe(event);
             for (const item of read(event)) {
+              canary.observe(item);
               // A notice (retry, rate limit, denied tool) replaces the status line until the agent is seen working again.
               if (agent && item.kind !== "notice" && item.kind !== "session" && item.kind !== "usage-by-model")
                 agent.detail = running;
@@ -362,7 +365,7 @@ export async function runAgent(
   try {
     await ctx.store.save();
     await retryTransientAuth(invoke, {
-      signal,
+      signal: canary.signal,
       sleep: ctx.dependencies.sleep,
       onRetry: (notice) => {
         recordEfficiency(false);
@@ -370,6 +373,7 @@ export async function runAgent(
         ctx.log(run, role, notice, { kind: "notice" });
       },
     });
+    canary.assertNoHit();
     if (signal.aborted) throw new AppError(cancelled(), 409);
     if (terminalFailure) throw new AppError(terminalFailure, 422);
     if (!answer.trim())
@@ -389,7 +393,7 @@ export async function runAgent(
       agent.status = "failed";
       agent.detail = sm().run.agents.failed;
     }
-    throw error;
+    throw canary.failure(error);
   } finally {
     recordEfficiency(completed);
     await ctx.store.save();
