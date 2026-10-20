@@ -2,7 +2,11 @@
  * What helps the person learn from a finished run: explanations of each
  * changed file, follow-up questions to a mentor, their own notes, the
  * maintainers' feedback on the published PR, and a fresh independent review
- * after they edited the worktree by hand.
+ * after they edited the worktree by hand. In a Learn-by-hand run:
+ * explanations of the person's own code only after Ready and their own
+ * answer, the Ask tab through the guide, every agent text filtered before
+ * it is stored, and the person's pushed follow-up commits taken over at the
+ * feedback read.
  */
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -35,6 +39,7 @@ import type { ChangeExplanation } from "../shared/explanations.js";
 import * as guide from "./by-hand-guide.js";
 import { turnFiles } from "./by-hand-filter.js";
 import { assertHelpAllowed, recordHelp } from "./by-hand-record.js";
+import { takeOverOwnCommits } from "./by-hand-takeover.js";
 import { assertReady, countRemoved, reviewAgain } from "./by-hand.js";
 import { planUnderstanding, understandingRequired } from "./understanding.js";
 
@@ -454,6 +459,8 @@ export async function fetchPrFeedback(ctx: WorkbenchContext, id: string) {
     const prNumber = remote && prNumberOf(run.prUrl, remote.url);
     if (!remote || !prNumber)
       throw new AppError((m) => m.run.review.feedbackMismatch, 422);
+    // Learn by hand: commits the person pushed from the run's folder are taken over first.
+    if (run.learnByHand) await takeOverOwnCommits(ctx, run);
     const result = await command(
       "gh",
       [
