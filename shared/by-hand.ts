@@ -401,7 +401,8 @@ export function byHandSummary(run: Pick<ByHandRunFacts, "byHand">): ByHandSummar
   };
   for (const entry of hints) raise(entry.stepId, entry.rung);
   for (const step of record.plan?.steps ?? []) raise(step.id, step.maxRung);
-  // Only the first prediction after each new change counts (re-runs are free to predict).
+  // Only the first prediction after each new change counts (re-runs are free to predict),
+  // and only a run that passed or failed judges it: a stopped, timed-out or errored run is no wrong prediction.
   const predictions = { judged: 0, right: 0, unsure: 0 };
   let namedTests = 0;
   const predicted = new Set<string>();
@@ -410,7 +411,7 @@ export function byHandSummary(run: Pick<ByHandRunFacts, "byHand">): ByHandSummar
     if (!test.prediction || predicted.has(test.changeFingerprint)) continue;
     predicted.add(test.changeFingerprint);
     if (test.prediction === "unsure") predictions.unsure++;
-    else if (test.prediction === "pass" || test.prediction === "fail") {
+    else if ((test.prediction === "pass" || test.prediction === "fail") && (test.outcome === "passed" || test.outcome === "failed")) {
       predictions.judged++;
       if (test.outcome === (test.prediction === "pass" ? "passed" : "failed")) predictions.right++;
     }

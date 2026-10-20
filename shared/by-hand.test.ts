@@ -280,6 +280,32 @@ test("byHandSummary counts help per request and only the first prediction after 
   assert.deepEqual(byHandSummary({}).predictions, { judged: 0, right: 0, unsure: 0 });
 });
 
+test("byHandSummary judges a first prediction only by a run that passed or failed", () => {
+  const test = (at: string, fingerprint: string, prediction: string, outcome: string): TestRun => ({
+    at,
+    command: "npm test",
+    changeFingerprint: fingerprint,
+    outcome,
+    ms: 10,
+    prediction,
+  });
+  const predictions = (tests: TestRun[]) => byHandSummary({ byHand: { tests } }).predictions;
+  // A stopped, timed-out or errored first run after a change is no wrong prediction, and its re-run does not count instead.
+  assert.deepEqual(
+    predictions([
+      test("2026-10-20T01:00:00Z", "f1", "pass", "stopped"),
+      test("2026-10-20T01:05:00Z", "f1", "fail", "failed"),
+      test("2026-10-20T02:00:00Z", "f2", "pass", "timeout"),
+      test("2026-10-20T03:00:00Z", "f3", "fail", "error"),
+      test("2026-10-20T04:00:00Z", "f4", "pass", "passed"),
+      test("2026-10-20T05:00:00Z", "f5", "pass", "failed"),
+    ]),
+    { judged: 2, right: 1, unsure: 0 },
+  );
+  // "Not sure" stays the person's own answer, whatever the run did.
+  assert.deepEqual(predictions([test("2026-10-20T01:00:00Z", "f1", "unsure", "stopped")]), { judged: 0, right: 0, unsure: 1 });
+});
+
 test("byHandPreflight gives the respect checks' input only for a clean Learn-by-hand run", () => {
   const helpLock: HelpLock = {
     kinds: ["explain", "answer"],
