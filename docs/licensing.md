@@ -1,10 +1,11 @@
 # Licensing
 
 BELL PR has two plans. **Free** covers the whole responsible loop, one
-contribution at a time: the agent team, review with explanations and
-try-first questions, the understanding check, every project-rule, issue,
-reviewability and pacing check, publishing a Draft PR, reading your
-maintainers' feedback, and the learning page with its practice deck.
+contribution at a time: the agent team, Learn by hand with the guide,
+review with explanations and try-first questions, the understanding
+check, every project-rule, issue, reviewability and pacing check,
+publishing a Draft PR, reading your maintainers' feedback, and the
+learning page with its practice deck.
 **Pro goes deeper**: a coach debrief from your own records, the complete
 learning record export, AI follow-up rounds on maintainer feedback, bigger
 agent teams, more than one contribution at a time, GitHub-wide discovery,
