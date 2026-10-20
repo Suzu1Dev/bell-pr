@@ -3,13 +3,17 @@
 // two places: the unchanged code around each change, read from the run's
 // base; the code walkthrough an agent writes (the stand-in codex answers
 // with what a test sets); the lead's premise check made again on the
-// overview; the setup a teammate could not find; and, on a published run,
-// the commits read from its worktree. The tests of each server share it
-// and run in order. Axe checks each new view.
+// overview; the setup a teammate could not find; on a published run,
+// the commits read from its worktree; and, on a Learn-by-hand run marked
+// ready, no explanation or walkthrough asked for on its own. The tests of
+// each server share it and run in order. Axe checks each new view.
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, request, test, type Browser, type Page } from "@playwright/test";
+import { readyNow } from "../shared/by-hand";
+import { changeFingerprint } from "../shared/change-fingerprint";
+import panelStrings from "../src/review/i18n/en";
 import { expectNoOverflow } from "./helpers/overflow";
-import { prUrl, runId, startRealProject, type RealProject } from "./helpers/real-project";
+import { files, prUrl, runId, startRealProject, type RealProject } from "./helpers/real-project";
 import { messages } from "./helpers/sample-states";
 
 const t = messages.en;
@@ -263,6 +267,98 @@ test.describe("the commits of a published real run", () => {
       await expect(commit.locator(".rv-line-added").first()).toBeVisible();
       await axe(page, ".commit-history");
       await expectNoOverflow(page, [".commit-history"]);
+    } finally {
+      await close();
+    }
+  });
+});
+
+test.describe("a Learn-by-hand run in review, marked ready", () => {
+  test.describe.configure({ mode: "serial" });
+  let project: RealProject;
+  const open = opener(() => project);
+  test.beforeAll(async () => {
+    // A file's fingerprint depends only on its path and patch, so the
+    // seeded project's change has the same fingerprint on every start: read
+    // it from a first one, and mark that version ready on the second.
+    const first = await startRealProject();
+    let ready: string;
+    try {
+      const api = await request.newContext({ baseURL: first.baseURL, storageState: first.storageState });
+      const { files: diff } = (await (await api.get(`/api/runs/${runId}/diff`)).json()) as {
+        files: { path: string; fingerprint: string }[];
+      };
+      ready = changeFingerprint(diff);
+      await api.dispose();
+    } finally {
+      await first.stop();
+    }
+    project = await startRealProject({
+      run: {
+        learnByHand: true,
+        // Nothing explained yet: an explanation comes only on a click after Ready.
+        explanations: {},
+        byHand: { ready: { at: "2026-10-14T10:00:00.000Z", changeFingerprint: ready, review: false } },
+      },
+    });
+  });
+  test.afterAll(async () => {
+    await project?.stop();
+  });
+
+  test("no explanation or walkthrough is asked for on load or on a refresh", async ({ browser }) => {
+    const { page, close } = await open(browser);
+    const asked: string[] = [];
+    page.on("request", (sent) => {
+      const { pathname } = new URL(sent.url());
+      if (sent.method() === "POST" && /^\/api\/runs\/[^/]+\/(explanations|walkthroughs)$/.test(pathname))
+        asked.push(pathname);
+    });
+    try {
+      const { run } = (await (await page.request.get(`/api/runs/${runId}`)).json()) as {
+        run: Parameters<typeof readyNow>[0];
+      };
+      const { files: diff } = (await (await page.request.get(`/api/runs/${runId}/diff`)).json()) as {
+        files: { path: string; fingerprint: string; explanationStatus?: string; walkthroughStatus?: string }[];
+      };
+      // The seeded run is Learn by hand, ready at this version, and its files wait.
+      expect(readyNow(run, diff)).toBe(true);
+      expect(diff.find((file) => file.path === files.greeting)?.explanationStatus).toBe("pending");
+      expect(diff.find((file) => file.path === files.greeting)?.walkthroughStatus).toBe("pending");
+      await page.goto(`/#/runs/${runId}/changes?file=${files.greeting}&locale=en`);
+      await expect(page.locator(".file-item.selected")).toHaveAttribute("title", files.greeting);
+      await expect(page.locator(".explain-panel")).toBeVisible();
+      await page.getByRole("tab", { name: t.review.panel.tabs.walkthrough }).click();
+      await page.locator(`.file-item[title="${files.format}"]`).click();
+      await expect(page.locator(".file-item.selected")).toHaveAttribute("title", files.format);
+      await page.reload();
+      await expect(page.locator(".explain-panel")).toBeVisible();
+      // The polls and refreshes of a few seconds pass; the network log stays empty.
+      await page.waitForTimeout(3_000);
+      expect(asked).toEqual([]);
+      const after = (await (await page.request.get(`/api/runs/${runId}/diff`)).json()) as {
+        files: { explanationStatus?: string; walkthroughStatus?: string }[];
+      };
+      expect(after.files.filter((file) => file.explanationStatus === "generating" || file.walkthroughStatus === "generating")).toEqual([]);
+    } finally {
+      await close();
+    }
+  });
+
+  // MERGE-STEP: the reader view shows once the Changes tab passes
+  // byHandReview to ExplanationPanel (W2D's mount, with the check view and
+  // openCheckPanel); then this test runs as written.
+  test.fixme("the reader view says to answer the file's question first and opens the check", async ({ browser }) => {
+    const { page, close } = await open(browser);
+    try {
+      await page.goto(`/#/runs/${runId}/changes?file=${files.greeting}&locale=en`);
+      const panel = page.locator(".explain-panel");
+      await expect(panel.getByRole("heading", { name: panelStrings.reader.title })).toBeVisible();
+      await expect(panel).toContainText(panelStrings.reader.answerFirst);
+      await expect(panel).not.toContainText(panelStrings.reader.show);
+      await panel.getByRole("button", { name: t.workspace.check.title }).click();
+      await expect(page.locator(".understanding-check")).toBeVisible();
+      await axe(page, ".understanding-check");
     } finally {
       await close();
     }
