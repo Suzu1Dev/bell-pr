@@ -195,6 +195,8 @@ const prohibition = new RegExp(
     String.raw`\b(?:prohibited|forbidden|forbids?|banned|disallowed|unacceptable|declined?)\b`,
     String.raw`\bno\s+(?:AI|LLM|machine)[\w-]*`,
     String.raw`\b(?:will|shall|may)\s+be\s+(?:closed|rejected|refused|declined)\b`,
+    // "must be written without any help from AI tools" (the AI after "without" is its help)
+    String.raw`\b(?:must|shall|should|(?:are|is)\s+required\s+to|ha(?:ve|s)\s+to|needs?\s+to)\s+(?:only\s+)?be\s+(?:(?:entirely|fully|completely|wholly)\s+)?(?:written|made|created|authored|produced|done|developed|prepared|crafted)\s+(?:(?:entirely|fully|completely|wholly)\s+)?without\b`,
     // "we will flag and reject …"
     String.raw`\b(?:will|shall|must|we)\s+(?:\w+\s+){0,2}?(?:reject|refuse)\w*`,
     String.raw`\bzero[- ]tolerance\b`,
@@ -296,6 +298,16 @@ const conductCondition = new RegExp(
   ].join("|"),
   flags,
 );
+/**
+ * Plain AI as what a contribution must be made without: "Patches must be
+ * made without AI", "without the help of AI", "without using an LLM"
+ * (the refusal is in `prohibition`); never "without AI jargon".
+ */
+const withoutAi = new RegExp(
+  String.raw`\bwithout\s+(?:the\s+)?(?:any\s+)?(?:(?:help|aid|assistance|use|input|involvement)\s+(?:of|from|by)\s+|using\s+|relying\s+on\s+)?(?:an?\s+|any\s+)?${aiNoun}\b(?=\s*(?:[.!;,)]|$)|\s+(?:or|and|nor|of|in|for|at|whatsoever|whatever)\b)`,
+  flags,
+);
+refusalTerms.push(withoutAi);
 /** Permission only maintainers give ("unless approved by core") keeps a refusal a ban. */
 const maintainerPermission = new RegExp(
   String.raw`\b(?:prior|explicit|express|written|advance)\s+(?:written\s+)?(?:approval|permission|consent|agreement|authori[sz]ation)\b|\b(?:approved|permitted|authori[sz]ed|allowed|agreed|requested|invited)\s+(?:by|in\s+advance|beforehand)\b|\b(?:approval|permission|consent)\s+(?:of|by|from)\b`,
