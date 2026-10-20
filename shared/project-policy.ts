@@ -1017,9 +1017,9 @@ const permissionScoped =
 const othersApproval = /\b(?:approv\w*|permission|consent|sign[- ]?off|agree\w*|ask(?:s|ed)?\s+(?:you|for)|invit\w*)\b/i;
 /** A contrast right after the permission that takes it back: "fine in your fork, but not in this repository". */
 const contrastTakesBack = /^\W*(?:but\s+)?(?:not|never|no)\b/i;
-/** Somebody else's view, a rule of the past or one not decided: never the project's permission. */
+/** Somebody else's view, a rule of the past or one not decided or adopted: never the project's permission. */
 const notTheProjects =
-  /\b(?:no\s+longer|anymore|used\s+to|previously|formerly|until\s+recently|in\s+the\s+past|whether|myths?|misconceptions?|(?:some|many|other)\s+(?:people|contributors|users|folks|projects)|people\s+(?:often\s+|sometimes\s+)?(?:think|believe|say|claim|assume)|(?:you|they|others)\s+(?:may|might)\s+(?:think|believe|hear|have\s+heard)|(?:it\s+is|it['’]s)\s+(?:often\s+|commonly\s+|widely\s+|sometimes\s+)?(?:said|claimed|believed|assumed|thought))\b|\b(?:says?|said|writes?|wrote)\s+(?!(?:that\s+)?(?:it['’]?s|it\s+is|using|the\s+use|you|we|our)\b)\w|\bputs\s+it\b|\baccording\s+to\s+(?!(?:our|this|these|the\s+(?:policy|rules|guidelines|text|section)\b))/i;
+  /\b(?:no\s+longer|anymore|used\s+to|previously|formerly|until\s+recently|in\s+the\s+past|whether|myths?|misconceptions?|(?:some|many|other)\s+(?:people|contributors|users|folks|projects)|people\s+(?:often\s+|sometimes\s+)?(?:think|believe|say|claim|assume)|(?:you|they|others)\s+(?:may|might)\s+(?:think|believe|hear|have\s+heard)|(?:it\s+is|it['’]s)\s+(?:often\s+|commonly\s+|widely\s+|sometimes\s+)?(?:said|claimed|believed|assumed|thought))\b|\b(?:says?|said|writes?|wrote)\s+(?!(?:that\s+)?(?:it['’]?s|it\s+is|using|the\s+use|you|we|our)\b)\w|\bputs\s+it\b|\baccording\s+to\s+(?!(?:our|this|these|the\s+(?:policy|rules|guidelines|text|section)\b))|\b(?:propos(?:ed|als?)|drafts?|pending|tentative|considering|under\s+discussion|still\s+discussing|not\s+yet\s+(?:adopted|agreed|decided|final|approved|in\s+effect)|RFC|TODO|TBD|WIP)\b/i;
 /** A condition that the words after it are part of: "If …", "When …". */
 const subordinate = /\b(?:if|when|whenever|whether|once|until)\b[^,;]*$/i;
 /** The next sentence takes it back: "Just kidding: it is not." */
