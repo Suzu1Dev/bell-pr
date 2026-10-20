@@ -344,7 +344,7 @@ const byHandWords = {
     askAnswer: "Your project's test command takes a file path after it; give it the greeting test's path.",
     hint: "Look at how the greeting text is built today, then at where a language could choose it.",
     tail: "FAIL test/greeting.test.ts > greets\nAssertionError: expected 'Hallo, Ada!' to be 'Hello, Ada!'",
-    body: "## Summary\n\nGreetings come from a table of languages and fall back to English. I wrote and tested it myself.",
+    body: "## Summary\n\nGreetings come from a table of languages and fall back to English. I wrote and tested the change myself; an AI guide (BELL PR's Learn by hand) answered my questions and explained parts of the code.",
   },
   "zh-TW": {
     title: "用你的語言打招呼",
@@ -361,9 +361,17 @@ const byHandWords = {
     askAnswer: "專案的測試指令後面可以接檔案路徑；把問候語測試的路徑給它就好。",
     hint: "先看看現在問候語的文字是怎麼組出來的，再想想語言可以在哪裡決定要用哪一句。",
     tail: "FAIL test/greeting.test.ts > greets\nAssertionError: expected 'Hallo, Ada!' to be 'Hello, Ada!'",
-    body: "## Summary\n\nGreetings come from a table of languages and fall back to English. I wrote and tested it myself.",
+    body: "## Summary\n\nGreetings come from a table of languages and fall back to English. I wrote and tested the change myself; an AI guide (BELL PR's Learn by hand) answered my questions and explained parts of the code.",
   },
 } satisfies Record<Locale, unknown>;
+
+/**
+ * The understanding check as a person who explained this version of the
+ * change back left it, so the publish dialog shows no "check off" line:
+ * the check is on by default, and these servers turn the setting off only
+ * to skip seeding its questions.
+ */
+const checkPassed = (fingerprint: string) => ({ passedAt: byHandAt(57), passedFingerprint: fingerprint });
 
 /** The fields of a Learn-by-hand run that all the views share. */
 function byHandRun(locale: Locale, fields: Record<string, unknown>, byHand: Record<string, unknown>) {
@@ -459,7 +467,7 @@ function approvedRun(locale: Locale, fingerprint: string) {
   const words = byHandWords[locale];
   return byHandRun(
     locale,
-    { status: "approved", approvedFingerprint: "e2e-approved", draft: { title: byHandWords.en.title, body: words.body } },
+    { status: "approved", approvedFingerprint: "e2e-approved", draft: { title: byHandWords.en.title, body: words.body }, understanding: checkPassed(fingerprint) },
     {
       plan: personPlan(locale, true),
       ready: { at: byHandAt(56), changeFingerprint: fingerprint, review: true },
@@ -498,6 +506,8 @@ async function openPublish(page: Page, locale: Locale) {
   const dialog = page.getByRole("dialog", { name: workspace.publish.title });
   await expect(dialog).toBeVisible({ timeout: 30_000 });
   await expect(dialog.getByText(workspace.publish.factsLoading)).toHaveCount(0, { timeout: 30_000 });
+  // The linked issue's facts arrive after the dialog's first checks: every width shows them.
+  await expect(dialog.getByRole("group", { name: workspace.publish.groups.issue })).toBeVisible({ timeout: 30_000 });
   return dialog;
 }
 
@@ -645,7 +655,7 @@ for (const locale of locales)
         extraFiles: [{ path: file, before: qemu, after: qemu }],
         run: byHandRun(
           locale,
-          { status: "review", draft: { title: byHandWords.en.title, body: words.body } },
+          { status: "review", draft: { title: byHandWords.en.title, body: words.body }, understanding: checkPassed(fingerprint) },
           {
             plan: personPlan(locale, true),
             helpLock: { ...fitted.lock, at: started },
