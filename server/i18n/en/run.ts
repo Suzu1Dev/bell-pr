@@ -518,6 +518,8 @@ export default {
       "A follow-up round is in progress on this PR; finish or discard it before you sync.",
     prCheckoutDiffers:
       "The working directory differs from the pushed PR; undo the changes in it before you sync.",
+    /** A file was saved in the checkout while a sync wrote its result there; nothing moved. */
+    savedMeanwhile: `A file in the run's folder changed while ${product.name} was syncing, so nothing moved. Sync again.`,
     prUpToDate: ({ branch }: { branch: string }) =>
       `Checked: the PR already contains the latest ${branch}.`,
     nothingToMerge: ({ branch }: { branch: string }) =>

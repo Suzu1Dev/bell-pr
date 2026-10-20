@@ -305,6 +305,7 @@ const m: Translation<typeof en> = {
     roundOpen: "這個 PR 已有一輪修正在進行；完成或放棄後再同步。",
     prCheckoutDiffers:
       "工作目錄和已推送的 PR 內容不一致；請先還原工作目錄裡的修改再同步。",
+    savedMeanwhile: `${product.name} 同步時，工作目錄裡有檔案被修改，所以沒有變動任何東西。請再同步一次。`,
     prUpToDate: ({ branch }) => `已確認 PR 已包含 ${branch} 的最新版本。`,
     nothingToMerge: ({ branch }) =>
       `${branch} 已經包含這個 PR 的全部修改，合併後沒有差異，所以沒有同步；PR 沒有變動，可以考慮關閉它。`,

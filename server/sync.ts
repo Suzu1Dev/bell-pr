@@ -145,10 +145,28 @@ export async function conflictsWithoutMarkers(
  * Makes the checkout's files match `tree` while the index holds `base`, so
  * the difference reads as uncommitted changes against it, which is how BELL
  * keeps a contribution until it is published. HEAD is not moved.
+ *
+ * `from` is what the checkout held when the caller looked (its clean check,
+ * or its snapshot): a file saved since is never overwritten. Git writes
+ * only files that still hold what `from` has; a saved file the tree leaves
+ * as it is stays as saved, and one the tree changes refuses it all (409),
+ * with the files and the index as they were.
  */
-export async function checkoutTreeOnto(cwd: string, tree: string, base: string) {
+export async function checkoutTreeOnto(cwd: string, tree: string, base: string, from?: string) {
   await assertGitConfigSafe(cwd);
-  await git(cwd, ["read-tree", "-u", "--reset", tree]);
+  if (from === undefined) await git(cwd, ["read-tree", "-u", "--reset", tree]);
+  else {
+    const index = (await git(cwd, ["write-tree"])).stdout.trim();
+    await git(cwd, ["read-tree", from]);
+    // Git then compares each file with `from` by its contents (a refreshed entry), not by its stat data.
+    await git(cwd, ["update-index", "-q", "--refresh"], { allowedCodes: [0, 1] });
+    try {
+      await git(cwd, ["read-tree", "-m", "-u", from, tree]);
+    } catch (error) {
+      await git(cwd, ["read-tree", index]);
+      throw new AppError((m) => m.run.sync.savedMeanwhile, 409, { cause: error });
+    }
+  }
   await git(cwd, ["read-tree", base]);
 }
 
