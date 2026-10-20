@@ -31,9 +31,10 @@ export interface HelpInput {
 }
 
 /**
- * Records one help event on the run (the newest 300 are kept), with the
- * model and CLI from `run.modelExecution`, and returns it. Refuses with
- * 409 `m.byHand.helpOutsideFit` when the run's help lock lacks the kind.
+ * Records one help event on the run (the newest 300 are kept, with the
+ * newest of each kind among them), with the model and CLI from
+ * `run.modelExecution`, and returns it. Refuses with 409
+ * `m.byHand.helpOutsideFit` when the run's help lock lacks the kind.
  */
 export function recordHelp(run: Run, input: HelpInput): HelpEvent {
   const kind = helpKindOf(input.source, input.rung);
@@ -52,8 +53,24 @@ export function recordHelp(run: Run, input: HelpInput): HelpEvent {
     ...(input.removed ? { removed: input.removed } : {}),
   };
   const record = (run.byHand ??= {});
-  record.events = [...(record.events ?? []), event].slice(-byHandLimits.events);
+  record.events = newestKept([...(record.events ?? []), event], byHandLimits.events);
   return event;
+}
+
+/**
+ * The newest `limit` events, always with the newest one of each kind, so
+ * the kinds of help a long run used stay on its record (the quoted confirm
+ * and the facts list read them).
+ */
+function newestKept(events: HelpEvent[], limit: number) {
+  if (events.length <= limit) return events;
+  const newestOfKind = new Map(events.map((entry, index) => [entry.kind, index]));
+  const needed = new Set(newestOfKind.values());
+  let room = limit - needed.size;
+  const kept = new Set<number>();
+  for (let index = events.length - 1; index >= 0; index--)
+    if (needed.has(index) || room-- > 0) kept.add(index);
+  return events.filter((_entry, index) => kept.has(index));
 }
 
 /**

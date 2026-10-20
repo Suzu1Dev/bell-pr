@@ -3,7 +3,7 @@
 // and the backstop of a fitted run's help set.
 import test from "node:test";
 import assert from "node:assert/strict";
-import type { HelpLock } from "../shared/by-hand.js";
+import { helpKinds, type HelpLock } from "../shared/by-hand.js";
 import { assertHelpAllowed, recordHelp } from "./by-hand-record.js";
 import { withLocale } from "./i18n/index.js";
 import { AppError, type Run } from "./types.js";
@@ -66,9 +66,11 @@ test("recordHelp records the kind, the model the CLI reported and the CLI, newes
     source: "premise",
     cli: "codex",
   });
-  for (let index = 0; index < 305; index++) recordHelp(run, { source: "ask" });
+  for (let index = 0; index < 305; index++) recordHelp(run, { source: "ask", at: `2026-10-20T02:00:${String(index % 60).padStart(2, "0")}.000Z` });
   assert.equal(run.byHand?.events?.length, 300);
-  assert.equal(run.byHand?.events?.[0].source, "ask");
+  // The oldest answers went; the only plan and explain events stay, so the record keeps every kind used.
+  assert.deepEqual(run.byHand?.events?.slice(0, 3).map((event) => event.source), ["hint", "premise", "ask"]);
+  assert.deepEqual(helpKinds(run), ["explain", "answer", "plan"]);
 });
 
 test("in a fitted run recordHelp records nothing outside the help set and refuses with 409", () => {
