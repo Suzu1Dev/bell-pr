@@ -604,6 +604,7 @@ export function ChangesTab({
                 : undefined
             }
             highlight={shownHighlight}
+            guide={!!run.learnByHand && !demo}
           />
         ) : writing && run.worktreePath ? (
           <ErrorBoundary resetKey={`${run.id}:turn`}>
@@ -616,7 +617,7 @@ export function ChangesTab({
             </div>
             <h3>
               {active
-                ? t.preparing
+                ? run.learnByHand ? workspace.byHand.reading : t.preparing
                 : run.workspaceRemovedAt
                   ? t.filesRemoved
                   : t.noChanges}
@@ -627,7 +628,7 @@ export function ChangesTab({
               ) : run.workspaceRemovedAt ? (
                 notices.workspaceRemoved
               ) : (
-                t.noChangesHint
+                run.learnByHand ? workspace.byHand.planFirst : t.noChangesHint
               )}
             </p>
             <button

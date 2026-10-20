@@ -126,3 +126,15 @@ test("a run of the person's own can free its disk space or be deleted; the sampl
     /aria-label="刪除貢獻：Retry timeouts"/,
   );
 });
+
+test("in the runs list a learn-by-hand run the person still writes reads as their turn, with the Learn-by-hand chip", () => {
+  const run = (phase: string, learnByHand = true) =>
+    ({ ...getDemo("en").run, id: "run-1", repoId: repo.id, title: "Cap retries", status: "review", branch: "by-hand/cap", learnByHand, team: { phase } }) as unknown as RunSummary;
+  const list = (runs: RunSummary[]) =>
+    renderEn(createElement(RunsModal, { runs, repos: [repo], async chooseRun() { return true; }, beginContribution() {}, closeModal() {} }));
+  const html = list([run("developing")]);
+  assertNoHan(html);
+  assert.match(html, /<strong>Cap retries<\/strong>[\s\S]*?<em><span title="Learn by hand"><svg[^>]*lucide-hand[\s\S]*?<\/svg><span class="visually-hidden">Learn by hand<\/span><\/span> Your turn<\/em>/);
+  assert.match(list([run("complete")]), /<strong>Cap retries<\/strong>[\s\S]*?<\/span><\/span> Ready for your review<\/em>/);
+  assert.doesNotMatch(list([run("developing", false)]), /Your turn|title="Learn by hand"/);
+});

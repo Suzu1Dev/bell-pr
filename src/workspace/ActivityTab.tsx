@@ -46,6 +46,9 @@ export function ActivityTab({
   byHand,
 }: ActivityTabProps) {
   const t = useT("workspace").activity;
+  // Learn by hand: the guide is the one agent role (lead, reviewer, test analyst), so no filter by role (DESIGN v1.2 §12).
+  const guide = useT("team").guide;
+  const agentName = (id: string) => (run.learnByHand && ["lead", "reviewer", "tester"].includes(id) ? guide : id);
   const fmt = useFormat();
   const {
     approveTeamPlan,
@@ -54,7 +57,7 @@ export function ActivityTab({
     retryTeam,
     cancel,
   } = actions;
-  const activeLogFilter = run.agents.some((agent) => agent.id === logFilter)
+  const activeLogFilter = !run.learnByHand && run.agents.some((agent) => agent.id === logFilter)
     ? logFilter
     : "all";
   const visibleLogs =
@@ -127,7 +130,7 @@ export function ActivityTab({
             <h3>{t.log}</h3>
             <span>{demo ? t.demoLog : active ? t.live : t.taskLog}</span>
           </div>
-          {run.agents.length > 0 && run.logs.length > 0 && (
+          {!run.learnByHand && run.agents.length > 0 && run.logs.length > 0 && (
             <div
               className="log-filters"
               role="group"
@@ -164,7 +167,7 @@ export function ActivityTab({
                     second: "2-digit",
                   })}
                 </span>
-                <span className="log-agent">{log.agent}</span>
+                <span className="log-agent">{agentName(log.agent)}</span>
                 {log.kind === "command" ? (
                   // The command the CLI reported, with its exit code; no output was captured.
                   <p>

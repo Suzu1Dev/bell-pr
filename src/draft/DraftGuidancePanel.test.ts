@@ -778,3 +778,39 @@ test("a published Learn-by-hand run's rules row quotes the rules instead of wait
   assert.ok(row.includes("We decline AI-generated contributions."));
   assert.ok(!html.includes("BELL PR won") && !html.includes("AI agents wrote this change"));
 });
+
+test("a Learn-by-hand run published through the quoted confirm keeps its rules row on the confirm, never OK", () => {
+  const rules: ContributionRules = {
+    checkedAt: "2026-10-20T08:00:00.000Z",
+    findings: [{ kind: "ban", path: "docs/policy.md", line: 4, quote: "We decline AI-generated contributions.", contribution: true }],
+    filesRead: ["docs/policy.md"],
+  };
+  const render = (readOnly: boolean, locale = renderEn) =>
+    locale(
+      createElement(DraftGuidancePanel, {
+        preparation: undefined,
+        busy: false,
+        onGenerate: () => {},
+        onApply: () => {},
+        draftBody: "My own words.",
+        rules,
+        byHandRun: byHandRun(),
+        readOnly,
+      }),
+    );
+  // The run was fitted to this rule, so publishing asked for the confirm (the server refuses without it).
+  byHandRulesDecisionInTests((findings) => ({ blocked: [], confirmable: findings.bans.map((finding) => ({ finding, allows: [], others: [] })) }));
+  try {
+    const html = render(true);
+    assertNoHan(html);
+    assert.equal(rowStatuses(html).rules, "confirm");
+    const row = checklistRow(html, "rules");
+    assert.ok(row.includes("You confirmed the project&#x27;s quoted rule when you published. The maintainers decide whether your change fits."), row);
+    assert.ok(row.includes("We decline AI-generated contributions."));
+    assert.match(checklistRow(render(true, renderZh), "rules"), /你在送出時確認了專案引用的規則/);
+    // In review the row still waits for the server's list.
+    assert.ok(checklistRow(render(false), "rules").includes("The saved draft hasn&#x27;t been checked yet."));
+  } finally {
+    byHandRulesDecisionInTests();
+  }
+});

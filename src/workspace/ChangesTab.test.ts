@@ -321,3 +321,19 @@ test("while the person writes a learn-by-hand change, the guide takes the explan
   const ready = { writing: false, openReady() {}, ask() {}, guide: {} } as unknown as Props["byHand"];
   assert.match(renderEn(element({ run: byHandRun, byHand: ready, understanding: understanding() })), /Take the check now/);
 });
+
+test("before a learn-by-hand run's first change, Code changes says the guide reads and the person plans, never the agent team", () => {
+  const empty = (status: Run["status"], active: boolean, learnByHand?: true, render = renderEn) =>
+    render(element({ run: { ...run, status, learnByHand, reports: {} }, files: [], file: undefined, selectedPath: "", active }));
+  const reading = empty("running", true, true);
+  assertNoHan(reading);
+  assert.match(reading, /<h3>The guide is reading the code<\/h3>/);
+  assert.doesNotMatch(reading, /agent team|once it finishes/);
+  const planning = empty("awaiting_plan", false, true);
+  assert.match(planning, /Write your own plan in Agent activity first; then you write the change\./);
+  assert.doesNotMatch(planning, /once it finishes/);
+  assert.match(empty("running", true, true, renderZh), /嚮導正在閱讀程式碼/);
+  // An agent run's team prepares the changes, as before.
+  assert.match(empty("running", true), /The agent team is preparing your changes/);
+  assert.match(empty("awaiting_plan", false), /once it finishes, you can review it here/);
+});

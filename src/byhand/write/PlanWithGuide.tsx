@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { ListChecks, Loader2, Play, Plus, Trash2 } from "lucide-react";
-import { focusAfterPlan, useFocusHome } from "./focus";
+import { focusAfterPlan, focusById, useFocusHome } from "./focus";
 import { byHandLimits, helpAllowed, type ByHandPlanInput } from "../../../shared/by-hand";
 import { PremiseNotice } from "../../team/PremiseNotice";
 import { PlanCompare } from "./PlanCompare";
@@ -134,7 +134,7 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
         ))}
       </ol>
       {drafts.length < byHandLimits.planSteps && (
-        <button type="button" className="mission-text-button" onClick={() => setDrafts((list) => [...list, { title: "", files: "", how: "" }])}>
+        <button type="button" className="mission-text-button" onClick={() => (setDrafts((list) => [...list, { title: "", files: "", how: "" }]), focusById(`${run.id}-step-${drafts.length}`))}>
           <Plus size={14} aria-hidden="true" /> {t.add}
         </button>
       )}

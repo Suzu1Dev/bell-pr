@@ -149,9 +149,8 @@ export function TeamBoard({
     ["failed", "blocked"].includes(task.status),
   ).length;
   const queued = run.status === "queued";
-  const working = ["planning", "developing", "integrating", "reviewing"].includes(
-    team.phase,
-  );
+  // Learn by hand: it turns only while the guide or BELL works (byHand.busy), never while the person writes.
+  const working = run.learnByHand ? !!run.byHand?.busy : ["planning", "developing", "integrating", "reviewing"].includes(team.phase);
   const currentStep = queued ? undefined : flowSteps[team.phase];
   const step = (id: NonNullable<typeof currentStep>) =>
     currentStep === id

@@ -299,6 +299,7 @@ export function ExplanationPanel({
   byHandReview,
 }: ExplanationPanelProps) {
   const t = useT("review");
+  const panel = usePanelStrings(); // A Learn-by-hand run's Ask tab names the guide, who answers it (DESIGN v1.2 F8).
   const fmt = useFormat();
   const [locale] = useLocale();
   const [tab, setTab] = useState<PanelTab>(
@@ -419,7 +420,7 @@ export function ExplanationPanel({
     t.presets.why,
     t.presets.risks,
     t.presets.test,
-    ...(explanation ? [t.presets.elsewhere, t.presets.alternatives] : []),
+    ...(explanation ? [t.presets.elsewhere, ...(byHandReview?.run?.byHand?.helpLock?.kinds.includes("plan") === false ? [] : [t.presets.alternatives])] : []),
     ...(isTestFile ? [t.presets.testFile] : []),
     ...(feedback.length ? [t.presets.feedback] : []),
   ];
@@ -504,7 +505,7 @@ export function ExplanationPanel({
           onClick={() => setTab("chat")}
         >
           <MessageCircle size={14} />
-          {t.panel.tabs.chat}
+          {byHandReview ? panel.ask.tab : t.panel.tabs.chat}
           {questionCount > 0 && (
             <span className="explain-message-count">{questionCount}</span>
           )}
@@ -873,7 +874,7 @@ export function ExplanationPanel({
             reports={reports}
             demo={demo}
             feedback={feedback}
-            onRerunReview={onRerunReview && (byHandReview?.onReviewAgain ?? onRerunReview)}
+            onRerunReview={onRerunReview && byHandReview?.run?.byHand?.helpLock?.kinds.includes("review") !== false ? (byHandReview?.onReviewAgain ?? onRerunReview) : undefined}
             reviewBusy={reviewBusy}
             byHand={!!byHandReview}
             failed={byHandReview?.run && reviewFailure(byHandReview.run)}
@@ -931,7 +932,7 @@ export function ExplanationPanel({
                             <Sparkles size={12} />
                           )}
                         </span>
-                        {failed ? t.chat.failed : t.chat.assistant}
+                        {failed ? t.chat.failed : byHandReview ? panel.guide : t.chat.assistant}
                         {demo && (
                           <span className="explain-inline-demo">
                             {t.panel.demoBadge}
@@ -993,7 +994,7 @@ export function ExplanationPanel({
             }}
           >
             <textarea
-              aria-label={t.chat.inputLabel}
+              aria-label={byHandReview ? panel.ask.label : t.chat.inputLabel}
               placeholder={
                 file.blocked ? t.chat.placeholderBlocked : t.chat.placeholder
               }

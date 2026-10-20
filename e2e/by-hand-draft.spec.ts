@@ -515,10 +515,15 @@ test("against the real server: no AI draft or AI line, a PR title of the person'
     const { files } = (await (await page.request.get(`/api/runs/${runId}/diff`)).json()) as { files: { path: string; fingerprint: string }[] };
     const ready = await page.request.post(`/api/runs/${runId}/by-hand/ready`, { data: { changeFingerprint: changeFingerprint(files), review: false } });
     expect(ready.ok()).toBe(true);
-    // Ready (read again), but still no title: approval asks for it.
+    // Ready (read again), but still no title: approval waits for it, saying why, and the footer leads to the PR draft tab.
     await page.reload();
-    await approve.click();
-    await expect(page.locator(".toast-error")).toContainText(serverRun.publish.prTextRequired);
+    await expect(approve).toBeDisabled();
+    await expect(approve).toHaveAttribute("title", workspace.byHand.writePr);
+    await expect(footer.getByRole("button", { name: workspace.byHand.writePr })).toBeVisible();
+    // The server refuses it as well.
+    const empty = await page.request.post(`/api/runs/${runId}/approve`, { data: { draft: { title: "", body: "" } } });
+    expect(empty.status()).toBe(422);
+    expect(((await empty.json()) as { error: string }).error).toBe(serverRun.publish.prTextRequired);
     // The person writes both; the notice goes, and saving never adds the AI line, though "Always add" is on.
     await title.fill("Greet people in their own language");
     await body.fill("## Summary\n\nGreetings come from a table of languages; I wrote and tested it myself.");

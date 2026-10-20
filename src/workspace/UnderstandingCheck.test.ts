@@ -216,3 +216,31 @@ test("the check reads in Traditional Chinese with the fixed vocabulary", () => {
   assert.match(html, /用自己的話講一遍/);
   for (const label of ["確定", "大概", "用猜的", "鎖定我的答案", "填入範例答案"]) assert.ok(html.includes(label), label);
 });
+
+test("in a Learn-by-hand run the person's own words and the guide's review are labelled apart, never AI-written or the Test analyst's", () => {
+  const locked = { ...run, learnByHand: true as const, understanding: demoLockAnswers(run, demo.files, answers, questionsFor, at) };
+  const view = viewOf(locked)!;
+  // The server's Learn-by-hand references: the person's own earlier words (or their last test run) and the guide's review.
+  const own = (id: string) => (id === "untested" ? "Your last test run of this version: npm test (passed)." : "Cap the retries at three, in the client.");
+  const ai = (id: string) => (id === "untested" ? "The guide's review: the timeout path has no test." : "The guide's review: retry.ts:12 still loops when maxRetries is 0.");
+  const byHand = {
+    ...view,
+    plan: view.plan.map((item) => ({ ...item, reference: `${own(item.id)}\n\n${ai(item.id)}`, ownReference: own(item.id), copyReference: ai(item.id) })),
+  };
+  const html = renderEn(element({ run: locked, view: byHand, demo: false }));
+  assertNoHan(html);
+  assert.match(html, /Closed book: the guide, the explanations and your notes stay hidden while you answer/);
+  assert.match(html, /You grade yourself against your own earlier words and the guide&#x27;s review\./);
+  assert.match(html, /<strong>Your own words<\/strong><p>Cap the retries at three, in the client\.<\/p><strong>The guide&#x27;s review<\/strong><p>The guide&#x27;s review: retry\.ts:12/);
+  // The not-tested question: the last test run speaks for itself, then the guide's review.
+  assert.match(html, /<div class="check-reference"><p>Your last test run of this version: npm test \(passed\)\.<\/p><strong>The guide&#x27;s review<\/strong>/);
+  assert.doesNotMatch(html, /AI-written|Test analyst|the agent/);
+  const zh = renderZh(element({ run: locked, view: byHand, demo: false }));
+  assert.match(zh, /<strong>你自己的話<\/strong>/);
+  assert.match(zh, /<strong>嚮導的審查<\/strong>/);
+  assert.doesNotMatch(zh, /Test analyst|agent|AI 撰寫/);
+  // An agent run keeps its AI-written reference and the Test analyst's report.
+  const agent = renderEn(element({ run: { ...locked, learnByHand: undefined }, view, demo: false }));
+  assert.ok(agent.includes(t.reference));
+  assert.ok(agent.includes(escaped(t.testerReference)));
+});

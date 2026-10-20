@@ -180,6 +180,8 @@ export function WorkspacePage({
   const statusLabels = useT("common").runStatus;
   const { draftDirty, draftUnfinished, followUp, commitMessageUnfinished } =
     draft;
+  // Learn by hand: the PR title and description are the person's own, and approval needs both (DESIGN v1.2 F11).
+  const prTextMissing = !!run.learnByHand && !demo && !followUp && (!draft.draftTitle?.trim() || !draft.draftBody?.trim());
   const { approve, plan, exporting, exportLearning } = actions;
   // The Explain-it-back check and the person's other records on this run.
   const understanding = useUnderstanding(run, files, { demo, setRun: actions.setRun });
@@ -523,7 +525,9 @@ export function WorkspacePage({
               <Sparkles size={15} />
             </span>
             <span>{t.footer[footer.status]}</span>
-            <span className="footer-hint">{t.footer.hint}</span>
+            {prTextMissing && !byHand.writing && !reviewing && run.status !== "published" ? (
+              <button type="button" className="mission-text-button" onClick={() => setTab("draft")}>{t.byHand.writePr}</button>
+            ) : <span className="footer-hint">{run.learnByHand ? t.footer.hintByHand : t.footer.hint}</span>}
           </div>
           <div>
             <span className="footer-reviewed">
@@ -562,6 +566,7 @@ export function WorkspacePage({
                   busy ||
                   !!run.publishing ||
                   draftDirty ||
+                  prTextMissing ||
                   (!demo &&
                     (followUp ? commitMessageUnfinished : !!draftUnfinished)) ||
                   !["review", "approved"].includes(run.status))
@@ -573,6 +578,8 @@ export function WorkspacePage({
                       ? t.footer.needsCheck
                       : draftDirty
                       ? t.footer.needsSave
+                      : prTextMissing
+                      ? t.byHand.writePr
                       : followUp && commitMessageUnfinished
                         ? t.footer.needsCommitMessage
                         : !demo && draftUnfinished

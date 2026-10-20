@@ -144,17 +144,6 @@ const m: Translation<typeof en> = {
       `輸入 ${input} · 輸出 ${output} tokens${partial ? "（部分回報）" : ""}`,
     unreported: "用量未回報",
   },
-  premise: {
-    label: "前提查核",
-    heading: ({ verdict }) => `前提查核：${verdict}`,
-    verdicts: {
-      holds: "假設成立",
-      refuted: "假設不成立",
-      unclear: "無法確認假設",
-    },
-    source: "由 Lead 閱讀程式碼得出，可對照引用的位置確認。",
-    sourceGuide: "由嚮導閱讀程式碼得出，可對照引用的位置確認。",
-  },
   setupNeeds: {
     title: "需要你在這台機器準備的環境",
     intro:
@@ -163,6 +152,7 @@ const m: Translation<typeof en> = {
     round: ({ number }) => `修正第 ${number} 輪`,
     agent: ({ name, id }) => `${name}（${id}）`,
   },
+  guide: "嚮導",
   howItWorks: "運作方式",
   protocolNote: ({ provider }) =>
     `${product.name} 使用共享任務、獨立工作目錄及回合間訊息協作。這是由 ${provider} 逐回合驅動的 ${product.name} 實作，並非 Claude Code 原生 Agent Teams。`,

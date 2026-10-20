@@ -169,6 +169,8 @@ const draft = {
         fmt.plural(count) === "one"
           ? "1 rule quoted from the project's files. The rows below check this change against it."
           : `${fmt.number(count)} rules quoted from the project's files. The rows below check this change against them.`,
+      /** A published Learn-by-hand run fitted to the project's rule: publishing asked for the quoted confirm (DESIGN v1.2 F12). */
+      rulesConfirmed: "You confirmed the project's quoted rule when you published. The maintainers decide whether your change fits.",
       rulesNotFound: ({ files }: { files: number }) =>
         `Not found in the ${fmt.plural(files) === "one" ? "1 file" : `${fmt.number(files)} files`} ${product.name} read. Some projects publish their rules on a website or wiki; check before you publish.`,
       doorOpen: "Pull requests: open to you.",
@@ -325,7 +327,7 @@ const draft = {
     mergedNone: "The sizes of the project's recent merged pull requests were not read.",
     split: "Is this one logical change?",
     splitLead:
-      "A change that a maintainer can review in one sitting gets reviewed sooner. If this one does several things, ask the agent how it could be split.",
+      "A change that a maintainer can review in one sitting gets reviewed sooner. If this one does several things, ask how it could be split.",
     askSplit: "Ask how to split it",
     weakened: "Weakened tests",
     weakenedLead:

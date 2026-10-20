@@ -62,7 +62,7 @@ const m: Translation<typeof en> = {
     next: ({ rung }) => `下一個提示：${rung}`,
     tryFirst: "先試試看：改程式碼、跑測試，或說說你試了什麼。",
     noRung: "這一步已經沒有提示了；下面有其他出口。",
-    working: "嚮導正在回答…",
+    working: "嚮導正在回答…", answered: "嚮導回答了。",
     failed: ({ reason }) => (reason ? `嚮導沒能回答：${reason}` : "嚮導沒能回答，請再試一次。"),
     reviewAsk: ({ at, observed }) => `關於審查在 ${at} 提到的一點：「${observed}」`,
     aboutReview: "問嚮導關於這次審查的問題",

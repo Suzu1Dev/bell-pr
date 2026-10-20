@@ -42,7 +42,7 @@ export function usePremiseCheck(
   { setRun, setFiles, notify }: Pick<RunActions, "setRun" | "setFiles" | "notify">,
 ) {
   const t = useT("workspace").notices;
-  const verdicts = useT("team").premise.verdicts;
+  const verdicts = useT("workspace").premise.verdicts;
   const [checkingPremise, setChecking] = useState(false);
   const openRun = useRef(run.id);
   openRun.current = run.id;

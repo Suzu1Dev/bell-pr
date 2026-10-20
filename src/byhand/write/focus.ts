@@ -1,4 +1,4 @@
-import { useEffect, useRef, type FocusEvent } from "react";
+import { useEffect, useRef, type FocusEvent, type RefObject } from "react";
 import { focusWhenShown } from "../../app/hooks/useByHand";
 
 /** The fields the focus can come back to: never a read-only one. */
@@ -42,3 +42,9 @@ export const focusAfterReady = () =>
 
 /** After This is my plan the plan gives way to Code changes: the focus goes to that tab, not to the page. */
 export const focusAfterPlan = () => focusWhenShown(() => document.querySelector<HTMLElement>("#workspace-tab-changes[aria-selected=true]"));
+
+/** After "Add a step" the focus goes to the new step's title, so typing never lands in another field (or adds steps). */
+export const focusById = (id: string) => focusWhenShown(() => document.getElementById(id));
+
+/** A guide answer that came in, newest first in the thread (often below the Tests card): the focus, and so the view, goes to it. */
+export const focusAnswer = (root: RefObject<HTMLElement | null>) => focusWhenShown(() => root.current?.querySelector<HTMLElement>(".by-hand-thread > li"));

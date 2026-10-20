@@ -146,3 +146,20 @@ test("a learn-by-hand run waiting for the person's own plan reads as their turn 
   assert.match(renderEn(element({ runs: [waiting(true)] })), /<small>octo\/widgets · Your turn<\/small>/);
   assert.match(renderEn(element({ runs: [waiting(false)] })), /<small>octo\/widgets · Awaiting plan approval<\/small>/);
 });
+
+test("a learn-by-hand run the person still writes reads as their turn on Home, with the Learn-by-hand chip", () => {
+  const writing = (phase: string, learnByHand = true) =>
+    ({ ...run("run-9", "Cap retries", "2026-10-04T00:00:00Z"), status: "review", learnByHand, team: { phase } }) as unknown as RunSummary;
+  // Never marked ready (an empty diff included): their turn, not "Ready for your review".
+  const html = renderEn(element({ runs: [writing("developing")] }));
+  assertNoHan(html);
+  assert.match(html, /<small>octo\/widgets · Your turn<\/small>/);
+  assert.match(html, /<span title="Learn by hand"><svg[^>]*lucide-hand[\s\S]*?<\/svg><span class="visually-hidden">Learn by hand<\/span><\/span>/);
+  // Marked ready once: it waits for their review, as the run's own header says.
+  assert.match(renderEn(element({ runs: [writing("complete")] })), /<small>octo\/widgets · Ready for your review<\/small>/);
+  // An agent run is as it was, with no chip.
+  const agent = renderEn(element({ runs: [writing("developing", false)] }));
+  assert.match(agent, /<small>octo\/widgets · Ready for your review<\/small>/);
+  assert.doesNotMatch(agent, /Learn by hand/);
+  assert.match(renderZh(element({ runs: [writing("developing")] })), /換你寫/);
+});

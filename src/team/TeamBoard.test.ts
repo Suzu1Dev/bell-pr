@@ -814,3 +814,43 @@ test("a learn-by-hand run's plan heading says what the guide and the person do, 
   assert.equal(heading(board("planning", "running", "agents")), "The lead is planning");
   assert.equal(heading(board("awaiting_approval", "awaiting_plan", "agents")), "Waiting for you to approve the plan");
 });
+
+test("a learn-by-hand board turns only while the guide or BELL works, and names no agent team in any phase it reaches", () => {
+  const sample = getDemo("en");
+  const board = (phase: AgentTeam["phase"], status: Run["status"], extra: Partial<Run> = {}) =>
+    renderEn(
+      createElement(TeamBoard, {
+        run: { ...sample.run, status, learnByHand: true, team: { ...sample.team, phase, tasks: [], planSummary: "", messages: [] }, ...extra },
+        demo: false,
+        onApprove() {},
+        async onRevise() {},
+        async onMessage() {},
+        busy: false,
+        entitlements: freeEntitlements,
+        byHand: { onSave: async () => {}, onReveal: async () => {}, onAskQuestions: async () => {}, onConfirm: async () => {} },
+      }),
+    );
+  const heading = (html: string) => html.match(/<div class="team-plan-heading"><h3>([\s\S]*?)<\/h3>/)?.[1] ?? "";
+  // The person writes: nothing turns, whatever the phase says.
+  for (const [phase, status] of [["developing", "review"], ["awaiting_approval", "awaiting_plan"], ["complete", "review"], ["complete", "published"]] as const)
+    assert.doesNotMatch(heading(board(phase, status)), /class="[^"]*spin/, phase);
+  // The guide reads the code, answers, reviews, or BELL runs the tests: it turns.
+  for (const kind of ["plan", "guide", "review", "tests"])
+    assert.match(heading(board("developing", "review", { byHand: { busy: { kind, since: "2026-10-20T09:00:00.000Z" } } })), /class="[^"]*spin/, kind);
+  // Every phase a learn-by-hand run reaches (the server never gives it integrating or reviewing).
+  for (const [phase, status] of [["planning", "running"], ["awaiting_approval", "awaiting_plan"], ["developing", "review"], ["complete", "published"], ["failed", "failed"], ["cancelled", "cancelled"]] as const)
+    assert.doesNotMatch(heading(board(phase, status)), /lead|team|Teammates|Cross-review/i, phase);
+  // An agent run's board still turns while its team works.
+  const agents = renderEn(
+    createElement(TeamBoard, {
+      run: { ...sample.run, status: "running", team: { ...sample.team, phase: "developing" } },
+      demo: false,
+      onApprove() {},
+      async onRevise() {},
+      async onMessage() {},
+      busy: false,
+      entitlements: freeEntitlements,
+    }),
+  );
+  assert.match(heading(agents), /class="[^"]*spin/);
+});

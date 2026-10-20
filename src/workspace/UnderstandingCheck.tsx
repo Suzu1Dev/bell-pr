@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { CircleCheck, Loader2, Sparkles, X } from "lucide-react";
 import { activeFollowUp } from "../../shared/followups";
 import {
@@ -26,7 +26,7 @@ import type { CheckPanelMode, Understanding } from "../app/hooks/useUnderstandin
 import { demoCheckFiles } from "../app/hooks/understandingDemo";
 import { getDemo } from "../demo";
 import ReviewabilitySnapshot from "../draft/ReviewabilitySnapshot";
-import { useLocale, useT } from "../i18n";
+import { useLocale, useT, type Messages } from "../i18n";
 import type { DiffFile, Repo, Run } from "../types";
 import { changesOf } from "./respect";
 import "./understanding.css";
@@ -96,6 +96,12 @@ function useTypewriter() {
     tick();
   };
 }
+
+/** A reference's parts and labels: in Learn by hand the person's own words (or last test run) apart from the guide's review (DESIGN v1.2 F10). */
+const referenceParts = (planned: PlannedItem, byHand: boolean, t: Messages["workspace"]["check"]) =>
+  byHand && planned.copyReference !== undefined
+    ? [[planned.source === "untested" ? "" : t.ownWords, planned.ownReference], [t.guideReview, planned.copyReference]]
+    : [[planned.source === "untested" ? t.testerReference : t.reference, planned.reference]];
 
 /** One step of the check: a section with its own heading, which focus moves to. */
 function Step({
@@ -212,7 +218,7 @@ export default function UnderstandingCheck({
           <X size={16} />
         </button>
       </div>
-      <p>{t.intro}</p>
+      <p>{run.learnByHand ? t.introByHand : t.intro}</p>
       {!check.required && <p className="check-note">{t.off}</p>}
       <ReviewabilitySnapshot
         snapshot={snapshot}
@@ -599,14 +605,8 @@ export default function UnderstandingCheck({
                     <p>{item.dontKnow ? t.dontKnowAnswer : item.answer}</p>
                   </div>
                   <div className="check-reference">
-                    <strong>
-                      {planned.reference
-                        ? planned.source === "untested"
-                          ? t.testerReference
-                          : t.reference
-                        : t.noReference}
-                    </strong>
-                    {planned.reference && <p>{planned.reference}</p>}
+                    {referenceParts(planned, !!run.learnByHand, t).map(([label, text]) => text && <Fragment key={label}>{label && <strong>{label}</strong>}<p>{text}</p></Fragment>)}
+                    {!planned.reference && <strong>{t.noReference}</strong>}
                   </div>
                 </div>
                 {planned.source === "untested" ? (

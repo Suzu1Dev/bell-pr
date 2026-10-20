@@ -23,6 +23,8 @@ const messages = {
    * (DESIGN v1.2 F8).
    */
   guide: "The guide",
+  /** A Learn-by-hand run's Ask tab, which the guide answers: its name and its question field's. */
+  ask: { tab: "Ask", label: "Question for the guide" },
   /** A review at Ready that ended without one and left no line in the run log (the server stopped). */
   reviewFailed: "The guide's review didn't finish. Run the review again.",
   /** The title of a walkthrough unit's answer-first card (try first, D1). */

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronRight, GitPullRequest, HardDrive, Plus, Trash2 } from "lucide-react";
+import { ByHandChip, byHandTurn } from "../app/byHandStatus";
 import { getDemo } from "../demo";
 import { useLocale, useT } from "../i18n";
 import type { Repo, RunSummary } from "../types";
@@ -52,7 +53,7 @@ export function RunsModal({
   const t = useT("modals").runs;
   const common = useT("common");
   const statusLabels = common.runStatus;
-  const yourTurn = useT("workspace").byHand.turn;
+  const { turn: yourTurn, badge: byHandBadge } = useT("workspace").byHand;
   const [locale] = useLocale();
   const demoRun = getDemo(locale).run;
   const [pending, setPending] = useState<Pending | null>(null);
@@ -113,7 +114,7 @@ export function RunsModal({
                 {job.workspaceRemovedAt && (
                   <span className="run-files-removed">{t.filesRemoved}</span>
                 )}
-                <em>{job.learnByHand && job.status === "awaiting_plan" ? yourTurn : statusLabels[job.status]}</em>
+                <em>{job.learnByHand && <><ByHandChip label={byHandBadge} /> </>}{byHandTurn(job) ? yourTurn : statusLabels[job.status]}</em>
                 <ChevronRight size={15} />
               </button>
               {own && (freeRunSpace || deleteRun) && (

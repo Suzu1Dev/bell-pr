@@ -75,3 +75,24 @@ test("the run log takes the full width; the request is not repeated beside it, t
   assert.match(zh, /開發在獨立的 Git worktree 中執行，審查完成後由你決定何時送出。<\/p>/);
   assert.doesNotMatch(zh, /這次的貢獻目標/);
 });
+
+test("a learn-by-hand run's log names the guide, with no filter by agent role", () => {
+  const logs = [
+    { time: "2026-10-20T09:00:00.000Z", agent: "lead", message: "The guide read the code." },
+    { time: "2026-10-20T09:01:00.000Z", agent: "reviewer", message: "The review is done." },
+    { time: "2026-10-20T09:02:00.000Z", agent: "user", message: "Marked ready." },
+  ];
+  const run = (learnByHand?: true): Run => ({ ...demo.run, id: "run-1", learnByHand, logs, team: { ...demo.team, tasks: [], messages: [] } });
+  // A role picked in another run doesn't hide this run's lines.
+  const html = renderEn(element({ run: run(true), demo: false, logFilter: "lead" }));
+  assertNoHan(html);
+  assert.doesNotMatch(html, /class="log-filters"|log-filter-chip/);
+  assert.equal(count(html, /<span class="log-agent">The guide<\/span>/), 2);
+  assert.match(html, /<span class="log-agent">user<\/span>/);
+  assert.doesNotMatch(html, /<span class="log-agent">(lead|reviewer)<\/span>/);
+  assert.equal(count(renderZh(element({ run: run(true), demo: false })), /<span class="log-agent">嚮導<\/span>/), 2);
+  // An agent run keeps its roles and filters.
+  const agent = renderEn(element({ run: run(), demo: false }));
+  assert.match(agent, /log-filter-chip/);
+  assert.match(agent, /<span class="log-agent">lead<\/span>/);
+});

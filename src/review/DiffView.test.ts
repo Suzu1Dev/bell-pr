@@ -388,3 +388,19 @@ test("a highlighted range marks its lines in the changed version only", () => {
   assert.deepEqual(marked, [12, 13, 14, 15, 16]);
   assert.doesNotMatch(html, /rv-line-removed[^"]*rv-line-highlighted/);
 });
+
+test("in a Learn-by-hand run the selection's button and hint name the guide, never an agent explaining", () => {
+  const file = getDemo("en").files[0];
+  const diff = (props: Partial<DiffViewProps>, render = renderEn) =>
+    render(createElement(DiffView, { file, reviewed: false, onReview() {}, onAsk() {}, view: "unified", ...props }));
+  const html = diff({ guide: true } as Partial<DiffViewProps>);
+  assertNoHan(html);
+  assert.match(html, /rv-diff-footer[^>]*>.*Click any line to ask the guide about it/);
+  assert.match(html, /Press Enter to go to “Ask the guide about these lines” for the selection/);
+  assert.doesNotMatch(html, /agent|Explain this code/);
+  const zh = diff({ guide: true } as Partial<DiffViewProps>, renderZh);
+  assert.match(zh, /點選任何一行，向嚮導提問/);
+  assert.doesNotMatch(zh, /Agent/);
+  // An agent run keeps the agent's words.
+  assert.match(diff({}), /Click any line and the agent will explain it/);
+});

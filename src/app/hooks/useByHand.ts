@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { readyNow } from "../../../shared/by-hand";
+import { readyNow, type ByHandCheckInInput } from "../../../shared/by-hand";
 import { api, send } from "../../api";
 import { parseDiff } from "../../review/diff";
 import type { DiffFile, Repo, Run } from "../../types";
@@ -31,6 +31,25 @@ export function focusWhenShown(find: () => HTMLElement | null | undefined, tries
   const target = find();
   if (target) target.focus();
   else if (tries > 0) setTimeout(() => focusWhenShown(find, tries - 1), 50);
+}
+
+/** The repeated-failure check-ins this tab sent, by run, step and last failing test run. */
+const repeatsSent = new Set<string>();
+
+/**
+ * Whether a repeated-failure check-in is still to be sent (DESIGN v1.2 F6):
+ * once per step and failing test run. Not again when its card mounts once
+ * more (another tab and back), nor after a reload, where the run's own
+ * check-ins already hold one for the step since that test run.
+ */
+export function repeatCheckInDue(run: Pick<Run, "id" | "byHand">, stepId?: string) {
+  const record = run.byHand ?? {};
+  const last = Math.max(0, ...(record.tests ?? []).filter((test) => !test.reported).map((test) => Date.parse(test.at)));
+  const key = `${run.id}:${stepId ?? ""}:${last}`;
+  const recorded = (record.checkIns ?? []).some((entry) => entry.signal === "repeat-failure" && entry.stepId === stepId && Date.parse(entry.at) >= last);
+  if (recorded || repeatsSent.has(key)) return false;
+  repeatsSent.add(key);
+  return true;
 }
 
 /**
@@ -72,7 +91,8 @@ export function useByHand(
   }, [id]);
   /** A request of this run's; a refusal shows the server's message and rejects. */
   const call = (path: string, method = "POST", then?: () => void) => async (body?: unknown) => {
-    const from = path === "ready" ? path : path.startsWith("plan") ? "plan" : "guide";
+    // While the Ready dialog is open (modal), its own requests (Mark it ready, the Tests card) answer in it.
+    const from = path === "ready" || readyOpen ? "ready" : path.startsWith("plan") ? "plan" : "guide";
     setState({ busy: true, error: "", from });
     try {
       const result = await api<{ run?: Run }>(path.startsWith("/") ? path : `${runPath(id)}/by-hand/${path}`, send(method, body));
@@ -146,6 +166,12 @@ export function useByHand(
   }, [id, testing, setFiles]);
 
   const view = (from: string) => ({ busy: state.busy, error: state.from === from ? state.error : "" });
+  const tests = {
+    onConfirmTestCommand: (command: string) => call(`/repos/${encodeURIComponent(run.repoId)}/test-command`, "PUT")({ command }),
+    onRunTests: call("tests"),
+    onStopTests: call("tests/stop"),
+    onReportTests: call("tests/report"),
+  };
   return {
     /** The person writes: an LBH run in review whose change isn't the version marked ready. */
     writing: open && !ready,
@@ -171,18 +197,17 @@ export function useByHand(
       channels: repo?.contributionRules?.channels,
       onGuide: call("guide", "POST", () => setSelection(undefined)),
       onStep: (stepId: string, input: object) => call(`steps/${encodeURIComponent(stepId)}`, "PATCH")(input),
-      onCheckIn: call("check-ins"),
-      onConfirmTestCommand: (command: string) => call(`/repos/${encodeURIComponent(run.repoId)}/test-command`, "PUT")({ command }),
-      onRunTests: call("tests"),
-      onStopTests: call("tests/stop"),
-      onReportTests: call("tests/report"),
+      onCheckIn: (input: ByHandCheckInInput) =>
+        input.signal === "repeat-failure" && !repeatCheckInDue(run, input.stepId) ? Promise.resolve() : call("check-ins")(input),
+      ...tests,
       onLeave: call("leave", "POST", handBack),
     },
     readyDialog: {
       ...view("ready"),
+      tests,
       onReady: call("ready", "POST", () => setReadyOpen(false)),
-      // Any AI rule but "open an issue first" asks for care before an AI review.
-      aiRules: (repo?.contributionRules?.findings ?? []).some((finding) => finding.kind !== "issue-first"),
+      // A rule about AI (a ban, disclosure, reserved area or one addressed to agents, or one whose words name AI) asks for care before an AI review.
+      aiRules: (repo?.contributionRules?.findings ?? []).some((finding) => ["ban", "disclose", "area", "agent"].includes(finding.kind) || /\b(?:AI|LLMs?|GPT|Copilot)\b|artificial intelligence|language model/i.test(finding.quote)),
     },
   };
 }

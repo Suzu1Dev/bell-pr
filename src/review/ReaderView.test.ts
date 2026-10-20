@@ -378,3 +378,76 @@ test("a review asked for at Ready that ended without one says why in the run log
   assert.equal(failedOf({ byHandReview: { ...reader(check([])), run: runOf({}) } }), failedLine);
   assert.equal(failedOf({}), undefined);
 });
+
+test("a run fitted to rules that don't name AI review offers no Run the review again", () => {
+  const rerun = (lock?: string[]) =>
+    find(
+      shallow(ExplanationPanel, {
+        file,
+        messages: [],
+        loading: false,
+        onAsk() {},
+        demo: false,
+        initialTab: "reports",
+        onRerunReview() {},
+        byHandReview: {
+          ...reader(check([])),
+          run: { logs: [], byHand: lock ? { helpLock: { kinds: lock, at: "2026-10-20T09:00:00.000Z", rulesCheckedAt: "2026-10-20T09:00:00.000Z", rules: [] } } : {} },
+        } as ByHandReader,
+      }),
+      ReviewReports,
+    )!.props.onRerunReview;
+  // The Ready dialog of such a run has no review box (the server refuses review: true), so the button would lead nowhere.
+  assert.equal(rerun(["explain", "answer", "test"]), undefined);
+  assert.equal(typeof rerun(["explain", "answer", "review"]), "function");
+  assert.equal(typeof rerun(), "function");
+});
+
+test("a run fitted to rules that don't name planning help offers no Ask-tab starter about other ways to do it", () => {
+  const demoFile = { ...getDemo("en").files.find((entry) => entry.path === "src/client.ts")!, fingerprint: file.fingerprint };
+  const ask = (lock?: string[]) =>
+    renderEn(
+      createElement(ExplanationPanel, {
+        file: demoFile,
+        messages: [],
+        loading: false,
+        onAsk() {},
+        demo: false,
+        chatRequestId: 1,
+        byHandReview: {
+          ...reader(check([`fallback:${file.path}`])),
+          run: { logs: [], byHand: lock ? { helpLock: { kinds: lock, at: "2026-10-20T09:00:00.000Z", rulesCheckedAt: "2026-10-20T09:00:00.000Z", rules: [] } } : {} },
+        } as ByHandReader,
+      }),
+    );
+  const alternatives = /What other ways could this be done/;
+  assert.doesNotMatch(ask(["explain", "answer", "test"]), alternatives);
+  assert.match(ask(["explain", "answer", "plan"]), alternatives);
+  assert.match(ask(), alternatives);
+});
+
+test("a Learn-by-hand run's Ask tab names the guide, never an agent or a learning assistant", () => {
+  const chat = (props: Partial<ExplanationPanelProps>, render = renderEn) =>
+    render(
+      createElement(ExplanationPanel, {
+        file,
+        messages: [{ role: "user", content: "Why a cap?" }, { role: "assistant", content: "Because a timeout loops." }],
+        loading: false,
+        onAsk() {},
+        demo: false,
+        chatRequestId: 1,
+        ...props,
+      }),
+    );
+  const html = chat({ byHandReview: reader(check([])) });
+  assertNoHan(html);
+  assert.match(html, /<\/svg>The guide<\/div>|<\/span>The guide</);
+  assert.match(html, /aria-label="Question for the guide"/);
+  assert.doesNotMatch(html, /Learning assistant|Question for the agent/);
+  const zh = chat({ byHandReview: reader(check([])) }, renderZh);
+  assert.match(zh, /追問嚮導/);
+  assert.doesNotMatch(zh, /追問 Agent|學習助理/);
+  // An agent run's tab is as it was.
+  assert.match(chat({}), /Learning assistant/);
+  assert.match(chat({}, renderZh), /追問 Agent/);
+});

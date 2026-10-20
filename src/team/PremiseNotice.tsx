@@ -29,7 +29,7 @@ export function PremiseNotice({
   compact?: boolean;
   guide?: boolean;
 }) {
-  const t = useT("team").premise;
+  const t = useT("workspace").premise;
   if (!premise) return null;
   const source = guide ? t.sourceGuide : t.source;
   const verdict = knownVerdict(premise.verdict);

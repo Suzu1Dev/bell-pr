@@ -5,6 +5,7 @@
  */
 import { formatters } from "../../../shared/i18n/locale";
 import { product } from "../../../shared/product";
+import type { PremiseVerdict } from "../../../shared/team";
 
 const { plural } = formatters("en");
 
@@ -63,6 +64,19 @@ const workspace = {
   },
   sampleReview: "Sample review",
   humanReview: "Human review",
+  /** The lead's check of the request's assumption, made by reading the code. */
+  premise: {
+    label: "Premise check",
+    heading: ({ verdict }: { verdict: string }) => `Premise check: ${verdict}`,
+    verdicts: {
+      holds: "the assumption holds",
+      refuted: "the assumption does not hold",
+      unclear: "the assumption could not be confirmed",
+    } satisfies Record<PremiseVerdict, string>,
+    source: "Found by the lead reading the code; check it against the cited lines.",
+    /** A Learn-by-hand run's premise check, from the guide's first read (DESIGN v1.2 F3). */
+    sourceGuide: "Found by the guide reading the code; check it against the cited lines.",
+  },
   /** Learn by hand (DESIGN v1.2 F4, F5): what shows before the byhand chunk loads. */
   byHand: {
     badge: "Learn by hand",
@@ -70,6 +84,11 @@ const workspace = {
     turn: "Your turn",
     ready: "Ready for review",
     writeFirst: "Write a change first",
+    /** Code changes before the first change: the guide's first read, then the person's own plan (DESIGN v1.2 F3). */
+    reading: "The guide is reading the code",
+    planFirst: "Write your own plan in Agent activity first; then you write the change.",
+    /** The footer while the PR title or description is empty: approval needs both, in the person's words (DESIGN v1.2 F11). */
+    writePr: "Write the PR title and description first",
     reviewing: "The guide is reviewing",
     changed: "You changed the code after marking it ready. The review and the check wait until you mark it ready again.",
   },
@@ -80,6 +99,7 @@ const workspace = {
       "Every file reviewed · Understanding check off. Approval needs your reviewed ticks only.",
     learning: "Not just a review: a lesson in code, too.",
     hint: "Select code to ask the agent about it.",
+    hintByHand: "Select code to ask the guide about it.",
     reviewed: ({ reviewed, total }: { reviewed: number; total: number }) =>
       `${reviewed} / ${total} reviewed`,
     viewPullRequest: "View pull request",
@@ -163,6 +183,9 @@ const workspace = {
     title: "Explain it back",
     intro:
       "Closed book: the explanations, notes and questions to the agent stay hidden while you answer; the diff and the file list stay. You grade yourself against the AI-written references. It is a commitment, not a test.",
+    /** A Learn-by-hand run (DESIGN v1.2 F10): the references are the person's own words and the guide's review. */
+    introByHand:
+      "Closed book: the guide, the explanations and your notes stay hidden while you answer; the diff and the file list stay. You grade yourself against your own earlier words and the guide's review. It is a commitment, not a test.",
     off: "The understanding check is off, so approval does not wait for it. You can still take it.",
     close: "Close the check",
     loading: "Loading the check…",
@@ -203,6 +226,8 @@ const workspace = {
     reference: "Reference, AI-written: the diff is the authority",
     testerReference: "The Test analyst's report, AI-written: the diff is the authority",
     noReference: "No reference: compare with the diff yourself.",
+    ownWords: "Your own words",
+    guideReview: "The guide's review",
     notGraded: "Not graded: what you did not test is yours to say.",
     dontKnowAnswer: "You said you don't know, which counts as Missed.",
     grade: "Your grade",
@@ -281,6 +306,8 @@ const workspace = {
       "The value of this contribution still has to be confirmed by the task's needs and its acceptance results.",
     before:
       "The problem in the task description exists today; the team confirms how far it reaches while planning.",
+    beforeByHand:
+      "The problem in the task description exists today; you and the guide find how far it reaches while you plan.",
     after:
       "Improve the current behavior as the task asks; not yet verified to be achieved.",
     risk: "Before submitting, check compatibility, regression tests and user-facing behavior.",

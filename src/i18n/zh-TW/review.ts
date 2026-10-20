@@ -33,6 +33,7 @@ const m: Translation<typeof en> = {
     after: "變更後",
     selectedLines: ({ count }) => `已選取 ${count} 行`,
     idleHint: "點選任何一行，讓 Agent 為你解說",
+    idleHintGuide: "點選任何一行，向嚮導提問",
     shiftKey: "Shift",
     shiftHint: ({ key }) => `${key} 可多行選取`,
     clearSelection: "清除選取",
@@ -49,6 +50,7 @@ const m: Translation<typeof en> = {
       loadFailed: "無法讀取周圍的程式碼。",
     },
     askSelection: "解說這段程式碼",
+    askGuide: "問嚮導這幾行",
   },
   selection: {
     question: ({ path, count }) =>

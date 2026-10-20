@@ -129,6 +129,7 @@ const m: Translation<typeof en> = {
       whySummary: "維護者為什麼在意",
       rulesFound: ({ count }) =>
         `從專案檔案中引用了 ${fmt.number(count)} 條規範，下方各項會拿這次的變更逐一對照。`,
+      rulesConfirmed: "你在送出時確認了專案引用的規則；你的變更是否合適，由維護者決定。",
       rulesNotFound: ({ files }) =>
         `在 ${product.name} 讀過的 ${fmt.number(files)} 個檔案中沒有找到。有些專案把規範放在網站或 wiki 上，發布前請自行確認。`,
       doorOpen: "Pull Request：對你開放。",
@@ -234,7 +235,7 @@ const m: Translation<typeof en> = {
       `#${number}：${fmt.number(files)} 個檔案 +${fmt.number(additions)} −${fmt.number(deletions)}`,
     mergedNone: "沒有讀到專案最近合併的 Pull Request 規模。",
     split: "這是一個合乎邏輯的單一變更嗎？",
-    splitLead: "維護者能一次看完的變更，會比較快得到審查。如果這份變更做了好幾件事，可以問 agent 怎麼拆開。",
+    splitLead: "維護者能一次看完的變更，會比較快得到審查。如果這份變更做了好幾件事，可以問問怎麼拆開。",
     askSplit: "問問怎麼拆開",
     weakened: "被削弱的測試",
     weakenedLead: "每一個被跳過、刪除或放寬的測試，發布前都需要一行理由：為什麼這樣改是對的？",

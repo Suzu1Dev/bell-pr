@@ -64,6 +64,8 @@ export default {
   },
   /** The team's turns, tasks and phases in a run's log. */
   team: {
+    /** The name a Learn-by-hand run's turns start with in its log: its one agent role is the guide (DESIGN v1.2 §12). */
+    guideName: "The guide",
     /** The first line of every agent turn; a missing model or effort is the CLI's own default. */
     started: ({
       name,

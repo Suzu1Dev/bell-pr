@@ -265,7 +265,9 @@ export function DraftGuidancePanel({
           locale,
         )
       : undefined;
-  const mirror = learnByHand ? local?.filter((check) => !serverOnly.has(check.id)) : local;
+  // Published through the quoted confirm (publishing asks for it): the rules row keeps it, saying it was confirmed, never OK.
+  const confirmed = readOnly && local?.find((check) => check.id === "by-hand-rules");
+  const mirror = learnByHand ? local?.filter((check) => !serverOnly.has(check.id)).concat(confirmed ? [{ ...confirmed, message: t.checklist.rulesConfirmed }] : []) : local;
   const respect = checks
     ? withFactChecks(
         checks,

@@ -16,7 +16,6 @@ import pages from "./pages";
 import repos from "./repos";
 import review from "./review";
 import setup from "./setup";
-import team from "./team";
 import workspace from "./workspace";
 
 const messages = {
@@ -28,7 +27,6 @@ const messages = {
   modals,
   mission,
   review,
-  team,
   draft,
   setup,
   license,

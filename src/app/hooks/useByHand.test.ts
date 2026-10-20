@@ -169,3 +169,83 @@ test("the focus moves to an element once it is on screen, and the search gives u
     mock.timers.reset();
   }
 });
+
+test("the Ready dialog's line about AI rules comes only from rules about AI", async () => {
+  const finding = (kind: string, quote: string) => ({ kind, path: "CONTRIBUTING.md", line: 3, quote, contribution: false });
+  function Probe({ findings }: { findings: ReturnType<typeof finding>[] }) {
+    const byHand = useByHand({ id: "run-1", repoId: "repo-1", status: "review", learnByHand: true, agents: [], logs: [] } as unknown as Run, [], {
+      demo: false,
+      repo: { id: "repo-1", contributionRules: { checkedAt: "2026-10-20T09:00:00.000Z", findings, filesRead: [] } } as never,
+      draftMutationEpoch: { current: 0 },
+      actions: { setRun() {}, setFiles() {}, approveTeamPlan: async () => {} },
+      handBack() {},
+    });
+    return createElement("span", null, String(byHand.readyDialog.aiRules));
+  }
+  const aiRules = async (findings: ReturnType<typeof finding>[]) => {
+    const mounted = await mount(createElement(Probe, { findings }));
+    try {
+      return mounted.text();
+    } finally {
+      await mounted.unmount();
+    }
+  };
+  // Open an issue first, write it in your own words, understand your change: not about AI.
+  assert.equal(
+    await aiRules([
+      finding("issue-first", "Open an issue before you change behaviour."),
+      finding("own-words", "Write the description in your own words."),
+      finding("understand", "You must understand every line you submit."),
+    ]),
+    "false",
+  );
+  for (const kind of ["ban", "disclose", "area", "agent"]) assert.equal(await aiRules([finding(kind, "Some rule.")]), "true", kind);
+  // A rule of another kind whose own words are about AI.
+  assert.equal(await aiRules([finding("understand", "If you used an LLM, you must understand every line it wrote.")]), "true");
+  assert.equal(await aiRules([finding("own-words", "Don't paste AI output into the description.")]), "true");
+});
+
+test("a repeated failure is checked in once per step and failing test run, however often its card mounts", async () => {
+  const realFetch = globalThis.fetch;
+  const posts: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    posts.push(`${init?.method ?? "GET"} ${String(input)} ${String(init?.body ?? "")}`);
+    return new Response(JSON.stringify({}), { headers: { "Content-Type": "application/json" } });
+  }) as typeof fetch;
+  const failing = (minute: number) => ({ at: `2026-10-20T09:0${minute}:00.000Z`, command: "npm test", changeFingerprint: "f", outcome: "failed", exitCode: 1, ms: 9, tailHash: "h" });
+  const run = (id: string, extra: object = {}) =>
+    ({ id, repoId: "repo-1", status: "review", learnByHand: true, agents: [], logs: [], byHand: { tests: [failing(1), failing(2), failing(3)], ...extra } }) as unknown as Run;
+  let latest: ByHand | undefined;
+  function Probe({ value }: { value: Run }) {
+    latest = useByHand(value, [], { demo: false, draftMutationEpoch: { current: 0 }, actions: { setRun() {}, setFiles() {}, approveTeamPlan: async () => {} }, handBack() {} });
+    return null;
+  }
+  const checkIn = async (value: Run, input: Parameters<ByHand["guide"]["onCheckIn"]>[0]) => {
+    const mounted = await mount(createElement(Probe, { value }));
+    try {
+      await act(async () => latest!.guide.onCheckIn(input));
+    } finally {
+      await mounted.unmount();
+    }
+  };
+  try {
+    const repeat = { stepId: "s1", signal: "repeat-failure" } as const;
+    // The card mounts three times (another tab and back): one check-in.
+    for (let mount = 0; mount < 3; mount++) await checkIn(run("run-a"), repeat);
+    assert.equal(posts.filter((post) => post.includes("/runs/run-a/by-hand/check-ins")).length, 1);
+    // After a reload the run holds it already (since the last failing run): none.
+    await checkIn(run("run-b", { checkIns: [{ stepId: "s1", signal: "repeat-failure", at: "2026-10-20T09:04:00.000Z" }] }), repeat);
+    assert.equal(posts.filter((post) => post.includes("/runs/run-b/")).length, 0);
+    // An older one, another step, or a fourth failing run: due again.
+    await checkIn(run("run-b", { checkIns: [{ stepId: "s1", signal: "repeat-failure", at: "2026-10-20T09:02:00.000Z" }] }), repeat);
+    await checkIn(run("run-b", { tests: [failing(1), failing(2), failing(3), failing(5)] }), repeat);
+    await checkIn(run("run-b"), { stepId: "s2", signal: "repeat-failure" });
+    assert.equal(posts.filter((post) => post.includes("/runs/run-b/by-hand/check-ins")).length, 3);
+    // "I'm stuck" is the person's own: every press is sent.
+    await checkIn(run("run-c"), { stepId: "s1", signal: "button" });
+    await checkIn(run("run-c"), { stepId: "s1", signal: "button" });
+    assert.equal(posts.filter((post) => post.includes("/runs/run-c/by-hand/check-ins")).length, 2);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});

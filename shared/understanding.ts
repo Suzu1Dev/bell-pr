@@ -258,6 +258,8 @@ export interface PlannedItem {
    * reference.
    */
   copyReference?: string;
+  /** In a Learn-by-hand run, the part of the reference that isn't AI-written: the person's own earlier words, or their last test run (not persisted). */
+  ownReference?: string;
 }
 
 export type MissingPart =
@@ -648,7 +650,7 @@ export function planCheck({
   /** The reference of a Learn-by-hand slot, with its AI-written part for the copy check. */
   const byHandReference = ({ own, ai }: { own?: string; ai?: string }) => {
     const reference = [own, ai].filter((text) => text?.trim()).join("\n\n");
-    return { ...(reference ? { reference } : {}), copyReference: ai?.trim() ?? "" };
+    return { ...(reference ? { reference } : {}), copyReference: ai?.trim() ?? "", ...(own?.trim() ? { ownReference: own.trim() } : {}) };
   };
   const scope = checkScope(files, record);
   const slots = checkQuestionCount(changedLines(scope, generated));
