@@ -14,9 +14,9 @@ import {
   conversationMessageLimit,
   type ChatMessage,
 } from "../shared/chat.js";
-import { AppError, withRunLocale, type Run } from "./types.js";
+import { AppError, withRunLocale, type DiffFile, type Repository, type Run } from "./types.js";
 import { log } from "./log.js";
-import { shuttingDown, sm } from "./i18n/index.js";
+import { shuttingDown, sm, type ServerMessages } from "./i18n/index.js";
 import {
   explanationBatches,
   explanationJsonSchema,
@@ -30,9 +30,17 @@ import { contributionContext } from "./prompts/team.js";
 import { runAgent, runIndependentReview } from "./run-executor.js";
 import { parseAgentOutput } from "./run-events.js";
 import type { WorkbenchContext } from "./workbench.js";
-import { reviewAgain } from "./by-hand.js";
+import { filterAgentText, filterCodeField } from "../shared/by-hand-filter.js";
+import type { ChangeExplanation } from "../shared/explanations.js";
+import { turnFiles } from "./by-hand-filter.js";
+import { assertHelpAllowed, recordHelp } from "./by-hand-record.js";
+import { assertReady, countRemoved, reviewAgain } from "./by-hand.js";
+import { planUnderstanding, understandingRequired } from "./understanding.js";
 
 const now = () => new Date().toISOString();
+const refuse = (message: (m: ServerMessages) => string) => new AppError(message, 409);
+/** The person's diff, which the filter accepts code from. */
+const patches = (files: readonly DiffFile[]) => files.map((file) => file.patch).join("\n");
 /** Statuses whose diff is final enough to explain, discuss and annotate. */
 const readableStatuses: Run["status"][] = [
   "review",
@@ -147,6 +155,9 @@ export async function explanations(
     !files.some((file) => file.path === options.filePath)
   )
     throw new AppError((m) => m.run.review.fileNotFound, 404);
+  // Learn by hand: after Ready, one file, after its own Explain-it-back answer (F10).
+  if (run.learnByHand)
+    assertReaderView(run, files, options.filePath, ctx.store.data.repos.find((repo) => repo.id === run.repoId));
   const existing = ctx.explanationJobs.get(id);
   if (existing) await existing;
   else {
@@ -260,10 +271,15 @@ async function generateExplanations(
           )
             continue;
           const { path: _path, ...content } = entry;
+          // Learn by hand: filtered (F7) and recorded as help before it is stored.
+          const filtered = run.learnByHand
+            ? await filterExplanation(run, [...current.values()], file.path, content)
+            : undefined;
+          if (filtered) recordStoredHelp(run, "explanation", filtered.removed);
           run.explanations![file.path] = {
             fingerprint: file.fingerprint,
             status: "ready",
-            content,
+            content: filtered?.value ?? content,
             generatedAt: now(),
           };
         }
@@ -476,4 +492,91 @@ export async function fetchPrFeedback(ctx: WorkbenchContext, id: string) {
     await ctx.store.save();
     return run;
   });
+}
+
+// Learn by hand (DESIGN v1.2): "How a reader sees your change" (F10) and
+// the filter of what agents wrote about the person's change (F7).
+
+/**
+ * A filter of what an agent wrote about the person's change, before it is
+ * stored (F7), over the changed files and the `cited` ones (at most 10,
+ * cited first) at base and in the worktree; `removed` counts what it took
+ * out.
+ */
+export async function changeFilter(run: Run, files: readonly DiffFile[], cited: readonly string[] = []) {
+  const changed = files.map((file) => file.path);
+  const sources = await turnFiles(run).sources([...cited.filter(Boolean), ...changed], {
+    diff: patches(files),
+    protectedFiles: changed,
+  });
+  let removed = 0;
+  const text = (value: string) => {
+    const filtered = filterAgentText(value, sources);
+    removed += filtered.removed;
+    return filtered.value;
+  };
+  return {
+    get removed() {
+      return removed;
+    },
+    text,
+    /**
+     * A field that may hold code: kept as written when it is verbatim lines
+     * of base or worktree (rule 3), otherwise filtered as prose (rules 1-2).
+     * An explanation's example before/after is everyday prose by its prompt,
+     * and a card without an example is made again (synchronizeExplanations),
+     * so the field is never dropped whole.
+     */
+    code: (value: string) => (filterCodeField(value, sources).value !== undefined ? value : text(value)),
+  };
+}
+
+/** An explanation card of the person's change, filtered (F7) field by field. */
+export async function filterExplanation(run: Run, files: readonly DiffFile[], filePath: string, content: ChangeExplanation) {
+  const filter = await changeFilter(run, files, [filePath]);
+  const example = content.example && {
+    scenario: filter.text(content.example.scenario),
+    before: filter.code(content.example.before),
+    after: filter.code(content.example.after),
+  };
+  const value: ChangeExplanation = {
+    summary: filter.text(content.summary),
+    reason: filter.text(content.reason),
+    concept: filter.text(content.concept),
+    tip: filter.text(content.tip),
+    ...(example ? { example } : {}),
+    ...(content.alternatives ? { alternatives: filter.text(content.alternatives) } : {}),
+    ...(content.lookup ? { lookup: content.lookup.map(filter.text) } : {}),
+    ...(content.selfCheck
+      ? { selfCheck: { question: filter.text(content.selfCheck.question), answer: filter.text(content.selfCheck.answer) } }
+      : {}),
+  };
+  return { value, removed: filter.removed };
+}
+
+/** Stores filtered output's removals on the run and records its help event (F13). */
+export function recordStoredHelp(run: Run, source: "explanation" | "walkthrough" | "premise", removed: number) {
+  recordHelp(run, { source, ...(removed ? { removed } : {}) });
+  countRemoved(run, removed);
+}
+
+
+/**
+ * "How a reader sees your change" (F10): after Ready, one file per
+ * request, and only when that file's Explain-it-back question has an
+ * answer at its current version, or the file has no question and every
+ * question is answered, or the check is off.
+ */
+export function assertReaderView(run: Run, files: readonly DiffFile[], filePath: string | undefined, repo?: Repository) {
+  assertReady(run, files);
+  if (!filePath) throw refuse((m) => m.byHand.flow.oneFile);
+  assertHelpAllowed(run, "explain");
+  if (!understandingRequired()) return;
+  const saved = run.understanding?.items ?? [];
+  const answered = (item: { id: string; path?: string; fingerprint?: string }) =>
+    saved.some((entry) => entry.id === item.id && entry.path === item.path && (!item.path || entry.fingerprint === item.fingerprint));
+  const plan = planUnderstanding(run, files, repo);
+  const own = plan.find((item) => item.path === filePath);
+  if (own ? answered(own) : plan.every(answered)) return;
+  throw refuse((m) => m.byHand.flow.answerFirst);
 }
