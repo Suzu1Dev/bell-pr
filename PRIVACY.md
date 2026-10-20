@@ -127,8 +127,8 @@ BELL PR runs your project's test command only when you click Run, and
 only a command you confirmed. It runs on your computer, in the run's
 folder, with your permissions, without the environment variables that
 hold BELL PR's, GitHub's or the AI providers' tokens and keys (they are
-removed by name); like anything you run, it can read files in your home
-folder. BELL PR keeps the last 4,000 characters of its output in
+removed by name, so a key kept under another name stays); like anything
+you run, it can read files in your home folder. BELL PR keeps the last 4,000 characters of its output in
 `state.json`, with text shaped like a credential masked; that output
 leaves your computer only inside a guide answer or a guide review you ask
 for. <!-- claim:PRIV-62 -->
