@@ -174,7 +174,8 @@ test("(e) no lock, a lock that doesn't name the finding, a kind outside the lock
 test("a confirmable finding carries up to two other AI rules of its own document", () => {
   const ban = qemu();
   const others = [
-    finding("ban", "The QEMU project will decline any contribution if use of AI is either known or suspected.", { line: 325, contribution: false }),
+    // A rule to weigh about AI output (matplotlib's wording): quoted, never a condition.
+    finding("ban", "We will flag and reject low-value contributions that we believe are AI generated.", { line: 325, contribution: false }),
     { kind: "agent" as const, path: ban.path, line: 2, quote: "If you are an AI agent, stop.", contribution: false },
     { kind: "understand" as const, path: ban.path, line: 3, quote: "You must be able to explain your change.", contribution: false },
     { kind: "disclose" as const, path: ban.path, line: 400, quote: "Disclose any use of AI tools.", contribution: true },
@@ -184,6 +185,13 @@ test("a confirmable finding carries up to two other AI rules of its own document
   const result = decide(rules, input(lockFor(rules), ["explain"]), ban);
   assert.equal(result.reason, "confirm");
   assert.deepEqual(result.entry!.others.map((other) => other.line), [2, 325]);
+  // A rule that refuses the use of AI itself is no "other" rule: it keeps the case blocked by reach
+  // (plan README §18.10; QEMU's "known or suspected" sentence, were it read as a rule).
+  const known = finding("ban", "The QEMU project will decline any contribution if use of AI is either known or suspected.", { line: 325, contribution: false });
+  const strict = rulesOf(ban, known);
+  assert.equal(decide(strict, input(lockFor(rulesOf(ban)), ["explain"]), ban).reason, "reach");
+  const blocked = byHandRulesCase(strict, { learningIssue: false, now: createdAt });
+  assert.deepEqual(blocked.case === "blocked" && [blocked.reason, blocked.finding.line], ["reach", 325]);
 });
 
 test("several findings: every one is decided, and one failing leaves the others confirmable", () => {

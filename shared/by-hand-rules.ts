@@ -3,46 +3,36 @@
  * owner answer 2 of 2026-10-20). W1A froze these signatures; W2G filled
  * them. A ban or a reserved issue stays a hard block unless every
  * condition holds; nothing here is an override, and an agent run never
- * reaches it.
+ * reaches it. All of it is pure and non-persisted; the only clock is the
+ * `now` passed in.
  *
- * `respectChecks`, `createRun`, the respect mirrors, the task dialog and
- * the GuidePanel call the case reader and the decision. Only the server's
- * carve-out reader (`attachCarveOuts`, shared/project-policy.ts) calls
- * `carveOutKinds`, so the word table stays out of the client. All of it
- * is pure and non-persisted; the only clock is the `now` passed in.
- *
- * - `carveOutKinds(text)`: the help kinds the permitted part of one
- *   carve-out names, by the F12 word table (understanding the code,
- *   explaining, a learning aid, research and questions about the code:
- *   explain and answer; debugging: test; a private review of your own
- *   code: review; possible solutions or solution ideas: plan). Any other
- *   word names none: "static analysis", "find bugs", "analyze" and
- *   "suggest" included.
- *
- * - `byHandRulesCase(rules, { learningIssue, now })`: which case applies
- *   before a run exists. `none` when no contribution ban applies and no
- *   `area` finding applies (area findings count only with
- *   `learningIssue`); `blocked` with the first failing finding, its reach
- *   and the reason ((a) reach, (b) no carve-out or a stale checked-list
- *   entry, then `too-few-kinds`); `fitted` when every applicable finding
- *   passes (a) and (b), with the intersection of the kinds their
- *   carve-outs name (always explain and answer) and the lock to store
- *   (`HelpLock` without `at`, which createRun sets).
- *
- * - `byHandRulesDecision({ bans, areas, rules }, learnByHand)`: at
- *   approve and publish, for the contribution `ban` findings and the
- *   applicable `area` findings of a clean Learn-by-hand run (the preflight
- *   input; condition (c) is the caller's), which stay blocked, each with
- *   the first failed condition (and, for `kind-not-named`, the kinds the
- *   text doesn't name), and which pass all of F12 (a), (b), (d) and (e),
- *   each with its carve-outs and up to two other AI rules of the same
- *   document. The caller shows the `by-hand-rules` confirm only when none
- *   is blocked, and publish needs it acknowledged (f).
+ * - `carveOutKinds(text)`: the help kinds one carve-out's permitted words
+ *   name, by the F12 word table (understanding the code, explaining, a
+ *   learning aid, research and questions about the code: explain and
+ *   answer; debugging: test; a private review of your own code: review;
+ *   possible solutions or solution ideas: plan); any other word names
+ *   none. Only the server's carve-out reader (`attachCarveOuts`) and the
+ *   registry check call it, so the table stays out of the client.
+ * - `byHandRulesCase(rules, { learningIssue, now })`, before a run: `none`
+ *   when no contribution ban or (with `learningIssue`) `area` finding
+ *   applies; `blocked` with the first failing finding, its reach and the
+ *   reason ((a) reach, here or in any rule of the rules that refuses AI
+ *   help itself; (b) no carve-out or a stale checked-list entry; then
+ *   `too-few-kinds`); `fitted` with the intersection of the kinds the
+ *   carve-outs name (always explain and answer) and the lock to store.
+ * - `byHandRulesDecision({ bans, areas, rules }, learnByHand)`, at approve
+ *   and publish, for a clean run (condition (c) is the caller's): which
+ *   findings stay blocked, each with the first failed condition, and
+ *   which pass (a), (b), (d) and (e), each with its carve-outs and up to
+ *   two other AI rules of the same document. The caller shows the
+ *   `by-hand-rules` confirm only when none is blocked; publish needs it
+ *   acknowledged (f).
  */
 import { allHelpKinds, type HelpKind, type HelpLock, type HelpLockRule } from "./by-hand.js";
 import type { ContributionRules, PolicyAllowance, PolicyFinding } from "./contribution.js";
 import type { ByHandPreflightInput } from "./draft-checks.js";
 import { areaReach, banReach, type AreaReach, type BanReach } from "./policy-reach.js";
+import { refusesAiHelp } from "./project-policy.js";
 
 /**
  * Why a finding stays blocked, or why a run can't be fitted (not
@@ -149,13 +139,20 @@ const reachOf = (finding: PolicyFinding) =>
 /**
  * Condition (a): an output-only ban, or a reservation worded around
  * AI-generated or automated pull requests. A checked-list finding's quote
- * is read the same way; the registry check refuses an entry whose signed
- * reach the quote doesn't read as.
+ * is read the same way (the registry check holds its signed reach to it).
  */
 function restrictsOutput(finding: PolicyFinding) {
   const reach = reachOf(finding);
   return finding.kind === "area" ? reach === "output" || reach === "automate" : reach === "output";
 }
+
+/**
+ * A ban anywhere in the rules, contribution named or not, that refuses AI
+ * help itself or whose reach BELL can't tell ("AI assistance of any kind
+ * is not accepted."; `refusesAiHelp`): no quoted confirm while it stands.
+ */
+const helpRefused = (rules: ContributionRules) =>
+  rules.findings.find((finding) => finding.kind === "ban" && !restrictsOutput(finding) && refusesAiHelp(finding.quote));
 
 /** The kinds a finding's carve-outs name, together. */
 const namedKinds = (finding: PolicyFinding) =>
@@ -202,6 +199,9 @@ export function byHandRulesCase(
     reach: reachOf(finding),
     reason,
   });
+  // (a) for the whole rules: a rule elsewhere refuses AI help itself.
+  const refused = helpRefused(rules);
+  if (refused) return blocked(refused, "reach");
   for (const finding of applicable) {
     const reason = textCondition(finding, options.now);
     if (reason) return blocked(finding, reason);
@@ -225,8 +225,9 @@ function failedCondition(
   finding: PolicyFinding,
   rules: ContributionRules,
   input: ByHandPreflightInput,
+  refused: PolicyFinding | undefined,
 ): { reason: ByHandBlockReason; kinds?: HelpKind[] } | undefined {
-  if (!restrictsOutput(finding)) return { reason: "reach" };
+  if (!restrictsOutput(finding) || refused) return { reason: "reach" };
   const lock = input.helpLock;
   const locked = lock?.rules.find((rule) => sameRule(rule, finding));
   // (e), the drift guard first for the rule the run was fitted to: a
@@ -284,8 +285,9 @@ export function byHandRulesDecision(
 ): ByHandRulesDecision {
   const decided = [...findings.bans, ...findings.areas];
   const decision: ByHandRulesDecision = { blocked: [], confirmable: [] };
+  const refused = helpRefused(findings.rules);
   for (const finding of decided) {
-    const failed = failedCondition(finding, findings.rules, learnByHand);
+    const failed = failedCondition(finding, findings.rules, learnByHand, refused);
     if (failed) decision.blocked.push({ finding, ...failed });
     else
       decision.confirmable.push({

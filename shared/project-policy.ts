@@ -885,6 +885,39 @@ const maxFindings = 30;
 const blocksPublishing = (finding: PolicyFinding) =>
   (finding.kind === "ban" && finding.contribution) || finding.kind === "area" || finding.kind === "disclose";
 
+/** The project's own practice, not a rule for contributors: "We do not use AI tools in our release process". */
+const ownPractice =
+  /^\W*(?:we|maintainers?|reviewers?|the\s+(?:team|maintainers|reviewers|project|core\s+team)|this\s+project|our\s+(?:team|maintainers|reviewers|project|CI|bots?))\s+(?:(?:do|does|will)\s*(?:not|n't)|never)\s+(?:\w+\s+)?use\b/i;
+/** An exception that is the contributor's own conduct: "unless you have reviewed every line". */
+const conductException =
+  /\b(?:unless|except)\b[^.;:]{0,60}?\b(?:review|understand|disclos|declar|attribut|label|mention|test|verif|check|explain|edit)\w*/i;
+
+/**
+ * Whether a ban's quote, read alone, refuses AI help as such: a ban with
+ * nothing to weigh but whether it names a contribution ("AI assistance of
+ * any kind is not accepted."). Not when it lets contributors use AI, makes
+ * an exception for their own review, understanding, disclosure or testing,
+ * is about the conversation, a size or the credit, or states the
+ * project's own practice ("We do not use AI tools in our own release
+ * process."); "except for translations" is no such exception. A quote
+ * BELL can't read as a refusal refuses (the strict reading). Such a rule,
+ * anywhere in a project's rules, stops the quoted confirm
+ * (shared/by-hand-rules.ts).
+ */
+export function refusesAiHelp(quote: string) {
+  const search = searchable(visibleText(quote));
+  const whole = { start: 0, end: search.length };
+  const pair = nearAssistance(search, prohibition, () => whole)[0];
+  if (!pair) return true;
+  if (ownPractice.test(search)) return false;
+  const why = weighedFor(search, whole, pair.term);
+  // A bare "unless" or "except" is no condition the person meets by their own conduct.
+  const conduct =
+    (conductCondition.test(search.replace(/\b(?:unless|except)\b/gi, blank)) || conductException.test(search)) &&
+    !maintainerPermission.test(search);
+  return !(why.permitted || conduct || why.aboutConversation || why.sized || why.credited);
+}
+
 /**
  * A permission: what follows "does not apply to", "it's fine to", or "is
  * allowed to"/"not prohibited to", or what comes before "is out of
