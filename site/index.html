@@ -76,7 +76,7 @@
           <div class="section-head">
             <p class="eyebrow">How it works</p>
             <h2 id="how-title">Let AI do the legwork. Keep the understanding.</h2>
-            <p>Learn while you contribute: the agents write the code, you make every decision, and you finish able to explain the change you send.</p>
+            <p>Learn while you contribute: the agents write the code, or you write it yourself with a guide; you make every decision, and you finish able to explain the change you send.</p>
           </div>
           <ol class="steps">
             <li>
@@ -84,8 +84,8 @@
               <p>BELL PR quotes the project's own contribution rules, checks that it takes pull requests from you, and shows whether the issue you pick is still open and who else is on it.</p>
             </li>
             <li>
-              <h3>Approve the plan, let the team work</h3>
-              <p>The Lead plans the work and you approve it. Teammates, a Reviewer and a Test analyst then work in isolated git worktrees, with the AI coding CLI you already use.</p>
+              <h3>Choose who writes, then approve the plan</h3>
+              <p>Let the agent team write it: you approve the Lead&#39;s plan, and teammates, a Reviewer and a Test analyst work in isolated git worktrees. Or write it yourself, with a guide that hints without code.</p>
             </li>
             <li>
               <h3>Try first, then explain it back</h3>
@@ -143,6 +143,10 @@
           </div>
           <ul class="grid">
             <li class="card">
+              <h3>Write it yourself, with a guide</h3>
+              <p>In Learn by hand you write every line while BELL PR's agents only read. The guide hints without code and reviews your change when you ask, BELL PR runs the test command you confirmed when you click, and the record says which help you used. Free.</p>
+            </li>
+            <li class="card">
               <h3>Explanations you test yourself on</h3>
               <p>Every changed file comes with what changed and why, an example, trade-offs and another way to do it. You answer its question before the answer shows, and you choose which approach you would take.</p>
             </li>
@@ -174,7 +178,7 @@
         <div class="wrap">
           <div class="section-head">
             <h2 id="plans-title">Free covers the whole responsible loop. Pro goes deeper.</h2>
-            <p>Free includes the understanding check, every project-rule, issue and pacing check, and reading your maintainers' feedback. Pro adds a coach debrief, the complete learning record, AI follow-up rounds, bigger teams, discovery and web access. No plan buys more pull requests or a way past a check.</p>
+            <p>Free includes Learn by hand, the understanding check, every project-rule, issue and pacing check, and reading your maintainers' feedback. Pro adds a coach debrief, the complete learning record, AI follow-up rounds, bigger teams, discovery and web access. No plan buys more pull requests or a way past a check.</p>
           </div>
           <div class="table-frame">
             <!-- generated:plan-table locale=en -->
@@ -189,7 +193,7 @@
                 <tr class="tier-free-limited"><th scope="row">Agent team size</th><td data-label="Plan">Free (limited)</td><td data-label="Limits">Free: Lead, 2 teammates, Reviewer and Test analyst. Pro and trial: 3 or 4 teammates.</td></tr>
                 <tr class="tier-free-limited"><th scope="row">Work on more than one contribution at a time</th><td data-label="Plan">Free (limited)</td><td data-label="Limits">Free: one contribution at a time; others wait in the queue. Pro: up to your configured limit (2 by default, at most 8). Publishing is paced the same on every plan.</td></tr>
                 <tr class="tier-free"><th scope="row">Plan approval and revision, team inbox, retry of failed subtasks</th><td data-label="Plan">Free</td><td data-label="Limits">Up to 3 plan revisions</td></tr>
-                <tr class="tier-free"><th scope="row">Learn by hand: you write the change; the guide plans with you, gives hints without code and reviews your change when you&#39;re ready</th><td data-label="Plan">Free</td><td data-label="Limits">BELL PR runs your tests; its agents can&#39;t edit your files in these runs</td></tr>
+                <tr class="tier-free"><th scope="row">Learn by hand: you write the change; the guide plans with you, gives hints without code and reviews your change when you ask</th><td data-label="Plan">Free</td><td data-label="Limits">BELL PR runs the test command you confirmed when you click; its agents can&#39;t edit your files in these runs</td></tr>
                 <tr class="tier-free"><th scope="row">Diff review, explanations, try-first questions, follow-up chat, notes, suggested review order</th><td data-label="Plan">Free</td><td data-label="Limits">No limit</td></tr>
                 <tr class="tier-free"><th scope="row">Explain it back before approval</th><td data-label="Plan">Free</td><td data-label="Limits">On by default; you can turn it off in Settings → Learning, and runs approved without it are marked</td></tr>
                 <tr class="tier-free"><th scope="row">Re-run Reviewer and Test analyst</th><td data-label="Plan">Free</td><td data-label="Limits">No limit (part of the human review safety gate)</td></tr>
@@ -251,7 +255,7 @@
             <h2 id="faq-title">Questions</h2>
             <details>
               <summary>What do I need to run BELL PR?</summary>
-              <p>macOS, Linux, or Windows through WSL2; Node.js 22 or later (or Docker); Git; the GitHub CLI, signed in; and one AI coding CLI, installed and signed in: the OpenAI Codex CLI or Claude Code. The <a href="install.html">install guide</a> has the details.</p>
+              <p>macOS, Linux, or Windows through WSL2; Node.js 22 or later (or Docker); Git; the GitHub CLI, signed in; and one AI coding CLI, installed and signed in: the OpenAI Codex CLI or Claude Code. The web interface needs Chrome or Edge 111, Firefox 113 or Safari 16.2, or later. The <a href="install.html">install guide</a> has the details.</p>
             </details>
             <details>
               <summary>Whose AI account does it use?</summary>
@@ -267,11 +271,19 @@
             </details>
             <details>
               <summary>What is free?</summary>
-              <p>The whole responsible loop, one contribution at a time: a Lead, two teammates, a Reviewer and a Test analyst, explanations with try-first questions, the understanding check, every project-rule, issue and pacing check, reading your maintainers' feedback, and the practice deck. A 14-day Pro trial starts only when you choose. See <a href="pricing.html">pricing</a> for the full comparison.</p>
+              <p>The whole responsible loop, one contribution at a time: a Lead, two teammates, a Reviewer and a Test analyst, Learn by hand with the guide, explanations with try-first questions, the understanding check, every project-rule, issue and pacing check, reading your maintainers' feedback, and the practice deck. A 14-day Pro trial starts only when you choose. See <a href="pricing.html">pricing</a> for the full comparison.</p>
             </details>
             <details>
               <summary>Does the pull request say that AI helped?</summary>
               <p>Only if you choose, or if the project requires it. The draft can end with an editable line saying that AI coding agents helped prepare the change and that you reviewed it. The line is off unless you turn it on, or the project&#39;s own rules ask for a disclosure. When they require one, BELL PR does not publish until the description has it. Follow each project&#39;s rules on AI-assisted contributions; the <a href="legal/terms.html#4-responsible-contribution">terms</a> explain what responsible use means.</p>
+            </details>
+            <details>
+              <summary>Does Learn by hand mean my PR was made without AI?</summary>
+              <p>No. The guide is an AI model: it can explain code, answer your questions, give hints, review your change and explain a test failure, and the run&#39;s record lists each kind of help you used. For a run whose history is clean, the record says: &ldquo;BELL PR&#39;s agents had no write access and gave you no code for this change.&rdquo; BELL PR can&#39;t see other tools you used, such as editor autocomplete, and the record isn&#39;t proof of who wrote the code.</p>
+            </details>
+            <details>
+              <summary>Does Learn by hand make my PR welcome where AI is banned?</summary>
+              <p>No. BELL PR quotes each project&#39;s rules. Where they restrict AI help itself, where BELL PR can&#39;t tell what they cover, or where they keep an issue for people learning without AI tools, BELL PR won&#39;t publish, whichever mode you used. Where a project declines AI-generated content and its own text says some uses are fine, BELL PR can publish a learn-by-hand run whose guide stayed within those uses from the start, after you confirm the project&#39;s quoted rule; the maintainers decide whether your change fits.</p>
             </details>
             <details>
               <summary>Can I turn the understanding check off?</summary>

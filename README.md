@@ -11,8 +11,9 @@ BELL PR is a self-hosted, local-first workbench for open-source
 contributions. It runs on your computer with the AI coding CLI you already
 use (the OpenAI Codex CLI or Claude Code) and the GitHub CLI. It analyzes a
 project, suggests where to contribute and lets a small agent team build the
-change in isolated Git worktrees. Then it has you do the part that makes
-you better: understand every line you send, train your taste on real code,
+change in isolated Git worktrees, or, in **Learn by hand**, guides you while
+you write every line yourself. Then it has you do the part that makes you
+better: understand every line you send, train your taste on real code,
 and respect the maintainers' time. It explains every changed file in plain
 language, asks you to explain the change back before you approve it, and
 drafts a pull request that follows the project's own rules. Before the
@@ -56,6 +57,9 @@ seconds.
    the command that fixes it) and pick the AI **provider** your agents use.
 4. Take the sample tour, import a repository, or find a project to
    contribute to.
+5. Start a contribution. The task dialog asks **Who writes the code?**:
+   **The agent team writes it**, or **You write it (Learn by hand)**, with
+   the guide.
 
 **Lost the sign-in link? Run `bell-pr open`** (or `npx bell-pr open` if you
 started with `npx`). It opens a new one-time link.
@@ -82,6 +86,8 @@ through a whole contribution.
     your own account.
 - **On Linux, bubblewrap and socat** for the sandbox that Claude Code
   agents edit files in (`sudo apt-get install bubblewrap socat`).
+- **A current browser** for the web interface: Chrome or Edge 111,
+  Firefox 113 or Safari 16.2, or later.
 
 `bell-pr doctor` checks all of this and prints the command that fixes each
 problem.
@@ -132,6 +138,51 @@ the machine lacks, the overview lists it with a suggested command, for you
 to verify and run yourself.
 
 ![Agent activity: the team's plan, progress and reports](docs/images/en/run-activity-1280.png)
+
+### Write it yourself, with a guide
+
+Choose **You write it (Learn by hand)** in the task dialog, and you write
+every line of the change yourself, in your own editor. BELL PR's agents
+only read in these runs, and the Lead becomes **the guide**. It reads the
+project first; then you write the steps of your own plan, and the guide's
+outline stays folded until you have saved a step of your own, unless you
+ask to see it sooner. While you write, ask the guide about your setup,
+the project or a concept, or ask for the next hint on a step: **Where to
+look**, **What applies**, **Options**, then **An example in this
+project**. After the first hint on a step, the next one needs an attempt
+first (a new edit, a test run or a few words on what you tried), and
+**I'm stuck** offers ways out, starting with asking the project's people.
+No hint holds code the guide wrote: the guide shows code only as quotes
+that BELL PR cuts from the project or from your own edits, and BELL PR's
+filter removes the code it finds in anything else the guide writes
+before you see it.
+
+BELL PR runs your project's tests with the command you confirmed, only
+when you click, and you can predict the result first. The guide doesn't
+review your change, and BELL PR writes no explanation of it, until you
+mark it **Ready for review**; then the guide can review it, with up to
+three problems, each with its evidence, and never the fix. The
+understanding check (on by default) asks why you wrote each file this way
+and what would break if it were wrong, with the guide hidden. The pull request's title and description are yours: BELL PR
+doesn't draft them in Learn by hand.
+
+The publish dialog shows the run's record: the kinds of help you used and
+how often, and the test runs. When the run's history is clean, the record
+says: "BELL PR's agents had no write access and gave you no code for this
+change." BELL PR can't see other tools you used, such as editor
+autocomplete, and the record isn't proof of who wrote the code. Learn by
+hand is Free.
+
+![Code changes in a Learn-by-hand run: your diff, and beside it the guide's panel with a hint that quotes the project's code](docs/images/en/run-by-hand-your-turn-1280.png)
+
+Learn by hand doesn't make a pull request welcome where a project
+restricts AI help. Where a project declines AI-generated content and its
+own text says some uses of AI are fine, you can fit the guide to that text
+when the run starts; publishing then quotes the project's rule beside your
+help record and asks you to confirm it. BELL PR quotes the project, and
+the maintainers decide whether your change fits. [Contributing
+responsibly](docs/contributing-responsibly.md#learn-by-hand-and-a-projects-ai-rules)
+says when that confirm can appear.
 
 ### Review that teaches, and checks you learned
 
@@ -219,7 +270,10 @@ Practise anything locally; publish only what is welcome.
   project keeps for newcomers, and twice your budget each block it, with
   no override; someone else's open pull request for the same issue blocks
   it until you give your reason. A fact BELL PR could not read shows as
-  "Couldn't check", never as a pass.
+  "Couldn't check", never as a pass. In a Learn-by-hand run, a rule that
+  declines only AI-generated content can become a confirm of the
+  project's quoted rule instead, as [Write it yourself, with a
+  guide](#write-it-yourself-with-a-guide) describes.
 
 [Contributing responsibly](docs/contributing-responsibly.md) shows what
 maintainers ask for, in their own words, and how each check maps to it.
@@ -244,7 +298,9 @@ interests, language and the difficulty you want, reads their contribution
 rules, and explains the effort and the first step. It looks for
 help-wanted issues for the agent team: an issue labelled for newcomers is
 marked "Learn by hand", because writing that fix yourself is how a
-newcomer learns the project. Free shows labelled sample results.
+newcomer learns the project, and its card offers **Start learning by
+hand** instead, except where the project keeps such issues for people
+learning without AI tools. Free shows labelled sample results.
 
 ![Explore contributions: search GitHub for your next contribution](docs/images/en/discover-1280.png)
 
@@ -291,7 +347,7 @@ sample data.
 | Agent team size | Free (limited) | Free: Lead, 2 teammates, Reviewer and Test analyst. Pro and trial: 3 or 4 teammates. |
 | Work on more than one contribution at a time | Free (limited) | Free: one contribution at a time; others wait in the queue. Pro: up to your configured limit (2 by default, at most 8). Publishing is paced the same on every plan. |
 | Plan approval and revision, team inbox, retry of failed subtasks | Free | Up to 3 plan revisions |
-| Learn by hand: you write the change; the guide plans with you, gives hints without code and reviews your change when you're ready | Free | BELL PR runs your tests; its agents can't edit your files in these runs |
+| Learn by hand: you write the change; the guide plans with you, gives hints without code and reviews your change when you ask | Free | BELL PR runs the test command you confirmed when you click; its agents can't edit your files in these runs |
 | Diff review, explanations, try-first questions, follow-up chat, notes, suggested review order | Free | No limit |
 | Explain it back before approval | Free | On by default; you can turn it off in Settings → Learning, and runs approved without it are marked |
 | Re-run Reviewer and Test analyst | Free | No limit (part of the human review safety gate) |
@@ -366,6 +422,14 @@ policy in [PRIVACY.md](PRIVACY.md).
   with `BELLPR_ALLOW_UNSANDBOXED_AGENTS=1`; such agents have your full user
   rights, and every run that used one carries a **Ran without sandbox**
   badge.
+- **Learn by hand.** BELL PR's agents get no write turn in a
+  Learn-by-hand run, and when BELL PR sees an agent change a file anyway,
+  the run's record withdraws its claim. BELL PR runs your project's tests only when
+  you click, and only the command you confirmed: as you, in the run's
+  folder, without the variables that hold BELL PR's, GitHub's or the AI
+  providers' keys (removed by name) and without an operating-system
+  sandbox, so, like anything you run, your tests can read files in your
+  home folder.
 - **You publish.** Nothing reaches GitHub before your file-by-file review
   and approval, and the commit holds only the files you reviewed.
 

@@ -43,8 +43,8 @@ const plans = {
     },
     learnByHand: {
       label:
-        "Learn by hand: you write the change; the guide plans with you, gives hints without code and reviews your change when you're ready",
-      limit: `${product.name} runs your tests; its agents can't edit your files in these runs`,
+        "Learn by hand: you write the change; the guide plans with you, gives hints without code and reviews your change when you ask",
+      limit: `${product.name} runs the test command you confirmed when you click; its agents can't edit your files in these runs`,
     },
     review: {
       label:

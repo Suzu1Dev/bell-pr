@@ -15,7 +15,7 @@ any payment is taken (owner gate G4). Both are pending.
 | Document | Claims | Owner placeholders | EULA version |
 | --- | --- | --- | --- |
 | LICENSE.md (EULA) | EULA-01 to EULA-66 | 5 | `1.0-draft-2026-10-14` (`shared/product.ts` `eulaVersion`) |
-| PRIVACY.md | PRIV-01 to PRIV-58 | 4 | |
+| PRIVACY.md | PRIV-01 to PRIV-64 | 4 | |
 | TERMS.md | TERMS-01 to TERMS-34 | 4 | |
 | REFUND.md | REFUND-01 to REFUND-19 | 5 | |
 | SECURITY.md | SEC-01 to SEC-37 | 1 | |
@@ -51,16 +51,16 @@ or incomplete against the shipped code and are corrected in the documents:
 - **AI disclosure (TERMS-21, EULA-38).** The drafts said BELL PR adds a
   disclosure line to every pull request by default. It is off by default:
   the line appears when the person turns it on for one draft or in Settings
-  (`shared/app-settings.ts:34`, `server/drafts.ts:111`, `server/drafts.ts:321`),
+  (`shared/app-settings.ts:34`, `server/drafts.ts:111`, `server/drafts.ts:331`),
   or in the suggested description when the project's own rules ask for a
-  disclosure (`src/draft/DraftGuidancePanel.tsx:196`).
+  disclosure (`src/draft/DraftGuidancePanel.tsx:213`).
 - **Retention (PRIV-38).** The drafts said the working copies of finished,
   cancelled and failed runs are removed after 14 days. Only cancelled and
   failed runs are (`server/cleanup.ts:33`); runs in review, approved and
   published runs keep their checkout until the person frees it.
 - **Data inventory (PRIV-34).** Added `author-emails.json`
-  (`server/publish.ts:65`), `state.json.corrupt-<time>`
-  (`server/store.ts:590`), the AI-assistance note setting, and the temporary
+  (`server/publish.ts:67`), `state.json.corrupt-<time>`
+  (`server/store.ts:844`), the AI-assistance note setting, and the temporary
   index files with their cleanup (PRIV-35).
 - **Session token (SEC-14, SEC-16).** The drafts said the token is never on a
   command line. It was never on BELL PR's own, but the startup link that
@@ -69,7 +69,7 @@ or incomplete against the shipped code and are corrected in the documents:
   (`server/index.ts:555`, `server/cli.ts:174`), so the token is on no
   command line, and SEC-14 and SEC-16 say so.
 - **Web access (PRIV-28, PRIV-29, SEC-32).** Named which agents get it
-  (`server/run-executor.ts:134`), the Claude Code WebFetch domain list
+  (`server/run-executor.ts:140`), the Claude Code WebFetch domain list
   (`server/agent-cli.ts:38`) and Codex's live web search
   (`server/agent-cli.ts:205`).
 - **Update period (EULA-09, EULA-10).** Tied to the "updates until" date the
@@ -86,13 +86,13 @@ or incomplete against the shipped code and are corrected in the documents:
   the "Agent sandbox in Docker" section of `docs/docker.md`).
 - **Sign-ins (EULA-28, PRIV-10).** The texts said BELL PR never reads the
   tools' tokens. It does not store them, but it passes the CLIs' own sign-in
-  variables through (`server/process.ts:125`) and runs `gh auth token` to
+  variables through (`server/process.ts:163`) and runs `gh auth token` to
   see whether a sign-in exists (`server/doctor.ts:299`); the texts now say
   that it only asks the tools whether the person is signed in.
 - **The tools' own usage data (PRIV-12).** The texts said the tools' own
   settings decide. The agents get only the variables their CLI needs
-  (`server/process.ts:50`), plus, since finding 7 was fixed, the usage-data
-  opt-outs the person set (`server/process.ts:108`); each Codex agent starts
+  (`server/process.ts:88`), plus, since finding 7 was fixed, the usage-data
+  opt-outs the person set (`server/process.ts:146`); each Codex agent starts
   without its `config.toml` (`server/agent-cli.ts:191`), so an opt-out made
   only there does not reach them. Reading the Codex model list
   (`codex app-server`, `server/models.ts:105`) still loads that file, so the
@@ -100,6 +100,16 @@ or incomplete against the shipped code and are corrected in the documents:
 - **Refunded seats (REFUND-14).** A revocation covers a whole key
   (`server/license-keys.ts:19`), so a key that also holds kept seats is
   replaced.
+- **Learn by hand (v1.2: PRIV-13 and PRIV-34 amended, PRIV-59 to
+  PRIV-64 new).** The privacy policy now names code walkthroughs, premise
+  checks and the Learn-by-hand guide among the features that use the AI
+  CLI, what a guide answer and a review at Ready send, the test command
+  BELL PR runs as the person and what it keeps of its output, the run's
+  record, the setup needs agents report, and the checked list of
+  off-repository AI rules (read only for entries the publisher signed
+  off). These rows are drafts that wait for the owner's sign-off and
+  counsel's review; none is signed off. The `path:line` references that
+  v1.2 moved are re-pointed.
 
 ## Findings for the product lead
 
@@ -152,7 +162,7 @@ own. The legal texts already describe the shipped behavior.
    `DISABLE_TELEMETRY` or `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` set in
    the environment did not reach Claude Code. It now passes `DO_NOT_TRACK`
    to both CLIs and Claude Code's documented opt-out variables to Claude
-   Code (`server/process.ts:108`, tested in `server/process.test.ts`).
+   Code (`server/process.ts:146`, tested in `server/process.test.ts`).
    `codex exec --ignore-user-config` (`server/agent-cli.ts:191`) still
    skips any setting in the person's Codex `config.toml`, such as
    `[analytics] enabled = false`; the Codex flags are unchanged, and
@@ -183,7 +193,7 @@ Commands run on the tree of this review, test files excluded:
 | EULA-01 | The agreement is a contract with the licensor [OWNER] | Owner decision: licensor entity (G4) |
 | EULA-02 | The Pro Feature Set is what a key or the trial unlocks, as the app's plan comparison and the table in TERMS.md list it | `shared/plans.ts:17`, `shared/plans.ts:183`, `src/license/UpgradeDialog.tsx:98`; TERMS.md table generated by `scripts/render-generated-regions.ts` |
 | EULA-03 | Installing or using the Software means agreeing | Owner decision: counsel review (G4) |
-| EULA-04 | The web interface asks to accept this version before first use and again when it changes, and stays locked until then | `src/onboarding/Welcome.tsx:157`, `src/onboarding/eula.ts:8`, `src/app/AppShell.tsx:435`, `src/onboarding/EulaPrompt.tsx:58`, `shared/product.ts:67`, `shared/product-eula.test.ts:12` |
+| EULA-04 | The web interface asks to accept this version before first use and again when it changes, and stays locked until then | `src/onboarding/Welcome.tsx:157`, `src/onboarding/eula.ts:8`, `src/app/AppShell.tsx:446`, `src/onboarding/EulaPrompt.tsx:58`, `shared/product.ts:67`, `shared/product-eula.test.ts:12` |
 | EULA-05 | Accepting for an organization binds it | Owner decision: counsel review (G4) |
 | EULA-06 | Free License grant on computers you own or control | Owner decision: counsel review (G4); Free is the plan without a key, `shared/plans.ts:58` |
 | EULA-07 | Free allows commercial use [OWNER] | Owner decision: commercial terms |
@@ -205,23 +215,23 @@ Commands run on the tree of this review, test files excluded:
 | EULA-23 | No publishing, sharing or generating keys, no revoked keys | Owner decision: counsel review (G4) |
 | EULA-24 | No unlawful use or use against third-party terms | Owner decision: counsel review (G4) |
 | EULA-25 | Open-source components are under their own terms, listed in THIRD_PARTY_NOTICES.md | `THIRD_PARTY_NOTICES.md:1`, generated by `scripts/generate-third-party-notices.mjs:1` |
-| EULA-26 | THIRD_PARTY_NOTICES.md holds a written source offer for GPL/LGPL programs in the container image | `THIRD_PARTY_NOTICES.md:271`; owner decision for the contact (TERMS-32) |
-| EULA-27 | The Software works through git, gh and the Codex CLI or Claude Code under the person's accounts | `server/agent-cli.ts:149`, `server/process.ts:125`, `server/publish.ts:582` |
-| EULA-28 | It does not store the tools' passwords or tokens, and only asks the tools whether the person is signed in | `server/process.ts:125` (passes the CLIs' own sign-in variables through), `server/agent-cli.ts:219` (sign-in checked with each CLI's own status command), `server/doctor.ts:299` (`gh auth token` only shows that a sign-in exists; its output is not kept) |
+| EULA-26 | THIRD_PARTY_NOTICES.md holds a written source offer for GPL/LGPL programs in the container image | `THIRD_PARTY_NOTICES.md:246`; owner decision for the contact (TERMS-32) |
+| EULA-27 | The Software works through git, gh and the Codex CLI or Claude Code under the person's accounts | `server/agent-cli.ts:149`, `server/process.ts:163`, `server/publish.ts:610` |
+| EULA-28 | It does not store the tools' passwords or tokens, and only asks the tools whether the person is signed in | `server/process.ts:163` (passes the CLIs' own sign-in variables through), `server/agent-cli.ts:219` (sign-in checked with each CLI's own status command), `server/doctor.ts:299` (`gh auth token` only shows that a sign-in exists; its output is not kept) |
 | EULA-29 | Third-party terms, fees and quotas are the person's | Owner decision: counsel review (G4) |
 | EULA-30 | The seller does not control or answer for third-party services | Owner decision: counsel review (G4) |
 | EULA-31 | No affiliation with GitHub, OpenAI or Anthropic | Owner decision: trademark and provider terms (G1, G5) |
-| EULA-32 | AI models analyse, plan, change code, explain and draft PR text | `server/insights.ts:1257`, `server/run-executor.ts:695`, `server/run-executor.ts:753`, `server/learning.ts:229`, `server/draft-jobs.ts:121` |
-| EULA-33 | AI output can be wrong, insecure or resemble licensed code | Owner decision: counsel review (G4); the app says so at `src/i18n/en/review.ts:119` |
+| EULA-32 | AI models analyse, plan, change code, explain and draft PR text | `server/insights.ts:1257`, `server/run-executor.ts:732`, `server/run-executor.ts:792`, `server/learning.ts:252`, `server/draft-jobs.ts:128` |
+| EULA-33 | AI output can be wrong, insecure or resemble licensed code | Owner decision: counsel review (G4); the app says so at `src/i18n/en/review.ts:144` |
 | EULA-34 | The person must review everything before relying on it | Owner decision: counsel review (G4) |
-| EULA-35 | Nothing is published until every changed file is reviewed and the PR text approved | `server/publish.ts:308`, `server/publish.ts:386`, `server/publish.ts:406` |
+| EULA-35 | Nothing is published until every changed file is reviewed and the PR text approved | `server/publish.ts:329`, `server/publish.ts:411`, `server/publish.ts:431` |
 | EULA-36 | The person is responsible for what they publish | Owner decision: counsel review (G4) |
-| EULA-37 | AI-written analyses, recommendations, explanations and answers are labelled AI-generated | `src/mission/ProjectOverview.tsx:1067`, `src/mission/ProjectOverview.tsx:1138`, `src/review/ExplanationPanel.tsx:100`, `src/review/ExplanationPanel.tsx:904`, `src/learning/LearningNotes.tsx:167` |
-| EULA-38 | The disclosure line is the person's choice: off unless turned on or the project's rules ask | `shared/drafts.ts:86`, `server/drafts.ts:111`, `server/drafts.ts:381`, `src/draft/DraftGuidancePanel.tsx:196` |
+| EULA-37 | AI-written analyses, recommendations, explanations and answers are labelled AI-generated | `src/mission/ProjectOverview.tsx:1276`, `src/mission/ProjectOverview.tsx:1345`, `src/review/ExplanationPanel.tsx:127`, `src/review/ExplanationPanel.tsx:957`, `src/learning/LearningNotes.tsx:171` |
+| EULA-38 | The disclosure line is the person's choice: off unless turned on or the project's rules ask | `shared/drafts.ts:86`, `server/drafts.ts:111`, `server/drafts.ts:392`, `src/draft/DraftGuidancePanel.tsx:213` |
 | EULA-39 | Agents run commands and the projects' own code on the computer | `server/agent-cli.ts:54` (write roles get Bash), `server/agent-cli.ts:201` (Codex `workspace-write`) |
-| EULA-40 | Each run has its own working copy; Claude Code write agents run only in its sandbox, Codex agents in Codex's | `server/workbench.ts:539`, `server/sandbox.ts:153`, `server/agent-cli.ts:105`, `server/agent-cli.ts:201` |
+| EULA-40 | Each run has its own working copy; Claude Code write agents run only in its sandbox, Codex agents in Codex's | `server/new-run.ts:162`, `server/sandbox.ts:153`, `server/agent-cli.ts:105`, `server/agent-cli.ts:201` |
 | EULA-41 | No sandbox is complete | Owner decision: risk statement for counsel (G4) |
-| EULA-42 | Unsandboxed agents have the user's full permissions, and such runs are marked | `server/sandbox.ts:161`, `server/run-executor.ts:226`, `src/workspace/RunNotices.tsx:78` |
+| EULA-42 | Unsandboxed agents have the user's full permissions, and such runs are marked | `server/sandbox.ts:161`, `server/run-executor.ts:236`, `src/workspace/RunNotices.tsx:78` |
 | EULA-43 | Import only projects you are willing to run; accept the risks | Owner decision: counsel review (G4) |
 | EULA-44 | The Software runs on the computer and stores its data there | `server/config.ts:72`, `server/config.ts:97` |
 | EULA-45 | No telemetry, never contacts the seller | `src/api.ts:196`, `server/index.ts:25`; see the evidence above |
@@ -239,7 +249,7 @@ Commands run on the tree of this review, test files excluded:
 | EULA-57 | Export control and sanctions | Owner decision: counsel review (G4) |
 | EULA-58 | Governing law and venue [OWNER] | Owner decision: governing law (G4) |
 | EULA-59 | Each EULA version carries its own version line | `shared/product.ts:67`, `shared/product-eula.test.ts:12` |
-| EULA-60 | A new version is asked for before use; earlier builds stay under the accepted version | `src/onboarding/eula.ts:8`, `src/app/AppShell.tsx:435`; owner decision for the legal part |
+| EULA-60 | A new version is asked for before use; earlier builds stay under the accepted version | `src/onboarding/eula.ts:8`, `src/app/AppShell.tsx:446`; owner decision for the legal part |
 | EULA-61 | Entire agreement with TERMS.md and REFUND.md | Owner decision: counsel review (G4) |
 | EULA-62 | Severability | Owner decision: counsel review (G4) |
 | EULA-63 | No waiver | Owner decision: counsel review (G4) |
@@ -253,46 +263,46 @@ Commands run on the tree of this review, test files excluded:
 | --- | --- | --- |
 | PRIV-01 | No BELL PR cloud and no account | `server/config.ts:72`; no network module, see the evidence above |
 | PRIV-02 | No telemetry, no license server, never contacts the seller | `server/license.ts:254`, `src/api.ts:196`, `server/index.ts:25` |
-| PRIV-03 | Code and questions go only to the chosen AI provider and GitHub, under the person's accounts | `server/agent-cli.ts:149`, `server/process.ts:125`, `server/publish.ts:582` |
-| PRIV-04 | Web access is off unless turned on | `server/agent-cli.ts:153`, `server/run-executor.ts:134` |
+| PRIV-03 | Code and questions go only to the chosen AI provider and GitHub, under the person's accounts | `server/agent-cli.ts:149`, `server/process.ts:163`, `server/publish.ts:610` |
+| PRIV-04 | Web access is off unless turned on | `server/agent-cli.ts:153`, `server/run-executor.ts:140` |
 | PRIV-05 | Everything stays in the data directory and can be deleted from the app | `server/config.ts:97`, `server/cleanup.ts:349` |
 | PRIV-06 | Who makes BELL PR [OWNER] | Owner decision: seller entity (G4) |
 | PRIV-07 | No telemetry, analytics, crash reports or update checks | `src/api.ts:196`, `server/index.ts:25`; see the evidence above |
 | PRIV-08 | Activating, removing a key and starting the trial send nothing | `server/license.ts:462`, `server/license.ts:485`, `server/license.ts:502`, `server/license.ts:609` (local file writes only) |
 | PRIV-09 | The interface loads nothing from other sites; fonts and icons are bundled; the CSP blocks other sites | `server/http-guard.ts:83`, `server/http-guard.ts:216`, `src/theme/fonts.css:4`, `e2e/no-external-requests.spec.ts:21` |
-| PRIV-10 | BELL PR does not store the tools' passwords and tokens, and only asks the tools whether the person is signed in | `server/process.ts:125`, `server/agent-cli.ts:219`, `server/doctor.ts:299` |
+| PRIV-10 | BELL PR does not store the tools' passwords and tokens, and only asks the tools whether the person is signed in | `server/process.ts:163`, `server/agent-cli.ts:219`, `server/doctor.ts:299` |
 | PRIV-11 | Providers' own terms decide what they keep and train on | Owner decision: statement about third parties (G4, G5) |
-| PRIV-12 | The tools may send their own usage data; BELL PR neither adds nor removes it, passes only the variables each CLI needs plus the person's usage-data opt-outs (`DO_NOT_TRACK` to both, Claude Code's documented ones to Claude Code), and starts each Codex agent without its `config.toml`, so an opt-out made only there does not reach the agents | `server/process.ts:50`, `server/process.ts:108`, `server/process.ts:109`, `server/process.ts:125` (only listed variables are passed; none is set or removed), `server/agent-cli.ts:191` (`--ignore-user-config`); see finding 7 |
-| PRIV-13 | Which features use the AI CLI, and which providers Claude Code may use | `server/agent-cli.ts:149`, `server/sync-runs.ts:398` (conflict resolution), `server/coach.ts:404` (coach debrief), `server/process.ts:70`, `server/process.ts:76` |
-| PRIV-14 | BELL PR's instructions, the direction and the approved plan are sent | `server/run-executor.ts:695`, `server/run-executor.ts:753` |
-| PRIV-15 | Repository files, analysis excerpts, diffs, rules and templates are sent | `server/insights.ts:1220`, `server/drafts.ts:384`, `server/learning.ts:229` |
+| PRIV-12 | The tools may send their own usage data; BELL PR neither adds nor removes it, passes only the variables each CLI needs plus the person's usage-data opt-outs (`DO_NOT_TRACK` to both, Claude Code's documented ones to Claude Code), and starts each Codex agent without its `config.toml`, so an opt-out made only there does not reach the agents | `server/process.ts:88`, `server/process.ts:146`, `server/process.ts:147`, `server/process.ts:163` (only listed variables are passed; none is set or removed), `server/agent-cli.ts:191` (`--ignore-user-config`); see finding 7 |
+| PRIV-13 | Which features use the AI CLI, and which providers Claude Code may use | `server/agent-cli.ts:149`, `server/sync-runs.ts:419` (conflict resolution), `server/coach.ts:404` (coach debrief), `server/process.ts:108`, `server/process.ts:114`; v1.2: `server/walkthrough-runs.ts:131` (code walkthroughs), `server/premise-runs.ts:99` (premise checks), `server/by-hand-guide.ts:172` (Learn-by-hand guide answers), `server/by-hand-guide.ts:479` (the guide's review at Ready) |
+| PRIV-14 | BELL PR's instructions, the direction and the approved plan are sent | `server/run-executor.ts:732`, `server/run-executor.ts:792` |
+| PRIV-15 | Repository files, analysis excerpts, diffs, rules and templates are sent | `server/insights.ts:1220`, `server/drafts.ts:395`, `server/learning.ts:252` |
 | PRIV-16 | Output of the agents' commands is sent | `server/agent-cli.ts:54` (write roles run commands through the CLI, which returns the output to its model) |
-| PRIV-17 | Questions are sent with the diff, explanation and reports | `server/explanations.ts:271`, `server/learning.ts:358` |
-| PRIV-18 | Review comments and check results are sent with questions about the files they comment on and for follow-up rounds, with the person's restatement of each selected comment | `server/pr-feedback.ts:42`, `server/learning.ts:345`, `server/explanations.ts:216`, `server/followup-runs.ts:94`, `server/followup-runs.ts:238`, `server/followup-runs.ts:262` |
-| PRIV-19 | Discovery sends the interests and the found repositories' details, documents, issues and comments | `server/discovery.ts:710`, `server/discovery-sources.ts:88`, `server/discovery-sources.ts:249` |
-| PRIV-20 | Credential-shaped text is masked before logs, answers, questions and team messages are saved, and in draft context | `server/secrets.ts:17`, `server/run-executor.ts:91`, `server/run-executor.ts:204`, `server/run-executor.ts:427`, `server/learning.ts:373`, `server/drafts.ts:384` |
-| PRIV-21 | Imported repositories are cloned and fetched; details, issues, guidelines and templates are read; v1.1 reads, read-only and kept out of every prompt, whether the repository takes pull requests (its settings, the person's permission and login) with its last 3 merged pull request sizes, the linked issue's facts (with the pull requests that close or refer to it) and the person's own pull request counts with links to up to 10 waiting on their answer, at import or update, on "Check again", in the task dialog, when the publish dialog opens and at publish | `server/repositories.ts:54`, `server/repositories.ts:306`, `server/draft-sources.ts:53`, `server/contribution-facts.ts:98`, `server/issue-check.ts:158`, `server/issue-check.ts:173`, `server/pacing.ts:29`, `server/pacing.ts:122`, `server/repositories.ts:394`, `server/routes/contribution.ts:50`, `server/routes/contribution.ts:56`, `src/workspace/PublishModal.tsx:282`, `server/publish.ts:448`, `server/prompts/team.ts:34` |
+| PRIV-17 | Questions are sent with the diff, explanation and reports | `server/explanations.ts:271`, `server/learning.ts:416` |
+| PRIV-18 | Review comments and check results are sent with questions about the files they comment on and for follow-up rounds, with the person's restatement of each selected comment | `server/pr-feedback.ts:42`, `server/learning.ts:403`, `server/explanations.ts:216`, `server/followup-runs.ts:95`, `server/followup-runs.ts:241`, `server/followup-runs.ts:265` |
+| PRIV-19 | Discovery sends the interests and the found repositories' details, documents, issues and comments | `server/discovery.ts:749`, `server/discovery-sources.ts:88`, `server/discovery-sources.ts:249` |
+| PRIV-20 | Credential-shaped text is masked before logs, answers, questions and team messages are saved, and in draft context | `server/secrets.ts:17`, `server/run-executor.ts:95`, `server/run-executor.ts:214`, `server/run-executor.ts:448`, `server/learning.ts:431`, `server/drafts.ts:395` |
+| PRIV-21 | Imported repositories are cloned and fetched; details, issues, guidelines and templates are read; v1.1 reads, read-only and kept out of every prompt, whether the repository takes pull requests (its settings, the person's permission and login) with its last 3 merged pull request sizes, the linked issue's facts (with the pull requests that close or refer to it) and the person's own pull request counts with links to up to 10 waiting on their answer, at import or update, on "Check again", in the task dialog, when the publish dialog opens and at publish | `server/repositories.ts:54`, `server/repositories.ts:306`, `server/draft-sources.ts:53`, `server/contribution-facts.ts:100`, `server/issue-check.ts:158`, `server/issue-check.ts:173`, `server/pacing.ts:29`, `server/pacing.ts:122`, `server/repositories.ts:394`, `server/routes/contribution.ts:50`, `server/routes/contribution.ts:56`, `src/workspace/PublishModal.tsx:298`, `server/publish.ts:473`, `server/prompts/team.ts:52` |
 | PRIV-22 | Discovery searches GitHub | `server/discovery-sources.ts:249` |
-| PRIV-23 | Reviews, comments, check results and state of the person's PRs are read when they choose "Read feedback" (no Pro gate since v1.1) | `server/learning.ts:415`, `server/pr-feedback.ts:19`, `server/pr-feedback.ts:42`, `server/routes/review.ts:149` |
-| PRIV-24 | GitHub writes only after approval: fork, branch, draft PR, approved follow-up commits; never a force push | `server/publish.ts:386`, `server/publish.ts:582`, `server/publish.ts:649`, `server/publish.ts:853`, `server/pr-branch.ts:5` |
-| PRIV-25 | Commits carry the configured git identity and become public | `server/publish.ts:352` |
-| PRIV-26 | A non-no-reply commit e-mail needs confirmation, once per address | `shared/draft-checks.ts:520`, `shared/draft-checks.ts:525`, `server/publish.ts:146`, `server/publish.ts:478` |
+| PRIV-23 | Reviews, comments, check results and state of the person's PRs are read when they choose "Read feedback" (no Pro gate since v1.1) | `server/learning.ts:475`, `server/pr-feedback.ts:19`, `server/pr-feedback.ts:42`, `server/routes/review.ts:151` |
+| PRIV-24 | GitHub writes only after approval: fork, branch, draft PR, approved follow-up commits; never a force push | `server/publish.ts:411`, `server/publish.ts:610`, `server/publish.ts:677`, `server/publish.ts:881`, `server/pr-branch.ts:5` |
+| PRIV-25 | Commits carry the configured git identity and become public | `server/publish.ts:374` |
+| PRIV-26 | A non-no-reply commit e-mail needs confirmation, once per address | `shared/draft-checks.ts:551`, `shared/draft-checks.ts:556`, `server/publish.ts:148`, `server/publish.ts:506` |
 | PRIV-27 | Web access is Pro and turned on in the AI provider settings | `server/license.ts:286`, `src/i18n/en/settings.ts:120` |
-| PRIV-28 | Which agents may use the web, and which never do | `server/run-executor.ts:134`, `server/learning.ts:242`, `server/draft-jobs.ts:128`, `server/insights.ts:1259`, `server/discovery.ts:705`, `server/followup-runs.ts:244` |
+| PRIV-28 | Which agents may use the web, and which never do | `server/run-executor.ts:140`, `server/learning.ts:265`, `server/draft-jobs.ts:135`, `server/insights.ts:1259`, `server/discovery.ts:744`, `server/followup-runs.ts:247` |
 | PRIV-29 | Claude Code may open pages on three GitHub domains only; Codex uses OpenAI's web search | `server/agent-cli.ts:38`, `server/agent-cli.ts:63`, `server/agent-cli.ts:205` |
-| PRIV-30 | The run log keeps queries and addresses, not page contents | `server/run-executor.ts:292` |
-| PRIV-31 | Agents are told not to put contents or secrets in queries | `server/prompts/team.ts:28` |
+| PRIV-30 | The run log keeps queries and addresses, not page contents | `server/run-executor.ts:307` |
+| PRIV-31 | Agents are told not to put contents or secrets in queries | `server/prompts/team.ts:40` |
 | PRIV-32 | One data directory: `~/.bellpr`, `--data-dir` or `BELLPR_DATA_DIR` | `server/config.ts:97`, `server/config.ts:105` |
-| PRIV-33 | The data directory is 0700 and BELL PR's files are private to the user | `server/store.ts:543`, `server/store.ts:548`, `server/index.ts:330` |
-| PRIV-34 | The data inventory table | `server/store.ts:36`, `server/store.ts:37`, `server/store.ts:590`, `server/store.ts:731`, `server/repositories.ts:289`, `server/workbench.ts:539`, `server/run-executor.ts:497`, `server/insights.ts:695`, `server/insights.ts:747`, `server/discovery.ts:450`, `server/license.ts:348`, `server/app-settings.ts:150`, `server/publish.ts:65`, `server/config.ts:114`, `server/config.ts:116`, `server/config.ts:120`, `server/log.ts:15`, `server/log.ts:305`, `server/log.ts:306`, `server/cli.ts:242`; the v1.1 learning records and GitHub facts in `state.json`: `server/store.ts:229`, `server/store.ts:230`, `server/store.ts:311`, `server/store.ts:334`, `server/store.ts:336`, `server/store.ts:337`, `server/store.ts:347`, `server/store.ts:358`, `server/store.ts:359`, `server/store.ts:362`, the links to the person's waiting pull requests `server/store.ts:206`, practice answers never stored `server/practice.ts:5` |
+| PRIV-33 | The data directory is 0700 and BELL PR's files are private to the user | `server/store.ts:797`, `server/store.ts:802`, `server/index.ts:330` |
+| PRIV-34 | The data inventory table | `server/store.ts:37`, `server/store.ts:38`, `server/store.ts:844`, `server/store.ts:985`, `server/repositories.ts:289`, `server/new-run.ts:162`, `server/run-executor.ts:526`, `server/insights.ts:695`, `server/insights.ts:747`, `server/discovery.ts:489`, `server/license.ts:348`, `server/app-settings.ts:150`, `server/publish.ts:67`, `server/config.ts:114`, `server/config.ts:116`, `server/config.ts:120`, `server/log.ts:15`, `server/log.ts:305`, `server/log.ts:306`, `server/cli.ts:242`; the v1.1 learning records and GitHub facts in `state.json`: `server/store.ts:460`, `server/store.ts:461`, `server/store.ts:549`, `server/store.ts:573`, `server/store.ts:575`, `server/store.ts:576`, `server/store.ts:586`, `server/store.ts:597`, `server/store.ts:598`, `server/store.ts:601`, the links to the person's waiting pull requests `server/store.ts:437`, practice answers never stored `server/practice.ts:5`; v1.2: walkthrough answers `server/store.ts:228` and walkthroughs `server/store.ts:512`, each Learn-by-hand run's record `server/store.ts:286`, `server/store.ts:327` (the person's questions and the guide's answers), `server/store.ts:340` (test runs and the end of their output), `server/store.ts:350` (predictions), `server/store.ts:355` (results the person recorded), `server/store.ts:360` (the "least sure" line), `server/store.ts:366` (the guide's reviews), `server/store.ts:399` (the kinds of help used), `server/store.ts:408` (the model that gave them), `server/store.ts:604`, `shared/runs.ts:30`, the quoted rules a fitted run was fitted to `server/store.ts:269`, the confirmed test command `server/store.ts:463`, carve-out quotes and checked-list rules in the stored rules `server/store.ts:110`, `server/store.ts:111`, the places a project's people talk `server/store.ts:135`, test runs in `children.json` `server/agent-registry.ts:136` |
 | PRIV-35 | Temporary index files are deleted when done or at the next start | `server/sync.ts:40`, `server/cleanup.ts:153`, `server/janitor.ts:13` |
-| PRIV-36 | What the browser keeps, and the 30-day cookie | `src/i18n/index.tsx:35`, `src/app/AppShell.tsx:146`, `src/app/AppShell.tsx:530`, `src/app/AppShell.tsx:548`, `src/app/hooks/demoStorage.ts:15`, `src/app/ErrorBoundary.tsx:118`, `server/http-guard.ts:80` |
+| PRIV-36 | What the browser keeps, and the 30-day cookie | `src/i18n/index.tsx:45`, `src/app/AppShell.tsx:157`, `src/app/AppShell.tsx:541`, `src/app/AppShell.tsx:559`, `src/app/hooks/demoStorage.ts:15`, `src/app/ErrorBoundary.tsx:118`, `server/http-guard.ts:80` |
 | PRIV-37 | `BELLPR_LICENSE_KEY` holds the key wherever it is set | `server/index.ts:512` |
 | PRIV-38 | Cancelled and failed runs lose their working copy after 14 days or the set period (1-365); others keep it | `server/cleanup.ts:33`, `server/cleanup.ts:52`, `server/cleanup.ts:408`, `shared/app-settings.ts:29` |
 | PRIV-39 | Run records stay until deleted | `server/cleanup.ts:245`, `server/cleanup.ts:279` |
-| PRIV-40 | Free a working copy, delete a run, remove a repository with its clone and analysis | `server/routes/maintenance.ts:131`, `server/routes/maintenance.ts:134`, `server/routes/maintenance.ts:137`, `server/cleanup.ts:310`, `src/modals/RunsModal.tsx:62`, `src/app/AppShell.tsx:934` |
+| PRIV-40 | Free a working copy, delete a run, remove a repository with its clone and analysis | `server/routes/maintenance.ts:131`, `server/routes/maintenance.ts:134`, `server/routes/maintenance.ts:137`, `server/cleanup.ts:310`, `src/modals/RunsModal.tsx:64`, `src/app/AppShell.tsx:956` |
 | PRIV-41 | "Delete all data" keeps settings, license and the server's own files | `server/cleanup.ts:332`, `server/cleanup.ts:349`, `src/settings/DataSection.tsx:391` |
-| PRIV-42 | Removing everything: the data directory and the browser's site data | `server/config.ts:97`, `src/i18n/index.tsx:35` |
+| PRIV-42 | Removing everything: the data directory and the browser's site data | `server/config.ts:97`, `src/i18n/index.tsx:45` |
 | PRIV-43 | Data at GitHub or the AI provider is under their control | Owner decision: statement about third parties (G4) |
 | PRIV-44 | Keys are checked offline against a built-in public key | `server/license.ts:254`, `server/license-keys.ts:17` |
 | PRIV-45 | What a key contains | `server/license.ts:100` |
@@ -308,7 +318,13 @@ Commands run on the tree of this review, test files excluded:
 | PRIV-55 | Data subject rights and the privacy contact [OWNER] | Owner decision: privacy contact (G4, G6) |
 | PRIV-56 | Not directed at children | Owner decision: counsel review (G4) |
 | PRIV-57 | Each release ships its policy version | Owner decision: release process; `scripts/generate-third-party-notices.mjs:52` copies the policy into each build |
-| PRIV-58 | A coach debrief, asked for by the person, sends their own records for one project: run titles and PR outcomes, explanations, check answers with confidence, grades and corrections, approaches chosen and why, forecasts, and maintainers' and tagged comments with their authors and the person's tags and lessons | `server/routes/learning.ts:193`, `server/coach.ts:67`, `server/coach.ts:101`, `server/coach.ts:404`, `server/prompts/coach.ts:11` |
+| PRIV-58 | A coach debrief, asked for by the person, sends their own records for one project: run titles and PR outcomes, explanations, check answers with confidence, grades and corrections, approaches chosen and why, forecasts, and maintainers' and tagged comments with their authors and the person's tags and lessons | `server/routes/learning.ts:201`, `server/coach.ts:67`, `server/coach.ts:101`, `server/coach.ts:404`, `server/prompts/coach.ts:11` |
+| PRIV-59 | Code walkthroughs and premise checks send the task, the change and the plan and reports they check, and the repository files the agent reads, as explanations do | `server/walkthrough-runs.ts:131`, `server/prompts/walkthroughs.ts:20`, `server/prompts/walkthroughs.ts:33` (the file's diff and the task), `server/premise-runs.ts:99`, `server/prompts/premise.ts:21`, `server/prompts/premise.ts:30` (the task, the team's plan and reports, the diff); the agents read the checkout read-only, `server/agent-cli.ts:60` |
+| PRIV-60 | Setup needs that agents report are stored in `state.json`, shown, and never run | `server/store.ts:429` (stored with tasks and rounds), `src/team/SetupNeeds.tsx:41` (shown with a copy of each command), `src/i18n/en/team.ts:202` (an agent's suggestion to check before you run it); no code runs them |
+| PRIV-61 | What a Learn-by-hand guide answer and a review at Ready send; the agents cannot edit files in these runs | `server/by-hand-guide.ts:123` (one turn's input), `server/by-hand-guide.ts:126` (the selected lines), `server/by-hand-guide.ts:132` (what the person tried), `server/by-hand-guide.ts:135` (the last 4 answers on the step), `server/prompts/by-hand.ts:106` (the change, at most 40 kB), `server/prompts/by-hand.ts:107` and `server/prompts/by-hand.ts:140` (the end of the last test output, at most 4 kB), `server/prompts/by-hand.ts:149` (the person's plan), `server/by-hand-guide.ts:172` (read-only turn), `server/prompts/by-hand.ts:293` (the review: task, plan, least-sure line, last test run, the change), `server/run-executor.ts:123` (no write turn in a Learn-by-hand run), `server/by-hand-filter.ts:48` (held-back files are never quoted) |
+| PRIV-62 | The test command runs only on a click and only as confirmed, on the computer, in the run's folder, with the person's permissions, without the token and key variables (by name), and can read the home folder; the last 4,000 characters are kept, masked, and leave the computer only in a guide answer or review | `server/routes/by-hand.ts:139` (confirmed in its own request), `server/routes/by-hand.ts:142` (run on a click), `server/by-hand-tests.ts:222` (only the confirmed command), `server/by-hand-tests.ts:313` (`/bin/sh -c` in the run's folder, no sandbox), `server/test-command.ts:180` (variables removed by name), `server/by-hand-tests.ts:366` and `shared/by-hand.ts:75` (the last 4,000 characters), `server/test-command.ts:241` (masked), `server/prompts/by-hand.ts:140` (sent only inside a guide turn) |
+| PRIV-63 | The Learn-by-hand record stays in `state.json` and leaves the computer only in a guide answer or review, or when copied or exported | `server/by-hand-record.ts:39` (help events with the model and CLI), `server/store.ts:286`, `shared/by-hand.ts:390` (counts shown locally), `shared/learning-export.ts:217` (the export, on request) |
+| PRIV-64 | BELL PR ships a dated list of off-repository AI rules, reads an entry only after the publisher signed it off, and sends nothing to read it | `server/policy-registry.ts:285` (an entry is read only with its sign-off date), `server/policy-registry.ts:306`, `server/contribution-facts.ts:338` (merged into the rules read locally); the list is data in the package, no network module; `scripts/check-policy-registry.mjs` lists unsigned entries |
 
 ## TERMS.md
 
@@ -321,31 +337,31 @@ Commands run on the tree of this review, test files excluded:
 | TERMS-05 | The checkout shows price, currency and taxes | Owner decision: Merchant of Record and prices |
 | TERMS-06 | A key for the seats bought, under EULA section 4 | `server/license.ts:100` (`seats`); owner decision for the legal part |
 | TERMS-07 | The feature table lists Free and Pro in this build | `shared/plans.ts:183`; generated into TERMS.md by `scripts/render-generated-regions.ts` |
-| TERMS-08 | Pro includes no AI or GitHub usage | `server/process.ts:125` (agents use the person's own sign-ins); owner decision for the legal part |
+| TERMS-08 | Pro includes no AI or GitHub usage | `server/process.ts:163` (agents use the person's own sign-ins); owner decision for the legal part |
 | TERMS-09 | REFUND.md covers delivery and consent to immediate delivery | Owner decision: delivery method |
 | TERMS-10 | A free 14-day trial, once per data directory | `shared/plans.ts:72`, `server/license.ts:502` |
 | TERMS-11 | REFUND.md covers refunds and refunded keys | Owner decision: refund window |
 | TERMS-12 | Organizations assign each seat to one Named User | Owner decision: counsel review (G4) |
 | TERMS-13 | Free needs no purchase, key or account, and has no time limit | `shared/plans.ts:58`, `server/license.ts:754` |
 | TERMS-14 | Using BELL PR means agreeing to the responsible-contribution rules | Owner decision: counsel review (G4) |
-| TERMS-15 | Nothing is published before every file is reviewed and the text approved; the PR opens as a draft | `server/publish.ts:308`, `server/publish.ts:406`, `server/publish.ts:649` |
+| TERMS-15 | Nothing is published before every file is reviewed and the text approved; the PR opens as a draft | `server/publish.ts:329`, `server/publish.ts:431`, `server/publish.ts:677` |
 | TERMS-16 | Approve only what you understand; you are the author | Owner decision: counsel review (G4) |
 | TERMS-17 | Follow each project's rules, CLA/DCO and AI policy | Owner decision: counsel review (G4) |
-| TERMS-18 | BELL PR shows the rules and templates it finds, with sources, and can miss some | `server/draft-sources.ts:53`, `src/draft/DraftGuidancePanel.tsx:340` |
-| TERMS-19 | BELL PR never adds a sign-off and refuses suggestions that contain one | `server/drafts.ts:65`, `server/drafts.ts:239`, `server/drafts.ts:294`, `server/prompts/followups.ts:55` |
+| TERMS-18 | BELL PR shows the rules and templates it finds, with sources, and can miss some | `server/draft-sources.ts:53`, `src/draft/DraftGuidancePanel.tsx:363` |
+| TERMS-19 | BELL PR never adds a sign-off and refuses suggestions that contain one | `server/drafts.ts:65`, `server/drafts.ts:248`, `server/drafts.ts:303`, `server/prompts/followups.ts:59` |
 | TERMS-20 | Add a sign-off only if you can certify it | Owner decision: counsel review (G4) |
-| TERMS-21 | The disclosure line: editable, off unless turned on per PR or in Settings, suggested when rules ask | `shared/drafts.ts:86`, `server/drafts.ts:111`, `server/drafts.ts:127`, `server/drafts.ts:321`, `src/draft/DraftGuidancePanel.tsx:190`, `src/draft/DraftGuidancePanel.tsx:196`, `src/i18n/en/settings.ts:128` |
+| TERMS-21 | The disclosure line: editable, off unless turned on per PR or in Settings, suggested when rules ask | `shared/drafts.ts:86`, `server/drafts.ts:111`, `server/drafts.ts:130`, `server/drafts.ts:331`, `src/draft/DraftGuidancePanel.tsx:207`, `src/draft/DraftGuidancePanel.tsx:213`, `src/i18n/en/settings.ts:128` |
 | TERMS-22 | Keep an accurate disclosure where a project asks | Owner decision: counsel review (G4) |
-| TERMS-23 | AI-written text in the app is labelled AI-generated | `src/review/ExplanationPanel.tsx:100`, `src/review/ExplanationPanel.tsx:904`, `src/mission/ProjectOverview.tsx:1067`, `src/mission/ProjectOverview.tsx:1138`, `src/learning/LearningNotes.tsx:167` |
+| TERMS-23 | AI-written text in the app is labelled AI-generated | `src/review/ExplanationPanel.tsx:127`, `src/review/ExplanationPanel.tsx:957`, `src/mission/ProjectOverview.tsx:1276`, `src/mission/ProjectOverview.tsx:1345`, `src/learning/LearningNotes.tsx:171` |
 | TERMS-24 | No bulk or unsolicited pull requests | Owner decision: counsel review (G4) |
 | TERMS-25 | Follow GitHub's and the AI provider's policies | Owner decision: counsel review (G4) |
 | TERMS-26 | Breach may end the licenses | Owner decision: counsel review (G4) |
-| TERMS-27 | Third-party services run under the person's accounts and terms | `server/process.ts:125`, `server/agent-cli.ts:149` |
+| TERMS-27 | Third-party services run under the person's accounts and terms | `server/process.ts:163`, `server/agent-cli.ts:149` |
 | TERMS-28 | The seller does not provide or support those services | Owner decision: counsel review (G4) |
 | TERMS-29 | Non-affiliation and trademarks | Owner decision: trademark and provider terms (G1, G5) |
 | TERMS-30 | Changes apply to later purchases | Owner decision: counsel review (G4) |
 | TERMS-31 | Statutory consumer rights prevail | Owner decision: counsel review (G4) |
-| TERMS-32 | The support contact [OWNER], also for source-code requests | Owner decision: support contact (G6); `THIRD_PARTY_NOTICES.md:271` |
+| TERMS-32 | The support contact [OWNER], also for source-code requests | Owner decision: support contact (G6); `THIRD_PARTY_NOTICES.md:246` |
 | TERMS-33 | The EULA's governing law applies | Owner decision: governing law (G4) |
 | TERMS-34 | The feature table comes from the same source as the app's plan comparison; the EULA governs the term and the privacy policy says what web access allows | `shared/plans.ts:183`, `src/license/UpgradeDialog.tsx:98`; PRIV-29 for web access; see findings 2 and 3 about two rows of its copy |
 
@@ -393,23 +409,23 @@ Commands run on the tree of this review, test files excluded:
 | SEC-14 | A random 32-byte token in memory, never in a file, environment or command line; a restart signs out | `server/index.ts:529`, `server/index.ts:532`, `server/index.ts:556` |
 | SEC-15 | The printed link holds the token and works until restart | `server/index.ts:548` |
 | SEC-16 | The browser opened at start gets a one-time link, which goes to `open`/`xdg-open`; the token never does; use `--no-open` on shared computers | `server/index.ts:556`, `server/routes/auth.ts:128`, `server/cli.ts:174`, `server/cli.ts:180`, `server/config.ts:306`; `server/cli.test.ts` checks the opener's arguments; finding 1 |
-| SEC-17 | HttpOnly, SameSite=Strict cookie for 30 days; all but the health check and sign-in page need it | `server/routes/auth.ts:65`, `server/routes/auth.ts:66`, `server/http-guard.ts:80`, `server/app.ts:165`, `server/http-guard.ts:237` |
+| SEC-17 | HttpOnly, SameSite=Strict cookie for 30 days; all but the health check and sign-in page need it | `server/routes/auth.ts:65`, `server/routes/auth.ts:66`, `server/http-guard.ts:80`, `server/app.ts:167`, `server/http-guard.ts:237` |
 | SEC-18 | One-time links: once, 120 seconds, at most 5, digests only | `server/routes/auth.ts:27`, `server/routes/auth.ts:28`, `server/routes/auth.ts:138` |
 | SEC-19 | The link file is private and deleted once read | `server/index.ts:358`, `server/index.ts:359`, `server/cli.ts:242` |
 | SEC-20 | Any program of the same user can ask for a link | `server/cli.ts:279`; owner decision for the trust statement |
 | SEC-21 | A local repository is cloned into the data directory | `server/repositories.ts:39`, `server/repositories.ts:55` |
-| SEC-22 | Git runs with overrides and refuses unsafe local configuration | `server/process.ts:310`, `server/process.ts:392`, `server/process.ts:438` |
+| SEC-22 | Git runs with overrides and refuses unsafe local configuration | `server/process.ts:456`, `server/process.ts:538`, `server/process.ts:584` |
 | SEC-23 | Project instruction files and settings are not loaded as instructions | `server/agent-cli.ts:169`, `server/agent-cli.ts:171`, `server/agent-cli.ts:195`, `server/agent-cli.ts:197` |
-| SEC-24 | Reports, diffs and feedback reach agents as untrusted data | `server/prompts/team.ts:45`, `server/prompts/team.ts:60`, `server/explanations.ts:271` |
-| SEC-25 | PR text is checked for secrets and local paths, and CI workflow changes need confirmation | `shared/draft-checks.ts:420`, `shared/draft-checks.ts:499`, `shared/draft-checks.ts:509` |
+| SEC-24 | Reports, diffs and feedback reach agents as untrusted data | `server/prompts/team.ts:69`, `server/prompts/team.ts:84`, `server/explanations.ts:271` |
+| SEC-25 | PR text is checked for secrets and local paths, and CI workflow changes need confirmation | `shared/draft-checks.ts:451`, `shared/draft-checks.ts:530`, `shared/draft-checks.ts:540` |
 | SEC-26 | Agents that change code run builds and tests | `server/agent-cli.ts:54` |
 | SEC-27 | Claude Code write agents' commands are sandboxed: writes in the working copy only, no network | `server/agent-cli.ts:105`, `server/agent-cli.ts:123`, `server/agent-cli.ts:124`, `server/sandbox.ts:153` |
 | SEC-28 | Every Claude Code agent is denied credential files and BELL PR's other data | `server/agent-cli.ts:112`, `server/sandbox.ts:321`, `server/sandbox.ts:284` |
 | SEC-29 | Read-only Claude Code agents cannot run commands and read only their working directory | `server/agent-cli.ts:54`, `server/agent-cli.ts:115` |
 | SEC-30 | Codex agents: writes in the working copy, no network, reads anything the user can | `server/agent-cli.ts:201` |
-| SEC-31 | No agent gets the GitHub token or a license key; each gets only its own sign-in settings | `server/process.ts:50`, `server/process.ts:125` |
-| SEC-32 | Web access: search, Claude Code pages on three GitHub domains, untrusted data | `server/agent-cli.ts:38`, `server/agent-cli.ts:205`, `server/prompts/team.ts:28` |
-| SEC-33 | Without the sandbox, Claude Code write agents are refused unless allowed; such runs are marked | `server/sandbox.ts:153`, `server/sandbox.ts:136`, `server/run-executor.ts:226`, `src/settings/SafetySection.tsx:126` |
+| SEC-31 | No agent gets the GitHub token or a license key; each gets only its own sign-in settings | `server/process.ts:88`, `server/process.ts:163` |
+| SEC-32 | Web access: search, Claude Code pages on three GitHub domains, untrusted data | `server/agent-cli.ts:38`, `server/agent-cli.ts:205`, `server/prompts/team.ts:40` |
+| SEC-33 | Without the sandbox, Claude Code write agents are refused unless allowed; such runs are marked | `server/sandbox.ts:153`, `server/sandbox.ts:136`, `server/run-executor.ts:236`, `src/settings/SafetySection.tsx:126` |
 | SEC-34 | Unsandboxed agents have the user's full permissions | `server/sandbox.ts:161` |
 | SEC-35 | Sandboxes depend on versions and can have flaws; do not run as root | Owner decision: risk statement for counsel (G4); detection at `server/sandbox.ts:86` |
 | SEC-36 | In Docker the sandbox needs the documented options | `server/sandbox.ts:59`, `server/sandbox.ts:169`; the probe results are in `docs/docker.md`, "Agent sandbox in Docker" |

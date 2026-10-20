@@ -72,9 +72,10 @@ agents BELL PR runs. <!-- claim:PRIV-12 -->
 
 ### The AI coding CLI you choose
 
-Contribution runs, project analysis, discovery, explanations, follow-up
-questions, pull request drafts, coach debriefs, conflict
-resolution and follow-up rounds use the OpenAI Codex CLI or Claude Code. The CLI sends data to its
+Contribution runs, project analysis, discovery, explanations, code
+walkthroughs, premise checks, follow-up questions, pull request drafts,
+coach debriefs, conflict resolution, follow-up rounds, and Learn-by-hand
+guide answers and reviews use the OpenAI Codex CLI or Claude Code. The CLI sends data to its
 provider: OpenAI for the Codex CLI, and Anthropic for Claude Code, or the
 cloud platform you set Claude Code up to use, such as Amazon Bedrock,
 Google Vertex AI or Microsoft Foundry. <!-- claim:PRIV-13 -->
@@ -100,12 +101,42 @@ It sends:
   with their authors' GitHub logins and your tags and lessons; <!-- claim:PRIV-58 -->
 - for discovery, your search interests and the public details, documents,
   open issues and comments of the GitHub repositories that the search
-  found. <!-- claim:PRIV-19 -->
+  found; <!-- claim:PRIV-19 -->
+- for code walkthroughs and premise checks, the task, the change and the
+  plan and reports they check, and the files of the repository that the
+  agent reads, as for explanations. <!-- claim:PRIV-59 -->
 
 Before BELL PR saves run logs, agent answers, your questions and team
 messages, it masks text shaped like a credential, such as GitHub tokens, API
 keys, license keys and private keys. It does the same with the context of a
 pull request draft before an agent sees it. <!-- claim:PRIV-20 -->
+
+### Learn by hand
+
+In a Learn-by-hand run you write the change, and BELL PR's agents cannot
+edit your files. Each answer of the guide sends to the AI CLI you chose
+the task, your question (with what you said you tried and the lines you
+selected), your plan, the step you are on, your current changes to that
+step's files (up to 40 kB), your last test run with the end of its output
+(up to 4 kB) and the guide's last answers on that step, with the files of
+the run's folder that the guide opens. A review you ask for at "Ready for
+review" sends your change, your plan, your "least sure" line and your
+last test run at that version. <!-- claim:PRIV-61 -->
+
+BELL PR runs your project's test command only when you click Run, and
+only a command you confirmed. It runs on your computer, in the run's
+folder, with your permissions, without the environment variables that
+hold BELL PR's, GitHub's or the AI providers' tokens and keys (they are
+removed by name, so a key kept under another name stays); like anything
+you run, it can read files in your home folder. BELL PR keeps the last 4,000 characters of its output in
+`state.json`, with text shaped like a credential masked; that output
+leaves your computer only inside a guide answer or a guide review you ask
+for. <!-- claim:PRIV-62 -->
+
+The Learn-by-hand record (which help you used, when, from which model,
+your test runs and predictions) stays in `state.json` on your computer.
+Apart from what a guide answer or a review you ask for sends, as
+described above, it leaves your computer only when you copy or export it. <!-- claim:PRIV-63 -->
 
 ### GitHub, through the GitHub CLI and git
 
@@ -136,6 +167,11 @@ become public on GitHub. <!-- claim:PRIV-25 -->
 The app asks you to confirm, once per address, before it publishes a commit
 e-mail address that is not a GitHub no-reply address. <!-- claim:PRIV-26 -->
 
+BELL PR also ships a short, dated list of AI rules that some projects
+publish outside their repositories. It reads an entry only after BELL
+PR's publisher has signed it off, and reading the list sends nothing
+anywhere. <!-- claim:PRIV-64 -->
+
 ### Web access for agents (off by default)
 
 Web access is a Pro feature that you turn on in the AI provider settings. <!-- claim:PRIV-27 -->
@@ -162,7 +198,7 @@ account only. <!-- claim:PRIV-33 -->
 
 | Item | What it holds |
 | --- | --- |
-| `state.json`, with `state.json.bak.1` to `.bak.3`, `state.quarantine.json` and `state.json.corrupt-<time>` | The repositories you imported and your runs: contribution directions, plans, agent logs and reports, review progress, explanations, follow-up questions and answers, notes and pull request drafts. Your learning records: your understanding checks (your explanation, answers, confidence, grades, corrections, forecast and how long each check took), your try-first answers and the approaches you chose, your tags and lessons on maintainer comments, your restatements for follow-up rounds, your practice schedule (grades and dates, never your practice answers), the reasons you gave for a weakened test or for publishing next to another person's pull request, and coach debriefs. The GitHub facts described above, including the rules quoted from each repository's files and, for a linked issue, the GitHub logins of the people assigned to it, claiming it or with a pull request for it, and its latest maintainer comment, and links to up to 10 of your own pull requests in that repository that wait on your answer. A damaged file is kept aside, never silently dropped. |
+| `state.json`, with `state.json.bak.1` to `.bak.3`, `state.quarantine.json` and `state.json.corrupt-<time>` | The repositories you imported and your runs: contribution directions, plans, agent logs and reports, review progress, explanations, follow-up questions and answers, notes and pull request drafts. Your learning records: your understanding checks (your explanation, answers, confidence, grades, corrections, forecast and how long each check took), your try-first answers and the approaches you chose, your tags and lessons on maintainer comments, your restatements for follow-up rounds, your practice schedule (grades and dates, never your practice answers), the reasons you gave for a weakened test or for publishing next to another person's pull request, and coach debriefs. Code walkthroughs and the answers you gave to their questions. For each Learn-by-hand run, its record: your plan, your questions to the guide and its answers and reviews, BELL PR's test runs with your predictions and the end of their output, the test results you recorded yourself, your "least sure" line, the kinds of help you used and which model gave them, and, for a run fitted to a project's rules, the quoted rules it was fitted to; and the test command you confirmed for each project. The GitHub facts described above, including the rules quoted from each repository's files (with the parts that say which uses of AI are fine, the places where its people talk, and rules from the list described above) and, for a linked issue, the GitHub logins of the people assigned to it, claiming it or with a pull request for it, and its latest maintainer comment, and links to up to 10 of your own pull requests in that repository that wait on your answer. A damaged file is kept aside, never silently dropped. |
 | `repositories/` | BELL PR's own clones of the repositories you imported, from GitHub or from a folder on your computer. |
 | `worktrees/` and `team-worktrees/` | A working copy for each run and each teammate, with the changes the agents made. |
 | `insights/` | Each project's cached analysis, recommendations and contribution preferences. |
@@ -171,7 +207,7 @@ account only. <!-- claim:PRIV-33 -->
 | `license.json` | The license key you activated, when you activated it, the latest time the app saw (to notice a clock that was set back), and the trial start date. |
 | `app-settings.json` | Language, limits, onboarding status, the version of the license terms you accepted, safety settings, the AI-assistance note setting and the retention period. |
 | `author-emails.json` | SHA-256 fingerprints of the commit e-mail addresses you confirmed when publishing, so the app asks only once per address. |
-| `children.json` | Process IDs of the agent tools that are running, so that BELL PR can stop leftovers after a crash. |
+| `children.json` | Process IDs of the agent tools that are running, and of the test runs BELL PR runs for you, so that BELL PR can stop leftovers after a crash. |
 | `logs/` | Daily log files, at most 7 files and 50 MB in total. Secret-shaped text is masked, and BELL PR does not write prompts or page contents to them. |
 | `bellpr.lock` and `run/` | The running instance's process ID, address, port, version and start time, and the one-time sign-in link for `bell-pr open`, which that command deletes as soon as it has read it. |
 
@@ -180,6 +216,10 @@ account only. <!-- claim:PRIV-33 -->
 While a run works, Git may also keep short-lived temporary files in the
 data directory. BELL PR deletes them when the step is done, or at the next
 start after a crash. <!-- claim:PRIV-35 -->
+
+When an agent reports that a check needs something your computer lacks,
+BELL PR stores that suggestion, with its command, in `state.json` and
+shows it to you. It never runs the command. <!-- claim:PRIV-60 -->
 
 Your browser also keeps some data for this local site only: the language you
 chose, the contribution you opened last, layout preferences and the sample

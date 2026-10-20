@@ -37,6 +37,42 @@ You review, you decide, and the pull request is yours. It is not a tool
 for mass-producing automatic PRs; maintainers' time is precious. See
 [Contributing responsibly](contributing-responsibly.md).
 
+### What is Learn by hand?
+
+A second way to run a contribution: you write every line of the change
+yourself, in your own editor, and BELL PR's agents only read. The guide
+asks about your plan after you have written your own steps, gives hints
+without code and reviews your change when you mark it ready and ask; BELL
+PR runs your tests when you click; and you explain the change back before
+you approve it. Learn by hand is Free. See [Getting
+started](getting-started.md#learn-by-hand-write-it-yourself).
+
+### Does Learn by hand mean my PR was made without AI?
+
+No. The guide is an AI model: in a Learn-by-hand run it can explain code,
+answer your questions, give hints, review your change and explain a test
+failure, and the run's record lists each kind of help you used. For a run
+whose history is clean, what BELL PR can say is what its record says:
+"BELL PR's agents had no write access and gave you no code for this
+change. The guide showed only quotes of the project's code and of your
+own edits." BELL PR can't see other tools you used, such as editor
+autocomplete or another chat, and the record isn't proof of who wrote the
+code. How you describe the help you had is up to you, within the
+project's rules; BELL PR never writes it for you.
+
+### Does Learn by hand make my PR welcome where AI is banned?
+
+No. BELL PR quotes each project's rules. Where they restrict AI help
+itself, where BELL PR can't tell what they cover, or where they keep an
+issue for people learning without AI tools, BELL PR won't publish,
+whichever mode you used. Where a project declines AI-generated content
+and its own text says some uses are fine, BELL PR can publish a
+learn-by-hand run whose guide stayed within those uses from the start,
+after you confirm the project's quoted rule; the maintainers decide
+whether your change fits. [Contributing
+responsibly](contributing-responsibly.md#when-the-projects-own-text-says-some-uses-of-ai-are-fine)
+lists every condition.
+
 ### Will maintainers know that AI helped?
 
 That is your decision, within the project's rules. BELL PR mentions AI
@@ -71,9 +107,10 @@ asked.
 
 No. BELL PR is not an AI detector, and it never guesses who wrote a piece
 of code, because such a guess can wrongly flag a person's own work. It
-knows that agents wrote a change because it ran them, and it
-treats every run as agent-written when a project's rules are about
-AI-assisted contributions.
+knows that agents wrote a change because it ran them, and it treats every
+agent run as agent-written when a project's rules are about AI-assisted
+contributions. In a Learn-by-hand run it knows what its own agents did
+and what help the guide gave, and nothing about other tools you used.
 
 ### Why did BELL PR block publishing?
 
@@ -82,8 +119,10 @@ take pull requests from you, its rules do not accept AI-assisted
 contributions, a required disclosure or your own words are missing, the
 linked issue is closed or someone else's pull request already fixes it,
 the issue is kept for newcomers, a test was weakened without a reason, or
-you have too many open pull requests there. The publish dialog names the
-check and its source. [Troubleshooting](troubleshooting.md#publishing-was-blocked-by-a-project-rule-an-issue-or-pacing)
+you have too many open pull requests there. In a Learn-by-hand run the
+block also says what the project's rule covers, and when the quoted
+confirm could apply, which of its conditions failed. The publish dialog
+names the check and its source. [Troubleshooting](troubleshooting.md#publishing-was-blocked-by-a-project-rule-an-issue-or-pacing)
 explains each one and how to clear it.
 
 ### Why does BELL PR limit open PRs per project?
@@ -113,9 +152,17 @@ using AI tools on them, and matplotlib's
 [contributing guide](https://github.com/matplotlib/matplotlib/blob/main/doc/devel/contribute.rst)
 says it closes AI-generated pull requests for them. So discovery looks for
 help-wanted issues for the agent team and marks newcomer issues "Learn by
-hand: write this one yourself". The task dialog explains this when you
-link such an issue, and publishing is blocked when the project's own rules
-reserve those issues.
+hand: write this one yourself", with **Start learning by hand**: you
+write the fix, with the guide. The task dialog explains this when you
+link such an issue. Publishing is blocked when the project's own rules
+reserve those issues, for a learn-by-hand run too. Only when the rule is
+about AI-generated pull requests and the project's own text names every
+kind of help the run used can a learn-by-hand run fitted to that text
+end in the quoted confirm instead (see [Does Learn by hand make my PR
+welcome where AI is
+banned?](#does-learn-by-hand-make-my-pr-welcome-where-ai-is-banned)).
+Where the rule is about using AI tools at all, discovery doesn't offer
+the start.
 
 ## AI providers and costs
 
@@ -200,8 +247,8 @@ teammates, a Reviewer and a Test analyst, review with explanations and
 try-first questions, the understanding check, PR drafts with your own
 words, every project-rule, issue, reviewability and pacing check,
 publishing and syncing, reading your maintainers' feedback and comparing
-it with your forecast, and the learning page with its practice deck and
-counts. Pro goes deeper: a coach debrief, the complete learning record
+it with your forecast, the learning page with its practice deck and
+counts, and Learn by hand. Pro goes deeper: a coach debrief, the complete learning record
 export, AI follow-up rounds, bigger teams, more than one contribution at a
 time, discovery, more recommendations, web access and deep reasoning
 efforts. No plan buys more pull requests or a way past a check. The full
@@ -224,8 +271,9 @@ started can be continued or cancelled.
 ### Which platforms does it run on?
 
 macOS, Linux, and Windows through WSL2. It needs Node.js 22 or later, Git,
-the GitHub CLI and the Codex CLI or Claude Code. There is also a Docker
-image, in beta: [Docker](docker.md).
+the GitHub CLI and the Codex CLI or Claude Code. The web interface needs
+Chrome or Edge 111, Firefox 113 or Safari 16.2, or later. There is also a
+Docker image, in beta: [Docker](docker.md).
 
 ### Does it work with GitLab or Bitbucket?
 

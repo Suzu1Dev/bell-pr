@@ -157,6 +157,16 @@ them, BELL PR still runs, but every command a Codex agent runs fails (so
 analysis, reviews and code changes stall), and Claude Code agents that write
 code cannot start their sandbox.
 
+**Learn by hand.** With Claude Code, a Learn-by-hand run needs none of
+these options: its agents only read, and Claude Code's read-only agents
+run without the sandbox. Codex runs every turn, read-only ones included,
+in its own bubblewrap sandbox, so with Codex a Learn-by-hand run needs the
+same three options. The tests that BELL PR runs for you in Learn by hand
+run inside the container as the `node` user, without a sandbox (see the
+[security model](security-model.md#bell-pr-runs-your-test-command)), and
+only with the tools the image has: Node.js, git and the tools above.
+Install any other tool your tests need into the container yourself.
+
 ## Beta status
 
 Docker stays **beta** in 1.0.0-rc.1 because the agent sandbox needs the

@@ -5,6 +5,25 @@ release-candidate QA found. Items marked **OWNER** need the owner's
 machines, accounts or decisions; nobody else runs them. Nothing in this
 list publishes, pushes or tags anything.
 
+## 1.2 (Learn by hand): before a release candidate
+
+Pending **OWNER** sign-offs; none of them is done yet.
+
+- [ ] The first real run of the guide eval
+  ([Development](development.md#the-guide-eval)) with every supported
+  provider, meeting every threshold in `test/eval-guide/thresholds.json`;
+  again after any later change to the guide's prompts.
+- [ ] Each entry of the checked list of off-repository AI rules
+  (`server/policy-registry.ts`), with the kinds of help it allows: the
+  owner signs it off, and only then is its sign-off date recorded and the
+  entry read. `node scripts/check-policy-registry.mjs` lists the entries
+  that still wait.
+- [ ] The privacy policy's Learn-by-hand rows (PRIV-13, PRIV-34 and
+  PRIV-59 to PRIV-64 in `PRIVACY.md`, mapped in `LEGAL-REVIEW.md`), with
+  counsel.
+- [ ] A native read-through of the Traditional Chinese copy of Learn by
+  hand.
+
 ## 1.0.0-rc.1 (2026-10-14)
 
 Checked on branch `ws/6A-rc-hardening` (wave 6), Linux x64, Node.js

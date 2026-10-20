@@ -28,6 +28,8 @@ You need:
 - **On Linux, bubblewrap and socat**, so Claude Code agents that edit files
   run in the operating-system sandbox (`sudo apt-get install bubblewrap
   socat` on Debian and Ubuntu). macOS has its sandbox built in.
+- **A current browser** for the web interface: Chrome or Edge 111,
+  Firefox 113 or Safari 16.2, or later.
 
 BELL PR runs on macOS and Linux, and on Windows inside WSL2
 ([install WSL](https://learn.microsoft.com/windows/wsl/install), then
@@ -180,18 +182,26 @@ publish the change (a closed issue, a project that does not take pull
 requests from you, rules that do not accept AI-assisted contributions,
 an issue the project keeps for newcomers, someone else's pull request, or
 twice your budget), the start button asks once, and you can start and
-practise locally. For an issue labelled for newcomers, the dialog also
-explains why such issues are best written by hand.
+practise locally. For an issue labelled for newcomers, the dialog starts
+on Learn by hand, unless the project's rules ban AI-assisted
+contributions or keep such issues for people learning without AI tools;
+when you start an agent team on such an issue anyway, the start button
+explains first why these issues matter to newcomers.
 
-The same form sets the team size (Free: 2 teammates; Pro: up to 4), whether
-you approve the plan before development, and the efficiency mode. The
-agent, model and reasoning effort are shared by every project; each run
-records the ones it started with.
+The same form asks **Who writes the code?**: **The agent team writes it**
+(steps 4 and 5 below) or **You write it (Learn by hand)** ([Learn by
+hand](#learn-by-hand-write-it-yourself)). It sets the team size (Free: 2
+teammates; Pro: up to 4), whether you approve the plan before
+development, and the efficiency mode. The agent, model and reasoning
+effort are shared by every project; each run records the ones it started
+with.
 
 ## 4. Let the agent team work
 
 Start the run with **Generate the team plan** (with plan approval) or
-**Start the agent team**. Everything happens in **Agent activity**:
+**Start the agent team**. (A Learn-by-hand run starts with **Plan with the
+guide** instead: see [Learn by hand](#learn-by-hand-write-it-yourself).)
+Everything happens in **Agent activity**:
 
 - The **Lead** splits the work into tasks, each with the files it may
   change and what it depends on. Before it plans, it checks any
@@ -247,11 +257,18 @@ When the team is done, the run waits for your review in **Code changes**:
   way to see it and a question to check yourself. A function the change adds whole has no
   earlier version to walk through, so it points to the explanation
   instead. Walkthroughs are written one file at a time, the selected file
-  first, and are kept for that version of the diff. The walkthrough's
-  question is a hint: click it to see its answer. Unlike the
-  explanation's "Quiz yourself", it does not ask for your answer first,
-  nothing is recorded, and it does not count toward the understanding
-  check.
+  first, and are kept for that version of the diff. With try-first
+  prompts on (the default), each function's **Check yourself** question
+  asks for your answer and how sure you are before its answer shows, then
+  for your grade, as the explanation's question does (below); showing the
+  answer with an empty field skips it. BELL PR keeps up to 12 of these
+  answers per file version; past that, the card still asks first but
+  doesn't save the answer. In an agent run, a graded walkthrough answer
+  can count as the file's understanding-check question ("Answered during
+  review") when you have not graded the explanation's own question; in a
+  Learn-by-hand run it counts toward nothing. With the prompts off, the
+  question and its answer sit behind a plain reveal and nothing is
+  recorded. After publishing, saved answers are read-only.
 - **Unchanged code**: the bar between two changes says how many unchanged
   lines it hides; show 20 more above or below, or all of them, and
   **Whole file** shows the whole file between the changes. The lines are
@@ -272,7 +289,9 @@ way you can guess how else the change could be done before the
 alternative shows, then choose **Keep this approach**, **Prefer the
 other** or **It depends** for this project, with an optional why. An
 answer you gave before the reveal, on the current version of the file,
-counts toward the understanding check, so you are not asked it twice.
+counts toward the understanding check, so you are not asked it twice. A
+saved answer is final: it stays as you gave it before the answer showed,
+even from another tab.
 Very small files (lockfiles, generated files, whitespace-only changes and
 tiny docs edits) get no prompts. **Settings → Learning → Try-first prompts
 during review** turns the prompts off; the answers then sit behind a plain
@@ -445,9 +464,9 @@ opens a Draft PR. Nothing is ever force-pushed.
   **Surprised me**; a surprise asks for one "Lesson for next time" and goes
   to your practice deck. The outcome line states facts only, such as
   "Merged" or "No response yet".
-- **Follow-up rounds** (Pro): tick the comments you want handled and, for
-  each one, write in your own words what the maintainer is asking for (at
-  least 3 words). The agent gets your words as its task and the
+- **Follow-up rounds** (Pro, agent runs): tick the comments you want
+  handled and, for each one, write in your own words what the maintainer
+  is asking for (at least 3 words). The agent gets your words as its task and the
   maintainer's comment only as context, then changes the code. You review
   each file, explain the round back (while the understanding check is on),
   and push the round as one new commit to the same PR.
@@ -459,6 +478,303 @@ opens a Draft PR. Nothing is ever force-pushed.
   named but not shown.
 - **Can't continue?** Close the pull request yourself on GitHub, with a
   short note in your own words.
+
+A Learn-by-hand run has no AI follow-up rounds and no conflict agent: see
+[After publishing](#after-publishing) in the Learn-by-hand section.
+
+## Learn by hand: write it yourself
+
+In a Learn-by-hand run you write every line of the change yourself, in
+your own editor, and BELL PR's agents only read. The run's Lead becomes
+**the guide**: it reads the project, asks about your plan, points and
+hints without code, reviews your change when you ask, and explains
+failures of the tests BELL PR runs for you. The run keeps the same tabs
+and every check of any other run, with one more gate, **Ready for
+review**; this section walks through what is different. Learn by hand is
+Free. It works on your own projects: the sample shows the agent team
+only.
+
+### Choose it
+
+In the task dialog, **Who writes the code?** offers **The agent team
+writes it** (the default) and **You write it (Learn by hand)**. Learn by
+hand hides the team size, keeps plan approval on ("Always on in Learn by
+hand: you confirm your own plan before you write.") and names the dialog
+and its start button **Plan with the guide**. The choice holds for the
+whole run: the run carries a **Learn by hand** badge, the sidebar and the
+contributions list mark it with a hand, and its status reads **Your
+turn** until you first mark the change ready. The dialog starts on Learn
+by hand when you came from discovery's **Start learning by hand** or the
+linked issue is labelled for newcomers, but never before BELL PR has read
+the project's rules, and never on a project whose rules ban AI-assisted
+contributions or keep issues for newcomers.
+
+Before you write a line, the dialog says what the project's rules mean
+for publishing a learn-by-hand run, and when you start, **Before you
+start** says it once more:
+
+- When no AI rule of the project applies, there is nothing to say:
+  publishing runs the usual checks.
+- When the project's rules restrict AI help itself, BELL PR can't tell
+  what a rule covers, or the linked issue is kept for people learning
+  without AI tools, the dialog says "BELL PR won't publish a learn-by-hand
+  run here: …" and "The guide still gives every kind of help.", and
+  **Before you start** offers **Practise by hand locally**.
+- When the project declines AI-generated content and its own text says
+  which uses of AI are fine, you choose between **Fit the guide to the
+  project's rules** (preselected) and **Every kind of help, practise
+  locally**. A fitted run's guide offers only the kinds of help that text
+  names, for the whole run, and publishing asks you to confirm the
+  project's quoted rule ([Contributing
+  responsibly](contributing-responsibly.md#when-the-projects-own-text-says-some-uses-of-ai-are-fine)
+  lists every condition); **Before you start** says so and offers
+  **Start anyway**. A run with every kind of help won't be published
+  there, and **Before you start** offers **Practise by hand locally**. If the project's rules changed since the dialog read
+  them, starting a fitted run is refused: "BELL PR can't fit this run to
+  the project's rules any more: …". Check the rules again, or start with
+  every kind of help.
+
+### Plan with the guide
+
+Your plan lives in **Agent activity**, which in Learn by hand shows the
+run details and your plan, not an agent team. The guide reads the project
+first, read-only, and checks the request's premise, so a refuted premise
+reaches you before you write a line. Then:
+
+- **Write your own steps first.** Each **Step N** has a title and,
+  optionally, its files and "What you'll do here". Add **How will you test
+  it?**, **What are you unsure about?** and one prediction before you read
+  the code: which function would you change, and why? "No idea yet" is a
+  fine answer.
+- **Read these first, in your editor**: the code ranges the guide points
+  to, as `path:line` you can copy.
+- **The guide's steps** stay folded until you save a step of your own.
+  **I don't know where to start** shows its step names earlier, and the
+  record notes that you asked. After your first draft, **Show the guide's
+  step names** reveals them, and **Compare with the guide's steps**
+  ("Where your plan and the guide's differ") puts both plans side by side.
+  The guide's outline is never run: no agent works from it.
+- **Questions on my plan** (up to 3 per run, while you plan): the guide
+  reads your plan, not its own, and asks about missing steps, risky
+  assumptions, the scope and missing tests. It is told never to give you
+  its own plan.
+- **This is my plan** confirms it (it needs at least one step you wrote)
+  and takes you to **Code changes**. Your answers are then read-only, but
+  you can still edit your steps while you write, until you mark the change
+  ready for review.
+
+Until you confirm your plan, **Code changes** says that the guide is
+reading the code, then that you write your own plan in **Agent activity**
+first. In a fitted run whose project text doesn't name planning help, the
+guide's step names and **Questions on my plan** stay closed (you still see
+its summary and the ranges to read first); your own plan works as usual.
+"Send back with feedback" is not offered: the plan is yours. A retry
+before you confirm the plan takes the run back to planning with the
+guide.
+
+### Your turn
+
+Before your first change, **Code changes** shows **Your turn** with the
+run's folder and a copy button: "Open this folder in your editor, make
+your first step's change, save, and come back." BELL PR reads the diff again when you come back to
+the window (2 seconds after it gets the focus, one read at a time) and
+when a test run ends; **Refresh the diff** works too. You don't need to
+commit: when you publish, BELL PR makes one commit of the files you
+reviewed.
+
+Beside the diff, **The guide** panel shows your steps with **Done** and
+**Park**, and, while the run's history is clean, "BELL PR's agents can't
+edit files in this run." A banner says when BELL PR won't publish this run
+here ("Practise freely."), or that the run is fitted to the project's
+rules and which kinds of help the guide offers.
+
+- **Ask the guide** about **Setup and tools**, **This project** or **A
+  concept**, or about **My change**, which goes to the next hint of the
+  step. Select lines in the diff and choose **Ask the guide about these
+  lines** to ask about them. An optional fold takes "What I tried · what I
+  expected · what happened".
+- **Hints**, one rung at a time per step: **Where to look**, **What
+  applies**, **Options** (two or three ways forward with their
+  trade-offs, never ranked; you choose one and say why) and **An example
+  in this project**. There is no rung with code. After the first hint on a
+  step, the next one waits for an attempt: a new edit, a test run BELL PR
+  ran, or at least five words on what you tried that differ from last
+  time. Otherwise: "Try something first: change the code, run the tests,
+  or say what you tried." After **Options** or an example, **Done** on
+  that step asks "Why does your change for this step work?"
+- **Answers**, newest first: each points to `path:line` and shows code
+  only as quotes labelled **From the repository** or **From your change**,
+  which BELL PR cuts from the files itself; a pointer to a file that isn't
+  in the run's checkout is dropped. When BELL PR removed code from an
+  answer, it says "BELL PR removed code from this answer." The panel
+  reminds you: "The guide can be wrong. Check its pointers against the
+  code and your tests." When a turn fails, it says "The guide couldn't
+  answer: …" and gives your question back.
+- **I'm stuck** opens the exits, in this order: **Ask a human** (the
+  issue and the project's own places to talk, with a note you fill in
+  yourself), **Make this step smaller**, **Talk it through** (what you are
+  trying, what you expect and what you see, with a short checklist; no AI
+  call), **Park this step**, and **Hand this task to the agent team**,
+  which starts a new agent run from the task dialog; your edits stay in
+  this run's folder.
+
+One guide turn runs at a time per run, and none while your tests run. In
+a fitted run, help the project's text doesn't name isn't offered: "Not
+offered in this run: the project's text it is fitted to doesn't name …".
+
+### Your tests
+
+BELL PR runs your project's tests only with a command you confirmed, and
+only when you click. The **Tests** card suggests a command from the
+project's files (`npm test`, `pnpm test` or `yarn test` from
+`package.json`; `python -m pytest`, or `python3 -m pytest` when only
+`python3` is installed; `cargo test`; `go test ./...`; `make test`), which
+you edit and confirm with **Use this command**. It stays confirmed for
+the project; every change is a new confirmation. Pick a prediction
+(**Pass**, **Fail** or **Not sure**), optionally name the test you expect
+to fail, and choose **Run the tests**. **Output so far**
+follows the run, **Stop** ends it, and the result reads, for example, "You
+predicted Fail; it failed." Files your tests created are named, because
+they change the diff.
+
+- **Explain this failure** asks the guide where to look in the output and
+  the code.
+- **Record my result** records a run in your own terminal, marked
+  "reported by you".
+- When the same failure comes three runs in a row, the panel suggests
+  stepping back to the exits, once per step and failing run.
+
+[Security model](security-model.md#bell-pr-runs-your-test-command)
+describes how the command runs and what it can reach.
+
+### Ready for review
+
+While you write, the guide doesn't review your change, and BELL PR writes
+no explanation or walkthrough of it. When the change is ready, choose
+**Ready for review** in the footer ("Write a change first" while the diff
+is empty). The dialog shows the files and lines you
+changed and your last test run at this version, or "Not run since your
+last edit. It isn't required; the tests are the judge.", and asks what
+you are least sure about. **Ask the guide to review it** (on by default)
+has the guide read your change and your last test run and point out up to
+three problems, each with its evidence, as a question when it has none,
+while a test analyst names in words what your tests might not catch.
+Neither writes the fix. "The review takes about 2 agent turns." When the
+project's rules say something about AI, the dialog reminds you to check
+them before you ask for an AI review. A second review needs a test run,
+or a result you recorded, at this version since the last review: "Run
+your tests on this version first; the tests are the judge." In a fitted
+run whose project text doesn't name AI review, the dialog has no review
+box and says why, and **Run the review again** isn't shown; without
+planning help, the Draft tab doesn't offer **Ask how to split it**.
+**Mark it ready** records the version you declared ready; the footer
+reads "The guide is reviewing" while the guide reviews it.
+
+The review appears in **Reviews**, under the name "The guide". If you
+change the code afterwards, a notice says so, and the review and the check
+wait until you mark it ready again; approval needs the version you marked
+ready. **Run the review again** opens the same dialog. While the reviewed
+version is the ready one, the **Ask** tab takes your questions about a
+file or the review; after a new edit, the guide panel's **Ask the guide
+about the review** does.
+
+### Explain it back
+
+The understanding check works as in every run (step 6 above), with the
+guide hidden, and opens once the change is ready. Its file questions are
+fixed: "You wrote the change to <path>. Why this way rather than
+another, and what would break if it were wrong?" You compare your answers
+with **Your own words** (your plan's steps and the reasons you gave) and
+**The guide's review**, shown apart.
+
+### How a reader sees your change
+
+After Ready, a file's explanation and walkthrough are written only when
+you ask, with **Show how a reader sees it**: that file only, in up to two
+agent turns, and only once your Explain-it-back answer for that file is
+saved (for a file without its own question, once every answer is saved;
+with the check off, straight away). BELL PR filters them like every guide
+answer. Read them as a reader of your pull request would, and compare
+them with what you meant. When BELL PR can't read your check, the panel
+says why and offers **Try again**.
+
+### Your words in the pull request
+
+In Learn by hand, BELL PR doesn't draft the pull request: the title starts
+empty, and the Draft tab says "Write the pull request's title and
+description in your own words: in Learn by hand, BELL PR doesn't draft
+them, and approval needs both." It offers no AI draft, no AI-assistance
+line and no suggested commit message, and when a saved description holds
+BELL PR's own AI-assistance line word for word (from an older version,
+for example), BELL PR removes it; a line you reworded stays. Approval
+waits for both the title and the description: the footer reads "Write the
+PR title and description first" and leads to the PR draft tab. Instead:
+
+- **Start from the project's template** puts the project's pull request
+  template in at your cursor, or into an empty description, verbatim; it
+  never replaces your text. A template that is a symbolic link isn't
+  offered.
+- **Use my explanation** works as in every run.
+- **Facts for an AI note** lists the CLI and model the guide ran on, the
+  kinds of help you used, the claim when the run's history is clean, what
+  BELL PR can't see and the project's disclosure rule when it has one.
+  BELL PR never puts them into the description. With **Always add an
+  AI-assistance note to my pull requests** on (**Settings → Agent
+  safety**), the tab says "Write your AI note in your own words."
+
+### The record
+
+The publish dialog shows **Learn by hand record**: the kinds of help you
+used and how often, BELL PR's runs of your tests and how often your first
+prediction after each change was right, how many answers BELL PR removed
+code from, and, for a fitted run, the kinds of help it was fitted to.
+When the run's history is clean, it says: "BELL PR's agents had no write
+access and gave you no code for this change. The guide showed only quotes
+of the project's code and of your own edits." Otherwise it says why BELL
+PR makes no Learn-by-hand claim for the run. It always says "BELL PR
+can't see other tools you used, such as editor autocomplete or another
+chat." and "This record is for you. It isn't proof of who wrote the
+code." When the quoted confirm applies, it stands right after the record,
+and the confirm counts only for the words you saw: if they change, the
+tick is cleared. A line in your text saying that no AI helped, in a run
+the guide helped with, is quoted beside your help record under **Your
+words and reviewability**, for you to confirm or reword. When BELL PR
+can't read its checks for the run, the dialog says so and offers **Try
+again**, and **Submit Draft PR** stays off. The learning page shows the
+run with a **Learn by hand** badge and the same counts, never the claim;
+the complete learning record export (Pro) has a Learn-by-hand section.
+
+### After publishing
+
+Reading maintainer feedback works as in every run. When a fitted run was
+published through the quoted confirm, the Draft tab's rules row says "You
+confirmed the project's quoted rule when you published. The maintainers
+decide whether your change fits."
+
+AI follow-up rounds aren't offered: push follow-up commits from the run's
+folder with your own Git; BELL PR takes them over at the next feedback
+read. Taking over means BELL PR records them as the pull request's
+commits; it doesn't check or review them. It does so only when the run's
+folder has no uncommitted changes, is on the run's own branch, and its
+latest commit is the head of the pull request's branch on GitHub.
+Otherwise nothing in the folder moves and the feedback is still read;
+when GitHub can't be reached, the run log says so, and in the other cases
+it says what to do first:
+
+- "Push your commits first; BELL PR takes them over once they are on the
+  pull request's branch."
+- "Commit or discard your changes in the run's folder first."
+- "The run's folder isn't on its branch …. Switch back to it first; BELL
+  PR takes over commits only from that branch."
+- "The pull request's branch has commits the run's folder doesn't have
+  yet. Pull them into the run's folder first; …"
+
+A sync of the pull request onto the latest target branch refuses with the
+same words. When the pull request's history was rewritten, BELL PR refuses
+as it does for every run. Conflicts are yours to resolve: there is no
+conflict agent. "Resolve the markers by hand; BELL PR re-checks them when
+you refresh the diff on the Code changes tab." Approval waits until every
+marker is gone, and changed files need another review.
 
 ## Keep learning
 
@@ -488,7 +804,12 @@ opens a Draft PR. Nothing is ever force-pushed.
 - **Explore contributions** (Pro) searches GitHub for projects and issues
   that match what you want to work on. For the agent team it looks for
   help-wanted issues; an issue labelled for newcomers is marked "Learn by
-  hand: write this one yourself".
+  hand: write this one yourself", with **Open the issue** and **Start
+  learning by hand**. Where the project keeps such issues for people
+  learning without AI tools, the card says so and offers no start; where
+  it closes AI-generated pull requests for them, the card says that BELL
+  PR can publish a learn-by-hand run only through the project's own text,
+  and the task dialog shows whether it can.
 
 ## Shortcuts
 

@@ -22,6 +22,8 @@ Contents:
 - [I lost the sign-in link](#i-lost-the-sign-in-link)
 - [Error codes](#error-codes), one section per code
 - [Publishing was blocked by a project rule, an issue or pacing](#publishing-was-blocked-by-a-project-rule-an-issue-or-pacing)
+- [Learn by hand](#learn-by-hand): Ready for review, the guide, your
+  tests, fitted runs, the quoted confirm and follow-up commits
 - [BELL PR does not start](#bell-pr-does-not-start)
 - [Runs that wait, stop or cannot be reviewed](#runs-that-wait-stop-or-cannot-be-reviewed)
 - [Collecting details for a support request](#collecting-details-for-a-support-request)
@@ -428,7 +430,11 @@ or AI-assisted contributions, and the same sentence is about pull
 requests, patches or contributions. AI agents wrote this change, so BELL
 PR will not publish it, with no override. You can keep practising on it
 locally. A rule that mentions AI without that context is only a confirm:
-you read the quote and decide whether it applies.
+you read the quote and decide whether it applies. So is a rule against
+crediting AI as a commit's co-author, against AI-written commit messages
+or against large AI-generated pull requests. In a Learn-by-hand run the
+block says what the rule covers: see [BELL PR won't publish my
+learn-by-hand run](#bell-pr-wont-publish-my-learn-by-hand-run).
 
 ### `ai-disclosure`
 
@@ -470,7 +476,9 @@ lift.
 without AI." The linked issue carries a label for newcomers (such as
 "good first issue"), and a rule quoted from the project's files reserves
 those issues. BELL PR will not publish a change for it, with no override.
-Practise on it locally, or pick a help-wanted issue instead.
+Practise on it locally, or pick a help-wanted issue instead. In a
+Learn-by-hand run the block says what the rule covers: see [BELL PR won't
+publish my learn-by-hand run](#bell-pr-wont-publish-my-learn-by-hand-run).
 
 ### `tests-weakened`
 
@@ -501,6 +509,214 @@ requests one person may have open. BELL PR cannot read that limit
 beforehand; when GitHub refuses a pull request because of it, BELL PR
 says so in plain words. Finish or close one of your open pull requests
 there, then publish again.
+
+## Learn by hand
+
+In a Learn-by-hand run you write the change and BELL PR's agents only
+read (see [Getting started](getting-started.md#learn-by-hand-write-it-yourself)).
+None of its refusals has an error code of its own: the app shows the
+server's message where you acted.
+
+### Ready for review is greyed out
+
+The footer's **Ready for review** waits while:
+
+- the diff is empty: it reads "Write a change first". Save your edits in
+  the run's folder; BELL PR reads the diff again when you come back to the
+  window, or choose **Refresh the diff**;
+- the guide reviews your last ready version: it reads "The guide is
+  reviewing";
+- another action of the run is still running.
+
+Before you confirm your plan with **This is my plan**, the footer has no
+**Ready for review** at all. In the dialog, **Mark it ready** can still
+be refused:
+
+- "The change moved since you opened this. Look at it again, then mark it
+  ready.": you saved an edit after the dialog opened.
+- "The guide is already working on this run. Wait for it to finish, or
+  stop it.": you asked for a review while a guide turn or your tests run.
+- "Run your tests on this version first; the tests are the judge.": a
+  second review needs a test run, or a result you recorded, at this
+  version since the last review. The dialog shows the **Tests** card for
+  it; or untick **Ask the guide to review it**.
+
+### "Mark your changes ready for review first."
+
+Explanations, walkthroughs, the premise check's **Check again**, **Run
+the review again** and approval wait until you mark the change ready, so
+the guide never explains half-written code. After you edit the code
+again, they wait for the next **Ready for review**. When you save an edit
+while the premise check or a walkthrough runs, nothing is stored: mark
+the change ready again, then ask again.
+
+"Answer this file's Explain-it-back question first; then you can see how
+a reader sees your change." means that **Show how a reader sees it** waits
+for your own answer for that file in the understanding check.
+
+### The guide says "Try something first"
+
+"Try something first: change the code, run the tests, or say what you
+tried." After the first hint on a step, the next one needs an attempt
+since the last hint: an edit that changes the diff, a test run BELL PR
+ran (a result you recorded doesn't count), or at least five words in
+"What I tried · what I expected · what happened" that differ from what you
+wrote last time. Hints come one rung at a time ("Ask for the hints of this
+step in order, one rung at a time."). After **Options** or an example,
+**Done** on that step needs one sentence on why your change works. When
+the same failure came three test runs in a row, **An example in this
+project** needs no new attempt; **I'm stuck** lists the other ways out.
+
+### The guide doesn't offer a hint or a review
+
+- **A run fitted to the project's rules** gets only the kinds of help
+  that the project's text names, for the whole run, and the panel says
+  "Not offered in this run: the project's text it is fitted to doesn't
+  name …". Answers to questions and **Where to look** are answers;
+  **What applies** and the explanations and walkthroughs of **Show how a
+  reader sees it** are explanations; **Options**, **An example in this
+  project**, the guide's outline and **Questions on my plan** are
+  planning help; **Explain this failure** is help with tests; the review
+  at **Ready for review** is a review. When the next rung is not offered,
+  the guide says so and points to the exits. On such a project, a run
+  started with every kind of help gets them all, and BELL PR won't
+  publish it there.
+- **No rung left:** "There is no hint after an example in this project."
+  Try an exit: ask a human, make the step smaller or talk it through.
+- **One thing at a time:** "The guide is already working on this run.
+  Wait for it to finish, or stop it." and "Your tests are running. Ask the
+  guide when they finish." The guide gives hints and answers questions
+  while you write, not while the run plans or publishes.
+- **A failed turn:** "The guide couldn't answer: …" gives your question
+  back; "The guide's answer was not in the expected form, so nothing was
+  stored. Try again." means the model's answer could not be read.
+  **Explain this failure** needs a failed test run: "There is no failed
+  test run to explain. Run your tests first."
+
+### BELL PR can't fit this run to the project's rules any more
+
+"BELL PR can't fit this run to the project's rules any more: …. Check the
+rules again, or start with every kind of help." When you start a run with
+**Fit the guide to the project's rules**, BELL PR reads the case again
+from the project's stored rules; when they changed after the task dialog
+read them (for example after **Check again** or **Update to the latest
+version**), the fit no longer holds. Open the task dialog again and
+choose again, or choose **Every kind of help, practise locally**, which
+BELL PR won't publish on that project. When the reason is "the project's
+rules have no AI rule to fit the guide to", start a Learn-by-hand run
+without the fit: nothing needs it.
+
+### BELL PR won't publish my learn-by-hand run
+
+A Learn-by-hand run gets the same checks as every run. When its history
+is clean, its `ai-ban` and `area-reserved` blocks say what the project's
+rule covers:
+
+- "The project's rules restrict AI help itself, so BELL PR won't publish a
+  run its guide helped with." The rule is about AI help itself, not only
+  AI-written code, and Learn by hand doesn't change that. Keep practising
+  locally, or ask the project's people how newcomers can work on it.
+- "The project keeps this issue for people learning without AI tools, so
+  BELL PR won't publish a run its guide helped with." Pick a help-wanted
+  issue for Learn by hand, or ask the project's people.
+- "The project's rules decline AI-generated content. BELL PR's agents had
+  no write access and gave you no code for this change. BELL PR publishes
+  here only through the project's own text, and …" or "The project closes
+  AI-generated pull requests for issues like this one. BELL PR publishes
+  them only through the project's own text, and …": the rule could allow
+  the quoted confirm, and the words after "and" name the condition that
+  failed.
+
+| The block ends with | What to do |
+| --- | --- |
+| its rule restricts AI help itself, or BELL PR can't tell what it covers | Nothing in BELL PR lifts it. Ask the project's people. |
+| its text doesn't say which uses of AI are fine | The project names no use of AI as fine, so BELL PR won't publish a learn-by-hand run there. |
+| its text doesn't name … | This run used a kind of help that the project's text doesn't name. A new run fitted to the project's rules when it starts offers only the kinds the text names. |
+| its text doesn't name explanations and answers | The guide can't work without them, so BELL PR won't publish a learn-by-hand run there. |
+| BELL PR's checked list entry is more than 90 days old (…) | The rule comes from BELL PR's checked list, and its quotes were last checked more than 90 days ago: it still blocks, but it can't lead to the confirm. |
+| its rules weren't read since this run started (check them again) | Choose **Check again** on the project's **Before you contribute** card (for a fitted run, the publish dialog offers it on the block too), then open the publish dialog again. |
+| this run wasn't fitted to its rules when it started | A run started with every kind of help can't be fitted later. Start a new run and choose **Fit the guide to the project's rules**. |
+| its rules changed since this run started | The quotes this run was fitted to are no longer in the project's rules. Check the rules again; if they changed for good, start a new fitted run. |
+| another of its AI rules applies | This rule could lead to the confirm, but another AI rule of the project blocks; its own block says why. |
+
+A run whose history isn't clean (BELL PR saw an agent write to its files,
+or a teammate, a team task, an AI follow-up round or an agent conflict
+resolution joined it) gets the agent run's checks and words. See
+[Contributing
+responsibly](contributing-responsibly.md#when-the-projects-own-text-says-some-uses-of-ai-are-fine)
+for every condition of the quoted confirm.
+
+### Publishing asks me to confirm the project's rule
+
+This is the quoted confirm of a Learn-by-hand run fitted to the project's
+rules: "The project declines AI-generated contributions, and its own text
+says some uses of AI are fine. BELL PR is quoting the project, not
+deciding for it: the maintainers decide whether your change fits." (for a
+reserved issue: "The project closes AI-generated pull requests for issues
+like this one, …"). It stands right after the run's record and quotes the
+rule, the project's text on which uses are fine ("The same rules say:
+…"), up to two other AI rules of the same document ("They also say:
+…") and the help you used.
+
+It is not an override and asks for no reason: it says that you read the
+project's words beside your help record. If you're not sure your change
+fits, ask the project's people before you publish. Publishing without the
+tick is refused with the confirm's words. The tick counts only for the
+words you saw: when BELL PR reads different words (the rules changed, or
+another tab read them again), the tick is cleared and you read and tick
+again.
+
+### My tests pass in my terminal but fail in BELL PR
+
+BELL PR runs your confirmed command differently from your terminal:
+
+- variables whose names look like secrets, and those of BELL PR, GitHub
+  and the AI CLIs, are removed (the full rule is in the [security
+  model](security-model.md#bell-pr-runs-your-test-command)), and so is
+  what npm added when npm started BELL PR;
+- `CI=1` and `NO_COLOR=1` are set, and some test runners behave
+  differently in CI;
+- there is no standard input and no terminal (TTY);
+- the command runs in the run's folder, not in your own clone, with a
+  10-minute limit, and processes it leaves in the background end when it
+  ends.
+
+When your tests need what BELL PR leaves out, run them in your own
+terminal and choose **Record my result**: the result is marked "reported
+by you" and counts as a test of that version for a second review, though
+not as an attempt for the next hint. "did not finish" means that the
+tests wrote more than 50 MB of output or the command could not start; the
+run log in **Agent activity** says which. "Confirm a test command for this
+project first." means that no command is confirmed: choose **Use this
+command** on the **Tests** card.
+
+### BELL PR doesn't take over my follow-up commits
+
+In a published Learn-by-hand run you push follow-up commits from the
+run's folder with your own Git, and BELL PR takes them over at the next
+feedback read. It does so only when the run's folder has no uncommitted
+changes, is on the run's own branch, and its latest commit is the head of
+the pull request's branch on GitHub. Otherwise nothing moves, the
+feedback is still read, and the run log says what to do first:
+
+- "Push your commits first; BELL PR takes them over once they are on the
+  pull request's branch." Push them (also when the branch is gone on
+  GitHub, this is the message).
+- "Commit or discard your changes in the run's folder first."
+- "The run's folder isn't on its branch …. Switch back to it first; BELL
+  PR takes over commits only from that branch."
+- "The pull request's branch has commits the run's folder doesn't have
+  yet. Pull them into the run's folder first; …"
+
+A sync of the pull request refuses with the same words. When the pull
+request's history was rewritten (a force push), BELL PR refuses as it
+does for every run. Taking commits over records them as the pull
+request's; BELL PR doesn't check or review them.
+
+When you discard a round of such a run, BELL PR never drops your commits
+or deletes your files: "You committed in the run's folder after this
+round started, …" or "These files in the run's folder aren't this
+round's: …" asks you to move them first.
 
 ## BELL PR does not start
 

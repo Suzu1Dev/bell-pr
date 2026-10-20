@@ -36,6 +36,48 @@ months of updates from the date your key is issued, by default.
 runs on Free; the build you have keeps working with Pro. See
 [Licensing](licensing.md#the-update-period).
 
+## After you update to 1.2: check each project's rules again
+
+1.2 reads more from a project's rules: the kinds of help that the
+project's own text says are fine (a Learn-by-hand run can be fitted to
+them), the places where the project's people talk, and the rules in BELL
+PR's checked list of rules that projects publish outside their
+repositories (only entries BELL PR's publisher has signed off). It also
+reads some rules more precisely: for example, a rule against crediting AI
+as a co-author or against large AI-generated pull requests is now a rule
+to weigh rather than a ban, more ways of saying that a project refuses
+AI help in contributions are found as bans, rules written with typographic
+apostrophes and hyphens or with invisible characters are found, and
+quotes leave the invisible characters out.
+
+All of this reaches a project only when BELL PR reads its rules: at
+import, with **Update to the latest version**, or with **Check again** on
+the **Before you contribute** card. For a project you imported before
+1.2, choose **Check again** after the update. Until then BELL PR uses the
+rules it read before (what each stored rule covers is worked out again
+from its quote, at once), finds no carve-out in them, and so can't fit a
+Learn-by-hand run to the project's text.
+
+## Learn-by-hand runs and older versions
+
+Learn by hand is new in 1.2: open Learn-by-hand runs only with 1.2 or
+later. An older version still opens the data directory and the run, as
+every older version does, but it doesn't know Learn by hand:
+
+- It can't approve the run's plan. The guide's outline is kept outside
+  the agent team's task list, so an older version finds no plan to
+  approve and never starts teammates from it.
+- It ignores the help a fitted run was limited to and never shows the
+  quoted confirm: its checks block publishing wherever the project's
+  rules decline AI-assisted contributions.
+- It could offer what 1.2 refuses in a Learn-by-hand run: AI follow-up
+  rounds, the conflict agent, sending the plan back for a team plan, or an
+  AI-drafted pull request description.
+- When an agent changes the run's files there, or a teammate, a team
+  task, an AI follow-up round or an agent conflict resolution joins the
+  run, 1.2's record of that run withdraws the Learn-by-hand claim for
+  good and says why.
+
 ## Back up the data directory
 
 Stop BELL PR, then copy the whole data directory, for example:
