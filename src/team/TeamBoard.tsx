@@ -80,7 +80,7 @@ export function TeamBoard({
    */
   entitlements?: Entitlements;
   /** A Learn-by-hand run's plan requests: the person plans with the guide (useByHand). */
-  byHand?: Omit<PlanWithGuideProps, "run">;
+  byHand?: Omit<PlanWithGuideProps, "run"> & { writing?: boolean };
 }) {
   const t = useT("team");
   const byHandText = useT("discovery").byHand;
@@ -123,7 +123,8 @@ export function TeamBoard({
       </div>
     );
   const finished = ["complete", "failed", "cancelled"].includes(team.phase);
-  const byHandPlan = run.learnByHand && byHand && ["awaiting_approval", "developing"].includes(team.phase);
+  // The plan stays open to split a step whenever the person writes, also after a Ready (then the phase is complete).
+  const byHandPlan = run.learnByHand && byHand && (["awaiting_approval", "developing"].includes(team.phase) || byHand.writing);
   const canReceive = (task: TeamTask) =>
     ["pending", "ready", "running"].includes(task.status) &&
     task.acceptsMessages !== false;

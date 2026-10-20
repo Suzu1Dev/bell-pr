@@ -131,6 +131,8 @@ export function useByHand(
     ask: (file: DiffFile, question: string) => setSelection(selectionOf(file, question)),
     plan: {
       ...view("plan"),
+      /** The person writes, so the plan's steps can still change (also after a Ready, once edited). */
+      writing: open && !ready,
       onSave: call("plan", "PUT"),
       onReveal: (mode: "names" | "compare") => call("plan/reveal")({ mode }),
       onAskQuestions: call("plan/questions"),

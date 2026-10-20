@@ -770,4 +770,11 @@ test("a learn-by-hand run plans with the guide instead of approving a team plan,
   const confirmed = byHand("failed", "failed", { byHand: { plan: { steps: [{ id: "s1", title: "Cap" }], savedAt: sample.run.createdAt, confirmedAt: sample.run.createdAt } } });
   assert.doesNotMatch(renderEn(element(confirmed)), /A retry takes this run back|Retry failed subtasks/);
   assert.match(renderZh(element(byHand("failed", "failed"))), /重試會讓這個任務回到和嚮導一起規劃的階段/);
+  // Edited after a Ready (the phase is complete): the plan opens again to split a step.
+  const panel = /<div class="team-plan[^"]*">[\s\S]*?lucide-loader-circle[^>]*spin/;
+  const plan = { onSave: async () => {}, onReveal: async () => {}, onAskQuestions: async () => {}, onConfirm: async () => {} };
+  const after = (writing: boolean) =>
+    renderEn(createElement(TeamBoard, { run: byHand("review", "complete"), demo: false, onApprove() {}, async onRevise() {}, async onMessage() {}, busy: false, entitlements: freeEntitlements, byHand: { ...plan, writing } }));
+  assert.match(after(true), panel);
+  assert.doesNotMatch(after(false), panel);
 });
