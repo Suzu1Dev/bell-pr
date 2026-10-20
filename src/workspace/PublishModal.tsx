@@ -564,14 +564,15 @@ export function PublishChecks({
   const rulesCard = useT("mission").rules;
   const confirms = (checks ?? []).filter((check) => check.kind === "confirm");
   const recordFirst = !checks?.some((check) => check.id === "by-hand-rules");
-  // A read that removes the focused button (Try again, Check again) leaves the focus in the dialog, on the heading.
+  // In a Learn-by-hand run's dialog (the one with a record), a read that removes the focused
+  // button (Try again, Check again) leaves the focus in the dialog, on the heading.
   const title = useRef<HTMLHeadingElement>(null);
   const shown = useRef<string>(undefined);
   const now = `${checks?.map((check) => check.id + check.kind).join() ?? "-"}${checkRules?.offer ? "+" : ""}`;
   useEffect(() => {
-    if (shown.current !== undefined && shown.current !== now && document.activeElement === document.body) title.current?.focus();
+    if (record && shown.current !== undefined && shown.current !== now && document.activeElement === document.body) title.current?.focus();
     shown.current = now;
-  }, [now]);
+  }, [now, record]);
   return (
     <section className="publish-checks" aria-labelledby="publish-checks-title">
       <h3 id="publish-checks-title" ref={title} tabIndex={-1}>{t.checksTitle}</h3>

@@ -333,3 +333,33 @@ test("Check again reads the rules again from the dialog, says when it couldn't, 
     await project.stop();
   }
 });
+
+test("an agent run's dialog leaves the focus where it is when the server's checks change", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const project = await startRealProject({ reviewed: true, appSettings: { skipUnderstandingCheck: true }, run: { status: "approved", approvedFingerprint: "e2e-approved" } });
+  const { context, page } = await open(browser, project);
+  try {
+    // After a refused publish the dialog reads the checks again, and they bring a confirm when `release` says so.
+    const confirm: DraftCheck = { id: "project-rules", kind: "confirm", message: "Rules to weigh.", details: ["Why."] };
+    let changed = false;
+    let release = () => {};
+    const later = new Promise<void>((resolve) => (release = resolve));
+    await page.route(`**/api/runs/${runId}/preflight`, async (route) => {
+      if (changed) await later;
+      await route.fulfill({ json: { checks: changed ? [confirm] : [] } });
+    });
+    await page.route(`**/api/runs/${runId}/publish`, (route) => route.fulfill({ status: 409, json: { error: "Not now." } }));
+    await page.goto(`/#/runs/${runId}/draft?locale=en`);
+    const dialog = await publishDialog(page);
+    changed = true;
+    await dialog.getByRole("button", { name: workspace.publish.submit }).click();
+    await expect(dialog.getByRole("alert").filter({ hasText: "Not now." })).toBeVisible();
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    release();
+    await expect(dialog.getByRole("checkbox", { name: confirm.message })).toBeVisible();
+    expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+  } finally {
+    await context.close();
+    await project.stop();
+  }
+});
