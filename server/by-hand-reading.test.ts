@@ -271,6 +271,26 @@ test("after Ready a walkthrough of the person's code waits for the file's answer
   assert.deepEqual(f.run.byHand?.events?.map((event) => [event.kind, event.source]), [["explain", "walkthrough"]]);
 });
 
+test("a walkthrough is made only of the version that passed the reader check, never of one edited since", async (t) => {
+  skipUnderstandingCheckInTests(true);
+  const f = await fixture(t);
+  await f.markReady();
+  const diff = f.ctx.diff;
+  t.after(() => {
+    f.ctx.diff = diff;
+  });
+  let reads = 0;
+  f.ctx.diff = async (id) => {
+    // The person saves an edit right after the check read the change.
+    if (++reads === 2)
+      await writeFile(path.join(f.run.worktreePath, "src", "retry.ts"), changedSource.replace("attempts = 3", "attempts = 4"));
+    return diff(id);
+  };
+  await assert.rejects(en(() => f.workbench.walkthrough(f.run.id, "src/retry.ts")), notReady);
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.run.walkthroughs?.["src/retry.ts"]?.status ?? "pending", "pending");
+});
+
 test("after Ready the premise check filters its evidence and records explain help", async (t) => {
   const f = await fixture(t, {
     premise: JSON.stringify({

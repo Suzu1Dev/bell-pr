@@ -73,10 +73,12 @@ export async function walkthrough(
   const existing = ctx.walkthroughJobs.get(key);
   if (existing) await existing;
   else {
-    const file = (await ctx.lock(id, () => ctx.diff(id))).find(
-      (entry) => entry.path === filePath,
-    );
+    const files = await ctx.lock(id, () => ctx.diff(id));
+    const file = files.find((entry) => entry.path === filePath);
     if (!file) throw new AppError((m) => m.run.review.fileNotFound, 404);
+    // Learn by hand: the version walked through is the one checked, never one edited since (F5, F10).
+    if (run.learnByHand)
+      assertReaderView(run, files, filePath, ctx.store.data.repos.find((repo) => repo.id === run.repoId));
     // With no job for this file, "generating" was left by a job that
     // stopped without a result: it is made again, like a pending one.
     const wanted =
