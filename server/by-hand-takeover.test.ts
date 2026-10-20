@@ -488,7 +488,7 @@ test("adoptRemoteCommits without expectedHead takes over as before; with it, onl
   await assert.rejects(en(() => adoptRemoteCommits(ctx, f.run, { expectedHead: elsewhere })), refused(remoteMoved));
   assert.equal(f.run.publishCommit, pushedByBell);
   assert.equal(await f.head(), pushedByBell);
-  assert.equal(f.run.followUps, undefined);
+  assert.ok(!f.run.followUps?.length);
   assert.equal(await en(() => adoptRemoteCommits(ctx, f.run)), true);
   assert.equal(f.run.publishCommit, forced);
   assert.equal(await f.head(), forced);
