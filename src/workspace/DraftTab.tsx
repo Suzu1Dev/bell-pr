@@ -297,13 +297,13 @@ export function DraftTab({
             </div>
           )}
           {!demo &&
-            !followUp && !run.learnByHand &&
+            !followUp &&
             run.status !== "published" &&
-            !draftBody.trim() &&
+            (!draftBody.trim() || (run.learnByHand && !draftTitle.trim())) &&
             !preparingDraft && (
               <div className="draft-origin-notice" role="status">
                 <AlertCircle size={16} />
-                <p>{t.draft.emptyNotice}</p>
+                <p>{run.learnByHand ? t.draft.emptyNoticeByHand : t.draft.emptyNotice}</p>
               </div>
             )}
           {!followUp && (

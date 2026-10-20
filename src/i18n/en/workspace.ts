@@ -286,6 +286,8 @@ const workspace = {
     proposalNotice: `The description below is the suggestion ${product.name} wrote from the project's rules, and you have not edited it yet. It goes to GitHub exactly as it is: confirm it in your own words before submitting, and keep to-dos in the checklist of the guide below, not in the description.`,
     emptyNotice:
       "There is no PR description yet. Generate and apply a suggested draft below, or write in your own words what changed, why, and which checks you actually ran. The agents' full reports are in the explanation panel next to the code.",
+    /** A Learn-by-hand run, while its PR title or description is empty: it starts with neither (DESIGN v1.2 F11). */
+    emptyNoticeByHand: `Write the pull request's title and description in your own words: in Learn by hand, ${product.name} doesn't draft them, and approval needs both.`,
     titleLabel: "Pull request title",
     /** The group of the Edit and Preview buttons. */
     modeLabel: "Description view",

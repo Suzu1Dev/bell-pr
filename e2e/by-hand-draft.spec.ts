@@ -11,7 +11,11 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import type { DraftCheck } from "../shared/draft-checks";
+import { changeFingerprint } from "../shared/change-fingerprint";
 import { aiDisclosureLine } from "../shared/drafts";
+import byHand from "../server/i18n/en/by-hand";
+import byHandFlow from "../server/i18n/en/by-hand-flow";
+import serverRun from "../server/i18n/en/run";
 import record from "../src/byhand/record/i18n/en";
 import common from "../src/i18n/en/common";
 import draft from "../src/i18n/en/draft";
@@ -434,6 +438,69 @@ test("a refused or failed publish of a Learn-by-hand run says why and keeps the 
       await page.keyboard.press("Tab");
       expect(await page.evaluate(() => !!document.activeElement?.closest("[role=dialog]"))).toBe(true);
     }
+  } finally {
+    await context.close();
+    await project.stop();
+  }
+});
+
+test("against the real server: no AI draft or AI line, a PR title of the person's own, and approval only after Ready", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const project = await startRealProject({
+    reviewed: true,
+    appSettings: { alwaysDiscloseAi: true, skipUnderstandingCheck: true },
+    // As the server starts a Learn-by-hand run: no PR title from the task (DESIGN v1.2 F11).
+    run: { learnByHand: true, agents: [agent("lead", "Guide")], draft: { title: "", body: "" }, byHand: { events: [] } },
+  });
+  const context = await browser.newContext({
+    baseURL: project.baseURL,
+    storageState: project.storageState,
+    viewport: { width: 1440, height: 900 },
+    locale: "en-US",
+    timezoneId: "UTC",
+  });
+  const page = await context.newPage();
+  try {
+    // The server drafts nothing for a Learn-by-hand run, and nothing on the page offers it.
+    const prepare = await page.request.post(`/api/runs/${runId}/draft/prepare`, { data: {} });
+    expect(prepare.status()).toBe(409);
+    expect(((await prepare.json()) as { error: string }).error).toBe(byHandFlow.draftRefused);
+    await page.goto(`/#/runs/${runId}/draft?locale=en`);
+    await expect(page.locator(".draft-guidance-panel").getByRole("heading", { name: draft.guidance.title })).toBeVisible();
+    await expect(page.getByRole("button", { name: draft.guidance.generate.first })).toHaveCount(0);
+    // The title starts empty, and the tab asks for the person's own title and description.
+    const title = page.getByRole("textbox", { name: workspace.draft.titleLabel });
+    const body = page.getByRole("textbox", { name: workspace.draft.bodyLabel });
+    await expect(title).toHaveValue("");
+    const asks = page.locator(".draft-origin-notice[role=status]", { hasText: workspace.draft.emptyNoticeByHand });
+    await expect(asks).toBeVisible();
+    // Approval is refused before the person marks the change ready.
+    const approve = page.locator(".review-footer").getByRole("button", { name: workspace.footer.approvePr });
+    await approve.click();
+    await expect(page.locator(".toast-error")).toContainText(byHand.notReady);
+    const { files } = (await (await page.request.get(`/api/runs/${runId}/diff`)).json()) as { files: { path: string; fingerprint: string }[] };
+    const ready = await page.request.post(`/api/runs/${runId}/by-hand/ready`, { data: { changeFingerprint: changeFingerprint(files), review: false } });
+    expect(ready.ok()).toBe(true);
+    // Ready, but still no title: approval asks for it.
+    await page.locator(".toast-error").getByRole("button").click();
+    await approve.click();
+    await expect(page.locator(".toast-error")).toContainText(serverRun.publish.prTextRequired);
+    // The person writes both; the notice goes, and saving never adds the AI line, though "Always add" is on.
+    await title.fill("Greet people in their own language");
+    await body.fill("## Summary\n\nGreetings come from a table of languages; I wrote and tested it myself.");
+    await expect(asks).toHaveCount(0);
+    await page.getByRole("button", { name: workspace.draft.save }).click();
+    await expect(page.locator(".toast")).toContainText(workspace.notices.draftSaved);
+    const saved = await page.request.patch(`/api/runs/${runId}/draft`, {
+      data: { title: "Greet people in their own language", body: await body.inputValue(), aiDisclosure: true },
+    });
+    const { run } = (await saved.json()) as { run: { draft: { title: string; body: string } } };
+    expect(run.draft.title).toBe("Greet people in their own language");
+    expect(run.draft.body).not.toContain(aiDisclosureLine);
+    await expect(body).not.toHaveValue(new RegExp(aiDisclosureLine.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    // Approved on the real server: the publish dialog opens with the record.
+    const dialog = await publishDialog(page);
+    await expect(dialog.getByRole("region", { name: record.title })).toBeVisible();
   } finally {
     await context.close();
     await project.stop();

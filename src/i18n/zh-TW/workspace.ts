@@ -238,6 +238,7 @@ const m: Translation<typeof en> = {
     proposalNotice: `下方說明是 ${product.name} 依專案規範產生的建議原文，你還沒有修改。這段文字會原樣送到 GitHub：送出前請用自己的話確認內容，待辦事項留在下方規範區的核對清單，不要寫進說明。`,
     emptyNotice:
       "還沒有 PR 說明。可以在下方產生並套用建議草稿，或用自己的話寫下改了什麼、為什麼，以及實際執行過哪些檢查。Agent 的完整報告在「審查者怎麼看」。",
+    emptyNoticeByHand: `請用自己的話寫下 PR 標題與說明：在親手學中，${product.name} 不會替你起草，而核准需要兩者都填好。`,
     titleLabel: "Pull Request 標題",
     modeLabel: "說明檢視方式",
     edit: "編輯",

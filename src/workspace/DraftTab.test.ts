@@ -549,3 +549,19 @@ test("a Learn-by-hand run never offers an agent's commit message, even one an ol
   assertNoHan(html);
   assert.doesNotMatch(html, /Agent-written body|Use suggestion|suggested by the project/);
 });
+
+test("a Learn-by-hand run asks for its own PR title and description while either is empty", () => {
+  const review: Run = { ...published, status: "review", prUrl: undefined, followUps: [], prFeedback: undefined, learnByHand: true };
+  const asks = /<div class="draft-origin-notice" role="status">.*Write the pull request&#x27;s title and description in your own words: in Learn by hand, BELL PR doesn&#x27;t draft them, and approval needs both\.<\/p>/;
+  // As the server starts it: no title and no description (DESIGN v1.2 F11).
+  const empty = renderEn(element({ run: { ...review, draft: { title: "", body: "" } } }, { draftTitle: "", draftBody: "" }));
+  assertNoHan(empty);
+  assert.match(empty, asks);
+  assert.doesNotMatch(empty, /suggested draft/);
+  // A description but no title yet: still asked; both written: nothing to ask.
+  assert.match(renderEn(element({ run: review }, { draftTitle: " ", draftBody: "Greets the world." })), asks);
+  assert.doesNotMatch(renderEn(element({ run: review }, { draftTitle: "Greet the world", draftBody: "Greets the world." })), /draft-origin-notice/);
+  // An agent run's title comes from its task: with a description, no notice.
+  assert.doesNotMatch(renderEn(element({ run: { ...review, learnByHand: undefined } }, { draftTitle: "", draftBody: "Greets." })), /draft-origin-notice/);
+  assert.match(renderZh(element({ run: review }, { draftTitle: "", draftBody: "" })), /請用自己的話寫下 PR 標題與說明/);
+});
