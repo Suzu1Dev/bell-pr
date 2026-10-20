@@ -18,6 +18,9 @@ import {
   isTestPath,
   whitespaceOnlyPatch,
 } from "./reviewability.js";
+import { changeFingerprint } from "./change-fingerprint.js";
+
+export { changeFingerprint };
 
 // The vocabularies below are stored as text in state.json and frozen at
 // these values: a later build may add a field, never a value.
@@ -380,31 +383,6 @@ export function needsUntestedQuestion(
       !isDocsPath(file.path) &&
       !isTestPath(file.path),
   );
-}
-
-const fnvOffset = 0xcbf29ce484222325n;
-const fnvPrime = 0x100000001b3n;
-const mask64 = 0xffffffffffffffffn;
-
-/**
- * The fingerprint of the whole change: FNV-1a 64-bit, as 16 hex digits, of
- * the sorted `path:fingerprint` lines. Synchronous so the client, the demo
- * and the server compute it alike; it identifies a version of the change
- * and is not security-relevant.
- */
-export function changeFingerprint(
-  files: readonly Pick<CheckFile, "path" | "fingerprint">[],
-) {
-  const text = files
-    .map((file) => `${file.path}:${file.fingerprint}`)
-    .sort()
-    .join("\n");
-  let hash = fnvOffset;
-  for (const byte of new TextEncoder().encode(text)) {
-    hash ^= BigInt(byte);
-    hash = (hash * fnvPrime) & mask64;
-  }
-  return hash.toString(16).padStart(16, "0");
 }
 
 /** Paragraphs (split on blank lines) of a report that mention the path or its basename. */
