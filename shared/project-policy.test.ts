@@ -490,6 +490,24 @@ test("understanding, own-words and issue-first rules need no AI term", () => {
   );
 });
 
+test("a size counts only where it is said of the AI-made thing the sentence refuses", () => {
+  // A ban of AI-generated code beside a rule about large changes stays a ban.
+  for (const text of [
+    "AI-generated code is not accepted, and large changes must be discussed first.",
+    "Large changes and AI-generated code are not accepted.",
+    "Do not submit AI-generated patches; substantial refactors need an issue.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [["ban", true]], text);
+  // Godot's size rule, and sizes said of the refused AI help itself, stay rules to weigh.
+  for (const text of [
+    "Do not use AI to generate substantial pieces of code.",
+    "Do not use AI to generate substantial pieces of code or documentation.",
+    "AI tools must not be used to write substantial parts of a pull request.",
+    "Substantial pieces of AI-generated code, such as new features, are not accepted.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [["ban", false]], text);
+});
+
 test("long sentences are quoted within 300 characters around the rule", () => {
   const filler = "This project has a long history of careful review and friendly discussion, ".repeat(5);
   const text = `${filler}and pull requests made of AI-generated code are not accepted, ${filler.toLowerCase()}`;

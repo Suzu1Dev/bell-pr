@@ -305,6 +305,18 @@ function weighedPart(part: string) {
 }
 
 /**
+ * A part that refuses AI-made code or changes with no size of its own
+ * ("AI-generated code is not accepted, and large changes must be discussed
+ * first"): the sentence's size is said of something else, so it is no
+ * size rule (`sizeQualifier`).
+ */
+function unsizedAiChange(words: string) {
+  return refusedParts(words).some(
+    (part) => part.ai && changeObject.test(part.text) && !sizeQualifier.test(part.text) && !weighedPart(part.text),
+  );
+}
+
+/**
  * A refusal the person weighs for what it refuses (DESIGN v1.2 F14): a
  * part that names AI help is such a rule (`weighedPart`), and no part
  * refuses the change itself otherwise. "AI-generated code and
@@ -702,7 +714,7 @@ export function classifyPolicy(path: string, document: string): PolicyFinding[] 
         conversation.test(words) && !changeObject.test(words);
       // "Do not use AI to generate substantial pieces of code": how much is
       // too much is the person's call.
-      const sized = sizeQualifier.test(words);
+      const sized = sizeQualifier.test(words) && !unsizedAiChange(words);
       // "Listing AI tooling as a co-author … is not allowed": how AI help
       // is credited, not whether it may help; each refused thing counts.
       const credited = weighedRefusal(words);
