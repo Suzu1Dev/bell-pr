@@ -16,6 +16,7 @@ const fields = [
   "maintenance",
 ] as const;
 const getters = [
+  "byHand",
   "maxActiveRuns",
   "effectiveMaxActiveRuns",
   "agentTimeoutScale",

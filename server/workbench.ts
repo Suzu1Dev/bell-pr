@@ -61,6 +61,7 @@ import {
   type ContributionFacade,
 } from "./contribution-facts.js";
 import { learningLoopFacade, type LearningLoopFacade } from "./learning-loop.js";
+import { byHandFacade, type ByHandFacade } from "./by-hand.js";
 import type { GuardOverride } from "../shared/contribution.js";
 import type { WorkbenchContext } from "./workbench-context.js";
 
@@ -81,6 +82,9 @@ export class Workbench {
   private reviewJobs = new Map<string, Promise<void>>();
   private followUpJobs = new Map<string, Promise<void>>();
   private conflictJobs = new Map<string, Promise<void>>();
+  /** Learn-by-hand guide turns, reviews and test runs, by `<kind>:<run id>`. */
+  private byHandJobs = new Map<string, Promise<void>>();
+  private byHandApi?: ByHandFacade;
   /** Shared by every agent CLI call, including project analysis and discovery. */
   readonly agentSlots: AgentSlots;
   /**
@@ -172,6 +176,7 @@ export class Workbench {
       reviewJobs: this.reviewJobs,
       followUpJobs: this.followUpJobs,
       conflictJobs: this.conflictJobs,
+      byHandJobs: this.byHandJobs,
       dependencies: {
         command: dependencies.command,
         agentRunner,
@@ -259,6 +264,11 @@ export class Workbench {
   /** Queued, running and paused runs together; grows with the active limit. */
   get maxQueuedRuns() {
     return Math.max(8, this.maxActiveRuns * 2);
+  }
+
+  /** Learn by hand: the person's plan, the guide and their test runs (by-hand.ts). */
+  get byHand(): ByHandFacade {
+    return (this.byHandApi ??= byHandFacade(this.context));
   }
 
   /** Reported by GET /api/status so the settings page can show the configured caps. */
@@ -421,6 +431,14 @@ export class Workbench {
     if (side) {
       this.controllers.get(id)?.abort();
       await Promise.allSettled([side]);
+      return run;
+    }
+    // Stop ends a Learn-by-hand guide turn, review or test run; the run keeps its status.
+    const byHand = ["guide", "review", "tests"].map((kind) => `${kind}:${id}`);
+    const jobs = byHand.flatMap((key) => this.byHandJobs.get(key) ?? []);
+    if (jobs.length) {
+      for (const key of byHand) this.controllers.get(key)?.abort();
+      await Promise.allSettled(jobs);
       return run;
     }
     if (!["queued", "running", "awaiting_plan"].includes(run.status))
@@ -652,7 +670,7 @@ export class Workbench {
     deactivateAppSettings(this.appSettings);
     this.runQueue.clear();
     for (const controller of this.controllers.values()) controller.abort();
-    await Promise.allSettled([...this.jobs, this.maintenance]);
+    await Promise.allSettled([...this.jobs, ...this.byHandJobs.values(), this.maintenance]);
     await this.store.save();
     // Later entries of this process go to stderr, not this data directory.
     closeLog(this.store.directory);

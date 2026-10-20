@@ -36,6 +36,12 @@ export interface WorkbenchContext {
   /** Review follow-up rounds and sync conflict resolutions, by run id; aborted through controllers[run.id]. */
   followUpJobs: Map<string, Promise<void>>;
   conflictJobs: Map<string, Promise<void>>;
+  /**
+   * Learn-by-hand jobs, keyed `guide:<id>`, `review:<id>` and `tests:<id>`,
+   * each aborted through `controllers` under the same key; cancel() and
+   * shutdown() abort and await them.
+   */
+  byHandJobs: Map<string, Promise<void>>;
   dependencies: {
     /** Agent CLI invocations only; Git and gh keep using the real command. */
     command?: typeof command;
