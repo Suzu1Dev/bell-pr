@@ -62,7 +62,7 @@ function manualChunks(id: string): string | undefined {
   if (/\/node_modules\/(react|react-dom|scheduler)\//.test(file)) return "react";
   if (file.includes("/node_modules/lucide-react/")) return "icons";
   if (
-    /\/node_modules\/(react-markdown|remark-[^/]+|micromark[^/]*|mdast-util-[^/]+|hast-util-[^/]+|unist-util-[^/]+|unified|vfile[^/]*)\//.test(
+    /\/node_modules\/(micromark[^/]*|mdast-util-[^/]+|unist-util-[^/]+)\//.test(
       file,
     )
   )

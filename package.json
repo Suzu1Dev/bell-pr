@@ -90,8 +90,6 @@
     "micromark-util-sanitize-uri": "~2.0.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1",
     "tsx": "^4.19.0",
     "typescript": "^5.8.0",
     "typescript-eslint": "~8.70.1",
