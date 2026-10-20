@@ -254,11 +254,11 @@ It appears only when all of these hold:
    text is in the same document as the rule in the project's repository,
    or, for a rule from BELL PR's checked list (below), in the same entry,
    which BELL PR's publisher signed off and whose quotes were checked
-   within the last 90 days. BELL PR reads such text narrowly: understanding or explaining the
-   code, research, and questions about the code name explanations and
-   answers; debugging names help with test failures; a private review of
-   your own code names reviews; possible solutions or solution ideas name
-   planning help. They count only where AI gives that help, and other
+   within the last 90 days. BELL PR reads such text narrowly:
+   understanding or explaining the code, research, and questions about
+   the code name explanations and answers; debugging names help with test
+   failures; a private review of your own code names reviews; possible
+   solutions or solution ideas name planning help. They count only where AI gives that help, and other
    words, such as "static analysis" or "suggest", name no kind of help.
    Text in code or code comments, quotes of other projects' rules, items
    listed as not acceptable, proposals, sentences with a condition (if,
