@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef } from "react";
 import { Play, TriangleAlert } from "lucide-react";
-import { useT } from "../i18n";
-import type { StartReason } from "./respect";
+import { useLocale, useT } from "../i18n";
+import { byHandReasonText, isByHandReason, type StartReason } from "./respect";
 
 export type { StartCheck, StartReason } from "./respect";
 
@@ -18,12 +18,16 @@ export function StartConfirm({
   reasons,
   onConfirm,
   onCancel,
+  byHand = false,
 }: {
   reasons: StartReason[];
   onConfirm(): void;
   onCancel(): void;
+  /** The person writes the change (Learn by hand). */
+  byHand?: boolean;
 }) {
   const t = useT("mission").startConfirm;
+  const [locale] = useLocale();
   const id = useId().replaceAll(":", "");
   const heading = useRef<HTMLHeadingElement>(null);
   // Moved here when it opens, so a screen reader reads why Start waits.
@@ -35,13 +39,16 @@ export function StartConfirm({
         ? t.pacing(reason)
         : reason.id === "learning"
           ? t.lesson
-          : t.practise[reason.id],
+          : isByHandReason(reason)
+            ? byHandReasonText(reason, t.byHand, locale)
+            : t.practise[reason.id],
   );
-  const practise = reasons.some((reason) => reason.id !== "learning");
+  // A Learn-by-hand run that can publish through the quoted confirm only informs.
+  const practise = reasons.some((reason) => !["learning", "by-hand-fitted"].includes(reason.id));
   return (
     <section className="start-confirm" aria-labelledby={`start-confirm-${id}`}>
       <h3 id={`start-confirm-${id}`} ref={heading} tabIndex={-1}>
-        <TriangleAlert size={16} aria-hidden="true" /> {t.title}
+        <TriangleAlert size={16} aria-hidden="true" /> {byHand ? t.titleByHand : t.title}
       </h3>
       <ul>
         {lines.map((line) => (
@@ -54,7 +61,7 @@ export function StartConfirm({
         </button>
         <button type="button" className="button primary" onClick={onConfirm}>
           <Play size={15} aria-hidden="true" />
-          {practise ? t.practiseLocally : t.startAnyway}
+          {practise ? (byHand ? t.practiseByHand : t.practiseLocally) : t.startAnyway}
         </button>
       </div>
     </section>

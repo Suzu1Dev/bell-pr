@@ -54,3 +54,29 @@ test("the reasons' key changes with the reasons, so Start asks again for new one
   assert.notEqual(startReasonsKey([{ id: "door" }]), startReasonsKey([{ id: "ban" }]));
   assert.equal(startReasonsKey([{ id: "door" }]), startReasonsKey([{ id: "door" }]));
 });
+
+test("a learn-by-hand run's case comes first, and Start says it practises by hand", () => {
+  const reasons: StartReason[] = [
+    { id: "by-hand-ban", reach: "assistance", reason: "reach" },
+    { id: "door" },
+  ];
+  const html = renderEn(createElement(StartConfirm, { reasons, byHand: true, onConfirm() {}, onCancel() {} }));
+  assertNoHan(html);
+  assert.match(html, /<\/svg> Before you start<\/h3>/);
+  assert.deepEqual(lines(html), [
+    "BELL PR won&#x27;t publish a learn-by-hand run here: the project&#x27;s rules restrict AI help itself, not only AI-written code.",
+    "You can practise this locally; BELL PR won&#x27;t publish it while this repository doesn&#x27;t take pull requests from you.",
+  ]);
+  assert.match(html, /Practise by hand locally<\/button>/);
+  // A run that can publish through the quoted confirm is told so and starts.
+  const fitted = renderEn(
+    createElement(StartConfirm, {
+      reasons: [{ id: "by-hand-fitted", kinds: ["explain", "answer"], quote: "Researching APIs is fine." }],
+      byHand: true,
+      onConfirm() {},
+      onCancel() {},
+    }),
+  );
+  assert.match(fitted, /Start anyway<\/button>/);
+  assert.match(renderZh(createElement(StartConfirm, { reasons, byHand: true, onConfirm() {}, onCancel() {} })), /親手寫，在本機練習/);
+});

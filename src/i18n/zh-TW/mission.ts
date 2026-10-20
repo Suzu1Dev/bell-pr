@@ -325,6 +325,7 @@ const m: Translation<typeof en> = {
     planApproval: {
       label: "開發前，先讓我確認計畫",
       help: "先看分工、範圍與驗收方式，確認後再進入實作。",
+      byHand: "親手學一律開啟：動手寫之前，你要先確認自己的計畫。",
     },
   },
   insights: {
@@ -463,6 +464,18 @@ const m: Translation<typeof en> = {
     practiseLocally: "開始，在本機練習",
     startAnyway: "仍要開始",
     back: "返回",
+    titleByHand: "開始之前",
+    practiseByHand: "親手寫，在本機練習",
+    byHand: {
+      ban: ({ reach, condition }) =>
+        `${product.name} 不會在這裡發布親手學的任務：${reach === "assistance" ? "專案規範限制的是 AI 協助本身，不只是 AI 寫的程式碼" : reach === "output" ? `專案規範不接受 AI 產生的內容，而且${condition}` : `${product.name} 無法從專案規範的原文判斷它涵蓋哪些情況`}。`,
+      area: ({ reach, condition }) =>
+        reach === "output" || reach === "automate"
+          ? `${product.name} 不會為這個 issue 發布親手學的任務：專案會關閉這類 issue 由 AI 產生的 Pull Request，而且${condition}。`
+          : `${product.name} 不會為這個 issue 發布親手學的任務：專案把它留給不靠 AI 工具學習的人。`,
+      fitted: ({ kinds, quote }) =>
+        `只有嚮導始終待在專案原文說可以的範圍內（${kinds}：「${quote}」），而且你確認過專案被引用的規範之後，${product.name} 才能在這裡發布親手學的任務。你的修改是否合適，由維護者決定。`,
+    },
   },
 };
 
