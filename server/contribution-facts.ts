@@ -45,6 +45,7 @@ import {
 } from "./issue-check.js";
 import { log } from "./log.js";
 import { readPacing, readViewerLogin } from "./pacing.js";
+import { mergeRegistryFindings, registryFindings, type RegistryEntry } from "./policy-registry.js";
 import { AppError, type Repository, type Run } from "./types.js";
 import type { WorkbenchContext } from "./workbench.js";
 
@@ -279,12 +280,14 @@ export async function refreshRunFacts(
  * only for a GitHub origin and unless `network` is false, as for a project
  * imported from a local folder, which records `door: folder-import` and
  * runs no gh. A failure never rejects: it is recorded in `unknown` and
- * logged.
+ * logged. The signed entries of BELL's checked list for the repository's
+ * GitHub name (`registry`, the shipped list by default) are added after
+ * its own findings, so a project gets them at its next rules read.
  */
 export async function refreshRepositoryRules(
   _ctx: WorkbenchContext,
   repo: Repository,
-  options: { network?: boolean } = {},
+  options: { network?: boolean; registry?: readonly RegistryEntry[] } = {},
 ): Promise<ContributionRules | undefined> {
   const rules: ContributionRules = { checkedAt: now(), findings: [], filesRead: [] };
   const unknown: string[] = [];
@@ -329,7 +332,11 @@ export async function refreshRepositoryRules(
     } else if (account.status === "rejected")
       unknown.push(unknownEntry("orgDefaults", unknownReason(account.reason)));
   }
-  rules.findings = policyFindings(documents);
+  // Only adds: the repository's own findings stay as read (DESIGN v1.2 F14).
+  rules.findings = mergeRegistryFindings(
+    policyFindings(documents),
+    registryFindings(remote?.fullName, rules.checkedAt, options.registry),
+  );
   // v1.2: the project's own human help channels, for the guide's "Ask a human".
   const channels = channelLinks(documents, remote?.fullName);
   if (channels.length) rules.channels = channels;

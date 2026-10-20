@@ -140,7 +140,7 @@ export function generatedPatterns(content: string): string[] {
 }
 
 /** What the card keeps first when a project states more than 30 rules. */
-const weight = (finding: PolicyFinding) =>
+export const findingWeight = (finding: PolicyFinding) =>
   finding.kind === "ban" && finding.contribution
     ? 0
     : ((
@@ -181,7 +181,7 @@ export function policyFindings(documents: readonly PolicyDocument[]): PolicyFind
   const kept = new Set(
     all
       .map((finding, index) => ({ finding, index }))
-      .sort((a, b) => weight(a.finding) - weight(b.finding) || a.index - b.index)
+      .sort((a, b) => findingWeight(a.finding) - findingWeight(b.finding) || a.index - b.index)
       .slice(0, policyLimits.findings)
       .map(({ index }) => index),
   );
