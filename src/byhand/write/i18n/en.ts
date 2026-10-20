@@ -98,6 +98,13 @@ const en = {
     leaveText: `Your edits stay in this run's folder. The new run starts from the target branch, and ${name}'s agents write it.`,
     leaveGo: "Hand it to the agent team",
   },
+  talk: {
+    label: "Talk it through",
+    trying: "What I'm trying to do",
+    expect: "What I expect",
+    see: "What I see",
+    repeat: "The same failure, three runs in a row. Step back and try one of the exits below.",
+  },
   tests: {
     title: "Tests",
     command: "Test command",

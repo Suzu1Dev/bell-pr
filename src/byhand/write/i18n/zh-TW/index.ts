@@ -93,6 +93,13 @@ const m: Translation<typeof en> = {
     leaveText: `你的修改會留在這個任務的資料夾。新任務會從目標分支開始，由 ${name} 的 agent 來寫。`,
     leaveGo: "交給 agent 團隊",
   },
+  talk: {
+    label: "說說看",
+    trying: "我想做的事",
+    expect: "我預期的結果",
+    see: "我實際看到的",
+    repeat: "連續三次同樣的失敗。退一步，試試下面的其他出口。",
+  },
   tests: {
     title: "測試",
     command: "測試指令",

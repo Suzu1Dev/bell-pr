@@ -4,6 +4,7 @@ import type { ByHandCheckInInput, ByHandStep, ByHandStepInput, ExitKind, TestRun
 import type { HelpChannel } from "../../../shared/contribution";
 import { useT } from "../../i18n";
 import { serializeRoute } from "../../navigation/route";
+import { TalkItThrough } from "./TalkItThrough";
 import { CopyRef } from "./CopyRef";
 import { useWriteText } from "./text";
 import { Channels } from "./Channels";
@@ -86,6 +87,7 @@ export function GuideExits({
           <div className="by-hand-row">
             {button("human", UserRound, t.human)}
             {button("smaller", ListOrdered, t.smaller)}
+            <TalkItThrough step={step} tests={tests} fingerprint={fingerprint} onStep={onStep} />
             {button("park", CircleMinus, t.park)}
             {button("leave", Users, t.leave)}
           </div>

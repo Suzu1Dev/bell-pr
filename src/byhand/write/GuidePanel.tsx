@@ -35,6 +35,7 @@ import type { DiffFile, Run } from "../../types";
 import { GuideExits } from "./GuideExits";
 import { GuideThread } from "./GuideThread";
 import { TestsCard } from "./TestsCard";
+import { RepeatFailure, TalkItThrough } from "./TalkItThrough";
 import { useWriteText } from "./text";
 import "./byhand.css";
 
@@ -221,6 +222,8 @@ export function GuidePanel(props: GuidePanelProps) {
         </div>
         {step && (rungs.includes(next) ? !attempt && <p className="field-help">{t.tryFirst}</p> : <p className="field-help">{t.noRung}</p>)}
       </form>
+      {step && <TalkItThrough step={step} tests={record.tests ?? []} fingerprint={fingerprint} onStep={onStep} />}
+      <RepeatFailure key={step?.id} step={step} tests={record.tests ?? []} onCheckIn={props.onCheckIn} />
       {thinking && (
         <p role="status">
           <Loader2 size={14} className="spin" aria-hidden="true" /> {t.working}
