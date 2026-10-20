@@ -124,12 +124,12 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
       <ol className="by-hand-steps">
         {drafts.map((draft, index) => (
           <li key={draft.id ?? `new-${index}`}>
-            <label htmlFor={`${run.id}-step-${index}`}>{t.step({ number: index + 1 })}</label>
+            <label id={`${run.id}-step-${index}-name`} htmlFor={`${run.id}-step-${index}`}>{t.step({ number: index + 1 })}</label>
             <input id={`${run.id}-step-${index}`} className="text-input" maxLength={byHandLimits.stepTitleChars} value={draft.title} onChange={(event) => edit(index, { title: event.target.value })} />
-            <input className="text-input" aria-label={t.files} placeholder={t.files} value={draft.files} onChange={(event) => edit(index, { files: event.target.value })} />
-            <textarea className="text-input" aria-label={t.how} placeholder={t.how} rows={2} maxLength={byHandLimits.stepHowChars} value={draft.how} onChange={(event) => edit(index, { how: event.target.value })} />
+            <input className="text-input" aria-label={t.files} aria-describedby={`${run.id}-step-${index}-name`} placeholder={t.files} value={draft.files} onChange={(event) => edit(index, { files: event.target.value })} />
+            <textarea className="text-input" aria-label={t.how} aria-describedby={`${run.id}-step-${index}-name`} placeholder={t.how} rows={2} maxLength={byHandLimits.stepHowChars} value={draft.how} onChange={(event) => edit(index, { how: event.target.value })} />
             {drafts.length > 1 && (
-              <button type="button" className="icon-button" aria-label={t.remove} title={t.remove} onClick={() => setDrafts((list) => list.filter((_, at) => at !== index))}>
+              <button type="button" className="icon-button" aria-label={t.remove} aria-describedby={`${run.id}-step-${index}-name`} title={t.remove} onClick={() => setDrafts((list) => list.filter((_, at) => at !== index))}>
                 <Trash2 size={14} aria-hidden="true" />
               </button>
             )}

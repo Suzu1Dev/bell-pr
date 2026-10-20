@@ -170,7 +170,7 @@ const thread = [
 test("the guide says the agents can't edit files, lists the steps, and offers the next hint behind the attempt gate", () => {
   const text = html(guide({ plan: { steps, savedAt: at }, thread, hints: { s2: { rung: 1, at, fingerprint } } }));
   assert.ok(text.includes(apostrophes("BELL PR's agents can't edit files in this run.")));
-  assert.match(text, /<li aria-current="step"><span>Cap the retries at three<\/span>/);
+  assert.match(text, /<li aria-current="step"><span id="run-1-on-s2">Cap the retries at three<\/span>/);
   for (const chip of ["Setup and tools", "This project", "A concept", "My change"]) assert.ok(text.includes(chip), chip);
   // R1 given at this version: R2 waits for an attempt.
   assert.match(text, /<button type="button" class="button secondary" disabled=""><svg[\s\S]*?<\/svg> Next hint: What applies<\/button>/);
@@ -183,6 +183,18 @@ test("the guide says the agents can't edit files, lists the steps, and offers th
   assert.ok(text.includes("I&#x27;m stuck"));
   assert.ok(text.includes("The guide can be wrong."));
   assert.match(renderZh(guide({ plan: { steps, savedAt: at } })), /我卡住了/);
+});
+
+test("each step's buttons and fields say which step they belong to", () => {
+  const text = html(guide({ plan: { steps, savedAt: at } }));
+  assert.match(text, /<span id="run-1-on-s2">Cap the retries at three<\/span>/);
+  assert.match(text, /<button type="button" class="mission-text-button" aria-describedby="run-1-on-s2">Done<\/button>/);
+  assert.match(text, /<button type="button" class="mission-text-button" aria-describedby="run-1-on-s2">Park<\/button>/);
+  const findings = html(guide({ reviews: [{ at, changeFingerprint: "older", verified: "", checked: ["a"], findings: [{ path: "src/a.ts", line: 1, observed: "A bare number.", evidence: { type: "pattern", path: null, line: null, quote: null }, why: "w", question: "q", dimension: null }] }] } as ByHandRecord));
+  assert.match(findings, /<span id="run-1-finding-0">A bare number\.<\/span> <button type="button" class="mission-text-button" aria-describedby="run-1-finding-0">/);
+  const planned = html(plan({ guidePlan, plan: { steps, savedAt: at } }, {}, { status: "awaiting_plan" }));
+  assert.match(planned, /<label id="run-1-step-1-name" for="run-1-step-1">Step 2<\/label>/);
+  assert.match(planned, /<input class="text-input" aria-label="Files \(optional, comma-separated\)" aria-describedby="run-1-step-1-name"/);
 });
 
 test("after the same failure three test runs in a row, R4 needs no other attempt, as the server allows", () => {

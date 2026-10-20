@@ -144,13 +144,13 @@ export function GuidePanel(props: GuidePanelProps) {
             {steps.map((item) => (
               <li key={item.id} aria-current={item === step ? "step" : undefined}>
                 {item.doneAt ? <Check size={14} aria-label={t.done} /> : item.parkedAt ? <CircleMinus size={14} aria-label={t.park} /> : null}
-                <span>{item.title}</span>
+                <span id={`${run.id}-on-${item.id}`}>{item.title}</span>
                 {!item.doneAt && (
                   <span className="by-hand-row">
-                    <button type="button" className="mission-text-button" disabled={working} onClick={() => done(item.id, why?.stepId === item.id ? why.text : undefined)}>
+                    <button type="button" className="mission-text-button" aria-describedby={`${run.id}-on-${item.id}`} disabled={working} onClick={() => done(item.id, why?.stepId === item.id ? why.text : undefined)}>
                       {t.done}
                     </button>
-                    {!item.parkedAt && <button type="button" className="mission-text-button" disabled={working} onClick={() => void onStep(item.id, { parked: true }).catch(quiet)}>{t.park}</button>}
+                    {!item.parkedAt && <button type="button" className="mission-text-button" aria-describedby={`${run.id}-on-${item.id}`} disabled={working} onClick={() => void onStep(item.id, { parked: true }).catch(quiet)}>{t.park}</button>}
                   </span>
                 )}
                 {why?.stepId === item.id && <input className="text-input" aria-label={t.why} placeholder={t.why} maxLength={300} value={why.text} autoFocus
@@ -162,10 +162,10 @@ export function GuidePanel(props: GuidePanelProps) {
       )}
       {review && review.changeFingerprint !== fingerprint && review.findings.length > 0 && (
         <ul aria-label={t.aboutReview}>
-          {review.findings.map((finding) => (
+          {review.findings.map((finding, index) => (
             <li key={`${finding.path}:${finding.line}`}>
-              {finding.observed}{" "}
-              <button type="button" className="mission-text-button" onClick={() => ask(t.reviewAsk({ at: `${finding.path}${finding.line ? `:${finding.line}` : ""}`, observed: finding.observed }))}>{t.aboutReview}</button>
+              <span id={`${run.id}-finding-${index}`}>{finding.observed}</span>{" "}
+              <button type="button" className="mission-text-button" aria-describedby={`${run.id}-finding-${index}`} onClick={() => ask(t.reviewAsk({ at: `${finding.path}${finding.line ? `:${finding.line}` : ""}`, observed: finding.observed }))}>{t.aboutReview}</button>
             </li>
           ))}
         </ul>
