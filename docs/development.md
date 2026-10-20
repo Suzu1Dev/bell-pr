@@ -218,7 +218,7 @@ each in both languages, and fails when one renders differently:
 | Largest JS chunk (startup) | 94.3 kB | 94.3 kB |
 | All JS | 442.4 kB in 42 files | 424.7 kB in 42 files |
 | Markdown chunk (loaded on demand) | 42.9 kB | 23.5 kB |
-| `MarkdownContent` chunk (loaded on demand) | 0.8 kB | 2.5 kB |
+| `MarkdownContent` chunk (loaded on demand) | 0.8 kB | 2.6 kB |
 | All CSS | 41.4 kB in 1 file | 41.4 kB in 1 file |
 
 ## Test and tool variables
