@@ -378,3 +378,27 @@ test("a review asked for at Ready that ended without one says why in the run log
   assert.equal(failedOf({ byHandReview: { ...reader(check([])), run: runOf({}) } }), failedLine);
   assert.equal(failedOf({}), undefined);
 });
+
+test("a run fitted to rules that don't name AI review offers no Run the review again", () => {
+  const rerun = (lock?: string[]) =>
+    find(
+      shallow(ExplanationPanel, {
+        file,
+        messages: [],
+        loading: false,
+        onAsk() {},
+        demo: false,
+        initialTab: "reports",
+        onRerunReview() {},
+        byHandReview: {
+          ...reader(check([])),
+          run: { logs: [], byHand: lock ? { helpLock: { kinds: lock, at: "2026-10-20T09:00:00.000Z", rulesCheckedAt: "2026-10-20T09:00:00.000Z", rules: [] } } : {} },
+        } as ByHandReader,
+      }),
+      ReviewReports,
+    )!.props.onRerunReview;
+  // The Ready dialog of such a run has no review box (the server refuses review: true), so the button would lead nowhere.
+  assert.equal(rerun(["explain", "answer", "test"]), undefined);
+  assert.equal(typeof rerun(["explain", "answer", "review"]), "function");
+  assert.equal(typeof rerun(), "function");
+});

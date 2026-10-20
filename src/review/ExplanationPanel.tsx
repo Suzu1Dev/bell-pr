@@ -873,7 +873,7 @@ export function ExplanationPanel({
             reports={reports}
             demo={demo}
             feedback={feedback}
-            onRerunReview={onRerunReview && (byHandReview?.onReviewAgain ?? onRerunReview)}
+            onRerunReview={onRerunReview && byHandReview?.run?.byHand?.helpLock?.kinds.includes("review") !== false ? (byHandReview?.onReviewAgain ?? onRerunReview) : undefined}
             reviewBusy={reviewBusy}
             byHand={!!byHandReview}
             failed={byHandReview?.run && reviewFailure(byHandReview.run)}
