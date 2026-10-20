@@ -184,7 +184,13 @@ export function WorkspacePage({
   // The Explain-it-back check and the person's other records on this run.
   const understanding = useUnderstanding(run, files, { demo, setRun: actions.setRun });
   const premise = usePremiseCheck(run, actions);
-  const byHand = useByHand(run, files, { demo, repo: currentRepo, actions, handBack: () => beginContribution(run.repoId, run) });
+  const byHand = useByHand(run, files, {
+    demo,
+    repo: currentRepo,
+    actions,
+    handBack: () => beginContribution(run.repoId, run),
+    draftMutationEpoch: draft.draftMutationEpoch,
+  });
   const reviewing = !!run.learnByHand && run.byHand?.busy?.kind === "review";
   const records = useRunRecords(run, files, { demo, setRun: actions.setRun, notify: actions.notify, file, ask: actions.ask, setSelectedPath, setTab });
   // The sample's playback queues for a moment behind nothing.

@@ -745,7 +745,7 @@ export function ChangesTab({
                     )}
                     onRerunReview={editable ? rerunReview : undefined}
                     reviewBusy={
-                      reviewRerunning || rerunRequests.has(run.id)
+                      reviewRerunning || rerunRequests.has(run.id) || (!!run.learnByHand && run.byHand?.busy?.kind === "review")
                     }
                     runLocale={run.locale}
                     attempt={run.attempts?.[file.path]}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { readyNow } from "../../../shared/by-hand";
 import { api, send } from "../../api";
 import { parseDiff } from "../../review/diff";
@@ -29,15 +29,18 @@ export function selectionOf(file: DiffFile, question: string): GuideSelection {
 /**
  * A Learn-by-hand run in the workspace (DESIGN v1.2 F3-F6, F9, F5): its
  * requests, each showing the server's message when refused, the Ready
- * dialog, and, while the person writes, one diff read 2 s after the window
- * comes back (no polling). The views themselves load lazily.
+ * dialog, and, while the run is in review, one read of the run and its
+ * diff 2 s after the window comes back (no polling; it never asks for an
+ * explanation or a walkthrough). The views themselves load lazily.
  */
 export function useByHand(
   run: Run,
   files: DiffFile[],
-  { demo, repo, actions, handBack }: {
+  { demo, repo, actions, handBack, draftMutationEpoch }: {
     demo: boolean;
     repo?: Repo;
+    /** Bumped by draft saves; a read begun before a save keeps the newer run. */
+    draftMutationEpoch: RefObject<number>;
     actions: Pick<RunActions, "setRun" | "setFiles" | "approveTeamPlan">;
     /** Opens the task dialog with this run's task, for the agent team. */
     handBack(): void;
@@ -71,10 +74,11 @@ export function useByHand(
     }
   };
 
-  // Back from the editor: one diff read, 2 s after the last focus or
+  // Back from the editor: one read of the diff and the run (an explanation
+  // asked for meanwhile shows when it is ready), 2 s after the last focus or
   // visibility change, never two at once (DESIGN v1.2 F4).
   const reading = useRef(false);
-  const { setFiles } = actions;
+  const { setFiles, setRun } = actions;
   useEffect(() => {
     if (!open) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -84,8 +88,13 @@ export function useByHand(
       timer = setTimeout(() => {
         if (reading.current) return;
         reading.current = true;
-        readRunFiles(id)
-          .then((next) => shown.current === id && setFiles(next))
+        const epoch = draftMutationEpoch.current;
+        Promise.all([readRunFiles(id), api<{ run: Run }>(runPath(id))])
+          .then(([next, current]) => {
+            if (shown.current !== id) return;
+            setFiles(next);
+            if (epoch === draftMutationEpoch.current) setRun(current.run);
+          })
           // The next return, or Refresh, reads it again.
           .catch(() => undefined)
           .finally(() => (reading.current = false));
@@ -98,7 +107,7 @@ export function useByHand(
       window.removeEventListener("focus", back);
       document.removeEventListener("visibilitychange", back);
     };
-  }, [id, open, setFiles]);
+  }, [id, open, setFiles, setRun, draftMutationEpoch]);
 
   return {
     /** The person writes: an LBH run in review whose change isn't the version marked ready. */
