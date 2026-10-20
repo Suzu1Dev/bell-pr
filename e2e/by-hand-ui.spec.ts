@@ -540,7 +540,10 @@ test("the task dialog says why BELL won't publish a learn-by-hand run on a banni
     await dialog.locator("#task-repo").selectOption(banRepoId);
     // A banning project is never a reason to preselect Learn by hand.
     await expect(dialog.getByRole("radio", { name: mode.agents })).toBeChecked();
+    await expect(page.getByRole("dialog", { name: "Hand your idea to your agent team." })).toBeVisible();
     await dialog.getByText(mode.hand).click();
+    // The person writes it: the dialog no longer hands it to the agent team.
+    await expect(page.getByRole("dialog", { name: mode.start })).toBeVisible();
     const reason = "BELL PR won't publish a learn-by-hand run here: the project's rules restrict AI help itself, not only AI-written code.";
     await expect(dialog.locator(".mode-case")).toHaveText(`${reason} ${mode.practice}`);
     await expectAccessible(page, ".mode-choice");

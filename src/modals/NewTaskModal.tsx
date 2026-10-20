@@ -133,7 +133,7 @@ export function NewTaskModal({
   return (
     <Modal
       wide
-      title={t.title}
+      title={mode === "hand" ? modeText.start : t.title}
       subtitle={t.subtitle}
       onClose={closeModal}
     >
