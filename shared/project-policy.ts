@@ -726,6 +726,34 @@ function nearAssistance(
 }
 
 /**
+ * What makes a refusal of AI help in `sentence` a rule the person weighs
+ * rather than a ban (see classifyPolicy), each by its own words.
+ */
+function weighedFor(search: string, sentence: Span, term: Span) {
+  const words = search.slice(sentence.start, sentence.end);
+  return {
+    // "You may use AI tools, but …": the AI use itself is allowed.
+    permitted: allMatches(aiPermission, words).some(
+      (match) =>
+        sentence.start + match.end <= term.start &&
+        term.start - (sentence.start + match.end) <= 20,
+    ),
+    // "… unless you have reviewed every line": a rule about how AI is used.
+    conditional: conductCondition.test(words) && !maintainerPermission.test(words),
+    // "Write the PR description and comments without AI": a rule about
+    // the conversation, not the change; for the description it is the
+    // project's own-words rule.
+    aboutConversation: conversation.test(words) && !changeObject.test(words),
+    // "Do not use AI to generate substantial pieces of code": how much is
+    // too much is the person's call.
+    sized: sizeQualifier.test(words) && !unsizedAiChange(words),
+    // "Listing AI tooling as a co-author … is not allowed": how AI help
+    // is credited, not whether it may help; each refused thing counts.
+    credited: weighedRefusal(words),
+  };
+}
+
+/**
  * A document as a reader sees it: without soft hyphens, zero-width spaces
  * and joiners, word joiners or byte-order marks, which would hide a rule's
  * words from the patterns ("AI-gen\u00aderated", "Un\u200bacceptable
@@ -807,26 +835,7 @@ export function classifyPolicy(path: string, document: string): PolicyFinding[] 
       decided.add(sentence.start);
       const words = search.slice(sentence.start, sentence.end);
       const agentTerm = /agent|bot/i.test(search.slice(term.start, term.end));
-      // "You may use AI tools, but …": the AI use itself is allowed.
-      const permitted = allMatches(aiPermission, words).some(
-        (match) =>
-          sentence.start + match.end <= term.start &&
-          term.start - (sentence.start + match.end) <= 20,
-      );
-      // "… unless you have reviewed every line": a rule about how AI is used.
-      const conditional =
-        conductCondition.test(words) && !maintainerPermission.test(words);
-      // "Write the PR description and comments without AI": a rule about
-      // the conversation, not the change; for the description it is the
-      // project's own-words rule.
-      const aboutConversation =
-        conversation.test(words) && !changeObject.test(words);
-      // "Do not use AI to generate substantial pieces of code": how much is
-      // too much is the person's call.
-      const sized = sizeQualifier.test(words) && !unsizedAiChange(words);
-      // "Listing AI tooling as a co-author … is not allowed": how AI help
-      // is credited, not whether it may help; each refused thing counts.
-      const credited = weighedRefusal(words);
+      const { permitted, conditional, aboutConversation, sized, credited } = weighedFor(search, sentence, term);
       // A long sentence about good first issues that refuses AI-generated
       // pull requests at its end still reserves the learning issues.
       if (learningIssues.test(words)) add("area", block, search, span);
