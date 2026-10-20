@@ -10,6 +10,7 @@ import { appendFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { changeFingerprint } from "../shared/change-fingerprint";
+import type { DraftCheck } from "../shared/draft-checks";
 import type { Run } from "../src/types";
 import byHandText from "../src/byhand/write/i18n/en";
 import workspace from "../src/i18n/en/workspace";
@@ -138,6 +139,37 @@ test.describe("the fix-ups a browser shows (README v1.2 §18.11)", () => {
       await expect(refusal).toBeFocused();
       await page.keyboard.press("Tab");
       expect(await page.evaluate(() => !!document.activeElement?.closest("[role=dialog]"))).toBe(true);
+    } finally {
+      await context.close();
+      await project.stop();
+    }
+  });
+
+  test("the publish dialog of a Learn-by-hand run opens on its title, so the record is read before the quoted confirm", async ({ browser }) => {
+    test.setTimeout(120_000);
+    const quoted: DraftCheck = {
+      id: "by-hand-rules",
+      kind: "confirm",
+      message: "The project declines AI-generated contributions, and its own text says some uses of AI are fine.",
+      details: ["Why.", 'CONTRIBUTING.md:3: "We decline AI-generated contributions."'],
+    };
+    const project = await startRealProject({
+      reviewed: true,
+      appSettings: { skipUnderstandingCheck: true },
+      run: {
+        ...byHandRun("approved", "complete"),
+        approvedFingerprint: "e2e-approved",
+        draft: { title: "Greet people in their own language", body: "Greetings come from a table of languages; I wrote it myself." },
+      },
+    });
+    const { context, page } = await open(browser, project);
+    try {
+      await page.route(`**/api/runs/${runId}/preflight`, (route) => route.fulfill({ json: { checks: [quoted] } }));
+      const dialog = await publishDialog(page);
+      await expect(dialog.getByRole("checkbox", { name: quoted.message })).toBeVisible();
+      // The focus starts on the dialog's title, above the summary, the record and the confirm.
+      await expect(dialog.getByRole("heading", { level: 2, name: workspace.publish.title })).toBeFocused();
+      await expect(dialog.getByRole("checkbox", { name: quoted.message })).not.toBeFocused();
     } finally {
       await context.close();
       await project.stop();

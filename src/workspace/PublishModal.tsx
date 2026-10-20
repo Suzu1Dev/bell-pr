@@ -377,6 +377,8 @@ export function PublishModal({
               : t.subtitle
       }
       onClose={closeModal}
+      // A Learn-by-hand run's record comes before its first confirm: reading starts at the top.
+      focusTitle={byHand}
     >
       <div className="publish-summary">
         <span>
