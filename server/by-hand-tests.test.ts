@@ -7,7 +7,7 @@
 import test, { after, before, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -135,6 +135,22 @@ function alive(pid: number) {
   }
 }
 
+/**
+ * Kills the process after the test, in case the test failed before the
+ * runner ended it: by pid, and only while its command line is still the
+ * test's own script (Linux).
+ */
+function reap(t: TestContext, pid: number) {
+  t.after(() => {
+    try {
+      if (readFileSync(`/proc/${pid}/cmdline`, "utf8").includes("setInterval")) process.kill(pid, "SIGKILL");
+    } catch {
+      // Already gone.
+    }
+  });
+  return pid;
+}
+
 /** Waits until the process is gone (the group kill reaches it at once; reaping takes a moment). */
 async function gone(pid: number) {
   const deadline = Date.now() + 5_000;
@@ -163,6 +179,27 @@ setInterval(() => {}, 1000);
 async function lingering(directory: string) {
   const script = path.join(directory, "lingering.cjs");
   await writeFile(script, lingeringScript);
+  return `node ${JSON.stringify(script)}`;
+}
+
+/**
+ * A script whose grandchild ignores SIGTERM and holds no output pipe, so
+ * nothing but a SIGKILL to the group after the pipes closed reaches it.
+ * Once the grandchild ignores SIGTERM, the script prints its pid and then
+ * keeps running, or exits with `exitCode`.
+ */
+const pipelessScript = (exitCode?: number) => `const { spawn } = require("child_process");
+const child = spawn(process.execPath, ["-e", "process.on('SIGTERM', () => {}); process.send('ready', () => process.disconnect()); setInterval(() => {}, 1000)"], { stdio: ["ignore", "ignore", "ignore", "ipc"] });
+child.once("message", () => {
+  console.log("pid " + child.pid);
+  ${exitCode === undefined ? "setInterval(() => {}, 1000);" : `process.exit(${exitCode});`}
+});
+`;
+
+/** Writes the pipeless script next to the repository and returns the command that runs it. */
+async function pipeless(directory: string, exitCode?: number) {
+  const script = path.join(directory, "pipeless.cjs");
+  await writeFile(script, pipelessScript(exitCode));
   return `node ${JSON.stringify(script)}`;
 }
 
@@ -245,6 +282,46 @@ test("Stop ends the run as stopped, and every process the command started is gon
   // Stop with nothing running changes nothing.
   const again = await f.byHand.stopTests(f.run.id);
   assert.equal(again.run.byHand?.tests?.length, 1);
+});
+
+test("Stop and the timeout also end a grandchild that ignores SIGTERM and holds no output pipe", async (t) => {
+  const f = await fixture(t);
+  await f.confirm(await pipeless(f.directory));
+  await en(() => f.byHand.runTests(f.run.id, {}));
+  const stopped = reap(t, Number((await f.liveMatch(/pid (\d+)/)).value));
+  assert.ok(alive(stopped));
+  const { run } = await en(() => f.byHand.stopTests(f.run.id));
+  assert.equal(run.byHand?.tests?.at(-1)?.outcome, "stopped");
+  assert.ok(await gone(stopped), "the grandchild still runs after Stop");
+  testRunLimits.timeoutMs = 2_000;
+  const timedOut = await f.runOnce();
+  assert.equal(timedOut.outcome, "timeout");
+  const pid = reap(t, Number(/pid (\d+)/.exec(timedOut.outputTail ?? "")?.[1]));
+  assert.ok(pid > 0 && pid !== stopped);
+  assert.ok(await gone(pid), "the grandchild still runs after the timeout");
+});
+
+test("a suite that exits while a process it started holds the output ends with its exit code, and the process is ended", async (t) => {
+  const f = await fixture(t);
+  // Without settling on the suite's own exit, the open pipe made this a timeout.
+  testRunLimits.timeoutMs = 20_000;
+  await f.confirm(
+    `node -e "const c = require('child_process').spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'inherit' }); console.log('child ' + c.pid); console.log('3 passing'); setTimeout(() => process.exit(0), 100)"`,
+  );
+  const passed = await f.runOnce();
+  assert.equal(passed.outcome, "passed");
+  assert.equal(passed.exitCode, 0);
+  assert.ok(passed.ms < 15_000, `${passed.ms} ms`);
+  assert.match(passed.outputTail ?? "", /3 passing$/);
+  const pid = reap(t, Number(/child (\d+)/.exec(passed.outputTail ?? "")?.[1]));
+  assert.ok(await gone(pid), "the process the suite left behind still runs");
+  // A pipeless leftover is ended too, and a failing exit stays a failure.
+  await f.confirm(await pipeless(f.directory, 1));
+  const failed = await f.runOnce();
+  assert.equal(failed.outcome, "failed");
+  assert.equal(failed.exitCode, 1);
+  const leftover = reap(t, Number(/pid (\d+)/.exec(failed.outputTail ?? "")?.[1]));
+  assert.ok(await gone(leftover), "the pipeless leftover still runs");
 });
 
 test("cancel and shutdown stop a running test job and its process group", async (t) => {

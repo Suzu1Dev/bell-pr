@@ -42,11 +42,12 @@ import { AppError, withRunLocale, type Repository, type Run } from "./types.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 /**
- * The limits of one test run: 10 minutes, and the output BELL reads before
- * it stops the run (far above command()'s 2 MB default, so a verbose suite
- * is not cut). Tests lower them.
+ * The limits of one test run: 10 minutes, the output BELL reads before it
+ * stops the run (far above command()'s 2 MB default, so a verbose suite
+ * is not cut), and how long BELL still reads output after the shell
+ * exited. Tests lower them.
  */
-export const testRunLimits = { timeoutMs: 10 * 60_000, maxBytes: 50 * 1024 * 1024 };
+export const testRunLimits = { timeoutMs: 10 * 60_000, maxBytes: 50 * 1024 * 1024, settleMs: 2_000 };
 
 /** The live tail kept in memory while a run goes on. */
 const liveTailChars = 64 * 1024;
@@ -257,8 +258,12 @@ async function execute(
   try {
     // detached: the command leads its own process group. On Stop (the
     // signal) and on the timeout, command() sends SIGTERM to the whole
-    // group, and SIGKILL 1.5 s later while its output is still open. Its
-    // stdin is closed at once; nothing is ever typed into it.
+    // group. The run ends when the shell exits (output still in the pipes
+    // is read for `settleMs` more), and then whatever is left of the
+    // group, in any case, gets SIGTERM and, 1.5 s after the first one,
+    // SIGKILL (`endGroup`). Its stdin is closed at once; nothing is ever
+    // typed into it. The output is read only line by line, into the live
+    // tail.
     const result = await command("/bin/sh", ["-c", start.command], {
       cwd: run.worktreePath,
       env: testEnvironment(process.env),
@@ -266,6 +271,8 @@ async function execute(
       maxBytes: testRunLimits.maxBytes,
       signal,
       allowedCodes: exitCodes,
+      endGroup: { settleAfterExitMs: testRunLimits.settleMs },
+      discardOutput: true,
       onLine: (line) => {
         live.tail += `${cleanLine(line)}\n`;
         if (live.tail.length > 2 * liveTailChars) live.tail = live.tail.slice(-liveTailChars);
