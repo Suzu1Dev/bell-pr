@@ -28,6 +28,18 @@ provider you set it up for). It receives:
 - your follow-up questions about a change, with the code and notes they
   refer to, and the review comments on that file once you have read your
   pull request's feedback;
+- for code walkthroughs and premise checks, the changed file, the code
+  around the change, the task and the project's files, as for
+  explanations;
+- in Learn by hand, for each guide answer: the task, your question, your
+  plan, the step you are on, your current changes to that step's files
+  (up to 40 kB), the end of your last test run's output (up to 4 kB) and
+  the guide's last answers on that step, along with the project files the
+  guide opens. For a review you ask for at **Ready for review**: your
+  change, your plan, your "least sure" line and your last test run at
+  that version. The guide never opens the files the review holds back
+  (`.env` files, keys and similar), and BELL PR's agents can't edit your
+  files in these runs;
 - for a follow-up round (Pro), the review comments you selected, with your
   restatement of each one;
 - for a coach debrief (Pro, only when you ask for one), your own records
@@ -39,6 +51,13 @@ provider you set it up for). It receives:
 Your understanding checks, try-first answers, practice grades and
 forecasts are never sent to the AI provider except in a coach debrief you
 ask for. The check itself makes no AI call: you grade your own answers.
+
+In Learn by hand, BELL PR runs your project's test command on your
+computer, only when you click and only a command you confirmed. Its output
+leaves your computer only inside a guide answer, a failure explanation or
+a review you ask for, as above. The record of the run (which help you
+used, when, from which model, your test runs and predictions) leaves your
+computer only in those requests or when you copy or export it.
 
 Do not import a project if your AI provider must not see its code.
 
@@ -74,7 +93,14 @@ origin never runs `gh`.
 The project's own rule files are read from BELL PR's clone, without the
 network, except the default contribution files of the project's account
 (its `.github` repository), which BELL PR reads through `gh api` as it
-does for pull request drafts.
+does for pull request drafts. BELL PR also ships a short, dated checked
+list of AI rules that some projects publish outside their repositories,
+and reads an entry only once BELL PR's publisher has signed it off.
+Reading it sends nothing anywhere.
+
+When you read the feedback of a published Learn-by-hand run, or sync its
+pull request, Git also asks GitHub for the head of the pull request's
+branch, to take over the commits you pushed from the run's folder.
 
 **Web access for agents** (Pro, off by default). While you have it on,
 agents in contribution runs and follow-up chat can search the web and read
@@ -115,7 +141,7 @@ with mode 0600.
 
 | Item | What it holds |
 | --- | --- |
-| `state.json` | Your projects and runs: contribution directions, plans, agent logs and reports, review progress, explanations, follow-up questions and answers, notes and PR drafts. Also your learning records: your understanding checks (explanation, answers, confidence, grades, corrections, forecast and how long each check took), try-first answers and the approaches you chose, your tags and lessons on maintainer comments, your restatements for follow-up rounds, your practice schedule (grades and due dates only; practice answers are never saved), the reasons you gave for weakened tests or for publishing past someone else's pull request, and coach debriefs. And the GitHub facts BELL PR read: the rules quoted from each project's files, its pull request settings and recent merged pull request sizes, and for each run the linked issue's facts (including the GitHub logins of people assigned to it, claiming it or with a pull request for it, and the latest maintainer comment) and your pull request counts there, with links to up to 10 of your pull requests waiting on your answer. Token-shaped strings are masked in logs and questions before they are saved. |
+| `state.json` | Your projects and runs: contribution directions, plans, agent logs and reports, review progress, explanations, code walkthroughs and the answers you gave to their questions, follow-up questions and answers, notes and PR drafts. For each Learn-by-hand run, its record: your plan, the guide's outline and answers, its reviews, BELL PR's test runs with the end of their output, your predictions, the kinds of help you used and, for a run fitted to a project's rules, the quoted rules it was fitted to; and for each project, the test command you confirmed. Also your learning records: your understanding checks (explanation, answers, confidence, grades, corrections, forecast and how long each check took), try-first answers and the approaches you chose, your tags and lessons on maintainer comments, your restatements for follow-up rounds, your practice schedule (grades and due dates only; practice answers are never saved), the reasons you gave for weakened tests or for publishing past someone else's pull request, and coach debriefs. And the GitHub facts BELL PR read: the rules quoted from each project's files (with the parts that say which uses of AI are fine, the places its people talk, and rules from BELL PR's checked list), its pull request settings and recent merged pull request sizes, and for each run the linked issue's facts (including the GitHub logins of people assigned to it, claiming it or with a pull request for it, and the latest maintainer comment) and your pull request counts there, with links to up to 10 of your pull requests waiting on your answer. Token-shaped strings are masked in logs and questions before they are saved. |
 | `state.json.bak.1` to `.bak.3`, `state.quarantine.json` | The last three versions of `state.json`, and records a damaged file could not load, so a crash or a bad write loses nothing. |
 | `repositories/` | BELL PR's own clones of the projects you imported. A project imported from a folder on your computer is cloned too; your folder is never changed. |
 | `worktrees/`, `team-worktrees/` | A working copy for each run and each teammate, with the changes the agents made. |
@@ -126,7 +152,7 @@ with mode 0600.
 | `license.json` | The license key you activated, when you activated it, the latest time BELL PR saw (to notice a clock set back) and the trial's start date. |
 | `author-emails.json` | SHA-256 digests of the commit e-mail addresses you confirmed when publishing, never the addresses themselves. |
 | `logs/` | Daily log files, at most 7 files and 50 MB, with secrets redacted. Prompts and page contents are never logged. |
-| `children.json`, `bellpr.lock`, `run/` | The agent processes that are running (so a crash leaves none behind), the running instance's process id and port, and a one-time sign-in link that is deleted as soon as `bell-pr open` reads it. |
+| `children.json`, `bellpr.lock`, `run/` | The agent processes and test runs that are running (so a crash leaves none behind), the running instance's process id and port, and a one-time sign-in link that is deleted as soon as `bell-pr open` reads it. |
 
 The session secret lives only in the memory of the running server and is
 never written to disk. The browser BELL PR opens at start gets a one-time
