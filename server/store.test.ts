@@ -1331,6 +1331,20 @@ function repositoryWithV12Fields(): Repository {
   };
   repo.contributionRules!.findings.push({
     kind: "ban",
+    path: "docs/devel/code-provenance.rst",
+    line: 293,
+    quote: "Current QEMU project policy is to DECLINE any contributions which are believed to include or derive from AI generated content.",
+    contribution: true,
+    allows: [
+      {
+        line: 297,
+        quote: "This policy does not apply to other uses of AI, such as researching APIs or algorithms, static analysis, or debugging, provided their output is not included in contributions.",
+        kinds: ["explain", "answer", "test"],
+      },
+    ],
+  });
+  repo.contributionRules!.findings.push({
+    kind: "ban",
     path: "src/policies/llm-usage.md",
     line: 24,
     quote: "But not to **create**.",
@@ -1373,6 +1387,7 @@ const v12RepositorySchemas: Record<string, z.ZodTypeAny> = {
   testCommand: repositoryReadSchema.omit({ testCommand: true }),
   "contributionRules.channels": withoutRulesField("channels"),
   "contributionRules.findings[].source": withoutFindingField("source"),
+  "contributionRules.findings[].allows": withoutFindingField("allows"),
 };
 
 for (const [field, older] of Object.entries(v12RepositorySchemas))
@@ -1382,3 +1397,20 @@ for (const [field, older] of Object.entries(v12RepositorySchemas))
     assert.ok(read.success, read.success ? "" : read.error.message);
     assert.deepEqual(read.data, written);
   });
+
+test("a carve-out this build cannot read is left out, and the rest of the finding stays", () => {
+  const repo = JSON.parse(JSON.stringify(repositoryWithV12Fields())) as Repository;
+  const finding = repo.contributionRules!.findings.find((entry) => entry.allows)!;
+  (finding as unknown as Record<string, unknown>).allows = "not a list";
+  const read = lenientRead(repositoryReadSchema).safeParse(repo);
+  assert.ok(read.success);
+  const kept = read.data.contributionRules!.findings.find((entry) => entry.line === 293)!;
+  assert.equal(kept.allows, undefined);
+  assert.equal(kept.quote, finding.quote);
+  // Kinds are text: a kind a later build adds still loads.
+  finding.allows = [{ line: 297, quote: "x", kinds: ["explain", "later-kind" as never] }];
+  assert.deepEqual(
+    lenientRead(repositoryReadSchema).parse(repo).contributionRules!.findings.find((entry) => entry.line === 293)!.allows,
+    finding.allows,
+  );
+});

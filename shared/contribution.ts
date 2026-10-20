@@ -20,6 +20,7 @@ import en from "./i18n/draft-checks.en.js";
 import zhTW from "./i18n/draft-checks.zh-TW.js";
 import { formatters, type Locale } from "./i18n/locale.js";
 import { disclosureRule, hasAiDisclosure } from "./project-policy.js";
+import type { HelpKind } from "./by-hand.js";
 
 /** Rule kinds the classifier finds (shared/project-policy.ts); stored as text, frozen. */
 export const policyKinds = [
@@ -51,6 +52,25 @@ export interface PolicyFinding {
    * from the repository.
    */
   source?: PolicySource;
+  /**
+   * Carve-outs of a `ban` or `area` finding (DESIGN v1.2 F12): sentences of
+   * the same document, or of the same signed checked-list entry, that say
+   * some uses of AI are fine, quoted verbatim with the help kinds each one
+   * names; at most 3. Shown with the rule, and read only by the quoted
+   * confirm of a Learn-by-hand run; an agent run's outcome never reads
+   * them. Absent when there are none.
+   */
+  allows?: PolicyAllowance[];
+}
+
+/** One carve-out quote and the kinds of help it names (`PolicyFinding.allows`). */
+export interface PolicyAllowance {
+  /** 1-based line of the quote's start, in the finding's document. */
+  line: number;
+  /** Verbatim, 300 characters or fewer. */
+  quote: string;
+  /** At most 5, from the frozen HelpKind vocabulary (stored as text). */
+  kinds: HelpKind[];
 }
 
 /** The checked-list entry a finding comes from (`PolicyFinding.source`). */

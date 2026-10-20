@@ -104,8 +104,10 @@ const contributionRulesSchema = loose({
         line: count,
         quote: text.max(300),
         contribution: z.boolean(),
-        // v1.2: a finding from BELL's checked list of off-repository rules.
+        // v1.2: a finding from BELL's checked list of off-repository rules,
+        // and the carve-outs that name kinds of help.
         source: later(registrySourceSchema),
+        allows: later(allowsSchema),
       }),
     )
     .max(30),
