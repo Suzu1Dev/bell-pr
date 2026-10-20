@@ -1,4 +1,4 @@
-import { Eye, PenLine } from "lucide-react";
+import { Eye, PenLine, RotateCcw } from "lucide-react";
 import type { UnderstandingView } from "../../shared/understanding";
 import { useT } from "../i18n";
 import type { DiffFile } from "../types";
@@ -11,8 +11,12 @@ export interface ByHandReader {
   onReviewAgain: () => void;
   /** The run's Explain-it-back check (`useUnderstanding().view`); undefined while it loads. */
   check: UnderstandingView | undefined;
+  /** Why the check could not be read (`useUnderstanding().error`): the request waits for it. */
+  checkError: string | undefined;
   /** Opens the check next to the diff (`openCheckPanel(run.id)`). */
   onOpenCheck: () => void;
+  /** Reads the check again (`useUnderstanding().refresh`). */
+  onRetryCheck: () => void;
 }
 
 /**
@@ -20,6 +24,7 @@ export interface ByHandReader {
  * explanation or walkthrough nobody asked for: the way to its own question
  * in Explain it back, then a button that asks for this file's explanation
  * and walkthrough only (its progress replaces it; focus moves to the panel).
+ * When the check can't be read, it says why and reads it again.
  */
 export function ReaderView({
   file,
@@ -37,7 +42,7 @@ export function ReaderView({
 }) {
   const review = useT("review");
   const t = usePanelStrings().reader;
-  const checkTitle = useT("workspace").check.title;
+  const check = useT("workspace").check;
   const ownQuestion = reader.check?.plan.some((item) => item.path === file.path);
   function show(event: { currentTarget: HTMLElement }) {
     event.currentTarget.closest<HTMLElement>("[role=tabpanel]")?.focus();
@@ -52,17 +57,27 @@ export function ReaderView({
       {!reader.check || readerAllowed(reader.check, file) ? (
         <>
           <p>{t.intro}</p>
-          <button type="button" className="explain-retry" disabled={busy || !reader.check} onClick={show}>
-            <Eye size={14} aria-hidden="true" />
-            {busy ? review.explain.retryBusy : t.show}
-          </button>
+          {!reader.check && reader.checkError ? (
+            <>
+              <p role="alert">{check.loadFailed({ message: reader.checkError })}</p>
+              <button type="button" className="explain-retry" onClick={reader.onRetryCheck}>
+                <RotateCcw size={14} aria-hidden="true" />
+                {check.retry}
+              </button>
+            </>
+          ) : (
+            <button type="button" className="explain-retry" disabled={busy || !reader.check} onClick={show}>
+              <Eye size={14} aria-hidden="true" />
+              {busy ? review.explain.retryBusy : t.show}
+            </button>
+          )}
         </>
       ) : (
         <>
           <p>{ownQuestion ? t.answerFirst : t.answerAll}</p>
           <button type="button" className="explain-retry" onClick={reader.onOpenCheck}>
             <PenLine size={14} aria-hidden="true" />
-            {checkTitle}
+            {check.title}
           </button>
         </>
       )}

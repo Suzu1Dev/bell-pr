@@ -50,7 +50,9 @@ function check(answered: string[], options: { required?: boolean; ownSlot?: bool
 const reader = (view: UnderstandingView | undefined): ByHandReader => ({
   onReviewAgain() {},
   check: view,
+  checkError: undefined,
   onOpenCheck() {},
+  onRetryCheck() {},
 });
 
 /** The first element of `type` in a tree that is not rendered further. */
@@ -283,4 +285,23 @@ test("a Learn-by-hand run's Reports tab names the guide and says nothing of the 
     find(shallow(ExplanationPanel, { file, messages: [], loading: false, onAsk() {}, demo: false, initialTab: "reports", ...props }), ReviewReports)!.props;
   assert.equal(reportsOf({ byHandReview: reader(check([])) }).byHand, true);
   assert.ok(!reportsOf({}).byHand);
+});
+
+test("when the check can't be read, the reader view says why and reads it again, instead of a request that never enables", () => {
+  const calls: string[] = [];
+  const failed = { ...reader(undefined), checkError: "The server did not answer.", onRetryCheck: () => calls.push("read the check again") };
+  const html = renderEn(createElement(ReaderView, { file, reader: failed, busy: false }));
+  assertNoHan(html);
+  assert.match(html, /<p role="alert">Could not load the check: The server did not answer\.<\/p>/);
+  assert.match(html, /<button type="button" class="explain-retry">.*Try again<\/button>/);
+  assert.doesNotMatch(html, /Show how a reader sees it/);
+  (find(shallow(ReaderView, { file, reader: failed, busy: false }), "button")!.props.onClick as () => void)();
+  assert.deepEqual(calls, ["read the check again"]);
+  const zh = renderZh(createElement(ReaderView, { file, reader: failed, busy: false }));
+  assert.match(zh, /<p role="alert">無法載入檢查：The server did not answer\.<\/p>/);
+  assert.match(zh, />重試<\/button>/);
+  // A check read once stays in use while a later read fails: the error alone changes nothing.
+  const kept = renderEn(createElement(ReaderView, { file, reader: { ...failed, check: check([`fallback:${file.path}`]) }, busy: false }));
+  assert.doesNotMatch(kept, /Could not load the check/);
+  assert.match(kept, /Show how a reader sees it/);
 });
