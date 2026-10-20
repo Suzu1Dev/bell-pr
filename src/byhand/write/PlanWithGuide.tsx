@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { ListChecks, Loader2, Play, Plus, Trash2 } from "lucide-react";
 import { byHandLimits, helpAllowed, type ByHandPlanInput } from "../../../shared/by-hand";
 import { PremiseNotice } from "../../team/PremiseNotice";
+import { PlanCompare } from "./PlanCompare";
 import type { Run } from "../../types";
 import { CopyRef } from "./CopyRef";
 import { PlanQuestions } from "./PlanQuestions";
@@ -160,6 +161,7 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
           </button>
         </div>
       )}
+      {planHelp && drafted && <PlanCompare run={run} onReveal={() => save().then(() => (revealed ? undefined : onReveal("compare")))} busy={busy} />}
       {error && (
         <p className="inline-error" role="alert">
           {error}

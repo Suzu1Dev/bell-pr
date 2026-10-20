@@ -37,6 +37,10 @@ const m: Translation<typeof en> = {
     open: "在你的編輯器打開這個資料夾，完成第一步的修改並存檔，再回到這裡。",
     first: ({ step }) => `第一步：${step}`,
   },
+  compare: {
+    action: "和嚮導的步驟比較",
+    title: "你的計畫和嚮導的計畫哪裡不同",
+  },
   guide: {
     title: "嚮導",
     clean: `這個任務裡，${name} 的 agent 無法修改檔案。`,

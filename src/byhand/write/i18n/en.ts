@@ -41,6 +41,10 @@ const en = {
     open: "Open this folder in your editor, make your first step's change, save, and come back.",
     first: ({ step }: { step: string }) => `First step: ${step}`,
   },
+  compare: {
+    action: "Compare with the guide's steps",
+    title: "Where your plan and the guide's differ",
+  },
   guide: {
     title: "The guide",
     clean: `${name}'s agents can't edit files in this run.`,
