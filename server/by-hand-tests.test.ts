@@ -628,6 +628,19 @@ test("the live tail starts at a whole line, so a credential cut at its start is 
   assert.doesNotMatch(run.byHand?.tests?.at(-1)?.outputTail ?? "", /A{8}/);
 });
 
+test("a line longer than the live tail is cut after a separator, so a credential cut at its start is not shown in part", async (t) => {
+  const f = await fixture(t);
+  // One 66,555-character line: a 64 KiB window from its end starts 15 characters into the token.
+  await f.confirm(
+    `node -e "console.log('x'.repeat(1000) + ' ghp_' + 'A'.repeat(40) + ' ' + 'y'.repeat(65504) + ' done'); setInterval(() => {}, 1000)"`,
+  );
+  await en(() => f.byHand.runTests(f.run.id, {}));
+  const { live } = await f.liveMatch(/(done)$/m);
+  assert.doesNotMatch(live.tail, /A{8}/);
+  assert.match(live.tail, /^y+ done\n?$/);
+  await en(() => f.byHand.stopTests(f.run.id));
+});
+
 test("new untracked files the command created are listed; ignored and earlier files are not", async (t) => {
   const f = await fixture(t);
   await writeFile(path.join(f.repository, "notes.txt"), "mine\n");

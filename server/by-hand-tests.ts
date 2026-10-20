@@ -72,13 +72,17 @@ function lives(ctx: WorkbenchContext) {
 /**
  * The last `liveTailChars` of the output, from the first whole line in
  * them, so a cut never leaves the end of a credential without the prefix
- * that redact() recognises. One line longer than that is cut anyway.
+ * that the masking recognises. One line longer than that starts after the
+ * first space or quote in its first 2,000 characters, for the same
+ * reason, or is cut where it is.
  */
 function tailWindow(text: string) {
   if (text.length <= liveTailChars) return text;
   const cut = text.length - liveTailChars;
   const newline = text.indexOf("\n", cut - 1);
-  return newline >= 0 && newline < text.length - 1 ? text.slice(newline + 1) : text.slice(cut);
+  if (newline >= 0 && newline < text.length - 1) return text.slice(newline + 1);
+  const separator = text.slice(cut, cut + 2_000).search(/[\s"',;]/);
+  return text.slice(separator >= 0 ? cut + separator + 1 : cut);
 }
 
 /**
