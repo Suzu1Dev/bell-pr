@@ -98,6 +98,8 @@ export interface ExplanationPanelProps {
   /** The tab to open on; the panel remounts per file, so the caller keeps the reader's choice. */
   initialTab?: PanelTab;
   onTabChange?: (tab: PanelTab) => void;
+  /** A Learn-by-hand run's review at Ready: "Run the review again" opens the Ready dialog (W2E). */
+  byHandReview?: { onReviewAgain: () => void };
 }
 
 /** The learning panel's tabs. */
