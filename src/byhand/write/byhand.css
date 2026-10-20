@@ -83,11 +83,12 @@
 .by-hand-ref code {
   overflow-wrap: anywhere;
 }
-/* The guide's answers, questions and findings keep the lines it wrote. */
+/* The guide's answers, questions and findings keep the lines it wrote, and a long path wraps. */
 .by-hand p,
 .by-hand li,
 .by-hand blockquote {
   white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 .by-hand-chip {
   position: relative;

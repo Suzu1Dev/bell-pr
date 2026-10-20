@@ -44,6 +44,7 @@ const git = (cwd: string, ...args: string[]) =>
     env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" },
   }).trim();
 
+const longPath = "packages/http-client/src/policies/retry/exponential-backoff-with-full-jitter.ts";
 const retryBase = "export const maxRetries = Infinity;\n\nexport function shouldRetry(attempt: number) {\n  return attempt < maxRetries;\n}\n";
 const retryAfter = retryBase.replace("Infinity", "3");
 
@@ -177,6 +178,17 @@ async function seed(dataDir: string) {
             plan: { steps, savedAt: at, confirmedAt: at, outlineAt: at },
             hints: { s2: { rung: 1, at, fingerprint: writing.fingerprint } },
             thread: [
+              // A long path, as monorepos have them: it wraps rather than widen the panel.
+              {
+                id: "e0",
+                at: "2026-10-20T08:55:00.000Z",
+                kind: "ask",
+                entry: "project",
+                question: "Where do the retry policies live?",
+                text: "Next to the client, in its policies folder.",
+                refs: [{ path: longPath, line: 12 }],
+                quotes: [{ path: longPath, startLine: 12, endLine: 12, from: "base", text: "export const jitter = true;" }],
+              },
               { id: "e1", at, kind: "hint", stepId: "s2", rung: 1, text: "Look where the attempt is compared with the limit.", refs: [{ path: source, line: 4 }] },
               {
                 id: "e2",
@@ -317,7 +329,7 @@ test("while the person writes, the guide's panel, its thread, the Tests card and
     await expect(guide.getByRole("heading", { name: t.guide.title, exact: true })).toBeVisible();
     await expect(guide).toContainText(t.guide.clean);
     // The thread, newest first: the quote BELL cut under its header, and the filter's note.
-    await expect(guide.locator("figcaption", { hasText: t.thread.base })).toContainText(`${source}:1-1`);
+    await expect(guide.locator("figcaption", { hasText: `${source}:1-1` })).toContainText(t.thread.base);
     await expect(guide).toContainText(t.thread.removed);
     // The guide's lines stay lines.
     expect(await guide.locator(".by-hand-thread p", { hasText: "a constant at the top" }).innerText()).toBe(
@@ -627,6 +639,8 @@ for (const locale of ["en", "zh-TW"] as const)
       try {
         await expect(page.getByRole("heading", { name: text.guide.title, exact: true })).toBeVisible();
         await fits(page, ".guide-panel");
+        // Nothing in the panel, a long path included, makes it scroll sideways.
+        expect(await page.locator(".guide-panel").evaluate((panel) => panel.scrollWidth - panel.clientWidth)).toBeLessThanOrEqual(1);
         await page.locator(".review-footer button.button.primary").click();
         await expect(page.getByRole("dialog", { name: text.ready.title })).toBeVisible();
         await fits(page, "[role=dialog]");
