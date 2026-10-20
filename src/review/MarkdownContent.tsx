@@ -1,23 +1,5 @@
-import { gfmFromMarkdown } from "mdast-util-gfm";
-import { gfm } from "micromark-extension-gfm";
-import ReactMarkdown from "react-markdown";
 import { useT } from "../i18n";
-
-/**
- * GitHub Flavored Markdown (tables, task lists, strikethrough, autolinks
- * and footnotes) for reading. remark-gfm also adds a Markdown writer, which
- * react-markdown never calls; this plugin adds only the two parsing
- * extensions, the ones shared/draft-checks.ts already uses.
- */
-function remarkGfm(this: { data(): object }) {
-  // The two lists remark-parse reads from the processor's data.
-  const data = this.data() as {
-    micromarkExtensions?: unknown[];
-    fromMarkdownExtensions?: unknown[];
-  };
-  (data.micromarkExtensions ??= []).push(gfm());
-  (data.fromMarkdownExtensions ??= []).push(gfmFromMarkdown());
-}
+import { Markdown } from "./markdown/render";
 
 function safeLink(value: string) {
   try {
@@ -53,13 +35,16 @@ function DiffLines({ text }: { text: string }) {
   ));
 }
 
+/**
+ * GitHub Flavored Markdown (tables, task lists, strikethrough, autolinks
+ * and footnotes) for reading. Raw HTML never renders, links open web pages
+ * only, and images show as a note.
+ */
 export function MarkdownContent({ children }: { children: string }) {
   const t = useT("review");
   return (
     <div className="markdown-content">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        skipHtml
+      <Markdown
         urlTransform={safeLink}
         components={{
           a: ({ href, children }) =>
@@ -105,7 +90,7 @@ export function MarkdownContent({ children }: { children: string }) {
         }}
       >
         {children}
-      </ReactMarkdown>
+      </Markdown>
     </div>
   );
 }

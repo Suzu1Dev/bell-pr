@@ -44,8 +44,8 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 // Classes that libraries add: lucide-react on every icon, and the Markdown
-// renderer (react-markdown through mdast-util-to-hast) on task lists,
-// footnotes and fenced code.
+// renderer (src/review/markdown/render.ts, after mdast-util-to-hast) on task
+// lists, footnotes and fenced code.
 const runtimeClasses = new Set([
   "lucide",
   "contains-task-list",
