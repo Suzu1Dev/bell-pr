@@ -198,3 +198,29 @@ test("Add a step puts the focus in the new step's title, and an R3 choice in its
     await writing.close();
   }
 });
+
+test("a guide answer is announced, and the focus goes to it at the top of the answers", async ({ browser }) => {
+  const { page, close } = await open(browser, `#/runs/${runs.writing}/changes`);
+  try {
+    // The guide route as W2B answers it: accepted, the guide busy; then the run reads back with the answer.
+    const { run } = await (await page.request.get(`/api/runs/${runs.writing}`)).json();
+    const answer = { id: "e9", at: "2099-01-01T00:00:00.000Z", kind: "ask", entry: "project", question: "Where is the limit read?", text: "At the top of the file, where the constant is." };
+    await page.route(`**/api/runs/${runs.writing}/by-hand/guide`, async (route) => {
+      await page.route(`**/api/runs/${runs.writing}`, (read) =>
+        read.fulfill({ json: { run: { ...run, byHand: { ...run.byHand, thread: [...run.byHand.thread, answer] } } } }),
+      );
+      await route.fulfill({ status: 202, json: { run: { ...run, byHand: { ...run.byHand, busy: { kind: "guide", since: at } } } } });
+    });
+    const guide = page.locator(".guide-panel");
+    await guide.getByRole("textbox", { name: t.guide.question }).fill("Where is the limit read?");
+    await guide.getByRole("button", { name: t.guide.ask, exact: true }).click();
+    const newest = guide.locator(".by-hand-thread > li").first();
+    await expect(newest).toContainText(answer.text, { timeout: 15_000 });
+    // Below the Tests card it would land out of view: it is said, and the focus (so the view) goes to it.
+    await expect(guide.locator("form p[role=status]")).toHaveText("The guide answered.");
+    await expect(newest).toBeFocused();
+    await expect(newest).toBeInViewport();
+  } finally {
+    await close();
+  }
+});

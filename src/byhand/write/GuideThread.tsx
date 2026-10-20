@@ -18,7 +18,7 @@ export function GuideThread({ entries, steps, onStep, busy }: { entries: GuideEn
         {[...entries].reverse().map((entry) => {
           const step = steps.find((item) => item.id === entry.stepId);
           return (
-            <li key={entry.id}>
+            <li key={entry.id} tabIndex={-1}>
               <strong>{t.kinds[entry.kind] ?? entry.kind}</strong>
               {entry.rung ? <span> {text.guide.rungs[entry.rung] ?? entry.rung}</span> : null}
               {entry.question && <blockquote>{entry.question}</blockquote>}

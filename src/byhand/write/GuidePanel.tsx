@@ -17,7 +17,7 @@ import { api } from "../../api";
 import { useLocale, useT } from "../../i18n";
 import { helpKindList, rulesFrom } from "../../mission/respect";
 import type { DiffFile, Run } from "../../types";
-import { useFocusHome } from "./focus";
+import { focusAnswer, useFocusHome } from "./focus";
 import { GuideExits } from "./GuideExits";
 import { GuideThread } from "./GuideThread";
 import { TestsCard } from "./TestsCard";
@@ -115,21 +115,21 @@ export function GuidePanel(props: GuidePanelProps) {
   const entries = askEntries.filter((value) => value !== "change" || offered);
   const asked = entries.includes(entry) ? entry : "project";
   const review = record.reviews?.at(-1);
-  // A turn that ends with no answer (the CLI failed, timed out) says so in the run log's words and gives the question back.
+  // A turn that ends says so: its answer gets the focus, and no answer (the CLI failed, timed out) says why in the run log's words and gives the question back.
   const turn = useRef<{ last?: string; log?: string; question: string; started?: boolean }>(undefined);
-  const [failed, setFailed] = useState<string>();
+  const [ended, setEnded] = useState<string | true>();
   const answering = record.busy?.kind === "guide";
   useEffect(() => {
     const sent = turn.current;
     if (sent && answering) sent.started = true;
     if (!sent?.started || answering) return;
     turn.current = undefined;
-    if (record.thread?.at(-1)?.id !== sent.last) return;
-    setFailed([...run.logs].reverse().find((log) => log.agent === "lead" && log.kind === "notice" && log.time > (sent.log ?? ""))?.message ?? "");
+    if (record.thread?.at(-1)?.id !== sent.last) return void (setEnded(true), focusAnswer(home.ref));
+    setEnded([...run.logs].reverse().find((log) => log.agent === "lead" && log.kind === "notice" && log.time > (sent.log ?? ""))?.message ?? "");
     setQuestion((now) => now || sent.question);
   }, [answering]); // eslint-disable-line react-hooks/exhaustive-deps -- once per turn, when it ends
   const send = (input: ByHandGuideInput) => {
-    setFailed(undefined);
+    setEnded(undefined);
     turn.current = { last: record.thread?.at(-1)?.id, log: run.logs.at(-1)?.time, question };
     void onGuide({ ...input, ...(step ? { stepId: step.id } : {}), ...(tried.trim() ? { tried: tried.trim() } : {}) }).then(() => (setQuestion(""), setTried("")), quiet);
   };
@@ -209,7 +209,7 @@ export function GuidePanel(props: GuidePanelProps) {
         </div>
         {step && (offered ? !attempt && <p className="field-help">{t.tryFirst}</p> : <p className="field-help">{t.noRung}</p>)}
         {/* Always there, so a screen reader hears the guide start and finish an answer. */}
-        <p role="status" className="visually-hidden">{doing}</p>
+        <p role="status" className="visually-hidden">{doing || (ended === true ? t.answered : "")}</p>
       </form>
       {step && <TalkItThrough step={step} tests={record.tests ?? []} fingerprint={fingerprint} onStep={onStep} />}
       <RepeatFailure key={step?.id} step={step} tests={record.tests ?? []} onCheckIn={props.onCheckIn} />
@@ -218,7 +218,7 @@ export function GuidePanel(props: GuidePanelProps) {
           <Loader2 size={14} className="spin" /> {doing}
         </p>
       )}
-      {(error || failed !== undefined) && <p className="inline-error" role="alert">{error || t.failed({ reason: failed ?? "" })}</p>}
+      {(error || typeof ended === "string") && <p className="inline-error" role="alert">{error || t.failed({ reason: typeof ended === "string" ? ended : "" })}</p>}
       <GuideExits runId={run.id} step={step} tests={record.tests ?? []} fingerprint={fingerprint} issueUrl={props.issueUrl}
         channels={props.channels} onStep={onStep} onCheckIn={props.onCheckIn} onLeave={props.onLeave} busy={working} />
       <TestsCard runId={run.id} record={record} testCommand={testCommand} onRunTests={props.onRunTests} onReportTests={props.onReportTests} onStopTests={props.onStopTests}
