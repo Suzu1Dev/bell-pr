@@ -502,15 +502,20 @@ test("against the real server: no AI draft or AI line, a PR title of the person'
     await expect(title).toHaveValue("");
     const asks = page.locator(".draft-origin-notice[role=status]", { hasText: workspace.draft.emptyNoticeByHand });
     await expect(asks).toBeVisible();
-    // Approval is refused before the person marks the change ready.
-    const approve = page.locator(".review-footer").getByRole("button", { name: workspace.footer.approvePr });
-    await approve.click();
-    await expect(page.locator(".toast-error")).toContainText(byHand.notReady);
+    // Before the person marks the change ready, the footer offers Ready for review, not approval,
+    // and the server refuses an approval.
+    const footer = page.locator(".review-footer");
+    const approve = footer.getByRole("button", { name: workspace.footer.approvePr });
+    await expect(footer.getByRole("button", { name: workspace.byHand.ready })).toBeVisible();
+    await expect(approve).toHaveCount(0);
+    const early = await page.request.post(`/api/runs/${runId}/approve`, { data: { draft: { title: "", body: "" } } });
+    expect(early.status()).toBe(409);
+    expect(((await early.json()) as { error: string }).error).toBe(byHand.notReady);
     const { files } = (await (await page.request.get(`/api/runs/${runId}/diff`)).json()) as { files: { path: string; fingerprint: string }[] };
     const ready = await page.request.post(`/api/runs/${runId}/by-hand/ready`, { data: { changeFingerprint: changeFingerprint(files), review: false } });
     expect(ready.ok()).toBe(true);
-    // Ready, but still no title: approval asks for it.
-    await page.locator(".toast-error").getByRole("button").click();
+    // Ready (read again), but still no title: approval asks for it.
+    await page.reload();
     await approve.click();
     await expect(page.locator(".toast-error")).toContainText(serverRun.publish.prTextRequired);
     // The person writes both; the notice goes, and saving never adds the AI line, though "Always add" is on.
