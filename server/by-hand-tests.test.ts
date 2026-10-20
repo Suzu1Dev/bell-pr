@@ -560,6 +560,48 @@ test("the stored tail is ANSI-stripped, keeps what a terminal shows of progress 
   assert.doesNotMatch(JSON.stringify(f.run.byHand), /ghp_B|ghp_D|\\u001b/);
 });
 
+/** Credentials as failing suites print them; none of these values may be kept or shown. */
+const printedSecrets = [
+  "AxiosError: Request failed with status code 401",
+  "  headers: { Authorization: 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N' },",
+  '  "authorization": "Basic dXNlcjpwYXNzd29yZDEyMw==",',
+  "  proxy-authorization: token 0123456789abcdef0123456789abcdef01234567",
+  "Error: connect ECONNREFUSED postgres://app:hunter2pass@127.0.0.1:5432/retry",
+  "redis://:s3cretpassw0rd@cache:6379 refused",
+  "//registry.npmjs.org/:_authToken=npm_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789",
+  "aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+  "AWS_SESSION_TOKEN=IQoJb3JpZ2luX2VjEJrEXAMPLEXAMPLEwEaCXVzLWVhc3QtMSJHMEUCIQ",
+  'config: { "stripeSecretKey": "rk_live_51H8abcdefghijklmnopqrstuvwxyz", "privateKey": "abcdefgh12345678" }',
+  "DJANGO_SECRET_KEY=django-insecure-0123456789abcdefghij",
+  "sent Bearer abcdef0123456789abcdef0123456789 to the mock",
+  "slack xoxb-123456789012-1234567890123-AbCdEfGhIjKlMnOpQrStUvWx",
+  "gitlab glpat-abcdefghij0123456789 google AIzaSyA-abcdefghijklmnopqrstuvwxyz12345",
+  "hugging face hf_abcdefghijklmnopqrstuvwxyzABCDEF",
+];
+/** Pieces of the values above that must not survive masking. */
+const secretPieces = /eyJzdWIi|dXNlcjpw|0123456789abcdef01234567|hunter2|s3cretpassw0rd|npm_aBcDeF|wJalrXUtn|IQoJb3Jp|rk_live|abcdefgh12345678|django-insecure|abcdef0123456789abcdef0123456789|xoxb-|glpat-|AIzaSy|hf_abcdef/;
+
+test("credentials a suite prints are masked in the stored tail, the live tail and a reported result", async (t) => {
+  const f = await fixture(t);
+  const script = path.join(f.directory, "secrets.cjs");
+  await writeFile(script, `console.log(${JSON.stringify(printedSecrets.join("\n"))}); console.log("pid " + process.pid); setInterval(() => {}, 1000);`);
+  await f.confirm(`node ${JSON.stringify(script)}`);
+  await en(() => f.byHand.runTests(f.run.id, {}));
+  reap(t, Number((await f.liveMatch(/pid (\d+)/)).value));
+  const live = await f.byHand.liveTests(f.run.id);
+  assert.match(live.tail, /AxiosError/);
+  assert.doesNotMatch(live.tail, secretPieces);
+  const { run } = await en(() => f.byHand.stopTests(f.run.id));
+  const stored = run.byHand!.tests!.at(-1)!.outputTail ?? "";
+  assert.match(stored, /ECONNREFUSED postgres:\/\/\[REDACTED\]@127\.0\.0\.1:5432\/retry/);
+  assert.doesNotMatch(stored, secretPieces);
+  const reported = await f.byHand.reportTests(f.run.id, { outcome: "failed", output: printedSecrets.join("\n") });
+  assert.doesNotMatch(reported.run.byHand!.tests!.at(-1)!.outputTail ?? "", secretPieces);
+  // A credential in the confirmed command is masked in the record.
+  await f.confirm(`DATABASE_URL=postgres://app:hunter2pass@127.0.0.1/retry node -e "process.exit(0)"`);
+  assert.match((await f.runOnce()).command, /^DATABASE_URL=postgres:\/\/\[REDACTED\]@127\.0\.0\.1\/retry node/);
+});
+
 test("the command a run records stays within 300 characters after masking", async (t) => {
   const f = await fixture(t);
   // Masking a short password makes it longer ("[REDACTED]" is 10 characters).

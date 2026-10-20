@@ -1,14 +1,16 @@
 /**
- * Learn by hand: the test command BELL suggests for a project and the
- * environment BELL runs the person's confirmed command with (DESIGN v1.2
- * F9). Both are deterministic: the suggestion comes from the project's own
- * files, never from model output, and it is only a suggestion; nothing
- * runs until the person confirms a command in a request of its own
+ * Learn by hand: the test command BELL suggests for a project, the
+ * environment BELL runs the person's confirmed command with, and the
+ * masking of credentials in its output (DESIGN v1.2 F9). All are
+ * deterministic: the suggestion comes from the project's own files, never
+ * from model output, and it is only a suggestion; nothing runs until the
+ * person confirms a command in a request of its own
  * (server/by-hand-tests.ts).
  */
 import { constants } from "node:fs";
 import { access, lstat, readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { redact } from "./secrets.js";
 
 /** Larger manifests are not read; the suggestion is only a convenience. */
 const manifestBytes = 1_000_000;
@@ -185,4 +187,60 @@ export function testEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     result[name] = byNpm && name === "PATH" ? withoutNpmFolders(value) : value;
   }
   return { ...result, CI: "1", NO_COLOR: "1" };
+}
+
+/** Words of a name that make its value a secret on their own. */
+const secretWords = new Set(["token", "secret", "password", "passwd", "credentials"]);
+/** Last two words of a name that make its value a secret. */
+const secretPairs = new Set(["api key", "access key", "private key", "secret key", "auth key"]);
+
+/**
+ * Whether a name in test output (a config dump, a .env file, a JSON or
+ * YAML object) holds a secret, as the environment filter's names do: its
+ * words, split at _, -, . and at a lower-to-upper case change, are at
+ * least two, and one is token, secret, password, passwd or credentials,
+ * or the last two are api, access, private, secret or auth key. A single
+ * word is left to redact() and to the header rule: "Unexpected token: …"
+ * is a parser's message.
+ */
+function secretName(name: string) {
+  const words = name
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .split(/[\s_.-]+/)
+    .filter(Boolean);
+  return words.length > 1 && (words.some((word) => secretWords.has(word)) || secretPairs.has(words.slice(-2).join(" ")));
+}
+
+/**
+ * Credential shapes in test output that redact() (server/secrets.ts) does
+ * not know, each linear in the text's length: the value of an
+ * Authorization header or after "Bearer"; the user and password of a URL
+ * of any scheme (postgres://, redis://…); tokens with a known prefix (npm,
+ * Slack, Stripe, GitLab, Google, Hugging Face); the value of an assignment
+ * to a secret name (secretName); and the base64 lines of a private key
+ * whose BEGIN line was cut off before the text, up to its END line.
+ */
+const outputSecrets: readonly [RegExp, string | ((...match: string[]) => string)][] = [
+  [/\b((?:proxy-)?authorization["']?\s*[:=]\s*["']?(?:(?:bearer|basic|token|digest|bot)\s+)?)[^\s"',;]{6,}/gi, "$1[REDACTED]"],
+  [/\b(bearer\s+)[A-Za-z0-9._~+/=-]{16,}/gi, "$1[REDACTED]"],
+  [/\b([a-z][a-z0-9+.-]{0,30}:\/\/)[^\s/@:]*:[^\s/@]+@/gi, "$1[REDACTED]@"],
+  [
+    /\b(?:npm_[A-Za-z0-9]{36}|xox[abposr]-[A-Za-z0-9-]{10,}|[rs]k_(?:live|test)_[A-Za-z0-9]{16,}|glpat-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}|hf_[A-Za-z0-9]{30,})/g,
+    "[REDACTED]",
+  ],
+  [
+    /(?<![\w.-])([\w.-]{1,100})(["']?\s*[:=]\s*["']?)([^\s"',;]{8,})/g,
+    (match, name, separator) => (secretName(name) ? `${name}${separator}[REDACTED]` : match),
+  ],
+  [/^[\s\S]*?-----END (?:[A-Z]+ )?PRIVATE KEY-----/, "[REDACTED]"],
+];
+
+/** Test output and the test command as BELL keeps or shows them: redact() and the shapes above masked. */
+export function maskOutput(text: string): string {
+  return outputSecrets.reduce(
+    (result, [pattern, replacement]) =>
+      typeof replacement === "string" ? result.replace(pattern, replacement) : result.replace(pattern, replacement),
+    redact(text),
+  );
 }

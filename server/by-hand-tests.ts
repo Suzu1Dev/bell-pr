@@ -36,8 +36,8 @@ import {
 import { changeFingerprint } from "../shared/change-fingerprint.js";
 import { shuttingDown, sm } from "./i18n/index.js";
 import { log } from "./log.js";
-import { command, git, redact } from "./process.js";
-import { suggestTestCommand, testEnvironment } from "./test-command.js";
+import { command, git } from "./process.js";
+import { maskOutput, suggestTestCommand, testEnvironment } from "./test-command.js";
 import { AppError, withRunLocale, type Repository, type Run } from "./types.js";
 import type { WorkbenchContext } from "./workbench.js";
 
@@ -95,11 +95,11 @@ function cleanLine(line: string) {
 }
 
 /** A command as the record keeps it: credentials masked, within the record's cap (masking can lengthen it). */
-const recordedCommand = (text: string) => redact(text).slice(0, byHandLimits.commandChars);
+const recordedCommand = (text: string) => maskOutput(text).slice(0, byHandLimits.commandChars);
 
 /** Text the person pasted or a tail kept: cleaned line by line, credentials masked, trailing space dropped. */
 function cleanOutput(text: string) {
-  return redact(text.split("\n").map(cleanLine).join("\n")).trimEnd();
+  return maskOutput(text.split("\n").map(cleanLine).join("\n")).trimEnd();
 }
 
 /**
@@ -278,7 +278,7 @@ function errorNote(error: unknown) {
   if (error instanceof AppError && error.statusCode === 422)
     return m.tooMuchOutput({ megabytes: Math.round(testRunLimits.maxBytes / 1_048_576) });
   const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error;
-  return m.couldNotStart({ reason: redact(cause instanceof Error ? cause.message : String(cause)) });
+  return m.couldNotStart({ reason: maskOutput(cause instanceof Error ? cause.message : String(cause)) });
 }
 
 /** Runs `/bin/sh -c <confirmed command>` in the run's folder and records the result. */
@@ -374,7 +374,7 @@ export async function liveTests(ctx: WorkbenchContext, id: string): Promise<Live
   ctx.run(id);
   const live = lives(ctx).get(id);
   if (!live || !ctx.byHandJobs.has(jobKey(id))) return { running: false, tail: "" };
-  return { running: true, tail: redact(tailWindow(live.tail)), startedAt: live.startedAt };
+  return { running: true, tail: maskOutput(tailWindow(live.tail)), startedAt: live.startedAt };
 }
 
 /** POST /api/runs/:id/by-hand/tests/stop */
