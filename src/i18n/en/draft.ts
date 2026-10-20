@@ -433,8 +433,13 @@ const draft = {
       "All conflict markers are removed; changed files still need a file-by-file review.",
     resolving: "The agent is resolving the conflicts…",
     resolve: "Ask the agent to resolve the conflicts",
-    /** A Learn-by-hand run has no conflict agent (DESIGN v1.2 F2). */
-    byHand: `Resolve the markers by hand; ${product.name} re-checks them when you refresh the diff on the Code changes tab.`,
+    /** A Learn-by-hand run has no conflict agent (DESIGN v1.2 F2): the person resolves the markers. */
+    byHand: {
+      published: ({ latest, ours }: { latest: string; ours: string }) =>
+        `In each file, the side marked ${latest} is the target branch's current content and the side marked ${ours} is this pull request. You cannot approve until every conflict marker is removed. Resolve the markers by hand; ${product.name} re-checks them when you refresh the diff on the Code changes tab. Changed files still need a file-by-file review.`,
+      unpublished: ({ latest, ours }: { latest: string; ours: string }) =>
+        `In each file, the side marked ${latest} is the target branch's current content and the side marked ${ours} is this contribution. You cannot approve until every conflict marker is removed. Resolve the markers by hand; ${product.name} re-checks them when you refresh the diff on the Code changes tab. Changed files still need a file-by-file review.`,
+    },
   },
   /** FollowUpRounds: the rounds of changes after maintainer review. */
   followUps: {

@@ -322,7 +322,12 @@ const m: Translation<typeof en> = {
     allResolved: "衝突標記都已移除；改過的檔案仍要逐檔審閱。",
     resolving: "Agent 正在解衝突…",
     resolve: "請 Agent 解決衝突",
-    byHand: `請親手解決衝突標記；你到「程式碼變更」重新整理差異時，${product.name} 會再檢查一次。`,
+    byHand: {
+      published: ({ latest, ours }) =>
+        `檔案裡標示 ${latest} 的一邊是目標分支現在的內容，標示 ${ours} 的一邊是這個 PR。衝突標記全部移除前不能核准。請親手解決衝突標記；你到「程式碼變更」重新整理差異時，${product.name} 會再檢查一次。改過的檔案仍要逐檔審閱。`,
+      unpublished: ({ latest, ours }) =>
+        `檔案裡標示 ${latest} 的一邊是目標分支現在的內容，標示 ${ours} 的一邊是這次的貢獻。衝突標記全部移除前不能核准。請親手解決衝突標記；你到「程式碼變更」重新整理差異時，${product.name} 會再檢查一次。改過的檔案仍要逐檔審閱。`,
+    },
   },
   followUps: {
     title: "依 review 修正的紀錄",

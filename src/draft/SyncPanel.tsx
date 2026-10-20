@@ -149,10 +149,9 @@ export function SyncPanel({ run, busy, onSync, onResolve, onUndo }: Props) {
           </ul>
           {open.length > 0 && (
             <p>
-              {byHand ? t.byHand : rich(
-                published
-                  ? t.conflictHelp.published
-                  : t.conflictHelp.unpublished,
+              {rich(
+                // A Learn-by-hand run's help has no conflict agent to offer.
+                (byHand ? t.byHand : t.conflictHelp)[published ? "published" : "unpublished"],
                 {
                   latest: <code>latest {run.baseBranch}</code>,
                   ours: (
