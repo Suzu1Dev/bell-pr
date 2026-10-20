@@ -758,7 +758,14 @@ const refusingHeading =
   /\b(?:unacceptable|not\s+(?:\w+\s+)?(?:acceptable|allowed|permitted|ok|okay|fine)|disallowed|forbidden|prohibited|banned|never|don['’]t|do\s+not|avoid)\b/i;
 /** A "Yes" that answers a question about using AI, unless it says "but please don't". */
 const yesAnswer = /^\W*yes\b/i;
-const yesButDont = /\b(?:don['’]t|do\s+not|please\s+(?:avoid|refrain))\b/i;
+/** A "no", a "not", an exception or a "please don't" in a Yes answer or the sentence after it. */
+const yesButDont =
+  /\b(?:no|not|never|nope|don['’]t|do\s+not|avoid\w*|refrain\w*|except\w*|unless|instead|rather\s+than)\b|n['’]t\b/i;
+/** A Yes that says nothing more, or only points to a caveat: the question's kinds stand. */
+const plainYes = /^\W*yes\b[\s,.!;:-]*(?:$|(?:but\s+)?(?:see|note|remember|keep\s+in\s+mind|be\s+(?:aware|careful))\b)/i;
+/** A question about the person asking using AI ("Can I use …?", "Is it OK to …?"), not about others. */
+const askerUsesAi =
+  /^\W*(?:(?:can|may|could)\s+(?:I|we|you|one|contributors?|newcomers?)\b|(?:is\s+it|it['’]s)\s+(?:ok|okay|fine|acceptable|allowed|permitted|alright)\b|(?:am\s+I|are\s+(?:we|you|contributors?|newcomers?))\s+(?:allowed|permitted)\b)/i;
 const listItem = /^\s*(?:[-*+]|\d{1,9}[.)])\s+/;
 
 /**
@@ -862,19 +869,26 @@ function readCarveOuts(path: string, text: string): PolicyAllowance[] {
     sentences.forEach((sentence, at) => {
       const words = search.slice(sentence.start, sentence.end);
       if (!aiMention.test(words)) return;
-      // A question about using AI, answered "Yes" in the next sentence or block.
+      // A question about the person using AI, answered "Yes" in the next sentence or block.
       if (/\?\W*$/.test(words)) {
+        if (!askerUsesAi.test(words)) return;
         const following = all[index + 1];
         const next = sentences[at + 1]
           ? { block, sentence: sentences[at + 1] }
           : following && { block: following, sentence: splitSentences(following.text)[0] };
         if (!next?.sentence) return;
-        const answer = searchable(next.block.text).slice(next.sentence.start, next.sentence.end);
-        if (!yesAnswer.test(answer) || yesButDont.test(answer) || permissionScoped.test(answer)) return;
+        const answered = searchable(next.block.text);
+        const answer = answered.slice(next.sentence.start, next.sentence.end);
+        // The answer and the sentence after it: "Yes. But please don't." is no Yes.
+        const after = splitSentences(next.block.text).find((other) => other.start >= next.sentence.end);
+        const said = answered.slice(next.sentence.start, after?.end ?? next.sentence.end);
+        if (!yesAnswer.test(answer) || yesButDont.test(said) || permissionScoped.test(said)) return;
+        // "Yes, for understanding the code": only what the answer names too.
+        const kinds = carveOutKinds(words).filter((kind) => plainYes.test(answer) || carveOutKinds(answer).includes(kind));
         const asked = quoteOf(block.text, sentence, sentence);
-        const said = quoteOf(next.block.text, next.sentence, next.sentence);
-        const quote = `${asked.quote} ${said.quote}`;
-        if (quote.length <= 300) add(block, { quote, offset: asked.offset }, carveOutKinds(words));
+        const yes = quoteOf(next.block.text, next.sentence, next.sentence);
+        const quote = `${asked.quote} ${yes.quote}`;
+        if (quote.length <= 300) add(block, { quote, offset: asked.offset }, kinds);
         return;
       }
       for (const phrase of allMatches(permission, words)) {

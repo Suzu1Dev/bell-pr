@@ -636,6 +636,24 @@ test("a question about using AI answered Yes is a carve-out, never 'Yes, but ple
   assert.deepEqual(carveOuts(`${ban} Can I use AI to research the codebase? Yes, but only maintainers may.`), []);
 });
 
+test("a Yes counts for the person asking, and only as far as it goes", () => {
+  // The answer narrows the question: only the kinds both name, or none.
+  assert.deepEqual(carveOuts(`${ban}\n\nCan I use AI to debug or understand my code? Yes, for understanding the code.`), [
+    "3: Can I use AI to debug or understand my code? Yes, for understanding the code. [explain, answer]",
+  ]);
+  for (const text of [
+    // A "no", a "not" or an "only" anywhere in the answer, or in the sentences after it.
+    "Can I use AI to debug or understand my code? Yes, for understanding; no for debugging.",
+    "Can I use an AI tool to debug my patch? Yes. But please don't.",
+    "Can I use an AI tool to debug my patch?\n\nYes. It is not a replacement for running the tests yourself.",
+    "Can I use AI to debug my patch? Yes, for understanding.",
+    // About somebody else using AI.
+    "Do the maintainers use AI to explain the code? Yes.",
+    "Does the CI use an LLM to debug failures? Yes.",
+  ])
+    assert.deepEqual(carveOuts(`${ban}\n\n${text}`), [], text);
+});
+
 test("a list under a heading or lead-in naming acceptable uses counts; never under an unacceptable one", () => {
   // matplotlib doc/devel/contribute.rst: a grid with a bold heading per list, and the
   // whole word "acceptable" (not the one inside "Unacceptable").
