@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { byHandClean } from "../shared/by-hand.js";
 import { git } from "./process.js";
 import { runAgent } from "./run-executor.js";
 import { Store } from "./store.js";
@@ -157,6 +158,25 @@ test("retryTeam re-plans a Learn-by-hand run without an outline, and returns one
     withLocale("en", () => f.workbench.retryTeam(f.run.id)),
     refused(/^A Learn-by-hand run goes on from your own edits/),
   );
+  assert.equal(f.calls.length, 0);
+});
+
+test("retryTeam never re-plans a Learn-by-hand run an older build planned as a team run", async (t) => {
+  const f = await fixture(t);
+  // An older build, which doesn't know the mode, planned the run for teammates who then wrote files.
+  f.run.status = "failed";
+  f.run.team!.tasks = [
+    { id: "t1", title: "Add the delay", description: "Wait between attempts.", owner: "member-1", files: ["retry.ts"], dependsOn: [], status: "failed" },
+  ];
+  f.run.agents.push({ id: "member-1", name: "Teammate 1", role: "Developer", status: "failed", detail: "" });
+  await assert.rejects(
+    withLocale("en", () => f.workbench.retryTeam(f.run.id)),
+    refused(/^A Learn-by-hand run goes on from your own edits/),
+  );
+  // The teammate stays on the record, so the run's history still withdraws the claim.
+  assert.deepEqual(f.run.agents.map((agent) => agent.id), ["lead", "reviewer", "tester", "member-1"]);
+  assert.deepEqual(byHandClean(f.run), { clean: false, reason: "agents" });
+  assert.equal(f.run.status, "failed");
   assert.equal(f.calls.length, 0);
 });
 

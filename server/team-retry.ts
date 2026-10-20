@@ -118,6 +118,10 @@ async function retryByHand(
   team: NonNullable<Run["team"]>,
   message?: string,
 ) {
+  // An older build planned (or ran) this run as a team run. Re-planning
+  // would take its teammates off the run's cards, the history that
+  // withdraws the claim (byHandClean), so there is nothing to retry.
+  if (team.tasks.length) throw new AppError((m) => m.byHand.retryRefused, 409);
   if (!run.byHand?.guidePlan) return retryPlanning(ctx, run, team, message);
   if (run.byHand.plan?.confirmedAt)
     throw new AppError((m) => m.byHand.retryRefused, 409);
