@@ -2,6 +2,7 @@ import { Eye, PenLine, RotateCcw } from "lucide-react";
 import type { UnderstandingView } from "../../shared/understanding";
 import { useT } from "../i18n";
 import type { DiffFile } from "../types";
+import { focusPanel, inPanel } from "./focus";
 import { usePanelStrings } from "./i18n";
 import { readerAllowed, readerRequests } from "./reader";
 
@@ -45,7 +46,7 @@ export function ReaderView({
   const check = useT("workspace").check;
   const ownQuestion = reader.check?.plan.some((item) => item.path === file.path);
   function show(event: { currentTarget: HTMLElement }) {
-    event.currentTarget.closest<HTMLElement>("[role=tabpanel]")?.focus();
+    focusPanel(event);
     const wanted = readerRequests(file);
     if (wanted.explanation) onExplain?.();
     if (wanted.walkthrough) onWalkthrough?.();
@@ -60,7 +61,7 @@ export function ReaderView({
           {!reader.check && reader.checkError ? (
             <>
               <p role="alert">{check.loadFailed({ message: reader.checkError })}</p>
-              <button type="button" className="explain-retry" onClick={reader.onRetryCheck}>
+              <button type="button" className="explain-retry" onClick={inPanel(reader.onRetryCheck)}>
                 <RotateCcw size={14} aria-hidden="true" />
                 {check.retry}
               </button>

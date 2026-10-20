@@ -19,6 +19,7 @@ import type {
 import { getDemo } from "../demo";
 import { useFormat, useLocale, useT } from "../i18n";
 import type { DiffFile } from "../types";
+import { inPanel } from "./focus";
 import { MarkdownContent } from "./MarkdownContent";
 import { WalkthroughAttempt, type WalkthroughInput } from "./WalkthroughAttempt";
 import { withNodes } from "./withNodes";
@@ -174,7 +175,7 @@ export function WalkthroughCards({
             className="explain-retry"
             type="button"
             disabled={busy}
-            onClick={onRetry}
+            onClick={inPanel(onRetry)}
           >
             <RotateCcw size={14} />
             {busy ? t.busy : t.retry}

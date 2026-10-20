@@ -295,7 +295,8 @@ test("when the check can't be read, the reader view says why and reads it again,
   assert.match(html, /<p role="alert">Could not load the check: The server did not answer\.<\/p>/);
   assert.match(html, /<button type="button" class="explain-retry">.*Try again<\/button>/);
   assert.doesNotMatch(html, /Show how a reader sees it/);
-  (find(shallow(ReaderView, { file, reader: failed, busy: false }), "button")!.props.onClick as () => void)();
+  const pressed = { currentTarget: { closest: () => null } };
+  (find(shallow(ReaderView, { file, reader: failed, busy: false }), "button")!.props.onClick as (event: typeof pressed) => void)(pressed);
   assert.deepEqual(calls, ["read the check again"]);
   const zh = renderZh(createElement(ReaderView, { file, reader: failed, busy: false }));
   assert.match(zh, /<p role="alert">無法載入檢查：The server did not answer\.<\/p>/);
@@ -304,4 +305,46 @@ test("when the check can't be read, the reader view says why and reads it again,
   const kept = renderEn(createElement(ReaderView, { file, reader: { ...failed, check: check([`fallback:${file.path}`]) }, busy: false }));
   assert.doesNotMatch(kept, /Could not load the check/);
   assert.match(kept, /Show how a reader sees it/);
+});
+
+/** The first element in a tree, not rendered further, that `match` accepts. */
+function findWhere(node: ReactNode, match: (element: ReactElement<Record<string, unknown>>) => boolean): ReactElement<Record<string, unknown>> | undefined {
+  if (Array.isArray(node)) return node.map((child) => findWhere(child, match)).find(Boolean);
+  if (!isValidElement<{ children?: ReactNode }>(node)) return undefined;
+  const element = node as ReactElement<Record<string, unknown>>;
+  return match(element) ? element : findWhere(node.props.children, match);
+}
+
+test("a failed explanation's or walkthrough's Retry keeps focus in the panel as the progress replaces it", () => {
+  const calls: string[] = [];
+  const panelElement = { focus: () => calls.push("focus the tab panel") };
+  const event = { currentTarget: { closest: (selector: string) => (selector === "[role=tabpanel]" ? panelElement : null) } };
+  const press = (tree: ReactNode) =>
+    (findWhere(tree, (element) => element.type === "button" && element.props.className === "explain-retry")!.props.onClick as (
+      pressed: typeof event,
+    ) => void)(event);
+  const failed = { ...file, explanationStatus: "failed" as const, walkthroughStatus: "failed" as const, explanationError: "It stopped." };
+  const panelTree = (props: Partial<ExplanationPanelProps>) =>
+    shallow(ExplanationPanel, {
+      file: failed,
+      messages: [],
+      loading: false,
+      onAsk() {},
+      demo: false,
+      onRetryExplanation: () => calls.push("explain again"),
+      onRetryWalkthrough: () => calls.push("walk through again"),
+      ...props,
+    });
+  press(panelTree({}));
+  assert.deepEqual(calls.splice(0), ["focus the tab panel", "explain again"]);
+  // The example of a ready explanation, made again on its own.
+  const demoFile = getDemo("en").files.find((entry) => entry.path === "src/client.ts")!;
+  const { example: _example, ...withoutExample } = demoFile.explanation!;
+  press(panelTree({ file: { ...failed, explanation: withoutExample } }));
+  assert.deepEqual(calls.splice(0), ["focus the tab panel", "explain again"]);
+  press(shallow(WalkthroughCards, { file: failed, demo: false, onRetry: () => calls.push("walk through again") }));
+  assert.deepEqual(calls.splice(0), ["focus the tab panel", "walk through again"]);
+  // Reading the check again: its Try again gives way to the request once the check arrives.
+  press(shallow(ReaderView, { file, busy: false, reader: { ...reader(undefined), checkError: "Down.", onRetryCheck: () => calls.push("read the check") } }));
+  assert.deepEqual(calls.splice(0), ["focus the tab panel", "read the check"]);
 });

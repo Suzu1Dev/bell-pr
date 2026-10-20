@@ -36,6 +36,7 @@ import { scrollBehavior } from "../app/presentation";
 import { useFormat, useLocale, useT } from "../i18n";
 import type { ChatMessage, DiffFile, Run } from "../types";
 import { MaintainerFeedback } from "./MaintainerFeedback";
+import { inPanel } from "./focus";
 import { usePanelStrings } from "./i18n";
 import { MarkdownContent } from "./MarkdownContent";
 import { QuizAttempt } from "./QuizAttempt";
@@ -608,7 +609,7 @@ export function ExplanationPanel({
                           className="explain-retry"
                           type="button"
                           disabled={explanationBusy}
-                          onClick={onRetryExplanation}
+                          onClick={inPanel(onRetryExplanation)}
                         >
                           <RotateCcw size={14} />
                           {explanationBusy
@@ -752,7 +753,7 @@ export function ExplanationPanel({
                     className="explain-retry"
                     type="button"
                     disabled={explanationBusy}
-                    onClick={onRetryExplanation}
+                    onClick={inPanel(onRetryExplanation)}
                   >
                     <RotateCcw size={14} />
                     {explanationBusy ? t.explain.retryBusy : t.explain.retry}
