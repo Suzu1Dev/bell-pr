@@ -3,6 +3,7 @@
 // are not copies of any project's files.
 import test from "node:test";
 import assert from "node:assert/strict";
+import { byHandRulesCase } from "./by-hand-rules.js";
 import { aiDisclosureLine } from "./drafts.js";
 import {
   attachCarveOuts,
@@ -338,6 +339,33 @@ test("a refusal and an AI term in different sentences are not a ban", () => {
     "This library wraps LLM APIs. We will not merge PRs that add new providers without tests.",
   ])
     assert.deepEqual(kinds("CONTRIBUTING.md", text), [], text);
+});
+
+test("typographic apostrophes and hyphens read as typed ones, so a ban with them is found", () => {
+  for (const text of [
+    "We don’t accept contributions made with the assistance of AI tools.",
+    "We won’t accept patches written with AI assistance.",
+    "You can’t use AI tools for any part of your contribution.",
+    "AI‑generated code is not accepted.",
+    "AI‐generated patches will be rejected.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [["ban", true]], text);
+  // The quote stays verbatim, with the file's own characters.
+  assert.equal(classifyPolicy("CONTRIBUTING.md", "We don’t accept AI-generated code.")[0].quote, "We don’t accept AI-generated code.");
+  // An assistance ban written with them still blocks a Learn-by-hand run, next to an
+  // output ban and a carve-out that alone would give the quoted confirm.
+  const text = [
+    "Contributors shouldn’t use AI assistants for their pull requests.",
+    "",
+    "AI-generated code is not accepted.",
+    "",
+    "Using AI to understand the code is fine.",
+  ].join("\n");
+  const fitted = byHandRulesCase(
+    { checkedAt: "2026-10-20T10:00:00.000Z", findings: attachCarveOuts("CONTRIBUTING.md", text, classifyPolicy("CONTRIBUTING.md", text)), filesRead: ["CONTRIBUTING.md"] },
+    { learningIssue: false, now: "2026-10-20T10:00:00.000Z" },
+  );
+  assert.deepEqual([fitted.case, fitted.case === "blocked" && fitted.reason], ["blocked", "reach"]);
 });
 
 test("a refusal in a sentence that lets contributors use AI is ambiguous, never a block", () => {

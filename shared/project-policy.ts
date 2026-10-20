@@ -440,9 +440,14 @@ const quotedWords = /^\s*(?:(?:Assisted|Generated)-by:?|[\w\s'’-]*\bgood[- ]fi
  * Text to search, positions kept: inline code and comment delimiters
  * blanked, emphasis markers too; what a reStructuredText role or link shows
  * (":ref:`AI generated <target>`", "`text <url>`_") stays readable.
+ * Typographic apostrophes and hyphens read as typed ones ("don’t",
+ * "AI‑generated"), one character for one, so a rule written with them is
+ * found; quotes keep the file's own characters.
  */
 function searchable(text: string) {
   return text
+    .replace(/[\u2018\u2019\u02bc\u2032]/g, "'")
+    .replace(/[\u2010\u2011]/g, "-")
     .replace(
       /:[\w.+-]+:`([^`]*)`|`([^`<]*?)\s*<[^`>]*>`_{1,2}/g,
       (whole: string, role: string | undefined, link: string | undefined) => {
