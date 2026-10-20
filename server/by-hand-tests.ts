@@ -5,10 +5,12 @@
  *
  * Only a command confirmed in its own request runs, only on a click,
  * never automatically, with the secret variables stripped by pattern and
- * the process group killed on Stop, timeout and shutdown; one test job per
- * run, registered in `ctx.byHandJobs` and `ctx.controllers` as
- * `tests:<id>`. BELL runs it as the person's terminal would: with their
- * permissions, in the run's folder, with no OS sandbox (v1.3).
+ * the process group killed on Stop, timeout and shutdown, and what is
+ * left of it once the command exits; one test job per run, registered in
+ * `ctx.byHandJobs` and `ctx.controllers` as `tests:<id>`. BELL runs it as
+ * the person's terminal would: with their permissions, in the run's
+ * folder, with no OS sandbox (v1.3). Processes that leave the group (their
+ * own session, a daemon) are not ended.
  *
  * - `testCommand(ctx, id)`: GET …/by-hand/test-command, the suggestion and
  *   the confirmed command.

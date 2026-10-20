@@ -7,8 +7,9 @@
  * `<dataDir>/children.json` (0600). If BELL PR crashes or is killed, those
  * agents keep running and editing worktrees, and a test run keeps running
  * in its run's folder; at the next start, reapOrphanedAgents stops the
- * recorded groups that are still alive, before the store marks their runs
- * failed.
+ * recorded groups that are still alive, before the store marks the agents'
+ * runs failed and clears a test run's busy mark (the run itself stays in
+ * review, without a result for that test run).
  *
  * POSIX only: Windows has no process groups, and BELL PR does not record
  * there.
