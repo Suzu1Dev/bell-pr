@@ -635,3 +635,17 @@ test("the quoted confirm leads the project's rules", () => {
     [["rules", ["by-hand-rules", "pr-closed", "project-rules"]]],
   );
 });
+
+test("the warning about the person's own words on AI use joins their words, not the project's rules", () => {
+  const check = (id: DraftCheck["id"], kind: DraftCheck["kind"] = "confirm"): DraftCheck => ({ id, kind, message: id, details: [] });
+  assert.deepEqual(
+    groupChecks([check("ai-disclosure", "block"), check("disclosure-accuracy"), check("own-words")]).map((group) => [
+      group.topic,
+      group.checks.map((item) => item.id),
+    ]),
+    [
+      ["rules", ["ai-disclosure"]],
+      ["words", ["disclosure-accuracy", "own-words"]],
+    ],
+  );
+});
