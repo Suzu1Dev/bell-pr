@@ -85,6 +85,24 @@ async function publishDialog(page: Page) {
   return dialog;
 }
 
+/**
+ * Resolves once the publish dialog's opening reads are done: the project's
+ * rules (the seeded project has none stored, so the dialog reads them),
+ * then the server's checks it reads after them. A test that changes the
+ * checks' words waits for it, so that this read never brings the new words.
+ */
+function openingReads(page: Page) {
+  return new Promise<void>((resolve) => {
+    let rulesRead = false;
+    page.on("response", (response) => {
+      if (new URL(response.url()).pathname.endsWith("/contribution-rules/refresh")) rulesRead = true;
+    });
+    page.on("requestfinished", (request) => {
+      if (rulesRead && new URL(request.url()).pathname === `/api/runs/${runId}/preflight`) resolve();
+    });
+  });
+}
+
 /** Fails on serious or critical axe issues inside `include`. */
 async function expectAccessible(page: Page, include: string) {
   const { violations } = await new AxeBuilder({ page }).include(include).analyze();
@@ -223,10 +241,12 @@ test("a fitted run's quoted confirm stands beside the record, with no reason fie
     const requoted: DraftCheck = { ...quoted, details: [quoted.details[0], `docs/devel/code-provenance.rst:4: "${rule} This applies to all files."`] };
     let changed = false;
     await page.route(`**/api/runs/${runId}/preflight`, (route) => route.fulfill({ json: { checks: [changed ? requoted : quoted] } }));
+    const reads = openingReads(page);
     await page.goto(`/#/runs/${runId}/draft?locale=en`);
     // The Draft tab's checklist shows the server's quoted confirm in the rules row.
     await expect(page.locator('[data-row="rules"]')).toContainText(quoted.message);
     const dialog = await publishDialog(page);
+    await reads;
     const rules = dialog.locator("fieldset", { has: page.locator("legend", { hasText: workspace.publish.groups.rules }) });
     // The record first, then the confirm with every quote on the page.
     await expect(rules.locator(":scope > section.byhand-record")).toContainText(record.fitted({ kinds: "explanations, answers, and test help" }));
@@ -391,8 +411,10 @@ test("a quoted confirm whose words change is never sent ticked, not even by a cl
       sent.push((route.request().postDataJSON() as { acknowledged: string[] }).acknowledged);
       await route.fulfill({ status: 409, json: { error: "Not now." } });
     });
+    const reads = openingReads(page);
     await page.goto(`/#/runs/${runId}/draft?locale=en`);
     const dialog = await publishDialog(page);
+    await reads;
     await dialog.getByRole("checkbox", { name: quoted.message }).check();
     // The moment the new words are on the page, before anything else runs, a click lands on Submit.
     await page.evaluate((words) => {
