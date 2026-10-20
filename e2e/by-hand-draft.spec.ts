@@ -13,6 +13,7 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import type { DraftCheck } from "../shared/draft-checks";
 import { aiDisclosureLine } from "../shared/drafts";
 import record from "../src/byhand/record/i18n/en";
+import common from "../src/i18n/en/common";
 import draft from "../src/i18n/en/draft";
 import mission from "../src/i18n/en/mission";
 import workspace from "../src/i18n/en/workspace";
@@ -401,6 +402,38 @@ test("a quoted confirm whose words change is never sent ticked, not even by a cl
     // Only the first request carried the tick: the one for the words the person read.
     await page.waitForTimeout(500);
     expect(sent).toEqual([["by-hand-rules"]]);
+  } finally {
+    await context.close();
+    await project.stop();
+  }
+});
+
+test("a refused or failed publish of a Learn-by-hand run says why and keeps the focus in the dialog", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const project = await startRealProject({ reviewed: true, appSettings: { skipUnderstandingCheck: true }, run: byHandRun() });
+  const { context, page } = await open(browser, project);
+  try {
+    // The server's checks stay the same, so nothing else moves the focus.
+    await page.route(`**/api/runs/${runId}/preflight`, (route) => route.fulfill({ json: { checks: [] } }));
+    let answer: "refuse" | "drop" = "refuse";
+    await page.route(`**/api/runs/${runId}/publish`, (route) =>
+      answer === "refuse" ? route.fulfill({ status: 422, json: { error: "Confirm the project's quoted rules first." } }) : route.abort("internetdisconnected"),
+    );
+    await page.goto(`/#/runs/${runId}/draft?locale=en`);
+    const dialog = await publishDialog(page);
+    const submit = dialog.getByRole("button", { name: workspace.publish.submit });
+    for (const next of ["refuse", "drop"] as const) {
+      answer = next;
+      await submit.click();
+      const error = dialog.locator(".inline-error[role=alert]");
+      await expect(error).toBeVisible();
+      if (next === "refuse") await expect(error).toHaveText("Confirm the project's quoted rules first.");
+      else await expect(error).toHaveText(common.errors.serverUnreachable);
+      // The focus is still in the dialog, so Tab stays in it too.
+      await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest("[role=dialog]"))).toBe(true);
+      await page.keyboard.press("Tab");
+      expect(await page.evaluate(() => !!document.activeElement?.closest("[role=dialog]"))).toBe(true);
+    }
   } finally {
     await context.close();
     await project.stop();
