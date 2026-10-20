@@ -178,4 +178,11 @@ export interface RunCore {
   guardOverrides?: GuardOverride[];
   /** The person's one-line reason for each weakened-test item, keyed by its id. */
   reviewability?: { testReasons?: Record<string, string> };
+  /**
+   * True for a Learn-by-hand run: the person writes every line and BELL's
+   * agents only read. Set only by createRun from the request and never
+   * changed; absent on agent runs. Not a detail field, so the run list
+   * shows it.
+   */
+  learnByHand?: true;
 }

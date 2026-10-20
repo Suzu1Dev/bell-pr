@@ -371,6 +371,8 @@ export const runReadSchema = loose({
       z.array(loose({ id: text.max(40), reason: text.max(200), at: text })).max(8),
     ),
     reviewability: later(loose({ testReasons: z.record(text.max(300)).optional() })),
+    // v1.2 (Learn by hand), optional in the same way.
+    learnByHand: later(z.literal(true)),
 });
 
 const runSchema = lenientRead(runReadSchema);

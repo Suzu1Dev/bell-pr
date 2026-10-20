@@ -1114,3 +1114,27 @@ test("a walkthrough a restart interrupted is failed in the run's language, and c
   // runWithV11Fields is an English run.
   assert.match(loaded.error!, /^The service restarted, so the code walkthrough stopped/);
 });
+
+// Fields added in v1.2 (Learn by hand), under the same rules: optional, and
+// readable by a build whose schema lacks them (AGENTS.md).
+
+/** A Learn-by-hand run in review that carries every field v1.2 adds to a run. */
+function runWithV12Fields(): Run {
+  const run = runWithUpstreamFields();
+  run.id = "run-v12-by-hand";
+  run.learnByHand = true;
+  return run;
+}
+
+const v12RunSchemas: Record<string, z.ZodTypeAny> = {
+  learnByHand: runReadSchema.omit({ learnByHand: true }),
+};
+
+for (const [field, older] of Object.entries(v12RunSchemas))
+  test(`a build that predates the run's ${field} (v1.2) still reads a run that has it`, () => {
+    const written = JSON.parse(JSON.stringify(runWithV12Fields()));
+    const read = lenientRead(older).safeParse(written);
+    assert.ok(read.success, read.success ? "" : read.error.message);
+    // state.json passes unknown fields through, so the field survives a save.
+    assert.deepEqual(read.data, written);
+  });
