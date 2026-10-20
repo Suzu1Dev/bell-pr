@@ -59,10 +59,27 @@ const automateWords = /\bautomat\w*/i;
 /** A use of AI that is the automating itself: "use AI to automate". */
 const useToAutomate = /\bus(?:e|es|ed|ing)\s+(?:\S+\s+){0,3}?to\s+automat\w*/gi;
 
+/**
+ * A quote as a reader sees it: the file's emphasis, code marks, link
+ * targets and reStructuredText roles left out, typographic apostrophes
+ * and hyphens read as typed ones, so "No **AI tools** may be used in the
+ * *creation* of a contribution" reads as written.
+ */
+function plain(quote: string) {
+  return quote
+    .replace(/[\u00ad\u200b-\u200d\u2060\ufeff]/g, "")
+    .replace(/[\u2018\u2019\u02bc\u2032]/g, "'")
+    .replace(/[\u2010\u2011]/g, "-")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/:[\w.+-]+:`([^`<]*?)\s*(?:<[^`>]*>)?`|`([^`<]*?)\s*<[^`>]*>`_{1,2}/g, "$1$2")
+    .replace(/\*\*|__|`|(?<![\w*])\*(?=\w)|(?<=\w)\*(?![\w*])|(?<![\w_])_(?=\w)|(?<=\w)_(?![\w_])/g, "");
+}
+
 /** The reach of a contribution ban, from its quote. */
 export function banReach(quote: string): BanReach {
-  if (assistanceWords.test(quote) || helpWordings.test(quote)) return "assistance";
-  if (outputWords.test(quote)) return "output";
+  const text = plain(quote);
+  if (assistanceWords.test(text) || helpWordings.test(text)) return "assistance";
+  if (outputWords.test(text)) return "output";
   return "unknown";
 }
 
@@ -73,8 +90,9 @@ export function banReach(quote: string): BanReach {
  * AI-generated pull requests.
  */
 export function areaReach(quote: string): AreaReach {
-  if (useWords.test(quote.replace(useToAutomate, " "))) return "use";
-  if (automateWords.test(quote)) return "automate";
-  if (outputWords.test(quote)) return "output";
+  const text = plain(quote);
+  if (useWords.test(text.replace(useToAutomate, " "))) return "use";
+  if (automateWords.test(text)) return "automate";
+  if (outputWords.test(text)) return "output";
   return "unknown";
 }
