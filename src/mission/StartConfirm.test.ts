@@ -26,7 +26,7 @@ test("each reason is one whole sentence: practise locally, BELL won't publish it
     "You can practise this locally; BELL PR won&#x27;t publish it while @other_dev&#x27;s pull request #9 would close the same issue, unless you give your reason when you publish.",
     "You can practise this locally; BELL PR won&#x27;t publish it while this repository doesn&#x27;t take pull requests from you.",
     "You can practise this locally; BELL PR won&#x27;t publish it while the project&#x27;s rules don&#x27;t accept AI-assisted contributions.",
-    "You can practise this locally; BELL PR won&#x27;t publish it while the project keeps issues labelled for newcomers for people who write the fix by hand.",
+    "You can practise this locally; BELL PR won&#x27;t publish it while the project keeps issues labelled for newcomers for people learning without AI tools.",
     "You can practise this locally; BELL PR won&#x27;t publish it while you have 2 open pull requests here, at least twice your budget of 1.",
   ]);
   assert.match(html, /<button type="button" class="button secondary">Back<\/button><button type="button" class="button primary"><svg[\s\S]*?<\/svg>Start and practise locally<\/button>/);

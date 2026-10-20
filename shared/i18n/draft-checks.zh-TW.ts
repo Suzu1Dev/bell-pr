@@ -43,7 +43,7 @@ const messages: Translation<typeof en> = {
     ownWords: `這份說明仍是 ${product.name} 建議的文字。許多專案要求用貢獻者自己的話寫說明。`,
     issueClosed: "連結的 issue 已關閉。請連結一個開著的 issue；如果你的變更處理的是別的事，請移除這個連結。",
     issueHasPr: "別人開著的 Pull Request 已經會關閉這個 issue。可以改去審查或測試對方的 Pull Request，或寫下你仍要發布的理由。",
-    areaReserved: `專案把這類 issue 留給不靠 AI、想學著貢獻的人。${product.name} 不會發布這份變更；你可以在本機練習，或親手寫一份。`,
+    areaReserved: `專案把這類 issue 留給不靠 AI、想學著貢獻的人。${product.name} 不會發布這份變更；你可以在本機練習，或改挑一個沒有保留的 issue。`,
     testsWeakened: ({ count }) =>
       `這份變更在 ${count} 處削弱了測試。發布前請為每一處寫一行理由。`,
     pacingMax: ({ open, budget }) =>

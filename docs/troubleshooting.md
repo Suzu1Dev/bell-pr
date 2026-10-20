@@ -469,9 +469,8 @@ lift.
 "The project keeps issues like this one for people learning to contribute
 without AI." The linked issue carries a label for newcomers (such as
 "good first issue"), and a rule quoted from the project's files reserves
-those issues. BELL PR will not publish an agent-written change for it,
-with no override. Practise on it locally, write the fix by hand, or pick a
-help-wanted issue instead.
+those issues. BELL PR will not publish a change for it, with no override.
+Practise on it locally, or pick a help-wanted issue instead.
 
 ### `tests-weakened`
 

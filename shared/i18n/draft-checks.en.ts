@@ -73,7 +73,7 @@ const messages = {
       "The linked issue is closed. Link an open issue, or remove the link if your work is about something else.",
     issueHasPr:
       "Someone else's open pull request would already close the linked issue. Review or test their pull request instead, or give your reason to publish anyway.",
-    areaReserved: `The project keeps issues like this one for people learning to contribute without AI. ${product.name} will not publish this change; you can practise on it locally or write it by hand.`,
+    areaReserved: `The project keeps issues like this one for people learning to contribute without AI. ${product.name} will not publish this change; you can practise on it locally or pick an issue that isn't reserved.`,
     testsWeakened: ({ count }: { count: number }) =>
       fmt.plural(count) === "one"
         ? "This change weakens a test. Give a one-line reason for it before you publish."

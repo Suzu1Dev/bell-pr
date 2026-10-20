@@ -452,7 +452,7 @@ const m: Translation<typeof en> = {
       "issue-closed": `你可以在本機練習；只要連結的 issue 仍是關閉的，${product.name} 就不會發布它。`,
       door: `你可以在本機練習；只要這個 repository 不接受你開的 Pull Request，${product.name} 就不會發布它。`,
       ban: `你可以在本機練習；只要專案規範不接受 AI 協助的貢獻，${product.name} 就不會發布它。`,
-      area: `你可以在本機練習；專案把有新手標籤的 issue 留給親手寫修正的人，所以 ${product.name} 不會發布它。`,
+      area: `你可以在本機練習；專案把有新手標籤的 issue 留給不靠 AI 工具學習的人，所以 ${product.name} 不會發布它。`,
     },
     otherPr: ({ author, number }) =>
       `你可以在本機練習；只要 @${author} 的 Pull Request #${number} 會關閉同一個 issue，${product.name} 就不會發布它，除非你在發布時寫下理由。`,
