@@ -8,7 +8,7 @@ import test, { after, before, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
@@ -402,6 +402,62 @@ test("the command runs in the run's folder without secret variables, with CI=1 a
     "CI=1",
     "NO_COLOR=1",
   ]);
+});
+
+const npmOnPath = (process.env.PATH ?? "").split(path.delimiter).some((folder) => existsSync(path.join(folder, "npm")));
+
+test("started by npx, BELL runs npm test as the person's terminal would: no npx flags, no other project's tools", { skip: !npmOnPath }, async (t) => {
+  const f = await fixture(t);
+  // Another project, where the person ran `npx --yes --offline bell-pr`; its tools are not this project's.
+  const elsewhere = path.join(f.directory, "elsewhere");
+  await mkdir(path.join(elsewhere, "node_modules", ".bin"), { recursive: true });
+  await writeFile(path.join(elsewhere, "node_modules", ".bin", "greet"), "#!/bin/sh\necho other project\n", { mode: 0o755 });
+  const chain: string[] = [];
+  for (let folder = elsewhere; ; folder = path.dirname(folder)) {
+    chain.push(path.join(folder, "node_modules", ".bin"));
+    if (folder === path.dirname(folder)) break;
+  }
+  // npm keeps its cache and log files in the test's folder.
+  const npx: NodeJS.ProcessEnv = {
+    PATH: [...chain, "/usr/share/nodejs/@npmcli/run-script/lib/node-gyp-bin", process.env.PATH].join(path.delimiter),
+    INIT_CWD: elsewhere,
+    NODE: process.execPath,
+    COLOR: "0",
+    npm_command: "exec",
+    npm_config_offline: "true",
+    npm_config_yes: "true",
+    npm_config_local_prefix: elsewhere,
+    npm_execpath: "/usr/share/nodejs/npm/bin/npx-cli.js",
+    npm_lifecycle_event: "npx",
+    npm_lifecycle_script: "bell-pr",
+    npm_node_execpath: process.execPath,
+    npm_package_json: path.join(elsewhere, "package.json"),
+    NPM_CONFIG_CACHE: path.join(f.directory, "npm-cache"),
+    NPM_CONFIG_USERCONFIG: path.join(f.directory, "npmrc"),
+    NPM_CONFIG_UPDATE_NOTIFIER: "false",
+  };
+  const saved = Object.fromEntries(Object.keys(npx).map((name) => [name, process.env[name]]));
+  t.after(() => {
+    for (const [name, value] of Object.entries(saved))
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+  });
+  Object.assign(process.env, npx);
+  await writeFile(path.join(f.directory, "npmrc"), "");
+  await writeFile(
+    path.join(f.repository, "package.json"),
+    JSON.stringify({
+      name: "retry",
+      scripts: { test: `echo "offline=$npm_config_offline yes=$npm_config_yes init=$INIT_CWD" && greet` },
+    }),
+  );
+  await f.confirm("npm test --silent");
+  const result = await f.runOnce();
+  // As in a terminal: npm's own defaults, this project's folder, and no greet here.
+  assert.equal(result.outcome, "failed");
+  assert.equal(result.exitCode, 127);
+  assert.match(result.outputTail ?? "", new RegExp(`^offline= yes= init=${f.repository}$`, "m"));
+  assert.doesNotMatch(result.outputTail ?? "", /other project/);
 });
 
 test("runs are refused with 409 without a confirmed command, while one runs, outside review and on agent runs", async (t) => {

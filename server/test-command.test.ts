@@ -212,3 +212,85 @@ test("a Python project gets python3 -m pytest when PATH has python3 and no pytho
   assert.equal(await suggest(path.relative(process.cwd(), only3)), "python -m pytest");
   assert.equal(existsSync(marker), false);
 });
+
+/**
+ * BELL's environment as `npx bell-pr` gives it (npm 9.2 and 11, recorded
+ * from a bin npx started in /home/person/code/app with `--yes --offline`).
+ */
+const npxStarted: NodeJS.ProcessEnv = {
+  PATH: [
+    "/home/person/.npm/_npx/46df7c093e0fb185/node_modules/.bin",
+    "/home/person/code/app/node_modules/.bin",
+    "/home/person/code/node_modules/.bin",
+    "/home/person/node_modules/.bin",
+    "/home/node_modules/.bin",
+    "/node_modules/.bin",
+    "/usr/share/nodejs/@npmcli/run-script/lib/node-gyp-bin",
+    "/home/person/.local/bin",
+    "/usr/bin",
+    "/bin",
+  ].join(path.delimiter),
+  HOME: "/home/person",
+  EDITOR: "vi",
+  COLOR: "0",
+  NODE: "/usr/bin/node",
+  INIT_CWD: "/home/person/code/app",
+  npm_command: "exec",
+  npm_config_cache: "/home/person/.npm",
+  npm_config_local_prefix: "/home/person/code/app",
+  npm_config_offline: "true",
+  npm_config_yes: "true",
+  npm_config_user_agent: "npm/9.2.0 node/v22.22.1 linux x64 workspaces/false",
+  npm_config_node_gyp: "/usr/share/nodejs/node-gyp/bin/node-gyp.js",
+  npm_execpath: "/usr/share/nodejs/npm/bin/npx-cli.js",
+  npm_lifecycle_event: "npx",
+  npm_lifecycle_script: "bell-pr",
+  npm_node_execpath: "/usr/bin/node",
+  npm_package_json: "/home/person/code/app/package.json",
+  // The person's own settings stay.
+  NPM_CONFIG_REGISTRY: "https://registry.example.invalid/",
+};
+
+test("started by npx, the tests get the person's terminal environment: npm's variables and PATH folders are gone", () => {
+  assert.deepEqual(testEnvironment(npxStarted), {
+    PATH: ["/home/person/.local/bin", "/usr/bin", "/bin"].join(path.delimiter),
+    HOME: "/home/person",
+    EDITOR: "vi",
+    NPM_CONFIG_REGISTRY: "https://registry.example.invalid/",
+    CI: "1",
+    NO_COLOR: "1",
+  });
+  // npm run inside npm run (npm start, then a script of BELL's own): every layer goes.
+  const nested = testEnvironment({
+    ...npxStarted,
+    PATH: [
+      "/srv/bell/node_modules/.bin",
+      "/srv/node_modules/.bin",
+      "/node_modules/.bin",
+      "/usr/lib/node_modules/npm/node_modules/@npmcli/run-script/lib/node-gyp-bin",
+      npxStarted.PATH,
+    ].join(path.delimiter),
+  });
+  assert.equal(nested.PATH, ["/home/person/.local/bin", "/usr/bin", "/bin"].join(path.delimiter));
+});
+
+test("not started by npm, the environment keeps npm's names and PATH as they are", () => {
+  const terminal: NodeJS.ProcessEnv = {
+    PATH: ["/home/person/code/app/node_modules/.bin", "/node_modules/.bin", "/opt/node-gyp-bin", "/usr/bin"].join(path.delimiter),
+    npm_config_registry: "https://registry.example.invalid/",
+    INIT_CWD: "/home/person",
+    NODE: "/usr/bin/node",
+    COLOR: "1",
+  };
+  assert.deepEqual(testEnvironment(terminal), { ...terminal, CI: "1", NO_COLOR: "1" });
+  // Started by npm, but PATH does not begin the way npm makes it: left as it is.
+  for (const PATH of [
+    ["/home/person/bin", "/node_modules/.bin", "/x/node-gyp-bin", "/usr/bin"],
+    ["/home/person/code/app/node_modules/.bin", "/x/node-gyp-bin", "/usr/bin"],
+    ["node_modules/.bin", "/node_modules/.bin", "/x/node-gyp-bin", "/usr/bin"],
+    ["/usr/bin", "/bin"],
+  ].map((entries) => entries.join(path.delimiter)))
+    assert.equal(testEnvironment({ npm_lifecycle_event: "start", PATH }).PATH, PATH);
+  // NODE stays when it is not the Node.js npm ran on.
+  assert.equal(testEnvironment({ ...npxStarted, NODE: "/opt/node18/bin/node" }).NODE, "/opt/node18/bin/node");
+});

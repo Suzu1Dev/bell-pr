@@ -125,22 +125,64 @@ const secretWord = /(?:^|_)(?:TOKEN|SECRET|PASSWORD)(?:_|$)/i;
 const ownedPrefix = /^(?:BELLPR_|GH_|GITHUB_|ANTHROPIC_|OPENAI_|CODEX_|CLAUDE_)/i;
 
 /**
+ * What npm (and npx, which `npx bell-pr` runs) sets for a program it
+ * starts, and a terminal does not have: the lowercase npm_… names
+ * (npm_config_… carries the flags given to npx, such as --yes or
+ * --offline, into every npm the tests run), INIT_CWD and COLOR.
+ */
+const npmName = /^(?:npm_|INIT_CWD$|COLOR$)/;
+const npmBin = /[\\/]node_modules[\\/]\.bin$/;
+
+/**
+ * PATH without the folders npm put in front of it for the program it
+ * started (@npmcli/run-script's set-path): npx's package folder, then the
+ * `node_modules/.bin` folder of the folder npm ran in and of each of its
+ * parents up to the root's, then npm's `node-gyp-bin`; every layer of an
+ * npm run inside another. A PATH that does not begin that way is kept.
+ */
+function withoutNpmFolders(value: string) {
+  let folders = value.split(path.delimiter);
+  for (;;) {
+    const gyp = folders.findIndex((folder) => /[\\/]node-gyp-bin$/.test(folder));
+    const added = folders.slice(0, Math.max(gyp, 0));
+    const last = added.at(-1);
+    if (
+      !last ||
+      !added.every((folder) => path.isAbsolute(folder) && npmBin.test(folder)) ||
+      path.dirname(path.dirname(last)) !== path.parse(last).root
+    )
+      return folders.join(path.delimiter);
+    folders = folders.slice(gyp + 1);
+  }
+}
+
+/**
  * The environment BELL runs the person's tests with: BELL's own
  * environment minus every variable whose name ends in TOKEN, SECRET,
  * PASSWORD, API_KEY, ACCESS_KEY, PRIVATE_KEY or CREDENTIALS, holds TOKEN,
  * SECRET or PASSWORD as a word between underscores, or starts with
  * BELLPR_, GH_, GITHUB_, ANTHROPIC_, OPENAI_, CODEX_ or CLAUDE_, ignoring
  * case; everything else stays (PATH, HOME, JAVA_HOME, VIRTUAL_ENV,
- * GOPATH…), as in the person's terminal; plus CI=1 and NO_COLOR=1. The
- * variables are removed by name only: files in the home folder, such as
- * the CLIs' sign-in files, stay readable to the tests.
+ * GOPATH…), as in the person's terminal; plus CI=1 and NO_COLOR=1.
+ *
+ * When npm started BELL (`npx bell-pr`, `npm start`: npm_lifecycle_event
+ * is set), what npm added for BELL goes too, so an `npm test` behaves as
+ * in the person's terminal: the names starting with npm_ (lowercase),
+ * INIT_CWD, COLOR, NODE when it names the Node.js npm ran on, and the
+ * folders npm put in front of PATH. The person's own NPM_CONFIG_…
+ * (uppercase) stay.
+ *
+ * The variables are removed by name only: files in the home folder, such
+ * as the CLIs' sign-in files, stay readable to the tests.
  */
 export function testEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const byNpm = env.npm_lifecycle_event !== undefined;
   const result: NodeJS.ProcessEnv = {};
   for (const [name, value] of Object.entries(env)) {
     if (value === undefined || secretEnding.test(name) || secretWord.test(name) || ownedPrefix.test(name))
       continue;
-    result[name] = value;
+    if (byNpm && (npmName.test(name) || (name === "NODE" && value === env.npm_node_execpath))) continue;
+    result[name] = byNpm && name === "PATH" ? withoutNpmFolders(value) : value;
   }
   return { ...result, CI: "1", NO_COLOR: "1" };
 }
