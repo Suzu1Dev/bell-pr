@@ -616,6 +616,9 @@ export default {
       `The PR branch ${branch} on GitHub has commits from outside ${product.name} (for example a suggestion applied on GitHub, a maintainer's push or an updated branch). ${product.name} does not overwrite them and cannot continue the round; handle it on GitHub or discard the round.`,
     remoteMissing: ({ branch }: { branch: string }) =>
       `The PR branch ${branch} is not on GitHub, so the round cannot be pushed.`,
+    /** Taking over pushed commits stopped by `reset --keep`: a saved change sits in a file they change. */
+    keepRefused: ({ branch }: { branch: string }) =>
+      `Changes saved in the run's folder touch files that the new commits on ${branch} change, so nothing moved. Commit or discard those changes first.`,
     historyRewritten: ({ branch }: { branch: string }) =>
       `The PR branch ${branch} on GitHub rewrote history that ${product.name} pushed (for example with a force push), so ${product.name} cannot continue; handle it on GitHub.`,
     adoptedReport: ({ commits }: { commits: number }) =>

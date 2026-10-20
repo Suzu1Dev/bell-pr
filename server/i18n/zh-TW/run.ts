@@ -364,6 +364,8 @@ const m: Translation<typeof en> = {
       `GitHub 上的 PR 分支 ${branch} 已有 ${product.name} 以外的提交（例如在 GitHub 上套用建議、維護者推送或更新分支），${product.name} 不會覆蓋，也無法接續修正；請在 GitHub 上處理，或放棄這輪修正。`,
     remoteMissing: ({ branch }) =>
       `GitHub 上找不到 PR 分支 ${branch}，無法推送修正。`,
+    keepRefused: ({ branch }) =>
+      `工作目錄裡已儲存的修改動到了 ${branch} 上新 commit 也改到的檔案，所以沒有變動任何東西。請先 commit 或捨棄那些修改。`,
     historyRewritten: ({ branch }) =>
       `GitHub 上的 PR 分支 ${branch} 改寫了 ${product.name} 推送過的歷史（例如 force push），${product.name} 無法接續；請在 GitHub 上處理。`,
     adoptedReport: ({ commits }) =>

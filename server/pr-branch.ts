@@ -202,7 +202,10 @@ export async function adoptRemoteCommits(
     ).stdout.trim();
     if (head !== expectedHead) throw moved();
     await assertGitConfigSafe(run.worktreePath);
-    await git(run.worktreePath, ["reset", "-q", "--keep", fetched]);
+    // Git refuses when a saved change sits in a file the new commits change: nothing moved, in the person's words.
+    await git(run.worktreePath, ["reset", "-q", "--keep", fetched]).catch((error: unknown) => {
+      throw new AppError((m) => m.run.followUp.keepRefused({ branch }), 409, { cause: error });
+    });
   }
   (run.followUps ??= []).push({
     id: newId().slice(0, 8),

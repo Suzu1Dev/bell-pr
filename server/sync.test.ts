@@ -844,6 +844,30 @@ test("a PR sync never overwrites a change saved in the run's folder after its cl
   }
 });
 
+test("commits pushed on GitHub are taken over before a PR sync only from HEAD, never over a change saved meanwhile", async () => {
+  const f = await publishedRun();
+  try {
+    const pushed = await f.github.pushToBranch("fix/sync0001", { "hello.ts": "line one\nline two, suggested\nline three\n" });
+    const mine = "line one\nline two, mine and saved\nline three\n";
+    savedAfterCleanCheck(f, () => f.write("hello.ts", mine));
+    const before = f.run.publishCommit;
+    await assert.rejects(
+      withLocale("en", () => f.workbench.syncRun(f.run.id)),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 409 &&
+        // The person's words, never git's ("error: Entry … would be overwritten").
+        /^Changes saved in the run's folder touch files that the new commits on fix\/sync0001 change/.test(error.message) &&
+        !/error:|fatal:|Entry/.test(error.message),
+    );
+    assert.equal(await f.read("hello.ts"), mine);
+    assert.equal(f.run.publishCommit, before);
+    assert.notEqual((await git(f.run.worktreePath, ["rev-parse", "HEAD"])).stdout.trim(), pushed);
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test("writing a merged tree onto a checkout keeps a file saved after its snapshot, or refuses and moves nothing", async () => {
   const f = await unpublishedRun();
   try {
