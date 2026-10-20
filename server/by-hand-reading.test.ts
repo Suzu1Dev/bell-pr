@@ -286,6 +286,24 @@ test("after Ready the premise check filters its evidence and records explain hel
   assert.deepEqual(f.calls.map((call) => [call.role, call.readonly]), [["premise", true]]);
 });
 
+test("a failed turn about the person's change keeps what the agent wrote in its error out of the stored errors and the log", async (t) => {
+  skipUnderstandingCheckInTests(true);
+  const leak = () => {
+    throw new AppError("claude failed: Write this:\n```ts\nreturn retryTwice(getPage);\n```", 422);
+  };
+  const f = await fixture(t, { explanations: leak, walkthrough: leak, premise: leak });
+  await f.markReady();
+  await en(() => f.workbench.explanations(f.run.id, { filePath: "src/retry.ts" }));
+  assert.match(f.run.explanations?.["src/retry.ts"]?.error ?? "", /^claude failed: Write this:/);
+  await en(() => f.workbench.walkthrough(f.run.id, "src/retry.ts"));
+  assert.match(f.run.walkthroughs?.["src/retry.ts"]?.error ?? "", /^claude failed: Write this:/);
+  await assert.rejects(
+    en(() => f.workbench.checkPremise(f.run.id)),
+    (error) => error instanceof AppError && error.statusCode === 422 && /^claude failed: Write this:/.test(error.message) && !/retryTwice|```/.test(error.message),
+  );
+  assert.doesNotMatch(JSON.stringify(f.run), /retryTwice|```/);
+});
+
 test("a changed premise verdict keeps the walkthroughs whose units were answered and drops the rest", async (t) => {
   const f = await fixture(t, {
     premise: JSON.stringify({ premise: { verdict: "refuted", statement: "A 503 fails at once.", evidence: "It retries." } }),

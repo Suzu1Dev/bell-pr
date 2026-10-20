@@ -71,7 +71,7 @@ const orientation = (premise: object | null = {
     premise,
   });
 
-async function fixture(t: TestContext, answers: Record<string, string> = {}) {
+async function fixture(t: TestContext, answers: Record<string, string | (() => string)> = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "bell-by-hand-flow-"));
   const repository = path.join(directory, "repo");
   await mkdir(path.join(repository, "src"), { recursive: true });
@@ -86,13 +86,14 @@ async function fixture(t: TestContext, answers: Record<string, string> = {}) {
   const store = new Store(path.join(directory, "state"));
   await store.initialize();
   const calls: TeamAgentInput[] = [];
-  const replies: Record<string, string> = { lead: orientation(), ...answers };
+  const replies: Record<string, string | (() => string)> = { lead: orientation(), ...answers };
   const workbench = new Workbench(
     store,
     async (input) => {
       calls.push(input);
       if (!(input.role in replies)) throw new Error(`no answer for ${input.role}`);
-      return replies[input.role];
+      const reply = replies[input.role];
+      return typeof reply === "function" ? reply() : reply;
     },
     { getModelCatalog: async (provider) => ({ models: [], source: provider ?? "codex" }) },
   );
@@ -208,6 +209,30 @@ test("a run fitted to rules that don't name planning help keeps none of the outl
   assert.deepEqual(outline?.readFirst?.map((range) => range.path), ["src/retry.ts"]);
   // Nowhere in what the run detail sends: not in the record, the log or the team.
   assert.doesNotMatch(JSON.stringify(run), /Find where the request fails|Decide how often to try again/);
+});
+
+test("a failed orientation or review keeps what the agent wrote in its error out of the run's error and log", async (t) => {
+  const leak = "claude failed: The plan is to wrap the call:\n```ts\nreturn retryTwice(getPage);\n```";
+  const f = await fixture(t, {
+    lead: () => {
+      throw new AppError(leak, 422);
+    },
+  });
+  const failed = await f.create();
+  assert.equal(failed.status, "failed");
+  assert.match(failed.error ?? "", /^claude failed: The plan is to wrap the call:/);
+  assert.doesNotMatch(JSON.stringify(failed), /retryTwice|```/);
+  // The review job's failure line is filtered too.
+  f.replies.lead = orientation();
+  const run = await f.writing();
+  t.after(() => byHandReviewInTests());
+  byHandReviewInTests(async () => {
+    throw new Error(leak);
+  });
+  await en(async () => f.workbench.byHand.ready(run.id, { changeFingerprint: await f.fingerprint(run), review: true }));
+  await f.waitFor(() => !f.ctx.byHandJobs.size);
+  assert.match(run.logs.at(-1)?.message ?? "", /^The guide's review didn't finish: claude failed: The plan is to wrap the call:/);
+  assert.doesNotMatch(JSON.stringify(run), /retryTwice|```/);
 });
 
 test("an orientation without a premise records no help, and planByHand leaves team.tasks and the agent cards as they are", async (t) => {

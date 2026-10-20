@@ -25,6 +25,7 @@ import {
 import type { WorkbenchContext } from "./workbench.js";
 import type { CodeReference, FileWalkthrough } from "../shared/walkthroughs.js";
 import { assertReaderView, changeFilter, recordStoredHelp } from "./learning.js";
+import { filteredError } from "./by-hand.js";
 
 const now = () => new Date().toISOString();
 
@@ -165,8 +166,10 @@ async function generateWalkthrough(
         generatedAt: now(),
       };
     });
-  } catch (error) {
+  } catch (failure) {
     const stored = run.walkthroughs?.[file.path];
+    // Learn by hand: what the agent may have written in its error is filtered (F7).
+    const error = run.learnByHand ? filteredError(failure) : failure;
     const message = controller.signal.aborted
       ? sm().run.walkthrough.stopped
       : redact(

@@ -40,7 +40,7 @@ import * as guide from "./by-hand-guide.js";
 import { turnFiles } from "./by-hand-filter.js";
 import { assertHelpAllowed, recordHelp } from "./by-hand-record.js";
 import { takeOverOwnCommits } from "./by-hand-takeover.js";
-import { assertReady, countRemoved, reviewAgain } from "./by-hand.js";
+import { assertReady, countRemoved, filteredError, reviewAgain } from "./by-hand.js";
 import { planUnderstanding, understandingRequired } from "./understanding.js";
 
 const now = () => new Date().toISOString();
@@ -201,7 +201,9 @@ async function generateExplanations(
   const controller = new AbortController();
   const key = `explanations:${run.id}`;
   ctx.controllers.set(key, controller);
-  const fail = (batch: typeof files, error: unknown) => {
+  const fail = (batch: typeof files, failure: unknown) => {
+    // Learn by hand: what the agent may have written in its error is filtered (F7).
+    const error = run.learnByHand ? filteredError(failure) : failure;
     const message = controller.signal.aborted
       ? sm().run.review.explanationsStopped
       : redact(

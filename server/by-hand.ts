@@ -1,29 +1,21 @@
 /**
  * Learn by hand on the server (DESIGN v1.2 F1-F5, F8, F10, F11): the run's
- * flow, and the façade the routes call (`Workbench.byHand`). The façade at
- * the end of this module refuses a run that is not Learn by hand (409
- * `m.byHand.notByHand`) before it calls the flow, the guide
- * (server/by-hand-guide.ts) or the test runner (server/by-hand-tests.ts).
- * No member is gated by plan.
+ * flow, and the façade the routes call (`Workbench.byHand`), which refuses
+ * a run that is not Learn by hand (409 `m.byHand.notByHand`) before the
+ * flow, the guide (server/by-hand-guide.ts), the test runner
+ * (server/by-hand-tests.ts) or the PR template (server/draft-jobs.ts). No
+ * member is gated by plan.
  *
- * - `planByHand(ctx, run, locale, signal)`: executeRun's Learn-by-hand
- *   branch: the read-only orientation turn (F3), its filtered outline in
- *   `byHand.guidePlan`, `team.tasks` and the agent cards left as they are
- *   (empty, so an older build has no plan to approve), the premise and its
- *   help event, then `awaiting_plan`. Never a write turn.
- * - `savePlan`, `revealOutline`, `updateStep`, `checkIn`, `leave`: the
- *   person's plan, the outline reveals (`plan` help, refused outside a
- *   fitted run's help set), step state and the R3 choice, the stuck card,
- *   and handing the task to the agent team.
- * - `ready(ctx, id, input)`: Ready for review at the current fingerprint
- *   (409 when stale; a second review needs a test run at this version), and
- *   the job `review:<id>` that runs the guide's structured review (F8,
- *   server/by-hand-guide.ts) when asked; `reviewAgain` is "Run the review
- *   again" for the ready version.
- * - The façade's `template` is server/draft-jobs.ts: the project's PR
- *   templates, verbatim.
- * - `assertReady(run, files)`: nothing is explained or reviewed before
- *   Ready (F5); the reading routes in server/learning.ts call it.
+ * - `planByHand`: executeRun's Learn-by-hand branch: the read-only
+ *   orientation turn (F3), its filtered outline in `byHand.guidePlan`
+ *   (`team.tasks` and the agent cards left as they are), the premise and
+ *   its help event, then `awaiting_plan`. Never a write turn.
+ * - `savePlan`, `revealOutline` (`plan` help), `updateStep`, `checkIn`,
+ *   `leave`: the person's plan, step state, the stuck card and the exits.
+ * - `ready`: Ready for review at the current fingerprint, and the job
+ *   `review:<id>` of the guide's review (F8) when asked; `reviewAgain`.
+ * - `assertReady`: nothing is explained or reviewed before Ready (F5).
+ * - `filteredError`, `checkoutPaths`: agent text in errors and paths (F7).
  */
 import { randomUUID } from "node:crypto";
 import { realpath, stat } from "node:fs/promises";
@@ -85,7 +77,9 @@ export async function planByHand(
     // Isolated: its raw answer reaches neither the log nor run.reports.
     const answer = await withSchemaFile(orientationJsonSchema, (outputSchema) =>
       runAgent(ctx, run, "lead", byHandPlanPrompt(locale, run), signal, true, { outputSchema, isolated: true }),
-    );
+    ).catch((error) => {
+      throw filteredError(error);
+    });
     const outline = parseAgentOutput(run, "by-hand-orientation", () => parseByHandAnswer(orientationSchema, answer));
     const named = [...outline.readFirst.map((range) => range.path), ...outline.steps.flatMap((step) => step.files)];
     // A path is agent text too: only the checkout's own are kept, the others are dropped and counted.
@@ -140,11 +134,18 @@ export function countRemoved(run: Run, removed: number) {
   if (removed) (run.byHand ??= {}).removedTotal = (run.byHand.removedTotal ?? 0) + removed;
 }
 
+/** An agent turn's error, filtered (F7): a CLI's failure can quote the agent. BELL's timeout and setup messages stay whole. */
+export function filteredError(error: unknown): Error {
+  if (error instanceof AppError && (error.statusCode === 504 || error.code)) return error;
+  const message = error instanceof Error ? error.message : String(error);
+  const { value, removed } = filterAgentText(message, { base: {}, worktree: {} });
+  if (!removed) return error instanceof Error ? error : new Error(message);
+  return error instanceof AppError ? new AppError(value, error.statusCode, { params: error.params, fixes: error.fixes }) : new Error(value);
+}
+
 /**
- * The paths an agent named that are in the checkout, as files or folders:
- * at the base commit by `git cat-file` (`git show <sha>:<path>` prints
- * nothing for a missing path with *, ? or [ in it, as for an empty file),
- * else in the worktree. Any other "path" is agent text, never stored as one.
+ * The agent-named paths that are files or folders of the checkout: at base by `git cat-file` (`git show`
+ * prints nothing for a missing path with *, ? or [), else in the worktree. Others are text, never paths.
  */
 export async function checkoutPaths(run: Pick<Run, "baseSha" | "worktreePath">, paths: readonly string[]) {
   const found = new Map<string, "file" | "folder">();
@@ -369,7 +370,7 @@ function startReview(ctx: WorkbenchContext, run: Run) {
       await (reviewOverride ?? guide.review)(ctx, run, leastSure ? { leastSure } : {}, controller.signal);
       ctx.log(run, "system", sm().byHand.flow.review.done);
     } catch (error) {
-      const reason = redact(error instanceof Error ? error.message : String(error));
+      const reason = redact(filteredError(error).message);
       ctx.log(run, "system", controller.signal.aborted ? sm().byHand.flow.review.stopped : sm().byHand.flow.review.failed({ reason }));
     }
   })

@@ -12,7 +12,7 @@ import path from "node:path";
 import { practiceKey } from "../shared/practice.js";
 import { keepAnsweredWalkthroughs } from "../shared/understanding.js";
 import { assertHelpAllowed } from "./by-hand-record.js";
-import { assertReady } from "./by-hand.js";
+import { assertReady, filteredError } from "./by-hand.js";
 import { changeFilter, recordStoredHelp } from "./learning.js";
 import { currentLocale, shuttingDown, sm } from "./i18n/index.js";
 import { premiseCheckPrompt } from "./prompts/premise.js";
@@ -114,7 +114,10 @@ export async function checkPremise(ctx: WorkbenchContext, id: string) {
         true,
         // Isolated: offline, out of the team inbox and the reports; it still reads this checkout.
         { outputSchema, isolated: true },
-      );
+      ).catch((error) => {
+        // Learn by hand: what the agent may have written in its error is filtered (F7).
+        throw run.learnByHand ? filteredError(error) : error;
+      });
       let value: unknown;
       try {
         value = JSON.parse(jsonText(answer));
