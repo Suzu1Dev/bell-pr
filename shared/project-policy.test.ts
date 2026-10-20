@@ -246,6 +246,28 @@ test("\"say so\" asks for a disclosure too, unless it says there is no need", ()
   );
 });
 
+test("AI 'involved in' making the code and 'convey' that AI helped ask for a disclosure", () => {
+  // Mesa docs/submittingpatches.rst and Forgejo AIAgreement.md (plan research/policies.md).
+  assert.deepEqual(
+    kinds("docs/submittingpatches.rst", 'Disclosure is always required when "AI" was involved in the creative process of coming up with the code'),
+    [["disclose", true]],
+  );
+  assert.deepEqual(
+    kinds("AIAgreement.md", "If content was made with the help of AI, you must convey that this is the case."),
+    [["disclose", false]],
+  );
+  // Still gated: an AI feature, a crash, and a request not to.
+  for (const text of [
+    "Please state whether the AI module was involved in the crash.",
+    "Please convey AI feature requests on the forum.",
+    "Do not convey that AI tools were used in commit messages; we never ask for it.",
+    "Let us know if you need help from the AI team.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [], text);
+  // The PR text's own disclosure check is unchanged by it.
+  assert.ok(!hasAiDisclosure("Fixes the cap.\n\nClaude was involved in the creative process."));
+});
+
 test("a note addressed to AI agents, or about agents acting alone, is an agent finding", () => {
   const note = [
     "# Contributing",

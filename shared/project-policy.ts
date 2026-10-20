@@ -829,7 +829,7 @@ function splitSentences(text: string): Span[] {
 const aiTerm =
   "(?:AI|LLMs?|large language models?|generative|gen[- ]?AI|artificial intelligence|machine[- ]generated|Copilot|ChatGPT|Claude|Codex)\\b";
 const discloseVerb =
-  "(?:disclos\\w*|declar\\w*|mention|indicate|state|tell us|let us know)";
+  "(?:disclos\\w*|declar\\w*|mention|indicate|state|convey|tell us|let us know)";
 const disclosedPassive =
   "(?:disclosed|declared|mentioned|indicated|stated|labell?ed|marked|flagged|noted)";
 
@@ -853,10 +853,11 @@ const disclosurePattern = new RegExp(
  * The patterns above also fit lines about an AI feature ("state whether
  * the AI module changed", "let us know if you need help with the AI
  * backend"), so a line counts only when it is about using AI to make the
- * contribution.
+ * contribution: also AI "involved in" making it (Mesa) or the content
+ * "made with the help of" AI (Forgejo), never AI "involved in" a crash.
  */
 const aiUse =
-  /\b(?:us(?:e|es|ed|ing|age)|assist\w*|generated|wr(?:ote|itten)|authored|produced)\b/i;
+  /\b(?:us(?:e|es|ed|ing|age)|assist\w*|generated|wr(?:ote|itten)|authored|produced)\b|\binvolved\s+in\s+(?:the\s+)?(?:creative|making|writing|creating|coming|authoring|developing|preparing|producing|designing)\b|\b(?:made|created|written|prepared|done)\s+with\s+(?:the\s+)?help\s+of\b/i;
 
 /** A template heading or checkbox: "## AI disclosure", "[ ] AI usage disclosed". */
 const disclosureHeading =
@@ -864,7 +865,7 @@ const disclosureHeading =
 
 /** "Do not mention AI" and the like are not disclosure rules. */
 const negated =
-  /\b(?:do not|don't|never|no need to|not required to)\s+(?:\w+\s+){0,2}(?:disclos|declar|mention|state|indicate|say so)/i;
+  /\b(?:do not|don't|never|no need to|not required to)\s+(?:\w+\s+){0,2}(?:disclos|declar|mention|state|indicate|convey|say so)/i;
 
 /**
  * A request to name the tool in a trailer: "use a commit message trailer
