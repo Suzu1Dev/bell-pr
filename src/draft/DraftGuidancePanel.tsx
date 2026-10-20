@@ -285,8 +285,8 @@ export function DraftGuidancePanel({
       issueUrl,
       disclosureRule: disclosureRequirement,
       suggestion: !!proposal?.body.trim(),
-      // Until the server's list arrives, those rows wait for it.
-      awaiting: checks ? [] : local?.filter((check) => !mirror?.includes(check)).map((check) => check.id),
+      // Until the server's list arrives, those rows wait for it; a published run's never comes.
+      awaiting: checks || readOnly ? [] : local?.filter((check) => !mirror?.includes(check)).map((check) => check.id),
     },
     t.checklist,
     fmt,

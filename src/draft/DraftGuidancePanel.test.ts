@@ -748,3 +748,33 @@ test("a clean Learn-by-hand run's rule rows come only from the server's checks, 
     }
   }
 });
+
+test("a published Learn-by-hand run's rules row quotes the rules instead of waiting for checks that never come", () => {
+  const rules: ContributionRules = {
+    checkedAt: "2026-10-20T08:00:00.000Z",
+    findings: [{ kind: "ban", path: "docs/policy.md", line: 4, quote: "We decline AI-generated contributions.", contribution: true }],
+    filesRead: ["docs/policy.md"],
+  };
+  const render = (readOnly: boolean) =>
+    renderEn(
+      createElement(DraftGuidancePanel, {
+        preparation: undefined,
+        busy: false,
+        onGenerate: () => {},
+        onApply: () => {},
+        draftBody: "My own words.",
+        rules,
+        byHandRun: byHandRun(),
+        readOnly,
+      }),
+    );
+  // In review the row waits for the server's list (the Draft tab reads it).
+  assert.ok(checklistRow(render(false), "rules").includes("The saved draft hasn&#x27;t been checked yet."));
+  // Published, nothing reads it again: the row quotes the project's rules, and neither the mirror's block nor a wait.
+  const html = render(true);
+  assertNoHan(html);
+  const row = checklistRow(html, "rules");
+  assert.ok(!row.includes("hasn&#x27;t been checked") && !/is-unknown|is-block/.test(row), row);
+  assert.ok(row.includes("We decline AI-generated contributions."));
+  assert.ok(!html.includes("BELL PR won") && !html.includes("AI agents wrote this change"));
+});
