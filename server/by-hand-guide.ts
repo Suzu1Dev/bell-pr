@@ -206,9 +206,9 @@ function assertIdle(ctx: WorkbenchContext, run: Run) {
 }
 
 /**
- * Starts the guide job `guide:<id>` with its controller, sets `byHand.busy`,
- * and on any end stores nothing more, clears `busy` and logs a failure on
- * the run so the person sees why no answer came.
+ * Starts the guide job `guide:<id>` with its controller and sets
+ * `byHand.busy`; however the job ends, it clears `busy` and saves, and a
+ * failure is logged on the run so the person sees why no answer came.
  */
 function startGuideJob(ctx: WorkbenchContext, run: Run, request: GuideRequest) {
   const key = `guide:${run.id}`;
