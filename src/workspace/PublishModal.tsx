@@ -331,6 +331,14 @@ export function PublishModal({
       ? sampleChecks
       : draftChecks && (serverChecksRead || !byHand) ? publishChecks : undefined;
   const checkRules = useRulesRecheck(byHand ? run : undefined, currentRepo?.contributionRules, checks, loadPublishChecks);
+  // A quoted confirm whose words changed in a later read (or that couldn't be read) is unticked:
+  // the person confirms what they read (F12 f).
+  const quoted = JSON.stringify(checks?.find((check) => check.id === "by-hand-rules") ?? null);
+  const confirmed = useRef(quoted);
+  useEffect(() => {
+    if (confirmed.current !== quoted) setAcknowledged((previous) => previous.filter((id) => id !== "by-hand-rules"));
+    confirmed.current = quoted;
+  }, [quoted, setAcknowledged]);
   const reason = overrides.find((override) => override.id === "issue-has-pr")?.reason ?? "";
   const blocks = (checks ?? []).filter(
     (check) => check.kind === "block" && !(check.id === "issue-has-pr" && validReason(reason)),

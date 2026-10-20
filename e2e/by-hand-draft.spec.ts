@@ -208,8 +208,10 @@ test("a fitted run's quoted confirm stands beside the record, with no reason fie
   });
   const { context, page } = await open(browser, project);
   try {
-    // The server's checks, as the quoted confirm's decision (W2G) gives them.
-    await page.route(`**/api/runs/${runId}/preflight`, (route) => route.fulfill({ json: { checks: [quoted] } }));
+    // The server's checks, as the quoted confirm's decision (W2G) gives them; later with other words.
+    const requoted: DraftCheck = { ...quoted, details: [quoted.details[0], `docs/devel/code-provenance.rst:4: "${rule} This applies to all files."`] };
+    let changed = false;
+    await page.route(`**/api/runs/${runId}/preflight`, (route) => route.fulfill({ json: { checks: [changed ? requoted : quoted] } }));
     await page.goto(`/#/runs/${runId}/draft?locale=en`);
     // The Draft tab's checklist shows the server's quoted confirm in the rules row.
     await expect(page.locator('[data-row="rules"]')).toContainText(quoted.message);
@@ -233,6 +235,14 @@ test("a fitted run's quoted confirm stands beside the record, with no reason fie
     await confirm.getByRole("checkbox").check();
     await expect(submit).toBeEnabled();
     await expectAccessible(page, "[role=dialog]");
+    // A refused publish reads the checks again: a quoted confirm whose words changed is unticked.
+    changed = true;
+    await page.route(`**/api/runs/${runId}/publish`, (route) => route.fulfill({ status: 409, json: { error: "The project's rules changed." } }));
+    await submit.click();
+    await expect(dialog.getByRole("alert").filter({ hasText: "The project's rules changed." })).toBeVisible();
+    await expect(confirm).toContainText(requoted.details[1]);
+    await expect(confirm.getByRole("checkbox")).not.toBeChecked();
+    await expect(submit).toBeDisabled();
   } finally {
     await context.close();
     await project.stop();
