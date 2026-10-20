@@ -6,7 +6,7 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { maskOutput, suggestTestCommand, testEnvironment } from "./test-command.js";
+import { suggestTestCommand, testEnvironment } from "./test-command.js";
 
 /** A temporary project folder with these files; removed after the test. */
 async function project(t: TestContext, files: Record<string, string>) {
@@ -293,46 +293,4 @@ test("not started by npm, the environment keeps npm's names and PATH as they are
     assert.equal(testEnvironment({ npm_lifecycle_event: "start", PATH }).PATH, PATH);
   // NODE stays when it is not the Node.js npm ran on.
   assert.equal(testEnvironment({ ...npxStarted, NODE: "/opt/node18/bin/node" }).NODE, "/opt/node18/bin/node");
-});
-
-test("the output mask keeps what holds no credential: parser messages, counts, plain URLs and addresses", () => {
-  const kept = [
-    "SyntaxError: Unexpected token: identifierName",
-    "max_tokens: 12345678, token_type: Bearer",
-    "author: Jane Doe <jane@example.com>, ssh git@github.com:org/repo.git",
-    "see https://github.com/org/repo/issues/12 and postgres://localhost:5432/app",
-    "password reset tests: 3 passing",
-    "key: valueThatIsLong, monkey=bananas123",
-  ];
-  for (const line of kept) assert.equal(maskOutput(line), line);
-  // A key whose BEGIN line was cut off before the text: its lines go.
-  assert.equal(
-    maskOutput("AAAAB3NzaC1yc2EAAAADAQABAAABAQC7\r\nQ0FGRQ==\n-----END RSA PRIVATE KEY-----\nnext"),
-    "[REDACTED]\nnext",
-  );
-  // An END line after other output masks nothing before it.
-  const parser = "Error: expected the key to end with\n-----END PRIVATE KEY-----\nnext";
-  assert.equal(maskOutput(parser), parser);
-});
-
-test("the output mask takes time linear in the text's length, also on crafted text", () => {
-  const n = 64 * 1024;
-  const crafted = [
-    "a".repeat(n),
-    "a.".repeat(n / 2),
-    "a://".repeat(n / 4),
-    "x://u:" + "p".repeat(n),
-    `my_token${" ".repeat(n)}`,
-    `authorization:${" ".repeat(n)}`,
-    "bearer ".repeat(n / 7),
-    "npm_".repeat(n / 4),
-    "-----END ".repeat(n / 9),
-    "QUJD\n".repeat(n / 5),
-    `${"A".repeat(99)}\n`.repeat(n / 100) + "x",
-    "a_b-c.d".repeat(n / 7) + "=x",
-  ];
-  const started = Date.now();
-  for (const text of crafted) maskOutput(text);
-  const elapsed = Date.now() - started;
-  assert.ok(elapsed < 1_000, `${elapsed} ms`);
 });

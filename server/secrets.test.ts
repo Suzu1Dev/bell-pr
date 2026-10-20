@@ -193,3 +193,68 @@ test("secrets: the URL-credential shape takes linear time on a crafted line", ()
   // A user name never holds a colon, so the password takes the rest: the whole pair is still masked.
   assert.equal(redact("https://user:pass:word@host/"), "https://[REDACTED]@host/");
 });
+
+test("secrets: redact masks the credential shapes test output shows, so logs and agent answers lose them too", () => {
+  // The shapes the test runner's mask had alone (server/test-command.ts until README §18.11 item 3).
+  const cases: [string, string][] = [
+    ["  headers: { Authorization: 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0' },", "  headers: { Authorization: 'Bearer [REDACTED]' },"],
+    ['  "authorization": "Basic dXNlcjpwYXNz",', '  "authorization": "Basic [REDACTED]",'],
+    ["sent Bearer abcdef0123456789abcdef0123456789 to the mock", "sent Bearer [REDACTED] to the mock"],
+    ["connect ECONNREFUSED postgres://app:hunter2pass@127.0.0.1:5432/retry", "connect ECONNREFUSED postgres://[REDACTED]@127.0.0.1:5432/retry"],
+    ["redis://:s3cretpassw0rd@cache:6379 refused", "redis://[REDACTED]@cache:6379 refused"],
+    ["//registry.npmjs.org/:_authToken=npm_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789", "//registry.npmjs.org/:_authToken=[REDACTED]"],
+    ["AWS_SESSION_TOKEN=IQoJb3JpZ2luX2VjEJrEXAMPLE", "AWS_SESSION_TOKEN=[REDACTED]"],
+    ["DJANGO_SECRET_KEY=django-insecure-0123456789", "DJANGO_SECRET_KEY=[REDACTED]"],
+    ["slack xoxb-123456789012-1234567890123-AbCdEf", "slack [REDACTED]"],
+    ["AAAAB3NzaC1yc2EAAAADAQABAAABAQC7\r\nQ0FGRQ==\n-----END RSA PRIVATE KEY-----\nnext", "[REDACTED]\nnext"],
+  ];
+  for (const [input, masked] of cases) {
+    assert.equal(redact(input), masked, input);
+    // Never a block on its own: fixtures and docs hold such shapes.
+    assert.equal(secretInPatch(input.replace(/-----END[^\n]*/, "")), false, input);
+  }
+});
+
+test("secrets: redact keeps parser messages, counts, plain URLs and the placeholders of documentation", () => {
+  const kept = [
+    "SyntaxError: Unexpected token: identifierName",
+    "max_tokens: 12345678, token_type: Bearer",
+    "Tests: 12 passed, 0 failed (input_tokens: 123456789)",
+    "author: Jane Doe <jane@example.com>, ssh git@github.com:org/repo.git",
+    "see https://github.com/org/repo/issues/12 and postgres://localhost:5432/app",
+    "password reset tests: 3 passing",
+    "key: valueThatIsLong, monkey=bananas123",
+    // A project's docs (draft sources, rules quotes) show where a credential goes, never one.
+    "curl -H 'Authorization: Bearer <token>' https://api.example.com",
+    'curl -H "Authorization: token $GITHUB_TOKEN" https://api.github.com',
+    "Send `Authorization: Bearer ${TOKEN}` with every request.",
+    "Set the header Authorization: Bearer YOUR_TOKEN_HERE.",
+    "Authorization: ******** in the redacted log",
+  ];
+  for (const line of kept) assert.equal(redact(line), line);
+  // An END line after other output masks nothing before it.
+  const parser = "Error: expected the key to end with\n-----END PRIVATE KEY-----\nnext";
+  assert.equal(redact(parser), parser);
+});
+
+test("secrets: redact takes time linear in the text's length, also on crafted text", () => {
+  const n = 64 * 1024;
+  const crafted = [
+    "a".repeat(n),
+    "a.".repeat(n / 2),
+    "a://".repeat(n / 4),
+    "x://u:" + "p".repeat(n),
+    `my_token${" ".repeat(n)}`,
+    `authorization:${" ".repeat(n)}`,
+    "bearer ".repeat(n / 7),
+    "npm_".repeat(n / 4),
+    "-----END ".repeat(n / 9),
+    "QUJD\n".repeat(n / 5),
+    `${"A".repeat(99)}\n`.repeat(n / 100) + "x",
+    "a_b-c.d".repeat(n / 7) + "=x",
+  ];
+  const started = Date.now();
+  for (const text of crafted) redact(text);
+  const elapsed = Date.now() - started;
+  assert.ok(elapsed < 1_000, `${elapsed} ms`);
+});
