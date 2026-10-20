@@ -157,7 +157,7 @@ export async function runAgent(
     run,
     role,
     sm().run.team.started({
-      name: agent?.name ?? "Guide",
+      name: run.learnByHand ? sm().run.team.guideName : (agent?.name ?? "Guide"),
       cli: label,
       model: modelExecution.model,
       effort: modelExecution.reasoningEffort,

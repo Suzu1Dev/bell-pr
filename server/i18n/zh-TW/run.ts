@@ -49,6 +49,7 @@ const m: Translation<typeof en> = {
       "已要求取消；失敗或取消任務的隔離工作目錄保留，已整合任務的目錄已自動移除。可用「重試失敗的子任務」接續。",
   },
   team: {
+    guideName: "嚮導",
     started: ({ name, cli, model, effort, web, timeout, inbox }) =>
       `${name} 開始工作。模型：${model ?? `${cli} CLI 預設（未記錄模型）`}；推理：${effort ?? "模型預設"}${web ? "；已允許上網" : ""}${timeout ? `；${timeout}` : ""}。${inbox ? ` 已在回合起點收到 ${inbox} 則團隊訊息。` : ""}`,
     waitingForSlot: ({ queued }) => `等待其他 Agent 完成（${queued} 個排隊中）。`,
