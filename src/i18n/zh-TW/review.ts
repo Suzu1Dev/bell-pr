@@ -267,7 +267,7 @@ const m: Translation<typeof en> = {
     pendingBody: "會依序為每個修改過的程式檔產生，先從你正在看的檔案開始。",
     onlyNewTitle: "這個檔案的變更都是新增的程式碼",
     noneTitle: "沒有找到包住這些變更的函式",
-    noneBody: "這些變更可能在頂層設定或宣告裡；可以展開周圍的程式碼，或在「追問 Agent」詢問。",
+    noneBody: "這些變更可能在頂層設定或宣告裡；可以展開周圍的程式碼，或到追問分頁詢問。",
     readyDemo: "示範解說 · 預先整理的學習內容",
     readyLive: "已讀過目前的檔案與它的呼叫端",
     locate: "在程式碼中標示這個範圍",
