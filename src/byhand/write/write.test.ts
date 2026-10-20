@@ -101,8 +101,11 @@ test("after a first draft the guide's step names can be shown, and an early reve
   const revealed = html(plan({ guidePlan, plan: { ...saved, outlineAt: at, outlineBeforeDraft: true } }));
   assert.ok(revealed.includes("<li>Read the retry loop</li><li>Add a cap</li>"));
   assert.ok(revealed.includes("Shown before your first draft, at your request."));
-  // A confirmed plan is the person's: no second confirmation.
-  assert.doesNotMatch(html(plan({ guidePlan, plan: { ...saved, confirmedAt: at } })), /This is my plan/);
+  // A confirmed plan is the person's: no second confirmation, and its answers before writing stay as they were.
+  const confirmed = html(plan({ guidePlan, plan: { ...saved, confirmedAt: at, prediction: "shouldRetry" } }));
+  assert.doesNotMatch(confirmed, /This is my plan/);
+  assert.match(confirmed, /<textarea id="run-1-prediction" class="text-input" rows="2" maxLength="300" readOnly="">shouldRetry<\/textarea>/);
+  assert.match(drafted, /<textarea id="run-1-prediction" class="text-input" rows="2" maxLength="300"><\/textarea>/);
 });
 
 test("a run fitted to rules that don't name planning help keeps the outline closed", () => {

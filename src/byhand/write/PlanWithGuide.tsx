@@ -73,14 +73,13 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
     const steps = drafts
       .filter((draft) => draft.title.trim())
       .map(({ id, title, files, how }) => ({
-        ...(id ? { id } : {}),
-        title: title.trim(),
+        ...(id ? { id } : {}), title: title.trim(),
         files: files.split(",").map((file) => file.trim()).filter(Boolean),
         ...(how.trim() ? { how: how.trim() } : {}),
       }));
     if (!steps.length) return undefined;
-    const optional = (key: "tests" | "unsure" | "prediction", value: string) => (value.trim() ? { [key]: value.trim() } : {});
-    return { steps, ...optional("tests", tests), ...optional("unsure", unsure), ...optional("prediction", prediction) };
+    // An emptied answer is sent empty, so the server drops it rather than keeping the last one.
+    return { steps, tests: tests.trim(), unsure: unsure.trim(), prediction: prediction.trim() };
   };
   const [last, setLast] = useState("");
   /** Saves what changed since the last save; the caller shows a refusal. */
@@ -99,10 +98,11 @@ export function PlanWithGuide(props: PlanWithGuideProps) {
   const planHelp = helpAllowed(run, "plan");
   const revealed = !!saved?.outlineAt;
   const action = (go: () => Promise<void>) => () => void save().then(go).catch(ignore);
+  // The answers before writing stay as confirmed (as the server keeps them), so they're read-only afterwards.
   const field = (id: string, label: string, value: string, set: (value: string) => void, max: number) => (
     <label htmlFor={`${run.id}-${id}`}>
       {label}
-      <textarea id={`${run.id}-${id}`} className="text-input" rows={2} maxLength={max} value={value} onChange={(event) => set(event.target.value)} />
+      <textarea id={`${run.id}-${id}`} className="text-input" rows={2} maxLength={max} value={value} readOnly={confirmed} onChange={(event) => set(event.target.value)} />
     </label>
   );
   return (

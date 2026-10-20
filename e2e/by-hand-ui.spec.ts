@@ -264,7 +264,7 @@ test("the person plans first: their steps, read-first ranges and the guide's out
     await plan.getByRole("textbox", { name: t.plan.step({ number: 1 }) }).fill("Find where retries are counted");
     await expect(confirm).toBeEnabled();
     await plan.getByRole("textbox", { name: t.plan.tests }).click();
-    expect((await saved).postDataJSON()).toEqual({ steps: [{ title: "Find where retries are counted", files: [] }] });
+    expect((await saved).postDataJSON()).toEqual({ steps: [{ title: "Find where retries are counted", files: [] }], tests: "", unsure: "", prediction: "" });
     await expect(plan.getByRole("alert")).toHaveText(notYet);
   } finally {
     await close();
