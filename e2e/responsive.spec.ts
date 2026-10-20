@@ -7,9 +7,10 @@
 //   hides its overflow;
 // - no control or text sticks out of the box it sits in;
 // - the sample badge covers nothing in the top bar.
-// The v1.1 views that take steps to reach (e2e/helpers/views.ts) are
-// checked the same way on a common and the narrowest phone, and at the
-// wider widths a view names where its layout changes.
+// The v1.1 and Learn-by-hand views that take steps to reach
+// (e2e/helpers/views.ts) are checked the same way on a common and the
+// narrowest phone, and at the wider widths a view names where its layout
+// changes.
 // The pages show the sample project in presentation mode (`present=1`,
 // `capture=1`) with the same ready setup as e2e/screenshots.spec.ts, so
 // these are the views the screenshots show, between and below the captured
