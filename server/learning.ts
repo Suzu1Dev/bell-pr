@@ -30,6 +30,7 @@ import { contributionContext } from "./prompts/team.js";
 import { runAgent, runIndependentReview } from "./run-executor.js";
 import { parseAgentOutput } from "./run-events.js";
 import type { WorkbenchContext } from "./workbench.js";
+import { reviewAgain } from "./by-hand.js";
 
 const now = () => new Date().toISOString();
 /** Statuses whose diff is final enough to explain, discuss and annotate. */
@@ -50,6 +51,8 @@ const readableStatuses: Run["status"][] = [
 export async function rerunReview(ctx: WorkbenchContext, id: string) {
   if (ctx.stopping()) throw new AppError(shuttingDown(), 503);
   const run = ctx.run(id);
+  // Learn by hand: the guide's review of the ready version (409 before Ready), never the team's prompts.
+  if (run.learnByHand) return reviewAgain(ctx, id);
   if (!["review", "approved"].includes(run.status) || run.publishing)
     throw new AppError((m) => m.run.review.rerunNotAllowed, 409);
   if (ctx.reviewJobs.has(id) || ctx.controllers.has(id))

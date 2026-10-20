@@ -1,14 +1,15 @@
 /**
  * What the person does with a team's plan and its work in progress: approve
  * the plan, send it back to the lead with feedback, or message the team.
- * An approved or revised plan goes back to the Workbench queue.
+ * An approved or revised plan goes back to the Workbench queue; a
+ * Learn-by-hand run's confirmed plan starts the person's own turn instead.
  */
 import { maxPlanRevisions } from "../shared/team.js";
 import { sm } from "./i18n/index.js";
 import { redact } from "./process.js";
-import { logRunQueued } from "./run-events.js";
+import { enterPhase, logRunQueued } from "./run-events.js";
 import { queueTeamMessage } from "./run-executor.js";
-import { AppError } from "./types.js";
+import { AppError, type Run } from "./types.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 const now = () => new Date().toISOString();
@@ -37,6 +38,7 @@ export async function sendTeamMessage(
 export async function approvePlan(ctx: WorkbenchContext, id: string) {
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
+    if (run.learnByHand) return confirmByHandPlan(ctx, run);
     if (run.status !== "awaiting_plan" || !run.team?.tasks.length)
       throw new AppError((m) => m.run.queue.noPlanToApprove, 409);
     run.team.approvedAt = now();
@@ -48,6 +50,30 @@ export async function approvePlan(ctx: WorkbenchContext, id: string) {
     ctx.enqueue(id);
     return run;
   });
+}
+
+/**
+ * "This is my plan" in a Learn-by-hand run (DESIGN v1.2 F3): it needs at
+ * least one step the person wrote, and starts their turn to write the
+ * change. Nothing is queued: no agent writes, and the guide's outline is
+ * never executed (`team.tasks` stays as it is). The caller holds the run
+ * lock.
+ */
+async function confirmByHandPlan(ctx: WorkbenchContext, run: Run) {
+  const team = run.team;
+  if (run.status !== "awaiting_plan" || !team)
+    throw new AppError((m) => m.run.queue.noPlanToApprove, 409);
+  const plan = run.byHand?.plan;
+  if (!plan?.steps.length)
+    throw new AppError((m) => m.byHand.flow.stepFirst, 409);
+  const at = now();
+  plan.confirmedAt = at;
+  team.approvedAt = at;
+  enterPhase(run, team, "developing");
+  run.status = "review";
+  ctx.log(run, "user", sm().byHand.flow.yourTurn);
+  await ctx.store.save();
+  return run;
 }
 
 /**
@@ -64,6 +90,9 @@ export async function revisePlan(
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     const team = run.team;
+    // Learn by hand: the plan is the person's, and a revision would erase the run's history.
+    if (run.learnByHand)
+      throw new AppError((m) => m.byHand.flow.reviseRefused, 409);
     if (run.status !== "awaiting_plan" || !team?.tasks.length)
       throw new AppError((m) => m.run.queue.noPlanToApprove, 409);
     const content = redact(feedback.trim());
