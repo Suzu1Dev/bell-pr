@@ -96,15 +96,18 @@ export function areaReach(quote: string): AreaReach {
 
 /**
  * A quote as a reader sees it: the file's emphasis, code marks, link
- * targets and reStructuredText roles left out, typographic apostrophes
- * and hyphens read as typed ones, so "Contributions that **use** AI are
- * declined" reads as written.
+ * targets, inline HTML and reStructuredText roles left out, entities,
+ * typographic apostrophes and hyphens read as typed ones, so
+ * "Contributions that **use** AI are declined" reads as written.
  */
 function plain(quote: string) {
   return quote
     .replace(/[\u00ad\u200b-\u200d\u2060\ufeff]/g, "")
     .replace(/[\u2018\u2019\u02bc\u2032]/g, "'")
     .replace(/[\u2010\u2011]/g, "-")
+    .replace(/&(?:nbsp|#160|#x[aA]0);/g, " ")
+    .replace(/&(?:#8208|#8209|#x201[01]|#45|hyphen|dash);/gi, "-")
+    .replace(/<\/?(?:a|abbr|b|big|cite|code|del|em|font|i|ins|kbd|mark|q|s|small|span|strike|strong|sub|sup|tt|u)\b[^<>]*>|<br\s*\/?>/gi, "")
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/:[\w.+-]+:`([^`<]*?)\s*(?:<[^`>]*>)?`|`([^`<]*?)\s*<[^`>]*>`_{1,2}/g, "$1$2")
     .replace(/\*\*|__|`|(?<![\w*])\*(?=\w)|(?<=\w)\*(?![\w*])|(?<![\w_])_(?=\w)|(?<=\w)_(?![\w_])/g, "");

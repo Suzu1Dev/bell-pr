@@ -599,9 +599,20 @@ function searchable(text: string) {
     .replace(/`([^`]*)`/g, (code, inside: string) =>
       quotedWords.test(inside) ? keepOnly(code, 1, inside) : blank(code),
     )
+    .replace(markdownLink, (whole: string, label: string) => keepOnly(whole, whole.indexOf("[") + 1, label))
+    .replace(inlineTag, blank)
+    .replace(/&(?:nbsp|#160|#x[aA]0);/g, (entity: string) => ` ${blank(entity.slice(1))}`)
+    .replace(/&(?:#8208|#8209|#x201[01]|#45|hyphen|dash);/gi, (entity: string) => `-${blank(entity.slice(1))}`)
     .replace(/<!--|-->/g, blank)
     .replace(/\*\*|__|(?<![\w*])\*(?=\w)|(?<=\w)\*(?![\w*])|(?<![\w_])_(?=\w)|(?<=\w)_(?![\w_])/g, blank);
 }
+
+/** A Markdown link or image, inline or by reference: what it shows is read, not where it leads. */
+const markdownLink =
+  /!?\[([^\]\n]*)\](?:\((?:[^()\s]|\([^()\s]*\))*(?:\s+(?:"[^"]*"|'[^']*'))?\)|\[[^\]\n]*\])/g;
+/** Inline HTML a policy writes words in ("<b>AI-generated</b>", "<em>not</em>"), and line breaks. */
+const inlineTag =
+  /<\/?(?:a|abbr|b|big|cite|code|del|em|font|i|ins|kbd|mark|q|s|small|span|strike|strong|sub|sup|tt|u)\b[^<>]*>|<br\s*\/?>/gi;
 
 /**
  * Where sentences end: after . ! or ? (and any closing bracket, quote or
@@ -682,6 +693,13 @@ const noAiFor = new RegExp(
   "i",
 );
 refusalTerms.push(noAiFor);
+/**
+ * A compound split by blanked markup: "AI-**generated**", "**AI**-generated"
+ * or "AI&nbsp;tools" read "AI-  generated", "  AI  -generated", "AI      tools".
+ */
+refusalTerms.push(
+  /\b(?:AI|LLMs?|large\s+language\s+models?|language\s+models?)(?:\s+-\s*|\s*-\s+|\s{2,})(?:generat\w*|assist\w*|written|authored|produced|tools?|tooling|agents?|code|coding)\b/i,
+);
 
 /**
  * Each rule phrase with the nearest AI-assistance term, when one is close
