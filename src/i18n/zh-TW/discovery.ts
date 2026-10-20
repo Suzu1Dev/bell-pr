@@ -170,7 +170,7 @@ const m: Translation<typeof en> = {
     fullNote: `${product.name} 不會在這裡發布那個任務。`,
     practice: "嚮導仍然提供所有協助。",
     planApproval: "親手學一律開啟：動手寫之前，你要先確認自己的計畫。",
-    title: "開始之前",
+    title: "動手寫之前",
     practise: "親手寫，在本機練習",
     ban: ({ reach, condition }) =>
       `${product.name} 不會在這裡發布親手學的任務：${reach === "assistance" ? "專案規範限制的是 AI 協助本身，不只是 AI 寫的程式碼" : reach === "output" ? `專案規範不接受 AI 產生的內容，而且${condition}` : `${product.name} 無法從專案規範的原文判斷它涵蓋哪些情況`}。`,

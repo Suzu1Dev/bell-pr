@@ -227,7 +227,7 @@ const discovery = {
     fullNote: `${product.name} won't publish that run here.`,
     practice: "The guide still gives every kind of help.",
     planApproval: "Always on in Learn by hand: you confirm your own plan before you write.",
-    title: "Before you start",
+    title: "Before you write",
     practise: "Practise by hand locally",
     ban: ({ reach, condition }: { reach: string; condition: string }) =>
       `${product.name} won't publish a learn-by-hand run here: ${reach === "assistance" ? "the project's rules restrict AI help itself, not only AI-written code" : reach === "output" ? `the project's rules decline AI-generated content, and ${condition}` : `${product.name} can't tell from the project's rule what it covers`}.`,
