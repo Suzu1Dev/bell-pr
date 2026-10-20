@@ -221,7 +221,12 @@ test("with no rung left on the step, \"My change\" isn't offered either", () => 
 test("a run whose history withdrew the claim says why instead of the in-run line", () => {
   const text = html(guide({ agentWrites: 1 }));
   assert.doesNotMatch(text, /agents can&#x27;t edit files/);
-  assert.ok(text.includes("BELL PR saw agent edits in this run (an agent tried to change files), so it makes no Learn-by-hand claim for it."));
+  // The record's own words (src/byhand/record), so the run says it one way everywhere.
+  assert.ok(text.includes("BELL PR makes no Learn-by-hand claim for this run: an agent tried to change files."));
+  assert.ok(html(guide({}, {}, { agents: [{ id: "a1", name: "Ada", role: "teammate", status: "complete", detail: "" }] as Run["agents"] })).includes(
+    "BELL PR makes no Learn-by-hand claim for this run: agents other than the guide, the reviewer and the test analyst joined it.",
+  ));
+  assert.ok(renderZh(guide({ agentWrites: 1 })).includes("BELL PR 不為這個工作做親手學的聲明：有 agent 試圖修改檔案。"));
 });
 
 test("a fitted run names its help set and offers no hint, test help or review outside it", () => {

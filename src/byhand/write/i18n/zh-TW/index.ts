@@ -43,9 +43,9 @@ const m: Translation<typeof en> = {
   guide: {
     title: "嚮導",
     clean: `這個任務裡，${name} 的 agent 無法修改檔案。`,
-    unclean: ({ reason }) => `${name} 在這個任務裡看到 agent 修改過檔案（${reason}），所以不為它做親手學的聲明。`,
-    reasons: { "agent-writes": "有 agent 試圖修改檔案", agents: "有其他 agent 參與", tasks: "它曾被規劃成團隊任務",
-      rounds: "跑過 AI 修正回合", resolutions: "有 agent 解決過衝突" },
+    unclean: ({ reason }) => `${name} 不為這個工作做親手學的聲明：${reason}。`,
+    reasons: { "agent-writes": "有 agent 試圖修改檔案", agents: "嚮導、審查者和測試分析師以外的 agent 參與過", tasks: "它曾被規劃成團隊任務",
+      rounds: "跑過 AI 後續修改", resolutions: "有 agent 解決過它的合併衝突" },
     fitted: ({ kinds }) => `這個任務配合專案規範：嚮導只提供${kinds}。發布時，你要確認專案被引用的規範。`,
     blocked: ({ clause }) => `${name} 不會在這裡發布這個任務：${clause}。儘管放心練習。`,
     notOffered: ({ kinds }) => `這個任務不提供：它配合的專案原文沒有提到${kinds}。`,
