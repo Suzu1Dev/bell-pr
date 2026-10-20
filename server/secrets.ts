@@ -10,42 +10,44 @@
 interface SecretPattern {
   pattern: RegExp;
   replacement: string;
-  /** When true the shape also makes secretInPatch() return true. */
-  blocks: boolean;
 }
 
+/**
+ * The shapes secretInPatch() reports. shared/draft-checks.ts imports it,
+ * so these also reach the client; the shapes that only mask stay below.
+ */
 export const secretPatterns: readonly SecretPattern[] = [
   {
     // Provider tokens share one minimum length of 16 characters after the prefix.
     pattern:
       /\b(?:gh[pousr]_[A-Za-z0-9_]{16,}|github_pat_[A-Za-z0-9_]{16,}|sk-[A-Za-z0-9_-]{16,}|AKIA[A-Z0-9]{16})\b/g,
     replacement: "[REDACTED]",
-    blocks: true,
   },
   {
     // BELL PR license keys: the BELLPR1 version tag, the payload and its signature.
     pattern: /BELLPR1\.[A-Za-z0-9_-]{40,}\.[A-Za-z0-9_-]{60,}/g,
     replacement: "[REDACTED]",
-    blocks: true,
   },
   {
     // PEM private keys; a block cut off before its END marker is masked to the end of the text.
     pattern:
       /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----[\s\S]*?(?:-----END (?:[A-Z]+ )?PRIVATE KEY-----|$)/g,
     replacement: "[REDACTED]",
-    blocks: true,
   },
+];
+
+/** Masked, and a reason to drop a project's document or an analysis, but never a block (server only). */
+const maskedPatterns: readonly SecretPattern[] = [
   {
-    // URL credentials. The user part never holds a colon, so the pattern stays linear on "http://a:a:a…".
-    pattern: /(https?:\/\/)[^\s/@:]+:[^\s/@]+@/g,
+    // URL credentials. The user part never holds a colon, so the pattern stays linear on "http://a:a:a…";
+    // neither part holds a double quote, which a URL never does, so in JSON it never reaches the next field.
+    pattern: /(https?:\/\/)[^\s"/@:]+:[^\s"/@]+@/g,
     replacement: "$1[REDACTED]@",
-    blocks: false,
   },
   {
     pattern:
       /((?:api[_-]?key|access[_-]?token|password|secret)\s*[:=]\s*["']?)[^\s"',;]{8,}/gi,
     replacement: "$1[REDACTED]",
-    blocks: false,
   },
 ];
 
@@ -107,7 +109,7 @@ const maskedShapes: readonly [RegExp, (...match: string[]) => string][] = [
       placeholder(value) || /^(?:bearer|basic|token|digest|bot)$/i.test(value) ? match : `${prefix}[REDACTED]`,
   ],
   [/\b(bearer\s+)([A-Za-z0-9._~+/=-]{16,})/gi, (match, prefix, value) => (placeholder(value) ? match : `${prefix}[REDACTED]`)],
-  [/\b([a-z][a-z0-9+.-]{0,30}:\/\/)[^\s/@:]*:[^\s/@]+@/gi, (_match, scheme) => `${scheme}[REDACTED]@`],
+  [/\b([a-z][a-z0-9+.-]{0,30}:\/\/)[^\s"/@:]*:[^\s"/@]+@/gi, (_match, scheme) => `${scheme}[REDACTED]@`],
   [
     /\b(?:npm_[A-Za-z0-9]{36}|xox[abposr]-[A-Za-z0-9-]{10,}|[rs]k_(?:live|test)_[A-Za-z0-9]{16,}|glpat-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}|hf_[A-Za-z0-9]{30,})/g,
     () => "[REDACTED]",
@@ -123,12 +125,13 @@ const maskedShapes: readonly [RegExp, (...match: string[]) => string][] = [
 ];
 
 /**
- * The shapes of secretPatterns masked, as redact() did before it masked the
- * shapes above: a project's document or a model's answer that these change
- * is dropped. The shapes above are masked, never a reason to drop one.
+ * The shapes of secretPatterns and maskedPatterns masked, as redact() did
+ * before it also masked maskedShapes: a project's document or a model's
+ * answer that these change is dropped. maskedShapes are masked, never a
+ * reason to drop one.
  */
 export function redactSecretPatterns(text: string): string {
-  return secretPatterns.reduce(
+  return [...secretPatterns, ...maskedPatterns].reduce(
     (result, { pattern, replacement }) =>
       result.replace(pattern, replacement),
     text,
@@ -142,7 +145,5 @@ export function redact(text: string): string {
 
 export function secretInPatch(patch: string): boolean {
   // String#search ignores the global flag's lastIndex, so the shared patterns stay stateless.
-  return secretPatterns.some(
-    ({ pattern, blocks }) => blocks && patch.search(pattern) !== -1,
-  );
+  return secretPatterns.some(({ pattern }) => patch.search(pattern) !== -1);
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { redact, secretInPatch } from "./secrets.js";
+import { redact, redactSecretPatterns, secretInPatch } from "./secrets.js";
 import { cutQuote } from "../shared/by-hand-filter.js";
 
 interface Row {
@@ -180,6 +180,35 @@ test("secrets: redact masks every shape in one text", () => {
     redact(text),
     "[REDACTED] [REDACTED] [REDACTED] https://[REDACTED]@host/ secret: [REDACTED]",
   );
+});
+
+test("secrets: a URL's user and password never cross a double quote, so JSON fields stay apart", () => {
+  // Prompts carry redact(JSON.stringify(data)) (server/drafts.ts, server/prompts/followups.ts): a port and an
+  // e-mail address in the next field once read as "user:password@host", and the prompt lost a field.
+  const kept = [
+    JSON.stringify({ url: "https://localhost:3000", email: "dev@example.com" }),
+    JSON.stringify({ database: "postgres://localhost:5432/app", owner: "dev@example.com" }),
+    JSON.stringify({ urls: ["http://127.0.0.1:8080", "mailto:dev@example.com"] }),
+  ];
+  for (const text of kept) {
+    assert.equal(redact(text), text);
+    // A project's docs or an analysis holding such JSON is no longer dropped as sensitive either.
+    assert.equal(redactSecretPatterns(text), text);
+  }
+  // Credentials inside one JSON string are still masked, in both lists of shapes.
+  const masked: [string, string][] = [
+    [
+      JSON.stringify({ url: "https://user:s3cretpass@github.com/o/r.git", email: "dev@example.com" }),
+      JSON.stringify({ url: "https://[REDACTED]@github.com/o/r.git", email: "dev@example.com" }),
+    ],
+    [
+      JSON.stringify({ database: "postgres://app:hunter2pass@db:5432/app", owner: "dev@example.com" }),
+      JSON.stringify({ database: "postgres://[REDACTED]@db:5432/app", owner: "dev@example.com" }),
+    ],
+  ];
+  for (const [input, output] of masked) assert.equal(redact(input), output, input);
+  assert.notEqual(redactSecretPatterns(masked[0][0]), masked[0][0]);
+  assert.equal(secretInPatch(masked[0][0]), false);
 });
 
 test("secrets: the URL-credential shape takes linear time on a crafted line", () => {
