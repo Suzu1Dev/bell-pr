@@ -8,6 +8,7 @@ import { assertNoHan } from "../test-utils/render";
 import {
   byHandReasonText,
   byHandStartReason,
+  byHandStartReasons,
   doorClosed,
   doorState,
   factsFrom,
@@ -229,6 +230,28 @@ test("a fitted case names the kinds of help and quotes the first carve-out", () 
     `BELL PR can publish a learn-by-hand run here only if the guide stays within what the project's own text says is fine (explanations and answers: "${carveOut}"), and only after you confirm the project's quoted rule. The maintainers decide whether your change fits.`,
   );
   assert.match(byHandReasonText(reason!, discoveryZh.byHand, "zh-TW"), /解說和回答/);
+});
+
+test("with every kind of help chosen on a project a run could be fitted to, Start says BELL won't publish it", () => {
+  const carveOut = "This policy does not apply to other uses of AI, such as researching APIs or algorithms.";
+  const rule = { kind: "ban", path: "docs/a.rst", line: 1, quote: qemuRule, allows: [{ line: 6, quote: carveOut, kinds: ["explain", "answer"] }] };
+  const rulesCase = {
+    case: "fitted",
+    kinds: ["explain", "answer"],
+    lock: { kinds: ["explain", "answer"], rulesCheckedAt: "2026-10-20T00:00:00.000Z", rules: [rule] },
+  } as const satisfies Parameters<typeof byHandStartReasons>[1];
+  const reasons = [byHandStartReason(rulesCase)!, { id: "door" } as const];
+  // Fitted: the case is said as it is.
+  assert.deepEqual(byHandStartReasons(reasons, rulesCase, true), reasons);
+  // Every kind of help: the same rule now blocks publishing, and Start offers to practise locally.
+  const full = byHandStartReasons(reasons, rulesCase, false);
+  assert.deepEqual(full, [{ id: "by-hand-ban", reach: "output", reason: "not-fitted" }, { id: "door" }]);
+  assert.equal(
+    byHandReasonText(full[0] as Parameters<typeof byHandReasonText>[0], discoveryEn.byHand, "en"),
+    "BELL PR won't publish a learn-by-hand run here: the project's rules decline AI-generated content, and this run wasn't fitted to its rules when it started.",
+  );
+  const area = { ...rulesCase, lock: { ...rulesCase.lock, rules: [{ ...rule, kind: "area", quote: "Pull requests that are AI generated will be closed." }] } };
+  assert.deepEqual(byHandStartReasons(reasons, area, false)[0], { id: "by-hand-area", reach: "output", reason: "not-fitted" });
 });
 
 test("the reasons a learn-by-hand run won't publish are worded by the rule's reach and the failed condition", () => {

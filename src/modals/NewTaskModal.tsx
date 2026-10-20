@@ -13,7 +13,7 @@ import { useLocale, useT } from "../i18n";
 import type { Repo } from "../types";
 import { DirectionSettings } from "../mission/DirectionSettings";
 import { providerReadiness } from "../mission/readiness";
-import { suggestedMode } from "../mission/respect";
+import { byHandStartReasons, suggestedMode } from "../mission/respect";
 import { StartConfirm, startReasonsKey, type StartCheck } from "../mission/StartConfirm";
 import { providerLabels } from "../../shared/models";
 import type { ModalName, Page } from "../app/AppShell";
@@ -95,15 +95,16 @@ export function NewTaskModal({
   const [startCheck, setStartCheck] = useState<StartCheck>({ reasons: [] });
   const [asking, setAsking] = useState(false);
   const accepted = useRef("");
-  const reasonsKey = startReasonsKey(startCheck.reasons);
   // Who writes it (DESIGN v1.2 F1): the person's choice, else the suggestion; the fitted help set is preselected.
   const [modeChoice, setModeChoice] = useState<RunMode>();
   const [fitChoice, setFitChoice] = useState<boolean>();
   const { rules, rulesCase, learningIssue = false } = startCheck;
   const mode = demo ? "agents" : (modeChoice ?? suggestedMode({ preferred: preferredMode, learningIssue, rules }));
   const fitted = mode === "hand" && rulesCase?.case === "fitted" && (fitChoice ?? true);
+  const reasons = mode === "hand" ? byHandStartReasons(startCheck.reasons, rulesCase, fitted) : startCheck.reasons;
+  const reasonsKey = startReasonsKey(reasons);
   const submit = (event: FormEvent) => {
-    if (startCheck.reasons.length && accepted.current !== reasonsKey) {
+    if (reasons.length && accepted.current !== reasonsKey) {
       event.preventDefault();
       setAsking(true);
       return;
@@ -272,10 +273,10 @@ export function NewTaskModal({
             {formError}
           </p>
         )}
-        {asking && startCheck.reasons.length > 0 && !startDisabled && (
+        {asking && reasons.length > 0 && !startDisabled && (
           <StartConfirm
             byHand={mode === "hand"}
-            reasons={startCheck.reasons}
+            reasons={reasons}
             onCancel={() => setAsking(false)}
             onConfirm={() => {
               accepted.current = reasonsKey;
