@@ -765,7 +765,8 @@ test("a learn-by-hand run plans with the guide instead of approving a team plan,
   const failed = renderEn(element(byHand("failed", "failed")));
   assertNoHan(failed);
   assert.ok(failed.includes("A retry takes this run back to planning with the guide."));
-  assert.doesNotMatch(failed, /Note for the retried subtasks/);
+  assert.doesNotMatch(failed, /Note for the retried subtasks|Retry failed subtasks/);
+  assert.match(failed, /<button class="button primary"><svg[\s\S]*?<\/svg>Plan with the guide<\/button>/);
   // After the person confirmed their plan, no retry can bring agents back.
   const confirmed = byHand("failed", "failed", { byHand: { plan: { steps: [{ id: "s1", title: "Cap" }], savedAt: sample.run.createdAt, confirmedAt: sample.run.createdAt } } });
   assert.doesNotMatch(renderEn(element(confirmed)), /A retry takes this run back|Retry failed subtasks/);

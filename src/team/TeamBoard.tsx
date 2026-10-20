@@ -458,7 +458,7 @@ export function TeamBoard({
               ) : (
                 <RotateCcw size={15} />
               )}
-              {t.retry.action}
+              {run.learnByHand ? byHandText.start : t.retry.action}
             </button>
             {retryError && (
               <p className="inline-error" role="alert">
