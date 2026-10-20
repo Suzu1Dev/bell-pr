@@ -111,6 +111,8 @@ export interface DirectionSettingsProps {
   repoId?: string;
   /** Tells the task dialog the facts read and whether Start asks once. */
   onStartCheck?: (check: StartCheck) => void;
+  /** The person writes the change (Learn by hand): no team size, and plan approval always on. */
+  byHand?: boolean;
 }
 
 export function DirectionSettings({
@@ -124,6 +126,7 @@ export function DirectionSettings({
   initialCatalog,
   repoId,
   onStartCheck,
+  byHand = false,
 }: DirectionSettingsProps) {
   const { directions, settings: t } = useT("mission");
   const { reasoningEffort: efforts, reasoningEffortWithId } = useT("common");
@@ -345,6 +348,7 @@ export function DirectionSettings({
                     issueUrl={value.issueUrl}
                     demo={demo}
                     onFacts={onStartCheck}
+                    byHand={byHand}
                   />
                 </Suspense>
               )}
@@ -565,7 +569,7 @@ export function DirectionSettings({
           </div>
 
           <div className="mission-team-settings">
-            <fieldset className="mission-fieldset mission-team-size">
+            {!byHand && <fieldset className="mission-fieldset mission-team-size">
               <legend>
                 <span className="mission-legend-icon">
                   <Users size={16} />
@@ -601,11 +605,12 @@ export function DirectionSettings({
                   {t.team.clampNotice({ free: teamLimit, pro: proTeammates })}
                 </p>
               )}
-            </fieldset>
+            </fieldset>}
             <label className="mission-plan-option">
               <input
                 type="checkbox"
-                checked={value.requirePlanApproval}
+                checked={byHand || value.requirePlanApproval}
+                disabled={byHand}
                 onChange={(event) =>
                   update("requirePlanApproval", event.target.checked)
                 }
@@ -615,7 +620,7 @@ export function DirectionSettings({
                   <Settings2 size={16} />
                   {t.planApproval.label}
                 </strong>
-                <small>{t.planApproval.help}</small>
+                <small>{byHand ? t.planApproval.byHand : t.planApproval.help}</small>
               </span>
             </label>
           </div>

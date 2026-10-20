@@ -493,11 +493,10 @@ export function useRunActions({
     }
     setBusy(true);
     try {
-      const result = await api<{ run: Run }>(
-        `/runs/${run.id}/plan/approve`,
-        send("POST"),
-      );
+      const result = await api<{ run: Run }>(`/runs/${run.id}/plan/approve`, send("POST"));
       if (runIdRef.current === result.run.id) setRun(result.run);
+      // Learn by hand: the person's turn to write starts in the Changes tab.
+      if (runIdRef.current === result.run.id && result.run.learnByHand) setTab("changes");
     } catch (error) {
       notify((error as Error).message, "error");
     } finally {
@@ -720,6 +719,7 @@ export function useRunActions({
           prompt: prompt.trim(),
           title: taskTitle.trim() || undefined,
           settings: contributionSettings,
+          ...setup.runRequest.current,
         }),
       );
       setRuns((previous) => [summarizeRun(created), ...previous]);

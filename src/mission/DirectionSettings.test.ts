@@ -441,3 +441,23 @@ test("the task dialog's form shows the Before-you-start facts under the issue fi
     await defaults.unmount();
   }
 });
+
+test("in Learn by hand the team size is hidden and plan approval is always on", () => {
+  const html = renderEn(
+    props({ requirePlanApproval: false }, { entitlements: proEntitlements(2), byHand: true }),
+  );
+  assertNoHan(html);
+  assert.doesNotMatch(html, /mission-team-size/);
+  const approval = html.slice(html.lastIndexOf('<label class="mission-plan-option">'));
+  assert.ok(approval.startsWith('<label class="mission-plan-option"><input type="checkbox" disabled="" checked=""/>'));
+  assert.ok(
+    approval.includes(
+      "Let me approve the plan before development</strong><small>Always on in Learn by hand: you confirm your own plan before you write.</small>",
+    ),
+  );
+  // The agent team keeps both, and the saved choice.
+  const team = renderEn(props({ requirePlanApproval: false }, { entitlements: proEntitlements(2) }));
+  assert.match(team, /mission-team-size/);
+  assert.ok(team.slice(team.lastIndexOf('<label class="mission-plan-option">')).startsWith('<label class="mission-plan-option"><input type="checkbox"/>'));
+  assert.match(renderZh(props({}, { byHand: true })), /親手學一律開啟/);
+});
