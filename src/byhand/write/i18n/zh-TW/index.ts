@@ -133,7 +133,7 @@ const m: Translation<typeof en> = {
   ready: {
     title: "可以審查了",
     facts: ({ n, additions, deletions }) => `改了 ${n} 個檔案，+${additions} −${deletions}。`,
-    tested: ({ outcome, when, predicted }) => `你的測試${when}${outcome}${predicted ? `；你預測「${predicted}」` : ""}。`,
+    tested: ({ outcome, when, predicted }) => `${when}，你的測試${outcome}${predicted ? `；你預測「${predicted}」` : ""}。`,
     untested: "最後一次修改後還沒跑過測試。這不是必要條件；測試才是裁判。",
     leastSure: "你最沒把握的是哪裡？（選填）",
     review: "請嚮導審查",

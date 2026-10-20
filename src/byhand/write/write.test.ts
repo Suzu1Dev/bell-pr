@@ -327,6 +327,9 @@ test("Ready for review states the version's facts and offers the guide's review"
   assert.ok(text.includes(apostrophes("Nothing is explained or reviewed until you say it's ready.")));
   assert.equal(renderEn(ready({}, { open: false })), "");
   assert.match(html(ready({}, { aiRules: true })), /This project has rules about AI use\./);
+  // zh-TW: the time leads, so a number never runs into the words before it.
+  const tested = { tests: [{ at: new Date(Date.now() - 60_000).toISOString(), command: "npm test", changeFingerprint: fingerprint, outcome: "failed" as const, ms: 5, prediction: "fail" as const }] };
+  assert.ok(renderZh(ready(tested)).includes("1 分鐘前，你的測試失敗了；你預測「失敗」。"));
 });
 
 test("a second review waits for a test run at the new version, and a fitted run without review offers none", () => {
