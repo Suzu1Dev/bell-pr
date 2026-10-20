@@ -64,7 +64,7 @@ const en = {
     entries: { tooling: "Setup and tools", project: "This project", concept: "A concept", change: "My change" },
     question: "Your question",
     tried: "What I tried · what I expected · what happened",
-    rungs: { 1: "Where to look", 2: "What applies", 3: "Options" } as Record<number, string>,
+    rungs: { 1: "Where to look", 2: "What applies", 3: "Options", 4: "An example in this project" } as Record<number, string>,
     next: ({ rung }: { rung: string }) => `Next hint: ${rung}`,
     tryFirst: "Try something first: change the code, run the tests, or say what you tried.",
     noRung: "No hint left on this step; the exits are below.",

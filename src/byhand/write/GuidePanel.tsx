@@ -126,7 +126,7 @@ export function GuidePanel(props: GuidePanelProps) {
   // The ladder of the step the person is on: the next rung after the
   // highest so far, if the run offers its kind, behind the attempt gate.
   const hintState = step ? record.hints?.[step.id] : undefined;
-  const rungs = [1, 2, 3].filter((rung) => helpAllowed(run, helpKindOf("hint", rung)));
+  const rungs = [1, 2, 3, 4].filter((rung) => helpAllowed(run, helpKindOf("hint", rung)));
   const next = (hintState?.rung ?? 0) + 1;
   const attempt = attemptSince(hintState, { fingerprint, tests: record.tests, tried });
   const review = record.reviews?.at(-1);

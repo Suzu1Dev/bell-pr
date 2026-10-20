@@ -59,7 +59,7 @@ const m: Translation<typeof en> = {
     entries: { tooling: "環境與工具", project: "這個專案", concept: "一個觀念", change: "我的修改" },
     question: "你的問題",
     tried: "我試了什麼 · 我預期什麼 · 實際發生什麼",
-    rungs: { 1: "看哪裡", 2: "用得上的觀念", 3: "幾種做法" },
+    rungs: { 1: "看哪裡", 2: "用得上的觀念", 3: "幾種做法", 4: "專案裡的例子" },
     next: ({ rung }) => `下一個提示：${rung}`,
     tryFirst: "先試試看：改程式碼、跑測試，或說說你試了什麼。",
     noRung: "這一步已經沒有提示了；下面有其他出口。",
