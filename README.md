@@ -172,6 +172,8 @@ change." BELL PR can't see other tools you used, such as editor
 autocomplete, and the record isn't proof of who wrote the code. Learn by
 hand is Free.
 
+![Code changes in a Learn-by-hand run: your diff, and beside it the guide's panel with a hint that quotes the project's code](docs/images/en/run-by-hand-your-turn-1280.png)
+
 Learn by hand doesn't make a pull request welcome where a project
 restricts AI help. Where a project declines AI-generated content and its
 own text says some uses of AI are fine, you can fit the guide to that text
