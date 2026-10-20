@@ -256,3 +256,31 @@ test("in a Learn-by-hand run the quiz and each walkthrough unit are told so, and
   const attempt = shallow(WalkthroughAttempt, { unit, onAttempt: async () => {}, demo: false, byHand: true });
   assert.equal(find(attempt, QuizAttempt)!.props.byHand, true);
 });
+
+test("a Learn-by-hand run's Reports tab names the guide and says nothing of the agent team's rerun", () => {
+  const reports = { reviewer: "One problem at `src/a.ts:3`.", tester: "The last test run passed." };
+  const tab = (props: Partial<Parameters<typeof ReviewReports>[0]>, render = renderEn) =>
+    render(createElement(ReviewReports, { file, demo: false, onRerunReview() {}, ...props }));
+  for (const html of [tab({ byHand: true, reports }), tab({ byHand: true })]) {
+    assertNoHan(html);
+    // Run the review again stays; it opens Ready for review, which says what the review does and costs.
+    assert.match(html, /<button type="button" class="explain-retry"[^>]*>.*Run the review again<\/button>/);
+    for (const agent of [/Runs the Reviewer and Test analyst again/, /Lens · Reviewer/, /Scout · Test analyst/, /Lead&#x27;s integration/])
+      assert.doesNotMatch(html, agent);
+  }
+  assert.equal(tab({ byHand: true, reports }).split(`<span class="explain-report-author">${en.guide}</span>`).length, 3);
+  const zh = tab({ byHand: true, reports }, renderZh);
+  assert.ok(zh.includes(`<span class="explain-report-author">${zhTW.guide}</span>`));
+  assert.doesNotMatch(zh, /Lens|Scout/);
+  // An agent run's tab is as it was.
+  const agent = tab({ reports });
+  assert.match(agent, /Runs the Reviewer and Test analyst again/);
+  assert.match(agent, /Lens · Reviewer/);
+  assert.doesNotMatch(agent, new RegExp(en.guide));
+  assert.match(tab({}), /Lead&#x27;s integration, the Reviewer and the Test analyst/);
+  // The panel tells its Reports tab which kind of run it is.
+  const reportsOf = (props: Partial<ExplanationPanelProps>) =>
+    find(shallow(ExplanationPanel, { file, messages: [], loading: false, onAsk() {}, demo: false, initialTab: "reports", ...props }), ReviewReports)!.props;
+  assert.equal(reportsOf({ byHandReview: reader(check([])) }).byHand, true);
+  assert.ok(!reportsOf({}).byHand);
+});

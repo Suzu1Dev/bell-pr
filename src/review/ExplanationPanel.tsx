@@ -36,6 +36,7 @@ import { scrollBehavior } from "../app/presentation";
 import { useFormat, useLocale, useT } from "../i18n";
 import type { ChatMessage, DiffFile, Run } from "../types";
 import { MaintainerFeedback } from "./MaintainerFeedback";
+import { usePanelStrings } from "./i18n";
 import { MarkdownContent } from "./MarkdownContent";
 import { QuizAttempt } from "./QuizAttempt";
 import { unasked } from "./reader";
@@ -161,6 +162,7 @@ export function ReviewReports({
   feedback = [],
   onRerunReview,
   reviewBusy = false,
+  byHand,
 }: {
   file: DiffFile;
   reports?: Run["reports"];
@@ -168,8 +170,11 @@ export function ReviewReports({
   feedback?: PrFeedbackItem[];
   onRerunReview?: () => void;
   reviewBusy?: boolean;
+  /** A Learn-by-hand run: the guide wrote the review, and Run the review again opens Ready for review. */
+  byHand?: boolean;
 }) {
   const t = useT("review");
+  const guide = usePanelStrings().guide;
   const available = reportKeys.filter((key) => reports?.[key]?.trim());
   // Demo reports are fixed text, so there is nothing to re-run there.
   const rerun = onRerunReview && !demo && (
@@ -188,7 +193,7 @@ export function ReviewReports({
         )}
         {reviewBusy ? t.reports.rerunBusy : t.reports.rerun}
       </button>
-      <small className="explain-empty-note">{t.reports.rerunNote}</small>
+      {!byHand && <small className="explain-empty-note">{t.reports.rerunNote}</small>}
     </div>
   );
   const reviewOrder = parseReviewOrder(reports?.implementer ?? "");
@@ -199,7 +204,7 @@ export function ReviewReports({
         <div className="explain-empty">
           <Eye size={28} />
           <h3>{t.reports.emptyTitle}</h3>
-          <p>{t.reports.emptyBody}</p>
+          {!byHand && <p>{t.reports.emptyBody}</p>}
           {rerun}
         </div>
       </>
@@ -239,7 +244,7 @@ export function ReviewReports({
             <h3>
               <Eye size={15} />
               {section.title}
-              <span className="explain-report-author">{section.author}</span>
+              <span className="explain-report-author">{byHand ? guide : section.author}</span>
             </h3>
             <p className="explain-report-meta">
               <span className="explain-report-badge">
@@ -869,6 +874,7 @@ export function ExplanationPanel({
             feedback={feedback}
             onRerunReview={onRerunReview && (byHandReview?.onReviewAgain ?? onRerunReview)}
             reviewBusy={reviewBusy}
+            byHand={!!byHandReview}
           />
         ) : (
           <div
