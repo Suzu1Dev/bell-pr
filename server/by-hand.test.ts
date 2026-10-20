@@ -436,6 +436,41 @@ test("only tests replace the guide's review turn", async () => {
   }
 });
 
+test("approval needs the version the person marked ready, and waits for BELL's test run", async (t) => {
+  skipUnderstandingCheckInTests(true);
+  const f = await fixture(t);
+  const run = await f.writing();
+  await git(run.worktreePath, ["config", "user.name", "BELL Test"]);
+  await git(run.worktreePath, ["config", "user.email", "test@example.invalid"]);
+  run.draft = { title: "Retry a GET twice", body: "Retries a GET twice after a 503." };
+  for (const file of await readDiff(run)) await f.workbench.review(run.id, file.path, true, file.fingerprint);
+  await assert.rejects(en(() => f.workbench.approve(run.id, { ...run.draft })), refused(409, /^Mark your changes ready for review first\./));
+  await en(async () => f.workbench.byHand.ready(run.id, { changeFingerprint: await f.fingerprint(run), review: false }));
+  // Never while BELL runs the person's tests (the job `tests:<id>`, server/by-hand-tests.ts).
+  const tests = new AbortController();
+  f.ctx.controllers.set(`tests:${run.id}`, tests);
+  await assert.rejects(
+    en(() => f.workbench.approve(run.id, { ...run.draft })),
+    refused(409, /^Wait for the tests to finish or stop them, then approve\./),
+  );
+  assert.equal(run.status, "review");
+  f.ctx.controllers.delete(`tests:${run.id}`);
+  assert.equal((await en(() => f.workbench.approve(run.id, { ...run.draft }))).status, "approved");
+  // Edited after Ready: the reviewed ticks and the ready version both have to come back.
+  await f.write(run, retrySource.replace("attempts = 1", "attempts = 4"));
+  for (const file of await readDiff(run)) await f.workbench.review(run.id, file.path, true, file.fingerprint);
+  await assert.rejects(en(() => f.workbench.approve(run.id, { ...run.draft })), refused(409, /^Mark your changes ready for review first\./));
+  await en(async () => f.workbench.byHand.ready(run.id, { changeFingerprint: await f.fingerprint(run), review: false }));
+  assert.equal((await en(() => f.workbench.approve(run.id, { ...run.draft }))).status, "approved");
+  // An agent run approves as before: no Ready version, and a `tests:` key means nothing to it.
+  delete run.learnByHand;
+  await f.write(run, retrySource.replace("attempts = 1", "attempts = 5"));
+  for (const file of await readDiff(run)) await f.workbench.review(run.id, file.path, true, file.fingerprint);
+  f.ctx.controllers.set(`tests:${run.id}`, new AbortController());
+  assert.equal((await en(() => f.workbench.approve(run.id, { ...run.draft }))).status, "approved");
+  f.ctx.controllers.delete(`tests:${run.id}`);
+});
+
 test("the PR template comes verbatim from the run's folder: at most three, none over 20 kB", async (t) => {
   const f = await fixture(t);
   const run = await f.writing();

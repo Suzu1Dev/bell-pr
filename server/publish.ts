@@ -39,6 +39,7 @@ import {
 import { assertRemoteHead, prHasCommit, remoteBranchHead } from "./pr-branch.js";
 import { assertConflictsResolved } from "./sync-runs.js";
 import { applyAiDisclosure } from "./drafts.js";
+import { assertReady } from "./by-hand.js";
 import { assertGitIdentity, githubTokenScopes } from "./doctor.js";
 import { setupError } from "./cli-errors.js";
 import type { WorkbenchContext } from "./workbench.js";
@@ -290,6 +291,14 @@ export async function approve(
   return ctx.lock(id, async () => {
     const run = ctx.run(id);
     editable(run);
+    // Learn by hand: never while BELL runs the person's tests, and only the
+    // version the person marked ready is approved (DESIGN v1.2 F5, F9).
+    if (run.learnByHand) {
+      const tests = `tests:${id}`;
+      if (ctx.byHandJobs.has(tests) || ctx.controllers.has(tests))
+        throw new AppError((m) => m.byHand.flow.testsRunning, 409);
+      assertReady(run, await ctx.diff(id));
+    }
     if (
       displayedDraft.title !== run.draft.title ||
       displayedDraft.body !== run.draft.body ||
