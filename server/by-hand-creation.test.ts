@@ -230,6 +230,8 @@ test("no route but POST /api/runs takes the mode, and none takes a help lock", a
     if (!name.endsWith(".ts") || name.endsWith(".test.ts")) continue;
     const source = await readFile(path.join(routes, name), "utf8");
     assert.doesNotMatch(source, /helpLock/, name);
-    if (name !== "runs.ts") assert.doesNotMatch(source, /learnByHand|byHandFit/, name);
+    // learning.ts only reports a stored run's flag on GET /api/learning; no schema takes it.
+    if (name === "learning.ts") assert.doesNotMatch(source, /byHandFit|learnByHand\??\s*:\s*z\./, name);
+    else if (name !== "runs.ts") assert.doesNotMatch(source, /learnByHand|byHandFit/, name);
   }
 });
