@@ -1,0 +1,14 @@
+# Justified exceptions for scripts/check-personal-info.mjs, one per line:
+#
+#   <path>:<pattern id>  # <reason>
+#
+# <path> is relative to the repository root. <pattern id> is one of the ids
+# defined in the script (home, tailnet, key, token); never write the finding
+# itself. Every entry needs a reason. Keep the list short.
+
+server/by-hand-tests.test.ts:token  # invented secrets that the redaction tests must catch
+server/cli-errors.test.ts:token  # invented secret that the redaction test must catch
+server/contribution-policy.test.ts:token  # invented secret that the redaction test must catch
+server/draft-sources.test.ts:token  # invented secret that the redaction test must catch
+server/secrets.test.ts:token  # invented secrets that the redaction tests must catch
+server/secrets.test.ts:key  # a key header with no key body, as the redaction test input

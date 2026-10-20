@@ -1,0 +1,1486 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { defaultContributionSettings } from "../shared/insights.js";
+import { activeFollowUp } from "../shared/followups.js";
+import { summarizeRun } from "../shared/runs.js";
+import { ProjectInsightsService } from "./insights.js";
+import { git } from "./process.js";
+import { Store } from "./store.js";
+import type { Database, Repository, Run } from "./types.js";
+import { withLocale } from "./i18n/index.js";
+import { z } from "zod";
+import { lenientRead } from "./persisted-schema.js";
+import { persistedDatabaseSchema, repositoryReadSchema, runReadSchema } from "./store.js";
+import { withStoredReach } from "../shared/project-policy.js";
+
+async function dataDirectory() {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-store-test-"));
+  return {
+    directory,
+    cleanup: () => rm(directory, { recursive: true, force: true }),
+  };
+}
+
+const repository: Repository = {
+  id: "11111111-1111-4111-8111-111111111111",
+  name: "greeting",
+  owner: "local",
+  fullName: "local/greeting",
+  path: "/tmp/greeting",
+  defaultBranch: "main",
+  url: "",
+};
+
+/**
+ * A run in the shape Workbench writes today. Keep this fixture loading when
+ * adding persisted fields: new fields must be optional (see AGENTS.md).
+ */
+function interruptedRun(): Run {
+  return {
+    id: "run00000-0000-4000-8000-000000000001",
+    repoId: repository.id,
+    title: "補上問候文字測試",
+    prompt: "補上問候文字測試",
+    status: "running",
+    branch: "bellpr/run00000",
+    baseBranch: "main",
+    baseSha: "a".repeat(40),
+    worktreePath: "/tmp/state/worktrees/run00000-0000-4000-8000-000000000001",
+    createdAt: "2026-10-07T00:00:00.000Z",
+    agents: [
+      { id: "lead", name: "Atlas", role: "Team lead", status: "running", detail: "分析專案與拆解需求" },
+      { id: "reviewer", name: "Lens", role: "Reviewer", status: "waiting", detail: "獨立審查正確性與維護性" },
+      { id: "tester", name: "Scout", role: "Test analyst", status: "waiting", detail: "檢查測試證據與回歸風險" },
+    ],
+    logs: [{ time: "2026-10-07T00:00:01.000Z", agent: "lead", message: "開始分析" }],
+    draft: { title: "補上問候文字測試", body: "" },
+    reviewedFiles: [],
+    reviewedFingerprints: {},
+    reports: {},
+    contributionSettings: { ...defaultContributionSettings },
+    modelExecution: { provider: "codex", source: "cli-default" },
+    publishing: false,
+    draftPreparation: { status: "generating", fingerprint: "c".repeat(64) },
+    explanations: {
+      "hello.ts": { status: "generating", fingerprint: "d".repeat(64) },
+    },
+    team: {
+      config: {
+        maxTeammates: 3,
+        requirePlanApproval: true,
+        provider: "codex",
+        protocol: "bell-shared-tasks",
+        messageDelivery: "between-turns",
+      },
+      phase: "developing",
+      planSummary: "一個任務",
+      tasks: [
+        {
+          id: "task-1",
+          title: "補測試",
+          description: "新增問候文字測試",
+          owner: "Scout",
+          files: ["hello.test.ts"],
+          dependsOn: [],
+          status: "running",
+        },
+      ],
+      messages: [],
+    },
+  };
+}
+
+test("state.json 不是有效 JSON 時，錯誤訊息包含檔案路徑", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  await writeFile(path.join(directory, "state.json"), "{ not json");
+  await assert.rejects(new Store(directory).initialize(), /state\.json/);
+});
+
+test("version 不是 1 時，錯誤訊息包含檔案路徑與版本提示", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  await writeFile(
+    path.join(directory, "state.json"),
+    JSON.stringify({ version: 2, repos: [], runs: [] }),
+  );
+  await assert.rejects(
+    new Store(directory).initialize(),
+    (error: Error) =>
+      /state\.json/.test(error.message) &&
+      /version 1/.test(error.message) &&
+      error.cause instanceof Error &&
+      error.cause.message === "Invalid state format",
+  );
+});
+
+test("既有 version 1 的 state.json 可載入，中斷的工作仍會被標記為失敗", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const fixture: Database = {
+    version: 1,
+    repos: [repository],
+    runs: [interruptedRun()],
+  };
+  await writeFile(path.join(directory, "state.json"), JSON.stringify(fixture));
+  const store = new Store(directory);
+  await store.initialize();
+  assert.equal(store.data.repos.length, 1);
+  assert.equal(store.data.repos[0].id, repository.id);
+  const [run] = store.data.runs;
+  assert.equal(run.status, "failed");
+  assert.equal(run.publishing, false);
+  assert.match(run.error ?? "", /服務重新啟動/);
+  assert.equal(run.agents[0].status, "failed");
+  assert.equal(run.agents[1].status, "waiting");
+  assert.equal(run.team?.phase, "failed");
+  assert.equal(run.team?.tasks[0].status, "failed");
+  assert.equal(run.draftPreparation?.status, "failed");
+  assert.equal(run.explanations?.["hello.ts"].status, "failed");
+  assert.deepEqual(run.contributionSettings, defaultContributionSettings);
+  assert.equal(run.logs[0].message, "開始分析");
+});
+
+test("重新審查途中當機時，已完成工作的審查者會被標記失敗而工作狀態不變", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const run = interruptedRun();
+  run.status = "review";
+  run.agents[0].status = "complete";
+  run.agents[1].status = "running";
+  const fixture: Database = { version: 1, repos: [repository], runs: [run] };
+  await writeFile(path.join(directory, "state.json"), JSON.stringify(fixture));
+  const store = new Store(directory);
+  await store.initialize();
+  const [loaded] = store.data.runs;
+  assert.equal(loaded.status, "review");
+  assert.equal(loaded.error, undefined);
+  assert.equal(loaded.agents[0].status, "complete");
+  assert.equal(loaded.agents[1].status, "failed");
+  assert.match(loaded.agents[1].detail, /重新審查已中斷/);
+  assert.equal(loaded.agents[2].status, "waiting");
+});
+
+/** Writes `runs` as state.json in a fresh data directory and returns it. */
+async function stateWith(runs: Run[]) {
+  const data = await dataDirectory();
+  const fixture: Database = { version: 1, repos: [repository], runs };
+  await writeFile(
+    path.join(data.directory, "state.json"),
+    JSON.stringify(fixture),
+  );
+  return data;
+}
+
+test("restart recovery explains each interrupted run in the run's own locale", async (t) => {
+  // The server default is en, as with BELLPR_LOCALE=en or the app settings.
+  const chinese = await stateWith([
+    { ...interruptedRun(), id: "run-zh", locale: "zh-TW" },
+    { ...interruptedRun(), id: "run-older" },
+  ]);
+  t.after(chinese.cleanup);
+  const first = new Store(chinese.directory);
+  await withLocale("en", () => first.initialize());
+  const [zh, older] = first.data.runs;
+  assert.equal(
+    zh.error,
+    "服務重新啟動，先前工作已中斷。工作目錄仍保留，可檢視差異；團隊工作可在任務板重試失敗的子任務，已整合的子任務不會重跑。",
+  );
+  assert.equal(
+    zh.team?.tasks[0].error,
+    "服務重新啟動，任務已中斷；隔離工作目錄保留，重試時會以新快照重新開始。",
+  );
+  assert.match(zh.draftPreparation?.error ?? "", /^服務重新啟動，PR 草稿建議已中斷/);
+  assert.match(zh.explanations?.["hello.ts"].error ?? "", /^服務重新啟動，解說產生已中斷/);
+  // A run saved before runs had a locale follows the server default.
+  assert.match(older.error ?? "", /^The service restarted, so the run stopped\./);
+  assert.equal(older.locale, undefined);
+
+  // The tests' default is zh-TW; an English run still recovers in English.
+  const reviewing: Run = { ...interruptedRun(), id: "run-review", locale: "en" };
+  reviewing.status = "review";
+  reviewing.agents[0].status = "complete";
+  reviewing.agents[1].status = "running";
+  const english = await stateWith([
+    { ...interruptedRun(), id: "run-en", locale: "en" },
+    reviewing,
+  ]);
+  t.after(english.cleanup);
+  const second = new Store(english.directory);
+  await second.initialize();
+  const [en, review] = second.data.runs;
+  assert.equal(
+    en.error,
+    "The service restarted, so the run stopped. Its working directory is kept and you can read the diff; for a team run, retry the failed subtasks on the task board, and integrated subtasks do not run again.",
+  );
+  assert.equal(
+    en.team?.tasks[0].error,
+    "The service restarted, so the task stopped; its isolated working directory is kept, and a retry starts again from a fresh snapshot.",
+  );
+  assert.equal(
+    en.draftPreparation?.error,
+    "The service restarted, so the PR draft suggestion stopped; your current draft is kept, and you can generate the suggestion again.",
+  );
+  assert.equal(
+    en.explanations?.["hello.ts"].error,
+    "The service restarted, so generating the explanation stopped; you can retry it.",
+  );
+  assert.equal(
+    review.agents[1].detail,
+    "The service restarted, so the review rerun stopped; the earlier reports are kept",
+  );
+  // Text saved before the restart is never translated.
+  assert.equal(en.logs[0].message, "開始分析");
+});
+
+test("an interrupted conflict resolution or follow-up round is explained in the run's own locale", async (t) => {
+  // An English run whose agent was resolving sync conflicts, under the
+  // tests' zh-TW default.
+  const resolving: Run = {
+    ...interruptedRun(),
+    id: "run-sync",
+    locale: "en",
+    sync: {
+      at: "2026-10-07T00:00:02.000Z",
+      from: "a".repeat(40),
+      to: "b".repeat(40),
+      snapshot: "c".repeat(40),
+      conflicts: ["hello.ts"],
+      resolving: true,
+    },
+  };
+  const english = await stateWith([resolving]);
+  t.after(english.cleanup);
+  const first = new Store(english.directory);
+  await first.initialize();
+  const [synced] = first.data.runs;
+  assert.equal(synced.status, "review");
+  assert.equal(synced.sync?.resolving, false);
+  assert.equal(
+    synced.sync?.report,
+    "The service restarted, so resolving the conflicts stopped; the edited files are kept, and you can finish yourself or ask the agent again.",
+  );
+
+  // A zh-TW run whose follow-up round was running, under an en default.
+  const revising: Run = {
+    ...interruptedRun(),
+    id: "run-round",
+    locale: "zh-TW",
+    prUrl: "https://github.com/test-owner/example/pull/1",
+    followUps: [
+      {
+        id: "round-1",
+        requestedAt: "2026-10-07T00:00:02.000Z",
+        feedbackUrls: [],
+        note: "Rename the greeting.",
+        status: "running",
+        parentCommit: "b".repeat(40),
+      },
+    ],
+  };
+  const chinese = await stateWith([revising]);
+  t.after(chinese.cleanup);
+  const second = new Store(chinese.directory);
+  await withLocale("en", () => second.initialize());
+  const [round] = second.data.runs;
+  assert.equal(round.status, "review");
+  assert.equal(round.followUps?.[0].status, "review");
+  assert.equal(
+    round.followUps?.[0].error,
+    "服務重新啟動，這輪修正已中斷；工作目錄保留的修改可以審閱、寫好提交訊息後推送，或放棄這輪修正。",
+  );
+});
+
+test("a run's locale, and fields a newer build adds, survive a load and save", async (t) => {
+  // state.json is read through a passthrough schema: a build that predates
+  // `locale` keeps the field (and any other it does not know) and writes it
+  // back field for field, as this one does.
+  const run = {
+    ...interruptedRun(),
+    status: "review",
+    locale: "en",
+    unsandboxed: true,
+    fromNewerBuild: { kept: true },
+  } as Run;
+  delete run.draftPreparation;
+  delete run.explanations;
+  for (const agent of run.agents) agent.status = "complete";
+  run.team!.tasks[0].status = "complete";
+  const unknownLocale = {
+    ...interruptedRun(),
+    id: "run-unknown-locale",
+    locale: "fr",
+  } as unknown as Run;
+  const { directory, cleanup } = await stateWith([run, unknownLocale]);
+  t.after(cleanup);
+  const written = JSON.parse(
+    await readFile(path.join(directory, "state.json"), "utf8"),
+  ) as Database;
+  const store = new Store(directory);
+  await withLocale("en", () => store.initialize());
+  assert.deepEqual(store.data.runs[0], written.runs[0]);
+  assert.equal(store.data.runs[0].locale, "en");
+  // A locale this build does not know is kept as written, and recovery
+  // uses the locale in effect instead of failing.
+  const [, unknown] = store.data.runs;
+  assert.equal(unknown.locale, "fr");
+  assert.match(unknown.error ?? "", /^The service restarted/);
+  await store.save();
+  const reopened = new Store(directory);
+  await reopened.initialize();
+  assert.deepEqual(reopened.data.runs[0], written.runs[0]);
+  assert.deepEqual(
+    (reopened.data.runs[0] as unknown as Record<string, unknown>).fromNewerBuild,
+    { kept: true },
+  );
+});
+
+/**
+ * A state.json written by the upstream repository at cdcfb06, by its own
+ * Workbench through a stand-in GitHub: an updated clone, an unpublished run
+ * synced with a conflict the agent left behind, and a published run with a
+ * taken-over GitHub commit, a pushed review round and an open sync round.
+ */
+const upstreamState = () =>
+  readFile(
+    path.join(import.meta.dirname, "fixtures", "state-upstream-cdcfb06.json"),
+    "utf8",
+  );
+
+test("a state.json written by upstream cdcfb06 with follow-up rounds and syncs loads and saves unchanged", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const written = await upstreamState();
+  await writeFile(path.join(directory, "state.json"), written);
+  const store = new Store(directory);
+  await store.initialize();
+  // Nothing was interrupted, so loading changes nothing.
+  assert.deepEqual(store.data, JSON.parse(written));
+  const [repo] = store.data.repos;
+  assert.ok(repo.updatedAt);
+  const [published, unpublished] = store.data.runs;
+  assert.deepEqual(
+    published.followUps?.map((round) => [
+      round.kind ?? "review",
+      round.status,
+      !!round.adopted,
+    ]),
+    [
+      ["sync", "published", true],
+      ["review", "published", false],
+      ["sync", "review", false],
+    ],
+  );
+  const round = activeFollowUp(published.followUps);
+  assert.equal(round?.mergeParent, published.baseSha);
+  assert.equal(round?.parentCommit, published.publishCommit);
+  assert.equal(unpublished.sync?.to, unpublished.baseSha);
+  assert.deepEqual(unpublished.sync?.unresolved, ["hello.ts"]);
+  // The run list leaves the round history and the sync to the open run.
+  for (const run of store.data.runs) {
+    const summary = summarizeRun(run) as Record<string, unknown>;
+    assert.equal("followUps" in summary, false);
+    assert.equal("sync" in summary, false);
+  }
+  // This build writes it back field for field.
+  await store.save();
+  const reopened = new Store(directory);
+  await reopened.initialize();
+  assert.deepEqual(reopened.data, JSON.parse(written));
+});
+
+/**
+ * A state.json written by the upstream repository at 1fb6329, by its own
+ * Workbench (its team, follow-up and walkthrough tests, instrumented to
+ * keep the file): a team run whose lead checked the premise and whose
+ * teammates reported missing setup, a published run whose follow-up rounds
+ * reported missing setup, and a run with a function walkthrough (temp
+ * paths replaced).
+ */
+const upstream1fb6329 = () =>
+  readFile(
+    path.join(import.meta.dirname, "fixtures", "state-upstream-1fb6329.json"),
+    "utf8",
+  );
+
+test("a state.json written by upstream 1fb6329 with premise checks, setup needs and walkthroughs loads and saves unchanged", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const written = await upstream1fb6329();
+  await writeFile(path.join(directory, "state.json"), written);
+  const store = new Store(directory);
+  await store.initialize();
+  // Nothing was interrupted, so loading changes nothing.
+  assert.deepEqual(store.data, JSON.parse(written));
+  const [team, published, walked] = store.data.runs;
+  assert.deepEqual(team.team?.premise, {
+    verdict: "unclear",
+    statement: "輸出格式在各模組不一致。",
+    evidence: "a.ts:1 與 b.ts:1 各自定義格式。",
+  });
+  assert.deepEqual(
+    team.team?.tasks.map((task) => task.setup?.map((need) => need.command)),
+    [["sudo apt install libglib2.0-dev"], ["rustup component add rustfmt"], undefined],
+  );
+  // A constant the diff replaced whole is new code; a changed function is explained.
+  assert.deepEqual(team.walkthroughs?.["a.ts"]?.content, { functions: [], newUnits: ["value"] });
+  const walkthrough = walked.walkthroughs?.["count.ts"];
+  assert.equal(walkthrough?.status, "ready");
+  assert.equal(walkthrough?.content?.functions[0].name, "count");
+  assert.deepEqual(walkthrough?.content?.functions[0].steps, [
+    { startLine: 2, endLine: 3, explanation: "計算並回傳。" },
+  ]);
+  assert.deepEqual(
+    published.followUps?.map((round) => [round.status, round.setup?.[0]?.command]),
+    [
+      ["published", "rustup component add rustfmt"],
+      ["failed", "rustup component add rustfmt"],
+      ["discarded", "rustup component add rustfmt"],
+    ],
+  );
+  assert.ok(published.publishCommit);
+  // The run list leaves the walkthroughs and the rounds to the open run.
+  for (const run of store.data.runs) {
+    const summary = summarizeRun(run) as Record<string, unknown>;
+    assert.equal("walkthroughs" in summary, false);
+    assert.equal("followUps" in summary, false);
+  }
+  // This build writes it back field for field.
+  await store.save();
+  const reopened = new Store(directory);
+  await reopened.initialize();
+  assert.deepEqual(reopened.data, JSON.parse(written));
+});
+
+/**
+ * A state.json written by this product before the port of upstream
+ * #15-#28 (fb60a66), by its own Workbench (the team test, instrumented to
+ * add a note and a review mark and keep the file; temp paths replaced).
+ */
+test("a state.json written by the product at fb60a66 loads and saves unchanged, without the ported fields", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const written = await readFile(
+    path.join(import.meta.dirname, "fixtures", "state-product-fb60a66.json"),
+    "utf8",
+  );
+  await writeFile(path.join(directory, "state.json"), written);
+  const store = new Store(directory);
+  await store.initialize();
+  assert.deepEqual(store.data, JSON.parse(written));
+  const [run] = store.data.runs;
+  assert.equal(run.locale, "zh-TW");
+  assert.equal(run.notes?.["a.ts"]?.text, "The value now matches the other modules.");
+  assert.equal(run.team?.premise, undefined);
+  assert.equal(run.walkthroughs, undefined);
+  assert.ok(run.team?.tasks.every((task) => task.setup === undefined));
+  await store.save();
+  const reopened = new Store(directory);
+  await reopened.initialize();
+  assert.deepEqual(reopened.data, JSON.parse(written));
+});
+
+test("an upstream 1fb6329 state saved while a walkthrough was being written reopens with it failed", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const data = JSON.parse(await upstream1fb6329()) as Database;
+  data.runs[0].walkthroughs!["b.ts"].status = "generating";
+  await writeFile(path.join(directory, "state.json"), JSON.stringify(data));
+  const store = new Store(directory);
+  await store.initialize();
+  const entry = store.data.runs[0].walkthroughs!["b.ts"];
+  assert.equal(entry.status, "failed");
+  assert.ok(entry.error);
+  // The other files' walkthroughs stay as they were.
+  assert.equal(store.data.runs[0].walkthroughs!["a.ts"].status, "ready");
+});
+
+test("an upstream state saved during a follow-up round or a conflict resolution reopens in review", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const data = JSON.parse(await upstreamState()) as Database;
+  const [published, unpublished] = data.runs;
+  // As upstream saves a run while its agent works: the open round becomes
+  // a review round whose agent is still editing.
+  published.status = "running";
+  published.agents[0].status = "running";
+  const round = published.followUps!.at(-1)!;
+  round.status = "running";
+  delete round.kind;
+  unpublished.status = "running";
+  unpublished.agents[0].status = "running";
+  unpublished.sync!.resolving = true;
+  await writeFile(path.join(directory, "state.json"), JSON.stringify(data));
+  const store = new Store(directory);
+  await store.initialize();
+  const [pullRequest, synced] = store.data.runs;
+  assert.equal(pullRequest.status, "review");
+  assert.equal(pullRequest.prUrl, published.prUrl);
+  assert.equal(pullRequest.followUps!.at(-1)!.status, "review");
+  assert.match(pullRequest.followUps!.at(-1)!.error!, /服務重新啟動/);
+  assert.equal(pullRequest.draft.commitMessage, undefined);
+  assert.equal(pullRequest.agents[0].status, "failed");
+  assert.equal(synced.status, "review");
+  assert.equal(synced.sync!.resolving, false);
+  assert.match(synced.sync!.report!, /服務重新啟動/);
+  assert.equal(synced.agents[0].status, "failed");
+});
+
+test("既有 insights 快取檔可由 ProjectInsightsService 讀取", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const repoPath = path.join(directory, "repo");
+  await mkdir(repoPath);
+  await git(repoPath, ["init", "-b", "main"]);
+  await git(repoPath, ["config", "user.name", "BELL Test"]);
+  await git(repoPath, ["config", "user.email", "test@example.invalid"]);
+  await writeFile(path.join(repoPath, "hello.ts"), 'export const hello = "hi";\n');
+  await git(repoPath, ["add", "--", "hello.ts"]);
+  await git(repoPath, ["commit", "-m", "initial"]);
+  const store = new Store(path.join(directory, "state"));
+  await store.initialize();
+  const repo = { ...repository, path: repoPath };
+  store.data.repos.push(repo);
+  const cache = {
+    version: 1,
+    settings: { ...defaultContributionSettings },
+    insights: {
+      summary: "依已追蹤檔案取樣：這是一個向使用者打招呼的小工具。",
+      purpose: "讓使用者取得清楚的問候文字。",
+      audience: ["使用命令列的開發者"],
+      userJourney: ["執行工具", "讀取輸出的問候文字"],
+      modules: [{ path: "hello.ts", purpose: "組合問候文字" }],
+      evidence: [{ path: "hello.ts", note: "提供問候文字" }],
+      recommendations: [
+        {
+          id: "greeting-tests",
+          title: "驗證問候文字",
+          direction: "testing",
+          problem: "此取樣未呈現問候的行為測試，完整測試涵蓋仍需確認。",
+          userImpact: "減少問候文字變更時出現不預期行為的機會。",
+          approach: "先確認既有測試，再補足輸入範例。",
+          acceptance: ["既有與新增測試通過"],
+          effort: "small",
+          confidence: "medium",
+          evidence: ["hello.ts"],
+          evidenceDetails: [
+            {
+              path: "hello.ts",
+              quote: "export const hello =",
+              reason: "問候內容由這個常數提供，可驗證其對外行為。",
+            },
+          ],
+        },
+      ],
+      generatedAt: "2026-10-07T00:00:00.000Z",
+      source: "ai",
+      baseSha: "a".repeat(40),
+    },
+    fingerprint: "b".repeat(64),
+    recommendationPreferences: { order: ["greeting-tests"], hidden: [] },
+  };
+  const insightsDirectory = path.join(store.directory, "insights");
+  await mkdir(insightsDirectory, { recursive: true });
+  await writeFile(
+    path.join(
+      insightsDirectory,
+      `${createHash("sha256").update(repo.id).digest("hex")}.json`,
+    ),
+    JSON.stringify(cache),
+  );
+  const result = await new ProjectInsightsService(store).get(repo.id);
+  assert.equal(result.insights?.summary, cache.insights.summary);
+  assert.equal(result.insights?.recommendations[0].id, "greeting-tests");
+  assert.equal(result.stale, true);
+  assert.deepEqual(result.recommendationPreferences, {
+    order: ["greeting-tests"],
+    hidden: [],
+  });
+});
+
+test("each Store rotates state.json into three backups on its first save and writes compact JSON", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const statePath = path.join(directory, "state.json");
+  const generations: string[] = [];
+  for (let start = 0; start < 5; start++) {
+    const store = new Store(directory);
+    await store.initialize();
+    store.data.repos = [{ ...repository, name: `generation-${start}` }];
+    await store.save();
+    // Later saves of the same Store do not rotate again.
+    await store.save();
+    generations.push(await readFile(statePath, "utf8"));
+  }
+  const names = (await readdir(directory)).sort();
+  assert.deepEqual(
+    names.filter((name) => name.startsWith("state.json")),
+    ["state.json", "state.json.bak.1", "state.json.bak.2", "state.json.bak.3"],
+  );
+  // bak.1 is the state the newest Store found when it started.
+  assert.equal(await readFile(`${statePath}.bak.1`, "utf8"), generations[3]);
+  assert.equal(await readFile(`${statePath}.bak.2`, "utf8"), generations[2]);
+  assert.equal(await readFile(`${statePath}.bak.3`, "utf8"), generations[1]);
+  assert.ok(!generations[4].includes("\n"), "state.json is compact");
+  if (process.platform !== "win32") {
+    assert.equal((await stat(statePath)).mode & 0o777, 0o600);
+    assert.equal((await stat(`${statePath}.bak.1`)).mode & 0o777, 0o600);
+  }
+});
+
+test("a missing state.json starts empty and keeps every backup in place", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const statePath = path.join(directory, "state.json");
+  for (let start = 0; start < 4; start++) {
+    const store = new Store(directory);
+    await store.initialize();
+    store.data.repos = [{ ...repository, name: `generation-${start}` }];
+    await store.save();
+  }
+  const backups = async () =>
+    Promise.all(
+      [1, 2, 3].map((index) => readFile(`${statePath}.bak.${index}`, "utf8")),
+    );
+  const before = await backups();
+  await rm(statePath);
+  const store = new Store(directory);
+  await store.initialize();
+  assert.deepEqual(store.data, { version: 1, repos: [], runs: [] });
+  assert.deepEqual(store.backupsWithoutState?.sort(), [
+    "state.json.bak.1",
+    "state.json.bak.2",
+    "state.json.bak.3",
+  ]);
+  // Nothing new to keep, so no backup moved or was dropped.
+  assert.deepEqual(await backups(), before);
+  // The next start backs up the new state.json as usual.
+  const next = new Store(directory);
+  await next.initialize();
+  assert.equal(next.backupsWithoutState, undefined);
+  assert.deepEqual(await backups(), [
+    await readFile(statePath, "utf8"),
+    before[0],
+    before[1],
+  ]);
+});
+
+test("save() coalesces writes and resolves once the state it was called after is on disk", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const store = new Store(directory);
+  await store.initialize();
+  const statePath = path.join(directory, "state.json");
+  const saves: Promise<void>[] = [];
+  const returned = new Set<Promise<void>>();
+  for (let index = 0; index < 50; index++) {
+    store.data.repos = [{ ...repository, name: `name-${index}` }];
+    const saved = store.save();
+    returned.add(saved);
+    saves.push(
+      saved.then(async () => {
+        // Whatever was written includes this change or a later one.
+        const written = JSON.parse(await readFile(statePath, "utf8")) as Database;
+        assert.ok(Number(written.repos[0].name.slice(5)) >= index);
+      }),
+    );
+  }
+  // One write in flight plus one waiting: fifty calls, two writes.
+  assert.equal(returned.size, 2);
+  await Promise.all(saves);
+  const written = JSON.parse(await readFile(statePath, "utf8")) as Database;
+  assert.equal(written.repos[0].name, "name-49");
+  assert.deepEqual(
+    (await readdir(directory)).filter((name) => name.endsWith(".tmp")),
+    [],
+  );
+});
+
+test("save() shares one pending write between the calls made while another write runs", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const store = new Store(directory);
+  await store.initialize();
+  const first = store.save();
+  const second = store.save();
+  const third = store.save();
+  assert.notEqual(first, second);
+  assert.equal(second, third);
+  await Promise.all([first, second, third]);
+  // Once idle, a call starts a write of its own. It is awaited before the
+  // test ends, so cleanup never removes the directory under a running write.
+  const fourth = store.save();
+  assert.notEqual(fourth, second);
+  await fourth;
+});
+
+test("the data directory is made private, and one owned by another user is refused", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  if (process.platform === "win32" || typeof process.getuid !== "function")
+    return t.skip("POSIX permissions only");
+  const dataDir = path.join(directory, "data");
+  await mkdir(dataDir, { mode: 0o755 });
+  await new Store(dataDir).initialize();
+  assert.equal((await stat(dataDir)).mode & 0o777, 0o700);
+  const getuid = process.getuid;
+  t.after(() => {
+    process.getuid = getuid;
+  });
+  process.getuid = () => getuid() + 1;
+  await assert.rejects(
+    withLocale("en", () => new Store(dataDir).initialize()),
+    (error: Error) =>
+      error.message ===
+      `The data directory ${dataDir} belongs to another user. Start BELL PR as that user, or choose a data directory you own with --data-dir.`,
+  );
+});
+
+test("a state.json from a newer format is never replaced by a backup", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const statePath = path.join(directory, "state.json");
+  await writeFile(statePath, JSON.stringify({ version: 1, repos: [], runs: [] }));
+  await new Store(directory).initialize();
+  const newer = JSON.stringify({ version: 2, repos: [], runs: [] });
+  await writeFile(statePath, newer);
+  await assert.rejects(new Store(directory).initialize(), /version 1/);
+  assert.equal(await readFile(statePath, "utf8"), newer);
+});
+
+// v1.1 fields (plan README §7): every field is optional, and an older build
+// that lacks it in its read schema still reads data that carries it. The
+// older build is simulated by leaving the field out of the schema.
+
+/** A finished run in review that carries every field v1.1 adds. */
+function runWithV11Fields(): Run {
+  const run: Run = {
+    ...interruptedRun(),
+    id: "run-v11",
+    status: "review",
+    locale: "en",
+    understanding: {
+      summary: {
+        text: "The greeting test now covers the empty name, so a missing name cannot print a dangling comma again.",
+        changeFingerprint: "0123456789abcdef",
+        at: "2026-10-15T00:01:00.000Z",
+      },
+      items: [
+        {
+          id: "selfCheck:hello.ts",
+          path: "hello.ts",
+          fingerprint: "e".repeat(64),
+          source: "selfCheck",
+          question: "What does the greeting print for an empty name?",
+          answer: "It prints Hello without a comma",
+          confidence: "think",
+          lockedAt: "2026-10-15T00:02:00.000Z",
+          grade: "partly",
+          correction: "it prints Hello, world as the fallback",
+          gradedAt: "2026-10-15T00:03:00.000Z",
+        },
+      ],
+      passedAt: "2026-10-15T00:03:00.000Z",
+      passedFingerprint: "0123456789abcdef",
+      passedFiles: { "hello.ts": "e".repeat(64) },
+      forecast: { dimension: "tests", question: "Is the empty name tested?", at: "2026-10-15T00:03:00.000Z" },
+      history: [{ passedAt: "2026-10-15T00:03:00.000Z", questions: 1, misses: 1, confidentMisses: 1, seconds: 120 }],
+    },
+    understandingCheckOff: true,
+    attempts: {
+      "hello.ts": {
+        fingerprint: "e".repeat(64),
+        quiz: { answer: "it prints Hello alone", confidence: "sure", grade: "missed", at: "2026-10-15T00:00:30.000Z" },
+        road: { guess: "a default parameter", choice: "keep", why: "it reads clearly", at: "2026-10-15T00:00:40.000Z" },
+      },
+    },
+    feedbackTags: {
+      "https://github.com/acme/widgets/pull/3#discussion_r1": {
+        dimension: "tests",
+        predicted: true,
+        at: "2026-10-16T00:00:00.000Z",
+      },
+    },
+    practice: {
+      "check:selfCheck:hello.ts": { box: 1, dueAt: "2026-10-18T00:00:00.000Z", lastGrade: "got", lastConfidence: "sure" },
+    },
+    contributionFacts: {
+      checkedAt: "2026-10-15T00:04:00.000Z",
+      door: { hasPullRequests: true, pullRequestCreationPolicy: "all", viewerPermission: "READ" },
+      issue: { url: "https://github.com/acme/widgets/issues/7", state: "OPEN", labels: ["bug"] },
+      pacing: {
+        openPrs: 1,
+        mergedPrs: 0,
+        waitingPrs: 1,
+        waitingUrls: ["https://github.com/acme/widgets/pull/2"],
+      },
+      unknown: ["pacing: rate limited"],
+    },
+    guardOverrides: [
+      { id: "issue-has-pr", reason: "Their PR was abandoned two months ago.", at: "2026-10-15T00:05:00.000Z" },
+    ],
+    reviewability: { testReasons: { "hello.test.ts#-4": "The assertion moved to the new test case." } },
+    prFeedback: {
+      fetchedAt: "2026-10-16T00:00:00.000Z",
+      prNumber: 3,
+      items: [],
+      prState: "OPEN",
+      merged: false,
+      reviewDecision: "CHANGES_REQUESTED",
+    },
+    followUps: [
+      {
+        id: "round-1",
+        requestedAt: "2026-10-16T00:00:00.000Z",
+        feedbackUrls: ["https://github.com/acme/widgets/pull/3#discussion_r1"],
+        restatements: [
+          { url: "https://github.com/acme/widgets/pull/3#discussion_r1", text: "They want a test for the empty name." },
+        ],
+        status: "discarded",
+        parentCommit: "b".repeat(40),
+      },
+    ],
+  };
+  for (const agent of run.agents) agent.status = "complete";
+  run.team!.tasks[0].status = "complete";
+  delete run.draftPreparation;
+  delete run.explanations;
+  return run;
+}
+
+/** A repository that carries both repository fields v1.1 adds. */
+const repositoryWithV11Fields: Repository = {
+  ...repository,
+  contributionRules: {
+    checkedAt: "2026-10-15T00:00:00.000Z",
+    door: { hasPullRequests: true },
+    findings: [
+      { kind: "disclose", path: "CONTRIBUTING.md", line: 12, quote: "If you used AI tools, say so in the PR description.", contribution: true },
+    ],
+    filesRead: ["CONTRIBUTING.md", ".github/pull_request_template.md"],
+    generated: ["dist/**"],
+    mergedSizes: [{ number: 2, additions: 30, deletions: 4, changedFiles: 2 }],
+    orgDefaults: "local/.github",
+  },
+  debriefs: [
+    {
+      at: "2026-10-20T00:00:00.000Z",
+      locale: "en",
+      runIds: ["run-v11"],
+      recurring: { dimension: "tests", quotes: ["Is the empty name tested?"] },
+      drills: [{ context: "A greeting helper.", optionA: "A default parameter.", optionB: "An explicit check.", question: "Which fits this project, and why?", reveal: "The project prefers explicit checks." }],
+      nextStep: "Write the empty-name test before you change the greeting again.",
+    },
+  ],
+};
+
+const olderRunSchemas = {
+  understanding: runReadSchema.omit({ understanding: true }),
+  understandingCheckOff: runReadSchema.omit({ understandingCheckOff: true }),
+  attempts: runReadSchema.omit({ attempts: true }),
+  feedbackTags: runReadSchema.omit({ feedbackTags: true }),
+  practice: runReadSchema.omit({ practice: true }),
+  contributionFacts: runReadSchema.omit({ contributionFacts: true }),
+  guardOverrides: runReadSchema.omit({ guardOverrides: true }),
+  reviewability: runReadSchema.omit({ reviewability: true }),
+  // Before v1.1 the run schema did not read prFeedback at all.
+  "prFeedback.prState, merged and reviewDecision": runReadSchema.omit({ prFeedback: true }),
+  "contributionFacts.pacing.waitingUrls": runReadSchema.extend({
+    contributionFacts: (() => {
+      const facts = runReadSchema.shape.contributionFacts.removeCatch().unwrap();
+      return facts
+        .extend({ pacing: facts.shape.pacing.unwrap().omit({ waitingUrls: true }).optional() })
+        .optional()
+        .catch(undefined);
+    })(),
+  }),
+  "followUps[].restatements": runReadSchema.extend({
+    followUps: z
+      .array(runReadSchema.shape.followUps.unwrap().element.omit({ restatements: true }))
+      .optional(),
+  }),
+};
+
+for (const [field, older] of Object.entries(olderRunSchemas))
+  test(`a build that predates the run's ${field} still reads a run that has it`, () => {
+    const written = JSON.parse(JSON.stringify(runWithV11Fields()));
+    const read = lenientRead(older).safeParse(written);
+    assert.ok(read.success, read.success ? "" : read.error.message);
+    // state.json passes unknown fields through, so the field survives a save.
+    assert.deepEqual(read.data, written);
+  });
+
+for (const [field, older] of Object.entries({
+  contributionRules: repositoryReadSchema.omit({ contributionRules: true }),
+  debriefs: repositoryReadSchema.omit({ debriefs: true }),
+}))
+  test(`a build that predates the repository's ${field} still reads a repository that has it`, () => {
+    const written = JSON.parse(JSON.stringify(repositoryWithV11Fields));
+    const read = lenientRead(older).safeParse(written);
+    assert.ok(read.success, read.success ? "" : read.error.message);
+    assert.deepEqual(read.data, written);
+  });
+
+test("runs and repositories with every v1.1 field load and save unchanged", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const fixture: Database = {
+    version: 1,
+    repos: [repositoryWithV11Fields],
+    runs: [runWithV11Fields()],
+  };
+  await writeFile(path.join(directory, "state.json"), JSON.stringify(fixture));
+  const store = new Store(directory);
+  await store.initialize();
+  assert.equal(store.recovery, undefined);
+  assert.deepEqual(store.data, fixture);
+  await store.save();
+  assert.deepEqual(JSON.parse(await readFile(path.join(directory, "state.json"), "utf8")), fixture);
+});
+
+test("a v1.1 field this build cannot read is left out instead of quarantining the run", async (t) => {
+  const run = {
+    ...runWithV11Fields(),
+    // A later build wrote shapes this build does not accept.
+    understanding: { items: "not a list" },
+    guardOverrides: Array.from({ length: 40 }, () => ({ id: "x", reason: "y", at: "z" })),
+  } as unknown as Run;
+  const { directory, cleanup } = await stateWith([run]);
+  t.after(cleanup);
+  const store = new Store(directory);
+  await store.initialize();
+  assert.equal(store.recovery, undefined);
+  assert.equal(store.data.runs.length, 1);
+  assert.equal(store.data.runs[0].understanding, undefined);
+  assert.equal(store.data.runs[0].guardOverrides, undefined);
+  // Caps are four times the write caps: 8 overrides become 32 on read.
+  assert.equal(
+    lenientRead(runReadSchema).safeParse({
+      ...JSON.parse(JSON.stringify(runWithV11Fields())),
+      guardOverrides: Array.from({ length: 32 }, () => ({ id: "x", reason: "y", at: "z" })),
+    }).data?.guardOverrides?.length,
+    32,
+  );
+  assert.equal(store.data.runs[0].understandingCheckOff, true);
+});
+
+// Fields ported from upstream 1fb6329 (PRs #15-#28), under the same rules:
+// optional, and readable by a build whose schema lacks them.
+
+/** A published run in review that carries every field the upstream port adds. */
+function runWithUpstreamFields(): Run {
+  const run = runWithV11Fields();
+  run.id = "run-upstream-1fb6329";
+  run.team!.tasks[0].setup = [
+    {
+      need: "GLib development headers",
+      command: "sudo apt install libglib2.0-dev",
+      reason: "cargo test needs them; the README lists GLib under Build time.",
+    },
+  ];
+  run.followUps![0].setup = [
+    { need: "rustfmt", command: "rustup component add rustfmt", reason: "cargo fmt --check needs it." },
+  ];
+  run.team!.premise = {
+    verdict: "refuted",
+    statement: "The greeting prints a dangling comma for an empty name.",
+    evidence: "hello.ts:2 falls back to world, so no comma dangles.",
+  };
+  run.walkthroughs = {
+    "hello.ts": {
+      fingerprint: "e".repeat(64),
+      status: "ready",
+      generatedAt: "2026-10-15T00:06:00.000Z",
+      content: {
+        functions: [
+          {
+            name: "greeting",
+            kind: "function",
+            startLine: 1,
+            endLine: 3,
+            summary: "Returns the greeting for a name.",
+            change: "The empty name now falls back to world.",
+            steps: [
+              { startLine: 1, endLine: 1, explanation: "Takes the name." },
+              { startLine: 2, endLine: 3, explanation: "Builds the text." },
+            ],
+            callers: [{ name: "main", path: "src/main.ts", line: 4, note: "Prints it." }],
+            callees: [],
+            analogy: "Like a receptionist who greets everyone.",
+            selfCheck: { question: "What does an empty name print?", answer: "Hello, world." },
+          },
+        ],
+        newUnits: ["greetingTest"],
+      },
+    },
+    "notes.md": { fingerprint: "f".repeat(64), status: "unavailable", error: "This kind of file has no functions to walk through." },
+  };
+  return run;
+}
+
+/** The run read schema with one field of a nested list's elements left out. */
+function withoutElementField(
+  list: "team.tasks" | "followUps",
+  field: string,
+) {
+  if (list === "followUps") {
+    const element = runReadSchema.shape.followUps.unwrap().element;
+    return runReadSchema.extend({
+      followUps: z.array(element.omit({ [field]: true } as never)).optional(),
+    });
+  }
+  const team = runReadSchema.shape.team.unwrap();
+  const task = team.shape.tasks.element;
+  return runReadSchema.extend({
+    team: team
+      .extend({ tasks: z.array(task.omit({ [field]: true } as never)) })
+      .optional(),
+  });
+}
+
+const upstreamRunSchemas = {
+  walkthroughs: runReadSchema.omit({ walkthroughs: true }),
+  "team.premise": runReadSchema.extend({
+    team: runReadSchema.shape.team.unwrap().omit({ premise: true }).optional(),
+  }),
+  "team.tasks[].setup": withoutElementField("team.tasks", "setup"),
+  "followUps[].setup": withoutElementField("followUps", "setup"),
+};
+
+for (const [field, older] of Object.entries(upstreamRunSchemas))
+  test(`a build that predates the run's ${field} (upstream 1fb6329) still reads a run that has it`, () => {
+    const written = JSON.parse(JSON.stringify(runWithUpstreamFields()));
+    const read = lenientRead(older).safeParse(written);
+    assert.ok(read.success, read.success ? "" : read.error.message);
+    // state.json passes unknown fields through, so the field survives a save.
+    assert.deepEqual(read.data, written);
+  });
+
+test("runs with every field of the upstream port load and save unchanged, and a malformed one is left out", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const fixture: Database = { version: 1, repos: [repository], runs: [runWithUpstreamFields()] };
+  await writeFile(path.join(directory, "state.json"), JSON.stringify(fixture));
+  const store = new Store(directory);
+  await store.initialize();
+  assert.equal(store.recovery, undefined);
+  assert.deepEqual(store.data, fixture);
+  await store.save();
+  assert.deepEqual(JSON.parse(await readFile(path.join(directory, "state.json"), "utf8")), fixture);
+
+  // A shape this build does not accept drops that field, not the run.
+  const odd = runWithUpstreamFields();
+  (odd.team!.tasks[0] as unknown as Record<string, unknown>).setup = "not a list";
+  (odd.team! as unknown as Record<string, unknown>).premise = { verdict: "holds" };
+  const other = await stateWith([odd]);
+  t.after(other.cleanup);
+  const reopened = new Store(other.directory);
+  await reopened.initialize();
+  assert.equal(reopened.recovery, undefined);
+  assert.equal(reopened.data.runs[0].team!.tasks[0].setup, undefined);
+  assert.equal(reopened.data.runs[0].team!.premise, undefined);
+  // A verdict word a later build may add is kept as written.
+  const later = runWithUpstreamFields();
+  later.team!.premise!.verdict = "partly" as never;
+  assert.equal(
+    lenientRead(runReadSchema).safeParse(JSON.parse(JSON.stringify(later))).data?.team?.premise?.verdict,
+    "partly",
+  );
+  assert.equal(reopened.data.runs[0].followUps![0].setup?.length, 1);
+  // The run list leaves the walkthroughs to the open run.
+  assert.equal("walkthroughs" in summarizeRun(runWithUpstreamFields()), false);
+});
+
+test("a walkthrough a restart interrupted is failed in the run's language, and can be retried", async (t) => {
+  const run = runWithUpstreamFields();
+  run.walkthroughs!["hello.ts"] = { fingerprint: "e".repeat(64), status: "generating" };
+  const { directory, cleanup } = await stateWith([run]);
+  t.after(cleanup);
+  const store = new Store(directory);
+  await store.initialize();
+  const loaded = store.data.runs[0].walkthroughs!["hello.ts"];
+  assert.equal(loaded.status, "failed");
+  // runWithV11Fields is an English run.
+  assert.match(loaded.error!, /^The service restarted, so the code walkthrough stopped/);
+});
+
+// Fields added in v1.2 (Learn by hand), under the same rules: optional, and
+// readable by a build whose schema lacks them (AGENTS.md).
+
+/** Every part of a Learn-by-hand record (shared/by-hand.ts), the fitted help set included. */
+function byHandRecord(): NonNullable<Run["byHand"]> {
+  const entry = {
+    id: "entry-1",
+    at: "2026-10-20T00:20:00.000Z",
+    kind: "hint",
+    stepId: "step-1",
+    rung: 1,
+    tried: "I printed the greeting for an empty name",
+    text: "Look at how the greeting falls back to a default.",
+    ask: "What does the function return for an empty string?",
+    refs: [{ path: "hello.ts", line: 2 }],
+    quotes: [{ path: "hello.ts", startLine: 1, endLine: 3, from: "base", text: "export function greeting(name: string) {" }],
+    removed: 1,
+    changeFingerprint: "0123456789abcdef",
+    model: "gpt-5.5",
+  };
+  return {
+    guidePlan: {
+      summary: "An empty name prints a dangling comma.",
+      steps: [{ title: "Find the greeting", files: ["hello.ts"] }],
+      readFirst: [{ path: "hello.ts", startLine: 1, endLine: 3, why: "The greeting is built here." }],
+      at: "2026-10-20T00:01:00.000Z",
+      removed: 0,
+      dropped: 1,
+    },
+    plan: {
+      steps: [
+        {
+          id: "step-1",
+          title: "Fall back to world for an empty name",
+          files: ["hello.ts"],
+          how: "Check the name before building the text.",
+          doneAt: "2026-10-20T00:40:00.000Z",
+          maxRung: 3,
+          why: "An empty string is falsy, so the default applies to it too.",
+          chosen: { entryId: "entry-2", option: 1, why: "It keeps the function small." },
+        },
+        { id: "step-2", title: "Test the empty name", parkedAt: "2026-10-20T00:41:00.000Z" },
+      ],
+      tests: "A test that greets an empty name.",
+      unsure: "Whether whitespace counts as empty.",
+      prediction: "greeting, because it builds the text.",
+      savedAt: "2026-10-20T00:05:00.000Z",
+      confirmedAt: "2026-10-20T00:10:00.000Z",
+      outlineAt: "2026-10-20T00:06:00.000Z",
+      outlineBeforeDraft: true,
+    },
+    planQuestions: [
+      {
+        id: "question-1",
+        at: "2026-10-20T00:08:00.000Z",
+        kind: "plan",
+        text: "Your plan has no step for the test.",
+        ask: "How will you know the empty name works?",
+      },
+    ],
+    thread: [
+      entry,
+      {
+        ...entry,
+        id: "entry-2",
+        rung: 3,
+        options: [
+          { name: "A default parameter", tradeoff: "Short, but misses the empty string." },
+          { name: "An explicit check", tradeoff: "One more line, and clear." },
+        ],
+      },
+    ],
+    hints: { "step-1": { rung: 3, at: "2026-10-20T00:30:00.000Z", fingerprint: "0123456789abcdef", testRunAt: "2026-10-20T00:25:00.000Z", tried: "I added a check" } },
+    talks: [{ stepId: "step-1", at: "2026-10-20T00:15:00.000Z" }],
+    tests: [
+      {
+        at: "2026-10-20T00:25:00.000Z",
+        command: "npm test",
+        changeFingerprint: "0123456789abcdef",
+        outcome: "failed",
+        exitCode: 1,
+        ms: 1200,
+        prediction: "fail",
+        expect: "greets an empty name",
+        outputTail: "not ok 2 - greets an empty name",
+        tailHash: "9f86d081884c7d65",
+        newFiles: ["coverage/lcov.info"],
+      },
+      { at: "2026-10-20T00:45:00.000Z", command: "npm test", changeFingerprint: "fedcba9876543210", outcome: "passed", ms: 900, reported: true },
+    ],
+    ready: { at: "2026-10-20T00:50:00.000Z", changeFingerprint: "fedcba9876543210", leastSure: "The whitespace case.", review: true },
+    readyHistory: [{ at: "2026-10-20T00:35:00.000Z", changeFingerprint: "0123456789abcdef", review: false }],
+    reviews: [
+      {
+        at: "2026-10-20T00:52:00.000Z",
+        changeFingerprint: "fedcba9876543210",
+        leastSure: "The whitespace case.",
+        testRunAt: "2026-10-20T00:45:00.000Z",
+        verified: "Your last run passed; the diff covers both steps.",
+        checked: ["tests", "the empty-name path"],
+        findings: [
+          {
+            path: "hello.ts",
+            line: 2,
+            observed: "A name of spaces still prints a comma.",
+            evidence: { type: "pattern", path: "hello.ts", line: 2, quote: "name || \"world\"" },
+            why: "Users paste names with spaces.",
+            question: "What should a name of spaces print?",
+            dimension: "tests",
+          },
+        ],
+        removed: 0,
+      },
+    ],
+    events: [
+      { at: "2026-10-20T00:01:00.000Z", kind: "explain", source: "premise", model: "gpt-5.5", cli: "codex" },
+      { at: "2026-10-20T00:20:00.000Z", kind: "answer", source: "hint", rung: 1, stepId: "step-1", model: "gpt-5.5", cli: "codex", removed: 1 },
+    ],
+    agentWrites: 0,
+    removedTotal: 1,
+    checkIns: [{ stepId: "step-1", signal: "button", choice: "talk", at: "2026-10-20T00:14:00.000Z" }],
+    exits: [{ stepId: "step-1", exit: "talk", at: "2026-10-20T00:14:30.000Z" }],
+    leftAt: "2026-10-20T01:00:00.000Z",
+    busy: { kind: "review", since: "2026-10-20T00:51:00.000Z" },
+    helpLock: {
+      kinds: ["explain", "answer", "test"],
+      at: "2026-10-20T00:00:00.000Z",
+      rulesCheckedAt: "2026-10-19T23:59:00.000Z",
+      rules: [
+        {
+          kind: "ban",
+          path: "docs/devel/code-provenance.rst",
+          line: 293,
+          quote: "Current QEMU project policy is to DECLINE any contributions which are believed to include or derive from AI generated content.",
+          allows: [
+            {
+              line: 297,
+              quote: "This policy does not apply to other uses of AI, such as researching APIs or algorithms, static analysis, or debugging, provided their output is not included in contributions.",
+              kinds: ["explain", "answer", "test"],
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
+
+/** A Learn-by-hand run in review that carries every field v1.2 adds to a run. */
+function runWithV12Fields(): Run {
+  const run = runWithUpstreamFields();
+  run.id = "run-v12-by-hand";
+  run.learnByHand = true;
+  run.byHand = byHandRecord();
+  run.attempts!["hello.ts"].walkthroughs = {
+    "greeting:1": { answer: "It returns the greeting with the name", confidence: "think", grade: "partly", at: "2026-10-20T00:55:00.000Z" },
+    "main:4": { skipped: true, at: "2026-10-20T00:56:00.000Z" },
+  };
+  return run;
+}
+
+const v12RunSchemas: Record<string, z.ZodTypeAny> = {
+  learnByHand: runReadSchema.omit({ learnByHand: true }),
+  byHand: runReadSchema.omit({ byHand: true }),
+  // The help set fixed at the start, a part of the record (DESIGN §7).
+  "byHand.helpLock": runReadSchema.extend({
+    byHand: runReadSchema.shape.byHand.removeCatch().unwrap().omit({ helpLock: true }).optional().catch(undefined),
+  }),
+  "attempts[].walkthroughs": runReadSchema.extend({
+    attempts: z
+      .record(runReadSchema.shape.attempts.removeCatch().unwrap().valueSchema.omit({ walkthroughs: true }))
+      .optional()
+      .catch(undefined),
+  }),
+};
+
+for (const [field, older] of Object.entries(v12RunSchemas))
+  test(`a build that predates the run's ${field} (v1.2) still reads a run that has it`, () => {
+    const written = JSON.parse(JSON.stringify(runWithV12Fields()));
+    const read = lenientRead(older).safeParse(written);
+    assert.ok(read.success, read.success ? "" : read.error.message);
+    // state.json passes unknown fields through, so the field survives a save.
+    assert.deepEqual(read.data, written);
+  });
+
+test("a Learn-by-hand record loads and saves unchanged, and a restart clears its busy mark", async (t) => {
+  const run = runWithV12Fields();
+  const { directory, cleanup } = await stateWith([run]);
+  t.after(cleanup);
+  const store = new Store(directory);
+  await store.initialize();
+  assert.equal(store.recovery, undefined);
+  const { busy: _busy, ...rest } = run.byHand!;
+  assert.deepEqual(store.data.runs[0], { ...run, byHand: rest });
+  assert.equal("busy" in store.data.runs[0].byHand!, false);
+  // The run list leaves the record out and keeps the mark.
+  const summary = summarizeRun(store.data.runs[0]);
+  assert.equal("byHand" in summary, false);
+  assert.equal(summary.learnByHand, true);
+  // A part this build cannot read is left out, the rest of the record stays.
+  const odd = runWithV12Fields();
+  (odd.byHand as unknown as Record<string, unknown>).thread = "not a list";
+  const read = lenientRead(runReadSchema).safeParse(JSON.parse(JSON.stringify(odd)));
+  assert.ok(read.success);
+  assert.equal(read.data.byHand?.thread, undefined);
+  assert.equal(read.data.byHand?.helpLock?.kinds.length, 3);
+  assert.equal(read.data.byHand?.agentWrites, 0);
+});
+
+/** A repository that carries every field v1.2 adds to a repository. */
+function repositoryWithV12Fields(): Repository {
+  const repo: Repository = {
+    ...JSON.parse(JSON.stringify(repositoryWithV11Fields)),
+    testCommand: { command: "npm test -- hello", confirmedAt: "2026-10-20T00:00:00.000Z" },
+  };
+  repo.contributionRules!.findings.push({
+    kind: "ban",
+    path: "docs/devel/code-provenance.rst",
+    line: 293,
+    quote: "Current QEMU project policy is to DECLINE any contributions which are believed to include or derive from AI generated content.",
+    contribution: true,
+    allows: [
+      {
+        line: 297,
+        quote: "This policy does not apply to other uses of AI, such as researching APIs or algorithms, static analysis, or debugging, provided their output is not included in contributions.",
+        kinds: ["explain", "answer", "test"],
+      },
+    ],
+  });
+  repo.contributionRules!.findings.push({
+    kind: "ban",
+    path: "src/policies/llm-usage.md",
+    line: 24,
+    quote: "But not to **create**.",
+    contribution: true,
+    source: {
+      registry: "bell",
+      url: "https://github.com/rust-lang/rust-forge/blob/main/src/policies/llm-usage.md",
+      version: "67096ec0a6",
+      checkedOn: "2026-10-19",
+    },
+  });
+  repo.contributionRules!.channels = [
+    { label: "Zulip", url: "https://example.zulipchat.com/", path: "CONTRIBUTING.md", line: 3 },
+    { label: "GitHub Discussions", url: "https://github.com/acme/widgets/discussions" },
+  ];
+  return repo;
+}
+
+/** The repository read schema with one field of each contribution-rules finding left out. */
+function withoutFindingField(field: string) {
+  const rules = repositoryReadSchema.shape.contributionRules.removeCatch().unwrap();
+  const finding = rules.shape.findings.element;
+  return repositoryReadSchema.extend({
+    contributionRules: rules
+      .extend({ findings: z.array(finding.omit({ [field]: true } as never)).max(30) })
+      .optional()
+      .catch(undefined),
+  });
+}
+
+/** The repository read schema with one field of its contribution rules left out. */
+function withoutRulesField(field: string) {
+  const rules = repositoryReadSchema.shape.contributionRules.removeCatch().unwrap();
+  return repositoryReadSchema.extend({
+    contributionRules: rules.omit({ [field]: true } as never).optional().catch(undefined),
+  });
+}
+
+const v12RepositorySchemas: Record<string, z.ZodTypeAny> = {
+  testCommand: repositoryReadSchema.omit({ testCommand: true }),
+  "contributionRules.channels": withoutRulesField("channels"),
+  "contributionRules.findings[].source": withoutFindingField("source"),
+  "contributionRules.findings[].allows": withoutFindingField("allows"),
+};
+
+for (const [field, older] of Object.entries(v12RepositorySchemas))
+  test(`a build that predates the repository's ${field} (v1.2) still reads a repository that has it`, () => {
+    const written = JSON.parse(JSON.stringify(repositoryWithV12Fields()));
+    const read = lenientRead(older).safeParse(written);
+    assert.ok(read.success, read.success ? "" : read.error.message);
+    assert.deepEqual(read.data, written);
+  });
+
+test("a carve-out this build cannot read is left out, and the rest of the finding stays", () => {
+  const repo = JSON.parse(JSON.stringify(repositoryWithV12Fields())) as Repository;
+  const finding = repo.contributionRules!.findings.find((entry) => entry.allows)!;
+  (finding as unknown as Record<string, unknown>).allows = "not a list";
+  const read = lenientRead(repositoryReadSchema).safeParse(repo);
+  assert.ok(read.success);
+  const kept = read.data.contributionRules!.findings.find((entry) => entry.line === 293)!;
+  assert.equal(kept.allows, undefined);
+  assert.equal(kept.quote, finding.quote);
+  // Kinds are text: a kind a later build adds still loads.
+  finding.allows = [{ line: 297, quote: "x", kinds: ["explain", "later-kind" as never] }];
+  assert.deepEqual(
+    lenientRead(repositoryReadSchema).parse(repo).contributionRules!.findings.find((entry) => entry.line === 293)!.allows,
+    finding.allows,
+  );
+});
+
+/**
+ * A state.json with a Learn-by-hand run in review (server/fixtures/
+ * state-v1.2-by-hand.json): every part of the record, the help set fixed
+ * when the run started, a walkthrough answer, and a repository whose rules
+ * carry a checked-list finding with carve-outs, help channels and a
+ * confirmed test command.
+ */
+const v12State = () =>
+  readFile(path.join(import.meta.dirname, "fixtures", "state-v1.2-by-hand.json"), "utf8");
+
+test("a v1.2 state with a Learn-by-hand run loads and saves unchanged, its busy mark cleared and its rules' reach read", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const written = await v12State();
+  const expected = JSON.parse(written) as Database;
+  // The read schema itself changes nothing, the fitted help set included.
+  assert.deepEqual(persistedDatabaseSchema.parse(JSON.parse(written)), expected);
+  const [run] = expected.runs;
+  assert.equal(run.learnByHand, true);
+  assert.deepEqual(run.byHand?.helpLock?.kinds, ["explain", "answer", "plan", "review"]);
+  assert.ok(expected.repos[0].contributionRules?.findings.some((finding) => finding.allows?.length));
+  await writeFile(path.join(directory, "state.json"), written);
+  const store = new Store(directory);
+  await store.initialize();
+  assert.equal(store.recovery, undefined);
+  // A restart ends whatever was busy, and the rules, stored before the
+  // reach was, get it from each quote (server/stored-reach.test.ts);
+  // nothing else changes.
+  delete run.byHand!.busy;
+  const rules = expected.repos[0].contributionRules!;
+  rules.findings = rules.findings.map(withStoredReach);
+  assert.equal(rules.findings[0].reach, "output");
+  assert.deepEqual(store.data, expected);
+  await store.save();
+  const reopened = new Store(directory);
+  await reopened.initialize();
+  assert.deepEqual(reopened.data, expected);
+});
+
+test("a v1.1 build, whose schema has none of the v1.2 fields, still loads the v1.2 state", async () => {
+  const state = JSON.parse(await v12State()) as Database;
+  const rules = repositoryReadSchema.shape.contributionRules.removeCatch().unwrap();
+  const finding = rules.shape.findings.element.omit({ source: true, allows: true });
+  const olderRepository = repositoryReadSchema.omit({ testCommand: true }).extend({
+    contributionRules: rules
+      .omit({ channels: true })
+      .extend({ findings: z.array(finding).max(30) })
+      .optional()
+      .catch(undefined),
+  });
+  const olderRun = runReadSchema.omit({ learnByHand: true, byHand: true }).extend({
+    attempts: z
+      .record(runReadSchema.shape.attempts.removeCatch().unwrap().valueSchema.omit({ walkthroughs: true }))
+      .optional()
+      .catch(undefined),
+  });
+  const older = z
+    .object({
+      version: z.literal(1),
+      repos: z.array(lenientRead(olderRepository)),
+      runs: z.array(lenientRead(olderRun)),
+    })
+    .passthrough();
+  const read = older.safeParse(state);
+  assert.ok(read.success, read.success ? "" : read.error.message);
+  // Unknown fields pass through, so an older build's save keeps them.
+  assert.deepEqual(read.data, state);
+});

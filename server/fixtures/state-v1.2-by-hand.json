@@ -1,0 +1,544 @@
+{
+  "version": 1,
+  "repos": [
+    {
+      "id": "7c1f3a52-9d4e-4b8a-a6f0-2e5d8c4b1a90",
+      "name": "widgets",
+      "owner": "acme",
+      "fullName": "acme/widgets",
+      "path": "/tmp/bell-v12-state/repositories/acme-widgets",
+      "defaultBranch": "main",
+      "url": "https://github.com/acme/widgets",
+      "language": "TypeScript",
+      "contributionRules": {
+        "baseSha": "9a4f1c2e7b3d5a6f8e0c1b2d3a4f5e6c7b8d9e0a",
+        "checkedAt": "2026-10-20T08:59:00.000Z",
+        "door": {
+          "hasPullRequests": true,
+          "pullRequestCreationPolicy": "all",
+          "viewerPermission": "READ",
+          "login": "learner"
+        },
+        "findings": [
+          {
+            "kind": "ban",
+            "path": "src/policies/llm-usage.md",
+            "line": 24,
+            "quote": "But not to **create**.",
+            "contribution": true,
+            "source": {
+              "registry": "bell",
+              "url": "https://github.com/rust-lang/rust-forge/blob/main/src/policies/llm-usage.md",
+              "version": "67096ec0a6",
+              "checkedOn": "2026-10-19"
+            },
+            "allows": [
+              {
+                "line": 62,
+                "quote": "Asking an LLM questions about an existing codebase",
+                "kinds": [
+                  "explain",
+                  "answer"
+                ]
+              },
+              {
+                "line": 64,
+                "quote": "Asking an LLM to privately review your code or prose",
+                "kinds": [
+                  "review"
+                ]
+              },
+              {
+                "line": 66,
+                "quote": "Using an LLM to generate possible solutions to an issue, learning from them, and then writing something from scratch in your own style.",
+                "kinds": [
+                  "plan"
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "disclose",
+            "path": "CONTRIBUTING.md",
+            "line": 12,
+            "quote": "If you used AI tools, say so in the PR description.",
+            "contribution": true
+          }
+        ],
+        "filesRead": [
+          "CONTRIBUTING.md"
+        ],
+        "channels": [
+          {
+            "label": "Zulip",
+            "url": "https://widgets.zulipchat.com/",
+            "path": "CONTRIBUTING.md",
+            "line": 4
+          },
+          {
+            "label": "GitHub Discussions",
+            "url": "https://github.com/acme/widgets/discussions"
+          }
+        ]
+      },
+      "testCommand": {
+        "command": "npm test -- retry",
+        "confirmedAt": "2026-10-20T09:30:00.000Z"
+      }
+    }
+  ],
+  "runs": [
+    {
+      "id": "2b9e6d14-5f3a-4c7e-8d21-6a0f4e9c3b57",
+      "repoId": "7c1f3a52-9d4e-4b8a-a6f0-2e5d8c4b1a90",
+      "title": "Retry GET requests after a 503",
+      "prompt": "Retry idempotent GET requests when the server answers 503.",
+      "status": "review",
+      "branch": "fix/2b9e6d14",
+      "baseBranch": "main",
+      "baseSha": "9a4f1c2e7b3d5a6f8e0c1b2d3a4f5e6c7b8d9e0a",
+      "worktreePath": "/tmp/bell-v12-state/worktrees/2b9e6d14-5f3a-4c7e-8d21-6a0f4e9c3b57",
+      "createdAt": "2026-10-20T09:00:00.000Z",
+      "locale": "en",
+      "learnByHand": true,
+      "agents": [
+        {
+          "id": "lead",
+          "name": "Atlas",
+          "role": "Team lead",
+          "status": "complete",
+          "detail": "Done; the report is ready to review"
+        },
+        {
+          "id": "reviewer",
+          "name": "Lens",
+          "role": "Reviewer",
+          "status": "complete",
+          "detail": "Done; the report is ready to review"
+        },
+        {
+          "id": "tester",
+          "name": "Scout",
+          "role": "Test analyst",
+          "status": "complete",
+          "detail": "Done; the report is ready to review"
+        }
+      ],
+      "logs": [
+        {
+          "time": "2026-10-20T09:00:05.000Z",
+          "agent": "lead",
+          "message": "Codex CLI started.",
+          "kind": "status"
+        },
+        {
+          "time": "2026-10-20T09:20:00.000Z",
+          "agent": "user",
+          "message": "Your turn: write the change."
+        }
+      ],
+      "draft": {
+        "title": "Retry GET requests after a 503",
+        "body": ""
+      },
+      "reviewedFiles": [],
+      "reviewedFingerprints": {},
+      "reports": {
+        "reviewer": "Checked the tests and the retry loop. One question about the delay."
+      },
+      "contributionSettings": {
+        "provider": "codex",
+        "maxTeammates": 2,
+        "requirePlanApproval": true,
+        "webAccess": false,
+        "ponytailMode": "lite",
+        "issueUrl": "https://github.com/acme/widgets/issues/12"
+      },
+      "modelExecution": {
+        "provider": "codex",
+        "source": "cli-default"
+      },
+      "team": {
+        "config": {
+          "maxTeammates": 2,
+          "requirePlanApproval": true,
+          "provider": "codex",
+          "protocol": "bell-shared-tasks",
+          "messageDelivery": "between-turns"
+        },
+        "phase": "complete",
+        "planSummary": "A 503 from the server fails the request at once; callers retry by hand.",
+        "tasks": [],
+        "messages": [],
+        "approvedAt": "2026-10-20T09:20:00.000Z",
+        "premise": {
+          "verdict": "holds",
+          "statement": "GET requests fail at once on a 503.",
+          "evidence": "src/client.ts:41 throws on any status above 499."
+        }
+      },
+      "attempts": {
+        "src/client.ts": {
+          "fingerprint": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "walkthroughs": {
+            "get:38": {
+              "answer": "It throws before it looks at the status code",
+              "confidence": "think",
+              "grade": "partly",
+              "at": "2026-10-20T10:50:00.000Z"
+            }
+          }
+        }
+      },
+      "byHand": {
+        "guidePlan": {
+          "summary": "Requests that meet a 503 fail at once, so a short outage breaks every page that loads data.",
+          "steps": [
+            {
+              "title": "Find where the client throws",
+              "files": [
+                "src/client.ts"
+              ]
+            },
+            {
+              "title": "Wait and retry a GET",
+              "files": [
+                "src/client.ts",
+                "src/retry.ts"
+              ]
+            },
+            {
+              "title": "Test the retry",
+              "files": [
+                "test/client.test.ts"
+              ]
+            }
+          ],
+          "readFirst": [
+            {
+              "path": "src/client.ts",
+              "startLine": 36,
+              "endLine": 48,
+              "why": "Every request goes through get()."
+            }
+          ],
+          "at": "2026-10-20T09:10:00.000Z",
+          "removed": 0,
+          "dropped": 1
+        },
+        "plan": {
+          "steps": [
+            {
+              "id": "s1",
+              "title": "Read how get() handles a status",
+              "files": [
+                "src/client.ts"
+              ],
+              "how": "Follow a 503 through get().",
+              "doneAt": "2026-10-20T09:40:00.000Z"
+            },
+            {
+              "id": "s2",
+              "title": "Retry a GET twice with a delay",
+              "files": [
+                "src/client.ts"
+              ],
+              "maxRung": 3,
+              "why": "Only GET is idempotent, so retrying it cannot create anything twice.",
+              "chosen": {
+                "entryId": "e3",
+                "option": 1,
+                "why": "A loop in get() keeps every caller unchanged."
+              },
+              "doneAt": "2026-10-20T10:20:00.000Z"
+            },
+            {
+              "id": "s3",
+              "title": "Test two 503s then a 200",
+              "files": [
+                "test/client.test.ts"
+              ],
+              "parkedAt": "2026-10-20T10:25:00.000Z"
+            }
+          ],
+          "tests": "A fake server answers 503 twice, then 200.",
+          "unsure": "Whether POST needs anything.",
+          "prediction": "get() in src/client.ts, because it throws.",
+          "savedAt": "2026-10-20T09:18:00.000Z",
+          "confirmedAt": "2026-10-20T09:20:00.000Z",
+          "outlineAt": "2026-10-20T09:19:00.000Z"
+        },
+        "planQuestions": [
+          {
+            "id": "q1",
+            "at": "2026-10-20T09:19:30.000Z",
+            "kind": "plan",
+            "text": "Your plan has no step for what happens after the last retry.",
+            "ask": "What should the caller see when the third answer is still a 503?"
+          }
+        ],
+        "thread": [
+          {
+            "id": "e1",
+            "at": "2026-10-20T09:30:00.000Z",
+            "kind": "hint",
+            "stepId": "s2",
+            "rung": 1,
+            "text": "Look at where get() reads the status code.",
+            "refs": [
+              {
+                "path": "src/client.ts",
+                "line": 41
+              }
+            ],
+            "removed": 0,
+            "changeFingerprint": "0123456789abcdef"
+          },
+          {
+            "id": "e2",
+            "at": "2026-10-20T09:45:00.000Z",
+            "kind": "ask",
+            "entry": "tooling",
+            "question": "How do I run only the client tests?",
+            "text": "Pass the file to the test command: `npm test -- client`.",
+            "removed": 0
+          },
+          {
+            "id": "e3",
+            "at": "2026-10-20T10:00:00.000Z",
+            "kind": "hint",
+            "stepId": "s2",
+            "rung": 3,
+            "tried": "I wrapped the fetch call in a for loop but the test hangs",
+            "text": "Two ways forward; each has a cost.",
+            "quotes": [
+              {
+                "path": "src/retry.ts",
+                "startLine": 3,
+                "endLine": 5,
+                "from": "base",
+                "text": "export function delay(ms: number) {\n  return new Promise((resolve) => setTimeout(resolve, ms));\n}"
+              }
+            ],
+            "options": [
+              {
+                "name": "Retry inside get()",
+                "tradeoff": "Every caller gets it; a test needs a fake timer."
+              },
+              {
+                "name": "A wrapper the callers opt into",
+                "tradeoff": "No change for existing callers; each caller must remember it."
+              }
+            ],
+            "removed": 1,
+            "dropped": 0,
+            "changeFingerprint": "1123456789abcdef",
+            "model": "gpt-5.5"
+          }
+        ],
+        "hints": {
+          "s2": {
+            "rung": 3,
+            "at": "2026-10-20T10:00:00.000Z",
+            "fingerprint": "1123456789abcdef",
+            "testRunAt": "2026-10-20T09:55:00.000Z",
+            "tried": "I wrapped the fetch call in a for loop but the test hangs"
+          }
+        },
+        "talks": [
+          {
+            "stepId": "s2",
+            "at": "2026-10-20T09:50:00.000Z"
+          }
+        ],
+        "tests": [
+          {
+            "at": "2026-10-20T09:55:00.000Z",
+            "command": "npm test -- retry",
+            "changeFingerprint": "1123456789abcdef",
+            "outcome": "failed",
+            "exitCode": 1,
+            "ms": 4100,
+            "prediction": "fail",
+            "expect": "retries a 503",
+            "outputTail": "not ok 3 - retries a 503\n  timeout after 2000 ms",
+            "tailHash": "5d41402abc4b2a76"
+          },
+          {
+            "at": "2026-10-20T10:30:00.000Z",
+            "command": "npm test -- retry",
+            "changeFingerprint": "2123456789abcdef",
+            "outcome": "passed",
+            "exitCode": 0,
+            "ms": 3900,
+            "prediction": "pass",
+            "outputTail": "ok 3 - retries a 503\n# pass 12",
+            "tailHash": "7d793037a0760186",
+            "newFiles": [
+              "coverage/lcov.info"
+            ]
+          },
+          {
+            "at": "2026-10-20T10:35:00.000Z",
+            "command": "npm test",
+            "changeFingerprint": "2123456789abcdef",
+            "outcome": "passed",
+            "ms": 9000,
+            "reported": true
+          }
+        ],
+        "ready": {
+          "at": "2026-10-20T10:40:00.000Z",
+          "changeFingerprint": "2123456789abcdef",
+          "leastSure": "The delay between retries.",
+          "review": true
+        },
+        "readyHistory": [
+          {
+            "at": "2026-10-20T10:10:00.000Z",
+            "changeFingerprint": "1123456789abcdef",
+            "review": false
+          }
+        ],
+        "reviews": [
+          {
+            "at": "2026-10-20T10:42:00.000Z",
+            "changeFingerprint": "2123456789abcdef",
+            "leastSure": "The delay between retries.",
+            "testRunAt": "2026-10-20T10:30:00.000Z",
+            "verified": "Your last run passed, and the diff covers steps 1 and 2.",
+            "checked": [
+              "the retry loop in get()",
+              "the test for two 503s"
+            ],
+            "findings": [
+              {
+                "path": "src/client.ts",
+                "line": 44,
+                "observed": "A POST that meets a 503 is retried too.",
+                "evidence": {
+                  "type": "rule",
+                  "path": "CONTRIBUTING.md",
+                  "line": 30,
+                  "quote": "Only idempotent requests may be retried."
+                },
+                "why": "A retried POST can create the resource twice.",
+                "question": "Which methods should the loop cover?",
+                "dimension": "risk"
+              }
+            ],
+            "removed": 0
+          }
+        ],
+        "events": [
+          {
+            "at": "2026-10-20T09:10:00.000Z",
+            "kind": "explain",
+            "source": "premise",
+            "cli": "codex"
+          },
+          {
+            "at": "2026-10-20T09:30:00.000Z",
+            "kind": "answer",
+            "source": "hint",
+            "rung": 1,
+            "stepId": "s2",
+            "cli": "codex"
+          },
+          {
+            "at": "2026-10-20T09:45:00.000Z",
+            "kind": "answer",
+            "source": "ask",
+            "cli": "codex"
+          },
+          {
+            "at": "2026-10-20T10:00:00.000Z",
+            "kind": "plan",
+            "source": "hint",
+            "rung": 3,
+            "stepId": "s2",
+            "model": "gpt-5.5",
+            "cli": "codex",
+            "removed": 1
+          },
+          {
+            "at": "2026-10-20T10:42:00.000Z",
+            "kind": "review",
+            "source": "review",
+            "cli": "codex"
+          }
+        ],
+        "agentWrites": 0,
+        "removedTotal": 1,
+        "checkIns": [
+          {
+            "stepId": "s2",
+            "signal": "button",
+            "choice": "talk",
+            "at": "2026-10-20T09:49:00.000Z"
+          }
+        ],
+        "exits": [
+          {
+            "stepId": "s2",
+            "exit": "talk",
+            "at": "2026-10-20T09:49:30.000Z"
+          }
+        ],
+        "leftAt": "2026-10-20T11:00:00.000Z",
+        "busy": {
+          "kind": "review",
+          "since": "2026-10-20T10:41:00.000Z"
+        },
+        "helpLock": {
+          "kinds": [
+            "explain",
+            "answer",
+            "plan",
+            "review"
+          ],
+          "at": "2026-10-20T09:00:00.000Z",
+          "rulesCheckedAt": "2026-10-20T08:59:00.000Z",
+          "rules": [
+            {
+              "kind": "ban",
+              "path": "src/policies/llm-usage.md",
+              "line": 24,
+              "quote": "But not to **create**.",
+              "allows": [
+                {
+                  "line": 62,
+                  "quote": "Asking an LLM questions about an existing codebase",
+                  "kinds": [
+                    "explain",
+                    "answer"
+                  ]
+                },
+                {
+                  "line": 64,
+                  "quote": "Asking an LLM to privately review your code or prose",
+                  "kinds": [
+                    "review"
+                  ]
+                },
+                {
+                  "line": 66,
+                  "quote": "Using an LLM to generate possible solutions to an issue, learning from them, and then writing something from scratch in your own style.",
+                  "kinds": [
+                    "plan"
+                  ]
+                }
+              ],
+              "source": {
+                "registry": "bell",
+                "url": "https://github.com/rust-lang/rust-forge/blob/main/src/policies/llm-usage.md",
+                "version": "67096ec0a6",
+                "checkedOn": "2026-10-19"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

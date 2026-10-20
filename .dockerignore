@@ -1,0 +1,18 @@
+# Build context for the Dockerfile: sources only. The image builds dist/
+# and build/ itself and installs its own node_modules.
+node_modules
+dist
+build
+.bellpr
+.git
+.env*
+e2e
+site
+*.pem
+*.key
+*.tgz
+.vite-cache
+test-results
+playwright-report
+.ui-baseline
+output

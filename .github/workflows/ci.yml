@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Parallel test processes must not share tsx's transform cache.
+  TSX_DISABLE_CACHE: "1"
+
+jobs:
+  build-and-test:
+    name: Build and test (${{ matrix.os }}, Node.js ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Check git (syncing runs needs 2.40 or later)
+        run: >-
+          node -e "const v = require('node:child_process').execFileSync('git', ['--version'], { encoding: 'utf8' });
+          console.log(v.trim()); const [major, minor] = v.match(/(\d+)\.(\d+)/).slice(1).map(Number);
+          if (major < 2 || (major === 2 && minor < 40)) { console.error('git 2.40 or later is required'); process.exit(1); }"
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+      - run: node scripts/check-i18n.mjs
+      - run: node scripts/check-policy-registry.mjs
+      - run: node scripts/check-personal-info.mjs
+      - run: node scripts/check-personal-info.mjs --self-test
+      - run: node scripts/tokenize-css.mjs --check
+      - run: node scripts/generate-third-party-notices.mjs --check
+      - run: node scripts/audit.mjs
+      - run: npx tsx scripts/render-generated-regions.ts --check
+      - run: node scripts/sync-package-meta.mjs --check
+      - run: node scripts/npm-readme.mjs --check-docs
+      - run: node scripts/npm-readme.mjs --self-test
+      - run: node site/check-site.mjs
+
+  package-smoke:
+    name: Package smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Pack (prepack builds)
+        run: npm pack
+      - run: node scripts/check-pack.mjs
+      - name: Install the tarball into a temporary prefix
+        run: npm install -g --prefix "$RUNNER_TEMP/p" ./bell-pr-*.tgz
+      - name: Run the installed command outside the checkout
+        working-directory: ${{ runner.temp }}
+        run: |
+          export PATH="$RUNNER_TEMP/p/bin:$PATH"
+          version="$(node -p "require(process.env.GITHUB_WORKSPACE + '/package.json').version")"
+          bell-pr --version
+          bell-pr --version | grep -F "$version"
+      - name: Start the installed server and sign in
+        working-directory: ${{ runner.temp }}
+        env:
+          BELLPR_DATA_DIR: ${{ runner.temp }}/d
+          BELLPR_NO_OPEN: "1"
+        run: |
+          # Agent CLIs that always fail, so nothing real can start.
+          mkdir -p fake-bin
+          for name in codex claude gh; do printf '#!/bin/sh\nexit 1\n' > "fake-bin/$name"; chmod +x "fake-bin/$name"; done
+          export PATH="$RUNNER_TEMP/fake-bin:$RUNNER_TEMP/p/bin:$PATH"
+          bell-pr start --port 4598 > server.log 2>&1 &
+          server=$!
+          # The log holds the sign-in token; mask it.
+          trap 'kill "$server" 2>/dev/null || true; sed "s/t=[A-Za-z0-9_-]*/t=***/" server.log' EXIT
+          curl -fsS --retry 30 --retry-connrefused --retry-delay 1 http://127.0.0.1:4598/api/health
+          echo
+          signin="$(grep -o 'http://127\.0\.0\.1:4598/auth?t=[A-Za-z0-9_-]*' server.log | head -1)"
+          test -n "$signin"
+          curl -fsS -c jar -b jar -o /dev/null "$signin"
+          type="$(curl -fsS -b jar -o /dev/null -w '%{content_type}' http://127.0.0.1:4598/)"
+          echo "GET / -> $type"
+          case "$type" in text/html*) ;; *) exit 1 ;; esac
+      - run: node scripts/check-personal-info.mjs --pack
+
+  e2e:
+    name: End-to-end tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run the end-to-end tests (builds, then starts bell-pr on port 4599)
+        env:
+          BELLPR_E2E_PORT: "4599"
+        run: npm run test:e2e
+      - name: Upload the traces and the report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-traces
+          path: e2e/output/
+          retention-days: 14
+
+  docker:
+    name: Docker build
+    # Builds only; nothing is pushed.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: docker build -t bell-pr:ci .
+      - name: Check the tools in the image
+        run: |
+          docker run --rm --entrypoint sh bell-pr:ci -c 'for c in bwrap socat codex gh git; do command -v "$c" || exit 1; done; git --version'
+      - name: Start the image and wait until it is healthy
+        run: |
+          docker run -d --name bellpr-ci --health-interval 2s -p 127.0.0.1:4311:4311 bell-pr:ci
+          trap 'docker logs bellpr-ci 2>&1 | sed "s/t=[A-Za-z0-9_-]*/t=***/"; docker rm -f bellpr-ci' EXIT
+          for attempt in $(seq 1 60); do
+            status="$(docker inspect --format '{{.State.Health.Status}}' bellpr-ci)"
+            [ "$status" = healthy ] && break
+            sleep 2
+          done
+          test "$status" = healthy
+          docker exec bellpr-ci bell-pr --version

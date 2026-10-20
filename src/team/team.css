@@ -1,0 +1,841 @@
+.team-board {
+  padding: 28px;
+  background: var(--color-bg);
+}
+.team-board-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 25px;
+  align-items: center;
+}
+.team-board-header h2 {
+  font-size: 23px;
+  margin: 10px 0;
+  font-weight: 600;
+}
+.team-board-header p {
+  font-size: var(--text-md);
+  color: var(--color-text-muted);
+  line-height: 1.8;
+}
+.team-runtime-badge {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--color-accent-200);
+  background: var(--color-accent-50);
+  padding: 12px;
+  border-radius: 8px;
+  color: var(--color-accent-600);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.team-runtime-badge small {
+  display: block;
+  font-size: var(--text-2xs);
+  margin-top: 4px;
+  color: var(--color-accent-600);
+}
+/* The model and AI usage cards, folded under one summary line. */
+.team-run-details {
+  margin: 22px 0 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 9px;
+  background: var(--color-surface);
+}
+.team-run-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--text-sm);
+  color: var(--color-accent-600);
+}
+.team-run-details > summary::-webkit-details-marker {
+  display: none;
+}
+.team-run-details > summary strong {
+  font-weight: 550;
+}
+.team-run-details > summary span {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.team-run-details > summary svg {
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+.team-run-details[open] > summary svg {
+  transform: rotate(180deg);
+}
+.team-run-details-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+.team-run-details-body > .model-summary,
+.team-run-details-body > .efficiency-summary {
+  margin: 0;
+}
+.team-flow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 25px 0;
+  padding: 18px 22px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 7px;
+  background: var(--color-surface);
+}
+.team-flow > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--color-accent-600);
+}
+.team-flow > span.is-current {
+  padding: 4px 10px;
+  margin: -4px -10px;
+  border-radius: 999px;
+  background: var(--color-accent-100);
+  color: var(--color-accent-700);
+  font-weight: 550;
+}
+.team-flow > i {
+  flex: 1;
+  border-top: 1px dashed var(--color-accent-200);
+}
+.team-plan {
+  padding: 20px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  background: var(--color-surface);
+  margin-bottom: 24px;
+}
+.team-plan.needs-approval {
+  border-color: var(--color-accent-300);
+  background: var(--color-accent-50);
+}
+.team-plan-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+.team-plan-heading h3 {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 550;
+  color: var(--color-accent-600);
+}
+.team-plan-heading > span {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
+}
+.team-plan > p {
+  font-size: var(--text-md);
+  line-height: 1.9;
+  color: var(--color-text-muted);
+  margin: 12px 0 0;
+  white-space: pre-wrap;
+}
+/* A long plan and long task descriptions open to their first lines. */
+.team-plan > p.team-plan-folded,
+.team-task > p.team-task-folded {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  overflow: hidden;
+}
+.team-task > p.team-task-folded {
+  -webkit-line-clamp: 5;
+}
+.team-more-toggle {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-600);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.team-plan-action {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  align-items: center;
+  margin-top: 20px;
+  border-top: 1px solid var(--color-accent-200);
+  padding-top: 16px;
+}
+.team-plan-action > span {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.team-plan-revisions {
+  margin: 14px 0 0;
+  padding: 0 0 0 18px;
+  display: grid;
+  gap: 10px;
+}
+.team-plan-revisions li {
+  font-size: var(--text-xs);
+  line-height: 1.8;
+  color: var(--color-text-muted);
+}
+.team-plan-revisions strong {
+  color: var(--color-accent-600);
+  margin-right: 8px;
+}
+.team-plan-revisions li > span {
+  color: var(--color-text-muted);
+}
+.team-plan-revisions p {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+}
+.team-plan-revisions b {
+  font-weight: 550;
+  color: var(--color-accent-600);
+}
+.team-plan-revise {
+  margin-top: 16px;
+  border-top: 1px dashed var(--color-accent-200);
+  padding-top: 14px;
+}
+.team-plan-revise > label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 550;
+  color: var(--color-accent-600);
+}
+.team-plan-revise > label small {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  line-height: 1.8;
+  color: var(--color-text-muted);
+}
+.team-plan-revise textarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--color-accent-200);
+  border-radius: 5px;
+  margin-top: 10px;
+  padding: 9px;
+  font-size: var(--text-sm);
+  line-height: 1.8;
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+.team-plan-revise textarea::placeholder {
+  color: var(--color-text-muted);
+}
+.team-plan-revise textarea:disabled {
+  background: var(--color-surface-sunken);
+  color: var(--color-accent-600);
+}
+.team-plan-revise > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-top: 10px;
+}
+.team-plan-revise > div small {
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
+}
+.team-plan-retry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--color-accent-200);
+}
+.team-plan-retry > span {
+  flex-basis: 100%;
+  font-size: var(--text-xs);
+  line-height: 1.8;
+  color: var(--color-accent-600);
+}
+.team-plan-retry > input {
+  flex: 1 1 240px;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: 8px 10px;
+  border: 1px solid var(--color-accent-200);
+  border-radius: 6px;
+}
+.team-plan-retry > .inline-error {
+  flex-basis: 100%;
+}
+.team-board-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 20px;
+}
+.team-kanban {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  container: team-kanban / inline-size;
+}
+/* Too narrow for three readable lanes (the activity tab on a tablet): the
+   lanes stack, as they do on a phone. */
+@container team-kanban (max-width: 560px) {
+  .team-lane {
+    grid-column: 1 / -1;
+  }
+  .team-kanban.has-tasks .team-lane.is-empty {
+    display: none;
+  }
+}
+.team-lane {
+  min-width: 0;
+  background: var(--color-surface-muted);
+  padding: 12px;
+  border-radius: 8px;
+}
+.team-lane > h3 {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+  font-weight: 550;
+  color: var(--color-accent-600);
+  padding: 4px 3px 14px;
+}
+.team-lane > h3 > span {
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+}
+.team-task {
+  padding: 15px 13px;
+  border: 1px solid var(--color-accent-200);
+  background: var(--color-surface);
+  border-radius: 7px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+.team-task.task-running {
+  border-color: var(--color-accent-500);
+  box-shadow: 0 0 0 2px var(--color-accent-100);
+}
+.team-task-label {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 5px;
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
+  font-family: var(--font-mono);
+}
+.team-task-label > span:last-child {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font-family: inherit;
+}
+.team-task h4 {
+  font-size: var(--text-md);
+  font-weight: 550;
+  line-height: 1.7;
+  margin: 13px 0 9px;
+  color: var(--color-accent-600);
+}
+.team-task > p {
+  font-size: var(--text-xs);
+  line-height: 1.9;
+  color: var(--color-text-muted);
+}
+.team-task-owner {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.team-task-owner > span {
+  margin-left: auto;
+  font-size: var(--text-2xs);
+  background: var(--color-accent-50);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+.team-task-files {
+  display: flex;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
+  line-height: 1.8;
+  margin-top: 10px;
+}
+.team-task-files > span {
+  overflow-wrap: anywhere;
+}
+.team-task-deps {
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
+  margin-top: 8px;
+}
+.team-lane-empty {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 28px 6px;
+}
+.team-report-toggle {
+  font-size: var(--text-2xs);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-accent-600);
+  margin-top: 14px;
+  padding: 0;
+}
+.team-task-integrated {
+  color: var(--color-accent-600);
+}
+.team-task-checks {
+  margin-top: 12px;
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
+}
+.team-task-checks > summary {
+  cursor: pointer;
+  line-height: 1.7;
+}
+.team-task-checks ul {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+.team-task-checks li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.team-task-checks code {
+  color: var(--color-accent-700);
+  background: var(--color-accent-50);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.team-task-checks li > span {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.team-task-report {
+  font: var(--text-xs)/1.9 var(--font-sans);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 250px;
+  overflow: auto;
+  color: var(--color-accent-600);
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: 12px;
+}
+.team-mailbox {
+  border: 1px solid var(--color-accent-200);
+  border-radius: 8px;
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-height: 730px;
+}
+.team-mailbox-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 19px 17px 12px;
+}
+.team-mailbox-heading h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-md);
+  font-weight: 550;
+  color: var(--color-accent-600);
+}
+.team-mailbox-heading > span {
+  font: var(--text-2xs) var(--font-mono);
+  color: var(--color-text-muted);
+}
+.team-delivery-note {
+  font-size: var(--text-2xs);
+  line-height: 1.8;
+  color: var(--color-text-muted);
+  padding: 0 17px 16px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.team-messages {
+  padding: 18px 15px;
+  min-height: 160px;
+  max-height: 460px;
+  overflow: auto;
+  flex: 1;
+}
+.team-messages:focus-visible {
+  outline: 2px solid var(--color-accent-500);
+  outline-offset: -2px;
+}
+.team-message {
+  margin-bottom: 17px;
+}
+.team-message > div {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
+  flex-wrap: wrap;
+}
+.team-message strong {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
+  font-weight: 500;
+}
+.team-message time {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+}
+.team-message p {
+  font-size: var(--text-xs);
+  line-height: 1.9;
+  padding: 10px 11px;
+  background: var(--color-accent-50);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 6px;
+  margin-top: 8px;
+  color: var(--color-accent-600);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.team-message small {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
+  margin-top: 5px;
+}
+.team-message.from-user p {
+  background: var(--color-accent-100);
+  border-color: var(--color-accent-200);
+}
+.team-messages-empty {
+  font-size: var(--text-xs);
+  line-height: 1.9;
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 25px 5px;
+}
+.team-message-form {
+  border-top: 1px solid var(--color-border-subtle);
+  padding: 14px;
+}
+.team-message-form > label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
+}
+.team-message-form select {
+  font-size: var(--text-2xs);
+  max-width: 200px;
+  flex: 1;
+  min-width: 0;
+  padding: 5px;
+  border: 1px solid var(--color-accent-200);
+  border-radius: 4px;
+  color: var(--color-accent-600);
+  background: var(--color-surface-sunken);
+}
+.team-message-form textarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--color-accent-200);
+  border-radius: 5px;
+  margin-top: 10px;
+  padding: 9px;
+  font-size: var(--text-xs);
+  line-height: 1.8;
+  color: var(--color-text);
+  min-height: 90px;
+}
+.team-message-form textarea::placeholder {
+  color: var(--color-text-muted);
+}
+.team-message-form > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+.team-message-form small {
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
+}
+.team-message-form .button {
+  padding: 7px;
+}
+.team-how {
+  margin-top: 20px;
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
+}
+.team-how > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+  line-height: 1.8;
+}
+.team-how > summary::-webkit-details-marker {
+  display: none;
+}
+.team-how[open] > summary svg:last-child {
+  transform: rotate(180deg);
+}
+.team-protocol-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: var(--text-2xs);
+  color: var(--color-accent-600);
+  line-height: 1.8;
+  margin-top: 8px;
+}
+.team-legacy {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 25px;
+  color: var(--color-accent-600);
+  background: var(--color-accent-50);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.team-legacy h3 {
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.team-legacy p {
+  font-size: var(--text-sm);
+  line-height: 1.9;
+}
+/* The lead's check of the request's assumption. */
+.premise-notice {
+  margin-top: var(--space-3);
+  padding: 11px 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  font-size: var(--text-xs);
+  line-height: 1.75;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.premise-notice.premise-refuted {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-bg);
+}
+.premise-notice h3,
+.premise-notice summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.premise-notice summary {
+  flex-wrap: wrap;
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+.premise-notice summary > span {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-weight: 400;
+}
+.premise-holds svg {
+  color: var(--color-success);
+}
+.premise-refuted svg {
+  color: var(--color-warning);
+}
+.premise-unclear svg {
+  color: var(--color-text-muted);
+}
+.premise-notice p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+}
+.premise-notice .premise-statement {
+  font-weight: 550;
+}
+.premise-notice small {
+  display: block;
+  margin-top: 6px;
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+}
+.premise-compact {
+  margin: 0;
+  border-width: 0 0 1px;
+  border-radius: 0;
+}
+/* Setup the machine lacks for checks agents could not run: the person installs it. */
+.setup-needs {
+  margin: 0 var(--space-7) var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-bg);
+}
+.setup-needs h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 550;
+}
+.setup-needs > p {
+  margin: 6px 0 var(--space-3);
+  font-size: var(--text-xs);
+  line-height: 1.8;
+  color: var(--color-text-secondary);
+}
+.setup-needs ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.setup-needs li {
+  min-width: 0;
+  padding: 10px var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: var(--text-xs);
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.setup-needs li p {
+  margin: 2px 0 6px;
+  color: var(--color-text-secondary);
+}
+.setup-needs li small {
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+}
+@media (max-width: 1250px) {
+  .team-board-content {
+    grid-template-columns: 1fr;
+  }
+  .team-mailbox {
+    max-height: 450px;
+  }
+  .team-flow {
+    gap: 8px;
+    padding: 17px 14px;
+  }
+  .team-flow > span {
+    font-size: var(--text-xs);
+  }
+  .team-board-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .team-runtime-badge {
+    white-space: normal;
+  }
+}
+@media (max-width: 760px) {
+  .setup-needs {
+    margin: 0 var(--space-4) var(--space-4);
+  }
+  .team-board {
+    padding: 22px 15px;
+  }
+  .team-board-header h2 {
+    font-size: 21px;
+  }
+  .team-flow {
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+  .team-flow > i {
+    display: none;
+  }
+  .team-flow > span {
+    flex-basis: 43%;
+  }
+  .team-kanban {
+    grid-template-columns: 1fr;
+  }
+  /* Once there are tasks, empty lanes give the space to the others. */
+  .team-kanban.has-tasks .team-lane.is-empty {
+    display: none;
+  }
+  .team-run-details-body {
+    grid-template-columns: 1fr;
+  }
+  .team-plan-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .team-plan-action {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .team-plan-revise > div {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .team-task-label,
+  .team-task-owner,
+  .team-task-files {
+    font-size: var(--text-xs);
+  }
+  .team-plan > p {
+    font-size: var(--text-sm);
+  }
+  .team-board-header p {
+    font-size: var(--text-sm);
+  }
+  .team-message p {
+    font-size: var(--text-md);
+  }
+}

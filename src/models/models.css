@@ -1,0 +1,53 @@
+.model-summary {
+  padding: 12px 16px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 9px;
+  background: var(--color-surface-sunken);
+  color: var(--color-accent-700);
+  min-width: 0;
+}
+.model-summary-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+}
+.model-summary dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 30px;
+  margin: 10px 0 0;
+}
+.model-summary dl > div {
+  min-width: 0;
+}
+.model-summary dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+  margin-bottom: 4px;
+}
+.model-summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-md);
+  font-weight: 550;
+}
+.model-summary p {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  margin: 8px 0 0;
+}
+.mission-project-card > .model-summary {
+  margin-top: 16px;
+}
+.team-board > .model-summary {
+  margin: 22px 0 16px;
+}
+.model-summary-sample {
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--color-accent-100);
+  color: var(--color-accent-700);
+  font-size: var(--text-2xs);
+}

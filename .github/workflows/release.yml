@@ -1,0 +1,222 @@
+name: Release
+
+# A version tag (v1.2.3) publishes the npm package (with provenance), pushes
+# the Docker image to ghcr.io and creates a GitHub release in this repository.
+# Started by hand with dry_run (the default), it builds, tests and packs, runs
+# `npm publish --dry-run` and builds the image without pushing, and creates
+# no release anywhere. `node scripts/release-dry-run.mjs` runs the same dry
+# run locally.
+#
+# Secrets: NPM_TOKEN (or npm trusted publishing). The release uses the
+# workflow's own GITHUB_TOKEN. npm provenance needs `repository` in
+# package.json: set `publicRepoUrl` in shared/product.ts and run
+# `node scripts/sync-package-meta.mjs --write`.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Dry run (publish nothing)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TSX_DISABLE_CACHE: "1"
+
+jobs:
+  verify:
+    name: Verify, build and pack
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      dry_run: ${{ steps.meta.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Provenance needs the repository field of package.json
+        if: github.event_name == 'push'
+        run: |
+          node -e "const r = require('./package.json').repository; if (!r || !r.url) { console.error('::error::package.json has no repository.url, which npm provenance needs. Set publicRepoUrl in shared/product.ts and run node scripts/sync-package-meta.mjs --write.'); process.exit(1); }"
+      - name: Read the version
+        id: meta
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "$EVENT_NAME" = push ]; then
+            # A tag must name exactly the version in package.json.
+            if [ "$REF_NAME" != "v$version" ]; then
+              echo "::error::Tag $REF_NAME does not match package.json version $version."
+              exit 1
+            fi
+            dry_run=false
+          elif [ "$DRY_RUN" = false ]; then
+            dry_run=false
+          else
+            dry_run=true
+          fi
+          case "$version" in *-*) prerelease=true ;; *) prerelease=false ;; esac
+          {
+            echo "version=$version"
+            echo "prerelease=$prerelease"
+            echo "dry_run=$dry_run"
+          } >> "$GITHUB_OUTPUT"
+          echo "bell-pr $version, prerelease: $prerelease, dry run: $dry_run"
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - name: Pack (prepack builds)
+        run: npm pack
+      - run: node scripts/check-pack.mjs
+      - name: Checksums
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: sha256sum "bell-pr-$VERSION.tgz" | tee SHA256SUMS
+      - name: Release notes from CHANGELOG.md
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          # A tagged release needs its own section; a dry run may use [Unreleased].
+          if [ "$EVENT_NAME" = push ]; then require=--require; else require=; fi
+          node scripts/release-dry-run.mjs --notes release-notes.md $require
+          cat release-notes.md
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: |
+            bell-pr-*.tgz
+            SHA256SUMS
+            release-notes.md
+          if-no-files-found: error
+
+  npm:
+    name: npm
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # npm trusted publishing and provenance.
+      id-token: write
+    steps:
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # Node.js 24 brings an npm that supports trusted publishing.
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+      - name: npm publish --dry-run
+        if: needs.verify.outputs.dry_run == 'true'
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+        run: |
+          if [ "$PRERELEASE" = true ]; then tag="--tag next"; else tag=; fi
+          npm publish "bell-pr-$VERSION.tgz" --dry-run $tag
+      - name: npm publish
+        if: needs.verify.outputs.dry_run != 'true'
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ "$PRERELEASE" = true ]; then tag="--tag next"; else tag=; fi
+          npm publish "bell-pr-$VERSION.tgz" --access public --provenance $tag
+
+  docker:
+    name: Docker image
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Image name
+        id: image
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: echo "name=ghcr.io/${OWNER,,}/bell-pr" >> "$GITHUB_OUTPUT"
+      - name: Tags and labels
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ steps.image.outputs.name }}
+          flavor: latest=false
+          # {{major}}.{{minor}} is never applied to a prerelease.
+          tags: |
+            type=semver,pattern={{version}},value=v${{ needs.verify.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ needs.verify.outputs.version }}
+            type=raw,value=latest,enable=${{ needs.verify.outputs.prerelease != 'true' }}
+            type=raw,value=next,enable=${{ needs.verify.outputs.prerelease == 'true' }}
+          labels: |
+            org.opencontainers.image.licenses=Apache-2.0
+      - name: Log in to ghcr.io
+        if: needs.verify.outputs.dry_run != 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build (and push unless this is a dry run)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ needs.verify.outputs.dry_run != 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  release:
+    name: GitHub release
+    # Never in a dry run: no release, draft or otherwise.
+    if: needs.verify.outputs.dry_run != 'true'
+    needs: [verify, npm, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+        run: |
+          if [ "$PRERELEASE" = true ]; then prerelease=--prerelease; else prerelease=; fi
+          gh release create "v$VERSION" \
+            --title "BELL PR $VERSION" \
+            --notes-file release-notes.md \
+            $prerelease \
+            "bell-pr-$VERSION.tgz" SHA256SUMS

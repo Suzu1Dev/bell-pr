@@ -1,0 +1,24 @@
+{
+  "name": "Ponytail",
+  "version": "4.10.2",
+  "repository": "https://github.com/DietrichGebert/ponytail",
+  "commit": "a17afe0712fc43b08f812d54391a0e5c35353b61",
+  "license": "MIT",
+  "files": [
+    {
+      "upstream": "AGENTS.md",
+      "local": "vendor/ponytail/rules.md",
+      "sha256": "b57f736a83ddab7111d752008c3e131a157e646a6b47c9eb223f076c494685a8"
+    },
+    {
+      "upstream": "LICENSE",
+      "local": "vendor/ponytail/LICENSE",
+      "sha256": "fb1bc6909ac3ef82d5c22106e32ef682b0cff66788fa915fb9b53b15c9d2f3ab"
+    },
+    {
+      "upstream": "skills/ponytail/SKILL.md",
+      "local": ".agents/skills/ponytail/SKILL.md",
+      "sha256": "1316a2f3f95741d2300b116fe0c2d81ce4a9568656ed0a62643f54aaf09957f2"
+    }
+  ]
+}

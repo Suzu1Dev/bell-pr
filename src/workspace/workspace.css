@@ -1,0 +1,342 @@
+/* The contribution workspace's own rules. Theme tokens only
+   (src/theme/tokens.css). Selectors name their container, so they win over
+   the general rules in styles.css whatever the bundle order. */
+
+/* The file list's filters stack on a wide screen and share one row that
+   scrolls sideways on a phone, so the two toggles never overlap. */
+.file-panel .file-filters {
+  display: flex;
+  flex-direction: column;
+}
+.file-panel .file-search-toggle {
+  display: none;
+}
+@media (max-width: 760px) {
+  .file-panel .file-filters {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-4);
+    overflow-x: auto;
+    padding: 0 14px var(--space-2);
+  }
+  .file-panel .file-filters .filter-toggle {
+    position: static;
+    flex-shrink: 0;
+    margin: 0;
+    padding: var(--space-1) 0;
+    white-space: nowrap;
+  }
+  /* The search hides behind an icon button until it is opened. */
+  .file-panel .file-panel-heading .file-search-toggle {
+    display: inline-flex;
+  }
+  .file-panel.is-search-open .file-search {
+    display: flex;
+    margin: 0 14px var(--space-2);
+  }
+}
+
+/* A run whose Claude agent ran without the OS sandbox: a persistent badge
+   with a tooltip on hover and keyboard focus. */
+.title-row .unsandboxed-badge {
+  position: relative;
+  display: inline-flex;
+}
+.title-row .unsandboxed-badge > a,
+.title-row .unsandboxed-badge > .badge-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 4px 9px;
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.title-row .unsandboxed-badge > a:hover {
+  text-decoration: underline;
+}
+/* Approved without the understanding check, or the check is off. */
+.title-row .check-off-badge > a,
+.title-row .check-off-badge > .badge-label {
+  border-color: var(--color-violet-border);
+  background: var(--color-violet-bg);
+  color: var(--color-violet);
+}
+.title-row .unsandboxed-help {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  z-index: 5;
+  width: max-content;
+  max-width: min(320px, 70vw);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: normal;
+  /* Hidden, it takes no room: a laid-out tooltip past a phone's edge made the page scroll sideways. */
+  display: none;
+}
+.title-row .unsandboxed-badge:hover .unsandboxed-help,
+.title-row .unsandboxed-badge:focus-within .unsandboxed-help {
+  display: block;
+  animation: fade-in 0.15s ease;
+}
+.title-row .unsandboxed-badge.opens-left .unsandboxed-help {
+  right: 0;
+  left: auto;
+}
+.title-row .unsandboxed-badge.is-dismissed .unsandboxed-help {
+  display: none;
+}
+
+/* Notes under the heading: queued, files cleaned up. */
+.run-notices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: -8px 34px 22px;
+}
+.run-notices .run-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-info-border);
+  border-radius: var(--radius-md);
+  background: var(--color-info-bg);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.run-notices .run-notice > svg {
+  flex-shrink: 0;
+  color: var(--color-info);
+}
+.run-notices .run-notice-link {
+  padding: 0;
+  color: var(--color-accent-600);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+}
+@media (max-width: 760px) {
+  .run-notices {
+    margin: -6px 17px 18px;
+  }
+}
+.is-reading .run-notices {
+  margin: 0 18px var(--space-2);
+}
+
+/* The learning record export: a quiet text button in the heading. */
+.workspace-heading .export-button {
+  padding: 0;
+  white-space: nowrap;
+}
+.workspace-heading .meta-demo + .export-button {
+  margin-left: var(--space-3);
+}
+
+/* The publish dialog: who the commit and the push act as. */
+.modal .publish-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+.modal .publish-identity > svg {
+  color: var(--color-text-muted);
+}
+
+/* Before publishing, the guide and the sync panel follow the editor and
+   can close the tab: keep the last one off the card's edge. */
+.draft-workspace > :last-child:not(.draft-layout, .pr-feedback) {
+  margin-bottom: var(--space-6);
+}
+
+/* The sample's "published" Draft PR at the top of the draft tab. */
+.draft-workspace .sample-published {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: var(--space-6) 28px 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-accent-200);
+  border-radius: var(--radius-md);
+  background: var(--color-success-bg);
+}
+.draft-workspace .sample-published.is-pending {
+  align-items: center;
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.draft-workspace .sample-published-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-success);
+}
+.draft-workspace .sample-published h2 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.draft-workspace .sample-published p {
+  margin-top: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.draft-workspace .sample-published-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  overflow-wrap: anywhere;
+}
+.draft-workspace .sample-published-meta code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+@media (max-width: 760px) {
+  .draft-workspace .sample-published {
+    margin: var(--space-4) 14px 0;
+  }
+}
+
+/* "Take the check now" under the file list's heading; the check takes the
+   explanation's place while it is open (understanding.css styles the
+   check itself). */
+.file-panel .check-link {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0 13px var(--space-2);
+  padding: 0;
+  color: var(--color-accent-600);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-align: left;
+}
+.file-panel .check-link > svg {
+  flex-shrink: 0;
+}
+.explanation-wrap .check-wrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.explanation-wrap .check-ask-waiting {
+  margin: var(--space-2) var(--space-4) 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-info-border);
+  border-radius: var(--radius-md);
+  background: var(--color-info-bg);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+/* The Draft checklist's understanding row, and the forecast link in it. */
+.publish-checklist .checklist-item .run-notice-link {
+  display: block;
+  margin-top: var(--space-1);
+  padding: 0;
+  color: var(--color-accent-600);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+}
+
+/* "Can't continue?" under a published PR's feedback. */
+.pr-feedback .pr-feedback-cant {
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+}
+.pr-feedback .pr-feedback-cant a {
+  color: var(--color-accent-600);
+}
+
+/* Before an AI round: the person's words for each selected comment. */
+.follow-up-start .follow-up-restatements blockquote {
+  margin: 0 0 var(--space-1);
+  padding-left: var(--space-2);
+  border-left: 3px solid var(--color-border-strong);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+/* The publish dialog's checks, grouped by topic. */
+.modal .publish-checks {
+  margin-top: var(--space-4);
+}
+.modal .publish-checks h3 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.modal .publish-checks .publish-fact {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+.modal .publish-checks .publish-fact.is-unknown {
+  color: var(--color-warning);
+}
+.modal .publish-checks .publish-fact.is-clear {
+  color: var(--color-success);
+}
+.modal .publish-checks .publish-block {
+  padding: var(--space-1) 0;
+  color: var(--color-danger);
+  font-size: var(--text-xs);
+}
+.modal .publish-checks .publish-block > span {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+.modal .publish-checks .publish-why {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
+.modal .publish-checks .publish-override {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+}
+.modal .publish-checks .publish-override textarea {
+  min-height: 64px;
+  margin-top: var(--space-1);
+  resize: vertical;
+}
+.modal .publish-checks .publish-confirmations .run-notice-link {
+  display: block;
+  margin-top: var(--space-2);
+  padding: 0;
+  color: var(--color-accent-600);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+  text-align: left;
+}

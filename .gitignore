@@ -1,0 +1,30 @@
+node_modules
+dist/
+.bellpr/
+.env
+.env.*
+!.env.example
+output/
+.playwright-cli/
+.DS_Store
+.vite-cache/
+
+# Build output
+build/
+
+# Package tarballs from `npm pack`
+/bell-pr-*.tgz
+.README.md.orig
+
+# Keys and certificates never enter the repository
+*.pem
+*.key
+
+# Test and screenshot output
+e2e/output/
+test-results/
+playwright-report/
+.ui-baseline/
+
+# Landing site build output (deployed separately, never committed)
+site/dist/

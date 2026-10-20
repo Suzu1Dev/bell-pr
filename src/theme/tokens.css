@@ -1,0 +1,145 @@
+/*
+ * BELL PR design tokens.
+ *
+ * Every color, type size, space, radius and shadow in the UI comes from the
+ * custom properties below. New CSS uses these tokens only; it never adds a
+ * color literal. `node scripts/tokenize-css.mjs --check` fails when one
+ * appears outside src/theme/, and `--check-contrast` prints the contrast of
+ * every text token on every background token.
+ *
+ * Text tokens meet WCAG AA (4.5:1) on every light background token. The
+ * mid tones (brand-500, accent-500, warning-500, the -300/-200 tints) are for
+ * fills, borders and icons, never for text.
+ */
+:root {
+  /* Surfaces: page, cards, wells, chips. */
+  --color-bg: #fafbf9;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f4f6f1;
+  --color-surface-muted: #edf0ea;
+  --color-surface-inverse: var(--color-text);
+
+  /* Lines. */
+  --color-border-subtle: var(--color-surface-muted);
+  --color-border: #e5e8e3;
+  --color-border-strong: #cfd6ca;
+
+  /* Text, darkest to lightest. */
+  --color-text: #24342b;
+  --color-text-secondary: #46564b;
+  --color-text-muted: #5a6a58;
+  /* On surface-inverse and on solid brand or status fills. */
+  --color-text-inverse: #ffffff;
+  --color-text-inverse-muted: #d3e0d6;
+
+  /* Brand green. 700 and 600 are text colors; 600 is the primary fill. */
+  --color-brand-700: #175a40;
+  --color-brand-600: #1f6d50;
+  --color-brand-500: #3f8a69;
+  --color-brand-300: #8dbb9f;
+  --color-brand-200: #c4dccb;
+  --color-brand-100: #e0eee4;
+  --color-brand-50: #eef6f0;
+
+  /* Olive accent: secondary highlights such as running work and progress.
+     700 and 600 are text colors. */
+  --color-accent-700: #465c3b;
+  --color-accent-600: #4f733e;
+  --color-accent-500: #7f9c66;
+  --color-accent-300: #b0c79c;
+  --color-accent-200: #d3e0c6;
+  --color-accent-100: #e7efdd;
+  --color-accent-50: #f4f8ee;
+
+  /* Status. The base token is the text color; -bg is its background. */
+  --color-success: var(--color-brand-600);
+  --color-success-bg: var(--color-brand-50);
+  --color-warning: #765a17;
+  --color-warning-500: #c99a3e;
+  --color-warning-border: #e6d7ae;
+  --color-warning-bg: #fbf6e7;
+  --color-danger: #a33d2f;
+  --color-danger-border: #ebcdc5;
+  --color-danger-bg: #fcefeb;
+  --color-info: #3c6685;
+  --color-info-border: #c9d9e6;
+  --color-info-bg: #edf3f8;
+  /* Self-check questions and answers in the explanation panel. */
+  --color-violet: #64528a;
+  --color-violet-border: #d6cbe3;
+  --color-violet-bg: #f4f1f8;
+
+  /* Diff view. */
+  --color-diff-add-bg: #eef8ed;
+  --color-diff-add-fg: var(--color-brand-600);
+  --color-diff-del-bg: #fff0ee;
+  --color-diff-del-fg: var(--color-danger);
+  --color-diff-selected: #e0eee9;
+
+  /* Code tokens in the diff view. */
+  --color-syntax-keyword: var(--color-violet);
+  --color-syntax-string: var(--color-warning);
+  --color-syntax-number: #9a5124;
+  --color-syntax-comment: var(--color-text-muted);
+
+  --color-selection: var(--color-brand-200);
+  --color-overlay: rgb(25 46 36 / 34%);
+
+  /* Fonts. fonts.css self-hosts DM Sans and IBM Plex Mono (latin and
+     latin-ext only); CJK text uses the system fonts, see :lang below. */
+  --font-sans-base: "DM Sans";
+  --font-sans: var(--font-sans-base), system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* Type scale. 11px is the smallest size the UI uses. */
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 28px;
+  --text-3xl: 36px;
+
+  /* Space on a 4px grid. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-9: 36px;
+  --space-10: 40px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* Raised controls, cards, then floating layers (toasts, dialogs). */
+  --shadow-1: 0 1px 2px rgb(28 56 34 / 7%);
+  --shadow-2: 0 4px 16px rgb(36 52 43 / 5%);
+  --shadow-3: 0 24px 80px rgb(22 43 36 / 20%), 0 8px 24px rgb(22 43 36 / 8%);
+
+  /* Keyboard focus. The inner ring separates the outer ring from fills;
+     the inset variant is for rows inside scroll containers, which would
+     clip an outer ring. */
+  --focus-ring: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-brand-600);
+  --focus-ring-inset: inset 0 0 0 2px var(--color-brand-600);
+}
+
+/* Traditional Chinese uses the platform's CJK font; no CJK webfont ships.
+   The stack is swapped on the element whose language is zh-Hant, and every
+   element that sets its own font-family re-reads it there. */
+:lang(zh-Hant) {
+  --font-sans: var(--font-sans-base), "PingFang TC", "Microsoft JhengHei",
+    "Noto Sans CJK TC", "Noto Sans TC", sans-serif;
+}
+:root,
+[lang] {
+  font-family: var(--font-sans);
+}

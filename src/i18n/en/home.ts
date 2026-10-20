@@ -1,0 +1,33 @@
+/** The Home page (English): where the app opens. */
+const home = {
+  /** The one-line value proposition under the logo: the product's headline. */
+  tagline: "From vibe coding to knowing why.",
+  start: {
+    heading: "Start here",
+    sample: {
+      title: "Try the sample project",
+      text: "Walk through a finished contribution: the project's rules, the agent team's plan, explaining the change back and the pull request draft. No setup needed.",
+    },
+    import: {
+      title: "Import a repository",
+      text: "Bring a project from GitHub (owner/repo or a link) or a Git folder on this computer.",
+    },
+    discover: {
+      title: "Find a project to contribute to",
+      text: "Search GitHub for projects that welcome the kind of help you want to give.",
+    },
+  },
+  setup: {
+    heading: "Your environment",
+  },
+  continue: {
+    heading: "Continue where you left off",
+    /** Marks the run opened last. */
+    lastOpened: "Last opened",
+    /** The repository and the status under a run's title. */
+    detail: ({ repo, status }: { repo: string; status: string }) =>
+      repo ? `${repo} · ${status}` : status,
+  },
+};
+
+export default home;

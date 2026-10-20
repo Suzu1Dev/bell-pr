@@ -1,0 +1,641 @@
+/* A dedicated reading surface: give the code the space it deserves. */
+.workspace-heading {
+  padding-top: 22px;
+  padding-bottom: 14px;
+}
+.review-tabs {
+  gap: 23px;
+}
+.review-tabs > button {
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+/* The tabs fill the top edge of the review card, which clips its overflow,
+   and up to 1100 px the tab row scrolls sideways: an outer focus ring
+   would be cut off. */
+:root .review-tabs > [role="tab"]:focus-visible {
+  box-shadow: var(--focus-ring-inset);
+}
+.review-toolbar {
+  height: 58px;
+  /* The totals never touch the last tab, even when the row scrolls. */
+  gap: 24px;
+}
+.explore-page {
+  padding-top: 30px;
+}
+.explore-page .mission-overview {
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+.explore-page > .page-title {
+  margin-bottom: 22px;
+}
+.modal-wide {
+  width: 790px;
+}
+.task-repo-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 20px;
+}
+.task-repo-actions > button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-accent-600);
+  font-size: var(--text-xs);
+  padding: 0;
+}
+.task-repo-actions > button:hover {
+  color: var(--color-brand-700);
+}
+.task-demo-note {
+  padding: 12px 14px;
+  font-size: var(--text-xs);
+  line-height: 1.8;
+  background: var(--color-accent-50);
+  border: 1px solid var(--color-accent-200);
+  border-radius: 6px;
+  color: var(--color-accent-600);
+  margin-bottom: 20px;
+}
+.save-direction-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-accent-600);
+  font-size: var(--text-xs);
+  padding: 0;
+  margin: 16px 0 25px;
+}
+.save-direction-button:hover {
+  color: var(--color-brand-700);
+}
+.code-size-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 5px;
+  padding: 3px 4px;
+  margin: 0 4px;
+  background: var(--color-surface);
+}
+.code-size-control > span {
+  font: var(--text-2xs) var(--font-mono);
+  min-width: 16px;
+  text-align: center;
+  color: var(--color-accent-600);
+}
+.code-size-control > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  color: var(--color-accent-600);
+  border-radius: 3px;
+}
+.code-size-control > button:hover {
+  background: var(--color-diff-add-bg);
+}
+.pane-resizer {
+  width: 6px;
+  background: var(--color-surface-sunken);
+  cursor: col-resize;
+  touch-action: none;
+  position: relative;
+  z-index: 1;
+  border-left: 1px solid var(--color-border-subtle);
+  border-right: 1px solid var(--color-border-subtle);
+}
+.pane-resizer::after {
+  content: "";
+  position: absolute;
+  top: 45%;
+  height: 34px;
+  width: 2px;
+  left: 1px;
+  border-radius: 3px;
+  background: var(--color-accent-200);
+}
+.pane-resizer:hover,
+.pane-resizer:focus-visible {
+  background: var(--color-accent-300);
+}
+.is-reading .rv-line {
+  font-size: var(--code-size, 14px);
+  line-height: 1.85;
+  min-height: calc(var(--code-size, 14px) * 1.85);
+}
+.is-reading .rv-gutter {
+  font-size: var(--text-xs);
+  line-height: inherit;
+  flex-basis: 38px;
+}
+.is-reading .rv-hunk {
+  font-size: var(--text-xs);
+  height: 33px;
+}
+.is-reading .rv-file-header {
+  min-height: 40px;
+}
+.is-reading .rv-diff-footer {
+  min-height: 30px;
+}
+.is-reading .rv-code-scroll {
+  max-height: none;
+  min-height: 0;
+}
+.is-reading .rv-diff {
+  border: 0;
+  border-radius: 0;
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+.is-reading .diff-topbar {
+  height: 38px;
+  flex-shrink: 0;
+  gap: 8px;
+}
+.is-reading .diff-toolbar-actions {
+  gap: 6px;
+}
+.is-reading .diff-topbar > span {
+  font-size: var(--text-2xs);
+}
+.is-reading .review-area {
+  margin: 0 18px 16px;
+}
+.is-reading .workspace-heading {
+  padding: 18px 20px;
+}
+.is-reading .heading-top {
+  margin-bottom: 7px;
+}
+.is-reading .title-row h1 {
+  font-size: 22px;
+}
+.is-reading .repo-meta {
+  margin-top: 9px;
+}
+.is-reading .workflow-strip {
+  display: none;
+}
+.is-reading .topbar {
+  height: 50px;
+  padding: 0 21px;
+}
+.is-reading .review-totals {
+  font-size: var(--text-xs);
+}
+.is-reading .file-panel {
+  min-height: 0;
+}
+.is-reading .file-panel-heading {
+  height: 48px;
+}
+.is-reading .explanation-wrap {
+  overflow: hidden;
+}
+.is-reading .explain-panel {
+  border: 0;
+  min-height: 0;
+  width: 100%;
+  flex: 1;
+}
+.is-reading .explain-header {
+  min-height: 65px;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+.is-reading .explain-context {
+  margin-top: 12px;
+}
+.is-reading .explain-content {
+  max-height: none;
+  flex: 1;
+  min-height: 0;
+}
+.is-reading .review-footer {
+  padding: 11px 15px;
+}
+.is-reading .footer-hint {
+  display: none;
+}
+@media (min-width: 761px) {
+  .is-sidebar-collapsed .sidebar {
+    width: 64px;
+    padding: 19px 8px 0;
+    align-items: center;
+  }
+  .is-sidebar-collapsed .main-shell {
+    margin-left: 64px;
+  }
+  .is-sidebar-collapsed .brand {
+    padding: 0;
+    gap: 0;
+  }
+  .is-sidebar-collapsed .brand > span:not(.brand-symbol),
+  .is-sidebar-collapsed .nav-label,
+  .is-sidebar-collapsed .recent-list,
+  .is-sidebar-collapsed .profile {
+    display: none;
+  }
+  .is-sidebar-collapsed .sidebar nav {
+    margin-top: 40px;
+    width: 100%;
+  }
+  .is-sidebar-collapsed .sidebar .nav-item {
+    justify-content: center;
+    padding: 13px 10px;
+    position: relative;
+    min-height: 43px;
+  }
+  .is-sidebar-collapsed .sidebar .nav-item > span {
+    position: absolute;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    width: 1px;
+    height: 1px;
+    /* A padded count chip would keep a box larger than 1 px, and the
+       overflow check would read its hidden text as cut off. */
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .is-sidebar-collapsed .sidebar .nav-item > svg {
+    width: 20px;
+    height: 20px;
+  }
+  .is-sidebar-collapsed .sidebar-bottom {
+    width: 100%;
+    padding-bottom: 20px;
+  }
+  /* Reading layout: the shell is one viewport tall and the code grid takes
+     whatever the compact chrome above and below it leaves, so the page never
+     scrolls and no magic height constants have to track the chrome. */
+  .is-reading .main-shell {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  .is-reading .topbar {
+    height: 44px;
+    flex-shrink: 0;
+  }
+  /* The title and the actions share the first row; the repository and
+     branch line wraps below them, so no label ever cuts the title short. */
+  .is-reading .workspace-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 14px;
+    min-width: 0;
+    padding: 6px 20px;
+    flex-shrink: 0;
+  }
+  .is-reading .heading-top {
+    order: 3;
+    margin: 0 0 0 auto;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .is-reading .heading-top .eyebrow > svg,
+  .is-reading .heading-top .eyebrow > span:not(.demo-pill) {
+    display: none;
+  }
+  .is-reading .heading-top .demo-pill {
+    margin-left: 0;
+  }
+  .is-reading .title-row {
+    flex: 1 1 0%;
+    flex-wrap: nowrap;
+    min-width: 0;
+    gap: 10px;
+  }
+  .is-reading .title-row h1 {
+    font-size: 18px;
+    line-height: 1.4;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .is-reading .repo-meta {
+    order: 4;
+    flex: 1 0 100%;
+    flex-wrap: wrap;
+    row-gap: 2px;
+    min-width: 0;
+    margin: 0;
+  }
+  .is-reading .meta-demo {
+    margin-left: 8px;
+  }
+  .is-reading .review-area {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 6px;
+  }
+  .is-reading .review-toolbar {
+    height: 40px;
+    flex-shrink: 0;
+  }
+  .is-reading .review-area > [role="tabpanel"] {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .is-reading .review-footer {
+    padding: 3px 15px;
+    flex-shrink: 0;
+  }
+  .is-reading .file-panel-heading {
+    height: 40px;
+  }
+  .is-reading .review-grid {
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr) 6px var(
+        --explanation-width,
+        340px
+      );
+    flex: 1;
+    height: auto;
+    min-height: 300px;
+    align-items: stretch;
+  }
+  .is-reading .review-grid.files-hidden {
+    grid-template-columns: minmax(0, 1fr) 6px var(--explanation-width, 340px);
+  }
+  .is-reading .review-grid.explanation-hidden {
+    grid-template-columns: 190px minmax(0, 1fr);
+  }
+  .is-reading .review-grid.files-hidden.explanation-hidden {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .is-reading .explanation-wrap {
+    grid-column: auto;
+    border-top: 0;
+    border-left: 0;
+  }
+  .is-reading .diff-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .is-reading .file-tree {
+    overflow: auto;
+  }
+  .is-reading .review-progress {
+    flex-shrink: 0;
+  }
+  .is-focused .sidebar,
+  .is-focused .topbar,
+  .is-focused .workspace-heading,
+  .is-focused .file-panel,
+  .is-focused .explanation-wrap,
+  .is-focused .pane-resizer,
+  .is-focused .diff-context-bar {
+    display: none;
+  }
+  .is-focused .main-shell {
+    margin-left: 0;
+  }
+  /* Focus mode hides the tab row (it comes back with Esc or the 離開專注模式
+     button); the review footer stays so the reviewed count and 確認並準備 PR
+     remain visible. */
+  .is-focused .review-toolbar {
+    display: none;
+  }
+  .is-focused .review-area {
+    margin: 0;
+    border-radius: 0;
+  }
+  .is-focused .review-grid,
+  .is-focused .review-grid.files-hidden,
+  .is-focused .review-grid.explanation-hidden,
+  .is-focused .review-grid.files-hidden.explanation-hidden {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .is-focused .diff-topbar > span {
+    font-size: var(--text-xs);
+  }
+  .is-focused .rv-file-path {
+    font-size: var(--text-md);
+  }
+}
+@media (min-width: 1650px) {
+  .is-reading .review-grid {
+    grid-template-columns: 205px minmax(0, 1fr) 6px var(
+        --explanation-width,
+        340px
+      );
+  }
+  .is-focused .review-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  .is-reading .review-grid {
+    grid-template-columns: 155px minmax(0, 1fr) 6px 280px;
+  }
+  .is-reading .review-grid.files-hidden {
+    grid-template-columns: minmax(0, 1fr) 6px 280px;
+  }
+  .is-reading .review-grid.explanation-hidden {
+    grid-template-columns: 155px minmax(0, 1fr);
+  }
+  .is-reading .review-grid.files-hidden.explanation-hidden {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .is-reading:not(.is-sidebar-collapsed):not(.is-focused)
+    .review-area
+    > [role="tabpanel"] {
+    overflow-y: auto;
+  }
+  .is-reading:not(.is-sidebar-collapsed):not(.is-focused) .review-grid {
+    grid-template-columns: 155px minmax(0, 1fr);
+    grid-template-rows: minmax(470px, 70dvh) auto;
+    flex: none;
+    height: auto;
+    min-height: 0;
+  }
+  .is-reading:not(.is-sidebar-collapsed):not(.is-focused)
+    .review-grid.files-hidden {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .is-reading:not(.is-sidebar-collapsed):not(.is-focused) .explanation-wrap {
+    grid-column: 1 / -1;
+    height: 520px;
+    border-top: 1px solid var(--color-border-subtle);
+  }
+  .is-reading:not(.is-sidebar-collapsed):not(.is-focused) .pane-resizer {
+    display: none;
+  }
+  /* Every tab scrolls the tab row sideways when it does not fit. */
+  .review-toolbar {
+    overflow-x: auto;
+  }
+  .review-tabs {
+    flex-shrink: 0;
+  }
+  .is-reading .diff-topbar > span {
+    display: none;
+  }
+  .is-reading .diff-topbar {
+    justify-content: flex-end;
+    height: auto;
+    min-height: 38px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .is-reading .diff-toolbar-actions {
+    flex-shrink: 1;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .is-reading .file-name {
+    font-size: var(--text-2xs);
+  }
+  .is-reading .rv-shift-hint {
+    display: none;
+  }
+  .is-focused .review-grid,
+  .is-focused .review-grid.files-hidden,
+  .is-focused .review-grid.explanation-hidden,
+  .is-focused .review-grid.files-hidden.explanation-hidden {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .is-focused .diff-topbar > span {
+    display: flex;
+  }
+}
+/* The review-mode label goes first, before the totals crowd the five tabs. */
+@media (max-width: 1180px) {
+  .review-totals > svg,
+  .review-totals > span:last-child {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .review-toolbar {
+    padding: 0 10px;
+    overflow-x: auto;
+  }
+  .review-tabs {
+    gap: 18px;
+    flex-shrink: 0;
+  }
+  .review-tabs > button {
+    font-size: var(--text-xs);
+  }
+  .review-tabs > button svg {
+    width: 14px;
+  }
+  .modal-wide {
+    width: 100%;
+    padding: 25px 19px;
+  }
+  .task-repo-actions {
+    flex-wrap: wrap;
+    font-size: var(--text-xs);
+  }
+  .task-team-preview {
+    flex-wrap: wrap;
+    font-size: var(--text-2xs);
+    gap: 7px;
+  }
+  .is-reading .review-area {
+    margin: 0 8px 12px;
+  }
+  .is-reading .workspace-heading {
+    padding: 17px 15px;
+  }
+  .is-reading .title-row h1 {
+    font-size: 21px;
+  }
+  .is-reading .review-grid {
+    display: flex;
+    height: auto;
+    min-height: 0;
+  }
+  .is-reading .diff-panel {
+    height: 65dvh;
+    min-height: 430px;
+    display: flex;
+    flex-direction: column;
+  }
+  .is-reading .diff-topbar {
+    justify-content: flex-end;
+    padding: 0 9px;
+  }
+  .is-reading .diff-topbar > span {
+    display: none;
+  }
+  .is-reading .diff-toolbar-actions {
+    gap: 8px;
+  }
+  .is-reading .rv-file-path {
+    font-size: var(--text-xs);
+  }
+  .is-reading .rv-gutter {
+    font-size: var(--text-2xs);
+    flex-basis: 30px;
+  }
+  .is-reading .explanation-wrap {
+    min-height: 520px;
+    border-top: 1px solid var(--color-border-subtle);
+  }
+  .is-reading .explain-content {
+    max-height: 460px;
+  }
+  .pane-resizer {
+    display: none;
+  }
+  .is-focused .workspace-heading,
+  .is-focused .topbar,
+  .is-focused .file-panel,
+  .is-focused .explanation-wrap {
+    display: none;
+  }
+  .is-focused .review-area {
+    margin: 0;
+    border-radius: 0;
+  }
+  .is-focused .diff-panel {
+    height: calc(100dvh - 133px);
+    min-height: 400px;
+  }
+  .is-focused .review-footer > div {
+    gap: 8px;
+  }
+  .is-reading .diff-toolbar-actions > .icon-button {
+    padding: 5px;
+  }
+  .explore-page {
+    padding: 24px 14px;
+  }
+  .explore-page .page-title h1 {
+    font-size: 21px;
+    overflow-wrap: anywhere;
+  }
+  .task-demo-note {
+    font-size: var(--text-xs);
+  }
+}
+
+.direction-settings-container {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.direction-settings-container:disabled {
+  opacity: 0.6;
+}

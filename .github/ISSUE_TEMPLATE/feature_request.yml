@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest an improvement or a new capability
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the idea. Search the existing issues first. For anything bigger than a small change, please open the issue before you write code, as `CONTRIBUTING.md` asks, so nobody builds something that cannot be merged.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem do you want to solve, and for whom?
+      description: Describe the situation, not only the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like BELL PR to do?
+      description: How it would work for the person using it.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Other ways to solve it, including doing it outside BELL PR.
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you like to build it?
+      options:
+        - "No, I am only suggesting it"
+        - "Yes, I would send a pull request"
+        - "Yes, with some guidance"
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues and pull requests.
+          required: true

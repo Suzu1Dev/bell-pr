@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>BELL PR: from vibe coding to knowing why</title>
+    <meta name="description" content="BELL PR is free, open-source software (Apache-2.0) for learning while you contribute to open source. An AI agent team does the legwork on your own machine; you understand every change, explain it back, and send one Draft PR that follows the project's rules. Nothing is published until you approve it.">
+    <meta name="theme-color" content="#1f6d50">
+    <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="assets/brand/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="BELL PR">
+    <meta property="og:title" content="BELL PR: from vibe coding to knowing why">
+    <meta property="og:description" content="Free, open-source and local-first. Your AI agent team does the legwork. You understand every change, explain it back, and send only what a maintainer is glad to review.">
+    <!-- generated:product-meta key=homepageUrl property="og:url" -->
+    <!-- /generated:product-meta -->
+    <!-- generated:product-meta key=homepageUrl property="og:image" path="assets/brand/og-image.png" -->
+    <!-- /generated:product-meta -->
+    <meta property="og:image" content="assets/brand/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <script src="site.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="index.html"><img src="assets/brand/logo-wordmark.svg" alt="BELL PR" width="104" height="34"></a>
+        <nav class="site-nav" aria-label="Main">
+          <ul>
+            <li><a href="#how-it-works">How it works</a></li>
+            <li><a href="install.html">Install</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="wrap">
+          <p class="eyebrow">Open source · Local-first · You explain it back · No telemetry</p>
+          <h1>From vibe coding to knowing why.</h1>
+          <p class="lead">Your AI agent team does the legwork. You understand every change, explain it back, and send only what a maintainer is glad to review. BELL PR runs on your own machine with the AI coding CLI and the GitHub CLI you already use, and it only ever opens Draft pull requests that you approved.</p>
+          <div class="hero-actions">
+            <div class="command"><code id="start-command">npx bell-pr</code><button class="copy-button" type="button" data-copy="start-command" hidden>Copy</button></div>
+            <a class="button" href="install.html">Install guide</a>
+          </div>
+          <p class="hero-note">Free and open source under the Apache License 2.0, with no account. Needs Node.js 22 or later, Git, the GitHub CLI, and the Codex CLI or Claude Code.</p>
+        </div>
+      </section>
+
+      <section class="section section-tinted" id="how-it-works" aria-labelledby="how-title">
+        <div class="wrap">
+          <div class="section-head">
+            <p class="eyebrow">How it works</p>
+            <h2 id="how-title">Let AI do the legwork. Keep the understanding.</h2>
+            <p>Learn while you contribute: the agents write the code, you make every decision, and you finish able to explain the change you send.</p>
+          </div>
+          <ol class="steps">
+            <li>
+              <h3>Read the rules first</h3>
+              <p>BELL PR quotes the project's own contribution rules, checks that it takes pull requests from you, and shows whether the issue you pick is still open and who else is on it.</p>
+            </li>
+            <li>
+              <h3>Approve the plan, let the team work</h3>
+              <p>The Lead plans the work and you approve it. Teammates, a Reviewer and a Test analyst then work in isolated git worktrees, with the AI coding CLI you already use.</p>
+            </li>
+            <li>
+              <h3>Try first, then explain it back</h3>
+              <p>Answer each file's question before the explanation shows you, then explain the whole change back in your own words before you approve it.</p>
+            </li>
+            <li>
+              <h3>Send one Draft PR, then learn from the review</h3>
+              <p>Publish a Draft PR in your own words once the project's checks pass, then compare the maintainers' review with what you predicted and practise what you missed.</p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="section" id="screenshots" aria-labelledby="screenshots-title">
+        <div class="wrap">
+          <div class="section-head">
+            <p class="eyebrow">A closer look</p>
+            <h2 id="screenshots-title">What you work with</h2>
+            <p>Screens from the sample project that comes with BELL PR. Select one to see it at full size.</p>
+          </div>
+          <ul class="shots">
+            <li>
+              <figure class="shot">
+                <a href="assets/screenshots/repo-overview-1440.png"><img src="assets/screenshots/repo-overview-1440.png" alt="The project overview of the sample project: the project context, and the Before you contribute card, which says that pull requests are open to you and quotes the project's rules with their file and line." width="1440" height="900" loading="lazy" decoding="async"></a>
+                <figcaption><strong>Read the rules first</strong>Before you choose a contribution direction, BELL PR quotes the project&#39;s own rules with their file and line, says what publishing does about each, and checks that pull requests are open to you.</figcaption>
+              </figure>
+            </li>
+            <li>
+              <figure class="shot">
+                <a href="assets/screenshots/run-changes-1440.png"><img src="assets/screenshots/run-changes-1440.png" alt="The code changes of a sample contribution: the changed files, a diff, and a plain-language explanation of the selected file beside it." width="1440" height="900" loading="lazy" decoding="async"></a>
+                <figcaption><strong>Every change, explained</strong>Read each changed file next to a plain-language explanation with examples, answer its question before the answer shows, and ask about any line.</figcaption>
+              </figure>
+            </li>
+            <li>
+              <figure class="shot">
+                <a href="assets/screenshots/run-check-1440.png"><img src="assets/screenshots/run-check-1440.png" alt="The understanding check next to the diff of a sample contribution: the person's own explanation, their answers with their own grades and a correction, and the footer saying they explained it back and can approve." width="1440" height="900" loading="lazy" decoding="async"></a>
+                <figcaption><strong>Explain it back before you approve</strong>A short closed-book check next to the diff: your explanation, your answers and your own grades. No AI model grades you.</figcaption>
+              </figure>
+            </li>
+            <li>
+              <figure class="shot">
+                <a href="assets/screenshots/run-draft-1440.png"><img src="assets/screenshots/run-draft-1440.png" alt="The pull request draft of a sample contribution: the title and description editor, and beside it what is left to do before you submit." width="1440" height="900" loading="lazy" decoding="async"></a>
+                <figcaption><strong>A pull request that fits the project</strong>You edit the title and description with what is left to do beside them. Further down, the maintainer checklist checks the change against the project&#39;s rules, the issue and your pace there. AI help is mentioned only if the project requires it or you choose to.</figcaption>
+              </figure>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section section-tinted" id="features" aria-labelledby="features-title">
+        <div class="wrap">
+          <div class="section-head">
+            <h2 id="features-title">Built for contributions you can stand behind</h2>
+            <p>Understand what you send, train your taste on real code, and respect the maintainer's time.</p>
+          </div>
+          <ul class="grid">
+            <li class="card">
+              <h3>Explanations you test yourself on</h3>
+              <p>Every changed file comes with what changed and why, an example, trade-offs and another way to do it. You answer its question before the answer shows, and you choose which approach you would take.</p>
+            </li>
+            <li class="card">
+              <h3>Explain it back before you approve</h3>
+              <p>Ship only what you can explain: a short closed-book check of your own summary and answers, which you grade yourself. It is on by default; turning it off is visible on every run.</p>
+            </li>
+            <li class="card">
+              <h3>Practice what you missed</h3>
+              <p>Answers you got wrong while you were sure, and maintainer comments that surprised you, come back days later in your practice deck. No streaks, no scores.</p>
+            </li>
+            <li class="card">
+              <h3>The project's rules, quoted</h3>
+              <p>Rules on AI use, disclosure and descriptions in your own words are quoted from the project's own files, with the file and line, and checked again when you publish.</p>
+            </li>
+            <li class="card">
+              <h3>Still open, still yours</h3>
+              <p>Before you start and again before you publish, BELL PR checks that the issue is open and looks for anyone else assigned to it, claiming it or with a pull request linked to it.</p>
+            </li>
+            <li class="card">
+              <h3>Close the loop before the next PR</h3>
+              <p>Publishing is paced in each project: answer the review on your open pull requests before you open more there.</p>
+            </li>
+            <li class="card">
+              <h3>Directions with evidence</h3>
+              <p>An agent reads the project and suggests contribution directions, each quoting the code or documents it rests on, and BELL PR checks that every quote really exists. Ask for five more whenever you want, up to 30 per project.</p>
+            </li>
+            <li class="card">
+              <h3>Find your next contribution</h3>
+              <p>Discovery searches GitHub for projects and issues that match your interests, language and the difficulty you want, reads their contribution rules, and explains the effort and the first step.</p>
+            </li>
+            <li class="card">
+              <h3>A team that fits the change</h3>
+              <p>A Lead, two, three or four teammates, a Reviewer and a Test analyst, each teammate in its own git worktree. Work on several contributions at once, up to the limit you set (2 by default, at most 8).</p>
+            </li>
+            <li class="card">
+              <h3>Follow up on the review</h3>
+              <p>Read the maintainers' feedback and compare it with your forecast. Then let an agent address selected comments in a follow-up round, after you restate each one in your own words; you review the round and push it as one more commit.</p>
+            </li>
+            <li class="card">
+              <h3>A coach that reads your records</h3>
+              <p>A coach debrief reads your records for one project, names what its maintainers raise most and builds practice drills from your own contributions. Export a contribution's complete learning record as Markdown.</p>
+            </li>
+            <li class="card">
+              <h3>Your tools, your effort</h3>
+              <p>Choose the Codex CLI or Claude Code, the model, the reasoning effort (including the deepest levels) and an efficiency mode. Web access for agents stays off until you turn it on.</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section" id="open-source" aria-labelledby="open-source-title">
+        <div class="wrap">
+          <div class="section-head">
+            <p class="eyebrow">Open source</p>
+            <h2 id="open-source-title">Free, Apache-2.0 licensed, community-maintained</h2>
+            <p>BELL PR is open-source software. It has no fee, no account and no BELL PR server, and it is built and maintained by its community.</p>
+          </div>
+          <ul class="grid">
+            <li class="card">
+              <h3>Free to use</h3>
+              <p>Nothing to buy or sign up for. The AI coding CLI you connect is billed by its provider to your own account, and usage counts against it.</p>
+            </li>
+            <li class="card">
+              <h3>Apache License 2.0</h3>
+              <p>Use it, study it, change it and share it under the Apache License 2.0. It is provided as is, without warranty of any kind.</p>
+            </li>
+            <li class="card">
+              <h3>Community-maintained</h3>
+              <p>Report issues, suggest changes and send pull requests. The project asks of you what BELL PR asks of its users: small changes you understand and can explain.</p>
+            </li>
+            <li class="card">
+              <h3>The name and logo</h3>
+              <p>BELL PR is a trademark of the project. The Apache License covers the code, not the name or the logo; the trademark policy in the source repository, <code>TRADEMARKS.md</code>, says what you may do with them.</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section section-tinted" id="privacy" aria-labelledby="privacy-title">
+        <div class="wrap">
+          <div class="section-head">
+            <p class="eyebrow">Privacy and trust</p>
+            <h2 id="privacy-title">Your machine, your accounts, your decision</h2>
+          </div>
+          <ul class="trust">
+            <li>
+              <h3>Local-first</h3>
+              <p>BELL PR runs on your computer and listens on 127.0.0.1 by default. Repositories, runs and notes stay in its data directory, and you can delete them from the app.</p>
+            </li>
+            <li>
+              <h3>No BELL cloud</h3>
+              <p>There is no BELL PR server and no account. BELL PR works with the OpenAI Codex CLI or the Claude Code CLI you installed and signed in to, and with the GitHub CLI: your code goes only where they send it, and usage counts against your own account.</p>
+            </li>
+            <li>
+              <h3>No telemetry</h3>
+              <p>No analytics, usage data or crash reports, in the app or on this site. The app loads nothing from other sites.</p>
+            </li>
+            <li>
+              <h3>Open source</h3>
+              <p>The code is licensed under the Apache License 2.0 and open to read, so you can check what BELL PR does and what leaves your computer.</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section" id="faq" aria-labelledby="faq-title">
+        <div class="wrap">
+          <div class="faq">
+            <h2 id="faq-title">Questions</h2>
+            <details>
+              <summary>What do I need to run BELL PR?</summary>
+              <p>macOS, Linux, or Windows through WSL2; Node.js 22 or later (or Docker); Git; the GitHub CLI, signed in; and one AI coding CLI, installed and signed in: the OpenAI Codex CLI or Claude Code. The <a href="install.html">install guide</a> has the details.</p>
+            </details>
+            <details>
+              <summary>Whose AI account does it use?</summary>
+              <p>Yours. BELL PR runs the AI coding CLI you installed and signed in to: the Codex CLI, or the Claude Code CLI with your Claude plan or Anthropic API key. Usage counts against your own account.</p>
+            </details>
+            <details>
+              <summary>Does it open pull requests on its own?</summary>
+              <p>No. BELL PR publishes a Draft PR only after you have reviewed every changed file, explained the change back (unless you turned that check off) and approved the draft. Before it publishes, it checks again that the project takes pull requests from you and that the issue is still yours.</p>
+            </details>
+            <details>
+              <summary>Does my code go to BELL PR?</summary>
+              <p>No. There is no BELL PR cloud. Your code goes to the AI provider behind the coding CLI you chose and to GitHub, under your own accounts and the conditions of each service.</p>
+            </details>
+            <details>
+              <summary>What does it cost?</summary>
+              <p>Nothing. BELL PR is free and open source under the Apache License 2.0, with no account. You pay only the provider of the AI coding CLI you chose, for your own usage.</p>
+            </details>
+            <details>
+              <summary>Is BELL PR open source?</summary>
+              <p>Yes. It is licensed under the Apache License 2.0 and maintained by its community, and it is provided as is, without warranty. The license covers the code; the BELL PR name and logo are trademarks of the project, and <code>TRADEMARKS.md</code> in the source repository says what you may do with them. Contributions are welcome: <code>CONTRIBUTING.md</code> says how.</p>
+            </details>
+            <details>
+              <summary>Does the pull request say that AI helped?</summary>
+              <p>Only if you choose, or if the project requires it. The draft can end with an editable line saying that AI coding agents helped prepare the change and that you reviewed it. The line is off unless you turn it on, or the project&#39;s own rules ask for a disclosure. When they require one, BELL PR does not publish until the description has it. Follow each project&#39;s rules on AI-assisted contributions; <code>docs/contributing-responsibly.md</code> in the source repository explains what responsible use means.</p>
+            </details>
+            <details>
+              <summary>Can I turn the understanding check off?</summary>
+              <p>Yes, in Settings → Learning, after a confirmation that says what changes. Every file still has to be reviewed and you still approve the pull request; every project-rule, issue and pacing check still applies, and runs approved without the check are marked for good.</p>
+            </details>
+            <details>
+              <summary>Is BELL PR made by GitHub, OpenAI or Anthropic?</summary>
+              <p>No. BELL PR is an independent product. It works with tools from those companies that you install and sign in to yourself.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <div class="footer-grid">
+          <div class="footer-brand"><img src="assets/brand/logo-wordmark.svg" alt="BELL PR" width="92" height="30"></div>
+          <nav class="footer-col" aria-labelledby="footer-product">
+            <h2 id="footer-product">Product</h2>
+            <ul>
+              <li><a href="index.html#how-it-works">How it works</a></li>
+              <li><a href="install.html">Install</a></li>
+            </ul>
+          </nav>
+          <nav class="footer-col" aria-labelledby="footer-source">
+            <h2 id="footer-source">Open source</h2>
+            <ul>
+              <li><!-- generated:product-link key=publicRepoUrl text="Source" --><a href="https://github.com/Suzu1Dev/bell-pr">Source</a><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=publicRepoUrl path=blob/main/LICENSE text="Apache-2.0 license" --><a href="https://github.com/Suzu1Dev/bell-pr/blob/main/LICENSE">Apache-2.0 license</a><!-- /generated:product-link --></li>
+            </ul>
+          </nav>
+          <div class="footer-col">
+            <h2>Contact</h2>
+            <ul>
+              <li><!-- generated:product-link key=supportEmail text="Support" --><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=securityEmail text="Report a vulnerability" --><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=publicRepoUrl path=issues text="Report an issue" --><a href="https://github.com/Suzu1Dev/bell-pr/issues">Report an issue</a><!-- /generated:product-link --></li>
+              <li><!-- generated:product-link key=docsUrl text="Documentation" --><!-- /generated:product-link --></li>
+            </ul>
+          </div>
+        </div>
+        <p class="disclaimer">BELL PR is open-source software licensed under the Apache License 2.0 and provided &quot;as is&quot;, without warranty of any kind. BELL PR is a trademark of the project; the name and logo are not covered by that license. BELL PR is an independent product and is not affiliated with, endorsed by, or sponsored by GitHub, Inc., OpenAI, or Anthropic PBC. GitHub, OpenAI, Codex, Anthropic, Claude and Claude Code are trademarks of their respective owners; BELL PR names them only to say which tools it works with.</p>
+      </div>
+    </footer>
+    <p class="visually-hidden" role="status" id="copy-status"></p>
+  </body>
+</html>

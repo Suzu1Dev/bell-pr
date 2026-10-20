@@ -1,0 +1,908 @@
+import {
+  Suspense,
+  useEffect,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+import {
+  AlertCircle,
+  Check,
+  Circle,
+  CircleCheck,
+  ExternalLink,
+  GitPullRequest,
+  Loader2,
+  Play,
+  RefreshCw,
+  ShieldCheck,
+} from "lucide-react";
+import { getDemo } from "../demo";
+import { useFormat, useLocale, useT } from "../i18n";
+import type { DiffFile, Repo, Run } from "../types";
+import { groupPrFeedback, summarizeChecks } from "../../shared/pr-feedback";
+import {
+  followUpFeedbackLimit,
+  followUpNoteLimit,
+} from "../../shared/followups";
+import type { Tab } from "../app/AppShell";
+import { ErrorBoundary } from "../app/ErrorBoundary";
+import type { DraftEditor } from "../app/hooks/useDraftEditor";
+import type { RunActions } from "../app/hooks/useRunActions";
+import type { RunRecords } from "../app/hooks/useRunRecords";
+import type { RunRounds } from "../app/hooks/useRunRounds";
+import type { Understanding } from "../app/hooks/useUnderstanding";
+import { FollowUpRounds } from "../draft/FollowUpRounds";
+import { SyncPanel } from "../draft/SyncPanel";
+import {
+  ByHandRecord,
+  Deferred,
+  DraftGuide,
+  ForecastCompare,
+  MarkdownContent,
+  OwnGitRounds,
+  Restatements,
+  Reviewability,
+  UnderstandingRow,
+  YourWords,
+} from "./draftMounts";
+
+interface DraftTabProps {
+  run: Run;
+  files: DiffFile[];
+  demo: boolean;
+  busy: boolean;
+  active: boolean;
+  preparingDraft: boolean;
+  reviewedCount: number;
+  allReviewed: boolean;
+  setSelectedPath: Dispatch<SetStateAction<string>>;
+  setTab: Dispatch<SetStateAction<Tab>>;
+  draft: Pick<
+    DraftEditor,
+    | "draftTitle"
+    | "setDraftTitle"
+    | "draftBody"
+    | "setDraftBody"
+    | "draftCommitMessage"
+    | "setDraftCommitMessage"
+    | "draftPublishBranch"
+    | "setDraftPublishBranch"
+    | "draftChecks"
+    | "draftPreview"
+    | "setDraftPreview"
+    | "draftRequests"
+    | "draftDirty"
+    | "draftUnfinished"
+    | "draftTaskGroups"
+    | "draftIsProposal"
+    | "publishBranchError"
+    | "publishBranchInvalid"
+    | "followUp"
+    | "commitMessageUnfinished"
+    | "commitMessageSuggestion"
+    | "prepareDraft"
+    | "applyDraftProposal"
+    | "applyCommitMessageSuggestion"
+    | "saveDraft"
+    | "setAiDisclosure"
+    | "alwaysDiscloseAi"
+    | "publishChecks"
+    | "serverChecksRead"
+    | "loadPublishChecks"
+  >;
+  actions: Pick<RunActions, "feedbackLoading" | "fetchPrFeedback">;
+  rounds: RunRounds;
+  currentRepo?: Repo;
+  /** The Explain-it-back check and the person's other records (useUnderstanding, useRunRecords). */
+  understanding?: Pick<Understanding, "view" | "required" | "passed" | "off">;
+  records?: RunRecords;
+}
+
+/**
+ * The sample's Draft PR once the demo "publishes" it: the demo's own card,
+ * which says that nothing was created on GitHub, with the branch and the
+ * title it would carry. While the playback pushes, it says so.
+ */
+export function SamplePublishedCard({ run }: { run: Run }) {
+  const t = useT("workspace").published;
+  const [locale] = useLocale();
+  const card = getDemo(locale).publishedCard;
+  if (run.publishing)
+    return (
+      <section className="sample-published is-pending" role="status">
+        <Loader2 className="spin" size={18} aria-hidden="true" />
+        <p>{t.publishing}</p>
+      </section>
+    );
+  if (run.status !== "published" || !card) return null;
+  return (
+    <section
+      className="sample-published"
+      role="status"
+      aria-labelledby="sample-published-title"
+    >
+      <span className="sample-published-icon">
+        <GitPullRequest size={20} aria-hidden="true" />
+      </span>
+      <div>
+        <h2 id="sample-published-title">{card.title}</h2>
+        <p>{card.note}</p>
+        <p className="sample-published-meta">
+          <strong>{run.draft.title}</strong>
+          <span>
+            <code>{run.publishedBranch ?? run.branch}</code> →{" "}
+            <code>{run.baseBranch}</code>
+          </span>
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The PR draft tab: the target branch and syncing, review follow-up rounds,
+ * contribution guide, draft editor, checklist and feedback.
+ */
+export function DraftTab({
+  run,
+  files,
+  demo,
+  busy,
+  active,
+  preparingDraft,
+  reviewedCount,
+  allReviewed,
+  setSelectedPath,
+  setTab,
+  draft,
+  actions,
+  rounds,
+  currentRepo,
+  understanding,
+  records,
+}: DraftTabProps) {
+  const t = useT("workspace");
+  const optional = useT("common").optional;
+  const fmt = useFormat();
+  // The run's own branch is shown as code inside the help sentence.
+  const [branchHelpBefore, branchHelpAfter = ""] =
+    t.draft.branchHelp.split("{branch}");
+  const {
+    draftTitle,
+    setDraftTitle,
+    draftBody,
+    setDraftBody,
+    draftCommitMessage,
+    setDraftCommitMessage,
+    draftPublishBranch,
+    setDraftPublishBranch,
+    draftChecks,
+    draftPreview,
+    setDraftPreview,
+    draftRequests,
+    draftDirty,
+    draftUnfinished,
+    draftTaskGroups,
+    draftIsProposal,
+    publishBranchError,
+    publishBranchInvalid,
+    followUp,
+    commitMessageUnfinished,
+    commitMessageSuggestion,
+    prepareDraft,
+    applyDraftProposal,
+    applyCommitMessageSuggestion,
+    saveDraft,
+    setAiDisclosure,
+    alwaysDiscloseAi,
+    publishChecks,
+    loadPublishChecks,
+  } = draft;
+  const { feedbackLoading, fetchPrFeedback } = actions;
+  // The guide lists the checks publishing runs on the saved draft, with
+  // the ones only the server can make (this computer's folders, changed CI
+  // files, the commit e-mail), read again whenever the saved draft changes.
+  const checkable =
+    !demo && !followUp && ["review", "approved"].includes(run.status);
+  useEffect(() => {
+    if (checkable) void loadPublishChecks(run.id, run.approvedFingerprint);
+  }, [
+    checkable,
+    loadPublishChecks,
+    run.id,
+    run.approvedFingerprint,
+    run.draft.title,
+    run.draft.body,
+  ]);
+  const {
+    followUpSelection,
+    setFollowUpSelection,
+    followUpNote,
+    setFollowUpNote,
+    restatements,
+    setRestatement,
+    syncToLatest,
+    resolveSyncConflicts,
+    undoSync,
+    startFollowUp,
+    discardFollowUp,
+  } = rounds;
+  const record = understanding?.view?.record ?? run.understanding;
+  const [locale] = useLocale();
+  const sampleRestatements = demo ? (getDemo(locale).restatementSample ?? []) : [];
+  const selected = run.prFeedback?.items.filter((item) => followUpSelection.includes(item.url)) ?? [];
+  // A published PR's draft tab leads with its sync and review rounds (the
+  // draft itself is sent); before that it leads with the editor, then the
+  // guide, then the sync. A run has a base only once its checkout exists; a
+  // queued run has nothing to sync.
+  const sync = !demo && !!run.baseSha && (
+    <SyncPanel
+      run={run}
+      busy={busy}
+      onSync={() => void syncToLatest()}
+      onResolve={() => void resolveSyncConflicts()}
+      onUndo={() => void undoSync()}
+    />
+  );
+  return (
+    <div className="draft-workspace">
+      {demo && <SamplePublishedCard run={run} />}
+      {run.prUrl && sync}
+      {!!run.followUps?.length && (
+        <FollowUpRounds
+          rounds={run.followUps}
+          headRepository={run.headRepository}
+          feedback={run.prFeedback?.items}
+          busy={busy || active}
+          onDiscard={
+            followUp && ["review", "approved"].includes(run.status)
+              ? discardFollowUp
+              : undefined
+          }
+        />
+      )}
+      <div className="draft-layout">
+        <div className="draft-editor">
+          <div className="section-heading">
+            <div>
+              <h2>{t.draft.heading}</h2>
+              <p>{t.draft.subheading}</p>
+            </div>
+            <span className="draft-label">{t.draft.label}</span>
+          </div>
+          {followUp && (
+            <div className="draft-origin-notice" role="status">
+              <AlertCircle size={16} />
+              <p>
+                {followUp.kind === "sync"
+                  ? t.draft.syncNotice
+                  : t.draft.roundNotice}
+              </p>
+            </div>
+          )}
+          {!demo && !followUp && run.status !== "published" && draftIsProposal && (
+            <div className="draft-origin-notice" role="status">
+              <AlertCircle size={16} />
+              <p>{t.draft.proposalNotice}</p>
+            </div>
+          )}
+          {!demo &&
+            !followUp &&
+            run.status !== "published" &&
+            (!draftBody.trim() || (run.learnByHand && !draftTitle.trim())) &&
+            !preparingDraft && (
+              <div className="draft-origin-notice" role="status">
+                <AlertCircle size={16} />
+                <p>{run.learnByHand ? t.draft.emptyNoticeByHand : t.draft.emptyNotice}</p>
+              </div>
+            )}
+          {!followUp && (
+            <Deferred resetKey={run.id}>
+              <YourWords run={run} record={record} body={draftBody} onInsert={setDraftBody} disabled={run.status === "published"} />
+            </Deferred>
+          )}
+          <label className="field-label" htmlFor="pr-title">
+            {t.draft.titleLabel}
+          </label>
+          <input
+            id="pr-title"
+            className="text-input draft-title"
+            value={draftTitle}
+            onChange={(e) => setDraftTitle(e.target.value)}
+            disabled={run.status === "published" || !!followUp}
+          />
+          <div className="editor-toolbar">
+            <div role="group" aria-label={t.draft.modeLabel}>
+              <button
+                className={!draftPreview ? "selected" : ""}
+                aria-pressed={!draftPreview}
+                onClick={() => setDraftPreview(false)}
+              >
+                {t.draft.edit}
+              </button>
+              <button
+                className={draftPreview ? "selected" : ""}
+                aria-pressed={draftPreview}
+                onClick={() => setDraftPreview(true)}
+              >
+                {t.draft.preview}
+              </button>
+            </div>
+            <span>Markdown</span>
+          </div>
+          {draftPreview ? (
+            <div className="markdown-preview">
+              <ErrorBoundary resetKey={run.id}>
+                <Suspense fallback={<p>{t.loadingPreview}</p>}>
+                  <MarkdownContent>{draftBody}</MarkdownContent>
+                </Suspense>
+              </ErrorBoundary>
+            </div>
+          ) : (
+            <textarea
+              className="draft-textarea" id="pr-body"
+              aria-label={t.draft.bodyLabel}
+              value={draftBody}
+              onChange={(e) => setDraftBody(e.target.value)}
+              disabled={run.status === "published" || !!followUp}
+            />
+          )}
+          <label
+            className="field-label"
+            htmlFor="pr-commit-message"
+          >
+            {followUp ? t.draft.commitLabelRound : t.draft.commitLabel}{" "}
+            <span>git commit</span>
+          </label>
+          <textarea
+            id="pr-commit-message"
+            className="draft-textarea draft-commit-message"
+            aria-describedby="pr-commit-message-help"
+            maxLength={4000}
+            value={
+              followUp
+                ? draftCommitMessage
+                : draftCommitMessage || draftTitle
+            }
+            onChange={(e) =>
+              setDraftCommitMessage(e.target.value)
+            }
+            disabled={run.status === "published"}
+          />
+          <p id="pr-commit-message-help" className="field-help">
+            {followUp ? t.draft.commitHelpRound : t.draft.commitHelp}
+          </p>
+          <label
+            className="field-label"
+            htmlFor="pr-publish-branch"
+          >
+            {t.draft.branchLabel} <span>git push</span>
+          </label>
+          <input
+            id="pr-publish-branch"
+            className="text-input"
+            value={draftPublishBranch}
+            placeholder={run.branch}
+            spellCheck={false}
+            aria-describedby="pr-publish-branch-help"
+            aria-invalid={publishBranchInvalid}
+            onChange={(e) => setDraftPublishBranch(e.target.value)}
+            disabled={
+              run.status === "published" ||
+              !!run.publishedBranch ||
+              !!followUp
+            }
+          />
+          <p id="pr-publish-branch-help" className="field-help">
+            {branchHelpBefore}
+            <code>{run.branch}</code>
+            {branchHelpAfter}
+            {run.publishedBranch && t.draft.branchLocked}
+          </p>
+          {publishBranchInvalid && (
+            <p role="alert" className="inline-error">
+              {publishBranchError}
+            </p>
+          )}
+          {commitMessageSuggestion && !followUp && !run.learnByHand && (
+            <div className="commit-suggestion">
+              <div>
+                <strong>{t.draft.suggestionTitle}</strong>
+                <p>{commitMessageSuggestion.rationale}</p>
+              </div>
+              <pre>{commitMessageSuggestion.message}</pre>
+              <div className="commit-suggestion-actions">
+                <span>{t.draft.suggestionNote}</span>
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={run.status === "published"}
+                  onClick={applyCommitMessageSuggestion}
+                >
+                  {t.draft.useSuggestion}
+                </button>
+              </div>
+            </div>
+          )}
+          <div className="draft-save-row">
+            <span>
+              {demo ? t.draft.savedInBrowser : t.draft.savedLocally}
+            </span>
+            <button
+              className="button primary"
+              disabled={
+                busy || !draftDirty || run.status === "published"
+              }
+              onClick={saveDraft}
+            >
+              {busy ? (
+                <Loader2 className="spin" size={15} />
+              ) : (
+                <Check size={15} />
+              )}
+              {t.draft.save}
+            </button>
+          </div>
+        </div>
+        <aside className="publish-checklist">
+          <div className="checklist-icon">
+            <GitPullRequest size={24} />
+          </div>
+          <h3>{t.checklist.title}</h3>
+          <p>{t.checklist.text}</p>
+          <div
+            className={
+              allReviewed
+                ? "checklist-item checked"
+                : "checklist-item"
+            }
+          >
+            {allReviewed ? (
+              <CircleCheck size={18} />
+            ) : (
+              <Circle size={18} />
+            )}
+            <span>
+              {t.checklist.allReviewed}
+              <small>
+                {t.checklist.files({
+                  reviewed: reviewedCount,
+                  total: files.length,
+                })}
+              </small>
+            </span>
+          </div>
+          {understanding && <UnderstandingRow run={run} check={understanding} />}
+          {run.learnByHand && <Deferred resetKey={run.id}><ByHandRecord run={run} place="draft" /></Deferred>}
+          <div
+            className={
+              !draftDirty
+                ? "checklist-item checked"
+                : "checklist-item"
+            }
+          >
+            {!draftDirty ? (
+              <CircleCheck size={18} />
+            ) : (
+              <Circle size={18} />
+            )}
+            <span>
+              {t.checklist.saved}
+              <small>
+                {draftDirty ? t.checklist.unsaved : t.checklist.canAdjust}
+              </small>
+            </span>
+          </div>
+          {followUp ? (
+            <div
+              className={
+                commitMessageUnfinished
+                  ? "checklist-item"
+                  : "checklist-item checked"
+              }
+            >
+              {commitMessageUnfinished ? (
+                <Circle size={18} />
+              ) : (
+                <CircleCheck size={18} />
+              )}
+              <span>
+                {t.checklist.commitReady}
+                <small>
+                  {commitMessageUnfinished
+                    ? t.checklist.commitMissing
+                    : t.checklist.commitBecomes}
+                </small>
+              </span>
+            </div>
+          ) : (
+          <>
+          <div
+            className={
+              draftBody.trim() && !draftUnfinished
+                ? "checklist-item checked"
+                : "checklist-item"
+            }
+          >
+            {draftBody.trim() && !draftUnfinished ? (
+              <CircleCheck size={18} />
+            ) : (
+              <Circle size={18} />
+            )}
+            <span>
+              {t.checklist.noPlaceholders}
+              <small>
+                {!draftBody.trim()
+                  ? t.checklist.noDescription
+                  : draftUnfinished
+                    ? draftUnfinished.details.join("\n")
+                    : t.checklist.placeholdersStay}
+              </small>
+            </span>
+          </div>
+          {draftTaskGroups.length > 0 && (
+            <fieldset
+              className="draft-task-items"
+              disabled={run.status === "published" || busy}
+            >
+              <legend>{t.checklist.taskItems}</legend>
+              <p>{t.checklist.taskItemsHelp}</p>
+              {draftTaskGroups.map(([heading, items]) => (
+                <div key={`${heading}:${items[0].line}`}>
+                  <strong>{heading || t.checklist.noSection}</strong>
+                  {items.map((item) => (
+                    <label key={item.line}>
+                      <input
+                        type="checkbox"
+                        checked={item.checked}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setDraftBody((body) =>
+                            draftChecks
+                              ? draftChecks.setDraftTaskItem(
+                                  body,
+                                  item.line,
+                                  checked,
+                                )
+                              : body,
+                          );
+                        }}
+                      />
+                      <span>{item.text}</span>
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </fieldset>
+          )}
+          </>
+          )}
+          <div className="checklist-item">
+            <ShieldCheck size={18} />
+            {followUp ? (
+              <span>
+                {t.checklist.samePr}
+                <small>{t.checklist.samePrHelp}</small>
+              </span>
+            ) : (
+              <span>
+                {t.checklist.draftPr}
+                <small>{t.checklist.draftPrHelp}</small>
+              </span>
+            )}
+          </div>
+        </aside>
+      </div>
+      {!followUp && (
+      <ErrorBoundary resetKey={run.id}>
+        <Suspense
+          fallback={<p className="muted">{t.draft.loadingGuide}</p>}
+        >
+          <DraftGuide
+            run={run}
+            files={files}
+            repo={currentRepo}
+            check={understanding ?? { required: true, passed: false, off: false }}
+            preparation={run.draftPreparation}
+            busy={draftRequests.has(run.id)}
+            disabled={
+              active ||
+              busy ||
+              !["review", "approved"].includes(run.status)
+            }
+            demo={demo}
+            issueUrl={run.contributionSettings?.issueUrl}
+            onGenerate={prepareDraft}
+            onApply={applyDraftProposal}
+            applied={
+              !!run.draftPreparation?.proposal &&
+              draftTitle === run.draftPreparation.proposal.title &&
+              // BELL's AI-disclosure line is not a change to the suggestion.
+              !!draftChecks?.sameDraftProse(
+                draftBody,
+                run.draftPreparation.proposal.body,
+              )
+            }
+            aiDisclosure={run.draft.aiDisclosure}
+            alwaysDiscloseAi={alwaysDiscloseAi}
+            draftBody={draftBody} onDraftBody={setDraftBody}
+            onAiDisclosureChange={(on) => void setAiDisclosure(on)}
+            // A Learn-by-hand run's rule rows wait for the server's list (DESIGN v1.2 F12).
+            checks={checkable && draftChecks && (draft.serverChecksRead || !run.learnByHand) ? publishChecks : undefined}
+            readOnly={run.status === "published"}
+          />
+        </Suspense>
+      </ErrorBoundary>
+      )}
+      {!followUp && files.length > 0 && (
+        <Deferred resetKey={run.id}>
+          <Reviewability run={run} files={files} repo={currentRepo} demo={demo} onSaveReasons={records?.saveTestReasons} onAskSplit={records?.askSplit} />
+        </Deferred>
+      )}
+      {!run.prUrl && sync}
+      {run.status === "published" && run.prUrl && (
+        <section
+          className="pr-feedback"
+          aria-labelledby="pr-feedback-title"
+        >
+          <div className="section-heading">
+            <div>
+              <h2 id="pr-feedback-title">{t.feedback.title}</h2>
+              <p>{t.feedback.intro}</p>
+            </div>
+            <div className="pr-feedback-actions">
+              {/* The sample PR exists nowhere to link to. */}
+              {!demo && (
+                <a
+                  className="button secondary"
+                  href={run.prUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <GitPullRequest size={15} />
+                  {t.feedback.viewPullRequest}
+                  <ExternalLink size={13} />
+                </a>
+              )}
+              <button className="button primary" disabled={feedbackLoading} onClick={fetchPrFeedback}>
+                {feedbackLoading ? <Loader2 className="spin" size={15} /> : <RefreshCw size={15} />}
+                {run.prFeedback ? t.feedback.fetchAgain : t.feedback.fetch}
+              </button>
+            </div>
+          </div>
+          <Deferred resetKey={run.id}>
+            <ForecastCompare forecast={record?.forecast} feedback={run.prFeedback} tags={run.feedbackTags} onTag={records?.saveFeedbackTag} demo={demo} />
+          </Deferred>
+          {run.prFeedback ? (
+            <>
+              <p className="pr-feedback-meta">
+                {[
+                  t.feedback.fetchedAt({
+                    time: fmt.dateTime(run.prFeedback.fetchedAt),
+                  }),
+                  run.prFeedback.checks &&
+                    (() => {
+                      const checks = summarizeChecks(run.prFeedback.checks);
+                      const state = run.prFeedback.checksState || undefined;
+                      return checks.total
+                        ? t.feedback.checks({ ...checks, state })
+                        : t.feedback.noChecks({ state });
+                    })(),
+                  !!run.prFeedback.labels?.length &&
+                    t.feedback.labels({
+                      labels: fmt.list(run.prFeedback.labels, { type: "unit" }),
+                    }),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+              {run.prFeedback.labels?.some((label) =>
+                label.startsWith("needs:"),
+              ) && (
+                <p className="pr-feedback-warning">{t.feedback.needsLabel}</p>
+              )}
+              {run.prFeedback.checks?.some(
+                (check) =>
+                  !["SUCCESS", "NEUTRAL", "SKIPPED"].includes(
+                    check.state.toUpperCase(),
+                  ),
+              ) && (
+                <ul className="pr-feedback-checks">
+                  {run.prFeedback.checks
+                    .filter(
+                      (check) =>
+                        !["SUCCESS", "NEUTRAL", "SKIPPED"].includes(
+                          check.state.toUpperCase(),
+                        ),
+                    )
+                    .map((check) => (
+                      <li key={`${check.name}:${check.url ?? ""}`}>
+                        <span>{check.name}</span>
+                        <b>{check.state}</b>
+                        {check.url && (
+                          <a
+                            href={check.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {t.feedback.details}
+                          </a>
+                        )}
+                      </li>
+                    ))}
+                </ul>
+              )}
+              {run.prFeedback.warnings?.map((warning) => (
+                <p className="pr-feedback-warning" key={warning}>
+                  {warning}
+                </p>
+              ))}
+              {run.prFeedback.items.length === 0 && (
+                <p className="muted">{t.feedback.noItems}</p>
+              )}
+              {groupPrFeedback(run.prFeedback.items).map(
+                (group, groupIndex) => (
+                  <div
+                    className="pr-feedback-group"
+                    key={group.path ?? "general"}
+                  >
+                    <div className="pr-feedback-group-head">
+                      <strong>
+                        {group.path ?? t.feedback.general}
+                      </strong>
+                      {group.path &&
+                        files.some(
+                          (f) => f.path === group.path,
+                        ) && (
+                          <button
+                            className="button secondary"
+                            onClick={() => {
+                              setSelectedPath(group.path!);
+                              setTab("changes");
+                            }}
+                          >
+                            {t.feedback.openInChanges}
+                          </button>
+                        )}
+                    </div>
+                    <ul>
+                      {group.items.map((item, itemIndex) => (
+                        <li key={item.url}>
+                          <div className="pr-feedback-item-head">
+                            {!followUp && !run.learnByHand && (
+                              <input
+                                type="checkbox"
+                                aria-label={t.feedback.include({
+                                  author: item.author,
+                                  path: group.path,
+                                  line:
+                                    typeof item.line === "number"
+                                      ? item.line
+                                      : undefined,
+                                })}
+                                aria-describedby={`pr-feedback-body-${groupIndex}-${itemIndex}`}
+                                checked={followUpSelection.includes(item.url)}
+                                // At the limit only selected items stay
+                                // changeable; the sample starts no round.
+                                disabled={
+                                  busy ||
+                                  demo ||
+                                  (!followUpSelection.includes(item.url) &&
+                                    followUpSelection.length >=
+                                      followUpFeedbackLimit)
+                                }
+                                onChange={(event) => {
+                                  const checked = event.target.checked;
+                                  setFollowUpSelection((previous) =>
+                                    checked
+                                      ? [...previous, item.url]
+                                      : previous.filter(
+                                          (url) => url !== item.url,
+                                        ),
+                                  );
+                                }}
+                              />
+                            )}
+                            <strong>{item.author}</strong>
+                            <span>{item.authorAssociation}</span>
+                            {item.state && <span>{item.state}</span>}
+                            {typeof item.line === "number" && (
+                              <span>{t.feedback.line({ line: item.line })}</span>
+                            )}
+                            {item.isResolved && (
+                              <span>{t.feedback.resolved}</span>
+                            )}
+                            {/* Sample feedback links to nothing on GitHub. */}
+                            {!demo && (
+                              <a
+                                href={item.url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {t.feedback.openOnGitHub}
+                              </a>
+                            )}
+                          </div>
+                          <p
+                            id={`pr-feedback-body-${groupIndex}-${itemIndex}`}
+                          >
+                            {item.body}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ),
+              )}
+              {!followUp && (run.learnByHand ? <OwnGitRounds /> : (
+                <div className="follow-up-start">
+                  <h3>{t.followUp.title}</h3>
+                  <p>{t.followUp.intro}</p>
+                  {demo && <p className="field-help">{t.followUp.demoNote}</p>}
+                  <p
+                    className="field-help"
+                    id="follow-up-limit"
+                    role="status"
+                  >
+                    {t.followUp.limit({
+                      limit: followUpFeedbackLimit,
+                      selected: followUpSelection.length,
+                    })}
+                  </p>
+                  <label className="field-label" htmlFor="follow-up-note">
+                    {t.followUp.note} <span>{optional}</span>
+                  </label>
+                  <textarea
+                    id="follow-up-note"
+                    className="text-input follow-up-note-input"
+                    value={followUpNote}
+                    maxLength={followUpNoteLimit}
+                    placeholder={t.followUp.placeholder}
+                    onChange={(event) => setFollowUpNote(event.target.value)}
+                    disabled={busy || demo}
+                  />
+                  <Restatements
+                    items={demo ? (run.prFeedback?.items ?? []).filter((item) => sampleRestatements.some((entry) => entry.url === item.url)) : selected}
+                    values={demo ? sampleRestatements : restatements}
+                    onChange={setRestatement}
+                    disabled={busy || demo}
+                  />
+                  <button
+                    className="button primary"
+                    aria-describedby="follow-up-limit"
+                    disabled={
+                      busy ||
+                      demo ||
+                      feedbackLoading ||
+                      followUpSelection.length > followUpFeedbackLimit ||
+                      (!followUpSelection.length && !followUpNote.trim()) ||
+                      selected.some((item) => (draftChecks?.draftProseWords(restatements[item.url] ?? "") ?? 0) < 3)
+                    }
+                    onClick={startFollowUp}
+                  >
+                    <Play size={15} />
+                    {followUpSelection.length
+                      ? t.followUp.startSelected({
+                          count: followUpSelection.length,
+                        })
+                      : t.followUp.startNote}
+                  </button>
+                </div>
+              ))}
+            </>
+          ) : (
+            <p className="muted">{t.feedback.notFetched}</p>
+          )}
+          {/* The sample's PR exists nowhere to close. */}
+          {!demo && (
+            <p className="pr-feedback-cant">
+              <a href={run.prUrl} target="_blank" rel="noreferrer">
+                {t.feedback.cantContinue}
+              </a>
+            </p>
+          )}
+        </section>
+      )}
+    </div>
+  );
+}

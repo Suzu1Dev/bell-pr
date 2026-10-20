@@ -1,0 +1,815 @@
+/**
+ * Respect for the maintainer's time: the project's own rules, whether its
+ * pull requests are open to the person, the state of the linked issue and
+ * the person's pace of publishing in that repository. The facts come from
+ * the project's files (read locally) and read-only GitHub calls; this
+ * module holds their shapes and the pure rules over them.
+ *
+ * Every fact has an explicit unknown state: a fact that could not be read
+ * is never a pass. The numbers are BELL defaults, labelled as such.
+ */
+import {
+  brevityRule,
+  draftProseWords,
+  sameDraftProse,
+  type DraftCheck,
+  type DraftPreflightInput,
+} from "./draft-checks.js";
+import en from "./i18n/draft-checks.en.js";
+import zhTW from "./i18n/draft-checks.zh-TW.js";
+import { formatters, type Locale } from "./i18n/locale.js";
+import { assistanceDenial, disclosureRule, hasAiDisclosure } from "./project-policy.js";
+import type { HelpKind } from "./by-hand.js";
+import { byHandRulesDecision, helpRefused, type ByHandBlockReason } from "./by-hand-rules.js";
+import type { AreaReach, BanReach } from "./policy-reach.js";
+
+/** Rule kinds the classifier finds (shared/project-policy.ts); stored as text, frozen. */
+export const policyKinds = [
+  "ban",
+  "disclose",
+  "understand",
+  "area",
+  "agent",
+  "own-words",
+  "issue-first",
+] as const;
+export type PolicyKind = (typeof policyKinds)[number];
+
+/** One rule quoted from a project document. */
+export interface PolicyFinding {
+  kind: PolicyKind;
+  /** The repository path the quote comes from. */
+  path: string;
+  /** 1-based line of the quote's start. */
+  line: number;
+  /** Verbatim, 300 characters or fewer. */
+  quote: string;
+  /** The same sentence names a PR, patch, contribution, commit or submitted code. */
+  contribution: boolean;
+  /**
+   * Where a finding from BELL's checked list of off-repository rules comes
+   * from (an owner-signed entry): the list, the source URL, its version and
+   * when the quote was last checked against it. Absent on findings read
+   * from the repository.
+   */
+  source?: PolicySource;
+  /**
+   * Carve-outs of a `ban` or `area` finding (DESIGN v1.2 F12): sentences of
+   * the same document, or of the same signed checked-list entry, that say
+   * some uses of AI are fine, quoted verbatim with the help kinds each one
+   * names; at most 3. Shown with the rule, and read only by the quoted
+   * confirm of a Learn-by-hand run; an agent run's outcome never reads
+   * them. Absent when there are none.
+   */
+  allows?: PolicyAllowance[];
+  /**
+   * What a `ban` or `area` rule restricts (shared/policy-reach.ts): a ban's
+   * BanReach, a reserved-issue rule's AreaReach. The server reads it from
+   * the stored quote at every rules read and when it loads rules an older
+   * build stored (`withStoredReach`), so the client and the server read the
+   * same reach and the classifier stays out of the client. Stored as text:
+   * absent, or a value this build doesn't know, reads as "unknown", the
+   * strict reading. Absent on the other kinds.
+   */
+  reach?: BanReach | AreaReach;
+  /**
+   * A `ban`, contribution named or not, that refuses AI help itself or
+   * whose reach BELL can't tell (`stopsQuotedConfirm`): while it stands in
+   * a project's rules, no Learn-by-hand run gets the quoted confirm. Set
+   * with `reach`; absent otherwise.
+   */
+  stopsConfirm?: true;
+}
+
+/** One carve-out quote and the kinds of help it names (`PolicyFinding.allows`). */
+export interface PolicyAllowance {
+  /** 1-based line of the quote's start, in the finding's document. */
+  line: number;
+  /** Verbatim, 300 characters or fewer. */
+  quote: string;
+  /** At most 5, from the frozen HelpKind vocabulary (stored as text). */
+  kinds: HelpKind[];
+}
+
+/** The checked-list entry a finding comes from (`PolicyFinding.source`). */
+export interface PolicySource {
+  /** At most 60 characters. */
+  registry: string;
+  /** At most 300 characters. */
+  url: string;
+  /** A commit or revision date, at most 80 characters. */
+  version?: string;
+  /** When the quote was last verified against the source (a date). */
+  checkedOn: string;
+}
+
+/**
+ * Whether the repository takes pull requests from the person, read through
+ * `gh api` (REST `repos/{owner}/{repo}` and GraphQL `viewerPermission`).
+ * GitHub's own field values are kept as text.
+ */
+export interface DoorFacts {
+  /** `has_pull_requests`; false when the repository turned pull requests off. */
+  hasPullRequests?: boolean;
+  /** `pull_request_creation_policy`, such as `all` or `collaborators_only`. */
+  pullRequestCreationPolicy?: string;
+  archived?: boolean;
+  disabled?: boolean;
+  /** GraphQL `repository.viewerPermission`: ADMIN, MAINTAIN, WRITE, TRIAGE, READ or none. */
+  viewerPermission?: string;
+  /** GraphQL `viewer.login`. */
+  login?: string;
+}
+
+/** The project's size reference: one of its last merged pull requests. */
+export interface MergedPrSize {
+  number: number;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+}
+
+/**
+ * The "Before you contribute" facts of a repository
+ * (`Repository.contributionRules`), read at import, at Update project and
+ * on "Check again".
+ */
+export interface ContributionRules {
+  /** The clone's commit the files were read at. */
+  baseSha?: string;
+  checkedAt: string;
+  door?: DoorFacts;
+  /** At most 30. */
+  findings: PolicyFinding[];
+  /** Every file read, so the card can say "not found in the N files BELL read". At most 60. */
+  filesRead: string[];
+  /** `.gitattributes` `linguist-generated` patterns. At most 30. */
+  generated?: string[];
+  /** The last 3 merged pull requests' sizes. */
+  mergedSizes?: MergedPrSize[];
+  /** The organization repository (`<owner>/.github`) whose default files were read. */
+  orgDefaults?: string;
+  /**
+   * What could not be read, as `<part>` or `<part>: <reason>`; the reason
+   * is one of `unknownReasonCodes`, or the words an older build stored.
+   */
+  unknown?: string[];
+  /**
+   * The project's own human help channels found in its contributing files
+   * (chat, forum, mailing list, Discussions), at most 5, with where each is
+   * named. Absent when none was found or the rules were read before v1.2.
+   */
+  channels?: HelpChannel[];
+}
+
+/** A place to ask the project's people, quoted from its files (`ContributionRules.channels`). */
+export interface HelpChannel {
+  /** At most 80 characters. */
+  label: string;
+  /** At most 300 characters. */
+  url: string;
+  path?: string;
+  line?: number;
+}
+
+/** Another pull request on the linked issue. */
+export interface IssuePr {
+  number: number;
+  url?: string;
+  author?: string;
+  /** OPEN, CLOSED or MERGED. */
+  state: string;
+  /** GitHub would close the issue when it merges (`closedByPullRequestsReferences`, `willCloseTarget`). */
+  willClose?: boolean;
+  closedAt?: string;
+}
+
+/** The linked issue, read through one GraphQL call. */
+export interface IssueFacts {
+  url: string;
+  number?: number;
+  title?: string;
+  /** OPEN or CLOSED. */
+  state?: string;
+  /** COMPLETED, NOT_PLANNED, DUPLICATE, … */
+  stateReason?: string;
+  locked?: boolean;
+  /** The issue's labels, as the repository names them. */
+  labels?: string[];
+  assignees?: string[];
+  /** Comments that claim the issue ("I'd like to work on this"), with their author and date. */
+  claims?: { author: string; at: string; bot?: boolean }[];
+  otherPrs?: IssuePr[];
+  /** The latest comment by an OWNER, MEMBER or COLLABORATOR, quoted (300 characters or fewer). */
+  maintainerQuote?: { author: string; association: string; quote: string; at: string };
+  /** Whether the person ever commented on the issue. */
+  viewerCommented?: boolean;
+}
+
+/** The person's pull requests in this repository (one aliased GraphQL call). */
+export interface PacingFacts {
+  /** Open pull requests by the person here, drafts included. */
+  openPrs?: number;
+  /** Merged pull requests by the person here. */
+  mergedPrs?: number;
+  /** Open pull requests where a maintainer asked for changes more than 7 days ago. */
+  waitingPrs?: number;
+  /**
+   * Links to those pull requests (up to 10 of them, on github.com in this
+   * repository), so "close the loop first" can point at each one.
+   */
+  waitingUrls?: string[];
+  viewerPermission?: string;
+}
+
+/**
+ * A display snapshot of the GitHub facts for one run
+ * (`run.contributionFacts`). Publishing always reads them again.
+ */
+export interface ContributionFacts {
+  checkedAt: string;
+  door?: DoorFacts;
+  issue?: IssueFacts;
+  pacing?: PacingFacts;
+  /**
+   * The facts that could not be read, as `<part>` or `<part>: <reason>`
+   * (part: door, issue or pacing; reason as in ContributionRules.unknown).
+   */
+  unknown?: string[];
+}
+
+/** A block the person lifted with a reason (`run.guardOverrides`). */
+export interface GuardOverride {
+  /** A DraftCheck id; only `issue-has-pr` can be overridden in v1.1. */
+  id: string;
+  /** Typed by the person, 20 to 200 characters. */
+  reason: string;
+  at: string;
+}
+
+/** Checks a typed reason can lift. */
+export const overridableCheckIds = ["issue-has-pr"] as const;
+export type OverridableCheckId = (typeof overridableCheckIds)[number];
+export const overrideReasonLimits = { min: 20, max: 200 } as const;
+
+/**
+ * A weakened-test reason (`run.reviewability.testReasons`, DESIGN F9): a
+ * line a maintainer can check, at least 3 words (one CJK character counts
+ * as a word) and at most 300 characters. The client, the route and the
+ * publish check share it.
+ */
+export const testReasonLimits = { words: 3, chars: 300 } as const;
+
+/**
+ * How many of the person's pull requests may be open in one repository
+ * before BELL asks to close the loop first: 1 before their first merged
+ * pull request there, 2 after. BELL defaults.
+ */
+export function openPrBudget(mergedHere: number | boolean): 1 | 2 {
+  return (typeof mergedHere === "number" ? mergedHere > 0 : mergedHere)
+    ? 2
+    : 1;
+}
+
+/** People with write access maintain the repository; their pace is not BELL's business. */
+export function pacingExempt(viewerPermission?: string) {
+  return ["WRITE", "MAINTAIN", "ADMIN"].includes(
+    (viewerPermission ?? "").toUpperCase(),
+  );
+}
+
+/** Permissions that may open pull requests where creation is limited to collaborators. */
+export function collaboratorPermission(viewerPermission?: string) {
+  return ["ADMIN", "MAINTAIN", "WRITE", "TRIAGE"].includes(
+    (viewerPermission ?? "").toUpperCase(),
+  );
+}
+
+/** A label for issues set aside for people who are learning, by the repository's own name for it. */
+export function learningLabel(name: string) {
+  return /\bgood[\s_-]*first[\s_-]*(?:issue|bug|pr)s?\b|\bfirst[\s_-]*timers?(?:[\s_-]*only)?\b|\bbeginners?\b|\bstarter\b|\bnewcomers?\b|\b(?:e|d)[\s_-]easy\b|^easy$|\beasy[\s_-]*(?:fix|pick)\b/i.test(
+    name.trim(),
+  );
+}
+
+/** A label saying the issue is not ready to be worked on: triage, design or blocked. */
+export function notReadyLabel(name: string) {
+  return /\btriage\b|\bdesign\b|\bblocked\b|\bon[\s_-]*hold\b|\bneeds?[\s_:-]*(?:discussion|decision|approval|info|investigation|repro\w*)\b|\bwaiting[\s_-]*(?:for|on)\b|\bstale\b/i.test(
+    name.trim(),
+  );
+}
+
+/** A comment that claims an issue: "I'd like to work on this", "/assign", "can I take it?". */
+export function claimComment(body: string) {
+  return /^\s*\/(?:assign|claim|take)\b|\b(?:i(?:'d| would) (?:like|love) to (?:work on|take|tackle|pick up|fix)|i(?:'m| am) (?:working on|taking|on) (?:this|it)|i(?:'ll| will) (?:work on|take|fix|tackle|pick up) (?:this|it)|can i (?:work on|take|tackle|pick up|fix) (?:this|it)|(?:please )?assign (?:(?:this|it) )?(?:to )?me|let me (?:work on|take|fix) (?:this|it))\b/i.test(
+    body,
+  );
+}
+
+/** GitHub's author associations that speak for the project. */
+export function maintainerAssociation(value?: string) {
+  return ["OWNER", "MEMBER", "COLLABORATOR"].includes((value ?? "").toUpperCase());
+}
+
+const dictionaries: Record<Locale, typeof en> = { en, "zh-TW": zhTW };
+
+/**
+ * Changes of this many lines or fewer are small enough not to ask about a
+ * missing test: the same line count under which the understanding check
+ * asks no file question. A BELL default.
+ */
+const untestedMinLines = 15;
+
+/** Older than this, a closed and unmerged pull request on the issue is history, not news. */
+const recentClosedPrDays = 90;
+const dayMs = 24 * 60 * 60 * 1000;
+
+const sameLogin = (a?: string, b?: string) =>
+  !!a && !!b && a.toLowerCase() === b.toLowerCase();
+
+/** A typed reason long enough to lift a block (20 to 200 characters). */
+export function validOverride(
+  override: Pick<GuardOverride, "id" | "reason"> | undefined,
+  id: OverridableCheckId,
+) {
+  const length = override?.reason.trim().length ?? 0;
+  return (
+    override?.id === id &&
+    length >= overrideReasonLimits.min &&
+    length <= overrideReasonLimits.max
+  );
+}
+
+const unknownPartIds = ["door", "issue", "pacing", "rules", "orgDefaults"] as const;
+type UnknownPartId = (typeof unknownPartIds)[number];
+
+/**
+ * Why a GitHub fact could not be read. ContributionFacts.unknown and
+ * ContributionRules.unknown store "<part>: <code>", never the words, so a
+ * reader sees the reason in the language they use now.
+ */
+export const unknownReasonCodes = [
+  "gh-missing",
+  "signed-out",
+  "timeout",
+  "rate-limited",
+  "not-found",
+  "forbidden",
+  "github-error",
+  "invalid-answer",
+  "no-github-origin",
+  "not-an-issue",
+  "files-unreadable",
+  "folder-import",
+] as const;
+export type UnknownReasonCode = (typeof unknownReasonCodes)[number];
+
+/**
+ * A stored reason in `locale`'s words. Entries saved before the codes hold
+ * the words of the language they were read in, and stay as they are.
+ */
+export function unknownReasonText(reason: string | undefined, locale: Locale) {
+  const code = unknownReasonCodes.find((known) => known === reason?.trim());
+  return code ? dictionaries[locale].respect.reasons[code] : reason;
+}
+
+/** Splits "<part>: <reason>" from ContributionFacts.unknown or ContributionRules.unknown. */
+function unknownParts(entries: readonly string[], locale: Locale) {
+  return entries.map((entry) => {
+    const [part, ...rest] = entry.split(":");
+    const id = unknownPartIds.find((known) => known === part.trim());
+    const known: UnknownPartId | "other" = id ?? "other";
+    const reason = (known === "other" ? entry : rest.join(":")).trim();
+    return { part: known, reason: unknownReasonText(reason, locale) || undefined };
+  });
+}
+
+/** The quoted confirm's decision; a test double replaces it only in tests. */
+let decideByHand = byHandRulesDecision;
+
+/**
+ * Tests only: replaces the quoted confirm's decision
+ * (shared/by-hand-rules.ts) with a test double, or restores it without an
+ * argument. A grep test checks that only test files call it, so nothing
+ * in the product can change the decision.
+ */
+export function byHandRulesDecisionInTests(decide?: typeof byHandRulesDecision) {
+  decideByHand = decide ?? byHandRulesDecision;
+}
+
+/**
+ * Why a Learn-by-hand run can't publish through the quoted confirm, as the
+ * clause the block copy and createRun's refusal use (DESIGN v1.2 F12):
+ * `kinds` are the help kinds the project's text doesn't name, `checkedOn`
+ * the checked-list entry's date. `held`: the finding passes, and another
+ * of the project's AI rules blocks.
+ */
+export function byHandBlockClause(
+  reason: ByHandBlockReason | "held",
+  locale: Locale,
+  facts: { kinds?: readonly string[]; checkedOn?: string } = {},
+) {
+  const m = dictionaries[locale].respect.byHand;
+  const fmt = formatters(locale);
+  if (reason === "kind-not-named")
+    return m.clauses["kind-not-named"]({
+      kinds: fmt.list((facts.kinds ?? []).map((kind) => m.kinds[kind as HelpKind] ?? kind)),
+    });
+  if (reason === "registry-stale")
+    return m.clauses["registry-stale"]({ date: facts.checkedOn ? fmt.date(facts.checkedOn) : "?" });
+  return m.clauses[reason];
+}
+
+/**
+ * The respect checks (DESIGN §5.4), computed from what the input carries:
+ * the project's quoted rules, the GitHub facts, the reviewability
+ * snapshot, the overrides and test reasons. Without facts (none read yet)
+ * no fact-based check runs; a fact that could not be read is the
+ * `facts-unknown` confirm, never a pass. No plan skips any of them, and
+ * the understanding-check switch changes only one detail line. Blocks come
+ * first, then confirms; every check's first detail says why maintainers
+ * care, and the details after it name the source.
+ */
+export function respectChecks(
+  input: DraftPreflightInput,
+  locale: Locale = "en",
+): DraftCheck[] {
+  const m = dictionaries[locale].respect;
+  const fmt = formatters(locale);
+  const blocks: DraftCheck[] = [];
+  const confirms: DraftCheck[] = [];
+  const findings = input.rules?.findings ?? [];
+  const found = (kind: PolicyKind) =>
+    findings.filter((finding) => finding.kind === kind);
+  const quote = (finding: PolicyFinding) =>
+    m.quote({ path: finding.path, line: finding.line, quote: finding.quote });
+  const facts = input.facts;
+  const door = facts?.door;
+  const issue = facts?.issue;
+  const login = door?.login;
+
+  // A clean Learn-by-hand run (DESIGN v1.2 F12): its contribution bans and
+  // applicable reserved-issue rules go to the quoted confirm's decision.
+  // Their blocks stand, with the copy for their reach and the failed
+  // condition, unless every one of them passes; then one `by-hand-rules`
+  // confirm quotes them instead. An agent run's checks never change.
+  const byHand = input.learnByHand;
+  const bh = m.byHand;
+  const kindList = (kinds: readonly string[]) =>
+    fmt.list(kinds.map((kind) => bh.kinds[kind as HelpKind] ?? kind));
+  const used = byHand?.helps.length ? kindList(byHand.helps) : bh.noHelp;
+  const learning = (issue?.labels ?? []).filter(learningLabel);
+  const bans = found("ban").filter((finding) => finding.contribution);
+  const areas = learning.length ? found("area") : [];
+  const decision =
+    byHand && input.rules && (bans.length || areas.length)
+      ? decideByHand({ bans, areas, rules: input.rules }, byHand)
+      : undefined;
+  const same = (finding: PolicyFinding) => (entry: { finding: PolicyFinding }) =>
+    entry.finding.path === finding.path &&
+    entry.finding.line === finding.line &&
+    entry.finding.quote === finding.quote;
+  const blockOf = (finding: PolicyFinding) => decision?.blocked.find(same(finding));
+  // A finding the decision names neither way stays blocked.
+  const confirmed =
+    !!decision &&
+    [...bans, ...areas].every(
+      (finding) => !blockOf(finding) && decision.confirmable.some(same(finding)),
+    );
+  const condition = (finding: PolicyFinding) => {
+    const entry = blockOf(finding);
+    return byHandBlockClause(entry?.reason ?? "held", locale, {
+      kinds: entry?.kinds ?? byHand?.helps,
+      checkedOn: finding.source?.checkedOn,
+    });
+  };
+  const sourced = (finding: PolicyFinding) =>
+    finding.source
+      ? bh.registryQuote({ date: fmt.date(finding.source.checkedOn), url: finding.source.url, quote: finding.quote })
+      : quote(finding);
+  // A ban elsewhere in the rules, without contribution context, that refuses AI help itself (or whose reach
+  // BELL can't tell) stops the confirm: the block it causes quotes it too (a contribution ban is there already).
+  const stopper = decision && helpRefused(input.rules!);
+  const stopped = stopper && !stopper.contribution ? [sourced(stopper)] : [];
+  if (confirmed) {
+    const lock = byHand!.helpLock;
+    confirms.push({
+      id: "by-hand-rules",
+      kind: "confirm",
+      message: bh.rulesConfirm({ area: !bans.length }),
+      details: [
+        bh.why,
+        ...decision!.confirmable.flatMap((entry) => [
+          sourced(entry.finding),
+          ...entry.allows.map((allowance) => bh.sameRules({ path: entry.finding.path, line: allowance.line, quote: allowance.quote })),
+          ...entry.others.slice(0, 2).map((other) => bh.alsoSay({ path: entry.finding.path, line: other.line, quote: other.quote })),
+        ]),
+        // The record beside it in the publish dialog says the claim and what BELL can't see, once.
+        bh.helpRecord({ ...(lock ? { fitted: kindList(lock.kinds) } : {}), used }),
+      ],
+    });
+  }
+
+  // The door: pull requests closed, archived, or for collaborators only.
+  if (door) {
+    const sources: string[] = [];
+    if (door.hasPullRequests === false)
+      sources.push(m.githubField({ field: "has_pull_requests", value: "false" }));
+    if (door.archived) sources.push(m.githubField({ field: "archived", value: "true" }));
+    if (door.disabled) sources.push(m.githubField({ field: "disabled", value: "true" }));
+    if (
+      door.pullRequestCreationPolicy === "collaborators_only" &&
+      !collaboratorPermission(door.viewerPermission)
+    )
+      sources.push(
+        m.githubField({
+          field: "pull_request_creation_policy",
+          value: `collaborators_only (viewerPermission ${door.viewerPermission || "NONE"})`,
+        }),
+      );
+    if (sources.length)
+      blocks.push({ id: "pr-closed", kind: "block", message: m.prClosed, details: [m.why.prClosed, ...sources] });
+  }
+
+  // An explicit ban of AI-assisted contributions; an ambiguous one is a confirm below.
+  if (bans.length && !byHand)
+    blocks.push({ id: "ai-ban", kind: "block", message: m.aiBan, details: [m.why.aiBan, ...bans.map(quote)] });
+  else if (bans.length && !confirmed) {
+    const first = bans.find(blockOf) ?? bans[0];
+    // The reach the server stored with the rule; none reads as unknown.
+    const reach = first.reach ?? "unknown";
+    blocks.push({
+      id: "ai-ban",
+      kind: "block",
+      message: bh.aiBan(
+        reach === "assistance" ? {} : { condition: reach === "output" ? condition(first) : bh.clauses.reach },
+      ),
+      details: [bh.why, ...bans.map(sourced), ...stopped],
+    });
+  }
+
+  // A disclosure the project requires, enforced at publish. The guide's
+  // help verbs (explain, review, …) count only for a clean Learn-by-hand run.
+  const disclosures = found("disclose");
+  const disclosureSource = disclosureRule(input.sources ?? []);
+  const disclosed = input.learnByHand
+    ? hasAiDisclosure(input.body, input.commitMessage, { helpVerbs: true })
+    : hasAiDisclosure(input.body, input.commitMessage);
+  if ((disclosures.length || disclosureSource) && !disclosed)
+    blocks.push({
+      id: "ai-disclosure",
+      kind: "block",
+      message: byHand ? bh.aiDisclosure({ kinds: used }) : m.aiDisclosure,
+      details: [
+        m.why.aiDisclosure,
+        ...(disclosures.length
+          ? disclosures.map(quote)
+          : [dictionaries[locale].ruleQuote(disclosureSource!)]),
+      ],
+    });
+  // Headroom item 2 (DESIGN v1.2 F13): a line that says no AI helped, in a
+  // run the guide helped with, is quoted next to the record; never a block.
+  const denial = byHand?.helps.length ? assistanceDenial(input.body, input.commitMessage) : undefined;
+  if (denial)
+    confirms.push({
+      id: "disclosure-accuracy",
+      kind: "confirm",
+      message: bh.denial({ line: denial, kinds: used }),
+      details: [bh.helpRecord({ used })],
+    });
+
+  // The description is still BELL's suggestion: a block where the project
+  // asks for the contributor's own words, a confirm on every other project.
+  const unrevised =
+    !!input.proposalBody?.trim() &&
+    sameDraftProse(input.body, input.proposalBody);
+  const ownWords = found("own-words");
+  const brevity = brevityRule(input.sources ?? []);
+  if (unrevised && ownWords.length)
+    blocks.push({
+      id: "own-words",
+      kind: "block",
+      message: m.ownWordsRequired,
+      details: [m.why.ownWords, ...ownWords.map(quote)],
+    });
+  // A brevity rule already raises the `brevity` confirm for it, quoting the rule.
+  else if (unrevised && !brevity)
+    confirms.push({
+      id: "own-words",
+      kind: "confirm",
+      message: m.ownWords,
+      details: [m.why.ownWords],
+    });
+
+  // The linked issue.
+  if (issue?.state?.toUpperCase() === "CLOSED")
+    blocks.push({
+      id: "issue-closed",
+      kind: "block",
+      message: m.issueClosed,
+      details: [
+        m.why.issueClosed,
+        m.githubField({
+          field: "state",
+          value: issue.stateReason ? `CLOSED (${issue.stateReason})` : "CLOSED",
+        }),
+      ],
+    });
+  const competing = (issue?.otherPrs ?? []).filter(
+    (pr) =>
+      pr.state.toUpperCase() === "OPEN" &&
+      pr.willClose !== false &&
+      !sameLogin(pr.author, login),
+  );
+  if (
+    competing.length &&
+    !(input.overrides ?? []).some((override) => validOverride(override, "issue-has-pr"))
+  )
+    blocks.push({
+      id: "issue-has-pr",
+      kind: "block",
+      message: m.issueHasPr,
+      details: [
+        m.why.issueHasPr,
+        ...competing.map((pr) => m.otherPr({ number: pr.number, author: pr.author ?? "?" })),
+      ],
+    });
+  if (areas.length && !byHand)
+    blocks.push({
+      id: "area-reserved",
+      kind: "block",
+      message: m.areaReserved,
+      details: [m.why.areaReserved, m.learningLabels({ labels: learning }), ...areas.map(quote)],
+    });
+  else if (areas.length && !confirmed) {
+    const first = areas.find(blockOf) ?? areas[0];
+    const reach = first.reach ?? "unknown";
+    blocks.push({
+      id: "area-reserved",
+      kind: "block",
+      message: bh.areaReserved(
+        reach === "output" || reach === "automate" ? { condition: condition(first) } : {},
+      ),
+      details: [m.why.areaReserved, m.learningLabels({ labels: learning }), ...areas.map(sourced), ...stopped],
+    });
+  }
+
+  // Weakened tests need a reason each.
+  const unexplained = (input.changes?.weakened ?? []).filter(
+    (item) => draftProseWords(input.testReasons?.[item.id] ?? "") < testReasonLimits.words,
+  );
+  if (unexplained.length)
+    blocks.push({
+      id: "tests-weakened",
+      kind: "block",
+      message: m.testsWeakened({ count: unexplained.length }),
+      details: [
+        m.why.testsWeakened,
+        ...unexplained.map((item) =>
+          item.line === 0
+            ? m.weakenedFile({ path: item.path })
+            : m.weakenedLine({
+                path: item.path,
+                line: item.line,
+                text: item.text,
+                removed: item.id.includes("#-"),
+              }),
+        ),
+      ],
+    });
+
+  // Pacing: the person's open pull requests in this repository.
+  const pacing = facts?.pacing;
+  if (
+    pacing &&
+    typeof pacing.openPrs === "number" &&
+    !pacingExempt(pacing.viewerPermission ?? door?.viewerPermission)
+  ) {
+    const budget = openPrBudget(pacing.mergedPrs ?? 0);
+    const counts = m.pacingCounts({ open: pacing.openPrs, merged: pacing.mergedPrs ?? 0, budget });
+    if (pacing.openPrs >= 2 * budget)
+      blocks.push({
+        id: "pacing-max",
+        kind: "block",
+        message: m.pacingMax({ open: pacing.openPrs, budget }),
+        details: [m.why.pacingMax, counts],
+      });
+    else {
+      const details = [
+        ...(pacing.openPrs >= budget ? [m.atBudget({ open: pacing.openPrs, budget })] : []),
+        ...(pacing.waitingPrs ? [m.waiting({ count: pacing.waitingPrs })] : []),
+      ];
+      if (details.length)
+        confirms.push({ id: "pacing", kind: "confirm", message: m.pacing, details: [m.why.pacing, ...details, counts] });
+    }
+  }
+
+  // Rules the person reads and decides on.
+  const ruleDetails = [
+    ...found("ban")
+      .filter((finding) => !finding.contribution)
+      .map((finding) =>
+        byHand ? bh.ambiguousBan({ ...finding, kinds: used }) : m.ambiguousBan(finding),
+      ),
+    ...(input.understandingOff ? found("understand").map((finding) => m.understandOff(finding)) : []),
+    ...found("agent").map((finding) => (byHand ? bh.agent(finding) : m.agent(finding))),
+    ...(!input.issueUrl?.trim() ? found("issue-first").map((finding) => m.issueFirst(finding)) : []),
+  ];
+  if (ruleDetails.length)
+    confirms.push({
+      id: "project-rules",
+      kind: "confirm",
+      message: m.projectRules,
+      details: [m.why.projectRules, ...ruleDetails],
+    });
+
+  // The issue's state beyond open or closed.
+  if (issue && issue.state?.toUpperCase() !== "CLOSED") {
+    const now = Date.now();
+    const others = (issue.assignees ?? []).filter((name) => !sameLogin(name, login));
+    const claims = (issue.claims ?? []).filter((claim) => !sameLogin(claim.author, login));
+    const notReady = (issue.labels ?? []).filter(notReadyLabel);
+    const closed = (issue.otherPrs ?? []).filter(
+      (pr) =>
+        pr.state.toUpperCase() === "CLOSED" &&
+        (!pr.closedAt || now - Date.parse(pr.closedAt) <= recentClosedPrDays * dayMs),
+    );
+    const details = [
+      ...(others.length ? [m.assigned({ names: others })] : []),
+      ...claims.map((claim) =>
+        m.claimed({ author: claim.author, date: fmt.date(claim.at), bot: !!claim.bot }),
+      ),
+      ...(notReady.length ? [m.notReady({ labels: notReady })] : []),
+      ...(issue.locked ? [m.locked] : []),
+      ...closed.map((pr) => m.closedPr({ number: pr.number, author: pr.author ?? "?" })),
+      ...(found("issue-first").length && issue.viewerCommented === false ? [m.sayHello] : []),
+    ];
+    if (details.length)
+      confirms.push({
+        id: "issue-state",
+        kind: "confirm",
+        message: m.issueState,
+        details: [m.why.issueState, ...details],
+      });
+  }
+
+  // How reviewable the change is.
+  const changes = input.changes;
+  if (changes) {
+    const details = [
+      ...(changes.band === "very-large"
+        ? [m.split({ lines: changes.changedLines, files: changes.files })]
+        : []),
+      ...(changes.sourceChanged &&
+      !changes.testFilesChanged &&
+      !changes.docsOnly &&
+      changes.changedLines > untestedMinLines
+        ? [m.noTests]
+        : []),
+      ...(changes.outsidePlan.length
+        ? [m.outsidePlan({ files: changes.outsidePlan.slice(0, 10) })]
+        : []),
+      ...(changes.whitespaceOnly.length
+        ? [m.whitespace({ files: changes.whitespaceOnly.slice(0, 10) })]
+        : []),
+      ...(changes.newDependencies.length
+        ? [m.dependencies({ names: changes.newDependencies.map((dependency) => dependency.name).slice(0, 10) })]
+        : []),
+    ];
+    if (details.length) {
+      const sizes = (changes.mergedSizes ?? input.rules?.mergedSizes ?? []).map(
+        (size) => size.additions + size.deletions,
+      );
+      confirms.push({
+        id: "reviewability",
+        kind: "confirm",
+        message: m.reviewability,
+        details: [m.why.reviewability, ...details, ...(sizes.length ? [m.mergedSizes({ sizes })] : [])],
+      });
+    }
+  }
+
+  // Facts that could not be read. With facts (the publish dialog and
+  // publish itself), rules BELL never read, or files it could not read,
+  // are unknown too: an AI ban or a required disclosure may be in them.
+  const rulesUnknown = facts
+    ? input.rules
+      ? unknownParts(input.rules.unknown ?? [], locale).filter(
+          ({ part }) => part === "rules" || part === "orgDefaults",
+        )
+      : undefined
+    : [];
+  const unknown = [
+    ...unknownParts(facts?.unknown ?? [], locale).map((part) => m.unknownPart(part)),
+    ...(rulesUnknown ? rulesUnknown.map((part) => m.unknownPart(part)) : [m.rulesUnread]),
+  ];
+  if (unknown.length)
+    confirms.push({
+      id: "facts-unknown",
+      kind: "confirm",
+      message: m.factsUnknown,
+      details: [m.why.factsUnknown, ...unknown],
+    });
+
+  return [...blocks, ...confirms];
+}

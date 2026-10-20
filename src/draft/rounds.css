@@ -1,0 +1,76 @@
+/* The draft tab's sync panel and review rounds: the visual pass that matches
+   the draft guidance. The base layout stays in styles.css; states are
+   always written out, and colors only repeat them. */
+.sync-panel h2,
+.follow-up-rounds h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-accent-700);
+}
+.sync-conflicts .sync-conflict-count {
+  margin-top: 4px;
+  color: var(--color-warning);
+}
+.sync-conflicts .sync-conflict-files {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+  padding-left: 0;
+  list-style: none;
+}
+.sync-conflict-files li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.sync-conflict-state,
+.follow-up-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: var(--text-2xs);
+  font-weight: 550;
+  line-height: 1.7;
+}
+.sync-conflict-state.is-open {
+  border-color: var(--color-warning-border);
+  background: var(--color-surface);
+  color: var(--color-warning);
+}
+.sync-conflict-state.is-resolved {
+  border-color: var(--color-border);
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.follow-up-round-head h3 {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-accent-700);
+}
+.follow-up-status.is-running,
+.follow-up-status.is-review {
+  border-color: var(--color-warning-border);
+  background: var(--color-surface);
+  color: var(--color-warning);
+}
+.follow-up-status.is-published {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.follow-up-status.is-failed {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.follow-up-status.is-cancelled,
+.follow-up-status.is-discarded {
+  border-color: var(--color-border);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+}
