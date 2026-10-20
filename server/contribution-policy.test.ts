@@ -65,6 +65,8 @@ const realExpectations: Record<string, readonly (readonly [string, boolean?])[]>
     ["understand"],
     ["understand"],
     ["ban", false],
+    // Line 29: "if you're interested in that then don't use AI" (learning), a rule to weigh.
+    ["ban", false],
   ],
   // A real ban, under a reStructuredText "~~~" heading.
   "qemu-code-provenance.rst": [["ban", true]],

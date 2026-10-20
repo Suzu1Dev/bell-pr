@@ -245,6 +245,27 @@ const aiPermission = new RegExp(
   flags,
 );
 
+/** In a contribution: at all, at any stage, for or in patches, pull requests or code, when contributing. */
+const inContributing = String.raw`(?:at\s+all|whatsoever|at\s+any\s+(?:stage|point|time|step)|in\s+any\s+(?:way|form|part|stage|step|capacity|manner)|(?:for|in|on|with)\s+(?:(?:your|any|a|an|the|their|this|these|our)\s+)?(?:contribut\w*|patch(?:es)?|pull\s+requests?|PRs?|merge\s+requests?|code(?!\s+reviews?)|commits?|submissions?|changes)\b|(?:when|while)\s+contributing\b|to\s+contribute\b)`;
+/**
+ * Using AI itself, refused to the contributor: "Please do not use AI at
+ * all when contributing", "You may not use AI for contributions", "Using
+ * AI for contributions is forbidden", "the use of AI in contributions".
+ * The plain "AI" counts only as what the person (or the contribution) is
+ * told not to use, or as a use in a contribution (`inContributing`), and
+ * only with nothing but where it is used after it, so "Do not use AI
+ * opponents", "we don't use AI for code review", "If you don't use AI, …"
+ * or "You don't have to use AI" are no rules.
+ */
+const useAi = new RegExp(
+  [
+    String.raw`(?<=(?<!\b(?:if|when|whenever|whether|unless|once|in\s+case)\s+(?:you\s+|contributors?\s+)?)\b(?:(?:please\s+)?(?:do\s+not|don't|never|avoid|refrain\s+from)|(?:you|contributors?|contributions?|patches|pull\s+requests?|PRs?|submissions?)\s+(?:(?:must|may|should|shall|can|will)\s*(?:not|n't)|(?:must|may|should|shall|can|will)\s+never|cannot|are\s+not\s+(?:allowed|permitted)\s+to))\s+(?:(?:ever|even|any|just|simply|really|please)\s+)?)us(?:e|ing)\s+(?:any\s+)?AI\b(?=\s*(?:[.!;,)]|$)|\s+${inContributing})`,
+    String.raw`(?:^|(?<=[^\w\s]\s*)|(?<=\b(?:the|any|all)\s+))(?:using|use\s+of|usage\s+of)\s+(?:any\s+)?AI\s+${inContributing}`,
+  ].join("|"),
+  flags,
+);
+refusalTerms.push(useAi);
+
 /**
  * A condition the contributor meets by their own conduct ("unless you have
  * reviewed every line", "without disclosure", "code you do not
