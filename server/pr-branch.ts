@@ -121,8 +121,11 @@ export function assertRemoteHead(
  * `expectedHead` is for a caller that found the checkout's HEAD on GitHub's
  * branch (the Learn-by-hand takeover, server/by-hand-takeover.ts): the
  * branch can move between that look and the fetch, so the fetched head must
- * still be HEAD or build on it, or nothing moves (409). Without it, nothing
- * changes.
+ * still be HEAD or build on it, or nothing moves (409). The checkout is then
+ * the person's, who may save or commit meanwhile: it is left as it is when
+ * the fetched head is HEAD, and otherwise moves only from HEAD, with
+ * `reset --keep`, which never drops a change saved since. Without it,
+ * nothing changes.
  */
 export async function adoptRemoteCommits(
   ctx: WorkbenchContext,
@@ -159,6 +162,8 @@ export async function adoptRemoteCommits(
       (m) => m.run.followUp.historyRewritten({ branch }),
       409,
     );
+  const moved = () =>
+    new AppError((m) => m.run.followUp.remoteMoved({ branch }), 409);
   if (
     expectedHead !== undefined &&
     (
@@ -169,7 +174,7 @@ export async function adoptRemoteCommits(
       )
     ).code !== 0
   )
-    throw new AppError((m) => m.run.followUp.remoteMoved({ branch }), 409);
+    throw moved();
   const repo = ctx.repo(run.repoId);
   const target = await ctx.lock(`repository:${repo.id}`, () =>
     fetchBranchCommit(repo, run.baseBranch),
@@ -186,9 +191,19 @@ export async function adoptRemoteCommits(
       ])
     ).stdout.trim(),
   );
-  // The checkout is clean (callers check), so moving it loses nothing.
-  await assertGitConfigSafe(run.worktreePath);
-  await git(run.worktreePath, ["reset", "-q", "--hard", fetched]);
+  if (expectedHead === undefined) {
+    // The checkout is clean (callers check), so moving it loses nothing.
+    await assertGitConfigSafe(run.worktreePath);
+    await git(run.worktreePath, ["reset", "-q", "--hard", fetched]);
+  } else if (fetched !== expectedHead) {
+    // Pushed on top of HEAD meanwhile: moved only from HEAD, keeping saved changes.
+    const head = (
+      await git(run.worktreePath, ["rev-parse", "HEAD"])
+    ).stdout.trim();
+    if (head !== expectedHead) throw moved();
+    await assertGitConfigSafe(run.worktreePath);
+    await git(run.worktreePath, ["reset", "-q", "--keep", fetched]);
+  }
   (run.followUps ??= []).push({
     id: newId().slice(0, 8),
     kind: "sync",

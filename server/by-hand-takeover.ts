@@ -11,9 +11,10 @@
  * Nothing happens unless the run's folder is still there, clean, and its
  * HEAD is past the last pushed commit. BELL adopts only when that HEAD
  * builds on the last push and is exactly the PR branch's head on GitHub
- * (the person pushed), and the fetched head must still hold that HEAD, so
- * its reset to the fetched head moves nothing. It never resets local
- * commits away: unpushed commits, a branch that moved on without them
+ * (the person pushed), and when the fetched head is still that HEAD or
+ * builds on it; the folder then stays as it is, or moves on to that head
+ * without a change saved meanwhile. It never resets local commits or saved
+ * changes away: unpushed commits, a branch that moved on without them
  * (also while BELL looked), a dirty checkout or rewritten history leave
  * everything as it is, with a notice on the feedback read, or a refusal
  * before a sync. Agent runs are never touched.
@@ -51,8 +52,8 @@ async function takeOver(ctx: WorkbenchContext, run: Run, again = false): Promise
     try {
       return (await adoptRemoteCommits(ctx, run, { expectedHead: head })) ? "adopted" : "none";
     } catch (error) {
-      // GitHub's branch moved while BELL looked, and nothing moved here: what it holds now
-      // decides, once.
+      // GitHub's branch (or the folder) moved while BELL looked, and nothing moved here: what they
+      // hold now decides, once.
       if (again || !(error instanceof AppError && error.statusCode === 409)) throw error;
       return takeOver(ctx, run, true);
     }

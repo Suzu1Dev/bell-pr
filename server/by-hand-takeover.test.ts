@@ -8,7 +8,7 @@
 // and gh); fake codex and claude come first on PATH.
 import test, { after, before, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { byHandClean } from "../shared/by-hand.js";
@@ -405,6 +405,49 @@ test("a force push while BELL looks, which keeps BELL's push but drops the perso
   assert.equal(f.run.publishCommit, pushedByBell);
   assert.equal(f.run.followUps, undefined);
   assert.deepEqual(byHandClean(f.run), { clean: true });
+});
+
+test("a change saved or a commit made in the folder while BELL takes over stays where the person left it", async (t) => {
+  const f = await published(t);
+  const readme = path.join(f.run.worktreePath, "README.md");
+  const mine = await f.commit("export const attempts = 3;\n", "Retry three times");
+  // The person saves a file while BELL reads GitHub's branch: the commits are taken over, the edit stays.
+  await onNextFetch(t, f, `printf '# Example, edited\\n' > ${JSON.stringify(readme)}`);
+  await en(() => f.workbench.fetchPrFeedback(f.run.id));
+  assert.equal(f.run.publishCommit, mine);
+  assert.equal(f.run.followUps?.at(-1)?.adopted, true);
+  assert.equal(await f.head(), mine);
+  assert.equal(await readFile(readme, "utf8"), "# Example, edited\n");
+  await git(f.run.worktreePath, ["checkout", "--", "README.md"]);
+  // The person commits while BELL reads the branch: the pushed commit is taken over, the new one stays.
+  const pushed = await f.commit("export const attempts = 4;\n", "Retry four times");
+  await onNextFetch(t, f, `printf 'A note.\\n' > NOTES.md && "$GIT" add NOTES.md && "$GIT" commit -q -m "Add a note"`);
+  await en(() => f.workbench.fetchPrFeedback(f.run.id));
+  assert.equal(f.run.publishCommit, pushed);
+  const local = await f.head();
+  assert.notEqual(local, pushed);
+  assert.equal((await git(f.run.worktreePath, ["rev-parse", `${local}^`])).stdout.trim(), pushed);
+  // It waits for a push, as any commit not on the branch yet.
+  await en(() => f.workbench.fetchPrFeedback(f.run.id));
+  assert.match(f.run.logs.at(-2)?.message ?? "", pushFirst);
+  assert.equal(await f.head(), local);
+});
+
+test("a commit pushed on top of the person's while BELL looks moves the folder without dropping a saved change", async (t) => {
+  const f = await published(t);
+  const readme = path.join(f.run.worktreePath, "README.md");
+  const mine = await f.commit("export const attempts = 3;\n", "Retry three times");
+  const onTop = await sideCommit(f, mine, { "NOTES.md": "A maintainer's note.\n" }, "Add a maintainer's note");
+  await onNextFetch(
+    t,
+    f,
+    `"$GIT" --git-dir="$BARE" update-ref refs/heads/${branch} ${onTop} && printf '# Example, edited\\n' > ${JSON.stringify(readme)}`,
+  );
+  await en(() => f.workbench.fetchPrFeedback(f.run.id));
+  assert.equal(f.run.publishCommit, onTop);
+  assert.equal(await f.head(), onTop);
+  assert.equal(await readFile(path.join(f.run.worktreePath, "NOTES.md"), "utf8"), "A maintainer's note.\n");
+  assert.equal(await readFile(readme, "utf8"), "# Example, edited\n");
 });
 
 test("adoptRemoteCommits without expectedHead takes over as before; with it, only a head that still holds it", async (t) => {
