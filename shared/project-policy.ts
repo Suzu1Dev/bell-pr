@@ -184,6 +184,18 @@ const sizeQualifier = new RegExp(
 );
 
 /**
+ * A size said of the pull request or change a part refuses ("Large AI
+ * generated PRs", "substantial AI-assisted changes"), as `sizeQualifier`
+ * is for the code; read per refused part (`weighedPart`), so "We do not
+ * accept large or AI-generated pull requests" still refuses the
+ * AI-generated ones.
+ */
+const largeChange = new RegExp(
+  String.raw`\b(?:substantial|significant|large|major|non[- ]?trivial)\s+(?:[\w'-]+\s+){0,2}?(?:PRs?|pull[- ]requests?|merge\s+requests?|changes?|patch(?:es)?)\b`,
+  flags,
+);
+
+/**
  * Words that let contributors use AI ("You may use AI tools, but do not
  * submit code you do not understand"): a refusal in the same sentence is
  * about something else, so it is never a clear ban.
@@ -282,6 +294,8 @@ function weighedPart(part: string) {
   if (reviewLeftToReviewers.test(part)) return true;
   // How AI help is credited, with nothing else of the change (Kubernetes).
   if (creditObject.test(part) && !changeObject.test(part.replace(creditPhrase, " "))) return true;
+  // "Large AI generated PRs": how large is too large is the person's call (Kubernetes).
+  if (largeChange.test(part)) return true;
   return false;
 }
 

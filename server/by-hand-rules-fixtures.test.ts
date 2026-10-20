@@ -188,7 +188,7 @@ test("Kubernetes' AI Guidance gives neither run an AI ban: its rules are quoted 
   // doesn't is quoted in the project-rules confirm for the person to weigh.
   const sectionBans = new Map<number, boolean>([
     // "[Large AI generated](#large-or-automatic-edits) PRs and AI generated commit messages are not allowed."
-    [638, true],
+    [638, false],
     // "Do not leave the first review of AI generated changes to the reviewers."
     [640, false],
   ]);

@@ -75,7 +75,7 @@ const realExpectations: Record<string, readonly (readonly [string, boolean?])[]>
     ["disclose"],
     ["ban", false],
     // Line 13 (source 638): large AI generated PRs and AI generated commit messages.
-    ["ban", true],
+    ["ban", false],
     // Line 15 (source 640): the first review of AI generated changes, left to the reviewers.
     ["ban", false],
     ["ban", false],
@@ -139,7 +139,7 @@ const blocksAgentRuns = [
  */
 const kubernetesBans = new Map<number, boolean>([
   // Line 13 (source 638): large AI generated PRs and AI generated commit messages.
-  [13, true],
+  [13, false],
   // Line 15 (source 640): the first review of AI generated changes, left to the reviewers.
   [15, false],
 ]);

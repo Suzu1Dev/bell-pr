@@ -408,6 +408,28 @@ test("models and assistants by name count next to a word of help", () => {
     assert.deepEqual(kinds("CONTRIBUTING.md", text), [["ban", true]], text);
 });
 
+test("a refusal of large AI-generated pull requests is a size rule the person weighs", () => {
+  // Kubernetes contributors/guide/pull-requests.md:638 (plan README §18.10).
+  for (const text of [
+    "[Large AI generated](#large-or-automatic-edits) PRs and AI generated commit messages are not allowed.",
+    "Large AI-generated PRs are not allowed.",
+    "Submitting large AI-generated pull requests is not allowed.",
+    "Substantial AI-assisted changes will be rejected.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [["ban", false]], text);
+  // AI-generated pull requests of any size, or beside a size rule, stay banned.
+  for (const text of [
+    "AI generated PRs are not allowed.",
+    "AI generated PRs are not allowed; large PRs must be discussed first.",
+    "We do not accept large or AI-generated pull requests.",
+    "Large AI-generated PRs and AI-generated code are not allowed.",
+    "Large AI-generated PRs and code are not allowed.",
+    "Large AI-generated PRs are not allowed, nor are small ones.",
+    "AI-generated pull requests of any size are not allowed.",
+  ])
+    assert.deepEqual(kinds("CONTRIBUTING.md", text), [["ban", true]], text);
+});
+
 test("understanding, own-words and issue-first rules need no AI term", () => {
   assert.deepEqual(
     kinds("CONTRIBUTING.md", "You must be able to explain your change in review."),
