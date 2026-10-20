@@ -1,4 +1,5 @@
 import analysis from "./analysis.js";
+import byHand from "./by-hand.js";
 import cli from "./cli.js";
 import common from "./common.js";
 import contribution from "./contribution.js";
@@ -21,4 +22,5 @@ export default {
   cli,
   understanding,
   contribution,
+  byHand,
 };
