@@ -11,7 +11,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fromMarkdown } from "mdast-util-from-markdown";
-import { review } from "./by-hand-guide.js";
+import { chat, review } from "./by-hand-guide.js";
 import { withLocale } from "./i18n/index.js";
 import { git } from "./process.js";
 import { Store } from "./store.js";
@@ -153,4 +153,13 @@ test("a review is filtered as the Reports tab shows it: lines a list marker spli
   assert.doesNotMatch(shown(reviewer), fix, reviewer);
   assert.doesNotMatch(reviewer.replace(/\s+/g, " "), fix, reviewer);
   assert.ok((f.run.byHand?.reviews?.[0].removed ?? 0) >= 3);
+});
+
+test("Markdown escapes, character references and invisible characters can't spell code", async (t) => {
+  const f = await fixture(t);
+  const text = "Write delay\\*2\\*\\*attempt, or delayMs&#42;2, or attempt&#x2B;1, or delay *​ 2 there; delay &ast; 2 also.";
+  f.answers.push(JSON.stringify({ text, question: null, refs: [{ path: "src/retry.js", line: 6, endLine: null }], quotes: [], options: null, topic: "change", askedForCode: false }));
+  const answer = await withLocale("en", () => chat(f.ctx, f.run, "src/retry.js", "How do I back off?", new AbortController().signal));
+  assert.doesNotMatch(shown(answer), fix, answer);
+  assert.doesNotMatch(answer, /delay\\\*2|&#42;|&#x2B;|&ast;|\u200B/, answer);
 });

@@ -197,6 +197,29 @@ const compactCode = (run: string) =>
   ((/[A-Za-z_$"']/.test(run) && compactOperator.test(run)) || compactShapes.some((shape) => shape.test(run)));
 /** A call with arguments, or a member call ("retry(fn, 2)", "Math.max(a, b)"); "file(s)" is prose. */
 const call = /(?<![\w$.])[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\((?!(?:s|es|ies)\))[^()\n]{0,120}\)/g;
+/** Characters a reader never sees: zero-width space, word joiner, soft hyphen, byte-order mark, direction marks. */
+const invisible = /[\u00AD\u200B\u2060\uFEFF\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
+/** ASCII punctuation by its HTML entity name, which Markdown decodes. */
+const entityNames: Record<string, string> = {
+  lt: "<", gt: ">", amp: "&", quot: '"', apos: "'", ast: "*", midast: "*", lowast: "*", equals: "=", plus: "+",
+  minus: "-", lpar: "(", rpar: ")", lsqb: "[", rsqb: "]", lbrack: "[", rbrack: "]", lcub: "{", rcub: "}",
+  lbrace: "{", rbrace: "}", semi: ";", colon: ":", excl: "!", percnt: "%", Hat: "^", vert: "|", verbar: "|",
+  lowbar: "_", grave: "`", num: "#", dollar: "$", period: ".", comma: ",", quest: "?", commat: "@", sol: "/", bsol: "\\",
+};
+/**
+ * Prose as Markdown shows it, so code can't hide behind an escape
+ * ("delay\\*2"), a character reference ("delay&#42;2") or an invisible
+ * character; never BELL's own placeholder character.
+ */
+const asShown = (text: string) =>
+  text
+    .replace(invisible, "")
+    .replace(/&(?:#(\d{1,7})|#[xX]([\da-fA-F]{1,6})|([A-Za-z]+));/g, (entity, decimal?: string, hex?: string, name?: string) => {
+      const point = decimal ? Number(decimal) : hex ? parseInt(hex, 16) : undefined;
+      if (point === undefined) return entityNames[name!] ?? entity;
+      return point > 0 && point <= 0x10ffff && point !== 0xe000 ? String.fromCodePoint(point).replace(invisible, "") : entity;
+    })
+    .replace(/\\([!-/:-@[-`{-~])/g, "$1");
 /** A line break Markdown shows as a space: not before a blank line, a list item, a quote, a heading, a table row or a fence. */
 const softBreak = /\n(?![ \t]*(?:\n|$|[-*+][ \t]|\d{1,9}[.)][ \t]|>|#|\||`{3}|~{3}))/g;
 
@@ -331,8 +354,9 @@ export function filterAgentText(
       const code = body.trim();
       return code && (occurs(code) || (options.tooling && safeCommand(code, sources, isWord))) ? hold(span) : remove();
     })
-    .replace(/\bhttps?:\/\/\S+/g, (url) => ([...url.matchAll(encodedRun)].some(([run]) => payload(run)) ? remove() : hold(url)))
-    .replace(encodedRun, (run) => (payload(run) ? remove() : run));
+    .replace(/\bhttps?:\/\/\S+/g, (url) => ([...url.matchAll(encodedRun)].some(([run]) => payload(run)) ? remove() : hold(url)));
+  // From here on the rules read prose as Markdown shows it.
+  value = asShown(value).replace(encodedRun, (run) => (payload(run) ? remove() : run));
   value = replaceShown(value, expression, (code) =>
     occurs(code.replace(/[.,;:]+$/, "")) || keyChord.test(code.replace(/\s+/g, "")) ? undefined : remove(),
   );
