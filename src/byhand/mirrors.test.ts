@@ -4,11 +4,16 @@
 // server: only a clean Learn-by-hand run gets its copy; an unclean one gets
 // the agent run's copy and outcome.
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
 import { createElement } from "react";
 import { byHandPreflight } from "../../shared/by-hand";
+import { byHandRulesCase } from "../../shared/by-hand-rules";
 import { respectChecks, type ContributionRules } from "../../shared/contribution";
 import type { DraftCheck } from "../../shared/draft-checks";
+import { attachCarveOuts, classifyPolicy } from "../../shared/project-policy";
+import { checklistCheck } from "../draft/checklist";
 import { getDemo } from "../demo";
 import { DraftGuidancePanel } from "../draft/DraftGuidancePanel";
 import { assertNoHan, renderEn } from "../test-utils/render";
@@ -78,5 +83,69 @@ test("the Draft tab's live checklist follows the clean-run rule", () => {
   for (const html of [render(byHandRun(false)), render()]) {
     assert.ok(html.includes(escape(agentCopy)));
     assert.ok(!html.includes("BELL PR&#x27;s agents had no write access"));
+  }
+});
+
+test("with the real quoted-confirm decision, a clean fitted run's live checklist has the server's rule rows, ids and outcomes", () => {
+  // QEMU's rule and carve-out, and Kubernetes' AI Guidance as another file's rules to weigh, read as the rules card reads them.
+  const read = (file: string, fixture: string) => {
+    const text = readFileSync(path.join(import.meta.dirname, "../../server/fixtures/policy/real", fixture), "utf8");
+    return attachCarveOuts(file, text, classifyPolicy(file, text));
+  };
+  const file = "docs/devel/code-provenance.rst";
+  const findings = [...read(file, "qemu-code-provenance.rst"), ...read("CONTRIBUTING.md", "kubernetes-pull-requests.md")];
+  const createdAt = "2026-10-20T09:00:00.000Z";
+  const now = "2026-10-20T12:00:00.000Z";
+  const rulesAt = (checkedAt: string): ContributionRules => ({ checkedAt, findings, filesRead: [file, "CONTRIBUTING.md"] });
+  const fitted = byHandRulesCase(rulesAt(createdAt), { learningIssue: false, now: createdAt });
+  assert.equal(fitted.case, "fitted");
+  const run: Run = {
+    ...byHandRun(true),
+    createdAt,
+    byHand: {
+      helpLock: fitted.case === "fitted" ? { ...fitted.lock, at: createdAt } : undefined,
+      events: [
+        { at: createdAt, kind: "explain", source: "premise" },
+        { at: createdAt, kind: "test", source: "test" },
+      ],
+    },
+  };
+  const body = "Retries a GET twice after a 503.";
+  const outcomes = (checks: readonly DraftCheck[]) =>
+    checks.filter(checklistCheck).map((check) => `${check.id}:${check.kind}`).sort();
+  const rowsOf = (html: string) =>
+    Object.fromEntries([...html.matchAll(/class="draft-checklist-row is-(\w+)" data-row="(\w+)"/g)].map((match) => [match[2], match[1]]));
+  // Rules read before the run started (the server blocks: condition d), and after it (the confirm).
+  for (const [checkedAt, expected] of [
+    ["2026-10-20T08:00:00.000Z", ["ai-ban:block", "ai-disclosure:block", "project-rules:confirm"]],
+    ["2026-10-20T10:00:00.000Z", ["ai-disclosure:block", "by-hand-rules:confirm", "project-rules:confirm"]],
+  ] as const) {
+    const rules = rulesAt(checkedAt);
+    // The server's list (publishChecks fills the input with the run's start).
+    const server = respectChecks({ body, rules, learnByHand: byHandPreflight(run, now, { createdAt: true }) }, "en");
+    assert.deepEqual(outcomes(server), expected);
+    // The client's mirror (DraftGuidancePanel: no run start, so the rule rows are left to the server).
+    const mirror = respectChecks({ body, rules, learnByHand: byHandPreflight(run, now) }, "en").filter(
+      (check) => !["ai-ban", "area-reserved", "by-hand-rules"].includes(check.id),
+    );
+    assert.deepEqual(outcomes(mirror), outcomes(server.filter((check) => !["ai-ban", "area-reserved", "by-hand-rules"].includes(check.id))));
+    // Rendered with the server's list, the rules row says what the server says.
+    const html = renderEn(
+      createElement(DraftGuidancePanel, {
+        preparation: undefined,
+        busy: false,
+        onGenerate: () => {},
+        onApply: () => {},
+        draftBody: body,
+        rules,
+        byHandRun: run,
+        checks: server,
+      }),
+    );
+    assertNoHan(html);
+    const rulesRow = server.find((check) => check.id === "ai-ban" || check.id === "by-hand-rules")!;
+    assert.equal(rowsOf(html).rules, rulesRow.kind);
+    for (const check of server.filter(checklistCheck))
+      assert.ok(html.includes(check.message.replace(/'/g, "&#x27;").replace(/"/g, "&quot;")), check.message);
   }
 });
