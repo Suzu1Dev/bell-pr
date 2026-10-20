@@ -7,6 +7,7 @@
 // (https://book.servo.org/policy/ai-usage.html), Rust's rust-forge
 // llm-usage.md and Gentoo's council policy.
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -384,4 +385,28 @@ test("the registry check refuses each kind of malformed entry and reports drafts
     assert.ok(report.errors.some((message) => error.test(message)), `${String(error)}: ${report.errors.join("; ")}`);
   }
   assert.match(checkRegistry([servo, servo], now).errors.join(), /listed twice/);
+});
+
+test("the registry check script exits 0 with warnings, and 1 on a malformed entry", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "bell-registry-check-"));
+  const script = path.join(import.meta.dirname, "..", "scripts", "check-policy-registry.mjs");
+  const run = async (entries: unknown) => {
+    const file = path.join(directory, "entries.json");
+    await writeFile(file, JSON.stringify(entries));
+    return spawnSync(process.execPath, [script, "--entries", file], { encoding: "utf8" });
+  };
+  try {
+    const drafts = await run([unsigned(servo), { ...gentoo, checkedOn: "2026-01-02", signedOff: "2026-01-03" }]);
+    assert.equal(drafts.status, 0, drafts.stderr);
+    assert.match(drafts.stdout, /2 entries, 1 signed by the owner/);
+    assert.match(drafts.stdout, /warning: servo\/servo \(checked on 2026-10-19\) is awaiting the owner's sign-off/);
+    assert.match(drafts.stdout, /warning: re-check gentoo\/\*: its quotes were checked on 2026-01-02/);
+    const broken = await run([{ ...servo, url: "http://example.org" }]);
+    assert.equal(broken.status, 1);
+    assert.match(broken.stderr, /error: servo\/servo: url must be an https URL/);
+    const shipped = spawnSync(process.execPath, [script], { encoding: "utf8" });
+    assert.equal(shipped.status, 0, shipped.stderr);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });

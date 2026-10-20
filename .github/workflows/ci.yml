@@ -44,6 +44,7 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: node scripts/check-i18n.mjs
+      - run: node scripts/check-policy-registry.mjs
       - run: node scripts/check-personal-info.mjs
       - run: node scripts/check-personal-info.mjs --self-test
       - run: node scripts/tokenize-css.mjs --check
