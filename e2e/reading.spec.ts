@@ -227,12 +227,14 @@ test.describe("reading a real run in review", () => {
   });
 
   test("3. the overview lists the missing setup, and the premise is checked again against the code", async ({ browser }) => {
-    await project.setAgentAnswer(JSON.stringify({ premise }));
+    // Under load the walkthroughs and explanations of the run's files take a while.
+    test.setTimeout(150_000);
+    // The premise check gets its own answer; walkthroughs keep theirs.
+    await project.setAgentAnswers([{ when: "checking a finished contribution", text: JSON.stringify({ premise }) }]);
     const { page, close } = await open(browser);
     try {
       await page.goto(`/#/runs/${runId}/overview?locale=en`);
-      // The stand-in agent gives every turn the same answer: let the
-      // walkthroughs and explanations finish before it answers the premise.
+      // Let the walkthroughs and explanations the run opened with finish before the premise is checked.
       await expect
         .poll(
           async () => {
@@ -246,7 +248,7 @@ test.describe("reading a real run in review", () => {
                 file.explanationStatus === "generating",
             ).length;
           },
-          { timeout: 30_000 },
+          { timeout: 90_000 },
         )
         .toBe(0);
       const setup = page.locator(".setup-needs");

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createElement } from "react";
+import { act, createElement } from "react";
 import { formatters } from "../../shared/i18n/locale";
 import type { ProjectInsights } from "../../shared/insights";
 import type { AgentTeam } from "../../shared/team";
@@ -631,12 +631,20 @@ test("the sample's overview reads no plan, also while its analysis plays", async
   }) as typeof fetch;
   const loadingOverview = (id: string) =>
     createElement(ProjectOverview, overviewProps({ repo: { ...repo, id }, insights: null, loading: true }));
+  // Lets effects and their requests run; under load a request can come a few turns later.
+  const settle = async (done: () => boolean) => {
+    for (let tries = 0; tries < 100 && !done(); tries++) await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+  };
   const view = await mount(loadingOverview("demo-repo"));
   try {
+    await settle(() => false);
     assert.deepEqual(requests, []);
-    // A real repository's overview reads the plan for "Generate 5 more".
+    // A real repository's overview reads the plan for "Generate 5 more", once. (Its rules card, a lazy
+    // view, reads the project's rules when its code has loaded, sooner or later under load.)
     await view.rerender(loadingOverview("repo-1"));
-    assert.deepEqual(requests, ["/api/license"]);
+    const plans = () => (requests as string[]).filter((url) => url.startsWith("/api/license"));
+    await settle(() => plans().length > 0);
+    assert.deepEqual(plans(), ["/api/license"]);
   } finally {
     await view.unmount();
     globalThis.fetch = realFetch;

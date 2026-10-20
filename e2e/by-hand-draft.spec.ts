@@ -319,20 +319,20 @@ test("Check again reads the rules again from the dialog, says when it couldn't, 
     rulesCheckedAt: before,
     rules: [{ kind: "ban", path: "CONTRIBUTING.md", line: 3, quote: rule, allows: [{ line: 5, quote: carveOut, kinds: ["explain", "answer"] }] }],
   };
-  const project = await startRealProject({ reviewed: true, appSettings: { skipUnderstandingCheck: true }, run: byHandRun({}, { helpLock }) });
+  // The project's rules as read before the run started; reading them again first fails, then works.
+  const rules = (checkedAt: string) => ({
+    checkedAt,
+    findings: [{ kind: "ban", path: "CONTRIBUTING.md", line: 3, quote: rule, contribution: true }],
+    filesRead: ["CONTRIBUTING.md"],
+  });
+  const project = await startRealProject({
+    reviewed: true,
+    appSettings: { skipUnderstandingCheck: true },
+    run: byHandRun({}, { helpLock }),
+    repo: { contributionRules: rules(before) },
+  });
   const { context, page } = await open(browser, project);
   try {
-    // The project's rules as read before the run started; reading them again first fails, then works.
-    const rules = (checkedAt: string) => ({
-      checkedAt,
-      findings: [{ kind: "ban", path: "CONTRIBUTING.md", line: 3, quote: rule, contribution: true }],
-      filesRead: ["CONTRIBUTING.md"],
-    });
-    await page.route("**/api/repos", async (route) => {
-      const response = await route.fetch();
-      const body = (await response.json()) as { repos: { id: string }[] };
-      await route.fulfill({ response, json: { ...body, repos: body.repos.map((repo) => ({ ...repo, contributionRules: rules(before) })) } });
-    });
     let refreshed = 0;
     await page.route("**/api/repos/*/contribution-rules/refresh", (route) =>
       ++refreshed === 1
