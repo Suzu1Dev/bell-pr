@@ -895,3 +895,29 @@ test("writing a merged tree onto a checkout keeps a file saved after its snapsho
     await f.cleanup();
   }
 });
+
+test("a sync goes through as before when Git left unmerged entries in the run's folder index", async () => {
+  // A `git stash pop` or merge that stopped on a conflict in the run's folder leaves stages 1-3 in its index.
+  const f = await unpublishedRun();
+  try {
+    await f.write("hello.ts", "line one\nline two, mine\nline three\n");
+    const blob = (await git(f.run.worktreePath, ["hash-object", "-w", "hello.ts"])).stdout.trim();
+    await git(f.run.worktreePath, ["update-index", "--index-info"], {
+      input: `0 ${"0".repeat(40)}\thello.ts\n${[1, 2, 3].map((stage) => `100644 ${blob} ${stage}\thello.ts`).join("\n")}\n`,
+    });
+    assert.notEqual((await git(f.run.worktreePath, ["ls-files", "-u"])).stdout.trim(), "");
+    const upstream = await f.github.upstreamCommit({ "other.ts": "other, upstream\n" });
+    assert.equal((await f.workbench.syncRun(f.run.id)).updated, true);
+    assert.equal(f.run.baseSha, upstream);
+    assert.equal(await f.read("hello.ts"), "line one\nline two, mine\nline three\n");
+    assert.equal(await f.read("other.ts"), "other, upstream\n");
+    // The index holds the new base, as every sync leaves it.
+    assert.equal((await git(f.run.worktreePath, ["ls-files", "-u"])).stdout.trim(), "");
+    assert.equal(await indexDiffers(f.run.worktreePath), false);
+    await f.workbench.undoSync(f.run.id);
+    assert.equal(await f.read("other.ts"), "other\n");
+    assert.equal(await f.read("hello.ts"), "line one\nline two, mine\nline three\n");
+  } finally {
+    await f.cleanup();
+  }
+});

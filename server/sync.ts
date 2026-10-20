@@ -150,21 +150,26 @@ export async function conflictsWithoutMarkers(
  * or its snapshot): a file saved since is never overwritten. Git writes
  * only files that still hold what `from` has; a saved file the tree leaves
  * as it is stays as saved, and one the tree changes refuses it all (409),
- * with the files and the index as they were.
+ * with the files and the index as they were. The comparison runs in a
+ * private index, so the checkout's own is replaced only after the files are
+ * written, unmerged entries that Git left in it too, as without `from`.
  */
 export async function checkoutTreeOnto(cwd: string, tree: string, base: string, from?: string) {
   await assertGitConfigSafe(cwd);
   if (from === undefined) await git(cwd, ["read-tree", "-u", "--reset", tree]);
   else {
-    const index = (await git(cwd, ["write-tree"])).stdout.trim();
-    await git(cwd, ["read-tree", from]);
-    // Git then compares each file with `from` by its contents (a refreshed entry), not by its stat data.
-    await git(cwd, ["update-index", "-q", "--refresh"], { allowedCodes: [0, 1] });
+    const index = (await git(cwd, ["rev-parse", "--path-format=absolute", "--git-path", "bellpr-sync-index"])).stdout.trim();
+    const env = { ...process.env, GIT_INDEX_FILE: index };
     try {
-      await git(cwd, ["read-tree", "-m", "-u", from, tree]);
-    } catch (error) {
-      await git(cwd, ["read-tree", index]);
-      throw new AppError((m) => m.run.sync.savedMeanwhile, 409, { cause: error });
+      await git(cwd, ["read-tree", from], { env });
+      // Git then compares each file with `from` by its contents (a refreshed entry), not by its stat data.
+      await git(cwd, ["update-index", "-q", "--refresh"], { env, allowedCodes: [0, 1] });
+      await git(cwd, ["read-tree", "-m", "-u", from, tree], { env }).catch((error: unknown) => {
+        throw new AppError((m) => m.run.sync.savedMeanwhile, 409, { cause: error });
+      });
+    } finally {
+      await rm(index, { force: true });
+      await rm(`${index}.lock`, { force: true });
     }
   }
   await git(cwd, ["read-tree", base]);
