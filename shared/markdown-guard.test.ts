@@ -63,6 +63,29 @@ test("deep nesting and dense emphasis under the size limit are guarded too", () 
   }
 });
 
+test("inline raw HTML that never closes is guarded under the size limit: each opener reads to the paragraph's end", () => {
+  // Processing instructions, comments and declarations: about 275 ms, 155 ms and 185 ms at 12,000 characters unguarded.
+  for (const [name, opener] of [
+    ["processing instructions", "<? "],
+    ["comments", "<!-- "],
+    ["declarations", "<!A "],
+  ] as const) {
+    const text = `a ${opener.repeat((markdownLimits.chars - 2) / opener.length)}`.slice(0, markdownLimits.chars);
+    assert.equal(markdownTooHeavy(text), true, name);
+    for (const [check, run] of [
+      ["prose", () => markdownProse(text)],
+      ["disclosure", () => hasAiDisclosure(text)],
+      ["denial", () => assistanceDenial(text)],
+    ] as const) {
+      markdownProse("warm up");
+      const ms = blocked(run);
+      assert.ok(ms < 200, `${name}, ${check}: ${ms.toFixed(0)} ms`);
+    }
+  }
+  // A template's comments, a page's doctype or a PHP tag in ordinary text are read by the parser.
+  assert.equal(markdownTooHeavy("<!-- Describe your change. -->\nFixes the cap. <!-- why --> See <?php echo 1; ?>.\n<!DOCTYPE html>"), false);
+});
+
 test("ordinary Markdown is read by the parser as before: code, nesting, emphasis and long logs in fences", () => {
   const body = [
     "## Summary",

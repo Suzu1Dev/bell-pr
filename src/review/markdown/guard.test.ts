@@ -34,6 +34,17 @@ test("hostile Markdown of 128 K shows as plain text with a note, quickly, in bot
   assert.match(renderZh(createElement(MarkdownContent, { children: hostile[2] })), new RegExp(panelZh.plainText));
 });
 
+test("inline raw HTML that never closes shows as plain text, quickly", () => {
+  for (const opener of ["<? ", "<!-- ", "<!A "]) {
+    const text = `a ${opener.repeat(11_990 / opener.length)}`;
+    const started = performance.now();
+    const html = renderEn(createElement(MarkdownContent, { children: text }));
+    const ms = performance.now() - started;
+    assert.ok(ms < 200, `${opener}: ${ms.toFixed(0)} ms`);
+    assert.ok(html.includes(`<p class="markdown-plain-note">${panelEn.plainText}</p>`), opener);
+  }
+});
+
 test("2,000 nested block quotes show as plain text instead of overflowing the stack", () => {
   const html = renderEn(createElement(MarkdownContent, { children: `${"> ".repeat(2000)}deep` }));
   assert.match(html, /<pre class="markdown-plain">(?:&gt; ){2000}deep<\/pre>/);

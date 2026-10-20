@@ -3,13 +3,14 @@
  * security review): the parser (micromark with GFM) takes super-linear time
  * on some shapes, and deep nesting overflows the stack in it or in React.
  * Text that is too long, too deeply nested, or too dense in lazy
- * continuation lines, emphasis or link openers is not parsed: the renderer
- * shows it as plain text with a notice, and the draft checks read it with
- * `roughProse`. Both run in linear time. Measured on the parser: the
- * costliest shapes that pass (nested lists by indent, tables, headings,
- * dotted words at 12,000 characters; 1,500 emphasis runs) take up to about
- * 70 ms; beyond the limits, shapes took seconds (setext headings, lazy
- * continuation, emphasis) or threw (nesting).
+ * continuation lines, emphasis, link openers or inline raw HTML is not
+ * parsed: the renderer shows it as plain text with a notice, and the draft
+ * checks read it with `roughProse`. Both run in linear time. Measured on
+ * the parser: the costliest shapes that pass (nested lists by indent,
+ * tables, headings, dotted words at 12,000 characters; 1,500 emphasis runs)
+ * take up to about 70 ms; beyond the limits, shapes took seconds (setext
+ * headings, lazy continuation, emphasis, unclosed inline raw HTML) or threw
+ * (nesting).
  */
 export const markdownLimits = {
   /** Characters of the whole text. */
@@ -20,7 +21,7 @@ export const markdownLimits = {
   depth: 16,
   /** Lines of one paragraph that continue a quote or list item lazily (without its marker or indent). */
   lazyLines: 400,
-  /** Emphasis, strikethrough and link openers in one paragraph. */
+  /** Emphasis, strikethrough and link openers in one paragraph; inline raw HTML ("<!--", "<?", "<!") counts five. */
   delimiters: 500,
 } as const;
 
@@ -30,6 +31,8 @@ const fenceLine = /^[ \t>]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?(`{3,}|~{3,})([^`]*)$
 const containerMarker = /^ {0,3}(?:>|[-*+](?=[ \t]|$)|\d{1,9}[.)](?=[ \t]|$))[ \t]?/;
 /** Emphasis and strikethrough runs (an underscore inside a word is no emphasis) and link openers. */
 const delimiter = /\*+|~+|(?<![\p{L}\p{N}])_+|_+(?![\p{L}\p{N}])|\[/gu;
+/** Inline raw HTML that reads to its closer: unclosed, each reads to the paragraph's end. */
+const htmlOpener = /<[!?]/g;
 
 /** The fence a line opens or closes, or undefined. */
 function fenceOf(line: string) {
@@ -70,7 +73,7 @@ export function markdownTooHeavy(text: string): boolean {
     }
     if (depth) inContainer = true;
     else if (inContainer && !/^[ \t]{2}/.test(line) && ++lazy > markdownLimits.lazyLines) return true;
-    delimiters += rest.match(delimiter)?.length ?? 0;
+    delimiters += (rest.match(delimiter)?.length ?? 0) + 5 * (rest.match(htmlOpener)?.length ?? 0);
     if (delimiters > markdownLimits.delimiters) return true;
   }
   return false;
