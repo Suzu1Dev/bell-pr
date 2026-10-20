@@ -22,6 +22,7 @@ import type {
   GuardOverride,
 } from "./contribution.js";
 import type { CoachDebrief } from "./coach.js";
+import type { ByHandRecord } from "./by-hand.js";
 
 export type RunStatus =
   | "queued"
@@ -185,4 +186,11 @@ export interface RunCore {
    * shows it.
    */
   learnByHand?: true;
+  /**
+   * A Learn-by-hand run's record (shared/by-hand.ts): the person's plan, the
+   * guide's answers, BELL's test runs, the help used and, for a run fitted
+   * to a project's rules, the help set fixed when it started. Absent on
+   * agent runs and until the run records something.
+   */
+  byHand?: ByHandRecord;
 }

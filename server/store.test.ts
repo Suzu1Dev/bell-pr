@@ -1118,16 +1118,166 @@ test("a walkthrough a restart interrupted is failed in the run's language, and c
 // Fields added in v1.2 (Learn by hand), under the same rules: optional, and
 // readable by a build whose schema lacks them (AGENTS.md).
 
+/** Every part of a Learn-by-hand record (shared/by-hand.ts), the fitted help set included. */
+function byHandRecord(): NonNullable<Run["byHand"]> {
+  const entry = {
+    id: "entry-1",
+    at: "2026-10-20T00:20:00.000Z",
+    kind: "hint",
+    stepId: "step-1",
+    rung: 1,
+    tried: "I printed the greeting for an empty name",
+    text: "Look at how the greeting falls back to a default.",
+    ask: "What does the function return for an empty string?",
+    refs: [{ path: "hello.ts", line: 2 }],
+    quotes: [{ path: "hello.ts", startLine: 1, endLine: 3, from: "base", text: "export function greeting(name: string) {" }],
+    removed: 1,
+    changeFingerprint: "0123456789abcdef",
+    model: "gpt-5.5",
+  };
+  return {
+    guidePlan: {
+      summary: "An empty name prints a dangling comma.",
+      steps: [{ title: "Find the greeting", files: ["hello.ts"] }],
+      readFirst: [{ path: "hello.ts", startLine: 1, endLine: 3, why: "The greeting is built here." }],
+      at: "2026-10-20T00:01:00.000Z",
+      removed: 0,
+      dropped: 1,
+    },
+    plan: {
+      steps: [
+        {
+          id: "step-1",
+          title: "Fall back to world for an empty name",
+          files: ["hello.ts"],
+          how: "Check the name before building the text.",
+          doneAt: "2026-10-20T00:40:00.000Z",
+          maxRung: 3,
+          why: "An empty string is falsy, so the default applies to it too.",
+          chosen: { entryId: "entry-2", option: 1, why: "It keeps the function small." },
+        },
+        { id: "step-2", title: "Test the empty name", parkedAt: "2026-10-20T00:41:00.000Z" },
+      ],
+      tests: "A test that greets an empty name.",
+      unsure: "Whether whitespace counts as empty.",
+      prediction: "greeting, because it builds the text.",
+      savedAt: "2026-10-20T00:05:00.000Z",
+      confirmedAt: "2026-10-20T00:10:00.000Z",
+      outlineAt: "2026-10-20T00:06:00.000Z",
+      outlineBeforeDraft: true,
+    },
+    planQuestions: [
+      {
+        id: "question-1",
+        at: "2026-10-20T00:08:00.000Z",
+        kind: "plan",
+        text: "Your plan has no step for the test.",
+        ask: "How will you know the empty name works?",
+      },
+    ],
+    thread: [
+      entry,
+      {
+        ...entry,
+        id: "entry-2",
+        rung: 3,
+        options: [
+          { name: "A default parameter", tradeoff: "Short, but misses the empty string." },
+          { name: "An explicit check", tradeoff: "One more line, and clear." },
+        ],
+      },
+    ],
+    hints: { "step-1": { rung: 3, at: "2026-10-20T00:30:00.000Z", fingerprint: "0123456789abcdef", testRunAt: "2026-10-20T00:25:00.000Z", tried: "I added a check" } },
+    talks: [{ stepId: "step-1", at: "2026-10-20T00:15:00.000Z" }],
+    tests: [
+      {
+        at: "2026-10-20T00:25:00.000Z",
+        command: "npm test",
+        changeFingerprint: "0123456789abcdef",
+        outcome: "failed",
+        exitCode: 1,
+        ms: 1200,
+        prediction: "fail",
+        expect: "greets an empty name",
+        outputTail: "not ok 2 - greets an empty name",
+        tailHash: "9f86d081884c7d65",
+        newFiles: ["coverage/lcov.info"],
+      },
+      { at: "2026-10-20T00:45:00.000Z", command: "npm test", changeFingerprint: "fedcba9876543210", outcome: "passed", ms: 900, reported: true },
+    ],
+    ready: { at: "2026-10-20T00:50:00.000Z", changeFingerprint: "fedcba9876543210", leastSure: "The whitespace case.", review: true },
+    readyHistory: [{ at: "2026-10-20T00:35:00.000Z", changeFingerprint: "0123456789abcdef", review: false }],
+    reviews: [
+      {
+        at: "2026-10-20T00:52:00.000Z",
+        changeFingerprint: "fedcba9876543210",
+        leastSure: "The whitespace case.",
+        testRunAt: "2026-10-20T00:45:00.000Z",
+        verified: "Your last run passed; the diff covers both steps.",
+        checked: ["tests", "the empty-name path"],
+        findings: [
+          {
+            path: "hello.ts",
+            line: 2,
+            observed: "A name of spaces still prints a comma.",
+            evidence: { type: "pattern", path: "hello.ts", line: 2, quote: "name || \"world\"" },
+            why: "Users paste names with spaces.",
+            question: "What should a name of spaces print?",
+            dimension: "tests",
+          },
+        ],
+        removed: 0,
+      },
+    ],
+    events: [
+      { at: "2026-10-20T00:01:00.000Z", kind: "explain", source: "premise", model: "gpt-5.5", cli: "codex" },
+      { at: "2026-10-20T00:20:00.000Z", kind: "answer", source: "hint", rung: 1, stepId: "step-1", model: "gpt-5.5", cli: "codex", removed: 1 },
+    ],
+    agentWrites: 0,
+    removedTotal: 1,
+    checkIns: [{ stepId: "step-1", signal: "button", choice: "talk", at: "2026-10-20T00:14:00.000Z" }],
+    exits: [{ stepId: "step-1", exit: "talk", at: "2026-10-20T00:14:30.000Z" }],
+    leftAt: "2026-10-20T01:00:00.000Z",
+    busy: { kind: "review", since: "2026-10-20T00:51:00.000Z" },
+    helpLock: {
+      kinds: ["explain", "answer", "test"],
+      at: "2026-10-20T00:00:00.000Z",
+      rulesCheckedAt: "2026-10-19T23:59:00.000Z",
+      rules: [
+        {
+          kind: "ban",
+          path: "docs/devel/code-provenance.rst",
+          line: 293,
+          quote: "Current QEMU project policy is to DECLINE any contributions which are believed to include or derive from AI generated content.",
+          allows: [
+            {
+              line: 297,
+              quote: "This policy does not apply to other uses of AI, such as researching APIs or algorithms, static analysis, or debugging, provided their output is not included in contributions.",
+              kinds: ["explain", "answer", "test"],
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
+
 /** A Learn-by-hand run in review that carries every field v1.2 adds to a run. */
 function runWithV12Fields(): Run {
   const run = runWithUpstreamFields();
   run.id = "run-v12-by-hand";
   run.learnByHand = true;
+  run.byHand = byHandRecord();
   return run;
 }
 
 const v12RunSchemas: Record<string, z.ZodTypeAny> = {
   learnByHand: runReadSchema.omit({ learnByHand: true }),
+  byHand: runReadSchema.omit({ byHand: true }),
+  // The help set fixed at the start, a part of the record (DESIGN §7).
+  "byHand.helpLock": runReadSchema.extend({
+    byHand: runReadSchema.shape.byHand.removeCatch().unwrap().omit({ helpLock: true }).optional().catch(undefined),
+  }),
 };
 
 for (const [field, older] of Object.entries(v12RunSchemas))
@@ -1138,3 +1288,27 @@ for (const [field, older] of Object.entries(v12RunSchemas))
     // state.json passes unknown fields through, so the field survives a save.
     assert.deepEqual(read.data, written);
   });
+
+test("a Learn-by-hand record loads and saves unchanged, and a restart clears its busy mark", async (t) => {
+  const run = runWithV12Fields();
+  const { directory, cleanup } = await stateWith([run]);
+  t.after(cleanup);
+  const store = new Store(directory);
+  await store.initialize();
+  assert.equal(store.recovery, undefined);
+  const { busy: _busy, ...rest } = run.byHand!;
+  assert.deepEqual(store.data.runs[0], { ...run, byHand: rest });
+  assert.equal("busy" in store.data.runs[0].byHand!, false);
+  // The run list leaves the record out and keeps the mark.
+  const summary = summarizeRun(store.data.runs[0]);
+  assert.equal("byHand" in summary, false);
+  assert.equal(summary.learnByHand, true);
+  // A part this build cannot read is left out, the rest of the record stays.
+  const odd = runWithV12Fields();
+  (odd.byHand as unknown as Record<string, unknown>).thread = "not a list";
+  const read = lenientRead(runReadSchema).safeParse(JSON.parse(JSON.stringify(odd)));
+  assert.ok(read.success);
+  assert.equal(read.data.byHand?.thread, undefined);
+  assert.equal(read.data.byHand?.helpLock?.kinds.length, 3);
+  assert.equal(read.data.byHand?.agentWrites, 0);
+});

@@ -199,6 +199,203 @@ const attemptSchema = loose({
   }).optional(),
 });
 
+/**
+ * A Learn-by-hand run's record (`RunCore.byHand`, shared/by-hand.ts), with
+ * its write caps. Each part is read on its own, so a part this build cannot
+ * read is left out without the rest.
+ */
+const guideEntrySchema = loose({
+  id: text,
+  at: text,
+  kind: text,
+  stepId: text.optional(),
+  rung: count.optional(),
+  entry: text.optional(),
+  question: text.max(600).optional(),
+  tried: text.max(300).optional(),
+  text: text.max(1200),
+  ask: text.max(300).optional(),
+  refs: z.array(loose({ path: text, line: count, endLine: count.optional() })).max(5).optional(),
+  quotes: z
+    .array(loose({ path: text, startLine: count, endLine: count, from: text, text: text.max(1200) }))
+    .max(3)
+    .optional(),
+  options: z.array(loose({ name: text.max(80), tradeoff: text.max(300) })).max(3).optional(),
+  removed: count.optional(),
+  dropped: count.optional(),
+  changeFingerprint: text.optional(),
+  model: text.optional(),
+});
+/** Carve-out quotes of a project rule and the help kinds each names (PolicyFinding.allows). */
+const allowsSchema = z
+  .array(loose({ line: count, quote: text.max(300), kinds: list.max(5) }))
+  .max(3);
+/** A finding from BELL's checked list of off-repository rules (PolicyFinding.source). */
+const registrySourceSchema = loose({
+  registry: text.max(60),
+  url: text.max(300),
+  version: text.max(80).optional(),
+  checkedOn: text,
+});
+const helpLockSchema = loose({
+  kinds: list.max(5),
+  at: text,
+  rulesCheckedAt: text,
+  rules: z
+    .array(
+      loose({
+        kind: text,
+        path: text,
+        line: count,
+        quote: text.max(300),
+        allows: allowsSchema,
+        source: registrySourceSchema.optional(),
+      }),
+    )
+    .max(4),
+});
+const byHandSchema = loose({
+  guidePlan: later(
+    loose({
+      summary: text.max(1200),
+      steps: z.array(loose({ title: text.max(80), files: list.max(8) })).max(8),
+      readFirst: z
+        .array(loose({ path: text, startLine: count, endLine: count, why: text.max(200) }))
+        .max(5)
+        .optional(),
+      at: text,
+      removed: count.optional(),
+      dropped: count.optional(),
+    }),
+  ),
+  plan: later(
+    loose({
+      steps: z
+        .array(
+          loose({
+            id: text,
+            title: text.max(120),
+            files: list.max(8).optional(),
+            how: text.max(400).optional(),
+            doneAt: text.optional(),
+            parkedAt: text.optional(),
+            maxRung: count.optional(),
+            why: text.max(300).optional(),
+            chosen: loose({ entryId: text, option: count, why: text.max(300) }).optional(),
+          }),
+        )
+        .max(12),
+      tests: text.max(600).optional(),
+      unsure: text.max(600).optional(),
+      prediction: text.max(300).optional(),
+      savedAt: text,
+      confirmedAt: text.optional(),
+      outlineAt: text.optional(),
+      outlineBeforeDraft: z.literal(true).optional(),
+    }),
+  ),
+  planQuestions: later(z.array(guideEntrySchema).max(3)),
+  thread: later(z.array(guideEntrySchema).max(40)),
+  hints: later(
+    z.record(
+      loose({
+        rung: count,
+        at: text,
+        fingerprint: text,
+        testRunAt: text.optional(),
+        tried: text.max(300).optional(),
+      }),
+    ),
+  ),
+  talks: later(z.array(loose({ stepId: text.optional(), at: text })).max(30)),
+  tests: later(
+    z
+      .array(
+        loose({
+          at: text,
+          command: text.max(300),
+          changeFingerprint: text,
+          outcome: text,
+          exitCode: count.optional(),
+          ms: count,
+          prediction: text.optional(),
+          expect: text.max(200).optional(),
+          outputTail: text.max(4000).optional(),
+          tailHash: text.optional(),
+          newFiles: list.max(10).optional(),
+          reported: z.literal(true).optional(),
+        }),
+      )
+      .max(10),
+  ),
+  ready: later(
+    loose({ at: text, changeFingerprint: text, leastSure: text.max(300).optional(), review: z.boolean() }),
+  ),
+  readyHistory: later(
+    z.array(loose({ at: text, changeFingerprint: text, review: z.boolean() })).max(10),
+  ),
+  reviews: later(
+    z
+      .array(
+        loose({
+          at: text,
+          changeFingerprint: text,
+          leastSure: text.max(300).optional(),
+          testRunAt: text.optional(),
+          verified: text.max(400),
+          checked: list.max(8),
+          findings: z
+            .array(
+              loose({
+                path: text,
+                line: count.optional(),
+                observed: text.max(400),
+                evidence: loose({
+                  type: text,
+                  path: text.optional(),
+                  line: count.optional(),
+                  quote: text.max(300).optional(),
+                }),
+                why: text.max(300),
+                question: text.max(300),
+                dimension: text.optional(),
+              }),
+            )
+            .max(3),
+          removed: count.optional(),
+        }),
+      )
+      .max(6),
+  ),
+  events: later(
+    z
+      .array(
+        loose({
+          at: text,
+          kind: text,
+          source: text,
+          rung: count.optional(),
+          stepId: text.optional(),
+          model: text.optional(),
+          cli: text.optional(),
+          removed: count.optional(),
+        }),
+      )
+      .max(300),
+  ),
+  agentWrites: later(count),
+  removedTotal: later(count),
+  checkIns: later(
+    z
+      .array(loose({ stepId: text.optional(), signal: text, choice: text.optional(), at: text }))
+      .max(20),
+  ),
+  exits: later(z.array(loose({ stepId: text.optional(), exit: text, at: text })).max(20)),
+  leftAt: later(text),
+  busy: later(loose({ kind: text, since: text })),
+  helpLock: later(helpLockSchema),
+});
+
 /** What an agent reported the machine lacks (TeamTask.setup, FollowUpRound.setup); its write caps. */
 const setupNeedsSchema = z
   .array(loose({ need: text.max(120), command: text.max(300), reason: text.max(600) }))
@@ -373,6 +570,7 @@ export const runReadSchema = loose({
     reviewability: later(loose({ testReasons: z.record(text.max(300)).optional() })),
     // v1.2 (Learn by hand), optional in the same way.
     learnByHand: later(z.literal(true)),
+    byHand: later(byHandSchema),
 });
 
 const runSchema = lenientRead(runReadSchema);
@@ -476,6 +674,8 @@ export class Store {
           walkthrough.error = recovery.walkthrough;
         }
       }
+      // A guide turn or a test run a restart stopped is over; nothing waits for it.
+      if (run.byHand?.busy) delete run.byHand.busy;
       // A re-review interrupted by a crash leaves reviewer/tester agents "running" on a finished run.
       if (!["running", "queued"].includes(run.status) && !run.publishing) {
         for (const agent of run.agents)
