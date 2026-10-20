@@ -960,7 +960,7 @@ const notTheProjects =
   /\b(?:no\s+longer|anymore|used\s+to|previously|formerly|until\s+recently|in\s+the\s+past|whether|myths?|misconceptions?|(?:some|many|other)\s+(?:people|contributors|users|folks|projects)|people\s+(?:often\s+|sometimes\s+)?(?:think|believe|say|claim|assume)|(?:you|they|others)\s+(?:may|might)\s+(?:think|believe|hear|have\s+heard)|(?:it\s+is|it['’]s)\s+(?:often\s+|commonly\s+|widely\s+|sometimes\s+)?(?:said|claimed|believed|assumed|thought))\b/i;
 /** The next sentence takes it back: "Just kidding: it is not." */
 const takenBack =
-  /^\W*(?:just\s+kidding|kidding|not\s+really|nope|(?:it|that|this)\s+(?:is|was)(?:\s+not|n['’]t)\b|(?:it|that|this)\s+no\s+longer\b)/i;
+  /^\W*(?:(?:actually|however|but|well|update|edit|correction|wait)\b\W*)?(?:just\s+kidding|kidding|not\s+really|nope|no\s*[,:;.!]|not\s+anymore|(?:it|that|this)\s+(?:is|was)(?:\s+not|n['’]t)\b|(?:it|that|this)\s+no\s+longer\b)/i;
 /** A sentence about AI help, as carve-outs are. */
 const aiMention =
   /\b(?:AI|LLMs?|large\s+language\s+models?|language\s+models?|generative|chatbots?|ChatGPT|Copilot|Claude|Codex|Gemini|machine[- ]learning|artificial\s+intelligence)\b/i;
@@ -1034,12 +1034,42 @@ export function attachCarveOuts(path: string, text: string, findings: PolicyFind
   );
 }
 
+/**
+ * Text no reader sees as the project's permission, blanked with its lines
+ * kept: HTML comments and, in reStructuredText, comments (".. " lines that
+ * are no directive or target, with their indented lines).
+ */
+function withoutComments(text: string, rest: boolean) {
+  const blankLines = (part: string) => part.replace(/[^\n]/g, " ");
+  if (!rest) return text.replace(/<!--[\s\S]*?(?:-->|$)/g, blankLines);
+  let comment: number | undefined;
+  return text
+    .split("\n")
+    .map((line) => {
+      const indent = line.length - line.trimStart().length;
+      if (comment !== undefined && (!line.trim() || indent > comment)) return blankLines(line);
+      comment = /^\s*\.\.(?:\s|$)(?!\s*(?:[\w.+-]+::|_|\[|\|))/.test(line) ? indent : undefined;
+      return comment === undefined ? line : blankLines(line);
+    })
+    .join("\n");
+}
+/** A lead-in that quotes or shows somebody else's text: "LLVM's policy says:", "for comparison", "an example policy". */
+const reportedLead =
+  /\b(?:says?|said|states?|stated|writes?|wrote|puts\s+it)\b\W*$|\bfor\s+comparison\b|\b(?:example|sample|template)\s+(?:polic(?:y|ies)|text|wording|rules?)\b/i;
+/** A quote's attribution: "> — from another project's guide". */
+const attribution = /(?:^|\s)(?:\u2014|\u2015|--)\s*\S/;
+/** A list item marked as not fine: "❌ …", "No: …", "Not …". */
+const markedNo = /^\s*(?:[-*+]|\d{1,9}[.)])\s+(?:\[[ xX]\]\s+)?(?:\u274c|\u2717|\u2718|\u2716|\u{1f6ab}|\u26d4|:x:|:no_entry(?:_sign)?:|(?:no|not|never|don['’]t|avoid)\b)/iu;
+
 /** Every carve-out of a document, in reading order (see attachCarveOuts). */
 function readCarveOuts(path: string, document: string): PolicyAllowance[] {
-  const text = visibleText(document);
   const rest = /\.rst$/i.test(path);
+  const text = withoutComments(visibleText(document), rest);
   const raw = text.split(/\r?\n/);
   const all = blocks(rest ? restProse(text) : rawProse(text));
+  // A Markdown indented code block: four spaces in, after a block that is no list item.
+  const indentedCode = (index: number) =>
+    !rest && /^(?: {4}|\t)/.test(raw[all[index].starts[0].line - 1] ?? "") && !(index && listItem.test(all[index - 1].text));
   // A heading, a bold line or a lead-in ending in ":" (not a directive), or a reStructuredText title.
   const headingOf = (block: Block) => {
     const plain = block.text.replace(/:[\w.+-]+:`[^`]*`/g, "").trim();
@@ -1064,15 +1094,23 @@ function readCarveOuts(path: string, document: string): PolicyAllowance[] {
     if (kinds.length && quote.quote.trim() && !found.some((other) => other.quote === quote.quote))
       found.push({ line: lineAt(block, quote.offset), quote: quote.quote, kinds });
   };
+  // The lead-in of a list item: a list item ending in ":" before it ("Not acceptable:"), else the heading.
+  const leadOf = (index: number) => {
+    for (let at = index - 1; at >= 0 && listItem.test(all[at].text); at--)
+      if (all[at].text.trim().endsWith(":")) return searchable(all[at].text.replace(listItem, ""));
+    return nearestHeading(index, (other) => listItem.test(other.text));
+  };
   all.forEach((block, index) => {
     const under = nearestHeading(index, () => true);
-    if (under !== undefined && (refusingHeading.test(under) || notTheProjects.test(under))) return;
+    if (under !== undefined && (refusingHeading.test(under) || notTheProjects.test(under) || reportedLead.test(under))) return;
+    if (indentedCode(index) || (/^\s*>/.test(block.text) && attribution.test(block.text))) return;
     const search = searchable(block.text);
-    // A list item under "Acceptable uses" (only list items between them).
-    const lead = listItem.test(block.text) ? nearestHeading(index, (other) => listItem.test(other.text)) : undefined;
+    // A list item under "Acceptable uses" (only list items between them), unless marked as not fine.
+    const lead = listItem.test(block.text) && !markedNo.test(block.text) ? leadOf(index) : undefined;
     const whole = { start: 0, end: block.text.length };
     if (
       lead !== undefined &&
+      !refusingHeading.test(lead) &&
       acceptableHeading.test(lead) &&
       headingTopic.test(lead) &&
       !permissionScoped.test(lead) &&
