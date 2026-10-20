@@ -15,7 +15,8 @@ import path from "node:path";
 import type { ByHandReview, GuideEntry } from "../shared/by-hand.js";
 import { changeFingerprint } from "../shared/change-fingerprint.js";
 import type { AgentProvider } from "../shared/models.js";
-import { guideTurnPrompt, reviewInput, storedGuideAnswer, storedReview, type GuideRequest, type GuideRun } from "./by-hand-guide.js";
+import { filterAgentText } from "../shared/by-hand-filter.js";
+import { chatText, guideTurnPrompt, reviewInput, reviewMarkdown, storedGuideAnswer, storedReview, type GuideRequest, type GuideRun } from "./by-hand-guide.js";
 import { guideAnswerJsonSchema, reviewerAnswerJsonSchema } from "./by-hand-schemas.js";
 import { readDiff } from "./git.js";
 import { withLocale } from "./i18n/index.js";
@@ -64,23 +65,14 @@ export interface Thresholds {
   minimumSample: { runsPerProvider: number };
 }
 
-export interface EvalFixtures {
-  files: Files;
-  tasks: EvalTask[];
-  personas: Persona[];
-  thresholds: Thresholds;
-}
+export interface EvalFixtures { files: Files; tasks: EvalTask[]; personas: Persona[]; thresholds: Thresholds }
 
 /** One model call: a read-only turn of the guide or the reviewer under its JSON Schema; returns the raw answer. */
 export interface EvalCall { provider: AgentProvider; role: "guide" | "reviewer"; prompt: string; schema: object; cwd: string }
 export type EvalRunner = (call: EvalCall) => Promise<string>;
 
 export interface EvalTurn {
-  kind: string;
-  rung?: number;
-  question?: string;
-  tried?: string;
-  asksForMore?: boolean;
+  kind: string; rung?: number; question?: string; tried?: string; asksForMore?: boolean;
   ms: number;
   /** The raw answer, before the filter; absent when the call failed. */
   raw?: string;
@@ -89,7 +81,7 @@ export interface EvalTurn {
   error?: string;
   removed: number;
   dropped: number;
-  /** Code in the stored answer that neither the files nor the diff have (a filter bug). */
+  /** Code in the stored answer, or in what BELL renders of it, that neither the files nor the diff have (a filter bug). */
   postLeaks: string[];
   /** Overlap with the hidden change's added lines (personas 1-7). */
   similarity?: number;
@@ -157,13 +149,13 @@ export function editSimilarity(prose: string, added: readonly string[]) {
   return Math.round(best * 100) / 100;
 }
 
-/** The prose of a stored answer: what the person reads besides BELL's quotes. */
-function prose(stored: GuideEntry | ByHandReview | undefined) {
-  if (!stored) return "";
-  if ("findings" in stored)
-    return [stored.verified, ...stored.checked, ...stored.findings.flatMap((finding) => [finding.observed, finding.why, finding.question])].join("\n");
-  return [stored.text, stored.ask ?? "", ...(stored.options ?? []).flatMap((option) => [option.name, option.tradeoff])].join("\n");
+/** The prose fields of a stored answer: what the person reads besides BELL's quotes. */
+function fields(stored: GuideEntry | ByHandReview | undefined) {
+  if (!stored) return [];
+  if ("findings" in stored) return [stored.verified, ...stored.checked, ...stored.findings.flatMap((finding) => [finding.observed, finding.why, finding.question])];
+  return [stored.text, stored.ask ?? "", ...(stored.options ?? []).flatMap((option) => [option.name, option.tradeoff])];
 }
+const prose = (stored: GuideEntry | ByHandReview | undefined) => fields(stored).join("\n");
 
 const fencePattern = /(`{3,}|~{3,})[^\n]*\n([\s\S]*?)(?:\n[ \t]*\1[`~]*[ \t]*(?=\n|$)|$(?![\s\S]))/g;
 const inlinePattern = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g;
@@ -173,8 +165,10 @@ const commandLike = /^(?:npm|npx|node|yarn|pnpm|git)\b[^;{}()<>=]*$/;
 /**
  * Code in a stored answer that the base files, the worktree and the diff
  * don't have: a fenced block with a line none of them has, an inline span
- * none of them contains, a quote whose text is not its file's lines, or a
- * path that is no file or folder of the checkout.
+ * none of them contains, code in a prose field or in what BELL renders from
+ * the answer (a review's Markdown, a chat answer) that the filter would
+ * remove, a quote whose text is not its file's lines, or a path that is no
+ * file or folder of the checkout.
  */
 export function postFilterLeaks(stored: GuideEntry | ByHandReview | undefined, sources: { files: Files; worktree: Files; diff: string }) {
   if (!stored) return [];
@@ -197,7 +191,13 @@ export function postFilterLeaks(stored: GuideEntry | ByHandReview | undefined, s
   const paths = [...Object.keys(sources.files), ...Object.keys(sources.worktree)];
   const places = "findings" in stored ? stored.findings.flatMap((finding) => [finding.path, finding.evidence.path]) : [...(stored.refs ?? []), ...(stored.quotes ?? [])].map((place) => place.path);
   for (const place of places) if (place !== undefined && !paths.some((file) => file === place || file.startsWith(`${place}/`))) leaks.push(place);
-  return leaks;
+  if (leaks.length) return leaks;
+  // Code the filter would still remove from a prose field or from what BELL renders of it (a review's Markdown, a chat answer).
+  const byFile = (map: Files) => Object.fromEntries(Object.entries(map).map(([file, content]) => [file, lines(content)]));
+  const all = { base: byFile(sources.files), worktree: byFile(sources.worktree), diff: sources.diff };
+  const rendered = "findings" in stored ? reviewMarkdown(stored) : stored.kind === "chat" ? chatText(stored) : "";
+  const shown = [...fields(stored), rendered].map((value) => value.replace(fencePattern, " ").replace(inlinePattern, " "));
+  return shown.filter((piece) => filterAgentText(piece, all).removed).slice(0, 1).map((piece) => piece.trim().slice(0, 300));
 }
 
 /** An answer that is only a question: no place, quote or option, and nothing but questions in its prose. */

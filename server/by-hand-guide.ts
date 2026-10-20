@@ -339,7 +339,7 @@ const literalFences = (text: string) =>
 const oneLine = (text: string) => literalFences(text).replace(/\s*\n\s*/g, " ");
 
 /** A chat answer as the conversation stores it: the prose, the guide's question, BELL's quotes. */
-function chatText(entry: GuideEntry) {
+export function chatText(entry: GuideEntry) {
   const messages = sm().byHand.guide;
   const unnamed = (entry.refs ?? []).filter((ref) => !entry.text.includes(`${ref.path}:${ref.line}`));
   return [
