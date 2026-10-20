@@ -16,7 +16,7 @@ function file(path: string, lines: number): CheckFile {
   return { path, fingerprint: `${path}@1`, additions: lines, deletions: 0 };
 }
 const questions = {
-  fallback: (path: string) => `You wrote the change to \`${path}\`. Why this way rather than another, and what would break if it were wrong?`,
+  fallback: (path: string) => `You wrote the change to ${path}. Why this way rather than another, and what would break if it were wrong?`,
   untested: "What did you not test, and why?",
 };
 const card = (question: string, answer: string): ChangeExplanation => ({

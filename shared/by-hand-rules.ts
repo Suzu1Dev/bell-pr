@@ -100,13 +100,14 @@ const carveOutTable: readonly (readonly [RegExp, readonly HelpKind[]])[] = [
  * Help the person does themselves, not AI: "code that you then debug
  * yourself", "code you can explain", "research the APIs yourself"; never
  * help AI gives the person ("help you debug", "so you can understand").
+ * Read in the 60 characters before the word and the 200 after it.
  */
 const personBefore = /\b(?:you|I|we|they|contributors?)\s+(?:(?:then|later|still|first|also|can|could|must|should|will|may|need\s+to|have\s+to)\s+){0,2}$/i;
 const helpedBefore = /\b(?:help(?:s|ed|ing)?|let(?:s|ting)?|allow(?:s|ing)?|enabl(?:e|es|ing)|so(?:\s+that)?)\s+(?:you|me|us|them|contributors?)\s+(?:(?:to|can|could|better)\s+)?$/i;
 const personAfter = /^\W*(?:[\w'-]+\s+){0,3}?(?:yourself|yourselves|on\s+your\s+own|by\s+yourself|by\s+hand|manually)\b/i;
 function byPerson(text: string, at: number, end: number) {
   const before = text.slice(Math.max(0, at - 60), at);
-  return (personBefore.test(before) && !helpedBefore.test(before)) || personAfter.test(text.slice(end));
+  return (personBefore.test(before) && !helpedBefore.test(before)) || personAfter.test(text.slice(end, end + 200));
 }
 
 /** The help kinds a carve-out's permitted words name (the F12 word table) where AI gives that help, in vocabulary order. */

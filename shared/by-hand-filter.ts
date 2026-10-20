@@ -30,6 +30,7 @@
  * outside its file is dropped and counted.
  */
 import { byHandLimits, type GuideQuote } from "./by-hand.js";
+import { htmlCodeElements, inlineCodeSpans, replaceSpans, sourceText, verbatimLines } from "./by-hand-filter-parts.js";
 
 /** The text the filter checks agent output against. */
 export interface FilterSources {
@@ -73,33 +74,6 @@ export interface FilteredGuideOutput {
 }
 
 const removedMark = "…";
-const trimEnd = (line: string) => line.replace(/\s+$/, "");
-
-/** Every file's lines at base and in the worktree. */
-const allFiles = (sources: FilterSources) =>
-  [...Object.values(sources.base), ...Object.values(sources.worktree)].filter(
-    (lines): lines is readonly string[] => !!lines,
-  );
-
-/** Whether `block` is a contiguous run of lines of one of the files (trailing spaces aside). */
-function verbatimLines(block: readonly string[], sources: FilterSources) {
-  const wanted = block.map(trimEnd);
-  while (wanted.length && !wanted[wanted.length - 1]) wanted.pop();
-  while (wanted.length && !wanted[0]) wanted.shift();
-  if (!wanted.length) return false;
-  return allFiles(sources).some((lines) => {
-    const file = lines.map(trimEnd);
-    for (let start = 0; start + wanted.length <= file.length; start++)
-      if (wanted.every((line, index) => file[start + index] === line)) return true;
-    return false;
-  });
-}
-
-/** The cited files' text and the person's diff, where code the guide shows must occur. */
-const corpus = (sources: FilterSources) => [
-  ...allFiles(sources).map((lines) => lines.join("\n")),
-  ...(sources.diff ? [sources.diff] : []),
-];
 
 /** Commands and redirections that edit a file. */
 const editing = /\bsed\s+(?:-\w*\s+)*-\w*i|\bperl\s+(?:-\w*\s+)*-\w*[pi]\w*i|\bpatch\b|\bgit\s+apply\b|\btee\b|>{1,2}|\bawk\s+(?:-\w+\s+)*-i\b|\bed\b/;
@@ -129,12 +103,10 @@ function safeCommand(span: string, sources: FilterSources, isWord: (word: string
 /**
  * Fenced code blocks, ``` or ~~~, after any indentation, quote marker or
  * list marker, closed by the same fence or running to the end of the text.
+ * An opening run is read once: a shorter one would fail the same way.
  */
 const fence =
-  /^((?:[ \t]*>)*[ \t]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?[ \t]*)(`{3,}(?![^\n]*`)|~{3,})[^\n]*\n([\s\S]*?)(?:\n(?:[ \t]*>)*[ \t]*\2[`~]*[ \t]*(?=\n|$)|$(?![\s\S]))/gm;
-/** HTML elements that show code (the guide's text is never rendered as HTML, so the code would show). */
-const htmlCode =
-  /<(pre|code|samp|kbd|tt|var|xmp|listing|plaintext|textarea|script|style)\b[^>]*>([\s\S]*?)(?:<\/\1\s*>|$(?![\s\S]))/gi;
+  /^((?:[ \t]*>)*[ \t]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?)(`{3,}(?![^\n]*?`)|~{3,}(?!~))[^\n]*\n([\s\S]*?)(?:\n(?:[ \t]*>)*[ \t]*\2[`~]*[ \t]*(?=\n|$)|$(?![\s\S]))/gm;
 /** A unified diff's hunk header. */
 const hunkHeader = /^[ \t]*@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/;
 /** A line a diff adds, after any indentation or quote marker; "++" is not one. */
@@ -146,8 +118,10 @@ const listMarker = /^[ \t]*(?:[-*+]|\d{1,9}[.)])[ \t]+(?=\S)/;
 /** The width of a line's indentation, a tab counting as 4 columns. */
 const indentOf = (row: string) => (/^[ \t]*/.exec(row)?.[0] ?? "").replace(/\t/g, "    ").length;
 /** A line without up to `width` columns of indentation. */
-const dedent = (row: string, width: number) =>
-  row.replace(/^[ \t]+/, (margin) => margin.replace(/\t/g, "    ")).replace(new RegExp(`^ {0,${width}}`), "");
+const dedent = (row: string, width: number) => {
+  const spaced = row.replace(/^[ \t]+/, (margin) => margin.replace(/\t/g, "    "));
+  return spaced.slice(Math.min(width, indentOf(spaced)));
+};
 /**
  * A long run of base64 (or base64url) text with the mix of capitals,
  * small letters and digits that encoding gives: a payload the person
@@ -161,8 +135,6 @@ const encoded = (run: string) => {
 };
 /** Marks text held aside while the rules run; never kept from agent text. */
 const holdMark = "\uE000";
-/** Inline code spans of one or more backticks. */
-const inline = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g;
 /**
  * An expression written into prose: operands joined by code operators with
  * spaces around them, no-break ones too ("delayMs * 2 ** attempt;", "a ?? b"),
@@ -172,7 +144,7 @@ const inline = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g;
  */
 const [space, strong] = [String.raw`[ \t\u00A0\u2000-\u200A\u202F\u205F\u3000]`, String.raw`\?\?|<<=?|>>>?=?|[-+*/%&|^]=|=>|===?|!==?|<=|>=|&&|\|\||=`];
 const expression = new RegExp(
-  String.raw`[\w$.()[\]'"]+(?:(?:${space}+(?:${strong}|\*\*|[<>*%+])${space}+|${space}+(?:${strong})|(?:${strong})${space}+|${space}+\*(?=\d)|\*${space}+(?=\d))[\w$.()[\]'"]+)+;?`,
+  String.raw`(?<![\w$.()[\]'"])[\w$.()[\]'"]+(?:(?:${space}+(?:${strong}|\*\*|[<>*%+])${space}+|${space}+(?:${strong})|(?:${strong})${space}+|${space}+\*(?=\d)|\*${space}+(?=\d))[\w$.()[\]'"]+)+;?`,
   "g",
 );
 /** Identifier-like words of prose: camelCase, snake_case and calls such as `retry(` (not "file(s)"); never part of a path. */
@@ -197,11 +169,11 @@ const compactOperator =
   /[\w$'")\]](?:===|!==|==|!=|<=|>=|=>|&&|\|\||\?\?|\?\.|\*\*=?|<<=?|>>>?=?|::|[-+*/%&|^]=|[=*%<>+])(?=[\w$'"([{!-])/;
 /** Other shapes of code without spaces: "i++", "++i", "arr[i]", "x?1:2", "{retries:3}". */
 const compactShapes = [
-  /(?<![\w$+])(?![cCgG]\+\+)[A-Za-z_$][\w$.]*(?:\+\+|--)(?![\w$+-])/,
+  /(?<![\w$.+])(?![cCgG]\+\+)[A-Za-z_$][\w$.]*(?:\+\+|--)(?![\w$+-])|(?<![\w$.])(?=[\w$.]*(?:\+\+|--)(?![\w$+-]))[\w$.]*?\.(?![cCgG]\+\+)[A-Za-z_$]/,
   /(?<![\w$+])\+\+[A-Za-z_$]/,
-  /(?<![\w$])[A-Za-z_$][\w$]*\[[^\]\s]*\]/,
+  /(?=\])(?<=(?<![\w$])[A-Za-z_$][\w$]*\[[^\]\s]*)\]/,
   /[\w$)\]]\?[\w$("'-][^\s?:]*:[\w$("'-]/,
-  /\{[^{}\s]*[:;=,(][^{}]*\}/,
+  /\{[^{}\s:;=,(]*[:;=,(][^{}]*\}/,
 ];
 /** Whether a run of text without spaces is code (a CLI flag such as "--max-count=5" and a shortcut are not). */
 const compactCode = (run: string) =>
@@ -322,7 +294,7 @@ function indentedBlocks(text: string, block: (rows: string[], width: number) => 
 /** The text of an HTML element's content: no tags, the usual entities decoded. */
 const elementText = (body: string) =>
   body
-    .replace(/<\/?[A-Za-z][^>]*>/g, "")
+    .replace(/<\/?[A-Za-z][^<>]*>/g, "")
     .replace(/&(lt|gt|quot|#39|apos|amp);/g, (_entity, name: string) =>
       ({ lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'", amp: "&" })[name] ?? "",
     );
@@ -339,16 +311,10 @@ export function filterAgentText(
   sources: FilterSources,
   options: { tooling?: boolean; refs?: readonly { path: string; line: number; endLine?: number }[] } = {},
 ): Filtered<string> {
-  const known = corpus(sources);
+  // The sources' text, whole words and single lines (sourceText), read once per sources object.
+  const { known, words, lines } = sourceText(sources);
   const occurs = (code: string) => known.some((source) => source.includes(code));
-  // An identifier counts as a whole word of the sources: "wait" is not one because "await" is.
-  const words = new Set(known.flatMap((source) => source.match(/[A-Za-z_$][\w$]*/g) ?? []));
   const isWord = (word: string) => words.has(word);
-  // Single lines of the files and of the person's diff (without its +, - or space), for diff lines.
-  const lines = new Set([
-    ...allFiles(sources).flatMap((file) => file.map((line) => line.trim())),
-    ...(sources.diff ?? "").split("\n").map((line) => line.slice(1).trim()),
-  ]);
   const knownLine = (line: string) => !line.trim() || lines.has(line.trim());
   let removed = 0;
   const remove = () => {
@@ -370,27 +336,27 @@ export function filterAgentText(
     const rows = body.split("\n");
     return block(whole, rows, rows.map((row) => dedent(prefix.includes(">") ? row.replace(quoted, "") : row, margin)));
   });
-  value = value.replace(htmlCode, (whole, _tag: string, body: string) => {
+  value = replaceSpans(value, htmlCodeElements(value), (whole, body) => {
     const code = elementText(body);
     return !code.trim() || occurs(code.trim()) || verbatimLines(code.split("\n"), sources) ? hold(whole) : remove();
   });
   value = diffLines(value, knownLine, hold, remove);
   value = indentedBlocks(value, (rows, width) => block(rows.join("\n"), rows, rows.map((row) => dedent(row, width))));
-  value = value
-    .replace(inline, (span, _ticks: string, body: string) => {
-      const code = body.trim();
-      return code && (occurs(code) || (options.tooling && safeCommand(code, sources, isWord))) ? hold(span) : remove();
-    })
+  value = replaceSpans(value, inlineCodeSpans(value), (span, body) => {
+    const code = body.trim();
+    return code && (occurs(code) || (options.tooling && safeCommand(code, sources, isWord))) ? hold(span) : remove();
+  })
     .replace(/\bhttps?:\/\/\S+/g, (url) => ([...url.matchAll(encodedRun)].some(([run]) => payload(run)) || linkCode(url) ? remove() : hold(url)));
   // From here on the rules read prose as Markdown shows it.
   value = asShown(value).replace(encodedRun, (run) => (payload(run) ? remove() : run));
   value = replaceShown(value, expression, (code) =>
-    occurs(code.replace(/[.,;:]+$/, "")) || keyChord.test(code.replace(/\s+/g, "")) ? undefined : remove(),
+    occurs(code.replace(/(?<![.,;:])[.,;:]+$/, "")) || keyChord.test(code.replace(/\s+/g, "")) ? undefined : remove(),
   );
   // Code without spaces goes with the run of text it is in, sentence punctuation aside.
   value = value.replace(word, (run) => {
-    const code = run.replace(/[.,:!?]+$/, "");
-    const bare = code.replace(/^[(["']+|[)\]"';]+$/g, "");
+    const code = run.replace(/(?<![.,:!?])[.,:!?]+$/, "");
+    // Without its opening brackets and quotes, then its closing ones (read from where their run starts).
+    const bare = code.replace(/^[(["']+/, "").replace(/(?<![)\]"';])[)\]"';]+$/, "");
     return !compactCode(code) || occurs(code) || (!!bare && occurs(bare)) ? run : remove() + run.slice(code.length);
   });
   value = value.replace(identifier, (name) => (isWord(name) || emoticon.test(name) ? name : remove()));
