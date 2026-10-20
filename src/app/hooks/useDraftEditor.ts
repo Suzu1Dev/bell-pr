@@ -168,6 +168,9 @@ export function useDraftEditor({
     !!followUp &&
     (!draftCommitMessage.trim() ||
       !!draftChecks?.findDraftPlaceholders(draftCommitMessage).length);
+  // The server's list for this run and approval has been read.
+  const serverChecksRead =
+    serverChecks?.runId === run.id && serverChecks.fingerprint === run.approvedFingerprint;
   const publishChecks: DraftCheck[] = followUp
     ? []
     : mergePublishChecks(
@@ -179,10 +182,7 @@ export function useDraftEditor({
           },
           locale,
         ) ?? [],
-        serverChecks?.runId === run.id &&
-          serverChecks.fingerprint === run.approvedFingerprint
-          ? serverChecks.checks
-          : undefined,
+        serverChecksRead ? serverChecks.checks : undefined,
       );
   const publishBlocked = publishChecks.find((check) => check.kind === "block");
   const publishConfirmations = publishChecks.filter(
@@ -378,6 +378,7 @@ export function useDraftEditor({
     followUp,
     commitMessageUnfinished,
     publishChecks,
+    serverChecksRead,
     publishBlocked,
     publishConfirmations,
     loadPublishChecks,

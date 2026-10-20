@@ -50,6 +50,7 @@ const rowOfCheck: Partial<Record<DraftCheck["id"], ChecklistRowId>> = {
   issue: "issue",
   brevity: "words",
   "ai-ban": "rules",
+  "by-hand-rules": "rules",
   "project-rules": "rules",
   "pr-closed": "door",
   "issue-closed": "issue",
@@ -125,6 +126,8 @@ export interface ChecklistInput {
    * description with it. Without one, nothing says whose words it is.
    */
   suggestion?: boolean;
+  /** Checks only the server's list decides that it hasn't brought yet: their rows wait for it. */
+  awaiting?: readonly DraftCheck["id"][];
 }
 
 /** The reason each part of the facts could not be read, by part, in `locale`. */
@@ -152,6 +155,7 @@ export function checklistRows(
     if (row) byRow.set(row, [...(byRow.get(row) ?? []), check]);
   }
   const unknown = unknownReasons(facts?.unknown, locale);
+  const awaiting = new Set(input.awaiting?.map((check) => rowOfCheck[check]));
   const door = facts?.door ?? rules?.door;
   const issue = facts?.issue;
   const pacing = facts?.pacing;
@@ -163,6 +167,7 @@ export function checklistRows(
     id: ChecklistRowId,
     fallback: () => Omit<ChecklistRow, "id">,
   ): ChecklistRow => {
+    if (awaiting.has(id)) return { id, status: "unknown", lines: [m.draftUnknown], sources: [] };
     const fired = byRow.get(id) ?? [];
     if (!fired.length) return { id, ...fallback() };
     const status = fired.reduce<ChecklistStatus>(

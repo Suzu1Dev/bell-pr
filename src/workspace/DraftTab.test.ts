@@ -121,6 +121,7 @@ const element = (
         async setAiDisclosure() {},
         alwaysDiscloseAi: undefined,
         publishChecks: [],
+        serverChecksRead: true,
         async loadPublishChecks() {},
         ...draft,
       },

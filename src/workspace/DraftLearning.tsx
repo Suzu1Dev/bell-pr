@@ -49,6 +49,7 @@ export function DraftGuide({
       {...(facts ? { facts } : {})}
       understanding={check}
       changes={changesOf(run, files, repo, sample)}
+      byHandRun={run}
     />
   );
 }

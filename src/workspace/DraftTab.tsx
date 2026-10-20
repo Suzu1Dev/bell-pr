@@ -89,6 +89,7 @@ interface DraftTabProps {
     | "setAiDisclosure"
     | "alwaysDiscloseAi"
     | "publishChecks"
+    | "serverChecksRead"
     | "loadPublishChecks"
   >;
   actions: Pick<RunActions, "feedbackLoading" | "fetchPrFeedback">;
@@ -634,7 +635,8 @@ export function DraftTab({
             alwaysDiscloseAi={alwaysDiscloseAi}
             draftBody={draftBody}
             onAiDisclosureChange={(on) => void setAiDisclosure(on)}
-            checks={checkable && draftChecks ? publishChecks : undefined}
+            // A Learn-by-hand run's rule rows wait for the server's list (DESIGN v1.2 F12).
+            checks={checkable && draftChecks && (draft.serverChecksRead || !run.learnByHand) ? publishChecks : undefined}
             readOnly={run.status === "published"}
           />
         </Suspense>

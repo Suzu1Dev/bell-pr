@@ -8,7 +8,11 @@ import { draftPreflight, type DraftCheck } from "../../shared/draft-checks";
 import { reviewabilitySnapshot } from "../../shared/reviewability";
 import { sampleRules as buildSampleRules } from "../mission/respect";
 import type { ByHandRunFacts } from "../../shared/by-hand";
-import type { ContributionFacts, ContributionRules } from "../../shared/contribution";
+import {
+  byHandRulesDecisionInTests,
+  type ContributionFacts,
+  type ContributionRules,
+} from "../../shared/contribution";
 import {
   aiDisclosureLine,
   withAiDisclosure,
@@ -691,5 +695,56 @@ test("a Learn-by-hand run gets no generate button, no suggestion and no AI line,
     // The helpers stand where an agent run is offered a suggestion.
     assert.ok(html.includes('<p id="by-hand-helpers">Helpers</p>'));
     assert.ok(!html.includes("draft-guidance-empty") && !html.includes("draft-guidance-apply"));
+  }
+});
+
+test("a clean Learn-by-hand run's rule rows come only from the server's checks, never from the mirror", () => {
+  const rules: ContributionRules = {
+    checkedAt: "2026-10-20T08:00:00.000Z",
+    findings: [{ kind: "ban", path: "docs/policy.md", line: 4, quote: "We decline AI-generated contributions.", contribution: true }],
+    filesRead: ["docs/policy.md"],
+  };
+  const quoted: DraftCheck = { id: "by-hand-rules", kind: "confirm", message: "Quoted confirm from the server.", details: ["Why.", "docs/policy.md:4"] };
+  const ban: DraftCheck = { id: "ai-ban", kind: "block", message: "Ban from the server.", details: ["Why.", "docs/policy.md:4"] };
+  const render = (checks: DraftCheck[] | undefined, run = byHandRun()) =>
+    renderEn(
+      createElement(DraftGuidancePanel, {
+        preparation: undefined,
+        busy: false,
+        onGenerate: () => {},
+        onApply: () => {},
+        draftBody: "My own words.",
+        rules,
+        byHandRun: run,
+        ...(checks ? { checks } : {}),
+      }),
+    );
+  // The mirror would confirm where the server blocks, and the reverse.
+  for (const [decision, server, shown, hidden] of [
+    ["confirm", [ban], "Ban from the server.", "BELL PR is quoting the project"],
+    ["block", [quoted], "Quoted confirm from the server.", "publishes here only through"],
+  ] as const) {
+    byHandRulesDecisionInTests((findings) =>
+      decision === "confirm"
+        ? { blocked: [], confirmable: findings.bans.map((finding) => ({ finding, allows: [], others: [] })) }
+        : { blocked: findings.bans.map((finding) => ({ finding, reason: "rules-unread" as const })), confirmable: [] },
+    );
+    try {
+      const html = render([...server]);
+      assertNoHan(html);
+      const row = checklistRow(html, "rules");
+      assert.ok(row.includes(shown), decision);
+      assert.ok(!html.includes(hidden), decision);
+      // The quoted confirm is a row of the checklist, not a line of the preflight list.
+      assert.equal(html.split("Quoted confirm from the server.").length - 1, decision === "block" ? 1 : 0);
+      // Until the server's list arrives, the row waits.
+      const waiting = checklistRow(render(undefined), "rules");
+      assert.match(waiting, /is-unknown/);
+      assert.ok(waiting.includes("The saved draft hasn&#x27;t been checked yet."));
+      // An unclean run gets the agent run's check, the same here as on the server.
+      assert.ok(checklistRow(render(undefined, byHandRun(false)), "rules").includes("AI agents wrote this change"));
+    } finally {
+      byHandRulesDecisionInTests();
+    }
   }
 });

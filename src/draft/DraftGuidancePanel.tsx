@@ -110,6 +110,9 @@ interface Props {
   helpers?: ReactNode;
 }
 
+/** A clean Learn-by-hand run's rows only the server decides: they hang on when the rules were read (DESIGN v1.2 F12 d). */
+const serverOnly = new Set<DraftCheck["id"]>(["ai-ban", "area-reserved", "by-hand-rules"]);
+
 const statusIcons: Record<ChecklistStatus, typeof CircleCheck> = {
   ok: CircleCheck,
   confirm: CircleAlert,
@@ -187,6 +190,8 @@ export function DraftGuidancePanel({
   const [locale] = useLocale();
   const prefix = useId().replaceAll(":", "");
   const byHand = !!byHandRun?.learnByHand;
+  // A clean Learn-by-hand run's input: then the server's list decides some rows.
+  const learnByHand = byHandRun && byHandPreflight(byHandRun, new Date().toISOString());
   // Read once per visit, then counted, so the sentences fold on a later one.
   const [whySeen] = useState(readWhySeen);
   useEffect(countWhySeen, []);
@@ -255,20 +260,21 @@ export function DraftGuidancePanel({
               understanding &&
               !understanding.passed &&
               (understanding.off || !understanding.required),
-            learnByHand: byHandRun && byHandPreflight(byHandRun, new Date().toISOString()),
+            learnByHand,
           },
           locale,
         )
       : undefined;
+  const mirror = learnByHand ? local?.filter((check) => !serverOnly.has(check.id)) : local;
   const respect = checks
     ? withFactChecks(
         checks,
         // Without the editor's text, the disclosure is the saved draft's to say.
         draftBody === undefined
-          ? local?.filter((check) => check.id !== "ai-disclosure")
-          : local,
+          ? mirror?.filter((check) => check.id !== "ai-disclosure")
+          : mirror,
       )
-    : local;
+    : mirror;
   const rows = checklistRows(
     {
       checks: respect,
@@ -279,6 +285,8 @@ export function DraftGuidancePanel({
       issueUrl,
       disclosureRule: disclosureRequirement,
       suggestion: !!proposal?.body.trim(),
+      // Until the server's list arrives, those rows wait for it.
+      awaiting: checks ? [] : local?.filter((check) => !mirror?.includes(check)).map((check) => check.id),
     },
     t.checklist,
     fmt,
