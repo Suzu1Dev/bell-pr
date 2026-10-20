@@ -57,7 +57,7 @@ BELL PR 是自架、以本機為主的開源貢獻工作台。它在你的電腦
 - **Linux**
 - **Windows（透過 WSL2）**：請在 WSL 發行版中安裝並執行 BELL PR、Git、GitHub CLI 與你的 AI CLI。
 
-1.0.0-rc.1 候選版本已在 Linux 上驗證；macOS 與 WSL2 的驗證仍在進行中（請見[變更紀錄](CHANGELOG.md)）。另有 Docker 映像檔，目前為 beta。
+1.0.0-rc.1 候選版本的單元測試、建置與套件檢查，在 Linux 與 macOS 上以 Node.js 22 與 24 執行（請見 CI 工作流程）。瀏覽器測試與真實 agent 執行只在 Linux 上做過，WSL2 尚未測試（請見[變更紀錄](CHANGELOG.md)）。另有 Docker 映像檔，目前為 beta。
 
 ## 功能
 

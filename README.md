@@ -96,9 +96,11 @@ problem.
 - **Windows through WSL2**: install and run BELL PR, Git, the GitHub CLI
   and your AI CLI inside your WSL distribution.
 
-The 1.0.0-rc.1 release candidate was verified on Linux; macOS and WSL2
-verification is pending (see the [changelog](CHANGELOG.md)). A Docker
-image is available in beta.
+The 1.0.0-rc.1 release candidate's unit tests, build and package check run
+on Linux and macOS with Node.js 22 and 24 (see the CI workflow). The browser
+tests and the real agent runs were done on Linux only, and WSL2 has not been
+tested (see the [changelog](CHANGELOG.md)). A Docker image is available in
+beta.
 
 ## Features
 

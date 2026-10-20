@@ -123,8 +123,9 @@ are not under the Apache license; see `TRADEMARKS.md`.
 
 ### Known limitations
 
-- Verified on Linux (Node.js 22). macOS and Windows (WSL2) are supported in
-  design but not yet verified.
+- Unit tests, the build and the package check run on Linux and macOS with
+  Node.js 22 and 24. The browser tests and real agent runs were done on
+  Linux only; Windows (WSL2) has not been tested.
 - Publishing a Draft PR, Discovery, reading maintainer feedback and
   follow-up rounds have been exercised only against a stand-in GitHub CLI,
   not against live GitHub. Reports from real use are welcome.
