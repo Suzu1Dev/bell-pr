@@ -489,9 +489,10 @@ your own editor, and BELL PR's agents only read. The run's Lead becomes
 **the guide**: it reads the project, asks about your plan, points and
 hints without code, reviews your change when you ask, and explains
 failures of the tests BELL PR runs for you. The run keeps the same tabs
-and the same gates as any other; this section walks through what is
-different. Learn by hand is Free. It works on your own projects: the
-sample shows the agent team only.
+and every check of any other run, with one more gate, **Ready for
+review**; this section walks through what is different. Learn by hand is
+Free. It works on your own projects: the sample shows the agent team
+only.
 
 ### Choose it
 
@@ -554,7 +555,8 @@ reaches you before you write a line. Then:
   The guide's outline is never run: no agent works from it.
 - **Questions on my plan** (up to 3 per run, while you plan): the guide
   reads your plan, not its own, and asks about missing steps, risky
-  assumptions, the scope and missing tests. It never gives you its plan.
+  assumptions, the scope and missing tests. It is told never to give you
+  its own plan.
 - **This is my plan** confirms it (it needs at least one step you wrote)
   and takes you to **Code changes**. Your answers are then read-only, but
   you can still edit your steps while you write, until you mark the change
@@ -575,8 +577,9 @@ Before your first change, **Code changes** shows **Your turn** with the
 run's folder and a copy button: "Open this folder in your editor, make
 your first step's change, save, and come back." BELL PR reads the diff again when you come back to
 the window (2 seconds after it gets the focus, one read at a time) and
-when a test run ends; **Refresh the diff** works too. Don't commit: BELL
-PR commits the reviewed files when you publish.
+when a test run ends; **Refresh the diff** works too. You don't need to
+commit: when you publish, BELL PR makes one commit of the files you
+reviewed.
 
 Beside the diff, **The guide** panel shows your steps with **Done** and
 **Park**, and, while the run's history is clean, "BELL PR's agents can't
@@ -645,9 +648,10 @@ describes how the command runs and what it can reach.
 
 ### Ready for review
 
-Nothing is explained or reviewed while you write. When the change is
-ready, choose **Ready for review** in the footer ("Write a change first"
-while the diff is empty). The dialog shows the files and lines you
+While you write, the guide doesn't review your change, and BELL PR writes
+no explanation or walkthrough of it. When the change is ready, choose
+**Ready for review** in the footer ("Write a change first" while the diff
+is empty). The dialog shows the files and lines you
 changed and your last test run at this version, or "Not run since your
 last edit. It isn't required; the tests are the judge.", and asks what
 you are least sure about. **Ask the guide to review it** (on by default)
