@@ -115,6 +115,14 @@ const en = {
     output: "Output",
     explain: "Explain this failure",
   },
+  live: {
+    tail: "Output so far",
+    record: "Record my result",
+    recordText: "For a run in your own terminal; it's marked as reported by you.",
+    passed: "It passed",
+    failed: "It failed",
+    output: "The end of its output (optional)",
+  },
   ready: {
     title: "Ready for review",
     facts: ({ n, additions, deletions }: { n: number; additions: number; deletions: number }) =>

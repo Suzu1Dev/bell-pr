@@ -11,6 +11,7 @@ import {
 } from "../../../shared/by-hand";
 import { useFormat } from "../../i18n";
 import { ago, useWriteText } from "./text";
+import { LiveTail, RecordResult } from "./TestsLive";
 
 /**
  * The Tests card (DESIGN v1.2 F9): BELL suggests a command, the person
@@ -19,11 +20,13 @@ import { ago, useWriteText } from "./text";
  * the run wrote, and keeps the output folded.
  */
 export function TestsCard({
+  runId,
   record,
   testCommand,
   onConfirmTestCommand,
   onRunTests,
   onStopTests,
+  onReportTests,
   onExplain,
   busy,
 }: {
@@ -107,6 +110,8 @@ export function TestsCard({
           )}
         </div>
       )}
+      {running && <LiveTail runId={runId} />}
+      <RecordResult onReport={onReportTests} busy={busy || running} />
     </section>
   );
 }

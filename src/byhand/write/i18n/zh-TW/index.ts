@@ -109,6 +109,14 @@ const m: Translation<typeof en> = {
     output: "輸出",
     explain: "解說這次失敗",
   },
+  live: {
+    tail: "目前的輸出",
+    record: "記錄我的結果",
+    recordText: "用於你在自己終端機執行的測試；會標示為由你回報。",
+    passed: "通過了",
+    failed: "失敗了",
+    output: "輸出的最後一段（選填）",
+  },
   ready: {
     title: "可以審查了",
     facts: ({ n, additions, deletions }) => `改了 ${n} 個檔案，+${additions} −${deletions}。`,
