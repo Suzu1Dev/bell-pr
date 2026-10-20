@@ -7,7 +7,7 @@ const understanding: Translation<typeof en> = {
   fallbackQuestion: ({ path }) =>
     `用一句話說明：對 ${path} 的變更做了什麼？為什麼這樣改？`,
   untestedQuestion: "你沒有測試哪些情況？為什麼？",
-  byHandQuestion: ({ path }) => `你寫了 \`${path}\` 的修改。為什麼這樣寫、不用別的做法？如果寫錯了，什麼會壞掉？`,
+  byHandQuestion: ({ path }) => `你寫了 ${path} 的修改。為什麼這樣寫、不用別的做法？如果寫錯了，什麼會壞掉？`,
   byHandTestRun: ({ command, outcome }) => `你在這個版本最後一次跑的測試：${command}（${outcome}）。`,
   byHandFinding: ({ observed, why }) => `嚮導的審查：${observed} ${why}`,
   testOutcomes: {

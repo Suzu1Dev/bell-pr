@@ -108,7 +108,7 @@ test("a Learn-by-hand check asks the fixed question and accepts the person's own
   assert.deepEqual(
     view.plan.map((item) => [item.id, item.question]),
     [
-      ["fallback:src/a.ts", "You wrote the change to `src/a.ts`. Why this way rather than another, and what would break if it were wrong?"],
+      ["fallback:src/a.ts", "You wrote the change to src/a.ts. Why this way rather than another, and what would break if it were wrong?"],
       ["untested", "What did you not test, and why?"],
     ],
   );
