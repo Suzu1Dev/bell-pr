@@ -97,6 +97,16 @@ test("real projects' policies yield the expected kinds, quoted verbatim, and con
   }
 });
 
+/**
+ * The real policies that block an agent-written change, one per line so
+ * each classifier fix can add or drop its own (DESIGN v1.2 F14).
+ */
+const blocksAgentRuns = [
+  "gentoo-ai-policy.txt",
+  "netbsd-commit-guidelines.txt",
+  "qemu-code-provenance.rst",
+];
+
 test("only the projects that ban AI-generated contributions outright block an agent-written change", async () => {
   const blocked: string[] = [];
   for (const file of Object.keys(realExpectations)) {
@@ -107,11 +117,7 @@ test("only the projects that ban AI-generated contributions outright block an ag
     });
     if (checks.some((check) => check.id === "ai-ban")) blocked.push(file);
   }
-  assert.deepEqual(blocked.sort(), [
-    "gentoo-ai-policy.txt",
-    "netbsd-commit-guidelines.txt",
-    "qemu-code-provenance.rst",
-  ]);
+  assert.deepEqual(blocked.sort(), [...blocksAgentRuns].sort());
 });
 
 test("carve-outs of the real policies: QEMU's research and debugging, matplotlib's acceptable uses", async () => {
