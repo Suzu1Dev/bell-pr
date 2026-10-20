@@ -36,6 +36,7 @@ import { latestTest, stepDiff, testTail, type GuidePromptInput } from "./prompts
 import { runAgent, runIndependentReview } from "./run-executor.js";
 import { reviewDiffContext } from "./team.js";
 import { AppError, withRunLocale, type DiffFile, type Run } from "./types.js";
+import type { Locale } from "../shared/i18n/locale.js";
 import type { WorkbenchContext } from "./workbench.js";
 
 const limits = byHandLimits;
@@ -43,6 +44,9 @@ const now = () => new Date().toISOString();
 /** Lines of a selection a question carries. */
 const selectionLines = 40;
 const removedMark = "…";
+
+/** What a turn reads of the run: its request, checkout, plan and record (the eval passes its own). */
+export type GuideRun = Pick<Run, "prompt" | "contributionSettings" | "team" | "baseSha" | "worktreePath" | "modelExecution" | "byHand">;
 
 /** One resolved guide turn: what is asked, at which version, and what the guide sees. */
 export interface GuideRequest {
@@ -83,7 +87,7 @@ function fitQuote(quote: FilteredGuideOutput["quotes"][number]) {
  * (DESIGN v1.2 F6); an answer with nothing left but removals points to its
  * refs, or says BELL removed it.
  */
-function answerEntry(run: Run, request: GuideRequest, filtered: Filtered<FilteredGuideOutput>): GuideEntry {
+function answerEntry(run: GuideRun, request: GuideRequest, filtered: Filtered<FilteredGuideOutput>): GuideEntry {
   const { value, removed, dropped } = filtered;
   const offTopic = request.kind === "ask" && value.topic === "change";
   let text = offTopic ? sm().byHand.guide.aboutYourChange : value.text;
@@ -115,7 +119,7 @@ function answerEntry(run: Run, request: GuideRequest, filtered: Filtered<Filtere
 }
 
 /** The lines of the person's file a question is about, as BELL read them. */
-async function selectionText(run: Run, selection: NonNullable<GuideRequest["selection"]>) {
+async function selectionText(run: GuideRun, selection: NonNullable<GuideRequest["selection"]>) {
   const sources = await turnFiles(run).sources([selection.path]);
   const lines = sources.worktree[selection.path];
   if (!lines || selection.startLine > lines.length) return undefined;
@@ -123,46 +127,47 @@ async function selectionText(run: Run, selection: NonNullable<GuideRequest["sele
   return { ...selection, endLine, text: lines.slice(selection.startLine - 1, endLine).join("\n") };
 }
 
-/**
- * One guide turn (DESIGN v1.2 F6, F7): the prompt from the request and its
- * context (never the outline), a read-only isolated turn under the guide's
- * schema, a strict parse, and the filter. Returns the entry to store;
- * the caller records it.
- */
-export async function runGuideTurn(
-  ctx: WorkbenchContext,
-  run: Run,
-  request: GuideRequest,
-  signal: AbortSignal,
-): Promise<GuideEntry> {
-  const locale = currentLocale();
+/** The prompt of one guide turn: the request and its context (DESIGN v1.2 F6), never the outline. */
+export async function guideTurnPrompt(run: GuideRun, request: GuideRequest, locale: Locale) {
   const plan = run.byHand?.plan;
-  let prompt: string;
-  if (request.kind === "plan" && plan) prompt = planQuestionsPrompt(locale, { run, plan });
-  else {
-    const selection = request.selection ? await selectionText(run, request.selection) : undefined;
-    const sameStep = (entry: GuideEntry) => entry.stepId === request.step?.id && entry.kind !== "plan";
-    const { kind, rung, entry, step, file, findings } = request;
-    const input: GuidePromptInput = {
-      run, kind, rung, entry, plan, step, selection, file, findings,
-      question: request.question?.trim() || undefined,
-      tried: request.tried?.trim() || undefined,
-      diff: stepDiff(request.files, request.scope),
-      testTail: testTail(run.byHand?.tests, request.fingerprint),
-      history: (request.history ?? (run.byHand?.thread ?? []).filter(sameStep)).slice(-4),
-    };
-    prompt = guidePrompt(locale, input);
-  }
+  if (request.kind === "plan" && plan) return planQuestionsPrompt(locale, { run, plan });
+  const selection = request.selection ? await selectionText(run, request.selection) : undefined;
+  const sameStep = (entry: GuideEntry) => entry.stepId === request.step?.id && entry.kind !== "plan";
+  const { kind, rung, entry, step, file, findings } = request;
+  const input: GuidePromptInput = {
+    run, kind, rung, entry, plan, step, selection, file, findings,
+    question: request.question?.trim() || undefined,
+    tried: request.tried?.trim() || undefined,
+    diff: stepDiff(request.files, request.scope),
+    testTail: testTail(run.byHand?.tests, request.fingerprint),
+    history: (request.history ?? (run.byHand?.thread ?? []).filter(sameStep)).slice(-4),
+  };
+  return guidePrompt(locale, input);
+}
+
+/** The person's diff as the filter checks code against it: the changed files and their patches. */
+const changeOf = (files: readonly DiffFile[]) => {
+  const visible = files.filter((file) => !file.blocked);
+  return { changed: visible.map((file) => file.path), diff: visible.map((file) => file.patch).join("\n") };
+};
+
+/** One guide answer as BELL stores it (DESIGN v1.2 F7): parsed strictly, quotes cut by BELL, prose filtered. */
+export async function storedGuideAnswer(run: GuideRun, request: GuideRequest, answer: string) {
+  const output = parseByHandAnswer(guideAnswerSchema, answer);
+  const change = { ...changeOf(request.files), stepFiles: request.step?.files };
+  return answerEntry(run, request, await filterGuideAnswer(turnFiles(run), output, change));
+}
+
+/**
+ * One guide turn (DESIGN v1.2 F6, F7): a read-only isolated turn under the
+ * guide's schema, then the stored answer. The caller records it.
+ */
+export async function runGuideTurn(ctx: WorkbenchContext, run: Run, request: GuideRequest, signal: AbortSignal) {
+  const prompt = await guideTurnPrompt(run, request, currentLocale());
   const answer = await withSchemaFile(guideAnswerJsonSchema, (outputSchema) =>
     runAgent(ctx, run, "lead", prompt, signal, true, { isolated: true, outputSchema }),
   );
-  const visible = request.files.filter((file) => !file.blocked);
-  const filtered = await filterGuideAnswer(turnFiles(run), parseByHandAnswer(guideAnswerSchema, answer), {
-    changed: visible.map((file) => file.path),
-    stepFiles: request.step?.files,
-    diff: visible.map((file) => file.patch).join("\n"),
-  });
-  return answerEntry(run, request, filtered);
+  return storedGuideAnswer(run, request, answer);
 }
 
 /**
@@ -409,69 +414,80 @@ export function reviewMarkdown(review: ByHandReview) {
   ].join("\n\n");
 }
 
+/** What the reviewer and the test analyst read at Ready (F8): the diff, the plan, the last run at this version. */
+export function reviewInput(run: GuideRun, files: DiffFile[], leastSure?: string) {
+  const fingerprint = changeFingerprint(files);
+  const lastTest = latestTest(run.byHand?.tests, fingerprint);
+  const sure = leastSure?.trim().slice(0, limits.leastSureChars) || undefined;
+  const prompt = { run, diff: reviewDiffContext(files), plan: run.byHand?.plan, leastSure: sure, lastTest, previous: run.byHand?.reviews?.at(-1) };
+  return { fingerprint, prompt };
+}
+
+/**
+ * The review as BELL stores it (F7, F8): the reviewer parsed strictly (422
+ * otherwise, nothing stored), every text filtered, an evidence quote kept
+ * only when a cited file or the last test output has it.
+ */
+export async function storedReview(run: GuideRun, files: DiffFile[], input: ReturnType<typeof reviewInput>, reports: { reviewer: string; tester: string }) {
+  const answer = parseByHandAnswer(reviewerAnswerSchema, reports.reviewer);
+  const { lastTest, leastSure } = input.prompt;
+  const reader = turnFiles(run);
+  let removed = 0;
+  const prose = async (text: string, cited: string[] = []) => {
+    const filtered = await filterStoredText(reader, text, { ...changeOf(files), cited });
+    removed += filtered.removed;
+    return filtered.value;
+  };
+  const findings: ByHandReview["findings"] = [];
+  for (const finding of answer.findings) {
+    const { evidence } = finding;
+    const cited = [finding.path, ...(evidence.path ? [evidence.path] : [])];
+    const quote = evidence.quote ? await verbatimQuote(reader, evidence.quote, cited, lastTest?.outputTail) : undefined;
+    const observed = (await prose(finding.observed, cited)).slice(0, limits.findingObservedChars);
+    const why = (await prose(finding.why, cited)).slice(0, limits.findingWhyChars);
+    const question = (await prose(finding.question, cited)).slice(0, limits.findingQuestionChars);
+    findings.push({
+      path: finding.path,
+      ...(finding.line ? { line: finding.line } : {}),
+      observed,
+      evidence: { type: evidence.type, ...(evidence.path ? { path: evidence.path } : {}), ...(evidence.line ? { line: evidence.line } : {}), ...(quote ? { quote } : {}) },
+      why,
+      question,
+      ...(finding.dimension ? { dimension: finding.dimension } : {}),
+    });
+  }
+  const verified = (await prose(answer.verified)).slice(0, limits.reviewVerifiedChars);
+  const checked: string[] = [];
+  for (const item of answer.checked) checked.push((await prose(item)).slice(0, 300));
+  const tester = await prose(reports.tester);
+  const review: ByHandReview = { at: now(), changeFingerprint: input.fingerprint, verified, checked, findings };
+  if (leastSure) review.leastSure = leastSure;
+  if (lastTest) review.testRunAt = lastTest.at;
+  if (removed) review.removed = removed;
+  return { review, tester };
+}
+
 /** The structured review at Ready (F8); `ready()` runs it as the job `review:<id>`. */
 export async function review(ctx: WorkbenchContext, run: Run, input: { leastSure?: string }, signal: AbortSignal): Promise<void> {
   assertHelpAllowed(run, helpKindOf("review"));
   await withRunLocale(run, async () => {
     const files = await readDiff(run);
-    const fingerprint = changeFingerprint(files);
-    const record = run.byHand ?? {};
-    const lastTest = latestTest(record.tests, fingerprint);
-    const leastSure = input.leastSure?.trim().slice(0, limits.leastSureChars);
-    const promptInput = { run, diff: reviewDiffContext(files), plan: record.plan, leastSure, lastTest, previous: record.reviews?.at(-1) };
+    const turn = reviewInput(run, files, input.leastSure);
     const locale = currentLocale();
     const reports = await withSchemaFile(reviewerAnswerJsonSchema, (reviewerSchema) =>
       runIndependentReview(ctx, run, files, undefined, signal, {
-        reviewerPrompt: byHandReviewerPrompt(locale, promptInput),
-        testerPrompt: byHandTesterPrompt(locale, promptInput),
+        reviewerPrompt: byHandReviewerPrompt(locale, turn.prompt),
+        testerPrompt: byHandTesterPrompt(locale, turn.prompt),
         reviewerSchema,
         isolated: true,
       }),
     );
-    const answer = parseByHandAnswer(reviewerAnswerSchema, reports.reviewer);
-    const visible = files.filter((file) => !file.blocked);
-    const reader = turnFiles(run);
-    let removed = 0;
-    const prose = async (text: string, cited: string[] = []) => {
-      const filtered = await filterStoredText(reader, text, {
-        changed: visible.map((file) => file.path),
-        diff: visible.map((file) => file.patch).join("\n"),
-        cited,
-      });
-      removed += filtered.removed;
-      return filtered.value;
-    };
-    const findings: ByHandReview["findings"] = [];
-    for (const finding of answer.findings) {
-      const { evidence } = finding;
-      const cited = [finding.path, ...(evidence.path ? [evidence.path] : [])];
-      const quote = evidence.quote ? await verbatimQuote(reader, evidence.quote, cited, lastTest?.outputTail) : undefined;
-      const observed = (await prose(finding.observed, cited)).slice(0, limits.findingObservedChars);
-      const why = (await prose(finding.why, cited)).slice(0, limits.findingWhyChars);
-      const question = (await prose(finding.question, cited)).slice(0, limits.findingQuestionChars);
-      findings.push({
-        path: finding.path,
-        ...(finding.line ? { line: finding.line } : {}),
-        observed,
-        evidence: { type: evidence.type, ...(evidence.path ? { path: evidence.path } : {}), ...(evidence.line ? { line: evidence.line } : {}), ...(quote ? { quote } : {}) },
-        why,
-        question,
-        ...(finding.dimension ? { dimension: finding.dimension } : {}),
-      });
-    }
-    const verified = (await prose(answer.verified)).slice(0, limits.reviewVerifiedChars);
-    const checked: string[] = [];
-    for (const item of answer.checked) checked.push((await prose(item)).slice(0, 300));
-    const tester = await prose(reports.tester);
-    const stored: ByHandReview = { at: now(), changeFingerprint: fingerprint, verified, checked, findings };
-    if (leastSure) stored.leastSure = leastSure;
-    if (lastTest) stored.testRunAt = lastTest.at;
-    if (removed) stored.removed = removed;
+    const { review: stored, tester } = await storedReview(run, files, turn, reports);
     // Stored together, after every await: the help event first, as it refuses a kind outside the lock.
-    recordHelp(run, { source: "review", removed });
+    recordHelp(run, { source: "review", removed: stored.removed });
     const byHand = (run.byHand ??= {});
     byHand.reviews = [...(byHand.reviews ?? []), stored].slice(-limits.reviews);
-    if (removed) byHand.removedTotal = (byHand.removedTotal ?? 0) + removed;
+    if (stored.removed) byHand.removedTotal = (byHand.removedTotal ?? 0) + stored.removed;
     run.reports = { ...run.reports, reviewer: reviewMarkdown(stored), tester };
     await ctx.store.save();
   });
