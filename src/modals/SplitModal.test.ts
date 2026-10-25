@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createElement } from "react";
+import { act, createElement } from "react";
 import type { TeamTask } from "../../shared/team";
 import { getDemo } from "../demo";
 import modals from "../i18n/en/modals";
+import { mount, type FakeElement } from "../mission/test-dom";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { DiffFile, Run } from "../types";
 import { SplitModal } from "./SplitModal";
@@ -164,4 +165,37 @@ test("the dialog reads in zh-TW", () => {
   assert.match(html, /拆分為不同的貢獻/);
   assert.match(html, /不移動/);
   assert.doesNotMatch(html, /Split into separate contributions|Leave out/);
+});
+
+/** Calls the click handler React gave `element`: the fake DOM dispatches no events. */
+const click = (element: FakeElement) =>
+  act(async () => {
+    const props = Object.entries(element).find(([name]) => name.startsWith("__reactProps$"))?.[1] as { onClick(): void };
+    props.onClick();
+  });
+
+test("adding or removing a contribution leaves the keyboard on a contribution's title", async () => {
+  const view = await mount(element(withPlan([]), [file("src/a.ts"), file("src/b.ts")]));
+  try {
+    const find = (match: (element: FakeElement) => boolean) => view.container.querySelectorAll(match)[0]!;
+    const add = find((element) => element.getAttribute("class") === "split-add");
+    const remove = (number: number) => find((element) => element.getAttribute("aria-label") === `Remove contribution ${number}`);
+    const focused = () => document.activeElement?.getAttribute("id");
+    // The new contribution's title is what the person fills in next; the eighth also disables Add.
+    for (let key = 3; key <= 8; key++) {
+      add.focus();
+      await click(add);
+      assert.equal(focused(), `split-title-${key}`);
+    }
+    assert.ok(add.disabled || add.hasAttribute("disabled"));
+    // A removed card takes its button with it: the next card's title takes the keyboard, or the previous one's for the last card.
+    remove(8).focus();
+    await click(remove(8));
+    assert.equal(focused(), "split-title-7");
+    remove(3).focus();
+    await click(remove(3));
+    assert.equal(focused(), "split-title-4");
+  } finally {
+    await view.unmount();
+  }
 });

@@ -117,6 +117,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   offered "Split into contributions", but the dialog could never be
   submitted. The split is now offered only when two files or more can move.
 
+- **Keyboard focus in the split dialog.** Removing a contribution, or adding
+  the eighth, sent keyboard focus out of the dialog to the page. Focus now
+  moves to the next (or previous) contribution's title after a removal, and
+  to the new contribution's title after an add.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

@@ -152,6 +152,10 @@ export class FakeElement extends FakeNode {
     if (this.ownerDocument?.activeElement === this)
       this.ownerDocument.activeElement = this.ownerDocument.body;
   }
+  /** CSS selectors are not matched here: it finds nothing, so a caller takes its fallback. */
+  querySelector(): FakeElement | null {
+    return null;
+  }
   /** Every element below this one that `match` accepts. */
   querySelectorAll(match: (element: FakeElement) => boolean): FakeElement[] {
     return this.childNodes.flatMap((child) =>
@@ -185,6 +189,9 @@ class FakeDocument extends FakeNode {
   }
   createTextNode(text: string) {
     return new FakeText(text, this);
+  }
+  getElementById(id: string) {
+    return this.documentElement.querySelectorAll((element) => element.getAttribute("id") === id)[0] ?? null;
   }
 }
 

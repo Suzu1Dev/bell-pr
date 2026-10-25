@@ -71,16 +71,17 @@ export function SplitModal({ run, files, busy, formError, splitRun, closeModal }
     startingPlan(files, run.team?.tasks ?? []),
   );
   const [plan, setPlan] = useState(initial);
-  // A file that moves lands in another card: its menu is where the keyboard stays.
-  const [focused, setFocused] = useState<number>();
+  // Where the keyboard goes after the control it was on moves or goes away: a moved file's menu,
+  // which lands in another card, or a contribution's title after one is added or removed.
+  const [focusId, setFocusId] = useState<string>();
   const { groups, placed } = plan;
   const { minContributions, maxContributions, titleChars, maxPaths } = splitLimits;
 
   useEffect(() => {
-    if (focused === undefined) return;
-    document.getElementById(`split-move-${focused}`)?.focus();
-    setFocused(undefined);
-  }, [focused, plan]);
+    if (focusId === undefined) return;
+    document.getElementById(focusId)?.focus();
+    setFocusId(undefined);
+  }, [focusId, plan]);
 
   const membersOf = (key: number) => files.filter((file) => placed[file.path] === key);
   const leftOut = files.filter((file) => placed[file.path] === undefined);
@@ -138,7 +139,7 @@ export function SplitModal({ run, files, busy, formError, splitRun, closeModal }
           disabled={busy || !!file.blocked}
           onChange={(event) => {
             place(file.path, event.target.value === "" ? undefined : Number(event.target.value));
-            setFocused(index);
+            setFocusId(`split-move-${index}`);
           }}
         >
           <option value="">{t.leaveOut}</option>
@@ -198,7 +199,10 @@ export function SplitModal({ run, files, busy, formError, splitRun, closeModal }
                     className="button secondary"
                     disabled={busy || groups.length <= minContributions}
                     aria-label={t.remove({ number: index + 1 })}
-                    onClick={() =>
+                    onClick={() => {
+                      // The card goes with this button: the next card's title takes the keyboard, or the previous one's.
+                      const neighbour = groups[index + 1] ?? groups[index - 1];
+                      setFocusId(neighbour && `split-title-${neighbour.key}`);
                       // The files of a removed contribution go back to leaving out.
                       setPlan((current) => ({
                         ...current,
@@ -206,8 +210,8 @@ export function SplitModal({ run, files, busy, formError, splitRun, closeModal }
                         placed: Object.fromEntries(
                           Object.entries(current.placed).filter(([, key]) => key !== group.key),
                         ),
-                      }))
-                    }
+                      }));
+                    }}
                   >
                     <Trash2 size={14} aria-hidden="true" />
                   </button>
@@ -224,13 +228,15 @@ export function SplitModal({ run, files, busy, formError, splitRun, closeModal }
             type="button"
             className="split-add"
             disabled={busy || groups.length >= maxContributions}
-            onClick={() =>
+            onClick={() => {
+              // The new card's title is what the person fills in next, and the eighth card disables this button.
+              setFocusId(`split-title-${plan.nextKey}`);
               setPlan((current) => ({
                 ...current,
                 groups: [...current.groups, { key: current.nextKey, title: "" }],
                 nextKey: current.nextKey + 1,
-              }))
-            }
+              }));
+            }}
           >
             <Plus size={14} aria-hidden="true" /> {t.add}
           </button>
