@@ -45,6 +45,7 @@ const fields: [string, string][] = [
   ["calls", fill("f(")],
   ["index brackets", fill("a[")],
   ["braces", `{${fill(":")}`],
+  ["spaced braces", `{ ${fill("a: b; c, ")}`],
   ["backticks", fill("`")],
   ["backtick pairs", fill("``a")],
   ["tildes", fill("~")],

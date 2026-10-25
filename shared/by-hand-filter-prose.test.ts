@@ -79,6 +79,8 @@ const prose = [
   "The score was 3/5, so 60%.",
   "The ~/.config folder holds it.",
   "As 1+1=2 in the README, digits alone are arithmetic, not code.",
+  "The set {1, 2, 3} has three members.",
+  "Fill in { owner } and {repo} in the template.",
   "Steps:\n* Read the loop\n* Run the tests",
   "Two ideas\n+ ask a maintainer\n+ read the issue again",
   // zh-TW
@@ -126,6 +128,19 @@ const code: [string, string][] = [
   ["Write if(attempt<3) above.", "attempt<3"],
   ["Write while(true) around it.", "while(true)"],
   ["Use {retries:3} as the options.", "retries:3"],
+  ["Pass {retries:{max:3}} to it.", "retries"],
+  ["Write if(attempt){throw{code:3}} there.", "throw"],
+  ["Then else{return} at the end.", "return"],
+  ["Use { retries: 3 } as the options.", "retries: 3"],
+  ["Use const opts = { retries: 3 } there.", "retries: 3"],
+  ['Send { "retries": 3 } as the body.', '"retries": 3'],
+  ["Pass { ...opts, retries: 3 } to it.", "retries: 3"],
+  ["Write while (true) { break; } there.", "break;"],
+  ["Then else { return; } at the end.", "return;"],
+  ["Then if (attempt > 3) { throw err } at the end.", "throw err"],
+  ["Call { fn(); } in the catch.", "fn();"],
+  ["Pass { retries: { max: 3 } } to it.", "retries"],
+  ["Write for (;;) { if (attempt) { break; } } there.", "if (attempt)"],
   ["Use Vec<u8> there.", "Vec<u8>"],
   ["Use std::time::sleep instead.", "std::time"],
   ["Make it delay*=2 each time.", "delay*=2"],
@@ -155,6 +170,7 @@ const code: [string, string][] = [
   ["在迴圈裡加 i++;", "i++"],
   ["改成 retry(fn, 2) 再跑。", "retry(fn, 2)"],
   ["把條件寫成a&&b。", "a&&b"],
+  ["把選項寫成 { retries: 3 } 就好。", "retries: 3"],
 ];
 
 test(`${prose.length} prose samples keep every character`, () => {
@@ -176,6 +192,32 @@ test("code that quotes the files exactly stays, with or without spaces", () => {
     assert.equal(filterAgentText(text, sources).removed, 0, text);
 });
 
+test("a block or an object around a group the files have still goes; one the files have whole stays", () => {
+  const lines = ["  while (true) { if (done) { break; } }", "  const opts = { max: 3 };", "  retry({retries:{ max: 3 }});"];
+  const quoted: FilterSources = { base: { "src/loop.ts": lines }, worktree: { "src/loop.ts": lines }, diff: "" };
+  assert.deepEqual(filterAgentText("Write while (true) { if (attempt) { break; } } there.", quoted), { value: "Write while (true) … there.", removed: 1, dropped: 0 });
+  assert.deepEqual(filterAgentText("Pass { retries: { max: 3 } } to it.", quoted), { value: "Pass … to it.", removed: 1, dropped: 0 });
+  assert.deepEqual(filterAgentText("Pass {retry:{ max: 3 }} to it.", quoted), { value: "Pass … to it.", removed: 1, dropped: 0 });
+  // Kept as written, a soft line break included.
+  for (const text of ["Write while (true) { if (done) { break;\n} } there.", "Pass {retries:{ max: 3 }} to it.", "Call retry({retries:{ max: 3 }}) there."])
+    assert.deepEqual(filterAgentText(text, quoted), { value: text, removed: 0, dropped: 0 }, text);
+  assert.deepEqual(filterAgentText("Pass { retries: 3 } to it. The naturals {1, 2, 3, …} go on.", quoted), {
+    value: "Pass … to it. The naturals {1, 2, 3, …} go on.",
+    removed: 1,
+    dropped: 0,
+  });
+});
+
+test("a call whose argument is a spaced object stays when a file has it word for word", () => {
+  const lines = ["  retry({ max: 3 });", "  await retry(fn, { retries: 3 });"];
+  const calls: FilterSources = { base: { "src/call.ts": lines }, worktree: { "src/call.ts": lines }, diff: "" };
+  for (const text of ["Call retry({ max: 3 }) there.", "It calls retry(fn, { retries: 3 }) once."])
+    assert.deepEqual(filterAgentText(text, calls), { value: text, removed: 0, dropped: 0 }, text);
+  // The same call with an argument the files don't have still goes.
+  const other = filterAgentText("Call retry({ max: 9 }) there.", calls);
+  assert.ok(other.removed >= 1 && !other.value.includes("max: 9"), other.value);
+});
+
 test("a tooling answer's command can't carry code in an inline program or a quoted argument", () => {
   const tooling = (text: string) =>
     filterGuideOutput({ text, question: null, refs: [], quotes: [], options: null, topic: "tooling", askedForCode: false }, sources).value.text;
@@ -185,6 +227,9 @@ test("a tooling answer's command can't carry code in an inline program or a quot
     "Run `bash -c 'x=y'` first.",
     "Run `node scripts/check.js 'delay * 2 ** attempt'` to check.",
     "Run `npm test -- --grep 'attempt+1'` to check.",
+    "Run `node scripts/check.js '{ retries: 3 }'` to check.",
+    "Run `node scripts/check.js { retries: 3 } -v` to check.",
+    "Run `bash scripts/x.sh { break; } -v` to check.",
     "Run `echo delay*2` to see it.",
   ])
     assert.match(tooling(text), /^Run … /, text);

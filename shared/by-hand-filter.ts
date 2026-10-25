@@ -18,7 +18,8 @@
  *    invents in its prose (one that occurs in none of those) becomes "…"
  *    too, and so does an expression it writes into prose, with spaces or
  *    without ("delay * 2", "delay*2", "x=y", "a&&b", "arr[i]", "i++",
- *    "retry(fn, 2)"), also across a line break Markdown shows as a space.
+ *    "retry(fn, 2)", "{ retries: 3 }", "{ break; }"), also across a line
+ *    break Markdown shows as a space.
  * 3. A code field (an explanation's example.before/after and the like) is
  *    kept only when it is verbatim in base or worktree; otherwise it is
  *    dropped.
@@ -83,12 +84,14 @@ const inlineProgram = /\b(?:node|deno|bun|python3?|ruby|perl|php|bash|sh|zsh|Rsc
 
 /**
  * A tooling answer's one-line command: at most 120 characters, not shaped
- * like code (ending in ; { or }, with an arrow, an inline program or code
- * in an argument), naming no identifier the project's files don't have,
- * and editing no changed or step file.
+ * like code (ending in ; { or }, with an arrow, a block or an object, an
+ * inline program or code in an argument), naming no identifier the
+ * project's files don't have, and editing no changed or step file.
  */
 function safeCommand(span: string, sources: FilterSources, isWord: (word: string) => boolean) {
   if (span.includes("\n") || span.length > 120 || /[;{}]\s*$|=>/.test(span) || inlineProgram.test(span)) return false;
+  // A block or an object, which splitting at spaces would never see whole.
+  if ((span.match(braces) ?? []).some(blockCode)) return false;
   // An argument, quoted or not, is no expression, call or code without spaces; a path or a test id ("a.py::test") is no code.
   const argument = ([, single, double, bare]: string[]) =>
     bare === undefined ? hasCode(single ?? double) : !/[/:]/.test(bare) && compactCode(bare);
@@ -135,6 +138,8 @@ const encoded = (run: string) => {
 };
 /** Marks text held aside while the rules run; never kept from agent text. */
 const holdMark = "\uE000";
+/** A piece held aside, by its index. */
+const heldPiece = new RegExp(`${holdMark}(\\d+)${holdMark}`, "g");
 /**
  * An expression written into prose: operands joined by code operators with
  * spaces around them, no-break ones too ("delayMs * 2 ** attempt;", "a ?? b"),
@@ -182,9 +187,20 @@ const compactCode = (run: string) =>
   ((/[A-Za-z_$"']/.test(run) && compactOperator.test(run)) || compactShapes.some((shape) => shape.test(run)));
 /** A call with arguments, or a member call ("retry(fn, 2)", "Math.max(a, b)"); "file(s)" is prose. */
 const call = /(?<![\w$.])[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\((?!(?:s|es|ies)\))[^()\n]{0,120}\)/g;
+/** Text in braces on one line, spaces allowed. */
+const braces = /\{[^{}\n]*\}/g;
+/**
+ * Whether text in braces is a block or an object, spaced or not
+ * ("{ retries: 3 }", "{ break; }", "{ throw err }"): a semicolon, a key
+ * and a colon first or after a comma, or a statement keyword first. A set
+ * ("{1, 2, 3}") and a placeholder ("{ name }") are prose.
+ */
+const blockCode = (braced: string) =>
+  /;|^\s*(?:return|throw|break|continue|await|yield)\b|(?:^|,)\s*["']?[A-Za-z_$][\w$]*["']?:/.test(braced.slice(1, -1));
 /** Whether a piece of text has code in it, read without the files (a link's path or query). */
 const hasCode = (text: string) =>
-  new RegExp(expression.source).test(text) || (text.match(word) ?? []).some(compactCode) || new RegExp(call.source).test(text);
+  new RegExp(expression.source).test(text) || (text.match(word) ?? []).some(compactCode) || new RegExp(call.source).test(text) ||
+  (text.match(braces) ?? []).some(blockCode);
 /** Whether a link's path, query or fragment, decoded, spells code ("?fix=return+delay*2**attempt"). */
 function linkCode(url: string) {
   let rest = url.replace(/^https?:\/\/[^/?#]*/, "").replace(/\+/g, " ");
@@ -224,14 +240,14 @@ const softBreak = /\n(?![ \t]*(?:\n|$|[-*+][ \t]|\d{1,9}[.)][ \t]|>|#|\||`{3}|~{
 /**
  * Replaces the matches of `pattern` found in the text as Markdown shows it,
  * with each soft line break read as a space (the offsets stay the same), so
- * code split over two lines is found; `replace` returns undefined to keep
- * the original text.
+ * code split over two lines is found; `replace` also gets the match as
+ * written and returns undefined to keep the original text.
  */
-function replaceShown(text: string, pattern: RegExp, replace: (match: string) => string | undefined) {
+function replaceShown(text: string, pattern: RegExp, replace: (match: string, written: string) => string | undefined) {
   let out = "";
   let last = 0;
   for (const match of text.replace(softBreak, " ").matchAll(pattern)) {
-    const next = replace(match[0]);
+    const next = replace(match[0], text.slice(match.index, match.index + match[0].length));
     if (next === undefined) continue;
     out += text.slice(last, match.index) + next;
     last = match.index + match[0].length;
@@ -324,6 +340,9 @@ export function filterAgentText(
   // What stays as written is held aside, so a later rule never reads into it.
   const held: string[] = [];
   const hold = (piece: string) => `${holdMark}${held.push(piece) - 1}${holdMark}`;
+  const unhold = (text: string) => text.replace(heldPiece, (_mark, index: string) => held[Number(index)]);
+  /** Whether a match, with what is held in it put back, is in the files; its line breaks are soft ones. */
+  const occursGroup = (group: string) => occurs(unhold(group).replaceAll("\n", " "));
   /** An encoded payload the sources don't have. */
   const payload = (run: string) => encoded(run) && !occurs(run);
   /** A code block stays when its lines, as written or without their margin, are a run of a file's lines. */
@@ -349,6 +368,18 @@ export function filterAgentText(
     .replace(/\bhttps?:\/\/\S+/g, (url) => ([...url.matchAll(encodedRun)].some(([run]) => payload(run)) || linkCode(url) ? remove() : hold(url)));
   // From here on the rules read prose as Markdown shows it.
   value = asShown(value).replace(encodedRun, (run) => (payload(run) ? remove() : run));
+  // A block or an object written with spaces goes whole, a nested one from the inside out (at most 4 levels);
+  // one written without spaces goes with its run of text below. What a round removes or keeps is held aside,
+  // so the group around it is read in the next round.
+  const firstHeld = held.length;
+  for (let round = 0, before = ""; round < 4 && value !== before; round++) {
+    before = value;
+    value = replaceShown(value, braces, (code, written) => {
+      const nested = [...code.matchAll(heldPiece)].some(([, index]) => Number(index) >= firstHeld);
+      if (!/\s/.test(code) || !(blockCode(code) || nested)) return undefined;
+      return hold(occursGroup(code) ? unhold(written) : remove());
+    });
+  }
   value = replaceShown(value, expression, (code) =>
     occurs(code.replace(/(?<![.,;:])[.,;:]+$/, "")) || keyChord.test(code.replace(/\s+/g, "")) ? undefined : remove(),
   );
@@ -359,13 +390,15 @@ export function filterAgentText(
     const bare = code.replace(/^[(["']+/, "").replace(/(?<![)\]"';])[)\]"';]+$/, "");
     return !compactCode(code) || occurs(code) || (!!bare && occurs(bare)) ? run : remove() + run.slice(code.length);
   });
+  // A block without spaces that its run kept ("else{return}", "{return}", "{retries:{ max: 3 }}").
+  value = replaceShown(value, braces, (code) => (blockCode(code) && !occursGroup(code) ? remove() : undefined));
   value = value.replace(identifier, (name) => (isWord(name) || emoticon.test(name) ? name : remove()));
   // A call is kept only as the files have it, or as a bare mention of a name they have ("retry()").
   value = replaceShown(value, call, (code) => {
     const bare = /^([\w$.]+)\(\s*\)$/.exec(code);
-    return occurs(code) || (bare && bare[1].split(".").every(isWord)) ? undefined : remove();
+    return occursGroup(code) || (bare && bare[1].split(".").every(isWord)) ? undefined : remove();
   });
-  value = value.replace(new RegExp(`${holdMark}(\\d+)${holdMark}`, "g"), (_match, index: string) => held[Number(index)]);
+  value = unhold(value);
   if (removed && options.refs?.length && !/[\p{L}\p{N}]/u.test(value.replaceAll(removedMark, "")))
     value = options.refs.map(pointer).join("\n");
   return { value, removed, dropped: 0 };

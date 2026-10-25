@@ -260,6 +260,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   that open PR on the pushed branch and records it, and does not try to
   open a second one.
 
+- **Code in spaced braces got through the Learn-by-hand filter.** The filter
+  removed an object like "{retries:3}" from a guide answer, review finding
+  or chat answer, but kept "{ retries: 3 }", "{ break; }" or
+  "{ throw err }". So the agent could hand you an options object or a
+  statement block it wrote itself. These are now removed unless they are
+  copied exactly from the project's files. Sets like "{1, 2, 3}" and
+  placeholders like "{ name }" stay.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files
