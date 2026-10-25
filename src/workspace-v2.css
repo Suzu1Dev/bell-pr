@@ -289,7 +289,8 @@
     flex-shrink: 0;
   }
   /* The title and the actions share the first row; the repository and
-     branch line wraps below them, so no label ever cuts the title short. */
+     branch line wraps below them unless the heading is wide (see below), so
+     no label ever cuts the title short. */
   .is-reading .workspace-heading {
     display: flex;
     flex-wrap: wrap;
@@ -298,6 +299,7 @@
     min-width: 0;
     padding: 6px 20px;
     flex-shrink: 0;
+    container: workspace-heading / inline-size;
   }
   .is-reading .heading-top {
     order: 3;
@@ -334,6 +336,42 @@
   }
   .is-reading .meta-demo {
     margin-left: 8px;
+  }
+  /* A heading this wide also holds the repository and branch beside the title,
+     as two short lines no taller than the actions, which gives the code a
+     line. The sample keeps its own line below: its note ("never sent to
+     GitHub") is long. The export shrinks to its icon; its name stays for
+     screen readers and as the tooltip. */
+  @container workspace-heading (min-width: 960px) {
+    .is-reading .title-row {
+      flex-basis: 12rem;
+    }
+    .is-reading .repo-meta:not(:has(.meta-demo)) {
+      order: 2;
+      flex: 0 1 15rem;
+      max-width: 45%;
+      row-gap: 0;
+    }
+    .is-reading .repo-meta:not(:has(.meta-demo)) i {
+      display: none;
+    }
+    .is-reading .repo-meta:not(:has(.meta-demo)) > span {
+      overflow-wrap: anywhere;
+    }
+    .is-reading .repo-meta:not(:has(.meta-demo)) .export-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .is-reading .repo-meta:not(:has(.meta-demo)) .export-button {
+      min-width: 24px;
+      min-height: 24px;
+      justify-content: center;
+    }
   }
   .is-reading .review-area {
     flex: 1;

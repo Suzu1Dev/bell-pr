@@ -195,11 +195,12 @@ export function WorkspacePage({
     <button
       type="button"
       className="export-link export-button"
+      title={t.exportLearning}
       disabled={exporting}
       onClick={() => void exportLearning()}
     >
       <ArrowDownToLine size={13} aria-hidden="true" />
-      {t.exportLearning}
+      <span className="export-label">{t.exportLearning}</span>
     </button>
   );
   const reviewedCount = files.filter((f) =>

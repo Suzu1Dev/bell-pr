@@ -33,6 +33,10 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   above the diff, so the code keeps that height. The files are still under
   `worktrees/` in the data directory, and a Learn by hand run shows its
   folder in its own panel.
+- **Repository and branch.** In the reading layout of a run, a wide window
+  shows them beside the title as two short lines, with the export as an
+  icon, instead of a line below it. The code gets that line; a narrower
+  window and the sample keep the line below.
 - **Rejected analysis.** When BELL PR rejects an AI analysis as incomplete,
   the server log's `agent.output_retry` line now names the fields that did
   not fit and why (for example `recommendations: too_big`), never their
