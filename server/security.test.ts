@@ -281,7 +281,8 @@ test("a local import is cloned, so runs never add worktrees or branches to the p
   // Every branch came along; the clone keeps no remote pointing at the checkout.
   assert.match((await git(repo.path, ["branch", "--list"])).stdout, /feature/);
   assert.equal((await git(repo.path, ["remote"])).stdout.trim(), "");
-  assert.equal((await git(repo.path, ["config", "--get", "user.name"], { allowedCodes: [0, 1] })).stdout, "");
+  // --local: the checkout's own config must not come along; a global user.name is not the clone's.
+  assert.equal((await git(repo.path, ["config", "--local", "--get", "user.name"], { allowedCodes: [0, 1] })).stdout, "");
   // Importing the same checkout again finds the clone.
   assert.equal((await workbench.importRepository(own)).id, repo.id);
 
