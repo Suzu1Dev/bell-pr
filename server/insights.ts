@@ -101,9 +101,9 @@ export const contributionSettingsSchema = z
       .string()
       .trim()
       .max(400)
-      .refine((value) => !value || parseGitHubIssueUrl(value) !== null, () => ({
-        message: sm().analysis.insights.issueUrlInvalid,
-      }))
+      .refine((value) => !value || parseGitHubIssueUrl(value) !== null, {
+        error: () => sm().analysis.insights.issueUrlInvalid,
+      })
       .optional(),
     ...modelSettingsSchema,
   })
@@ -308,9 +308,9 @@ export const persistedInsightsSchema = analysisSchema.extend({
 const recommendationIdsSchema = z
   .array(recommendationSchema.shape.id)
   .max(maxProjectRecommendations)
-  .refine((ids) => new Set(ids).size === ids.length, () => ({
-    message: sm().analysis.insights.duplicateRecommendationIds,
-  }));
+  .refine((ids) => new Set(ids).size === ids.length, {
+    error: () => sm().analysis.insights.duplicateRecommendationIds,
+  });
 const recommendationPreferencesSchema = z
   .object({ order: recommendationIdsSchema, hidden: recommendationIdsSchema })
   .strict();

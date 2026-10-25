@@ -102,7 +102,7 @@ export const attemptSchema = z
   .strict()
   .refine(
     (input) => input.quiz || input.road || input.walkthrough,
-    () => ({ message: sm().understanding.attemptEmpty }),
+    { error: () => sm().understanding.attemptEmpty },
   );
 
 export function registerUnderstandingRoutes(

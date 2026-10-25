@@ -58,10 +58,10 @@ export function registerRunsRoutes(
         learnByHand: z.boolean().optional(),
         byHandFit: z.object({ learningIssue: z.boolean() }).strict().optional(),
       })
-      .refine((input) => !input.byHandFit || input.learnByHand === true, () => ({
-        message: sm().byHand.fitNeedsByHand,
+      .refine((input) => !input.byHandFit || input.learnByHand === true, {
+        error: () => sm().byHand.fitNeedsByHand,
         path: ["byHandFit"],
-      }))
+      })
       .parse(req.body);
     const selected = settings ?? (await insights.getSettings(repoId));
     res.status(202).json({

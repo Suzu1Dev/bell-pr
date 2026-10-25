@@ -293,7 +293,8 @@ test("the original schema is left unchanged", () => {
   lenientRead(schema);
   assert.equal(schema.safeParse({ text: "abc" }).success, false);
   assert.equal(schema.safeParse({ text: "ab", extra: 1 }).success, false);
-  assert.equal(schema._def.unknownKeys, "strict");
+  // A strict object rejects unknown keys through a catchall of never.
+  assert.ok(schema._zod.def.catchall instanceof z.ZodNever);
 });
 
 // Persisted files as the services read them. A file written by a newer

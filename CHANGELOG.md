@@ -82,6 +82,19 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   contribution replaced it. The workspace now says it is opening the
   contribution until it arrives.
 
+### Security
+
+- **zod 4.** The server validates requests, agent answers and saved files
+  with zod 4.6.7 (was 3.25.76). zod 3 has no fix for GHSA-mrhx-c7xc-m3w5,
+  where a list with very many invalid items could use up the server's
+  memory. A request that fails validation now says why in zod 4's words,
+  for example `prompt: Too small: expected string to have >=10 characters`,
+  and the server log's `agent.output_retry` line uses zod 4's codes
+  (`invalid_value` instead of `invalid_enum_value`). Text lengths count
+  Unicode code points instead of UTF-16 units, so most emoji count once.
+  Files that earlier builds saved load as before, and saved files are read
+  as leniently as before.
+
 ## [1.0.0-rc.1] - 2026-10-20
 
 The first public release candidate of BELL PR, open source under the

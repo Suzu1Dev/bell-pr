@@ -257,7 +257,7 @@ function describePlanIssue(issue: z.ZodIssue) {
   const path =
     issue.path
       .map((part, index) =>
-        typeof part === "number" ? `[${part}]` : index ? `.${part}` : part,
+        typeof part === "number" ? `[${part}]` : index ? `.${String(part)}` : String(part),
       )
       .join("") || m.wholePlan;
   switch (issue.code) {
@@ -265,7 +265,7 @@ function describePlanIssue(issue: z.ZodIssue) {
       return m.tooBig({
         path,
         maximum: Number(issue.maximum),
-        items: issue.type === "array",
+        items: issue.origin === "array",
       });
     case z.ZodIssueCode.too_small:
       return issue.minimum === 1
@@ -273,15 +273,21 @@ function describePlanIssue(issue: z.ZodIssue) {
         : m.tooSmall({
             path,
             minimum: Number(issue.minimum),
-            items: issue.type === "array",
+            items: issue.origin === "array",
           });
     case z.ZodIssueCode.invalid_type:
       return m.wrongType({
         path,
         expected: issue.expected,
-        received: issue.received,
+        // The plan is parsed JSON, so its values are one of JSON's types.
+        received:
+          issue.input === null
+            ? "null"
+            : Array.isArray(issue.input)
+              ? "array"
+              : typeof issue.input,
       });
-    case z.ZodIssueCode.invalid_string:
+    case z.ZodIssueCode.invalid_format:
       return m.badFormat({ path });
     default:
       return m.other({ path, reason: issue.message });
@@ -295,7 +301,10 @@ export function parseTeamPlan(answer: string, maxTeammates: number) {
   } catch {
     throw new AppError((m) => m.run.plan.notJson, 422);
   }
-  const result = planSchema.safeParse(normalisePlanIds(raw));
+  // reportInput keeps the value of each issue, to name its type.
+  const result = planSchema.safeParse(normalisePlanIds(raw), {
+    reportInput: true,
+  });
   if (!result.success)
     throw new AppError(
       (m) =>

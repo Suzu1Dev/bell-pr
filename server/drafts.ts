@@ -80,18 +80,18 @@ export const runDraftSchema = z.object({
     .trim()
     .max(4000)
     // A message function, so the text follows the request's locale.
-    .refine((value) => !commitMessageControl.test(value), () => ({
-      message: sm().run.publish.commitMessageInvalid,
-    }))
+    .refine((value) => !commitMessageControl.test(value), {
+      error: () => sm().run.publish.commitMessageInvalid,
+    })
     .optional(),
   // The GitHub branch is pushed as a refspec; empty means the run's own branch.
   publishBranch: z
     .string()
     .trim()
     .max(100)
-    .refine((value) => !value || validBranchName(value), () => ({
-      message: sm().run.publish.invalidBranch,
-    }))
+    .refine((value) => !value || validBranchName(value), {
+      error: () => sm().run.publish.invalidBranch,
+    })
     .optional(),
   aiDisclosure: z.boolean().optional(),
 });

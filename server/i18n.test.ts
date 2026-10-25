@@ -263,10 +263,10 @@ test("a request body that fails as a whole is named without a stray separator", 
   };
   const cases: [z.ZodError, string][] = [
     // An unknown key of a strict object and a body of the wrong type have no path.
-    [failure({ name: "x", extra: 1 }), "Unrecognized key(s) in object: 'extra'"],
-    [failure([]), "Expected object, received array"],
+    [failure({ name: "x", extra: 1 }), 'Unrecognized key: "extra"'],
+    [failure([]), "Invalid input: expected object, received array"],
     // A field keeps its path in front of the message.
-    [failure({ name: 1 }), "name: Expected string, received number"],
+    [failure({ name: 1 }), "name: Invalid input: expected string, received number"],
   ];
   for (const [error, message] of cases) {
     const { call, close } = await startApp(failingRun(error));

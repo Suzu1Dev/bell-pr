@@ -866,10 +866,10 @@ test("HTTP errors follow X-Bell-Locale: validation, the guard, the error handler
     const invalidRun = JSON.stringify({ repoId: "not-a-uuid", prompt: "short" });
     const english = await errorOf("en", "/api/runs", { body: invalidRun });
     assert.equal(english.status, 400);
-    assert.match(english.error, /^repoId: Invalid uuid, prompt: String must contain at least 10/);
+    assert.match(english.error, /^repoId: Invalid UUID, prompt: Too small: expected string to have >=10 characters/);
     assert.doesNotMatch(english.error, cjk);
     const chinese = await errorOf("zh-TW", "/api/runs", { body: invalidRun });
-    assert.match(chinese.error, /^repoId: Invalid uuid、prompt: /);
+    assert.match(chinese.error, /^repoId: Invalid UUID、prompt: /);
     // The refinements the routes define are worded at request time.
     const control = JSON.stringify({
       title: "Improve greeting",

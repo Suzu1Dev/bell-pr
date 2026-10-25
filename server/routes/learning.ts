@@ -137,7 +137,7 @@ export const feedbackTagSchema = z
       input.dimension !== undefined ||
       input.predicted !== undefined ||
       input.lesson !== undefined,
-    () => ({ message: sm().understanding.feedbackTagEmpty }),
+    { error: () => sm().understanding.feedbackTagEmpty },
   );
 
 /** POST /api/runs/:id/practice: the grade and confidence only, never the answer. */

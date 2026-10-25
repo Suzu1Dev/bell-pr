@@ -188,7 +188,7 @@ const understandingSchema = loose({
     .optional(),
   passedAt: text.optional(),
   passedFingerprint: text.optional(),
-  passedFiles: z.record(text).optional(),
+  passedFiles: z.record(text, text).optional(),
   startedAt: text.optional(),
   forecast: loose({
     dimension: text.optional(),
@@ -328,6 +328,7 @@ const byHandSchema = loose({
   thread: later(z.array(guideEntrySchema).max(40)),
   hints: later(
     z.record(
+      text,
       loose({
         rung: count,
         at: text,
@@ -508,16 +509,16 @@ export const runReadSchema = loose({
       publishBranch: text.optional(),
     }),
     reviewedFiles: list,
-    reviewedFingerprints: z.record(text),
+    reviewedFingerprints: z.record(text, text),
     approvedFingerprint: text.optional(),
-    reports: z.record(text).optional(),
-    notes: z.record(loose({ text, fingerprint: text })).optional(),
+    reports: z.record(text, text).optional(),
+    notes: z.record(text, loose({ text, fingerprint: text })).optional(),
     explanations: z
-      .record(loose({ fingerprint: text, status: text }))
+      .record(text, loose({ fingerprint: text, status: text }))
       .optional(),
-    walkthroughs: later(z.record(loose({ fingerprint: text, status: text }))),
+    walkthroughs: later(z.record(text, loose({ fingerprint: text, status: text }))),
     draftPreparation: loose({ status: text, fingerprint: text }).optional(),
-    conversations: z.record(loose({})).optional(),
+    conversations: z.record(text, loose({})).optional(),
     team: loose({
       config: loose({}),
       phase: text,
@@ -578,9 +579,10 @@ export const runReadSchema = loose({
     }).optional(),
     understanding: later(understandingSchema),
     understandingCheckOff: later(z.boolean()),
-    attempts: later(z.record(attemptSchema)),
+    attempts: later(z.record(text, attemptSchema)),
     feedbackTags: later(
       z.record(
+        text,
         loose({
           dimension: text.optional(),
           predicted: z.boolean().optional(),
@@ -591,6 +593,7 @@ export const runReadSchema = loose({
     ),
     practice: later(
       z.record(
+        text,
         loose({
           box: count,
           dueAt: text,
@@ -604,7 +607,7 @@ export const runReadSchema = loose({
     guardOverrides: later(
       z.array(loose({ id: text.max(40), reason: text.max(200), at: text })).max(8),
     ),
-    reviewability: later(loose({ testReasons: z.record(text.max(300)).optional() })),
+    reviewability: later(loose({ testReasons: z.record(text, text.max(300)).optional() })),
     // v1.2 (Learn by hand), optional in the same way.
     learnByHand: later(z.literal(true)),
     byHand: later(byHandSchema),

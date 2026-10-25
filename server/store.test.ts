@@ -1285,7 +1285,7 @@ const v12RunSchemas: Record<string, z.ZodTypeAny> = {
   }),
   "attempts[].walkthroughs": runReadSchema.extend({
     attempts: z
-      .record(runReadSchema.shape.attempts.removeCatch().unwrap().valueSchema.omit({ walkthroughs: true }))
+      .record(z.string(), runReadSchema.shape.attempts.removeCatch().unwrap().valueType.omit({ walkthroughs: true }))
       .optional()
       .catch(undefined),
   }),
@@ -1468,7 +1468,7 @@ test("a v1.1 build, whose schema has none of the v1.2 fields, still loads the v1
   });
   const olderRun = runReadSchema.omit({ learnByHand: true, byHand: true }).extend({
     attempts: z
-      .record(runReadSchema.shape.attempts.removeCatch().unwrap().valueSchema.omit({ walkthroughs: true }))
+      .record(z.string(), runReadSchema.shape.attempts.removeCatch().unwrap().valueType.omit({ walkthroughs: true }))
       .optional()
       .catch(undefined),
   });

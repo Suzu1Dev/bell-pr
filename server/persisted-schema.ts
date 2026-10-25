@@ -17,145 +17,106 @@ import { z } from "zod";
  * Use it only where a persisted file is read. Agent output and request
  * input schemas stay strict.
  */
-export function lenientRead<T extends z.ZodTypeAny>(
+export function lenientRead<T extends z.ZodType>(
   schema: T,
   opts: { capFactor?: number } = {},
-): z.ZodType<z.output<T>, z.ZodTypeDef, z.input<T>> {
+): z.ZodType<z.output<T>, z.input<T>> {
   const capFactor = opts.capFactor ?? 4;
   if (!Number.isFinite(capFactor) || capFactor < 1)
     throw new RangeError("capFactor must be a finite number of at least 1.");
   const relax = (limit: number) => Math.ceil(limit * capFactor);
   // Shared sub-schemas are rebuilt once, and z.lazy cycles end here.
-  const rebuilt = new Map<z.ZodTypeAny, z.ZodTypeAny>();
+  const rebuilt = new Map<z.core.$ZodType, z.core.$ZodType>();
 
-  function lenient(node: z.ZodTypeAny): z.ZodTypeAny {
+  function lenient<S extends z.core.$ZodType>(node: S): S {
     let result = rebuilt.get(node);
     if (!result) {
-      result = rebuild(node);
+      result = rebuild(node as unknown as z.core.$ZodTypes);
       rebuilt.set(node, result);
     }
-    return result;
+    return result as S;
   }
 
-  function rebuild(node: z.ZodTypeAny): z.ZodTypeAny {
-    if (node instanceof z.ZodObject) {
-      const def = node._def;
-      const shape = Object.fromEntries(
-        Object.entries(def.shape() as z.ZodRawShape).map(([key, value]) => [
-          key,
-          lenient(value),
-        ]),
-      );
-      return new z.ZodObject({
-        ...def,
-        shape: () => shape,
-        unknownKeys:
-          def.unknownKeys === "passthrough" ? "passthrough" : "strip",
-        catchall: lenient(def.catchall),
-      });
-    }
-    if (node instanceof z.ZodArray) {
-      const def = node._def;
-      return new z.ZodArray({
-        ...def,
-        type: lenient(def.type),
-        maxLength: def.maxLength && {
-          ...def.maxLength,
-          value: relax(def.maxLength.value),
-        },
-      });
-    }
-    if (node instanceof z.ZodString) {
-      const def = node._def;
-      return new z.ZodString({
-        ...def,
-        checks: def.checks.map((check) =>
-          check.kind === "max"
-            ? { ...check, value: relax(check.value) }
-            : check,
-        ),
-      });
-    }
-    if (
-      node instanceof z.ZodOptional ||
-      node instanceof z.ZodNullable ||
-      node instanceof z.ZodDefault ||
-      node instanceof z.ZodCatch ||
-      node instanceof z.ZodReadonly
-    ) {
-      const Wrapper = node.constructor as new (
-        def: z.ZodTypeDef & { innerType: z.ZodTypeAny },
-      ) => z.ZodTypeAny;
-      return new Wrapper({
-        ...node._def,
-        innerType: lenient(node._def.innerType),
-      });
-    }
-    if (node instanceof z.ZodEffects)
-      return new z.ZodEffects({
-        ...node._def,
-        schema: lenient(node._def.schema),
-      });
-    if (node instanceof z.ZodUnion)
-      return new z.ZodUnion({
-        ...node._def,
-        options: node._def.options.map(lenient),
-      });
-    if (node instanceof z.ZodDiscriminatedUnion) {
-      const def = node._def;
-      // The options map is keyed by discriminator value; let zod rebuild it.
-      const fresh = z.ZodDiscriminatedUnion.create(
-        def.discriminator,
-        def.options.map(lenient) as [
-          z.ZodDiscriminatedUnionOption<string>,
-          ...z.ZodDiscriminatedUnionOption<string>[],
-        ],
-      );
-      return new z.ZodDiscriminatedUnion({
-        ...def,
-        options: fresh._def.options,
-        optionsMap: fresh._def.optionsMap,
-      });
-    }
-    if (node instanceof z.ZodIntersection)
-      return new z.ZodIntersection({
-        ...node._def,
-        left: lenient(node._def.left),
-        right: lenient(node._def.right),
-      });
-    if (node instanceof z.ZodRecord)
-      return new z.ZodRecord({
-        ...node._def,
-        keyType: lenient(node._def.keyType),
-        valueType: lenient(node._def.valueType),
-      });
-    if (node instanceof z.ZodTuple)
-      return new z.ZodTuple({
-        ...node._def,
-        items: node._def.items.map(lenient),
-        rest: node._def.rest && lenient(node._def.rest),
-      });
-    if (node instanceof z.ZodLazy) {
-      const getter = node._def.getter;
-      // zod calls the getter on every parse, and an inline getter returns a
-      // new schema each time; rebuild it once instead of on every call.
-      let resolved: z.ZodTypeAny | undefined;
-      return new z.ZodLazy({
-        ...node._def,
-        getter: () => (resolved ??= lenient(getter())),
-      });
-    }
-    if (node instanceof z.ZodPipeline)
-      return new z.ZodPipeline({
-        ...node._def,
-        in: lenient(node._def.in),
-        out: lenient(node._def.out),
-      });
-    if (node instanceof z.ZodBranded)
-      return new z.ZodBranded({ ...node._def, type: lenient(node._def.type) });
-    // Enums, literals, numbers, booleans and other leaves keep their rules.
-    return node;
+  /** A copy of the node with some of its definition replaced. */
+  function copy<S extends z.core.$ZodType>(node: S, changes: object): S {
+    // mergeDefs keeps getters, such as a default's, as getters.
+    return z.clone(node, z.util.mergeDefs(node._zod.def, changes));
   }
 
-  return lenient(schema);
+  /** The checks with every maximum length relaxed; the others as written. */
+  function relaxed(checks: z.core.$ZodCheck[] | undefined) {
+    return checks?.map((check) => {
+      const def = check._zod.def;
+      if (def.check !== "max_length") return check;
+      // zod builds every check with its class in _zod.constr.
+      const { constr: Check } = check._zod as unknown as {
+        constr: new (def: z.core.$ZodCheckMaxLengthDef) => z.core.$ZodCheck;
+      };
+      const maxLength = def as z.core.$ZodCheckMaxLengthDef;
+      return new Check({ ...maxLength, maximum: relax(maxLength.maximum) });
+    });
+  }
+
+  function rebuild(node: z.core.$ZodTypes): z.core.$ZodType {
+    const def = node._zod.def;
+    switch (def.type) {
+      case "object":
+        return copy(node, {
+          shape: Object.fromEntries(
+            Object.entries(def.shape).map(([key, value]) => [key, lenient(value)]),
+          ),
+          // A strict object's catchall is never and a passthrough object's
+          // unknown; without one, unknown keys are stripped.
+          catchall:
+            !def.catchall || def.catchall instanceof z.ZodNever
+              ? undefined
+              : lenient(def.catchall),
+        });
+      case "array":
+        return copy(node, {
+          element: lenient(def.element),
+          checks: relaxed(def.checks),
+        });
+      case "string":
+        return copy(node, { checks: relaxed(def.checks) });
+      case "optional":
+      case "nullable":
+      case "default":
+      case "prefault":
+      case "catch":
+      case "readonly":
+      case "nonoptional":
+        return copy(node, { innerType: lenient(def.innerType) });
+      case "pipe":
+        return copy(node, { in: lenient(def.in), out: lenient(def.out) });
+      // A discriminated union is a union with a discriminator; zod maps its
+      // options by discriminator value again from the new options.
+      case "union":
+        return copy(node, { options: def.options.map(lenient) });
+      case "intersection":
+        return copy(node, { left: lenient(def.left), right: lenient(def.right) });
+      case "record":
+        return copy(node, {
+          keyType: lenient(def.keyType),
+          valueType: lenient(def.valueType),
+        });
+      case "tuple":
+        return copy(node, {
+          items: def.items.map(lenient),
+          rest: def.rest && lenient(def.rest),
+        });
+      case "lazy": {
+        const getter = def.getter;
+        // Rebuild what the getter returns once, on its first use. A new
+        // z.lazy, because zod caches the resolved schema on the definition.
+        let resolved: z.core.$ZodType | undefined;
+        return z.lazy(() => (resolved ??= lenient(getter())));
+      }
+      // Enums, literals, numbers, booleans and other leaves keep their rules.
+      default:
+        return node;
+    }
+  }
+
+  return lenient(schema) as z.ZodType<z.output<T>, z.input<T>>;
 }

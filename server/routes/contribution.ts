@@ -12,9 +12,9 @@ const checkQuerySchema = z
       .string()
       .trim()
       .max(400)
-      .refine((value) => !value || parseGitHubIssueUrl(value) !== null, () => ({
-        message: sm().analysis.insights.issueUrlInvalid,
-      }))
+      .refine((value) => !value || parseGitHubIssueUrl(value) !== null, {
+        error: () => sm().analysis.insights.issueUrlInvalid,
+      })
       .optional(),
   })
   .strict();

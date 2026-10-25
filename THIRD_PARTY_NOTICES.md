@@ -197,7 +197,7 @@ time.
 | unpipe | 1.0.0 | MIT | [65](#license-text-65) |
 | vary | 1.1.2 | MIT | [19](#license-text-19) |
 | wrappy | 1.0.2 | ISC | [51](#license-text-51) |
-| zod | 3.25.76 | MIT | [66](#license-text-66) |
+| zod | 4.6.7 | MIT | [66](#license-text-66) |
 | zwitch | 2.0.4 | MIT | [12](#license-text-12) |
 
 ## C. Vendored Ponytail rules
@@ -2164,7 +2164,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 <a id="license-text-66"></a>
 
-### 66. Used by zod 3.25.76
+### 66. Used by zod 4.6.7
 
 ```text
 MIT License

@@ -362,7 +362,7 @@ test("agent.output_retry names the paths and codes that did not fit, never the v
   assert.deepEqual(
     retries.map(({ schema, problem }) => ({ schema, problem })),
     [
-      { schema: "schema", problem: "kind: invalid_enum_value; items: too_big" },
+      { schema: "schema", problem: "kind: invalid_value; items: too_big" },
       { schema: "syntax", problem: "json_syntax" },
       { schema: "plain", problem: undefined },
     ],

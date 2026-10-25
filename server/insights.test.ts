@@ -833,7 +833,8 @@ test("a rejected analysis logs which fields did not fit, never their values", as
     assert.deepEqual(
       retries.map(({ schema, problem }) => ({ schema, problem })),
       [
-        { schema: "analysis", problem: "recommendations: invalid_type" },
+        // zod 4 also measures a string sent for the list against its cap.
+        { schema: "analysis", problem: "recommendations: invalid_type; recommendations: too_big" },
         { schema: "analysis", problem: "(root): invalid_type" },
       ],
     );
