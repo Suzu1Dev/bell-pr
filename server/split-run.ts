@@ -156,6 +156,10 @@ function contributionRun(
   );
   const created = new Date().toISOString();
   const explanations = onlyPaths(source.explanations, own);
+  // A job still writing an explanation writes it to the original only, and
+  // the new run asks for one only while it is pending.
+  for (const entry of Object.values(explanations ?? {}))
+    if (entry.status === "generating") entry.status = "pending";
   const walkthroughs = onlyPaths(source.walkthroughs, own);
   const notes = onlyPaths(source.notes, own);
   const reports = onlyPaths(source.reports, kept);

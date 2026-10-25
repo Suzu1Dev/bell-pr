@@ -454,3 +454,19 @@ test("a split waits until a sync's conflict markers are resolved, so no part car
   const { created } = await en(() => f.workbench.split(f.run.id, { contributions: three }));
   assert.equal(created.length, 3);
 });
+
+test("an explanation the original is still writing is asked for again in the part, not left waiting on the original's job", async (t) => {
+  const f = await fixture(t);
+  const fingerprint = f.files.find((file) => file.path === "web/a.js")!.fingerprint;
+  // The original's explanation job is writing web/a.js; it only ever writes to the original.
+  f.run.explanations = { "web/a.js": { fingerprint, status: "generating" } };
+  const { created } = await en(() => f.workbench.split(f.run.id, { contributions: three }));
+  const [a] = created;
+
+  assert.equal(a.explanations?.["web/a.js"]?.status, "pending");
+  assert.equal(f.run.explanations["web/a.js"].status, "generating");
+  // Asking for the part's explanations starts its own job (the fake agent fails it), so the
+  // file no longer looks as if it were being written.
+  const { files } = await en(() => f.workbench.explanations(a.id));
+  assert.equal(files.find((file) => file.path === "web/a.js")?.explanationStatus, "failed");
+});

@@ -92,6 +92,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   conflict, so they could be approved and published with the markers still
   in their files. The split now waits until the conflicts are resolved and
   names the files that still hold markers.
+
+- **Split parts no longer get stuck on an explanation in progress.** Splitting
+  a run while its explanations were still being written left those files
+  marked as being explained in the new parts forever: Retry did nothing and
+  the page kept asking the server again. The new parts now ask for their own
+  explanations.
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files
