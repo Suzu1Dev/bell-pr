@@ -128,8 +128,14 @@ test("on a QEMU-like project the dialog offers the fitted guide, starts a fitted
     await expect(dialog.locator(".start-confirm")).toContainText(fittedLine);
     // ...and the project drops its carve-out before Start (in the copy the server keeps of the
     // folder): the server reads its rules again.
-    const { repos } = (await (await page.request.get("/api/repos")).json()) as { repos: { id: string; path: string }[] };
-    const checkout = repos.find((repo) => repo.id === repoId)!.path;
+    // The run started above moves this in-place project into that copy in the background
+    // (adoptLegacyCheckout); edit the copy only once it is there.
+    const repoPath = async () => {
+      const { repos } = (await (await page.request.get("/api/repos")).json()) as { repos: { id: string; path: string }[] };
+      return repos.find((repo) => repo.id === repoId)!.path;
+    };
+    await expect.poll(repoPath).toContain(`${path.sep}repositories${path.sep}`);
+    const checkout = await repoPath();
     const text = await readFile(path.join(checkout, "CONTRIBUTING.rst"), "utf8");
     await writeFile(
       path.join(checkout, "CONTRIBUTING.rst"),
