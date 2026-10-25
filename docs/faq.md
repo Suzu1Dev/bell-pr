@@ -218,15 +218,14 @@ explanations and need another review.
 No. BELL PR is a single-user tool: it works with one person's Git, GitHub
 and AI sign-ins. Each person runs their own. To reach your BELL PR from
 another of your machines, put an HTTPS reverse proxy in front of it, as
-[Self-hosting](self-hosting.md) describes; never expose it to the internet
-without one.
+[Self-hosting](self-hosting.md) describes. BELL PR does no authentication
+itself, so never expose it to the internet without a proxy that does.
 
 ### Can I run two BELL PRs on one computer?
 
 Yes, with different data directories and ports, for example
 `bell-pr start --data-dir ~/bellpr-work --port 4400`. Each data directory
-allows one running BELL PR, and the sign-in cookies of different ports do
-not interfere.
+allows one running BELL PR.
 
 ### Which languages does it speak?
 
