@@ -87,6 +87,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   contribution replaced it. The workspace now says it is opening the
   contribution until it arrives.
 
+- **Splitting no longer gets around open sync conflicts.** A run whose sync
+  left conflict markers could be split, and the new parts lost track of the
+  conflict, so they could be approved and published with the markers still
+  in their files. The split now waits until the conflicts are resolved and
+  names the files that still hold markers.
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

@@ -419,7 +419,8 @@ a banner asks you to publish the parts instead. Files BELL PR holds back from
 review (binary, sensitive, containing a secret, or symbolic links) cannot be
 moved; they can only be left out. The split is offered for a run in review
 or approved that is not published, is not a Learn-by-hand run and still has
-its working copy; it is not offered on the sample run. BELL PR cannot check
+its working copy; it is not offered on the sample run. Conflicts a sync left
+must be resolved before the split, as before approval. BELL PR cannot check
 that a part works on its own, because one part's tests may need another
 part, so run each part's tests.
 

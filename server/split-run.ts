@@ -24,6 +24,7 @@ import { shuttingDown, sm } from "./i18n/index.js";
 import { log } from "./log.js";
 import { git } from "./process.js";
 import { editable } from "./publish.js";
+import { assertConflictsResolved } from "./sync-runs.js";
 import {
   AppError,
   withRunLocale,
@@ -241,6 +242,8 @@ export async function splitRun(
     if (source.splitInto?.length)
       throw new AppError((m) => m.run.split.alreadySplit({ count: source.splitInto!.length }), 409);
     assertWorkspacePresent(source);
+    // A part would carry the markers without the sync that guards approval and publishing.
+    await assertConflictsResolved(source);
     const files = assertRequest(input, await ctx.diff(id));
     const repo = ctx.repo(source.repoId);
 

@@ -428,3 +428,29 @@ test("a contribution that fails after its checkout exists leaves no checkout or 
   assert.deepEqual(await readdir(path.join(f.store.directory, "worktrees")), ["source-run-0001"]);
   assert.deepEqual(await contributionBranches(f.repo.path), ["fix/source01"]);
 });
+
+test("a split waits until a sync's conflict markers are resolved, so no part carries them past the conflict check", async (t) => {
+  const f = await fixture(t);
+  // A sync onto a newer target branch left markers in web/a.js.
+  await writeFile(
+    path.join(f.run.worktreePath, "web/a.js"),
+    "<<<<<<< ours\nexport const a = 2;\n=======\nexport const a = 3;\n>>>>>>> main\n",
+  );
+  const at = new Date().toISOString();
+  const sha = f.run.baseSha;
+  f.run.sync = { at, from: sha, to: sha, snapshot: sha, conflicts: ["web/a.js"] };
+
+  await assert.rejects(
+    en(() => f.workbench.split(f.run.id, { contributions: three })),
+    refused(409, /merge conflict markers: .*web\/a\.js/),
+  );
+  assert.equal(f.store.data.runs.length, 1);
+  assert.equal(f.run.splitInto, undefined);
+  assert.deepEqual(await readdir(path.join(f.store.directory, "worktrees")), ["source-run-0001"]);
+  assert.deepEqual(await contributionBranches(f.repo.path), ["fix/source01"]);
+
+  // Once the person resolves the conflict, the split goes ahead.
+  await writeFile(path.join(f.run.worktreePath, "web/a.js"), "export const a = 3;\n");
+  const { created } = await en(() => f.workbench.split(f.run.id, { contributions: three }));
+  assert.equal(created.length, 3);
+});
