@@ -1050,7 +1050,7 @@ button {
   container: diff-panel / inline-size;
 }
 .diff-topbar {
-  height: 45px;
+  min-height: 45px;
   border-bottom: 1px solid var(--color-border-subtle);
   display: flex;
   align-items: center;
@@ -1081,60 +1081,74 @@ button {
     display: none;
   }
 }
-.worktree-hint {
-  display: flex;
-  align-items: center;
+/* The premise check lives in the diff's top bar. Closed, it is one line.
+   Open, its statement, evidence and source are one overlay over the code,
+   scrolling when long, so the code never moves. */
+.diff-topbar {
+  position: relative;
+  /* The premise check keeps its words: when it cannot have a row beside the
+     tools, it takes a row of its own. */
   flex-wrap: wrap;
-  gap: 6px 8px;
-  padding: 7px 15px;
-  border-bottom: 1px solid var(--color-border-subtle);
-  background: var(--color-accent-50);
-  color: var(--color-text-muted);
-  font-size: var(--text-2xs);
-  line-height: 1.6;
 }
-.worktree-hint > svg {
-  flex-shrink: 0;
-  color: var(--color-accent-600);
+.diff-topbar > .diff-toolbar-actions {
+  margin-left: auto;
 }
-/* No text is cut off: a long path wraps anywhere. */
-.worktree-hint > code {
+.diff-topbar > .premise-notice.premise-compact {
+  flex: 1 1 18rem;
   min-width: 0;
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  color: var(--color-accent-700);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 4px;
-  padding: 2px 6px;
-  overflow-wrap: anywhere;
-  user-select: all;
-}
-.worktree-hint > .icon-button {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-}
-/* Above the diff: the premise check and the worktree share one row. */
-.diff-context-bar {
-  display: flex;
-  flex-wrap: wrap;
-  border-bottom: 1px solid var(--color-border-subtle);
-  background: var(--color-accent-50);
-}
-.diff-context-bar > .premise-compact {
-  flex: 1 1 320px;
-  min-width: 0;
+  margin: 0 12px 0 0;
+  padding: 0;
   border: 0;
-  padding: 7px 15px;
+  background: transparent;
 }
-.diff-context-bar > .premise-compact:has(details[open]) {
-  flex-basis: 100%;
-}
-.diff-context-bar > .worktree-hint {
-  flex: 0 1 420px;
+.diff-topbar > .premise-compact summary {
+  flex-wrap: nowrap;
   min-width: 0;
-  border-bottom: 0;
+  padding: 6px 0;
+}
+/* The label wraps, rather than being cut off, in a pane too narrow for it. */
+.diff-topbar > .premise-compact summary > strong {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.diff-topbar > .premise-compact summary > span {
+  flex: 1 1 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Open, the statement reads in the overlay, so the line drops it. */
+.diff-topbar > .premise-compact details[open] > summary > span {
+  display: none;
+}
+/* A narrow pane leaves the statement too little room to read on one line. */
+@container diff-panel (max-width: 760px) {
+  .diff-topbar > .premise-compact summary > span {
+    display: none;
+  }
+}
+.diff-topbar > .premise-compact details[open] > .premise-detail {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  /* The pane clips the overlay and has no fixed height, so stay under what the
+     chrome above and below it leaves: 440px covers it with room to spare. */
+  max-height: clamp(120px, calc(100dvh - 440px), 320px);
+  overflow-y: auto;
+  padding: 10px 15px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-1);
+}
+.diff-topbar > .premise-compact .premise-detail > :first-child {
+  margin-top: 0;
+}
+.diff-topbar > .premise-compact details[open] > .premise-detail:focus-visible {
+  outline: 2px solid var(--color-accent-500);
+  outline-offset: -2px;
 }
 .view-toggle {
   display: flex;

@@ -261,9 +261,10 @@ When the team is done, the run waits for your review in **Code changes**:
   **Whole file** shows the whole file between the changes. The lines are
   read from the run's base commit and are marked as context; you can
   select them and ask about them too.
-- Above the diff, one row holds the **premise check**, folded to its
-  verdict and the assumption, and the **worktree** path with a copy button
-  (hover for the editing hint).
+- The **premise check** sits in the diff's top bar, folded to its verdict.
+  Open it to read the assumption, the evidence and where it came from over
+  the code; it can be reached with the keyboard (**Tab**, then the arrow
+  keys or **Page Down** to scroll).
 - **My understanding**: write a note in your own words, then mark the file
   as **Reviewed**.
 
@@ -282,8 +283,9 @@ tiny docs edits) get no prompts. **Settings → Learning → Try-first prompts
 during review** turns the prompts off; the answers then sit behind a plain
 reveal button.
 
-You can also change the code yourself: copy the worktree path, edit the
-files in your editor, then **Refresh the diff**. Changed files get new
+You can also change the code yourself: edit the files in the run's folder
+under `worktrees/` in the data directory (a Learn by hand run shows its
+folder in its own panel), then **Refresh the diff**. Changed files get new
 explanations and need another review.
 
 Explanations and answers come from an AI and can be wrong. Check them

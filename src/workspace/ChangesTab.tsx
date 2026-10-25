@@ -54,7 +54,6 @@ import {
   useCheckPanel,
   type Understanding,
 } from "../app/hooks/useUnderstanding";
-import { WorktreeHint } from "./WorktreeHint";
 
 const ExplanationPanel = lazy(() =>
   import("../review/ExplanationPanel").then((module) => ({
@@ -118,7 +117,6 @@ interface ChangesTabProps {
     | "chatLoading"
     | "rerunRequests"
     | "refreshRun"
-    | "copyWorktreePath"
     | "rerunReview"
     | "reviewFile"
     | "saveNote"
@@ -198,15 +196,12 @@ export function ChangesTab({
     chatLoading,
     rerunRequests,
     refreshRun,
-    copyWorktreePath,
     rerunReview,
     reviewFile,
     saveNote,
     ask,
   } = actions;
-  const { present, maskPath } = usePresentation();
-  const showWorktree =
-    editable && !!run.worktreePath && !run.workspaceRemovedAt;
+  const { present } = usePresentation();
   // Closed book: while the check is open it takes the explanation's place,
   // and questions to the agent wait until it closes.
   const checkMode = useCheckPanel(run.id);
@@ -316,22 +311,6 @@ export function ChangesTab({
   );
   return (
     <>
-    {/* The lead's premise check, folded (the diff is read file after file),
-        and the worktree share one row above the code. It comes before the
-        file list, so the way from the files to the explanation stays short. */}
-    {(run.team?.premise || showWorktree) && (
-      <div className="diff-context-bar">
-        <PremiseNotice premise={run.team?.premise} compact guide={run.learnByHand} />
-        {showWorktree && (
-          <WorktreeHint
-            path={run.worktreePath!}
-            presenting={present}
-            maskPath={maskPath}
-            onCopy={copyWorktreePath}
-          />
-        )}
-      </div>
-    )}
     {run.byHand?.ready && writing && <p className="by-hand-note" role="status">{workspace.byHand.changed}</p>}
     <div
       ref={reviewGridRef}
@@ -493,6 +472,7 @@ export function ChangesTab({
             <span className="diff-topbar-arrow">←</span>{" "}
             {run.branch}
           </span>
+          <PremiseNotice premise={run.team?.premise} compact guide={run.learnByHand} />
           <div
             className="diff-toolbar-actions"
             role="toolbar"

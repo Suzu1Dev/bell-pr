@@ -26,6 +26,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Premise check.** In Code changes it sits in the diff's top bar instead
+  of a row of its own, and opens as an overlay that scrolls and can be
+  reached with the keyboard, so the code keeps its height.
+- **Worktree path.** Code changes no longer shows the run's worktree path
+  above the diff, so the code keeps that height. The files are still under
+  `worktrees/` in the data directory, and a Learn by hand run shows its
+  folder in its own panel.
 - **Rejected analysis.** When BELL PR rejects an AI analysis as incomplete,
   the server log's `agent.output_retry` line now names the fields that did
   not fit and why (for example `recommendations: too_big`), never their

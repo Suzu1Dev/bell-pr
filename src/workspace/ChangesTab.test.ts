@@ -3,10 +3,8 @@ import test from "node:test";
 import { createElement } from "react";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
 import type { DiffFile, Run } from "../types";
-import { maskPath } from "../app/presentation";
 import { closeCheckPanel, openCheckPanel, type Understanding } from "../app/hooks/useUnderstanding";
 import { ChangesTab } from "./ChangesTab";
-import { WorktreeHint } from "./WorktreeHint";
 
 type Props = Parameters<typeof ChangesTab>[0];
 
@@ -95,7 +93,6 @@ const element = (props: Partial<Props> = {}) =>
       chatLoading: false,
       rerunRequests: new Set<string>(),
       async refreshRun() {},
-      async copyWorktreePath() {},
       async rerunReview() {},
       async reviewFile() {},
       async saveNote() {},
@@ -164,26 +161,7 @@ test("the diff toolbar is one labelled tab stop", () => {
   assert.match(renderZh(element()), /role="toolbar" aria-label="Diff 工具"/);
 });
 
-test("the worktree path can be copied, except while presenting, when it loses its folders", () => {
-  const html = renderEn(element());
-  assert.match(html, /<code><span>\/home\/someone\/\.bellpr\/worktrees\/run-1<\/span><\/code>/);
-  assert.match(html, /aria-label="Copy the worktree path"/);
-  const path = run.worktreePath!;
-  const presenting = renderEn(
-    createElement(WorktreeHint, {
-      path,
-      presenting: true,
-      maskPath: (value: string) => maskPath(value, undefined, true),
-      onCopy() {},
-    }),
-  );
-  assert.match(presenting, /<code><span>…\/run-1<\/span><\/code>/);
-  assert.doesNotMatch(presenting, /someone|\/home\//);
-  assert.doesNotMatch(presenting, /Copy the worktree path/);
-  assertNoHan(presenting);
-});
-
-test("the premise check and the worktree share one row above the diff, the path on one line with the hint as its tooltip", () => {
+test("the premise check sits in the diff's top bar and no row is left above the code", () => {
   const premise = {
     verdict: "holds",
     statement: "GET requests do not retry today.",
@@ -191,23 +169,18 @@ test("the premise check and the worktree share one row above the diff, the path 
   } as const;
   const team = { ...(run.team ?? {}), premise } as NonNullable<Run["team"]>;
   const html = renderEn(element({ run: { ...run, team } }));
-  const bar = html.slice(html.indexOf('<div class="diff-context-bar">'));
+  const topbar = html.slice(html.indexOf('<div class="diff-topbar">'), html.indexOf('role="toolbar"'));
   assert.match(
-    bar,
-    /^<div class="diff-context-bar"><section class="premise-notice premise-holds premise-compact" aria-label="Premise check"><details><summary>.*?<span>GET requests do not retry today\.<\/span><\/summary>/,
+    topbar,
+    /<section class="premise-notice premise-holds premise-compact" aria-label="Premise check"><details><summary>.*?<span>GET requests do not retry today\.<\/span><\/summary><div class="premise-detail" role="region" tabindex="0" aria-label="Evidence and source"><p class="premise-statement">GET requests do not retry today\.<\/p><p>src\/client\.ts:12 sends one fetch\.<\/p>/,
   );
-  assert.match(
-    bar,
-    /<\/section><div class="worktree-hint" title="You can edit files in this folder directly\. Refresh the diff to update the explanations and the review status\."><svg[^>]*><path[^]*?<\/svg><span>Worktree<\/span><span class="visually-hidden">You can edit files/,
-  );
+  // The review grid follows the pane's own top bar directly: no worktree or other row above the code.
+  assert.doesNotMatch(html, /diff-context-bar|worktree/i);
   assertNoHan(html);
-  assert.match(renderZh(element({ run: { ...run, team } })), /<span>工作目錄<\/span>/);
-  // Without a premise the bar holds the worktree alone; with neither, there is no bar.
-  assert.match(renderEn(element()), /<div class="diff-context-bar"><div class="worktree-hint"/);
-  assert.doesNotMatch(renderEn(element({ editable: false })), /diff-context-bar/);
+  assert.match(renderZh(element({ run: { ...run, team } })), /aria-label="前提查核"/);
 });
 
-test("a run whose files were cleaned up says so instead of offering its folder", () => {
+test("a run whose files were cleaned up says so", () => {
   const html = renderEn(
     element({
       run: { ...run, workspaceRemovedAt: "2026-10-12T00:00:00Z" },
@@ -218,7 +191,6 @@ test("a run whose files were cleaned up says so instead of offering its folder",
   );
   assert.match(html, /The changed files were cleaned up/);
   assert.match(html, /Reports and notes are kept\./);
-  assert.doesNotMatch(html, /worktree-hint/);
   assertNoHan(html);
 });
 

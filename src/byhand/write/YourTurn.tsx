@@ -8,7 +8,7 @@ import "./byhand.css";
 
 export interface YourTurnProps {
   run: Run;
-  /** The run's worktree, masked while presenting (as WorktreeHint does). */
+  /** The run's worktree, masked while presenting. */
   worktreePath: string;
   presenting?: boolean;
 }

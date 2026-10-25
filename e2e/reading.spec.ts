@@ -261,12 +261,13 @@ test.describe("reading a real run in review", () => {
       await expect(brief.locator(".premise-notice.premise-refuted")).toContainText(premise.evidence);
       await expect(brief.getByRole("button", { name: t.mission.brief.premiseRecheck })).toBeVisible();
       await axe(page, ".mission-overview");
-      // The code changes tab carries the verdict folded, on one row with the worktree.
+      // The code changes tab carries the verdict folded in the diff's top bar; opening it shows the evidence over the code.
       await page.goto(`/#/runs/${runId}/changes?locale=en`);
-      const bar = page.locator(".diff-context-bar");
-      await expect(bar.locator(".premise-compact summary")).toContainText(premise.statement);
-      await expect(bar.locator(".worktree-hint")).toContainText(t.workspace.changes.worktreeLabel);
-      await axe(page, ".diff-context-bar");
+      const bar = page.locator(".diff-topbar");
+      await bar.locator(".premise-compact summary").click();
+      await expect(bar.locator(".premise-detail")).toContainText(premise.statement);
+      await expect(bar.locator(".premise-detail")).toContainText(premise.evidence);
+      await axe(page, ".diff-topbar");
     } finally {
       await close();
     }

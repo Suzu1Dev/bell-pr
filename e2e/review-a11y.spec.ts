@@ -76,7 +76,7 @@ test("the diff is one tab stop however many lines it has", async ({ page }) => {
   await expect(page.locator('.rv-diff [role=listbox] [tabindex="0"]')).toHaveCount(1);
 });
 
-test("the explanation panel is reached in 5 or fewer Tab presses from the file list", async ({ page }) => {
+test("the explanation panel is reached in 6 or fewer Tab presses from the file list", async ({ page }) => {
   await openChanges(page);
   await page.locator(".file-panel .file-item").last().focus();
   const stops: { part: string; role: string; name: string }[] = [];
@@ -96,7 +96,9 @@ test("the explanation panel is reached in 5 or fewer Tab presses from the file l
   // The diff toolbar between the file list and the diff is one tab stop: a
   // role="toolbar" with a roving tabindex, whose arrow keys move inside it.
   expect(stops.filter((stop) => stop.part === "toolbar").length, route).toBe(1);
-  expect(stops.length, route).toBeLessThanOrEqual(5);
+  // The premise check in the top bar is one disclosure, one stop.
+  expect(stops.filter((stop) => stop.role === "summary").length, route).toBe(1);
+  expect(stops.length, route).toBeLessThanOrEqual(6);
 });
 
 test("Shift+ArrowDown selects lines and Enter brings up the ask bar", async ({ page }) => {

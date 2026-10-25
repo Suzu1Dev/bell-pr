@@ -51,8 +51,11 @@ export function PremiseNotice({
             {heading}
             <span>{premise.statement}</span>
           </summary>
-          {premise.evidence && <p>{premise.evidence}</p>}
-          <small>{source}</small>
+          <div className="premise-detail" role="region" tabIndex={0} aria-label={t.detailLabel}>
+            <p className="premise-statement">{premise.statement}</p>
+            {premise.evidence && <p>{premise.evidence}</p>}
+            <small>{source}</small>
+          </div>
         </details>
       ) : (
         <>

@@ -56,6 +56,7 @@ const m: Translation<typeof en> = {
       unclear: "無法確認假設",
     },
     source: "由 Lead 閱讀程式碼得出，可對照引用的位置確認。",
+    detailLabel: "依據與來源",
     sourceGuide: "由嚮導閱讀程式碼得出，可對照引用的位置確認。",
   },
   byHand: {
@@ -127,10 +128,6 @@ const m: Translation<typeof en> = {
     viewMode: "Diff 顯示模式",
     unified: "統一檢視",
     split: "並排檢視",
-    worktreeLabel: "工作目錄",
-    worktreeHint:
-      "你可以直接在這個目錄修改，重新整理差異後會重新解說與審閱狀態",
-    copyWorktree: "複製工作目錄路徑",
     preparing: "Agent team 正在準備你的變更",
     noChanges: "尚無程式碼變更",
     filesRemoved: "變更的檔案已清除",
@@ -434,8 +431,6 @@ const m: Translation<typeof en> = {
     draftChangedWhileSwitching: "草稿在切換期間已更新，已保留目前任務。",
     demoRefresh: "目前是示範資料。匯入自己的 repository 後可讀取真實差異。",
     refreshed: "已讀取最新差異與審查狀態",
-    copiedWorktree: "已複製工作目錄路徑",
-    clipboardUnavailable: "無法使用剪貼簿，請直接選取路徑複製。",
     demoRerun: "目前是示範資料。匯入自己的 repository 後可重新執行審查。",
     rerunStarted:
       "已開始依目前差異重新審查，報告完成後會出現在「審查者怎麼看」。",

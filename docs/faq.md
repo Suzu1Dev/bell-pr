@@ -208,7 +208,8 @@ published.
 
 ### Can I change the agents' code myself?
 
-Yes. **Code changes** shows the run's worktree path with a copy button.
+Yes. The run's files are a Git worktree, a folder under `worktrees/` in the
+data directory (a Learn by hand run shows its folder in its own panel).
 Edit the files in your own editor (do not commit; BELL PR does that when
 you publish), then choose **Refresh the diff**. Changed files get new
 explanations and need another review.

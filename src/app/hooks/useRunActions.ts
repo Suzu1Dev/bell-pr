@@ -614,15 +614,6 @@ export function useRunActions({
       notify((error as Error).message, "error");
     }
   }
-  async function copyWorktreePath() {
-    if (!run.worktreePath) return;
-    try {
-      await navigator.clipboard.writeText(run.worktreePath);
-      notify(t.copiedWorktree);
-    } catch {
-      notify(t.clipboardUnavailable, "error");
-    }
-  }
   async function rerunReview() {
     if (demo) {
       notify(t.demoRerun);
@@ -1093,7 +1084,6 @@ export function useRunActions({
     sendTeamMessage,
     chooseRun,
     refreshRun,
-    copyWorktreePath,
     rerunReview,
     importRepo,
     startTask,

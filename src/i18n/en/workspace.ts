@@ -74,6 +74,7 @@ const workspace = {
       unclear: "the assumption could not be confirmed",
     } satisfies Record<PremiseVerdict, string>,
     source: "Found by the lead reading the code; check it against the cited lines.",
+    detailLabel: "Evidence and source",
     /** A Learn-by-hand run's premise check, from the guide's first read (DESIGN v1.2 F3). */
     sourceGuide: "Found by the guide reading the code; check it against the cited lines.",
   },
@@ -160,10 +161,6 @@ const workspace = {
     viewMode: "Diff view mode",
     unified: "Unified view",
     split: "Split view",
-    worktreeLabel: "Worktree",
-    worktreeHint:
-      "You can edit files in this folder directly. Refresh the diff to update the explanations and the review status.",
-    copyWorktree: "Copy the worktree path",
     preparing: "The agent team is preparing your changes",
     noChanges: "No code changes yet",
     filesRemoved: "The changed files were cleaned up",
@@ -560,9 +557,6 @@ const workspace = {
     demoRefresh:
       "This is sample data. Import your own repository to read a real diff.",
     refreshed: "Loaded the latest diff and review status",
-    copiedWorktree: "Copied the worktree path",
-    clipboardUnavailable:
-      "The clipboard is not available. Select the path and copy it instead.",
     demoRerun:
       "This is sample data. Import your own repository to run the review again.",
     rerunStarted:
