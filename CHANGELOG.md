@@ -73,6 +73,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **ESLint 10.** The lint runs on ESLint 10.13 (was 9.39) with the same
   rules, so developing BELL PR needs Node.js 22.13 or later. Running it
   still needs Node.js 22 or later.
+- **Vite 8.** The web app is built with Vite 8.3 and @vitejs/plugin-react 6
+  (were Vite 6.4 and plugin-react 4.7), which bundle with Rolldown. The app
+  loads as a few more, smaller files, within the same size budgets, and
+  `THIRD_PARTY_NOTICES.md` now credits Rolldown, whose runtime helpers ship
+  in the bundle instead of those of @rollup/plugin-commonjs.
 
 ### Fixed
 

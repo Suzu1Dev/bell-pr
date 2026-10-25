@@ -132,16 +132,12 @@ function describePackage(directory) {
 }
 
 /**
- * Vite's LICENSE.md covers everything its Node.js build bundles. Only two
- * parts reach dist/assets: Vite's own client helpers (module preload) and
- * the CommonJS interop helpers of @rollup/plugin-commonjs.
+ * Vite's LICENSE.md covers everything its Node.js build bundles. Only Vite's
+ * own client helpers (module preload) reach dist/assets; Rolldown's runtime
+ * helpers are credited to the rolldown package.
  */
 function viteNotice(text) {
-  const core = text.split(/^# Licenses of bundled dependencies/m)[0];
-  const commonjs = /^## [^\n]*@rollup\/plugin-commonjs[^\n]*\n[\s\S]*?(?=^-{10,})/m.exec(
-    text,
-  )?.[0];
-  return normalize(commonjs ? `${core}\n\n${commonjs}` : core);
+  return normalize(text.split(/^# Licenses of bundled dependencies/m)[0]);
 }
 
 function bundledPackages() {

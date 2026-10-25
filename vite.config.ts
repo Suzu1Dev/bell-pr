@@ -23,20 +23,24 @@ function packageDirectory(id: string): string | undefined {
 /**
  * Writes dist/.vite/bundled-modules.json: the npm packages whose code ends
  * up in dist/assets, for scripts/generate-third-party-notices.mjs. Vite's
- * own helpers (module preload, CommonJS interop) count as the vite package.
+ * own helpers (module preload) count as the vite package, and Rolldown's
+ * runtime helpers (CommonJS interop) as the rolldown package.
  */
 function bundledModules(): Plugin {
   return {
     name: "bellpr-bundled-modules",
     apply: "build",
-    generateBundle() {
+    generateBundle(_options, bundle) {
       const directories = new Set<string>();
       for (const id of this.getModuleIds()) {
         const directory = packageDirectory(id);
         if (directory) directories.add(directory);
-        else if (/^\0(vite\/|commonjsHelpers)/.test(id))
-          directories.add("node_modules/vite");
+        else if (/^\0vite\//.test(id)) directories.add("node_modules/vite");
       }
+      // Rolldown adds its runtime to a chunk without a module of the graph.
+      for (const chunk of Object.values(bundle))
+        if (chunk.type === "chunk" && chunk.moduleIds.some((id) => id.startsWith("\0rolldown/")))
+          directories.add("node_modules/rolldown");
       const packages = [...directories].sort().map((directory) => ({
         name: directory.slice(directory.lastIndexOf("node_modules/") + 13),
         path: directory,

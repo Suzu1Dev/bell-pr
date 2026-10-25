@@ -61,13 +61,14 @@ The browser code in `dist/assets` contains code from these packages.
 | micromark-util-subtokenize | 2.1.0 | MIT | [2](#license-text-2) |
 | react | 19.3.0 | MIT | [10](#license-text-10) |
 | react-dom | 19.3.0 | MIT | [10](#license-text-10) |
+| rolldown | 1.2.15 | MIT | [11](#license-text-11) |
 | scheduler | 0.28.0 | MIT | [10](#license-text-10) |
-| unist-util-is | 6.0.1 | MIT | [11](#license-text-11) |
-| unist-util-stringify-position | 4.0.0 | MIT | [12](#license-text-12) |
+| unist-util-is | 6.0.1 | MIT | [12](#license-text-12) |
+| unist-util-stringify-position | 4.0.0 | MIT | [13](#license-text-13) |
 | unist-util-visit | 5.1.0 | MIT | [1](#license-text-1) |
-| unist-util-visit-parents | 6.0.2 | MIT | [12](#license-text-12) |
-| vite | 6.4.4 | MIT | [13](#license-text-13) |
-| zwitch | 2.0.4 | MIT | [12](#license-text-12) |
+| unist-util-visit-parents | 6.0.2 | MIT | [13](#license-text-13) |
+| vite | 8.3.5 | MIT | [14](#license-text-14) |
+| zwitch | 2.0.4 | MIT | [13](#license-text-13) |
 
 ## B. Server dependencies installed with BELL PR
 
@@ -76,53 +77,53 @@ time.
 
 | Package | Version | License | Text |
 | --- | --- | --- | --- |
-| @types/debug | 4.1.13 | MIT | [14](#license-text-14) |
-| @types/mdast | 4.0.4 | MIT | [14](#license-text-14) |
-| @types/ms | 2.1.0 | MIT | [14](#license-text-14) |
-| @types/unist | 3.0.3 | MIT | [14](#license-text-14) |
-| accepts | 2.0.0 | MIT | [15](#license-text-15) |
-| body-parser | 2.3.0 | MIT | [16](#license-text-16) |
-| bytes | 3.1.2 | MIT | [17](#license-text-17) |
-| call-bind-apply-helpers | 1.0.2 | MIT | [18](#license-text-18) |
-| call-bound | 1.0.4 | MIT | [18](#license-text-18) |
+| @types/debug | 4.1.13 | MIT | [15](#license-text-15) |
+| @types/mdast | 4.0.4 | MIT | [15](#license-text-15) |
+| @types/ms | 2.1.0 | MIT | [15](#license-text-15) |
+| @types/unist | 3.0.3 | MIT | [15](#license-text-15) |
+| accepts | 2.0.0 | MIT | [16](#license-text-16) |
+| body-parser | 2.3.0 | MIT | [17](#license-text-17) |
+| bytes | 3.1.2 | MIT | [18](#license-text-18) |
+| call-bind-apply-helpers | 1.0.2 | MIT | [19](#license-text-19) |
+| call-bound | 1.0.4 | MIT | [19](#license-text-19) |
 | ccount | 2.0.1 | MIT | [1](#license-text-1) |
 | character-entities | 2.0.2 | MIT | [1](#license-text-1) |
-| content-disposition | 2.0.1 | MIT | [19](#license-text-19) |
-| content-type | 2.1.0 | MIT | [20](#license-text-20) |
-| cookie | 0.7.2 | MIT | [21](#license-text-21) |
-| cookie-signature | 1.2.2 | MIT | [22](#license-text-22) |
-| debug | 4.4.3 | MIT | [23](#license-text-23) |
+| content-disposition | 2.0.1 | MIT | [20](#license-text-20) |
+| content-type | 2.1.0 | MIT | [21](#license-text-21) |
+| cookie | 0.7.2 | MIT | [22](#license-text-22) |
+| cookie-signature | 1.2.2 | MIT | [23](#license-text-23) |
+| debug | 4.4.3 | MIT | [24](#license-text-24) |
 | decode-named-character-reference | 1.3.0 | MIT | [2](#license-text-2) |
-| depd | 2.0.0 | MIT | [24](#license-text-24) |
-| dequal | 2.0.3 | MIT | [25](#license-text-25) |
+| depd | 2.0.0 | MIT | [25](#license-text-25) |
+| dequal | 2.0.3 | MIT | [26](#license-text-26) |
 | devlop | 1.1.0 | MIT | [3](#license-text-3) |
-| dunder-proto | 1.0.1 | MIT | [26](#license-text-26) |
-| ee-first | 1.1.1 | MIT | [27](#license-text-27) |
-| encodeurl | 2.0.0 | MIT | [28](#license-text-28) |
-| es-define-property | 1.0.1 | MIT | [18](#license-text-18) |
-| es-errors | 1.3.0 | MIT | [18](#license-text-18) |
-| es-object-atoms | 1.1.2 | MIT | [18](#license-text-18) |
-| escape-html | 1.0.3 | MIT | [29](#license-text-29) |
+| dunder-proto | 1.0.1 | MIT | [27](#license-text-27) |
+| ee-first | 1.1.1 | MIT | [28](#license-text-28) |
+| encodeurl | 2.0.0 | MIT | [29](#license-text-29) |
+| es-define-property | 1.0.1 | MIT | [19](#license-text-19) |
+| es-errors | 1.3.0 | MIT | [19](#license-text-19) |
+| es-object-atoms | 1.1.2 | MIT | [19](#license-text-19) |
+| escape-html | 1.0.3 | MIT | [30](#license-text-30) |
 | escape-string-regexp | 5.0.0 | MIT | [4](#license-text-4) |
-| etag | 1.8.1 | MIT | [30](#license-text-30) |
-| express | 5.3.0 | MIT | [31](#license-text-31) |
-| finalhandler | 2.1.1 | MIT | [32](#license-text-32) |
-| forwarded | 0.2.0 | MIT | [19](#license-text-19) |
-| fresh | 2.0.0 | MIT | [33](#license-text-33) |
-| function-bind | 1.1.2 | MIT | [34](#license-text-34) |
-| get-intrinsic | 1.3.0 | MIT | [35](#license-text-35) |
-| get-proto | 1.0.1 | MIT | [36](#license-text-36) |
-| gopd | 1.2.0 | MIT | [37](#license-text-37) |
-| has-symbols | 1.1.0 | MIT | [38](#license-text-38) |
-| hasown | 2.0.4 | MIT | [39](#license-text-39) |
-| http-errors | 2.0.1 | MIT | [40](#license-text-40) |
-| iconv-lite | 0.7.3 | MIT | [41](#license-text-41) |
-| inherits | 2.0.4 | ISC | [42](#license-text-42) |
-| ipaddr.js | 1.9.1 | MIT | [43](#license-text-43) |
-| is-promise | 4.0.0 | MIT | [44](#license-text-44) |
+| etag | 1.8.1 | MIT | [31](#license-text-31) |
+| express | 5.3.0 | MIT | [32](#license-text-32) |
+| finalhandler | 2.1.1 | MIT | [33](#license-text-33) |
+| forwarded | 0.2.0 | MIT | [20](#license-text-20) |
+| fresh | 2.0.0 | MIT | [34](#license-text-34) |
+| function-bind | 1.1.2 | MIT | [35](#license-text-35) |
+| get-intrinsic | 1.3.0 | MIT | [36](#license-text-36) |
+| get-proto | 1.0.1 | MIT | [37](#license-text-37) |
+| gopd | 1.2.0 | MIT | [38](#license-text-38) |
+| has-symbols | 1.1.0 | MIT | [39](#license-text-39) |
+| hasown | 2.0.4 | MIT | [40](#license-text-40) |
+| http-errors | 2.0.1 | MIT | [41](#license-text-41) |
+| iconv-lite | 0.7.3 | MIT | [42](#license-text-42) |
+| inherits | 2.0.4 | ISC | [43](#license-text-43) |
+| ipaddr.js | 1.9.1 | MIT | [44](#license-text-44) |
+| is-promise | 4.0.0 | MIT | [45](#license-text-45) |
 | longest-streak | 3.1.0 | MIT | [5](#license-text-5) |
 | markdown-table | 3.0.4 | MIT | [2](#license-text-2) |
-| math-intrinsics | 1.1.0 | MIT | [26](#license-text-26) |
+| math-intrinsics | 1.1.0 | MIT | [27](#license-text-27) |
 | mdast-util-find-and-replace | 3.0.3 | MIT | [2](#license-text-2) |
 | mdast-util-from-markdown | 2.1.0 | MIT | [2](#license-text-2) |
 | mdast-util-gfm | 3.1.0 | MIT | [2](#license-text-2) |
@@ -134,8 +135,8 @@ time.
 | mdast-util-phrasing | 4.1.0 | MIT | [8](#license-text-8) |
 | mdast-util-to-markdown | 2.2.0 | MIT | [2](#license-text-2) |
 | mdast-util-to-string | 4.0.0 | MIT | [1](#license-text-1) |
-| media-typer | 1.1.1 | MIT | [19](#license-text-19) |
-| merge-descriptors | 2.0.0 | MIT | [45](#license-text-45) |
+| media-typer | 1.1.1 | MIT | [20](#license-text-20) |
+| merge-descriptors | 2.0.0 | MIT | [46](#license-text-46) |
 | micromark | 4.0.3 | MIT | [2](#license-text-2) |
 | micromark-core-commonmark | 2.0.4 | MIT | [2](#license-text-2) |
 | micromark-extension-gfm | 3.0.0 | MIT | [7](#license-text-7) |
@@ -165,40 +166,40 @@ time.
 | micromark-util-subtokenize | 2.1.0 | MIT | [2](#license-text-2) |
 | micromark-util-symbol | 2.0.1 | MIT | [2](#license-text-2) |
 | micromark-util-types | 2.0.3 | MIT | [2](#license-text-2) |
-| mime-db | 1.54.0 | MIT | [46](#license-text-46) |
-| mime-types | 3.0.2 | MIT | [15](#license-text-15) |
-| ms | 2.1.3 | MIT | [47](#license-text-47) |
-| negotiator | 1.1.0 | MIT | [48](#license-text-48) |
-| object-inspect | 1.13.4 | MIT | [49](#license-text-49) |
-| on-finished | 2.4.1 | MIT | [50](#license-text-50) |
-| once | 1.4.0 | ISC | [51](#license-text-51) |
-| parseurl | 1.3.3 | MIT | [52](#license-text-52) |
-| path-to-regexp | 8.4.2 | MIT | [53](#license-text-53) |
-| proxy-addr | 2.0.8 | MIT | [30](#license-text-30) |
-| qs | 6.16.0 | BSD-3-Clause | [54](#license-text-54) |
-| range-parser | 1.3.0 | MIT | [55](#license-text-55) |
-| raw-body | 3.0.2 | MIT | [56](#license-text-56) |
-| router | 2.2.0 | MIT | [57](#license-text-57) |
-| safer-buffer | 2.1.2 | MIT | [58](#license-text-58) |
-| send | 1.2.1 | MIT | [59](#license-text-59) |
-| serve-static | 2.2.1 | MIT | [60](#license-text-60) |
-| setprototypeof | 1.2.0 | ISC | [61](#license-text-61) |
-| side-channel | 1.1.1 | MIT | [62](#license-text-62) |
-| side-channel-list | 1.0.1 | MIT | [18](#license-text-18) |
-| side-channel-map | 1.0.1 | MIT | [18](#license-text-18) |
-| side-channel-weakmap | 1.0.2 | MIT | [62](#license-text-62) |
-| statuses | 2.0.2 | MIT | [63](#license-text-63) |
-| toidentifier | 1.0.1 | MIT | [64](#license-text-64) |
-| type-is | 2.1.0 | MIT | [16](#license-text-16) |
-| unist-util-is | 6.0.1 | MIT | [11](#license-text-11) |
-| unist-util-stringify-position | 4.0.0 | MIT | [12](#license-text-12) |
+| mime-db | 1.54.0 | MIT | [47](#license-text-47) |
+| mime-types | 3.0.2 | MIT | [16](#license-text-16) |
+| ms | 2.1.3 | MIT | [48](#license-text-48) |
+| negotiator | 1.1.0 | MIT | [49](#license-text-49) |
+| object-inspect | 1.13.4 | MIT | [50](#license-text-50) |
+| on-finished | 2.4.1 | MIT | [51](#license-text-51) |
+| once | 1.4.0 | ISC | [52](#license-text-52) |
+| parseurl | 1.3.3 | MIT | [53](#license-text-53) |
+| path-to-regexp | 8.4.2 | MIT | [54](#license-text-54) |
+| proxy-addr | 2.0.8 | MIT | [31](#license-text-31) |
+| qs | 6.16.0 | BSD-3-Clause | [55](#license-text-55) |
+| range-parser | 1.3.0 | MIT | [56](#license-text-56) |
+| raw-body | 3.0.2 | MIT | [57](#license-text-57) |
+| router | 2.2.0 | MIT | [58](#license-text-58) |
+| safer-buffer | 2.1.2 | MIT | [59](#license-text-59) |
+| send | 1.2.1 | MIT | [60](#license-text-60) |
+| serve-static | 2.2.1 | MIT | [61](#license-text-61) |
+| setprototypeof | 1.2.0 | ISC | [62](#license-text-62) |
+| side-channel | 1.1.1 | MIT | [63](#license-text-63) |
+| side-channel-list | 1.0.1 | MIT | [19](#license-text-19) |
+| side-channel-map | 1.0.1 | MIT | [19](#license-text-19) |
+| side-channel-weakmap | 1.0.2 | MIT | [63](#license-text-63) |
+| statuses | 2.0.2 | MIT | [64](#license-text-64) |
+| toidentifier | 1.0.1 | MIT | [65](#license-text-65) |
+| type-is | 2.1.0 | MIT | [17](#license-text-17) |
+| unist-util-is | 6.0.1 | MIT | [12](#license-text-12) |
+| unist-util-stringify-position | 4.0.0 | MIT | [13](#license-text-13) |
 | unist-util-visit | 5.1.0 | MIT | [1](#license-text-1) |
-| unist-util-visit-parents | 6.0.2 | MIT | [12](#license-text-12) |
-| unpipe | 1.0.0 | MIT | [65](#license-text-65) |
-| vary | 1.1.2 | MIT | [19](#license-text-19) |
-| wrappy | 1.0.2 | ISC | [51](#license-text-51) |
-| zod | 4.6.7 | MIT | [66](#license-text-66) |
-| zwitch | 2.0.4 | MIT | [12](#license-text-12) |
+| unist-util-visit-parents | 6.0.2 | MIT | [13](#license-text-13) |
+| unpipe | 1.0.0 | MIT | [66](#license-text-66) |
+| vary | 1.1.2 | MIT | [20](#license-text-20) |
+| wrappy | 1.0.2 | ISC | [52](#license-text-52) |
+| zod | 4.6.7 | MIT | [67](#license-text-67) |
+| zwitch | 2.0.4 | MIT | [13](#license-text-13) |
 
 ## C. Vendored Ponytail rules
 
@@ -208,7 +209,7 @@ from https://github.com/DietrichGebert/ponytail at commit a17afe0712fc43b08f812d
 
 | Package | Version | License | Text |
 | --- | --- | --- | --- |
-| Ponytail | 4.10.2 | MIT | [67](#license-text-67) |
+| Ponytail | 4.10.2 | MIT | [68](#license-text-68) |
 
 ## D. Fonts
 
@@ -217,8 +218,8 @@ the SIL Open Font License 1.1 (full text below).
 
 | Package | Version | License | Text |
 | --- | --- | --- | --- |
-| DM Sans (@fontsource-variable/dm-sans) | 5.3.0 | OFL-1.1 | [68](#license-text-68) |
-| IBM Plex Mono (@fontsource/ibm-plex-mono) | 5.3.0 | OFL-1.1 | [69](#license-text-69) |
+| DM Sans (@fontsource-variable/dm-sans) | 5.3.0 | OFL-1.1 | [69](#license-text-69) |
+| IBM Plex Mono (@fontsource/ibm-plex-mono) | 5.3.0 | OFL-1.1 | [70](#license-text-70) |
 
 ## E. Docker image only
 
@@ -233,8 +234,8 @@ exact package versions.
 | Node.js and npm (official `node` image) | MIT; npm: Artistic-2.0 | https://github.com/nodejs/node |
 | Debian base system | Various free licenses, see each copyright file | https://sources.debian.org |
 | git | GPL-2.0-only, parts LGPL-2.1-or-later | Debian package `git` |
-| GitHub CLI (gh) | MIT, text [70](#license-text-70) | https://github.com/cli/cli |
-| OpenAI Codex CLI (@openai/codex) | Apache-2.0, text and NOTICE [71](#license-text-71) | https://github.com/openai/codex |
+| GitHub CLI (gh) | MIT, text [71](#license-text-71) | https://github.com/cli/cli |
+| OpenAI Codex CLI (@openai/codex) | Apache-2.0, text and NOTICE [72](#license-text-72) | https://github.com/openai/codex |
 | bubblewrap | LGPL-2.0-or-later | Debian package `bubblewrap` |
 | socat | GPL-2.0-only with an OpenSSL exception | Debian package `socat` |
 | tini | MIT | Debian package `tini` |
@@ -563,7 +564,39 @@ SOFTWARE.
 
 <a id="license-text-11"></a>
 
-### 11. Used by unist-util-is 6.0.1
+### 11. Used by rolldown 1.2.15
+
+```text
+MIT License
+
+Copyright (c) 2024-present VoidZero Inc. & Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+end of terms and conditions
+
+The licenses of externally maintained libraries from which parts of the Software is derived are listed [here](https://github.com/rolldown/rolldown/blob/main/THIRD-PARTY-LICENSE).
+```
+
+<a id="license-text-12"></a>
+
+### 12. Used by unist-util-is 6.0.1
 
 ```text
 (The MIT license)
@@ -590,9 +623,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-12"></a>
+<a id="license-text-13"></a>
 
-### 12. Used by unist-util-stringify-position 4.0.0, unist-util-visit-parents 6.0.2, zwitch 2.0.4
+### 13. Used by unist-util-stringify-position 4.0.0, unist-util-visit-parents 6.0.2, zwitch 2.0.4
 
 ```text
 (The MIT License)
@@ -619,9 +652,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-13"></a>
+<a id="license-text-14"></a>
 
-### 13. Used by vite 6.4.4
+### 14. Used by vite 8.3.5
 
 ```text
 # Vite core license
@@ -648,52 +681,11 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-
-
-## @rollup/plugin-alias, @rollup/plugin-commonjs, @rollup/plugin-dynamic-import-vars, @rollup/pluginutils
-License: MIT
-By: Johannes Stein
-Repository: rollup/plugins
-
-License: MIT
-By: Rich Harris
-Repository: rollup/plugins
-
-License: MIT
-By: LarsDenBakker
-Repository: rollup/plugins
-
-License: MIT
-By: Rich Harris
-Repository: rollup/plugins
-
-> The MIT License (MIT)
->
-> Copyright (c) 2019 RollupJS Plugin Contributors (https://github.com/rollup/plugins/graphs/contributors)
->
-> Permission is hereby granted, free of charge, to any person obtaining a copy
-> of this software and associated documentation files (the "Software"), to deal
-> in the Software without restriction, including without limitation the rights
-> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-> copies of the Software, and to permit persons to whom the Software is
-> furnished to do so, subject to the following conditions:
->
-> The above copyright notice and this permission notice shall be included in
-> all copies or substantial portions of the Software.
->
-> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-> IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-> FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-> AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-> LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-> THE SOFTWARE.
 ```
 
-<a id="license-text-14"></a>
+<a id="license-text-15"></a>
 
-### 14. Used by @types/debug 4.1.13, @types/mdast 4.0.4, @types/ms 2.1.0, @types/unist 3.0.3
+### 15. Used by @types/debug 4.1.13, @types/mdast 4.0.4, @types/ms 2.1.0, @types/unist 3.0.3
 
 ```text
 MIT License
@@ -719,9 +711,9 @@ MIT License
     SOFTWARE
 ```
 
-<a id="license-text-15"></a>
+<a id="license-text-16"></a>
 
-### 15. Used by accepts 2.0.0, mime-types 3.0.2
+### 16. Used by accepts 2.0.0, mime-types 3.0.2
 
 ```text
 (The MIT License)
@@ -749,9 +741,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-16"></a>
+<a id="license-text-17"></a>
 
-### 16. Used by body-parser 2.3.0, type-is 2.1.0
+### 17. Used by body-parser 2.3.0, type-is 2.1.0
 
 ```text
 (The MIT License)
@@ -779,9 +771,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-17"></a>
+<a id="license-text-18"></a>
 
-### 17. Used by bytes 3.1.2
+### 18. Used by bytes 3.1.2
 
 ```text
 (The MIT License)
@@ -809,9 +801,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-18"></a>
+<a id="license-text-19"></a>
 
-### 18. Used by call-bind-apply-helpers 1.0.2, call-bound 1.0.4, es-define-property 1.0.1, es-errors 1.3.0, es-object-atoms 1.1.2, side-channel-list 1.0.1, side-channel-map 1.0.1
+### 19. Used by call-bind-apply-helpers 1.0.2, call-bound 1.0.4, es-define-property 1.0.1, es-errors 1.3.0, es-object-atoms 1.1.2, side-channel-list 1.0.1, side-channel-map 1.0.1
 
 ```text
 MIT License
@@ -837,9 +829,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-<a id="license-text-19"></a>
+<a id="license-text-20"></a>
 
-### 19. Used by content-disposition 2.0.1, forwarded 0.2.0, media-typer 1.1.1, vary 1.1.2
+### 20. Used by content-disposition 2.0.1, forwarded 0.2.0, media-typer 1.1.1, vary 1.1.2
 
 ```text
 (The MIT License)
@@ -866,9 +858,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-20"></a>
+<a id="license-text-21"></a>
 
-### 20. Used by content-type 2.1.0
+### 21. Used by content-type 2.1.0
 
 ```text
 (The MIT License)
@@ -895,9 +887,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-21"></a>
+<a id="license-text-22"></a>
 
-### 21. Used by cookie 0.7.2
+### 22. Used by cookie 0.7.2
 
 ```text
 (The MIT License)
@@ -925,9 +917,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-22"></a>
+<a id="license-text-23"></a>
 
-### 22. Used by cookie-signature 1.2.2
+### 23. Used by cookie-signature 1.2.2
 
 ```text
 (The MIT License)
@@ -954,9 +946,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-23"></a>
+<a id="license-text-24"></a>
 
-### 23. Used by debug 4.4.3
+### 24. Used by debug 4.4.3
 
 ```text
 (The MIT License)
@@ -980,9 +972,9 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-24"></a>
+<a id="license-text-25"></a>
 
-### 24. Used by depd 2.0.0
+### 25. Used by depd 2.0.0
 
 ```text
 (The MIT License)
@@ -1009,9 +1001,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-25"></a>
+<a id="license-text-26"></a>
 
-### 25. Used by dequal 2.0.3
+### 26. Used by dequal 2.0.3
 
 ```text
 The MIT License (MIT)
@@ -1037,9 +1029,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-<a id="license-text-26"></a>
+<a id="license-text-27"></a>
 
-### 26. Used by dunder-proto 1.0.1, math-intrinsics 1.1.0
+### 27. Used by dunder-proto 1.0.1, math-intrinsics 1.1.0
 
 ```text
 MIT License
@@ -1065,9 +1057,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-<a id="license-text-27"></a>
+<a id="license-text-28"></a>
 
-### 27. Used by ee-first 1.1.1
+### 28. Used by ee-first 1.1.1
 
 ```text
 The MIT License (MIT)
@@ -1093,9 +1085,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-<a id="license-text-28"></a>
+<a id="license-text-29"></a>
 
-### 28. Used by encodeurl 2.0.0
+### 29. Used by encodeurl 2.0.0
 
 ```text
 (The MIT License)
@@ -1122,9 +1114,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-29"></a>
+<a id="license-text-30"></a>
 
-### 29. Used by escape-html 1.0.3
+### 30. Used by escape-html 1.0.3
 
 ```text
 (The MIT License)
@@ -1153,9 +1145,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-30"></a>
+<a id="license-text-31"></a>
 
-### 30. Used by etag 1.8.1, proxy-addr 2.0.8
+### 31. Used by etag 1.8.1, proxy-addr 2.0.8
 
 ```text
 (The MIT License)
@@ -1182,9 +1174,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-31"></a>
+<a id="license-text-32"></a>
 
-### 31. Used by express 5.3.0
+### 32. Used by express 5.3.0
 
 ```text
 (The MIT License)
@@ -1213,9 +1205,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-32"></a>
+<a id="license-text-33"></a>
 
-### 32. Used by finalhandler 2.1.1
+### 33. Used by finalhandler 2.1.1
 
 ```text
 (The MIT License)
@@ -1242,9 +1234,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-33"></a>
+<a id="license-text-34"></a>
 
-### 33. Used by fresh 2.0.0
+### 34. Used by fresh 2.0.0
 
 ```text
 (The MIT License)
@@ -1272,9 +1264,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-34"></a>
+<a id="license-text-35"></a>
 
-### 34. Used by function-bind 1.1.2
+### 35. Used by function-bind 1.1.2
 
 ```text
 Copyright (c) 2013 Raynos.
@@ -1298,9 +1290,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-<a id="license-text-35"></a>
+<a id="license-text-36"></a>
 
-### 35. Used by get-intrinsic 1.3.0
+### 36. Used by get-intrinsic 1.3.0
 
 ```text
 MIT License
@@ -1326,9 +1318,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-<a id="license-text-36"></a>
+<a id="license-text-37"></a>
 
-### 36. Used by get-proto 1.0.1
+### 37. Used by get-proto 1.0.1
 
 ```text
 MIT License
@@ -1354,9 +1346,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-<a id="license-text-37"></a>
+<a id="license-text-38"></a>
 
-### 37. Used by gopd 1.2.0
+### 38. Used by gopd 1.2.0
 
 ```text
 MIT License
@@ -1382,9 +1374,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-<a id="license-text-38"></a>
+<a id="license-text-39"></a>
 
-### 38. Used by has-symbols 1.1.0
+### 39. Used by has-symbols 1.1.0
 
 ```text
 MIT License
@@ -1410,9 +1402,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-<a id="license-text-39"></a>
+<a id="license-text-40"></a>
 
-### 39. Used by hasown 2.0.4
+### 40. Used by hasown 2.0.4
 
 ```text
 MIT License
@@ -1438,9 +1430,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-<a id="license-text-40"></a>
+<a id="license-text-41"></a>
 
-### 40. Used by http-errors 2.0.1
+### 41. Used by http-errors 2.0.1
 
 ```text
 The MIT License (MIT)
@@ -1467,9 +1459,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-<a id="license-text-41"></a>
+<a id="license-text-42"></a>
 
-### 41. Used by iconv-lite 0.7.3
+### 42. Used by iconv-lite 0.7.3
 
 ```text
 Copyright (c) 2011 Alexander Shtuchkin
@@ -1494,9 +1486,9 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-42"></a>
+<a id="license-text-43"></a>
 
-### 42. Used by inherits 2.0.4
+### 43. Used by inherits 2.0.4
 
 ```text
 The ISC License
@@ -1516,9 +1508,9 @@ OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-<a id="license-text-43"></a>
+<a id="license-text-44"></a>
 
-### 43. Used by ipaddr.js 1.9.1
+### 44. Used by ipaddr.js 1.9.1
 
 ```text
 Copyright (C) 2011-2017 whitequark <whitequark@whitequark.org>
@@ -1542,9 +1534,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-<a id="license-text-44"></a>
+<a id="license-text-45"></a>
 
-### 44. Used by is-promise 4.0.0
+### 45. Used by is-promise 4.0.0
 
 ```text
 Copyright (c) 2014 Forbes Lindesay
@@ -1568,9 +1560,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-<a id="license-text-45"></a>
+<a id="license-text-46"></a>
 
-### 45. Used by merge-descriptors 2.0.0
+### 46. Used by merge-descriptors 2.0.0
 
 ```text
 MIT License
@@ -1586,9 +1578,9 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-46"></a>
+<a id="license-text-47"></a>
 
-### 46. Used by mime-db 1.54.0
+### 47. Used by mime-db 1.54.0
 
 ```text
 (The MIT License)
@@ -1616,9 +1608,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-47"></a>
+<a id="license-text-48"></a>
 
-### 47. Used by ms 2.1.3
+### 48. Used by ms 2.1.3
 
 ```text
 The MIT License (MIT)
@@ -1644,9 +1636,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-<a id="license-text-48"></a>
+<a id="license-text-49"></a>
 
-### 48. Used by negotiator 1.1.0
+### 49. Used by negotiator 1.1.0
 
 ```text
 (The MIT License)
@@ -1675,9 +1667,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-49"></a>
+<a id="license-text-50"></a>
 
-### 49. Used by object-inspect 1.13.4
+### 50. Used by object-inspect 1.13.4
 
 ```text
 MIT License
@@ -1703,9 +1695,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-<a id="license-text-50"></a>
+<a id="license-text-51"></a>
 
-### 50. Used by on-finished 2.4.1
+### 51. Used by on-finished 2.4.1
 
 ```text
 (The MIT License)
@@ -1733,9 +1725,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-51"></a>
+<a id="license-text-52"></a>
 
-### 51. Used by once 1.4.0, wrappy 1.0.2
+### 52. Used by once 1.4.0, wrappy 1.0.2
 
 ```text
 The ISC License
@@ -1755,9 +1747,9 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
 IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-<a id="license-text-52"></a>
+<a id="license-text-53"></a>
 
-### 52. Used by parseurl 1.3.3
+### 53. Used by parseurl 1.3.3
 
 ```text
 (The MIT License)
@@ -1785,9 +1777,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-53"></a>
+<a id="license-text-54"></a>
 
-### 53. Used by path-to-regexp 8.4.2
+### 54. Used by path-to-regexp 8.4.2
 
 ```text
 The MIT License (MIT)
@@ -1813,9 +1805,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-<a id="license-text-54"></a>
+<a id="license-text-55"></a>
 
-### 54. Used by qs 6.16.0
+### 55. Used by qs 6.16.0
 
 ```text
 BSD 3-Clause License
@@ -1849,9 +1841,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-<a id="license-text-55"></a>
+<a id="license-text-56"></a>
 
-### 55. Used by range-parser 1.3.0
+### 56. Used by range-parser 1.3.0
 
 ```text
 (The MIT License)
@@ -1879,9 +1871,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-56"></a>
+<a id="license-text-57"></a>
 
-### 56. Used by raw-body 3.0.2
+### 57. Used by raw-body 3.0.2
 
 ```text
 The MIT License (MIT)
@@ -1908,9 +1900,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-<a id="license-text-57"></a>
+<a id="license-text-58"></a>
 
-### 57. Used by router 2.2.0
+### 58. Used by router 2.2.0
 
 ```text
 (The MIT License)
@@ -1938,9 +1930,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-58"></a>
+<a id="license-text-59"></a>
 
-### 58. Used by safer-buffer 2.1.2
+### 59. Used by safer-buffer 2.1.2
 
 ```text
 MIT License
@@ -1966,9 +1958,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-<a id="license-text-59"></a>
+<a id="license-text-60"></a>
 
-### 59. Used by send 1.2.1
+### 60. Used by send 1.2.1
 
 ```text
 (The MIT License)
@@ -1996,9 +1988,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-60"></a>
+<a id="license-text-61"></a>
 
-### 60. Used by serve-static 2.2.1
+### 61. Used by serve-static 2.2.1
 
 ```text
 (The MIT License)
@@ -2028,9 +2020,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-61"></a>
+<a id="license-text-62"></a>
 
-### 61. Used by setprototypeof 1.2.0
+### 62. Used by setprototypeof 1.2.0
 
 ```text
 Copyright (c) 2015, Wes Todd
@@ -2048,9 +2040,9 @@ OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-<a id="license-text-62"></a>
+<a id="license-text-63"></a>
 
-### 62. Used by side-channel 1.1.1, side-channel-weakmap 1.0.2
+### 63. Used by side-channel 1.1.1, side-channel-weakmap 1.0.2
 
 ```text
 MIT License
@@ -2076,9 +2068,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-<a id="license-text-63"></a>
+<a id="license-text-64"></a>
 
-### 63. Used by statuses 2.0.2
+### 64. Used by statuses 2.0.2
 
 ```text
 The MIT License (MIT)
@@ -2105,9 +2097,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-<a id="license-text-64"></a>
+<a id="license-text-65"></a>
 
-### 64. Used by toidentifier 1.0.1
+### 65. Used by toidentifier 1.0.1
 
 ```text
 MIT License
@@ -2133,9 +2125,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-<a id="license-text-65"></a>
+<a id="license-text-66"></a>
 
-### 65. Used by unpipe 1.0.0
+### 66. Used by unpipe 1.0.0
 
 ```text
 (The MIT License)
@@ -2162,9 +2154,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-<a id="license-text-66"></a>
+<a id="license-text-67"></a>
 
-### 66. Used by zod 4.6.7
+### 67. Used by zod 4.6.7
 
 ```text
 MIT License
@@ -2190,9 +2182,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-<a id="license-text-67"></a>
+<a id="license-text-68"></a>
 
-### 67. Used by Ponytail 4.10.2
+### 68. Used by Ponytail 4.10.2
 
 ```text
 MIT License
@@ -2218,9 +2210,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-<a id="license-text-68"></a>
+<a id="license-text-69"></a>
 
-### 68. Used by DM Sans (@fontsource-variable/dm-sans) 5.3.0
+### 69. Used by DM Sans (@fontsource-variable/dm-sans) 5.3.0
 
 ```text
 Copyright 2014 The DM Sans Project Authors (https://github.com/googlefonts/dm-fonts) DMSans-Italic[opsz,wght].ttf: Copyright 2014 The DM Sans Project Authors (https://github.com/googlefonts/dm-fonts)
@@ -2318,9 +2310,9 @@ FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.
 ```
 
-<a id="license-text-69"></a>
+<a id="license-text-70"></a>
 
-### 69. Used by IBM Plex Mono (@fontsource/ibm-plex-mono) 5.3.0
+### 70. Used by IBM Plex Mono (@fontsource/ibm-plex-mono) 5.3.0
 
 ```text
 Copyright 2017 IBM Corp. All rights reserved. IBMPlexMono-ThinItalic.ttf: Copyright 2017 IBM Corp. All rights reserved. IBMPlexMono-ExtraLight.ttf: Copyright 2017 IBM Corp. All rights reserved. IBMPlexMono-ExtraLightItalic.ttf: Copyright 2017 IBM Corp. All rights reserved. IBMPlexMono-Light.ttf: Copyright 2017 IBM Corp. All rights reserved. IBMPlexMono-LightItalic.ttf: Copyright 2017 IBM Corp. All rights reserved. IBMPlexMono-Regular.ttf: Copyright 2017 IBM Corp. All rights reserved. IBMPlexMono-Italic.ttf: Copyright 2017 IBM Corp. All rights reserved. IBMPlexMono-Medium.ttf: Copyright 2017 IBM Corp. All rights reserved. IBMPlexMono-MediumItalic.ttf: Copyright 2017 IBM Corp. All rights reserved. IBMPlexMono-SemiBold.ttf: Copyright 2017 IBM Corp. All rights reserved. IBMPlexMono-SemiBoldItalic.ttf: Copyright 2017 IBM Corp. All rights reserved. IBMPlexMono-Bold.ttf: Copyright 2017 IBM Corp. All rights reserved. IBMPlexMono-BoldItalic.ttf: Copyright 2017 IBM Corp. All rights reserved.
@@ -2418,9 +2410,9 @@ FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.
 ```
 
-<a id="license-text-70"></a>
+<a id="license-text-71"></a>
 
-### 70. Used by GitHub CLI (Docker image)
+### 71. Used by GitHub CLI (Docker image)
 
 ```text
 MIT License
@@ -2446,9 +2438,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-<a id="license-text-71"></a>
+<a id="license-text-72"></a>
 
-### 71. Used by OpenAI Codex CLI (Docker image)
+### 72. Used by OpenAI Codex CLI (Docker image)
 
 ```text
 OpenAI Codex
