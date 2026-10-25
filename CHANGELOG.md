@@ -144,6 +144,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   own config names a signing program, as it already did for filters and
   credential helpers.
 
+- **Deleted projects no longer come back through a settings save.** If you
+  deleted a project, or used Delete all data, while that project's
+  settings were still saving (for example while the model list loaded),
+  the save wrote the project's analysis file again. Its notes then
+  outlived the deletion and still counted toward storage use. The save
+  now stops with "not found" and writes nothing.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

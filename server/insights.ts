@@ -855,6 +855,8 @@ export class ProjectInsightsService {
         : { webAccess: settings.webAccess }),
     });
     await this.update(repoId, (cache) => {
+      // A project deleted meanwhile (or all data) gets no cache again.
+      this.repository(repoId);
       cache.settings = contributionSettingsSchema.parse(project);
     });
     return { ...project, ...model };

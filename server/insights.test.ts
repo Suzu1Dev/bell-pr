@@ -244,6 +244,53 @@ test("contribution settings persist and remain independent for each repository",
   }
 });
 
+test("saving settings of a project deleted while the model list loads writes no cache again", async () => {
+  const f = await fixture();
+  const insights = path.join(f.store.directory, "insights");
+  let deleteProject: () => Promise<void> = async () => undefined;
+  const service = new ProjectInsightsService(f.store, {
+    getModelCatalog: async () => {
+      await deleteProject();
+      return {
+        source: "codex",
+        models: [
+          {
+            id: "test-model",
+            name: "Test model",
+            description: "Test only",
+            isDefault: true,
+            reasoningEfforts: ["low"],
+            defaultReasoningEffort: "low",
+          },
+        ],
+      };
+    },
+  });
+  try {
+    const settings = {
+      ...defaultContributionSettings,
+      targetUser: "初次使用者",
+      model: "test-model",
+    };
+    await service.setSettings(f.repo.id, settings);
+    assert.equal((await readdir(insights)).length, 1);
+    // As removeRepository does: the cache file goes, then the project.
+    deleteProject = async () => {
+      for (const file of await readdir(insights))
+        await rm(path.join(insights, file), { force: true });
+      f.store.data.repos.splice(f.store.data.repos.indexOf(f.repo), 1);
+    };
+    await assert.rejects(
+      service.setSettings(f.repo.id, { ...settings, outcome: "更快理解問候" }),
+      (error: unknown) => error instanceof AppError && error.statusCode === 404,
+    );
+    assert.deepEqual(await readdir(insights), []);
+  } finally {
+    await service.shutdown();
+    await f.cleanup();
+  }
+});
+
 test("analysis uses bounded read-only structured Codex context and excludes secrets and symlinks", async () => {
   const f = await fixture();
   try {
