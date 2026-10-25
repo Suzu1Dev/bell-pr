@@ -1755,6 +1755,104 @@ test("cancelling a paused plan completes without starting any teammate", async (
   }
 });
 
+/**
+ * Holds the first save after arm() until release(). Armed by an agent's
+ * answer, it holds runAgent's last save, after its own cancellation check.
+ */
+function holdNextSave(store: Store) {
+  const save = store.save.bind(store);
+  let armed = false;
+  let held = false;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  store.save = async () => {
+    if (armed) {
+      armed = false;
+      held = true;
+      await gate;
+    }
+    return save();
+  };
+  return { arm: () => (armed = true), held: () => held, release };
+}
+
+test("a Stop while the lead's plan is being saved cancels the run instead of pausing for approval", async () => {
+  const f = await fixture(async () => {
+    saving.arm();
+    return makePlan([{ id: "alpha", files: ["a.ts"] }]);
+  });
+  const saving = holdNextSave(f.store);
+  try {
+    const run = await f.workbench.createRun(
+      f.repo.id,
+      "Plan before editing",
+      undefined,
+      settings,
+    );
+    await waitUntil(saving.held, "the lead's last save");
+    const stopping = f.workbench.cancel(run.id);
+    saving.release();
+    const stopped = await stopping;
+    assert.equal(stopped.status, "cancelled");
+    assert.equal(stopped.team!.phase, "cancelled");
+    // The plan is kept, so a retry returns to the approval step.
+    assert.equal(stopped.team!.tasks.length, 1);
+  } finally {
+    saving.release();
+    await f.cleanup();
+  }
+});
+
+test("a Stop while the lead's coordination turn is being saved cancels the run instead of moving it to review", async () => {
+  let leadCalls = 0;
+  let runId = "";
+  const f = await fixture(async (input) => {
+    if (input.role === "lead") {
+      leadCalls++;
+      if (leadCalls === 1) return makePlan([{ id: "alpha", files: ["a.ts"] }]);
+      if (leadCalls === 3) saving.arm();
+      return "Integrated alpha.";
+    }
+    if (input.role === "reviewer") {
+      // A message for the lead during the review asks for a coordination turn.
+      await f.workbench.sendTeamMessage(runId, {
+        to: "lead",
+        content: "Check a.ts once more.",
+      });
+      return "reviewer report: no issues found.";
+    }
+    if (input.role === "tester") return "tester report: no issues found.";
+    await writeFile(
+      path.join(input.cwd, "a.ts"),
+      'export const value = "alpha";\n',
+    );
+    return "alpha done";
+  });
+  const saving = holdNextSave(f.store);
+  try {
+    const run = await f.workbench.createRun(f.repo.id, "Improve a", undefined, {
+      ...settings,
+      requirePlanApproval: false,
+    });
+    runId = run.id;
+    await waitUntil(saving.held, "the coordination turn's last save");
+    assert.equal(leadCalls, 3);
+    const stopping = f.workbench.cancel(run.id);
+    saving.release();
+    const stopped = await stopping;
+    assert.equal(stopped.status, "cancelled");
+    assert.equal(stopped.team!.phase, "cancelled");
+    // No PR draft or explanations start for a stopped run.
+    assert.equal(stopped.draftPreparation, undefined);
+    assert.deepEqual(stopped.explanations ?? {}, {});
+  } finally {
+    saving.release();
+    await f.cleanup();
+  }
+});
+
 test("shared agent slots bound simultaneous CLI invocations across teammates while every task completes", async () => {
   const slots = new AgentSlots(2);
   const running = new Set<string>();

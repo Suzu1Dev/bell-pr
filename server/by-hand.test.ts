@@ -235,6 +235,38 @@ test("a failed orientation or review keeps what the agent wrote in its error out
   assert.doesNotMatch(JSON.stringify(run), /retryTwice|```/);
 });
 
+test("a Stop while the orientation is being saved cancels the run instead of waiting for the person's plan", async (t) => {
+  let hold = false;
+  let held = false;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  t.after(() => release());
+  const f = await fixture(t, {
+    lead: () => {
+      hold = true;
+      return orientation();
+    },
+  });
+  // Holds runAgent's last save, after its own cancellation check.
+  const save = f.store.save.bind(f.store);
+  f.store.save = async () => {
+    if (hold) {
+      hold = false;
+      held = true;
+      await gate;
+    }
+    return save();
+  };
+  const run = await en(() => f.workbench.createRun(f.repo.id, "Retry a GET twice after a 503.", "Retry twice", undefined, { learnByHand: true }));
+  await f.waitFor(() => held);
+  const stopping = f.workbench.cancel(run.id);
+  release();
+  const stopped = await stopping;
+  assert.equal(stopped.status, "cancelled");
+  assert.equal(stopped.team?.phase, "cancelled");
+  assert.equal(stopped.byHand?.busy, undefined);
+});
+
 test("an orientation without a premise records no help, and planByHand leaves team.tasks and the agent cards as they are", async (t) => {
   const f = await fixture(t, { lead: orientation(null) });
   const run = await f.create();

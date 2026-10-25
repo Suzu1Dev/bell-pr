@@ -773,6 +773,8 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
         }),
       );
       if (team.config.requirePlanApproval) {
+        // A Stop during the lead's last save must not turn into a plan to approve.
+        if (signal.aborted) throw new AppError(cancelled(), 409);
         enterPhase(run, team, "awaiting_approval");
         run.status = "awaiting_plan";
         ctx.log(run, "lead", sm().run.team.awaitingApproval);
@@ -809,6 +811,8 @@ export async function executeRun(ctx: WorkbenchContext, id: string) {
       );
     }
     run.reports!.implementer = implementation;
+    // A Stop during the last lead turn's save must not move the run to review.
+    if (signal.aborted) throw new AppError(cancelled(), 409);
     // The body stays empty until the draft agent proposes one: the agents'
     // reports remain on the review tab and are not a PR description.
     const automaticDraft = { ...run.draft };

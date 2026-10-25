@@ -151,6 +151,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   outlived the deletion and still counted toward storage use. The save
   now stops with "not found" and writes nothing.
 
+- **Stop during the lead's last save.** Clicking Stop just as the lead
+  finished its plan could leave the run waiting for plan approval instead
+  of stopped. Stopping during the lead's last coordination turn could move
+  the run to review and start the explanations and the PR draft. A
+  Learn-by-hand orientation could end waiting for your plan the same way.
+  The run now ends cancelled. A plan or outline that was already written
+  is kept, so Retry takes you back to the approval step.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

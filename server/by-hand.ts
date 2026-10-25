@@ -48,7 +48,7 @@ import { assertHelpAllowed, recordHelp } from "./by-hand-record.js";
 import { orientationJsonSchema, orientationSchema, parseByHandAnswer, withSchemaFile } from "./by-hand-schemas.js";
 import * as tests from "./by-hand-tests.js";
 import { template } from "./draft-jobs.js";
-import { shuttingDown, sm, type ServerMessages } from "./i18n/index.js";
+import { cancelled, shuttingDown, sm, type ServerMessages } from "./i18n/index.js";
 import { log } from "./log.js";
 import { git, redact } from "./process.js";
 import { byHandPlanPrompt } from "./prompts/by-hand.js";
@@ -120,6 +120,8 @@ export async function planByHand(
       recordHelp(run, { source: "premise", ...(removed ? { removed } : {}) });
     } else delete team.premise;
     countRemoved(run, removed);
+    // A Stop during the turn's last save or the path checks must not turn into a plan to write.
+    if (signal.aborted) throw new AppError(cancelled(), 409);
     enterPhase(run, team, "awaiting_approval");
     run.status = "awaiting_plan";
     ctx.log(run, "lead", sm().byHand.flow.guideRead);
