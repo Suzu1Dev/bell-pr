@@ -74,6 +74,8 @@ export function SplitModal({ run, files, busy, formError, splitRun, closeModal }
   // Where the keyboard goes after the control it was on moves or goes away: a moved file's menu,
   // which lands in another card, or a contribution's title after one is added or removed.
   const [focusId, setFocusId] = useState<string>();
+  // True while this dialog's own split request runs; `busy` is shared by every action in the app.
+  const [sending, setSending] = useState(false);
   const { groups, placed } = plan;
   const { minContributions, maxContributions, titleChars, maxPaths } = splitLimits;
 
@@ -107,12 +109,17 @@ export function SplitModal({ run, files, busy, formError, splitRun, closeModal }
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!valid || busy) return;
-    await splitRun({
-      contributions: groups.map((group) => ({
-        title: group.title.trim(),
-        paths: membersOf(group.key).map((file) => file.path),
-      })),
-    });
+    setSending(true);
+    try {
+      await splitRun({
+        contributions: groups.map((group) => ({
+          title: group.title.trim(),
+          paths: membersOf(group.key).map((file) => file.path),
+        })),
+      });
+    } finally {
+      setSending(false);
+    }
   }
 
   /** A contribution's name in a "goes to" menu: its number and the start of its title. */
@@ -159,8 +166,12 @@ export function SplitModal({ run, files, busy, formError, splitRun, closeModal }
     );
   };
 
+  // A split cannot be called back once sent: the dialog stays until it ends, then opens the first part or shows why it failed.
+  // Another action that runs meanwhile does not hold the dialog open.
+  const close = sending ? () => {} : closeModal;
+
   return (
-    <Modal title={t.title} subtitle={t.subtitle} onClose={closeModal} wide>
+    <Modal title={t.title} subtitle={t.subtitle} onClose={close} wide>
       <form onSubmit={submit}>
         {mixed.map((part) => (
           <div className="split-warning" role="note" key={part.taskIds.join(",")}>
@@ -274,7 +285,7 @@ export function SplitModal({ run, files, busy, formError, splitRun, closeModal }
             {t.summary({ contributions: groups.length, leftOut: leftOut.length })}
           </p>
           <div className="split-footer-buttons">
-            <button type="button" className="button secondary" onClick={closeModal}>
+            <button type="button" className="button secondary" disabled={sending} onClick={closeModal}>
               {common.actions.cancel}
             </button>
             <button type="submit" className="button primary" disabled={busy || !valid}>

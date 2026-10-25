@@ -48,7 +48,7 @@ const withPlan = (tasks: TeamTask[]): Run => ({
   },
 });
 
-const element = (run: Run, files: DiffFile[]) =>
+const element = (run: Run, files: DiffFile[], props: Partial<Parameters<typeof SplitModal>[0]> = {}) =>
   createElement(SplitModal, {
     run,
     files,
@@ -56,6 +56,7 @@ const element = (run: Run, files: DiffFile[]) =>
     formError: "",
     async splitRun() {},
     closeModal() {},
+    ...props,
   });
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -195,6 +196,62 @@ test("adding or removing a contribution leaves the keyboard on a contribution's 
     remove(3).focus();
     await click(remove(3));
     assert.equal(focused(), "split-title-4");
+  } finally {
+    await view.unmount();
+  }
+});
+
+/** Calls the submit handler React gave `form`, without waiting for the request it starts. */
+const submit = (form: FakeElement) =>
+  act(async () => {
+    const props = Object.entries(form).find(([name]) => name.startsWith("__reactProps$"))?.[1] as {
+      onSubmit(event: { preventDefault(): void }): Promise<void>;
+    };
+    void props.onSubmit({ preventDefault() {} });
+  });
+
+test("while the split is sent the dialog cannot be closed, so it can still open the first part or show the error", async () => {
+  const run = withPlan([task("retry", "Retry on timeout", ["src/a.ts"]), task("cache", "Cache the token", ["src/b.ts"])]);
+  const files = [file("src/a.ts"), file("src/b.ts")];
+  let closed = 0;
+  let finish = () => {};
+  const props = (busy: boolean) => ({
+    busy,
+    closeModal: () => void closed++,
+    splitRun: () => new Promise<void>((resolve) => (finish = resolve)),
+  });
+  const view = await mount(element(run, files, props(false)));
+  try {
+    const find = (match: (element: FakeElement) => boolean) => view.container.querySelectorAll(match)[0]!;
+    // The close button, Escape and the backdrop all close through the Modal's onClose.
+    const close = () => click(find((element) => element.getAttribute("class") === "icon-button modal-close"));
+    const cancel = () => find((element) => element.getAttribute("class") === "button secondary" && element.textContent === "Cancel");
+    await submit(find((element) => element.nodeName === "FORM"));
+    // AppShell is busy while the split runs, as it is for every request.
+    await view.rerender(element(run, files, props(true)));
+    await close();
+    assert.equal(closed, 0);
+    assert.ok(cancel().hasAttribute("disabled"));
+    // A failed split leaves the dialog open, and then it closes again.
+    await act(async () => finish());
+    await view.rerender(element(run, files, props(false)));
+    assert.ok(!cancel().hasAttribute("disabled"));
+    await close();
+    assert.equal(closed, 1);
+  } finally {
+    await view.unmount();
+  }
+});
+
+test("another request that runs while the dialog is open does not keep it from closing", async () => {
+  let closed = 0;
+  const view = await mount(element(withPlan([]), [file("src/a.ts"), file("src/b.ts")], { busy: true, closeModal: () => void closed++ }));
+  try {
+    const find = (match: (element: FakeElement) => boolean) => view.container.querySelectorAll(match)[0]!;
+    const cancel = find((element) => element.getAttribute("class") === "button secondary" && element.textContent === "Cancel");
+    assert.ok(!cancel.hasAttribute("disabled"));
+    await click(find((element) => element.getAttribute("class") === "icon-button modal-close"));
+    assert.equal(closed, 1);
   } finally {
     await view.unmount();
   }

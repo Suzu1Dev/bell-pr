@@ -208,6 +208,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   over the navigation drawer and its backdrop, hiding the drawer's links
   and catching clicks meant for them. The drawer now opens above it.
 
+- **Closing the split dialog mid-split.** Cancel, Escape, the close button
+  or the backdrop could close the dialog while "Splitting…" showed, but the
+  split went on anyway: on success the app jumped to the first part, and a
+  failure was never shown. The dialog now stays open until the split ends.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files
