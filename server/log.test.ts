@@ -4,11 +4,12 @@ import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/
 import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { z } from "zod";
 import { closeLog, initLog, log, recentLogLines } from "./log.js";
 import { command, git } from "./process.js";
-import { agentSpawn } from "./run-events.js";
+import { agentSpawn, parseAgentOutput } from "./run-events.js";
 import { Store } from "./store.js";
-import type { Run } from "./types.js";
+import { AppError, type Run } from "./types.js";
 import { Workbench } from "./workbench.js";
 
 const token = `ghp_${"A1b2C3d4".repeat(4)}`;
@@ -327,6 +328,46 @@ test("agent.exit records the exit code of an agent process that failed", async (
       { outcome: "failed", exitCode: undefined },
     ],
   );
+});
+
+test("agent.output_retry names the paths and codes that did not fit, never the value", async (t) => {
+  const { directory, cleanup } = await logDirectory();
+  t.after(cleanup);
+  initLog(directory, { stderr: capture(false).stream });
+  const run = { id: "run-problem" } as Run;
+  const answerSchema = z
+    .object({ kind: z.enum(["a", "b"]), items: z.array(z.string()).max(1) })
+    .strict();
+  const rejected = (raw: string) => () => {
+    try {
+      return answerSchema.parse(JSON.parse(raw));
+    } catch (error) {
+      throw new AppError("The answer was incomplete.", 422, { cause: error });
+    }
+  };
+  const marker = "ANSWER-MARKER-5678";
+  assert.throws(() =>
+    parseAgentOutput(run, "schema", rejected(JSON.stringify({ kind: marker, items: ["x", "y"] }))),
+  );
+  assert.throws(() => parseAgentOutput(run, "syntax", rejected(`{"kind": "${marker}`)));
+  assert.throws(() =>
+    parseAgentOutput(run, "plain", () => {
+      throw new AppError("The answer was incomplete.", 422);
+    }),
+  );
+  const lines = await recentLogLines(directory);
+  const retries = lines
+    .map((line) => JSON.parse(line) as Record<string, unknown>)
+    .filter((entry) => entry.msg === "agent.output_retry");
+  assert.deepEqual(
+    retries.map(({ schema, problem }) => ({ schema, problem })),
+    [
+      { schema: "schema", problem: "kind: invalid_enum_value; items: too_big" },
+      { schema: "syntax", problem: "json_syntax" },
+      { schema: "plain", problem: undefined },
+    ],
+  );
+  assert.ok(!lines.join("\n").includes(marker), "the answer's value must not be logged");
 });
 
 test("after the Workbench shuts down, the process logs to stderr, not into the data directory it left", async (t) => {

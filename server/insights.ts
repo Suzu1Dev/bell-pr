@@ -440,8 +440,11 @@ function validateAnalysis<
   let value: z.infer<S>;
   try {
     value = schema.parse(JSON.parse(raw)) as z.infer<S>;
-  } catch {
-    throw new AppError((m) => m.analysis.insights.incompleteAnswer, 422);
+  } catch (error) {
+    // The person reads one sentence; parseAgentOutput logs which part did not fit.
+    throw new AppError((m) => m.analysis.insights.incompleteAnswer, 422, {
+      cause: error,
+    });
   }
   // Checked on the complete answer: a dropped recommendation is still model output that was seen.
   const serialized = JSON.stringify(value);

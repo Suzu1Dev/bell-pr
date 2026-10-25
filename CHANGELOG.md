@@ -16,6 +16,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   it). BELL PR does not authenticate anyone, so put an authenticating proxy in
   front of it before you reach it from another machine.
 
+### Changed
+
+- **Rejected analysis.** When BELL PR rejects an AI analysis as incomplete,
+  the server log's `agent.output_retry` line now names the fields that did
+  not fit and why (for example `recommendations: too_big`), never their
+  values, so a rejection can be diagnosed without the answer.
+
 ## [1.0.0-rc.1] - 2026-10-20
 
 The first public release candidate of BELL PR, open source under the

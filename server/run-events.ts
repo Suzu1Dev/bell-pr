@@ -4,6 +4,7 @@
  * `agent.output_retry`, so the log files can be counted and searched.
  * Prompts and agent answers are never logged.
  */
+import { z } from "zod";
 import { log } from "./log.js";
 import { AppError, type Run } from "./types.js";
 import type { AgentTeam } from "../shared/team.js";
@@ -100,10 +101,27 @@ export function agentSpawn(
 }
 
 /**
+ * What a rejected answer got wrong, safe to log, read from the `cause` of
+ * the AppError its parser threw. For a schema it is each problem's path and
+ * code, never zod's message, which quotes the value it received; for text
+ * that is not JSON, only that. Any other error says nothing.
+ */
+function answerProblem(error: unknown): string | undefined {
+  const cause = error instanceof AppError ? error.cause : undefined;
+  if (cause instanceof z.ZodError)
+    return cause.issues
+      .slice(0, 8)
+      .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.code}`)
+      .join("; ");
+  if (cause instanceof SyntaxError) return "json_syntax";
+  return undefined;
+}
+
+/**
  * Parses an agent's structured answer. When the answer does not fit its
  * schema, logs agent.output_retry with the run id and the schema name (the
- * "format incomplete, retry" path the person then has to retry) and
- * rethrows.
+ * "format incomplete, retry" path the person then has to retry), and a
+ * `problem` when the error carries one (see answerProblem), then rethrows.
  */
 export function parseAgentOutput<T>(
   run: Pick<Run, "id">,
@@ -113,10 +131,12 @@ export function parseAgentOutput<T>(
   try {
     return parse();
   } catch (error) {
+    const problem = answerProblem(error);
     log.warn("agent.output_retry", {
       runId: run.id,
       schema,
       reason: errorMessage(error),
+      ...(problem ? { problem } : {}),
     });
     throw error;
   }

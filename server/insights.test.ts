@@ -27,6 +27,7 @@ import {
   ProjectInsightsService,
 } from "./insights.js";
 import { lenientRead } from "./persisted-schema.js";
+import { closeLog, initLog, recentLogLines } from "./log.js";
 import { assertNoHan } from "../src/test-utils/render.js";
 import { command, git } from "./process.js";
 import { AppError } from "./types.js";
@@ -802,6 +803,42 @@ test("malformed AI output and nonexistent or sensitive evidence never replace ca
       assert.deepEqual(await service.get(f.repo.id), saved);
     }
   } finally {
+    await f.cleanup();
+  }
+});
+
+test("a rejected analysis logs which fields did not fit, never their values", async () => {
+  const f = await fixture();
+  const marker = "ANALYSIS-MARKER-9012";
+  initLog(f.store.directory, { stderr: { write: () => true } });
+  try {
+    for (const response of [
+      { ...validAnalysis(), recommendations: marker },
+      marker,
+    ]) {
+      const service = new ProjectInsightsService(f.store, {
+        getModelCatalog: async () => ({ models: [], source: "codex" }),
+        command: fakeCodex(() => response).execute,
+      });
+      await assert.rejects(
+        service.generate(f.repo.id),
+        (error: unknown) => error instanceof AppError && error.statusCode === 422,
+      );
+    }
+    const lines = await recentLogLines(f.store.directory);
+    const retries = lines
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .filter((entry) => entry.msg === "agent.output_retry");
+    assert.deepEqual(
+      retries.map(({ schema, problem }) => ({ schema, problem })),
+      [
+        { schema: "analysis", problem: "recommendations: invalid_type" },
+        { schema: "analysis", problem: "(root): invalid_type" },
+      ],
+    );
+    assert.ok(!lines.join("\n").includes(marker), "the answer's value must not be logged");
+  } finally {
+    closeLog();
     await f.cleanup();
   }
 });
