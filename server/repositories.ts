@@ -578,9 +578,22 @@ export async function adoptLegacyCheckout(
   return true;
 }
 
+/** Removes a worktree and the branch made for it, when they are not kept. */
+export async function discardCheckout(repo: Repository, branch: string, worktreePath: string) {
+  try {
+    await git(repo.path, ["worktree", "remove", "--force", worktreePath]);
+  } catch {
+    await rm(worktreePath, { recursive: true, force: true });
+    await git(repo.path, ["worktree", "prune"]).catch(() => undefined);
+  }
+  await git(repo.path, ["branch", "-D", branch]).catch(() => undefined);
+}
+
 /**
  * Pins the run's base commit, fetched from GitHub when the repository has a
- * remote, and adds the run's worktree on its own branch. The caller holds the
+ * remote, and adds the run's worktree on its own branch. A checkout that
+ * fails or is cancelled takes its branch and files with it and pins no base
+ * commit, so the next attempt makes the worktree again. The caller holds the
  * repository lock.
  */
 export async function createRunWorktree(
@@ -589,21 +602,24 @@ export async function createRunWorktree(
   signal: AbortSignal,
 ) {
   assertRefName(run.branch);
-  run.baseSha = await fetchBranchCommit(repo, run.baseBranch, signal);
+  const baseSha = await fetchBranchCommit(repo, run.baseBranch, signal);
   await mkdir(path.dirname(run.worktreePath), {
     recursive: true,
     mode: 0o700,
   });
-  await git(
-    repo.path,
-    [
-      "worktree",
-      "add",
-      "-b",
-      run.branch,
-      run.worktreePath,
-      run.baseSha,
-    ],
-    { signal, timeoutMs: 60_000 },
-  );
+  // The branch on its own first, so a failed checkout removes only a branch it made.
+  // Without the signal, so a cancel cannot leave it behind: the checkout below then
+  // fails at once, and its cleanup removes the branch.
+  await git(repo.path, ["branch", "--", run.branch, baseSha]);
+  try {
+    await git(repo.path, ["worktree", "add", run.worktreePath, run.branch], {
+      signal,
+      timeoutMs: 60_000,
+    });
+  } catch (error) {
+    // Without the signal: once a run is cancelled, a command given it does not start.
+    await discardCheckout(repo, run.branch, run.worktreePath);
+    throw error;
+  }
+  run.baseSha = baseSha;
 }

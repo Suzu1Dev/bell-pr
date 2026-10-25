@@ -13,7 +13,7 @@
  * reports) does not: each contribution is explained and approved on its own.
  */
 import { randomUUID } from "node:crypto";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { activeFollowUp } from "../shared/followups.js";
 import { planTaskPaths } from "../shared/reviewability.js";
@@ -24,6 +24,7 @@ import { shuttingDown, sm } from "./i18n/index.js";
 import { log } from "./log.js";
 import { git } from "./process.js";
 import { editable } from "./publish.js";
+import { discardCheckout } from "./repositories.js";
 import { assertConflictsResolved } from "./sync-runs.js";
 import {
   AppError,
@@ -59,17 +60,6 @@ function assertRequest(input: SplitRequest, files: readonly DiffFile[]) {
         throw new AppError((m) => m.run.split.heldBack({ path: filePath }), 422);
     }
   return byPath;
-}
-
-/** Removes a worktree and branch made for a contribution that was not kept. */
-async function discardCheckout(repo: Repository, branch: string, worktreePath: string) {
-  try {
-    await git(repo.path, ["worktree", "remove", "--force", worktreePath]);
-  } catch {
-    await rm(worktreePath, { recursive: true, force: true });
-    await git(repo.path, ["worktree", "prune"]).catch(() => undefined);
-  }
-  await git(repo.path, ["branch", "-D", branch]).catch(() => undefined);
 }
 
 /**

@@ -219,6 +219,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   original also left a dead "Open the original" link in each part. A deleted
   run now leaves those links, and the original can be split again.
 
+- **Retrying a run whose checkout failed.** If making a run's worktree timed
+  out, was cancelled or hit a folder that was already there, the run kept its
+  base commit and its branch. Every retry then started the agents in a
+  missing or half-made folder. Now a failed or cancelled checkout removes its
+  branch and files, and the next attempt makes the worktree again.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files
