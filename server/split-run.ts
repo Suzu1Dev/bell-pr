@@ -90,10 +90,11 @@ async function createContribution(
   assertRefName(branch);
   const worktreePath = path.join(ctx.store.directory, "worktrees", id);
   await mkdir(path.dirname(worktreePath), { recursive: true, mode: 0o700 });
-  await git(repo.path, ["worktree", "add", "-b", branch, worktreePath, source.baseSha], {
-    timeoutMs: 60_000,
-  });
+  // The branch comes first and on its own: `worktree add -b` keeps the branch
+  // it made when the checkout fails, before this function could remove it.
+  await git(repo.path, ["branch", "--no-track", branch, source.baseSha]);
   try {
+    await git(repo.path, ["worktree", "add", worktreePath, branch], { timeoutMs: 60_000 });
     const chosen = paths.map((filePath) => files.get(filePath)!);
     const patch = chosen.map((file) => file.patch).join("\n");
     await git(worktreePath, ["apply", "--check", "--whitespace=nowarn", "-"], { input: patch });

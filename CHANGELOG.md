@@ -98,6 +98,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   marked as being explained in the new parts forever: Retry did nothing and
   the page kept asking the server again. The new parts now ask for their own
   explanations.
+
+- **A failed split no longer leaves a stray branch.** When git failed while
+  checking out a split part, for example on a timeout or a full disk, the
+  part's new fix/ branch and any files already written stayed in BELL PR's
+  copy of the repository, with nothing left to remove them. A failed checkout
+  now removes both.
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

@@ -470,3 +470,37 @@ test("an explanation the original is still writing is asked for again in the par
   const { files } = await en(() => f.workbench.explanations(a.id));
   assert.equal(files.find((file) => file.path === "web/a.js")?.explanationStatus, "failed");
 });
+
+test("a checkout that fails after git made its branch leaves no branch behind", { skip: process.platform === "win32" }, async (t) => {
+  const f = await fixture(t);
+  // A git whose `git worktree add` does its work and then fails, as one stopped by the
+  // timeout or a full disk would after the branch exists.
+  const realGit = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+  const bin = await mkdtemp(path.join(os.tmpdir(), "bell-split-git-"));
+  await writeFile(
+    path.join(bin, "git"),
+    `#!/bin/sh
+for arg in "$@"; do
+  if [ "$previous" = "worktree" ] && [ "$arg" = "add" ]; then
+    '${realGit}' "$@"; echo "checkout stopped" >&2; exit 1
+  fi
+  previous="$arg"
+done
+exec '${realGit}' "$@"
+`,
+    { mode: 0o755 },
+  );
+  const path_ = process.env.PATH;
+  process.env.PATH = `${bin}${path.delimiter}${path_}`;
+  t.after(async () => {
+    process.env.PATH = path_;
+    await rm(bin, { recursive: true, force: true });
+  });
+
+  await assert.rejects(en(() => f.workbench.split(f.run.id, { contributions: three })), /checkout stopped/);
+
+  process.env.PATH = path_;
+  assert.equal(f.store.data.runs.length, 1);
+  assert.deepEqual(await readdir(path.join(f.store.directory, "worktrees")), ["source-run-0001"]);
+  assert.deepEqual(await contributionBranches(f.repo.path), ["fix/source01"]);
+});
