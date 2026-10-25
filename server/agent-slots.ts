@@ -1,5 +1,5 @@
 import { AppError } from "./types.js";
-import { cancelled, currentLocale, withLocale } from "./i18n/index.js";
+import { cancelled, currentLocale, sm, withLocale } from "./i18n/index.js";
 
 export const defaultAgentProcessLimit = 3;
 
@@ -92,7 +92,9 @@ export function parseAgentProcessLimit(value: string | undefined): number {
   if (value === undefined) return defaultAgentProcessLimit;
   const limit = Number(value);
   if (!Number.isInteger(limit) || limit < 1 || limit > 32)
-    throw new Error("BELLPR_MAX_AGENT_PROCESSES must be between 1 and 32.");
+    throw new Error(
+      sm().cli.config.limitRange({ name: "BELLPR_MAX_AGENT_PROCESSES", min: 1, max: 32 }),
+    );
   return limit;
 }
 
@@ -103,6 +105,8 @@ export function parseActiveRunLimit(value: string | undefined): number {
   if (value === undefined) return defaultActiveRunLimit;
   const limit = Number(value);
   if (!Number.isInteger(limit) || limit < 1 || limit > 8)
-    throw new Error("BELLPR_MAX_ACTIVE_RUNS must be between 1 and 8.");
+    throw new Error(
+      sm().cli.config.limitRange({ name: "BELLPR_MAX_ACTIVE_RUNS", min: 1, max: 8 }),
+    );
   return limit;
 }

@@ -192,6 +192,8 @@ test("BELLPR_AGENT_TIMEOUT_SCALE defaults to 1 and accepts 0.5-10", () => {
   assert.equal(parseAgentTimeoutScale("0.5"), 0.5);
   assert.equal(parseAgentTimeoutScale("2.5"), 2.5);
   assert.equal(parseAgentTimeoutScale("10"), 10);
-  for (const invalid of ["0", "0.4", "11", "-1", "two", "", " ", "NaN", "Infinity"])
-    assert.throws(() => parseAgentTimeoutScale(invalid), /0\.5 and 10/);
+  withLocale("en", () => {
+    for (const invalid of ["0", "0.4", "11", "-1", "two", "", " ", "NaN", "Infinity"])
+      assert.throws(() => parseAgentTimeoutScale(invalid), /0\.5 and 10/);
+  });
 });

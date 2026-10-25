@@ -103,6 +103,8 @@ export function parseAgentTimeoutScale(value: string | undefined): number {
   if (value === undefined) return defaultAgentTimeoutScale;
   const scale = Number(value);
   if (value.trim() === "" || !Number.isFinite(scale) || scale < 0.5 || scale > 10)
-    throw new Error("BELLPR_AGENT_TIMEOUT_SCALE must be between 0.5 and 10.");
+    throw new Error(
+      sm().cli.config.limitRange({ name: "BELLPR_AGENT_TIMEOUT_SCALE", min: 0.5, max: 10 }),
+    );
   return scale;
 }

@@ -226,6 +226,21 @@ test("an invalid BELLPR_ALLOWED_ORIGINS is reported in the CLI's language", () =
   );
 });
 
+test("an out-of-range limit is reported in the CLI's language", () => {
+  withLocale("zh-TW", () => {
+    for (const [env, expected] of [
+      [{ BELLPR_MAX_AGENT_PROCESSES: "50" }, /^BELLPR_MAX_AGENT_PROCESSES 必須介於 1 到 32/],
+      [{ BELLPR_MAX_ACTIVE_RUNS: "0" }, /^BELLPR_MAX_ACTIVE_RUNS 必須介於 1 到 8/],
+      [{ BELLPR_AGENT_TIMEOUT_SCALE: "11" }, /^BELLPR_AGENT_TIMEOUT_SCALE 必須介於 0\.5 到 10/],
+    ] as const)
+      assert.throws(
+        () => resolveConfig({}, env),
+        (error: unknown) => error instanceof ConfigError && expected.test(error.message),
+        JSON.stringify(env),
+      );
+  });
+});
+
 test("resolveConfig adds the public origin, trusts the dev port only in dev and never opens a browser in CI", () => {
   const config = resolveConfig(
     {},

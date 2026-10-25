@@ -136,8 +136,10 @@ test("BELLPR_MAX_AGENT_PROCESSES defaults to 3 and rejects values outside 1-32",
   assert.equal(parseAgentProcessLimit(undefined), 3);
   assert.equal(parseAgentProcessLimit("1"), 1);
   assert.equal(parseAgentProcessLimit("32"), 32);
-  for (const invalid of ["0", "33", "two", "", "2.5"])
-    assert.throws(() => parseAgentProcessLimit(invalid), /1 and 32/);
+  withLocale("en", () => {
+    for (const invalid of ["0", "33", "two", "", "2.5"])
+      assert.throws(() => parseAgentProcessLimit(invalid), /1 and 32/);
+  });
   assert.throws(() => new AgentSlots(0), /positive integer/);
 });
 
@@ -145,6 +147,8 @@ test("BELLPR_MAX_ACTIVE_RUNS defaults to 2 and rejects values outside 1-8", () =
   assert.equal(parseActiveRunLimit(undefined), 2);
   assert.equal(parseActiveRunLimit("1"), 1);
   assert.equal(parseActiveRunLimit("8"), 8);
-  for (const invalid of ["0", "9", "two", "", "1.5"])
-    assert.throws(() => parseActiveRunLimit(invalid), /1 and 8/);
+  withLocale("en", () => {
+    for (const invalid of ["0", "9", "two", "", "1.5"])
+      assert.throws(() => parseActiveRunLimit(invalid), /1 and 8/);
+  });
 });

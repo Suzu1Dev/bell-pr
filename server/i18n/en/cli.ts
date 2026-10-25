@@ -81,6 +81,9 @@ export default {
     /** A host other than this computer or all addresses, without BELLPR_PUBLIC_URL. */
     publicUrlRequired: ({ host }: { host: string }) =>
       `To listen on ${host}, set BELLPR_PUBLIC_URL to the HTTPS address browsers use to reach ${name}, such as https://bell.example.com behind a reverse proxy; without it every request would be refused. To use ${name} on this computer only, leave --host at 127.0.0.1.`,
+    /** A run, process or timeout limit outside its range. */
+    limitRange: ({ name, min, max }: { name: string; min: number; max: number }) =>
+      `${name} must be between ${min} and ${max}.`,
   },
   /** `bell-pr start`. */
   start: {

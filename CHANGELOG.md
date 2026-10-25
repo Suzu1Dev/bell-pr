@@ -167,6 +167,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   any commands. A retried task now shows only the commands the new attempt
   runs. Completed tasks keep theirs.
 
+- **Limit errors in the chosen language.** An out-of-range
+  BELLPR_MAX_AGENT_PROCESSES, BELLPR_MAX_ACTIVE_RUNS or
+  BELLPR_AGENT_TIMEOUT_SCALE stopped `bell-pr start` with an English message
+  even when BELL PR was set to Traditional Chinese. The message now follows
+  the language in effect, like the other configuration errors.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

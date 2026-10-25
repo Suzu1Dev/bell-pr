@@ -62,6 +62,7 @@ const m: Translation<typeof en> = {
       `開發模式只能在這台電腦上監聽。請改用 --host 127.0.0.1，不要使用 ${host}。`,
     publicUrlRequired: ({ host }) =>
       `要在 ${host} 監聽，請把 BELLPR_PUBLIC_URL 設為瀏覽器連到 ${name} 的 HTTPS 位址，例如反向代理後的 https://bell.example.com；沒有設定時，所有請求都會被拒絕。若只在這台電腦上使用 ${name}，請讓 --host 保持 127.0.0.1。`,
+    limitRange: ({ name, min, max }) => `${name} 必須介於 ${min} 到 ${max} 之間。`,
   },
   start: {
     startup: ({ version, url }) => `${name} ${version} → ${url}`,
