@@ -91,11 +91,10 @@ export function AnalysisProgress({ progress }: { progress: InsightsProgress }) {
           );
         })}
       </ol>
-      {progress.notice && (
-        <p className="mission-analysis-notice" role="status">
-          {progress.notice}
-        </p>
-      )}
+      {/* Always there, even empty: screen readers often skip a live region that appears with its text. */}
+      <p className="mission-analysis-notice" role="status">
+        {progress.notice}
+      </p>
       <p className="mission-analysis-note">{text.note}</p>
     </div>
   );

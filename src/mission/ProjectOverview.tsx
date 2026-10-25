@@ -1150,7 +1150,8 @@ export function ProjectOverview({
       </Suspense>
 
       {!insights ? (
-        <section className="mission-overview-empty" aria-busy={loading}>
+        // Not busy once the steps show, or their notice could be held back until they are gone.
+        <section className="mission-overview-empty" aria-busy={loading && !progress}>
           <span className="mission-empty-icon">
             {loading ? (
               <Loader2 className="mission-spin" size={27} />

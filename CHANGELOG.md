@@ -122,6 +122,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   moves to the next (or previous) contribution's title after a removal, and
   to the new contribution's title after an add.
 
+- **Screen readers announce analysis notices.** During an analysis, a
+  sign-in retry or rate-limit notice from the CLI was often not read
+  aloud. Its status region only appeared together with its text, and on
+  a first analysis it sat inside a section marked busy until the analysis
+  ended. The region now stays on screen and only its text changes, and the
+  section stops being marked busy once the progress steps show.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

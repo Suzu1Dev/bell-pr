@@ -1298,6 +1298,10 @@
 .mission-analysis-notice {
   color: var(--color-text-secondary);
 }
+/* Stays in the page while empty, so that its first notice is announced; it takes no room. */
+.mission-analysis-notice:empty {
+  margin: 0;
+}
 /* No time to measure (reading, a wait between tries, checking, saving): the bar only moves. */
 .mission-analysis-progress.is-indeterminate > span {
   width: 30%;

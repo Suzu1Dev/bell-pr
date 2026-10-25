@@ -2,14 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { formatters } from "../../shared/i18n/locale";
-import type { ProjectInsights } from "../../shared/insights";
+import type { InsightsProgress, ProjectInsights } from "../../shared/insights";
 import type { AgentTeam } from "../../shared/team";
 import { getDemo } from "../demo";
 import type { PlaybackClock } from "../demo/playback";
 import { assertNoHan, renderEn, renderWith, renderZh } from "../test-utils/render";
 import { MarkdownContent } from "../review/MarkdownContent";
+import { AnalysisProgress } from "./AnalysisProgress";
 import { briefMarkdown, ProjectOverview, type ProjectOverviewProps } from "./ProjectOverview";
 import { playSampleAnalysis, stopSampleAnalysis } from "./sample-analysis";
+import { mount } from "./test-dom";
 
 const demoInsights = getDemo("zh-TW").insights;
 
@@ -547,6 +549,35 @@ test("while a real analysis runs, the overview lists its steps with the time use
     renderWith("zh-TW", createElement(ProjectOverview, overviewProps({ insights: null, loading: true, progress }))),
     /已等待 1:05，上限 10:00/,
   );
+});
+
+test("the CLI's notice is announced: its live region stays on screen and no busy section holds it back", async () => {
+  const progress: InsightsProgress = { phase: "agent", elapsedSeconds: 30, more: false, attempt: 1, attempts: 3 };
+  const notice = "Claude Code is retrying (attempt 2 of 10, rate_limit, retrying in 4 s).";
+  // A first analysis: once its steps show, the empty state around them is no longer busy.
+  const first = renderEnglish({ repo: { ...repo, id: "repo-1" }, insights: null, loading: true, progress });
+  assert.match(first, /<p class="mission-analysis-notice" role="status"><\/p>/);
+  assert.doesNotMatch(first, /aria-busy="true"/);
+  // Before the server has answered, it still is.
+  assert.match(
+    renderEnglish({ repo: { ...repo, id: "repo-1" }, insights: null, loading: true }),
+    /<section class="mission-overview-empty" aria-busy="true">/,
+  );
+  // A notice changes the text of the region already there; it never inserts a new one.
+  const mounted = await mount(createElement(AnalysisProgress, { progress }));
+  try {
+    const regions = () => mounted.container.querySelectorAll((element) => element.getAttribute("role") === "status");
+    const [region] = regions();
+    assert.equal(region?.textContent, "");
+    for (const next of [{ ...progress, notice }, progress]) {
+      await mounted.rerender(createElement(AnalysisProgress, { progress: next }));
+      assert.equal(regions().length, 1);
+      assert.equal(regions()[0], region);
+      assert.equal(region.textContent, next.notice ?? "");
+    }
+  } finally {
+    await mounted.unmount();
+  }
 });
 
 test("the progress bar has a value only while a started try is timed; everywhere else it just moves", () => {
