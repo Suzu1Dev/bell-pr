@@ -153,7 +153,7 @@ require('node:fs').appendFileSync(${JSON.stringify(record)}, JSON.stringify({
 const configOf = (args: string[]) =>
   args.flatMap((arg, index) => (args[index - 1] === "-c" ? [arg] : []));
 
-test("every Git command overrides hooks, monitors, pagers, editors, prompts and SSH from the repository", async (t) => {
+test("every Git command overrides hooks, monitors, pagers, editors, prompts, SSH and log signature checks from the repository", async (t) => {
   const calls = await recordingGit(t);
   await git(os.tmpdir(), ["status"]);
   const [call] = await calls();
@@ -166,6 +166,7 @@ test("every Git command overrides hooks, monitors, pagers, editors, prompts and 
     "core.pager=cat",
     "core.editor=true",
     "core.askPass=",
+    "log.showSignature=false",
   ]);
   assert.equal(call.args.at(-1), "status");
 });
@@ -208,6 +209,8 @@ test("a repository whose own Git configuration could run commands is refused", a
     ["merge.conflictStyle", "diff3"],
     ["diff.custom.xfuncname", "^def"],
     ["merge.custom.name", "A custom driver"],
+    ["gpg.format", "ssh"],
+    ["gpg.ssh.allowedSignersFile", ".allowed_signers"],
     ["core.hooksPath", ".husky/_"],
     ["core.fsmonitor", "touch pwned"],
     ["core.sshCommand", "touch pwned"],
@@ -241,6 +244,11 @@ test("a repository whose own Git configuration could run commands is refused", a
     ["includeIf.gitdir:/tmp/.path", "/tmp/other.config"],
     ["core.alternateRefsCommand", "touch pwned"],
     ["url.https://evil.example/.insteadOf", "https://github.com/"],
+    ["gpg.program", "touch pwned"],
+    ["gpg.openpgp.program", "touch pwned"],
+    ["gpg.x509.program", "touch pwned"],
+    ["gpg.ssh.program", "touch pwned"],
+    ["gpg.ssh.defaultKeyCommand", "touch pwned"],
   ]) {
     await git(directory, ["config", key, value]);
     await assert.rejects(
@@ -293,5 +301,38 @@ test("a checkout's own hooks path and file monitor never run through git()", asy
   await git(directory, ["add", "file.txt"]);
   await git(directory, ["commit", "-q", "-m", "Add a file"]);
   await git(directory, ["status", "--porcelain"]);
+  assert.equal(await readFile(marker, "utf8").catch(() => ""), "");
+});
+
+test("a checkout's own signing program never verifies a signed commit in git log", async (t) => {
+  const directory = await repository(t);
+  const marker = path.join(directory, "ran");
+  const program = path.join(directory, "verify.sh");
+  await writeFile(program, `#!/bin/sh\necho "$0" >> ${JSON.stringify(marker)}\n`, {
+    mode: 0o755,
+  });
+  await git(directory, ["config", "log.showSignature", "true"]);
+  await git(directory, ["config", "gpg.program", program]);
+  // A commit carrying a signature, as GitHub's web-flow commits do.
+  const tree = (await git(directory, ["mktree"])).stdout.trim();
+  const commit = (
+    await git(directory, ["hash-object", "-t", "commit", "-w", "--stdin"], {
+      input: [
+        `tree ${tree}`,
+        "author Someone <someone@example.invalid> 1700000000 +0000",
+        "committer Someone <someone@example.invalid> 1700000000 +0000",
+        "gpgsig -----BEGIN PGP SIGNATURE-----",
+        " ",
+        " AAAA",
+        " -----END PGP SIGNATURE-----",
+        "",
+        "Signed on the web",
+        "",
+      ].join("\n"),
+    })
+  ).stdout.trim();
+  await git(directory, ["update-ref", "refs/heads/main", commit]);
+  await git(directory, ["log", "--no-color", "--format=%H%x00%s"]);
+  await git(directory, ["show", "--no-color", "--format=%B", "--no-patch", commit]);
   assert.equal(await readFile(marker, "utf8").catch(() => ""), "");
 });

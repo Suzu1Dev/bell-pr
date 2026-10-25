@@ -264,10 +264,10 @@ Published runs are never cleaned up automatically; only you can free them.
 "This repository's Git configuration sets …, which can make Git run other
 programs or send credentials elsewhere." (HTTP 409). The project's own
 `.git/config` (or a worktree's `config.worktree`) defines a filter, a diff
-or merge driver, a credential helper, protocol rules, URL rewrites or an
-include. BELL PR's own clones never have them, so someone or something
-changed the clone by hand. BELL PR runs no Git command in it until they are
-gone.
+or merge driver, a signing program, a credential helper, protocol rules,
+URL rewrites or an include. BELL PR's own clones never have them, so
+someone or something changed the clone by hand. BELL PR runs no Git
+command in it until they are gone.
 
 - Remove the settings the message names from that repository's
   configuration, for example with

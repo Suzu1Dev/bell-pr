@@ -152,21 +152,22 @@ to both CLIs, and `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`,
   your repository; delete them yourself if you no longer need them.
 - **Hardened Git.** Every Git command runs with hooks, the file-system
   monitor and the global attributes file switched off, and with BELL PR's
-  own pager, editor, password prompt and SSH command. Fetches, `ls-remote`
-  and pushes take credentials from the GitHub CLI only, allow HTTPS and SSH
-  transports only, never follow submodules and never prompt.
+  own pager, editor, password prompt and SSH command. Logs never verify
+  commit signatures, which would run a signing program. Fetches,
+  `ls-remote` and pushes take credentials from the GitHub CLI only, allow
+  HTTPS and SSH transports only, never follow submodules and never prompt.
 - **Repository configuration.** Before a diff is read, a teammate's work is
   integrated or a snapshot taken, a checkout is synced, an agent's moved
   HEAD is put back, or anything is published, BELL PR refuses a repository
   whose own configuration (`.git/config` or the worktree's
   `config.worktree`) defines filters, diff or merge drivers, an
-  alternate-refs command, credential helpers, protocol rules, URL rewrites
-  or includes (error code `git_config_unsafe`). A hooks path (as husky sets
-  it), file-system monitor, pager, editor, password prompt or SSH command
-  there is allowed, because BELL PR's own settings above always replace
-  them. Your global and system configuration are not checked. A
-  `.gitattributes` file in the project can name a driver, but only
-  configuration can define one.
+  alternate-refs command, signing programs, credential helpers, protocol
+  rules, URL rewrites or includes (error code `git_config_unsafe`). A
+  hooks path (as husky sets it), file-system monitor, pager, editor,
+  password prompt or SSH command there is allowed, because BELL PR's own
+  settings above always replace them. Your global and system
+  configuration are not checked. A `.gitattributes` file in the project
+  can name a driver, but only configuration can define one.
 - **Teammate checkouts.** Before Git runs in a teammate's checkout, its
   `.git` must be a plain file pointing at `<repository>/worktrees/<name>`,
   and Git's own record of that worktree must point back at it.

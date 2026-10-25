@@ -135,6 +135,15 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   error instead of the interface. The page now opens. Other sites still
   cannot call the API, load its files or put it in a frame.
 
+- **A repository's signing program no longer runs when you view commits.**
+  If a run repository's own Git config turned on signature display and
+  named a signing program, opening the run's commit list (or retrying a
+  publish) ran that program for every signed commit, such as the ones
+  GitHub creates when you apply a suggestion. BELL PR's Git commands now
+  never verify signatures in logs, and BELL PR refuses a repository whose
+  own config names a signing program, as it already did for filters and
+  credential helpers.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files
