@@ -58,6 +58,10 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the server log's `agent.output_retry` line now names the fields that did
   not fit and why (for example `recommendations: too_big`), never their
   values, so a rejection can be diagnosed without the answer.
+- **One fix per proposal.** The prompts for the lead's plan, the
+  recommendations and the discovery opportunities now ask for one fix a
+  maintainer can review on its own, and the plan names its independent fixes
+  so they can be split. The effect on the agents' output is not measured yet.
 
 ## [1.0.0-rc.1] - 2026-10-20
 
