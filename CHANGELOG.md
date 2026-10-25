@@ -173,6 +173,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   even when BELL PR was set to Traditional Chinese. The message now follows
   the language in effect, like the other configuration errors.
 
+- **Damaged state file reported in the chosen language.** When state.json
+  was valid JSON but not a state BELL PR could read, and no backup could
+  replace it, the startup error contained the English phrase "Invalid state
+  format" even in Traditional Chinese. That reason is now translated too.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

@@ -122,8 +122,21 @@ test("version 不是 1 時，錯誤訊息包含檔案路徑與版本提示", asy
       /state\.json/.test(error.message) &&
       /version 1/.test(error.message) &&
       error.cause instanceof Error &&
-      error.cause.message === "Invalid state format",
+      error.cause.message === "狀態檔格式無效",
   );
+});
+
+test("a state.json of the wrong shape is reported in the server's language", async (t) => {
+  const { directory, cleanup } = await dataDirectory();
+  t.after(cleanup);
+  const statePath = path.join(directory, "state.json");
+  await writeFile(statePath, "[]");
+  await assert.rejects(withLocale("zh-TW", () => new Store(directory).initialize()), {
+    message: `無法讀取 ${statePath}：狀態檔格式無效。請檢查檔案是否為有效 JSON（version 1）。`,
+  });
+  await assert.rejects(withLocale("en", () => new Store(directory).initialize()), {
+    message: `Cannot read ${statePath}: Invalid state format. Check that the file is valid JSON (version 1).`,
+  });
 });
 
 test("既有 version 1 的 state.json 可載入，中斷的工作仍會被標記為失敗", async (t) => {

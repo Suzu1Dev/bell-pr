@@ -371,6 +371,7 @@ const m: Translation<typeof en> = {
   recovery: {
     unreadableState: ({ path, reason }) =>
       `無法讀取 ${path}：${reason}。請檢查檔案是否為有效 JSON（version 1）。`,
+    invalidStateFormat: "狀態檔格式無效",
     draft: "服務重新啟動，PR 草稿建議已中斷；現有草稿保留，可重新產生。",
     explanation: "服務重新啟動，解說產生已中斷；可重試產生解說。",
     walkthrough: "服務重新啟動，程式碼解說已中斷；可重試。",

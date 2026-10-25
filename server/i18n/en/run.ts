@@ -619,6 +619,8 @@ export default {
   recovery: {
     unreadableState: ({ path, reason }: { path: string; reason: string }) =>
       `Cannot read ${path}: ${reason}. Check that the file is valid JSON (version 1).`,
+    /** The `reason` above for JSON that is not a version 1 state; no final period. */
+    invalidStateFormat: "Invalid state format",
     draft:
       "The service restarted, so the PR draft suggestion stopped; your current draft is kept, and you can generate the suggestion again.",
     explanation:

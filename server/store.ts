@@ -643,7 +643,7 @@ function parseState(content: string): Parsed {
   } catch (error) {
     return { error: error as Error, corrupt: true };
   }
-  const invalid = () => new Error("Invalid state format");
+  const invalid = () => new Error(sm().run.recovery.invalidStateFormat);
   if (!value || typeof value !== "object" || Array.isArray(value))
     return { error: invalid(), corrupt: true };
   const state = value as Record<string, unknown>;
