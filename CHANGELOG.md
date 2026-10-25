@@ -268,6 +268,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   copied exactly from the project's files. Sets like "{1, 2, 3}" and
   placeholders like "{ name }" stay.
 
+- **More spaced code in braces is caught by the Learn-by-hand filter.** A
+  key with a space before its colon ("{ retries : 3 }"), a quoted or computed
+  key ('{ "Content-Type": … }', "{ [key]: 3 }"), a statement without a
+  semicolon ("{ if (done) break }") or a call ("{ retry() }") still got past
+  the filter when written with spaces, while the same code without spaces
+  was removed. These are now removed too, unless the project's files have
+  them word for word.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

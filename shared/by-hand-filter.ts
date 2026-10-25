@@ -191,12 +191,16 @@ const call = /(?<![\w$.])[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\((?!(?:s|es|ies
 const braces = /\{[^{}\n]*\}/g;
 /**
  * Whether text in braces is a block or an object, spaced or not
- * ("{ retries: 3 }", "{ break; }", "{ throw err }"): a semicolon, a key
- * and a colon first or after a comma, or a statement keyword first. A set
- * ("{1, 2, 3}") and a placeholder ("{ name }") are prose.
+ * ("{ retries: 3 }", "{ break; }", "{ throw err }", "{ if (done) break }",
+ * "{ retry() }", '{ "Content-Type": "text/plain" }'): a semicolon; a
+ * statement keyword first, or if/for/while/switch and a parenthesis first;
+ * a call; or a key and a colon, first or after a comma, where the key is a
+ * name, a quoted string or a computed [key] and spaces may come before the
+ * colon. A set ("{1, 2, 3}") and a placeholder ("{ name }", "{name
+ * (optional)}") are prose.
  */
 const blockCode = (braced: string) =>
-  /;|^\s*(?:return|throw|break|continue|await|yield)\b|(?:^|,)\s*["']?[A-Za-z_$][\w$]*["']?:/.test(braced.slice(1, -1));
+  /;|^\s*(?:(?:return|throw|break|continue|await|yield)\b|(?:if|for|while|switch)\s*\()|(?<![\w$.])[A-Za-z_$][\w$.]*\((?!(?:s|es|ies)\))|(?:^|,)\s*(?:"[^"\n]*"|'[^'\n]*'|\[[^[\]\n]*\]|[A-Za-z_$][\w$]*)\s*:/.test(braced.slice(1, -1));
 /** Whether a piece of text has code in it, read without the files (a link's path or query). */
 const hasCode = (text: string) =>
   new RegExp(expression.source).test(text) || (text.match(word) ?? []).some(compactCode) || new RegExp(call.source).test(text) ||

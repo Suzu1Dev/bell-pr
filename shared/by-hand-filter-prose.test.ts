@@ -141,6 +141,12 @@ const code: [string, string][] = [
   ["Call { fn(); } in the catch.", "fn();"],
   ["Pass { retries: { max: 3 } } to it.", "retries"],
   ["Write for (;;) { if (attempt) { break; } } there.", "if (attempt)"],
+  ["Use { retries : 3 } as the options.", "retries : 3"],
+  ['Send { "Content-Type": "application/json" } as the headers.', '"Content-Type"'],
+  ["Send { 'max-retries': 3 } in the config.", "'max-retries'"],
+  ["Pass { [key]: 3 } to it.", "[key]: 3"],
+  ["Write while (true) { if (done) break } there.", "if (done) break"],
+  ["Write if (attempt) { retry() } there.", "retry()"],
   ["Use Vec<u8> there.", "Vec<u8>"],
   ["Use std::time::sleep instead.", "std::time"],
   ["Make it delay*=2 each time.", "delay*=2"],
@@ -230,6 +236,8 @@ test("a tooling answer's command can't carry code in an inline program or a quot
     "Run `node scripts/check.js '{ retries: 3 }'` to check.",
     "Run `node scripts/check.js { retries: 3 } -v` to check.",
     "Run `bash scripts/x.sh { break; } -v` to check.",
+    "Run `node scripts/check.js { retries : 3 } -v` to check.",
+    "Run `node scripts/check.js { if (attempt) break } -v` to check.",
     "Run `echo delay*2` to see it.",
   ])
     assert.match(tooling(text), /^Run … /, text);
