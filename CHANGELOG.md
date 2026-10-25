@@ -203,6 +203,11 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   tool to cite. A Claude Code run did show that line. The list now says
   "The guide ran on Codex; the CLI didn't report its model."
 
+- **The premise check no longer covers the mobile navigation drawer.** In a
+  narrow window, an open premise check in Code changes drew its evidence
+  over the navigation drawer and its backdrop, hiding the drawer's links
+  and catching clicks meant for them. The drawer now opens above it.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

@@ -1048,6 +1048,9 @@ button {
   /* The rules below follow the pane's width, which the file list, the
      explanation and the sidebar share with it, not the window's. */
   container: diff-panel / inline-size;
+  /* The open premise check's z-index counts only inside the pane, so the
+     narrow window's navigation drawer and its scrim paint above it. */
+  isolation: isolate;
 }
 .diff-topbar {
   min-height: 45px;

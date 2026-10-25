@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { createElement } from "react";
 import { assertNoHan, renderEn, renderZh } from "../test-utils/render";
@@ -178,6 +179,19 @@ test("the premise check sits in the diff's top bar and no row is left above the 
   assert.doesNotMatch(html, /diff-context-bar|worktree/i);
   assertNoHan(html);
   assert.match(renderZh(element({ run: { ...run, team } })), /aria-label="前提查核"/);
+});
+
+test("the open premise check covers the code but stays under the narrow window's navigation drawer", () => {
+  const css = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+  const rule = (selector: string) => {
+    const start = css.indexOf(`\n${selector} {\n`);
+    assert.notEqual(start, -1, selector);
+    return css.slice(start, css.indexOf("\n}", start));
+  };
+  // The overlay lies above the diff's sticky layers...
+  assert.match(rule(".diff-topbar > .premise-compact details[open] > .premise-detail"), /z-index: 20;/);
+  // ...but only inside the pane: the drawer (20) and its scrim (19) paint above it.
+  assert.match(rule(".diff-panel"), /isolation: isolate;/);
 });
 
 test("a run whose files were cleaned up says so", () => {
