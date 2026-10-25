@@ -97,6 +97,7 @@ const m: Translation<typeof en> = {
     approvePr: "確認並準備 PR",
   },
   loadingPreview: "正在載入預覽…",
+  loadingRun: "正在開啟貢獻…",
   changes: {
     files: "變更的檔案",
     searchPlaceholder: "搜尋檔案…",

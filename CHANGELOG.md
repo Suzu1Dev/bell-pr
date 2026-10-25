@@ -63,6 +63,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   maintainer can review on its own, and the plan names its independent fixes
   so they can be split. The effect on the agents' output is not measured yet.
 
+### Fixed
+
+- **Opening a contribution from a link.** A link or a reload that names a
+  contribution showed the sample project's workspace under that address for a
+  moment, so a click there, such as on the **Ask** tab, was lost when the
+  contribution replaced it. The workspace now says it is opening the
+  contribution until it arrives.
+
 ## [1.0.0-rc.1] - 2026-10-20
 
 The first public release candidate of BELL PR, open source under the

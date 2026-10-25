@@ -128,6 +128,8 @@ const workspace = {
   },
   /** Shared by the draft editor and the publish dialog. */
   loadingPreview: "Loading the preview…",
+  /** While the contribution a link or a reload names loads. */
+  loadingRun: "Opening the contribution…",
   changes: {
     files: "Changed files",
     searchPlaceholder: "Search files…",

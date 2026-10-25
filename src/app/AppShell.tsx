@@ -8,7 +8,7 @@ import {
   type CSSProperties,
   type SetStateAction,
 } from "react";
-import { Terminal, X } from "lucide-react";
+import { Loader2, Terminal, X } from "lucide-react";
 // Stylesheets enter the bundle in import order and later rules win ties.
 // These keep the order the single App component produced, before the
 // modules below pull the same files in a different order.
@@ -734,6 +734,11 @@ function AppShell({
   // an unsaved draft, or the server fails) leaves the address on the run
   // shown.
   const addressRunId = addressedRunId(route, sample.run.id);
+  // A link or a reload starts on the sample. Until the run the address names
+  // arrives, the workspace says so instead of showing the sample under that
+  // run's address, where a click would be lost when the run replaces it.
+  const addressRunLoading =
+    demo && !!addressRunId && addressRunId !== run.id && isRunId(addressRunId);
   const shownRunId = useRef(run.id);
   const loadingRunId = useRef<string | undefined>(undefined);
   const addressLoads = useRef(0);
@@ -1011,6 +1016,11 @@ function AppShell({
             openDiscovery={() => navigate("discovery")}
             chooseRun={chooseRun}
           />
+        ) : page === "workspace" && addressRunLoading ? (
+          <div className="empty-state" role="status">
+            <Loader2 className="spin" aria-hidden="true" />
+            <p>{workspaceMessages.loadingRun}</p>
+          </div>
         ) : page === "workspace" ? (
           <WorkspacePage
             run={run}
