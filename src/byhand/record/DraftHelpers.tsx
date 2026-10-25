@@ -30,9 +30,11 @@ export function DraftHelpers({ run, templates = [], onUseTemplate, alwaysDisclos
   const fmt = useFormat();
   const [chosen, setChosen] = useState(0);
   if (!run.learnByHand) return null;
-  const { provider, reported } = run.modelExecution ?? {};
+  // Records without a provider were created with Codex, which reports nothing.
+  const provider = run.modelExecution?.provider ?? "codex";
+  const reported = run.modelExecution?.reported;
   const facts = [
-    ...(provider ? [m.cli({ cli: `${providerLabels[provider]} ${reported?.cliVersion ?? ""}`.trim(), model: reported?.model })] : []),
+    m.cli({ cli: `${providerLabels[provider]} ${reported?.cliVersion ?? ""}`.trim(), model: reported?.model }),
     helpsLine(m, fmt, byHandSummary(run)),
     ...(byHandClean(run).clean ? [m.claim] : []),
     m.otherTools,

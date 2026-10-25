@@ -197,6 +197,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   failed. Now only an R3 hint and questions on your plan keep options, and
   you can only choose from an R3 hint's options.
 
+- **The guide's tool now appears in the facts list for Codex runs.** In a
+  Learn-by-hand run on Codex, the default, the "Your words" facts list left
+  out the line naming the tool the guide ran on, so your AI note had no
+  tool to cite. A Claude Code run did show that line. The list now says
+  "The guide ran on Codex; the CLI didn't report its model."
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

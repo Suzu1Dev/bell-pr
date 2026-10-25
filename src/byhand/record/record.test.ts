@@ -183,6 +183,15 @@ test("the facts list is shown and has no insert or copy control", () => {
   assert.ok(!one.includes("<select"));
 });
 
+test("the facts list names Codex for a run recorded without a provider, which Codex ran", () => {
+  const html = renderEn(createElement(DraftHelpers, { run: byHandRun({}, { modelExecution: { model: "gpt-5", source: "selected" } }), onUseTemplate: () => {} }));
+  // Codex reports no model, so the requested one is not passed off as reported.
+  assert.ok(html.includes(escape("The guide ran on Codex; the CLI didn't report its model.")));
+  assert.ok(!html.includes("gpt-5"));
+  const zh = renderZh(createElement(DraftHelpers, { run: byHandRun({}, { modelExecution: undefined }), onUseTemplate: () => {} }));
+  assert.ok(zh.includes("嚮導用的是 Codex；CLI 沒有回報它的模型。"));
+});
+
 test("several templates are picked from a list; none offers nothing; a published run can't insert one", () => {
   const templates = [
     { path: ".github/PULL_REQUEST_TEMPLATE/bug.md", content: "## Bug\n" },
