@@ -9,7 +9,11 @@ import { formatters } from "../shared/i18n/locale.js";
 import { modelArguments, modelExecutionSchema, modelId } from "./models.js";
 import { AppError } from "./types.js";
 import { redact } from "./secrets.js";
-import { agentReadDenials, enforceAgentSandbox } from "./sandbox.js";
+import {
+  agentReadDenials,
+  agentSandboxReadPaths,
+  enforceAgentSandbox,
+} from "./sandbox.js";
 import { cancelled, currentLocale, sm } from "./i18n/index.js";
 
 /** none: answer from the prompt only; read: inspect files; write: edit the working directory and run commands. */
@@ -92,13 +96,17 @@ function claudeAccess(access: AgentAccess, web: boolean): string[] {
  * reading credential files and BELL's data outside its checkout. Read-only
  * turns also refuse file reads outside the working directory. A write turn
  * with the sandbox runs every Bash command inside it: writes only in the
- * working directory, no network, and no way to step outside
+ * working directory, no reads in BELL's data directory outside its
+ * checkout, even of checkouts created during the turn (`filesystem`, see
+ * agentSandboxReadPaths), no network, and no way to step outside
  * (`allowUnsandboxedCommands: false`); `failIfUnavailable` stops the turn
  * instead of running unsandboxed if the sandbox cannot start after all.
  *
  * Keys verified against the settings schema bundled in Claude Code 2.1.292
  * (`permissions` and `sandbox` are passthrough objects there, so a key a
- * release does not know is ignored rather than rejected). Supported range:
+ * release does not know is ignored rather than rejected);
+ * `sandbox.filesystem.denyRead` and `allowRead` are in the schema since
+ * 2.1.114 at the latest, and both apply on Linux and macOS. Supported range:
  * Claude Code >= 2.1.292 and < 2.2; scripts/agent-sandbox-canary.mjs must
  * pass on a release before the range is widened.
  */
@@ -121,6 +129,7 @@ export function claudeSettings(options: {
             failIfUnavailable: true,
             autoAllowBashIfSandboxed: true,
             allowUnsandboxedCommands: false,
+            filesystem: agentSandboxReadPaths(options.cwd),
             network: { allowedDomains: [], strictAllowlist: true },
           },
         }

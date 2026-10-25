@@ -351,7 +351,14 @@ export function agentReadDenials(cwd: string): string[] {
       const rule = absoluteRule(resolved(directory), `/${file}`);
       if (rule) rules.push(rule);
     }
-  const dataDirectories = new Set(
+  for (const directory of dataDirectoriesFor(here))
+    rules.push(...dataDirectoryRules(directory, here));
+  return [...new Set(rules)];
+}
+
+/** Every data directory of BELL an agent working in `here` must not read. */
+function dataDirectoriesFor(here: string) {
+  return new Set(
     [
       agentDataDirectory,
       dataDirectoryOf(here),
@@ -361,7 +368,34 @@ export function agentReadDenials(cwd: string): string[] {
       .filter((value): value is string => !!value)
       .map((value) => resolved(value)),
   );
-  for (const directory of dataDirectories)
-    rules.push(...dataDirectoryRules(directory, here));
-  return [...new Set(rules)];
+}
+
+/**
+ * The `sandbox.filesystem` read paths for a sandboxed agent working in
+ * `cwd` (`//` starts an absolute path). The Read rules above can only list
+ * what exists when the turn starts, so a checkout or clone created during
+ * a long turn would stay readable. Here each data directory is denied
+ * whole, and a checkout inside one gets its own path and the Git directory
+ * of its clone opened again (allowRead wins over denyRead). Claude Code
+ * reads a path with glob characters as a pattern, so such a data directory
+ * is left to the Read rules.
+ */
+export function agentSandboxReadPaths(cwd: string) {
+  const here = resolved(cwd);
+  const denyRead: string[] = [];
+  const allowRead: string[] = [];
+  const literal = (value: string) => !/[*?[\]]/.test(value);
+  for (const root of dataDirectoriesFor(here)) {
+    const open: string[] = [];
+    if (root !== here && inside(here, root)) {
+      open.push(here);
+      const clone = owningClone(here);
+      const git = clone && path.join(clone, ".git");
+      if (git && inside(git, root)) open.push(git);
+    }
+    if (![root, ...open].every(literal)) continue;
+    denyRead.push(`/${root}`);
+    allowRead.push(...open.map((value) => `/${value}`));
+  }
+  return { denyRead: [...new Set(denyRead)], allowRead: [...new Set(allowRead)] };
 }

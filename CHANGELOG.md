@@ -231,6 +231,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Undo and Publish all refused to go on. Now the branch and files stay as
   they were, and you can press Sync or Undo again once the lock is gone.
 
+- **Checkouts created during a long agent turn stayed readable.** A Claude
+  write agent's sandboxed commands were kept out of BELL's data directory
+  only for the runs, tasks and clones that existed when its turn started,
+  so another project's checkout created during the turn could be read.
+  The sandbox now closes the whole data directory and opens only the
+  agent's own checkout and its clone's Git data.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

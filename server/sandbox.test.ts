@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { agentCommand } from "./agent-cli.js";
+import { agentCommand, claudeSettings } from "./agent-cli.js";
 import {
   agentReadDenials,
   allowUnsandboxedAgents,
@@ -342,6 +342,51 @@ test("agents are denied credentials and BELL's data outside their own checkout",
   assert.ok(agentReadDenials(checkout).includes(rule(`${data}/insights/**`)));
 });
 
+test("sandboxed commands cannot read checkouts and clones created after the turn started", async (t) => {
+  const base = await realpath(await mkdtemp(path.join(os.tmpdir(), "bell-sandbox-late-")));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  const data = path.join(base, "data");
+  const checkout = path.join(data, "worktrees", "run-1");
+  const clone = path.join(data, "repositories", "owner-project-1");
+  const gitDirectory = path.join(clone, ".git", "worktrees", "run-1");
+  for (const directory of [checkout, gitDirectory])
+    await mkdir(directory, { recursive: true });
+  await writeFile(path.join(checkout, ".git"), `gitdir: ${gitDirectory}\n`);
+  setAgentDataDirectory(data);
+  t.after(() => setAgentDataDirectory());
+
+  // Built once, when the turn starts.
+  const settings = claudeSettings({ cwd: checkout, access: "write", sandbox: true });
+  // Whether a Read rule or a sandbox path closes `target` and no allowRead entry opens it again.
+  const under = (target: string, entry: string) =>
+    target === entry || target.startsWith(`${entry}/`);
+  const closed = (target: string) => {
+    const rules = settings.permissions.deny
+      .map((rule) => rule.replace(/^Read\(\/(.*)\)$/, "$1").replace(/\/\*\*$/, ""))
+      .filter((entry) => !/[*?[\]]/.test(entry));
+    const filesystem = settings.sandbox?.filesystem;
+    const denied = [...rules, ...(filesystem?.denyRead ?? []).map((entry) => entry.slice(1))];
+    const opened = (filesystem?.allowRead ?? []).map((entry) => entry.slice(1));
+    return (
+      denied.some((entry) => under(target, entry)) &&
+      !opened.some((entry) => under(target, entry))
+    );
+  };
+  // A run, a teammate task and a project imported while the turn runs.
+  const late = [
+    path.join(data, "worktrees", "run-2"),
+    path.join(data, "team-worktrees", "run-2", "task-1"),
+    path.join(data, "repositories", "other-project-2"),
+  ];
+  for (const directory of late) await mkdir(directory, { recursive: true });
+  for (const directory of late) assert.ok(closed(path.join(directory, "secret.ts")), directory);
+  assert.ok(closed(path.join(data, "state.json")));
+  // The checkout and the Git directory of its clone stay readable.
+  assert.ok(!closed(path.join(checkout, "src", "index.ts")));
+  assert.ok(!closed(path.join(gitDirectory, "HEAD")));
+  assert.ok(!closed(path.join(clone, ".git", "objects")));
+});
+
 test("the sandbox canary's fake mode checks the harness without a model call", () => {
   const root = path.resolve(import.meta.dirname, "..");
   const run = (args: string[]) =>
@@ -371,10 +416,15 @@ test("the sandbox canary's fake mode checks the harness without a model call", (
         ["network", "blocked"],
         ["env-token", "blocked"],
         ["data-dir", "blocked"],
+        ["late-checkout", "blocked"],
+        ["own-checkout", result.provider === "claude" ? "succeeded" : "blocked"],
       ],
     );
   }
   assert.ok(report.results[0].argv.sandboxEnabled && report.results[0].argv.deniesDataDirectory);
+  assert.ok(
+    report.results[0].argv.sandboxDeniesDataDirectory && report.results[0].argv.sandboxOpensCheckout,
+  );
   assert.ok(report.results[3].argv.ignoresRules && report.results[3].argv.ignoresProjectDocs);
   // Without the hardening flags the stand-ins behave unsandboxed, and the canary fails.
   const stripped = run(["--fake", "--fake-strip"]);

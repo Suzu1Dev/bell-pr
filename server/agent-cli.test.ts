@@ -47,6 +47,7 @@ const settingsOf = (args: string[]) =>
       enabled: boolean;
       failIfUnavailable: boolean;
       allowUnsandboxedCommands: boolean;
+      filesystem: { denyRead: string[]; allowRead: string[] };
       network: { allowedDomains: string[]; strictAllowlist: boolean };
     };
   };
@@ -196,13 +197,17 @@ test("Claude Code arguments map access levels, inline the schema and keep MCP co
     settingsOf(read.args).permissions.blockReadsOutsideWorkingDirectories,
     true,
   );
-  assert.deepEqual(settingsOf(write.args).sandbox, {
+  const { filesystem, ...sandbox } = settingsOf(write.args).sandbox!;
+  assert.deepEqual(sandbox, {
     enabled: true,
     failIfUnavailable: true,
     autoAllowBashIfSandboxed: true,
     allowUnsandboxedCommands: false,
     network: { allowedDomains: [], strictAllowlist: true },
   });
+  // Outside BELL's data directory, sandboxed commands may read none of it.
+  assert.ok(filesystem.denyRead.length > 0);
+  assert.deepEqual(filesystem.allowRead, []);
   assert.equal(
     settingsOf(write.args).permissions.blockReadsOutsideWorkingDirectories,
     undefined,
