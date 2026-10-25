@@ -328,8 +328,8 @@ Details: [Privacy and your data](docs/privacy-and-data.md).
   willing to run on this computer.
 - **No sign-in.** BELL PR does not authenticate anyone. It listens on
   `127.0.0.1` by default, so only this computer can reach it. Anyone who can
-  reach its address can use everything it can do. Requests from other sites
-  are refused.
+  reach its address can use everything it can do. Other sites may link to
+  its page, but cannot call its API or frame it.
 - **Unsandboxed agents are an explicit opt-in.** Without the sandbox (for
   example in Docker with default settings), a Claude Code agent that edits
   files is refused. You can allow it under **Settings → Agent safety** or

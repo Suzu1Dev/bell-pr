@@ -36,8 +36,11 @@ what BELL PR trusts, what it does not, and the limits of each protection.
 - **Loopback by default.** BELL PR listens on `127.0.0.1`. Requests must name
   a trusted host (`localhost`, `127.0.0.1` or `[::1]` with BELL PR's port, or
   an origin in `BELLPR_ALLOWED_ORIGINS`), and a request from another origin,
-  or marked `Sec-Fetch-Site: cross-site`, is refused. Requests that change
-  data must send JSON, which a plain HTML form cannot.
+  or marked `Sec-Fetch-Site: cross-site`, is refused. The one exception is
+  opening the page itself, from a link on another site or a sign-in proxy's
+  redirect; other sites still cannot call the API, load BELL PR's files or
+  frame it. Requests that change data must send JSON, which a plain HTML
+  form cannot.
 - **Proxies.** `BELLPR_ALLOWED_ORIGINS` accepts plain HTTP only for loopback
   addresses; any other origin must be HTTPS, so requests and responses never
   cross a network in clear text. BELL PR does not authenticate, so a proxy in

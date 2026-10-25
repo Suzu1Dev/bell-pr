@@ -168,6 +168,48 @@ test("localhost guard allows only local hosts and origins and JSON mutations", a
       assert.equal(response.status, 403, JSON.stringify(headers));
       assert.match(JSON.parse(response.body).error, /\S/);
     }
+    // A link on another site, or a sign-in proxy's redirect back from its
+    // identity provider, opens the page itself. The API, subresources,
+    // frames and form posts from other sites stay refused.
+    const navigation = {
+      ...local,
+      "sec-fetch-site": "cross-site",
+      "sec-fetch-mode": "navigate",
+      "sec-fetch-dest": "document",
+    };
+    for (const path of ["/", "/runs/x"]) {
+      assert.equal((await send(navigation, { path })).status, 200, path);
+    }
+    for (const { headers, ...options } of [
+      { headers: navigation, path: "/api/repos" },
+      { headers: navigation, path: "/API/health" },
+      { headers: { ...navigation, "sec-fetch-dest": "iframe" }, path: "/" },
+      {
+        headers: {
+          ...navigation,
+          "sec-fetch-mode": "no-cors",
+          "sec-fetch-dest": "script",
+        },
+        path: "/",
+      },
+      {
+        headers: {
+          ...navigation,
+          "sec-fetch-mode": "cors",
+          "sec-fetch-dest": "empty",
+        },
+        path: "/",
+      },
+      {
+        headers: { ...navigation, "content-type": "application/json" },
+        method: "POST",
+        path: "/",
+        body: "{}",
+      },
+    ]) {
+      const response = await send(headers, options);
+      assert.equal(response.status, 403, JSON.stringify({ headers, options }));
+    }
     for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
       assert.equal(
         (await send(json, { method, body: "{}" })).status,

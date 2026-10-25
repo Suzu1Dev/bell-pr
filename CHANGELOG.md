@@ -129,6 +129,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   ended. The region now stays on screen and only its text changes, and the
   section stops being marked busy once the progress steps show.
 
+- **Links from other sites open BELL PR.** Following a link to BELL PR from
+  another site, or arriving through a sign-in proxy's redirect from its
+  identity provider, showed a raw "Cross-origin requests are not allowed"
+  error instead of the interface. The page now opens. Other sites still
+  cannot call the API, load its files or put it in a frame.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

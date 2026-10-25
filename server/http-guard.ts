@@ -86,8 +86,17 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Content-Security-Policy", contentSecurityPolicy);
     res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
-    const api = req.path === "/api" || req.path.startsWith("/api/");
+    // Express matches routes without regard to case, so /API/repos is API too.
+    const api = /^\/api(?:\/|$)/i.test(req.path);
     if (api) res.setHeader("Cache-Control", "no-store");
+    // Opening the page from a link on another site, or through a sign-in
+    // proxy's redirect back from its identity provider. Framing is refused
+    // by the headers above.
+    const pageNavigation =
+      (req.method === "GET" || req.method === "HEAD") &&
+      !api &&
+      req.get("sec-fetch-mode") === "navigate" &&
+      req.get("sec-fetch-dest") === "document";
     const host = (req.headers.host ?? "").toLowerCase();
     if (!allowedHosts.has(host)) {
       res.status(403).json({ error: sm().common.hostNotAllowed });
@@ -100,7 +109,7 @@ export function localhostGuard(opts: GuardOptions): RequestHandler {
           (localHosts.has(host) && localOrigins.has(origin)) ||
           (allowedOrigins.has(origin) && new URL(origin).host === host)
         )) ||
-      req.get("sec-fetch-site") === "cross-site"
+      (req.get("sec-fetch-site") === "cross-site" && !pageNavigation)
     ) {
       res.status(403).json({ error: sm().common.crossOriginNotAllowed });
       return;
