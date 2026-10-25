@@ -6,6 +6,7 @@
  * screen. The panels themselves are the draft workstream's components.
  */
 import type { ComponentProps } from "react";
+import { splitLimits } from "../../shared/split";
 import type { RunUnderstanding } from "../../shared/understanding";
 import { getDemo } from "../demo";
 import { ByHandHelpers } from "../draft/ByHandHelpers";
@@ -99,7 +100,7 @@ export function Reviewability({
   onSplit?(): void;
 }) {
   const snapshot = changesOf(run, files, repo, useSample(demo));
-  // A contribution is split while it is open for review: not the sample, not learn-by-hand, not published or being published, not already split, workspace present, and two files at least to divide.
+  // A contribution is split while it is open for review: not the sample, not learn-by-hand, not published or being published, not already split, workspace present, and two files at least that can move (held-back files stay put).
   const splittable =
     !demo &&
     !run.learnByHand &&
@@ -109,7 +110,7 @@ export function Reviewability({
     !run.splitInto?.length &&
     !run.workspaceRemovedAt &&
     (run.status === "review" || run.status === "approved") &&
-    files.length >= 2;
+    files.filter((file) => !file.blocked).length >= splitLimits.minContributions;
   return (
     <ReviewabilitySnapshot
       snapshot={snapshot}

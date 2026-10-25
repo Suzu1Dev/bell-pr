@@ -95,4 +95,7 @@ test("an open contribution of two files or more offers to split; the sample, lea
   assert.doesNotMatch(card({ prUrl: "https://github.com/octo/widgets/pull/9" }), /Split into contributions/);
   assert.doesNotMatch(card({ workspaceRemovedAt: "2026-10-20T09:00:00.000Z" }), /Split into contributions/);
   assert.doesNotMatch(card({}, demo.files.slice(0, 1)), /Split into contributions/);
+  // A held-back file cannot move, so two files with one held back leave nothing to divide.
+  const [first, second] = demo.files;
+  assert.doesNotMatch(card({}, [first!, { ...second!, blocked: "sensitive path" }]), /Split into contributions/);
 });

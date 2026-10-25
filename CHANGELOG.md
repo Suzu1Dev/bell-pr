@@ -111,6 +111,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   joined independent fixes into one part, so the split suggestion found
   nothing to split and a split copied the task into every new
   contribution. Such a task now owns no file.
+
+- **Split offered with a held-back file.** With two changed files, one of
+  them held back (binary, sensitive path or a secret), the Draft tab still
+  offered "Split into contributions", but the dialog could never be
+  submitted. The split is now offered only when two files or more can move.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files
