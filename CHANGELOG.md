@@ -159,6 +159,14 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   The run now ends cancelled. A plan or outline that was already written
   is kept, so Retry takes you back to the approval step.
 
+- **Retried tasks no longer carry the discarded attempt's checks.** When a
+  failed team task was retried, the commands BELL had seen its first attempt
+  run (such as "npm test -> exit 0") stayed on the board. The lead and the
+  test analyst were shown them as evidence for the new diff, and a first
+  attempt that had hit the 40-command limit kept the retry from recording
+  any commands. A retried task now shows only the commands the new attempt
+  runs. Completed tasks keep theirs.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

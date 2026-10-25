@@ -56,6 +56,7 @@ export async function retryTeam(
       delete task.worktreeRemoved;
       delete task.baseSha;
       delete task.report;
+      delete task.checks; // They ran on the discarded edits.
       delete task.startedAt;
       delete task.completedAt;
       delete task.acceptsMessages;

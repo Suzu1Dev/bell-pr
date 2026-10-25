@@ -1135,6 +1135,10 @@ test("retrying a failed run reruns only the failed task with the previous error 
       /已停止工作/,
     );
 
+    // Commands observed in the discarded attempt are not evidence for the retry.
+    alpha.checks = [{ command: "npm test -- a.test.ts", outcome: "exit 0" }];
+    beta.checks = [{ command: "npm test", outcome: "exit 0" }];
+
     scenario.state.compliant = true;
     const retried = await f.workbench.retryTeam(run.id, "只改 b.ts");
     // drain() starts the job synchronously, so the run may already be running.
@@ -1175,6 +1179,10 @@ test("retrying a failed run reruns only the failed task with the previous error 
     assert.equal(beta.error, undefined);
     assert.equal(beta.status, "complete");
     assert.equal(beta.worktreeRemoved, true);
+    assert.equal(beta.checks, undefined);
+    assert.deepEqual(alpha.checks, [
+      { command: "npm test -- a.test.ts", outcome: "exit 0" },
+    ]);
     assert.deepEqual(
       (await readDiff(run)).map((file) => file.path),
       ["a.ts", "b.ts"],
