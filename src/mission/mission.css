@@ -259,10 +259,9 @@
 .mission-journey {
   padding: 3px 0;
 }
+/* One step per row, the number beside the text: any number of steps, and a long one, reads the same. */
 .mission-journey ol {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -272,28 +271,26 @@
   overflow: hidden;
 }
 .mission-journey li {
-  position: relative;
-  padding: 20px 25px 20px 18px;
-  border-right: 1px solid var(--color-border-subtle);
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 .mission-journey li:last-child {
-  border-right: none;
+  border-bottom: none;
 }
 .mission-journey-number {
   font: 500 var(--text-xs)/1.4 var(--font-mono);
   color: var(--color-accent-600);
 }
 .mission-journey p {
+  margin: 0;
   font-size: var(--text-md);
   line-height: 1.85;
-  margin-top: 10px;
   color: var(--color-text-secondary);
-}
-.mission-journey li > svg {
-  position: absolute;
-  top: 21px;
-  right: 10px;
-  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
 }
 .mission-reading-path {
   padding: 3px 0;
@@ -1766,25 +1763,6 @@
   .mission-change-arrow {
     height: 31px;
     transform: rotate(90deg);
-  }
-  .mission-journey ol {
-    grid-template-columns: 1fr;
-  }
-  .mission-journey li {
-    border-right: 0;
-    border-bottom: 1px solid var(--color-border-subtle);
-    padding: 17px 20px;
-  }
-  .mission-journey li:last-child {
-    border-bottom: none;
-  }
-  .mission-journey li > svg {
-    top: 21px;
-    right: 19px;
-    transform: rotate(90deg);
-  }
-  .mission-journey p {
-    margin-top: 5px;
   }
   .mission-detail-count {
     display: none;

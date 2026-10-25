@@ -879,9 +879,6 @@ export function ProjectOverview({
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <p>{step}</p>
-                {index < insights.userJourney.length - 1 && (
-                  <ChevronRight size={16} aria-hidden="true" />
-                )}
               </li>
             ))}
           </ol>

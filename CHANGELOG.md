@@ -37,6 +37,9 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   shows them beside the title as two short lines, with the export as an
   icon, instead of a line below it. The code gets that line; a narrower
   window and the sample keep the line below.
+- **How people use it.** The project overview lists the steps one per row,
+  numbered, instead of side by side, so ten steps or a long one no longer
+  crowd or break the row.
 - **Rejected analysis.** When BELL PR rejects an AI analysis as incomplete,
   the server log's `agent.output_retry` line now names the fields that did
   not fit and why (for example `recommendations: too_big`), never their
