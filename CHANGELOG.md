@@ -225,6 +225,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   missing or half-made folder. Now a failed or cancelled checkout removes its
   branch and files, and the next attempt makes the worktree again.
 
+- **Sync and Undo no longer leave a run stuck.** If the run's checkout could
+  not be updated, for example because your editor or terminal Git held the
+  index lock, Sync or Undo moved the run's branch anyway. After that, Sync,
+  Undo and Publish all refused to go on. Now the branch and files stay as
+  they were, and you can press Sync or Undo again once the lock is gone.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

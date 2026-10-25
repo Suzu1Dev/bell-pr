@@ -385,6 +385,99 @@ test("a sync whose conflicts cannot be marked, or after a publish that stopped h
   }
 });
 
+test("a sync or undo that another Git's index lock stops leaves the run where it was, to press again", async () => {
+  const f = await unpublishedRun();
+  try {
+    await f.write("hello.ts", "line one\nline two, mine\nline three\n");
+    const oldBase = f.run.baseSha;
+    const upstream = await f.github.upstreamCommit({ "other.ts": "other, upstream\n" });
+    const head = async () => (await git(f.run.worktreePath, ["rev-parse", "HEAD"])).stdout.trim();
+    // The person's editor or terminal Git holds the checkout's index.
+    const lock = path.resolve(
+      f.run.worktreePath,
+      (await git(f.run.worktreePath, ["rev-parse", "--git-path", "index.lock"])).stdout.trim(),
+    );
+    await writeFile(lock, "");
+    await assert.rejects(f.workbench.syncRun(f.run.id));
+    assert.equal(await head(), oldBase);
+    assert.equal(f.run.baseSha, oldBase);
+    assert.equal(f.run.sync, undefined);
+    assert.equal(await f.read("hello.ts"), "line one\nline two, mine\nline three\n");
+    assert.equal(await f.read("other.ts"), "other\n");
+    await rm(lock);
+    assert.equal((await f.workbench.syncRun(f.run.id)).updated, true);
+    assert.equal(await head(), upstream);
+    assert.equal(f.run.baseSha, upstream);
+    await writeFile(lock, "");
+    await assert.rejects(f.workbench.undoSync(f.run.id));
+    assert.equal(await head(), upstream);
+    assert.equal(f.run.baseSha, upstream);
+    assert.ok(f.run.sync);
+    assert.equal(await f.read("other.ts"), "other, upstream\n");
+    await rm(lock);
+    await f.workbench.undoSync(f.run.id);
+    assert.equal(await head(), oldBase);
+    assert.equal(f.run.baseSha, oldBase);
+    assert.equal(f.run.sync, undefined);
+    assert.equal(await f.read("hello.ts"), "line one\nline two, mine\nline three\n");
+    assert.equal(await f.read("other.ts"), "other\n");
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a sync whose index another Git takes once the branch has moved is kept, and its unlabelled conflicts still block approval", async () => {
+  const f = await unpublishedRun();
+  const previousPath = process.env.PATH;
+  try {
+    await f.write("hello.ts", "line one\nline two, mine\nline three\n");
+    const oldBase = f.run.baseSha;
+    const upstream = await f.github.upstreamCommit({
+      "hello.ts": "line one\nline two, theirs\nline three\n",
+      "other.ts": "other, upstream\n",
+    });
+    const head = async () => (await git(f.run.worktreePath, ["rev-parse", "HEAD"])).stdout.trim();
+    const lock = path.resolve(
+      f.run.worktreePath,
+      (await git(f.run.worktreePath, ["rev-parse", "--git-path", "index.lock"])).stdout.trim(),
+    );
+    // The person's editor starts a `git status` just before BELL sets the
+    // checkout's index to the new base.
+    const bin = await mkdtemp(path.join(f.directory, "git-bin-"));
+    await writeFile(
+      path.join(bin, "git"),
+      `#!/bin/sh\ncase " $* " in\n  *" read-tree ${upstream} ") : > '${lock}' ;;\nesac\nPATH="\${PATH#*${path.delimiter}}" exec git "$@"\n`,
+      { mode: 0o755 },
+    );
+    process.env.PATH = `${bin}${path.delimiter}${previousPath}`;
+    await assert.rejects(f.workbench.syncRun(f.run.id));
+    process.env.PATH = previousPath;
+    await rm(lock);
+    // HEAD and the files are on the new base, and so is the run.
+    assert.equal(await head(), upstream);
+    assert.equal(f.run.baseSha, upstream);
+    assert.deepEqual(f.run.sync?.conflicts, ["hello.ts"]);
+    assert.equal(await f.read("other.ts"), "other, upstream\n");
+    assert.deepEqual((await readDiff(f.run)).map((file) => file.path), ["hello.ts"]);
+    // The markers keep their commit ids, and still block approval and a further sync.
+    assert.match(await f.read("hello.ts"), /^<<<<<<< [0-9a-f]{40,64}$/m);
+    await f.reviewAll();
+    await assert.rejects(
+      f.workbench.approve(f.run.id, { ...f.run.draft }),
+      (error: AppError) => error.statusCode === 409 && /hello\.ts/.test(error.message),
+    );
+    await assert.rejects(f.workbench.syncRun(f.run.id), /衝突標記：hello\.ts/);
+    await f.workbench.undoSync(f.run.id);
+    assert.equal(await head(), oldBase);
+    assert.equal(f.run.baseSha, oldBase);
+    assert.equal(await f.read("hello.ts"), "line one\nline two, mine\nline three\n");
+    assert.equal(await f.read("other.ts"), "other\n");
+  } finally {
+    process.env.PATH = previousPath;
+    await f.cleanup();
+  }
+});
+
 test("a sync honours the conflict-marker-size attribute of the checkout", async () => {
   const f = await unpublishedRun();
   try {

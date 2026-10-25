@@ -10,7 +10,7 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { git, redact } from "./process.js";
+import { assertGitConfigSafe, git, redact } from "./process.js";
 import { AppError, withRunLocale, type Run } from "./types.js";
 import { activeFollowUp, type FollowUpRound } from "../shared/followups.js";
 import {
@@ -144,17 +144,39 @@ async function syncRunLocked(ctx: WorkbenchContext, id: string) {
       `refs/bellpr/sync/${run.id}`,
       snapshot,
     ]);
-    await git(run.worktreePath, [
-      "update-ref",
-      `refs/heads/${run.branch}`,
-      target,
-      head,
-    ]);
-    await checkoutTreeOnto(run.worktreePath, merged.tree, target);
-    await labelConflictMarkers(run.worktreePath, merged.conflicts, {
-      [target]: `latest ${run.baseBranch} (${target.slice(0, 7)})`,
-      [snapshot]: "this contribution",
-    });
+    // The files change before the branch moves: another Git holding the
+    // checkout's index (an editor, a terminal `git status`) stops the sync
+    // here with nothing changed, so it can be pressed again.
+    await assertGitConfigSafe(run.worktreePath);
+    await git(run.worktreePath, ["read-tree", "-u", "--reset", merged.tree]);
+    try {
+      await git(run.worktreePath, [
+        "update-ref",
+        `refs/heads/${run.branch}`,
+        target,
+        head,
+      ]);
+    } catch (error) {
+      await checkoutTreeOnto(
+        run.worktreePath,
+        `${snapshot}^{tree}`,
+        head,
+      ).catch(() => undefined);
+      throw error;
+    }
+    // HEAD and the files now agree on the new base, so the sync is recorded
+    // even if the index or the labels cannot be finished: unlabelled
+    // markers are still conflict markers and keep blocking approval.
+    let unfinished: unknown;
+    try {
+      await git(run.worktreePath, ["read-tree", target]);
+      await labelConflictMarkers(run.worktreePath, merged.conflicts, {
+        [target]: `latest ${run.baseBranch} (${target.slice(0, 7)})`,
+        [snapshot]: "this contribution",
+      });
+    } catch (error) {
+      unfinished = error;
+    }
     run.sync = {
       at: now(),
       from: run.baseSha,
@@ -177,6 +199,7 @@ async function syncRunLocked(ctx: WorkbenchContext, id: string) {
       }),
     );
     await ctx.store.save();
+    if (unfinished !== undefined) throw unfinished;
     return { run, updated: true, conflicts: merged.conflicts };
   });
 }
@@ -314,13 +337,16 @@ async function undoSyncLocked(ctx: WorkbenchContext, id: string) {
     ).stdout.trim();
     if (head !== run.baseSha)
       throw new AppError((m) => m.run.sync.baseMismatchUndo, 409);
+    // The files go back before the branch moves: if another Git holds the
+    // checkout's index, HEAD stays on the synced base and Undo can be
+    // pressed again.
+    await checkoutTreeOnto(run.worktreePath, `${sync.snapshot}^{tree}`, sync.from);
     await git(run.worktreePath, [
       "update-ref",
       `refs/heads/${run.branch}`,
       sync.from,
       head,
     ]);
-    await checkoutTreeOnto(run.worktreePath, `${sync.snapshot}^{tree}`, sync.from);
     await git(run.worktreePath, ["update-ref", "-d", `refs/bellpr/sync/${run.id}`]);
     run.baseSha = sync.from;
     // Marks come back for files whose diff is the one reviewed before the sync.
