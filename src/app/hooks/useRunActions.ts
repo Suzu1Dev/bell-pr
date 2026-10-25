@@ -691,6 +691,8 @@ export function useRunActions({
       notify(t.demoPlaybackStarted);
       return;
     }
+    // The new run replaces the open one, and with it the draft edits.
+    if (draftDirty && !window.confirm(t.discardDraftConfirm)) return;
     setBusy(true);
     setFormError("");
     try {

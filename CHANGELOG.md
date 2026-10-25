@@ -184,6 +184,12 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   run's files, and unsaved draft edits on it were lost. Now the open run
   stays as it is, and you still get the "PR created" notice.
 
+- **Starting a new task asks before dropping unsaved PR draft edits.**
+  Submitting the New task dialog for a real project replaced the open run
+  and threw away unsaved edits to its PR draft without a word. Now it first
+  asks whether to discard them, the way opening another run already does;
+  keeping them leaves the dialog open.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

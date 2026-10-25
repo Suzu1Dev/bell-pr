@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test, { mock } from "node:test";
-import { act, createElement } from "react";
+import { act, createElement, type FormEvent } from "react";
 import { assertNoHan } from "../../test-utils/render";
 import { mount } from "../../mission/test-dom";
 import en from "../../i18n/en";
@@ -487,6 +487,43 @@ test("a PR created after the person opened another run leaves that run on screen
     // Run B stays open, with its own files; the PR is still announced.
     assert.deepEqual(shell.shown, []);
     assert.deepEqual(shell.notices, [en.workspace.notices.prCreated]);
+  } finally {
+    await shell.unmount();
+  }
+});
+
+test("starting a task on a project asks before discarding the open run's unsaved draft", async (t) => {
+  const realFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = realFetch;
+  });
+  const reviewing: Run = { ...base, id: "run-a", status: "review" };
+  const created: Run = { ...base, id: "run-new", repoId: "repo-2", status: "queued" };
+  const asked: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    asked.push(`${init?.method ?? "GET"} ${String(input)}`);
+    return respond({ run: created });
+  }) as typeof fetch;
+  const shell = await mountActions(reviewing, { draftDirty: true });
+  const questions: string[] = [];
+  let keep = true;
+  window.confirm = (message?: string) => {
+    questions.push(message ?? "");
+    return !keep;
+  };
+  const submit = { preventDefault() {} } as FormEvent;
+  try {
+    // Keeping the edits starts nothing, and run A stays open.
+    await act(() => shell.actions().startTask(submit));
+    assert.deepEqual(questions, [en.workspace.notices.discardDraftConfirm]);
+    assert.deepEqual(asked, []);
+    assert.equal(shell.shown.length, 0);
+    // Discarding them starts the task and opens it.
+    keep = false;
+    await act(() => shell.actions().startTask(submit));
+    assert.equal(questions.length, 2);
+    assert.deepEqual(asked, ["POST /api/runs"]);
+    assert.deepEqual(shell.shown.map((run) => run.id), ["run-new"]);
   } finally {
     await shell.unmount();
   }
