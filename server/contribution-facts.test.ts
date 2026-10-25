@@ -1,7 +1,7 @@
 // The respect facts against a fake GitHub (test/fake-github.ts): the
 // project's rules and door at import, the run's live facts at publish, the
-// ways a read fails, and GitHub's open-PR cap. gh is the fake's, first on
-// PATH; nothing reaches the network.
+// ways a read fails, GitHub's open-PR cap, and a PR whose creation gh lost.
+// gh is the fake's, first on PATH; nothing reaches the network.
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import { appendFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -466,6 +466,75 @@ test("GitHub's limit on open pull requests is explained in plain words", async (
     );
     assert.equal(f.run.status, "approved");
     assert.match(f.run.error ?? "", /GitHub limits how many pull requests/);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a publish retry records the PR GitHub opened when gh lost its answer, never a second one", async () => {
+  const f = await githubProject({ prCreate: "lost" });
+  try {
+    await f.approve();
+    await assert.rejects(
+      withLocale("en", () => f.workbench.publish(f.run.id, f.run.approvedFingerprint!)),
+      /context deadline exceeded/,
+    );
+    assert.equal(f.run.status, "approved");
+    assert.equal(f.run.prUrl, undefined);
+    // gh answers normally again; the PR from the first attempt is open on GitHub.
+    await f.github.setFacts({});
+    await withLocale("en", () => f.workbench.publish(f.run.id, f.run.approvedFingerprint!));
+    assert.equal(f.run.status, "published");
+    assert.equal(f.run.prUrl, "https://github.com/test-owner/example/pull/1");
+    const calls = await f.github.calls();
+    const list = calls.filter((call) => call[0] === "gh" && call[2] === "list").at(-1)!;
+    assert.equal(list[list.indexOf("--head") + 1], f.run.publishedBranch);
+    assert.equal(calls.filter((call) => call[0] === "gh" && call[2] === "create").length, 1);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a publish retry records the lost PR before the pace check counts it as another open PR", async () => {
+  const f = await githubProject({ door: { viewerPermission: "READ" }, pacing: { open: 1, merged: 0 }, prCreate: "lost" });
+  try {
+    await f.approve();
+    await assert.rejects(
+      withLocale("en", () => f.workbench.publish(f.run.id, f.run.approvedFingerprint!, ["pacing"])),
+      /context deadline exceeded/,
+    );
+    // GitHub now counts the PR from the first attempt: 2 open, the most for a budget of 1.
+    await f.github.setFacts({ door: { viewerPermission: "READ" }, pacing: { open: 2, merged: 0 } });
+    await withLocale("en", () => f.workbench.publish(f.run.id, f.run.approvedFingerprint!, ["pacing"]));
+    assert.equal(f.run.status, "published");
+    assert.equal(f.run.prUrl, "https://github.com/test-owner/example/pull/1");
+    assert.equal(f.run.error, undefined);
+    const calls = await f.github.calls();
+    assert.equal(calls.filter((call) => call[0] === "gh" && call[2] === "create").length, 1);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("a publish retry does not take the lost PR once the approved changes differ from its commit", async () => {
+  const f = await githubProject({ prCreate: "lost" });
+  try {
+    await f.approve();
+    await assert.rejects(
+      withLocale("en", () => f.workbench.publish(f.run.id, f.run.approvedFingerprint!)),
+      /context deadline exceeded/,
+    );
+    await writeFile(path.join(f.run.worktreePath, "hello.ts"), "export const hello = 3;\n");
+    for (const file of await readDiff(f.run))
+      await f.workbench.review(f.run.id, file.path, true, file.fingerprint);
+    await f.workbench.approve(f.run.id, { ...f.run.draft });
+    await f.github.setFacts({});
+    await assert.rejects(
+      withLocale("en", () => f.workbench.publish(f.run.id, f.run.approvedFingerprint!)),
+      /An earlier publish made a different commit/,
+    );
+    assert.equal(f.run.status, "approved");
+    assert.equal(f.run.prUrl, undefined);
   } finally {
     await f.cleanup();
   }

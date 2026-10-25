@@ -253,6 +253,13 @@ and BELL PR follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Escape also folds it and puts the focus back on its heading, without
   also leaving focus mode.
 
+- **Retrying a publish finds the PR it already opened.** If GitHub opened
+  the draft PR but BELL PR never got the answer (for example, gh timed out
+  or the server stopped), every retry failed with "a pull request for branch
+  ... already exists" and the run never got the PR's link. A retry now finds
+  that open PR on the pushed branch and records it, and does not try to
+  open a second one.
+
 ### Security
 
 - **zod 4.** The server validates requests, agent answers and saved files

@@ -38,8 +38,12 @@ export interface FakeFacts {
   accountDefaults?: Record<string, string>;
   /** Reads that fail, by name. */
   fail?: Partial<Record<"door" | "doorGraph" | "issue" | "pacing" | "viewer" | "accountDefaults", FakeFailure>>;
-  /** `pr create` meets GitHub's limit on open pull requests. */
-  prCreate?: "cap";
+  /**
+   * `pr create` meets GitHub's limit on open pull requests (`cap`), or
+   * GitHub opens the PR but gh exits with an error before printing its
+   * address (`lost`, as when gh times out).
+   */
+  prCreate?: "cap" | "lost";
 }
 
 export interface FakeGitHub {
@@ -197,17 +201,27 @@ else if (args[0] === 'api' && /\\/pulls\\/\\d+\\/commits$/.test(args[1])) {
   if (pr) console.log(git('rev-list', '--reverse', pr.base + '..refs/heads/' + pr.branch));
 } else if (args[0] === 'repo' && args[1] === 'view') console.log(JSON.stringify({ viewerPermission: 'WRITE', defaultBranchRef: { name: ${JSON.stringify(defaultBranch)} } }));
 else if (args[0] === 'pr' && args[1] === 'list') {
-  const branch = value('--head').split(':')[1];
-  console.log(JSON.stringify(prs().filter((pr) => pr.branch === branch && pr.state === 'OPEN').map((pr) => ({ url: pr.url, headRefOid: git('rev-parse', 'refs/heads/' + pr.branch) }))));
+  // Like gh, --head matches the branch name alone: "<owner>:<branch>" matches nothing.
+  const branch = value('--head');
+  console.log(JSON.stringify(prs().filter((pr) => pr.branch === branch && pr.state === 'OPEN').map((pr) => ({ url: pr.url, headRefOid: git('rev-parse', 'refs/heads/' + pr.branch), headRepositoryOwner: { login: pr.headOwner } }))));
 } else if (args[0] === 'pr' && args[1] === 'create' && facts.prCreate === 'cap') {
   console.error(${JSON.stringify(prCapMessage)});
   process.exit(1);
 } else if (args[0] === 'pr' && args[1] === 'create') {
   const list = prs();
+  const [headOwner, branch] = value('--head').split(':');
+  if (list.some((pr) => pr.branch === branch && pr.state === 'OPEN')) {
+    console.error('a pull request for branch "' + value('--head') + '" into branch "' + value('--base') + '" already exists');
+    process.exit(1);
+  }
   const number = list.length + 1;
   const url = 'https://github.com/${owner}/${name}/pull/' + number;
-  list.push({ number, url, branch: value('--head').split(':')[1], base: git('rev-parse', 'refs/heads/' + value('--base')), state: 'OPEN' });
+  list.push({ number, url, branch, headOwner, base: git('rev-parse', 'refs/heads/' + value('--base')), state: 'OPEN' });
   fs.writeFileSync(${JSON.stringify(prs)}, JSON.stringify(list));
+  if (facts.prCreate === 'lost') {
+    console.error('gh: context deadline exceeded');
+    process.exit(1);
+  }
   console.log(url);
 } else if (args[0] === 'pr' && args[1] === 'view') console.log(prs().find((pr) => pr.url === args[2])?.state ?? 'CLOSED');
 else process.exit(97);

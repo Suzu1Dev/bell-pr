@@ -455,6 +455,37 @@ export async function publish(
         409,
       );
     assertRefName(headBranch);
+    // An earlier attempt pushed and may have opened the PR without hearing
+    // back (gh timed out, the server stopped). That PR is recorded before
+    // the checks below, which would count it as one more of the person's
+    // open PRs and could refuse the retry. A failed lookup, or a commit this
+    // publish would no longer make, is left to the full publish below.
+    if (resumesPublish(run)) {
+      let prUrl: string | undefined;
+      try {
+        await assertPriorCommit(
+          run,
+          run.publishCommit,
+          await reviewedTree(ctx, run, files),
+        );
+        prUrl = await openPrUrl(
+          repo.fullName,
+          run.publishedBranch,
+          run.headRepository.split("/")[0],
+          run.publishCommit,
+        );
+      } catch {
+        // The full publish checks the same again and records what failed.
+      }
+      if (prUrl) {
+        run.prUrl = prUrl;
+        run.status = "published";
+        delete run.error;
+        ctx.log(run, "system", sm().run.publish.prCreated);
+        await ctx.store.save();
+        return run;
+      }
+    }
     // A block the person lifted with a reason counts for this publish, and
     // is recorded on the run once publishing goes ahead (below); a reason
     // already recorded, as on a retry, is not added again.
@@ -566,18 +597,8 @@ export async function publish(
 
       const tree = await reviewedTree(ctx, run, files);
       let commit = run.publishCommit;
-      if (commit) {
-        const priorTree = (
-          await git(run.worktreePath, ["rev-parse", `${commit}^{tree}`])
-        ).stdout.trim();
-        if (priorTree !== tree)
-          throw new AppError((m) => m.run.publish.priorCommitDiffers, 409);
-        const priorMessage = (
-          await git(run.worktreePath, ["log", "-1", "--format=%B", commit])
-        ).stdout.trim();
-        if (priorMessage !== (run.draft.commitMessage?.trim() || run.draft.title))
-          throw new AppError((m) => m.run.publish.priorMessageDiffers, 409);
-      } else {
+      if (commit) await assertPriorCommit(run, commit, tree);
+      else {
         commit = (
           await git(
             run.worktreePath,
@@ -646,23 +667,7 @@ export async function publish(
       run.publishedBranch = headBranch;
       await ctx.store.save();
       const headRef = `${headOwner}:${headBranch}`;
-      const existing = json<{ url: string; headRefOid: string }[]>(
-        (
-          await command("gh", [
-            "pr",
-            "list",
-            "--repo",
-            repo.fullName,
-            "--head",
-            headRef,
-            "--state",
-            "open",
-            "--json",
-            "url,headRefOid",
-          ])
-        ).stdout,
-      );
-      let prUrl = existing.find((pr) => pr.headRefOid === commit)?.url;
+      let prUrl = await openPrUrl(repo.fullName, headBranch, headOwner, commit);
       if (!prUrl) {
         const result = await command(
           "gh",
@@ -902,6 +907,82 @@ async function publishFollowUp(
     await ctx.store.save();
   }
   return run;
+}
+
+/**
+ * Whether an earlier attempt pushed this run's commit but recorded no PR,
+ * which GitHub may have opened all the same (gh timed out, the server
+ * stopped). publish() looks for that PR before its checks.
+ */
+export function resumesPublish(
+  run: Run,
+): run is Run &
+  Required<Pick<Run, "publishCommit" | "publishedBranch" | "headRepository">> {
+  return (
+    !run.prUrl &&
+    !!run.publishCommit &&
+    !!run.publishedBranch &&
+    !!run.headRepository
+  );
+}
+
+/**
+ * Refuses when the commit of an earlier publish, which may already be on
+ * GitHub, is not the one this publish would make: its tree is not the
+ * reviewed tree, or its message is not the saved one.
+ */
+async function assertPriorCommit(run: Run, commit: string, tree: string) {
+  const priorTree = (
+    await git(run.worktreePath, ["rev-parse", `${commit}^{tree}`])
+  ).stdout.trim();
+  if (priorTree !== tree)
+    throw new AppError((m) => m.run.publish.priorCommitDiffers, 409);
+  const priorMessage = (
+    await git(run.worktreePath, ["log", "-1", "--format=%B", commit])
+  ).stdout.trim();
+  if (priorMessage !== (run.draft.commitMessage?.trim() || run.draft.title))
+    throw new AppError((m) => m.run.publish.priorMessageDiffers, 409);
+}
+
+/**
+ * The address of the open PR on `repoFullName` whose head is `commit` on
+ * `branch` of `headOwner`'s repository, if there is one. gh pr list --head
+ * takes the branch name alone ("<owner>:<branch>" matches nothing), so the
+ * owner is checked here.
+ */
+async function openPrUrl(
+  repoFullName: string,
+  branch: string,
+  headOwner: string,
+  commit: string,
+) {
+  const open = json<
+    {
+      url: string;
+      headRefOid: string;
+      headRepositoryOwner?: { login: string } | null;
+    }[]
+  >(
+    (
+      await command("gh", [
+        "pr",
+        "list",
+        "--repo",
+        repoFullName,
+        "--head",
+        branch,
+        "--state",
+        "open",
+        "--json",
+        "url,headRefOid,headRepositoryOwner",
+      ])
+    ).stdout,
+  );
+  return open.find(
+    (pr) =>
+      pr.headRefOid === commit &&
+      pr.headRepositoryOwner?.login.toLowerCase() === headOwner.toLowerCase(),
+  )?.url;
 }
 
 /**

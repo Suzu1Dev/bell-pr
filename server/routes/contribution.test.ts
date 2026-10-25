@@ -195,6 +195,25 @@ test("the publish dialog refreshes the run's facts on its own call; the prefligh
   assert.equal((await f.call("POST", "/runs/missing/contribution-facts/refresh", {})).status, 404);
 });
 
+test("after a push that recorded no PR, the preflight leaves out the open-PR limit, which may count that PR", async (t) => {
+  const f = await serve(t, { door: { viewerPermission: "READ" }, pacing: { open: 2, merged: 0 } });
+  assert.equal((await f.call("POST", `/runs/${f.run.id}/contribution-facts/refresh`, {})).status, 200);
+  const ids = async () =>
+    ((await f.call("GET", `/runs/${f.run.id}/preflight`)).body.checks as { id: string; kind: string }[]).map(
+      (check) => `${check.id}:${check.kind}`,
+    );
+  assert.ok((await ids()).includes("pacing-max:block"));
+  const before = await f.ghCalls();
+  f.run.publishCommit = f.run.baseSha;
+  f.run.publishedBranch = "fix/route0001";
+  f.run.headRepository = "test-owner/example";
+  assert.ok(!(await ids()).some((id) => id.startsWith("pacing")));
+  assert.equal(await f.ghCalls(), before);
+  // Once the PR is recorded, the run is not resuming anything.
+  f.run.prUrl = "https://github.com/test-owner/example/pull/1";
+  assert.ok((await ids()).includes("pacing-max:block"));
+});
+
 test("weakened-test reasons are saved per current item, at least 3 words each, and clear the block", async (t) => {
   const f = await serve(t);
   const skip = "tests/a.test.ts#1";

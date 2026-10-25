@@ -6,7 +6,7 @@ import {
 } from "../../shared/contribution.js";
 import { runDraftSchema } from "../drafts.js";
 import { learningExport } from "../learning-export.js";
-import { publishChecks } from "../publish.js";
+import { publishChecks, resumesPublish } from "../publish.js";
 import { currentLocale } from "../i18n/index.js";
 import type { RouteDeps } from "./types.js";
 
@@ -82,14 +82,21 @@ export function registerReviewRoutes(app: Express, { workbench }: RouteDeps) {
     const repo = workbench.store.data.repos.find(
       (value) => value.id === run.repoId,
     );
+    const checks = await publishChecks(
+      run,
+      files,
+      workbench.store.directory,
+      currentLocale(),
+      { repo },
+    );
+    // After an attempt that pushed but recorded no PR, GitHub's open count
+    // may include the PR that attempt opened. publish() records that PR
+    // before its checks and still refuses with this block when there is no
+    // such PR, so the block does not keep Send off here.
     res.json({
-      checks: await publishChecks(
-        run,
-        files,
-        workbench.store.directory,
-        currentLocale(),
-        { repo },
-      ),
+      checks: resumesPublish(run)
+        ? checks.filter((check) => check.id !== "pacing-max")
+        : checks,
     });
   });
   app.patch("/api/runs/:id/notes", async (req, res) => {
